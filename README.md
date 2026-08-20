@@ -20,3 +20,12 @@ This software provides a platform to Specify any Hardware Architecture, compile 
 6. Use all existing Architecture as Examples
 7. Develop the first version of an optimized compilation from input QASM to Hardware program
 
+
+
+# Near term goal
+
+For BBCode [[144,12,12]], what is the best Architecture?
+
+# Long term goal
+
+What is the best Code + Architecture to demonstrate breakeven?
