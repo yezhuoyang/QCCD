@@ -1,0 +1,12 @@
+import { loadPage } from './shim.mjs';
+import { PAGE_HOOK } from './drive.mjs';
+globalThis.__QCCD_SYNC = true;
+const t0 = Date.now();
+loadPage(process.argv[2], PAGE_HOOK);
+const ED = globalThis.EDITOR;
+console.log('load           ', Date.now() - t0, 'ms');
+let t = Date.now(); ED.repriceNow();
+console.log('reprice+rules  ', Date.now() - t, 'ms');
+t = Date.now(); ED.rebuild();
+console.log('full rebuild   ', Date.now() - t, 'ms');
+console.log('frames', globalThis.__page.nframes(), 'rules', JSON.stringify((ED.rules()||{}).by_rule));
