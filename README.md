@@ -2,7 +2,7 @@
 
 # QCCD
 
-**Design a trapped-ion QCCD architecture, put a program on it, and get a number back.**
+**A fault-tolerant algorithm and QCCD architecture codesign tool**
 
 [![python](https://img.shields.io/badge/python-3.10%2B-3776ab.svg)](https://www.python.org/downloads/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -10,14 +10,17 @@
 
 </div>
 
-In a QCCD machine ions are shuttled between traps to meet for gates. Every trap has a
-finite capacity, so a full trap blocks the ions behind it. Every junction an ion crosses
-heats it. And one broadcast waveform makes every site it drives do **the same thing** — so
-"move these two ions past each other" may not be a step the hardware can take at all.
+In a QCCD machine, ions are transported between traps so that they can be brought together
+for gates. Each trap holds only a limited number of ions, so an occupied trap can obstruct
+the ions behind it. Each junction an ion crosses adds motional heating. And because a single
+broadcast waveform drives every site connected to it identically, an operation as simple as
+moving two neighbouring ions past one another may not be realisable on the hardware at all.
 
-Which architecture wins therefore is not obvious: it depends on the code, on the schedule,
-and on the wiring. This is a platform for asking. Describe a device, write or compile a
-program for it, and the tool replays it, checks 23 hardware rules against it, and prices it.
+Which architecture performs best is therefore not self-evident: the answer depends jointly
+on the error-correcting code, on the transport schedule, and on the control wiring. This
+project provides a platform for answering that question quantitatively. A device is
+described declaratively, a program is written or compiled for it, and the tool then replays
+the program, evaluates twenty-three hardware rules against it, and reports its cost.
 
 ## Install
 
