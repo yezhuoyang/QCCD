@@ -1,0 +1,319 @@
+{
+  "name": "cyclone_dual_loop",
+  "schema_version": "0.3",
+  "description": "Deck p.12: one data loop and one ancilla loop, concentric. The data loop stays still while the ancilla loop rotates past it; one rotation finishes one syndrome type and two complete the ESM. One ion per trap, Data : Ancilla = 1 : 1 -- which the deck itself flags as not space efficient.",
+  "provenance": {
+    "deck": "ion_transport_deck_v3.pptx.pdf p.12",
+    "note": "couplings between the loops are left at zero: each one would make a node on BOTH loops degree 3, costing exactly what the shipped ring's dock spurs cost. Whether a gate needs transport or only adjacency is q_dual_loop_gate_mechanism."
+  },
+  "zone_types": {
+    "data": {
+      "capacity": 2,
+      "gate": false,
+      "spam": false,
+      "cool": true
+    },
+    "ancilla": {
+      "capacity": 2,
+      "gate": true,
+      "spam": true,
+      "cool": true
+    },
+    "trap": {
+      "capacity": 2,
+      "gate": true,
+      "spam": true,
+      "cool": true,
+      "note": "general-purpose trap: gate, measure and cool all available"
+    },
+    "tfactory": {
+      "capacity": 4,
+      "gate": true,
+      "spam": true,
+      "cool": true
+    },
+    "load": {
+      "capacity": 8,
+      "gate": false,
+      "spam": true,
+      "cool": true,
+      "photoionization": true
+    }
+  },
+  "primitives": {
+    "shuttle_segment": {
+      "curve": [
+        {
+          "us": 5,
+          "quanta": 0.1,
+          "table": "qccdsim_jones",
+          "source": "2510.23519",
+          "label": "t7 ion shuttling, one segment"
+        },
+        {
+          "us": 10,
+          "quanta": 0.1,
+          "table": "cyclone",
+          "source": "2511.15910",
+          "label": "move, one shuttling zone; quanta borrowed from Jones"
+        },
+        {
+          "us": 12,
+          "quanta": 1.0,
+          "table": "transport_excitation",
+          "source": "2605.25118",
+          "label": "single-ion transport, fast operating point"
+        },
+        {
+          "us": 14,
+          "quanta": 0.1,
+          "table": "transport_excitation",
+          "source": "2605.25118",
+          "label": "single-ion transport, slow operating point"
+        }
+      ]
+    },
+    "junction_cross": {
+      "curve_by_degree": {
+        "2": [
+          {
+            "us": 10,
+            "quanta": 0.5,
+            "table": "cyclone",
+            "source": "2511.15910",
+            "label": "L-junction; superseded by R18, a bend is not a junction"
+          }
+        ],
+        "3": [
+          {
+            "us": 100,
+            "quanta": 3.0,
+            "table": "qccdsim_jones",
+            "source": "2510.23519",
+            "label": "t10-t11 junction entry/exit"
+          },
+          {
+            "us": 100,
+            "quanta": 3.0,
+            "table": "cyclone",
+            "source": "2511.15910",
+            "label": "degree-3 junction crossing; quanta borrowed from Jones"
+          },
+          {
+            "us": 200,
+            "quanta": 3.0,
+            "table": "measured",
+            "source": "1210.3655",
+            "label": "~200 us one-way measured: 85 round trips in ~34 ms"
+          }
+        ],
+        "4": [
+          {
+            "us": 120,
+            "quanta": 3.0,
+            "table": "cyclone",
+            "source": "2511.15910",
+            "label": "X-junction crossing; quanta borrowed from Jones"
+          },
+          {
+            "us": 120,
+            "quanta": 3.0,
+            "table": "qccdsim_jones",
+            "source": "2511.15910",
+            "label": "Jones gives no degree-4 figure; Cyclone's is carried over"
+          }
+        ]
+      }
+    },
+    "split": {
+      "curve": [
+        {
+          "us": 80,
+          "quanta": 6.0,
+          "table": "qccdsim_jones",
+          "source": "2510.23519",
+          "label": "t8-t9 split and merge -- 60x a shuttle in heating"
+        },
+        {
+          "us": 80,
+          "quanta": 6.0,
+          "table": "cyclone",
+          "source": "2511.15910",
+          "label": "split; quanta borrowed from Jones (Cyclone charges none)"
+        },
+        {
+          "us": 30,
+          "quanta": 1.0,
+          "table": "transport_excitation",
+          "source": "2605.25118",
+          "label": "fast split, n~1"
+        },
+        {
+          "us": 40,
+          "quanta": 0.1,
+          "table": "transport_excitation",
+          "source": "2605.25118",
+          "label": "slow split, n~0.1"
+        }
+      ]
+    },
+    "merge": {
+      "curve": [
+        {
+          "us": 80,
+          "quanta": 6.0,
+          "table": "qccdsim_jones",
+          "source": "2510.23519"
+        },
+        {
+          "us": 80,
+          "quanta": 6.0,
+          "table": "cyclone",
+          "source": "2511.15910"
+        },
+        {
+          "us": 30,
+          "quanta": 1.0,
+          "table": "transport_excitation",
+          "source": "2605.25118"
+        },
+        {
+          "us": 40,
+          "quanta": 0.1,
+          "table": "transport_excitation",
+          "source": "2605.25118"
+        }
+      ]
+    },
+    "ion_swap": {
+      "curve": [
+        {
+          "us": 18,
+          "quanta": 1.0,
+          "table": "transport_excitation",
+          "source": "2605.25118"
+        },
+        {
+          "us": 20,
+          "quanta": 0.1,
+          "table": "transport_excitation",
+          "source": "2605.25118"
+        }
+      ]
+    },
+    "gate_swap": {
+      "gates": 3,
+      "note": "3 CX, distance-independent; R14's hidden cost of splitting off-edge",
+      "source": "2510.23519"
+    },
+    "ms_gate": {
+      "us": 25,
+      "fidelity_at_n0": 0.99816,
+      "error_vs_quanta": "linear:2.0e-3",
+      "max_quanta": 1.0,
+      "source": "2305.03828",
+      "note": "1.84e-3 two-qubit infidelity measured on H2 (2305.03828). max_quanta is R7's gate budget; PLAN \u00a70.4 puts it at 1-2 quanta, 1.0 is the strict end"
+    },
+    "1q_gate": {
+      "us": 5,
+      "fidelity": 0.999975,
+      "source": "2305.03828"
+    },
+    "measure": {
+      "us": 120,
+      "fidelity": 0.9984,
+      "source": "2305.03828"
+    },
+    "reset": {
+      "us": 50,
+      "error": 0.005,
+      "source": "2510.23519"
+    },
+    "cool": {
+      "us": 300,
+      "removes_quanta": "all",
+      "broadcastable": true,
+      "scope": "global",
+      "source": "2606.06455",
+      "note": "Doppler sheet beams cover the whole trap, so one cooling operation cools every ion: it costs schedule time but does not serialize per ion (R7c)"
+    }
+  },
+  "heating": {
+    "anomalous_rate_quanta_per_ms": 0.05,
+    "note": "R17: ndot = S_E(w) e^2 / 4 m hbar w, accruing whether or not the ion moves. Device-specific and unmeasured for the target trap -- q_heating_rate_measurement",
+    "source": "2605.25118"
+  },
+  "species": {
+    "qubit": "Ba+",
+    "coolant": "Sr+",
+    "sympathetic": true,
+    "coolant_fraction": 0.5,
+    "T_coh_s": 600,
+    "source": "2510.23519"
+  },
+  "budget": {
+    "max_dacs": 128,
+    "max_junctions": 200,
+    "max_area_mm2": 100,
+    "junction_electrode_multiplier": 2
+  },
+  "geometry": {
+    "generator": "dual_loop",
+    "params": {
+      "width": 36
+    }
+  },
+  "control": {
+    "model": "simd_classes",
+    "classes": {
+      "generator": "x_junction_grid",
+      "count": 18,
+      "note": "12 directional shifts + 6 directional swaps (JT-SIMD, 2504.17886)",
+      "extra": [
+        {
+          "id": "rotate_cw",
+          "type": "shift",
+          "orbit": "A",
+          "delta": 1,
+          "note": "the ancilla loop rotates; the data loop does not move"
+        },
+        {
+          "id": "rotate_ccw",
+          "type": "shift",
+          "orbit": "A",
+          "delta": -1
+        },
+        {
+          "id": "shuttle",
+          "type": "shift",
+          "orbit": "any",
+          "note": "one ion, one trap to the next; the lowest common denominator move"
+        }
+      ]
+    },
+    "max_simd_classes_per_cycle": 1,
+    "intra_inter_exclusive": true,
+    "wiring": {
+      "scheme": "broadcast_groups",
+      "dacs_dynamic": 6,
+      "shim_per_dac": 100,
+      "electrodes_per_trap": 24,
+      "electrodes_per_junction": 48,
+      "compensation_electrodes_per_trap": 8
+    },
+    "optical": {
+      "addressing": "global_beam",
+      "per_zone_switch": true
+    },
+    "channels": {
+      "grouping": "broadcast",
+      "roles": {
+        "linear_h": 6,
+        "linear_v": 6,
+        "junction": 4
+      },
+      "differential": 2,
+      "switch_per_site": true
+    }
+  }
+}

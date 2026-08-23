@@ -10,6 +10,15 @@ Among the most popular design are Grid QCCD (Ion Traps put in the Middle of the 
 This software provides a platform to Specify any Hardware Architecture, compile any QASM program, and evaluate the Performance.
 
 
+
+In "ion_transport_deck_v3.pptx.pdf"
+
+Page 13-15 indicated the primitive movement of the ions 
+The limitations:
+1. Only EXACT the same operations can be implemented at the same time (eg. page 15 case 2, step 1)
+2. The vertical green dash lines in the visualization I showed (attached .html file) are shuttling lines. The number of them can be different, in the demo we set it as 24 and therefore we have 24 ancilla ions. The existence of the vertical lines will increase the number of junctions, therefore increase the cost. But too few vertical lines will increase the number of rotations needed for ESM, so it's a tradeoff.
+
+
 # Plan
 
 1. Make design plan and Scope
