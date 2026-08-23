@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+
+# Generated programs and reports; regenerate with `python -m qccd regen`
+out/
+
+# A stray generated studio page at the repo root; the real one is out/studio.html
+/studio.html
+
+# The paper corpus: ~1.1 GB of third-party PDFs and arXiv tarballs, re-downloadable
+# and not this project's work.
+Library/
+
+# The knowledge graph. `Knowledge/kg/db` alone is 126 MB -- past GitHub's 100 MB per-file
+# limit, so a push carrying it is refused -- and it is rebuilt from the YAML notes by
+# `Knowledge/kg/build.py`.
+Knowledge/
