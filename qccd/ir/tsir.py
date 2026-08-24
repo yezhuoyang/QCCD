@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Iterable, Iterator, Mapping, Sequence
 
 __all__ = [
+    "iter_operands",
     "Participant",
     "Instruction",
     "TSIR",
@@ -95,7 +96,19 @@ class Instruction:
     holds: tuple[str, ...] = ()  # resources occupied over [t0, t1)
 
     # --- gates / SPAM ------------------------------------------------------
-    gate: str | None = None  # "MS" | "CX" | "SWAP" | ...
+    gate: str | None = None  # "MS" | "CX" | "SWAP" | "R" | ...
+    #: How many ions one instance of this gate acts on.  `None` infers it the way the
+    #: IR always has -- `pairs`, or two `ions` -- which keeps every existing document
+    #: reading exactly as before.  `arity=1` says the `ions` list is a BATCH of
+    #: single-qubit gates driven together, one per ion, which is what lets 144 beams at
+    #: 144 different traps be one machine cycle instead of 144 of them.  Without it the
+    #: two-ion spelling would be ambiguous between "one pair" and "two singles".
+    arity: int | None = None
+    #: Gate parameters, one tuple per operand, aligned with `pairs` or with `ions`.
+    #: `R` without an angle is not a hardware instruction, so a compiler that emits
+    #: native pulses has to be able to say which rotation it means; an imported schedule
+    #: that names logical gates carries none and this stays empty.
+    params: tuple[tuple[float, ...], ...] = ()
     pairs: tuple[tuple[str, str], ...] = ()
     ions: tuple[str, ...] = ()
     sites: tuple[str, ...] = ()
@@ -155,6 +168,10 @@ class Instruction:
             d["holds"] = list(self.holds)
         if self.gate is not None:
             d["gate"] = self.gate
+        if self.arity is not None:
+            d["arity"] = self.arity
+        if self.params:
+            d["params"] = [list(p) for p in self.params]
         if self.pairs:
             d["pairs"] = [list(p) for p in self.pairs]
         if self.ions:
@@ -191,6 +208,8 @@ class Instruction:
             participants=tuple(Participant.from_json(p) for p in d.get("participants", ())),
             holds=tuple(str(h) for h in d.get("holds", ())),
             gate=d.get("gate"),
+            arity=d.get("arity"),
+            params=tuple(tuple(float(x) for x in p) for p in d.get("params", ())),
             pairs=pairs,
             ions=tuple(str(i) for i in d.get("ions", ())),
             sites=tuple(str(s) for s in d.get("sites", ())),
@@ -347,8 +366,19 @@ def validate_program(prog: TSIR) -> list[str]:
             if instr.mode not in ("intra", "inter"):
                 errors.append(f"{where}: simd mode must be 'intra' or 'inter' (R4b)")
         if instr.type == "gate":
-            if not instr.pairs and len(instr.ions) != 2:
-                errors.append(f"{where}: gate needs `pairs` or exactly two `ions`")
+            # A gate carries either `pairs` (many co-located two-qubit gates driven
+            # together), exactly two `ions` (the other spelling of one pair), or exactly
+            # one `ion` -- a single-qubit gate.  The one-operand form exists because a
+            # compiler from a general circuit has to be able to say "rotate this ion";
+            # without it the IR could express an ESM schedule and nothing else.
+            if instr.arity == 1:
+                if not instr.ions:
+                    errors.append(f"{where}: arity=1 gate carries no `ions`")
+                if instr.pairs:
+                    errors.append(f"{where}: arity=1 gate must not carry `pairs`")
+            elif not instr.pairs and len(instr.ions) not in (1, 2):
+                errors.append(
+                    f"{where}: gate needs `pairs`, two `ions`, or one `ion`")
             if instr.gate is None:
                 errors.append(f"{where}: gate carries no gate name")
     if seen and prog.id_seq <= max(seen):
@@ -364,11 +394,36 @@ def validate_program(prog: TSIR) -> list[str]:
 
 
 def iter_pairs(instr: Instruction) -> Iterable[tuple[str, str]]:
-    """The gate's operand pairs, whether written as `pairs` or as two `ions`."""
+    """The gate's *two-qubit* operand pairs, written as `pairs` or as two `ions`.
+
+    A one-qubit gate yields nothing here, which is what every two-qubit rule wants: R6b
+    has no co-location to check, R7 has no pair whose hotter ion sets the error.  Use
+    `iter_operands` for the checks that apply to a gate of any arity.
+    """
+    if instr.arity == 1:
+        return
     if instr.pairs:
         yield from instr.pairs
     elif len(instr.ions) == 2:
         yield (instr.ions[0], instr.ions[1])
+
+
+def iter_operands(instr: Instruction) -> Iterable[tuple[str, ...]]:
+    """Every operand tuple of a gate, of either arity.
+
+    Two-qubit gates come back as pairs, one-qubit gates as singletons.  R6 (does this
+    zone permit a gate at all) and R12 (one gate per trap per cycle) are about the
+    *operation*, not about its arity, so they read this.
+    """
+    if instr.arity == 1:
+        for ion in instr.ions:
+            yield (ion,)
+    elif instr.pairs:
+        yield from instr.pairs
+    elif len(instr.ions) == 2:
+        yield (instr.ions[0], instr.ions[1])
+    elif len(instr.ions) == 1:
+        yield (instr.ions[0],)
 
 
 def total_participants(instrs: Sequence[Instruction]) -> int:
