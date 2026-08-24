@@ -29,6 +29,31 @@ C7 is ◐ because Cyclone's external oracle is still unattempted, not because th
 route at all, it stops at 46% loop occupancy — in 776 hops against the shipped Python
 pipeline's 2 672, with all 20 checkable rules and R10 `passed`:
 
+### Watching one run
+
+`--qasm` gives the animated page a second listing -- the circuit -- and steps it with the
+hardware. The statement the executing instruction is discharging is lit; the statements a
+shuttle is travelling towards are shaded; clicking a statement jumps to the instruction
+that discharges it. `python -m qccd studio --tsir ... --qasm ...` opens the same thing
+inside the design tool.
+
+```bash
+python bridge/render.py build/out/steane.cooled.tsir.json \
+    --arch arch/grid9x9.arch.json --qasm examples/steane_esm.qasm \
+    -o ../out/compiled/steane_debug.html
+#   circuit: 36 statements, 55 instructions discharge one and 21 shuttle towards one
+```
+
+The join is *checked*, not asserted. Every instruction carries `meta.op` -- the circuit
+operations it serves, stamped as the compiler emitted it -- because the certificate's gate
+witnesses are far too sparse to drive a page (10 of 50 gate instructions on
+`steane_esm/grid9x9`; 690 of 3,018 on the BB rotation schedule). Those sparse witnesses
+are then used to *verify* the dense stamps: if any witness disagrees with the stamp on the
+instruction it names, `qccd.ir.source_map` raises and nothing is drawn. Building it that
+way immediately found that a witness's `instr` field had always named the last instruction
+of the whole layer rather than one that performs the operation -- harmless while nothing
+read it, wrong the moment something did.
+
 `compile` reaches it on its own -- rotation is tried only after the general router
 declines, so it can add programs that compile but never change one that already did:
 

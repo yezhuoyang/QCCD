@@ -127,6 +127,7 @@ def build_view_model(
     provenance: str = "sites",
     template_stems: Sequence[str] | str | None = None,
     metal: dict | None = None,
+    source: dict | None = None,
 ) -> dict:
     """Everything the page needs, as plain JSON.
 
@@ -141,6 +142,14 @@ def build_view_model(
       program listing joins on;
     * `control` -- one deduplicated control-plane record per instruction from
       `qccd.verify.control`, plus one integer per frame pointing into the table.
+
+    `source` is the fourth, and it is optional because only a COMPILED program has one:
+    the circuit the program came from, its text, and which source operation each
+    hardware instruction realises. A hand-written program answers "what is executing"
+    with the instruction alone; a compiled one has a second answer -- which line of the
+    user's QASM this pulse is discharging -- and that is the answer somebody debugging a
+    compiler actually wants. `Compiler/bridge/animate.py` builds it from the certificate,
+    so the join is one the Lean checker has already verified.
     """
     dev = arch.device
     corners = dev.all_corners
@@ -338,6 +347,7 @@ def build_view_model(
         },
         "listing": prog_listing,
         "control": ctl,
+        "source": source,
         # ---- everything the CLIENT-SIDE EDITOR needs, and nothing it does not --------
         #
         # The drawing shape above is LOSSY on purpose -- it drops `Loop.closed`, `kind`
@@ -750,6 +760,17 @@ text-transform:uppercase}
   border-radius:6px;padding:5px 7px;cursor:pointer;margin-bottom:2px}
 .grip:hover{color:var(--accent);border-color:var(--accent)}
 .rail{position:relative}
+/* The source pane. `.ql` mirrors `.al` (the architecture listing) so the two read the
+   same; `.qh` is the statement the executing instruction is discharging and `.qw` one it
+   is still travelling towards, which is the distinction somebody debugging a router
+   needs at a glance. */
+.ql .n{color:var(--muted);text-align:right;min-width:34px;padding-right:8px;
+  font-variant-numeric:tabular-nums}
+.ql .a{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.ql.qh{background:color-mix(in srgb,var(--active) 26%,transparent)}
+.ql.qw{background:color-mix(in srgb,var(--active) 10%,transparent)}
+.ql.qz .a{color:var(--muted)}
+.tab.off{display:none}
 .pal{border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--panel)}
 .palfold>summary{list-style:none;cursor:pointer;font-size:11.5px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);font-weight:600;padding:1px 0}
@@ -1081,6 +1102,7 @@ textarea.src.out{min-height:120px;opacity:.85}
               aria-expanded="true">&#9654;</button>
       <div class="tabs" id="tabs">
         <button class="tab on" id="tabP">Program</button>
+        <button class="tab off" id="tabQ">Circuit</button>
         <button class="tab" id="tabA">Architecture</button>
         <button class="tab" id="tabM">Machine</button>
         <button class="tab" id="tabW">Write</button>
@@ -1104,6 +1126,21 @@ textarea.src.out{min-height:120px;opacity:.85}
             <button class="chip off" id="pChip"></button>
           </div>
           <footer class="pf" id="pFoot"></footer>
+        </section>
+
+        <section class="pane card" id="paneQ">
+          <header class="ph"><h3>Source circuit</h3><span class="sub" id="qCount"></span>
+            <span class="grow"></span>
+            <button class="tgl on" id="qFollow" aria-pressed="true"
+                    title="keep the statement being executed in view">Follow</button>
+          </header>
+          <div class="now" id="qNow"></div>
+          <div class="wrapl">
+            <div class="lst" id="qScroll">
+              <div class="pad" id="qPad"><div class="win" id="qWin"></div></div>
+            </div>
+          </div>
+          <footer class="pf" id="qFoot"></footer>
         </section>
 
         <section class="pane card" id="paneA">
@@ -2469,9 +2506,14 @@ function makeList(scId, padId, winId, opt){
     }
     T.mark();
   };
+  // `rowCls` lets a list colour a row from state the row itself does not carry -- the
+  // source pane marks whichever lines the CURRENT instruction is discharging, which
+  // changes on every step while the rows do not.  Applied here rather than in `render`
+  // because marking runs on every cursor move and rendering only on scroll.
   T.mark=()=>{ const base=opt.cls||'ln';
     for(const r of pool) r.className = base+(r._bnd?' bnd':'')
-      +(r._i===cur?' cur':'')+(r._i===sel?' sel':''); };
+      +(r._i===cur?' cur':'')+(r._i===sel?' sel':'')
+      +(opt.rowCls && r._i>=0 ? opt.rowCls(r._i) : ''); };
   T.scrollToRow=(i,where)=>{
     const max=Math.max(0, n*ROW_H - T.height);
     const t=Math.max(0, Math.min(max,
@@ -2690,6 +2732,7 @@ function nowHTML(f){
       +(q!=null?' &middot; &Delta;n&#772; '+(q>=0?'+':'')+fmt(q,1):'')
       +(pt?' &middot; '+esc(pt):'')+'</span>';
   }
+  h += qInlineHTML(f);
   h += ctlHTML(f);
   return h;
 }
@@ -2853,21 +2896,124 @@ function syncCursor(force){
   ALIST.setCursor(archRowFor(f));
   document.getElementById('pNow').innerHTML = nowHTML(f);
   document.getElementById('pFoot').innerHTML = srcHTML(f);
+  if(QLIST){
+    QMARK = qMarksFor(f);
+    const ln = qFirstLine(QMARK);
+    QLIST.setCursor(ln>0 ? ln-1 : -1);      // setCursor always re-marks, so qRowCls runs
+    document.getElementById('qNow').innerHTML = qNowHTML(f);
+  }
   updateChip();
   const ph=document.getElementById('playhead');
   if(ph) ph.style.left = (100*frame/Math.max(1,P.frames.length-1))+'%';
 }
 
+// ======================================================================
+//  THE SOURCE CIRCUIT -- which QASM statement this pulse is discharging
+//
+//  A hand-written program answers "what is executing?" with the instruction and
+//  nothing else.  A COMPILED one has a second answer, and it is the one somebody
+//  debugging a compiler wants: which line of their circuit this pulse is for, and
+//  -- while the machine is only shuttling -- which line it is travelling towards.
+//
+//  The join arrives in `D.source`, built from the compiler's certificate.  That
+//  matters: the certificate is the artifact the Lean checker decides, so "this
+//  instruction realises op 14" is a claim something has verified, not a label the
+//  compiler attached to its own output for the benefit of a pretty page.
+// ======================================================================
+const SRC = D.source || null;
+let QLIST = null, QMARK = null;
+
+const QOP = {}, QOPLINE = {}, QINSTR = {}, FIDX = {};
+if(SRC){
+  for(const o of SRC.ops){ QOP[o.i]=o; (QOPLINE[o.line] || (QOPLINE[o.line]=[])).push(o.i); }
+  for(const k in SRC.realises)
+    for(const oi of SRC.realises[k]) (QINSTR[oi] || (QINSTR[oi]=[])).push(+k);
+  for(let i=0;i<P.frames.length;i++) FIDX[P.frames[i].id] = i;
+}
+
+// line -> 2 (a statement this instruction realises) | 1 (one it is moving towards)
+function qMarksFor(f){
+  const m = {};
+  if(!SRC) return m;
+  for(const oi of (SRC.toward[f.id] || [])){ const o=QOP[oi]; if(o && !m[o.line]) m[o.line]=1; }
+  for(const oi of (SRC.realises[f.id] || [])){ const o=QOP[oi]; if(o) m[o.line]=2; }
+  return m;
+}
+function qFirstLine(m){
+  let best=-1, rank=0;
+  for(const k in m){ const L=+k;
+    if(m[k]>rank || (m[k]===rank && (best<0||L<best))){ rank=m[k]; best=L; } }
+  return best;
+}
+function qOpHTML(oi){
+  const o=QOP[oi];
+  if(!o) return '';
+  return '<b>'+esc(o.name)+'</b> '+o.q.map(q=>'q['+q+']').join(',')
+    + (o.p && o.p.length ? '<i class="mut">('+o.p.map(x=>fmt(x,3)).join(',')+')</i>' : '')
+    + ' <span class="mut">:'+o.line+'</span>';
+}
+function qListHTML(ids, cap){
+  return ids.slice(0,cap).map(qOpHTML).join(' &middot; ')
+    + (ids.length>cap ? ' <i class="mut">+'+(ids.length-cap)+' more</i>' : '');
+}
+function qNowHTML(f){
+  if(!SRC) return '';
+  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [];
+  if(now.length) return '<b>executing</b> &nbsp;'+qListHTML(now,3);
+  if(soon.length) return '<span class="mut">shuttling towards</span> &nbsp;'+qListHTML(soon,3);
+  return '<i class="mut">no circuit statement &mdash; '+esc(f.type)
+    + ' is the compiler&#39;s own bookkeeping</i>';
+}
+// the one-line version, for the hardware pane, so the answer is there without changing
+// tabs -- which is the whole point of putting the two side by side
+function qInlineHTML(f){
+  if(!SRC) return '';
+  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [];
+  if(now.length) return '<br><span class="mut">circuit &rarr;</span> '+qListHTML(now,2);
+  if(soon.length) return '<br><span class="mut">circuit &rarr; towards</span> '+qListHTML(soon,2);
+  return '';
+}
+function qRowCls(row){
+  const L=row+1, k=(QMARK||{})[L];
+  return (k===2?' qh':(k===1?' qw':'')) + (QOPLINE[L]?'':' qz');
+}
+function renderSrcRow(r,row){
+  const k=r._k;
+  k[0].textContent = String(row+1);
+  k[1].textContent = SRC.lines[row] || '';
+  const ops = QOPLINE[row+1];
+  r._ref = ops ? {kind:'op', id:ops[0]} : null;
+}
+// Click a statement, land on the instruction that discharges it.  The inverse of the
+// cursor, and the direction a compiler bug is usually chased in: you know which gate
+// looks wrong, you want to see what the machine did about it.
+function pickSrc(row){
+  const ops = QOPLINE[row+1];
+  if(!ops) return;
+  let best = -1;
+  for(const oi of ops) for(const id of (QINSTR[oi] || [])){
+    const fi = FIDX[id];
+    if(fi!=null && (best<0 || fi<best)) best = fi;
+  }
+  if(best<0) return;
+  stop(); frame=best; phase=1; slider.value=String(frame); draw();
+}
+
 // ---------- panes ----------
 function setPane(which){
   PANE=which;
-  for(const k of ['P','A','M','W','R']){
+  for(const k of ['P','Q','A','M','W','R']){
     document.getElementById('pane'+k).className = 'pane card'+(k===which?' on':'');
-    document.getElementById('tab'+k).className = 'tab'+(k===which?' on':'');
+    // `off` is not decoration: it is what keeps the Circuit tab out of the way of every
+    // hand-written programme, and setPane runs on every tab click, so it has to be
+    // reasserted here or the first click reveals a tab with nothing behind it.
+    document.getElementById('tab'+k).className = 'tab'+(k===which?' on':'')
+      + (k==='Q' && !SRC ? ' off' : '');
   }
   sizeLists();
 }
 document.getElementById('tabP').onclick=()=>setPane('P');
+document.getElementById('tabQ').onclick=()=>setPane('Q');
 document.getElementById('tabA').onclick=()=>setPane('A');
 document.getElementById('tabM').onclick=()=>setPane('M');
 document.getElementById('tabW').onclick=()=>setPane('W');
@@ -2905,6 +3051,8 @@ function sizeLists(){
   document.getElementById('pScroll').style.height = h+'px';
   document.getElementById('aScroll').style.height = h+'px';
   PLIST.measure(); ALIST.measure(); PLIST.paint(true); ALIST.paint(true);
+  if(QLIST){ document.getElementById('qScroll').style.height = h+'px';
+             QLIST.measure(); QLIST.paint(true); }
 }
 
 // ---------- build ----------
@@ -2913,6 +3061,23 @@ PLIST = makeList('pScroll','pPad','pWin', {render:renderProgRow, onPick:pickProg
                 b.className='tgl'+(v?' on':''); b.setAttribute('aria-pressed', v?'true':'false'); }});
 ALIST = makeList('aScroll','aPad','aWin', {render:renderArchRow, onPick:pickArch,
   cells:['i','a'], cls:'al', userScrollBreaksFollow:false});
+if(SRC){
+  QLIST = makeList('qScroll','qPad','qWin', {render:renderSrcRow, onPick:pickSrc,
+    cells:['n','a'], cls:'ql', rowCls:qRowCls,
+    onFollow:v=>{ const b=document.getElementById('qFollow');
+      b.className='tgl'+(v?' on':''); b.setAttribute('aria-pressed', v?'true':'false'); }});
+  QLIST.setCount(SRC.lines.length);
+  document.getElementById('tabQ').className = 'tab';
+  document.getElementById('qCount').textContent =
+    SRC.ops.length+' statements \u00b7 '+SRC.lines.length+' lines';
+  document.getElementById('qFoot').innerHTML =
+    '<i class="mut">'+esc(SRC.name)+' \u2014 click a statement to jump to the instruction '
+    + 'that discharges it</i>';
+  document.getElementById('qFollow').onclick=()=>{
+    QLIST.setFollow(!QLIST.follow);
+    if(QLIST.follow) syncCursor(true);
+  };
+}
 document.getElementById('pFollow').onclick=()=>{
   PLIST.setFollow(!PLIST.follow);
   if(PLIST.follow && VIEWPOS[frame]>=0) PLIST.scrollToRow(VIEWPOS[frame], CENTRE);
@@ -3070,12 +3235,14 @@ def render_html(
     provenance: str = "sites",
     template_stems: "Sequence[str] | str | None" = None,
     metal: dict | None = None,
+    source: dict | None = None,
 ) -> Path:
     """Write the self-contained page.  Returns the path written."""
     view = build_view_model(arch, prog, res, model, max_frames=max_frames,
                             kicker=kicker, headline=headline, lede=lede,
                             control=control, provenance=provenance,
-                            template_stems=template_stems, metal=metal)
+                            template_stems=template_stems, metal=metal,
+                            source=source)
     html = _TEMPLATE.replace("__TITLE__", f"{arch.name} - {prog.name}")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__DATA__", _escape_blob(json.dumps(view, separators=(",", ":"))))

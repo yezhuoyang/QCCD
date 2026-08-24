@@ -47,9 +47,14 @@ $PY bridge/gen_examples.py -o examples >/dev/null 2>&1
 $PY bridge/run_matrix.py --json build/matrix.json || fail=1
 
 banner "Animations"
+# --qasm adds the CIRCUIT pane: the source statement each instruction is discharging,
+# stepped with the hardware.  The join is checked against the certificate before it is
+# drawn, so a page that renders at all is one whose attribution agrees with the witnesses
+# the Lean checker decided.
 for pair in steane_esm:grid9x9 surface17_esm:ring144_24v ghz16:cyclone_base; do
   c=${pair%%:*}; d=${pair##*:}
-  $PY bridge/render.py "build/out/${c}_$d.cooled.tsir.json" --arch "arch/$d.arch.json"     -o "../out/compiled/${c}_$d.html" 2>/dev/null | tail -1
+  $PY bridge/render.py "build/out/${c}_$d.cooled.tsir.json" --arch "arch/$d.arch.json" \
+      --qasm "examples/$c.qasm" -o "../out/compiled/${c}_$d.html" 2>&1 | tail -2
 done
 
 banner "C7: where the general router's range ends, and rigid rotation past it"

@@ -66,6 +66,9 @@ type circuit_op = {
   (* the angles too: without them a `cu1(pi/4)` in the certificate is indistinguishable
      from a `cu1(pi)`, and the unitary check has no defining matrix to compare against *)
   oparams : float list;
+  (* the line of the QASM file this op was written on, so a debugger can put the
+     hardware instruction and the source statement side by side *)
+  osrc : int;
 }
 
 type t = {
@@ -130,6 +133,7 @@ let to_json (c : t) : json =
                    ("name", `String o.oname);
                    ("qubits", `List (List.map (fun q -> `Int q) o.oqubits));
                    ("params", `List (List.map (fun x -> `Float x) o.oparams));
+                   ("line", `Int o.osrc);
                  ])
              c.circuit_ops) );
       ( "map",

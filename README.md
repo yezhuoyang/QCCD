@@ -241,6 +241,30 @@ rule but to prove the exemption — `Cert/Commute.lean` proves two `cx` gates co
 they share a control with distinct targets, or a target with distinct controls, and exhibits
 a state where a control/target chain does not.
 
+### Watching one run
+
+A hand-written program answers *what is executing?* with the instruction. A compiled one
+has a second answer, and it is the one that makes the page a debugger: **which statement of
+your circuit that instruction is discharging** -- or, while the machine is only shuttling,
+which statement it is travelling towards. Pass `--qasm` and the page carries both listings
+and steps them together; click a statement to jump to the instruction that discharges it.
+
+```bash
+cd Compiler
+python bridge/render.py build/out/steane.cooled.tsir.json \
+    --arch arch/grid9x9.arch.json --qasm examples/steane_esm.qasm \
+    -o ../out/compiled/steane.html
+
+cd .. && python -m qccd studio \
+    --tsir Compiler/build/out/steane.cooled.tsir.json \
+    --qasm Compiler/examples/steane_esm.qasm -o out/studio.html
+```
+
+The correspondence is checked before it is drawn. Every instruction carries the circuit
+operations it serves, stamped as the compiler emitted it; the certificate's gate witnesses
+-- the ones the Lean checker decides -- are then used to verify those stamps, and a
+disagreement refuses the page rather than illustrating it.
+
 Full design notes, the SAT routing oracle, and the measured (runtime, error) frontier:
 [Compiler/PLAN.md](Compiler/PLAN.md) · [Compiler/README.md](Compiler/README.md).
 

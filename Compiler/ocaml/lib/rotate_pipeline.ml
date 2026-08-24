@@ -144,7 +144,31 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
   let prog = ref Tsir.{ name = c.name; arch_spec = arch_path; instructions = [];
                         metrics = []; prog_meta = []; id_seq = 0 } in
   let fresh () = let n, p = Tsir.next_id !prog in prog := p; n in
-  let add i = prog := { !prog with instructions = !prog.instructions @ [ i ] } in
+  (* The instruction a gate witness names ought to be one that actually performs the
+     operation.  It used to be `id_seq - 1` -- the last instruction of the whole LAYER --
+     which nothing read, so nothing noticed; the moment the animation joined on it, a
+     witness for op 5 pointed at a pulse belonging to ops 11, 22 and 32.  Recording the
+     last instruction stamped with each op keeps the field honest by construction. *)
+  let last_instr : (int, int) Hashtbl.t = Hashtbl.create 64 in
+  let note_instr (i : Tsir.instr) =
+    match List.assoc_opt "op" i.meta with
+    | Some (`List l) ->
+      List.iter (function `Int oi -> Hashtbl.replace last_instr oi i.id | _ -> ()) l
+    | _ -> ()
+  in
+  let add (i : Tsir.instr) =
+    note_instr i;
+    prog := { !prog with instructions = !prog.instructions @ [ i ] }
+  in
+  (* Which circuit operation is this instruction for?  See the note in `compile.ml`: the
+     certificate names one instruction per gate, a `cx` is seven pulses, and a debugger
+     wants an answer for all seven -- and for the rotation that brought the ions
+     together. *)
+  let op_meta (ids : int list) : (string * Yojson.Safe.t) list =
+    match List.sort_uniq compare ids with
+    | [] -> []
+    | l -> [ ("op", `List (List.map (fun i -> `Int i) l)) ]
+  in
   let blank = Tsir.{ ityp = ""; id = 0; cls = None; mode = None; template = None;
                      participants = []; holds = []; gate = None; arity = None;
                      params = []; pairs = []; ions = []; sites = []; broadcast = false;
@@ -173,7 +197,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
   let cert_rots = ref [] in
   let cert_gates = ref [] in
 
-  let rotate delta =
+  let rotate ?(ops = []) delta =
     if delta <> 0 then begin
       cert_rots :=
         Cert.{ rcycle = !cyc; rloop = cv.loop; rdelta = delta } :: !cert_rots;
@@ -185,7 +209,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
                                            ("loop", `String cv.loop);
                                            ("delta", `Int delta) ]);
                  holds = cv.loop :: cv.rail_segs;
-                 meta = [ ("kind", `String "rotate") ] };
+                 meta = [ ("kind", `String "rotate") ] @ op_meta ops };
       x.offset <- ((x.offset + delta) mod cv.n + cv.n) mod cv.n;
       incr n_rot;
       n_hops := !n_hops + abs delta
@@ -202,6 +226,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
      syndrome round contains both `cx anc,data` and `cx data,anc`. *)
   let contact (pairs4 : (string * Conveyor.dock * string * int * bool) list) =
     if pairs4 <> [] then begin
+      let batch_ops = List.map (fun (_, _, _, dag, _) -> dag) pairs4 in
       let dock_moves dir =
         List.map
           (fun (rider, (d : Conveyor.dock), _, _, _) ->
@@ -211,7 +236,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
       in
       add Tsir.{ blank with ityp = "simd"; id = fresh (); cls = Some cv.dock_cls;
                  mode = Some "inter"; participants = dock_moves true;
-                 meta = [ ("kind", `String "dock") ] };
+                 meta = [ ("kind", `String "dock") ] @ op_meta batch_ops };
       List.iter
         (fun (rider, (d : Conveyor.dock), _, _, _) ->
           cert_moves :=
@@ -247,24 +272,25 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
       for k = 0 to rounds - 1 do
         let beams = ref [] and mss = ref [] and vzs = ref [] in
         List.iter
-          (fun ((d : Conveyor.dock), _, _, _, ps) ->
+          (fun ((d : Conveyor.dock), dag, _, _, ps) ->
             if k < List.length ps then
               match List.nth ps k with
-              | `Beam (th, ph, i) -> beams := (i, d.site, [ th; ph ]) :: !beams
-              | `Ms (th, u, v) -> mss := ((u, v), d.site, [ th ]) :: !mss
-              | `Frame (l, i) -> vzs := (i, d.site, [ l ]) :: !vzs)
+              | `Beam (th, ph, i) -> beams := (i, d.site, [ th; ph ], dag) :: !beams
+              | `Ms (th, u, v) -> mss := ((u, v), d.site, [ th ], dag) :: !mss
+              | `Frame (l, i) -> vzs := (i, d.site, [ l ], dag) :: !vzs)
           seqs;
         let emit_batch gate arity items pairs_of =
           if items <> [] then begin
             add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some gate; arity;
                        mode = Some "intra";
-                       ions = (if arity = Some 1 then List.rev_map (fun (i, _, _) -> i) items
-                               else []);
+                       ions = (if arity = Some 1
+                               then List.rev_map (fun (i, _, _, _) -> i) items else []);
                        pairs = pairs_of items;
-                       params = List.rev_map (fun (_, _, p) -> p) items;
+                       params = List.rev_map (fun (_, _, p, _) -> p) items;
                        sites = List.sort_uniq compare
-                           (List.rev_map (fun (_, s, _) -> s) items);
-                       meta = [ ("round", `Int k) ] };
+                           (List.rev_map (fun (_, s, _, _) -> s) items);
+                       meta = [ ("round", `Int k) ]
+                              @ op_meta (List.rev_map (fun (_, _, _, g) -> g) items) };
             incr cyc
           end
         in
@@ -273,25 +299,30 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
         if !mss <> [] then begin
           add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "MS";
                      mode = Some "intra";
-                     pairs = List.rev_map (fun (p, _, _) -> p) !mss;
-                     params = List.rev_map (fun (_, _, p) -> p) !mss;
+                     pairs = List.rev_map (fun (p, _, _, _) -> p) !mss;
+                     params = List.rev_map (fun (_, _, p, _) -> p) !mss;
                      sites = List.sort_uniq compare
-                         (List.rev_map (fun (_, s, _) -> s) !mss);
-                     meta = [ ("kind", `String "contact"); ("round", `Int k) ] };
+                         (List.rev_map (fun (_, s, _, _) -> s) !mss);
+                     meta = [ ("kind", `String "contact"); ("round", `Int k) ]
+                            @ op_meta (List.rev_map (fun (_, _, _, g) -> g) !mss) };
           incr cyc
         end
       done;
       List.iter
         (fun ((d : Conveyor.dock), dag, rider, partner, _) ->
           cert_gates :=
-            Cert.{ dag; instr = !prog.id_seq - 1; cycle = !cyc - 1; site = d.site;
+            Cert.{ dag;
+                   instr =
+                     (try Hashtbl.find last_instr dag
+                      with Not_found -> !prog.id_seq - 1);
+                   cycle = !cyc - 1; site = d.site;
                    operands = [ rider; partner ]; pulses = [] }
             :: !cert_gates)
         seqs;
 
       add Tsir.{ blank with ityp = "simd"; id = fresh (); cls = Some cv.undock_cls;
                  mode = Some "inter"; participants = dock_moves false;
-                 meta = [ ("kind", `String "undock") ] };
+                 meta = [ ("kind", `String "undock") ] @ op_meta batch_ops };
       List.iter
         (fun (rider, (d : Conveyor.dock), _, _, _) ->
           cert_moves :=
@@ -373,13 +404,13 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
           add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "R";
                      arity = Some 1; mode = Some "intra"; ions = [ i ];
                      params = [ [ theta; phi ] ];
-                     meta = [ ("kind", `String "beam") ] };
+                     meta = [ ("kind", `String "beam") ] @ op_meta [ o.index ] };
           incr cyc
         | Gateset.Frame { lam; _ } ->
           add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "VZ";
                      arity = Some 1; mode = Some "intra"; ions = [ i ];
                      params = [ [ lam ] ];
-                     meta = [ ("kind", `String "virtual_z") ] };
+                     meta = [ ("kind", `String "virtual_z") ] @ op_meta [ o.index ] };
           incr cyc
         | Gateset.Ms _ ->
           raise (Not_applicable "a one-qubit gate decomposed to an entangler"))
@@ -387,7 +418,11 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
     (match Hashtbl.find_opt x.dock_of i with
     | Some (dk : Conveyor.dock) ->
       cert_gates :=
-        Cert.{ dag = o.index; instr = !prog.id_seq - 1; cycle = max start (!cyc - 1);
+        Cert.{ dag = o.index;
+               instr =
+                 (try Hashtbl.find last_instr o.index
+                  with Not_found -> !prog.id_seq - 1);
+               cycle = max start (!cyc - 1);
                site = dk.site; operands = [ i ]; pulses = [] }
         :: !cert_gates
     | None -> raise (Not_applicable "a one-qubit gate on an ion that is not docked"))
@@ -423,7 +458,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
         match (o.name, o.qubits) with
         | ("measure" | "reset"), [ q ] when Hashtbl.mem x.dock_of (ion q) ->
           add Tsir.{ blank with ityp = o.name; id = fresh (); ions = [ ion q ];
-                     meta = [ ("kind", `String o.name) ] };
+                     meta = [ ("kind", `String o.name) ] @ op_meta [ o.index ] };
           incr cyc;
           finished.(i) <- true; decr remaining; progressed := true
         | "barrier", _ ->
@@ -482,11 +517,13 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
           None offsets
         |> Option.get
       in
-      rotate
-        (match sweep with
-        | Greedy -> Conveyor.shortest cv x.offset best
-        | Monotone -> ((best - x.offset) mod cv.n + cv.n) mod cv.n);
-      (* take one contact per dock and one per rider at this offset *)
+      (* take one contact per dock and one per rider at this offset.
+
+         Chosen BEFORE the loop turns, though it is the turn that happens first: the
+         selection reads only the precomputed offsets, and knowing the batch is what lets
+         the rotation instruction say which circuit statements it is travelling towards.
+         A rotation with no answer to that is the single most opaque thing in a compiled
+         program -- 144 ions move and the page cannot say why. *)
       let used_dock = Hashtbl.create 32 and used_rider = Hashtbl.create 32 in
       let batch = ref [] in
       List.iter
@@ -501,7 +538,13 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
             decr remaining
           end)
         want;
-      contact (List.rev !batch)
+      let batch = List.rev !batch in
+      rotate
+        ~ops:(List.map (fun (_, _, _, i, _) -> i) batch)
+        (match sweep with
+        | Greedy -> Conveyor.shortest cv x.offset best
+        | Monotone -> ((best - x.offset) mod cv.n + cv.n) mod cv.n);
+      contact batch
     end
   done;
 
@@ -518,7 +561,8 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
         circuit_ops =
           List.map
             (fun (o : Circuit.op) ->
-              { oi = o.index; oname = o.name; oqubits = o.qubits; oparams = o.params })
+              { oi = o.index; oname = o.name; oqubits = o.qubits; oparams = o.params;
+                osrc = o.src_line })
             c.ops;
         circuit_sha256 = Cert.hash_file qasm_path;
         arch_sha256 = "";

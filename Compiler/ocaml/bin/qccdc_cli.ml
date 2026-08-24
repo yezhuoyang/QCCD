@@ -32,6 +32,10 @@ let usage () =
       dump every routing sub-problem the heuristic router solved, with its makespan,
       for the SAT oracle to solve optimally on the same graph
 
+  qccdc compile ... --no-rotate
+      refuse rather than falling back to rigid rotation, so that a measurement of the
+      individual-ion router measures the individual-ion router
+
   qccdc rotate <in.qasm> --arch <expanded.json> -o <out-prefix>
       compile by rotating the loop rigidly: one template moves every ion at once.
       For a conveyor device and a bipartite circuit (a syndrome-extraction round).
@@ -361,6 +365,11 @@ let () =
            it can only add programs that compile, never change one that already did. *)
         Printf.eprintf "%s: unroutable: %s
 " inp m;
+        (* `--no-rotate` is not a convenience.  `bridge/c7_occupancy.py` measures where
+           the INDIVIDUAL-ION router runs out, and with the fallback in place it measured
+           the pair of them and reported the answer as the individual router's -- a
+           silently wrong number in a document whose whole point is that number. *)
+        if List.mem "--no-rotate" rest then exit 4;
         prerr_endline "  trying rigid rotation, which does not need a free slot to move into";
         try exit (cmd_rotate inp arch_path out) with
         | Qccdc.Rotate_pipeline.Not_applicable r ->

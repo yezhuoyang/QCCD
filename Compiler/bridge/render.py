@@ -11,6 +11,12 @@ compiler's own account of what it did, so watching a compiled program is watchin
 verifier's reconstruction of it. If the compiler and the replay disagreed about where an
 ion is, the page would show it.
 
+What a compiled program adds is a **source circuit**. Given `--qasm`, the page carries a
+second listing -- the user's QASM -- and steps it in lockstep with the hardware: the
+statement each instruction is discharging is highlighted, the statements a shuttle is
+travelling towards are shaded, and clicking a statement jumps to the instruction that
+discharges it. `source_map.py` builds that join and checks it against the certificate.
+
     python Compiler/bridge/render.py build/out/steane_esm_grid9x9.cooled.tsir.json \
         --arch arch/grid9x9.arch.json -o out/steane_grid.html
 """
@@ -30,9 +36,24 @@ from qccd.arch import Architecture  # noqa: E402
 from qccd.cost.models import corrected_model, deck_model  # noqa: E402
 from qccd.ir.tsir import TSIR  # noqa: E402
 from qccd.verify import verify  # noqa: E402
+from qccd.ir.source_map import build as build_source  # noqa: E402
 from qccd.viz import render_html  # noqa: E402
 
 MODELS = {"corrected": corrected_model, "deck": deck_model}
+
+
+def _guess_cert(program: Path) -> Path | None:
+    """`build/out/x.cooled.tsir.json` -> `build/out/x.qcert.json`.
+
+    The cooling pass renames the file but not the compilation, so stripping the suffixes
+    the pipeline adds is enough; anything unexpected returns None and the caller asks for
+    `--cert` rather than guessing at a file that would silently be the wrong program.
+    """
+    stem = program.name
+    for suffix in (".cooled.tsir.json", ".tsir.json"):
+        if stem.endswith(suffix):
+            return program.with_name(stem[: -len(suffix)] + ".qcert.json")
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,12 +63,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--model", default="corrected", choices=sorted(MODELS))
     ap.add_argument("--max-frames", type=int, default=20000)
+    ap.add_argument("--qasm", default=None,
+                    help="the source circuit; adds the Circuit pane and steps it with "
+                         "the hardware")
+    ap.add_argument("--cert", default=None,
+                    help="the certificate (default: <program stem>.qcert.json)")
     args = ap.parse_args(argv)
 
     arch_path = ROOT / args.arch if not Path(args.arch).is_absolute() else Path(args.arch)
     arch = Architecture.from_json(json.loads(arch_path.read_text(encoding="utf-8")))
     prog = TSIR.load(args.program)
     model = MODELS[args.model]()
+
+    source = None
+    if args.qasm:
+        cert_path = Path(args.cert) if args.cert else _guess_cert(Path(args.program))
+        if cert_path is None or not cert_path.exists():
+            ap.error("--qasm needs the certificate; pass --cert <file>.qcert.json")
+        cert = json.loads(cert_path.read_text(encoding="utf-8"))
+        source = build_source(prog, cert, args.qasm)
 
     rep = verify(prog, arch, model, check_metrics=False)
     res = rep.result
@@ -58,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     render_html(
         arch, prog, res, model, out,
         max_frames=args.max_frames,
+        source=source,
         kicker="compiled by qccdc",
         headline=f"{prog.name} on {arch.name}",
         lede=(f"{len(prog)} instructions, {res.total_steps:,} machine steps, "
@@ -67,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"{prog.name} on {arch.name}: {len(prog)} instructions, "
           f"{res.total_us / 1000:.2f} ms, {len(rules['passed'])} rules pass")
+    if source:
+        print(f"  circuit: {len(source['ops'])} statements from {source['name']}, "
+              f"{len(source['realises'])} instructions discharge one and "
+              f"{len(source['toward'])} shuttle towards one")
     print(f"  -> {out}  ({out.stat().st_size // 1024} KB, self-contained)")
     return 0
 

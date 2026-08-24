@@ -189,7 +189,34 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                       prog_meta = [];
                       id_seq = 0;
                     }) in
-  let add instr =
+  (* Which circuit operation is this instruction for?
+
+     The certificate answers that for one instruction per gate -- the one the witness
+     names -- and a `cx` is seven pulses, so four fifths of a compiled program has no
+     answer there. A debugger wants one for every instruction, including the transport,
+     so the compiler stamps it as it emits: `meta.op` is the list of circuit ops an
+     instruction serves. `bridge/animate.py` cross-checks the gate instructions against
+     the certificate's own witnesses before drawing anything, so the stamp cannot drift
+     from the claim the Lean checker actually decided. *)
+  let op_meta (ids : int list) : (string * Yojson.Safe.t) list =
+    match List.sort_uniq compare ids with
+    | [] -> []
+    | l -> [ ("op", `List (List.map (fun i -> `Int i) l)) ]
+  in
+  (* The instruction a gate witness names ought to be one that actually performs the
+     operation.  It used to be `id_seq - 1` -- the last instruction of the whole LAYER --
+     which nothing read, so nothing noticed; the moment the animation joined on it, a
+     witness for op 5 pointed at a pulse belonging to ops 11, 22 and 32.  Recording the
+     last instruction stamped with each op keeps the field honest by construction. *)
+  let last_instr : (int, int) Hashtbl.t = Hashtbl.create 64 in
+  let note_instr (i : Tsir.instr) =
+    match List.assoc_opt "op" i.meta with
+    | Some (`List l) ->
+      List.iter (function `Int oi -> Hashtbl.replace last_instr oi i.id | _ -> ()) l
+    | _ -> ()
+  in
+  let add (instr : Tsir.instr) =
+    note_instr instr;
     let p = !prog in
     prog := { p with instructions = p.instructions @ [ instr ] }
   in
@@ -346,6 +373,20 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
           sited
       in
       let targets = needed |> List.filter (fun (i, s) -> Hashtbl.find pos i <> s) in
+      (* ion -> the ops of THIS layer it is being brought together for, so a transport
+         cycle can say which statements it is serving rather than just "route" *)
+      let ion_ops = Hashtbl.create 32 in
+      List.iter
+        (fun ((o : Circuit.op), site) ->
+          match site with
+          | None -> ()
+          | Some (_, ions) ->
+            List.iter
+              (fun i ->
+                Hashtbl.replace ion_ops i
+                  (o.index :: (try Hashtbl.find ion_ops i with Not_found -> [])))
+              ions)
+        sited;
       if targets <> [] then begin
         let before = Hashtbl.copy pos in
         let plan = Route.plan_layer a t d ~pos ~targets ~horizon in
@@ -380,7 +421,13 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                       (fun (m : Route.move) ->
                         Tsir.{ ion = m.ion; src = m.src; dst = m.dst; via = m.via })
                       cy.moves;
-                  meta = [ ("kind", `String "route") ];
+                  meta =
+                    [ ("kind", `String "route") ]
+                    @ op_meta
+                        (List.concat_map
+                           (fun (m : Route.move) ->
+                             try Hashtbl.find ion_ops m.ion with Not_found -> [])
+                           cy.moves);
                 };
             incr n_transport;
             incr cyc)
@@ -477,7 +524,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                   List.sort_uniq compare (List.rev_map (fun (_, s, _, _) -> s) !vzs);
                 meta =
                   [ ("kind", `String "virtual_z"); ("round", `Int k);
-                    ("note", `String "frame update: no laser, no duration") ];
+                    ("note", `String "frame update: no laser, no duration") ]
+                  @ op_meta (List.rev_map (fun (_, _, oi, _) -> oi) !vzs);
               };
         if !beams <> [] then begin
           let id = fresh_id () in
@@ -494,7 +542,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 params = List.rev_map (fun (_, _, _, p) -> p) !beams;
                 sites =
                   List.sort_uniq compare (List.rev_map (fun (_, s, _, _) -> s) !beams);
-                meta = [ ("kind", `String "beam"); ("round", `Int k) ];
+                meta = [ ("kind", `String "beam"); ("round", `Int k) ]
+                  @ op_meta (List.rev_map (fun (_, _, oi, _) -> oi) !beams);
               };
           n_beams := !n_beams + List.length !beams
         end;
@@ -512,7 +561,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 params = List.rev_map (fun (_, _, _, p) -> p) !mss;
                 sites =
                   List.sort_uniq compare (List.rev_map (fun (_, s, _, _) -> s) !mss);
-                meta = [ ("kind", `String "ms"); ("round", `Int k) ];
+                meta = [ ("kind", `String "ms"); ("round", `Int k) ]
+                  @ op_meta (List.rev_map (fun (_, _, oi, _) -> oi) !mss);
               };
           n_ms := !n_ms + List.length !mss
         end;
@@ -527,7 +577,9 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
               Cert.
                 {
                   dag = o.index;
-                  instr = !prog.id_seq - 1;
+                  instr =
+                    (try Hashtbl.find last_instr o.index
+                     with Not_found -> !prog.id_seq - 1);
                   cycle = !cyc - 1;
                   site = s;
                   operands = ions;
@@ -614,14 +666,14 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
       if policy.spam then begin
         let ms =
           List.filter_map
-            (fun ((o : Circuit.op), s, ions, _, _) ->
-              if o.name = "measure" then Some (List.hd ions, s) else None)
+            (fun ((o : Circuit.op), _, ions, _, _) ->
+              if o.name = "measure" then Some (List.hd ions, o.index) else None)
             phys
         in
         let rs =
           List.filter_map
-            (fun ((o : Circuit.op), s, ions, _, _) ->
-              if o.name = "reset" then Some (List.hd ions, s) else None)
+            (fun ((o : Circuit.op), _, ions, _, _) ->
+              if o.name = "reset" then Some (List.hd ions, o.index) else None)
             phys
         in
         if ms <> [] then begin
@@ -632,7 +684,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 ityp = "measure";
                 id = fresh_id ();
                 ions = List.map fst ms;
-                meta = [ ("kind", `String "readout") ];
+                meta =
+                  [ ("kind", `String "readout") ] @ op_meta (List.map snd ms);
               };
           incr cyc
         end;
@@ -644,7 +697,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 ityp = "reset";
                 id = fresh_id ();
                 ions = List.map fst rs;
-                meta = [ ("kind", `String "reset") ];
+                meta =
+                  [ ("kind", `String "reset") ] @ op_meta (List.map snd rs);
               };
           incr cyc
         end
@@ -664,7 +718,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
           List.map
             (fun (o : Circuit.op) ->
               Cert.{ oi = o.index; oname = o.name; oqubits = o.qubits;
-                     oparams = o.params })
+                     oparams = o.params; osrc = o.src_line })
             c.ops;
         map_ = Array.to_list (Array.mapi (fun q i -> (q, i)) pl.ion);
         init = placement;
