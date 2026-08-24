@@ -2935,7 +2935,8 @@ if(SRC){
 function qMarksFor(f){
   const m = {};
   if(!SRC) return m;
-  for(const oi of (SRC.toward[f.id] || [])){ const o=QOP[oi]; if(o && !m[o.line]) m[o.line]=1; }
+  for(const k of ['toward','after'])
+    for(const oi of ((SRC[k]||{})[f.id] || [])){ const o=QOP[oi]; if(o && !m[o.line]) m[o.line]=1; }
   for(const oi of (SRC.realises[f.id] || [])){ const o=QOP[oi]; if(o) m[o.line]=2; }
   return m;
 }
@@ -2958,9 +2959,11 @@ function qListHTML(ids, cap){
 }
 function qNowHTML(f){
   if(!SRC) return '';
-  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [];
+  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [],
+        past = (SRC.after||{})[f.id] || [];
   if(now.length) return '<b>executing</b> &nbsp;'+qListHTML(now,3);
   if(soon.length) return '<span class="mut">shuttling towards</span> &nbsp;'+qListHTML(soon,3);
+  if(past.length) return '<span class="mut">clearing after</span> &nbsp;'+qListHTML(past,3);
   return '<i class="mut">no circuit statement &mdash; '+esc(f.type)
     + ' is the compiler&#39;s own bookkeeping</i>';
 }
@@ -2968,9 +2971,11 @@ function qNowHTML(f){
 // tabs -- which is the whole point of putting the two side by side
 function qInlineHTML(f){
   if(!SRC) return '';
-  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [];
+  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [],
+        past = (SRC.after||{})[f.id] || [];
   if(now.length) return '<br><span class="mut">circuit &rarr;</span> '+qListHTML(now,2);
   if(soon.length) return '<br><span class="mut">circuit &rarr; towards</span> '+qListHTML(soon,2);
+  if(past.length) return '<br><span class="mut">circuit &rarr; after</span> '+qListHTML(past,2);
   return '';
 }
 function qRowCls(row){

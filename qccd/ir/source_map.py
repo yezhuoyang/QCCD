@@ -16,6 +16,9 @@ Two sources are joined here, and the reason there are two is worth stating.
   compiler emits carries `meta.op`, the circuit operations it serves, stamped as it was
   emitted.
 
+The result splits three ways -- `realises`, `toward` and `after` -- because transport
+before a gate and transport after it are different answers to "why is this ion moving".
+
 So the dense map is used, and the sparse one is used to **check** it: every gate witness
 must find its `dag` in the `meta.op` of the instruction it names, or `build()` raises. A
 compiler whose stamps drifted from the claims the checker verified cannot quietly draw a
@@ -65,16 +68,27 @@ def build(prog, cert: dict, qasm_path: str | Path, *, check: bool = True) -> dic
     ]
     known = {o["i"] for o in ops}
 
-    # An instruction that PERFORMS a circuit operation, against one that is moving ions so
-    # that a later one can. The distinction is the instruction's own type, not a guess:
-    # `simd` is transport and everything else that carries a stamp is the operation.
+    # Three things an instruction can be doing, and the difference is worth drawing.
+    # It PERFORMS the operation; or it is transport, in which case it is either bringing
+    # the ions together for one that has not happened yet, or putting them back after one
+    # that has. Calling the last of those "shuttling towards" -- as a two-way split does,
+    # because it only looks at the instruction type -- reads as a gate still to come when
+    # the gate is already done, which in a debugger is worse than saying nothing.
     realises: dict[str, list[int]] = {}
     toward: dict[str, list[int]] = {}
+    after: dict[str, list[int]] = {}
+    done: set[int] = set()
     for instr in prog.instructions:
-        got = [i for i in _ops_of(instr) if i in known]
+        got = sorted(i for i in _ops_of(instr) if i in known)
         if not got:
             continue
-        (toward if instr.type == "simd" else realises)[str(instr.id)] = sorted(got)
+        if instr.type != "simd":
+            realises[str(instr.id)] = got
+            done.update(got)
+        elif done.issuperset(got):
+            after[str(instr.id)] = got
+        else:
+            toward[str(instr.id)] = got
 
     if check:
         _cross_check(cert, realises)
@@ -85,6 +99,7 @@ def build(prog, cert: dict, qasm_path: str | Path, *, check: bool = True) -> dic
         "ops": ops,
         "realises": realises,
         "toward": toward,
+        "after": after,
     }
 
 

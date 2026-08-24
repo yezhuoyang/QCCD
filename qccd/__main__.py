@@ -351,7 +351,8 @@ def cmd_studio(args) -> int:
     if source:
         print(f"  circuit       {source['name']}: {len(source['ops'])} statements, "
               f"{len(source['realises'])} instructions discharge one, "
-              f"{len(source['toward'])} shuttle towards one")
+              f"{len(source['toward'])} shuttle towards one, "
+              f"{len(source['after'])} clear up after one")
     return 0
 
 

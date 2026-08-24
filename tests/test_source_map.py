@@ -64,14 +64,27 @@ def test_an_honest_program_joins(qasm):
     assert src["lines"][2] == "h q[0];"
 
 
-def test_transport_is_towards_rather_than_executing(qasm):
+def test_transport_before_a_gate_is_towards_it(qasm):
     """A shuttle serves a gate; it does not perform one, and the pane must not say so."""
+    prog = _prog({1: [0], 2: [1]})
+    prog.instructions.insert(1, Instruction(
+        type="simd", id=7, cls="shuttle", mode="inter", meta={"op": [1]}))
+    src = build(prog, CERT, qasm)
+    assert src["toward"] == {"7": [1]} and src["after"] == {}
+    assert "7" not in src["realises"]
+
+
+def test_transport_after_a_gate_is_not(qasm):
+    """The same instruction, moved past the gate it serves, means something else.
+
+    Both are transport for op 1, and a split on instruction TYPE alone calls both
+    "shuttling towards" -- announcing a gate that has already happened.
+    """
     prog = _prog({1: [0], 2: [1]})
     prog.instructions.append(
         Instruction(type="simd", id=7, cls="shuttle", mode="inter", meta={"op": [1]}))
     src = build(prog, CERT, qasm)
-    assert src["toward"] == {"7": [1]}
-    assert "7" not in src["realises"]
+    assert src["after"] == {"7": [1]} and src["toward"] == {}
 
 
 def test_a_stamp_that_contradicts_a_witness_is_refused(qasm):

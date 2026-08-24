@@ -36,6 +36,7 @@ globalThis.__srcMeta = () => ({
   ops: SRC ? SRC.ops.length : 0,
   realises: SRC ? Object.keys(SRC.realises).length : 0,
   toward: SRC ? Object.keys(SRC.toward).length : 0,
+  after: SRC ? Object.keys(SRC.after || {}).length : 0,
   frameIds: P.frames.map(f => f.id),
   // the inverse index the click-through uses
   jump: (line) => { pickSrc(line - 1); return frame; },
@@ -68,6 +69,6 @@ if (meta.present) {
 }
 console.log(JSON.stringify({
   present: meta.present, tab: meta.tab, ops: meta.ops,
-  realises: meta.realises, toward: meta.toward,
+  realises: meta.realises, toward: meta.toward, after: meta.after,
   frameIds: meta.frameIds, probes, jumps,
 }));
