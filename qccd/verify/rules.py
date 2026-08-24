@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture, Segment
-from ..ir.tsir import Instruction, iter_pairs
+from ..ir.tsir import Instruction, iter_operands, iter_pairs
 
 __all__ = [
     "Violation",
@@ -150,8 +150,8 @@ class CycleView:
         claim that R6b cross-checks.
         """
         out: list[str] = []
-        for a, b in iter_pairs(self.instr):
-            for ion in (a, b):
+        for operands in iter_operands(self.instr):
+            for ion in operands:
                 site = self.pos_before.get(ion)
                 if site is not None and site not in out:
                     out.append(site)
@@ -665,8 +665,9 @@ def r12_intra_parallelism(v: CycleView) -> list[Violation]:
     if v.instr.type != "gate":
         return []
     per_site: Counter[str] = Counter()
-    for a, b in iter_pairs(v.instr):
-        site = v.pos_before.get(a)
+    for operands in iter_operands(v.instr):
+        # intra-trap parallelism is 1 for a gate of ANY arity: one trap, one beam
+        site = v.pos_before.get(operands[0])
         if site is not None:
             per_site[site] += 1
     return [

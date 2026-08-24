@@ -144,6 +144,15 @@ class CostModel:
     def gate(self, arch: Architecture, gate: str, n_pairs: int) -> Charge:
         return Charge()
 
+    def gate_1q(self, arch: Architecture, gate: str, n: int) -> Charge:
+        """A single-qubit gate.  Priced from the `1q_gate` primitive, not `ms_gate`.
+
+        Every architecture declares `1q_gate` and, before the compiler needed to emit
+        one, nothing read it -- so a single-qubit rotation would have been charged as a
+        two-qubit entangling gate, roughly two orders of magnitude too slow.
+        """
+        return Charge()
+
     def cool(self, arch: Architecture) -> Charge:
         return Charge()
 
@@ -316,6 +325,15 @@ class CorrectedModel(CostModel):
         if key == "gate_swap":
             ms = arch.primitives.scalar("ms_gate")
             return Charge(cost=0.0, depth=1, us=float(spec["gates"]) * float(ms["us"]))
+        return Charge(cost=0.0, depth=1, us=float(spec["us"]))
+
+    def gate_1q(self, arch: Architecture, gate: str, n: int) -> Charge:
+        # A virtual-Z is a frame update: the controller advances the phase of every later
+        # pulse on that ion and no laser fires, so it takes no time.  It is still a real
+        # operation on the state, which is why it appears in the program at all.
+        if gate == "VZ":
+            return Charge(cost=0.0, depth=1, us=0.0)
+        spec = arch.primitives.scalar("1q_gate")
         return Charge(cost=0.0, depth=1, us=float(spec["us"]))
 
     def cool(self, arch: Architecture) -> Charge:
