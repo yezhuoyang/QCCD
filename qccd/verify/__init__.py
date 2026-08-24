@@ -233,10 +233,19 @@ def verify(
     only_rules: Sequence[str] | None = None,
     check_metrics: bool = True,
     keep_cycles: bool = True,
+    rule_config: Mapping[str, object] | None = None,
 ) -> VerificationReport:
-    """Replay, rule-check, and check the program's claims.  The one entry point."""
+    """Replay, rule-check, and check the program's claims.  The one entry point.
+
+    `rule_config` overrides a rule's own parameters -- today, R7's `max_gate_quanta`.
+    `replay` has always accepted it and `qccd.compile.cooling` has always passed it, so
+    without it here a budget sweep changes the schedule and is then judged against the
+    architecture's original budget: every point but the default reads as an R7 failure,
+    and the sweep reports nothing about the trade-off it exists to measure.
+    """
     res = replay(
-        prog, arch, model, check_rules=True, only_rules=only_rules, keep_cycles=keep_cycles
+        prog, arch, model, check_rules=True, only_rules=only_rules,
+        keep_cycles=keep_cycles, rule_config=rule_config
     )
     rules = res.rules
     # only rules that HAVE an implementation and were actually run may be marked

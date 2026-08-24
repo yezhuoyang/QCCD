@@ -504,14 +504,32 @@ def test_replay_rejects_a_via_that_does_not_reach_the_declared_destination():
 def test_program_validation_catches_shape_errors():
     prog = prog_of(
         Instruction(type="simd", id=0, participants=()),
-        Instruction(type="gate", id=0, ions=("a",)),
+        # three ions is neither a pair nor a single-qubit gate
+        Instruction(type="gate", id=0, ions=("a", "b", "c")),
     )
     errors = validate_program(prog)
     assert any("must open with `init`" in e for e in errors)
     assert any("duplicate instruction id" in e for e in errors)
     assert any("carries no class" in e for e in errors)
     assert any("neither participants nor a template" in e for e in errors)
-    assert any("`pairs` or exactly two `ions`" in e for e in errors)
+    assert any("two `ions`, or one `ion`" in e for e in errors)
+
+
+def test_a_gate_may_carry_one_ion_for_a_single_qubit_operation():
+    """A one-operand `gate` is legal: it is a single-qubit rotation.
+
+    Before a compiler from a general circuit existed, every gate in the system was an
+    entangling contact and the IR said so.  A QASM front end has to be able to emit
+    "rotate this ion", and without the one-operand form the IR could express an ESM
+    schedule and nothing else.
+    """
+    prog = prog_of(
+        init(d0="S0"),
+        Instruction(type="gate", id=1, gate="R", mode="intra", ions=("d0",)),
+    )
+    # `prog_of` does not advance the id allocator, so ignore that unrelated complaint
+    errors = [e for e in validate_program(prog) if "id_seq" not in e]
+    assert errors == []
 
 
 def test_unknown_template_kind_is_rejected():

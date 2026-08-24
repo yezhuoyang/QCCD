@@ -20,7 +20,8 @@ Which architecture performs best is therefore not self-evident: the answer depen
 on the error-correcting code, on the transport schedule, and on the control wiring. This
 project provides a platform for answering that question quantitatively. A device is
 described declaratively, a program is written or compiled for it, and the tool then replays
-the program, evaluates twenty-three hardware rules against it, and reports its cost.
+the program, evaluates twenty-three hardware rules against it, reports its cost, and
+derives the electrodes it would take to build.
 
 ## Install
 
@@ -30,6 +31,32 @@ No dependencies — the toolchain is pure standard-library Python.
 git clone https://github.com/yezhuoyang/QCCD.git && cd QCCD
 python -m qccd devices          # every architecture in arch/, and what it costs to wire
 ```
+
+## Use it
+
+Every command is self-contained: no server, no build step, no network. Pages are written
+to `out/` and opened in a browser.
+
+| | |
+|---|---|
+| `python -m qccd studio` | **the design tool**, as one page → `out/studio.html` |
+| `python -m qccd demo` | every device × program, rendered → `out/index.html` |
+| `python -m qccd devices` · `show <device>` | the architectures, and one in detail |
+| `python -m qccd run ring144_24v --program deck --html out/r.html` | replay, rule-check, price, render |
+| `python -m qccd reach <device>` | what a machine can do before any program exists |
+| `python -m qccd analyses` · `sweep <analysis> <device> <knob> <values>` | the knobs, and one curve |
+| `python -m qccd phys <device> [--svg f.svg] [--html f.html]` | the electrodes it implies, and their design rules |
+| `python -m qccd gds <device> -o x.gds` | the same metal as GDSII, for a fab tool |
+| `python -m qccd open <export>` | re-verify a design the browser produced |
+| `python -m qccd regen` | rebuild every emitted page |
+
+Start with `python -m qccd studio` and open `out/studio.html`: drag a trap, draw a segment,
+and the cost model and all 23 rules re-evaluate as you go.
+
+`run` exits non-zero when a rule fails, and on the shipped schedule two do — under the
+default cost model the deck's own program blows its heating budget, because it schedules no
+cooling anywhere. That is a result, not a broken install; add `--model deck` to reproduce
+the artifact's own figures instead (397,184 cost / 8,808 steps, all rules pass).
 
 ## 1 · Design an architecture
 
@@ -117,6 +144,136 @@ Junction heating is 76% of the summed gate error at nominal — which is what ma
 number of vertical shuttling lines a design decision rather than a detail. See
 `python -m qccd analyses` for the rest, and `python -m qccd reach <device>` for what a
 machine can do before anyone writes a program for it.
+
+## 3 · Compile a circuit for it
+
+The programs above are written by hand. [`Compiler/`](Compiler/) takes an **OpenQASM 2.0
+circuit and any architecture in [`arch/`](arch/)** and produces a TSIR program the verifier
+accepts — choosing which ion carries which qubit, routing the ions so that every two-qubit
+gate finds its operands in one trap, and decomposing each gate into the native trapped-ion
+pulses `R θ φ`, `VZ λ` and `MS θ`.
+
+```bash
+cd Compiler/ocaml && source ./ocamlenv.sh && dune build      # OCaml 5.3 / dune 3.19
+cd .. && ocaml/_build/default/bin/qccdc_cli.exe compile examples/steane_esm.qasm \
+    --arch build/grid9x9.expanded.json -o build/out/steane
+python bridge/check_tsir.py build/out/steane.tsir.json --arch arch/grid9x9.arch.json
+python bridge/mk_qcheck_input.py build/out/steane \
+    --arch build/grid9x9.expanded.json -o build/qc_steane.json
+python bridge/check_cert.py build/out/steane --qasm examples/steane_esm.qasm \
+    --arch arch/grid9x9.arch.json --qcheck build/qc_steane.json     # R10
+```
+
+The split of languages is the point. Search is untrusted and lives in **OCaml** (5,300
+lines): placement, a space-time A-star router over a reservation table, gate decomposition.
+Everything it does it must *justify*, by emitting a certificate alongside the program —
+which qubit went to which ion, where every ion was at every cycle, and which circuit
+operation each pulse group realises. Checking that certificate is **Lean 4**: 1,112 lines
+and 31 theorems with no `sorry`, of which the trusted checker itself is 712.
+
+### R10, the rule that was always skipped
+
+Of the [23 rules](docs/rules.md), twenty-two are structural and the platform has always
+checked them. R10 — *"the compiled program implements the input circuit"* — has only ever
+been reported **skipped**, never `passed`. Run the verifier on anything and it says so
+itself, and says why:
+
+```console
+skipped R10: needs symbolic permutation + Pauli-frame tracking against a QASM DAG
+```
+
+It is now checked, in two halves:
+
+- **transport** — `QCCDC.Cert.check` is defined as `decide (Implements inp)`, where
+  `Implements` is a *proposition* saying what it means for the program to realise the
+  circuit: operands co-located at a trap that can gate, every move a hop the **architecture**
+  admits, every op witnessed exactly once, dependent ops in program order. Soundness is
+  then `of_decide_eq_true`, so all the content sits in a statement a reader can judge rather
+  than in a pile of `Bool`s with a meaning asserted elsewhere. Ten further theorems prove
+  each named way of being wrong is one `check` *cannot* accept — a dropped gate, a teleport,
+  an aliased qubit, a reordering — and `bridge/mutate_cert.py` injects all ten into real
+  compiled certificates to confirm the checker rejects them in practice too.
+- **semantics** — the pulses are composed back into a stabilizer tableau (or, for small
+  non-Clifford circuits, an exact unitary) and compared against the QASM. This reads the
+  emitted program, not the compiler's claims about it.
+
+The facts the checker judges against — which traps can gate, which pairs are one cycle
+apart, the cyclic order of each loop — are re-derived from the architecture document by
+code the compiler never runs. A compiler cannot widen the machine by asserting it.
+
+### What it compiles
+
+Nine example circuits × the nine reference architectures:
+
+```console
+$ cd Compiler && python bridge/run_matrix.py
+81 (circuit, architecture) pairs
+   72 fully verified   -- compiled, all rules pass, R10 passed
+    9 out of reach     -- device too small, or the heuristic router declined
+    0 DEFECTS          -- a rule violated or R10 refused
+```
+
+The nine out of reach are honest failures, not silent ones: `stationary_chain` has two
+traps, and the router declines rather than emitting something illegal.
+
+**`BB [[144,12,12]]` on `ring144_24v`** is the case worth naming, because it needed a second
+router. Moving ions one at a time runs out at **46.2% loop occupancy** — past half full on a
+ring, a path across the device is a traffic jam no amount of replanning clears — and the
+round needs 53.8%. Rigid rotation has no such limit: one `loop_shift` template advances
+*every* ion at once, so occupancy never changes. `compile` tries the general router first
+and rotation only once it has declined, so it can add programs that compile but never change
+one that already did.
+
+| `BB [[144,12,12]]` ESM round | general router | rigid rotation | shipped Python pipeline |
+|---|---|---:|---:|
+| hops | *unroutable* | **776** | 2,672 |
+| batches | — | 546 | **396** |
+
+Fewer hops, more cycles — a different trade, not a free win. All applicable rules pass and
+R10 is `passed`, the proved checker deciding a 1,008-witness certificate in about five
+minutes.
+
+Two of those results are ones the checker found rather than testing: the first rotation
+compiler emitted the ancilla Hadamards as pulses but never *witnessed* them (invisible to a
+tableau, which composes from what was emitted), and its scheduler reordered commuting `cx`
+gates, which the order rule rejected outright. The fix for the second was not to relax the
+rule but to prove the exemption — `Cert/Commute.lean` proves two `cx` gates commute when
+they share a control with distinct targets, or a target with distinct controls, and exhibits
+a state where a control/target chain does not.
+
+Full design notes, the SAT routing oracle, and the measured (runtime, error) frontier:
+[Compiler/PLAN.md](Compiler/PLAN.md) · [Compiler/README.md](Compiler/README.md).
+
+## 4 · Derive its electrodes
+
+A device plus a **technology file** determines the metal. Nothing is authored: no
+`.arch.json` changes, no field is added to a trap. `qccd/phys/` derives integer-nanometre
+polygons, solves the RF pseudopotential in closed form, and writes GDSII and SVG from one
+shape table.
+
+```console
+$ python -m qccd phys ring144_24v
+ring144_24v  [eth_junction_2201.12579]
+  1372 polygons from 15 cells placed 192 times
+  die 16.215 x 0.705 mm
+    dc_pad           990
+    naive_crossing   46
+    rail             336
+  ...
+  rf_dc_clearance    66     ← the 24 dock spurs do not fit between the two rails
+```
+
+Every dimension in the technology file carries a page reference. Fed only the two RF widths
+that arXiv:2201.12579 publishes, the solver reproduces that paper's own naive-junction
+measurements — an **86.5 µm** transport path against their 84, and a confinement 30% of the
+linear section — which turns the RF-barrier argument behind the junction cost from a
+citation into a checked number. It also finds that **no shipped device sits at its design
+ion height**: neighbouring metal moves it by up to 15%. [docs/phys.md](docs/phys.md).
+
+`--html` puts the metal under the schematic as a true-to-scale backdrop. It does not
+register with the diagram above it and it is not meant to: the schematic is stretched to
+fit the page and the electrodes are not, so the page draws a scale bar and says which is
+which.
 
 ## The gallery
 
@@ -222,16 +379,20 @@ renders every device to `out/index.html`.
 | [`qccd/cost/`](qccd/cost/) | the objective: combinatorial (steps, templates) and physical (µs, quanta) |
 | [`qccd/compile/`](qccd/compile/) | placement, ordering, cooling insertion, the program builders |
 | [`qccd/viz/`](qccd/viz/) | the renderer, and the browser design tool it emits |
+| [`qccd/phys/`](qccd/phys/) | the electrodes a device implies: polygons, the RF field, GDSII |
 | [`arch/`](arch/) | nine reference architectures, every one from a published design |
 | [`examples/`](examples/) | runnable studies — routing benchmarks, heating budgets, `BB [[144,12,12]]` |
+| [`Compiler/`](Compiler/) | QASM → TSIR: OCaml search, Lean-verified checker, the R10 decision procedure |
 | [`tools/make_gif.py`](tools/make_gif.py) | the clips above (needs Pillow: `pip install pillow`) |
 
 **Docs** — [design plan](docs/PLAN.md) · [architecture language](docs/adl.md) ·
-[control IR](docs/tsir.md) · [the rules](docs/rules.md)
+[control IR](docs/tsir.md) · [the rules](docs/rules.md) ·
+[the electrodes](docs/phys.md) · [the compiler](Compiler/PLAN.md)
 
 ## Where this is going
 
-- **Near term** — for `BB [[144,12,12]]`, which architecture is best?
+- **Near term** — for `BB [[144,12,12]]`, which architecture is best? The compiler makes
+  that a measurement rather than an argument: same circuit, every device, verified output.
 - **Long term** — which code *and* architecture together give the cheapest demonstration
   of break-even?
 
