@@ -137,7 +137,7 @@ class Clip:
     """
 
     def __init__(self, arch, prog, res, model, max_frames=4000, width=560,
-                 layout=None, source=None):
+                 layout=None, source=None, rows=9, stage_h=None):
         vm = build_view_model(arch, prog, res, model, max_frames=max_frames,
                               include_listing=False, include_control=False)
 
@@ -156,21 +156,42 @@ class Clip:
         # caption -- the caption is one line and the second answer is a line of source.
         self.source = source
         self.src_line = {}
+        self.hw = []
+        self.circ = []
         if source:
             for o in source["ops"]:
                 self.src_line[o["i"]] = o
+            # BOTH listings are built once, in full: the clip is tracking two fixed
+            # programs and the whole point is that the reader can see they are fixed.
+            # Only the window moves.
+            self.hw = [(str(i + 1), *self._hw_row(f))
+                       for i, f in enumerate(self.frames)]
+            for o in source["ops"]:
+                text = (source["lines"][o["line"] - 1].strip()
+                        if 0 < o["line"] <= len(source["lines"]) else "")
+                self.circ.append((str(o["line"]), text or o["name"], ""))
 
+        # A TWELVE-trap device fitted to the full width draws its junctions at 120 px and
+        # its ions at 60, which is not a diagram of a machine, it is a diagram of four
+        # squares.  Capping the stage height caps the scale, and the stage is then centred
+        # in the full width rather than the page shrinking to it.
         self.k = (width * SS) / self.L["W"]
-        self.W = int(round(self.L["W"] * self.k))
+        if stage_h:
+            self.k = min(self.k, (stage_h * SS) / self.L["H"])
+        self.W = int(round(width * SS))
+        self.ox = (self.W - self.L["W"] * self.k) / 2
         self.head = int(round(30 * SS * width / 560))
-        self.foot = int(round(46 * SS * width / 560)) if source else 0
+        self.rows = min(rows, max(len(self.hw), len(self.circ))) if source else 0
+        self.row_h = int(round(15 * SS * width / 560))
+        self.foot = (int(round(20 * SS * width / 560)) + (self.rows + 1) * self.row_h
+                     if source else 0)
         self.H = int(round(self.L["H"] * self.k)) + self.head + self.foot
         self.axis = self._axes()
 
     # -- geometry ---------------------------------------------------------
     def xy(self, nid):
         n = self.nodes[nid]
-        return ((self.L["ox"] + n["x"] * self.L["sx"]) * self.k,
+        return (self.ox + (self.L["ox"] + n["x"] * self.L["sx"]) * self.k,
                 (self.L["oy"] + n["y"] * self.L["sy"]) * self.k + self.head)
 
     def _axes(self):
@@ -204,9 +225,10 @@ class Clip:
         d.rectangle([0, 0, self.W, self.head], fill=rgb("panel"))
         d.line([0, self.head, self.W, self.head], fill=rgb("line"), width=SS)
         if self.foot:
-            d.rectangle([0, self.H - self.foot, self.W, self.H], fill=rgb("panel"))
-            d.line([0, self.H - self.foot, self.W, self.H - self.foot],
-                   fill=rgb("line"), width=SS)
+            top = self.H - self.foot
+            d.rectangle([0, top, self.W, self.H], fill=rgb("panel"))
+            d.line([0, top, self.W, top], fill=rgb("line"), width=SS)
+            d.line([self.W // 2, top, self.W // 2, self.H], fill=rgb("line"), width=SS)
 
         w_rail = max(SS, int(round(self.L["sw_rail"] * self.k)))
         for s in self.segments:
@@ -287,63 +309,78 @@ class Clip:
             self.footer(d, i, f_small, f_mono)
         return img.resize((self.W // SS, self.H // SS), Image.LANCZOS)
 
-    # -- the two answers, for a compiled programme ------------------------
-    def instr_text(self, f):
-        """The hardware instruction, as the Program pane words it."""
+    # -- the two programmes, as listings ----------------------------------
+    #
+    # A caption saying "executing cx q[1],q[2]" is a fact with no context: it does not
+    # show that the compiler is walking two FIXED programs, one derived from the other,
+    # and that is the thing worth seeing.  So both are drawn as listings with their own
+    # indices -- the hardware program by step number, the circuit by source line -- and
+    # the cursor moves through them while the text stays put.
+
+    def _hw_row(self, f):
+        """One row of the hardware listing: what it is, and to whom."""
         if f["type"] == "gate":
-            what = f.get("gate") or "gate"
+            who = (", ".join("\u00b7".join(p) for p in (f.get("pairs") or ())[:2])
+                   or ", ".join((f.get("ions") or ())[:3]))
             n = len(f.get("pairs") or ()) or len(f.get("ions") or ())
-            return f"{what}" + (f" x{n}" if n > 1 else "")
+            return f"gate {f.get('gate') or ''}".strip(), who + (f"  x{n}" if n > 3 else "")
         if f["type"] == "simd":
             if f.get("shift"):
-                return f"rotate {f['shift'][0]} {f['shift'][1]:+d}"
-            return f"{f.get('cls') or 'shuttle'} x{len(f.get('moves') or ())}"
-        return f["type"]
+                return "simd rotate", f"{f['shift'][0]} {f['shift'][1]:+d}"
+            mv = f.get("moves") or ()
+            return f"simd {f.get('cls') or 'shuttle'}", ", ".join(m[0] for m in mv[:3])
+        return f["type"], ", ".join((f.get("ions") or ())[:3])
 
-    def circuit_text(self, f):
-        """The statement, and what this instruction is doing about it."""
+    def _window(self, rows, cur):
+        """`self.rows` entries centred on `cur`, clamped to the ends of the listing."""
+        n = len(rows)
+        if n <= self.rows:
+            return 0, n
+        lo = max(0, min(cur - self.rows // 2, n - self.rows))
+        return lo, lo + self.rows
+
+    def _pane(self, d, x0, x1, title, rows, cur, f_small, f_mono, tag="",
+              hi_col=None):
+        pad = int(9 * SS * self.W / (560 * SS))
+        top = self.H - self.foot + int(6 * SS * self.W / (560 * SS))
+        d.text((x0 + pad, top), title, font=f_small, fill=rgb("muted"))
+        # NOT `hi`: the window unpack below binds that, and a colour that became
+        # an integer row index failed loudly here rather than drawing something odd
+        hi_col = hi_col or rgb("accent")
+        if tag:
+            d.text((x1 - pad - d.textlength(tag, font=f_small), top), tag,
+                   font=f_small, fill=hi_col)
+        lo, hi = self._window(rows, cur if cur >= 0 else 0)
+        y = top + int(self.row_h * 1.25)
+        for r in range(lo, hi):
+            idx, op, args = rows[r]
+            on = r == cur
+            if on:
+                d.rectangle([x0 + pad // 2, y - self.row_h * 0.12,
+                             x1 - pad // 2, y + self.row_h * 0.92],
+                            fill=(*hi_col, 55))
+            col = hi_col if on else rgb("navy")
+            d.text((x0 + pad, y), ("\u25b8" if on else " "), font=f_mono, fill=col)
+            w_i = d.textlength("000", font=f_mono)
+            d.text((x0 + pad + self.row_h, y),
+                   idx.rjust(3), font=f_mono, fill=col if on else rgb("muted"))
+            d.text((x0 + pad + self.row_h + w_i + self.row_h * 0.5, y), op,
+                   font=f_mono, fill=col)
+            if args:
+                d.text((x0 + pad + self.row_h + w_i + self.row_h * 0.5
+                        + d.textlength("simd shuttle  ", font=f_mono), y),
+                       args, font=f_mono, fill=col if on else rgb("muted"))
+            y += self.row_h
+
+    def state_of(self, f):
+        """What this instruction is doing about the circuit, and to which statement."""
         src, k = self.source, str(f["id"])
         for state, ids in (("executing", src["realises"].get(k)),
                            ("shuttling towards", src["toward"].get(k)),
                            ("clearing after", src.get("after", {}).get(k))):
             if ids:
-                break
-        else:
-            return None, "", ""
-        first = self.src_line.get(ids[0])
-        if first is None:
-            return None, "", ""
-        text = (src["lines"][first["line"] - 1].strip()
-                if 0 < first["line"] <= len(src["lines"]) else first["name"])
-        extra = f"   +{len(ids) - 1} more" if len(ids) > 1 else ""
-        return state, f"{first['line']:>4}  {text}", extra
-
-    def footer(self, d, i, f_small, f_mono):
-        f = self.frames[i]
-        pad = 9 * SS
-        y0 = self.H - self.foot + int(self.foot * 0.16)
-        y1 = self.H - self.foot + int(self.foot * 0.55)
-        lab = int(self.W * 0.115)
-
-        d.text((pad, y0), "hardware", font=f_small, fill=rgb("muted"))
-        d.text((pad + lab, y0), f"#{f['id']}  {self.instr_text(f)}",
-               font=f_mono, fill=rgb("navy"))
-
-        state, line, extra = self.circuit_text(f)
-        d.text((pad, y1), "circuit", font=f_small, fill=rgb("muted"))
-        if state is None:
-            d.text((pad + lab, y1), "-- no statement; the compiler's own bookkeeping",
-                   font=f_mono, fill=rgb("muted"))
-            return
-        run = state == "executing"
-        col = rgb("accent") if run else rgb("arrow")
-        head = ("> " if run else "~ ") + line
-        d.text((pad + lab, y1), head, font=f_mono, fill=col)
-        if extra:
-            d.text((pad + lab + d.textlength(head, font=f_mono), y1),
-                   extra, font=f_mono, fill=rgb("muted"))
-        d.text((self.W - pad - d.textlength(state, font=f_small), y1),
-               state, font=f_small, fill=col)
+                return state, ids
+        return "", []
 
     def caption(self, d, i, f_small, f_mono, override=None):
         f = self.frames[i]
@@ -365,6 +402,25 @@ class Clip:
         d.text((self.W - pad - d.textlength(right, font=f_mono), top), right,
                font=f_mono, fill=rgb("muted"))
 
+    def footer(self, d, i, f_small, f_mono):
+        f = self.frames[i]
+        state, ids = self.state_of(f)
+        cur_op = -1
+        if ids:
+            want = self.src_line.get(ids[0], {}).get("line")
+            for r, (idx, _, _) in enumerate(self.circ):
+                if idx == str(want):
+                    cur_op = r
+                    break
+        # RUNNING a statement and merely fetching ions for it are different events, and
+        # a reader watching the cursor should not have to read the label to tell them
+        # apart.  `accent` and `arrow` are two oranges and did not: the pair has to be
+        # two HUES.  Orange is the gate firing; teal is the machine still travelling.
+        hi = rgb("accent") if state == "executing" else rgb("teal")
+        self._pane(d, 0, self.W // 2, "hardware program", self.hw, i,
+                   f_small, f_mono, tag=f"{i + 1}/{len(self.hw)}", hi_col=hi)
+        self._pane(d, self.W // 2, self.W, "circuit", self.circ, cur_op,
+                   f_small, f_mono, tag=state, hi_col=hi)
 
 # ----------------------------------------------------------------- writing a GIF
 
@@ -426,9 +482,9 @@ def render(arch_name, program, out, *, model="corrected", width=560, start=0,
                     f"({arch_name} x {program}, {len(clip.frames)} instructions)")
 
 
-def render_compiled(tsir, qasm, out, *, arch_name=None, cert=None, model="corrected",
-                    width=880, start=0, n=14, sub=3, ms=110, hold=1500, colors=64,
-                    max_frames=20000):
+def render_compiled(tsir, qasm, out, *, arch_name=None, arch_path=None, cert=None,
+                    model="corrected", width=880, start=0, n=14, sub=3, ms=110,
+                    hold=1500, colors=64, max_frames=20000, rows=9, stage_h=None):
     """The README's compiler figure: a compiled programme, and the circuit beside it.
 
     Not a mock-up and not a second renderer.  The frames are `build_view_model`'s, the
@@ -445,7 +501,9 @@ def render_compiled(tsir, qasm, out, *, arch_name=None, cert=None, model="correc
     tsir, qasm = Path(tsir), Path(qasm)
     prog = TSIR.load(tsir)
     stem = arch_name or Path(str(prog.arch_spec)).name.split(".")[0]
-    arch = load(ARCH / f"{stem}.arch.json")
+    # a demo device is generated into `Compiler/build/`, not checked into `arch/`, so the
+    # path can be given outright rather than resolved from a name
+    arch = load(Path(arch_path)) if arch_path else load(ARCH / f"{stem}.arch.json")
     cert = Path(cert) if cert else _cert_beside(tsir)
     source = build_source(prog, json.loads(cert.read_text(encoding="utf-8")), qasm)
 
@@ -453,7 +511,8 @@ def render_compiled(tsir, qasm, out, *, arch_name=None, cert=None, model="correc
     res = verify(prog, arch, m, check_metrics=False).result
     # the whole programme, not the default 4 000: the caption prints `step i/N`, and a
     # truncated N is a wrong number on the face of the clip
-    clip = Clip(arch, prog, res, m, width=width, source=source, max_frames=max_frames)
+    clip = Clip(arch, prog, res, m, width=width, source=source,
+                max_frames=max_frames, rows=rows, stage_h=stage_h)
 
     lo = max(0, min(start, len(clip.frames) - 1))
     hi = min(len(clip.frames), lo + n)
@@ -625,21 +684,6 @@ GALLERY = [
 ]
 
 
-#: The compiler clip.  `BB [[144,12,12]]` on the ring it was designed for, at the one
-#: place in the schedule where the whole vocabulary shows: the loop turns, an ion docks,
-#: the entangler fires, it undocks, and the loop turns again -- with the statement of the
-#: user's circuit that each of those five instructions is for.
-#:
-#: Both inputs are BUILT, not checked in: the programme comes out of `Compiler/` and the
-#: circuit out of `bridge/gen_bb144.py`, so a clone without an OCaml toolchain skips this
-#: clip the way one without the deck artifact skips the ring144 clip.
-COMPILED = dict(
-    tsir=ROOT / "Compiler/build/out/bb144_rot.cooled.tsir.json",
-    qasm=ROOT / "Compiler/build/bb144_esm.qasm",
-    start=48, n=12, width=880,
-)
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("-d", "--device")
@@ -657,33 +701,34 @@ def main(argv=None):
                     help="the design-parameter sweep clip only")
     ap.add_argument("--evaluate", action="store_true",
                     help="the terminal-session clip only")
+    # The compiler clips are NOT part of `--all`: they need a compiled programme, which
+    # needs the OCaml toolchain, and `Compiler/bridge/micro_demo.py --gif` is where that
+    # compilation already happens.  This flag renders one from artifacts that exist.
     ap.add_argument("--compiled", action="store_true",
-                    help="the compiler clip only: a compiled programme with the circuit "
-                         "statement each instruction is discharging")
-    ap.add_argument("--tsir", default=str(COMPILED["tsir"]))
-    ap.add_argument("--qasm", default=str(COMPILED["qasm"]))
+                    help="one compiled programme, with the circuit statement each "
+                         "instruction is discharging (needs --tsir and --qasm)")
+    ap.add_argument("--tsir")
+    ap.add_argument("--qasm")
     ap.add_argument("--cert", default=None)
+    ap.add_argument("--arch-file", default=None,
+                    help="the device, if it is not in arch/")
+    ap.add_argument("--stage", type=int, default=None,
+                    help="cap the stage at this many pixels tall")
+    ap.add_argument("--rows", type=int, default=9,
+                    help="listing rows in each of the two panes")
     a = ap.parse_args(argv)
 
     if a.all or a.design:
         render_design(IMG / "design.gif", colors=a.colors)
     if a.all or a.evaluate:
         render_terminal(IMG / "evaluate.gif")
-    if a.all or a.compiled:
-        spec = dict(COMPILED)
-        spec.pop("tsir"), spec.pop("qasm")
-        if a.start:
-            spec["start"] = a.start
-        if a.frames != 40:
-            spec["n"] = a.frames
-        try:
-            render_compiled(a.tsir, a.qasm, IMG / "compiled.gif", cert=a.cert,
-                            colors=a.colors, **spec)
-        except FileNotFoundError as exc:
-            # the compiled programme comes out of `Compiler/`, which needs an OCaml
-            # toolchain: a clone without one skips this clip rather than failing the
-            # gallery, exactly as the deck clip does without its artifact
-            print(f"{'compiled':26s} skipped: {exc}")
+    if a.compiled:
+        if not (a.tsir and a.qasm):
+            ap.error("--compiled needs --tsir and --qasm")
+        render_compiled(a.tsir, a.qasm, a.out or IMG / "compiled.gif", cert=a.cert,
+                        arch_path=a.arch_file, start=a.start,
+                        n=a.frames, width=a.width, colors=a.colors,
+                        stage_h=a.stage, rows=a.rows)
     if (a.design or a.evaluate or a.compiled) and not a.all:
         return 0
     if a.all or not a.device:

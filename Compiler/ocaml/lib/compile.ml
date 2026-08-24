@@ -651,7 +651,16 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                         (fun (m : Route.move) ->
                           Tsir.{ ion = m.ion; src = m.src; dst = m.dst; via = m.via })
                         cy.moves;
-                    meta = [ ("kind", `String "undock") ];
+                    (* the layer's ops again: this transport is not travelling TOWARDS
+                       them -- they have happened -- it is clearing the gate zone after
+                       them, and `qccd.ir.source_map` sorts the two apart by position *)
+                    meta =
+                      [ ("kind", `String "undock") ]
+                      @ op_meta
+                          (List.concat_map
+                             (fun (m : Route.move) ->
+                               try Hashtbl.find ion_ops m.ion with Not_found -> [])
+                             cy.moves);
                   };
               incr n_transport;
               incr cyc)

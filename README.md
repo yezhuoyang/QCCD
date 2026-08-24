@@ -171,6 +171,68 @@ which qubit went to which ion, where every ion was at every cycle, and which cir
 operation each pulse group realises. Checking that certificate is **Lean 4**: 1,112 lines
 and 31 theorems with no `sorry`, of which the trusted checker itself is 712.
 
+### Watching one run
+
+Four qubits, seven statements, and two twelve-trap devices — small enough that every
+hardware instruction fits beside the circuit statement it came from.
+
+```qasm
+qreg q[4];  creg c[2];
+h q[0];  cx q[0],q[1];  t q[2];  cx q[1],q[2];  rz(0.7854) q[3];  cx q[2],q[3];
+measure q[3] -> c[0];
+```
+
+**`micro_grid`** — a 3×3 lattice, every trap gate-capable. One shuttle brings a pair
+together and the entangler fires.
+
+![the same circuit on a grid](docs/img/micro_grid.gif)
+
+**`micro_ring`** — the same twelve traps wired as a loop with four dock spurs. Only the
+docks can gate, so every pair has to travel.
+
+![the same circuit on a ring](docs/img/micro_ring.gif)
+
+Two listings sit under the stage and the page steps both: the **hardware program** on the
+left, indexed by machine step, and the **circuit** on the right, indexed by source line.
+Neither moves — only the cursor does, and its colour says which of two things is
+happening. Orange is the gate firing; teal is the machine still travelling towards the
+statement, or clearing up after it.
+
+That is the whole loop a QCCD compiler runs, visible one instruction at a time:
+`cx q[0],q[1]` becomes a shuttle, then `R · MS · R · R · R` — the decomposition proved in
+[Compiler/lean](Compiler/lean/QCCDC/Pulse/Decompose.lean) — then a shuttle back.
+
+#### Same circuit, same trap count, different wiring
+
+| | `micro_grid` | `micro_ring` |
+|---|---:|---:|
+| traps / junctions | 12 / 5 | 12 / 4 |
+| hardware instructions | **28** | 45 |
+| transport instructions | **5** | 22 |
+| ion-hops | **5** | 22 |
+| cost | **15** | 33 |
+| machine steps | **32** | 44 |
+| runtime | **2.045 ms** | 2.615 ms |
+| all 20 checkable rules | pass | pass |
+| R10 (proved Lean checker) | **passed** | **passed** |
+
+The grid runs the same circuit **1.28× faster on the same number of traps**, and the
+reason is in one row: 5 transport instructions against 22. A lattice can gate wherever the
+ions already are; a ring has four gate zones and has to carry every pair to one. That
+trade is what the ring buys elsewhere — it is the shape that lets rigid rotation move 168
+ions with one instruction, which is how `BB [[144,12,12]]` compiles at all -- see *What it compiles*, below.
+
+Reproduce both clips, the table and the verification with one command:
+
+```bash
+python Compiler/bridge/micro_demo.py --gif
+```
+
+The correspondence is checked before it is drawn. Every instruction carries the circuit
+operations it serves, stamped as the compiler emitted it; the certificate's gate witnesses
+— the ones the Lean checker decides — are then used to verify those stamps, and a
+disagreement refuses the page rather than illustrating it.
+
 ### R10, the rule that was always skipped
 
 Of the [23 rules](docs/rules.md), twenty-two are structural and the platform has always
@@ -240,37 +302,6 @@ gates, which the order rule rejected outright. The fix for the second was not to
 rule but to prove the exemption — `Cert/Commute.lean` proves two `cx` gates commute when
 they share a control with distinct targets, or a target with distinct controls, and exhibits
 a state where a control/target chain does not.
-
-### Watching one run
-
-![a compiled program, step by step](docs/img/compiled.gif)
-
-A hand-written program answers *what is executing?* with the instruction. A compiled one
-has a second answer, and it is the one that makes the page a debugger: **which statement of
-your circuit that instruction is discharging**. Above is `BB [[144,12,12]]` on the ring it
-was designed for, at the five instructions where the whole vocabulary shows -- the loop
-turns towards `cx q[155],q[29]`, an ion docks, the entangler fires, it undocks, and the
-loop turns again towards the next statement.
-
-Pass `--qasm` and the page carries both listings and steps them together: the statement
-being discharged is lit, the ones being travelled towards are shaded, and clicking a
-statement jumps to the instruction that discharges it.
-
-```bash
-cd Compiler
-python bridge/render.py build/out/steane.cooled.tsir.json \
-    --arch arch/grid9x9.arch.json --qasm examples/steane_esm.qasm \
-    -o ../out/compiled/steane.html
-
-cd .. && python -m qccd studio \
-    --tsir Compiler/build/out/steane.cooled.tsir.json \
-    --qasm Compiler/examples/steane_esm.qasm -o out/studio.html
-```
-
-The correspondence is checked before it is drawn. Every instruction carries the circuit
-operations it serves, stamped as the compiler emitted it; the certificate's gate witnesses
--- the ones the Lean checker decides -- are then used to verify those stamps, and a
-disagreement refuses the page rather than illustrating it.
 
 Full design notes, the SAT routing oracle, and the measured (runtime, error) frontier:
 [Compiler/PLAN.md](Compiler/PLAN.md) · [Compiler/README.md](Compiler/README.md).
