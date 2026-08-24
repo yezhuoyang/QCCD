@@ -11,6 +11,8 @@ whole thing to one self-contained HTML page.
                                                the HARDWARE PROGRAM, disassembled
     python -m qccd run ring144_24v --html out/ring.html
     python -m qccd demo                        every device, every program, one index page
+    python -m qccd phys ring144_24v            the ELECTRODES it implies, and their DRC
+    python -m qccd gds ring144_24v -o ring.gds the same metal, for a fab tool
 
 The device / program / verify / report / view split is deliberate: a device description is
 independent of the program, a program is independent of the cost model, and the verifier
@@ -40,6 +42,7 @@ from qccd.verify.control import control_trace  # noqa: E402
 from qccd.verify import replay, verify  # noqa: E402
 from qccd.verify.replay import ReplayError  # noqa: E402
 from qccd.viz import render_html  # noqa: E402
+from qccd.viz.render import build_view_model  # noqa: E402
 
 ARCH_DIR = ROOT / "arch"
 OUT = ROOT / "out"
@@ -286,6 +289,18 @@ def cmd_verify(args) -> int:
 def cmd_studio(args) -> int:
     """`qccd studio` -- the design tool, as ONE self-contained page.
 
+    `--tsir`/`--qasm` open it on a COMPILED program with its circuit beside it, which is
+    the shape debugging a compiler actually takes: the animation says where the ions are,
+    the Program pane says which instruction is executing, and the Circuit pane says which
+    statement of the user's QASM that instruction is discharging -- or, while the machine
+    is only shuttling, which statement it is travelling towards. Clicking a statement
+    jumps to the instruction that discharges it.
+
+    The join is checked before it is drawn: every gate witness in the certificate must
+    agree with the stamp on the instruction it names, or `qccd.ir.source_map` raises. A
+    page that showed an unverified correspondence would be worse than one that showed
+    none, because it would be believed.
+
     Not a second page kind.  `render_html` is already a renderer over `(arch, prog)`, and
     `(empty arch, empty prog)` became a legal pair the moment `Architecture.from_json`
     started testing for the PRESENCE of `nodes` rather than its truthiness.  What the
@@ -294,7 +309,16 @@ def cmd_studio(args) -> int:
     packages to offer rather than a pair.
     """
     model = deck_model() if args.model == "deck" else corrected_model(args.table)
-    if args.seed:
+    source = None
+    if args.tsir:
+        prog = TSIR.load(args.tsir)
+        # `arch_spec` is whatever the producer wrote: the compiler records the path it
+        # was given, the Python builders record a bare device name.  Both are common,
+        # so both resolve -- and neither is invented when it does not exist.
+        arch = _load(args.seed) if args.seed else _load(str(_arch_of(prog)))
+        if args.qasm:
+            source = _compiled_source(args, prog)
+    elif args.seed:
         arch = _load(args.seed)
         prog = program_for(arch, args.program, args.k or "") if args.program else \
             TSIR(name="empty", arch_spec=str(args.seed))
@@ -311,14 +335,70 @@ def cmd_studio(args) -> int:
     report = verify(prog, arch, model)
     path = render_html(arch, prog, report.result, model, args.out,
                        kicker="QCCD STUDIO",
-                       headline=f"{arch.name} - design",
-                       lede="an empty canvas: build a device, write a test programme, "
-                            "and see what can and cannot be checked here",
+                       headline=(f"{arch.name} - {prog.name}" if args.tsir
+                                 else f"{arch.name} - design"),
+                       lede=(f"a compiled program, step by step: {len(prog)} hardware "
+                             f"instructions against "
+                             f"{len(source['ops'])} circuit statements"
+                             if source else
+                             "an empty canvas: build a device, write a test programme, "
+                             "and see what can and cannot be checked here"),
                        template_stems="*" if args.all_templates else None,
-                       max_frames=args.max_frames)
+                       max_frames=args.max_frames,
+                       source=source)
     print(f"wrote {path}  ({path.stat().st_size:,} bytes, "
           f"{len(arch.device.nodes)} nodes, {len(prog)} instructions)")
+    if source:
+        print(f"  circuit       {source['name']}: {len(source['ops'])} statements, "
+              f"{len(source['realises'])} instructions discharge one, "
+              f"{len(source['toward'])} shuttle towards one, "
+              f"{len(source['after'])} clear up after one")
     return 0
+
+
+def _arch_of(prog) -> Path:
+    """The device a compiled program names, as a path that exists.
+
+    `arch_spec` is a free-text field and its producers disagree: the compiler records the
+    path it was handed (`arch/grid9x9.arch.json`), the Python builders record a bare name
+    (`grid9x9`). Rather than pick a winner, resolve both -- and refuse rather than fall
+    back to some default, because opening a compiled program against the WRONG device
+    would replay, would draw, and would be nonsense.
+    """
+    spec = str(prog.arch_spec or "")
+    for cand in (Path(spec), ROOT / spec,
+                 ARCH_DIR / f"{Path(spec).name.split('.')[0]}.arch.json"):
+        if cand.suffix and cand.is_file():
+            return cand
+    raise SystemExit(
+        f"the program names device {spec!r}, which is not a file and is not in "
+        f"{ARCH_DIR}; pass --seed <arch.json>")
+
+
+def _compiled_source(args, prog):
+    """The circuit pane's payload, or a refusal that says which file is missing.
+
+    The certificate is looked for beside the program rather than demanded, because the
+    compiler always writes the two together -- but it is never GUESSED at loosely: an
+    unexpected filename asks for `--cert` instead of picking a certificate that might
+    belong to a different compilation.
+    """
+    from .ir.source_map import build as build_source
+
+    cert_path = Path(args.cert) if args.cert else None
+    if cert_path is None:
+        stem = Path(args.tsir).name
+        for suffix in (".cooled.tsir.json", ".tsir.json"):
+            if stem.endswith(suffix):
+                cert_path = Path(args.tsir).with_name(
+                    stem[: -len(suffix)] + ".qcert.json")
+                break
+    if cert_path is None or not cert_path.exists():
+        raise SystemExit(
+            f"--qasm needs the compiler certificate; "
+            f"{'no --cert given and none found beside ' + str(args.tsir) if cert_path is None else str(cert_path) + ' does not exist'}")
+    return build_source(prog, json.loads(cert_path.read_text(encoding="utf-8")),
+                        args.qasm)
 
 
 def cmd_open(args) -> int:
@@ -406,6 +486,91 @@ def cmd_reach(args) -> int:
         import json as _json
         Path(args.json).write_text(_json.dumps(r.as_dict(), indent=1), encoding="utf-8")
         print(f"  wrote {args.json}")
+    return 0
+
+
+def cmd_phys(args) -> int:
+    """The electrodes a device implies, and whether they can be fabricated.
+
+    Everything printed here is derived: no architecture file declares a polygon, and the
+    only authored input is the technology sidecar, whose every dimension carries a source.
+    """
+    from .phys.build import build_layout
+    from .phys.drc import check as drc_check
+    from .phys.tech import load_technology
+
+    arch = load(ARCH_DIR / f"{args.device}.arch.json")
+    tech = load_technology(args.tech)
+    layout = build_layout(arch, tech)
+    summary = layout.summary()
+
+    box = summary["bbox_nm"]
+    print(f"{arch.name}  [{tech.name}]")
+    print(f"  {summary['n_polys']} polygons from {summary['n_cells']} cells placed "
+          f"{summary['n_insts']} times")
+    if box:
+        print(f"  die {(box[2] - box[0]) / 1e6:.3f} x {(box[3] - box[1]) / 1e6:.3f} mm")
+    for role, n in summary["polys_by_role"].items():
+        print(f"    {role:<16} {n}")
+    for note in summary["notes"]:
+        print(f"  - {note}")
+    for r in layout.refused:
+        print(f"  REFUSED {r.kind} {r.owner}: {r.reason}")
+
+    report = drc_check(layout, arch)
+    print()
+    print(report.text(limit=args.limit))
+
+    if args.svg:
+        from .phys.svg import write_svg
+        write_svg(layout, args.svg)
+        print(f"\n  wrote {args.svg}")
+    if args.html:
+        # The studio page with the metal under it.  A device still needs a programme to
+        # render at all, and an empty one is a legal programme.
+        from .phys.svg import metal_view_model
+        prog = TSIR(name="empty", arch_spec=arch.name)
+        model = corrected_model()
+        rep = verify(prog, arch, model)
+        view = build_view_model(arch, prog, rep.result, model)
+        metal = metal_view_model(layout, width=view["layout"]["W"],
+                                 height=view["layout"]["H"])
+        out = render_html(arch, prog, rep.result, model, args.html,
+                          kicker="ELECTRODES",
+                          headline=f"{arch.name} - {tech.name}",
+                          lede=f"{summary['n_polys']} derived electrodes, true to scale, "
+                               f"under the schematic they came from",
+                          metal=metal)
+        print(f"  wrote {out}")
+    if args.json:
+        import json as _json
+        Path(args.json).write_text(
+            _json.dumps({"layout": summary, "drc": report.as_dict()}, indent=1),
+            encoding="utf-8")
+        print(f"  wrote {args.json}")
+    return 0
+
+
+def cmd_gds(args) -> int:
+    """Write the derived electrodes as GDSII, which a fab tool can open."""
+    from .phys.build import build_layout
+    from .phys.gds import read_gds, write_gds
+    from .phys.tech import load_technology
+
+    arch = load(ARCH_DIR / f"{args.device}.arch.json")
+    tech = load_technology(args.tech)
+    layout = build_layout(arch, tech)
+    out = Path(args.out or f"{args.device}.gds")
+    write_gds(layout, out, name=args.name)
+
+    # read it back before claiming it was written: the reader shares no code with the
+    # writer, so a file that does not parse is caught here rather than at the fab
+    lib = read_gds(out)
+    n = len(lib.boundaries)
+    if n != layout.n_polys():
+        raise SystemExit(f"wrote {layout.n_polys()} polygons but read back {n}")
+    print(f"{arch.name} -> {out}  ({out.stat().st_size} bytes, {n} polygons, "
+          f"database unit {lib.db_unit_m:g} m)")
     return 0
 
 
@@ -717,10 +882,28 @@ def build_parser() -> argparse.ArgumentParser:
     p_reach.add_argument("--metric", choices=["quanta", "us", "cost"], default="quanta")
     p_reach.add_argument("--json", default=None)
 
+    p_phys = sub.add_parser("phys", help="the electrodes a device implies, and their DRC")
+    p_phys.add_argument("device")
+    p_phys.add_argument("--tech", default="eth_junction_2201.12579",
+                        help="a shipped preset name, or a path to a .tech.json")
+    p_phys.add_argument("--limit", type=int, default=8,
+                        help="how many design-rule violations to print")
+    p_phys.add_argument("--svg", default=None, help="also render the metal to this file")
+    p_phys.add_argument("--html", default=None,
+                        help="render the studio page with the metal under it")
+    p_phys.add_argument("--json", default=None)
+
+    p_gds = sub.add_parser("gds", help="write the derived electrodes as GDSII")
+    p_gds.add_argument("device")
+    p_gds.add_argument("--tech", default="eth_junction_2201.12579")
+    p_gds.add_argument("-o", "--out", default=None)
+    p_gds.add_argument("--name", default="QCCD", help="the GDSII library and cell name")
+
     sub.add_parser("analyses", help="what analyses exist, and their knobs")
 
     p_sweep = sub.add_parser("sweep", help="vary one design knob and print the curve")
-    p_sweep.add_argument("analysis", help="reach | budget (see `qccd analyses`)")
+    p_sweep.add_argument("analysis",
+                         help="reach | budget | field (see `qccd analyses`)")
     p_sweep.add_argument("device")
     p_sweep.add_argument("key", help="the knob, dotted for nested (scale.junction)")
     p_sweep.add_argument("values",
@@ -740,6 +923,16 @@ def build_parser() -> argparse.ArgumentParser:
                                "(default: the built-in default template)")
     p_studio.add_argument("--program", default=None,
                           help="with --seed, a built-in program to open on")
+    p_studio.add_argument("--tsir", default=None,
+                          help="open on a COMPILED program (a .tsir.json); the device is "
+                               "taken from arch/ unless --seed says otherwise")
+    p_studio.add_argument("--qasm", default=None,
+                          help="with --tsir, the circuit it was compiled from -- adds the "
+                               "Circuit pane, which steps the source in lockstep with the "
+                               "hardware")
+    p_studio.add_argument("--cert", default=None,
+                          help="with --qasm, the compiler certificate "
+                               "(default: alongside --tsir)")
     p_studio.add_argument("--k", default="")
     p_studio.add_argument("--model", default="corrected", choices=["deck", "corrected"])
     p_studio.add_argument("--table", default="qccdsim_jones")
@@ -770,6 +963,7 @@ def main(argv=None) -> int:
     return {"devices": cmd_devices, "show": cmd_show, "run": cmd_run,
             "demo": cmd_demo, "verify": cmd_verify, "regen": cmd_regen,
             "reach": cmd_reach, "sweep": cmd_sweep,
+            "phys": cmd_phys, "gds": cmd_gds,
             "analyses": cmd_analyses,
             "arch": cmd_arch,
             "source": cmd_arch, "studio": cmd_studio, "open": cmd_open,

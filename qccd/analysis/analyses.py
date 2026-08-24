@@ -30,7 +30,8 @@ from .base import QCCDAnalysis
 from .budget import _Scaled, error_budget
 from .reach import reach_report
 
-__all__ = ["ReachAnalysis", "BudgetAnalysis", "ANALYSES", "get_analysis"]
+__all__ = ["ReachAnalysis", "BudgetAnalysis", "PhysicalAnalysis",
+           "ANALYSES", "get_analysis"]
 
 _MODELS = {"corrected": corrected_model, "deck": deck_model}
 
@@ -126,8 +127,10 @@ class BudgetAnalysis(QCCDAnalysis):
         }
 
 
+from .field import PhysicalAnalysis  # noqa: E402  (imports qccd.phys, which is heavier)
+
 #: every analysis the tool can offer, by the name an architect would pick
-ANALYSES = {"reach": ReachAnalysis, "budget": BudgetAnalysis}
+ANALYSES = {"reach": ReachAnalysis, "budget": BudgetAnalysis, "field": PhysicalAnalysis}
 
 
 def get_analysis(name: str) -> type[QCCDAnalysis]:

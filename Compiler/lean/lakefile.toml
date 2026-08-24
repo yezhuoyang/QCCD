@@ -1,0 +1,21 @@
+name = "QCCDC"
+version = "0.1.0"
+defaultTargets = ["QCCDC", "qcheck"]
+
+# Pinned to the toolchain and Mathlib revision that LeanQEC has already BUILT
+# (7,676 .olean under LeanQEC/.lake/packages, reached here through a junction at
+# .lake/packages).  Bumping either without intending a multi-hour rebuild is the
+# single most expensive mistake available in this directory.
+[[lean_lib]]
+name = "QCCDC"
+
+# The trusted checker, as a runnable program.  `QCCDC.Cert.*` imports only Lean core,
+# so this target builds in seconds and does not drag Mathlib in behind it.
+[[lean_exe]]
+name = "qcheck"
+root = "Main"
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "master"

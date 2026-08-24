@@ -1,0 +1,3 @@
+# The gate scripts are run by bash (Git Bash on Windows).  A CRLF checkout makes
+# every one of them fail on the shebang, so pin them to LF regardless of core.autocrlf.
+*.sh text eol=lf

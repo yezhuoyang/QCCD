@@ -27,7 +27,7 @@ from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
 from ..cost.models import QUANTA_COMPONENTS, Charge, CostModel
-from ..ir.tsir import TSIR, Instruction, Participant, iter_pairs
+from ..ir.tsir import TSIR, Instruction, Participant, iter_operands, iter_pairs
 from .rules import CycleView, ResolvedMove, RuleReport, check_cycle
 
 __all__ = ["ReplayResult", "CycleRecord", "replay", "ReplayError"]
@@ -67,6 +67,9 @@ class ReplayResult:
     moves_per_ion: Counter = field(default_factory=Counter)
     gates_per_ion: Counter = field(default_factory=Counter)
     n_gates: int = 0
+    #: single-qubit gates, counted apart from `n_gate_pairs` because they are priced
+    #: from a different primitive (`1q_gate`, not `ms_gate`)
+    n_1q_gates: int = 0
     n_gate_pairs: int = 0
     n_measure: int = 0
     n_reset: int = 0
@@ -372,7 +375,17 @@ def replay(
         if instr.type == "gate":
             pairs = list(iter_pairs(instr))
             n_pairs = len(pairs)
-            charge = model.gate(arch, instr.gate or "MS", n_pairs)
+            # A gate instruction is either two-qubit (pairs) or single-qubit (one ion).
+            # They are priced from different primitives, so they are counted separately
+            # rather than folded together -- see `CostModel.gate_1q`.
+            singles = [o[0] for o in iter_operands(instr) if len(o) == 1]
+            if singles:
+                charge = model.gate_1q(arch, instr.gate or "R", len(singles))
+                res.n_1q_gates += len(singles)
+                for a in singles:
+                    res.gates_per_ion[a] += 1
+            else:
+                charge = model.gate(arch, instr.gate or "MS", n_pairs)
             res.n_gates += 1
             res.n_gate_pairs += n_pairs
             for a, b in pairs:
