@@ -187,8 +187,10 @@ so it runs while CD1 is being closed, and each item can falsify a plan assumptio
 | 0.5 | Grid vs ring vs ladder at fixed trap count | the `micro_demo.py` pattern at BB scale | first real intuition about geometry |
 | 0.6 | What does the router actually cost? | occupancy sweep per family (`c7_occupancy.py` generalised) | tells us which families the compiler can even serve |
 
-**Deliverable:** `Codesign/FINDINGS.md`, one section per question, each with the command that
-produced it. Written as things were learned, including the ones that came out boring.
+**Deliverable:** one file per question in [`findings/`](findings/), each naming the command
+that produced it, with the raw output committed to `data/`. Written as things were learned,
+including the ones that came out boring. Question 0.1 is already answered --
+[findings/q01](findings/q01-error-structure.md).
 
 None of these needs the new model terms, so CD4 runs *while* G1 and G2 are being closed --
 except any sweep over trap capacity, which must wait for G1.
@@ -234,7 +236,7 @@ hides the engineering.
 | T2 physical — replay → `p_eff`, `T_round`, the channel split | ms | accepting a candidate |
 | T2 + feasibility — 23 rules and R10 by the **proved Lean checker** | s–min | anything reported |
 
-A number that reaches `FINDINGS.md` must have passed the top tier: **an infeasible schedule
+A number that reaches `findings/` must have passed the top tier: **an infeasible schedule
 has no performance.** T1 may rank; only T2 may be quoted.
 
 ---
