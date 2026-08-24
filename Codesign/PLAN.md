@@ -1,8 +1,7 @@
-# `Codesign/` — finding the architecture that gets BB codes to break-even
+# `Codesign/` — finding the architecture that runs BB codes best
 
-**Read this before writing any code.** It states the one claim this directory has to
-support, what is missing before that claim can even be *evaluated*, and the order in which
-to find out.
+**Read [`EVALUATION.md`](EVALUATION.md) first**, then this. That file settles what a design
+is scored by; this one settles what is searched and in what order.
 
 The work is a **double optimisation**: for a fixed architecture, find the best hardware
 program; across architectures, compare the best each can do. Neither half is meaningful
@@ -11,93 +10,71 @@ badly-shaped machine finds a local optimum nobody cares about.
 
 ---
 
-## CD0 · The claim, and why it is not yet computable
+## CD0 · The objective
 
-> **Break-even**: a logical qubit encoded in `BB [[144,12,12]]`, on architecture `A`,
-> retains its state better over one unit of wall-clock time than the best *physical* ion
-> on the same machine does over that same time.
-
-Written as a number, for a memory experiment of `R` rounds:
+**No decoder, no logical simulation.** A design is scored by two numbers this repository
+already computes for every compiled program:
 
 ```
-    ε_L(A)  =  logical error per syndrome round        (needs a DECODER)
-    T(A)    =  wall-clock per syndrome round           (have it: res.total_us)
-    ε_1(T)  =  a single idle physical ion's error over T   (have it: T2 model)
-
-    break-even margin   M(A)  =  ε_1(T(A)) / ε_L(A)          M > 1 is break-even
+T_round  =  wall-clock for one BB[[144,12,12]] syndrome round      res.total_us
+p_eff    =  neg_log_fidelity / (fault locations)                   mean fault probability
+            neg_log_fidelity = Σ_gates ε(n̄) + N·T/T_coh + Σ_spam
 ```
 
-**Three of those four quantities already exist in this repository. `ε_L` does not.**
+`p_eff` is the quantity the code's published **0.7 % threshold** is quoted against, so the
+first thing any candidate reports is `p_eff` versus 0.7 %. A design at 5 % is not slow; the
+code does not help it at all, and no compiler work will fix that.
 
-`qccd/analysis/budget.py` reports `total_error` — the *summed physical gate infidelity* of
-a schedule. That is not a logical error rate and must never be presented as one. Summed
-physical error goes **up** with more rounds while logical error goes **down**; optimising
-the former directly would pick the architecture that runs the fewest gates, which is the
-architecture that does no error correction at all.
+This is the same construction the closest published precedent uses — Murali *et al.* (ISCA
+2020) rank QCCD architectures by multiplying per-operation fidelities, with no simulation.
+[`EVALUATION.md`](EVALUATION.md) gives the derivation, the optional ranking scalar, the
+optimistic/pessimistic bracket, and the five things this metric cannot see.
 
-**So the first thing this directory builds is `ε_L`, and until it exists there is no
-objective and no loop.** Everything in CD1 is prerequisite, not preamble.
+**Time is a term, not a rival objective.** Cooling more lowers `n̄` at each gate and lengthens
+the round; a longer round costs idle dephasing, which is *already inside* the same scalar. So
+there is an interior optimum in the cooling budget rather than a frontier to pick a point on.
 
 ---
 
-## CD1 · What has to be built before the loop can start
+## CD1 · Three model gaps that must close before searching
 
-### CD1.a A circuit-level noise model derived from the compiled schedule
+Derived in [`EVALUATION.md`](EVALUATION.md) §4. The first is a blocker; the other two change
+answers but do not invalidate them.
 
-The raw material is already there and is *per-location*, not averaged:
+### G1 — gate error has no chain-length term · **BLOCKER**
 
-| quantity | where it lives now | what is needed |
-|---|---|---|
-| two-qubit gate error at each gate | `model.gate_error(arch, nbar)`, called per gate at [`replay.py:399`](../qccd/verify/replay.py) and **summed away** | retain it per gate |
-| idle / dephasing per ion | `t2_metrics` ([`cost/physical.py`](../qccd/cost/physical.py)), `res.per_ion_quanta` | per ion, per idle interval |
-| SPAM | `spam_error` in `physical.py:160` | per measure / reset |
-| heating that causes the above | `res.quanta_components`, split by channel | already per-channel |
+`gate_error(arch, nbar) = ε₀ + k·n̄`. No dependence on how many ions share the trap.
+**Trap capacity is one of the knobs we intend to search**, and with no penalty for long
+chains, more ions per trap is strictly better — fewer shuttles, no cost. The optimiser will
+drive capacity to R13's hard cap of 15 and report the cap as an optimum. That is the
+constraint being read back, not a finding.
 
-The compiled program is a TSIR instruction list with an exact replay, so **every ion's
-history is known at every cycle**. That is strictly more information than a uniform
-depolarising model, and it is the whole reason this platform can say something a paper
-study cannot: the noise is *derived from the transport schedule*, not assumed.
+Murali *et al.* locate the real optimum at **15–25 ions**, and it exists *because* of the
+`A ∝ N/ln N` laser-instability term this model omits. Add it, with the `Γτ` term so gate
+duration costs something:
 
-Deliverable: `Codesign/noise.py` — `(TSIR, Architecture, CostModel) -> DetectorErrorModel`,
-one error mechanism per (location, channel), with provenance back to the instruction that
-caused it.
-
-**Falsification test, run first:** if the derived per-gate error is within a few percent of
-`floor_error / n_gate_pairs` for every architecture, then heating is not the discriminator,
-geometry barely matters, and this whole study collapses to "minimise round time". That
-would be a *result* — report it and stop. Check it before building the decoder.
-
-### CD1.b A decoder
-
-BB codes are not surface codes; matching does not apply. The standard choice is **BP+OSD**
-over the check matrix `qccd/codes/bb.py` already builds.
-
-> **Decision D1 — dependencies.** The core tool advertises *zero dependencies*, and that is
-> worth protecting. Proposal: `Codesign/` may use `stim`, `ldpc`, `numpy` from a
-> `requirements-research.txt`, with **nothing in `qccd/` importing them**, and a pure-Python
-> BP+OSD-0 fallback (~300 lines) so the loop still runs on a bare clone, slower.
-> *This needs the user's agreement before CD1.b starts.*
-
-### CD1.c The physical baseline
-
-`ε_1(T)` — one ion, idle, no transport, for `T` microseconds. `stationary_chain` is already
-in `arch/` for exactly this purpose ("the baseline that already demonstrated break-even").
-Use the same `corrected_model`, the same T2, no special-casing.
-
-### CD1.d The evaluator
-
-`Codesign/evaluate.py` — one function, the contract everything else obeys:
-
-```python
-def evaluate(arch, program) -> Verdict:
-    """Feasible?  Then: rounds/s, logical error per round, break-even margin."""
+```
+ε(n̄, N, τ)  =  ε₀  +  Γ·τ(N)  +  κ · (N / ln N) · (2n̄ + 1)
 ```
 
-- **Feasibility is not negotiable.** A candidate must pass the 23 rules *and* R10. A
-  schedule that violates R1 or computes the wrong circuit is not a fast design, it is not a
-  design. This is what makes the study different from a paper: `Compiler/` already proves
-  the program implements the circuit.
-- Verdicts are appended to a ledger (CD5) and never recomputed.
+**Calibrate against the shipped oracle**: `ring144_24v` at its current chain length must
+reproduce its current error. This is a refinement of a validated model, not a replacement.
+
+### G2 — anomalous heating is a constant, but `qccd/phys/` computes the ion height
+
+Field noise scales as **d⁻⁴**. The solver already returns `ion_height_um`, and the repo has
+already measured that no shipped device sits at its design height — neighbouring metal moves
+it by up to 15%, which under d⁻⁴ is a **1.75× error in the heating rate** on every ion.
+
+Deriving `Γ_anom` from the solved height gives **layout → electrodes → ion height → heating →
+gate error** end to end. A study without a field solver has to assume this number; this one
+can compute it. It is the part of the result no purely algorithmic paper can produce.
+
+### G3 — idle error is linear in time
+
+`idle_error = N · T / T_coh`. Hyperfine ion memory under correlated field noise is often
+closer to `(t/T₂)²`. Linear is conservative and defensible, but it **directly sets the cooling
+optimum**, so run the loop under both and report whether the winner changes.
 
 ---
 
@@ -120,9 +97,12 @@ single knob, `--ancillas`.
 | CX order within a check | 6 members; the order sets which data qubits idle longest |
 | interleaving of X and Z checks | affects hook errors and ancilla contention |
 
-**The CX order is not free.** A wrong order in a weight-6 check turns a single ancilla fault
-into a weight-2 data error, which is a *distance* problem, not a speed problem. Any schedule
-search must be scored by `ε_L`, never by makespan.
+**The CX order is not free, and `p_eff` cannot see why.** A wrong order in a weight-6 check
+turns a single ancilla fault into a weight-2 data error — a *distance* problem, not a speed
+one, and two orders that differ this way score identically under a metric that only counts
+expected faults ([`EVALUATION.md`](EVALUATION.md) §5). So this sub-axis is the one exception
+to CD0: fix the CX order from the published depth-7 schedule and do **not** let the optimiser
+move it, unless and until something that can see error structure is added.
 
 ### 2. Mapping — which ion carries which qubit
 
@@ -152,10 +132,10 @@ and still pass R10).
 Exists and is the one axis already understood: `max_gate_quanta` traces a genuine
 (runtime, error) frontier, measured at **2.19× runtime for 22.5× error** by
 [`c5_pareto.py`](../Compiler/bridge/c5_pareto.py). The three shipped policies sit at the
-slow end and "are not a choice". Under `ε_L` this becomes a real optimum rather than a
+slow end and "are not a choice". Under `p_eff` this becomes a real optimum rather than a
 frontier: more cooling means fewer gate faults but a longer round, and a longer round means
-more idle dephasing. **There is an interior minimum, and finding it is the cleanest early
-win in this whole plan.**
+more idle dephasing — and both are terms in the same scalar. **There is an interior minimum,
+and finding it is the cleanest early win in this whole plan.**
 
 > **Fairness protocol.** Every architecture gets the **same inner-loop compute budget**
 > (same number of `evaluate` calls, same proposer, same seeds). Otherwise the outer
@@ -195,13 +175,13 @@ objectives — this is the part of the study a purely algorithmic paper cannot d
 
 ## CD4 · Phase 0 — cheap exploration, before any optimiser
 
-The user's instruction, and it is the right one. **Nothing below needs the decoder**, so it
-runs while CD1 is still being built, and each item can falsify a plan assumption in an hour.
+The user's instruction, and it is the right one. **Nothing below needs a new model term**,
+so it runs while CD1 is being closed, and each item can falsify a plan assumption in an hour.
 
 | # | question | how | what it would change |
 |---|---|---|---|
 | 0.1 | Does heating actually discriminate? | `error_budget` on the 9 shipped devices, same circuit | if not, geometry is irrelevant → report and stop |
-| 0.2 | Where is the cooling optimum? | `c5_pareto.py` + a crude `ε_L` surrogate (idle + gate faults, no decoder) | tells us whether the interior minimum exists at all |
+| 0.2 | Where is the cooling optimum? | `c5_pareto.py`, scoring each point by `p_eff` rather than by gate error alone | the interior optimum CD0 predicts — or its absence |
 | 0.3 | How much does ancilla count matter? | `gen_bb144.py --ancillas 12,24,36,48,72` on `ring144_24v` + `grid9x9` | sizes the schedule axis |
 | 0.4 | How much does CX order matter? | 3 hand-written orders, same device, compare data-ion idle | if it is 2%, deprioritise; if 2×, it leads |
 | 0.5 | Grid vs ring vs ladder at fixed trap count | the `micro_demo.py` pattern at BB scale | first real intuition about geometry |
@@ -210,6 +190,9 @@ runs while CD1 is still being built, and each item can falsify a plan assumption
 **Deliverable:** `Codesign/FINDINGS.md`, one section per question, each with the command that
 produced it. Written as things were learned, including the ones that came out boring.
 
+None of these needs the new model terms, so CD4 runs *while* G1 and G2 are being closed --
+except any sweep over trap capacity, which must wait for G1.
+
 ---
 
 ## CD5 · The autoresearch loop
@@ -217,7 +200,7 @@ produced it. Written as things were learned, including the ones that came out bo
 ```
    ledger.jsonl ──► propose ──► compile ──► evaluate ──► accept? ──► ledger.jsonl
         ▲             │            │            │                         │
-        │             │            │            └── 23 rules + R10, then ε_L, T, margin
+        │             │            │            └── 23 rules + R10, then p_eff, T_round
         │             │            └── Compiler/, with the inner-loop knobs as flags
         │             └── coordinate descent over the axis with the largest measured slope
         └───────────────────────────────────────────────────────────────────┘
@@ -247,12 +230,12 @@ hides the engineering.
 
 | tier | cost | used for |
 |---|---|---|
-| surrogate `ε_L` (analytic, no decoder) | ms | inner-loop search |
-| BP+OSD, few shots | s | accepting a candidate |
-| BP+OSD, full shots + R10 by the proved Lean checker | minutes | the reported result |
+| T1 combinatorial — steps, hops, junction transits | µs | inside the inner loop |
+| T2 physical — replay → `p_eff`, `T_round`, the channel split | ms | accepting a candidate |
+| T2 + feasibility — 23 rules and R10 by the **proved Lean checker** | s–min | anything reported |
 
-A number that reaches `FINDINGS.md` must have been through the top tier. **Never quote a
-surrogate as a result.**
+A number that reaches `FINDINGS.md` must have passed the top tier: **an infeasible schedule
+has no performance.** T1 may rank; only T2 may be quoted.
 
 ---
 
@@ -260,11 +243,12 @@ surrogate as a result.**
 
 | risk | why it is fatal | when it is checked |
 |---|---|---|
-| `ε_L` is dominated by the error floor | geometry cannot move it; the answer is "buy better gates" | CD4 · 0.1, day one |
-| `ε_L` is dominated by data-ion idle time | study collapses to "minimise round time", which needs no decoder | CD4 · 0.2 |
-| the decoder is the compute bottleneck | the loop never gets enough samples to distinguish candidates | CD1.b, before the loop |
+| `p_eff` is dominated by the gate floor `ε₀` | geometry cannot move it; the answer is "buy better gates" | CD4 · 0.1, day one |
+| `p_eff` is dominated by data-ion idle time | study collapses to "minimise round time" and the heating model stops mattering | CD4 · 0.2 |
+| **G1 not closed before searching capacity** | the optimiser reports R13's hard cap as an optimum | CD1 · G1, before any sweep over trap size |
+| every candidate sits far above 0.7 % | nothing being compared would work; the ranking is of losers | CD4 · 0.1 — compare to threshold immediately |
 | the compiler cannot serve a family | comparison silently becomes "which device suits *our router*" | CD4 · 0.6 |
-| the noise model is not validated | every number downstream is a story | CD1.a — validate against the shipped 397,184 / 8,808 oracle |
+| the model is not recalibrated after G1/G2 | every number downstream drifts from the validated oracle | on each model change — the 397,184 / 8,808 replay must still hold |
 | the search space is too small to contain a good answer | converges fast to something mediocre | after the first convergence: perturb hard, see if it comes back |
 
 The last row deserves emphasis. **A converged loop is not evidence of an optimum.** When it
@@ -277,21 +261,24 @@ that is evidence. If it does not, the proposer is the problem.
 
 | | question | recommendation |
 |---|---|---|
-| **D1** | May `Codesign/` use `numpy` / `stim` / `ldpc`? | **Yes**, isolated — nothing in `qccd/` imports them, with a pure-Python BP+OSD-0 fallback. The zero-dependency promise is about the *tool*, not the research. |
-| **D2** | Break-even against *what* physical baseline? | one idle ion on the same device under the same model — the strictest honest choice, and `stationary_chain` already exists for it |
-| **D3** | Memory experiment only, or logical operations too? | **memory first.** `ε_L` per round is the smallest thing that can support the claim; logical gates multiply the search space before anything is understood |
-| **D4** | Which BB code? | `[[144,12,12]]` throughout, so every number is comparable to the shipped artifact. `[[72,12,6]]` as a fast proxy during development |
+| **D1** | Where do `κ` and `Γ` in the new gate model come from? | calibrate on the shipped `ring144_24v` schedule so its current error is reproduced, and take the `N/ln N` *shape* from Murali *et al.* Alternative — a literature value per trap technology — is better if a source can be found; **this is the largest single assumption in the study** |
+| **D2** | Report the optional `Λ = ε_L/T_round` ranking scalar at all? | **yes, labelled an extrapolation.** It costs nothing, makes the time/error trade explicit rather than arbitrary, and never appears without `(p_eff, T_round)` beside it |
+| **D3** | Memory round only, or logical operations too? | **memory round first.** One ESM round is the smallest unit that exercises transport, gates, SPAM and idling together; logical gates multiply the search space before anything is understood |
+| **D4** | Which BB code? | `[[144,12,12]]` throughout, so every number is comparable to the shipped artifact and to Bravyi's published threshold. `[[72,12,6]]` as a fast proxy during development |
 
 ---
 
 ## First session, in order
 
-1. Read this file, `Compiler/PLAN.md` §0–§2 (the trust architecture), `docs/PLAN.md` §1.
-2. Get D1 answered. Everything in CD1.b depends on it.
-3. **CD4 · 0.1** — the falsification test. One afternoon. If heating does not discriminate
-   between the nine shipped devices, write that up and stop; the rest of the plan is void.
-4. If it survives: CD1.a, the per-location noise model, validated against the shipped oracle.
-5. Only then CD1.b and the loop.
+1. Read [`EVALUATION.md`](EVALUATION.md), then this file, then `docs/PLAN.md` §6 and §0.2
+   (which already argue the objective), then `Compiler/PLAN.md` §0–§2 (the trust architecture).
+2. **CD4 · 0.1** — the falsification test. One afternoon, no new code: `error_budget` across
+   the nine shipped devices, and `p_eff` against 0.7 %. If heating does not discriminate, or
+   if everything is far above threshold, write that up and stop.
+3. If it survives: close **G1**. Nothing may sweep trap capacity before it is closed.
+4. Then G2 — wire `qccd/phys`'s solved ion height into the heating rate. Re-validate the
+   397,184 / 8,808 oracle after each model change.
+5. Then CD4's remaining questions, then the loop.
 
 Do not build the optimiser first. The optimiser is the easy part, and an optimiser pointed
 at an objective nobody has validated will produce a confident, precise, wrong answer — which
