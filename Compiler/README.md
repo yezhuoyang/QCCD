@@ -31,7 +31,41 @@ pipeline's 2 672, with all 20 checkable rules and R10 `passed`:
 
 ### Watching one run
 
-![a compiled program, step by step](../docs/img/compiled.gif)
+![the same circuit on a grid](../docs/img/micro_grid.gif)
+
+The same seven statements on the same twelve traps, wired as a loop rather than a lattice:
+
+![the same circuit on a ring](../docs/img/micro_ring.gif)
+
+| same circuit, same trap count | `micro_grid` | `micro_ring` |
+|---|---:|---:|
+| traps / junctions | 12 / 5 | 12 / 4 |
+| hardware instructions | **28** | 45 |
+| transport instructions | **5** | 22 |
+| ion-hops | **5** | 22 |
+| cost | **15** | 33 |
+| machine steps | **32** | 44 |
+| runtime | **2.045 ms** | 2.615 ms |
+| all 20 checkable rules | pass | pass |
+| R10 (proved Lean checker) | **passed** | **passed** |
+
+The grid runs it **1.28x faster on the same number of traps**, and the reason is one row: a
+lattice gates where the ions already are; a ring has four gate zones and has to carry every
+pair to one. That trade is what the ring buys elsewhere -- it is the shape that lets rigid
+rotation move 168 ions with one instruction.
+
+Two listings sit under the stage and the clip steps both: the **hardware program** on the
+left, indexed by machine step, and the **circuit** on the right, indexed by source line.
+Neither moves -- only the cursor does, and its colour says which of two things is happening.
+Orange is the gate firing; teal is the machine still travelling towards the statement, or
+clearing up after it.
+
+One command builds both devices, compiles `examples/micro.qasm` to each, verifies
+them, renders the clips and prints the comparison:
+
+```bash
+python bridge/micro_demo.py --gif
+```
 
 `--qasm` gives the animated page a second listing -- the circuit -- and steps it with the
 hardware. The statement the executing instruction is discharging is lit; the statements a
@@ -68,6 +102,83 @@ python bridge/mk_qcheck_input.py build/out/bb144_rot \
 python bridge/check_cert.py build/out/bb144_rot --qasm build/bb144_esm.qasm \
     --arch arch/ring144_24v.arch.json --qcheck build/qc_bb144.json   # ~5 min in Lean
 ```
+
+---
+
+## R10, the rule that was always skipped
+
+Of the [23 rules](../docs/rules.md), twenty-two are structural and the platform has always
+checked them. R10 — *"the compiled program implements the input circuit"* — had only ever
+been reported **skipped**, never `passed`. Run the verifier on anything and it says so
+itself, and says why:
+
+```console
+skipped R10: needs symbolic permutation + Pauli-frame tracking against a QASM DAG
+```
+
+It is now checked, in two halves.
+
+**Transport and ordering.** `QCCDC.Cert.check` is defined as `decide (Implements inp)`,
+where `Implements` is a *proposition* saying what it means for the program to realise the
+circuit: operands co-located at a trap that can gate, every move a hop the **architecture**
+admits, every op witnessed exactly once, dependent ops in program order. Soundness is then
+`of_decide_eq_true`, so all the content sits in a statement a reader can judge rather than
+in a pile of `Bool`s with a meaning asserted elsewhere. Ten further theorems prove each
+named way of being wrong is one `check` *cannot* accept — a dropped gate, a teleport, an
+aliased qubit, a reordering — and [`bridge/mutate_cert.py`](bridge/mutate_cert.py) injects
+all ten into real compiled certificates to confirm the checker rejects them in practice too.
+
+**Semantics.** The pulses are composed back into a stabilizer tableau — or, for small
+non-Clifford circuits, an exact unitary — and compared against the QASM. This reads the
+emitted program, not the compiler's claims about it.
+
+The facts the checker judges against — which traps can gate, which pairs are one cycle
+apart, the cyclic order of each loop — are re-derived from the architecture document by code
+the compiler never runs. **A compiler cannot widen the machine by asserting it.**
+
+## What it compiles
+
+Nine example circuits × the nine reference architectures:
+
+```console
+$ python bridge/run_matrix.py
+81 (circuit, architecture) pairs
+   72 fully verified   -- compiled, all rules pass, R10 passed
+    9 out of reach     -- device too small, or the heuristic router declined
+    0 DEFECTS          -- a rule violated or R10 refused
+```
+
+The nine out of reach are honest failures, not silent ones: `stationary_chain` has two
+traps, and the router declines rather than emitting something illegal.
+
+### `BB [[144,12,12]]` on `ring144_24v`
+
+The case worth naming, because it needed a second router. Moving ions one at a time runs out
+at **46.2% loop occupancy** — past half full on a ring, a path across the device is a traffic
+jam no amount of replanning clears — and the round needs 53.8%. Rigid rotation has no such
+limit: one `loop_shift` template advances *every* ion at once, so occupancy never changes.
+
+| ESM round | general router | rigid rotation | shipped Python pipeline |
+|---|---|---:|---:|
+| hops | *unroutable* | **776** | 2,672 |
+| batches | — | 546 | **396** |
+
+Fewer hops, more cycles — a different trade, not a free win. All applicable rules pass and
+R10 is `passed`, the proved checker deciding a 1,008-witness certificate in about five
+minutes.
+
+`compile` tries the general router first and rotation only once it has declined, so it can
+add programs that compile but never change one that already did. `--no-rotate` refuses the
+fallback, which is what [`bridge/c7_occupancy.py`](bridge/c7_occupancy.py) needs in order to
+measure the individual-ion router rather than the pair of them.
+
+Two of those results are ones the checker found rather than testing: the first rotation
+compiler emitted the ancilla Hadamards as pulses but never *witnessed* them (invisible to a
+tableau, which composes from what was emitted), and its scheduler reordered commuting `cx`
+gates, which the order rule rejected outright. The fix for the second was not to relax the
+rule but to prove the exemption — [`Cert/Commute.lean`](lean/QCCDC/Cert/Commute.lean) proves
+two `cx` gates commute when they share a control with distinct targets, or a target with
+distinct controls, and exhibits a state where a control/target chain does not.
 
 ## Build and run
 
