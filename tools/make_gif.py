@@ -137,7 +137,7 @@ class Clip:
     """
 
     def __init__(self, arch, prog, res, model, max_frames=4000, width=560,
-                 layout=None):
+                 layout=None, source=None):
         vm = build_view_model(arch, prog, res, model, max_frames=max_frames,
                               include_listing=False, include_control=False)
 
@@ -150,10 +150,21 @@ class Clip:
         self.ion_roles = vm["ion_roles"]
         self.before, self.after, self.paths = derive_stage(self.frames, self.loops)
 
+        # A COMPILED programme carries the circuit it came from, and the clip then has
+        # two things to say per step rather than one: the hardware instruction, and the
+        # QASM statement it is discharging.  That is a band under the stage, not a wider
+        # caption -- the caption is one line and the second answer is a line of source.
+        self.source = source
+        self.src_line = {}
+        if source:
+            for o in source["ops"]:
+                self.src_line[o["i"]] = o
+
         self.k = (width * SS) / self.L["W"]
         self.W = int(round(self.L["W"] * self.k))
         self.head = int(round(30 * SS * width / 560))
-        self.H = int(round(self.L["H"] * self.k)) + self.head
+        self.foot = int(round(46 * SS * width / 560)) if source else 0
+        self.H = int(round(self.L["H"] * self.k)) + self.head + self.foot
         self.axis = self._axes()
 
     # -- geometry ---------------------------------------------------------
@@ -192,6 +203,10 @@ class Clip:
         d = ImageDraw.Draw(img)
         d.rectangle([0, 0, self.W, self.head], fill=rgb("panel"))
         d.line([0, self.head, self.W, self.head], fill=rgb("line"), width=SS)
+        if self.foot:
+            d.rectangle([0, self.H - self.foot, self.W, self.H], fill=rgb("panel"))
+            d.line([0, self.H - self.foot, self.W, self.H - self.foot],
+                   fill=rgb("line"), width=SS)
 
         w_rail = max(SS, int(round(self.L["sw_rail"] * self.k)))
         for s in self.segments:
@@ -268,7 +283,67 @@ class Clip:
                           outline=rgb("ion_stroke"), width=max(1, SS // 2))
 
         self.caption(d, i, f_small, f_mono, caption)
+        if self.foot:
+            self.footer(d, i, f_small, f_mono)
         return img.resize((self.W // SS, self.H // SS), Image.LANCZOS)
+
+    # -- the two answers, for a compiled programme ------------------------
+    def instr_text(self, f):
+        """The hardware instruction, as the Program pane words it."""
+        if f["type"] == "gate":
+            what = f.get("gate") or "gate"
+            n = len(f.get("pairs") or ()) or len(f.get("ions") or ())
+            return f"{what}" + (f" x{n}" if n > 1 else "")
+        if f["type"] == "simd":
+            if f.get("shift"):
+                return f"rotate {f['shift'][0]} {f['shift'][1]:+d}"
+            return f"{f.get('cls') or 'shuttle'} x{len(f.get('moves') or ())}"
+        return f["type"]
+
+    def circuit_text(self, f):
+        """The statement, and what this instruction is doing about it."""
+        src, k = self.source, str(f["id"])
+        for state, ids in (("executing", src["realises"].get(k)),
+                           ("shuttling towards", src["toward"].get(k)),
+                           ("clearing after", src.get("after", {}).get(k))):
+            if ids:
+                break
+        else:
+            return None, "", ""
+        first = self.src_line.get(ids[0])
+        if first is None:
+            return None, "", ""
+        text = (src["lines"][first["line"] - 1].strip()
+                if 0 < first["line"] <= len(src["lines"]) else first["name"])
+        extra = f"   +{len(ids) - 1} more" if len(ids) > 1 else ""
+        return state, f"{first['line']:>4}  {text}", extra
+
+    def footer(self, d, i, f_small, f_mono):
+        f = self.frames[i]
+        pad = 9 * SS
+        y0 = self.H - self.foot + int(self.foot * 0.16)
+        y1 = self.H - self.foot + int(self.foot * 0.55)
+        lab = int(self.W * 0.115)
+
+        d.text((pad, y0), "hardware", font=f_small, fill=rgb("muted"))
+        d.text((pad + lab, y0), f"#{f['id']}  {self.instr_text(f)}",
+               font=f_mono, fill=rgb("navy"))
+
+        state, line, extra = self.circuit_text(f)
+        d.text((pad, y1), "circuit", font=f_small, fill=rgb("muted"))
+        if state is None:
+            d.text((pad + lab, y1), "-- no statement; the compiler's own bookkeeping",
+                   font=f_mono, fill=rgb("muted"))
+            return
+        run = state == "executing"
+        col = rgb("accent") if run else rgb("arrow")
+        head = ("> " if run else "~ ") + line
+        d.text((pad + lab, y1), head, font=f_mono, fill=col)
+        if extra:
+            d.text((pad + lab + d.textlength(head, font=f_mono), y1),
+                   extra, font=f_mono, fill=rgb("muted"))
+        d.text((self.W - pad - d.textlength(state, font=f_small), y1),
+               state, font=f_small, fill=col)
 
     def caption(self, d, i, f_small, f_mono, override=None):
         f = self.frames[i]
@@ -349,6 +424,67 @@ def render(arch_name, program, out, *, model="corrected", width=560, start=0,
     durs[-1] = hold
     return save_gif(imgs, durs, out, colors,
                     f"({arch_name} x {program}, {len(clip.frames)} instructions)")
+
+
+def render_compiled(tsir, qasm, out, *, arch_name=None, cert=None, model="corrected",
+                    width=880, start=0, n=14, sub=3, ms=110, hold=1500, colors=64,
+                    max_frames=20000):
+    """The README's compiler figure: a compiled programme, and the circuit beside it.
+
+    Not a mock-up and not a second renderer.  The frames are `build_view_model`'s, the
+    same ones the emitted HTML page animates, and the circuit join is the same payload
+    the page's Circuit pane reads -- built by `qccd.ir.source_map`, which refuses if the
+    compiler's per-instruction attribution disagrees with its own certificate.  So this
+    clip cannot show a correspondence the page would not show.
+    """
+    import json
+
+    from qccd.ir.source_map import build as build_source
+    from qccd.ir.tsir import TSIR
+
+    tsir, qasm = Path(tsir), Path(qasm)
+    prog = TSIR.load(tsir)
+    stem = arch_name or Path(str(prog.arch_spec)).name.split(".")[0]
+    arch = load(ARCH / f"{stem}.arch.json")
+    cert = Path(cert) if cert else _cert_beside(tsir)
+    source = build_source(prog, json.loads(cert.read_text(encoding="utf-8")), qasm)
+
+    m = deck_model() if model == "deck" else corrected_model()
+    res = verify(prog, arch, m, check_metrics=False).result
+    # the whole programme, not the default 4 000: the caption prints `step i/N`, and a
+    # truncated N is a wrong number on the face of the clip
+    clip = Clip(arch, prog, res, m, width=width, source=source, max_frames=max_frames)
+
+    lo = max(0, min(start, len(clip.frames) - 1))
+    hi = min(len(clip.frames), lo + n)
+    base = clip.board()
+    f_small = font(int(13 * SS * width / 560))
+    f_mono = font(int(12 * SS * width / 560), mono=True)
+
+    imgs, durs = [], []
+    for i in range(lo, hi):
+        hops = max((len(p) - 1 for p in clip.paths[i].values()), default=0)
+        steps = min(max(1, hops * sub), 36)
+        for s in range(steps):
+            imgs.append(clip.draw(base, i, (s + 1) / steps, f_small, f_mono))
+            # a step that DISCHARGES a statement is the one worth reading, so it is held
+            # about twice as long as a shuttle: the clip is a document, not a stopwatch
+            slow = clip.frames[i]["type"] != "simd"
+            durs.append((ms if steps > 1 else int(ms * 2.4)) * (2 if slow else 1))
+    durs[-1] = hold
+    return save_gif(imgs, durs, out, colors,
+                    f"({stem} x {prog.name}, {len(clip.frames)} instructions, "
+                    f"{len(source['ops'])} circuit statements)")
+
+
+def _cert_beside(tsir: Path) -> Path:
+    for suffix in (".cooled.tsir.json", ".tsir.json"):
+        if tsir.name.endswith(suffix):
+            c = tsir.with_name(tsir.name[: -len(suffix)] + ".qcert.json")
+            if c.exists():
+                return c
+    raise FileNotFoundError(
+        f"no certificate beside {tsir}; compile it first, or pass --cert")
 
 
 # ------------------------------------------------------- designing, as a clip
@@ -489,6 +625,21 @@ GALLERY = [
 ]
 
 
+#: The compiler clip.  `BB [[144,12,12]]` on the ring it was designed for, at the one
+#: place in the schedule where the whole vocabulary shows: the loop turns, an ion docks,
+#: the entangler fires, it undocks, and the loop turns again -- with the statement of the
+#: user's circuit that each of those five instructions is for.
+#:
+#: Both inputs are BUILT, not checked in: the programme comes out of `Compiler/` and the
+#: circuit out of `bridge/gen_bb144.py`, so a clone without an OCaml toolchain skips this
+#: clip the way one without the deck artifact skips the ring144 clip.
+COMPILED = dict(
+    tsir=ROOT / "Compiler/build/out/bb144_rot.cooled.tsir.json",
+    qasm=ROOT / "Compiler/build/bb144_esm.qasm",
+    start=48, n=12, width=880,
+)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("-d", "--device")
@@ -506,13 +657,34 @@ def main(argv=None):
                     help="the design-parameter sweep clip only")
     ap.add_argument("--evaluate", action="store_true",
                     help="the terminal-session clip only")
+    ap.add_argument("--compiled", action="store_true",
+                    help="the compiler clip only: a compiled programme with the circuit "
+                         "statement each instruction is discharging")
+    ap.add_argument("--tsir", default=str(COMPILED["tsir"]))
+    ap.add_argument("--qasm", default=str(COMPILED["qasm"]))
+    ap.add_argument("--cert", default=None)
     a = ap.parse_args(argv)
 
     if a.all or a.design:
         render_design(IMG / "design.gif", colors=a.colors)
     if a.all or a.evaluate:
         render_terminal(IMG / "evaluate.gif")
-    if (a.design or a.evaluate) and not a.all:
+    if a.all or a.compiled:
+        spec = dict(COMPILED)
+        spec.pop("tsir"), spec.pop("qasm")
+        if a.start:
+            spec["start"] = a.start
+        if a.frames != 40:
+            spec["n"] = a.frames
+        try:
+            render_compiled(a.tsir, a.qasm, IMG / "compiled.gif", cert=a.cert,
+                            colors=a.colors, **spec)
+        except FileNotFoundError as exc:
+            # the compiled programme comes out of `Compiler/`, which needs an OCaml
+            # toolchain: a clone without one skips this clip rather than failing the
+            # gallery, exactly as the deck clip does without its artifact
+            print(f"{'compiled':26s} skipped: {exc}")
+    if (a.design or a.evaluate or a.compiled) and not a.all:
         return 0
     if a.all or not a.device:
         for spec in GALLERY:

@@ -243,11 +243,18 @@ a state where a control/target chain does not.
 
 ### Watching one run
 
+![a compiled program, step by step](docs/img/compiled.gif)
+
 A hand-written program answers *what is executing?* with the instruction. A compiled one
 has a second answer, and it is the one that makes the page a debugger: **which statement of
-your circuit that instruction is discharging** -- or, while the machine is only shuttling,
-which statement it is travelling towards. Pass `--qasm` and the page carries both listings
-and steps them together; click a statement to jump to the instruction that discharges it.
+your circuit that instruction is discharging**. Above is `BB [[144,12,12]]` on the ring it
+was designed for, at the five instructions where the whole vocabulary shows -- the loop
+turns towards `cx q[155],q[29]`, an ion docks, the entangler fires, it undocks, and the
+loop turns again towards the next statement.
+
+Pass `--qasm` and the page carries both listings and steps them together: the statement
+being discharged is lit, the ones being travelled towards are shaded, and clicking a
+statement jumps to the instruction that discharges it.
 
 ```bash
 cd Compiler

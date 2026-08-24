@@ -76,11 +76,14 @@ def _page(tmp_path: Path):
         gate(3, ("q0", "q1"), [1], sites[0]),
         # op 2, at the same trap
         gate(4, ("q0", "q1"), [2], sites[0]),
+        # transport AFTER the gate it serves -- putting the ions back, not fetching them
+        Instruction(type="simd", id=6, cls="shuttle", mode="inter",
+                    participants=(), meta={"op": [2]}),
         # the compiler's own bookkeeping: no circuit statement at all
         Instruction(type="cool", id=5, ions=tuple(ions), broadcast=True,
                     meta={"kind": "state_prep"}),
     ]
-    prog = TSIR(name="srcpane", arch_spec=arch.name, instructions=instrs, id_seq=6)
+    prog = TSIR(name="srcpane", arch_spec=arch.name, instructions=instrs, id_seq=7)
 
     qasm = tmp_path / "srcpane.qasm"
     qasm.write_text(QASM, encoding="utf-8")
@@ -124,11 +127,12 @@ def test_pane_is_present_and_revealed(report):
 
 
 def test_every_stamped_instruction_is_classified(report):
+    """Three states, not two: fetching the ions and putting them back differ."""
     r, source = report
-    # 4 instructions carry an op: one shuttle (toward) and three gates (realises)
-    assert r["realises"] == 3 and r["toward"] == 1
+    assert r["realises"] == 3 and r["toward"] == 1 and r["after"] == 1
     assert set(source["realises"]) == {"1", "3", "4"}
-    assert set(source["toward"]) == {"2"}
+    assert set(source["toward"]) == {"2"}      # before the gate it serves
+    assert set(source["after"]) == {"6"}       # after it
 
 
 def test_cursor_tracks_the_statement_being_executed(report):
@@ -139,6 +143,7 @@ def test_cursor_tracks_the_statement_being_executed(report):
         iid = r["frameIds"][p["frame"]]
         now = source["realises"].get(str(iid))
         soon = source["toward"].get(str(iid))
+        past = source["after"].get(str(iid))
         if now:
             want = min(line_of[i] for i in now)
             assert p["cursor"] == want - 1, (
@@ -149,6 +154,11 @@ def test_cursor_tracks_the_statement_being_executed(report):
             want = min(line_of[i] for i in soon)
             assert p["cursor"] == want - 1
             assert "shuttling towards" in p["now"]
+        elif past:
+            # the gate has already happened: saying "towards" here would read as a gate
+            # still to come, which is worse than saying nothing
+            assert p["cursor"] == min(line_of[i] for i in past) - 1
+            assert "clearing after" in p["now"]
         else:
             assert p["cursor"] == -1, "a bookkeeping instruction lit a source line"
             assert "no circuit statement" in p["now"]
@@ -160,11 +170,12 @@ def test_marks_distinguish_executing_from_travelling(report):
     for p in r["probes"]:
         iid = r["frameIds"][p["frame"]]
         now = source["realises"].get(str(iid), [])
-        soon = source["toward"].get(str(iid), [])
+        soon = (source["toward"].get(str(iid), [])
+                + source["after"].get(str(iid), []))
         for oi in now:
             assert p["marks"].get(str(line_of[oi])) == 2
         for oi in soon:
-            # a statement being travelled towards is shaded, not lit
+            # a statement transport is merely serving is shaded, not lit
             assert p["marks"].get(str(line_of[oi])) == 1
         for row in p["rows"]:
             want = p["marks"].get(row["n"])
@@ -181,6 +192,8 @@ def test_the_hardware_pane_names_the_statement_too(report):
             assert "circuit &rarr;" in p["inline"]
         elif source["toward"].get(str(iid)):
             assert "towards" in p["inline"]
+        elif source["after"].get(str(iid)):
+            assert "after" in p["inline"]
 
 
 def test_clicking_a_statement_lands_on_the_instruction(report):

@@ -31,6 +31,8 @@ pipeline's 2 672, with all 20 checkable rules and R10 `passed`:
 
 ### Watching one run
 
+![a compiled program, step by step](../docs/img/compiled.gif)
+
 `--qasm` gives the animated page a second listing -- the circuit -- and steps it with the
 hardware. The statement the executing instruction is discharging is lit; the statements a
 shuttle is travelling towards are shaded; clicking a statement jumps to the instruction

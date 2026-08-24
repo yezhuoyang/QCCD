@@ -103,9 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{prog.name} on {arch.name}: {len(prog)} instructions, "
           f"{res.total_us / 1000:.2f} ms, {len(rules['passed'])} rules pass")
     if source:
-        print(f"  circuit: {len(source['ops'])} statements from {source['name']}, "
-              f"{len(source['realises'])} instructions discharge one and "
-              f"{len(source['toward'])} shuttle towards one")
+        print(f"  circuit: {len(source['ops'])} statements from {source['name']}; "
+              f"{len(source['realises'])} instructions discharge one, "
+              f"{len(source['toward'])} shuttle towards one, "
+              f"{len(source['after'])} clear up after one")
     print(f"  -> {out}  ({out.stat().st_size // 1024} KB, self-contained)")
     return 0
 
