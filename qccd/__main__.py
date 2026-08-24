@@ -289,6 +289,18 @@ def cmd_verify(args) -> int:
 def cmd_studio(args) -> int:
     """`qccd studio` -- the design tool, as ONE self-contained page.
 
+    `--tsir`/`--qasm` open it on a COMPILED program with its circuit beside it, which is
+    the shape debugging a compiler actually takes: the animation says where the ions are,
+    the Program pane says which instruction is executing, and the Circuit pane says which
+    statement of the user's QASM that instruction is discharging -- or, while the machine
+    is only shuttling, which statement it is travelling towards. Clicking a statement
+    jumps to the instruction that discharges it.
+
+    The join is checked before it is drawn: every gate witness in the certificate must
+    agree with the stamp on the instruction it names, or `qccd.ir.source_map` raises. A
+    page that showed an unverified correspondence would be worse than one that showed
+    none, because it would be believed.
+
     Not a second page kind.  `render_html` is already a renderer over `(arch, prog)`, and
     `(empty arch, empty prog)` became a legal pair the moment `Architecture.from_json`
     started testing for the PRESENCE of `nodes` rather than its truthiness.  What the
@@ -297,7 +309,16 @@ def cmd_studio(args) -> int:
     packages to offer rather than a pair.
     """
     model = deck_model() if args.model == "deck" else corrected_model(args.table)
-    if args.seed:
+    source = None
+    if args.tsir:
+        prog = TSIR.load(args.tsir)
+        # `arch_spec` is whatever the producer wrote: the compiler records the path it
+        # was given, the Python builders record a bare device name.  Both are common,
+        # so both resolve -- and neither is invented when it does not exist.
+        arch = _load(args.seed) if args.seed else _load(str(_arch_of(prog)))
+        if args.qasm:
+            source = _compiled_source(args, prog)
+    elif args.seed:
         arch = _load(args.seed)
         prog = program_for(arch, args.program, args.k or "") if args.program else \
             TSIR(name="empty", arch_spec=str(args.seed))
@@ -314,14 +335,69 @@ def cmd_studio(args) -> int:
     report = verify(prog, arch, model)
     path = render_html(arch, prog, report.result, model, args.out,
                        kicker="QCCD STUDIO",
-                       headline=f"{arch.name} - design",
-                       lede="an empty canvas: build a device, write a test programme, "
-                            "and see what can and cannot be checked here",
+                       headline=(f"{arch.name} - {prog.name}" if args.tsir
+                                 else f"{arch.name} - design"),
+                       lede=(f"a compiled program, step by step: {len(prog)} hardware "
+                             f"instructions against "
+                             f"{len(source['ops'])} circuit statements"
+                             if source else
+                             "an empty canvas: build a device, write a test programme, "
+                             "and see what can and cannot be checked here"),
                        template_stems="*" if args.all_templates else None,
-                       max_frames=args.max_frames)
+                       max_frames=args.max_frames,
+                       source=source)
     print(f"wrote {path}  ({path.stat().st_size:,} bytes, "
           f"{len(arch.device.nodes)} nodes, {len(prog)} instructions)")
+    if source:
+        print(f"  circuit       {source['name']}: {len(source['ops'])} statements, "
+              f"{len(source['realises'])} instructions discharge one, "
+              f"{len(source['toward'])} shuttle towards one")
     return 0
+
+
+def _arch_of(prog) -> Path:
+    """The device a compiled program names, as a path that exists.
+
+    `arch_spec` is a free-text field and its producers disagree: the compiler records the
+    path it was handed (`arch/grid9x9.arch.json`), the Python builders record a bare name
+    (`grid9x9`). Rather than pick a winner, resolve both -- and refuse rather than fall
+    back to some default, because opening a compiled program against the WRONG device
+    would replay, would draw, and would be nonsense.
+    """
+    spec = str(prog.arch_spec or "")
+    for cand in (Path(spec), ROOT / spec,
+                 ARCH_DIR / f"{Path(spec).name.split('.')[0]}.arch.json"):
+        if cand.suffix and cand.is_file():
+            return cand
+    raise SystemExit(
+        f"the program names device {spec!r}, which is not a file and is not in "
+        f"{ARCH_DIR}; pass --seed <arch.json>")
+
+
+def _compiled_source(args, prog):
+    """The circuit pane's payload, or a refusal that says which file is missing.
+
+    The certificate is looked for beside the program rather than demanded, because the
+    compiler always writes the two together -- but it is never GUESSED at loosely: an
+    unexpected filename asks for `--cert` instead of picking a certificate that might
+    belong to a different compilation.
+    """
+    from .ir.source_map import build as build_source
+
+    cert_path = Path(args.cert) if args.cert else None
+    if cert_path is None:
+        stem = Path(args.tsir).name
+        for suffix in (".cooled.tsir.json", ".tsir.json"):
+            if stem.endswith(suffix):
+                cert_path = Path(args.tsir).with_name(
+                    stem[: -len(suffix)] + ".qcert.json")
+                break
+    if cert_path is None or not cert_path.exists():
+        raise SystemExit(
+            f"--qasm needs the compiler certificate; "
+            f"{'no --cert given and none found beside ' + str(args.tsir) if cert_path is None else str(cert_path) + ' does not exist'}")
+    return build_source(prog, json.loads(cert_path.read_text(encoding="utf-8")),
+                        args.qasm)
 
 
 def cmd_open(args) -> int:
@@ -846,6 +922,16 @@ def build_parser() -> argparse.ArgumentParser:
                                "(default: the built-in default template)")
     p_studio.add_argument("--program", default=None,
                           help="with --seed, a built-in program to open on")
+    p_studio.add_argument("--tsir", default=None,
+                          help="open on a COMPILED program (a .tsir.json); the device is "
+                               "taken from arch/ unless --seed says otherwise")
+    p_studio.add_argument("--qasm", default=None,
+                          help="with --tsir, the circuit it was compiled from -- adds the "
+                               "Circuit pane, which steps the source in lockstep with the "
+                               "hardware")
+    p_studio.add_argument("--cert", default=None,
+                          help="with --qasm, the compiler certificate "
+                               "(default: alongside --tsir)")
     p_studio.add_argument("--k", default="")
     p_studio.add_argument("--model", default="corrected", choices=["deck", "corrected"])
     p_studio.add_argument("--table", default="qccdsim_jones")

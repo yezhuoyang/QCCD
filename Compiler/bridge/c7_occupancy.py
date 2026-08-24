@@ -67,7 +67,11 @@ def try_compile(qasm: Path, device: str, out: Path, timeout: float) -> tuple[boo
         r = subprocess.run(
             [str(EXE), "compile", str(qasm),
              "--arch", str(COMPILER / "build" / f"{device}.expanded.json"),
-             "-o", str(out)],
+             "-o", str(out),
+             # what is being measured is the INDIVIDUAL-ION router, so the rigid-rotation
+             # fallback has to be off: with it on, this sweep reported that the individual
+             # router reaches 168 qubits, which is exactly the claim it exists to refute
+             "--no-rotate"],
             capture_output=True, text=True, env=OCAML_ENV, timeout=timeout)
     except subprocess.TimeoutExpired:
         return False, "timed out"
