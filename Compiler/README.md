@@ -31,7 +31,14 @@ pipeline's 2 672, with all 20 checkable rules and R10 `passed`:
 
 ### Watching one run
 
-![a compiled program, step by step](../docs/img/compiled.gif)
+![the same circuit on a grid](../docs/img/micro_grid.gif)
+
+One command builds both devices, compiles `examples/micro.qasm` to each, verifies
+them, renders the clips and prints the comparison:
+
+```bash
+python bridge/micro_demo.py --gif
+```
 
 `--qasm` gives the animated page a second listing -- the circuit -- and steps it with the
 hardware. The statement the executing instruction is discharging is lit; the statements a
