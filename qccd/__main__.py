@@ -11,6 +11,8 @@ whole thing to one self-contained HTML page.
                                                the HARDWARE PROGRAM, disassembled
     python -m qccd run ring144_24v --html out/ring.html
     python -m qccd demo                        every device, every program, one index page
+    python -m qccd phys ring144_24v            the ELECTRODES it implies, and their DRC
+    python -m qccd gds ring144_24v -o ring.gds the same metal, for a fab tool
 
 The device / program / verify / report / view split is deliberate: a device description is
 independent of the program, a program is independent of the cost model, and the verifier
@@ -40,6 +42,7 @@ from qccd.verify.control import control_trace  # noqa: E402
 from qccd.verify import replay, verify  # noqa: E402
 from qccd.verify.replay import ReplayError  # noqa: E402
 from qccd.viz import render_html  # noqa: E402
+from qccd.viz.render import build_view_model  # noqa: E402
 
 ARCH_DIR = ROOT / "arch"
 OUT = ROOT / "out"
@@ -409,6 +412,91 @@ def cmd_reach(args) -> int:
     return 0
 
 
+def cmd_phys(args) -> int:
+    """The electrodes a device implies, and whether they can be fabricated.
+
+    Everything printed here is derived: no architecture file declares a polygon, and the
+    only authored input is the technology sidecar, whose every dimension carries a source.
+    """
+    from .phys.build import build_layout
+    from .phys.drc import check as drc_check
+    from .phys.tech import load_technology
+
+    arch = load(ARCH_DIR / f"{args.device}.arch.json")
+    tech = load_technology(args.tech)
+    layout = build_layout(arch, tech)
+    summary = layout.summary()
+
+    box = summary["bbox_nm"]
+    print(f"{arch.name}  [{tech.name}]")
+    print(f"  {summary['n_polys']} polygons from {summary['n_cells']} cells placed "
+          f"{summary['n_insts']} times")
+    if box:
+        print(f"  die {(box[2] - box[0]) / 1e6:.3f} x {(box[3] - box[1]) / 1e6:.3f} mm")
+    for role, n in summary["polys_by_role"].items():
+        print(f"    {role:<16} {n}")
+    for note in summary["notes"]:
+        print(f"  - {note}")
+    for r in layout.refused:
+        print(f"  REFUSED {r.kind} {r.owner}: {r.reason}")
+
+    report = drc_check(layout, arch)
+    print()
+    print(report.text(limit=args.limit))
+
+    if args.svg:
+        from .phys.svg import write_svg
+        write_svg(layout, args.svg)
+        print(f"\n  wrote {args.svg}")
+    if args.html:
+        # The studio page with the metal under it.  A device still needs a programme to
+        # render at all, and an empty one is a legal programme.
+        from .phys.svg import metal_view_model
+        prog = TSIR(name="empty", arch_spec=arch.name)
+        model = corrected_model()
+        rep = verify(prog, arch, model)
+        view = build_view_model(arch, prog, rep.result, model)
+        metal = metal_view_model(layout, width=view["layout"]["W"],
+                                 height=view["layout"]["H"])
+        out = render_html(arch, prog, rep.result, model, args.html,
+                          kicker="ELECTRODES",
+                          headline=f"{arch.name} - {tech.name}",
+                          lede=f"{summary['n_polys']} derived electrodes, true to scale, "
+                               f"under the schematic they came from",
+                          metal=metal)
+        print(f"  wrote {out}")
+    if args.json:
+        import json as _json
+        Path(args.json).write_text(
+            _json.dumps({"layout": summary, "drc": report.as_dict()}, indent=1),
+            encoding="utf-8")
+        print(f"  wrote {args.json}")
+    return 0
+
+
+def cmd_gds(args) -> int:
+    """Write the derived electrodes as GDSII, which a fab tool can open."""
+    from .phys.build import build_layout
+    from .phys.gds import read_gds, write_gds
+    from .phys.tech import load_technology
+
+    arch = load(ARCH_DIR / f"{args.device}.arch.json")
+    tech = load_technology(args.tech)
+    layout = build_layout(arch, tech)
+    out = Path(args.out or f"{args.device}.gds")
+    write_gds(layout, out, name=args.name)
+
+    # read it back before claiming it was written: the reader shares no code with the
+    # writer, so a file that does not parse is caught here rather than at the fab
+    lib = read_gds(out)
+    n = len(lib.boundaries)
+    if n != layout.n_polys():
+        raise SystemExit(f"wrote {layout.n_polys()} polygons but read back {n}")
+    print(f"{arch.name} -> {out}  ({out.stat().st_size} bytes, {n} polygons, "
+          f"database unit {lib.db_unit_m:g} m)")
+    return 0
+
+
 def cmd_analyses(args) -> int:
     """What the tool can run, and what each one's knobs are."""
     from .analysis import ANALYSES
@@ -717,10 +805,28 @@ def build_parser() -> argparse.ArgumentParser:
     p_reach.add_argument("--metric", choices=["quanta", "us", "cost"], default="quanta")
     p_reach.add_argument("--json", default=None)
 
+    p_phys = sub.add_parser("phys", help="the electrodes a device implies, and their DRC")
+    p_phys.add_argument("device")
+    p_phys.add_argument("--tech", default="eth_junction_2201.12579",
+                        help="a shipped preset name, or a path to a .tech.json")
+    p_phys.add_argument("--limit", type=int, default=8,
+                        help="how many design-rule violations to print")
+    p_phys.add_argument("--svg", default=None, help="also render the metal to this file")
+    p_phys.add_argument("--html", default=None,
+                        help="render the studio page with the metal under it")
+    p_phys.add_argument("--json", default=None)
+
+    p_gds = sub.add_parser("gds", help="write the derived electrodes as GDSII")
+    p_gds.add_argument("device")
+    p_gds.add_argument("--tech", default="eth_junction_2201.12579")
+    p_gds.add_argument("-o", "--out", default=None)
+    p_gds.add_argument("--name", default="QCCD", help="the GDSII library and cell name")
+
     sub.add_parser("analyses", help="what analyses exist, and their knobs")
 
     p_sweep = sub.add_parser("sweep", help="vary one design knob and print the curve")
-    p_sweep.add_argument("analysis", help="reach | budget (see `qccd analyses`)")
+    p_sweep.add_argument("analysis",
+                         help="reach | budget | field (see `qccd analyses`)")
     p_sweep.add_argument("device")
     p_sweep.add_argument("key", help="the knob, dotted for nested (scale.junction)")
     p_sweep.add_argument("values",
@@ -770,6 +876,7 @@ def main(argv=None) -> int:
     return {"devices": cmd_devices, "show": cmd_show, "run": cmd_run,
             "demo": cmd_demo, "verify": cmd_verify, "regen": cmd_regen,
             "reach": cmd_reach, "sweep": cmd_sweep,
+            "phys": cmd_phys, "gds": cmd_gds,
             "analyses": cmd_analyses,
             "arch": cmd_arch,
             "source": cmd_arch, "studio": cmd_studio, "open": cmd_open,

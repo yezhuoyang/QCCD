@@ -126,6 +126,7 @@ def build_view_model(
     include_control: bool = True,
     provenance: str = "sites",
     template_stems: Sequence[str] | str | None = None,
+    metal: dict | None = None,
 ) -> dict:
     """Everything the page needs, as plain JSON.
 
@@ -475,6 +476,13 @@ def build_view_model(
         "checksum": checksum,
         "checksum_components": list(checked_components),
         "checksum_exact": exact,
+        # THE DERIVED ELECTRODES, or absent.  Built by `qccd.phys.svg.metal_view_model`
+        # and passed in -- this module does not import `qccd.phys`, because the metal is
+        # a property of `(device, technology)` and a page is a property of a run, and
+        # wiring the one to the other here would make every page pay for a field solve it
+        # did not ask for.  Absent by default, so every page emitted before this existed
+        # is byte-identical to the one emitted now.
+        **({"metal": metal} if metal else {}),
     }
 
 
@@ -1193,11 +1201,50 @@ const clamp = (lo,v,hi) => Math.max(lo, Math.min(hi, v));
 const px = n => L.ox + n.x*L.sx, py = n => L.oy + n.y*L.sy;
 const svg=document.getElementById('svg'), NS='http://www.w3.org/2000/svg';
 const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
-const gLoop=el('g',{}), gSeg=el('g',{}), gElec=el('g',{}), gHilite=el('g',{}),
-      gNode=el('g',{}), gWell=el('g',{}), gIon=el('g',{}), gTop=el('g',{});
+const gMetal=el('g',{}), gLoop=el('g',{}), gSeg=el('g',{}), gElec=el('g',{}),
+      gHilite=el('g',{}), gNode=el('g',{}), gWell=el('g',{}), gIon=el('g',{}),
+      gTop=el('g',{});
 // gHilite sits BELOW gNode so the active-site disc never paints over the marker it is
-// highlighting; gIon sits above everything structural.
-svg.append(gLoop,gSeg,gElec,gHilite,gNode,gWell,gIon,gTop);
+// highlighting; gIon sits above everything structural.  gMetal is first and therefore
+// underneath everything: it is a backdrop, not a mark, and it stays empty unless a
+// technology was named.
+svg.append(gMetal,gLoop,gSeg,gElec,gHilite,gNode,gWell,gIon,gTop);
+
+// ---------- the metal, when a technology was named ----------
+// DERIVED ELECTRODES, TRUE TO SCALE.  Every number below -- the transform, the fit, the
+// scale bar -- was computed in Python by `qccd.phys.svg.metal_view_model`; this block
+// reads them and does no arithmetic of its own.  It must not: `px()/py()` above is
+// anisotropic by up to K_ANISO, and pushing a rectangle that is 99.5 um by 16 mm through
+// it would draw a shape no fab could make.
+//
+// The consequence, said out loud rather than hidden: the underlay does NOT register with
+// the schematic on top of it.  Registering would need this page's sx/sy to equal the
+// technology's nm_per_unit_x / nm_per_unit_y, and on chain72 those are 1.0 and 0.634.
+// One of the two views has to misstate a proportion, and it is not the one in nanometres.
+if (D.metal){
+  const M = D.metal;
+  const inner = el('g',{transform:M.transform, opacity:0.5});
+  for (const layer of M.layers){
+    const gl = el('g',{fill:layer.fill, stroke:layer.stroke,
+                       'stroke-width':String(M.nm_per_px),
+                       'data-layer':layer.name, 'data-purpose':layer.purpose});
+    for (const xy of layer.polys){
+      const pts=[]; for(let i=0;i<xy.length;i+=2) pts.push(xy[i]+','+xy[i+1]);
+      gl.append(el('polygon',{points:pts.join(' ')}));
+    }
+    inner.append(gl);
+  }
+  // The scale bar is what makes the mismatch legible instead of looking like a bug: it
+  // is drawn through the SAME transform, so it is the one thing on the page whose length
+  // means a physical distance.
+  const B = M.bar_rect_nm, bar = el('g',{transform:M.transform});
+  bar.append(el('rect',{x:B.x, y:B.y, width:B.w, height:B.h, fill:C.ink||'#334155'}));
+  gMetal.append(inner, bar);
+  const cap=el('text',{x:8, y:14, 'font-size':11, fill:C.muted||'#64748b'});
+  cap.textContent = M.n_polys+' electrodes · '+M.technology+' · bar '+M.bar_label+
+                    ' · '+M.note;
+  gTop.append(cap);
+}
 svg.setAttribute('viewBox', `0 0 ${L.W} ${L.H}`);
 // THE LAYOUT REGIME IS AN ATTRIBUTE, NOT A CLASS, and it is re-applied rather than set
 // once.  `classList.add('wide')` ran ONLY at load, so a device that BECAME long-and-thin
@@ -3022,12 +3069,13 @@ def render_html(
     control: ControlTrace | None = None,
     provenance: str = "sites",
     template_stems: "Sequence[str] | str | None" = None,
+    metal: dict | None = None,
 ) -> Path:
     """Write the self-contained page.  Returns the path written."""
     view = build_view_model(arch, prog, res, model, max_frames=max_frames,
                             kicker=kicker, headline=headline, lede=lede,
                             control=control, provenance=provenance,
-                            template_stems=template_stems)
+                            template_stems=template_stems, metal=metal)
     html = _TEMPLATE.replace("__TITLE__", f"{arch.name} - {prog.name}")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__DATA__", _escape_blob(json.dumps(view, separators=(",", ":"))))
