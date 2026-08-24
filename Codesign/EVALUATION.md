@@ -9,6 +9,14 @@ closest published precedent uses. Three things have to be fixed before it can ra
 architectures honestly, and one of them (no chain-length term in the gate error) would
 otherwise hand the optimiser a free lunch and make it report a fake optimum.
 
+> **Measured since this was written.** As shipped, the objective is **96 % floor**: a constant
+> `n_pairs·ε₀ + spam` that every one of the nine architectures declares identically. R7's
+> `max_quanta = 1.0` caps the gate term at **2.09×** between any two feasible schedules, and
+> the cooling pass puts every schedule at the bottom of that interval — on the BB round the
+> mean gate n̄ after cooling is *exactly* 0. Median device-attributable share over 73 verified
+> pairs: **3.9 %**. Read [`findings/q01b`](findings/q01b-bb144-and-the-floor.md) alongside
+> §3 and §4 below; it corrects two claims in each.
+
 ---
 
 ## 1 · What the repository already has
@@ -114,14 +122,25 @@ p_eff     =  neg_log_fidelity / L                            mean fault probabil
 candidate reports is `p_eff` versus 0.7 %.** A design at 5 % is not a slow design; the code
 does not help it at all and no amount of compiler work will fix that.
 
-### Why time is a *term*, not a rival objective
+### Why time is a *term*, not a rival objective — and why it does **not** buy an interior optimum
 
-[`docs/PLAN.md` §0.2](../docs/PLAN.md) already argues this and it is worth restating: cooling
-more lowers `n̄` at each gate but lengthens the round, and a longer round costs idle
-dephasing — which is already inside `neg_log_fidelity` as `N·T_exe/T_coh`. So **the runtime/error
-trade is internal to one scalar**, and there is an interior optimum in the cooling budget
-rather than a frontier to choose a point on. Measured span of that knob:
-[**2.19× runtime for 22.5× gate error**](../Compiler/PLAN.md).
+[`docs/PLAN.md` §0.2](../docs/PLAN.md) already argues the first half: cooling more lowers `n̄`
+at each gate but lengthens the round, and a longer round costs idle dephasing — which is
+already inside `neg_log_fidelity` as `N·T_exe/T_coh`. So **the runtime/error trade is internal
+to one scalar**, which is right and is why this study has one objective rather than a frontier.
+
+> **This file previously concluded from that "there is an interior optimum in the cooling
+> budget". That was asserted, not measured, and it is false.**
+> [`findings/q01b`](findings/q01b-bb144-and-the-floor.md) §5 measures it. One global cool is
+> **300 µs**; charged as idle to 168 ions against **`T_coh = 600 s`** it costs `8.4e-5`, and
+> it saves up to `2.0e-3` on *each* gate it protects. It repays itself once it protects
+> **0.042 gates** — a 24× return on the first one. Re-scoring `c5_pareto`'s measured frontier
+> under the full objective gives a **monotone** curve whose minimum is at R7's cap, which is
+> where the shipped policy already sits.
+>
+> The knob's measured span, [**2.19× runtime for 22.5× gate error**](../Compiler/PLAN.md), is
+> exactly why: 22.5× on the large term against 2.19× on a term an order of magnitude smaller
+> is not a trade, it is a slope.
 
 ### Optional ranking scalar — a transfer function, never a simulation
 
@@ -152,11 +171,32 @@ p_eff_90     90th percentile of per-gate ε    pessimistic
 A design whose bracket straddles the threshold has not been shown to work. `peak_quanta` and
 `max_gate_quanta_seen` are already emitted, so the pessimistic end is nearly free.
 
+### The ceiling R7 puts on the whole exercise
+
+Measured in [`findings/q01b`](findings/q01b-bb144-and-the-floor.md) §4, and it bounds
+everything below. Every architecture declares `ms_gate.max_quanta = 1.0` and
+`error_vs_quanta = linear:2.0e-3`, so a gate in any **feasible** program sees
+
+```
+ε ∈ [ε₀, ε₀ + 2.0e-3 · 1.0]  =  [1.84e-3, 3.84e-3]
+```
+
+**Between two legal schedules the gate term can differ by at most 2.09×** — on any circuit,
+on any device. And the cooling pass lands both at the bottom of that interval: on
+`bb144_esm`/`ring144_24v` the mean gate n̄ after cooling is **exactly 0** and the gate term is
+exactly `864 × 1.84e-3`. Of 73 verified pairs, the device-attributable share of `−ln F` has a
+median of **3.9 %**.
+
+The geometry signal itself is not weak — the device-attributable *part* spreads **19× to
+121×** across devices on the same circuit. It is diluted by a floor (`n_pairs·ε₀ + spam`) that
+is identical on all nine architectures and is 96 % of the scalar. **Report the device-
+attributable part alongside `−ln F`**, or a ranking will be dominated by a constant.
+
 ---
 
 ## 4 · Three gaps to close before the loop runs
 
-### G1 · Gate error does not depend on chain length — **and this one is load-bearing**
+### G1 · Gate error does not depend on chain length — **and it is the only repair that survives cooling**
 
 ```python
 # qccd/cost/models.py
@@ -176,7 +216,19 @@ with the `Γτ` term so that gate duration (itself `N`-dependent for FM gates) c
 
 ```
 ε(n̄, N, τ)  =  ε₀ + Γ·τ(N) + κ · (N / ln N) · (2n̄ + 1)
+                   └──────────────┬─────────────────┘
+                     both are non-zero at n̄ = 0
 ```
+
+**And there is now a second, stronger reason to close it.**
+[`findings/q01b`](findings/q01b-bb144-and-the-floor.md) §4 measures that the cooling pass
+drives the mean gate n̄ to *exactly zero* on the BB round, pinning the gate term to its floor
+and erasing the heating signal into runtime. Anything that reaches the gate error **through
+`n̄` is laundered away by cooling.** G1's two new terms do not: at `n̄ = 0` they are
+`Γ·τ(N) + κ·N/ln N`, which no amount of cooling removes. G1 is therefore not merely a guard
+against the optimiser reading R13's cap back as an optimum — **it is the only change on this
+list that puts an architecture-dependent quantity into the gate error that the cooling pass
+cannot convert into free runtime.**
 
 Calibrate `κ` and `Γ` so the shipped `ring144_24v` schedule reproduces its current error at
 its current chain length — the change must be a *refinement* of the validated model, not a
@@ -199,6 +251,12 @@ This is the coupling that makes the study distinctive: **layout → electrodes �
 heating → gate error**, derived end to end. A study without a field solver has to assume the
 heating rate; this one can compute it.
 
+**But mind where that chain ends up.** Under the cooling pass the last link is broken: extra
+heating does not raise the gate error, it triggers more cooling stops, so the real chain is
+**layout → heating → cooling stops → runtime → idle error** — and `q01b` §4 measures idle at
+5.7 % of `−ln F` on the BB round. G2 is worth closing for the physics, but it will move the
+objective by a few percent, not by orders of magnitude, until G1 is in.
+
 ### G3 · Idle error is linear in time; ion memory is often closer to Gaussian
 
 ```python
@@ -207,9 +265,15 @@ idle_error = len(res.per_ion_quanta) * (res.total_us * 1e-6) / t_coh_s
 
 Markovian, linear in `t`, charged to every ion for the whole runtime. For hyperfine ion qubits
 under correlated magnetic-field noise the decay is often closer to `(t/T₂)²`. Linear is the
-conservative choice while `t ≪ T₂` and is defensible — but it is a **modelling choice that
-directly sets the cooling optimum**, so run the loop under both and report whether the winner
-changes. If it does, that is a finding about the study's sensitivity, not a bug.
+conservative choice while `t ≪ T₂` and is defensible, so run the loop under both and report
+whether the winner changes.
+
+> **This file previously claimed G3 "directly sets the cooling optimum". It does not, and the
+> arithmetic is one line.** At the BB round's 522 ms against `T₂ = 600 s`, `t/T₂ = 8.7e-4`
+> while `(t/T₂)² = 7.6e-7` — the quadratic law makes idle error **1150× smaller**, so it makes
+> runtime *more* free and pushes cooling harder in the same direction. Under either law the
+> cooling optimum is the boundary ([`q01b`](findings/q01b-bb144-and-the-floor.md) §5). G3
+> remains a real modelling question about idle error; it is not a question about cooling.
 
 ---
 
