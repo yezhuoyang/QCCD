@@ -1,0 +1,93 @@
+{
+  "name": "eth_junction_2201.12579",
+  "description": "The surface-electrode X-junction trap of Zhang, Mehta & Home, New J. Phys. 24 073030 (2022), arXiv:2201.12579. Every dimension below is a published INPUT of that design, not a fit to one of its outputs -- which is why this is the only preset shipped. The RF geometry is the linear-arm optimum of tab:junction_linear; the control-electrode numbers are the fabricated layout of section 4.",
+  "source": "arXiv:2201.12579 (New J. Phys. 24 073030), source at Library/papers/2201.12579__optimization-and-implementation-of/source/ms.tex",
+  "nm_per_unit_x": {
+    "nm": 225000,
+    "source": "derived: one lattice unit = one trap pitch = three broadcast control electrodes. 2305.03828 states the conveyor-belt tie pattern {a,b,c,a,b,c,...} supports '20 wells on each side (one for every three electrodes)'; 2201.12579 ms.tex:682 divides the middle control electrodes into 75 um segments in the linear regions. 3 x 75 um = 225 um."
+  },
+  "nm_per_unit_y": {
+    "nm": 355000,
+    "source": "derived: one lattice unit ACROSS the rails is one min_axis_pitch, 2 * (dc_setback + dc_width) + gap = 355 um. It is NOT the same quantity as nm_per_unit_x and cannot be: the axial trap pitch is set by how many control electrodes a well needs (three, so 225 um), while the transverse pitch is set by how wide one trap axis's electrode stack is (350 um of metal, plus a gap). An isotropic 225 um was tried first and shorts the north control column of every ring device against the opposite rail -- the two rows physically do not fit. This is the concrete reason the technology carries two scales rather than one."
+  },
+  "dims": {
+    "w_rf": {
+      "nm": 99500,
+      "source": "2201.12579 ms.tex:283-288 tab:junction_linear -- RF electrode width for maximal pseudopotential confinement at h = 50 um. The row's printed expression (4h^2-w_g^2)/(2w_g) evaluates to 99.73; the table prints 99.5 and the paper attributes the 0.23% to numerical truncation. The tabulated pair is what was fabricated, so the tabulated pair is what is used."
+    },
+    "w_g": {
+      "nm": 41500,
+      "source": "2201.12579 ms.tex:283-288 tab:junction_linear -- RF electrode separation, 0.83h at h = 50 um."
+    },
+    "gap": {
+      "nm": 5000,
+      "source": "2201.12579 ms.tex:368 -- the inter-electrode gap imposed by the fabrication process. DECLARED FOR DRC ONLY: the gapless-plane field kernel does not see it, and 2201.12579's own 5% position / 20% pseudopotential error against FEM (ms.tex:200-208) is what ignoring it costs."
+    },
+    "dc_pitch": {
+      "nm": 75000,
+      "source": "2201.12579 ms.tex:682, ms.tex:693 -- the middle control electrodes are divided into 75 um segments in the linear regions (40 um for the four adjacent to the junction centre, and a 30 um square at the centre itself, which this preset does not model). NOTE the paper states this segmentation for the MIDDLE electrodes; applying the same axial pitch to the outer columns is an extrapolation, and it is the one a segmented trap requires, since a well is formed by the electrodes on both sides of the axis acting together."
+    },
+    "dc_centre_width": {
+      "nm": 31500,
+      "source": "derived: w_g - 2 * gap = 41500 - 10000. Confirmed against the paper, which states the fabricated value directly: 'The width of the middle control electrodes in the linear region is 31.5 um' (ms.tex:685), and separately that w_g 'is reduced from 41.5 um to 31.5 um' by subtracting the gaps (ms.tex:370). So this derivation is checked, not assumed."
+    },
+    "dc_width": {
+      "nm": 49750,
+      "source": "2201.12579 ms.tex:725 -- the thinner outer control electrodes are 49.75 um wide at the linear region. (The wider ones are 580 um; the thin ones are the ones tiled at dc_pitch.)"
+    },
+    "dc_setback": {
+      "nm": 125250,
+      "source": "derived: w_g/2 + w_rf + gap = 20750 + 99500 + 5000. The first control electrode outboard of a rail sits one fabrication gap beyond the rail's outer edge, so nothing here is chosen -- change w_rf or gap and this follows."
+    },
+    "min_axis_pitch": {
+      "nm": 355000,
+      "source": "derived: 2 * (dc_setback + dc_width) + gap = 2 * 175000 + 5000. The closest two PARALLEL trap axes can be drawn in this technology: each needs its rails plus a control column out to dc_setback + dc_width on the side facing the other, and the two stacks must clear each other by a fabrication gap. Nothing chooses this -- it follows from the RF geometry and the control-electrode width."
+    },
+    "well_gap": {
+      "nm": 5000,
+      "source": "derived: equal to gap, which makes the control tiling UNIFORM across a trapping site rather than breaking at it. That is what 2201.12579 fabricates -- uniform 75 um segments (ms.tex:682) -- and what 2305.03828's {a,b,c,a,b,c,...} broadcast requires, since there a well is 'one for every three electrodes' of an unbroken tiling. Wells are made by voltages, not by geometry. The builder still implements a wider break, so an architecture whose sites ARE geometrically marked can set this larger and see it; at the value above the break is exactly one fabrication gap and the tiling is continuous."
+    },
+    "rail_end_extension": {
+      "nm": 50000,
+      "source": "derived: one nominal ion height (h = 1/2 sqrt(w_g (w_g + 2 w_rf)) = 49.95 um, rounded to 50 um, which is 2201.12579's own design target). RF rails are run this far past the last node so that a device boundary is not also a field discontinuity at the last trap."
+    }
+  },
+  "layers": [
+    {
+      "name": "RF",
+      "gds_layer": 1,
+      "gds_datatype": 0,
+      "purpose": "rf",
+      "z_nm": 0,
+      "thickness_nm": 1000,
+      "material": "Au",
+      "min_width_nm": 5000,
+      "min_gap_nm": 5000,
+      "source": "2201.12579 ms.tex:368 for the 5 um design rule; the metal thickness and material are typical for this class of trap and are NOT used by anything -- the field kernel solves an infinitely thin plane and no rule reads them."
+    },
+    {
+      "name": "DC",
+      "gds_layer": 2,
+      "gds_datatype": 0,
+      "purpose": "dc",
+      "z_nm": 0,
+      "thickness_nm": 1000,
+      "material": "Au",
+      "min_width_nm": 5000,
+      "min_gap_nm": 5000,
+      "source": "2201.12579 ms.tex:368 -- same plane, same 5 um design rule. Segmented control electrodes; invisible to the RF field solve by construction."
+    },
+    {
+      "name": "OUTLINE",
+      "gds_layer": 63,
+      "gds_datatype": 0,
+      "purpose": "outline",
+      "z_nm": 0,
+      "thickness_nm": 0,
+      "material": "none",
+      "min_width_nm": 1,
+      "min_gap_nm": 1,
+      "source": "declared: a drawn die boundary for the fab tool and for the eye. Never metal, never in a field sum, never design-rule checked against anything real -- the two rules are 1 nm so that the checker has a value rather than a special case."
+    }
+  ]
+}
