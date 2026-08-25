@@ -476,7 +476,8 @@ has no performance.** T1 may rank; only T2 may be quoted.
 | `p_eff` is dominated by the gate floor `ε₀` | geometry cannot move it; the answer is "buy better gates" | CD4 · 0.1, day one | 🔴 **FIRED.** 96 % floor, median device share **3.9 %**. Not fatal *yet* — the device-attributable part still spreads 19–121×, so the signal exists and is diluted, not absent. G1 is the repair |
 | `p_eff` is dominated by data-ion idle time | study collapses to "minimise round time" and the heating model stops mattering | CD4 · 0.2 | 🔶 **partly.** On the BB round idle is **100 %** of the device-attributable part (gate excess is exactly 0), so at BB scale the objective *is* `n_ions × T_round`. On smaller circuits idle is 2–5 % of it |
 | ~~G1 not closed before searching capacity~~ | the optimiser reports R13's hard cap as an optimum | CD1 · G1, before any sweep over trap size | ✅ **closed** — R13's cap now costs 1.50–1.72×, and the one device that gates 15-ion chains fell from 4th of 9 to last |
-| **nothing in the compiler ever chooses a long chain** | capacity is priced but never *used*, so the axis G1 unblocked may be inert for an unrelated reason | the capacity sweep, immediately | 🔶 suspected — `stationary_chain` reaches N=15 only because it has two traps and nowhere else to put ions |
+| **nothing in the compiler ever chooses a long chain** | capacity is priced but never *used*, so the axis G1 unblocked is inert for an unrelated reason | the capacity sweep, immediately | 🔴 **CONFIRMED** — capacity 4 compiles byte-identically to capacity 2, every gate still at chain length 2 ([q03](findings/q03-capacity-is-inert.md)). Moves to CD2 · 2 |
+| **capacity is not a monotone axis** | a sweep would report an artifact of router selection as an optimum | q03 | 🔴 **FIRED** — capacity 8 leaves 79 ops unrealised because the general router stops raising `Unroutable`, so rotation never fires. Fix the fallback before any sweep |
 | **B2 — the comparison set at BB scale is N = 1** | an outer loop cannot compare one candidate | CD4 · 0.1b | 🔴 **FIRED.** 8 of 9 devices cannot compile `bb144_esm`. Build the set from conveyor-shaped generators (CD3 · B2) |
 | every candidate sits far above 0.7 % | nothing being compared would work; the ranking is of losers | CD4 · 0.1 — compare to threshold immediately | ✅ no: 73 of 73 verified pairs sit **10–27× below** threshold. The study is about margin |
 | the compiler cannot serve a family | comparison silently becomes "which device suits *our router*" | CD4 · 0.6 | 🔴 **FIRED** — it is B2. Only the conveyor family is served at BB scale |
@@ -511,9 +512,10 @@ that is evidence. If it does not, the proposer is the problem.
    compiles on one device.
 3. ~~Close **G1**.~~ **Done** — [`findings/g1`](findings/g1-chain-length.md). Trap capacity
    is now safe to sweep; the oracle re-validated at 397,184 / 8,808.
-4. **Sweep trap capacity**, the axis G1 was blocking — and check *first* whether the compiler
-   ever fills a trap. If it does not, the axis is inert for a mapping reason (CD2 · 2), not a
-   geometry one.
+4. ~~Sweep trap capacity.~~ **Checked first, and it is inert** —
+   [`q03`](findings/q03-capacity-is-inert.md). Capacity 4 is byte-identical to capacity 2. The
+   axis has no content until a placer stacks (CD2 · 2), and the rotation fallback must be fixed
+   before any sweep or the result is an artifact of router selection.
 5. Close **B2** — build a comparison set of conveyor-shaped candidates from the CD3
    generators, so the outer loop has more than one machine to compare.
 6. Then G2 — wire `qccd/phys`'s solved ion height into the heating rate. Re-validate the
