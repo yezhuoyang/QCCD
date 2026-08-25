@@ -1,9 +1,11 @@
 # Trap capacity is inert — nothing in the compiler ever fills a trap
 
-**Status:** answered. **Verdict:** raising `ring144_24v`'s trap capacity from 2 to 4 produces a
-**byte-identical program** — same 864 gate pairs, same 358.52 ms, and every gate still at chain
-length 2. The axis [G1](g1-chain-length.md) was written to guard is currently **unreachable**.
-Raising it to 8 makes the device *worse*, for a reason that has nothing to do with capacity.
+**Status:** answered, and the compiler gap it exposed is fixed. **Verdict:** raising
+`ring144_24v`'s trap capacity from 2 to 4 **or 8** produces a **byte-identical program** — same
+864 gate pairs, same 358.52 ms, every gate still at chain length 2. The axis
+[G1](g1-chain-length.md) was written to guard is currently **unreachable**. Capacity 8 first
+appeared *worse* (79 ops unrealised); that turned out to be the rotation fallback hanging off
+an exception, and fixing it flattened the axis — see §3.
 
 ```bash
 # variants: zone_types data/ancilla/trap capacity 2 -> 4, 8; everything else identical
@@ -53,15 +55,40 @@ compiler**, and the non-monotonicity is an artifact of router selection, not of 
 sweep run today would report an optimum at capacity 2 and that number would be about
 `qccdc_cli.ml`'s control flow.
 
-## 3 · What to fix, in order
+## 3 · The fallback is fixed, and the axis is now flat
 
-1. **Make the rotation fallback fire on a partial placement, not only on an exception.** A
-   compile that leaves 79 ops unrealised has declined just as surely as one that raises. This
-   is a few lines and it removes the non-monotonicity above.
-2. **Then, if capacity is still to be searched, a placer that stacks.** Until one exists the
-   axis has no content, and `q03` should be re-run after it does.
+`qccdc_cli.ml` now treats a partial placement as the decline it is, and retries rotation.
+Re-running the sweep:
 
-## 4 · Caveats
+| | pairs | runtime | chain lengths | outcome |
+|---|---:|---:|---|---|
+| capacity 2 | 864 | 358.52 ms | `{2: 864}` | compiles |
+| capacity 4 | 864 | 358.52 ms | `{2: 864}` | compiles |
+| **capacity 8** | **864** | **358.52 ms** | **`{2: 864}`** | **compiles** — was 79 unrealised |
+
+**The non-monotonicity is gone, and the finding is stronger for it.** Capacity is inert across
+the whole range 2 → 8, not merely 2 → 4, and the capacity-8 anomaly is now positively
+identified as control flow rather than physics: removing the control-flow gap removed the
+anomaly, leaving a byte-identical program at every capacity.
+
+The retry can only add. Verified on the two paths it must not change:
+
+- `cyclone_dual_loop`, where rotation declines — the `UNREALISED ops: 1272` verdict still
+  prints, so `run_matrix.py`'s classification is unchanged.
+- `--no-rotate`, which still suppresses the retry, so `c7_occupancy.py` keeps measuring the
+  individual-ion router rather than the pair of them.
+
+One design note. The verdict is now printed by the **dispatcher**, not by `cmd_compile`.
+Leaving ops unrealised is a decline, and `run_matrix.py` greps stdout for that exact string —
+so printing it before a retry that might supersede it would have reported "unrealised" for a
+program that rotation went on to compile completely.
+
+## 4 · What is left
+
+**A placer that stacks.** Until one exists the axis has no content, and `q03` should be re-run
+after it does. That is CD2 · 2, not CD3.
+
+## 5 · Caveats
 
 - **Only `ring144_24v`, only `bb144_esm`.** The rotation pipeline is the only router that
   compiles this circuit at all ([`q01b`](q01b-bb144-and-the-floor.md) §1), so this measures the
