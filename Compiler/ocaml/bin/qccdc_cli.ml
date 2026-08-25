@@ -224,11 +224,11 @@ let cmd_compile inp arch_path out =
         if i < 8 then Printf.printf "    %s: %s
 " f.where f.why)
       fs);
-  if r.cert.unrealised <> [] then
-    Printf.printf "  UNREALISED ops: %d (%s)
-" (List.length r.cert.unrealised)
-      (String.concat ","
-         (List.filteri (fun i _ -> i < 8) (List.map string_of_int r.cert.unrealised)));
+  (* The UNREALISED verdict is NOT printed here.  Leaving ops unrealised is a decline,
+     and the caller may retry with rigid rotation -- printing the verdict before that
+     retry publishes an outcome the retry can supersede, and `bridge/run_matrix.py`
+     greps stdout for exactly this string.  The list is returned instead, and whoever
+     decides the final answer prints it.  See `report_unrealised`. *)
   (match Qccdc.Tsir.validate r.prog with
   | [] -> ()
   | errs ->
@@ -239,7 +239,15 @@ let cmd_compile inp arch_path out =
   Qccdc.Cert.save (out ^ ".qcert.json") r.cert;
   Printf.printf "  -> %s.tsir.json  %s.qcert.json
 " out out;
-  if Qccdc.Cert.check r.cert <> [] then 1 else 0
+  ((if Qccdc.Cert.check r.cert <> [] then 1 else 0), r.cert.unrealised)
+
+(* The verdict, in the exact words `bridge/run_matrix.py` greps for.  Printed only once
+   the answer is final -- after a rotation retry has succeeded or declined. *)
+let report_unrealised (ops : int list) =
+  if ops <> [] then
+    Printf.printf "  UNREALISED ops: %d (%s)
+" (List.length ops)
+      (String.concat "," (List.filteri (fun i _ -> i < 8) (List.map string_of_int ops)))
 
 let cmd_route_instances inp arch_path out =
   let a = Qccdc.Arch.load arch_path in
@@ -352,7 +360,34 @@ let () =
   | "compile" :: inp :: rest -> (
     match (arg_after "--arch" rest, arg_after "-o" rest) with
     | Some arch_path, Some out -> (
-      try exit (cmd_compile inp arch_path out) with
+      try
+        let code, unrealised = cmd_compile inp arch_path out in
+        (* A PARTIAL PLACEMENT IS A DECLINE TOO.  The general router signals "I cannot do
+           this" in two different ways: it raises `Unroutable`, or it returns having left
+           some ops unrealised.  The rotation fallback below used to hang off the
+           exception only, so a device with MORE room could compile WORSE than one with
+           less -- raising `ring144_24v`'s trap capacity to 8 stopped the router raising,
+           so rotation was never tried and 79 of 864 contacts stayed unrealised on a
+           circuit that compiles completely at capacity 2 (`Codesign/findings/q03`).
+           That made capacity a non-monotone axis for a reason that was control flow
+           rather than physics. Retrying here can only add programs that compile. *)
+        if unrealised <> [] && not (List.mem "--no-rotate" rest) then begin
+          Printf.eprintf "%s: %d ops unrealised by the general router
+" inp
+            (List.length unrealised);
+          prerr_endline "  trying rigid rotation, which does not need a free slot to move into";
+          try exit (cmd_rotate inp arch_path out) with
+          | Qccdc.Rotate_pipeline.Not_applicable r ->
+            Printf.eprintf "  rotation does not apply either: %s
+" r;
+            (* the partial program from the compile above is still on disk, and this is
+               now the final answer, so publish the verdict the caller greps for *)
+            report_unrealised unrealised;
+            exit code
+        end;
+        report_unrealised unrealised;
+        exit code
+      with
       | Qccdc.Qasm.Error m -> Printf.eprintf "%s: parse error: %s
 " inp m; exit 2
       | Qccdc.Circuit.Error m -> Printf.eprintf "%s: %s
