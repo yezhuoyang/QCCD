@@ -1,0 +1,10 @@
+[
+ {
+  "circuit": "bb144_esm",
+  "device": "ring144_24v",
+  "ms": 522.32,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ }
+]

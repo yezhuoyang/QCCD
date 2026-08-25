@@ -35,6 +35,7 @@ replay rather than out of a formula.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from typing import Mapping, Sequence
 
@@ -53,6 +54,49 @@ __all__ = [
 #: The named halves of the heating budget.  Keeping them separate is what lets M2 report
 #: "267 shuttling + 1336 junction + 144 dock/undock" instead of one opaque total.
 QUANTA_COMPONENTS = ("shuttle", "junction", "split_merge", "gate", "anomalous")
+
+
+def _chain_reference(spec: Mapping[str, object], key: str) -> int | None:
+    """Read a `"<shape>:<N_ref>"` chain rule off a primitive, or `None` if undeclared.
+
+    Undeclared means the primitive's numbers carry no statement about chain length, and
+    every model must then behave exactly as it did before chain length was modelled at
+    all.  Silence is not an invitation to assume a default.
+    """
+    rule = spec.get(key)
+    if rule is None:
+        return None
+    shape, _, value = str(rule).partition(":")
+    if shape not in ("murali", "linear"):
+        raise ValueError(f"unsupported {key} rule {rule!r}")
+    n_ref = int(value)
+    if n_ref < 2:
+        raise ValueError(f"{key} reference chain length must be >= 2, got {n_ref}")
+    return n_ref
+
+
+def _chain_factor(n_chain: int, n_ref: int) -> float:
+    """Murali's `A ~ N / ln N`, as a **monotone** envelope from the reference length.
+
+    Two deliberate departures from the bare formula, both because a search is going to
+    be pointed at this and neither is a claim the source makes:
+
+    **Clamped below at `n_ref`.**  `N / ln N` has a minimum at `N = e ~ 2.718`, so taken
+    literally it says a 3-ion chain is **5.4 % better** than a 2-ion one.  That is an
+    artifact of evaluating an asymptotic large-`N` scaling at `N = 3`, not a measured
+    discount -- and handing an optimiser a 5 % free lunch at `N = 3` is precisely the
+    failure mode G1 exists to prevent.  The envelope says instead that a chain longer
+    than the reference is never *better* than the reference, which is the conservative
+    reading and the one that cannot be exploited.
+
+    **Clamped below at 2 ions.**  A two-qubit gate needs two ions in the trap, and R6b
+    already requires the pair to be co-located, so `n_chain < 2` cannot reach here from a
+    legal program.  The clamp is a guard against a caller, not a model of a one-ion gate.
+    """
+    n = max(int(n_chain), 2)
+    raw = n / math.log(n)
+    floor = n_ref / math.log(n_ref)
+    return max(raw, floor)
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +185,9 @@ class CostModel:
 
     # -- everything else ---------------------------------------------------
 
-    def gate(self, arch: Architecture, gate: str, n_pairs: int) -> Charge:
+    def gate(
+        self, arch: Architecture, gate: str, n_pairs: int, n_chain: int | None = None
+    ) -> Charge:
         return Charge()
 
     def gate_1q(self, arch: Architecture, gate: str, n: int) -> Charge:
@@ -166,8 +212,17 @@ class CostModel:
         """R17: quanta accrued per microsecond of elapsed time, moving or not."""
         return 0.0
 
-    def gate_error(self, arch: Architecture, nbar: float) -> float:
-        """R16: two-qubit gate error as a function of accumulated quanta."""
+    def gate_error(
+        self, arch: Architecture, nbar: float, n_chain: int | None = None
+    ) -> float:
+        """R16: two-qubit gate error as a function of accumulated quanta.
+
+        ``n_chain`` is how many ions share the trap the gate happens in -- the same
+        quantity R13 caps at 15, read from the replayed occupancy.  ``None`` means "not
+        supplied", and every model must then answer exactly as it did before the argument
+        existed, so that a caller which does not know the chain length is never silently
+        given a different number.
+        """
         return 0.0
 
     def describe(self) -> dict:
@@ -319,13 +374,40 @@ class CorrectedModel(CostModel):
             )
         return charge
 
-    def gate(self, arch: Architecture, gate: str, n_pairs: int) -> Charge:
+    def gate(
+        self, arch: Architecture, gate: str, n_pairs: int, n_chain: int | None = None
+    ) -> Charge:
         key = {"MS": "ms_gate", "CX": "ms_gate", "SWAP": "gate_swap"}.get(gate, "ms_gate")
         spec = arch.primitives.scalar(key)
         if key == "gate_swap":
             ms = arch.primitives.scalar("ms_gate")
-            return Charge(cost=0.0, depth=1, us=float(spec["gates"]) * float(ms["us"]))
-        return Charge(cost=0.0, depth=1, us=float(spec["us"]))
+            return Charge(cost=0.0, depth=1,
+                          us=float(spec["gates"]) * self._gate_us(ms, n_chain))
+        return Charge(cost=0.0, depth=1, us=self._gate_us(spec, n_chain))
+
+    @staticmethod
+    def _gate_us(spec: Mapping[str, object], n_chain: int | None) -> float:
+        """Gate duration, optionally scaled by chain length.
+
+        The other half of G1.  Murali *et al.* report that gate duration scales with the
+        gate type -- **FM ∝ chain size N**, AM ∝ ion separation, PM weakly -- so a longer
+        chain can cost time as well as fidelity.  Declaring `us_vs_chain: "linear:N_ref"`
+        turns that on, normalised so the declared `us` is the duration **at `N_ref`** and
+        nothing changes at the reference length.
+
+        **No shipped architecture declares it, deliberately.** `ms_gate` cites
+        2305.03828 for its duration and does not say which of AM/FM/PM the gate is, and
+        Murali's linear scaling is FM-specific. Asserting it for an unstated gate type
+        would be inventing a number rather than refining one. The mechanism is here so a
+        capacity sweep can turn it on for an architecture that *does* say -- and when it
+        is on, the extra elapsed time reaches the error through R17's anomalous accrual
+        by itself, so there is no second `Γ` to calibrate and nothing double-counted.
+        """
+        us = float(spec["us"])
+        n_ref = _chain_reference(spec, "us_vs_chain")
+        if n_ref is None or n_chain is None:
+            return us
+        return us * max(int(n_chain), 2) / n_ref
 
     def gate_1q(self, arch: Architecture, gate: str, n: int) -> Charge:
         # A virtual-Z is a frame update: the controller advances the phase of every later
@@ -351,15 +433,71 @@ class CorrectedModel(CostModel):
             return 0.0
         return arch.anomalous_rate() / 1000.0
 
-    def gate_error(self, arch: Architecture, nbar: float) -> float:
-        """R16.  `error_vs_quanta: "linear:2.0e-3"` means eps = eps0 + 2.0e-3 * n-bar."""
+    def gate_error(
+        self, arch: Architecture, nbar: float, n_chain: int | None = None
+    ) -> float:
+        """R16.  `error_vs_quanta: "linear:2.0e-3"` means eps = eps0 + 2.0e-3 * n-bar.
+
+        With `error_vs_chain` also declared, the chain-length term of Murali *et al.*
+        (ISCA 2020) is added -- see `_chain_factor` and G1 in `Codesign/EVALUATION.md`.
+        """
         spec = arch.primitives.scalar("ms_gate")
         eps0 = 1.0 - float(spec.get("fidelity_at_n0", 1.0))
         rule = str(spec.get("error_vs_quanta", "linear:0"))
         kind, _, value = rule.partition(":")
         if kind != "linear":
             raise ValueError(f"unsupported error_vs_quanta rule {rule!r}")
-        return eps0 + float(value) * max(nbar, 0.0)
+        slope = float(value)
+        nbar = max(nbar, 0.0)
+
+        n_ref = _chain_reference(spec, "error_vs_chain")
+        if n_ref is None or n_chain is None:
+            return eps0 + slope * nbar
+
+        # The calibration must be checkable BEFORE the short-circuit below, or an
+        # architecture with an impossible slope would quietly return legacy numbers at
+        # the reference length and only blow up once a sweep reached a longer chain.
+        half = slope / 2.0
+        if eps0 - half < 0.0:
+            raise ValueError(
+                f"ms_gate declares error_vs_quanta slope {slope:g} against "
+                f"fidelity_at_n0 infidelity {eps0:g}: the chain-length calibration needs "
+                f"slope <= 2*eps0, or the zero-quanta floor goes negative"
+            )
+
+        # A chain no longer than the reference IS the reference case, so return the
+        # reference expression itself rather than an algebraically-equal regrouping of
+        # it.  The two agree to about 1 ULP, which is close enough for physics and not
+        # close enough for the claim being made: that this change leaves every
+        # already-validated number on a capacity-2 device EXACTLY as it was.  A
+        # 1-ULP-per-gate drift over 864 gates is a different claim, and a weaker one.
+        ratio = _chain_factor(n_chain, n_ref) / _chain_factor(n_ref, n_ref)
+        if ratio == 1.0:
+            return eps0 + slope * nbar
+
+        # G1.  Murali et al. give the laser-instability coefficient as A ~ N / ln N and
+        # the error as A (2 n-bar + 1).  Writing that as
+        #
+        #     eps(n-bar, N)  =  eps0' + kappa f(N) (2 n-bar + 1)
+        #
+        # and requiring it to equal the legacy eps0 + slope*n-bar AT THE REFERENCE CHAIN
+        # LENGTH, for every n-bar, pins both constants with nothing left to choose:
+        #
+        #     kappa  =  slope / (2 f(N_ref))          matching the n-bar coefficient
+        #     eps0'  =  eps0 - kappa f(N_ref)         matching the constant
+        #            =  eps0 - slope / 2
+        #
+        # That is what makes this a REFINEMENT rather than a replacement (D1): at
+        # N = N_ref the two models are the same function of n-bar, to the last bit, so
+        # every already-validated number on a capacity-2 device is unchanged.  N_ref is
+        # 2 because `fidelity_at_n0` and `error_vs_quanta` are both quoted from a
+        # two-ion gate zone (2305.03828); an architecture whose gate numbers came from a
+        # longer chain must say so in its own `error_vs_chain`.
+        # Written in terms of the RATIO f(N)/f(N_ref), which is all the shape contributes
+        # once kappa is pinned: kappa*f(N) = (slope/2) * ratio.  So neither kappa nor
+        # f itself appears, and the expression below is manifestly `eps0 + slope*nbar`
+        # at ratio = 1.
+        return (eps0 - half) + half * ratio * (2.0 * nbar + 1.0)
 
     def max_gate_quanta(self, arch: Architecture) -> float:
         """R7's budget."""

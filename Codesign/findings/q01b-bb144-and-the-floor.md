@@ -195,6 +195,14 @@ real modelling question; it is not this one.
 
 ### G1 survives, and is now the *only* proposed change that can restore a signal
 
+> **Corrected by [`findings/g1`](g1-chain-length.md) §4, which closed it.** The argument below
+> is right that G1's term survives cooling at `n̄ = 0`. The implication drawn from it — that
+> G1 therefore restores an architecture signal — is too strong: the term is only a *variable*
+> where trap capacity varies, and **seven of the nine devices declare capacity 2**, so on them
+> it is a constant that folds back into `ε₀`. Closing G1 moved 2 of 73 verified programs. What
+> it actually bought is that trap capacity is now safe to search, and that a device gating
+> 15-ion chains fell from 4th of 9 to last.
+
 The cooling pass nulls anything that reaches the gate error through `n̄`. That is what makes
 G1 different from every other repair on the list:
 

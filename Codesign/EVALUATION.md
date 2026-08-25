@@ -3,6 +3,10 @@
 The objective for the codesign loop, what the literature does, and the three places this
 repository's model is missing a term that the search would otherwise exploit.
 
+**Status of the three gaps:** **G1 closed** (2026-08-24,
+[`findings/g1`](findings/g1-chain-length.md)); G2 and G3 open, and §4 now says what each is
+actually worth.
+
 **Summary.** The metric this repo already computes — `neg_log_fidelity`, the expected number
 of faults in a syndrome round — is the right one, and it is the same construction the
 closest published precedent uses. Three things have to be fixed before it can rank
@@ -53,9 +57,9 @@ F  =  1 − Γτ − A(2n̄ + 1)          A ∝ N / ln N
 
 | term | meaning | in this repo? |
 |---|---|---|
-| `Γτ` | background heating during the gate, τ = gate duration | folded into a constant `ε₀` |
+| `Γτ` | background heating during the gate, τ = gate duration | **yes, dynamically** — R17 accrues anomalous heating over elapsed time, the gate's own duration included. Not a constant in `ε₀`, and not to be added a second time |
 | `A · 2n̄` | motional excitation at gate time | **yes** — `ε₀ + k·n̄` |
-| `A ∝ N/ln N` | laser-intensity instability grows with **chain length N** | **no — absent entirely** |
+| `A ∝ N/ln N` | laser-intensity instability grows with **chain length N** | ~~**no — absent entirely**~~ **yes, since G1** — `error_vs_chain: "murali:2"`, [`findings/g1`](findings/g1-chain-length.md) |
 
 Their quantitative transport figures: **~0.1 quanta per split/merge, ~0.01 quanta per
 segment traversal** — useful as an order-of-magnitude check against this repo's primitive
@@ -196,7 +200,24 @@ attributable part alongside `−ln F`**, or a ranking will be dominated by a con
 
 ## 4 · Three gaps to close before the loop runs
 
-### G1 · Gate error does not depend on chain length — **and it is the only repair that survives cooling**
+### G1 · Gate error does not depend on chain length — ✅ **CLOSED**, see [`findings/g1`](findings/g1-chain-length.md)
+
+> **Closed 2026-08-24.** `error_vs_chain: "murali:2"` is declared by all nine architectures
+> and `gate_error` reads the chain length the way R13 does. The calibration turned out to have
+> **no free parameter**: requiring the new model to equal the old one at `N_ref` for every `n̄`
+> pins `κ = slope / (2 f(N_ref))` and `ε₀' = ε₀ − slope/2`, so **D1's "largest single
+> assumption" is only the *shape*.** At `N_ref` the two models are bit-identical, 71 of 73
+> verified programs did not move at all, and the oracle still replays 397,184 / 8,808.
+>
+> What it bought: R13's cap of 15 ions now costs **1.50×** at `n̄ = 0` and **1.72×** at R7's
+> cap, widening the feasible band for one gate from 2.09× to **3.59×**. `stationary_chain` —
+> the only device in the corpus that gates 15-ion chains — went from **4th of 9 to last**.
+>
+> What it did **not** buy, correcting the paragraph below: seven of the nine devices declare
+> trap capacity 2, so on them the term is a constant that folds back into `ε₀`. **G1 adds no
+> signal to the current comparison; it makes capacity a safe axis to sweep.**
+
+The reasoning that motivated it, kept because it is still the argument for the term's shape:
 
 ```python
 # qccd/cost/models.py
@@ -220,15 +241,23 @@ with the `Γτ` term so that gate duration (itself `N`-dependent for FM gates) c
                      both are non-zero at n̄ = 0
 ```
 
-**And there is now a second, stronger reason to close it.**
+**And there is a second reason, which needs one qualification.**
 [`findings/q01b`](findings/q01b-bb144-and-the-floor.md) §4 measures that the cooling pass
 drives the mean gate n̄ to *exactly zero* on the BB round, pinning the gate term to its floor
 and erasing the heating signal into runtime. Anything that reaches the gate error **through
-`n̄` is laundered away by cooling.** G1's two new terms do not: at `n̄ = 0` they are
-`Γ·τ(N) + κ·N/ln N`, which no amount of cooling removes. G1 is therefore not merely a guard
-against the optimiser reading R13's cap back as an optimum — **it is the only change on this
-list that puts an architecture-dependent quantity into the gate error that the cooling pass
-cannot convert into free runtime.**
+`n̄` is laundered away by cooling.** G1's term does not: at `n̄ = 0` it is `κ·f(N)`, which no
+amount of cooling removes. **But it is only a *variable* where capacity varies**, and on a
+capacity-2 device it is a constant absorbed into `ε₀`
+([`findings/g1`](findings/g1-chain-length.md) §4). The correct claim is the narrow one: G1 is
+what makes trap capacity safe to search, not what puts signal into today's comparison.
+
+**One term of the published formula is deliberately not added.** `Γ·τ` — background heating
+during the gate — is **already in the model**, as R17's anomalous accrual over elapsed time,
+which includes the gate's own duration. Adding it again would double count. The table in §2
+above says `Γτ` is "folded into a constant `ε₀`"; that was wrong, it is modelled dynamically.
+The `us_vs_chain` mechanism that would make gate *duration* chain-dependent is implemented and
+tested but **left undeclared**, because `ms_gate` does not say whether the gate is AM, FM or
+PM and Murali's linear scaling is FM-specific.
 
 Calibrate `κ` and `Γ` so the shipped `ring144_24v` schedule reproduces its current error at
 its current chain length — the change must be a *refinement* of the validated model, not a

@@ -28,11 +28,12 @@ do — and it is meant to run as an iterative loop until it converges.
 - **Feasibility is not negotiable.** A candidate must pass the 23 hardware rules *and* R10,
   the latter by the proved Lean checker for anything reported. An infeasible schedule has no
   performance — do not report its numbers.
-- **G1 is a blocker.** The gate-error model has no chain-length term, so longer ion chains
-  cost nothing and the optimiser would drive trap capacity to R13's hard cap of 15 and report
-  that cap as an optimum. **Nothing may sweep trap capacity until G1 is closed.** Other work
-  may proceed in parallel. It is also, as of `q01b`, the only proposed repair whose terms are
-  non-zero at `n̄ = 0` — everything else the cooling pass launders into runtime.
+- **G1 is closed** (2026-08-24). The gate error now carries Murali's `κ·(N/ln N)·(2n̄+1)`
+  chain-length term, calibrated so it is *bit-identical* to the old model at a 2-ion chain, so
+  trap capacity is safe to sweep. Two things to carry forward: the calibration has **no free
+  parameter** (equality at the reference length pins it), and G1 added **no signal to the
+  current comparison** — seven of nine devices are capacity-2, so the term is a constant on
+  them. Do not re-argue either; read `findings/g1`.
 - **B2 is a blocker.** Of the nine shipped devices, exactly **one** compiles the BB round. An
   outer loop cannot compare one candidate, and no model change fixes it: build the comparison
   set from conveyor-shaped CD3 generators instead.
@@ -98,7 +99,10 @@ signal is real (the device-attributable *part* spreads 19–121 ×) but it is di
 **3.9 %** of `−ln F`. There is **no interior optimum in the cooling budget**: `T_coh = 600 s`
 makes runtime nearly free, so the curve is monotone and the shipped policy already sits at the
 minimum. And **the BB round compiles on one of the nine devices**, so at the scale that
-matters the comparison has N = 1 (blocker B2). The next action is to close G1, which is the
-only repair that survives cooling; then build a comparison set that has more than one member.
+matters the comparison has N = 1 (blocker B2). **G1 is now closed** — R13's cap of 15 ions
+costs 1.50–1.72 ×, and the one device that gates 15-ion chains fell from 4th of 9 to last —
+which makes trap capacity safe to sweep but adds nothing to the current comparison. The next
+action is to check whether the compiler ever *fills* a trap before sweeping capacity at all;
+then build a comparison set with more than one member.
 
 ---
