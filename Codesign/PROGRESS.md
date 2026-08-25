@@ -12,21 +12,21 @@ updating it. If this file and the code disagree, the code is right and this file
 
 ## Next action
 
-> **Sweep trap capacity — the axis G1 was blocking — but check first whether the compiler
-> ever fills a trap.** [`findings/g1`](findings/g1-chain-length.md) §6: `stationary_chain` is
-> the only device in the corpus that gates 15-ion chains, and it does so because it has *two
-> traps and nowhere else to put the ions*, not because a placer chose a long chain. Every
-> other device is capacity-2, so the question has never arisen.
+> **Make the rotation fallback fire on a partial placement, not only on an exception.**
+> [`findings/q03`](findings/q03-capacity-is-inert.md) §2: at trap capacity 8 the general router
+> stops raising `Route.Unroutable` and instead returns a partial placement with **79 ops
+> unrealised** — so `qccdc_cli.ml` never tries rigid rotation, and a device with *more* room
+> compiles *worse* than the shipped one.
 >
-> So step one is one command, not a sweep: raise `ring144_24v`'s trap capacity, recompile the
-> BB round, and look at `ReplayResult.chain_len_at_gate`. If the histogram is still all twos,
-> **capacity is inert because nothing uses it**, the finding belongs to CD2 · 2 (mapping)
-> rather than CD3 (geometry), and a capacity sweep would have measured nothing while looking
-> like it measured something.
+> A compile that leaves ops unrealised has declined just as surely as one that raises. This is
+> a few lines in [`qccdc_cli.ml:360`](../Compiler/ocaml/bin/qccdc_cli.ml#L360), it can only add
+> programs that compile, and it removes a non-monotonicity that would otherwise make any
+> capacity sweep report an artifact of control flow as an optimum.
 >
-> If it *is* used, sweep capacity 2 … 15 on the ring at BB scale and report the curve. That is
-> also the cheapest partial answer to **B2**: every point is conveyor-shaped, so every point
-> compiles, which is more than the nine shipped devices manage.
+> After that, the honest ordering is **B2 before more model work**: the study still has one
+> candidate at BB scale. Either the swap-based fallback router (certain to work, no checker
+> changes needed — verified) or C1's rail-and-storage layout (architectural, and the
+> collaborator is waiting on it).
 
 ---
 
@@ -42,7 +42,7 @@ updating it. If this file and the code disagree, the code is right and this file
 | CD4 · 0.5 | grid vs ring vs ladder at fixed trap count | 🔴 **blocked by B2** — at BB scale only the ring compiles | — |
 | CD4 · 0.6 | what does the router actually cost? | 🔶 partly answered — 8 of 9 devices cannot serve the BB round, for two separate reasons | [q01b §1](findings/q01b-bb144-and-the-floor.md) |
 | **G1** | chain-length term in the gate error | ✅ **CLOSED** — parameter-free calibration, bit-identical at N=2, R13's cap now costs 1.50–1.72×; `stationary_chain` fell from 4th of 9 to last. **Capacity is safe to sweep** | [findings/g1](findings/g1-chain-length.md) |
-| **CD3 · capacity** | does the compiler ever *fill* a trap? | ⬜ **next** — G1 prices long chains, but nothing may create them | — |
+| **CD3 · capacity** | does the compiler ever *fill* a trap? | ✅ **answered — no.** Capacity 4 gives a byte-identical program; every gate still at chain length 2. The axis G1 guards is unreachable until a placer stacks. Capacity 8 is *worse* (79 unrealised) via router selection, not physics | [findings/q03](findings/q03-capacity-is-inert.md) |
 | **C1** | space-efficient rail-and-storage layout (collaborator's sketch) | ⬜ **queued** — **two media**: small-capacity transport rails, larger-capacity `storage` sites holding *idle* ions off the transport path. The first serious second candidate, and an architectural answer to B2: rail occupancy stops scaling with qubit count | [PLAN CD3 · C1](PLAN.md) |
 | **B2** | the comparison set at BB scale is **N = 1** | 🔴 **BLOCKER** — an outer loop cannot compare one candidate. A capacity sweep on the ring is the cheapest partial answer: every point is conveyor-shaped | [PLAN CD3 · B2](PLAN.md) |
 | G2 | anomalous heating from the solved ion height | ⬜ — worth doing, but it reaches the objective only through runtime → idle (5.7 %) | [EVALUATION §4](EVALUATION.md) |
@@ -74,8 +74,8 @@ updating it. If this file and the code disagree, the code is right and this file
 - ~~How much of the 19–121× device-part spread survives G1?~~ **Answered: none of it moves.**
   G1 changed 2 of 73 programs, both on `stationary_chain`. Seven of nine devices are
   capacity-2, so the term is a constant on them.
-- **Will a placer ever choose a long chain if given the capacity?** G1 prices them; nothing
-  creates them. (**next action**)
+- ~~Will a placer ever choose a long chain if given the capacity?~~ **Answered: no.** Capacity
+  4 compiles byte-identically to capacity 2. The question moves to CD2 · 2 (mapping).
 - **Does keeping the transport rails empty route where a uniformly-loaded device does not?**
   C1's central claim, and the reason it may answer B2 without any compiler work.
 - **Storage buys routability and area, but not fidelity — is that a defect of the design or of
@@ -121,5 +121,6 @@ written up — the boring ones are what stop the next session repeating the work
 | date | what happened |
 |---|---|
 | 2026-08-24 | Plan and evaluation written. `q01` run on 39 existing programs: the falsification test does not fire (median 48% of `−ln F` is device-attributable), but best-to-worst is only 1.3× against the literature's three orders of magnitude. Wiring found to be invisible to the objective. |
+| 2026-08-24 | `q03`. Swept `ring144_24v` trap capacity 2 -> 4 -> 8 on the BB round. **Capacity 4 is byte-identical to capacity 2** — same batches, hops, runtime, and `{2: 864}` chain lengths — so the compiler never fills a trap and the axis G1 guards is unreachable. Capacity 8 is *worse* (79 ops unrealised) because the general router stops raising `Unroutable`, so the rotation fallback never fires: the latent gap found in `q01b` §1, firing for real. **Capacity is not a monotone axis under the current compiler**, and a sweep run today would report `qccdc_cli.ml`'s control flow as an optimum. |
 | 2026-08-24 | **G1 closed.** `error_vs_chain: "murali:2"` on all nine architectures; the replay reads the chain length the way R13 does. The calibration turned out **parameter-free** — equality with the old model at `N_ref` for every `n̄` pins `κ` and `ε₀'`, so D1's "largest single assumption" reduces to borrowing Murali's shape. Bit-identical at `N_ref`; 71 of 73 verified programs unmoved; oracle still 397,184 / 8,808; `bb144_esm` recompiled and R10 still `passed`. The raw `N/lnN` has a minimum at `N = e` and so discounts a 3-ion chain by 5.4 % — refused with a monotone envelope rather than handed to a search. **Result: `stationary_chain` fell from 4th of 9 to last** on both circuits it runs. But seven of nine devices are capacity-2, so G1 adds no signal to today's comparison, which corrects q01b §6. New question raised: nothing in the compiler ever *chooses* a long chain. |
 | 2026-08-24 | `q01b`. Generated `bb144_esm.qasm` and ran the matrix on it: **1 of 9 devices compiles the BB round** (three cannot hold 168 qubits; rigid rotation is the only router past ~46 % occupancy and only `ring144_24v` is conveyor-shaped) → new blocker **B2**. Re-measured 73 *verified* pairs and found `q01`'s 48 % was SPAM charged to the architecture — it is **3.9 %**. Diagnosed the 1.3 ×: not size, not G1, but **the cooling pass**, which drives the mean gate n̄ to exactly 0 and pins the gate term to its floor, while `T_coh = 600 s` makes the runtime it costs nearly free. Falsified the interior cooling optimum (**0.2 answered by its absence**) and the claim that G3 sets it. G1 survives as the next action, on a better argument: its terms are the only ones non-zero at n̄ = 0. Oracle re-checked: 397,184 / 8,808, EXPECTATIONS MET. |
