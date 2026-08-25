@@ -76,6 +76,10 @@ class ReplayResult:
     gate_error_sum: float = 0.0
     gate_quanta_sum: float = 0.0
     max_gate_quanta_seen: float = 0.0
+    #: G1: how many ions shared the trap at each two-qubit gate -- the same quantity R13
+    #: caps at 15.  Histogram rather than a mean, because the mean of a distribution that
+    #: is 99 % twos hides the tail that the chain-length term is about.
+    chain_len_at_gate: Counter = field(default_factory=Counter)
     us_by_type: dict[str, float] = field(default_factory=dict)
     us_by_class: dict[str, float] = field(default_factory=dict)
     cost_by_class: dict[str, float] = field(default_factory=dict)
@@ -117,6 +121,7 @@ class ReplayResult:
             "n_gate_pairs": self.n_gate_pairs,
             "gate_error_sum": self.gate_error_sum,
             "max_gate_quanta_seen": self.max_gate_quanta_seen,
+            "chain_len_at_gate": {str(k): v for k, v in sorted(self.chain_len_at_gate.items())},
         }
 
 
@@ -385,7 +390,13 @@ def replay(
                 for a in singles:
                     res.gates_per_ion[a] += 1
             else:
-                charge = model.gate(arch, instr.gate or "MS", n_pairs)
+                # G1: how many ions share the trap, which is what R13 caps at 15 and what
+                # the chain-length term of the gate model reads.  A gate instruction can
+                # hold several pairs in several traps; its DURATION is set by the longest
+                # chain involved, because the cycle ends when its slowest gate does.
+                chains = [occ_before.get(pos_before[a], 0) for a, b in pairs]
+                charge = model.gate(arch, instr.gate or "MS", n_pairs,
+                                    max(chains) if chains else None)
             res.n_gates += 1
             res.n_gate_pairs += n_pairs
             for a, b in pairs:
@@ -396,8 +407,13 @@ def replay(
                 # two sets the pair's error, since both share the motional mode.  This
                 # is the same n-bar R7 tests, by construction -- see `quanta_at_start`.
                 nbar = max(current.get(a, 0.0), current.get(b, 0.0))
-                res.gate_error_sum += model.gate_error(arch, nbar)
+                # R6b puts both ions of a pair in ONE gate zone, so either one names the
+                # chain.  Read it the way R13 does -- occupancy of the site before the
+                # cycle -- so the error model and the rule that caps it cannot disagree.
+                n_chain = occ_before.get(pos_before[a], 0)
+                res.gate_error_sum += model.gate_error(arch, nbar, n_chain)
                 res.gate_quanta_sum += nbar
+                res.chain_len_at_gate[n_chain] += 1
                 if nbar > res.max_gate_quanta_seen:
                     res.max_gate_quanta_seen = nbar
         elif instr.type in ("cool", "measure", "reset"):

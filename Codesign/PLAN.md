@@ -50,10 +50,22 @@ up to `2.0e-3` per gate it protects, so the curve is monotone and the optimum is
 
 ## CD1 · Three model gaps that must close before searching
 
-Derived in [`EVALUATION.md`](EVALUATION.md) §4. The first is a blocker; the other two change
-answers but do not invalidate them.
+Derived in [`EVALUATION.md`](EVALUATION.md) §4. **G1 is closed**
+([`findings/g1`](findings/g1-chain-length.md)); G2 and G3 remain, and change answers without
+invalidating them.
 
-### G1 — gate error has no chain-length term · **BLOCKER**
+### G1 — gate error has no chain-length term · ✅ **CLOSED** 2026-08-24
+
+> [`findings/g1`](findings/g1-chain-length.md). Declared as `error_vs_chain: "murali:2"` on
+> all nine architectures; `gate_error` reads the chain length the way R13 does. **The
+> calibration has no free parameter** — requiring equality with the old model at `N_ref` for
+> every `n̄` pins both constants, so D1 reduces to borrowing the shape. Bit-identical at
+> `N_ref`; 71 of 73 verified programs unmoved; oracle still 397,184 / 8,808.
+>
+> R13's cap of 15 ions now costs **1.50×** at `n̄ = 0` (**1.72×** at R7's cap), and
+> `stationary_chain` fell from **4th of 9 to last**. **Trap capacity is now safe to sweep.**
+> But seven of nine devices are capacity-2, so G1 adds no signal to today's comparison — and
+> nothing in the compiler ever *chooses* a long chain, which is the next thing to check.
 
 `gate_error(arch, nbar) = ε₀ + k·n̄`. No dependence on how many ions share the trap.
 **Trap capacity is one of the knobs we intend to search**, and with no penalty for long
@@ -80,6 +92,8 @@ is 5.7 % of `−ln F`.
 
 **Calibrate against the shipped oracle**: `ring144_24v` at its current chain length must
 reproduce its current error. This is a refinement of a validated model, not a replacement.
+*Done, and exactly rather than approximately — the two models are the same function of `n̄` at
+the reference chain length, bit for bit.*
 
 ### G2 — anomalous heating is a constant, but `qccd/phys/` computes the ion height
 
@@ -206,6 +220,155 @@ electrodes: a device that fails DRC (`rf_dc_clearance` already fails on `ring144
 spurs) cannot be built. Feed DRC and DAC count into the outer loop as constraints, not
 objectives — this is the part of the study a purely algorithmic paper cannot do.
 
+### C1 — the space-efficient rail-and-storage layout · **requested by a collaborator**
+
+A sketch, and the request: *"Since the BB codes are already set up on the ring architecture,
+do you think you could implement this space-efficient version as well? It'd be awesome to
+compare it directly to the single-ion ring setup."*
+
+**This is not a side quest. It is the first serious second candidate**, and B2 says the study
+does not currently have one. Take it on those grounds alone.
+
+#### What the sketch shows, as read — *confirm before building*
+
+Four horizontal transport rails, alternating in two colours, closed into **two interleaved
+loops** (the brackets at both ends). Vertical rungs cross all four. The vertical segments
+*between* rails are ringed in yellow and labelled **Storage**; the arrows show ions leaving
+storage onto a rail, travelling, and returning.
+
+So: **ions are parked densely in the vertical columns, and the horizontal rails are kept
+mostly empty as transport.** That is where "space-efficient" comes from — segments that in a
+plain grid are only wires here also hold qubits.
+
+**Answered by the author, 2026-08-24:**
+
+| | question | answer |
+|---|---|---|
+| **a** | two independent closed loops, or one fabric in two colours? | **two independent closed loops** |
+| **b** | where do gates happen? | **on the rails** — read from a "yes" to a three-way question, and consistent with the green dots sitting on the green rails in the sketch. *One word corrects it if wrong; it is the assumption everything below rests on.* |
+| **c** | ions per storage column? | **typically 2, but expose it as a generator parameter** |
+
+**Corrected by the author after the first draft of this section:** *"we add a 'Storage'
+design, which is essentially a **larger Site**. The **idle ions** can be put in the storage."*
+So storage is not a same-size site used differently — it is a site with **larger capacity than
+a rail site**, and its job is to hold ions that are **not currently being gated**. `typically
+2` is the default value of that parameter, not a claim that storage equals a rail site.
+
+#### What the design actually is: two media, not one
+
+This is the point, and it took the author's correction to see it. Every device in the corpus
+today has **one** medium — the same sites both hold ions and carry them. `ring144_24v` is 168
+capacity-2 sites, each holding a resident ion, and transport happens by moving those residents
+around each other. That is why occupancy and routability are the same problem there.
+
+This design **separates them**:
+
+| | rails | storage |
+|---|---|---|
+| capacity | small — a transit lane | **larger**, a parameter (default 2) |
+| holds | ions in flight, and gates (b) | **idle ions**, parked off the transport path |
+
+**That is an architectural answer to B2, and it is a better one than the swap router.** Five of
+nine devices fail the BB round because our planner needs an empty destination and 58 %
+occupancy leaves none. Here the occupancy that matters is *the rails'*, and idle ions are not
+on them. The rails can be kept near-empty **no matter how many qubits the device holds** —
+because capacity is bought in storage, which is not a transport medium. The occupancy ceiling
+stops being a function of qubit count.
+
+#### What it costs, and what it does not
+
+**It does not buy fidelity, and the plan should say so plainly.** Under this model an idle ion
+in storage is charged exactly what an idle ion on a rail is charged: `idle_error` is
+`n_ions × T_round / T_coh` with no reference to position, and `anomalous_per_us` accrues per
+ion per microsecond wherever it sits. **So the entire benefit of storage, as the model stands,
+is routability and area — not error.** That is not a defect of the design; it is a limit of the
+metric, and it belongs in the write-up beside the result rather than being discovered later.
+
+What it pays:
+
+- **`eject` / `reinsert` on every gate.** Those entail `split` + `merge` at **~6 quanta each
+  against ~0.1 for a shuttle hop — a 60× heating ratio** (`qccd/compile/oddeven.py`). This is
+  the dominant cost and it is charged automatically.
+- **R14, and only once storage is deeper than 2.** *"An ion must be at a trap edge to split;
+  getting there costs a 3-CX swap"* — flat 3 CX per position of burial, distance-independent.
+  At the default capacity 2 both ions are at an edge and it is **free**; at 3 and above,
+  extracting a buried ion costs 3 CX **per position**, i.e. ~5.5e-3 of gate error against a
+  gate's own 1.84e-3. **An extraction from one position deep costs three times what the gate it
+  enables costs.** That is a steep wall, and it is very likely why the author says 2 is typical.
+- **A scheduling opportunity that follows directly**: R14 charges for *burial depth*, so a
+  placer that keeps the next-needed ion at the edge of its storage chain pays nothing even in a
+  deep column. Ordering the storage chain by next-use is the obvious move and nothing in the
+  compiler does it today. This is the most interesting piece of new work in C1.
+
+**G1 does not bite here, and it also did not unblock this.** The chain-length term is priced
+**at a gate**; with gates on the rails (b) and storage never gated, `gate_error` never sees a
+storage chain. So `storage_capacity` may be swept regardless of G1 — the rule *"nothing may
+sweep trap capacity until G1 is closed"* covers **gate-capable** capacity, which this is not.
+Worth stating precisely rather than claiming today's G1 work as the enabler.
+
+> **A prediction worth writing down before measuring it.**
+> [`q01b`](findings/q01b-bb144-and-the-floor.md) found that the cooling pass converts heating
+> into runtime and that runtime is nearly free at `T_coh = 600 s`. If that holds, this layout
+> pays its 60× heating ratio **in cooling time and almost nothing in score** — so it should win
+> on die area and DAC count while scoring level with the ring. If instead it scores clearly
+> worse, `q01b`'s central finding has a limit we have not found yet, and *that* is the more
+> valuable result. Either way the experiment is worth running.
+
+#### Why it is worth the effort, in this study's own terms
+
+- **It is an architectural answer to B2.** The whole reason 5 of 9 devices fail to route the
+  BB round is that our planner needs an *empty destination* and 58 % occupancy leaves none. A
+  layout that deliberately concentrates ions in storage and **keeps the rails empty** may
+  route where `grid9x9` does not, with no compiler change at all. That is a hypothesis this
+  platform can test in an afternoon, and it is a genuinely different answer from the swap
+  router — worth having both, because they fail differently.
+- **Its cost is already modelled**: `eject`/`reinsert` heating always, plus R14 once storage
+  is deeper than 2. The movement classes declare `entails` and the cost model reads it. **No
+  new physics is needed to evaluate this design** — which is unusual and is why it is worth
+  doing now rather than later.
+- **Two closed loops change what can route it.** Rigid rotation preserves the cyclic order of
+  riders, so on one loop two ions can never meet (`Compiler/PLAN.md` §11.9a) — which is why
+  pure rotation only serves a bipartite round. **Ejecting to storage and reinserting breaks
+  that order**, so rotation *plus* eject/reinsert is strictly more powerful than either. That
+  is what the arrows in the sketch are doing, and it is the reason this layout might compile
+  the BB round where `grid9x9` cannot.
+
+#### What building it needs
+
+Mostly assembly of parts that exist:
+
+| | |
+|---|---|
+| geometry | a new generator — `ladder(width, rungs, highways)` has rails, rungs and `eject`/`reinsert` on-ramps but its four horizontal lines are **all open** (`closed=false`, from `qccdc arch`). (a) says the two rail pairs must each **close into a loop**, so this is a variant of `ladder`, not a call to it. Signature: `rail_storage(width, loops=2, storage_capacity=2)` — (c) asks for the capacity to be a parameter, not a constant |
+| storage zones | already expressible: `zone_types` carries per-type capacity and capability, and `load` is *already* capacity 8 with `gate: false` — a precedent for a large non-gating site. A `storage` type with capacity from the parameter and `gate: false` is a few lines of JSON |
+| **rail capacity** | must be **smaller than storage**, or the two media collapse back into one and the design is just a grid. This is the parameter that makes or breaks the comparison; state it explicitly in the generator rather than inheriting a default |
+| gate sites | **on the rails**, per (b) — so rail sites carry `gate: true` and storage columns do not. Note this is the mirror image of `ring144_24v`, where the loop is bare and the *docks* gate |
+| movement classes | `eject` / `reinsert` already exist on the ladder and already declare `entails: [split, merge]`, so the cost model charges them automatically |
+| the cost of depth | R14, above — already implemented and already checked |
+
+The genuinely new work is in two places:
+
+- **the placer** — which ions live in which column, when to pull one out, and **in what order
+  the column is stacked**. R14 charges for burial depth, so keeping the next-needed ion at the
+  edge is worth 3 CX per gate. CD2 · 2, and the same gap the capacity sweep exposed: *nothing
+  in the compiler currently chooses to stack ions, let alone order the stack*.
+- **the router**, and here is the risk to name up front. `conveyor.ml` detects *"a closed loop
+  with gate-capable **docks** hanging off it by one spur"*. This device has closed loops whose
+  **gate sites are on the loop itself**, which is the opposite arrangement — so
+  `rotate_pipeline` may decline on it exactly as it declines on `cyclone_dual_loop`, whose
+  gate sites also sit on its loops. If it does, this layout needs either the swap-based
+  fallback router or an extension of the conveyor detector to handle eject/reinsert as the
+  order-breaking move. **Check this before building the generator**: it is a ten-minute read of
+  `conveyor.ml` and it decides whether C1 is a geometry task or a geometry-plus-router task.
+
+#### How it gets judged
+
+No differently from anything else, and this matters for the comparison to mean something:
+the same `bb144_esm` round, `(p_eff, T_round)`, the 23 rules and **R10 by the proved checker**,
+plus DAC count and DRC as constraints. And the **fairness protocol** below — same inner-loop
+budget as the ring gets, recorded in the ledger. A space-efficient layout that wins because we
+tuned it harder has not won.
+
 ### B2 — the comparison set at BB scale is **N = 1** · **BLOCKER**
 
 Measured in [`findings/q01b`](findings/q01b-bb144-and-the-floor.md) §1. Of the nine shipped
@@ -312,7 +475,8 @@ has no performance.** T1 may rank; only T2 may be quoted.
 |---|---|---|---|
 | `p_eff` is dominated by the gate floor `ε₀` | geometry cannot move it; the answer is "buy better gates" | CD4 · 0.1, day one | 🔴 **FIRED.** 96 % floor, median device share **3.9 %**. Not fatal *yet* — the device-attributable part still spreads 19–121×, so the signal exists and is diluted, not absent. G1 is the repair |
 | `p_eff` is dominated by data-ion idle time | study collapses to "minimise round time" and the heating model stops mattering | CD4 · 0.2 | 🔶 **partly.** On the BB round idle is **100 %** of the device-attributable part (gate excess is exactly 0), so at BB scale the objective *is* `n_ions × T_round`. On smaller circuits idle is 2–5 % of it |
-| **G1 not closed before searching capacity** | the optimiser reports R13's hard cap as an optimum | CD1 · G1, before any sweep over trap size | 🔴 open — and now the *only* repair whose terms survive cooling |
+| ~~G1 not closed before searching capacity~~ | the optimiser reports R13's hard cap as an optimum | CD1 · G1, before any sweep over trap size | ✅ **closed** — R13's cap now costs 1.50–1.72×, and the one device that gates 15-ion chains fell from 4th of 9 to last |
+| **nothing in the compiler ever chooses a long chain** | capacity is priced but never *used*, so the axis G1 unblocked may be inert for an unrelated reason | the capacity sweep, immediately | 🔶 suspected — `stationary_chain` reaches N=15 only because it has two traps and nowhere else to put ions |
 | **B2 — the comparison set at BB scale is N = 1** | an outer loop cannot compare one candidate | CD4 · 0.1b | 🔴 **FIRED.** 8 of 9 devices cannot compile `bb144_esm`. Build the set from conveyor-shaped generators (CD3 · B2) |
 | every candidate sits far above 0.7 % | nothing being compared would work; the ranking is of losers | CD4 · 0.1 — compare to threshold immediately | ✅ no: 73 of 73 verified pairs sit **10–27× below** threshold. The study is about margin |
 | the compiler cannot serve a family | comparison silently becomes "which device suits *our router*" | CD4 · 0.6 | 🔴 **FIRED** — it is B2. Only the conveyor family is served at BB scale |
@@ -345,13 +509,16 @@ that is evidence. If it does not, the proposer is the problem.
    Heating *does* discriminate (19–121× on the device-attributable part) and nothing is above
    threshold — but the objective dilutes that signal to 3.9 % of itself, and the BB round
    compiles on one device.
-3. Close **G1**. Nothing may sweep trap capacity before it is closed, and it is now also the
-   only repair that survives the cooling pass. Re-validate the 397,184 / 8,808 oracle.
-4. Close **B2** — build a comparison set of conveyor-shaped candidates from the CD3
+3. ~~Close **G1**.~~ **Done** — [`findings/g1`](findings/g1-chain-length.md). Trap capacity
+   is now safe to sweep; the oracle re-validated at 397,184 / 8,808.
+4. **Sweep trap capacity**, the axis G1 was blocking — and check *first* whether the compiler
+   ever fills a trap. If it does not, the axis is inert for a mapping reason (CD2 · 2), not a
+   geometry one.
+5. Close **B2** — build a comparison set of conveyor-shaped candidates from the CD3
    generators, so the outer loop has more than one machine to compare.
-5. Then G2 — wire `qccd/phys`'s solved ion height into the heating rate. Re-validate the
+6. Then G2 — wire `qccd/phys`'s solved ion height into the heating rate. Re-validate the
    oracle after each model change. Expect it to move the objective by percent, not orders.
-6. Then CD4's remaining questions, then the loop.
+7. Then CD4's remaining questions, then the loop.
 
 Do not build the optimiser first. The optimiser is the easy part, and an optimiser pointed
 at an objective nobody has validated will produce a confident, precise, wrong answer — which

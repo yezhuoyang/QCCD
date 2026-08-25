@@ -12,20 +12,21 @@ updating it. If this file and the code disagree, the code is right and this file
 
 ## Next action
 
-> **Close G1** — add the chain-length terms to the gate error, calibrate them so `ring144_24v`
-> reproduces its current error at its current chain length, and re-run
-> `Codesign/scripts/q01b_bb144_spread.py`. The change in the device-attributable share *is*
-> the measurement of how much G1 mattered.
+> **Sweep trap capacity — the axis G1 was blocking — but check first whether the compiler
+> ever fills a trap.** [`findings/g1`](findings/g1-chain-length.md) §6: `stationary_chain` is
+> the only device in the corpus that gates 15-ion chains, and it does so because it has *two
+> traps and nowhere else to put the ions*, not because a placer chose a long chain. Every
+> other device is capacity-2, so the question has never arisen.
 >
-> It was already the declared blocker. [`q01b`](findings/q01b-bb144-and-the-floor.md) makes it
-> the *only* candidate repair worth doing first: the cooling pass drives the mean gate n̄ to
-> **exactly 0** on the BB round, so every term that reaches the gate error through `n̄` is
-> laundered into runtime — and runtime is nearly free at `T_coh = 600 s`. G1's terms
-> (`Γ·τ(N) + κ·N/ln N`) are non-zero at `n̄ = 0`; they survive.
+> So step one is one command, not a sweep: raise `ring144_24v`'s trap capacity, recompile the
+> BB round, and look at `ReplayResult.chain_len_at_gate`. If the histogram is still all twos,
+> **capacity is inert because nothing uses it**, the finding belongs to CD2 · 2 (mapping)
+> rather than CD3 (geometry), and a capacity sweep would have measured nothing while looking
+> like it measured something.
 >
-> Two guard rails, both non-negotiable: the `deck24` replay must still give **397,184 cost /
-> 8,808 steps**, and the new `κ`, `Γ` must be a *refinement* of the validated model
-> (`ring144_24v` at its shipped chain length unchanged), not a replacement (**D1**).
+> If it *is* used, sweep capacity 2 … 15 on the ring at BB scale and report the curve. That is
+> also the cheapest partial answer to **B2**: every point is conveyor-shaped, so every point
+> compiles, which is more than the nine shipped devices manage.
 
 ---
 
@@ -40,8 +41,10 @@ updating it. If this file and the code disagree, the code is right and this file
 | CD4 · 0.4 | how much does CX order matter? | ⬜ *exempt from the optimiser, still worth measuring* | — |
 | CD4 · 0.5 | grid vs ring vs ladder at fixed trap count | 🔴 **blocked by B2** — at BB scale only the ring compiles | — |
 | CD4 · 0.6 | what does the router actually cost? | 🔶 partly answered — 8 of 9 devices cannot serve the BB round, for two separate reasons | [q01b §1](findings/q01b-bb144-and-the-floor.md) |
-| **G1** | chain-length term in the gate error | 🔴 **BLOCKER · next action** — nothing may sweep trap capacity until closed, and it is the only repair that survives cooling | [EVALUATION §4](EVALUATION.md) |
-| **B2** | the comparison set at BB scale is **N = 1** | 🔴 **BLOCKER** — an outer loop cannot compare one candidate | [PLAN CD3 · B2](PLAN.md) |
+| **G1** | chain-length term in the gate error | ✅ **CLOSED** — parameter-free calibration, bit-identical at N=2, R13's cap now costs 1.50–1.72×; `stationary_chain` fell from 4th of 9 to last. **Capacity is safe to sweep** | [findings/g1](findings/g1-chain-length.md) |
+| **CD3 · capacity** | does the compiler ever *fill* a trap? | ⬜ **next** — G1 prices long chains, but nothing may create them | — |
+| **C1** | space-efficient rail-and-storage layout (collaborator's sketch) | ⬜ **queued** — **two media**: small-capacity transport rails, larger-capacity `storage` sites holding *idle* ions off the transport path. The first serious second candidate, and an architectural answer to B2: rail occupancy stops scaling with qubit count | [PLAN CD3 · C1](PLAN.md) |
+| **B2** | the comparison set at BB scale is **N = 1** | 🔴 **BLOCKER** — an outer loop cannot compare one candidate. A capacity sweep on the ring is the cheapest partial answer: every point is conveyor-shaped | [PLAN CD3 · B2](PLAN.md) |
 | G2 | anomalous heating from the solved ion height | ⬜ — worth doing, but it reaches the objective only through runtime → idle (5.7 %) | [EVALUATION §4](EVALUATION.md) |
 | G3 | idle error linear vs Gaussian | ⬜ — and it does **not** set the cooling optimum, as was claimed | [EVALUATION §4](EVALUATION.md) |
 | CD5 | the loop | ⬜ not started, and must not start before **G1 and B2** | [PLAN CD5](PLAN.md) |
@@ -55,6 +58,8 @@ updating it. If this file and the code disagree, the code is right and this file
 | **CX order is exempt from the optimiser** | a metric counting expected faults cannot see that a bad order turns one ancilla fault into a weight-2 data error | [EVALUATION §5](EVALUATION.md) |
 | **the cooling budget is not a search axis** | re-scoring `c5_pareto`'s measured frontier under the full objective is monotone; the optimum is R7's cap, where the shipped policy sits. `T_coh = 600 s` makes runtime nearly free | [q01b §5](findings/q01b-bb144-and-the-floor.md) |
 | **report the device-attributable part beside `−ln F`** | the objective is 96 % floor, so a ranking on `−ln F` alone is dominated by a constant. The device part spreads 19–121× where `−ln F` spreads 1.04–1.30× | [q01b §3](findings/q01b-bb144-and-the-floor.md) |
+| **D1 needs no answer** | `κ` and `ε₀'` are *derived*, not fitted: equality with the pre-G1 model at the reference chain length, for every `n̄`, pins both. The only assumption left is Murali's *shape* | [g1](findings/g1-chain-length.md) |
+| **`Γτ` is already modelled** | R17 accrues anomalous heating over elapsed time including the gate's own duration, so adding the published `Γ·τ` term explicitly would double count | [g1 §8](findings/g1-chain-length.md) |
 | **only verified programs may be measured** | `q01` measured 39 programs from a scratch directory with no rule or R10 verdict. Measure `Compiler/build/matrix/`, gated on `matrix.json` status `ok` | [q01b §2](findings/q01b-bb144-and-the-floor.md) |
 
 ## Open questions raised by the work itself
@@ -66,8 +71,23 @@ updating it. If this file and the code disagree, the code is right and this file
   its floor.
 - `p_eff` sits 10–27× below threshold everywhere, on all 73 verified pairs. Is any *reachable*
   design near it? If not, the study is about margin, and the title should say so.
-- **How much of the 19–121× device-part spread survives G1?** G1 adds gate error that cooling
-  cannot remove, so it should *raise* the device share. By how much is the whole question.
+- ~~How much of the 19–121× device-part spread survives G1?~~ **Answered: none of it moves.**
+  G1 changed 2 of 73 programs, both on `stationary_chain`. Seven of nine devices are
+  capacity-2, so the term is a constant on them.
+- **Will a placer ever choose a long chain if given the capacity?** G1 prices them; nothing
+  creates them. (**next action**)
+- **Does keeping the transport rails empty route where a uniformly-loaded device does not?**
+  C1's central claim, and the reason it may answer B2 without any compiler work.
+- **Storage buys routability and area, but not fidelity — is that a defect of the design or of
+  the metric?** `idle_error` is `n_ions × T / T_coh` with no reference to *where* an ion sits,
+  and anomalous heating accrues per ion per µs wherever it is. So the model is blind to the
+  difference between an ion parked in storage and one riding a rail. Real hardware may not be.
+- **How deep is storage worth making?** R14 charges 3 CX *per position of burial*, ~3× what the
+  gate it enables costs — so depth is expensive unless the placer keeps the next-needed ion at
+  the chain edge. Ordering the stack by next-use is the cheapest big win C1 offers.
+- **Does separating storage from gating dodge G1?** If gates happen on the rails at chain
+  length 2 while storage columns are deep, a design gets density without the `N/ln N` penalty.
+  C1 question (b) decides whether that is what the sketch means.
 - **Is the R7 budget of 1.0 quantum itself the right number?** It caps geometry's influence on
   the gate term at 2.09×, which is most of what this study is trying to measure. It is a
   policy constant from `docs/PLAN.md` §0.4 ("PLAN §0.4 puts it at 1–2 quanta, 1.0 is the
@@ -101,4 +121,5 @@ written up — the boring ones are what stop the next session repeating the work
 | date | what happened |
 |---|---|
 | 2026-08-24 | Plan and evaluation written. `q01` run on 39 existing programs: the falsification test does not fire (median 48% of `−ln F` is device-attributable), but best-to-worst is only 1.3× against the literature's three orders of magnitude. Wiring found to be invisible to the objective. |
+| 2026-08-24 | **G1 closed.** `error_vs_chain: "murali:2"` on all nine architectures; the replay reads the chain length the way R13 does. The calibration turned out **parameter-free** — equality with the old model at `N_ref` for every `n̄` pins `κ` and `ε₀'`, so D1's "largest single assumption" reduces to borrowing Murali's shape. Bit-identical at `N_ref`; 71 of 73 verified programs unmoved; oracle still 397,184 / 8,808; `bb144_esm` recompiled and R10 still `passed`. The raw `N/lnN` has a minimum at `N = e` and so discounts a 3-ion chain by 5.4 % — refused with a monotone envelope rather than handed to a search. **Result: `stationary_chain` fell from 4th of 9 to last** on both circuits it runs. But seven of nine devices are capacity-2, so G1 adds no signal to today's comparison, which corrects q01b §6. New question raised: nothing in the compiler ever *chooses* a long chain. |
 | 2026-08-24 | `q01b`. Generated `bb144_esm.qasm` and ran the matrix on it: **1 of 9 devices compiles the BB round** (three cannot hold 168 qubits; rigid rotation is the only router past ~46 % occupancy and only `ring144_24v` is conveyor-shaped) → new blocker **B2**. Re-measured 73 *verified* pairs and found `q01`'s 48 % was SPAM charged to the architecture — it is **3.9 %**. Diagnosed the 1.3 ×: not size, not G1, but **the cooling pass**, which drives the mean gate n̄ to exactly 0 and pins the gate term to its floor, while `T_coh = 600 s` makes the runtime it costs nearly free. Falsified the interior cooling optimum (**0.2 answered by its absence**) and the claim that G3 sets it. G1 survives as the next action, on a better argument: its terms are the only ones non-zero at n̄ = 0. Oracle re-checked: 397,184 / 8,808, EXPECTATIONS MET. |
