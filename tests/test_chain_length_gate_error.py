@@ -128,6 +128,60 @@ def test_the_mechanism_works_when_it_is_declared(model):
     assert model.gate(arch, "MS", 1, None).us == float(spec["us"])
 
 
+def test_a_cost_model_written_before_G1_still_replays():
+    """The compatibility guarantee, and it is not hypothetical -- G1 broke this once.
+
+    `gate` and `gate_error` gained an `n_chain` argument. The replay first passed it
+    positionally, which raised `TypeError` on every `CostModel` subclass overriding the
+    old three-argument `gate` -- `test_review_regressions`'s `HotGate` caught it, and a
+    user's own cost model would have broken identically with no test to notice. The replay
+    now asks each method whether it accepts the argument. This pins that.
+    """
+    from qccd.cost.models import Charge
+    from qccd.ir.tsir import TSIR, Instruction
+    from qccd.verify import replay
+    from qccd.verify.replay import _accepts_chain
+
+    arch = load(str(ARCH / "ring144_24v.arch.json"))
+
+    class PreG1(type(corrected_model())):
+        """Exactly the signatures that shipped before G1 -- no `n_chain` anywhere."""
+
+        def gate(self, arch, gate, n_pairs):
+            return Charge(cost=0.0, depth=1, us=25.0, quanta={"gate": 0.5})
+
+        def gate_error(self, arch, nbar):
+            return 0.001
+
+    m = PreG1()
+    assert not _accepts_chain(m.gate), "the probe must see the old signature"
+    assert not _accepts_chain(m.gate_error)
+
+    placement = {"d0": "A0", "a0": "A0"}
+    prog = TSIR(name="t", arch_spec="inline", instructions=[
+        Instruction(type="init", id=0, placement=placement,
+                    quanta={k: 0.0 for k in placement}),
+        Instruction(type="gate", id=1, gate="CX", mode="intra",
+                    pairs=(("d0", "a0"),), sites=("A0",)),
+    ])
+    res = replay(prog, arch, m, check_rules=False, keep_cycles=False)
+    assert res.n_gate_pairs == 1
+    assert res.gate_error_sum == 0.001, "the old two-argument gate_error must be used"
+    assert res.per_ion_quanta["d0"]["gate"] == pytest.approx(0.5)
+    # and the chain length is still recorded, because the replay knows it either way
+    assert dict(res.chain_len_at_gate) == {2: 1}
+
+
+def test_the_probe_is_conservative_about_signatures_it_cannot_read():
+    """An unreadable signature must fall back to the argument the method definitely has."""
+    from qccd.verify.replay import _accepts_chain
+
+    assert not _accepts_chain(None)
+    assert not _accepts_chain(lambda arch, nbar: 0.0)
+    assert _accepts_chain(lambda arch, nbar, n_chain=None: 0.0)
+    assert _accepts_chain(lambda *a, **kw: 0.0), "a catch-all can take it"
+
+
 def test_a_bad_calibration_is_refused_rather_than_silently_floored(model):
     """`eps0' = eps0 - slope/2` goes negative if an architecture declares a heating slope
     more than twice its zero-quanta infidelity. Clamping that at zero would quietly change
