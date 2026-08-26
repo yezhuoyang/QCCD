@@ -387,8 +387,9 @@ not fixed by any model change. Two ways out, and they are not equally good:
 
 | | route | verdict |
 |---|---|---|
-| **preferred** | build the comparison set from **conveyor-shaped generators** — `ring(width, height, verticals)`, `dual_loop` with docks on spurs, `racetrack` sized to hold 168 — so every candidate is rotation-compilable by construction | this is what CD3 was always going to do; the nine shipped devices were never the search space |
-| | extend the router past 46 % occupancy (the SAT encoding of `Compiler/PLAN.md` §6 as an optimiser) | large, and it changes what "the compiler" means mid-study — the fairness protocol below then compares devices under two different routers |
+| **now preferred** | **C1**, the rail-and-storage layout below, and conveyor-shaped generators — `ring(width, height, verticals)`, `dual_loop` with docks on spurs, `racetrack` sized to hold 168 — so every candidate is compilable by construction | the nine shipped devices were never the search space. Bending the *architecture* set to the router is a limitation to declare, not a result — say so wherever a comparison is reported |
+| ~~cheap~~ | ~~a swap/push fallback router, since swaps need no free slot~~ | **tried and reverted** — 0 of 14 pairs, and it falsified its own premise: the round fails at 26 % occupancy with 138 free slots ([`findings/q04`](findings/q04-swap-router-does-not-work.md)). **Read q04 §5 before re-proposing this** |
+| | extend the router properly — a published **push-and-swap / push-and-rotate** MAPF algorithm, or the SAT encoding of `Compiler/PLAN.md` §6 as an optimiser | large, and it changes what "the compiler" means mid-study. Note the genuinely novel part: published MAPF assumes every token is movable, and here **gate operands are pinned for a whole layer**. That has to be designed for, not discovered |
 
 Whichever is taken, record it: a comparison run on devices *some of which needed a different
 router* measures the router, not the machine.

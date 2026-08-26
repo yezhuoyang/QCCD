@@ -12,34 +12,29 @@ updating it. If this file and the code disagree, the code is right and this file
 
 ## Next action
 
-> **Build the bubble router** — the swap-based fallback, explicitly signed off as *"just let it
-> be slow as the baseline"*. This is the direct attack on **B2**, which is now the study's
-> binding constraint: the objective is understood, G1 is closed, capacity is measured and inert,
-> and the one thing still missing is **more than one candidate at BB scale**.
+> **C1 — the collaborator's rail-and-storage layout.** It attacks B2 from the architecture side
+> rather than the compiler side, needs no MAPF solver, and someone is waiting on it.
 >
-> The algorithm, and it cannot fail: *to gate ions A and B, walk A along the shortest path to B,
-> swapping with whatever occupies the next slot.* Adjacent swaps generate the full symmetric
-> group on a connected graph, so it terminates in `dist(A,B)` swaps with **no free space
-> required** and no occupancy ceiling.
+> [`findings/q04`](findings/q04-swap-router-does-not-work.md) closed off the compiler route for
+> now: a swap-based router fixed **0 of 14** failing pairs, and — more usefully — falsified the
+> reason it was built. The BB round fails at **26 % occupancy with 138 free slots**, so free
+> space was never the constraint. Do not re-propose a swap router without reading q04 §5 first.
 >
-> Verified as cheap before starting:
-> - **No checker work.** The certificate maps circuit-qubit → ion once at placement and records
->   moves by *ion*, so a swap changes positions, not identity — nothing to relabel, no O3
->   obligation. A transposition is **two ordinary moves at different timesteps**: `merge` then
->   `split`, exactly what `qccd/compile/oddeven.py` already does on a packed ring.
-> - **No new primitive.** R5 forbids exchanging along one segment *in a single step*; merge and
->   split are different steps. R14 is free at capacity 2 (both ions at a trap edge).
+> C1 is scoped in [PLAN CD3 · C1](PLAN.md) with the author's answers folded in: two closed
+> loops, gates on the rails, storage capacity a parameter (default 2). Build order:
+> 1. **Ten-minute read of `conveyor.ml`** — it detects "a closed loop with gate-capable *docks*
+>    hanging off it". C1's gate sites are *on* the loop, the opposite arrangement, and that is
+>    what makes `cyclone_dual_loop` decline. This decides whether C1 is a geometry task or a
+>    geometry-plus-router task, and it should be settled before any generator is written.
+> 2. `rail_storage(width, loops=2, storage_capacity=2)` in `qccd/arch/generators.py`, with rail
+>    capacity explicitly **smaller** than storage or the two media collapse into one.
+> 3. Compile `bb144_esm` on it, then the full ladder: 23 rules, R10, `(p_eff, T_round)`, DAC
+>    count, DRC.
 >
-> Wire it as a fallback **after** A\* and after rotation, the same "trying it second can only
-> add" pattern that the rotation fallback now follows for partial placements too. It will be
-> slow — split/merge is ~6 quanta against ~0.1 for a shuttle hop — and that is the point of a
-> baseline. Predicted, before measuring: per [`q01b`](findings/q01b-bb144-and-the-floor.md) the
-> cooling pass converts that heating into runtime and runtime is nearly free, so it should score
-> far better than its 60× heating ratio suggests. If it does not, `q01b`'s central finding has a
-> limit worth knowing.
->
-> Then **C1**, the collaborator's rail-and-storage layout, which attacks the same blocker from
-> the architecture side.
+> Prediction to record before measuring, from [`q01b`](findings/q01b-bb144-and-the-floor.md):
+> the design pays a 60× heating ratio on `eject`/`reinsert`, but cooling converts heating into
+> runtime and runtime is nearly free at `T_coh = 600 s` — so it should score level with the ring
+> while winning on area and DACs. If it scores clearly worse, q01b has a limit worth finding.
 
 ---
 
@@ -58,6 +53,7 @@ updating it. If this file and the code disagree, the code is right and this file
 | **CD3 · capacity** | does the compiler ever *fill* a trap? | ✅ **answered — no.** Byte-identical programs at capacity 2, 4 **and 8**; every gate still at chain length 2. Unreachable until a placer stacks (CD2 · 2) | [findings/q03](findings/q03-capacity-is-inert.md) |
 | **rotation fallback** | a partial placement is a decline too | ✅ **fixed** — `qccdc_cli.ml` retried only on `Unroutable`, so capacity 8 left 79 ops unrealised on a circuit that compiles at capacity 2. The capacity axis is now monotone | [q03 §3](findings/q03-capacity-is-inert.md) |
 | **C1** | space-efficient rail-and-storage layout (collaborator's sketch) | ⬜ **queued** — **two media**: small-capacity transport rails, larger-capacity `storage` sites holding *idle* ions off the transport path. The first serious second candidate, and an architectural answer to B2: rail occupancy stops scaling with qubit count | [PLAN CD3 · C1](PLAN.md) |
+| **q04** | does a swap-based router fix B2? | ❌ **no** — 0 of 14 pairs; and it falsified the occupancy diagnosis (fails at 26 % occupancy, 138 free slots). Reverted | [findings/q04](findings/q04-swap-router-does-not-work.md) |
 | **B2** | the comparison set at BB scale is **N = 1** | 🔴 **BLOCKER** — an outer loop cannot compare one candidate. A capacity sweep on the ring is the cheapest partial answer: every point is conveyor-shaped | [PLAN CD3 · B2](PLAN.md) |
 | G2 | anomalous heating from the solved ion height | ⬜ — worth doing, but it reaches the objective only through runtime → idle (5.7 %) | [EVALUATION §4](EVALUATION.md) |
 | G3 | idle error linear vs Gaussian | ⬜ — and it does **not** set the cooling optimum, as was claimed | [EVALUATION §4](EVALUATION.md) |
@@ -91,7 +87,12 @@ updating it. If this file and the code disagree, the code is right and this file
 - ~~Will a placer ever choose a long chain if given the capacity?~~ **Answered: no.** Capacity
   4 compiles byte-identically to capacity 2. The question moves to CD2 · 2 (mapping).
 - **Does keeping the transport rails empty route where a uniformly-loaded device does not?**
-  C1's central claim, and the reason it may answer B2 without any compiler work.
+  C1's central claim, and the reason it may answer B2 without any compiler work. Note q04 makes
+  this *less* likely to be the whole story: emptiness alone did not help a general router.
+- **What actually blocks the router, given it is not free space?** `q04` §3 has the first precise
+  blocking state ever recorded for this failure — goal trap half-pinned, a neighbour with a free
+  slot, 138 free slots device-wide. Any future attempt should be judged against that, not against
+  "58 % occupancy".
 - **Storage buys routability and area, but not fidelity — is that a defect of the design or of
   the metric?** `idle_error` is `n_ions × T / T_coh` with no reference to *where* an ion sits,
   and anomalous heating accrues per ion per µs wherever it is. So the model is blind to the
@@ -135,6 +136,7 @@ written up — the boring ones are what stop the next session repeating the work
 | date | what happened |
 |---|---|
 | 2026-08-24 | Plan and evaluation written. `q01` run on 39 existing programs: the falsification test does not fire (median 48% of `−ln F` is device-attributable), but best-to-worst is only 1.3× against the literature's three orders of magnitude. Wiring found to be invisible to the objective. |
+| 2026-08-26 | `q04`. Built a push/swap fallback router into `plan_layer` and **reverted it**: 0 of 14 failing pairs fixed, across five iterations that each fixed a real defect and revealed the next, ending in oscillation. The valuable part is the falsification: the BB round fails at **26 % occupancy with 138 free slots** (`--ancillas 6`), so the occupancy diagnosis in `q01b` §1 is wrong and free space was never the constraint. Recorded the first precise blocking state (goal trap full but only half-pinned, a neighbour with room) and three latent defects in the existing compiler — chief among them that `compile.ml` never tells the router which operands must not move, which today's A* survives only by accident. Oracle and spot regressions re-checked after the revert. |
 | 2026-08-24 | Fixed the rotation fallback: a compile that leaves ops unrealised has declined just as surely as one that raises, so `qccdc_cli.ml` now retries rotation on a partial placement. Capacity 8 goes from **79 unrealised to fully compiled**, and the capacity axis is flat and monotone 2→8. The UNREALISED verdict moved from `cmd_compile` to the dispatcher, so it is published only once final — `run_matrix.py` greps stdout for it, and printing it before a retry would misreport a program rotation went on to compile. Decline path and `--no-rotate` both verified unchanged. |
 | 2026-08-24 | `q03`. Swept `ring144_24v` trap capacity 2 -> 4 -> 8 on the BB round. **Capacity 4 is byte-identical to capacity 2** — same batches, hops, runtime, and `{2: 864}` chain lengths — so the compiler never fills a trap and the axis G1 guards is unreachable. Capacity 8 is *worse* (79 ops unrealised) because the general router stops raising `Unroutable`, so the rotation fallback never fires: the latent gap found in `q01b` §1, firing for real. **Capacity is not a monotone axis under the current compiler**, and a sweep run today would report `qccdc_cli.ml`'s control flow as an optimum. |
 | 2026-08-24 | **G1 closed.** `error_vs_chain: "murali:2"` on all nine architectures; the replay reads the chain length the way R13 does. The calibration turned out **parameter-free** — equality with the old model at `N_ref` for every `n̄` pins `κ` and `ε₀'`, so D1's "largest single assumption" reduces to borrowing Murali's shape. Bit-identical at `N_ref`; 71 of 73 verified programs unmoved; oracle still 397,184 / 8,808; `bb144_esm` recompiled and R10 still `passed`. The raw `N/lnN` has a minimum at `N = e` and so discounts a 3-ion chain by 5.4 % — refused with a monotone envelope rather than handed to a search. **Result: `stationary_chain` fell from 4th of 9 to last** on both circuits it runs. But seven of nine devices are capacity-2, so G1 adds no signal to today's comparison, which corrects q01b §6. New question raised: nothing in the compiler ever *chooses* a long chain. |
