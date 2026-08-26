@@ -201,6 +201,13 @@ PRIMITIVES = {
         "us": 25,
         "fidelity_at_n0": 0.99816,
         "error_vs_quanta": "linear:2.0e-3",
+        "error_vs_chain": "murali:2",
+        "chain_note": (
+            "G1: laser-intensity instability grows with chain length as A ~ N/ln N "
+            "(Murali et al., ISCA 2020). The value is the reference chain length at "
+            "which fidelity_at_n0 and error_vs_quanta were measured -- 2, from a "
+            "two-ion gate zone."
+        ),
         "max_quanta": 1.0,
         "source": H2,
         "note": (
