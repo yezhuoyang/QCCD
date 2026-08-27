@@ -215,6 +215,18 @@ Beyond geometry, and cheaper to sweep than it looks:
   lattice, 5,760 DACs against 44 — scoring *identically* on every shared circuit. The error
   model is blind to wiring, correctly so, and it enters only as R4 drivability and DAC count.
 
+> **Measured, and it changes how CD3 should be run.**
+> [`q05`](findings/q05-dock-sweep.md) swept the dock count over 11 feasible points. The
+> architecture axis, cleanly separated from the schedule, is worth **1.139× on round time and
+> 1.0070× on `p_eff`** — while the ancilla count is worth 1.82×. **The inner loop moves the
+> score about five times more than the outer loop does.** If that survives a second family, the
+> study's title is about the compiler, not the machine.
+>
+> And the first collision between the objective and buildability: **all 11 candidates fail
+> DRC**, with violations rising **30 → 140** in the direction the score rewards. Neither
+> declared budget (`max_dacs`, `max_junctions`) ever binds. So DRC is not a nice-to-have
+> constraint here — it is the *only* buildability limit that bites, and it is not in the score.
+
 **Constraints that make a candidate real, not just a graph.** `qccd/phys/` derives the
 electrodes: a device that fails DRC (`rf_dc_clearance` already fails on `ring144_24v`'s dock
 spurs) cannot be built. Feed DRC and DAC count into the outer loop as constraints, not
@@ -408,7 +420,7 @@ so it runs while CD1 is being closed, and each item can falsify a plan assumptio
 | 0.2 | Where is the cooling optimum? | `c5_pareto.py`, scoring each point by `p_eff` rather than by gate error alone | the interior optimum CD0 predicts — or its absence | ✅ [q01b §5](findings/q01b-bb144-and-the-floor.md) — **its absence.** Monotone; the optimum is R7's cap |
 | 0.3 | How much does ancilla count matter? | `gen_bb144.py --ancillas 12,24,36,48,72` on `ring144_24v` + `grid9x9` | sizes the schedule axis | ⬜ — and note `grid9x9` cannot compile the round at any ancilla count above ~144 qubits (B2) |
 | 0.4 | How much does CX order matter? | 3 hand-written orders, same device, compare data-ion idle | if it is 2%, deprioritise; if 2×, it leads | ⬜ *exempt from the optimiser, still worth measuring* |
-| 0.5 | Grid vs ring vs ladder at fixed trap count | the `micro_demo.py` pattern at BB scale | first real intuition about geometry | ⬜ **blocked by B2** — at BB scale only the ring compiles |
+| 0.5 | Grid vs ring vs ladder at fixed trap count | ~~the `micro_demo.py` pattern at BB scale~~ **the ring's dock count**, since every generated ring is conveyor-shaped | first real intuition about geometry | ✅ [q05](findings/q05-dock-sweep.md) — 11 feasible points. Cross-*family* still blocked by B2 |
 | 0.6 | What does the router actually cost? | occupancy sweep per family (`c7_occupancy.py` generalised) | tells us which families the compiler can even serve | 🔶 partly answered by B2: 8 of 9 shipped devices cannot serve the BB round |
 
 **Deliverable:** one file per question in [`findings/`](findings/), each naming the command
