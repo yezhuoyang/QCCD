@@ -12,29 +12,24 @@ updating it. If this file and the code disagree, the code is right and this file
 
 ## Next action
 
-> **C1 — the collaborator's rail-and-storage layout.** It attacks B2 from the architecture side
-> rather than the compiler side, needs no MAPF solver, and someone is waiting on it.
+> **Fix the reset accounting, then put DRC in the score.** Both are prerequisites for ranking
+> anything, and [`q05`](findings/q05-dock-sweep.md) showed why:
 >
-> [`findings/q04`](findings/q04-swap-router-does-not-work.md) closed off the compiler route for
-> now: a swap-based router fixed **0 of 14** failing pairs, and — more usefully — falsified the
-> reason it was built. The BB round fails at **26 % occupancy with 138 free slots**, so free
-> space was never the constraint. Do not re-propose a swap router without reading q04 §5 first.
+> 1. **Reset accounting.** `gen_bb144.py` emits a reset only for checks beyond the first
+>    `n_anc`, so `resets = 144 - ancillas`. Reset error is 3x measure error, so **75 % of a
+>    naive dock sweep's fidelity trend is "we did fewer resets"** — true on any machine. In
+>    steady state every ancilla arrives carrying the previous round's outcome, so all 144
+>    checks need one. Add a `--steady-state` flag emitting 144 resets, or report SPAM outside
+>    the score. Until then a reader comparing designs is mostly comparing reset counts.
+> 2. **DRC as a constraint (CD3).** All eleven q05 candidates fail `rf_dc_clearance`, and the
+>    count rises **30 -> 140** with the dock count that wins both scored axes. Score and
+>    buildability point in opposite directions and only one of them is being optimised.
 >
-> C1 is scoped in [PLAN CD3 · C1](PLAN.md) with the author's answers folded in: two closed
-> loops, gates on the rails, storage capacity a parameter (default 2). Build order:
-> 1. **Ten-minute read of `conveyor.ml`** — it detects "a closed loop with gate-capable *docks*
->    hanging off it". C1's gate sites are *on* the loop, the opposite arrangement, and that is
->    what makes `cyclone_dual_loop` decline. This decides whether C1 is a geometry task or a
->    geometry-plus-router task, and it should be settled before any generator is written.
-> 2. `rail_storage(width, loops=2, storage_capacity=2)` in `qccd/arch/generators.py`, with rail
->    capacity explicitly **smaller** than storage or the two media collapse into one.
-> 3. Compile `bb144_esm` on it, then the full ladder: 23 rules, R10, `(p_eff, T_round)`, DAC
->    count, DRC.
->
-> Prediction to record before measuring, from [`q01b`](findings/q01b-bb144-and-the-floor.md):
-> the design pays a 60× heating ratio on `eject`/`reinsert`, but cooling converts heating into
-> runtime and runtime is nearly free at `T_coh = 600 s` — so it should score level with the ring
-> while winning on area and DACs. If it scores clearly worse, q01b has a limit worth finding.
+> Then **C1**, which is the only thing that would give the study a second *shape*. Note the
+> cheap resolution found in `conveyor.ml`: C1's storage columns are already structurally docks
+> — off-loop sites one spur from a rail — so **if gates may happen in storage rather than on
+> the rails, C1 is rotation-compilable with no router work at all.** One question to the author
+> settles whether C1 is a generator task or a router task.
 
 ---
 
@@ -54,7 +49,8 @@ updating it. If this file and the code disagree, the code is right and this file
 | **rotation fallback** | a partial placement is a decline too | ✅ **fixed** — `qccdc_cli.ml` retried only on `Unroutable`, so capacity 8 left 79 ops unrealised on a circuit that compiles at capacity 2. The capacity axis is now monotone | [q03 §3](findings/q03-capacity-is-inert.md) |
 | **C1** | space-efficient rail-and-storage layout (collaborator's sketch) | ⬜ **queued** — **two media**: small-capacity transport rails, larger-capacity `storage` sites holding *idle* ions off the transport path. The first serious second candidate, and an architectural answer to B2: rail occupancy stops scaling with qubit count | [PLAN CD3 · C1](PLAN.md) |
 | **q04** | does a swap-based router fix B2? | ❌ **no** — 0 of 14 pairs; and it falsified the occupancy diagnosis (fails at 26 % occupancy, 138 free slots). Reverted | [findings/q04](findings/q04-swap-router-does-not-work.md) |
-| **B2** | the comparison set at BB scale is **N = 1** | 🔴 **BLOCKER** — an outer loop cannot compare one candidate. A capacity sweep on the ring is the cheapest partial answer: every point is conveyor-shaped | [PLAN CD3 · B2](PLAN.md) |
+| **q05** | dock sweep: the first multi-point comparison at BB scale | ✅ **answered** — 11 feasible points (20 rules + R10). Naive sweep 2.89x runtime / 1.16x `p_eff`, but **geometry alone is 1.139x / 1.0070x**; 75 % of the fidelity trend is reset count. DRC worsens 30->140 the way the score says to go | [findings/q05](findings/q05-dock-sweep.md) |
+| **B2** | the comparison set at BB scale is **N = 1** | 🟠 **downgraded, not closed** — 11 points, but **one family and one router**. No second *shape* yet | — an outer loop cannot compare one candidate. A capacity sweep on the ring is the cheapest partial answer: every point is conveyor-shaped | [PLAN CD3 · B2](PLAN.md) |
 | G2 | anomalous heating from the solved ion height | ⬜ — worth doing, but it reaches the objective only through runtime → idle (5.7 %) | [EVALUATION §4](EVALUATION.md) |
 | G3 | idle error linear vs Gaussian | ⬜ — and it does **not** set the cooling optimum, as was claimed | [EVALUATION §4](EVALUATION.md) |
 | CD5 | the loop | ⬜ not started, and must not start before **G1 and B2** | [PLAN CD5](PLAN.md) |
@@ -89,6 +85,10 @@ updating it. If this file and the code disagree, the code is right and this file
 - **Does keeping the transport rails empty route where a uniformly-loaded device does not?**
   C1's central claim, and the reason it may answer B2 without any compiler work. Note q04 makes
   this *less* likely to be the whole story: emptiness alone did not help a general router.
+- **Is `p_eff` the right thing to rank by at all?** Across every measurement so far the
+  architecture moves the ROUND TIME and barely moves the SCORE — 1.139x against 1.0070x in
+  `q05`. Either the study should rank on `T_round` with `p_eff` as a feasibility gate, or it
+  should say plainly that under this model the machine is nearly irrelevant to fidelity.
 - **What actually blocks the router, given it is not free space?** `q04` §3 has the first precise
   blocking state ever recorded for this failure — goal trap half-pinned, a neighbour with a free
   slot, 138 free slots device-wide. Any future attempt should be judged against that, not against
@@ -136,6 +136,7 @@ written up — the boring ones are what stop the next session repeating the work
 | date | what happened |
 |---|---|
 | 2026-08-24 | Plan and evaluation written. `q01` run on 39 existing programs: the falsification test does not fire (median 48% of `−ln F` is device-attributable), but best-to-worst is only 1.3× against the literature's three orders of magnitude. Wiring found to be invisible to the objective. |
+| 2026-08-26 | `q05`. Realised the nine shipped devices were never the search space: `conveyor.ml` serves any closed loop with docks, and **every device the `ring` generator emits has that shape**, so the dock count is a sweepable architecture axis reachable today. Eleven `(device, program)` points, all feasible — 20 rules and **R10 by the proved Lean checker** at every one. The naive sweep looks strong (2.89x runtime, 1.16x `p_eff`, and the shipped V=24 dominated inside its own family) but **confounds docks with ancillas**: 75.2 % of the fidelity trend is reset count, an artifact of `gen_bb144.py` and of scoring one round in isolation. Separated at fixed 24 ancillas, **the geometry alone is worth 1.139x runtime and 1.0070x `p_eff`** — 0.7 %. The junction penalty the sweep was built to find saturates at one dock (every rigid hop is charged 100 us at every V), and heating never reaches a gate at any of the eleven points, so `q01b`'s floor result now holds at eleven points instead of one. First score-vs-buildability collision: DRC violations rise **30 -> 140** with the dock count that wins both scored axes. B2 downgraded from "N = 1 device" to "N = 1 family, 11 points" — not closed. |
 | 2026-08-26 | `q04`. Built a push/swap fallback router into `plan_layer` and **reverted it**: 0 of 14 failing pairs fixed, across five iterations that each fixed a real defect and revealed the next, ending in oscillation. The valuable part is the falsification: the BB round fails at **26 % occupancy with 138 free slots** (`--ancillas 6`), so the occupancy diagnosis in `q01b` §1 is wrong and free space was never the constraint. Recorded the first precise blocking state (goal trap full but only half-pinned, a neighbour with room) and three latent defects in the existing compiler — chief among them that `compile.ml` never tells the router which operands must not move, which today's A* survives only by accident. Oracle and spot regressions re-checked after the revert. |
 | 2026-08-24 | Fixed the rotation fallback: a compile that leaves ops unrealised has declined just as surely as one that raises, so `qccdc_cli.ml` now retries rotation on a partial placement. Capacity 8 goes from **79 unrealised to fully compiled**, and the capacity axis is flat and monotone 2→8. The UNREALISED verdict moved from `cmd_compile` to the dispatcher, so it is published only once final — `run_matrix.py` greps stdout for it, and printing it before a retry would misreport a program rotation went on to compile. Decline path and `--no-rotate` both verified unchanged. |
 | 2026-08-24 | `q03`. Swept `ring144_24v` trap capacity 2 -> 4 -> 8 on the BB round. **Capacity 4 is byte-identical to capacity 2** — same batches, hops, runtime, and `{2: 864}` chain lengths — so the compiler never fills a trap and the axis G1 guards is unreachable. Capacity 8 is *worse* (79 ops unrealised) because the general router stops raising `Unroutable`, so the rotation fallback never fires: the latent gap found in `q01b` §1, firing for real. **Capacity is not a monotone axis under the current compiler**, and a sweep run today would report `qccdc_cli.ml`'s control flow as an optimum. |
