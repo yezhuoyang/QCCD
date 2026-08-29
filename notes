@@ -1,0 +1,123 @@
+This is a notes after discussing the rules in: "docs/rules.md". First, we review the terminology, then we discuss one by one, explanation what each rule does, is there redundancy. 
+
+Several questions must be addressed:
+
+1. What does replay mean? What is a replay site?
+2. R18: ?????????? 
+3. Why the equation n bar(estimate the gate error by heating) make sense? Need to elaborate the theory.
+
+
+
+
+Terminology:
+
+1. Junction: degree 2, degree 3 more Expensive.
+
+2. Nodes: Basically means crossover of shuttling
+
+3. Ions on the Edges.
+
+
+Rules discussion:
+
+
+1. R2:  Every time one ions through junction. EC Electrode: Only one direction to another Direction
+
+
+2. R3 same as R2
+
+
+
+3. R4: Ideas of Broadcasting.  Only do exactly the same operation in the same cycle.  
+
+First declare the movement type(Direction, distance), then the maximum number of iodes.
+
+All about direction/amount/distance. 
+
+Distance: They can cross the entire chip.
+
+Upper part/Lower part two Broadcasting.
+
+4. R4b: 
+
+Rotation: Sidewalk : Junction need to do first, and then move two broadcasting. 
+
+Make cycle: Soft corner
+
+
+5. R4: When you do transport, you cannot do gates
+
+
+6. R5: Redundant with R4
+
+
+7. R6:  Architecture: Gate: Measure/Cool,  Ancilla: No gate. 
+Label as data/ancilla.  
+
+Gate: Laser - Measurement Cooling(Different wave length difference).  
+
+Q: Where can we add gate. Discrete point due to Laser Power. 
+
+
+
+8. R7:  On Error model check.  When we do gate operation: Trapped ion: Spi(0 and 1 state, couple to the motional mode, with infinite number of energy level. As it gets hotter, the motion gets to higher energy level.  P(n) = Maxwell distribution.  e^{-n h kt}. Where n is the avergae phono number. )
+
+Decoherece/Heating.   Junction: n bar increase by 10^{-3}. Heating rate increase over time. Shutting more efficient. 
+
+(In R17.)
+
+9.  R7c: Heating, but not cooling, wrong.   In hardware, in gate zone: Shine another Cooling laser.  We don't want to be specifically about wave length. Just specify this is cooling.
+
+
+10.  About cooling: Everywhere trap can add cooling
+
+
+11. Replay: What does replay mean??????
+
+
+12. R10: Semantics
+
+
+13. R11: Ring can only move in one direction. Ring can. R11 redundant.
+
+
+14. R12: <= 1 gates per trap per cycle (Optical Broadcasting. Same gates at the same time.).
+
+QCCD: Shine laser Photonic through Fibre with wave guide beneth the trap.  
+
+Fibre: Fibre inputs , 1 to 2^n, geometry + determine the maximum broadcasting. 
+
+15. R13 Ceiling 50
+
+
+R14:  Split the chains is gate swap. Name is gate splitting. 
+Hardware:  Ions trapped in Harmonic potential. Change the DC eletrold to be a double well potential. Then separate.
+
+If every trap has only one ions, then same.  
+
+Increase the number of ions per cell, then we need to select some ions to split and shuttle. 
+
+
+R15: Calculating the heating nbar. 
+
+
+R16: Gate error also the is the function of nbar(Heating) + de-coherent time.  (Helpful to estimate gate error)
+
+
+R17.  nbar: Heating rate times time. Indenpendetly. 
+
+
+R18: ?????????? 
+
+
+
+R4: Extend and ephasizing broadcasting. 
+
+
+
+
+We don't need the Voltage/DC electrode.  The genesis mission project. 
+
+
+
+We want to figure out what is best architecture. 
