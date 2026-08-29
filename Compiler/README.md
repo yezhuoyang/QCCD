@@ -6,7 +6,7 @@ repository already replays, rule-checks and prices.
 **Read [`PLAN.md`](PLAN.md) first.** It states what is being built, why the trust architecture is
 shaped the way it is, and what each milestone has to prove.
 
-The one-sentence version: `qccd/verify` reported 22 of its 23 rules on any program and skipped
+The one-sentence version: `qccd/verify` reported every rule it could on any program and skipped
 **R10 — "the compiled program implements the input circuit"** — because there was no QASM front end
 to check against. This directory is the front end, and **R10 now reports `passed`**, decided by a
 checker written in Lean and proved sound there (`QCCDC.Cert.check_sound`, axioms: `propext` only).
@@ -107,7 +107,7 @@ python bridge/check_cert.py build/out/bb144_rot --qasm build/bb144_esm.qasm \
 
 ## R10, the rule that was always skipped
 
-Of the [23 rules](../docs/rules.md), twenty-two are structural and the platform has always
+Of the [25 rules](../docs/rules.md), most are structural and the platform has always
 checked them. R10 — *"the compiled program implements the input circuit"* — had only ever
 been reported **skipped**, never `passed`. Run the verifier on anything and it says so
 itself, and says why:
@@ -200,8 +200,8 @@ bash Compiler/run_c1.sh
 # table against the defining unitaries, decompose the whole corpus
 bash Compiler/run_c2.sh
 
-# the C3 gate: compile 4 circuits onto 6 architectures, insert cooling, check all
-# 23 rules, and discharge R10 against the certificate
+# the C3 gate: compile 4 circuits onto 6 architectures, insert cooling, check every
+# rule the verifier can, and discharge R10 against the certificate
 bash Compiler/run_c3.sh
 
 # the C4 oracle: re-solve the router's own sub-problems exactly, and price the

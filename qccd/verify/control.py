@@ -41,7 +41,7 @@ from typing import Iterable, Mapping, Sequence
 from ..arch.device import Architecture
 from ..ir.tsir import TSIR, Instruction
 from .replay import replay
-from .rules import CycleView, action_label, path_actions
+from .rules import CycleView, cycle_actions
 
 __all__ = [
     "ChannelBank", "ControlRecord", "ControlTrace",
@@ -252,11 +252,13 @@ def control_record(view: CycleView, *, hop: int = 0, hops: int = 1,
         return base("idle", instr.type, undetermined=(NOTE_SCOPE,))
 
     # ------------------------------------------------- transport cycles
-    paths = path_actions(view)
+    # `cycle_actions`, not `path_actions`, so the panel reads the cycle in the frame
+    # the DEVICE declares -- `"L0:+1"` under a path-frame tiling, `"+x"` under a
+    # lab-frame one.  Same call the verifier makes, so the two cannot disagree.
+    paths = cycle_actions(view)
     verified: dict[str, str] = {}
     for loop, acts in paths.items():
-        for site, d in acts.items():
-            verified[site] = action_label(loop, d)
+        verified.update(acts)
 
     actions: dict[str, str] = {}
     offpath = 0
@@ -273,8 +275,7 @@ def control_record(view: CycleView, *, hop: int = 0, hops: int = 1,
     # named path was actually judged: a dock is not "drivable: yes", it is unjudged.
     feasible: bool | None = None
     problems: list[str] = []
-    for loop, deltas in sorted(paths.items()):
-        labels = {s: action_label(loop, d) for s, d in deltas.items()}
+    for loop, labels in sorted(paths.items()):
         ok, probs = plane.drivable(labels)
         feasible = ok if feasible is None else (feasible and ok)
         problems += [f"on path {loop!r}: {p}" for p in probs]

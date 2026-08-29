@@ -36,6 +36,8 @@ __all__ = [
     "Instruction",
     "TSIR",
     "INSTRUCTION_TYPES",
+    "BROADCASTS",
+    "broadcast_kind",
     "loop_shift",
 ]
 
@@ -49,6 +51,30 @@ INSTRUCTION_TYPES = (
     "cool",  # broadcast or per-ion sympathetic/Doppler cooling
     "barrier",  # explicit synchronization; costs nothing
 )
+
+#: What an instruction may CLAIM about how its participants are driven.  R4c.
+#:
+#: The claim is an INTENT and nothing else.  It names no channel -- one rigid rotation
+#: engages `linear_h`, `linear_v` and `junction` groups at once, so a singular channel
+#: field would be a category error -- and it states no count, because the number of
+#: distinct drives a cycle needs is a DEVICE property (`len(Device.corners(loop))`,
+#: cached, already printed by `python -m qccd show`).  The instruction says what it meant
+#: to issue; `qccd.verify.rules.r4c_broadcast` computes what the device would need and
+#: reports the disagreement.
+#:
+#: ``"one"``            ONE drive: a single waveform (transport) or a single beam
+#:                      (optics) reaches every participant.  This is H2's `{a,b,c}`
+#:                      conveyor claim and the global-sheet cooling claim, and it is what
+#:                      the legacy `broadcast: true` on a `cool` has always meant.
+#: ``"per_direction"``  one drive per direction the device's declared electrode frame
+#:                      makes this cycle require.  Still a broadcast -- channels stay
+#:                      constant in array size -- but on a lab-frame tiling a closed path
+#:                      that turns needs one per direction it turns into (R19).  The
+#:                      program does not say how many; the geometry does.
+#: ``"per_site"``       the ANTI-claim: each participant is driven independently.  A
+#:                      `direct`-wired array can do this and a broadcast-wired one cannot,
+#:                      and today nothing in a TSIR file distinguishes the two.
+BROADCASTS = ("one", "per_direction", "per_site")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +105,29 @@ class Participant:
 def loop_shift(loop: str, delta: int) -> dict:
     """The rigid-rotation movement template."""
     return {"kind": "loop_shift", "loop": loop, "delta": int(delta)}
+
+
+def _broadcast_of(raw) -> bool | str:
+    """Whatever the document said, unchanged -- a string stays a string.
+
+    Deliberately not normalized here: `to_json` has to reproduce the byte the file
+    carried, and the shipped fleet's `cool` instructions all carry `true`.
+    """
+    return raw if isinstance(raw, str) else bool(raw)
+
+
+def broadcast_kind(instr: "Instruction") -> str | None:
+    """The R4c claim this instruction makes, or `None` for no claim.
+
+    The one place `True` is folded into `"one"`, so no rule has to know that the
+    boolean spelling came first.
+    """
+    b = instr.broadcast
+    if b is True:
+        return "one"
+    if isinstance(b, str) and b:
+        return b
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,8 +162,10 @@ class Instruction:
     ions: tuple[str, ...] = ()
     sites: tuple[str, ...] = ()
 
-    # --- cooling -----------------------------------------------------------
-    broadcast: bool = False
+    # --- how the participants are DRIVEN (R4c) ------------------------------
+    #: `False` (no claim) | one of `BROADCASTS` | `True`, the legacy spelling of
+    #: `"one"` that every shipped `cool` writes.  Read it through `broadcast_kind`.
+    broadcast: bool | str = False
 
     # --- init --------------------------------------------------------------
     placement: Mapping[str, str] = field(default_factory=dict)
@@ -179,7 +230,8 @@ class Instruction:
         if self.sites:
             d["sites"] = list(self.sites)
         if self.broadcast:
-            d["broadcast"] = True
+            # `True` stays `true`: every existing document round-trips byte for byte.
+            d["broadcast"] = self.broadcast
         if self.placement:
             d["placement"] = dict(self.placement)
         if self.quanta:
@@ -213,7 +265,7 @@ class Instruction:
             pairs=pairs,
             ions=tuple(str(i) for i in d.get("ions", ())),
             sites=tuple(str(s) for s in d.get("sites", ())),
-            broadcast=bool(d.get("broadcast", False)),
+            broadcast=_broadcast_of(d.get("broadcast", False)),
             placement=dict(d.get("placement", {})),
             quanta=dict(d.get("quanta", {})),
             t0=d.get("t0"),
@@ -358,6 +410,15 @@ def validate_program(prog: TSIR) -> list[str]:
         seen.add(instr.id)
         if instr.type == "init" and not instr.placement:
             errors.append(f"{where}: init carries no placement")
+        if isinstance(instr.broadcast, str) and instr.broadcast not in BROADCASTS:
+            errors.append(
+                f"{where}: broadcast={instr.broadcast!r} is not a claim this IR knows "
+                f"(have: {', '.join(BROADCASTS)})")
+        if instr.broadcast and instr.type in ("init", "barrier"):
+            # `init` and `barrier` build no CycleView (docs/notes.md 5.5), so R4c would
+            # never run on them and the claim would be a permanent false green.
+            errors.append(
+                f"{where}: {instr.type} cannot claim a broadcast; no rule ever runs on it")
         if instr.type == "simd":
             if instr.cls is None:
                 errors.append(f"{where}: simd carries no class (R4 needs one)")

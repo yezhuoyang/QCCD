@@ -4,7 +4,7 @@ Layer map (docs/PLAN.md):
 
     qccd.arch     Layer 1 -- the architecture description language (`.arch.json`)
     qccd.ir       Layer 2 -- the control IR (TSIR)
-    qccd.verify   Layer 3 -- the rules R1..R18, as machine-checkable invariants
+    qccd.verify   Layer 3 -- the rules R1..R19, as machine-checkable invariants
     qccd.cost     Layer 4 -- the objective (T1 combinatorial, T2 physical)
     qccd.compile  Layer 5 -- the compilation pipeline (cooling insertion so far)
 
