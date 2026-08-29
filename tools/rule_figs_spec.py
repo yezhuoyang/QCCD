@@ -16,8 +16,9 @@ from qccd.arch import load
 from qccd.cost import corrected_model
 from qccd.ir import TSIR, Instruction
 
-from make_rule_figs import (Case, Fig, chain, chart, grid, init, move, prog, ring,
-                            two_traps, wired_ring)
+from make_rule_figs import (ROOT, Case, Fig, chain, chart, grid, init, lab_ring,
+                            lab_ring_both_ways, lab_ring_broadcast, move, prog,
+                            ring, rotate, two_traps, wired_ring)
 
 # --------------------------------------------------------------- shared devices
 
@@ -25,6 +26,10 @@ R = ring()                       # 8 rail slots + 2 dock spurs; S0/S4 are degree
 R0 = ring(verticals=0)           # the same ring with no spurs: every node degree 2
 RQ = ring(zone="quiet")          # rail slots that cannot gate; ancillas that can
 RW = wired_ring()                # ...with its control channels declared
+RL = lab_ring()                  # ...tiled on the CHIP AXES, one group per direction
+RLB = lab_ring_broadcast()       # lab frame + the shipped all-sites broadcast map
+RL2 = lab_ring_both_ways()       # lab frame, a +1 map asked to turn -1 as well
+SC = load(ROOT / 'arch' / 'stationary_chain.arch.json')  # steerable_raman, no switch
 W1 = two_traps(1)                # one segment, capacity 1
 W2 = two_traps(2)                # one segment, capacity 2
 WW = two_traps(1, "wide")        # capacity-4 traps, no loop, no junction
@@ -355,6 +360,111 @@ def rules() -> list[Fig]:
                         note="R11 is silent - one ion, one direction. This is the one "
                              "cycle in the whole set that R4d rejects and every other "
                              "rule accepts")]),
+
+        # ----------------------------------------------------------------- R4c
+        Fig(key="R4c_broadcast_claim",
+            head="R4c - a broadcast is a CLAIM the instruction makes, and the device "
+                 "answers it",
+            sub="The identical rigid rotation, on two eight-slot rings that differ in "
+                "one declared field: control.channels.frame. On a path-frame tiling the "
+                "conveyor follows the trap axis, so one waveform advances the whole loop "
+                "and broadcast='one' is true - that is H2 (2305.03828). On a lab-frame "
+                "tiling the electrodes are fixed to the chip axes, so the same rotation "
+                "is four waveforms, one per direction the path turns into, and "
+                "broadcast='one' is refuted by the device. The instruction never states "
+                "the number four; the device geometry does.",
+            cases=[Case(RW, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                 rotate(broadcast="one")),
+                        "LEGAL  frame='path': one conveyor, one waveform", ()),
+                   Case(RL, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                 rotate(broadcast="per_direction")),
+                        "LEGAL  frame='lab': one waveform per direction", ()),
+                   Case(RL, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                 rotate(broadcast="one")),
+                        "VIOLATION  frame='lab', but the program claims one drive",
+                        ("R4c",),
+                        note="R4d is silent - every channel is uniform, the wiring CAN "
+                             "produce this cycle. R19 is silent - four groups for four "
+                             "directions. The only thing wrong is what the program said "
+                             "about itself")]),
+
+        Fig(key="R4c2_optical_broadcast",
+            head="R4c - the same claim on the optical side: 'Broadcast laser'",
+            sub="A gate instruction carries many pairs because a broadcast machine "
+                "drives them together - but nothing in a TSIR file has ever said whether "
+                "one beam or N steered beams lit them. stationary_chain is the one "
+                "shipped device that declares optical.addressing='steerable_raman' and "
+                "per_zone_switch=false, and it is where the claim fails: a steered beam "
+                "reaches one zone at a time, and a zone with no switch cannot be left "
+                "dark.",
+            cases=[Case(SC, prog(Instruction(type="init", id=0,
+                                             placement={"a": "C0", "b": "C0",
+                                                        "c": "C1", "d": "C1"},
+                                             quanta={k: 0.0 for k in "abcd"}),
+                                 _gate([("a", "b")], id=1),
+                                 Instruction(type="cool", id=2, broadcast=True)),
+                        "LEGAL  no broadcast claim: not judged, and silence is not a pass",
+                        ()),
+                   Case(SC, prog(Instruction(type="init", id=0,
+                                             placement={"a": "C0", "b": "C0",
+                                                        "c": "C1", "d": "C1"},
+                                             quanta={k: 0.0 for k in "abcd"}),
+                                 _gate([("a", "b")], id=1, broadcast="one"),
+                                 Instruction(type="cool", id=2, broadcast=True)),
+                        "VIOLATION  one beam, but C1 cannot opt out", ("R4c",),
+                        note="the broadcast COOL in the same programme is legal: cooling "
+                             "is not steered, and this device's own primitives.cool "
+                             "declares broadcastable=true, scope='global' (R7c)")]),
+
+
+        # ----------------------------------------------------------------- R19
+        Fig(key="R19_electrode_frame", static=True,
+            head="R19 - a lab-frame tiling needs one channel group per direction it turns",
+            sub="An ARCHITECTURE rule, like R11(b): it has no program variable, and it "
+                "fires with no program at all. Both panels are the same eight slots "
+                "declaring frame='lab'. The left one cuts its channel map from "
+                "Device.shift_directions - one explicit group per axis direction, sizes "
+                "3/3/1/1 here and 71/71/1/1 on ring144_24v, constant in array size. The "
+                "right one uses the map every shipped device actually has, "
+                "grouping='broadcast', which puts all sites on every channel: one "
+                "independent group against four directions.",
+            cases=[Case(RL, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                 rotate(broadcast="per_direction")),
+                        "LEGAL  4 groups, one per direction", (),
+                        note="4 channels for 8 slots, and 4 for 144 on the shipped ring - "
+                             "the number is how many axis directions the path turns in, "
+                             "not the array size, so "
+                             "WISE's O(1) DAC claim survives the lab frame intact"),
+                   Case(RLB, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                  rotate(broadcast="per_direction")),
+                        "VIOLATION  grouping='broadcast'", ("R19", "R4"),
+                        note="R4d fires too, and the pair is the point: R19 is an "
+                             "ARCHITECTURE verdict - this device cannot rotate, no "
+                             "program needed - while R4d is a CYCLE verdict exhibiting a "
+                             "rotation that proves it. (The label reads R4, not R4d: "
+                             "docs/notes.md 5.1.) Every shipped device is wired this way, "
+                             "which is why R19 defaults to frame='path' and reports a "
+                             "SKIP REASON rather than a pass")]),
+
+        Fig(key="R19b_both_directions", static=True,
+            head="R19 - and turning the loop BOTH ways needs the common refinement",
+            sub="The consequence that is not obvious. A +1 shift and a -1 shift do not "
+                "partition the sites the same way: they are offset by one at the corners, "
+                "so the site that goes +y under +1 is not the site that goes -y under -1. "
+                "A four-group map cut for +1 therefore asks one of its channels for two "
+                "waveforms under -1. The fix is the common refinement of the two "
+                "partitions - 6 groups here and on ring144_24v (70/70/1/1/1/1), still "
+                "constant in array size.",
+            cases=[Case(RL, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                 rotate(broadcast="per_direction")),
+                        "LEGAL  the device declares +1 only", (),
+                        note="lab_ring declares rotate_cw and nudge, both +1. Four groups "
+                             "are enough for one direction of travel"),
+                   Case(RL2, prog(init({f"i{i}": f"S{i}" for i in range(8)}),
+                                  rotate(broadcast="per_direction")),
+                        "VIOLATION  the same map, rotate_ccw restored", ("R19",),
+                        note="R19 judges the DECLARED classes, not the program: this "
+                             "fires with no -1 instruction anywhere in the program")]),
 
         # ------------------------------------------------------------------ R5
         Fig(key="R5_no_exchange",

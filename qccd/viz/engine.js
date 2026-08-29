@@ -3171,7 +3171,7 @@ function renderProgram(stmts) {
 //    returns [], and the class simply has no participants.
 //  * a declared-but-unused zone type is harmless and worth saying out loud.
 //
-// And the ONE state-free rule check that does exist -- R11/R18: every node the graph made
+// And the ONE state-free rule check that does exist -- R11/R18/R19: every node the graph made
 // a junction must be priceable at its degree.  It is pure, cheap and fully client-side,
 // and it is exactly the check a geometry edit needs.  Everything else in `rules.py` takes
 // a CycleView built from a PROGRAM, so it cannot run on an architecture edit at all.
@@ -3791,7 +3791,7 @@ function renderProgramSource(stmts) {
 // 12. THE BROWSER RULE SET -- one walk, two surfaces
 // =====================================================================================
 //
-// `qccd/verify/rules.py` has 23 rules.  Exactly one of them -- `architecture_violations`,
+// `qccd/verify/rules.py` has 25 rules.  Exactly one of them -- `architecture_violations`,
 // R11's structural half -- is state-free; the other 22 need a `CycleView` built from a
 // replay.  `priceFrames` ALREADY IS that replay: it carries `pos` (every ion's site), `q`
 // (running n-bar), `life` (lifetime deposit) and per-frame cost/steps/us, and it is

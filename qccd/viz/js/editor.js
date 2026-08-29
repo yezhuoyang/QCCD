@@ -334,7 +334,7 @@ function rebuild(opts) {
   rebuildStatic();
   repriceNow();
   // THE VERDICTS ARE RE-DERIVED, not struck through.  `RULES_STALE` used to invalidate
-  // all 23 at once because none of them could be re-run here; 17 of them now can, off the
+  // all 25 at once because none of them could be re-run here; 17 of them now can, off the
   // walk `repriceNow` just did, and only the other 6 go grey.  Keeping both mechanisms
   // would leave the page with two answers about the same rule.
   if (typeof renderSide === 'function') renderSide();
@@ -2372,7 +2372,7 @@ function newCanvas(opts) {
   // Seed the one key that makes a blank canvas RUNNABLE. `control.model` is required by
   // the schema, and without it `declare_class` is refused ("$.control: missing required
   // key 'model'") -- so a from-scratch device could be built and exported but never
-  // priced, and every one of the 23 rules stayed `unchecked` forever. `simd_classes` is
+  // priced, and every one of the 25 rules stayed `unchecked` forever. `simd_classes` is
   // the model every shipped architecture uses; `set_control` changes it.
   // Plus the smallest primitive set that makes a device PRICEABLE. Without these,
   // `declare_class` succeeds and pricing then dies on "architecture declares no
@@ -2813,7 +2813,7 @@ function framesAsTsir(stem) {
 
 // ------------------------------------------------------------------- the verdicts
 //
-// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 23 is
+// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 25 is
 // state-free; the browser re-derives 17 of them off the pricing walk; the other 6 need
 // Python, and each is named WITH ITS REASON rather than being absent.
 var RULES = null;
@@ -2865,7 +2865,7 @@ function evaluateNow(model) {
   }
 }
 
-// 23 entries, one per rule, each with its state and its reason.  The header text is
+// 25 entries, one per rule, each with its state and its reason.  The header text is
 // DERIVED from this array and never written down.
 function ruleCoverage() {
   var all = (D.evidence && D.evidence.rules_all) || [];

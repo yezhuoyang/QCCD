@@ -15,7 +15,7 @@ and will be *consumed*, not reimplemented:
 |---|---|---|
 | architecture graph + primitive curves | `qccd/arch/` | done, 9 devices, expands to explicit nodes/segments/loops |
 | **TSIR — the hardware instruction format** | `qccd/ir/tsir.py` | done, 7 instruction types, JSON round-trip |
-| replay + 23 rules | `qccd/verify/` | done, and adversarially reviewed |
+| replay + the rule set (23 when this was written; 25 today) | `qccd/verify/` | done, and adversarially reviewed |
 | cost models (combinatorial, µs, quanta) | `qccd/cost/` | done, two tables |
 | a compiler | `qccd/compile/pipeline.py` | **BB-code-only, closed-loop-only**, 7 passes |
 

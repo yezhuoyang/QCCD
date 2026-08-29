@@ -9,7 +9,7 @@ Design a machine · compile a circuit for it · prove the result runs · derive 
 [![python](https://img.shields.io/badge/python-3.10%2B-3776ab.svg)](https://www.python.org/downloads/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![dependencies](https://img.shields.io/badge/dependencies-none-lightgrey.svg)](#install)
-[![rules](https://img.shields.io/badge/hardware%20rules-23-1e2761.svg)](docs/rules.md)
+[![rules](https://img.shields.io/badge/hardware%20rules-25-1e2761.svg)](docs/rules.md)
 [![verified](https://img.shields.io/badge/R10-proved%20in%20Lean%204-e4572e.svg)](Compiler/)
 
 </div>
@@ -40,7 +40,7 @@ python -m qccd studio           # the design tool, as one self-contained page
 
 ### Design a machine in the browser
 
-Drag a trap, draw a segment, and the cost model and all 23 rules re-evaluate as you go.
+Drag a trap, draw a segment, and the cost model and all 25 rules re-evaluate as you go.
 One parameter here — the number of vertical shuttling lines — trades ancillas against
 junctions.
 
@@ -57,7 +57,7 @@ different things in one cycle.
 
 ![evaluating a design](docs/img/evaluate.gif)
 
-→ [**docs/rules.md**](docs/rules.md) for all 23
+→ [**docs/rules.md**](docs/rules.md) for all 25
 
 ### Compile any QASM circuit onto any device
 
@@ -134,7 +134,7 @@ different wiring — and the wiring is the whole cost.
 
 | | |
 |---|---|
-| [`qccd/`](qccd/README.md) | the platform: the language, the IR, the 23 rules, the cost model, the renderer |
+| [`qccd/`](qccd/README.md) | the platform: the language, the IR, the 25 rules, the cost model, the renderer |
 | [`Compiler/`](Compiler/README.md) | QASM → hardware instructions: OCaml search, Lean-verified checker |
 | [`arch/`](arch/README.md) | nine reference architectures |
 | [`examples/`](examples/) | runnable studies — routing benchmarks, heating budgets, `BB [[144,12,12]]` |

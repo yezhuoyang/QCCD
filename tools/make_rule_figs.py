@@ -156,6 +156,78 @@ def wired_ring(switch_per_site: bool = True) -> Architecture:
                   "switch_per_site": switch_per_site})
 
 
+def lab_ring() -> Architecture:
+    """The same eight slots, wired the way a LAB-FRAME machine has to be.
+
+    `wired_ring` is H2's reading: `frame` defaults to `"path"`, the conveyor follows the
+    trap axis, and one waveform advances the whole loop, bends included (2305.03828).
+    This is the other reading and the one the target machine takes: the electrode tiling
+    is fixed to the chip axes, so `+x` and `-x` are different waveforms and the corner
+    needs its own.  `Device.shift_directions("L0", +1)` says which four those are, and
+    the channel map is CUT FROM THAT -- one `explicit` group per axis direction, sizes
+    3/3/1/1 here and 71/71/1/1 on the shipped `ring144_24v`.  Constant in array size,
+    which is the whole broadcast argument, and R4d and R19 both pass on it.
+
+    Only the `+1` shift is declared.  A four-group map cut for `+1` cannot drive `-1`
+    (every site's direction changes), and R19 says so -- correctly, and loudly enough to
+    drown out the rule this device exists to isolate.
+    """
+    base = _arch("ring8_labframe_base", {
+        "generator": "ring",
+        "params": {"width": 4, "height": 2, "verticals": 2,
+                   "site_zone": "gatezone", "ancilla_zone": "gatezone"}})
+    labels, oblique = base.device.shift_directions("L0", 1)
+    assert not oblique, oblique
+    by: dict[str, list[str]] = {}
+    for site, lab in labels.items():
+        by.setdefault(lab, []).append(site)
+    return _arch("ring8_labframe", {
+        "generator": "ring",
+        "params": {"width": 4, "height": 2, "verticals": 2,
+                   "site_zone": "gatezone", "ancilla_zone": "gatezone"}},
+        classes={"extra": [c for c in CLASSES if c["id"] != "rotate_ccw"]},
+        channels={"grouping": "explicit", "frame": "lab", "switch_per_site": True,
+                  "explicit": [
+                      {"id": f"lab{lab}",
+                       "role": "linear_h" if "x" in lab else "linear_v",
+                       "drives": sorted(v)} for lab, v in sorted(by.items())]})
+
+
+def lab_ring_broadcast() -> Architecture:
+    """Lab-frame tiling, but wired the way every shipped device is wired.
+
+    `grouping: "broadcast"` puts every site on every channel, so the whole loop is ONE
+    independently driven group -- against the four directions a rectangular path turns
+    into.  This is the combination R19 exists to reject, and it is the shipped
+    `ring144_24v` map with one field changed.
+    """
+    return _arch("ring8_lab_broadcast", {
+        "generator": "ring",
+        "params": {"width": 4, "height": 2, "verticals": 2,
+                   "site_zone": "gatezone", "ancilla_zone": "gatezone"}},
+        classes={"extra": [c for c in CLASSES if c["id"] != "rotate_ccw"]},
+        channels={"grouping": "broadcast", "frame": "lab", "switch_per_site": True,
+                  "roles": {"linear_h": 3, "junction": 2}})
+
+
+def lab_ring_both_ways() -> Architecture:
+    """`lab_ring`'s four-group map, asked to turn the loop BOTH ways.
+
+    The sharpest consequence of the lab frame, and the one that is not obvious: `+1` and
+    `-1` do not induce the same partition of the sites.  They are offset by one at the
+    corners, so the site that goes `+y` under `+1` is not the site that goes `-y` under
+    `-1`, and a map cut for one direction asks one of its channels for two waveforms
+    under the other.  A device that must rotate both ways needs the COMMON REFINEMENT of
+    the two partitions -- 6 groups here and on `ring144_24v` (70/70/1/1/1/1), still
+    constant in array size.
+    """
+    base = lab_ring()
+    doc = base.to_json(expanded=False)
+    doc["name"] = "ring8_lab_bothways"
+    doc["control"]["classes"] = {"extra": list(CLASSES)}      # rotate_ccw restored
+    return Architecture.from_json(doc)
+
+
 # ------------------------------------------------------------------- programmes
 
 
@@ -174,6 +246,13 @@ def move(*movers, cls="nudge", mode="inter", id=1, **kw) -> Instruction:
     return Instruction(type="simd", id=id, cls=cls, mode=mode, participants=tuple(
         Participant(m[0], m[1], m[2], via=tuple(m[3]) if len(m) > 3 else ())
         for m in movers), **kw)
+
+
+def rotate(loop="L0", delta=1, cls="rotate_cw", id=1, **kw) -> Instruction:
+    """The rigid-rotation template as ONE instruction -- no participants, by design."""
+    from qccd.ir.tsir import loop_shift
+    return Instruction(type="simd", id=id, cls=cls, mode="inter",
+                       template=loop_shift(loop, delta), **kw)
 
 
 def prog(*instrs: Instruction, name="fig") -> TSIR:
@@ -336,6 +415,117 @@ def _arrows(img: Image.Image, clip: Clip, i: int) -> Image.Image:
     return img
 
 
+#: How many movers/operands a listing row spells out before it summarises the rest.  A
+#: 144-ion rotation is not debuggable as 144 comma-separated pairs, and it is not
+#: debuggable as "144 movers" either -- the first few plus a count is what lets a reader
+#: check the pattern and the arithmetic at once.
+LIST_HEAD = 4
+
+
+def instruction_text(instr) -> str:
+    """One TSIR instruction, spelled out exactly as the program carries it.
+
+    Rendered from the `Instruction` dataclass, NOT from the view model's frame -- the
+    frame is a drawing instruction and this is meant to be the hardware program, so that
+    a reader checking whether the figure shows what it claims is reading the same object
+    `verify()` read.
+    """
+    def few(items, fmt):
+        shown = ", ".join(fmt(x) for x in items[:LIST_HEAD])
+        rest = len(items) - LIST_HEAD
+        return shown + (f", (+{rest} more)" if rest > 0 else "")
+
+    t = instr.type
+    if t == "init":
+        pl = sorted(instr.placement.items())
+        hot = {k: v for k, v in (instr.quanta or {}).items() if v}
+        s = "init      " + few(pl, lambda kv: f"{kv[0]}@{kv[1]}")
+        if hot:
+            s += "  quanta=" + few(sorted(hot.items()), lambda kv: f"{kv[0]}:{kv[1]:g}")
+        return s
+    if t == "simd":
+        head = f"simd      cls={instr.cls} mode={instr.mode}"
+        if instr.template:
+            tm = instr.template
+            return (f"{head}  template=loop_shift(loop={tm.get('loop')}, "
+                    f"delta={int(tm.get('delta', 0)):+d})")
+        ps = list(instr.participants)
+        body = few(ps, lambda p: f"{p.ion}: {p.src}->{p.dst}"
+                                 + (f" via{list(p.via)}" if p.via else ""))
+        head += f"  [{len(ps)} mover{'s' if len(ps) != 1 else ''}]"
+        if instr.pairs:                       # illegal, but the figure has to show it
+            head += "  pairs=" + few(list(instr.pairs), lambda q: f"({q[0]},{q[1]})")
+        return f"{head}  {body}"
+    if t == "gate":
+        s = f"gate {instr.gate or 'MS':<4}"
+        if instr.pairs:
+            s += " pairs=" + few(list(instr.pairs), lambda q: f"({q[0]},{q[1]})")
+        if instr.ions:
+            s += " ions=" + few(list(instr.ions), str)
+        if instr.sites:
+            s += "  sites=" + few(list(instr.sites), str)
+        return s
+    if t == "cool":
+        return ("cool      broadcast=True (every ion in the trap)" if instr.broadcast
+                else "cool      ions=" + few(list(instr.ions), str))
+    if t in ("measure", "reset"):
+        return f"{t:<9} ions=" + few(list(instr.ions), str)
+    return t
+
+
+def _listing(width: int, program, current_id: int | None, rows_font=None):
+    """The whole hardware program, with a cursor on the instruction being executed.
+
+    The user's ask, and the right one: an animation that shows ions moving but not the
+    instruction that moved them cannot be used to check the instruction.  These programs
+    are two to five instructions long, so the WHOLE program fits and the reader can see
+    both what is running and what it sits between.
+    """
+    f = rows_font or font(int(11 * SS), mono=True)
+    fh = font(int(10 * SS))
+    pad, lh = 7 * SS, int((rows_font or f).size * 1.5)
+    probe = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+
+    rows: list[tuple[bool, str]] = []
+    # A program-level CLAIM is not an instruction, so without this the two panels of the
+    # R9 figure carry identical listings and the figure cannot show what R9 falsifies.
+    entries = [(False, "metrics= " + ", ".join(f"{k}={v:g}" for k, v in
+                                               sorted(program.metrics.items())))] \
+        if getattr(program, "metrics", None) else []
+    entries += [(ins.id == current_id, f"#{ins.id} {instruction_text(ins)}")
+                for ins in program.instructions]
+
+    for cur, text in entries:
+        # wrap on width, continuation rows indented under the id.  `.strip()` here would
+        # eat that indent on the next word, which is what made the wrapped half of a
+        # two-mover row look like a second instruction.
+        indent = "      "
+        line = ""
+        for w in text.split(" "):
+            trial = f"{line} {w}" if line else w
+            if probe.textlength("> " + trial, font=f) > width - 2 * pad and line:
+                rows.append((cur, line))
+                line = indent + w
+            else:
+                line = trial
+        rows.append((cur, line))
+
+    img = Image.new("RGB", (width, pad * 2 + int(fh.size * 1.6) + lh * len(rows)),
+                    rgb("soft"))
+    d = ImageDraw.Draw(img)
+    d.line([0, 0, width, 0], fill=rgb("line"), width=SS)
+    d.text((pad, pad), "hardware program (TSIR), cursor on the executing step",
+           font=fh, fill=rgb("muted"))
+    y = pad + int(fh.size * 1.6)
+    for i, (cur, text) in enumerate(rows):
+        if cur:
+            d.rectangle([pad // 2, y + i * lh - 2 * SS, width - pad // 2,
+                         y + (i + 1) * lh - 2 * SS], fill=rgb("card"))
+        d.text((pad, y + i * lh), ("> " if cur and not text.startswith("   ") else "  ")
+               + text, font=f, fill=rgb("navy") if cur else rgb("muted"))
+    return img
+
+
 def _panel_frames(case: Case, width: int, sub: int):
     """Every rendered instant of one case, plus its verdict band."""
     rep, model = case.run()
@@ -349,7 +539,15 @@ def _panel_frames(case: Case, width: int, sub: int):
     live = [i for i, f in enumerate(clip.frames) if f["type"] != "init"] or \
         list(range(len(clip.frames)))
 
-    imgs = []
+    # One listing per instruction id, not per frame: the cursor is the only thing that
+    # moves, so a frame just indexes into this.
+    listings = {}
+    for f in clip.frames:
+        if f["id"] not in listings:
+            im = _listing(imgs_w := width * SS, case.program, f["id"])
+            listings[f["id"]] = im.resize((imgs_w // SS, im.height // SS), Image.LANCZOS)
+
+    imgs, lists = [], []
     for i in live:
         hops = max((len(p) - 1 for p in clip.paths[i].values()), default=0)
         steps = min(max(1, hops * sub), 24)
@@ -359,8 +557,9 @@ def _panel_frames(case: Case, width: int, sub: int):
                           caption=(case.arch.name, case.label,
                                    f"step {i + 1}/{len(clip.frames)}")),
                 clip, i))
+            lists.append(listings[clip.frames[i]["id"]])
     band = _band(imgs[0].width * SS, case.verdict(rep))
-    return imgs, band.resize((band.width // SS, band.height // SS), Image.LANCZOS)
+    return imgs, lists, band.resize((band.width // SS, band.height // SS), Image.LANCZOS)
 
 
 # ------------------------------------------------------------------ the figure
@@ -477,7 +676,8 @@ def build(fig: Fig, out_dir: Path) -> Path:
     n = max(len(p[0]) for p in panels)
     pw = max(p[0][0].width for p in panels)
     ph = max(p[0][0].height for p in panels)
-    bh = max(p[1].height for p in panels)
+    lh = max(im.height for _, lists, _ in panels for im in lists)
+    bh = max(p[2].height for p in panels)
     total_w = pw * len(panels) + GAP * (len(panels) - 1)
 
     title = _title(total_w * SS, fig.head, fig.sub)
@@ -485,13 +685,14 @@ def build(fig: Fig, out_dir: Path) -> Path:
 
     out_frames = []
     for k in range(1 if fig.static else n):
-        canvas = Image.new("RGB", (total_w, title.height + ph + bh), rgb("bg"))
+        canvas = Image.new("RGB", (total_w, title.height + ph + lh + bh), rgb("bg"))
         canvas.paste(title, (0, 0))
-        for j, (imgs, band) in enumerate(panels):
+        for j, (imgs, lists, band) in enumerate(panels):
             x = j * (pw + GAP)
             idx = min(k, len(imgs) - 1) if not fig.static else len(imgs) - 1
             canvas.paste(imgs[idx], (x, title.height))
-            canvas.paste(band, (x, title.height + ph))
+            canvas.paste(lists[idx], (x, title.height + ph))
+            canvas.paste(band, (x, title.height + ph + lh))
         out_frames.append(canvas)
 
     out_dir.mkdir(parents=True, exist_ok=True)
