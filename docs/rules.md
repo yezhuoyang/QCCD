@@ -30,6 +30,8 @@ a check.
 | R3 | checked | ≤ `segment.capacity` participants per segment per cycle |
 | R4 | checked | the movement class is declared; ≤ `max_simd_classes_per_cycle` per cycle |
 | R4b | checked | a cycle has one mode, and never mixes transport with gates |
+| R4c | checked when a claim is judgeable | a declared `broadcast` is answered by the control plane; a claim the device cannot judge is **skipped with the reason**, never passed |
+| R4d | checked when the channels are declared | the cycle is producible by the declared map; **silent on an undeclared one, which is not a pass**. Emits under R4's name — see `docs/notes.md` §5.1 |
 | R5 | checked | no `(u→v)` together with `(v→u)` on one segment |
 | R6 | checked | gate/measure/cool only where the zone type allows, at the **replayed** site |
 | R6b | checked | both ions of a pair co-located; `sites`, when present, cross-checked |
@@ -47,6 +49,26 @@ a check.
 | R16 | checked when the model models heating | gate error evaluated from the carried `n̄`, not a constant |
 | R17 | checked when the model models time | anomalous heating accrued per elapsed µs |
 | R18 | by construction | junction cost charged by the degree the expanded graph reports |
+| R19 | checked when the tiling is declared `lab` | a lab-frame device needs one independently driven channel group per axis direction its rigid shift turns in; **all nine shipped devices are `path`, so R19 reports a skip reason on every one of them** |
+
+**R4c and R19 in detail.** They are the two halves of the broadcast question, and they sit
+in different buckets. R4c is a **program** rule: an instruction may claim
+`broadcast: "one" | "per_direction" | "per_site"`, and the verifier answers the claim from
+the device. R19 is an **architecture** rule, like R11's structural half: it needs no
+program, and it fires on a device that declares a lab-frame electrode tiling without
+enough independently driven channel groups to turn its own loop.
+
+Both are conditional, and both say so rather than passing quietly. `r4c_unjudged` gives the
+per-claim reason a device could not answer (no `control.channels`, no `control.optical`, an
+unrecognised word, or `per_direction`, which states no count and defers to R4d); `r19_scope`
+gives the per-device reason R19 said nothing (no channels declared, `frame='path'`, or no
+shift class on a closed path). A rule that cannot fail on this input lands in `skipped` with
+that string, never in `passed`.
+
+One number to be careful with: on every closed loop the fleet ships, the count of axis
+directions a rigid shift turns in equals `len(Device.corners(loop))` = 4. They are **not**
+the same quantity — an L-shaped closed loop has 6 corners and 4 directions — so R19's
+message reports both and equates neither.
 
 **R15 in detail.** The true composition is
 `n̄_tot = n̄_hom + n̄_inhom + 2√(n̄_hom·n̄_inhom)·cos θ`, whose interference term can be

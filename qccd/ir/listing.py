@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Iterable, Iterator, Mapping, Sequence
 
-from .tsir import TSIR, Instruction, iter_pairs
+from .tsir import TSIR, Instruction, broadcast_kind, iter_pairs
 
 __all__ = [
     "OpPoint", "Movement", "Operand", "Cost", "GroupKey", "Line", "Section",
@@ -420,6 +420,24 @@ def _movement(instr: Instruction, arch) -> Movement:
 
 def _detail(instr: Instruction, arch, mv: Movement, n_from_replay: int,
             n_ions: int = 0):
+    """-> (detail text, width, operands, note), with the R4c claim in front.
+
+    The word is deliberately in the DETAIL column and not in `op`: the mnemonic column
+    is eight characters and is the class, which is what a reader scans for.  A broadcast
+    is a property of how that class is driven, so it reads as a qualifier --
+    `broadcast(one) L0 cw 1 hop  all of L0` -- and every existing line is byte-identical
+    because an instruction that makes no claim gets no prefix.  `cool` is left alone: it
+    already prints "broadcast, all ions".
+    """
+    txt, width, ops, note = _detail_body(instr, arch, mv, n_from_replay, n_ions)
+    kind = broadcast_kind(instr)
+    if kind and instr.type != "cool":
+        txt = f"broadcast({kind}) {txt}"
+    return txt, width, ops, note
+
+
+def _detail_body(instr: Instruction, arch, mv: Movement, n_from_replay: int,
+                 n_ions: int = 0):
     """-> (detail text, width, operands, note)"""
     meta = instr.meta or {}
     note = meta.get("note")

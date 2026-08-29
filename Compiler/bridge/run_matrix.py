@@ -2,7 +2,7 @@
 
 For each pair it runs the whole stack and records what came out:
 
-    compile  ->  insert cooling  ->  all 23 rules  ->  R10 (proved Lean checker + tableau)
+    compile  ->  insert cooling  ->  every checkable rule  ->  R10 (proved Lean checker + tableau)
 
 and reports one of:
 

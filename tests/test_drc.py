@@ -299,7 +299,11 @@ def test_violations_are_ordered_by_rule_then_position(reports):
 # ------------------------------------------------------- discipline: not a rule
 
 def test_nothing_here_became_a_verifier_rule():
-    """23 rules, mirrored in `engine.js` and diffed at tolerance zero over every arch file.
+    """25 rules, mirrored in `engine.js` and diffed at tolerance zero over every arch file.
+
+    Was 23.  R19 (the electrode frame; an ARCHITECTURE rule, like R11(b)) and R4c took it
+    to 25.  Neither is in `BROWSER_SET`, which is the per-cycle set the browser engine
+    mirrors.
 
     A Python-only rule firing there is an automatic red harness, and a design rule is a
     different kind of claim anyway: it is about a technology's fabrication limits, which
@@ -308,7 +312,7 @@ def test_nothing_here_became_a_verifier_rule():
     from qccd.verify import rules as R
     from qccd.viz.render import BROWSER_SET
 
-    assert len(R.RULE_STATEMENTS) == 23 and len(R.RULE_SOURCES) == 23
+    assert len(R.RULE_STATEMENTS) == 25 and len(R.RULE_SOURCES) == 25
     assert len(BROWSER_SET) == 17 and set(BROWSER_SET) <= set(R.RULE_STATEMENTS)
     for name in RULES:
         assert name not in R.RULE_STATEMENTS
