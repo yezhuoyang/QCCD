@@ -43,6 +43,8 @@ __all__ = [
     "Architecture",
     "ExpansionError",
     "resolve_capacities",
+    "AXIS_LABELS",
+    "axis_label",
 ]
 
 _ROUND = 9
@@ -77,6 +79,32 @@ def _unit(a: Sequence[float], b: Sequence[float]) -> tuple[float, ...]:
     if scale == 0.0:
         return tuple(0.0 for _ in d)
     return tuple(round(c / scale, _ROUND) + 0.0 for c in d)
+
+
+#: The only four directions `pos` arithmetic is entitled to name in the LAB frame.
+#:
+#: `pos` is in abstract lattice units and the lattice is ANISOTROPIC: `qccd/phys/build.py`
+#: maps a node to nanometres as `(pos.x * nm_per_unit_x, pos.y * nm_per_unit_y)`
+#: (`build.py:176,203`), and the shipped technology gives those as 225000 and 355000 nm
+#: with a source that says in terms they "cannot be" the same quantity
+#: (`qccd/phys/presets/eth_junction_2201.12579.tech.json`).  So lattice -> lab is a
+#: POSITIVE DIAGONAL map.  Such a map does not preserve angles -- an oblique lattice
+#: direction has no determinate lab angle, and a rule that computed one would be
+#: measuring the drawing.  What it does preserve, exactly, is the sign pattern of each
+#: component: it fixes each of the four axis rays pointwise-as-a-label.  "Is this hop +x
+#: or -x?" therefore survives the anisotropy and is a fact about the metal; "what angle
+#: is this hop at?" does not and is not.  R19 counts only these four.
+AXIS_LABELS: Mapping[tuple[float, ...], str] = {
+    (1.0, 0.0): "+x", (-1.0, 0.0): "-x", (0.0, 1.0): "+y", (0.0, -1.0): "-y",
+}
+
+
+def axis_label(a: Sequence[float], b: Sequence[float]) -> str | None:
+    """`"+x" | "-x" | "+y" | "-y"`, or `None` when the hop is oblique or degenerate.
+
+    Same `_unit` the corner test uses, then the anisotropy filter above.
+    """
+    return AXIS_LABELS.get(_unit(a, b))
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,6 +386,42 @@ class Device:
         seq = loop.nodes
         k = len(seq)
         return {seq[i]: seq[(i + delta) % k] for i in range(k)}
+
+    def shift_directions(
+        self, loop_id: str, delta: int = 1
+    ) -> tuple[Mapping[str, str], tuple[str, ...]]:
+        """`({node: "+x"|"-x"|"+y"|"-y"}, oblique_nodes)` for the rigid shift by `delta`.
+
+        The LAB-frame reading of `shift_map`.  `path_actions` gives every site on a path
+        the same action -- `"L0:+1"` -- because a conveyor that follows the trap axis
+        means "forward one slot" everywhere on the path, bends included.  This is the
+        other reading: a tiling fixed to the chip axes has a *different* waveform for
+        each axis direction the path takes, so the same rigid shift is `k` actions, not
+        one.
+
+        Only axis-aligned hops get a label (see `AXIS_LABELS`): the lattice is
+        anisotropic, so an oblique hop's lab direction is not determined by `pos`.  Those
+        node ids come back in the second element and are never counted.  Since the
+        lattice -> lab map is invertible, an oblique hop can never *coincide* with an
+        axis one either, so `len(set(labels.values()))` is a sound LOWER BOUND on the
+        number of distinct lab directions, exact when `oblique` is empty.
+
+        On every closed loop the fleet ships, and on a 48-gon and a 40-node ring, this
+        count equals `len(self.corners(loop_id))` -- the quantity is a device property
+        that `python -m qccd show` already prints, not something to rediscover per
+        instruction.  A rigid shift of a *closed* path telescopes to zero displacement,
+        so the count is always >= 3, and 4 on anything axis-aligned; that is why R19 is
+        conditioned on a declaration rather than fired on every rotation.
+        """
+        labels: dict[str, str] = {}
+        oblique: list[str] = []
+        for src, dst in self.shift_map(loop_id, delta).items():
+            lab = axis_label(self.nodes[src].pos, self.nodes[dst].pos)
+            if lab is None:
+                oblique.append(src)
+            else:
+                labels[src] = lab
+        return labels, tuple(oblique)
 
     # ---------------------------------------------------------------- queries
 

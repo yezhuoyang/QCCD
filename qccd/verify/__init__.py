@@ -12,12 +12,14 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..cost.models import CostModel
-from ..ir.tsir import TSIR
+from ..ir.tsir import TSIR, broadcast_kind
 from .control import ChannelBank, ControlRecord, ControlTrace, control_trace
 from .replay import CycleRecord, ReplayError, ReplayResult, replay
 from .rules import (
     CYCLE_RULES,
     architecture_violations,
+    r19_scope,
+    r4c_unjudged,
     concurrency_violations,
     CycleView,
     ResolvedMove,
@@ -56,7 +58,7 @@ UNCHECKABLE: Mapping[str, str] = {
 }
 
 #: Rules checked outside the per-cycle loop, so `only_rules` may legitimately name them.
-PROGRAM_RULES = ("R9", "R7c", "R18")
+PROGRAM_RULES = ("R9", "R7c", "R18", "R19")
 
 PARTIAL: Mapping[str, str] = {
     "R15": (
@@ -254,10 +256,49 @@ def verify(
     rules.checked |= requested & set(CYCLE_RULES)
     for unknown in sorted(requested - set(CYCLE_RULES) - set(PROGRAM_RULES)):
         rules.skipped[unknown] = "no per-cycle check is implemented for this rule"
-    if only_rules is None or "R11" in only_rules:
+    if only_rules is None or {"R11", "R19"} & set(only_rules):
         rules.extend(architecture_violations(arch))
+        # R19 is `checked` only where it CAN fail -- a lab-frame tiling with a declared
+        # rigid shift of a closed path.  Everywhere else it reports `skipped` with the
+        # reason, because "R19 passed" must never be able to mean "this device is not
+        # lab-frame".
+        why = r19_scope(arch)
+        if why:
+            rules.skipped["R19"] = why
+        else:
+            rules.checked.add("R19")
     if only_rules is None or "R4" in only_rules:
         rules.extend(concurrency_violations(arch, prog))
+    if "R4c" in rules.checked:
+        # R4c judges a CLAIM, so a programme that claims nothing leaves it with nothing
+        # to check -- and "passed" would be a green tick for a check that could not fire
+        # (docs/notes.md 5.7).  Count the claims and say so.
+        claims = [i for i in prog.instructions if broadcast_kind(i)]
+        # A claim the DEVICE cannot answer is not a passed claim.  Every clause of R4c
+        # needs an input the architecture may not declare, and reporting those as
+        # `checked` was a green tick for a check that could not fire.
+        unjudged = [(i.id, why) for i in claims
+                    if (why := r4c_unjudged(arch, i)) is not None]
+        judged = len(claims) - len(unjudged)
+        if not claims:
+            rules.skipped["R4c"] = (
+                f"no instruction of {len(prog.instructions)} declares a broadcast, so "
+                f"there is no claim to check against the control plane")
+            rules.checked.discard("R4c")
+        elif not judged:
+            rules.skipped["R4c"] = (
+                f"{len(claims)} instruction(s) declare a broadcast and none could be "
+                f"judged: " + "; ".join(f"#{i} {w}" for i, w in unjudged[:2])
+                + (f" (+{len(unjudged) - 2} more)" if len(unjudged) > 2 else ""))
+            rules.checked.discard("R4c")
+        else:
+            note = (f"{judged} of {len(prog.instructions)} instruction(s) declare a "
+                    f"broadcast this device can judge; the rest are not judged")
+            if unjudged:
+                note += (f". {len(unjudged)} claim(s) were NOT judged: "
+                         + "; ".join(f"#{i} {w}" for i, w in unjudged[:2]))
+                rules.partial["R4c"] = note
+            rules.notes["R4c"] = note
     metrics: dict = {}
     if check_metrics:
         metrics, viol = verify_metrics(prog, res, model_name=model.name)

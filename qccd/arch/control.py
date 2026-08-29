@@ -46,9 +46,25 @@ from functools import cached_property
 from typing import Iterable, Mapping, Sequence
 
 __all__ = ["ControlPlane", "ChannelGroup", "Engagement", "build_control_plane",
-           "GROUPINGS"]
+           "GROUPINGS", "FRAMES"]
 
 GROUPINGS = ("direct", "broadcast", "row", "column", "row_column", "explicit")
+
+#: In which frame the conveyor electrodes are tiled -- the one thing a channel map
+#: cannot be derived from and no device could previously say.
+#:
+#: ``"path"``   the tiling FOLLOWS the trap axis.  One waveform means "forward one
+#:              slot along this path", and it means that identically where the path
+#:              bends: H2's curved end zones are ordinary conveyor regions driven by
+#:              the same ``{a,b,c}`` broadcast tiling as the straights (2305.03828,
+#:              quoted at ``docs/PLAN.md:132``, implemented at
+#:              ``qccd/arch/generators.py:404-406``).  This is what ``path_actions``
+#:              already assumes, so it is the default: no shipped device changes
+#:              verdict without an edit.
+#: ``"lab"``    the tiling is FIXED TO THE CHIP AXES.  "move +x" is one waveform and
+#:              "move -x" is a different one, so a path that turns needs a channel per
+#:              direction it turns into.  R19.
+FRAMES = ("path", "lab")
 
 
 @dataclass(frozen=True)
@@ -106,6 +122,7 @@ class ControlPlane:
     compensation_per_site: int = 0
     demux: int = 1
     grouping: str = "direct"
+    frame: str = "path"
     n_sites: int = 0
     n_junctions: int = 0
     declared: bool = False
@@ -269,6 +286,7 @@ class ControlPlane:
         sizes = sorted({len(g) for g in self.groups})
         return {
             "grouping": self.grouping,
+            "frame": self.frame,
             "declared": self.declared,
             "channels": self.n_channels,
             "shared_channels": self.n_shared_channels,
@@ -301,10 +319,14 @@ def build_control_plane(device, control: Mapping) -> ControlPlane:
         compensation_per_site=int(wiring.get("compensation_electrodes_per_trap", 0)),
         demux=int(wiring.get("shim_per_dac", 1) or 1),
         grouping=str(spec.get("grouping", "direct")),
+        frame=str(spec.get("frame", "path")),
         n_sites=len(sites),
         n_junctions=len(junctions),
         declared=bool(spec),
     )
+    if plane.frame not in FRAMES:
+        raise ValueError(
+            f"unknown electrode frame {plane.frame!r}; have: {', '.join(FRAMES)}")
     if not spec:
         return plane
 
@@ -364,6 +386,15 @@ def build_control_plane(device, control: Mapping) -> ControlPlane:
             f"unknown channel grouping {plane.grouping!r}; have: {', '.join(GROUPINGS)}")
 
     plane.groups = tuple(groups)
+    if plane.frame == "lab":
+        plane.notes.append(
+            "lab frame: the electrode tiling is fixed to the chip axes, so '+x' and "
+            "'-x' are different waveforms and a path that turns needs one channel "
+            "group per direction it turns into (R19)")
+    else:
+        plane.notes.append(
+            "path frame: the electrode tiling follows the trap axis, so one waveform "
+            "means 'forward one slot' everywhere on a path, bends included (2305.03828)")
     if plane.switch_per_site:
         plane.notes.append(
             "every site has a switch, so it may opt out of its channel -- which is what "

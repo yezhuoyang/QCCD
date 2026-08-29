@@ -98,7 +98,7 @@ electrode — which is why the same 144-trap lattice costs 5,760 DACs or 44.
 ## Adding one
 
 A new architecture is a document in this folder. Nothing else has to change: the cost model,
-the 23 rules, the renderer and the compiler all read the same description. See
+the 25 rules, the renderer and the compiler all read the same description. See
 [docs/adl.md](../docs/adl.md) for the language, and
 [`qccd/arch/generators.py`](../qccd/arch/generators.py) for the six generators that write
 one for you.

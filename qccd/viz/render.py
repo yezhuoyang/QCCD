@@ -2246,8 +2246,8 @@ const capHist=SUM.capacity_histogram||{};
 // all.  Everything on the R1-R18 surface except the structural check needs a CycleView
 // built from a program, so it genuinely cannot be re-run in the browser -- and saying so
 // is the honest behaviour, not a limitation to paper over.
-// THE VERDICT SURFACE.  `RULES_STALE` -- which struck all 23 verdicts through the moment
-// anything was edited -- is GONE, not kept alongside: 17 of the 23 are now re-derived
+// THE VERDICT SURFACE.  `RULES_STALE` -- which struck all 25 verdicts through the moment
+// anything was edited -- is GONE, not kept alongside: 17 of the 25 are now re-derived
 // client-side off the same walk that prices the programme, and only the other 6 go grey.
 // Two mechanisms would give the page two answers about the same rule.
 //
@@ -2281,7 +2281,7 @@ document.getElementById('side').innerHTML =
   `<h3>Rules</h3>`+
   (evd.replayed_cycles === 0 && !P.frames.length
     ? `<div class="mut">no programme has been replayed, so none of the `+
-      `${(evd.rules_all||[]).length||23} rules has been evaluated. Write one in the `+
+      `${(evd.rules_all||[]).length||25} rules has been evaluated. Write one in the `+
       `<b>Write</b> pane.</div>`
     : (ruleBadges() ||
        `<div>`+

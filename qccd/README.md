@@ -7,7 +7,7 @@ built, how a program is written, and what `run` actually reports.
 |---|---|
 | [`arch/`](arch/) | the architecture description language and its generators |
 | [`ir/`](ir/) | TSIR, the control IR a hardware program is written in |
-| [`verify/`](verify/) | the replay and the 23 rules, as machine-checkable invariants |
+| [`verify/`](verify/) | the replay and the 25 rules, as machine-checkable invariants |
 | [`cost/`](cost/) | the objective: combinatorial (steps, templates) and physical (µs, quanta) |
 | [`compile/`](compile/) | placement, ordering, cooling insertion, the program builders |
 | [`viz/`](viz/) | the renderer, and the browser design tool it emits |
@@ -61,7 +61,7 @@ p.rotate(+13)                                      # one template, every ion
 ![evaluating a design](../docs/img/evaluate.gif)
 
 `run` replays the program instruction by instruction, charges every hop to a cost model,
-and reports what the [23 rules](../docs/rules.md) say about it:
+and reports what the [25 rules](../docs/rules.md) say about it:
 
 ```python
 r = m.run(p)                          # replay + every rule + the objective

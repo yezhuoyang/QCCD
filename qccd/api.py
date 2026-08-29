@@ -124,9 +124,12 @@ class Cycle:
     Handed to you by `Program.cycle`; collect moves on it and they are issued together.
     """
 
-    def __init__(self, cls: str, mode: str = "inter"):
+    def __init__(self, cls: str, mode: str = "inter", broadcast: bool | str = False):
         self.cls = cls
         self.mode = mode
+        #: The R4c claim: `"one"` | `"per_direction"` | `"per_site"` | False.  It is an
+        #: INTENT, not a device fact -- it names no channel and states no count.
+        self.broadcast = broadcast
         self._moves: list[Participant] = []
         self.meta: dict = {}
 
@@ -205,7 +208,7 @@ class Program:
 
     @_traced
     def rotate(self, delta: int, loop: str | None = None, cls: str | None = None,
-               **meta) -> "Program":
+               broadcast: bool | str = False, **meta) -> "Program":
         """Rigid lockstep rotation: one template, every ion on the loop.
 
         `delta` is in slots; sign is the direction. This is one instruction however many
@@ -219,11 +222,12 @@ class Program:
         cls = cls or ("rotate_cw" if delta >= 0 else "rotate_ccw")
         self._prog.add(Instruction(
             type="simd", id=self._prog.next_id(), cls=cls, mode="inter",
-            template=loop_shift(loop, int(delta)),
+            template=loop_shift(loop, int(delta)), broadcast=broadcast,
             meta=self._meta(meta, kind="rotate", hops=abs(int(delta)))))
         return self
 
-    def cycle(self, cls: str, mode: str = "inter", **meta) -> "_CycleCtx":
+    def cycle(self, cls: str, mode: str = "inter", broadcast: bool | str = False,
+              **meta) -> "_CycleCtx":
         """Open one machine step of class `cls`.
 
         Use as a context manager; the moves collected inside are issued together::
@@ -242,7 +246,7 @@ class Program:
             call = (self._prov.current if self._prov.current is not None
                     else self._prov.record("cycle", capture_site(1),
                                            ("cls", "mode"), (cls, mode), meta))
-        return _CycleCtx(self, Cycle(cls, mode), meta, call)
+        return _CycleCtx(self, Cycle(cls, mode, broadcast), meta, call)
 
     def _route(self, ion: str, src: str, dst: str, via) -> None:
         """Refuse a route whose `via` does not connect `src` to `dst`.
@@ -265,7 +269,7 @@ class Program:
 
     @_traced
     def simd(self, cls: str, moves: Sequence[Sequence], mode: str = "inter",
-             **meta) -> "Program":
+             broadcast: bool | str = False, **meta) -> "Program":
         """One machine step, FLAT: `with p.cycle(cls, mode) as c: c.moves(moves)`.
 
         This exists because the browser's Python-subset grammar joins physical lines on
@@ -287,16 +291,16 @@ class Program:
         for mv in moves:
             self._route(str(mv[0]), str(mv[1]), str(mv[2]),
                         mv[3] if len(mv) > 3 else ())
-        with self.cycle(cls, mode, **meta) as c:
+        with self.cycle(cls, mode, broadcast=broadcast, **meta) as c:
             c.moves(moves)
         return self
 
     @_traced
     def move(self, ion: str, src: str, dst: str, via: Sequence[str] | None = None,
-             cls: str = "shuttle", **meta) -> "Program":
+             cls: str = "shuttle", broadcast: bool | str = False, **meta) -> "Program":
         """One ion, one step -- shorthand for a cycle with a single participant."""
         self._route(ion, src, dst, via)
-        with self.cycle(cls, **meta) as c:
+        with self.cycle(cls, broadcast=broadcast, **meta) as c:
             c.move(ion, src, dst, via)
         return self
 
@@ -321,32 +325,48 @@ class Program:
 
     @_traced
     def gate(self, name: str, pairs: Sequence[Sequence[str]],
-             sites: Sequence[str] | None = None, **meta) -> "Program":
-        """One or more co-located pairs, driven together."""
+             sites: Sequence[str] | None = None, broadcast: bool | str = False,
+             **meta) -> "Program":
+        """One or more co-located pairs, driven together.
+
+        `broadcast="one"` is the OPTICAL claim: one beam, or one splitter tree, lights
+        every named zone.  R4c checks it against `control.optical`.
+        """
         pp = tuple((a, b) for a, b in pairs)
         self._prog.add(Instruction(
             type="gate", id=self._prog.next_id(), gate=name, mode="intra",
-            pairs=pp, sites=tuple(sites or ()), meta=self._meta(meta)))
+            pairs=pp, sites=tuple(sites or ()), broadcast=broadcast,
+            meta=self._meta(meta)))
         return self
 
     @_traced
-    def cool(self, ions: Sequence[str] | None = None, **meta) -> "Program":
-        """Cooling.  With no ions it is a global broadcast -- one op, every ion (R7c)."""
+    def cool(self, ions: Sequence[str] | None = None, broadcast: bool | str | None = None,
+             **meta) -> "Program":
+        """Cooling.  With no ions it is a global broadcast -- one op, every ion (R7c).
+
+        `broadcast` defaults to `not ions`, which is the spelling every shipped program
+        writes and serializes as `true`; pass `"one"` to say it in the R4c vocabulary.
+        """
         self._prog.add(Instruction(
-            type="cool", id=self._prog.next_id(),
-            ions=tuple(ions or ()), broadcast=not ions, meta=self._meta(meta)))
+            type="cool", id=self._prog.next_id(), ions=tuple(ions or ()),
+            broadcast=(not ions) if broadcast is None else broadcast,
+            meta=self._meta(meta)))
         return self
 
     @_traced
-    def measure(self, ions: Sequence[str], **meta) -> "Program":
+    def measure(self, ions: Sequence[str], broadcast: bool | str = False,
+                **meta) -> "Program":
         self._prog.add(Instruction(type="measure", id=self._prog.next_id(),
-                                   ions=tuple(ions), meta=self._meta(meta)))
+                                   ions=tuple(ions), broadcast=broadcast,
+                                   meta=self._meta(meta)))
         return self
 
     @_traced
-    def reset(self, ions: Sequence[str], **meta) -> "Program":
+    def reset(self, ions: Sequence[str], broadcast: bool | str = False,
+              **meta) -> "Program":
         self._prog.add(Instruction(type="reset", id=self._prog.next_id(),
-                                   ions=tuple(ions), meta=self._meta(meta)))
+                                   ions=tuple(ions), broadcast=broadcast,
+                                   meta=self._meta(meta)))
         return self
 
     @_traced
@@ -429,6 +449,7 @@ class _CycleCtx:
         self._p._prog.add(Instruction(
             type="simd", id=self._p._prog.next_id(), cls=self._c.cls,
             mode=self._c.mode, participants=tuple(self._c._moves),
+            broadcast=self._c.broadcast,
             meta=self._tag(dict(self._meta, **self._c.meta))))
         return False
 
@@ -998,7 +1019,7 @@ class Machine:
 
         The questions an editor asks after every edit that the rule set does not:
         `architecture_violations` checks that every junction the graph made is priceable
-        (R11/R18), but nothing in R1-R18 notices that a device fell into two islands or
+        (R11/R18/R19), but nothing in R1-R19 notices that a device fell into two islands or
         that a trap has no segment on it.  Both are legal, and both are almost always a
         misplaced click.
         """
@@ -1014,7 +1035,7 @@ class Machine:
         }
 
     def violations(self) -> list:
-        """The architecture-level rule checks (R11/R18), as `Violation` records.
+        """The architecture-level rule checks (R11/R18/R19), as `Violation` records.
 
         A topology edit is the only thing that can turn these from empty to non-empty
         without touching the program, so an editor calls this after every edit.

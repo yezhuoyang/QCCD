@@ -443,6 +443,12 @@ Every rule traces to a source: `python Knowledge/kg/query.py rules`.
 | **R16** | 2Q gate error is a **function of accumulated n̄** at gate time, not a constant | 2510.23519, 2605.25118 |
 | **R17** | anomalous heating accrues with elapsed time whether or not an ion moves | 2605.25118 |
 
+> **Amended 2026-08-29.** This table is the v2 plan as written and is left as the
+> record of it. The rule set has since grown to 25 — R4c and R4d (broadcast
+> producibility and channel drivability) and R18/R19 (what a junction is, and what a
+> lab-frame electrode tiling costs). `docs/rules.md` carries the current table and
+> `docs/notes.md` the audit behind it.
+
 R1–R9, R11–R14, R16–R17 are cheap replay checks. R15 is checkable only up to the phase model.
 **R10 needs real work**: symbolic tracking (permutation + Pauli frame vs the QASM DAG, as ZAC's
 `verify_scheduling` does) plus a stabilizer differential test against `stim` on small instances.

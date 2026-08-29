@@ -328,6 +328,8 @@
     },
     "channels": {
       "grouping": "broadcast",
+      "frame": "path",
+      "frame_note": "the conveyor tiling FOLLOWS the trap axis: H2 is a single continuous RF null whose curved end zones are ordinary conveyor-belt regions driven by the same {a,b,c} broadcast tiling as the straights, so one waveform means 'forward one slot' at a bend too and the whole loop rotates on one channel (2305.03828). A machine whose electrodes are tiled on the chip axes declares frame='lab' instead and pays len(corners(L0)) = 4 channel groups for the same rotation (R19).",
       "roles": {
         "linear_h": 6,
         "linear_v": 6,

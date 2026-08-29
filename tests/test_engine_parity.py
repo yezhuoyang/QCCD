@@ -1711,7 +1711,7 @@ def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
     cases["build"] = _build_cases(rng)
     cases["build_vocabulary"] = {"build": sorted(BUILD_METHODS),
                                  "seed": sorted(SEED_METHODS)}
-    # the verdicts: 17 of the 23 rules, re-derived client-side off the pricing walk
+    # the verdicts: 17 of the 25 rules, re-derived client-side off the pricing walk
     cases["rules"] = _rule_cases()
     cases["browser_set"] = list(BROWSER_SET)
     # the programme lane: the twelve authoring verbs, lowered to frames and to TSIR
