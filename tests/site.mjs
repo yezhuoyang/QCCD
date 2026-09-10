@@ -101,7 +101,7 @@ async function shot(name) {
 }
 
 const PROBE = `(async function(){
-  function embedStatus(){ var f = document.querySelector('iframe.live'); if(!f) return null;
+  function embedStatus(){ var f = document.querySelector('.clip iframe.live'); if(!f) return null;
     try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false;
           var st = d.getElementById('status'); return st ? st.textContent : 'no status'; } catch(e){ return false; } }
   var e1 = embedStatus(); if(e1) await new Promise(function(r){ setTimeout(r, 1500); }); var e2 = embedStatus();
@@ -132,6 +132,7 @@ const walkthrough = [
   ['board/index.html', '06_board'], ['docs/rules/index.html', '09_docs_rules'], ['discuss/index.html', '10_discuss'],
   ['language/index.html', '11_language'], ['rules/index.html', '12_rules'],
   ['compilation/index.html', '13_compilation'],
+  ['physics/index.html', '15_physics'], ['people/index.html', '16_people'], ['publications/index.html', '17_publications'],
 ];
 const firstBoard = pages.find(p => /^board\/[^/]+\/index\.html$/.test(p));
 if (firstBoard) walkthrough.push([firstBoard, '07_board_task']);
@@ -153,14 +154,14 @@ async function visit(rel, shotName) {
     if (isStudio || redirect || embeds) await new Promise(r => setTimeout(r, redirect ? 2500 : embeds ? 3000 : 800));
     if (shotName) await shot(shotName);
     probe = await evaluate(PROBE);
-    // a page with runnable examples: the first Run button must bring up a moving embed
-    if (await evaluate("!!document.querySelector('button.run')")) {
-      await evaluate("document.querySelector('button.run').click()");
-      await new Promise(r => setTimeout(r, 3500));
-      const ran = await evaluate(`(async function(){ var f = document.querySelector('.runbox iframe.live'); if(!f) return 'no iframe';
-        function st(){ try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false; var e = d.getElementById('status'); return e ? e.textContent : 'no status'; } catch(e){ return false; } }
-        var a = st(); await new Promise(function(r){ setTimeout(r, 1500); }); var b = st(); if(a === false) return 'not in embed mode'; var m = /\\/ (\\d+)/.exec(a || ''); return (a !== b || (m && +m[1] <= 3)) ? 'moving' : 'still: ' + a; })()`);
-      if (ran !== 'moving') problems.push('the first example did not run: ' + ran);
+    // a page with examples shown in place: the first frame must load and enter embed mode
+    if (await evaluate("!!document.querySelector('.runbox iframe.live')")) {
+      await evaluate("document.querySelector('.runbox iframe.live').scrollIntoView({block: 'center'})");
+      await new Promise(r => setTimeout(r, 4500));
+      const ran = await evaluate(`(function(){ var f = document.querySelector('.runbox iframe.live');
+        try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return 'not in embed mode';
+              return d.getElementById('play') ? 'ready' : 'no transport'; } catch(e){ return 'unreadable'; } })()`);
+      if (ran !== 'ready') problems.push('the first example did not load: ' + ran);
     }
     if (!probe.nav) problems.push('no navigation bar');
     if (probe.search_hits < 1) problems.push('site search finds nothing for "steane"');

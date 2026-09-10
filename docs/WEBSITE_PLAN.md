@@ -370,7 +370,15 @@ head, tools bar, rail, dock and study card away and loops the transport), linkin
 entry at `#step=2`; a GIF was tried first and dropped because the user wants what the page shows; Learn is one row per part
 with a pictogram and a sentence each, then the four docs as cards and the fastest verified round
 of every task; the board is one row per task with the designs as bars coloured by family, the
-fastest verified in green, refusals and rule failures in red, and four stat tiles. A third expert page, **Compilation** (`compilation/`, 2026-09-10): the accepted QASM gates and
+fastest verified in green, refusals and rule failures in red, and four stat tiles. Every example on the Language, Rules and Compilation pages is now shown in place (2026-09-10 evening):
+the example's page sits in a lazily loaded frame, in embed mode, paused at its first step with
+the transport controls ready, so the device and its ions are visible before any click and Play
+runs it; only the landing's frame autoplays (`#embed&play`). The Compilation page became one
+full-width row per gate — the circuit drawn the textbook way (an SVG from the certificate's
+parsed ops: wires, boxes, the CNOT dot and crossed circle, the meter), the input, the mapping,
+the pulses and the verdicts on the left, the machine and the hardware programme on the right.
+A second session added Physics, People and Publications pages to the same build module that
+day; they are carried on this branch so it builds. A third expert page, **Compilation** (`compilation/`, 2026-09-10): the accepted QASM gates and
 the native set they lower to, the pipeline in nine stages (parse, lower, place, route, emit, cool,
 rules, R10's two halves, draw), the Bell pair's ion mapping and pulse witnesses, and every basic
 gate compiled onto the six-site ring and verified — the hardware programme, the mapping, the
@@ -427,3 +435,16 @@ unanchored `site/` in `.gitignore` also ignores `qccd/site/`, so the pattern is 
 repository (commit 2 of `website/0`; the site build reads them from `BBResults/` and
 `SmallCode/`, which are untracked today); enabling Discussions and installing the giscus
 app, then pasting the three category ids into `qccd/site/giscus.json`.
+
+**2026-09-10, the front door and three pages more.** The landing now says *Build a
+fault-tolerant QCCD quantum computer!* over one sentence (learn to design, compile any
+program, evaluate the performance), as asked. Three document pages joined the bar:
+**Physics** (`physics/`, rendered from `qccd/site/physics.md` through the docs renderer, so
+it carries the studio's hover cards and a table of contents: trapping one ion, the qubit,
+gates, cooling, the QCCD idea, the primitives and their prices, the control system, the six
+noise sources, the three levels of noise simulation, and what the replay does and does not
+model), **People** (`people/`, from the lists in `qccd/site/people.py`: cards by group,
+then the three institutions with their marks) and **Publications** (`publications/`, from
+`qccd/site/publications.py`: 21 papers grouped by what each contributes, one *used for*
+line each, arXiv and DOI links, and a BibTeX for citing the software until a paper exists).
+All three are searchable (page, section, person and paper entries) and in the walkthrough.

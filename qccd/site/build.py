@@ -15,6 +15,9 @@ third-party script on the whole site is giscus on /discuss/.  Nothing runs on a 
                            entry pages sit beside it exactly as bb_studio.py wrote them
     site/discuss/          GitHub Discussions, embedded
     site/docs/<name>/      adl, tsir, rules, phys, rendered from docs/*.md
+    site/physics/          the physics background, rendered from qccd/site/physics.md
+    site/people/           who takes part, from qccd/site/people.py
+    site/publications/     the papers the site is built on, from qccd/site/publications.py
 
 A task is `tasks/<id>/task.json`; its `seed` names the directory whose `manifest.json`
 and pages are the board's rows today (`BBResults/studio`, `SmallCode/<code>`).
@@ -30,7 +33,9 @@ from pathlib import Path
 
 from .compile_examples import GATES, OUT as COMPILED, load_compiled
 from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, machine, rule_meta
-from .md import Renderer, hints
+from .md import Renderer, hints, slug
+from .people import GROUPS as PEOPLE_GROUPS, INSTITUTIONS, JOIN, PEOPLE
+from .publications import GROUPS as PUB_GROUPS, PUBS, SOFTWARE
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -207,8 +212,35 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .badge{font-size:11.5px;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
 .badge.ok{background:#e6f4ec;color:#0b7a4b} .badge.bad{background:#fbe9e7;color:#c62828} .badge.lean{background:#eef3fb;color:#2a78d6}
 .gate .runbox iframe.live{height:300px}
+.runbox.tall iframe.live{height:360px}
+.gaterow{border-top:1px solid var(--line);padding:20px 0 12px;scroll-margin-top:48px}
+.gaterow h3{margin:0 0 10px;font-size:16px} .gaterow h3 code{font-size:14px;background:none;padding:0;color:#1c2a4a} .gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:13.5px}
+.gr{display:grid;grid-template-columns:1fr 1.15fr;gap:26px;align-items:start} .gr>*{min-width:0}
+.gr pre{margin:0 0 6px;font-size:11.5px;padding:8px 10px;background:#f7f6f2;overflow-x:auto}
+.gr .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:10px 0 3px} .gr .lab:first-child{margin-top:0}
+.gr .badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+svg.qc{display:block;max-width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;margin:0 0 6px}
+@media (max-width:860px){.gr{grid-template-columns:1fr}}
 .kv{font-size:12.5px;border-collapse:collapse} .kv td{padding:2px 12px 2px 0;border:0;vertical-align:top} .kv td:first-child{color:var(--ink3)}
 .pulses code{display:block;font-size:11.5px;background:#f7f6f2;padding:2px 6px;border-radius:4px;margin:2px 0}
+
+/* physics, people and publications */
+.folk{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:10px 0 0}
+.person{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;scroll-margin-top:48px}
+.person b{display:block;font-size:16px;color:#1c2a4a} .person .role{color:var(--accent);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+.person .aff{color:var(--ink2);font-size:13px;margin:2px 0 8px} .person p{margin:0 0 8px;font-size:13.5px}
+.person .links a{font-size:12.5px;margin-right:10px}
+.inst{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin:10px 0 0}
+.inst a{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit}
+.inst a:hover{border-color:var(--accent);text-decoration:none} .inst img{height:34px;width:auto;flex:0 0 auto} .inst img[alt="UCLA"]{height:26px}
+.inst b{display:block;color:#1c2a4a} .inst span{color:var(--ink2);font-size:12.5px}
+.pubs{list-style:none;padding:0;margin:8px 0 0}
+.pub{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 10px;scroll-margin-top:48px}
+.pub .ti{font-size:15px;font-weight:600;color:#1c2a4a;margin:0 0 2px} .pub .au{font-size:13px;margin:0 0 2px}
+.pub .ve{font-size:12.5px;color:var(--ink2);margin:0 0 6px} .pub .ve a{margin-left:10px;white-space:nowrap}
+.pub .use{font-size:12.5px;color:var(--ink2);margin:0;padding-top:6px;border-top:1px dashed var(--grid)}
+.pub .use b{color:var(--ink3);font-weight:500;text-transform:uppercase;font-size:10.5px;letter-spacing:.07em;margin-right:6px}
+.cite pre{font-size:12px}
 """
 
 
@@ -243,18 +275,20 @@ HASH_JS = """<script>
 (function(){
   // The site's deep links into an app page: #learn opens the course, #learn=B2 a lesson,
   // #design is the blank canvas (the default), and #embed (with &step=N) is the page as
-  // the landing shows it -- head, tools bar, rail and dock folded away, the stage playing
-  // on a loop.  It is the same page, not a picture of it.  Under the test shim there is
+  // the examples show it -- head, tools bar, rail and dock folded away, the stage and its
+  // transport waiting at the step named; with &play it runs on a loop (the landing).  It
+  // is the same page, not a picture of it.  Under the test shim there is
   // no `location`, and nothing here runs.
   if(typeof location === 'undefined' || typeof window === 'undefined' || !window.addEventListener) return;
   var looping = false;
-  function embed(){
+  function embed(play){
     document.body.setAttribute('data-embed', '1');
     try { var rail = document.getElementById('rail'); if(rail && typeof foldPanel === 'function') foldPanel(rail, true); } catch(e){}
     try { var dk = document.getElementById('dock'); if(dk && typeof foldPanel === 'function') foldPanel(dk, true); } catch(e){}
     try { if(typeof relayout === 'function') relayout(); } catch(e){}
-    var play = document.getElementById('play'), reset = document.getElementById('reset'), slider = document.getElementById('slider');
-    if(looping || !play) return;
+    var autoplay = play;
+    play = document.getElementById('play'); var reset = document.getElementById('reset'), slider = document.getElementById('slider');
+    if(looping || !play || !autoplay) return;
     looping = true;
     setTimeout(function(){ try { if(!play.disabled && play.textContent === 'Play') play.click(); } catch(e){} }, 400);
     // the transport stops on the last frame and says Play again: start over
@@ -266,7 +300,7 @@ HASH_JS = """<script>
   function apply(){
     var h = (location.hash || '').replace(/^#/, ''), m = /^learn(?:=([A-Za-z]\\d+))?$/.exec(h);
     var dk = document.getElementById('dock'), pl = document.getElementById('paneL');
-    if(h.split('&').indexOf('embed') >= 0){ embed(); return; }
+    if(h.split('&').indexOf('embed') >= 0){ embed(h.split('&').indexOf('play') >= 0); return; }
     if(h === 'design'){
       // the canvas, not the course: the course remembers itself across visits, so a lesson
       // left open is folded away here -- the work on the canvas is untouched
@@ -287,17 +321,7 @@ body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"]
 body[data-embed="1"] main{height:100vh!important}
 </style>"""
 
-EXAMPLE_JS = """<script>
-(function(){
-  // Run: the example's own page, in embed mode, takes the button's place
-  document.addEventListener('click', function(ev){
-    var b = ev.target && ev.target.closest ? ev.target.closest('button.run') : null; if(!b) return;
-    var box = b.parentNode, f = document.createElement('iframe');
-    f.className = 'live'; f.src = box.getAttribute('data-src'); f.title = 'the example, running';
-    box.replaceChild(f, b);
-  });
-})();
-</script>"""
+EXAMPLE_JS = ""
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -408,7 +432,7 @@ def landing(ts: list[dict]) -> str:
                f'every rule passed{", R10 by the proved Lean checker" if _r10(row) else ""}. '
                f'Step through it &rarr;')
         page = f'board/{task["id"]}/{row["page"]}'
-        url = page + "#embed&step=2"
+        url = page + "#embed&play&step=2"
     else:
         cap, url, page = ex["what"], "board/", "board/"
     return ((HERE / "landing.html").read_text(encoding="utf-8")
@@ -441,6 +465,8 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                     f'<ul class="lessons">{items}</ul></div></div>')
     body.append("</div>")
     body.append("<h2>The reference</h2><div class=\"docs\">")
+    body.append('<a class="doc" href="../physics/"><span class="tag">background</span><b>The physics, from one trapped ion to the noise model</b>'
+                '<span>Traps, qubits, gates, transport, the control system, where the noise comes from and how this website simulates it.</span></a>')
     body.append('<a class="doc" href="../language/"><span class="tag">the language</span><b>Every statement, with a running example</b>'
                 '<span>The syntax, what each statement does to the machine, what it costs, and the IR beneath it.</span></a>')
     body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 23 rules, each with a programme that passes and one that fails</b>'
@@ -596,7 +622,7 @@ def _example_card(ex: dict, focus: str | None, root: str) -> str:
             f'<p class="why">{ex["why"]}</p>'
             f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
             f'<div class="verdict">{verdict}</div>'
-            f'<div class="runbox" data-src="{ex["page"]}#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
+            f'<div class="runbox"><iframe class="live" loading="lazy" src="{ex["page"]}#embed&amp;step=1" title="the example, on its page"></iframe></div>'
             f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
 
 
@@ -763,6 +789,107 @@ def _positions(cert: dict) -> dict:
     return pos
 
 
+GATE_LABELS = {"h": "H", "x": "X", "y": "Y", "z": "Z", "s": "S", "sdg": "S†", "t": "T", "tdg": "T†", "id": "I",
+               "sx": "√X", "sxdg": "√X†", "rx": "Rx", "ry": "Ry", "rz": "Rz", "u1": "U1", "p": "P", "u2": "U2", "u3": "U3", "u": "U"}
+
+
+def circuit_svg(ops: list[dict], n: int) -> str:
+    """The circuit as the textbook draws it: one wire per qubit, gates as boxes, cx as a
+    dot and a crossed circle, measurement as a meter.  Built from the certificate's
+    circuit_ops, which are the parsed input."""
+    cols = [0] * n
+    placed = []
+    for op in ops:
+        qs = list(op.get("qubits") or [])
+        if op["name"] == "barrier" and not qs:
+            qs = list(range(n))
+        if not qs:
+            continue
+        lo, hi = min(qs), max(qs)
+        col = max(cols[lo:hi + 1])
+        placed.append((col, op, qs))
+        for q in range(lo, hi + 1):
+            cols[q] = col + 1
+    ncol = max(cols) if placed else 1
+    W, H = 60 + 58 * ncol + 24, 44 * n + 14
+    y = lambda q: 26 + 44 * q
+    x = lambda c: 74 + 58 * c
+    out = [f'<svg class="qc" viewBox="0 0 {W} {H}" width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif,system-ui,sans-serif">']
+    for q in range(n):
+        out.append(f'<text x="10" y="{y(q) + 4}" font-size="12" fill="#52514e">q{q}</text>'
+                   f'<line x1="36" y1="{y(q)}" x2="{W - 12}" y2="{y(q)}" stroke="#1c2a4a" stroke-width="1.5"/>')
+    ink = "#1c2a4a"
+    for col, op, qs in placed:
+        cx_, name = x(col), op["name"]
+        params = op.get("params") or []
+        if name == "cx" and len(qs) == 2:
+            c, t = qs
+            out.append(f'<line x1="{cx_}" y1="{y(c)}" x2="{cx_}" y2="{y(t)}" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<circle cx="{cx_}" cy="{y(c)}" r="5" fill="{ink}"/>'
+                       f'<circle cx="{cx_}" cy="{y(t)}" r="10" fill="#fff" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<line x1="{cx_ - 10}" y1="{y(t)}" x2="{cx_ + 10}" y2="{y(t)}" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<line x1="{cx_}" y1="{y(t) - 10}" x2="{cx_}" y2="{y(t) + 10}" stroke="{ink}" stroke-width="1.5"/>')
+        elif name == "cz" and len(qs) == 2:
+            c, t = qs
+            out.append(f'<line x1="{cx_}" y1="{y(c)}" x2="{cx_}" y2="{y(t)}" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<circle cx="{cx_}" cy="{y(c)}" r="5" fill="{ink}"/><circle cx="{cx_}" cy="{y(t)}" r="5" fill="{ink}"/>')
+        elif name == "swap" and len(qs) == 2:
+            a, b = qs
+            out.append(f'<line x1="{cx_}" y1="{y(a)}" x2="{cx_}" y2="{y(b)}" stroke="{ink}" stroke-width="1.5"/>')
+            for q in (a, b):
+                out.append(f'<path d="M{cx_ - 7} {y(q) - 7}l14 14M{cx_ + 7} {y(q) - 7}l-14 14" stroke="{ink}" stroke-width="1.8" fill="none"/>')
+        elif name == "barrier":
+            out.append(f'<line x1="{cx_}" y1="{y(min(qs)) - 16}" x2="{cx_}" y2="{y(max(qs)) + 16}" stroke="#8a8985" stroke-width="1.5" stroke-dasharray="4 3"/>')
+        elif name == "measure":
+            q = qs[0]
+            out.append(f'<rect x="{cx_ - 19}" y="{y(q) - 14}" width="38" height="28" rx="3" fill="#fff" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<path d="M{cx_ - 11} {y(q) + 7}a11 11 0 0 1 22 0" fill="none" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<line x1="{cx_}" y1="{y(q) + 7}" x2="{cx_ + 8}" y2="{y(q) - 6}" stroke="{ink}" stroke-width="1.5"/>')
+        elif name == "reset":
+            q = qs[0]
+            out.append(f'<rect x="{cx_ - 19}" y="{y(q) - 14}" width="38" height="28" rx="3" fill="#fff" stroke="{ink}" stroke-width="1.5"/>'
+                       f'<text x="{cx_}" y="{y(q) + 4}" font-size="12" text-anchor="middle" fill="{ink}">|0⟩</text>')
+        else:
+            label = GATE_LABELS.get(name, name.upper())
+            if params:
+                label += "(" + ",".join(f"{float(v):.2f}".rstrip("0").rstrip(".") for v in params) + ")"
+            w = max(38, 8 + 7 * len(label))
+            fs = 12 if len(label) <= 5 else 10.5
+            for q in qs:
+                out.append(f'<rect x="{cx_ - w / 2}" y="{y(q) - 14}" width="{w}" height="28" rx="3" fill="#fff" stroke="{ink}" stroke-width="1.5"/>'
+                           f'<text x="{cx_}" y="{y(q) + 4}" font-size="{fs}" text-anchor="middle" fill="{ink}" font-weight="600">{html.escape(label)}</text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _gate_row(g: dict, page: str) -> str:
+    v, r, c, m = g["verdict"], g["rules"], g["cert"], g["meta"]
+    final = _positions(c)
+    mapping = "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion, "?")}</td><td>{final.get(ion, "?")}</td></tr>'
+                      for q, ion in sorted(c.get("map", {}).items(), key=lambda kv: int(kv[0])))
+    pulses = "".join(f'<code>op {w["dag"]} at {w["site"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c.get("gates") or [])
+    if not pulses:
+        pulses = '<span style="color:var(--ink3)">no pulses: nothing for a tableau to compose, and no witness needed</span>'
+    n_pass, failed = len(r.get("passed", [])), r.get("failed", [])
+    badges = [f'<span class="badge {"ok" if not failed else "bad"}">{n_pass} rules passed{(", " + ", ".join(failed) + " failed") if failed else ""}</span>',
+              f'<span class="badge {"ok" if v.get("R10") == "passed" else "bad"}">R10 {v.get("R10", "?")}</span>',
+              f'<span class="badge lean">O1 Lean: {v.get("lean", "?")}</span>',
+              f'<span class="badge {"ok" if str(v.get("o2_semantics", "")).startswith("ok") else "bad"}">O2: {html.escape(str(v.get("o2_semantics", "?")))}</span>']
+    body = g["qasm"].split("creg c[2];\n", 1)[-1].strip()
+    return (f'<section class="gaterow" id="{g["id"]}"><h3><code>{html.escape(body.splitlines()[0])}</code> <span class="st">{m["note"]}</span></h3>'
+            f'<div class="gr"><div>'
+            f'<div class="lab">the circuit</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}'
+            f'<div class="lab">input</div><pre><code>{html.escape(body)}</code></pre>'
+            f'<div class="lab">ion mapping</div><table class="kv"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>{mapping}</table>'
+            f'<div class="lab">pulses witnessed</div><div class="pulses">{pulses}</div>'
+            f'<div class="lab">verdict &middot; {html.escape(str(v.get("method", "")))}</div><div class="badges">{"".join(badges)}</div>'
+            f'<a class="open" href="{page}#step=1">open the page, with the circuit beside the programme</a></div>'
+            f'<div><div class="lab">the machine: press Play, or step it</div>'
+            f'<div class="runbox tall"><iframe class="live" loading="lazy" src="{page}#embed&amp;step=1" title="{html.escape(m["title"])}, compiled, on its page"></iframe></div>'
+            f'<div class="lab">hardware programme ({len(g["tsir"]["instructions"])} instructions, cooled)</div><pre><code>{html.escape(_listing(g["tsir"], c))}</code></pre>'
+            f'</div></div></section>')
+
+
 def _gate_card(g: dict, page: str) -> str:
     v, r, c, m = g["verdict"], g["rules"], g["cert"], g["meta"]
     final = _positions(c)
@@ -808,7 +935,9 @@ def compilation_page(built: list[dict]) -> str:
                 "<div class=\"tw\"><table><thead><tr><th>gates</th><th>accepted</th><th>lowered to</th></tr></thead><tbody>"
                 + "".join(f"<tr><td>{a}</td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in QASM_GATES) + "</tbody></table></div>")
     if bell:
-        body.append(f'<pre><code>{html.escape(bell["qasm"].strip())}</code></pre>')
+        c = bell["cert"]
+        body.append(f'<div class="two"><pre><code>{html.escape(bell["qasm"].strip())}</code></pre>'
+                    f'<div><div class="lab">the same circuit, drawn</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}</div></div>')
     # the pipeline
     stages = [
         ("Parse", "circuit_ops, a DAG", "the QASM becomes a list of operations with their qubits, parameters and source lines, and the per-qubit order between them; a second front end in Python agrees on 507 of 507 test circuits."),
@@ -841,8 +970,8 @@ def compilation_page(built: list[dict]) -> str:
                     "pulse the compiler emitted but did not witness, or witnessed but did not emit, is caught.</p><div class=\"pulses\">"
                     + "".join(f'<code>op {w["dag"]} ({c["circuit_ops"][w["dag"]]["name"]}) at {w["site"]}, instruction #{w["instr"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c["gates"])
                     + f'</div><p class="sub">Verdict for the Bell pair: rules {len(bell["rules"].get("passed", []))} passed; R10 <b style="color:#0b7a4b">{v.get("R10")}</b> &mdash; {html.escape(str(v.get("R10_reason", "")))}.</p>')
-        body.append(f'<div class="ex pass" style="max-width:720px"><span class="tag">runs</span><p class="why">The compiled Bell pair on the six-site ring, the circuit stepping beside the programme.</p>'
-                    f'<div class="runbox" data-src="ex/bell.html#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
+        body.append(f'<div class="ex pass" style="max-width:820px"><span class="tag">runs</span><p class="why">The compiled Bell pair on the six-site ring: press Play, or step it. The full page shows the circuit stepping beside the programme.</p>'
+                    f'<div class="runbox tall"><iframe class="live" loading="lazy" src="ex/bell.html#embed&amp;step=1" title="the Bell pair, on its page"></iframe></div>'
                     f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
     # every basic gate
     body.append("<h2 id=\"gates\">Every basic gate, compiled and verified</h2>"
@@ -850,7 +979,7 @@ def compilation_page(built: list[dict]) -> str:
                 "programme it became, the ion mapping, the pulses witnessed, and the verdicts of the rules and of R10's two "
                 "halves. The gates that need no laser show a lone frame update; the two-qubit gates show the transport that "
                 "brings the ions together; the non-Clifford ones are checked against the exact unitary.</p>")
-    body.append('<div class="gates">' + "".join(_gate_card(g, f'ex/{g["id"]}.html') for g in built if g["id"] != "bell") + "</div>")
+    body.append("".join(_gate_row(g, f'ex/{g["id"]}.html') for g in built if g["id"] != "bell"))
     if not built:
         body.append('<p class="note">No compiled examples in this build: <code>python -m qccd.site.compile_examples</code> '
                     'writes them with the OCaml compiler and the Lean checker, and the site build reads them.</p>')
@@ -899,6 +1028,115 @@ def doc_page(name: str, d: dict) -> str:
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
 
+
+# ------------------------------------------------------------------------- physics, people, publications
+
+def _phys_link(target: str) -> str:
+    """Links in `physics.md`: a reference doc by its file name (`adl.md`) goes to its page,
+    a site path (`../rules/#R7`) is kept as written, anything else goes to the repository."""
+    if re.match(r"^(https?:|#|mailto:|\.\./)", target):
+        return target
+    path, _, frag = target.partition("#")
+    frag = f"#{frag}" if frag else ""
+    stem = Path(path).name[:-3] if path.endswith(".md") else None
+    if stem in DOC_NAMES:
+        return f"../docs/{stem}/{frag}"
+    return f"{REPO}/blob/main/{path}{frag}"
+
+
+def render_physics() -> dict:
+    """`qccd/site/physics.md` through the docs renderer: the same hover vocabulary, the
+    same anchors, one table of contents from its `##` headings."""
+    r = Renderer(hints(), _phys_link)
+    body = r.render((HERE / "physics.md").read_text(encoding="utf-8"))
+    title = html.unescape(re.sub(r"<[^>]+>", "", r.headings[0][2])) if r.headings else "Physics background"
+    toc = "".join(f'<li><a href="#{sid}">{text}</a></li>' for lvl, sid, text in r.headings if lvl == 2)
+    return {"title": title, "body": body, "toc": toc, "headings": r.headings}
+
+
+def physics_page(d: dict) -> str:
+    body = (f'<p class="sub"><a href="../learn/">Learn</a> &rsaquo; background &middot; '
+            f'<a href="{REPO}/blob/main/qccd/site/physics.md">qccd/site/physics.md</a></p>'
+            f'<ul class="toc">{d["toc"]}</ul>{d["body"]}')
+    return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
+
+
+def people_page() -> str:
+    """One card per person, grouped; then the three institutions with their marks."""
+    ids = [g for g, _, _ in PEOPLE_GROUPS]
+    group_of = lambda p: p.get("group") if p.get("group") in ids else ids[-1]
+    body = ["<h1>People</h1>",
+            '<p class="sub">Who takes part in the project. The work is led by a collaboration between UCLA and '
+            'UC Berkeley and funded by the Challenge Institute for Quantum Computation, an NSF Quantum Leap '
+            'Challenge Institute.</p>']
+    for gid, gtitle, gblurb in PEOPLE_GROUPS:
+        mine = [p for p in PEOPLE if group_of(p) == gid]
+        if not mine:
+            continue
+        body.append(f'<h2 id="{gid}">{html.escape(gtitle)}</h2><p class="sub">{html.escape(gblurb)}</p><div class="folk">')
+        for p in mine:
+            links = "".join(f'<a href="{html.escape(u)}">{html.escape(k)}</a>' for k, u in (p.get("links") or {}).items())
+            # an empty field leaves no empty box behind
+            body.append(f'<div class="person" id="{slug(p["name"])}"><b>{html.escape(p["name"])}</b>'
+                        + (f'<div class="role">{html.escape(p["role"])}</div>' if p.get("role") else "")
+                        + (f'<div class="aff">{html.escape(p["affiliation"])}</div>' if p.get("affiliation") else "")
+                        + (f'<p>{html.escape(p["about"])}</p>' if p.get("about") else "")
+                        + (f'<div class="links">{links}</div>' if links else "") + "</div>")
+        body.append("</div>")
+    body.append('<h2 id="institutions">Institutions</h2><div class="inst">')
+    for i in INSTITUTIONS:
+        body.append(f'<a href="{i["url"]}"><img src="../static/{i["logo"]}" alt="{html.escape(i["short"])}">'
+                    f'<div><b>{html.escape(i["name"])}</b><span>{html.escape(i["what"])}</span></div></a>')
+    body.append("</div>")
+    body.append(f'<p class="note">{Renderer({}, lambda t: t).inline(JOIN, hint=False)} '
+                f'<a href="{REPO}/graphs/contributors">Contributors on GitHub &rarr;</a></p>')
+    return PAGE.format(title="People - QCCD studio", style=STYLE, extra_css="", body="\n".join(body))
+
+
+def _pub_links(p: dict) -> str:
+    out = []
+    if p.get("arxiv"):
+        out.append(f'<a href="https://arxiv.org/abs/{p["arxiv"]}">arXiv:{p["arxiv"]}</a>')
+    if p.get("doi"):
+        out.append(f'<a href="https://doi.org/{p["doi"]}">doi:{p["doi"]}</a>')
+    if p.get("url"):
+        out.append(f'<a href="{html.escape(p["url"])}">{html.escape(p.get("url_label", "link"))}</a>')
+    return "".join(out)
+
+
+def _authors(a: list[str]) -> str:
+    if not a:
+        return ""
+    return html.escape(a[0] if len(a) == 1 else ", ".join(a[:-1]) + " and " + a[-1])
+
+
+def publications_page() -> str:
+    """The papers by group, each with where it enters the site; then how to cite the tool."""
+    body = ["<h1>Publications</h1>",
+            '<p class="sub">The papers this website is built on, grouped by what each one contributes, and how to '
+            'cite the website itself. Every number in the default device document names one of these as its '
+            'source; the <a href="../physics/">Physics background</a> page says where each enters.</p>',
+            '<ul class="toc2">' + "".join(f'<li><a href="#{gid}">{html.escape(t)}</a></li>' for gid, t, _ in PUB_GROUPS
+                                          if any(p.get("group") == gid for p in PUBS))
+            + '<li><a href="#cite">Citing this website</a></li></ul>']
+    for gid, gtitle, gblurb in PUB_GROUPS:
+        mine = [p for p in PUBS if p.get("group") == gid]
+        if not mine:
+            continue
+        body.append(f'<h2 id="{gid}">{html.escape(gtitle)}</h2><p class="sub">{html.escape(gblurb)}</p><ul class="pubs">')
+        for p in mine:
+            year = f' ({p["year"]})' if p.get("year") else ""
+            used = f'<p class="use"><b>used for</b>{html.escape(p["used"])}</p>' if p.get("used") else ""
+            body.append(f'<li class="pub" id="{p["key"]}"><p class="ti">{html.escape(p["title"])}</p>'
+                        f'<p class="au">{_authors(p.get("authors", []))}</p>'
+                        f'<p class="ve">{html.escape(p.get("venue", ""))}{year}{_pub_links(p)}</p>{used}</li>')
+        body.append("</ul>")
+    body.append('<h2 id="cite">Citing this website</h2>'
+                f'<p class="sub">{html.escape(SOFTWARE["note"])}</p>'
+                f'<div class="cite"><pre><code>{html.escape(SOFTWARE["bibtex"])}</code></pre></div>')
+    return PAGE.format(title="Publications - QCCD studio", style=STYLE, extra_css="", body="\n".join(body))
+
+
 # ------------------------------------------------------------------------- build
 
 def favicon(size: int = 32) -> bytes:
@@ -937,6 +1175,7 @@ def build(out: Path) -> int:
     ts = tasks()
     parts, less = lessons()
     docs = render_docs()
+    phys = render_physics()
 
     # the search index, before any page is written: every page carries it
     index: list[dict] = [{"t": label, "d": blurb, "u": u, "k": "part"} for key, label, u, blurb in PARTS]
@@ -951,6 +1190,16 @@ def build(out: Path) -> int:
                "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
     index += [{"t": f"compile {title}", "d": note[:90], "u": f"compilation/#{gid}", "k": "compiled"} for gid, body, title, note in GATES]
     index.append({"t": "Compilation", "d": "from QASM to hardware instructions, and how R10 is decided", "u": "compilation/", "k": "page"})
+    index.append({"t": "Physics background", "d": "from trapping one ion to the noise model, and how the website simulates it",
+                  "u": "physics/", "k": "page"})
+    index += [{"t": html.unescape(re.sub(r"<[^>]+>", "", text)), "d": "Physics background",
+               "u": f"physics/#{sid}", "k": "physics"} for lvl, sid, text in phys["headings"] if lvl == 2]
+    index.append({"t": "People", "d": "who takes part in the project", "u": "people/", "k": "page"})
+    index += [{"t": p["name"], "d": " \u00b7 ".join(x for x in (p.get("role"), p.get("affiliation")) if x),
+               "u": f"people/#{slug(p['name'])}", "k": "person"} for p in PEOPLE]
+    index.append({"t": "Publications", "d": "the papers this website is built on, and how to cite it", "u": "publications/", "k": "page"})
+    index += [{"t": p["title"], "d": (p.get("venue", "") + (" \u00b7 " if p.get("venue") else "") + (p.get("used") or ""))[:110],
+               "u": f"publications/#{p['key']}", "k": "paper"} for p in PUBS]
     for t in ts:
         index.append({"t": t["title"], "d": f"leaderboard · {len(t['rows'])} designs", "u": f"board/{t['id']}/", "k": "task"})
         for r in t["rows"]:
@@ -983,6 +1232,9 @@ def build(out: Path) -> int:
     for name in DOC_NAMES:
         put(f"docs/{name}/index.html", doc_page(name, docs[name]), 2, "learn")
     put("discuss/index.html", discuss_page(), 1, "discuss")
+    put("physics/index.html", physics_page(phys), 1, "physics")
+    put("people/index.html", people_page(), 1, "people")
+    put("publications/index.html", publications_page(), 1, "publications")
     lang, rules = build_examples(out, put)
     put("language/index.html", language_page(lang), 1, "language")
     put("rules/index.html", rules_page(rules), 1, "rules")
