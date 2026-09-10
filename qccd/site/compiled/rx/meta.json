@@ -1,0 +1,8 @@
+{
+ "id": "rx",
+ "title": "rx(\u03b8)",
+ "note": "an arbitrary angle about x: u3(\u03b8, \u2212\u03c0/2, \u03c0/2)",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "compile_seconds": 0.17,
+ "check_seconds": 1.8
+}

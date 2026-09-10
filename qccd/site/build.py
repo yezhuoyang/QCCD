@@ -28,6 +28,7 @@ import re
 import shutil
 from pathlib import Path
 
+from .compile_examples import GATES, OUT as COMPILED, load_compiled
 from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, machine, rule_meta
 from .md import Renderer, hints
 
@@ -190,6 +191,24 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .contract{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 0} .contract div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff}
 .contract b{display:block;margin-bottom:2px} .contract .ok b{color:#0b7a4b} .contract .bad b{color:#c62828} .contract .skip b{color:#52514e} .contract .partial b{color:#b26a00}
 @media (max-width:860px){.two,.pair{grid-template-columns:1fr}.contract{grid-template-columns:1fr 1fr}}
+/* compilation: the pipeline and the compiled gates */
+.stages{counter-reset:st;list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
+.stages li{display:grid;grid-template-columns:34px 190px 1fr;gap:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.stages li:before{counter-increment:st;content:counter(st);width:26px;height:26px;border-radius:13px;background:#1c2a4a;color:#fff;font-weight:700;font-size:12.5px;display:flex;align-items:center;justify-content:center}
+.stages b{color:#1c2a4a} .stages .art{color:var(--ink3);font-size:12px;display:block;margin-top:2px}
+.stages .out{font-size:12.5px;color:var(--ink2)} .stages .out code{font-size:11.5px}
+.gates{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:8px 0 0}
+.gate{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px}
+.gate h4{margin:0 0 4px;font-size:15px} .gate h4 code{font-size:14px;background:none;padding:0;color:#1c2a4a}
+.gate .note{margin:0 0 8px;font-size:12.5px;color:var(--ink2);border:0;padding:0;background:none}
+.gate pre{margin:0 0 6px;font-size:11.5px;padding:8px 10px;background:#f7f6f2;overflow-x:auto}
+.gate .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:8px 0 2px}
+.gate .badges{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px}
+.badge{font-size:11.5px;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
+.badge.ok{background:#e6f4ec;color:#0b7a4b} .badge.bad{background:#fbe9e7;color:#c62828} .badge.lean{background:#eef3fb;color:#2a78d6}
+.gate .runbox iframe.live{height:300px}
+.kv{font-size:12.5px;border-collapse:collapse} .kv td{padding:2px 12px 2px 0;border:0;vertical-align:top} .kv td:first-child{color:var(--ink3)}
+.pulses code{display:block;font-size:11.5px;background:#f7f6f2;padding:2px 6px;border-radius:4px;margin:2px 0}
 """
 
 
@@ -426,6 +445,8 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                 '<span>The syntax, what each statement does to the machine, what it costs, and the IR beneath it.</span></a>')
     body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 23 rules, each with a programme that passes and one that fails</b>'
                 '<span>The verifier\'s own verdicts, runnable here.</span></a>')
+    body.append('<a class="doc" href="../compilation/"><span class="tag">compilation</span><b>From QASM to hardware instructions, verified</b>'
+                '<span>The pipeline on a Bell pair, then every basic gate compiled, mapped, witnessed and checked.</span></a>')
     for name in DOC_NAMES:
         body.append(f'<a class="doc" href="../docs/{name}/"><span class="tag">{DOC_TAGS[name]}</span>'
                     f'<b>{html.escape(docs[name]["title"])}</b><span>{DOC_BLURBS[name]}</span></a>')
@@ -697,6 +718,180 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
     return lang, rules
 
 
+# ---------------------------------------------------------------- compilation
+
+QASM_GATES = [("single-qubit, via u3(&theta;, &phi;, &lambda;)", "id x y z h s sdg t tdg sx sxdg rx ry rz u1 p u2 u3 u",
+               "one frame update VZ(&lambda;) and one beam R(&theta;, &phi;); when &theta; is 0 the frame update carries the whole gate and the beam has angle 0"),
+              ("two-qubit", "cx cz cy ch swap cu1 cp", "cx is the primitive: R, MS(&pi;/2), R, R, R; the others are cx with single-qubit gates around it"),
+              ("three-qubit", "ccx", "the standard six-CNOT decomposition"),
+              ("non-unitary", "measure reset barrier", "readout and preparation in a zone with SPAM; barrier orders, and costs nothing")]
+
+
+def _listing(prog: dict, cert: dict) -> str:
+    """The hardware programme as one line per instruction, with the circuit op it serves."""
+    ops = {op["i"]: op for op in cert.get("circuit_ops", [])}
+    lines = []
+    for ins in prog["instructions"]:
+        t = ins["type"]
+        if t == "init":
+            body = "init " + ", ".join(f'{k}@{v}' for k, v in (ins.get("placement") or {}).items())
+        elif t == "simd":
+            ps = ins.get("participants") or []
+            body = f'{ins.get("class", "simd")} ' + ", ".join(f'{q["ion"]} {q["from"]}→{q["to"]}' for q in ps)
+            if ins.get("template"):
+                body = f'{ins.get("class", "simd")} rotate {ins["template"].get("loop")} by {ins["template"].get("delta")}'
+        elif t == "gate":
+            who = ",".join(ins.get("ions") or []) or ",".join(",".join(pr) for pr in (ins.get("pairs") or []))
+            body = f'gate {ins.get("gate")} {who} @{",".join(ins.get("sites") or [])}'
+        elif t == "cool":
+            body = "cool " + ("all" if ins.get("broadcast") else ",".join(ins.get("ions") or []))
+        else:
+            body = f'{t} ' + ",".join(ins.get("ions") or [])
+        op = (ins.get("meta") or {}).get("op")
+        tail = ""
+        if op:
+            names = [f'{i} {ops[i]["name"]}' if i in ops else str(i) for i in op]
+            tail = f'   ← op {", ".join(names)}'
+        lines.append(f'#{ins["id"]:<3} {body}{tail}')
+    return "\n".join(lines)
+
+
+def _positions(cert: dict) -> dict:
+    pos = dict(cert.get("init") or {})
+    for mv in cert.get("moves") or []:
+        pos[mv["ion"]] = mv["to"]
+    return pos
+
+
+def _gate_card(g: dict, page: str) -> str:
+    v, r, c, m = g["verdict"], g["rules"], g["cert"], g["meta"]
+    final = _positions(c)
+    mapping = "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion, "?")}</td><td>{final.get(ion, "?")}</td></tr>'
+                      for q, ion in sorted(c.get("map", {}).items(), key=lambda kv: int(kv[0])))
+    pulses = "".join(f'<code>op {w["dag"]} at {w["site"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c.get("gates") or [])
+    if not pulses:
+        pulses = '<span style="color:var(--ink3)">no pulses: nothing for a tableau to compose, and no witness needed</span>'
+    n_pass, failed = len(r.get("passed", [])), r.get("failed", [])
+    badges = [f'<span class="badge {"ok" if not failed else "bad"}">{n_pass} rules passed{(", " + ", ".join(failed) + " failed") if failed else ""}</span>',
+              f'<span class="badge {"ok" if v.get("R10") == "passed" else "bad"}">R10 {v.get("R10", "?")}</span>',
+              f'<span class="badge lean">O1 Lean: {v.get("lean", "?")}</span>',
+              f'<span class="badge {"ok" if str(v.get("o2_semantics", "")).startswith("ok") else "bad"}">O2: {html.escape(str(v.get("o2_semantics", "?")))}</span>']
+    body = g["qasm"].split("creg c[2];\n", 1)[-1].strip()
+    return (f'<div class="gate" id="{g["id"]}"><h4><code>{html.escape(body.splitlines()[0] if g["id"] != "bell" else "h; cx; measure")}</code></h4>'
+            f'<p class="note">{m["note"]}</p>'
+            f'<div class="lab">input</div><pre><code>{html.escape(body)}</code></pre>'
+            f'<div class="lab">hardware programme ({len(g["tsir"]["instructions"])} instructions, cooled)</div><pre><code>{html.escape(_listing(g["tsir"], c))}</code></pre>'
+            f'<div class="lab">ion mapping</div><table class="kv"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>{mapping}</table>'
+            f'<div class="lab">pulses witnessed</div><div class="pulses">{pulses}</div>'
+            f'<div class="lab">verdict &middot; {html.escape(str(v.get("method", "")))}</div><div class="badges">{"".join(badges)}</div>'
+            f'<div class="runbox" data-src="{page}#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
+            f'<a class="open" href="{page}#step=1">open the page, with the circuit beside the programme</a></div>')
+
+
+def compilation_page(built: list[dict]) -> str:
+    by = {g["id"]: g for g in built}
+    bell = by.get("bell")
+    body = ["<h1>Compilation</h1>",
+            "<p class=\"sub\">A circuit comes in as OpenQASM and leaves as a hardware programme in the "
+            "<a href=\"../language/\">language</a> the machine runs, together with a certificate. The compiler is "
+            "not trusted: everything it emits is replayed against the <a href=\"../rules/\">rules</a>, and R10, "
+            "<i>the programme implements the circuit</i>, is decided by a checker written and proved sound in Lean "
+            "plus a tableau composed from the emitted pulses. This page walks the pipeline on a Bell pair, then "
+            "compiles and verifies every basic gate on the same six-site ring, and each result can be run here.</p>"]
+    # the input
+    body.append("<h2 id=\"input\">The input</h2><p class=\"sub\">OpenQASM 2.0 with <code>qelib1.inc</code>. Every gate is lowered to the "
+                "native set of an ion trap: <b>R(&theta;, &phi;)</b>, one laser pulse; <b>VZ(&lambda;)</b>, a virtual "
+                "frame update that costs nothing; and <b>MS(&theta;)</b>, the M&oslash;lmer&ndash;S&oslash;rensen entangler on two "
+                "co-located ions. The lowering is two identities proved in Lean (<code>u3_decomp</code>, "
+                "<code>cx_decomp</code> in <code>Compiler/lean/QCCDC/Pulse/Decompose.lean</code>) and the OCaml table that "
+                "emits them is checked against the defining unitaries.</p>"
+                "<div class=\"tw\"><table><thead><tr><th>gates</th><th>accepted</th><th>lowered to</th></tr></thead><tbody>"
+                + "".join(f"<tr><td>{a}</td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in QASM_GATES) + "</tbody></table></div>")
+    if bell:
+        body.append(f'<pre><code>{html.escape(bell["qasm"].strip())}</code></pre>')
+    # the pipeline
+    stages = [
+        ("Parse", "circuit_ops, a DAG", "the QASM becomes a list of operations with their qubits, parameters and source lines, and the per-qubit order between them; a second front end in Python agrees on 507 of 507 test circuits."),
+        ("Lower", "pulses per op", "each single-qubit gate becomes u3(&theta;, &phi;, &lambda;) and then VZ(&lambda;) followed by R(&theta;, &phi;); cx becomes R, MS(&pi;/2), R, R, R; composites unfold to those."),
+        ("Place", "map, init", "qubits are bound to ions (<code>map</code>) and ions to sites (<code>init</code>): the ion mapping. Candidates from a greedy and a spectral placement are scored by weighted interaction distance and the better one kept."),
+        ("Route and schedule", "moves, layers", "ops are scheduled in DAG layers; every two-qubit gate's operands are carried to one gate-capable trap. The general router moves one ion at a time along hops the device admits; on rings past about half occupancy the rigid-rotation pass turns the whole loop instead. Every move is recorded."),
+        ("Emit", "prog.tsir.json + prog.qcert.json", "the hardware programme in the language, every instruction stamped with the circuit op it serves (<code>meta.op</code>), and the certificate: the mapping, the moves, one witness per gate with its site, ions and pulses."),
+        ("Cool", "prog.cooled.tsir.json", "the cooling pass replays the programme under the heating model and inserts cooling where a gate would otherwise fire hot (R7)."),
+        ("Verify the rules", "rules.json", "the same verifier the studio runs replays the cooled programme and reports the 22 structural rules; R10 is what remains."),
+        ("Verify R10", "verdict.json", "<b>O1</b>: the certificate's moves are replayed from <code>init</code>; every gate must find its operands together in a trap that can gate, every hop must be one the device admits, every op witnessed exactly once and in order. The Lean checker <code>QCCDC.Cert.check</code> decides this, and <code>check_sound</code> proves that an accepted input implements the circuit. The device facts it judges against are re-derived from the architecture by code the compiler never runs. <b>O2</b>: the pulses are read out of the emitted programme, composed through the mapping into a stabilizer tableau and compared with the circuit's; outside the Clifford fragment an exact unitary is compared instead. A swapped operand, a dropped gate, a wrong angle or a mis-tracked frame all move the tableau."),
+        ("Draw", "the page", "the studio joins the programme and the circuit through the stamps, but only after checking every witness against the stamp on the instruction it names; a disagreement refuses to draw."),
+    ]
+    body.append("<h2 id=\"pipeline\">The pipeline</h2><ol class=\"stages\">" + "".join(
+        f'<li><div><b>{t}</b><span class="art">{a}</span></div><div class="out">{d}</div></li>' for t, a, d in stages) + "</ol>")
+    if bell:
+        c, v = bell["cert"], bell["verdict"]
+        final = _positions(c)
+        body.append("<h2 id=\"mapping\">The ion mapping, verified</h2>"
+                    "<p class=\"sub\">For the Bell pair the placer binds q0 and q1 to ions and seats them; the CNOT then needs "
+                    "both in one trap, so one ion travels round the loop to the other's dock. O1 recomputes every position "
+                    "from <code>init</code> and the move list and checks each gate's operands are where the witness says.</p>"
+                    "<div class=\"two\"><div><table class=\"kv\"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>"
+                    + "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion)}</td><td>{final.get(ion)}</td></tr>' for q, ion in sorted(c["map"].items(), key=lambda kv: int(kv[0])))
+                    + "</table><p class=\"sub\" style=\"margin-top:8px\">moves recorded: " + ", ".join(f'{m["ion"]} {m["from"]}→{m["to"]}' for m in c["moves"]) + "</p></div>"
+                    f'<div><pre><code>{html.escape(_listing(bell["tsir"], c))}</code></pre></div></div>')
+        body.append("<h2 id=\"pulses\">The pulse sequence, matched to the gate</h2>"
+                    "<p class=\"sub\">Each gate witness names the instruction that completes the op, the site, the ions and the "
+                    "pulses in time order. Two checks meet here: the lowering is a theorem (these pulses equal this gate, up "
+                    "to global phase), and O2 composes the pulses actually emitted back into the circuit's semantics, so a "
+                    "pulse the compiler emitted but did not witness, or witnessed but did not emit, is caught.</p><div class=\"pulses\">"
+                    + "".join(f'<code>op {w["dag"]} ({c["circuit_ops"][w["dag"]]["name"]}) at {w["site"]}, instruction #{w["instr"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c["gates"])
+                    + f'</div><p class="sub">Verdict for the Bell pair: rules {len(bell["rules"].get("passed", []))} passed; R10 <b style="color:#0b7a4b">{v.get("R10")}</b> &mdash; {html.escape(str(v.get("R10_reason", "")))}.</p>')
+        body.append(f'<div class="ex pass" style="max-width:720px"><span class="tag">runs</span><p class="why">The compiled Bell pair on the six-site ring, the circuit stepping beside the programme.</p>'
+                    f'<div class="runbox" data-src="ex/bell.html#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
+                    f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
+    # every basic gate
+    body.append("<h2 id=\"gates\">Every basic gate, compiled and verified</h2>"
+                "<p class=\"sub\">One circuit per gate on the same ring, through the same pipeline: the input, the hardware "
+                "programme it became, the ion mapping, the pulses witnessed, and the verdicts of the rules and of R10's two "
+                "halves. The gates that need no laser show a lone frame update; the two-qubit gates show the transport that "
+                "brings the ions together; the non-Clifford ones are checked against the exact unitary.</p>")
+    body.append('<div class="gates">' + "".join(_gate_card(g, f'ex/{g["id"]}.html') for g in built if g["id"] != "bell") + "</div>")
+    if not built:
+        body.append('<p class="note">No compiled examples in this build: <code>python -m qccd.site.compile_examples</code> '
+                    'writes them with the OCaml compiler and the Lean checker, and the site build reads them.</p>')
+    body.append("<h2 id=\"try\">Reproduce it</h2><p class=\"sub\">The same commands, from the repository root, on any circuit and device:</p>"
+                "<pre><code>python Compiler/bridge/export_arch.py arch/&lt;device&gt;.arch.json -o build/&lt;device&gt;.expanded.json\n"
+                "Compiler/ocaml/_build/default/bin/qccdc_cli.exe compile circuit.qasm --arch build/&lt;device&gt;.expanded.json -o build/out\n"
+                "python Compiler/bridge/insert_cooling.py build/out.tsir.json --arch arch/&lt;device&gt;.arch.json -o build/out.cooled.tsir.json\n"
+                "python Compiler/bridge/check_tsir.py build/out.cooled.tsir.json --arch arch/&lt;device&gt;.arch.json --model corrected\n"
+                "python Compiler/bridge/mk_qcheck_input.py build/out --arch build/&lt;device&gt;.expanded.json -o build/out.qcheck.json\n"
+                "python Compiler/bridge/check_cert.py build/out --qasm circuit.qasm --arch arch/&lt;device&gt;.arch.json --qcheck build/out.qcheck.json\n"
+                "python -m qccd studio --tsir build/out.cooled.tsir.json --qasm circuit.qasm --cert build/out.qcert.json</code></pre>"
+                "<p class=\"sub\">Phase 2 of the plan brings the compiler itself into the browser, so the Design page can do this without a command line.</p>")
+    return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
+                       body="\n".join(body) + EXAMPLE_JS)
+
+
+def build_compiled_pages(out: Path, put) -> list[dict]:
+    """Every compiled example as the page the studio opens on it: the cooled programme,
+    the circuit beside it through the checked source map."""
+    from ..arch import Architecture
+    from ..cost import corrected_model
+    from ..ir.source_map import build as build_source
+    from ..ir.tsir import TSIR
+    from ..verify import verify
+    from ..viz.render import render_html
+    built = load_compiled()
+    if not built:
+        return built
+    arch = Architecture.from_json(json.loads((COMPILED / "ring6d.arch.json").read_text(encoding="utf-8")))
+    model = corrected_model()
+    for g in built:
+        prog = TSIR.load(g["dir"] / "prog.cooled.tsir.json")
+        source = build_source(prog, g["cert"], g["dir"] / "circuit.qasm")
+        res = verify(prog, arch, model, check_metrics=False).result
+        rel = f"compilation/ex/{g['id']}.html"
+        render_html(arch, prog, res, model, out / rel, kicker="COMPILED", headline=f'{g["meta"]["title"]} on ring6d',
+                    lede=g["meta"]["note"], source=source, open_pane="Q")
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "compilation", app=True, extra=HASH_JS)
+    return built
+
+
 def doc_page(name: str, d: dict) -> str:
     body = (f'<p class="sub"><a href="../../learn/">Learn</a> &rsaquo; reference &middot; '
             f'<a href="{REPO}/blob/main/docs/{name}.md">docs/{name}.md</a></p>'
@@ -754,6 +949,8 @@ def build(out: Path) -> int:
     index += [{"t": f"p.{v['verb']}", "d": v["what"][:90], "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
     index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": "a rule, with a passing and a failing programme",
                "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
+    index += [{"t": f"compile {title}", "d": note[:90], "u": f"compilation/#{gid}", "k": "compiled"} for gid, body, title, note in GATES]
+    index.append({"t": "Compilation", "d": "from QASM to hardware instructions, and how R10 is decided", "u": "compilation/", "k": "page"})
     for t in ts:
         index.append({"t": t["title"], "d": f"leaderboard · {len(t['rows'])} designs", "u": f"board/{t['id']}/", "k": "task"})
         for r in t["rows"]:
@@ -789,6 +986,9 @@ def build(out: Path) -> int:
     lang, rules = build_examples(out, put)
     put("language/index.html", language_page(lang), 1, "language")
     put("rules/index.html", rules_page(rules), 1, "rules")
+    compiled = build_compiled_pages(out, put)
+    put("compilation/index.html", compilation_page(compiled), 1, "compilation")
+    print(f"  compilation  {len(compiled)} compiled examples")
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
     put("board/index.html", board_index(ts), 1, "board")

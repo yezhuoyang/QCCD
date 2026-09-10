@@ -370,7 +370,15 @@ head, tools bar, rail, dock and study card away and loops the transport), linkin
 entry at `#step=2`; a GIF was tried first and dropped because the user wants what the page shows; Learn is one row per part
 with a pictogram and a sentence each, then the four docs as cards and the fastest verified round
 of every task; the board is one row per task with the designs as bars coloured by family, the
-fastest verified in green, refusals and rule failures in red, and four stat tiles. Two expert pages were added on request (2026-09-10): **Language** (`language/`), the hardware
+fastest verified in green, refusals and rule failures in red, and four stat tiles. A third expert page, **Compilation** (`compilation/`, 2026-09-10): the accepted QASM gates and
+the native set they lower to, the pipeline in nine stages (parse, lower, place, route, emit, cool,
+rules, R10's two halves, draw), the Bell pair's ion mapping and pulse witnesses, and every basic
+gate compiled onto the six-site ring and verified — the hardware programme, the mapping, the
+pulses, the rules and R10 by the Lean checker and the tableau or exact unitary — each runnable
+with the circuit beside the programme. The artefacts come from the real toolchain once, by
+`python -m qccd.site.compile_examples` (OCaml compiler, cooling pass, check_tsir, mk_qcheck_input,
+check_cert with qcheck), and live in `qccd/site/compiled/` (410 KB) so the site build needs no
+toolchain. Two expert pages were added on request (2026-09-10): **Language** (`language/`), the hardware
 language in PL style — an EBNF of the Write pane's syntax, the machine state and its transitions,
 and every one of the twelve statements with its signature, meaning, cost, the rules that judge it,
 the IR it becomes, and a running example — and **Rules** (`rules/`), all 23 rules with the

@@ -1,0 +1,8 @@
+{
+ "id": "z",
+ "title": "z",
+ "note": "a phase flip: u3(0, 0, \u03c0), so the frame update carries the gate and the emitted beam has angle 0",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "compile_seconds": 0.07,
+ "check_seconds": 2.8
+}

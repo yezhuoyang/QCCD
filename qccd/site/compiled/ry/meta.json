@@ -1,0 +1,8 @@
+{
+ "id": "ry",
+ "title": "ry(\u03b8)",
+ "note": "u3(\u03b8, 0, 0): one beam",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "compile_seconds": 0.08,
+ "check_seconds": 1.6
+}

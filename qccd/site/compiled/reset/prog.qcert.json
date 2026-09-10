@@ -1,0 +1,1 @@
+{"version":1,"circuit":"circuit","arch":"ring6d","circuit_fnv1a":"8717a69f1b6236ec","arch_fnv1a":"","n_qubits":2,"circuit_ops":[{"i":0,"name":"reset","qubits":[0],"params":[],"line":5}],"map":{"0":"q0","1":"q1"},"init":{"q0":"A0","q1":"A3"},"moves":[],"gates":[],"rotations":[],"unrealised":[],"claims":{"cycles":2,"beams":0,"ms_gates":0,"frames":0}}
