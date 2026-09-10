@@ -266,7 +266,7 @@ their rows; then the site build is the only thing that renders them.
 
 | Phase | Delivers | Done when |
 |---|---|---|
-| **0 · Skeleton** | `python -m qccd site` producing landing, nav, `studio.html` with `#learn`/`#design`, docs rendered, the five boards from existing rows, giscus page; `site.yml` deploying to Pages | the site is live at its URL; every existing board entry opens from it; the Node harness passes on every built page; a screenshot walkthrough of the four parts |
+| **0 · Skeleton** | `python -m qccd site` producing landing, nav, `studio.html` with `#learn`/`#design`, docs rendered, the five boards from existing rows, giscus page; `site.yml` deploying to Pages | the site is live at https://qccd.academy/; every existing board entry opens from it; the Node harness passes on every built page; a screenshot walkthrough of the four parts |
 | **1 · Verify v1** | `verify.js`: the six rule twins, R10-basic with the tableau, `score()`; the verdict card; parity tests green over shipped devices and all 89 board entries | `qccd open` and the card agree on every entry; the R10-basic tableau agrees with stim on all five tasks; a deliberately broken programme is caught on the card |
 | **2 · Compile in the page** | `qccdc.js` via js_of_ocaml in a worker; Compile action; cooling and hop-BFS in JS with parity | compiling each task's circuit onto each seed device in the page gives byte-identical TSIR and certificate to the CLI |
 | **3 · Contribute** | `submission.json`, the issue form, `submission.yml` producing a PR, the entry page and badge | a submission made in a fresh browser appears on the board after merge with the verdicts CI recomputed |
@@ -285,11 +285,13 @@ in parallel sessions; 3 needs 1; 4 needs 2; 5 needs 4.
    sfplseucla.org behind one nginx. The site lives in `/var/www/qccd.academy`, owned by
    the user `qccd`; the nginx site is `/etc/nginx/sites-available/qccd.academy` (port 80
    now; certbot adds 443 once DNS points here). The domain is **qccd.academy**
-   (Namecheap); its A records for `@` and `www` must be set to 165.232.55.161 — today they
-   still point at the parking page. `site.yml` builds `site/`, runs the studio harness on
-   it, and rsyncs as `qccd` with the repository secret `DEPLOY_KEY` (the private half of
-   `~/.ssh/qccd_deploy` on the machine that set the server up); the host key is pinned in
-   the workflow. GitHub stays the back office: Issues, Discussions, Actions.
+   (Namecheap); its A records for `@` and `www` point at 165.232.55.161 since the same
+   evening, and certbot issued the certificate for both names (auto-renewing; HTTP
+   redirects to HTTPS). **The site is live at https://qccd.academy/.** `site.yml` builds
+   `site/`, runs the studio harness on it, and rsyncs as `qccd` with the repository secret
+   `DEPLOY_KEY` (the private half of `~/.ssh/qccd_deploy` on the machine that set the
+   server up); the host key is pinned in the workflow. GitHub stays the back office:
+   Issues, Discussions, Actions.
 2. **Submission channel.** Decided: issue form + Action-opened PR. A contributor needs a
    GitHub login and nothing else; the Action does the fork-free part.
 3. **R10 levels on the board.** Decided: three badges as in §5, all entries shown. The
@@ -374,10 +376,10 @@ under `SmallCode/` and `BBResults/` (`st.device` is null in the editor's node wa
 that is the studio's to fix, not the site's. **Not live:** hosting changed mid-phase
 (§10.1). **Then deployed the same evening** to the droplet by `tar` over SSH from this
 machine: nginx serves it for `qccd.academy` and `www.qccd.academy` on port 80, the deploy user
-and key exist, and the workflow can take over once `DEPLOY_KEY` is a repository secret. Until
-the A records move, the live copy is reachable only by resolving the name yourself
-(`node tests/site.mjs site --base http://qccd.academy/ --resolve qccd.academy=165.232.55.161`);
-HTTPS needs `certbot --nginx -d qccd.academy -d www.qccd.academy` after that. A clean export of the branch (`git archive`)
+and key exist, and the workflow can take over once `DEPLOY_KEY` is a repository secret. The A
+records were set the same evening, certbot issued the certificate, and **https://qccd.academy/
+answers**; `node tests/site.mjs site --base https://qccd.academy/` walks the live copy (108
+pages, 0 failures on the first walk, made with the name resolved locally before DNS moved). A clean export of the branch (`git archive`)
 builds and passes the studio harness, but without the course, the tools bar and the hover
 hints: `tutorial.js`, `RULE_HINTS` and the current `render.py`/`editor.js` are the studio
 session's uncommitted work, so a site built by CI from a checkout lacks them until that work
