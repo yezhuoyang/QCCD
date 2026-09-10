@@ -370,7 +370,17 @@ head, tools bar, rail, dock and study card away and loops the transport), linkin
 entry at `#step=2`; a GIF was tried first and dropped because the user wants what the page shows; Learn is one row per part
 with a pictogram and a sentence each, then the four docs as cards and the fastest verified round
 of every task; the board is one row per task with the designs as bars coloured by family, the
-fastest verified in green, refusals and rule failures in red, and four stat tiles. Every document page ends in a footer naming the UCLA and UC Berkeley collaboration and the
+fastest verified in green, refusals and rule failures in red, and four stat tiles. Two expert pages were added on request (2026-09-10): **Language** (`language/`), the hardware
+language in PL style — an EBNF of the Write pane's syntax, the machine state and its transitions,
+and every one of the twelve statements with its signature, meaning, cost, the rules that judge it,
+the IR it becomes, and a running example — and **Rules** (`rules/`), all 23 rules with the
+verifier's statement, what it checks, its sources, and a programme that passes and one that fails
+(or, for R7b, R10, R15 and R18, what the verifier honestly reports instead). Both live in
+`qccd/site/examples.py` as the records the Write pane produces, so the text shown is what ran;
+each example is rendered by `Machine.render` into a real page under `language/ex/` and
+`rules/ex/` (55 pages, 60 MB) and opens in place, in embed mode, from a Run button; the verdicts
+are quoted from `qccd.verify`, asking for the focus rule alone as the course does. The bar
+gained Language and Rules. Every document page ends in a footer naming the UCLA and UC Berkeley collaboration and the
 CIQC funding, with the three marks (`qccd/site/static/`, served as `static/`; asked for on
 2026-09-09 evening). `tasks/<id>/task.json` + `circuit.qasm` for the five tasks. `.github/workflows/site.yml`
 builds, runs `tests/studio.mjs` on the shipped studio, keeps `site` as an artefact and
