@@ -186,8 +186,6 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .verdict{font-size:12.5px;margin:0 0 8px} .verdict b.ok{color:#0b7a4b} .verdict b.bad{color:#c62828} .verdict b.skip{color:#52514e} .verdict b.partial{color:#b26a00}
 .verdict .m{display:block;color:var(--ink2);margin-top:2px} .verdict .nums{display:block;color:var(--ink3);margin-top:3px}
 .runbox{margin:6px 0 4px}
-.runbox button.run{font:inherit;font-size:13px;padding:6px 12px;border:1px solid #cfceca;border-radius:7px;background:#fff;cursor:pointer;color:var(--ink)}
-.runbox button.run:hover{border-color:var(--accent);color:var(--accent)}
 .runbox iframe.live{display:block;width:100%;height:300px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .ex .open{font-size:12px}
 .rule h3 .st{font-weight:400;color:var(--ink2);font-size:14px} .rule .checks{margin:0 0 4px;font-size:13.5px}
@@ -202,16 +200,8 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .stages li:before{counter-increment:st;content:counter(st);width:26px;height:26px;border-radius:13px;background:#1c2a4a;color:#fff;font-weight:700;font-size:12.5px;display:flex;align-items:center;justify-content:center}
 .stages b{color:#1c2a4a} .stages .art{color:var(--ink3);font-size:12px;display:block;margin-top:2px}
 .stages .out{font-size:12.5px;color:var(--ink2)} .stages .out code{font-size:11.5px}
-.gates{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:8px 0 0}
-.gate{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px}
-.gate h4{margin:0 0 4px;font-size:15px} .gate h4 code{font-size:14px;background:none;padding:0;color:#1c2a4a}
-.gate .note{margin:0 0 8px;font-size:12.5px;color:var(--ink2);border:0;padding:0;background:none}
-.gate pre{margin:0 0 6px;font-size:11.5px;padding:8px 10px;background:#f7f6f2;overflow-x:auto}
-.gate .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:8px 0 2px}
-.gate .badges{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px}
 .badge{font-size:11.5px;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
 .badge.ok{background:#e6f4ec;color:#0b7a4b} .badge.bad{background:#fbe9e7;color:#c62828} .badge.lean{background:#eef3fb;color:#2a78d6}
-.gate .runbox iframe.live{height:300px}
 .runbox.tall iframe.live{height:360px}
 .gaterow{border-top:1px solid var(--line);padding:20px 0 12px;scroll-margin-top:48px}
 .gaterow h3{margin:0 0 10px;font-size:16px} .gaterow h3 code{font-size:14px;background:none;padding:0;color:#1c2a4a} .gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:13.5px}
@@ -320,8 +310,6 @@ body[data-embed="1"] #sitenav,body[data-embed="1"] .head,body[data-embed="1"] #t
 body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"] #bbnow{display:none!important}
 body[data-embed="1"] main{height:100vh!important}
 </style>"""
-
-EXAMPLE_JS = ""
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -666,7 +654,7 @@ def language_page(built: dict) -> str:
                 "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">docs/tsir</a>; the device language "
                 "the programmes run on is <a href=\"../docs/adl/\">docs/adl</a>.</p>")
     return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
-                       body="\n".join(body) + EXAMPLE_JS)
+                       body="\n".join(body))
 
 
 def _sources(src: str) -> str:
@@ -711,7 +699,7 @@ def rules_page(built: dict) -> str:
             f'<p class="src">device: {R["device"]["about"]} &middot; cost model: {b.get("model", "corrected")} &middot; sources: {_sources(meta["sources"])}</p>'
             f'{note}<div class="pair">{cards}</div></section>')
     return PAGE.format(title="Rules - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
-                       body="\n".join(body) + EXAMPLE_JS)
+                       body="\n".join(body))
 
 
 def build_examples(out: Path, put) -> tuple[dict, dict]:
@@ -890,31 +878,6 @@ def _gate_row(g: dict, page: str) -> str:
             f'</div></div></section>')
 
 
-def _gate_card(g: dict, page: str) -> str:
-    v, r, c, m = g["verdict"], g["rules"], g["cert"], g["meta"]
-    final = _positions(c)
-    mapping = "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion, "?")}</td><td>{final.get(ion, "?")}</td></tr>'
-                      for q, ion in sorted(c.get("map", {}).items(), key=lambda kv: int(kv[0])))
-    pulses = "".join(f'<code>op {w["dag"]} at {w["site"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c.get("gates") or [])
-    if not pulses:
-        pulses = '<span style="color:var(--ink3)">no pulses: nothing for a tableau to compose, and no witness needed</span>'
-    n_pass, failed = len(r.get("passed", [])), r.get("failed", [])
-    badges = [f'<span class="badge {"ok" if not failed else "bad"}">{n_pass} rules passed{(", " + ", ".join(failed) + " failed") if failed else ""}</span>',
-              f'<span class="badge {"ok" if v.get("R10") == "passed" else "bad"}">R10 {v.get("R10", "?")}</span>',
-              f'<span class="badge lean">O1 Lean: {v.get("lean", "?")}</span>',
-              f'<span class="badge {"ok" if str(v.get("o2_semantics", "")).startswith("ok") else "bad"}">O2: {html.escape(str(v.get("o2_semantics", "?")))}</span>']
-    body = g["qasm"].split("creg c[2];\n", 1)[-1].strip()
-    return (f'<div class="gate" id="{g["id"]}"><h4><code>{html.escape(body.splitlines()[0] if g["id"] != "bell" else "h; cx; measure")}</code></h4>'
-            f'<p class="note">{m["note"]}</p>'
-            f'<div class="lab">input</div><pre><code>{html.escape(body)}</code></pre>'
-            f'<div class="lab">hardware programme ({len(g["tsir"]["instructions"])} instructions, cooled)</div><pre><code>{html.escape(_listing(g["tsir"], c))}</code></pre>'
-            f'<div class="lab">ion mapping</div><table class="kv"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>{mapping}</table>'
-            f'<div class="lab">pulses witnessed</div><div class="pulses">{pulses}</div>'
-            f'<div class="lab">verdict &middot; {html.escape(str(v.get("method", "")))}</div><div class="badges">{"".join(badges)}</div>'
-            f'<div class="runbox" data-src="{page}#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
-            f'<a class="open" href="{page}#step=1">open the page, with the circuit beside the programme</a></div>')
-
-
 def compilation_page(built: list[dict]) -> str:
     by = {g["id"]: g for g in built}
     bell = by.get("bell")
@@ -993,7 +956,7 @@ def compilation_page(built: list[dict]) -> str:
                 "python -m qccd studio --tsir build/out.cooled.tsir.json --qasm circuit.qasm --cert build/out.qcert.json</code></pre>"
                 "<p class=\"sub\">Phase 2 of the plan brings the compiler itself into the browser, so the Design page can do this without a command line.</p>")
     return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
-                       body="\n".join(body) + EXAMPLE_JS)
+                       body="\n".join(body))
 
 
 def build_compiled_pages(out: Path, put) -> list[dict]:
