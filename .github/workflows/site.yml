@@ -1,0 +1,59 @@
+# The website: built by `python -m qccd site`, checked, and copied to the server.
+#
+# Pure standard-library Python, so the build needs no install.  The check before the
+# deploy is the design-tool harness on the studio page the site ships -- the same
+# `tests/studio.mjs` the test suite drives -- so a page that lost its editor cannot go live.
+#
+# The site is static files; any web server serves the `site/` directory as it is.  The
+# deploy job rsyncs it over SSH and runs only when the repository has these set:
+#   variables  DEPLOY_HOST  DEPLOY_USER  DEPLOY_PATH   (Settings > Secrets and variables > Actions)
+#   secret     DEPLOY_KEY   a private key whose public half is in the server's authorized_keys
+# Without them the build still runs on every push and leaves `site` as a downloadable artefact.
+name: site
+on:
+  push:
+    branches: [main, 'website/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: site
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m qccd site
+      - run: node tests/studio.mjs site/studio.html | python -c "import json,sys; d=json.load(sys.stdin); assert not d.get('fatal'), d.get('fatal'); b=d.get('base', {}); assert b.get('ready', True), b.get('why'); print('studio ok:', b.get('lessons', 0), 'lessons')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+          retention-days: 7
+  deploy:
+    needs: build
+    if: ${{ vars.DEPLOY_HOST != '' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - name: rsync to the server
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER: ${{ vars.DEPLOY_USER }}
+          DEST: ${{ vars.DEPLOY_PATH }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy" site/ "$USER@$HOST:$DEST/"

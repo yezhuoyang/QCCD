@@ -1,0 +1,9 @@
+{
+  "repo": "yezhuoyang/QCCD",
+  "repo_id": "R_kgDOT-DJNA",
+  "categories": {
+    "Rules": {"id": "", "blurb": "Proposals to add, drop or reword a rule. Link the rule's anchor in the docs; the change itself is a pull request that touches docs/rules.md, rules.py, engine.js and the parity test together."},
+    "Bugs": {"id": "", "blurb": "Something the studio, the compiler or the checker got wrong. Attach the qccd.studio artifact the page exports; a reproducible one becomes an issue."},
+    "Features": {"id": "", "blurb": "What the platform should do next."}
+  }
+}
