@@ -367,7 +367,12 @@ walkthrough). `tests/studio.mjs` passes on `studio.html` and on 71 of the 89 ent
 the other 18 (the torus, cylinder and h3-ring variants) fail identically on the originals
 under `SmallCode/` and `BBResults/` (`st.device` is null in the editor's node walk), so
 that is the studio's to fix, not the site's. **Not live:** hosting changed mid-phase
-(§10.1) and no server is named yet; nothing is deployed.
+(§10.1) and no server is named yet; nothing is deployed. A clean export of the branch (`git archive`)
+builds and passes the studio harness, but without the course, the tools bar and the hover
+hints: `tutorial.js`, `RULE_HINTS` and the current `render.py`/`editor.js` are the studio
+session's uncommitted work, so a site built by CI from a checkout lacks them until that work
+is committed (138 search entries from the export against 169 here); the build tolerates
+their absence and the Learn page says so.
 
 **Learned.** (1) the studio's stylesheet quotes `<body data-explain>` in a comment, so a
 post-render injection must look for `<body` after `</head>`; (2) the studio defines
@@ -376,7 +381,8 @@ post-render injection must look for `<body` after `</head>`; (2) the studio defi
 dock; (4) the entry pages are 1.5–3 MB each, 137 MB in all — fine for a static host, and
 the reason the seed pages are a second, separable commit; (5) the hints are pure data in
 `editor.js`, so a regex reads them and no JSON export was needed; (6) the plan's
-"instruction cheat sheet" has no `OPS` table behind it yet — deferred to phase 1.
+"instruction cheat sheet" has no `OPS` table behind it yet — deferred to phase 1; (7) an
+unanchored `site/` in `.gitignore` also ignores `qccd/site/`, so the pattern is `/site/`.
 
 **For review.** the server (host, path, key); whether the seed pages may live in the
 repository (commit 2 of `website/0`; the site build reads them from `BBResults/` and
