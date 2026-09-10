@@ -100,17 +100,22 @@ async function shot(name) {
   fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(r.data, 'base64'));
 }
 
-const PROBE = `(function(){
+const PROBE = `(async function(){
+  function embedStatus(){ var f = document.querySelector('iframe.live'); if(!f) return null;
+    try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false;
+          var st = d.getElementById('status'); return st ? st.textContent : 'no status'; } catch(e){ return false; } }
+  var e1 = embedStatus(); if(e1) await new Promise(function(r){ setTimeout(r, 1500); }); var e2 = embedStatus();
   var nav = document.getElementById('sitenav');
   var cur = nav ? nav.querySelector('a[aria-current="page"]') : null;
   var sw = document.documentElement.scrollWidth, iw = document.documentElement.clientWidth;
   var hits = (window.SITENAV ? window.SITENAV.search('steane').length : -1);
   return { title: document.title, nav: !!nav, active: cur ? cur.textContent : null, search_hits: hits,
+           embed: e1, embed_moving: (e1 && e2) ? e1 !== e2 : null,
            wide: sw > iw + 1, sw: sw, iw: iw,
            over: Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){ var r = e.getBoundingClientRect(); return r.right > iw + 1 && r.width > 0; }).slice(0, 4).map(function(e){ return e.tagName + (e.id ? '#' + e.id : '') + '@' + Math.round(e.getBoundingClientRect().right); }),
            learn_on: (function(){ var p = document.getElementById('paneL'), d = document.getElementById('dock');
                        return p ? (/\\bon\\b/.test(p.className) && !(d && d.getAttribute('data-collapsed') === '1')) : null; })(),
-           logos: (function(){ var im = document.querySelectorAll('#sitefoot img, .clip img'); if(!im.length) return null; for(var i = 0; i < im.length; i++) if(!(im[i].complete && im[i].naturalWidth > 0)) return false; return im.length; })(),
+           logos: (function(){ var im = document.querySelectorAll('#sitefoot img'); if(!im.length) return null; for(var i = 0; i < im.length; i++) if(!(im[i].complete && im[i].naturalWidth > 0)) return false; return im.length; })(),
            lesson: (window.EDITOR && EDITOR.lessonState) ? EDITOR.lessonState().id : null,
            ready: (window.EDITOR && EDITOR.ready) ? EDITOR.ready() : null };
 })()`;
@@ -142,12 +147,15 @@ async function visit(rel, shotName) {
     await open(url);
     // a redirect page (design/) lands on the studio: give the second load its time
     const redirect = /http-equiv="refresh"/.test(fs.readFileSync(path.join(site, rel.split('#')[0]), 'utf8'));
-    if (isStudio || redirect) await new Promise(r => setTimeout(r, redirect ? 2500 : 800));
+    const embeds = /iframe class="live"/.test(fs.readFileSync(path.join(site, rel.split('#')[0]), 'utf8'));
+    if (isStudio || redirect || embeds) await new Promise(r => setTimeout(r, redirect ? 2500 : embeds ? 3000 : 800));
     if (shotName) await shot(shotName);
     probe = await evaluate(PROBE);
     if (!probe.nav) problems.push('no navigation bar');
     if (probe.search_hits < 1) problems.push('site search finds nothing for "steane"');
     if (probe.logos === false) problems.push('a footer logo did not load');
+    if (probe.embed === false) problems.push('the embedded page did not enter embed mode');
+    if (probe.embed && probe.embed_moving === false) problems.push('the embedded page is not playing: ' + probe.embed);
     if (probe.wide) problems.push('page scrolls sideways: ' + probe.sw + ' > ' + probe.iw + ' ' + JSON.stringify(probe.over));
     if (rel.includes('studio.html') && probe.ready === false) problems.push('editor not ready');
     if (/#learn(=|$)/.test(rel) && probe.learn_on !== true) problems.push('#learn did not open the Learn pane');
