@@ -131,6 +131,7 @@ const walkthrough = [
   ['studio.html#learn=B2', '04_studio_lesson_B2'], ['studio.html#design', '05_studio_design'],
   ['board/index.html', '06_board'], ['docs/rules/index.html', '09_docs_rules'], ['discuss/index.html', '10_discuss'],
   ['language/index.html', '11_language'], ['rules/index.html', '12_rules'],
+  ['compilation/index.html', '13_compilation'],
 ];
 const firstBoard = pages.find(p => /^board\/[^/]+\/index\.html$/.test(p));
 if (firstBoard) walkthrough.push([firstBoard, '07_board_task']);
@@ -183,7 +184,7 @@ const shotFor = new Map(walkthrough.map(([p, n]) => [p, n]));
 for (const rel of pages) await visit(rel, shotFor.get(rel) && !rel.includes('#') ? shotFor.get(rel) : null);
 for (const [p, n] of walkthrough) if (p.includes('#')) await visit(p, n);
 
-if (SHOTS) { await open(BASE + 'index.html'); await evaluate("window.SITENAV.search('steane')"); await shot('13_search'); }
+if (SHOTS) { await open(BASE + 'index.html'); await evaluate("window.SITENAV.search('steane')"); await shot('14_search'); }
 ws.close(); chrome.kill(); if (!LIVE) server.close();
 try { fs.rmSync(udd, { recursive: true, force: true }); } catch {}
 console.log(JSON.stringify({ pages: results.length, failed, shots: SHOTS ? walkthrough.length + 1 : 0 }));

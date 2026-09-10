@@ -1,0 +1,42 @@
+{
+ "program": "circuit+cooling",
+ "instructions": 3,
+ "arch": "ring6d",
+ "model": "corrected",
+ "total_cost": 0.0,
+ "total_steps": 2,
+ "runtime_us": 420.0,
+ "contacts": 0,
+ "templates": {},
+ "passed": [
+  "R1",
+  "R11",
+  "R12",
+  "R13",
+  "R14",
+  "R15",
+  "R16",
+  "R17",
+  "R18",
+  "R2",
+  "R3",
+  "R4",
+  "R4b",
+  "R4d",
+  "R5",
+  "R6",
+  "R6b",
+  "R7",
+  "R7c",
+  "R8"
+ ],
+ "failed": [],
+ "skipped": {
+  "R9": "check_metrics=False: the program's claims were not checked",
+  "R7b": "no per-zone duty-cycle budget is declared by any architecture yet",
+  "R10": "needs symbolic permutation + Pauli-frame tracking against a QASM DAG"
+ },
+ "partial": {
+  "R15": "quanta are composed additively, which R15 says is an upper bound; the interference term needs a secular-phase model the corpus does not supply"
+ }
+}

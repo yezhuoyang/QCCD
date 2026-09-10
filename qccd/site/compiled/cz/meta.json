@@ -1,0 +1,8 @@
+{
+ "id": "cz",
+ "title": "cz",
+ "note": "h \u00b7 cx \u00b7 h on the target, so two extra single-qubit pulses around the same MS",
+ "compiler": "1 layers, 10 transport cycles, 6 beams, 1 MS, 2 virtual-Z, 21 instructions",
+ "compile_seconds": 0.09,
+ "check_seconds": 3.1
+}

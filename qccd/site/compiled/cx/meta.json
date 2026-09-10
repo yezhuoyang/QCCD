@@ -1,0 +1,8 @@
+{
+ "id": "cx",
+ "title": "cx",
+ "note": "the entangler: transport to co-locate, then R, MS, R, R, R (the proved decomposition)",
+ "compiler": "1 layers, 10 transport cycles, 4 beams, 1 MS, 0 virtual-Z, 17 instructions",
+ "compile_seconds": 0.12,
+ "check_seconds": 2.9
+}

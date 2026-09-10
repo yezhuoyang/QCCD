@@ -1,0 +1,12 @@
+{
+ "program": "circuit",
+ "arch": "ring6d",
+ "circuit_sha256": "520f3dd17b8ece48b7e638177a791989335c950f871b9c316aebdedcfe7c7f54",
+ "o1_transport": "ok",
+ "lean": "accepted",
+ "unrealised_ops": 0,
+ "o2_semantics": "ok (max entry error 1.51e-17)",
+ "method": "exact 4x4 unitary, built from the emitted pulses; global phase +0.0000",
+ "R10": "passed",
+ "R10_reason": "O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by exact 4x4 unitary, built from the emitted pulses; global phase +0.0000"
+}
