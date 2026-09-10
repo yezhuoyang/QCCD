@@ -130,6 +130,7 @@ const walkthrough = [
   ['index.html', '01_landing'], ['learn/index.html', '02_learn'], ['studio.html#learn', '03_studio_learn'],
   ['studio.html#learn=B2', '04_studio_lesson_B2'], ['studio.html#design', '05_studio_design'],
   ['board/index.html', '06_board'], ['docs/rules/index.html', '09_docs_rules'], ['discuss/index.html', '10_discuss'],
+  ['language/index.html', '11_language'], ['rules/index.html', '12_rules'],
 ];
 const firstBoard = pages.find(p => /^board\/[^/]+\/index\.html$/.test(p));
 if (firstBoard) walkthrough.push([firstBoard, '07_board_task']);
@@ -151,6 +152,15 @@ async function visit(rel, shotName) {
     if (isStudio || redirect || embeds) await new Promise(r => setTimeout(r, redirect ? 2500 : embeds ? 3000 : 800));
     if (shotName) await shot(shotName);
     probe = await evaluate(PROBE);
+    // a page with runnable examples: the first Run button must bring up a moving embed
+    if (await evaluate("!!document.querySelector('button.run')")) {
+      await evaluate("document.querySelector('button.run').click()");
+      await new Promise(r => setTimeout(r, 3500));
+      const ran = await evaluate(`(async function(){ var f = document.querySelector('.runbox iframe.live'); if(!f) return 'no iframe';
+        function st(){ try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false; var e = d.getElementById('status'); return e ? e.textContent : 'no status'; } catch(e){ return false; } }
+        var a = st(); await new Promise(function(r){ setTimeout(r, 1500); }); var b = st(); if(a === false) return 'not in embed mode'; var m = /\\/ (\\d+)/.exec(a || ''); return (a !== b || (m && +m[1] <= 3)) ? 'moving' : 'still: ' + a; })()`);
+      if (ran !== 'moving') problems.push('the first example did not run: ' + ran);
+    }
     if (!probe.nav) problems.push('no navigation bar');
     if (probe.search_hits < 1) problems.push('site search finds nothing for "steane"');
     if (probe.logos === false) problems.push('a footer logo did not load');
@@ -173,7 +183,7 @@ const shotFor = new Map(walkthrough.map(([p, n]) => [p, n]));
 for (const rel of pages) await visit(rel, shotFor.get(rel) && !rel.includes('#') ? shotFor.get(rel) : null);
 for (const [p, n] of walkthrough) if (p.includes('#')) await visit(p, n);
 
-if (SHOTS) { await open(BASE + 'index.html'); await evaluate("window.SITENAV.search('steane')"); await shot('11_search'); }
+if (SHOTS) { await open(BASE + 'index.html'); await evaluate("window.SITENAV.search('steane')"); await shot('13_search'); }
 ws.close(); chrome.kill(); if (!LIVE) server.close();
 try { fs.rmSync(udd, { recursive: true, force: true }); } catch {}
 console.log(JSON.stringify({ pages: results.length, failed, shots: SHOTS ? walkthrough.length + 1 : 0 }));

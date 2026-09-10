@@ -28,6 +28,7 @@ import re
 import shutil
 from pathlib import Path
 
+from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, machine, rule_meta
 from .md import Renderer, hints
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -161,6 +162,34 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink2);margin:10px 0 0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 @media (max-width:900px){.task{grid-template-columns:1fr}.pt .lessons{columns:1}.stats{grid-template-columns:1fr 1fr}}
+/* language and rules: statements and rules with their running examples */
+main.wide{max-width:1120px}
+pre.grammar{font-size:12.5px;line-height:1.6}
+.verb,.rule{border-top:1px solid var(--line);padding:20px 0 10px;scroll-margin-top:48px}
+.verb h3,.rule h3{margin:0 0 6px;font-size:16px} .verb h3 code{font-size:14px;background:none;padding:0;color:#1c2a4a}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+dl.sem{margin:8px 0 0;display:grid;grid-template-columns:64px 1fr;gap:5px 10px;font-size:13px}
+dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;padding-top:3px} dl.sem dd{margin:0}
+.ex{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;position:relative}
+.ex pre{margin:0 0 8px;background:#f7f6f2;font-size:12px;padding:10px 12px;overflow-x:auto} .ex pre.ir{white-space:pre-wrap;word-break:break-all}
+.two>*,.pair>*{min-width:0}
+.ex .tag{position:absolute;top:10px;right:12px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
+.ex.pass .tag{background:#e6f4ec;color:#0b7a4b} .ex.fail .tag{background:#fbe9e7;color:#c62828} .ex.partial .tag{background:#fff3e0;color:#b26a00} .ex.any .tag{background:#eef3fb;color:#2a78d6}
+.ex.fail{border-color:#f1c4c0} .ex.pass{border-color:#bfe3cf}
+.ex .why{font-size:12.5px;color:var(--ink2);margin:0 0 8px;padding-right:70px}
+.verdict{font-size:12.5px;margin:0 0 8px} .verdict b.ok{color:#0b7a4b} .verdict b.bad{color:#c62828} .verdict b.skip{color:#52514e} .verdict b.partial{color:#b26a00}
+.verdict .m{display:block;color:var(--ink2);margin-top:2px} .verdict .nums{display:block;color:var(--ink3);margin-top:3px}
+.runbox{margin:6px 0 4px}
+.runbox button.run{font:inherit;font-size:13px;padding:6px 12px;border:1px solid #cfceca;border-radius:7px;background:#fff;cursor:pointer;color:var(--ink)}
+.runbox button.run:hover{border-color:var(--accent);color:var(--accent)}
+.runbox iframe.live{display:block;width:100%;height:300px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.ex .open{font-size:12px}
+.rule h3 .st{font-weight:400;color:var(--ink2);font-size:14px} .rule .checks{margin:0 0 4px;font-size:13.5px}
+.rule .src{font-size:12px;color:var(--ink3);margin:0 0 10px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.toc2{font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;padding:0;list-style:none}
+.contract{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 0} .contract div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff}
+.contract b{display:block;margin-bottom:2px} .contract .ok b{color:#0b7a4b} .contract .bad b{color:#c62828} .contract .skip b{color:#52514e} .contract .partial b{color:#b26a00}
+@media (max-width:860px){.two,.pair{grid-template-columns:1fr}.contract{grid-template-columns:1fr 1fr}}
 """
 
 
@@ -238,6 +267,18 @@ body[data-embed="1"] #sitenav,body[data-embed="1"] .head,body[data-embed="1"] #t
 body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"] #bbnow{display:none!important}
 body[data-embed="1"] main{height:100vh!important}
 </style>"""
+
+EXAMPLE_JS = """<script>
+(function(){
+  // Run: the example's own page, in embed mode, takes the button's place
+  document.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest ? ev.target.closest('button.run') : null; if(!b) return;
+    var box = b.parentNode, f = document.createElement('iframe');
+    f.className = 'live'; f.src = box.getAttribute('data-src'); f.title = 'the example, running';
+    box.replaceChild(f, b);
+  });
+})();
+</script>"""
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -381,6 +422,10 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                     f'<ul class="lessons">{items}</ul></div></div>')
     body.append("</div>")
     body.append("<h2>The reference</h2><div class=\"docs\">")
+    body.append('<a class="doc" href="../language/"><span class="tag">the language</span><b>Every statement, with a running example</b>'
+                '<span>The syntax, what each statement does to the machine, what it costs, and the IR beneath it.</span></a>')
+    body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 23 rules, each with a programme that passes and one that fails</b>'
+                '<span>The verifier\'s own verdicts, runnable here.</span></a>')
     for name in DOC_NAMES:
         body.append(f'<a class="doc" href="../docs/{name}/"><span class="tag">{DOC_TAGS[name]}</span>'
                     f'<b>{html.escape(docs[name]["title"])}</b><span>{DOC_BLURBS[name]}</span></a>')
@@ -490,6 +535,168 @@ def discuss_page() -> str:
     return PAGE.format(title="Discuss - QCCD studio", style=STYLE, extra_css="", body=body)
 
 
+def _verdict(v: dict, focus: str | None, expect: str | None, tag: str | None) -> tuple[str, str, str]:
+    """(card class, tag text, verdict html) for one example."""
+    f = v.get("focus")
+    parts = []
+    if f:
+        st = f["state"]
+        cls = {"failed": "fail", "passed": "pass", "skipped": "skip", "partial": "partial"}.get(st, "any")
+        parts.append(f'<b class="{ {"fail": "bad", "pass": "ok", "skip": "skip", "partial": "partial"}.get(cls, "ok") }">{focus} {st}</b>')
+        if f["why"]:
+            parts.append(f'<span class="m">{html.escape(f["why"])}</span>')
+        for msg in f["messages"][:2]:
+            parts.append(f'<span class="m">{html.escape(msg)}</span>')
+        if len(f["messages"]) > 2:
+            parts.append(f'<span class="m">&hellip; and {len(f["messages"]) - 2} more sentences like these</span>')
+        others = [r for r in v["failed"] if r != focus]
+        if others:
+            parts.append(f'<span class="m">also fails {", ".join(others)}</span>')
+    else:
+        cls = "pass" if not v["failed"] else "fail"
+        parts.append('<b class="ok">no rule fails</b>' if not v["failed"] else f'<b class="bad">fails {", ".join(v["failed"])}</b>')
+        for msg in v["messages"][:3]:
+            parts.append(f'<span class="m">{html.escape(msg["message"])}</span>')
+    nums = f'cost {v["cost"]:g} &middot; steps {v["steps"]} &middot; {v["us"]:.0f} &micro;s &middot; peak n&#772; {v["peak_quanta"]:.2f}'
+    if focus == "R16":
+        nums += f' &middot; gate error {v["gate_error"]:.3g}'
+    if focus == "R17" and v.get("anomalous"):
+        nums += " &middot; anomalous n&#772; " + ", ".join(f"{k} {x}" for k, x in v["anomalous"].items())
+    parts.append(f'<span class="nums">{nums}</span>')
+    if expect == "any":
+        cls = "any"
+    tag_text = tag or {"pass": "passes", "fail": "fails", "skip": "skipped", "partial": "partial", "any": "compare"}[cls]
+    return cls, tag_text, "".join(parts)
+
+
+def _example_card(ex: dict, focus: str | None, root: str) -> str:
+    cls, tag, verdict = _verdict(ex["verdict"], focus, ex.get("expect"), ex.get("tag"))
+    return (f'<div class="ex {cls}"><span class="tag">{tag}</span>'
+            f'<p class="why">{ex["why"]}</p>'
+            f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
+            f'<div class="verdict">{verdict}</div>'
+            f'<div class="runbox" data-src="{ex["page"]}#embed&amp;step=1"><button class="run" type="button">&#9654; Run it here</button></div>'
+            f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
+
+
+def language_page(built: dict) -> str:
+    body = ["<h1>The hardware language</h1>",
+            "<p class=\"sub\">A programme is a list of statements over one device. Each statement is one instruction "
+            "and one machine cycle: it says what moves where, or which ions a gate, a measurement or a cooling "
+            "touches. It says nothing about cost. The replay computes the cost, the duration and the heating of "
+            "every cycle from the device's own primitive tables, and the rules judge each cycle as a whole. "
+            "The same text runs in the studio's Write pane and, unchanged, in Python through <code>qccd.api</code>.</p>",
+            "<h2 id=\"syntax\">Syntax</h2>",
+            f"<pre class=\"grammar\"><code>{html.escape(GRAMMAR)}</code></pre>",
+            "<p class=\"sub\">Statements are Python calls on a programme <code>p</code>; the literals are Python's. "
+            "A statement may span lines while a bracket is open, which is Python's own rule and the only "
+            "line-joining rule there is. Positional arguments come first, keywords after.</p>",
+            "<h2 id=\"semantics\">Semantics</h2>",
+            "<p class=\"sub\">The machine state is a map from ions to sites, a motional excitation n&#772; per ion, "
+            "and a clock. <code>init</code> and <code>fill</code> create the map; every other statement is a "
+            "transition of it. Transport statements move ions along segments and through junctions; each "
+            "crossing is priced from the device's curves and adds to n&#772;. Gates leave positions alone and "
+            "read n&#772; to evaluate their error. Cooling lowers n&#772;. Instructions execute in order, each "
+            "atomically; the next starts when the previous ends. Every cycle is then judged by the "
+            "<a href=\"../rules/\">rules</a>, which is where a programme is refused.</p>",
+            "<h2 id=\"statements\">Statements</h2>",
+            "<ul class=\"toc2\">" + "".join(f'<li><a href="#{v["verb"]}"><code>p.{v["verb"]}</code></a></li>' for v in VERBS) + "</ul>"]
+    for v in VERBS:
+        ex = built[v["verb"]]
+        rules = ", ".join(f'<a href="../rules/#{r}">{r}</a>' for r in v["rules"]) or "&ndash;"
+        body.append(
+            f'<section class="verb" id="{v["verb"]}"><h3><code>{html.escape(v["sig"])}</code></h3>'
+            f'<div class="two"><div><p>{v["what"]}</p>'
+            f'<dl class="sem"><dt>state</dt><dd>{v["state"]}</dd><dt>cost</dt><dd>{v["cost"]}</dd>'
+            f'<dt>rules</dt><dd>{rules}</dd><dt>IR</dt><dd><code>{v["ir"]}</code></dd></dl></div>'
+            f'{_example_card(ex, None, "")}</div></section>')
+    body.append("<h2 id=\"ir\">Beneath the text: the IR</h2>"
+                "<p class=\"sub\">Every statement becomes one instruction of the control IR, the JSON the compiler "
+                "emits and the verifier replays. The Write pane and the compiler meet there.</p>"
+                "<div class=\"tw\"><table><thead><tr><th>statement</th><th>instruction type</th><th>carries</th></tr></thead><tbody>"
+                + "".join(f"<tr><td><code>{a}</code></td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in IR_TABLE)
+                + "</tbody></table></div>"
+                "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">docs/tsir</a>; the device language "
+                "the programmes run on is <a href=\"../docs/adl/\">docs/adl</a>.</p>")
+    return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
+                       body="\n".join(body) + EXAMPLE_JS)
+
+
+def _sources(src: str) -> str:
+    out = []
+    for tok in [t.strip() for t in src.split(",") if t.strip()]:
+        if re.match(r"^\d{4}\.\d{4,5}$", tok):
+            out.append(f'<a href="https://arxiv.org/abs/{tok}">arXiv:{tok}</a>')
+        elif tok.startswith("quant-ph/"):
+            out.append(f'<a href="https://arxiv.org/abs/{tok}">arXiv:{tok}</a>')
+        elif tok == "deck_v3":
+            out.append("the ion-transport deck (v3)")
+        elif tok == "local":
+            out.append("this platform")
+        else:
+            out.append(html.escape(tok))
+    return ", ".join(out)
+
+
+def rules_page(built: dict) -> str:
+    body = ["<h1>The rules</h1>",
+            "<p class=\"sub\">Twenty-three rules a programme must obey on a QCCD machine, each traced to a source. "
+            "The verifier replays every cycle and reports each rule as one of four things; a green tick is "
+            "only ever printed for a check that ran. Each rule below has a programme that passes it and one "
+            "that fails it, both judged by the real verifier and both runnable here as the page the studio "
+            "would open on them. The rules are code: <a href=\"../docs/rules/\">docs/rules</a> is the prose, "
+            "<code>qccd/verify/rules.py</code> the checks, <code>engine.js</code> their browser twins, and a "
+            "parity test holds the two implementations to identical verdicts.</p>",
+            '<div class="contract"><div class="ok"><b>passed</b>the check ran and found nothing</div>'
+            '<div class="bad"><b>failed</b>the check ran and names the cycle and the reason</div>'
+            '<div class="skip"><b>skipped</b>the check could not run, and says why</div>'
+            '<div class="partial"><b>partial</b>the check ran on an approximation, and says which</div></div>',
+            "<h2 id=\"all\">All rules</h2>",
+            "<ul class=\"toc2\">" + "".join(f'<li><a href="#{r["id"]}">{r["id"]}</a></li>' for r in RULES) + "</ul>"]
+    for R in RULES:
+        meta = rule_meta(R["id"])
+        b = built[R["id"]]
+        cards = "".join(_example_card(b[w], R["id"], "") for w in ("pass", "fail") if w in b)
+        note = f'<p class="note">{R["note"]}</p>' if R.get("note") else ""
+        body.append(
+            f'<section class="rule" id="{R["id"]}"><h3>{R["id"]} <span class="st">{html.escape(meta["statement"])}</span></h3>'
+            f'<p class="checks">{R["checks"]}</p>'
+            f'<p class="src">device: {R["device"]["about"]} &middot; cost model: {b.get("model", "corrected")} &middot; sources: {_sources(meta["sources"])}</p>'
+            f'{note}<div class="pair">{cards}</div></section>')
+    return PAGE.format(title="Rules - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
+                       body="\n".join(body) + EXAMPLE_JS)
+
+
+def build_examples(out: Path, put) -> tuple[dict, dict]:
+    """Render every example page under language/ex and rules/ex, judge it, and return what
+    the two pages show."""
+    lang: dict[str, dict] = {}
+    for v in VERBS:
+        m = machine(v["device"])
+        rel = f"language/ex/{v['verb']}.html"
+        r = build_example({"program": v["example"]}, m, "corrected", out / rel, kicker="THE LANGUAGE",
+                          headline=f'p.{v["verb"]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True, extra=HASH_JS)
+        lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html"}
+    rules: dict[str, dict] = {}
+    for R in RULES:
+        m = machine(R["device"])
+        entry: dict = {"model": R.get("model", "corrected")}
+        for which in ("pass", "fail"):
+            if which not in R:
+                continue
+            ex = R[which]
+            model = ex.get("model") or R.get("model", "corrected")
+            rel = f"rules/ex/{R['id']}_{which}.html"
+            r = build_example(ex, m, model, out / rel, kicker=f"RULE {R['id']}",
+                              headline=f"{R['id']}: {'passes' if which == 'pass' else 'fails'}" if not ex.get("expect") else f"{R['id']}: {ex.get('tag') or ex['expect']}",
+                              lede=R["checks"], focus=R["id"], check_metrics=R.get("check_metrics", False))
+            put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True, extra=HASH_JS)
+            entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model}
+        rules[R["id"]] = entry
+    return lang, rules
+
+
 def doc_page(name: str, d: dict) -> str:
     body = (f'<p class="sub"><a href="../../learn/">Learn</a> &rsaquo; reference &middot; '
             f'<a href="{REPO}/blob/main/docs/{name}.md">docs/{name}.md</a></p>'
@@ -544,6 +751,9 @@ def build(out: Path) -> int:
         for lvl, sid, text in docs[name]["headings"]:
             index.append({"t": html.unescape(re.sub(r"<[^>]+>", "", text)),
                           "d": f"{docs[name]['title']} · docs", "u": f"docs/{name}/#{sid}", "k": "doc"})
+    index += [{"t": f"p.{v['verb']}", "d": v["what"][:90], "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
+    index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": "a rule, with a passing and a failing programme",
+               "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
     for t in ts:
         index.append({"t": t["title"], "d": f"leaderboard · {len(t['rows'])} designs", "u": f"board/{t['id']}/", "k": "task"})
         for r in t["rows"]:
@@ -576,6 +786,10 @@ def build(out: Path) -> int:
     for name in DOC_NAMES:
         put(f"docs/{name}/index.html", doc_page(name, docs[name]), 2, "learn")
     put("discuss/index.html", discuss_page(), 1, "discuss")
+    lang, rules = build_examples(out, put)
+    put("language/index.html", language_page(lang), 1, "language")
+    put("rules/index.html", rules_page(rules), 1, "rules")
+    print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
     put("board/index.html", board_index(ts), 1, "board")
     n_pages = 0
