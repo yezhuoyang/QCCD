@@ -92,7 +92,11 @@ async function evaluate(expr) {
 async function shot(name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
-  const r = await send('Page.captureScreenshot', { format: 'png' });
+  // a document page is captured whole (capped), an app page as its viewport
+  let clip = null;
+  try { const m = await evaluate('({h: document.documentElement.scrollHeight, w: document.documentElement.clientWidth, app: document.body.style.overflow === "hidden" || getComputedStyle(document.body).overflow === "hidden"})');
+        if (!m.app && m.h > 900) clip = { x: 0, y: 0, width: m.w, height: Math.min(m.h, 4200), scale: 1 }; } catch {}
+  const r = await send('Page.captureScreenshot', clip ? { format: 'png', captureBeyondViewport: true, clip } : { format: 'png' });
   fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(r.data, 'base64'));
 }
 
@@ -106,7 +110,7 @@ const PROBE = `(function(){
            over: Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){ var r = e.getBoundingClientRect(); return r.right > iw + 1 && r.width > 0; }).slice(0, 4).map(function(e){ return e.tagName + (e.id ? '#' + e.id : '') + '@' + Math.round(e.getBoundingClientRect().right); }),
            learn_on: (function(){ var p = document.getElementById('paneL'), d = document.getElementById('dock');
                        return p ? (/\\bon\\b/.test(p.className) && !(d && d.getAttribute('data-collapsed') === '1')) : null; })(),
-           logos: (function(){ var im = document.querySelectorAll('#sitefoot img'); if(!im.length) return null; for(var i = 0; i < im.length; i++) if(!(im[i].complete && im[i].naturalWidth > 0)) return false; return im.length; })(),
+           logos: (function(){ var im = document.querySelectorAll('#sitefoot img, .clip img'); if(!im.length) return null; for(var i = 0; i < im.length; i++) if(!(im[i].complete && im[i].naturalWidth > 0)) return false; return im.length; })(),
            lesson: (window.EDITOR && EDITOR.lessonState) ? EDITOR.lessonState().id : null,
            ready: (window.EDITOR && EDITOR.ready) ? EDITOR.ready() : null };
 })()`;
