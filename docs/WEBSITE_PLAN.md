@@ -363,9 +363,11 @@ existing ranking page and its entry pages byte-for-byte, plus the manifest); `di
 (giscus, dormant until the category ids exist). One 40 px bar on every page with a site
 search over parts, lessons, doc headings, tasks and entries (169 entries, inlined, so it
 works from `file://` too); Ctrl+K reaches it on pages without a search of their own.
-Restructured the same evening on request: the landing is a two-column hero with a running
-clip of the five-qubit code on the 24-site ring (`tools/make_gif.py` over that entry's own
-frames, `EXAMPLE` in `build.py`) linking into its entry at `#step=2`; Learn is one row per part
+Restructured the same evening on request: the landing is a two-column hero with the
+five-qubit code on the 24-site ring running live — the entry page itself in an iframe, in an
+**embed mode** every app page now has (`#embed&step=N` in the injected hash handler folds the
+head, tools bar, rail, dock and study card away and loops the transport), linking into the
+entry at `#step=2`; a GIF was tried first and dropped because the user wants what the page shows; Learn is one row per part
 with a pictogram and a sentence each, then the four docs as cards and the fastest verified round
 of every task; the board is one row per task with the designs as bars coloured by family, the
 fastest verified in green, refusals and rule failures in red, and four stat tiles. Every document page ends in a footer naming the UCLA and UC Berkeley collaboration and the

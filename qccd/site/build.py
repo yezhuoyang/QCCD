@@ -44,10 +44,9 @@ PARTS = (("learn", "Learn", "learn/", "the course, the reference docs, and worke
          ("board", "Leaderboard", "board/", "five tasks, every design ranked"),
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
 
-#: The running example on the landing: one task, one seed device, the clip
-#: `tools/make_gif.py` rendered from that entry's own frames (the same view model the
-#: entry page animates).
-EXAMPLE = {"task": "five_qubit", "device": "ring24_8", "gif": "five_qubit_ring24_8.gif",
+#: The running example on the landing: one seed entry, embedded as the page it is, in
+#: embed mode (HASH_JS) so only its stage and transport show.
+EXAMPLE = {"task": "five_qubit", "device": "ring24_8",
            "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks"}
 
 #: The ranking pages' family colours (bb_studio.py's FAMHEX); everything else is grey.
@@ -192,15 +191,34 @@ FOOTER_CSS = """
 FOOTER_BLOCK = "<style>" + FOOTER_CSS + "</style>" + FOOTER
 STYLE = STYLE + FOOTER_CSS
 
-STUDIO_HASH_JS = """<script>
+HASH_JS = """<script>
 (function(){
-  // The site's deep links into the one studio page: #learn opens the course, #learn=B2
-  // a lesson, #design is the blank canvas (the default).  Under the test shim there is no
-  // `location`, and nothing here runs.
+  // The site's deep links into an app page: #learn opens the course, #learn=B2 a lesson,
+  // #design is the blank canvas (the default), and #embed (with &step=N) is the page as
+  // the landing shows it -- head, tools bar, rail and dock folded away, the stage playing
+  // on a loop.  It is the same page, not a picture of it.  Under the test shim there is
+  // no `location`, and nothing here runs.
   if(typeof location === 'undefined' || typeof window === 'undefined' || !window.addEventListener) return;
+  var looping = false;
+  function embed(){
+    document.body.setAttribute('data-embed', '1');
+    try { var rail = document.getElementById('rail'); if(rail && typeof foldPanel === 'function') foldPanel(rail, true); } catch(e){}
+    try { var dk = document.getElementById('dock'); if(dk && typeof foldPanel === 'function') foldPanel(dk, true); } catch(e){}
+    try { if(typeof relayout === 'function') relayout(); } catch(e){}
+    var play = document.getElementById('play'), reset = document.getElementById('reset'), slider = document.getElementById('slider');
+    if(looping || !play) return;
+    looping = true;
+    setTimeout(function(){ try { if(!play.disabled && play.textContent === 'Play') play.click(); } catch(e){} }, 400);
+    // the transport stops on the last frame and says Play again: start over
+    setInterval(function(){ try {
+      if(play.disabled || !slider) return;
+      if(play.textContent === 'Play' && +slider.max > 0 && +slider.value >= +slider.max){ if(reset) reset.click(); play.click(); }
+    } catch(e){} }, 700);
+  }
   function apply(){
     var h = (location.hash || '').replace(/^#/, ''), m = /^learn(?:=([A-Za-z]\\d+))?$/.exec(h);
     var dk = document.getElementById('dock'), pl = document.getElementById('paneL');
+    if(h.split('&').indexOf('embed') >= 0){ embed(); return; }
     if(h === 'design'){
       // the canvas, not the course: the course remembers itself across visits, so a lesson
       // left open is folded away here -- the work on the canvas is untouched
@@ -214,7 +232,12 @@ STUDIO_HASH_JS = """<script>
   }
   window.addEventListener('hashchange', apply); apply();
 })();
-</script>"""
+</script>
+<style>
+body[data-embed="1"] #sitenav,body[data-embed="1"] .head,body[data-embed="1"] #tools,body[data-embed="1"] #bbpill,
+body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"] #bbnow{display:none!important}
+body[data-embed="1"] main{height:100vh!important}
+</style>"""
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -324,12 +347,13 @@ def landing(ts: list[dict]) -> str:
         cap = (f'{ex["what"]}: {n_ins} instructions, {_t(row):.1f} ms on the jones table, '
                f'every rule passed{", R10 by the proved Lean checker" if _r10(row) else ""}. '
                f'Step through it &rarr;')
-        url = f'board/{task["id"]}/{row["page"]}#step=2'
+        page = f'board/{task["id"]}/{row["page"]}'
+        url = page + "#embed&step=2"
     else:
-        cap, url = ex["what"], "board/"
+        cap, url, page = ex["what"], "board/", "board/"
     return ((HERE / "landing.html").read_text(encoding="utf-8")
             .replace("__TILES__", tiles).replace("__N__", f"{n_all} designs on {len(ts)} tasks, {n} run their round")
-            .replace("__EXAMPLE_GIF__", "static/" + ex["gif"]).replace("__EXAMPLE_URL__", url)
+            .replace("__EXAMPLE_PAGE__", page + "#step=2").replace("__EXAMPLE_URL__", url)
             .replace("__EXAMPLE_CAPTION__", cap).replace("__EXAMPLE_ALT__", html.escape(ex["what"]))
             .replace("__FOOTER__", FOOTER_BLOCK))
 
@@ -539,7 +563,7 @@ def build(out: Path) -> int:
     from ..__main__ import main as qccd_main
     studio = out / "studio.html"
     qccd_main(["studio", "-o", str(studio)])
-    put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True, extra=STUDIO_HASH_JS)
+    put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True, extra=HASH_JS)
 
     put("index.html", landing(ts), 0, None)
     put("learn/index.html", learn_page(parts, less, docs, ts), 1, "learn")
@@ -570,7 +594,8 @@ def build(out: Path) -> int:
         for r in t["rows"]:
             if r.get("status") != "ok" or not r.get("page"):
                 continue
-            put(f"board/{t['id']}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, "board", app=True)
+            put(f"board/{t['id']}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, "board",
+                app=True, extra=HASH_JS)
             n_pages += 1
             gif = r.get("gif")
             if gif and (src.parent / gif).exists():
