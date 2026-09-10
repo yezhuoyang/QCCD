@@ -75,9 +75,34 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .lessons .id{color:var(--ink3);font-variant-numeric:tabular-nums;width:2.4em;flex:0 0 auto} .lessons .stars{color:#d59a00;margin-left:auto;font-size:12px;white-space:nowrap}
 .part{margin:18px 0 0} .part h3{margin:0 0 2px} .part .ms{color:var(--ink2);font-size:13px;margin:0}
 .note{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:14px 0;color:var(--ink2)}
-"""
+""" 
 
 APP_CSS = "<style>main{height:calc(100vh - 40px)!important}</style>"
+
+# The footer on every document page: who leads the project and who funds it, with the
+# three marks.  The wordmarks are the public-domain text logos; CIQC's is its own header
+# image.  `__SITEROOT__` becomes the page's path back to the site root.
+FOOTER = """<footer id="sitefoot">
+  <p>Led by a collaboration between <a href="https://www.ucla.edu/">UCLA</a> and
+  <a href="https://www.berkeley.edu/">UC Berkeley</a>, funded by the
+  <a href="https://ciqc.berkeley.edu/">Challenge Institute for Quantum Computation</a> (CIQC),
+  an NSF Quantum Leap Challenge Institute.</p>
+  <div class="logos">
+    <a href="https://www.ucla.edu/" title="UCLA"><img src="__SITEROOT__static/ucla.svg" alt="UCLA"></a>
+    <a href="https://www.berkeley.edu/" title="University of California, Berkeley"><img src="__SITEROOT__static/berkeley.svg" alt="University of California, Berkeley"></a>
+    <a href="https://ciqc.berkeley.edu/" title="Challenge Institute for Quantum Computation"><img src="__SITEROOT__static/ciqc.png" alt="Challenge Institute for Quantum Computation"></a>
+  </div>
+</footer>"""
+FOOTER_CSS = """
+#sitefoot{background:#fff;border-top:1px solid #e6e5e1;padding:22px 24px 26px;text-align:center;color:#52514e;
+ font:13.5px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#sitefoot p{margin:0 auto 16px;max-width:72ch;color:#52514e}
+#sitefoot a{color:#0b0b0b;text-decoration:none} #sitefoot p a{border-bottom:1px solid #cfceca} #sitefoot p a:hover{border-bottom-color:#2a78d6}
+#sitefoot .logos{display:flex;justify-content:center;align-items:center;gap:44px;flex-wrap:wrap}
+#sitefoot .logos img{display:block;height:38px;width:auto} #sitefoot .logos img[alt="UCLA"]{height:30px}
+"""
+FOOTER_BLOCK = "<style>" + FOOTER_CSS + "</style>" + FOOTER
+STYLE = STYLE + FOOTER_CSS
 
 STUDIO_HASH_JS = """<script>
 (function(){
@@ -106,7 +131,7 @@ STUDIO_HASH_JS = """<script>
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title><style>{style}{extra_css}</style></head><body>
-<main>{body}</main></body></html>"""
+<main>{body}</main>__FOOTER__</body></html>"""
 
 
 # ------------------------------------------------------------------------- inputs
@@ -202,7 +227,8 @@ def landing(ts: list[dict]) -> str:
         f'<a class="tile" href="{u}"><b>{label}</b><span>{blurb}</span></a>'
         for key, label, u, blurb in PARTS)
     return ((HERE / "landing.html").read_text(encoding="utf-8")
-            .replace("__TILES__", tiles).replace("__N__", str(n)).replace("__T__", str(len(ts))))
+            .replace("__TILES__", tiles).replace("__N__", str(n)).replace("__T__", str(len(ts)))
+            .replace("__FOOTER__", FOOTER_BLOCK))
 
 
 def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) -> str:
@@ -344,6 +370,7 @@ def build(out: Path) -> int:
     out.mkdir(parents=True)
     (out / MARKER).write_text("written by `python -m qccd site`\n", encoding="utf-8")
     (out / "favicon.ico").write_bytes(favicon())
+    shutil.copytree(HERE / "static", out / "static")
 
     ts = tasks()
     parts, less = lessons()
@@ -368,7 +395,9 @@ def build(out: Path) -> int:
     def put(rel: str, page: str, depth: int, active: str | None, app: bool = False, extra: str = "") -> None:
         p = out / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(with_nav(page, depth, active, idx, app=app, extra=extra), encoding="utf-8", newline="")
+        page = with_nav(page, depth, active, idx, app=app, extra=extra)
+        page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
+        p.write_text(page, encoding="utf-8", newline="")
 
     # the studio, once: the one page Learn and Design both are
     from ..__main__ import main as qccd_main
@@ -397,7 +426,8 @@ def build(out: Path) -> int:
             continue
         dst = out / "board" / t["id"]
         dst.mkdir(parents=True, exist_ok=True)
-        put(f"board/{t['id']}/index.html", (src / "index.html").read_text(encoding="utf-8"), 2, "board")
+        put(f"board/{t['id']}/index.html", (src / "index.html").read_text(encoding="utf-8"), 2, "board",
+            extra=FOOTER_BLOCK)
         for name in ("manifest.json", "rows.json"):
             if (src / name).exists():
                 shutil.copy2(src / name, dst / name)

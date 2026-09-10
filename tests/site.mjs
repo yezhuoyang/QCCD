@@ -106,6 +106,7 @@ const PROBE = `(function(){
            over: Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){ var r = e.getBoundingClientRect(); return r.right > iw + 1 && r.width > 0; }).slice(0, 4).map(function(e){ return e.tagName + (e.id ? '#' + e.id : '') + '@' + Math.round(e.getBoundingClientRect().right); }),
            learn_on: (function(){ var p = document.getElementById('paneL'), d = document.getElementById('dock');
                        return p ? (/\\bon\\b/.test(p.className) && !(d && d.getAttribute('data-collapsed') === '1')) : null; })(),
+           logos: (function(){ var im = document.querySelectorAll('#sitefoot img'); if(!im.length) return null; for(var i = 0; i < im.length; i++) if(!(im[i].complete && im[i].naturalWidth > 0)) return false; return im.length; })(),
            lesson: (window.EDITOR && EDITOR.lessonState) ? EDITOR.lessonState().id : null,
            ready: (window.EDITOR && EDITOR.ready) ? EDITOR.ready() : null };
 })()`;
@@ -142,6 +143,7 @@ async function visit(rel, shotName) {
     probe = await evaluate(PROBE);
     if (!probe.nav) problems.push('no navigation bar');
     if (probe.search_hits < 1) problems.push('site search finds nothing for "steane"');
+    if (probe.logos === false) problems.push('a footer logo did not load');
     if (probe.wide) problems.push('page scrolls sideways: ' + probe.sw + ' > ' + probe.iw + ' ' + JSON.stringify(probe.over));
     if (rel.includes('studio.html') && probe.ready === false) problems.push('editor not ready');
     if (/#learn(=|$)/.test(rel) && probe.learn_on !== true) problems.push('#learn did not open the Learn pane');

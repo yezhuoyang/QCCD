@@ -363,7 +363,9 @@ existing ranking page and its entry pages byte-for-byte, plus the manifest); `di
 (giscus, dormant until the category ids exist). One 40 px bar on every page with a site
 search over parts, lessons, doc headings, tasks and entries (169 entries, inlined, so it
 works from `file://` too); Ctrl+K reaches it on pages without a search of their own.
-`tasks/<id>/task.json` + `circuit.qasm` for the five tasks. `.github/workflows/site.yml`
+Every document page ends in a footer naming the UCLA and UC Berkeley collaboration and the
+CIQC funding, with the three marks (`qccd/site/static/`, served as `static/`; asked for on
+2026-09-09 evening). `tasks/<id>/task.json` + `circuit.qasm` for the five tasks. `.github/workflows/site.yml`
 builds, runs `tests/studio.mjs` on the shipped studio, keeps `site` as an artefact and
 rsyncs it when the `DEPLOY_*` settings exist. `tests/site.mjs` opens every built page in
 headless Chrome over HTTP and fails on any exception, console error, missing bar, dead
