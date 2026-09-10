@@ -1,0 +1,90 @@
+<style>
+#sitenav{height:40px;margin:0;display:flex;align-items:center;gap:4px;padding:0 14px;
+ background:#fcfcfb;border-bottom:1px solid #e6e5e1;color:#0b0b0b;position:relative;z-index:50;
+ font:13.5px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;flex:0 0 40px}
+#sitenav a{color:#52514e;text-decoration:none;padding:0 9px;height:40px;display:inline-flex;align-items:center;
+ border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+#sitenav a:hover{color:#0b0b0b}
+#sitenav a[aria-current="page"]{color:#0b0b0b;border-bottom-color:#2a78d6}
+#sitenav a.sn-brand{color:#0b0b0b;font-weight:600;letter-spacing:.01em;padding-left:0;margin-right:8px}
+#sitenav a.sn-brand span{color:#2a78d6}
+#sitenav .sn-sp{flex:1 1 auto}
+#sitenav .sn-sq{position:relative}
+#siteq{font:inherit;font-size:13px;width:240px;max-width:38vw;padding:5px 9px;border:1px solid #cfceca;
+ border-radius:6px;background:#fff;color:#0b0b0b}
+#siteq:focus{outline:2px solid #bcd4f2;border-color:#2a78d6}
+#sitehits{display:none;position:absolute;right:0;top:34px;width:min(520px,90vw);max-height:60vh;overflow:auto;
+ background:#fff;border:1px solid #cfceca;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px 0;z-index:60}
+#sitehits[data-open="1"]{display:block}
+#sitehits a{display:block;padding:7px 12px;height:auto;line-height:1.35;border:0;margin:0;white-space:normal}
+#sitehits a[data-sel="1"],#sitehits a:hover{background:#eef3fb}
+#sitehits b{color:#0b0b0b;font-weight:600} #sitehits small{display:block;color:#8a8985;font-size:12px}
+#sitehits .sn-k{float:right;color:#8a8985;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
+#sitehits .sn-none{padding:8px 12px;color:#8a8985}
+</style>
+<nav id="sitenav" aria-label="site">
+  <a class="sn-brand" href="__ROOT__">QCCD <span>studio</span></a>
+  <a href="__ROOT__learn/" data-part="learn">Learn</a>
+  <a href="__ROOT__studio.html#design" data-part="design">Design</a>
+  <a href="__ROOT__board/" data-part="board">Leaderboard</a>
+  <a href="__ROOT__discuss/" data-part="discuss">Discuss</a>
+  <span class="sn-sp"></span>
+  <span class="sn-sq"><input id="siteq" type="search" placeholder="search the site" autocomplete="off"
+    aria-label="search the site"><div id="sitehits" data-open="0"></div></span>
+</nav>
+<script>
+(function(){
+  var ROOT = '__ROOT__', ACTIVE = '__ACTIVE__', INDEX = __INDEX__;
+  var nav = document.getElementById('sitenav'), q = document.getElementById('siteq'), hits = document.getElementById('sitehits');
+  if(!nav || !q || !hits) return;
+  var links = nav.querySelectorAll('a[data-part]');
+  for(var i = 0; i < links.length; i++) if(links[i].getAttribute('data-part') === ACTIVE) links[i].setAttribute('aria-current', 'page');
+  var HITS = [], SEL = 0;
+  function score(it, words){
+    var hay = (it.t + ' ' + (it.d || '') + ' ' + (it.k || '')).toLowerCase(), s = 0;
+    for(var w = 0; w < words.length; w++){
+      var at = hay.indexOf(words[w]); if(at < 0) return 0;
+      s += (it.t.toLowerCase().indexOf(words[w]) === 0 ? 3 : it.t.toLowerCase().indexOf(words[w]) >= 0 ? 2 : 1);
+    }
+    return s;
+  }
+  function render(){
+    hits.innerHTML = '';
+    if(!HITS.length){ hits.setAttribute('data-open', q.value.trim() ? '1' : '0');
+      if(q.value.trim()){ var d = document.createElement('div'); d.className = 'sn-none'; d.textContent = 'nothing matches'; hits.appendChild(d); } return; }
+    HITS.forEach(function(it, i){
+      var a = document.createElement('a'); a.href = ROOT + it.u; a.setAttribute('data-sel', i === SEL ? '1' : '0');
+      var k = document.createElement('span'); k.className = 'sn-k'; k.textContent = it.k || '';
+      var b = document.createElement('b'); b.textContent = it.t;
+      var s = document.createElement('small'); s.textContent = it.d || '';
+      a.appendChild(k); a.appendChild(b); a.appendChild(s); hits.appendChild(a);
+    });
+    hits.setAttribute('data-open', '1');
+  }
+  function search(){
+    var words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    HITS = []; SEL = 0;
+    if(words.length){
+      HITS = INDEX.map(function(it){ return [score(it, words), it]; }).filter(function(p){ return p[0] > 0; })
+        .sort(function(a, b){ return b[0] - a[0]; }).slice(0, 12).map(function(p){ return p[1]; });
+    }
+    render();
+  }
+  // the same document with another hash is a fragment navigation: no reload, `hashchange` fires
+  function open(it){ if(it) location.href = ROOT + it.u; }
+  q.addEventListener('input', search);
+  q.addEventListener('focus', function(){ if(q.value) search(); });
+  q.addEventListener('keydown', function(ev){
+    if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){ ev.preventDefault(); if(!HITS.length) return;
+      SEL = (SEL + (ev.key === 'ArrowDown' ? 1 : HITS.length - 1)) % HITS.length; render(); }
+    else if(ev.key === 'Enter'){ ev.preventDefault(); open(HITS[SEL]); }
+    else if(ev.key === 'Escape'){ q.value = ''; HITS = []; render(); q.blur(); }
+  });
+  document.addEventListener('click', function(ev){ if(!hits.contains(ev.target) && ev.target !== q){ hits.setAttribute('data-open', '0'); } });
+  // Ctrl+K reaches this box on pages that have no search of their own; the studio keeps its own
+  if(!document.getElementById('search')){
+    document.addEventListener('keydown', function(ev){ if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k'){ ev.preventDefault(); q.focus(); q.select(); } });
+  }
+  window.SITENAV = { search: function(s){ q.value = s; search(); return HITS.slice(); }, index: INDEX };
+})();
+</script>
