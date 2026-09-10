@@ -5,25 +5,40 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;overflow:auto;background:#fcfcfb;color:#0b0b0b;font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;max-width:1040px;width:100%;margin:0 auto;padding:24px 28px}
-h1{font-size:34px;font-weight:600;letter-spacing:-.02em;margin:0 0 10px}
+main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;max-width:1160px;width:100%;margin:0 auto;padding:22px 28px 18px}
+.hero{display:grid;grid-template-columns:1fr 1.2fr;gap:36px;align-items:center;margin-bottom:22px}
+h1{font-size:32px;font-weight:600;letter-spacing:-.02em;margin:0 0 10px;line-height:1.15}
 h1 span{color:#2a78d6}
-.one{font-size:18px;color:#52514e;max-width:62ch;margin:0 0 34px}
-.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.tile{display:flex;flex-direction:column;gap:8px;padding:20px 20px;min-height:132px;border:1px solid #e6e5e1;border-radius:12px;background:#fff;color:inherit;text-decoration:none}
+.one{font-size:16.5px;color:#52514e;max-width:52ch;margin:0 0 20px}
+.cta a{display:inline-block;padding:9px 16px;border-radius:8px;background:#2a78d6;color:#fff;font-weight:600;text-decoration:none;margin:0 8px 8px 0}
+.cta a.alt{background:#fff;color:#0b0b0b;border:1px solid #cfceca}
+.cta a:hover{filter:brightness(.95)}
+.clip{display:block;border:1px solid #e6e5e1;border-radius:12px;overflow:hidden;background:#fff;color:inherit;text-decoration:none}
+.clip:hover{border-color:#2a78d6}
+.clip img{display:block;width:100%;height:auto}
+.clip span{display:block;padding:9px 14px;font-size:12.5px;line-height:1.45;color:#52514e;border-top:1px solid #efeeeb}
+.clip span b{color:#0b7a4b}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tile{display:flex;flex-direction:column;gap:6px;padding:16px 18px;min-height:100px;border:1px solid #e6e5e1;border-radius:12px;background:#fff;color:inherit;text-decoration:none}
 .tile:hover{border-color:#2a78d6}
-.tile b{font-size:19px;font-weight:600} .tile span{color:#52514e;font-size:14px}
+.tile b{font-size:18px;font-weight:600} .tile span{color:#52514e;font-size:13.5px}
 .tile:nth-child(1) b{color:#2a78d6}.tile:nth-child(2) b{color:#eb6834}.tile:nth-child(3) b{color:#1baf7a}.tile:nth-child(4) b{color:#4a3aa7}
-.foot{color:#8a8985;font-size:12.5px;margin:28px 0 0}
+.foot{color:#8a8985;font-size:12.5px;margin:16px 0 0}
 .foot a{color:#8a8985}
-@media (max-width:820px){.tiles{grid-template-columns:repeat(2,1fr)}h1{font-size:26px}.one{font-size:16px}}
+@media (max-width:900px){.hero{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}h1{font-size:26px}.one{font-size:15px}}
 </style></head><body>
 <main>
-  <h1>Design a trapped-ion <span>QCCD</span> computer, in the browser.</h1>
-  <p class="one">Build the device, compile a quantum error-correction circuit onto it, watch every ion move,
-  check it against the machine's rules, and post the verified design to a leaderboard. Nothing runs on a server.</p>
+  <section class="hero">
+    <div>
+      <h1>Design a trapped-ion <span>QCCD</span> computer, in the browser.</h1>
+      <p class="one">Build the device, compile a quantum error-correction circuit onto it, watch every ion move,
+      check it against the machine's rules, and post the verified design to a leaderboard. Nothing runs on a server.</p>
+      <p class="cta"><a href="studio.html#design">Open the studio</a><a class="alt" href="learn/">Take the course</a><a class="alt" href="board/">See the leaderboard</a></p>
+    </div>
+    <a class="clip" href="__EXAMPLE_URL__"><img src="__EXAMPLE_GIF__" alt="__EXAMPLE_ALT__" width="760" height="491"><span>__EXAMPLE_CAPTION__</span></a>
+  </section>
   <div class="tiles">__TILES__</div>
-  <p class="foot">__N__ designs on __T__ tasks so far &middot; <a href="https://github.com/yezhuoyang/QCCD">the repository</a> &middot; MIT</p>
+  <p class="foot">__N__ &middot; <a href="https://github.com/yezhuoyang/QCCD">the repository</a> &middot; MIT</p>
 </main>
 __FOOTER__
 </body></html>

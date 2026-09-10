@@ -44,6 +44,61 @@ PARTS = (("learn", "Learn", "learn/", "the course, the reference docs, and worke
          ("board", "Leaderboard", "board/", "five tasks, every design ranked"),
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
 
+#: The running example on the landing: one task, one seed device, the clip
+#: `tools/make_gif.py` rendered from that entry's own frames (the same view model the
+#: entry page animates).
+EXAMPLE = {"task": "five_qubit", "device": "ring24_8", "gif": "five_qubit_ring24_8.gif",
+           "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks"}
+
+#: The ranking pages' family colours (bb_studio.py's FAMHEX); everything else is grey.
+FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7"}
+GREY = "#8a8985"
+
+#: One pictogram and one sentence per part of the course, keyed by the part id.
+PART_ART = {
+    "A": ("The map you will build on: sites, junctions, segments, loops and zones, and what one move costs.",
+          '<svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="14" width="48" height="36" rx="18" fill="none" stroke="#2a78d6" stroke-width="3"/>'
+          '<rect x="26" y="4" width="12" height="9" rx="2" fill="#e8b940"/><rect x="26" y="51" width="12" height="9" rx="2" fill="#e8b940"/>'
+          '<circle cx="20" cy="14" r="4" fill="#1c2a4a"/><circle cx="44" cy="50" r="4" fill="#1c2a4a"/><circle cx="56" cy="32" r="4" fill="#1c2a4a"/></svg>'),
+    "B": ("Ions on the map: a CNOT, a Bell pair and a docked rotation, written by hand in the eleven verbs.",
+          '<svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="10" width="48" height="44" rx="6" fill="none" stroke="#eb6834" stroke-width="3"/>'
+          '<path d="M16 22h12M16 30h22M16 38h16M16 46h26" stroke="#eb6834" stroke-width="3" stroke-linecap="round"/>'
+          '<path d="M44 20l6 4-6 4" fill="none" stroke="#1c2a4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
+    "R": ("Every rule the machine obeys, broken on purpose and repaired, or the honest reason it cannot be checked here.",
+          '<svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6l22 8v16c0 14-9 24-22 28C19 54 10 44 10 30V14z" fill="none" stroke="#1baf7a" stroke-width="3" stroke-linejoin="round"/>'
+          '<path d="M22 32l7 7 13-14" fill="none" stroke="#1baf7a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
+    "C": ("A syndrome round and a plaquette, scheduled by hand under all the rules, with the heat paid for.",
+          '<svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><path d="M6 20h52M6 44h52" stroke="#4a3aa7" stroke-width="3" stroke-linecap="round"/>'
+          '<circle cx="24" cy="20" r="4.5" fill="#4a3aa7"/><path d="M24 20v24" stroke="#4a3aa7" stroke-width="3"/>'
+          '<circle cx="24" cy="44" r="8" fill="#fff" stroke="#4a3aa7" stroke-width="3"/><path d="M24 36v16M16 44h16" stroke="#4a3aa7" stroke-width="3"/>'
+          '<rect x="42" y="12" width="14" height="16" rx="2" fill="#fff" stroke="#4a3aa7" stroke-width="3"/>'
+          '<text x="49" y="24.5" font-size="11" font-weight="700" text-anchor="middle" fill="#4a3aa7" font-family="ui-sans-serif,system-ui,sans-serif">H</text></svg>'),
+    "D": ("Let the compiler do it, then judge an architecture from measured numbers on the leaderboard's tasks.",
+          '<svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 56h44" stroke="#8a8985" stroke-width="3" stroke-linecap="round"/>'
+          '<rect x="14" y="30" width="9" height="24" rx="2" fill="#2a78d6"/><rect x="28" y="18" width="9" height="36" rx="2" fill="#eb6834"/><rect x="42" y="38" width="9" height="16" rx="2" fill="#1baf7a"/>'
+          '<path d="M12 14l14-6 12 8 16-8" fill="none" stroke="#1c2a4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
+}
+PART_COLOR = {"A": "#2a78d6", "B": "#eb6834", "R": "#1baf7a", "C": "#4a3aa7", "D": "#1c2a4a"}
+DOC_TAGS = {"adl": "device language", "tsir": "control IR", "rules": "the rules", "phys": "physics and metal"}
+DOC_BLURBS = {"adl": "One document describes a machine: its trap graph, zones, wiring and the curves of its primitives.",
+              "tsir": "The eleven verbs a programme is written in, and what each one costs.",
+              "rules": "All 23 rules, what each one checks, and what the verifier can honestly say about it.",
+              "phys": "From the graph to electrodes: the metal a device implies, and its design rules."}
+
+
+def _t(r: dict):
+    return (r.get("numbers") or {}).get("T_jones")
+
+
+def fam_color(f: str) -> str:
+    return FAMHEX.get(f, GREY)
+
+
+def short_name(r: dict) -> str:
+    """The design's name: the row's short name, else its key without the rank prefix."""
+    return r.get("short") or re.sub(r"^\d+_", "", r["key"])
+
+
 STYLE = """
 :root{color-scheme:light;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--ink3:#8a8985;--line:#e6e5e1;--grid:#efeeeb;--accent:#2a78d6}
 *{box-sizing:border-box}
@@ -75,7 +130,40 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .lessons .id{color:var(--ink3);font-variant-numeric:tabular-nums;width:2.4em;flex:0 0 auto} .lessons .stars{color:#d59a00;margin-left:auto;font-size:12px;white-space:nowrap}
 .part{margin:18px 0 0} .part h3{margin:0 0 2px} .part .ms{color:var(--ink2);font-size:13px;margin:0}
 .note{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:14px 0;color:var(--ink2)}
-""" 
+/* learn: the path, one row per part */
+.path{display:flex;flex-direction:column;gap:14px;margin:10px 0 0}
+.pt{display:grid;grid-template-columns:72px 1fr;gap:18px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.pt .ic{width:64px;height:64px;display:block} .pt h3{margin:0 0 2px;font-size:16px}
+.pt .kick{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;margin-bottom:2px}
+.pt .sum{color:var(--ink2);margin:0 0 8px;font-size:13.5px;max-width:70ch}
+.pt .lessons{columns:2;column-gap:28px} .pt .lessons li{break-inside:avoid}
+.pt .prog{font-size:12px;color:var(--ink3);margin-left:auto;white-space:nowrap}
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.doc{display:block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;color:inherit}
+.doc:hover{border-color:var(--accent);text-decoration:none} .doc b{display:block;color:#1c2a4a;margin-bottom:2px} .doc span{color:var(--ink2);font-size:13px}
+.doc .tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:4px}
+/* board: one row per task */
+.task{display:grid;grid-template-columns:240px 1fr 170px;gap:26px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:14px 0}
+.task h2{margin:0 0 4px;font-size:17px} .task h2 a{color:#1c2a4a} .task .desc{color:var(--ink2);font-size:13px;margin:0 0 10px}
+.task .more{font-size:13px} .task .meta{font-size:12.5px;color:var(--ink3);margin:8px 0 0}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bar{display:grid;grid-template-columns:168px 1fr 68px;align-items:center;gap:8px;font-size:12.5px;color:inherit;text-decoration:none}
+.bar:hover{text-decoration:none} .bar:hover .lbl{color:var(--accent)}
+.bar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .tr{display:block;height:10px;background:var(--grid);border-radius:3px;overflow:hidden} .bar .fl{display:block;height:100%;border-radius:3px}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.bar.best .lbl,.bar.best .v{font-weight:700;color:#0b7a4b} .bar.bad .lbl{color:#c62828}
+.refused{font-size:12px;color:var(--ink3);margin-top:8px} .refused b{color:#c62828;font-weight:600}
+.stats{display:grid;grid-template-columns:1fr;gap:8px;align-content:start}
+.stat{border:1px solid var(--line);border-radius:8px;padding:7px 10px} .stat b{display:block;font-size:19px;line-height:1.15;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:11.5px;color:var(--ink2);margin-top:1px}
+.stat span{display:block;font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.stat.good b{color:#0b7a4b} .stat.lean b{color:var(--accent)} .stat.warn b{color:#c62828}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink2);margin:10px 0 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+@media (max-width:900px){.task{grid-template-columns:1fr}.pt .lessons{columns:1}.stats{grid-template-columns:1fr 1fr}}
+"""
+
 
 APP_CSS = "<style>main{height:calc(100vh - 40px)!important}</style>"
 
@@ -222,85 +310,133 @@ def render_docs() -> dict[str, dict]:
 
 
 def landing(ts: list[dict]) -> str:
-    n = sum(1 for t in ts for r in t["rows"] if r.get("status") == "ok")
+    n_all = sum(len(t["rows"]) for t in ts)
+    n = sum(1 for t in ts for r in t["rows"] if r.get("status") == "ok" and _t(r) is not None)
     tiles = "".join(
         f'<a class="tile" href="{u}"><b>{label}</b><span>{blurb}</span></a>'
         for key, label, u, blurb in PARTS)
+    # the running example: the clip of one seed entry, captioned from that entry's own row
+    ex = EXAMPLE
+    task = next((t for t in ts if t["id"] == ex["task"]), None)
+    row = next((r for r in (task["rows"] if task else []) if ex["device"] in r["key"]), None)
+    if row:
+        n_ins = row.get("instructions")
+        cap = (f'{ex["what"]}: {n_ins} instructions, {_t(row):.1f} ms on the jones table, '
+               f'every rule passed{", R10 by the proved Lean checker" if _r10(row) else ""}. '
+               f'Step through it &rarr;')
+        url = f'board/{task["id"]}/{row["page"]}#step=2'
+    else:
+        cap, url = ex["what"], "board/"
     return ((HERE / "landing.html").read_text(encoding="utf-8")
-            .replace("__TILES__", tiles).replace("__N__", str(n)).replace("__T__", str(len(ts)))
+            .replace("__TILES__", tiles).replace("__N__", f"{n_all} designs on {len(ts)} tasks, {n} run their round")
+            .replace("__EXAMPLE_GIF__", "static/" + ex["gif"]).replace("__EXAMPLE_URL__", url)
+            .replace("__EXAMPLE_CAPTION__", cap).replace("__EXAMPLE_ALT__", html.escape(ex["what"]))
             .replace("__FOOTER__", FOOTER_BLOCK))
 
 
 def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) -> str:
     body = ["<h1>Learn</h1>",
             "<p class=\"sub\">One path: the course inside the design tool, then the reference, "
-            "then a real design stepped instruction by instruction. Progress is kept in this "
-            "browser by the course itself.</p>",
-            "<h2>The course</h2>",
-            "<p class=\"sub\">Every lesson opens the studio on its exercise; the check runs on the page's own verdicts. "
-            "<a href=\"../studio.html#learn\">Open the course</a>.</p>"]
+            "then a real design stepped instruction by instruction. Every lesson opens the studio on "
+            "its exercise and checks your work against the page's own verdicts; progress is kept in "
+            "this browser by the course itself. <a href=\"../studio.html#learn\">Open the course</a>.</p>",
+            "<h2>The course</h2>"]
     if not parts:
         body.append('<p class="note">This build carries no course: <code>qccd/viz/js/tutorial.js</code> '
                     'is not in the tree it was built from.</p>')
+    body.append('<div class="path">')
     for p in parts:
+        mine = [L for L in less if L["part"] == p["id"]]
+        blurb, art = PART_ART.get(p["id"], ("", ""))
         items = "".join(
             f'<li><span class="id">{L["id"]}</span><a href="../studio.html#learn={L["id"]}">{html.escape(L["title"])}</a>'
-            f'<span class="stars" data-lesson="{L["id"]}"></span></li>'
-            for L in less if L["part"] == p["id"])
-        body.append(f'<div class="part"><h3>Part {p["id"]} &middot; {html.escape(p["title"])}</h3>'
-                    f'<ul class="lessons">{items}</ul></div>')
-    body.append("<h2>The reference</h2><ul>")
+            f'<span class="stars" data-lesson="{L["id"]}"></span></li>' for L in mine)
+        body.append(f'<div class="pt">{art}<div><div class="kick" style="color:{PART_COLOR.get(p["id"], "#2a78d6")}">Part {p["id"]} &middot; {len(mine)} lessons'
+                    f'<span class="prog" data-part="{p["id"]}"></span></div>'
+                    f'<h3>{html.escape(p["title"])}</h3><p class="sum">{blurb}</p>'
+                    f'<ul class="lessons">{items}</ul></div></div>')
+    body.append("</div>")
+    body.append("<h2>The reference</h2><div class=\"docs\">")
     for name in DOC_NAMES:
-        body.append(f'<li><a href="../docs/{name}/">{html.escape(docs[name]["title"])}</a> <code>docs/{name}.md</code></li>')
-    body.append("</ul>")
+        body.append(f'<a class="doc" href="../docs/{name}/"><span class="tag">{DOC_TAGS[name]}</span>'
+                    f'<b>{html.escape(docs[name]["title"])}</b><span>{DOC_BLURBS[name]}</span></a>')
+    body.append("</div>")
     body.append("<h2>A real design</h2><p class=\"sub\">Every leaderboard entry is a worked example: the executing "
                 "instruction is marked in the programme, the circuit statement it discharges beside it, and "
-                "<code>#step=N</code> links any step.</p><ul>")
+                "<code>#step=N</code> links any step. The fastest verified round of each task:</p><ul>")
     for t in ts:
-        best = [r for r in t["rows"] if _entry_ok(r) and _r10(r)]
-        best.sort(key=lambda r: (r.get("numbers") or {}).get("T_jones", 1e9))
+        best = [r for r in t["rows"] if _entry_ok(r) and _r10(r) and _t(r) is not None]
+        best.sort(key=_t)
         if best:
             b = best[0]
-            body.append(f'<li><a href="../board/{t["id"]}/{b["page"]}#step=1">{html.escape(t["title"])}</a> '
-                        f'on {html.escape(b.get("short") or b["key"])}: the fastest verified round</li>')
+            body.append(f'<li><a href="../board/{t["id"]}/{b["page"]}#step=1">{html.escape(t["title"])}</a> on '
+                        f'<b>{html.escape(short_name(b))}</b> '
+                        f'<span style="color:#0b7a4b;font-weight:600">{_t(b):.2f} ms</span> '
+                        f'<span style="color:var(--ink3)">&middot; {b.get("instructions")} instructions</span></li>')
     body.append("</ul>")
     body.append("""<script>
 (function(){ var p = null; try { p = JSON.parse(localStorage.getItem('qccd.studio.tutorial') || 'null'); } catch(e){}
-  var stars = (p && p.stars) || {}, els = document.querySelectorAll('.stars[data-lesson]');
-  for(var i = 0; i < els.length; i++){ var n = stars[els[i].getAttribute('data-lesson')] || 0;
-    els[i].textContent = n ? new Array(n + 1).join('\\u2605') : ''; } })();
+  var stars = (p && p.stars) || {}, els = document.querySelectorAll('.stars[data-lesson]'), done = {}, all = {};
+  for(var i = 0; i < els.length; i++){ var id = els[i].getAttribute('data-lesson'), n = stars[id] || 0, part = id.charAt(0);
+    els[i].textContent = n ? new Array(n + 1).join('\\u2605') : ''; all[part] = (all[part] || 0) + 1; if(n) done[part] = (done[part] || 0) + 1; }
+  var ps = document.querySelectorAll('.prog[data-part]');
+  for(var j = 0; j < ps.length; j++){ var k = ps[j].getAttribute('data-part'); if(done[k]) ps[j].textContent = done[k] + ' of ' + all[k] + ' done'; } })();
 </script>""")
     return PAGE.format(title="Learn - QCCD studio", style=STYLE, extra_css="", body="\n".join(body))
 
 
 def board_index(ts: list[dict]) -> str:
-    cards = []
+    """One row per task: the ranked designs as bars coloured by family, the fastest verified
+    one in green, refused and rule-failing ones called out, and the numbers that matter."""
+    rows_html = []
     for t in ts:
         rows = t["rows"]
-        ok = [r for r in rows if r.get("status") == "ok"]
-        ok.sort(key=lambda r: (r.get("numbers") or {}).get("T_jones", 1e9))
+        ok = [r for r in rows if r.get("status") == "ok" and _t(r) is not None]
+        ok.sort(key=_t)
         sound = [r for r in ok if _entry_ok(r) and _r10(r)]
         best = sound[0] if sound else None
-        refused = [r.get("short") or r["key"] for r in rows if r.get("status") != "ok"]
-        lines = "".join(
-            f"<tr><td>{html.escape(r.get('short') or r['key'])}"
-            f"{'' if _entry_ok(r) else ' <span style=color:#c62828>(rules failed)</span>'}</td>"
-            f"<td>{(r.get('numbers') or {}).get('T_jones', float('nan')):.2f} ms</td>"
-            f"<td>{(r.get('numbers') or {}).get('ions_per_instruction', float('nan')):.1f}</td>"
-            f"<td>{'Lean checker' if _r10(r) else '&ndash;'}</td></tr>" for r in ok[:6])
-        cards.append(
-            f'<a class="card" href="{t["id"]}/"><h2>{html.escape(t["title"])}</h2>'
-            f'<p>{len(ok)} of {len(rows)} designs run it'
-            f'{(" &middot; " + str(sum(1 for r in ok if _r10(r))) + " with R10 by the Lean checker") if ok else ""}'
-            f'{(" &middot; refused: " + html.escape(", ".join(refused))) if refused else ""}</p>'
-            f'<p class="best">fastest verified: <b>{html.escape(best.get("short") or best["key"]) if best else "&ndash;"}</b>'
-            f'{(" at %.2f ms" % best["numbers"]["T_jones"]) if best else ""}</p>'
-            f'<table><tr><th>design</th><th>round</th><th>ions/instr</th><th>R10</th></tr>{lines}</table></a>')
+        refused = [r for r in rows if r not in ok]
+        tmax = max((_t(r) for r in ok), default=1.0)
+        fmt = (lambda v: f"{v:.2f} ms") if tmax < 100 else (lambda v: f"{v:.0f} ms")
+        bars = []
+        for r in ok:
+            cls = "bar" + (" best" if r is best else "") + ("" if _entry_ok(r) else " bad")
+            name = html.escape(short_name(r))
+            title = html.escape(r.get("title", ""))
+            note = "" if _entry_ok(r) else " &middot; rules failed"
+            bars.append(f'<a class="{cls}" href="{t["id"]}/{r["page"]}" title="{title}">'
+                        f'<span class="lbl">{name}{note}</span>'
+                        f'<span class="tr"><span class="fl" style="width:{100 * _t(r) / tmax:.1f}%;background:{fam_color(r.get("family", ""))}"></span></span>'
+                        f'<span class="v">{fmt(_t(r))}</span></a>')
+        ref = ""
+        if refused:
+            ref = ('<div class="refused"><b>refused</b> by the compiler: ' +
+                   ", ".join(html.escape(short_name(r)) for r in refused) + "</div>")
+        n_lean = sum(1 for r in ok if _r10(r))
+        n_bad = sum(1 for r in ok if not _entry_ok(r))
+        stats = (
+            f'<div class="stat good"><span>fastest verified</span><b>{fmt(_t(best)) if best else "&ndash;"}</b>'
+            f'<small>{html.escape(short_name(best)) if best else "none yet"}</small></div>'
+            f'<div class="stat lean"><span>R10 by Lean</span><b>{n_lean}</b><small>of {len(ok)} that run it</small></div>'
+            f'<div class="stat"><span>designs</span><b>{len(rows)}</b><small>{len(ok)} run the round</small></div>'
+            f'<div class="stat{" warn" if (refused or n_bad) else ""}"><span>refused &middot; rules failed</span>'
+            f'<b>{len(refused)} &middot; {n_bad}</b><small>{"marked in red" if (refused or n_bad) else "none"}</small></div>')
+        rows_html.append(
+            f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
+            f'<p class="desc">{html.escape(t.get("description", ""))}</p>'
+            f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p>'
+            f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; ranked by time on the jones table &middot; click a bar to step the programme</p></div>'
+            f'<div><div class="bars">{"".join(bars)}</div>{ref}</div>'
+            f'<div class="stats">{stats}</div></section>')
+    legend = ('<div class="legend">' +
+              "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
+              f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
+              '<span><i style="background:#0b7a4b"></i>fastest verified</span><span><i style="background:#c62828"></i>refused or rules failed</span></div>')
     body = ("<h1>Leaderboard</h1><p class=\"sub\">One board per task. A task is a fixed circuit, physics package "
             "and cost table; every design on a board ran one syndrome-extraction round of that circuit, was "
             "replayed against the 23 rules and, where it passed, checked by the proved Lean checker (R10). "
-            "Open a task for its ranking plot; click a dot there to step the programme in the studio.</p>"
-            f'<div class="cards">{"".join(cards)}</div>'
+            "Each row ranks its designs by running time; open a task for the full plot, where you can rank by "
+            "anything and click a dot to step the programme in the studio.</p>" + legend + "".join(rows_html) +
             "<p class=\"note\">Contributing a design from the studio (Verify &rarr; Contribute) arrives in phase 3 of "
             f"<a href=\"{REPO}/blob/main/docs/WEBSITE_PLAN.md\">the plan</a>; until then the boards carry the study's seed entries.</p>")
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE, extra_css="", body=body)
