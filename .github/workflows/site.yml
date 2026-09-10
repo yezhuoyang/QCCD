@@ -1,14 +1,14 @@
-# The website: built by `python -m qccd site`, checked, and copied to the server.
+# The website: built by `python -m qccd site`, checked, and copied to qccd.academy.
 #
 # Pure standard-library Python, so the build needs no install.  The check before the
 # deploy is the design-tool harness on the studio page the site ships -- the same
 # `tests/studio.mjs` the test suite drives -- so a page that lost its editor cannot go live.
 #
-# The site is static files; any web server serves the `site/` directory as it is.  The
-# deploy job rsyncs it over SSH and runs only when the repository has these set:
-#   variables  DEPLOY_HOST  DEPLOY_USER  DEPLOY_PATH   (Settings > Secrets and variables > Actions)
-#   secret     DEPLOY_KEY   a private key whose public half is in the server's authorized_keys
-# Without them the build still runs on every push and leaves `site` as a downloadable artefact.
+# The site is static files served by nginx on the droplet at 165.232.55.161 (the host
+# that also serves alphata.org) from /var/www/qccd.academy, owned by the user `qccd`.
+# The deploy job rsyncs as that user over SSH; its key is the repository secret
+# DEPLOY_KEY (the private half of ~/.ssh/qccd_deploy on the machine that set it up).
+# Without the secret the build still runs and the deploy step says so and skips.
 name: site
 on:
   push:
@@ -39,21 +39,20 @@ jobs:
           retention-days: 7
   deploy:
     needs: build
-    if: ${{ vars.DEPLOY_HOST != '' && github.ref == 'refs/heads/main' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: site
           path: site
-      - name: rsync to the server
+      - name: rsync to qccd.academy
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          HOST: ${{ vars.DEPLOY_HOST }}
-          USER: ${{ vars.DEPLOY_USER }}
-          DEST: ${{ vars.DEPLOY_PATH }}
         run: |
+          if [ -z "$DEPLOY_KEY" ]; then echo "no DEPLOY_KEY secret: build kept as the artefact, nothing deployed"; exit 0; fi
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -az --delete -e "ssh -i ~/.ssh/deploy" site/ "$USER@$HOST:$DEST/"
+          echo '165.232.55.161 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAbm6u8UkEk73LltHAvr8FtqUGfT4xbzEWWe5YXoWIwK' >> ~/.ssh/known_hosts
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes" site/ qccd@165.232.55.161:/var/www/qccd.academy/
+          echo "deployed to https://qccd.academy/"

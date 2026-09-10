@@ -1,8 +1,10 @@
 // THE SITE WALKTHROUGH: every page the site build wrote, opened in a real headless Chrome.
 //
 //   node tests/site.mjs <site dir> [--shots <dir>] [--only <substring>] [--quiet]
+//                       [--base <url> [--resolve <host>=<ip>]]   walk a LIVE copy instead
 //
-// The site is served over HTTP at the root, as a web server would, and each page is loaded,
+// The site is served over HTTP at the root, as a web server would (or, with --base, the
+// live server is walked, resolving its name to an IP before DNS moves), and each page is loaded,
 // its uncaught exceptions and console errors collected, the navigation bar and its search
 // probed, and -- for the studio -- the deep links #learn, #learn=B2 and #design asserted
 // to open what they name.  With --shots the walkthrough pages are captured as PNGs.  No
@@ -20,6 +22,7 @@ const args = process.argv.slice(2);
 const site = path.resolve(args[0] || 'site');
 const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const SHOTS = opt('--shots'), ONLY = opt('--only'), QUIET = args.includes('--quiet');
+const LIVE = opt('--base'), RESOLVE = opt('--resolve');
 const CHROME = process.env.CHROME || [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   '/usr/bin/google-chrome', '/usr/bin/chromium-browser', '/usr/bin/chromium',
@@ -37,15 +40,16 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
   fs.createReadStream(p).pipe(res);
 });
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const BASE = `http://127.0.0.1:${server.address().port}/`;
+if (!LIVE) await new Promise(r => server.listen(0, '127.0.0.1', r));
+const BASE = LIVE ? LIVE.replace(/\/?$/, '/') : `http://127.0.0.1:${server.address().port}/`;
 
 // -------- Chrome over CDP ---------------------------------------------------------------
 const port = 9300 + Math.floor(Math.random() * 500);
 const udd = fs.mkdtempSync(path.join(os.tmpdir(), 'qccd-site-'));
 const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${udd}`,
   '--disable-extensions', '--no-first-run', '--no-default-browser-check', '--window-size=1440,900',
-  '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
+  '--hide-scrollbars', ...(RESOLVE ? [`--host-resolver-rules=MAP ${RESOLVE.split('=')[0]} ${RESOLVE.split('=')[1]}`] : []),
+  'about:blank'], { stdio: 'ignore' });
 const getJSON = (u) => new Promise((res, rej) => http.get(u, r => { let s = ''; r.on('data', d => s += d); r.on('end', () => { try { res(JSON.parse(s)); } catch (e) { rej(e); } }); }).on('error', rej));
 let targets = null;
 for (let i = 0; i < 100 && !targets; i++) {
@@ -156,7 +160,7 @@ for (const rel of pages) await visit(rel, shotFor.get(rel) && !rel.includes('#')
 for (const [p, n] of walkthrough) if (p.includes('#')) await visit(p, n);
 
 if (SHOTS) { await open(BASE + 'index.html'); await evaluate("window.SITENAV.search('steane')"); await shot('11_search'); }
-ws.close(); chrome.kill(); server.close();
+ws.close(); chrome.kill(); if (!LIVE) server.close();
 try { fs.rmSync(udd, { recursive: true, force: true }); } catch {}
 console.log(JSON.stringify({ pages: results.length, failed, shots: SHOTS ? walkthrough.length + 1 : 0 }));
 process.exit(failed ? 1 : 0);

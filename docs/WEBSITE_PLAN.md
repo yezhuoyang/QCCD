@@ -280,11 +280,16 @@ in parallel sessions; 3 needs 1; 4 needs 2; 5 needs 4.
 
 1. **Hosting.** Decided 2026-09-09 morning: GitHub Pages from the same repository.
    **Revised 2026-09-09 during phase 0: a server of our own, not GitHub.** The site stays
-   static files; `site.yml` builds `site/`, runs the studio harness on it, and rsyncs it to
-   the host named by the repository variables `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`
-   and the secret `DEPLOY_KEY`; any web server serves the directory as it is (no rewrite,
-   no index rule beyond `index.html`). GitHub stays the back office: Issues, Discussions,
-   Actions. **Still to name: the server** (host, path, who holds the key).
+   static files. **Named 2026-09-09 evening: the DigitalOcean droplet at 165.232.55.161**,
+   the host that already serves alphata.org, qprogram.org, paperpilot.it.com and
+   sfplseucla.org behind one nginx. The site lives in `/var/www/qccd.academy`, owned by
+   the user `qccd`; the nginx site is `/etc/nginx/sites-available/qccd.academy` (port 80
+   now; certbot adds 443 once DNS points here). The domain is **qccd.academy**
+   (Namecheap); its A records for `@` and `www` must be set to 165.232.55.161 — today they
+   still point at the parking page. `site.yml` builds `site/`, runs the studio harness on
+   it, and rsyncs as `qccd` with the repository secret `DEPLOY_KEY` (the private half of
+   `~/.ssh/qccd_deploy` on the machine that set the server up); the host key is pinned in
+   the workflow. GitHub stays the back office: Issues, Discussions, Actions.
 2. **Submission channel.** Decided: issue form + Action-opened PR. A contributor needs a
    GitHub login and nothing else; the Action does the fork-free part.
 3. **R10 levels on the board.** Decided: three badges as in §5, all entries shown. The
@@ -367,7 +372,12 @@ walkthrough). `tests/studio.mjs` passes on `studio.html` and on 71 of the 89 ent
 the other 18 (the torus, cylinder and h3-ring variants) fail identically on the originals
 under `SmallCode/` and `BBResults/` (`st.device` is null in the editor's node walk), so
 that is the studio's to fix, not the site's. **Not live:** hosting changed mid-phase
-(§10.1) and no server is named yet; nothing is deployed. A clean export of the branch (`git archive`)
+(§10.1). **Then deployed the same evening** to the droplet by `tar` over SSH from this
+machine: nginx serves it for `qccd.academy` and `www.qccd.academy` on port 80, the deploy user
+and key exist, and the workflow can take over once `DEPLOY_KEY` is a repository secret. Until
+the A records move, the live copy is reachable only by resolving the name yourself
+(`node tests/site.mjs site --base http://qccd.academy/ --resolve qccd.academy=165.232.55.161`);
+HTTPS needs `certbot --nginx -d qccd.academy -d www.qccd.academy` after that. A clean export of the branch (`git archive`)
 builds and passes the studio harness, but without the course, the tools bar and the hover
 hints: `tutorial.js`, `RULE_HINTS` and the current `render.py`/`editor.js` are the studio
 session's uncommitted work, so a site built by CI from a checkout lacks them until that work
