@@ -1,0 +1,497 @@
+<style>
+/* Comments: a signed-in reader pins a note to any spot on any page.  The pin and its chat
+   box are absolutely positioned in the document (never fixed), so they stay on the words
+   they were placed on when the page scrolls.  Everything here is prefixed qc-. */
+#qcnav{display:inline-flex;align-items:center;gap:8px;margin-left:10px;height:40px;flex:0 0 auto;
+ font:13px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;position:relative}
+#qcnav.qc-float{position:fixed;right:12px;top:8px;z-index:1200;background:#fff;border:1px solid #cfceca;border-radius:99px;padding:0 6px 0 10px;height:36px}
+.qc-btn{font:inherit;font-size:13px;height:28px;padding:0 11px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:#0b0b0b;cursor:pointer;white-space:nowrap}
+.qc-btn:hover{border-color:#2a78d6;color:#2a78d6} .qc-btn:disabled{opacity:.5;cursor:default}
+.qc-btn.qc-primary{background:#2a78d6;border-color:#2a78d6;color:#fff} .qc-btn.qc-primary:hover{background:#1f63b5;color:#fff}
+.qc-btn.qc-on{background:#0b0b0b;border-color:#0b0b0b;color:#fff}
+.qc-av{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;
+ font-weight:600;font-size:11px;letter-spacing:.02em;flex:0 0 auto;user-select:none;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1}
+.qc-av.qc-sm{width:20px;height:20px;font-size:9px}
+#qc-me{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:0;background:none;padding:2px 4px;border-radius:99px;font:inherit;color:#0b0b0b;max-width:180px}
+#qc-me:hover{background:#eef3fb} #qc-me b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#qc-count{font-size:11px;color:#52514e;background:#f3f2ee;border-radius:99px;padding:3px 7px;white-space:nowrap}
+.qc-menu{position:absolute;right:0;top:36px;background:#fff;border:1px solid #cfceca;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);
+ padding:4px 0;min-width:190px;z-index:1300;font-size:13px;line-height:1.3}
+.qc-menu button{display:block;width:100%;text-align:left;border:0;background:none;font:inherit;padding:7px 12px;cursor:pointer;color:#0b0b0b}
+.qc-menu button:hover{background:#eef3fb} .qc-menu .qc-who{padding:6px 12px 8px;color:#8a8985;font-size:12px;border-bottom:1px solid #eee;margin-bottom:4px;word-break:break-all}
+/* above the studio's tools bar (70) and popovers (85-90), below the site bar and this layer's own dialogs */
+qccd-comments{position:absolute;left:0;top:0;width:0;height:0;overflow:visible;z-index:95;display:block;
+ font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0b0b0b;text-align:left}
+#sitenav{z-index:100}
+qccd-comments[hidden]{display:none}
+.qc-pin{position:absolute;width:30px;height:30px;margin:-30px 0 0 0;border-radius:50% 50% 50% 3px;border:2px solid #fff;
+ box-shadow:0 1px 6px rgba(0,0,0,.28);cursor:pointer;pointer-events:auto;z-index:1;display:flex;align-items:center;justify-content:center;
+ color:#fff;font-weight:600;font-size:11px;background:var(--qc);user-select:none}
+.qc-pin:hover{transform:scale(1.08)} .qc-pin.qc-approx{border-style:dashed}
+.qc-box{position:absolute;width:290px;background:#fff;border:1px solid var(--qc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);
+ pointer-events:auto;overflow:hidden;z-index:2}
+.qc-box:hover,.qc-box:focus-within{z-index:3}
+.qc-head{background:var(--qc);color:#fff;padding:6px 8px;display:flex;align-items:center;gap:7px;min-height:34px}
+.qc-head .qc-av{background:rgba(255,255,255,.28)}
+.qc-head b{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+.qc-head small{font-size:11px;opacity:.85;white-space:nowrap}
+.qc-x{border:0;background:rgba(255,255,255,.18);color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font:inherit;font-size:14px;line-height:1;padding:0;flex:0 0 auto}
+.qc-x:hover{background:rgba(255,255,255,.34)}
+.qc-msgs{max-height:280px;overflow:auto;padding:8px 8px 2px}
+.qc-msg{display:flex;gap:7px;margin:0 0 7px;align-items:flex-start}
+.qc-bub{background:color-mix(in srgb,var(--qc) 9%,#fff);border-radius:8px;padding:5px 8px 6px;flex:1 1 auto;min-width:0;position:relative}
+.qc-bub .qc-n{font-size:11px;color:#52514e;display:flex;gap:6px;align-items:baseline;margin-bottom:2px}
+.qc-bub .qc-n b{font-weight:600;color:#0b0b0b} .qc-bub .qc-n span{margin-left:auto;color:#8a8985;white-space:nowrap}
+.qc-bub p{margin:0;white-space:pre-wrap;word-wrap:break-word;font-size:13px;line-height:1.4;color:#0b0b0b}
+.qc-bub .qc-del{position:absolute;right:4px;bottom:3px;border:0;background:none;color:#8a8985;cursor:pointer;font-size:11px;padding:1px 4px;opacity:0;font-family:inherit}
+.qc-bub:hover .qc-del{opacity:1} .qc-bub .qc-del:hover{color:#d64545}
+.qc-reply{display:flex;gap:6px;padding:6px 8px 8px;border-top:1px solid #eee;align-items:flex-end}
+.qc-ta{flex:1 1 auto;min-width:0;font:inherit;font-size:13px;resize:none;min-height:32px;max-height:140px;border:1px solid #cfceca;border-radius:6px;padding:6px 8px;background:#fff;color:#0b0b0b}
+.qc-ta:focus{outline:2px solid #bcd4f2;border-color:#2a78d6}
+.qc-box.qc-draft .qc-ta{min-height:64px}
+.qc-err{color:#d64545;font-size:12px;margin:6px 0 0}
+.qc-hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:1300;background:#0b0b0b;color:#fff;padding:9px 16px;border-radius:99px;
+ font:13px/1 ui-sans-serif,system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none;white-space:nowrap}
+body.qc-placing,body.qc-placing *{cursor:crosshair!important}
+.qc-modal{position:fixed;inset:0;background:rgba(8,12,20,.45);z-index:1400;display:flex;align-items:center;justify-content:center;
+ font:13.5px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0b0b0b}
+.qc-dlg{background:#fff;border-radius:12px;padding:20px 22px 18px;width:360px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.3);text-align:left}
+.qc-dlg.qc-wide{width:720px}
+.qc-dlg h2{margin:0 0 4px;font-size:18px;font-weight:600} .qc-dlg .qc-sub{color:#52514e;margin:0 0 14px;font-size:13px}
+.qc-dlg label{display:block;font-size:12px;color:#52514e;margin:10px 0 3px}
+.qc-dlg input{width:100%;font:inherit;padding:7px 9px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:#0b0b0b}
+.qc-dlg input:focus{outline:2px solid #bcd4f2;border-color:#2a78d6}
+.qc-row{display:flex;gap:8px;align-items:center;margin-top:16px} .qc-row .qc-sp{flex:1 1 auto}
+.qc-link{border:0;background:none;color:#2a78d6;cursor:pointer;font:inherit;padding:0} .qc-link:hover{text-decoration:underline}
+.qc-list{list-style:none;margin:0;padding:0;font-size:13px} .qc-list li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid #eee}
+.qc-list li:first-child{border-top:0} .qc-list .qc-t{flex:1 1 auto;min-width:0} .qc-list .qc-t p{margin:2px 0 0;color:#0b0b0b;white-space:pre-wrap;word-wrap:break-word}
+.qc-list .qc-t small{color:#8a8985} .qc-list a{color:#2a78d6;text-decoration:none} .qc-list a:hover{text-decoration:underline}
+.qc-list .qc-btn{height:24px;padding:0 8px;font-size:12px}
+</style>
+<script>
+(function(){
+  // A static page anywhere (file://, the test shim, an embedded example inside an iframe)
+  // gets nothing from this: no widget, no requests.
+  if(typeof window === 'undefined' || typeof document === 'undefined' || typeof location === 'undefined') return;
+  if(typeof fetch !== 'function' || !window.addEventListener || !document.querySelector) return;
+  if(!/^https?:$/.test(location.protocol)) return;
+  try { if(window.top !== window.self) return; } catch(e){ return; }
+  if(/(^|&)embed(&|$)/.test((location.hash || '').replace(/^#/, ''))) return;
+
+  var API = '/api';
+  var PAGE = location.pathname.replace(/index\.html$/, '');
+  var PALETTE = ['#2a78d6','#d64545','#1baf7a','#eb6834','#4a3aa7','#c2308a','#0e9aa7','#8a6d1e','#5b8c1e','#b5471b','#6b4fbb','#2f7f6e'];
+  var ME = null, THREADS = [], NODES = {}, DRAFT = null, PLACING = false, HIDDEN = false, LAYER = null, NAV = null, HINT = null, MENU = null;
+  var FOLDED = {};
+  try { HIDDEN = localStorage.getItem('qc-hidden') === '1'; } catch(e){}
+  try { FOLDED = JSON.parse(localStorage.getItem('qc-fold:' + PAGE) || '{}') || {}; } catch(e){ FOLDED = {}; }
+
+  // ---- the API -------------------------------------------------------------------------
+  function api(method, path, body){
+    var opt = { method: method, credentials: 'same-origin', headers: {} };
+    if(body !== undefined){ opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    return fetch(API + path, opt).then(function(r){
+      return r.text().then(function(t){
+        var d = null; try { d = t ? JSON.parse(t) : null; } catch(e){}
+        if(!r.ok){ var err = new Error((d && d.error) || ('HTTP ' + r.status)); err.status = r.status; err.body = d; throw err; }
+        return d;
+      });
+    });
+  }
+
+  // ---- small helpers -------------------------------------------------------------------
+  function el(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+  function colour(u){ return PALETTE[((u && u.color) || 0) % PALETTE.length]; }
+  function initials(name){
+    var w = String(name || '?').trim().split(/\s+/).filter(Boolean);
+    return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase();
+  }
+  function avatar(u, small){ var a = el('span', 'qc-av' + (small ? ' qc-sm' : ''), initials(u && u.name)); a.style.background = colour(u); a.title = (u && u.name) || ''; return a; }
+  function when(t){
+    var d = new Date(t * 1000), now = new Date();
+    var o = { month: 'short', day: 'numeric' };
+    if(d.getFullYear() !== now.getFullYear()) o.year = 'numeric';
+    try { return d.toLocaleDateString(undefined, o) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch(e){ return d.toISOString().slice(0, 16); }
+  }
+  function cssEscape(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/([^\w-])/g, '\\$1'); }
+  function stopKeys(node){ ['keydown', 'keyup', 'keypress'].forEach(function(k){ node.addEventListener(k, function(ev){ ev.stopPropagation(); }); }); }
+  function canDelete(owner){ return !!ME && (ME.admin || (owner && owner.id === ME.id)); }
+  function saveFold(){ try { localStorage.setItem('qc-fold:' + PAGE, JSON.stringify(FOLDED)); } catch(e){} }
+
+  // ---- the bar widget ------------------------------------------------------------------
+  function mountNav(){
+    NAV = el('span'); NAV.id = 'qcnav';
+    var nav = document.getElementById('sitenav');
+    if(nav) nav.appendChild(NAV); else { NAV.className = 'qc-float'; document.body.appendChild(NAV); }
+    stopKeys(NAV);
+    document.addEventListener('click', function(ev){ if(MENU && !MENU.contains(ev.target) && !(ev.target.id === 'qc-me' || (ev.target.closest && ev.target.closest('#qc-me')))) closeMenu(); });
+    renderNav();
+  }
+  function renderNav(){
+    if(!NAV) return;
+    NAV.innerHTML = ''; MENU = null;
+    if(!ME){
+      var s = el('button', 'qc-btn', 'Sign in'); s.id = 'qc-signin'; s.type = 'button';
+      s.title = 'Sign in to read and leave comments'; s.addEventListener('click', function(){ openAuth('login'); });
+      NAV.appendChild(s); return;
+    }
+    var add = el('button', 'qc-btn' + (PLACING ? ' qc-on' : ' qc-primary'), PLACING ? 'Click a spot…' : '+ Comment'); add.id = 'qc-add'; add.type = 'button';
+    add.title = PLACING ? 'Press Escape to stop' : 'Pin a comment to any spot on this page';
+    add.addEventListener('click', function(){ setPlacing(!PLACING); });
+    NAV.appendChild(add);
+    var n = THREADS.length;
+    if(n || HIDDEN){
+      var c = el('span', null, HIDDEN ? 'hidden' : (n + (n === 1 ? ' comment' : ' comments'))); c.id = 'qc-count';
+      c.title = HIDDEN ? 'Comments on this page are hidden; show them from your menu' : 'Comments pinned on this page';
+      NAV.appendChild(c);
+    }
+    var me = el('button'); me.id = 'qc-me'; me.type = 'button'; me.title = ME.name + ' · ' + ME.email;
+    me.appendChild(avatar(ME)); me.appendChild(el('b', null, ME.name));
+    me.addEventListener('click', function(ev){ ev.stopPropagation(); MENU ? closeMenu() : openMenu(); });
+    NAV.appendChild(me);
+  }
+  function closeMenu(){ if(MENU && MENU.parentNode) MENU.parentNode.removeChild(MENU); MENU = null; }
+  function openMenu(){
+    closeMenu();
+    MENU = el('div', 'qc-menu'); MENU.id = 'qc-menu';
+    MENU.appendChild(el('div', 'qc-who', ME.name + '\n' + ME.email + (ME.admin ? ' · admin' : '')));
+    function item(label, fn, id){ var b = el('button', null, label); b.type = 'button'; if(id) b.id = id; b.addEventListener('click', function(){ closeMenu(); fn(); }); MENU.appendChild(b); }
+    item(HIDDEN ? 'Show comments on this page' : 'Hide comments on this page', function(){ HIDDEN = !HIDDEN; try { localStorage.setItem('qc-hidden', HIDDEN ? '1' : '0'); } catch(e){} applyHidden(); renderNav(); }, 'qc-toggle');
+    item('Unfold every thread', function(){ FOLDED = {}; saveFold(); renderAll(); });
+    if(ME.admin) item('All comments on the site', openAdmin, 'qc-admin');
+    item('Change password', openPassword, 'qc-passwd');
+    item('Sign out', signOut, 'qc-signout');
+    NAV.appendChild(MENU);
+  }
+  function signOut(){
+    api('POST', '/logout').catch(function(){}).then(function(){ ME = null; THREADS = []; setPlacing(false); clearLayer(); renderNav(); });
+  }
+
+  // ---- the sign-in / create-account dialog ---------------------------------------------
+  var MODAL = null;
+  function closeModal(){ if(MODAL && MODAL.parentNode) MODAL.parentNode.removeChild(MODAL); MODAL = null; }
+  function modal(){
+    closeModal();
+    MODAL = el('div', 'qc-modal');
+    var dlg = el('div', 'qc-dlg'); MODAL.appendChild(dlg);
+    MODAL.addEventListener('click', function(ev){ if(ev.target === MODAL) closeModal(); });
+    MODAL.addEventListener('keydown', function(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); closeModal(); } });
+    stopKeys(MODAL);
+    document.body.appendChild(MODAL);
+    return dlg;
+  }
+  function field(dlg, id, label, type, placeholder, autocomplete){
+    var l = el('label', null, label); l.htmlFor = id; dlg.appendChild(l);
+    var i = el('input'); i.id = id; i.type = type; i.placeholder = placeholder || ''; if(autocomplete) i.autocomplete = autocomplete; i.required = true;
+    dlg.appendChild(i); return i;
+  }
+  function openAuth(mode, after){
+    var dlg = modal(); dlg.id = 'qc-auth'; dlg.setAttribute('data-mode', mode);
+    var reg = mode === 'register';
+    dlg.appendChild(el('h2', null, reg ? 'Create an account' : 'Sign in'));
+    dlg.appendChild(el('p', 'qc-sub', reg ? 'Your name and avatar appear on the comments you pin.' : 'Comments on the site are visible to signed-in readers.'));
+    var form = el('form'); dlg.appendChild(form);
+    var name = reg ? field(form, 'qc-name', 'Your name', 'text', 'as it should appear on your comments', 'name') : null;
+    var email = field(form, 'qc-email', 'Email', 'email', 'you@example.org', 'email');
+    var pass = field(form, 'qc-pass', 'Password', 'password', reg ? 'at least 8 characters' : '', reg ? 'new-password' : 'current-password');
+    if(reg) pass.minLength = 8;
+    var err = el('p', 'qc-err'); err.id = 'qc-auth-err'; form.appendChild(err);
+    var row = el('div', 'qc-row'); form.appendChild(row);
+    var sw = el('button', 'qc-link', reg ? 'I already have an account' : 'Create an account'); sw.type = 'button'; sw.id = 'qc-switch';
+    sw.addEventListener('click', function(){ openAuth(reg ? 'login' : 'register', after); });
+    row.appendChild(sw); row.appendChild(el('span', 'qc-sp'));
+    var ok = el('button', 'qc-btn qc-primary', reg ? 'Create account' : 'Sign in'); ok.type = 'submit'; ok.id = 'qc-submit'; row.appendChild(ok);
+    form.addEventListener('submit', function(ev){
+      ev.preventDefault(); err.textContent = ''; ok.disabled = true;
+      var body = { email: email.value.trim(), password: pass.value };
+      if(reg) body.name = name.value.trim();
+      api('POST', reg ? '/register' : '/login', body).then(function(d){
+        ME = d.user; closeModal(); renderNav(); load(); if(after) after();
+      }).catch(function(e){ ok.disabled = false; err.textContent = e.message; });
+    });
+    (reg ? name : email).focus();
+  }
+  function openPassword(){
+    var dlg = modal(); dlg.id = 'qc-pw';
+    dlg.appendChild(el('h2', null, 'Change password'));
+    var form = el('form'); dlg.appendChild(form);
+    var old = field(form, 'qc-old', 'Current password', 'password', '', 'current-password');
+    var nw = field(form, 'qc-new', 'New password', 'password', 'at least 8 characters', 'new-password'); nw.minLength = 8;
+    var err = el('p', 'qc-err'); form.appendChild(err);
+    var row = el('div', 'qc-row'); form.appendChild(row);
+    var cancel = el('button', 'qc-link', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', closeModal);
+    row.appendChild(cancel); row.appendChild(el('span', 'qc-sp'));
+    var ok = el('button', 'qc-btn qc-primary', 'Change'); ok.type = 'submit'; row.appendChild(ok);
+    form.addEventListener('submit', function(ev){
+      ev.preventDefault(); err.textContent = ''; ok.disabled = true;
+      api('POST', '/password', { old: old.value, new: nw.value }).then(function(){ closeModal(); })
+        .catch(function(e){ ok.disabled = false; err.textContent = e.message; });
+    });
+    old.focus();
+  }
+  function openAdmin(){
+    var dlg = modal(); dlg.id = 'qc-all'; dlg.className += ' qc-wide';
+    dlg.appendChild(el('h2', null, 'All comments'));
+    var sub = el('p', 'qc-sub', 'Loading…'); dlg.appendChild(sub);
+    var list = el('ul', 'qc-list'); dlg.appendChild(list);
+    var row = el('div', 'qc-row'); dlg.appendChild(row); row.appendChild(el('span', 'qc-sp'));
+    var close = el('button', 'qc-btn', 'Close'); close.type = 'button'; close.addEventListener('click', closeModal); row.appendChild(close);
+    api('GET', '/admin/threads').then(function(d){
+      var ths = d.threads || [];
+      sub.textContent = ths.length ? (ths.length + ' thread' + (ths.length === 1 ? '' : 's') + ' on the site, newest first. Open one to see it in place; delete removes the whole thread.') : 'No comments anywhere yet.';
+      ths.forEach(function(th){
+        var li = el('li'); li.setAttribute('data-id', th.id);
+        li.appendChild(avatar(th.user));
+        var t = el('div', 'qc-t');
+        var a = el('a', null, ((th.anchor && th.anchor.title) || th.page) + ' '); a.href = th.page + '?c=' + th.id; a.title = th.page;
+        t.appendChild(a);
+        t.appendChild(el('small', null, th.user.name + ' · ' + when(th.created) + ' · ' + th.comments.length + (th.comments.length === 1 ? ' message' : ' messages')));
+        t.appendChild(el('p', null, (th.comments[0] ? th.comments[0].text : '').slice(0, 240)));
+        li.appendChild(t);
+        var del = el('button', 'qc-btn', 'Delete'); del.type = 'button';
+        del.addEventListener('click', function(){
+          if(!confirm('Delete this thread and its ' + th.comments.length + ' message(s)?')) return;
+          api('DELETE', '/threads/' + th.id).then(function(){ li.parentNode.removeChild(li); if(th.page === PAGE) load(); }).catch(function(e){ alert(e.message); });
+        });
+        li.appendChild(del);
+        list.appendChild(li);
+      });
+    }).catch(function(e){ sub.textContent = e.message; });
+  }
+
+  // ---- the layer: pins and chat boxes in the document ----------------------------------
+  function mountLayer(){
+    LAYER = document.createElement('qccd-comments'); LAYER.id = 'qc-layer';
+    stopKeys(LAYER);
+    document.body.appendChild(LAYER);
+    applyHidden();
+  }
+  function applyHidden(){ if(LAYER) LAYER.hidden = !!HIDDEN; }
+  function clearLayer(){ LAYER.innerHTML = ''; NODES = {}; DRAFT = null; renderNav(); }
+
+  // Where a thread sits: the element the reader clicked (by id, else by its tag path from
+  // the nearest id), and how far into it.  The text and the layer offsets are fallbacks
+  // for a page that has changed underneath.
+  function describe(target, cx, cy){
+    var e = target;
+    while(e && e !== document.body){ var r = e.getBoundingClientRect(); if(r.width > 0 && r.height > 0) break; e = e.parentElement; }
+    if(!e || e === document.documentElement) e = document.body;
+    var path = [], n = e;
+    while(n && n !== document.body && n !== document.documentElement){
+      if(n.id && !/^\d/.test(n.id) && document.getElementById(n.id) === n){ path.unshift('#' + cssEscape(n.id)); n = null; break; }
+      var k = 1, s = n.previousElementSibling;
+      while(s){ if(s.tagName === n.tagName) k++; s = s.previousElementSibling; }
+      path.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + k + ')');
+      n = n.parentElement;
+    }
+    if(n === document.body) path.unshift('body');
+    var R = e.getBoundingClientRect(), L = LAYER.getBoundingClientRect();
+    return { sel: path.join(' > '), tag: e.tagName.toLowerCase(), text: (e.textContent || '').trim().slice(0, 80),
+             ox: +((cx - R.left) / R.width).toFixed(4), oy: +((cy - R.top) / R.height).toFixed(4),
+             dx: Math.round(cx - L.left), dy: Math.round(cy - L.top), hash: location.hash || '', title: document.title };
+  }
+  function resolve(a){
+    var e = null;
+    if(a && a.sel){ try { e = document.querySelector(a.sel); } catch(err){ e = null; } }
+    if(e && a.tag && e.tagName.toLowerCase() !== a.tag) e = null;
+    if(e && LAYER.contains(e)) e = null;
+    if(!e && a && a.text && a.tag){
+      var c = document.getElementsByTagName(a.tag);
+      for(var i = 0; i < c.length; i++){ if(!LAYER.contains(c[i]) && (c[i].textContent || '').trim().slice(0, 80) === a.text){ e = c[i]; break; } }
+    }
+    return e;
+  }
+  // a point inside a panel that scrolled it out of view is not drawn over the panel's edge
+  function clipped(e, vx, vy){
+    var p = e.parentElement;
+    while(p && p !== document.body){
+      var cs = getComputedStyle(p), o = cs.overflow + cs.overflowX + cs.overflowY;
+      if(/auto|scroll|hidden/.test(o)){ var r = p.getBoundingClientRect(); if(vx < r.left - 1 || vx > r.right + 1 || vy < r.top - 1 || vy > r.bottom + 1) return true; }
+      p = p.parentElement;
+    }
+    return false;
+  }
+  function pointOf(node){
+    var a = node.anchor || {}, L = LAYER.getBoundingClientRect();
+    if(!node.el || !node.el.isConnected) node.el = resolve(a);
+    if(node.el){
+      var r = node.el.getBoundingClientRect();
+      if(r.width > 0 || r.height > 0){
+        var vx = r.left + (a.ox || 0) * r.width, vy = r.top + (a.oy || 0) * r.height;
+        return { x: vx - L.left, y: vy - L.top, ok: true, hide: clipped(node.el, vx, vy) };
+      }
+      return { x: 0, y: 0, ok: false, hide: true };
+    }
+    return { x: a.dx || 0, y: a.dy || 0, ok: false, hide: false, approx: true };
+  }
+  function layout(node){
+    var p = pointOf(node), L = LAYER.getBoundingClientRect();
+    node.pin.style.display = node.box.style.display = p.hide ? 'none' : '';
+    if(p.hide) return;
+    node.pin.classList.toggle('qc-approx', !!p.approx);
+    node.pin.style.left = p.x + 'px'; node.pin.style.top = p.y + 'px';
+    if(node.box.classList.contains('qc-fold')) return;
+    var vw = document.documentElement.clientWidth, bw = node.box.offsetWidth || 290, bh = node.box.offsetHeight || 120;
+    var vx = p.x + L.left;
+    var bx = (vx + 36 + bw + 8 <= vw) ? p.x + 36 : Math.max(8 - L.left, p.x - 8 - bw);
+    var by = p.y - 30;
+    var docH = Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight);
+    if(by + bh + 8 - L.top > docH + window.scrollY) by = Math.max(8 - L.top, docH + window.scrollY - L.top - bh - 8);
+    node.box.style.left = bx + 'px'; node.box.style.top = by + 'px';
+  }
+  var raf = false;
+  function place(){ raf = false; if(!LAYER) return; for(var id in NODES) layout(NODES[id]); if(DRAFT) layout(DRAFT); }
+  function schedule(){ if(raf) return; raf = true; (window.requestAnimationFrame || setTimeout)(place, 16); }
+
+  function msgRow(th, c){
+    var row = el('div', 'qc-msg'); row.setAttribute('data-cid', c.id);
+    row.appendChild(avatar(c.user, true));
+    var b = el('div', 'qc-bub'); b.style.setProperty('--qc', colour(c.user));
+    var n = el('div', 'qc-n'); n.appendChild(el('b', null, c.user.name)); n.appendChild(el('span', null, when(c.created))); b.appendChild(n);
+    b.appendChild(el('p', null, c.text));
+    if(canDelete(c.user)){
+      var d = el('button', 'qc-del', 'delete'); d.type = 'button'; d.title = 'Delete this message';
+      d.addEventListener('click', function(){
+        api('DELETE', '/comments/' + c.id).then(function(r){ if(r.gone) removeThread(th.id); else { th.comments = th.comments.filter(function(x){ return x.id !== c.id; }); renderThread(th); } })
+          .catch(function(e){ alert(e.message); });
+      });
+      b.appendChild(d);
+    }
+    row.appendChild(b);
+    return row;
+  }
+  function removeThread(id){
+    THREADS = THREADS.filter(function(t){ return t.id !== id; });
+    var n = NODES[id]; if(n){ if(n.pin.parentNode) LAYER.removeChild(n.pin); if(n.box.parentNode) LAYER.removeChild(n.box); delete NODES[id]; }
+    renderNav();
+  }
+  function renderThread(th){
+    var node = NODES[th.id];
+    if(!node){
+      node = NODES[th.id] = { anchor: th.anchor, el: null, pin: el('div', 'qc-pin'), box: el('div', 'qc-box') };
+      node.pin.setAttribute('data-id', th.id); node.box.setAttribute('data-id', th.id);
+      node.pin.addEventListener('click', function(){ toggleFold(th.id); });
+      LAYER.appendChild(node.pin); LAYER.appendChild(node.box);
+    }
+    var c = colour(th.user);
+    node.pin.style.setProperty('--qc', c); node.pin.textContent = initials(th.user.name);
+    node.pin.title = th.user.name + ' · ' + when(th.created) + (FOLDED[th.id] ? ' · click to open' : ' · click to fold');
+    node.box.style.setProperty('--qc', c);
+    node.box.classList.toggle('qc-fold', !!FOLDED[th.id]);
+    node.box.innerHTML = '';
+    var head = el('div', 'qc-head'); head.appendChild(avatar(th.user));
+    head.appendChild(el('b', null, th.user.name)); head.appendChild(el('small', null, when(th.created)));
+    var fold = el('button', 'qc-x', '–'); fold.type = 'button'; fold.title = 'Fold to the pin'; fold.addEventListener('click', function(){ toggleFold(th.id); }); head.appendChild(fold);
+    if(canDelete(th.user)){
+      var del = el('button', 'qc-x qc-delthread', '×'); del.type = 'button'; del.title = ME.admin && th.user.id !== ME.id ? 'Delete this thread (admin)' : 'Delete this thread';
+      del.addEventListener('click', function(){
+        if(!confirm('Delete this thread' + (th.comments.length > 1 ? ' and its ' + th.comments.length + ' messages' : '') + '?')) return;
+        api('DELETE', '/threads/' + th.id).then(function(){ removeThread(th.id); }).catch(function(e){ alert(e.message); });
+      });
+      head.appendChild(del);
+    }
+    node.box.appendChild(head);
+    var msgs = el('div', 'qc-msgs'); th.comments.forEach(function(cm){ msgs.appendChild(msgRow(th, cm)); }); node.box.appendChild(msgs);
+    var reply = el('div', 'qc-reply');
+    var ta = el('textarea', 'qc-ta'); ta.placeholder = 'Reply…'; ta.rows = 1; reply.appendChild(ta);
+    var send = el('button', 'qc-btn qc-primary qc-send', 'Reply'); send.type = 'button'; reply.appendChild(send);
+    function post(){
+      var text = ta.value.trim(); if(!text) return; send.disabled = true;
+      api('POST', '/threads/' + th.id + '/comments', { text: text }).then(function(d){ th.comments.push(d.comment); renderThread(th); schedule(); })
+        .catch(function(e){ send.disabled = false; alert(e.message); });
+    }
+    send.addEventListener('click', post);
+    ta.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); post(); } });
+    ta.addEventListener('input', function(){ ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; schedule(); });
+    node.box.appendChild(reply);
+    layout(node);
+  }
+  function toggleFold(id){ if(FOLDED[id]) delete FOLDED[id]; else FOLDED[id] = 1; saveFold(); var th = THREADS.filter(function(t){ return t.id === id; })[0]; if(th) renderThread(th); }
+  function renderAll(){
+    for(var id in NODES){ if(!THREADS.some(function(t){ return String(t.id) === String(id); })) removeThread(+id); }
+    THREADS.forEach(renderThread);
+    renderNav(); schedule();
+  }
+
+  // ---- placing a new one ---------------------------------------------------------------
+  function setPlacing(on){
+    PLACING = !!on;
+    document.body.classList.toggle('qc-placing', PLACING);
+    if(PLACING && !HINT){ HINT = el('div', 'qc-hint', 'Click where the comment should go · Esc cancels'); HINT.id = 'qc-hintbar'; document.body.appendChild(HINT); }
+    if(!PLACING && HINT){ document.body.removeChild(HINT); HINT = null; }
+    renderNav();
+  }
+  function ours(t){ return !!(t && t.closest && (t.closest('#qcnav') || t.closest('#qc-layer') || t.closest('.qc-modal') || t.closest('.qc-menu'))); }
+  function swallow(ev){ if(!PLACING || ours(ev.target)) return; ev.stopPropagation(); if(ev.type !== 'pointerdown' && ev.type !== 'mousedown') ev.preventDefault(); }
+  ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'dblclick'].forEach(function(k){ document.addEventListener(k, swallow, true); });
+  document.addEventListener('click', function(ev){
+    if(!PLACING || ours(ev.target)) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var a = describe(ev.target, ev.clientX, ev.clientY);
+    setPlacing(false);
+    openDraft(a);
+  }, true);
+  document.addEventListener('keydown', function(ev){
+    if(ev.key === 'Escape'){ if(PLACING) setPlacing(false); if(DRAFT) closeDraft(); }
+  }, true);
+  function closeDraft(){ if(!DRAFT) return; if(DRAFT.pin.parentNode) LAYER.removeChild(DRAFT.pin); if(DRAFT.box.parentNode) LAYER.removeChild(DRAFT.box); DRAFT = null; }
+  function openDraft(anchor){
+    closeDraft();
+    var c = colour(ME);
+    DRAFT = { anchor: anchor, el: null, pin: el('div', 'qc-pin'), box: el('div', 'qc-box qc-draft') };
+    DRAFT.pin.style.setProperty('--qc', c); DRAFT.pin.textContent = initials(ME.name);
+    DRAFT.box.style.setProperty('--qc', c); DRAFT.box.id = 'qc-draft';
+    var head = el('div', 'qc-head'); head.appendChild(avatar(ME)); head.appendChild(el('b', null, ME.name)); head.appendChild(el('small', null, 'new comment'));
+    var x = el('button', 'qc-x', '×'); x.type = 'button'; x.title = 'Cancel'; x.addEventListener('click', closeDraft); head.appendChild(x);
+    DRAFT.box.appendChild(head);
+    var reply = el('div', 'qc-reply');
+    var ta = el('textarea', 'qc-ta'); ta.id = 'qc-draft-text'; ta.placeholder = 'What is wrong here, or what should change?'; ta.rows = 3; reply.appendChild(ta);
+    var send = el('button', 'qc-btn qc-primary', 'Post'); send.type = 'button'; send.id = 'qc-post'; reply.appendChild(send);
+    function post(){
+      var text = ta.value.trim(); if(!text) return; send.disabled = true;
+      api('POST', '/threads', { page: PAGE, anchor: anchor, text: text }).then(function(d){
+        closeDraft(); THREADS.push(d.thread); renderThread(d.thread); renderNav(); schedule();
+      }).catch(function(e){ send.disabled = false; alert(e.message); });
+    }
+    send.addEventListener('click', post);
+    ta.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)){ ev.preventDefault(); post(); } });
+    DRAFT.box.appendChild(reply);
+    LAYER.appendChild(DRAFT.pin); LAYER.appendChild(DRAFT.box);
+    if(HIDDEN){ HIDDEN = false; try { localStorage.setItem('qc-hidden', '0'); } catch(e){} applyHidden(); renderNav(); }
+    layout(DRAFT);
+    ta.focus();
+  }
+
+  // ---- loading -------------------------------------------------------------------------
+  function load(){
+    if(!ME) return;
+    api('GET', '/threads?page=' + encodeURIComponent(PAGE)).then(function(d){
+      THREADS = d.threads || []; renderAll();
+      var m = /[?&]c=(\d+)/.exec(location.search);
+      if(m){ var id = +m[1]; if(FOLDED[id]){ delete FOLDED[id]; saveFold(); } var th = THREADS.filter(function(t){ return t.id === id; })[0];
+             if(th){ renderThread(th); try { NODES[id].box.scrollIntoView({ block: 'center' }); } catch(e){} } }
+    }).catch(function(e){ if(e.status === 401){ ME = null; renderNav(); } });
+  }
+  function start(){
+    mountNav(); mountLayer();
+    window.addEventListener('resize', schedule);
+    document.addEventListener('scroll', schedule, true);
+    window.addEventListener('load', schedule);
+    document.addEventListener('load', schedule, true);
+    ['pointerup', 'keyup', 'transitionend', 'animationend'].forEach(function(k){ document.addEventListener(k, schedule, true); });
+    document.addEventListener('wheel', schedule, { capture: true, passive: true });
+    window.addEventListener('hashchange', schedule);
+    if(window.ResizeObserver){ try { new ResizeObserver(schedule).observe(document.body); } catch(e){} }
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+    setInterval(schedule, 1000);
+    api('GET', '/me').then(function(d){ ME = d && d.user; renderNav(); load(); })
+      .catch(function(){ /* no accounts service behind this copy of the page: nothing to show */ if(NAV && NAV.parentNode) NAV.parentNode.removeChild(NAV); NAV = null; });
+  }
+  window.QCCOMMENTS = {
+    state: function(){ return { me: ME, placing: PLACING, hidden: HIDDEN, page: PAGE,
+                                threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null, folded: !!FOLDED[t.id] }; }) }; },
+    reload: load, place: place
+  };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>

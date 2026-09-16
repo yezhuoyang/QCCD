@@ -306,7 +306,12 @@ in parallel sessions; 3 needs 1; 4 needs 2; 5 needs 4.
 ## 11 · Do not do
 
 - No server, no database, no accounts, no upload endpoint. If a feature needs one, it is
-  the wrong feature.
+  the wrong feature. **Revised 2026-09-14:** the one exception is the comment layer the
+  user asked for (accounts by email and password, notes pinned to any spot of any page,
+  visible to signed-in readers only, an admin who deletes anything): `qccd/site/comments_api.py`
+  behind nginx at `/api/`, see the status entry below. Design and verification still
+  never touch it; a copy of the site served without it is the site with a Sign-in button
+  that leads nowhere.
 - No second implementation of a rule, a price or a checker for the website; every browser
   piece is a twin under a parity test, or the original compiled to the browser.
 - No trust in a submitted verdict; CI recomputes everything it publishes.
@@ -448,3 +453,49 @@ then the three institutions with their marks) and **Publications** (`publication
 `qccd/site/publications.py`: 21 papers grouped by what each contributes, one *used for*
 line each, arXiv and DOI links, and a BibTeX for citing the software until a paper exists).
 All three are searchable (page, section, person and paper entries) and in the walkthrough.
+
+### Accounts and comments — 2026-09-14
+
+**Asked.** Sign in with an email and a password; comments visible to signed-in readers
+only; the user (yezhuoyang@cs.ucla.edu) is the admin and deletes any comment; a reader
+pins a comment anywhere on any page, shown as a coloured chat box with the author's name
+and avatar, so a problem can be pointed at where it is; the boxes stay on the page when
+it scrolls (they are in the document, never fixed to the viewport).
+
+**Built.** (1) `qccd/site/comments_api.py`: the API, standard library only (`http.server`,
+`sqlite3`, `hashlib.scrypt` for passwords, a random session token in an HttpOnly
+SameSite cookie, hashed at rest); routes for register/login/logout/password, threads per
+page, comments per thread, delete by author or admin, an admin list of every thread;
+refusals for cross-site Origins, malformed or oversized bodies and bursts of sign-in
+attempts; a `passwd` command that makes or resets an account from the shell (the admin
+account is made that way, so nobody can register the address; there is no mail on the
+host, so no reset email). (2) `qccd/site/comments.html`: the layer `build.py::with_nav`
+injects into every page after the bar. Signed out: a Sign in button in the bar and
+nothing else. Signed in: `+ Comment` enters a placing mode (crosshair, a hint bar,
+Escape cancels); a click describes the spot as an anchor (`#id`, else the tag path from
+the nearest id, the fraction of the element's box, its first 80 characters as a fallback,
+the layer offsets as a last resort) and opens a draft box; a posted thread is a pin (the
+author's initials in their colour, twelve colours by account) at the spot and a chat box
+beside it (coloured header with avatar, name and time; messages as tinted bubbles; a
+reply field; delete on own messages, admin on all; fold to the pin). Positions are
+recomputed on scroll (capture, so panels inside the studio count), resize, load, fonts,
+a ResizeObserver on `body` and once a second, so a note follows its paragraph through a
+reflow; a point inside a scrolled-away panel is not drawn over the panel's edge.
+Embedded examples (iframes, `#embed`), `file://` copies and the test shim get nothing.
+The account menu hides/shows the page's comments, unfolds all, changes the password,
+signs out, and for the admin opens *All comments on the site* (every thread, newest
+first, open-in-place links `page?c=<id>`, delete). (3) `qccd/site/deploy/`: the systemd
+unit (user `qccd`, `/var/lib/qccd/comments.db`, `--secure --proxied`), the nginx
+snippet (`/api/` to `127.0.0.1:8200`), a README with the install and the one sudo rule;
+`site.yml` now also rsyncs the API file and restarts the unit. (4) Tests:
+`tests/test_comments_api.py` (the API over HTTP: who may see, post and delete what;
+sessions ending on sign-out and password change; every refusal), `tests/comments.mjs` +
+`tests/test_site_comments.py` (headless Chrome on a page made through `with_nav`, with the
+real API proxied: sign in with real typing, pin with a real click, the pin stands on the
+paragraph through a scroll, a reload and a 720 px window, reply, delete, sign out, admin
+deletes it all; no console errors); `tests/site.mjs` answers `/api/me` as nobody
+signed in and asserts every page offers Sign in and shows no pins.
+
+**Not done.** No email verification (no mail on the host); no avatar upload (initials
+in the account's colour); comments are keyed by path, not by the studio's `#learn`/
+`#design` hash (the anchor records it for context).

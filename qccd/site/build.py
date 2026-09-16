@@ -2,9 +2,12 @@
 
 The site is a build target that ARRANGES what exists: the studio page (`qccd studio`),
 the reference docs (`docs/*.md`), the boards `Codesign/scripts/bb_studio.py` already
-rendered for the five tasks, and a discussion page.  It writes plain HTML.  The only
-thing it adds to a page is the 40 px navigation bar with its search box, and the only
-third-party script on the whole site is giscus on /discuss/.  Nothing runs on a server.
+rendered for the five tasks, and a discussion page.  It writes plain HTML.  What it adds
+to a page is the 40 px navigation bar with its search box and the comment layer
+(`comments.html`): a signed-in reader pins a note to any spot of any page, and only
+signed-in readers see the notes.  The one process behind the site is that layer's API,
+`comments_api.py` (accounts, sessions and threads in SQLite, standard library only),
+reached through nginx at `/api/`; the only third-party script is giscus on /discuss/.
 
     site/                  the landing: one sentence, four tiles
     site/studio.html       the design tool; #learn opens the course, #learn=B2 a lesson,
@@ -364,11 +367,18 @@ def nav_html(depth: int, active: str | None, index_json: str) -> str:
             .replace("__INDEX__", index_json))
 
 
+def comments_html() -> str:
+    """The comment layer (`comments.html`): the Sign-in control in the bar, and for a
+    signed-in reader the pins and chat boxes anchored in the page.  It talks to `/api/`
+    (`comments_api.py` behind nginx) and does nothing on a copy served without it."""
+    return (HERE / "comments.html").read_text(encoding="utf-8")
+
+
 def with_nav(page: str, depth: int, active: str | None, index_json: str,
              app: bool = False, extra: str = "") -> str:
-    """The bar goes right after `<body>`; an app page (the studio frame, one viewport
-    high) also gets the 40 px taken off its `main`."""
-    bar = (APP_CSS if app else "") + nav_html(depth, active, index_json)
+    """The bar goes right after `<body>`, the comment layer right after the bar; an app
+    page (the studio frame, one viewport high) also gets the 40 px taken off its `main`."""
+    bar = (APP_CSS if app else "") + nav_html(depth, active, index_json) + comments_html()
     # the real tag, not the `<body data-explain>` a stylesheet comment in the studio quotes
     i = page.index("<body", page.index("</head>"))
     i = page.index(">", i) + 1
@@ -566,7 +576,11 @@ def discuss_page() -> str:
         secs.append(f'<h2 id="{cat.lower()}">{cat}</h2><p class="sub">{blurb}</p>{widget}')
     body = ("<h1>Discuss</h1><p class=\"sub\">GitHub Discussions on the repository, embedded here with giscus. "
             "A rule change is a pull request touching the rule's doc, its Python and browser twins and the parity "
-            "test together; the discussion happens here, the decision is a merge.</p>" + "".join(secs))
+            "test together; the discussion happens here, the decision is a merge.</p>"
+            "<p class=\"note\">To point at one spot instead: <b>sign in</b> from the bar (an email and a password; "
+            "an account takes a moment to create), press <b>+ Comment</b>, and click the word, figure or control you "
+            "mean. The note stays pinned there for every signed-in reader, who can reply under it. "
+            "Only signed-in readers see comments.</p>" + "".join(secs))
     return PAGE.format(title="Discuss - QCCD studio", style=STYLE, extra_css="", body=body)
 
 
