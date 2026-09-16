@@ -34,6 +34,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json',
                '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.js': 'text/javascript' };
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
+  // the comment layer asks /api/me on every page; this copy has no accounts service, so
+  // answer as one with nobody signed in (a 404 would be a console error on every page)
+  if (u.startsWith('/api/')) {
+    const body = u === '/api/me' ? '{"user":null}' : '{"error":"sign in first"}';
+    res.writeHead(u === '/api/me' ? 200 : 401, { 'content-type': 'application/json' }); return res.end(body);
+  }
   let p = path.join(site, u);
   if (u.endsWith('/')) p = path.join(p, 'index.html');
   if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); return res.end('not found'); }
@@ -110,6 +116,7 @@ const PROBE = `(async function(){
   var sw = document.documentElement.scrollWidth, iw = document.documentElement.clientWidth;
   var hits = (window.SITENAV ? window.SITENAV.search('steane').length : -1);
   return { title: document.title, nav: !!nav, active: cur ? cur.textContent : null, search_hits: hits,
+           signin: !!document.getElementById('qc-signin'), pins: document.querySelectorAll('.qc-pin').length,
            embed: e1, embed_moving: (e1 && e2) ? e1 !== e2 : null,
            wide: sw > iw + 1, sw: sw, iw: iw,
            over: Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){ var r = e.getBoundingClientRect(); return r.right > iw + 1 && r.width > 0; }).slice(0, 4).map(function(e){ return e.tagName + (e.id ? '#' + e.id : '') + '@' + Math.round(e.getBoundingClientRect().right); }),
@@ -165,6 +172,9 @@ async function visit(rel, shotName) {
     }
     if (!probe.nav) problems.push('no navigation bar');
     if (probe.search_hits < 1) problems.push('site search finds nothing for "steane"');
+    // signed out: the bar offers Sign in and the page shows no comment pins
+    if (!probe.signin) problems.push('no Sign in control in the bar');
+    if (probe.pins) problems.push('comment pins shown to a reader who is not signed in');
     if (probe.logos === false) problems.push('a footer logo did not load');
     if (probe.embed === false) problems.push('the embedded page did not enter embed mode');
     if (probe.embed && probe.embed_moving === false) problems.push('the embedded page is not playing: ' + probe.embed);

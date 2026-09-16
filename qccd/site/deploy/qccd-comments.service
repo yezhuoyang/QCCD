@@ -1,0 +1,27 @@
+# The accounts and comments API behind https://qccd.academy/api/ -- one standard-library
+# Python process (qccd/site/comments_api.py, copied to /home/qccd) as the unprivileged
+# user that owns the site, with its SQLite database under /var/lib/qccd.
+#
+#   install: cp qccd-comments.service /etc/systemd/system/ && systemctl daemon-reload
+#            systemctl enable --now qccd-comments
+#   logs:    journalctl -u qccd-comments -f
+[Unit]
+Description=qccd.academy accounts and comments API
+After=network.target
+
+[Service]
+Type=simple
+User=qccd
+Group=qccd
+ExecStart=/usr/bin/python3 /home/qccd/comments_api.py serve --db /var/lib/qccd/comments.db --host 127.0.0.1 --port 8200 --admins yezhuoyang@cs.ucla.edu --secure --proxied
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/qccd
+
+[Install]
+WantedBy=multi-user.target

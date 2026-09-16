@@ -42,6 +42,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: qccd/site/comments_api.py
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           name: site
@@ -56,3 +60,8 @@ jobs:
           echo '165.232.55.161 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAbm6u8UkEk73LltHAvr8FtqUGfT4xbzEWWe5YXoWIwK' >> ~/.ssh/known_hosts
           rsync -az --delete -e "ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes" site/ qccd@165.232.55.161:/var/www/qccd.academy/
           echo "deployed to https://qccd.academy/"
+          # the accounts and comments API (qccd/site/deploy/README.md): the one file, then a
+          # restart through the single sudo rule the server grants qccd
+          rsync -az -e "ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes" qccd/site/comments_api.py qccd@165.232.55.161:/home/qccd/comments_api.py
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes qccd@165.232.55.161 'sudo /bin/systemctl restart qccd-comments'
+          sleep 2 && curl -fsS https://qccd.academy/api/health && echo " api ok"
