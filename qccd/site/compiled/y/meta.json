@@ -3,6 +3,8 @@
  "title": "y",
  "note": "u3(\u03c0, \u03c0/2, \u03c0/2), one beam",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
- "compile_seconds": 0.07,
- "check_seconds": 7.0
+ "device": "grid2x3",
+ "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",
+ "compile_seconds": 0.04,
+ "check_seconds": 1.3
 }

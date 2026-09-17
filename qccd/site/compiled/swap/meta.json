@@ -3,6 +3,8 @@
  "title": "swap",
  "note": "three CNOTs, so three MS pulses at one site",
  "compiler": "1 layers, 10 transport cycles, 12 beams, 3 MS, 0 virtual-Z, 27 instructions",
- "compile_seconds": 0.06,
- "check_seconds": 6.4
+ "device": "ring6d",
+ "device_about": "the six-site ring with two dock spurs",
+ "compile_seconds": 0.04,
+ "check_seconds": 2.8
 }

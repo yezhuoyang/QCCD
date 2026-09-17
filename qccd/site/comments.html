@@ -67,6 +67,16 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
 .qc-list li:first-child{border-top:0} .qc-list .qc-t{flex:1 1 auto;min-width:0} .qc-list .qc-t p{margin:2px 0 0;color:#0b0b0b;white-space:pre-wrap;word-wrap:break-word}
 .qc-list .qc-t small{color:#8a8985} .qc-list a{color:#2a78d6;text-decoration:none} .qc-list a:hover{text-decoration:underline}
 .qc-list .qc-btn{height:24px;padding:0 8px;font-size:12px}
+.qc-dlg input[readonly]{background:#f3f2ee;color:#52514e}
+.qc-inline{display:flex;gap:8px;align-items:flex-end} .qc-inline>div{flex:1 1 auto;min-width:0}
+.qc-inline>div.qc-go{flex:0 0 auto}
+.qc-tag{font-size:11px;border:1px solid #cfceca;border-radius:99px;padding:2px 8px;color:#52514e;white-space:nowrap;align-self:center}
+.qc-tag.qc-warn{border-color:#e0b000;color:#8a6d1e} .qc-tag.qc-bad{border-color:#d64545;color:#d64545}
+.qc-ok{color:#1baf7a;font-size:12px;margin:8px 0 0}
+.qc-note{color:#8a8985;font-size:12px}
+.qc-h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a8985;margin:20px 0 2px}
+.qc-linkbox{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;background:#f3f2ee;border-radius:6px;padding:8px 10px;margin:8px 0 0}
+.qc-list .qc-t div{font-weight:600}
 </style>
 <script>
 (function(){
@@ -159,6 +169,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     item(HIDDEN ? 'Show comments on this page' : 'Hide comments on this page', function(){ HIDDEN = !HIDDEN; try { localStorage.setItem('qc-hidden', HIDDEN ? '1' : '0'); } catch(e){} applyHidden(); renderNav(); }, 'qc-toggle');
     item('Unfold every thread', function(){ FOLDED = {}; saveFold(); renderAll(); });
     if(ME.admin) item('All comments on the site', openAdmin, 'qc-admin');
+    if(ME.admin) item('Readers and invitations', openPeople, 'qc-people-btn');
     item('Change password', openPassword, 'qc-passwd');
     item('Sign out', signOut, 'qc-signout');
     NAV.appendChild(MENU);
@@ -185,31 +196,70 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     var i = el('input'); i.id = id; i.type = type; i.placeholder = placeholder || ''; if(autocomplete) i.autocomplete = autocomplete; i.required = true;
     dlg.appendChild(i); return i;
   }
-  function openAuth(mode, after){
-    var dlg = modal(); dlg.id = 'qc-auth'; dlg.setAttribute('data-mode', mode);
+  // `inv` is {token, email, name}: an invitation the admin made, read back from the link.
+  // There is no other way into the register form -- nobody signs themselves up.
+  function openAuth(mode, after, inv){
     var reg = mode === 'register';
-    dlg.appendChild(el('h2', null, reg ? 'Create an account' : 'Sign in'));
-    dlg.appendChild(el('p', 'qc-sub', reg ? 'Your name and avatar appear on the comments you pin.' : 'Comments on the site are visible to signed-in readers.'));
+    if(reg && !inv) return;
+    var dlg = modal(); dlg.id = 'qc-auth'; dlg.setAttribute('data-mode', mode);
+    dlg.appendChild(el('h2', null, reg ? 'Accept your invitation' : 'Sign in'));
+    dlg.appendChild(el('p', 'qc-sub', reg ? 'This link was sent to ' + inv.email + '. Choose a password and the account is yours; your name and avatar appear on the comments you pin.'
+                                          : 'Comments on the site are visible to signed-in readers.'));
     var form = el('form'); dlg.appendChild(form);
     var name = reg ? field(form, 'qc-name', 'Your name', 'text', 'as it should appear on your comments', 'name') : null;
-    var email = field(form, 'qc-email', 'Email', 'email', 'you@example.org', 'email');
+    if(reg && inv.name) name.value = inv.name;
+    var email = field(form, 'qc-email', 'Email', reg ? 'text' : 'email', 'you@example.org', 'email');
+    if(reg){ email.value = inv.email; email.readOnly = true; email.title = 'The invitation is for this address'; }
     var pass = field(form, 'qc-pass', 'Password', 'password', reg ? 'at least 8 characters' : '', reg ? 'new-password' : 'current-password');
     if(reg) pass.minLength = 8;
     var err = el('p', 'qc-err'); err.id = 'qc-auth-err'; form.appendChild(err);
     var row = el('div', 'qc-row'); form.appendChild(row);
-    var sw = el('button', 'qc-link', reg ? 'I already have an account' : 'Create an account'); sw.type = 'button'; sw.id = 'qc-switch';
-    sw.addEventListener('click', function(){ openAuth(reg ? 'login' : 'register', after); });
-    row.appendChild(sw); row.appendChild(el('span', 'qc-sp'));
+    if(reg){
+      var back = el('button', 'qc-link', 'I already have an account'); back.type = 'button'; back.id = 'qc-switch';
+      back.addEventListener('click', function(){ openAuth('login', after); });
+      row.appendChild(back);
+    } else {
+      row.appendChild(el('span', 'qc-note', 'The site is by invitation.'));
+    }
+    row.appendChild(el('span', 'qc-sp'));
     var ok = el('button', 'qc-btn qc-primary', reg ? 'Create account' : 'Sign in'); ok.type = 'submit'; ok.id = 'qc-submit'; row.appendChild(ok);
     form.addEventListener('submit', function(ev){
       ev.preventDefault(); err.textContent = ''; ok.disabled = true;
-      var body = { email: email.value.trim(), password: pass.value };
-      if(reg) body.name = name.value.trim();
+      var body = reg ? { token: inv.token, name: name.value.trim(), password: pass.value }
+                     : { email: email.value.trim(), password: pass.value };
       api('POST', reg ? '/register' : '/login', body).then(function(d){
         ME = d.user; closeModal(); renderNav(); load(); if(after) after();
       }).catch(function(e){ ok.disabled = false; err.textContent = e.message; });
     });
-    (reg ? name : email).focus();
+    (reg ? (inv.name ? pass : name) : email).focus();
+  }
+  function say(title, text){
+    var dlg = modal(); dlg.id = 'qc-say';
+    dlg.appendChild(el('h2', null, title));
+    dlg.appendChild(el('p', 'qc-sub', text));
+    var row = el('div', 'qc-row'); dlg.appendChild(row); row.appendChild(el('span', 'qc-sp'));
+    var ok = el('button', 'qc-btn qc-primary', 'OK'); ok.type = 'button'; ok.id = 'qc-say-ok';
+    ok.addEventListener('click', closeModal); row.appendChild(ok); ok.focus();
+  }
+
+  // ---- arriving on an invitation link --------------------------------------------------
+  // The link is <site>/?invite=<token>.  The token is read once and then taken out of the
+  // address bar and the history, so a shared screenshot or a back button does not carry it.
+  function inviteToken(){
+    var m = /[?&]invite=([A-Za-z0-9_\-]+)/.exec(location.search || '');
+    return m ? m[1] : null;
+  }
+  function dropInviteFromUrl(){
+    try {
+      var q = (location.search || '').replace(/([?&])invite=[^&]*&?/, '$1').replace(/[?&]$/, '');
+      history.replaceState(null, '', location.pathname + (q === '?' ? '' : q) + (location.hash || ''));
+    } catch(e){}
+  }
+  function openInvite(token){
+    api('GET', '/invite?token=' + encodeURIComponent(token)).then(function(d){
+      if(ME) return say('You are already signed in', 'This invitation is for ' + d.invite.email + ', and you are signed in as ' + ME.email + '. Sign out first to use it.');
+      openAuth('register', null, { token: token, email: d.invite.email, name: d.invite.name });
+    }).catch(function(e){ say('This invitation', e.message); });
   }
   function openPassword(){
     var dlg = modal(); dlg.id = 'qc-pw';
@@ -229,6 +279,111 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     });
     old.focus();
   }
+  // ---- the admin's panel: who is in, and who has been asked in -------------------------
+  function openPeople(){
+    var dlg = modal(); dlg.id = 'qc-people'; dlg.className += ' qc-wide';
+    dlg.appendChild(el('h2', null, 'Readers and invitations'));
+    var sub = el('p', 'qc-sub', 'Loading\u2026'); dlg.appendChild(sub);
+
+    var form = el('form'); dlg.appendChild(form);
+    var line = el('div', 'qc-inline'); form.appendChild(line);
+    function cell(id, label, type, ph){ var d = el('div'); line.appendChild(d); return field(d, id, label, type, ph); }
+    var email = cell('qc-inv-email', 'Invite an email address', 'email', 'them@university.edu');
+    var name = cell('qc-inv-name', 'Their name (optional)', 'text', 'Ada Lovelace'); name.required = false;
+    var go = el('div', 'qc-go'); line.appendChild(go);
+    go.appendChild(el('label', null, '\u00a0'));
+    var send = el('button', 'qc-btn qc-primary', 'Invite'); send.type = 'submit'; send.id = 'qc-invite'; go.appendChild(send);
+    var note = field(form, 'qc-inv-note', 'A line of your own in the message (optional)', 'text', 'why you are asking them'); note.required = false;
+    var err = el('p', 'qc-err'); err.id = 'qc-invite-err'; form.appendChild(err);
+    var okmsg = el('p', 'qc-ok'); okmsg.id = 'qc-invite-ok'; form.appendChild(okmsg);
+    var linkbox = el('div'); form.appendChild(linkbox);
+
+    dlg.appendChild(el('p', 'qc-h3', 'Invitations'));
+    var ilist = el('ul', 'qc-list'); ilist.id = 'qc-invites'; dlg.appendChild(ilist);
+    dlg.appendChild(el('p', 'qc-h3', 'Accounts'));
+    var ulist = el('ul', 'qc-list'); ulist.id = 'qc-users'; dlg.appendChild(ulist);
+    var row = el('div', 'qc-row'); dlg.appendChild(row); row.appendChild(el('span', 'qc-sp'));
+    var close = el('button', 'qc-btn', 'Close'); close.type = 'button'; close.addEventListener('click', closeModal); row.appendChild(close);
+
+    function showLink(link){
+      linkbox.innerHTML = '';
+      linkbox.appendChild(el('div', 'qc-linkbox', link));
+      var r = el('div', 'qc-row'); linkbox.appendChild(r);
+      var copy = el('button', 'qc-btn', 'Copy the link'); copy.type = 'button'; copy.id = 'qc-copy-link';
+      copy.addEventListener('click', function(){
+        try { navigator.clipboard.writeText(link).then(function(){ copy.textContent = 'Copied'; }); } catch(e){ copy.textContent = 'Select it and copy'; }
+      });
+      r.appendChild(copy); r.appendChild(el('span', 'qc-sp'));
+    }
+    function two(t, head, tail){ t.appendChild(el('div', null, head)); t.appendChild(el('small', null, tail)); }
+    function refresh(){
+      return api('GET', '/admin/people').then(function(d){
+        var waiting = (d.invites || []).filter(function(i){ return !i.accepted && !i.expired; }).length;
+        sub.textContent = d.users.length + (d.users.length === 1 ? ' account' : ' accounts') + ', ' +
+          waiting + ' invitation' + (waiting === 1 ? '' : 's') + ' waiting. ' +
+          (d.mail ? 'Invitations are mailed from the server.' : 'No mail relay is configured on the server, so send the link yourself.');
+        ilist.innerHTML = '';
+        if(!d.invites.length) ilist.appendChild(el('li', null, 'Nobody has been invited yet.'));
+        d.invites.forEach(function(iv){
+          var li = el('li'); li.setAttribute('data-email', iv.email);
+          var t = el('div', 'qc-t'); li.appendChild(t);
+          two(t, iv.email, (iv.name ? iv.name + ' \u00b7 ' : '') +
+              (iv.accepted ? 'joined ' + when(iv.accepted)
+                           : iv.expired ? 'expired ' + when(iv.expires)
+                           : (iv.sent ? 'mailed ' + when(iv.sent) : 'not mailed') + ' \u00b7 good until ' + when(iv.expires)));
+          li.appendChild(el('span', 'qc-tag' + (iv.accepted ? '' : iv.expired ? ' qc-bad' : ' qc-warn'),
+                            iv.accepted ? 'joined' : iv.expired ? 'expired' : 'waiting'));
+          if(!iv.accepted){
+            var again = el('button', 'qc-btn', 'Invite again'); again.type = 'button';
+            again.addEventListener('click', function(){ email.value = iv.email; name.value = iv.name || ''; invite(); });
+            li.appendChild(again);
+            var drop = el('button', 'qc-btn', 'Withdraw'); drop.type = 'button';
+            drop.addEventListener('click', function(){
+              if(!confirm('Withdraw the invitation to ' + iv.email + '? Their link stops working.')) return;
+              api('DELETE', '/admin/invites/' + iv.id).then(refresh).catch(function(e){ alert(e.message); });
+            });
+            li.appendChild(drop);
+          }
+          ilist.appendChild(li);
+        });
+        ulist.innerHTML = '';
+        d.users.forEach(function(u){
+          var li = el('li'); li.setAttribute('data-email', u.email);
+          li.appendChild(avatar(u));
+          var t = el('div', 'qc-t'); li.appendChild(t);
+          two(t, u.name, u.email + ' \u00b7 joined ' + when(u.created));
+          if(u.admin) li.appendChild(el('span', 'qc-tag', 'admin'));
+          else if(!u.access) li.appendChild(el('span', 'qc-tag qc-bad', 'closed'));
+          if(!u.admin){
+            var b = el('button', 'qc-btn', u.access ? 'Close account' : 'Let back in'); b.type = 'button';
+            b.addEventListener('click', function(){
+              if(u.access && !confirm('Close the account of ' + u.name + '? They are signed out at once, and cannot sign in again until you let them back.')) return;
+              api('POST', '/admin/users/' + u.id + '/access', { allow: !u.access }).then(refresh).catch(function(e){ alert(e.message); });
+            });
+            li.appendChild(b);
+          }
+          ulist.appendChild(li);
+        });
+      }).catch(function(e){ sub.textContent = e.message; });
+    }
+    function invite(){
+      err.textContent = ''; okmsg.textContent = ''; linkbox.innerHTML = ''; send.disabled = true;
+      api('POST', '/admin/invites', { email: email.value.trim(), name: name.value.trim(), note: note.value.trim(), send: true })
+        .then(function(d){
+          send.disabled = false; email.value = ''; name.value = ''; note.value = '';
+          okmsg.textContent = d.sent
+            ? 'The invitation was mailed to ' + d.invite.email + '. It is good for 14 days.'
+            : 'The invitation for ' + d.invite.email + ' was made but not mailed (' + (d.mail_error || 'no mail relay') + '). Send this link yourself:';
+          showLink(d.link);
+          refresh();
+        })
+        .catch(function(e){ send.disabled = false; err.textContent = e.message; });
+    }
+    form.addEventListener('submit', function(ev){ ev.preventDefault(); invite(); });
+    refresh();
+    email.focus();
+  }
+
   function openAdmin(){
     var dlg = modal(); dlg.id = 'qc-all'; dlg.className += ' qc-wide';
     dlg.appendChild(el('h2', null, 'All comments'));
@@ -484,13 +639,15 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     if(window.ResizeObserver){ try { new ResizeObserver(schedule).observe(document.body); } catch(e){} }
     if(document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
     setInterval(schedule, 1000);
-    api('GET', '/me').then(function(d){ ME = d && d.user; renderNav(); load(); })
+    var invited = inviteToken();
+    if(invited) dropInviteFromUrl();
+    api('GET', '/me').then(function(d){ ME = d && d.user; renderNav(); load(); if(invited) openInvite(invited); })
       .catch(function(){ /* no accounts service behind this copy of the page: nothing to show */ if(NAV && NAV.parentNode) NAV.parentNode.removeChild(NAV); NAV = null; });
   }
   window.QCCOMMENTS = {
     state: function(){ return { me: ME, placing: PLACING, hidden: HIDDEN, page: PAGE,
                                 threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null, folded: !!FOLDED[t.id] }; }) }; },
-    reload: load, place: place
+    reload: load, place: place, invite: openInvite, people: openPeople
   };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

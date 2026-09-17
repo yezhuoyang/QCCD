@@ -1,6 +1,7 @@
-// THE COMMENTS WALKTHROUGH: a reader signs in, pins a note to a paragraph, and the note
-// stays on that paragraph through scrolling, a reload and a narrower window; an admin
-// then removes it.
+// THE COMMENTS WALKTHROUGH: the admin invites a reader, she follows the link in the mail
+// and the link makes her account; she pins a note to a paragraph, and the note stays on
+// that paragraph through scrolling, a reload and a narrower window; the admin then removes
+// it, and closes her account.
 //
 //   node tests/comments.mjs <site dir> <page.html> [--target <selector>] [--python <exe>]
 //                           [--shots <dir>]
@@ -49,6 +50,14 @@ const apiPort = 8600 + Math.floor(Math.random() * 400);
 const api = spawn(PYTHON, [API_PY, 'serve', '--db', db, '--port', String(apiPort), '--admins', ADMIN.email], { stdio: ['ignore', 'pipe', 'pipe'] });
 let apiLog = ''; api.stdout.on('data', d => apiLog += d); api.stderr.on('data', d => apiLog += d);
 const getJSON = (u) => new Promise((res, rej) => http.get(u, r => { let s = ''; r.on('data', d => s += d); r.on('end', () => { try { res(JSON.parse(s)); } catch (e) { rej(e); } }); }).on('error', rej));
+// asked from here rather than from the page, so a refusal is not a console error there
+const apiPost = (p, body) => new Promise((res) => {
+  const data = JSON.stringify(body);
+  const r = http.request({ host: '127.0.0.1', port: apiPort, path: p, method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+    x => { x.resume(); res(x.statusCode); });
+  r.on('error', () => res(null)); r.write(data); r.end();
+});
 let up = false;
 for (let i = 0; i < 100 && !up; i++) { try { up = (await getJSON(`http://127.0.0.1:${apiPort}/api/health`)).ok; } catch { await new Promise(r => setTimeout(r, 100)); } }
 if (!up) { console.error('the API did not start:\n' + apiLog); api.kill(); process.exit(2); }
@@ -137,17 +146,24 @@ function step(name, ok, detail) {
   steps.push(rec); console.log(JSON.stringify(rec));
 }
 const near = (a, b, eps = 2.5) => Math.abs(a - b) <= eps;
-async function signIn(u, mode) {
+async function signIn(u) {
   await until("!!document.getElementById('qc-signin')", 'the Sign in control');
   await evaluate("document.getElementById('qc-signin').click()");
   await until("!!document.getElementById('qc-auth')", 'the sign-in dialog');
-  if (mode === 'register') { await evaluate("document.getElementById('qc-switch').click()"); await until("document.getElementById('qc-auth').getAttribute('data-mode') === 'register'", 'the create-account form'); }
   // real typing into each field
-  if (mode === 'register') { await evaluate("document.getElementById('qc-name').focus()"); await type(u.name); }
   await evaluate("document.getElementById('qc-email').focus()"); await type(u.email);
   await evaluate("document.getElementById('qc-pass').focus()"); await type(u.password);
   await evaluate("document.getElementById('qc-submit').click()");
   await until("!!document.getElementById('qc-add')", 'the + Comment control after signing in');
+}
+async function openMenu(item) {
+  await evaluate("document.getElementById('qc-me').click()");
+  await until(`!!document.getElementById('${item}')`, 'the menu item ' + item);
+  await evaluate(`document.getElementById('${item}').click()`);
+}
+async function signOut() {
+  await openMenu('qc-signout');
+  await until("!!document.getElementById('qc-signin')", 'Sign in after signing out');
 }
 
 try {
@@ -159,9 +175,54 @@ try {
   const st401 = await new Promise(res => http.get(BASE + 'api/threads?page=/', r => { r.resume(); res(r.statusCode); }).on('error', () => res(null)));
   step('signed out: the API refuses the thread list', st401 === 401, { status: st401 });
 
-  await signIn(READER, 'register');
+  // the admin invites the reader: nobody here makes their own account
+  await signIn(ADMIN);
+  await openMenu('qc-people-btn');
+  await until("!!document.getElementById('qc-people') && document.querySelectorAll('#qc-users li').length === 1", 'the people panel');
+  step('admin: the panel lists the one account there is',
+       (await evaluate("document.querySelector('#qc-users li').textContent")).includes(ADMIN.email));
+  await evaluate("document.getElementById('qc-inv-email').focus()"); await type(READER.email);
+  await evaluate("document.getElementById('qc-inv-name').focus()"); await type(READER.name);
+  await evaluate("document.getElementById('qc-invite').click()");
+  await until("!!document.querySelector('#qc-people .qc-linkbox')", 'the invitation link');
+  const link = await evaluate("document.querySelector('#qc-people .qc-linkbox').textContent");
+  const okmsg = await evaluate("document.getElementById('qc-invite-ok').textContent");
+  step('admin: invited the reader, and the link came back to copy',
+       /\?invite=[A-Za-z0-9_-]{20,}$/.test(link) && okmsg.includes(READER.email), { link, okmsg });
+  await until("document.querySelectorAll('#qc-invites li[data-email]').length === 1", 'the invitation in the list');
+  step('admin: the invitation is waiting in the list',
+       (await evaluate("document.querySelector('#qc-invites li[data-email]').textContent")).includes('waiting'));
+  await shot('01_invite');
+  await evaluate("document.querySelector('#qc-people > .qc-row .qc-btn').click()");
+  await signOut();
+
+  // there is no way into a registration form without a link
+  await evaluate("document.getElementById('qc-signin').click()");
+  await until("!!document.getElementById('qc-auth')", 'the sign-in dialog');
+  step('signed out: the dialog offers no way to make an account',
+       !(await evaluate("!!document.getElementById('qc-switch')"))
+       && (await evaluate("document.getElementById('qc-auth').textContent")).includes('by invitation'));
+  await evaluate("document.querySelector('.qc-modal').click()");
+
+  // the reader follows the link she was mailed
+  const token = link.split('invite=')[1];
+  await open(url + '?invite=' + token);
+  await until("!!document.getElementById('qc-auth') && document.getElementById('qc-auth').getAttribute('data-mode') === 'register'", 'the invitation form');
+  const search = await evaluate('location.search');
+  step('the link opened the invitation form for that address, and left the URL',
+       (await evaluate("document.getElementById('qc-email').value")) === READER.email
+       && (await evaluate("document.getElementById('qc-email').readOnly")) === true
+       && !/invite=/.test(search), { search });
+  await evaluate("document.getElementById('qc-name').value = ''; document.getElementById('qc-name').focus()"); await type(READER.name);
+  await evaluate("document.getElementById('qc-pass').focus()"); await type(READER.password);
+  await evaluate("document.getElementById('qc-submit').click()");
+  await until("!!document.getElementById('qc-add')", 'the + Comment control after accepting');
   const s1 = await state();
-  step('create account: signed in as the reader', s1 && s1.me && s1.me.name === READER.name && s1.me.admin === false && s1.threads.length === 0, { me: s1 && s1.me });
+  step('the invitation made her account and signed her in',
+       s1 && s1.me && s1.me.name === READER.name && s1.me.email === READER.email && s1.me.admin === false && s1.threads.length === 0, { me: s1 && s1.me });
+  // and it is spent: the same link opens nothing now
+  const spent = await new Promise(res => http.get(`http://127.0.0.1:${apiPort}/api/invite?token=` + token, r => { r.resume(); res(r.statusCode); }).on('error', () => res(null)));
+  step('the link is spent once it has made an account', spent === 409, { status: spent });
 
   // placing: press + Comment, click the middle of the target paragraph
   await evaluate("document.getElementById('qc-add').click()");
@@ -228,20 +289,15 @@ try {
   step('unfolded again', !(await evaluate("document.querySelector('.qc-box[data-id]').classList.contains('qc-fold')")));
 
   // sign out: everything disappears
-  await evaluate("document.getElementById('qc-me').click()");
-  await until("!!document.getElementById('qc-signout')", 'the menu');
-  await evaluate("document.getElementById('qc-signout').click()");
-  await until("!!document.getElementById('qc-signin')", 'Sign in after signing out');
+  await signOut();
   step('signed out: no pins, no boxes', !(await evaluate("document.querySelectorAll('.qc-pin, .qc-box').length")) && (await state()).me === null);
 
   // the admin sees the reader's thread, and may delete it
-  await signIn(ADMIN, 'login');
+  await signIn(ADMIN);
   await until("document.querySelectorAll('.qc-pin[data-id]').length === 1", "the reader's pin for the admin");
   const s3 = await state();
   step('admin: signed in, sees the thread, has the delete control', s3.me.admin === true && s3.threads.length === 1 && await evaluate("!!document.querySelector('.qc-box[data-id] .qc-delthread')"));
-  await evaluate("document.getElementById('qc-me').click()");
-  await until("!!document.getElementById('qc-admin')", 'the admin menu item');
-  await evaluate("document.getElementById('qc-admin').click()");
+  await openMenu('qc-admin');
   await until("document.querySelectorAll('#qc-all .qc-list li').length === 1", 'the all-comments list');
   const listed = await evaluate("document.querySelector('#qc-all .qc-list li').textContent");
   step('admin: the all-comments list names the reader and the note', listed.includes(READER.name) && listed.includes(NOTE));
@@ -250,6 +306,18 @@ try {
   await until("document.querySelectorAll('.qc-pin[data-id]').length === 0", 'the thread gone');
   const left = await evaluate("fetch('/api/admin/threads').then(r => r.json()).then(d => d.threads.length)");
   step('admin: deleted the thread; the API has none left', left === 0 && (await state()).threads.length === 0);
+
+  // closing her account: she is out at once, and refused at the door afterwards
+  await evaluate("document.querySelector('#qc-all > .qc-row .qc-btn').click()");
+  await openMenu('qc-people-btn');
+  await until("document.querySelectorAll('#qc-users li').length === 2", 'both accounts in the panel');
+  const who = `#qc-users li[data-email="${READER.email}"]`;
+  await evaluate(`window.confirm = function(){ return true; }; document.querySelector('${who} .qc-btn').click()`);
+  await until(`/closed/.test(document.querySelector('${who}').textContent)`, 'the closed tag');
+  step("admin: closed the reader's account", true);
+  await shot('05_closed');
+  const refused = await apiPost('/api/login', { email: READER.email, password: READER.password });
+  step('a closed account is refused at the door', refused === 403, { status: refused });
 } catch (e) {
   step('story', false, { error: String(e.message || e) });
 }

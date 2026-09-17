@@ -1,6 +1,6 @@
 {
  "program": "circuit",
- "arch": "ring6d",
+ "arch": "grid2x3",
  "circuit_sha256": "81779ca1746d20047864d357acefb4ad6ce449828134f586151d2df10c561e04",
  "o1_transport": "ok",
  "lean": "accepted",
