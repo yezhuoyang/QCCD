@@ -28,6 +28,7 @@ qccd-comments[hidden]{display:none}
  box-shadow:0 1px 6px rgba(0,0,0,.28);cursor:pointer;pointer-events:auto;z-index:1;display:flex;align-items:center;justify-content:center;
  color:#fff;font-weight:600;font-size:11px;background:var(--qc);user-select:none}
 .qc-pin:hover{transform:scale(1.08)} .qc-pin.qc-approx{border-style:dashed}
+.qc-pin{touch-action:none} .qc-pin.qc-dragging{cursor:grabbing;transform:none}
 .qc-box{position:absolute;width:290px;background:#fff;border:1px solid var(--qc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);
  pointer-events:auto;overflow:hidden;z-index:2}
 .qc-box:hover,.qc-box:focus-within{z-index:3}
@@ -176,7 +177,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     function item(label, fn, id){ var b = el('button', null, label); b.type = 'button'; if(id) b.id = id; b.addEventListener('click', function(){ closeMenu(); fn(); }); MENU.appendChild(b); }
     item(HIDDEN ? 'Show comments on this page' : 'Hide comments on this page', function(){ HIDDEN = !HIDDEN; try { localStorage.setItem('qc-hidden', HIDDEN ? '1' : '0'); } catch(e){} applyHidden(); renderNav(); }, 'qc-toggle');
     item('Open every note on this page', function(){ FOLDED = {}; saveFold(); renderAll(); });
-    item('Put every note back on its spot', function(){ MOVED = {}; saveMoved(); for(var k in NODES) NODES[k].off = null; place(); });
+    item('Put every note back on its spot', function(){ MOVED = {}; saveMoved(); for(var k in NODES) NODES[k].off = NODES[k].pinOff = null; place(); }, 'qc-putback');
     if(ME.admin) item('All comments on the site', openAdmin, 'qc-admin');
     if(ME.admin) item('Readers and invitations', openPeople, 'qc-people-btn');
     item('Change password', openPassword, 'qc-passwd');
@@ -493,14 +494,20 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     node.pin.style.display = node.box.style.display = p.hide ? 'none' : '';
     if(p.hide) return;
     node.pin.classList.toggle('qc-approx', !!p.approx);
+    // the whole note, pin and all, carried off its spot by dragging the pin -- the offset
+    // is from the anchor, so it still follows that paragraph through a scroll or a reflow
+    if(node.pinOff){
+      var vwp = document.documentElement.clientWidth;
+      p.x = Math.min(Math.max(p.x + node.pinOff[0], 8 - L.left), Math.max(8 - L.left, vwp - 38 - L.left));
+      p.y = Math.max(p.y + node.pinOff[1], 38 - L.top);
+    }
     node.pin.style.left = p.x + 'px'; node.pin.style.top = p.y + 'px';
     if(node.box.classList.contains('qc-fold')) return;
     var vw = document.documentElement.clientWidth, bw = node.box.offsetWidth || 290, bh = node.box.offsetHeight || 120;
     var vx = p.x + L.left;
     var bx = (vx + 36 + bw + 8 <= vw) ? p.x + 36 : Math.max(8 - L.left, p.x - 8 - bw);
     var by = p.y - 30;
-    // where the reader dragged it to, as an offset from the spot: the note still follows
-    // its paragraph through a scroll or a reflow, it just sits where it was put
+    // where the reader dragged the box to, relative to its pin
     if(node.off){ bx += node.off[0]; by += node.off[1]; }
     var docH = Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight);
     bx = Math.min(Math.max(bx, 8 - L.left), Math.max(8 - L.left, vw - bw - 8 - L.left));
@@ -508,41 +515,56 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     if(by + bh + 8 - L.top > docH + window.scrollY) by = Math.max(8 - L.top, docH + window.scrollY - L.top - bh - 8);
     node.box.style.left = bx + 'px'; node.box.style.top = by + 'px';
   }
-  // The header is the handle.  Dragging stores an offset from the anchor rather than an
-  // absolute position, so a note the reader pulled off the words it covered goes on
-  // following those words; double-clicking the header drops the offset again.
-  function draggable(node, head){
-    head.title = 'Drag to move this note; double-click to put it back';
-    head.addEventListener('pointerdown', function(ev){
+  // Two handles, two offsets, both from the anchor rather than absolute, so a note that
+  // has been pulled about goes on belonging to its paragraph through a scroll or a reflow.
+  // Dragging the header (`off`) moves the box and leaves the pin on the words it marks;
+  // dragging the pin (`pinOff`) carries the whole note, which is the only thing there is
+  // to take hold of once the note is folded down to it.  Double-clicking the header, or
+  // the menu item, puts both back.
+  function draggable(node, handle, key){
+    if(key === 'off') handle.title = 'Drag to move this note; double-click to put it back';
+    handle.addEventListener('pointerdown', function(ev){
       if(ev.button !== 0 || (ev.target.closest && ev.target.closest('button'))) return;
       ev.preventDefault(); ev.stopPropagation();
-      var sx = ev.clientX, sy = ev.clientY, base = (node.off || [0, 0]).slice(), moved = false;
-      head.classList.add('qc-dragging');
-      try { head.setPointerCapture(ev.pointerId); } catch(e){}
+      var sx = ev.clientX, sy = ev.clientY, base = (node[key] || [0, 0]).slice(), moved = false;
+      handle.classList.add('qc-dragging');
+      try { handle.setPointerCapture(ev.pointerId); } catch(e){}
       function move(e2){
-        node.off = [base[0] + (e2.clientX - sx), base[1] + (e2.clientY - sy)];
+        node[key] = [base[0] + (e2.clientX - sx), base[1] + (e2.clientY - sy)];
         moved = moved || Math.abs(e2.clientX - sx) > 2 || Math.abs(e2.clientY - sy) > 2;
         layout(node);
       }
       function up(){
-        head.classList.remove('qc-dragging');
-        head.removeEventListener('pointermove', move);
-        head.removeEventListener('pointerup', up);
-        head.removeEventListener('pointercancel', up);
-        if(moved) remember(node);
+        handle.classList.remove('qc-dragging');
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
+        if(!moved) return;
+        // the click that follows this pointerup would fold the note; it was a drag
+        node.dragged = true;
+        setTimeout(function(){ node.dragged = false; }, 0);
+        remember(node);
       }
-      head.addEventListener('pointermove', move);
-      head.addEventListener('pointerup', up);
-      head.addEventListener('pointercancel', up);
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointercancel', up);
     });
-    head.addEventListener('dblclick', function(ev){
+    if(key !== 'off') return;
+    handle.addEventListener('dblclick', function(ev){
       if(ev.target.closest && ev.target.closest('button')) return;
-      node.off = null; remember(node); layout(node);
+      putBack(node); layout(node);
     });
+  }
+  function putBack(node){ node.off = node.pinOff = null; remember(node); }
+  function restore(node, id){
+    var m = MOVED[id] || [];                         // [box dx, box dy, pin dx, pin dy]
+    node.off = (m[0] || m[1]) ? [m[0] || 0, m[1] || 0] : null;
+    node.pinOff = (m[2] || m[3]) ? [m[2], m[3]] : null;
   }
   function remember(node){
     if(node.id == null) return;                      // a draft is moved, but not remembered
-    if(node.off && (node.off[0] || node.off[1])) MOVED[node.id] = node.off;
+    var b = node.off || [0, 0], q = node.pinOff || [0, 0];
+    if(b[0] || b[1] || q[0] || q[1]) MOVED[node.id] = [b[0], b[1], q[0], q[1]];
     else delete MOVED[node.id];
     saveMoved();
   }
@@ -576,14 +598,18 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     var node = NODES[th.id];
     if(!node){
       node = NODES[th.id] = { id: th.id, anchor: th.anchor, el: null, pin: el('div', 'qc-pin'),
-                              box: el('div', 'qc-box'), off: MOVED[th.id] || null };
+                              box: el('div', 'qc-box') };
+      restore(node, th.id);
       node.pin.setAttribute('data-id', th.id); node.box.setAttribute('data-id', th.id);
-      node.pin.addEventListener('click', function(){ toggleFold(th.id); });
+      node.pin.addEventListener('click', function(){ if(node.dragged) return; toggleFold(th.id); });
+      draggable(node, node.pin, 'pinOff');
       LAYER.appendChild(node.pin); LAYER.appendChild(node.box);
     }
     var c = colour(th.user);
     node.pin.style.setProperty('--qc', c); node.pin.textContent = initials(th.user.name);
-    node.pin.title = th.user.name + ' · ' + when(th.created) + (FOLDED[th.id] ? ' · click to open' : ' · click to fold');
+    node.pin.title = th.user.name + ' · ' + when(th.created)
+                   + (FOLDED[th.id] ? ' · click to open it' : ' · click to fold it')
+                   + ' · drag to move it';
     node.box.style.setProperty('--qc', c);
     node.box.classList.toggle('qc-fold', !!FOLDED[th.id]);
     node.box.innerHTML = '';
@@ -600,7 +626,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
       });
       head.appendChild(del);
     }
-    draggable(node, head);
+    draggable(node, head, 'off');
     node.box.appendChild(head);
     var msgs = el('div', 'qc-msgs'); th.comments.forEach(function(cm){ msgs.appendChild(msgRow(th, cm)); }); node.box.appendChild(msgs);
     var reply = el('div', 'qc-reply');
@@ -653,7 +679,8 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     DRAFT.pin.style.setProperty('--qc', c); DRAFT.pin.textContent = initials(ME.name);
     DRAFT.box.style.setProperty('--qc', c); DRAFT.box.id = 'qc-draft';
     var head = el('div', 'qc-head'); head.appendChild(avatar(ME)); head.appendChild(el('b', null, ME.name)); head.appendChild(el('small', null, 'new comment'));
-    draggable(DRAFT, head);
+    draggable(DRAFT, head, 'off');
+    draggable(DRAFT, DRAFT.pin, 'pinOff');
     var x = el('button', 'qc-x', '×'); x.type = 'button'; x.title = 'Cancel'; x.addEventListener('click', closeDraft); head.appendChild(x);
     DRAFT.box.appendChild(head);
     var reply = el('div', 'qc-reply');
@@ -704,7 +731,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   window.QCCOMMENTS = {
     state: function(){ return { me: ME, placing: PLACING, hidden: HIDDEN, page: PAGE,
                                 threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null,
-                                                         folded: !!FOLDED[t.id], moved: (n && n.off) || null,
+                                                         folded: !!FOLDED[t.id], moved: (n && n.off) || null, movedPin: (n && n.pinOff) || null,
                                                          shown: !!(n && n.box.offsetParent) }; }) }; },
     reload: load, place: place, invite: openInvite, people: openPeople
   };
