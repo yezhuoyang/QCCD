@@ -1,0 +1,35 @@
+// A LogicQ program for the logical-gadget tool (docs/GADGETS.md).
+//
+//   python -m qccd.gadget build examples/gadgets/demo.lq
+//   open out/gadgets/demo/index.html
+//
+// Four blocks of the [[72,12,6]] bivariate-bicycle code.  Every statement below is written
+// the way LogicQ's own parsers read it; the tool binds q0,q1 to one pair of tiles and q2,q3
+// to the next, so the block-level CNOTs pair within a pair and the measurements travel.
+
+code q0 as BivariateBicycle { l = 6; m = 6; A = x^3 + y + y^2; B = y^3 + x + x^2; params = (72, 12, 6); }
+code q1 as BivariateBicycle { l = 6; m = 6; A = x^3 + y + y^2; B = y^3 + x + x^2; params = (72, 12, 6); }
+code q2 as BivariateBicycle { l = 6; m = 6; A = x^3 + y + y^2; B = y^3 + x + x^2; params = (72, 12, 6); }
+code q3 as BivariateBicycle { l = 6; m = 6; A = x^3 + y + y^2; B = y^3 + x + x^2; params = (72, 12, 6); }
+
+// frame updates cost no time
+Logical X q0[0]
+pauli Z q2[1]
+
+// a block-level transversal CNOT: all twelve logical pairs of q0 and q1 at once
+transversalCNOTBatch q0 q1
+
+// a two-block parity: one messenger visits q1 and q2 and is read at its reservoir
+ppm c0 := M q1[0]↦Z, q2[0]↦Z
+
+// the Tutorial's spelling of the block-level CNOT, the other way round, on the second pair
+Logical transversalBatch q3 -> q2
+
+// a T gate: the row's 15-to-1 factory distills; a messenger carries Z̄⊗Z_T
+magic T q0[4]
+
+// an X-basis single-block readout
+Logical measure q3[5]↦X -> c1
+
+// refused, with LogicQ's reason: transversal H does not preserve this code's stabilizers
+blockTransversal q1 H
