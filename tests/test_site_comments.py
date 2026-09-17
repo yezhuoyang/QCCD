@@ -5,8 +5,10 @@ made through the same `with_nav` every site page passes through -- with `/api/` 
 the real API on a temporary database, and drives headless Chrome through the story: the
 admin invites a reader and copies the link, she follows it and the link makes her account,
 she pins a note to a paragraph with a real click, the pin stands on that paragraph through
-scrolling, a reload and a narrower window, she replies, deletes, signs out; the admin then
-deletes it all and closes her account.  Skipped without node or Chrome.
+scrolling, a reload and a narrower window, she replies and deletes; she gets the note out
+of the way of the words -- minimised to its pin, and dragged clear by its header, which
+survives a reload and still follows the paragraph -- and signs out; the admin then deletes
+it all and closes her account.  Skipped without node or Chrome.
 """
 
 from __future__ import annotations
@@ -66,6 +68,10 @@ def test_pin_a_comment_and_manage_it(tmp_path: Path):
                  "the link opened the invitation form for that address, and left the URL",
                  "the invitation made her account and signed her in",
                  "the link is spent once it has made an account",
+                 "minimised from its header: the note leaves the page and the pin stays",
+                 "dragged by its header: the note moved with the mouse",
+                 "a moved note still belongs to its paragraph",
+                 "the move survives a reload", "double-clicking the header puts it back",
                  "the pin stands on that spot", "scrolled: the pin moved with the text, not with the window",
                  "reloaded: signed in, the pin is back on the spot", "narrower window: the pin follows the reflowed paragraph",
                  "admin: deleted the thread; the API has none left",

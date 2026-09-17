@@ -128,6 +128,23 @@ async function click(x, y) {
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
 }
 async function type(text) { await send('Input.insertText', { text }); }
+async function drag(x0, y0, x1, y1) {
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y: y0 });
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 6; i++) {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1,
+      x: x0 + (x1 - x0) * i / 6, y: y0 + (y1 - y0) * i / 6 });
+  }
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button: 'left', buttons: 0, clickCount: 1 });
+  await new Promise(r => setTimeout(r, 150));
+}
+async function dblclick(x, y) {
+  for (const clickCount of [1, 2]) {
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount });
+  }
+  await new Promise(r => setTimeout(r, 150));
+}
 async function shot(name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -282,11 +299,51 @@ try {
   await until("document.querySelectorAll('.qc-box[data-id] .qc-msg').length === 1", 'the reply gone');
   step('deleted own reply: one message again', (await state()).threads[0].n === 1);
 
-  // fold to the pin, and unfold
+  // getting the note out of the way of the words it covers: minimise it, or move it.
+  // `shown` asks whether the box is really on the page, not whether it carries the class:
+  // the class was once set with no rule to hide it, so folding did nothing a reader saw.
+  const shown = () => evaluate("(function(){ var b = document.querySelector('.qc-box[data-id]'); return !!(b && b.offsetParent && b.getBoundingClientRect().height > 0); })()");
+  await evaluate("document.querySelector('.qc-box[data-id] [id^=qc-fold-]').click()");
+  step('minimised from its header: the note leaves the page and the pin stays',
+       (await shown()) === false && (await state()).threads[0].folded === true
+       && await evaluate("!!document.querySelector('.qc-pin[data-id]')"));
   await evaluate("document.querySelector('.qc-pin[data-id]').click()");
-  step('folded: the box hides behind the pin', await evaluate("document.querySelector('.qc-box[data-id]').classList.contains('qc-fold')"));
+  step('the pin opens it again', (await shown()) === true);
   await evaluate("document.querySelector('.qc-pin[data-id]').click()");
-  step('unfolded again', !(await evaluate("document.querySelector('.qc-box[data-id]').classList.contains('qc-fold')")));
+  step('and the pin folds it again', (await shown()) === false);
+  await evaluate("document.querySelector('.qc-pin[data-id]').click()");
+  await until("document.querySelector('.qc-box[data-id]').getBoundingClientRect().height > 0", 'the note open again');
+
+  // dragged by its header, with a real mouse, off the text it was covering
+  const r0 = await rectOf('.qc-box[data-id]');
+  const h0 = await rectOf('.qc-box[data-id] .qc-head');
+  await drag(h0.l + 60, h0.t + 12, h0.l + 200, h0.t + 102);
+  const r1 = await rectOf('.qc-box[data-id]');
+  step('dragged by its header: the note moved with the mouse',
+       near(r1.l, r0.l + 140, 4) && near(r1.t, r0.t + 90, 4), { before: r0, after: r1 });
+
+  // it is still pinned to the paragraph: the scroll carries it, it is not stuck to the window
+  const canScroll2 = await evaluate('document.documentElement.scrollHeight > window.innerHeight + 100');
+  if (canScroll2) {
+    await evaluate('window.scrollTo(0, 200)'); await new Promise(r => setTimeout(r, 200)); await evaluate('window.QCCOMMENTS.place()');
+    const r2 = await rectOf('.qc-box[data-id]');
+    step('a moved note still belongs to its paragraph', r2.sy > 100 && near(r2.t, r1.t - r2.sy, 4), { before: r1.t, after: r2.t, scrolled: r2.sy });
+    await evaluate('window.scrollTo(0, 0)'); await new Promise(r => setTimeout(r, 200)); await evaluate('window.QCCOMMENTS.place()');
+  } else step('a moved note still belongs to its paragraph (page too short, skipped)', true);
+
+  // and where the reader put it is where it is after a reload
+  await open(url);
+  await until("document.querySelector('.qc-box[data-id]')", 'the note after the reload');
+  const r3 = await rectOf('.qc-box[data-id]');
+  step('the move survives a reload', near(r3.l, r1.l, 4) && near(r3.t, r1.t, 4), { before: r1, after: r3 });
+  await shot('04_moved');
+
+  // double-clicking the header puts it back on its spot
+  const h3 = await rectOf('.qc-box[data-id] .qc-head');
+  await dblclick(h3.l + 60, h3.t + 12);
+  const r4 = await rectOf('.qc-box[data-id]');
+  step('double-clicking the header puts it back', near(r4.l, r0.l, 4) && near(r4.t, r0.t, 4) && (await state()).threads[0].moved === null,
+       { back: r4, was: r0 });
 
   // sign out: everything disappears
   await signOut();
@@ -301,7 +358,7 @@ try {
   await until("document.querySelectorAll('#qc-all .qc-list li').length === 1", 'the all-comments list');
   const listed = await evaluate("document.querySelector('#qc-all .qc-list li').textContent");
   step('admin: the all-comments list names the reader and the note', listed.includes(READER.name) && listed.includes(NOTE));
-  await shot('04_admin_list');
+  await shot('05_admin_list');
   await evaluate("window.confirm = function(){ return true; }; document.querySelector('#qc-all .qc-list li .qc-btn').click()");
   await until("document.querySelectorAll('.qc-pin[data-id]').length === 0", 'the thread gone');
   const left = await evaluate("fetch('/api/admin/threads').then(r => r.json()).then(d => d.threads.length)");
@@ -315,7 +372,7 @@ try {
   await evaluate(`window.confirm = function(){ return true; }; document.querySelector('${who} .qc-btn').click()`);
   await until(`/closed/.test(document.querySelector('${who}').textContent)`, 'the closed tag');
   step("admin: closed the reader's account", true);
-  await shot('05_closed');
+  await shot('06_closed');
   const refused = await apiPost('/api/login', { email: READER.email, password: READER.password });
   step('a closed account is refused at the door', refused === 403, { status: refused });
 } catch (e) {
