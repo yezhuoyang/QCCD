@@ -345,6 +345,32 @@ try {
   step('double-clicking the header puts it back', near(r4.l, r0.l, 4) && near(r4.t, r0.t, 4) && (await state()).threads[0].moved === null,
        { back: r4, was: r0 });
 
+  // folded, the pin is the whole note -- and it is what there is to take hold of
+  await evaluate("document.querySelector('.qc-box[data-id] [id^=qc-fold-]').click()");
+  const p0 = await rectOf('.qc-pin[data-id]');
+  await drag(p0.l + 15, p0.t + 15, p0.l + 15 - 180, p0.t + 15 + 120);
+  const p1 = await rectOf('.qc-pin[data-id]');
+  step('folded: the pin itself drags around the page',
+       (await shown()) === false && near(p1.l, p0.l - 180, 4) && near(p1.t, p0.t + 120, 4), { before: p0, after: p1 });
+  step('the drag did not count as the click that opens it', (await state()).threads[0].folded === true);
+  await shot('05_folded_pin');
+  await evaluate("document.querySelector('.qc-pin[data-id]').click()");
+  await until("document.querySelector('.qc-box[data-id]').getBoundingClientRect().height > 0", 'the note open again');
+  const p2 = await rectOf('.qc-pin[data-id]'), b2 = await rectOf('.qc-box[data-id]');
+  step('a click still opens it, and the note comes back beside the pin where it now stands',
+       near(p2.l, p1.l, 2) && b2.l > p2.l && b2.l - p2.l < 60, { pin: p2, box: b2 });
+  await open(url);
+  await until("document.querySelector('.qc-pin[data-id]')", 'the pin after the reload');
+  const p3 = await rectOf('.qc-pin[data-id]');
+  step('the moved pin is where it was left after a reload', near(p3.l, p2.l, 4) && near(p3.t, p2.t, 4), { before: p2, after: p3 });
+
+  // and the menu puts the whole lot back
+  await openMenu('qc-putback');
+  await new Promise(r => setTimeout(r, 200));
+  const p4 = await rectOf('.qc-pin[data-id]');
+  step('the menu puts every note back on its spot',
+       near(p4.l, p0.l, 4) && near(p4.t, p0.t, 4) && (await state()).threads[0].movedPin === null, { back: p4, was: p0 });
+
   // sign out: everything disappears
   await signOut();
   step('signed out: no pins, no boxes', !(await evaluate("document.querySelectorAll('.qc-pin, .qc-box').length")) && (await state()).me === null);
@@ -358,7 +384,7 @@ try {
   await until("document.querySelectorAll('#qc-all .qc-list li').length === 1", 'the all-comments list');
   const listed = await evaluate("document.querySelector('#qc-all .qc-list li').textContent");
   step('admin: the all-comments list names the reader and the note', listed.includes(READER.name) && listed.includes(NOTE));
-  await shot('05_admin_list');
+  await shot('06_admin_list');
   await evaluate("window.confirm = function(){ return true; }; document.querySelector('#qc-all .qc-list li .qc-btn').click()");
   await until("document.querySelectorAll('.qc-pin[data-id]').length === 0", 'the thread gone');
   const left = await evaluate("fetch('/api/admin/threads').then(r => r.json()).then(d => d.threads.length)");
@@ -372,7 +398,7 @@ try {
   await evaluate(`window.confirm = function(){ return true; }; document.querySelector('${who} .qc-btn').click()`);
   await until(`/closed/.test(document.querySelector('${who}').textContent)`, 'the closed tag');
   step("admin: closed the reader's account", true);
-  await shot('06_closed');
+  await shot('07_closed');
   const refused = await apiPost('/api/login', { email: READER.email, password: READER.password });
   step('a closed account is refused at the door', refused === 403, { status: refused });
 } catch (e) {

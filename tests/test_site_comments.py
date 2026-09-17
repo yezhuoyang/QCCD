@@ -6,8 +6,9 @@ the real API on a temporary database, and drives headless Chrome through the sto
 admin invites a reader and copies the link, she follows it and the link makes her account,
 she pins a note to a paragraph with a real click, the pin stands on that paragraph through
 scrolling, a reload and a narrower window, she replies and deletes; she gets the note out
-of the way of the words -- minimised to its pin, and dragged clear by its header, which
-survives a reload and still follows the paragraph -- and signs out; the admin then deletes
+of the way of the words -- minimised to its pin, dragged clear by its header, and, folded
+down to the pin, dragged again by that, all of which survives a reload and still follows
+the paragraph -- and signs out; the admin then deletes
 it all and closes her account.  Skipped without node or Chrome.
 """
 
@@ -72,6 +73,10 @@ def test_pin_a_comment_and_manage_it(tmp_path: Path):
                  "dragged by its header: the note moved with the mouse",
                  "a moved note still belongs to its paragraph",
                  "the move survives a reload", "double-clicking the header puts it back",
+                 "folded: the pin itself drags around the page",
+                 "the drag did not count as the click that opens it",
+                 "the moved pin is where it was left after a reload",
+                 "the menu puts every note back on its spot",
                  "the pin stands on that spot", "scrolled: the pin moved with the text, not with the window",
                  "reloaded: signed in, the pin is back on the spot", "narrower window: the pin follows the reflowed paragraph",
                  "admin: deleted the thread; the API has none left",
