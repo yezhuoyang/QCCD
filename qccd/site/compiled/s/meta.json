@@ -3,6 +3,8 @@
  "title": "s",
  "note": "u3(0, 0, \u03c0/2): the frame update carries the gate, the beam has angle 0",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
- "compile_seconds": 0.07,
- "check_seconds": 3.8
+ "device": "chain4",
+ "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
+ "compile_seconds": 0.05,
+ "check_seconds": 2.1
 }

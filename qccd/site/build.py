@@ -5,7 +5,7 @@ the reference docs (`docs/*.md`), the boards `Codesign/scripts/bb_studio.py` alr
 rendered for the five tasks, and a discussion page.  It writes plain HTML.  What it adds
 to a page is the 40 px navigation bar with its search box and the comment layer
 (`comments.html`): a signed-in reader pins a note to any spot of any page, and only
-signed-in readers see the notes.  The one process behind the site is that layer's API,
+signed-in readers see the notes -- and only an invited reader has an account at all.  The one process behind the site is that layer's API,
 `comments_api.py` (accounts, sessions and threads in SQLite, standard library only),
 reached through nginx at `/api/`; the only third-party script is giscus on /discuss/.
 
@@ -91,7 +91,7 @@ PART_COLOR = {"A": "#2a78d6", "B": "#eb6834", "R": "#1baf7a", "C": "#4a3aa7", "D
 DOC_TAGS = {"adl": "device language", "tsir": "control IR", "rules": "the rules", "phys": "physics and metal"}
 DOC_BLURBS = {"adl": "One document describes a machine: its trap graph, zones, wiring and the curves of its primitives.",
               "tsir": "The eleven verbs a programme is written in, and what each one costs.",
-              "rules": "All 23 rules, what each one checks, and what the verifier can honestly say about it.",
+              "rules": "All 27 rules, what each one checks, and what the verifier can honestly say about it.",
               "phys": "From the graph to electrodes: the metal a device implies, and its design rules."}
 
 
@@ -113,14 +113,14 @@ STYLE = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--surface);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:920px;margin:0 auto;padding:28px 24px 64px}
-h1{font-size:24px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
-h2{font-size:18px;font-weight:600;margin:30px 0 8px} h3{font-size:15px;font-weight:600;margin:22px 0 6px}
-p,li{color:var(--ink)} .sub{color:var(--ink2);max-width:76ch}
+h1{font-size:34px;font-weight:600;margin:0 0 8px;letter-spacing:-.015em;line-height:1.15}
+h2{font-size:22px;font-weight:600;margin:34px 0 8px} h3{font-size:17px;font-weight:600;margin:22px 0 6px}
+p,li{color:var(--ink)} .sub{color:var(--ink2)}
 a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
 code{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f3f2ee;padding:1px 4px;border-radius:4px}
 pre{background:#f7f6f2;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto}
 pre code{background:none;padding:0;font-size:12.5px}
-.tw{overflow-x:auto} table{border-collapse:collapse;font-size:13px;margin:8px 0}
+.tw{overflow-x:auto} table{border-collapse:collapse;font-size:13px;margin:8px 0;width:100%}
 th,td{padding:5px 10px 5px 0;border-bottom:1px solid var(--grid);vertical-align:top} th{color:var(--ink3);font-weight:500}
 blockquote{margin:0;padding:0 0 0 14px;border-left:3px solid var(--line);color:var(--ink2)}
 hr{border:0;border-top:1px solid var(--line);margin:24px 0}
@@ -144,7 +144,7 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .pt{display:grid;grid-template-columns:72px 1fr;gap:18px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
 .pt .ic{width:64px;height:64px;display:block} .pt h3{margin:0 0 2px;font-size:16px}
 .pt .kick{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;margin-bottom:2px}
-.pt .sum{color:var(--ink2);margin:0 0 8px;font-size:13.5px;max-width:70ch}
+.pt .sum{color:var(--ink2);margin:0 0 8px;font-size:13.5px}
 .pt .lessons{columns:2;column-gap:28px} .pt .lessons li{break-inside:avoid}
 .pt .prog{font-size:12px;color:var(--ink3);margin-left:auto;white-space:nowrap}
 .docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
@@ -152,7 +152,7 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .doc:hover{border-color:var(--accent);text-decoration:none} .doc b{display:block;color:#1c2a4a;margin-bottom:2px} .doc span{color:var(--ink2);font-size:13px}
 .doc .tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:4px}
 /* board: one row per task */
-.task{display:grid;grid-template-columns:240px 1fr 170px;gap:26px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:14px 0}
+.task{display:grid;grid-template-columns:240px 1fr;gap:26px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:14px 0}
 .task h2{margin:0 0 4px;font-size:17px} .task h2 a{color:#1c2a4a} .task .desc{color:var(--ink2);font-size:13px;margin:0 0 10px}
 .task .more{font-size:13px} .task .meta{font-size:12.5px;color:var(--ink3);margin:8px 0 0}
 .bars{display:flex;flex-direction:column;gap:3px}
@@ -162,8 +162,11 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 .bar .tr{display:block;height:10px;background:var(--grid);border-radius:3px;overflow:hidden} .bar .fl{display:block;height:100%;border-radius:3px}
 .bar .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)}
 .bar.best .lbl,.bar.best .v{font-weight:700;color:#0b7a4b} .bar.bad .lbl{color:#c62828}
+.bar .rank{display:inline-block;width:20px;height:20px;border-radius:10px;background:#1c2a4a;color:#fff;font-size:11.5px;font-weight:700;text-align:center;line-height:20px;margin-right:8px;vertical-align:1px}
+.bar .rank.r1{background:#0b7a4b} .bar .rank.r2{background:#52514e} .bar .rank.r3{background:#8a8985}
+.bar{grid-template-columns:200px 1fr 68px;font-size:13.5px;padding:3px 0} .refused a{color:var(--accent)}
 .refused{font-size:12px;color:var(--ink3);margin-top:8px} .refused b{color:#c62828;font-weight:600}
-.stats{display:grid;grid-template-columns:1fr;gap:8px;align-content:start}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-content:start;margin-top:14px}
 .stat{border:1px solid var(--line);border-radius:8px;padding:7px 10px} .stat b{display:block;font-size:19px;line-height:1.15;font-variant-numeric:tabular-nums}
 .stat small{display:block;font-size:11.5px;color:var(--ink2);margin-top:1px}
 .stat span{display:block;font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
@@ -175,7 +178,7 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 main.wide{max-width:1120px}
 pre.grammar{font-size:12.5px;line-height:1.6}
 .verb,.rule{border-top:1px solid var(--line);padding:20px 0 10px;scroll-margin-top:48px}
-.verb h3,.rule h3{margin:0 0 6px;font-size:16px} .verb h3 code{font-size:14px;background:none;padding:0;color:#1c2a4a}
+.verb h3,.rule h3{margin:0 0 6px;font-size:20px} .verb h3 code{font-size:18px;background:none;padding:0;color:#1c2a4a}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
 dl.sem{margin:8px 0 0;display:grid;grid-template-columns:64px 1fr;gap:5px 10px;font-size:13px}
 dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;padding-top:3px} dl.sem dd{margin:0}
@@ -191,8 +194,11 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .runbox{margin:6px 0 4px}
 .runbox iframe.live{display:block;width:100%;height:300px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .ex .open{font-size:12px}
-.rule h3 .st{font-weight:400;color:var(--ink2);font-size:14px} .rule .checks{margin:0 0 4px;font-size:13.5px}
-.rule .src{font-size:12px;color:var(--ink3);margin:0 0 10px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.rule h3 .st{font-weight:400;color:var(--ink2);font-size:16px} .rule .checks{margin:0 0 4px;font-size:14px}
+.rule .src{font-size:12px;color:var(--ink3);margin:0 0 10px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+/* the two cards of a pair share their rows, so programme, verdict and the running machine line up */
+.pair>.ex{display:grid;grid-template-rows:subgrid;grid-row:span 5;align-content:start}
+.pair>.ex>.runbox{align-self:end} .pair>.ex>.verdict{align-self:start}
 .toc2{font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;padding:0;list-style:none}
 .contract{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 0} .contract div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff}
 .contract b{display:block;margin-bottom:2px} .contract .ok b{color:#0b7a4b} .contract .bad b{color:#c62828} .contract .skip b{color:#52514e} .contract .partial b{color:#b26a00}
@@ -207,10 +213,13 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .badge.ok{background:#e6f4ec;color:#0b7a4b} .badge.bad{background:#fbe9e7;color:#c62828} .badge.lean{background:#eef3fb;color:#2a78d6}
 .runbox.tall iframe.live{height:360px}
 .gaterow{border-top:1px solid var(--line);padding:20px 0 12px;scroll-margin-top:48px}
-.gaterow h3{margin:0 0 10px;font-size:16px} .gaterow h3 code{font-size:14px;background:none;padding:0;color:#1c2a4a} .gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:13.5px}
-.gr{display:grid;grid-template-columns:1fr 1.15fr;gap:26px;align-items:start} .gr>*{min-width:0}
+.gaterow h3{margin:0 0 10px;font-size:20px} .gaterow h3 code{font-size:18px;background:none;padding:0;color:#1c2a4a} .gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:14.5px}
+.gr{display:grid;grid-template-columns:1fr 1.15fr;gap:26px;align-items:stretch} .gr>*{min-width:0;display:flex;flex-direction:column}
+/* both columns of a gate row are one height: the machine view grows to fill it */
+.gr .runbox.tall{flex:1 1 auto;display:flex;flex-direction:column;min-height:360px} .gr .runbox.tall iframe.live{flex:1 1 auto;height:auto;min-height:360px}
+.gr .lab,.gr pre,.gr table,.gr .badges,.gr .open,.gr .pulses,.gr svg{flex:0 0 auto}
 .gr pre{margin:0 0 6px;font-size:11.5px;padding:8px 10px;background:#f7f6f2;overflow-x:auto}
-.gr .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:10px 0 3px} .gr .lab:first-child{margin-top:0}
+.gr .lab{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:10px 0 3px} .gr .lab:first-child{margin-top:0}
 .gr .badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
 svg.qc{display:block;max-width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;margin:0 0 6px}
 @media (max-width:860px){.gr{grid-template-columns:1fr}}
@@ -234,6 +243,17 @@ svg.qc{display:block;max-width:100%;height:auto;background:#fff;border:1px solid
 .pub .use{font-size:12.5px;color:var(--ink2);margin:0;padding-top:6px;border-top:1px dashed var(--grid)}
 .pub .use b{color:var(--ink3);font-weight:500;text-transform:uppercase;font-size:10.5px;letter-spacing:.07em;margin-right:6px}
 .cite pre{font-size:12px}
+
+/* physics: figures drawn from the device data, embeds, photographs */
+.fig{margin:16px 0 22px} .fig figcaption{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.45}
+.fig .credit{color:var(--ink3)} .fig img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.figsvg{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px} .figsvg svg{display:block;width:100%;height:auto}
+.fig iframe.live{display:block;width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:12px 0 22px}
+.gallery figure{margin:0} .gallery .figsvg{padding:8px 10px}
+.gallery figcaption{font-size:12.5px;color:var(--ink2);margin-top:6px} .gallery figcaption b{color:#1c2a4a}
+.legend.zones{margin:6px 0 0;font-size:12px}
+table.formulas td:first-child{white-space:nowrap;color:var(--ink)} table.formulas td:nth-child(2) code{font-size:12.5px;white-space:nowrap}
 """
 
 
@@ -276,6 +296,8 @@ HASH_JS = """<script>
   var looping = false;
   function embed(play){
     document.body.setAttribute('data-embed', '1');
+    // the website's embedded examples run and are watched, never edited
+    try { if(window.EDITOR && EDITOR.setViewOnly) EDITOR.setViewOnly(true); } catch(e){}
     try { var rail = document.getElementById('rail'); if(rail && typeof foldPanel === 'function') foldPanel(rail, true); } catch(e){}
     try { var dk = document.getElementById('dock'); if(dk && typeof foldPanel === 'function') foldPanel(dk, true); } catch(e){}
     try { if(typeof relayout === 'function') relayout(); } catch(e){}
@@ -312,6 +334,11 @@ HASH_JS = """<script>
 body[data-embed="1"] #sitenav,body[data-embed="1"] .head,body[data-embed="1"] #tools,body[data-embed="1"] #bbpill,
 body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"] #bbnow{display:none!important}
 body[data-embed="1"] main{height:100vh!important}
+/* view-only: the transport stays (play, step, reset, fit, speed); the editing tools, the
+   display modes, the element rail and the guide go */
+body[data-embed="1"] #ebar,body[data-embed="1"] #glide,body[data-embed="1"] #phase,body[data-embed="1"] #mode,
+body[data-embed="1"] #stagebar label,body[data-embed="1"] #rail,body[data-embed="1"] #toasts,
+body[data-embed="1"] #eCount,body[data-embed="1"] #eProb{display:none!important}
 </style>"""
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -328,8 +355,12 @@ def tasks() -> list[dict]:
         t = json.loads(p.read_text(encoding="utf-8"))
         t["dir"] = p.parent
         seed = ROOT / t["seed"]
-        t["rows"] = (json.loads((seed / "manifest.json").read_text(encoding="utf-8"))
-                     if (seed / "manifest.json").exists() else [])
+        rows = (json.loads((seed / "manifest.json").read_text(encoding="utf-8"))
+                if (seed / "manifest.json").exists() else [])
+        # a design that fails any rule is disqualified: not ranked, not published, not
+        # searchable -- the board carries only candidates that obey every rule
+        t["disqualified"] = [r for r in rows if r.get("rules_failed")]
+        t["rows"] = [r for r in rows if not r.get("rules_failed")]
         t["seed_dir"] = seed
         out.append(t)
     out.sort(key=lambda t: t.get("order", 99))
@@ -369,8 +400,11 @@ def nav_html(depth: int, active: str | None, index_json: str) -> str:
 
 def comments_html() -> str:
     """The comment layer (`comments.html`): the Sign-in control in the bar, and for a
-    signed-in reader the pins and chat boxes anchored in the page.  It talks to `/api/`
-    (`comments_api.py` behind nginx) and does nothing on a copy served without it."""
+    signed-in reader the pins and chat boxes anchored in the page.  It also carries the
+    one way an account is made -- a page opened as `?invite=<token>` asks for a name and
+    a password and makes it -- and, for the admin, the panel that sends those links.  It
+    talks to `/api/` (`comments_api.py` behind nginx) and does nothing on a copy served
+    without it."""
     return (HERE / "comments.html").read_text(encoding="utf-8")
 
 
@@ -467,7 +501,7 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                 '<span>Traps, qubits, gates, transport, the control system, where the noise comes from and how this website simulates it.</span></a>')
     body.append('<a class="doc" href="../language/"><span class="tag">the language</span><b>Every statement, with a running example</b>'
                 '<span>The syntax, what each statement does to the machine, what it costs, and the IR beneath it.</span></a>')
-    body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 23 rules, each with a programme that passes and one that fails</b>'
+    body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 27 rules, each with a programme that passes and one that fails</b>'
                 '<span>The verifier\'s own verdicts, runnable here.</span></a>')
     body.append('<a class="doc" href="../compilation/"><span class="tag">compilation</span><b>From QASM to hardware instructions, verified</b>'
                 '<span>The pipeline on a Bell pair, then every basic gate compiled, mapped, witnessed and checked.</span></a>')
@@ -510,47 +544,47 @@ def board_index(ts: list[dict]) -> str:
         sound = [r for r in ok if _entry_ok(r) and _r10(r)]
         best = sound[0] if sound else None
         refused = [r for r in rows if r not in ok]
-        tmax = max((_t(r) for r in ok), default=1.0)
+        # the board shows the three fastest verified designs of each task; the task page has them all
+        shown = (sound or ok)[:3]
+        tmax = max((_t(r) for r in shown), default=1.0)
         fmt = (lambda v: f"{v:.2f} ms") if tmax < 100 else (lambda v: f"{v:.0f} ms")
         bars = []
-        for r in ok:
+        for i, r in enumerate(shown, 1):
             cls = "bar" + (" best" if r is best else "") + ("" if _entry_ok(r) else " bad")
             name = html.escape(short_name(r))
             title = html.escape(r.get("title", ""))
             note = "" if _entry_ok(r) else " &middot; rules failed"
             bars.append(f'<a class="{cls}" href="{t["id"]}/{r["page"]}" title="{title}">'
-                        f'<span class="lbl">{name}{note}</span>'
+                        f'<span class="lbl"><span class="rank r{i}">{i}</span>{name}{note}</span>'
                         f'<span class="tr"><span class="fl" style="width:{100 * _t(r) / tmax:.1f}%;background:{fam_color(r.get("family", ""))}"></span></span>'
                         f'<span class="v">{fmt(_t(r))}</span></a>')
-        ref = ""
-        if refused:
-            ref = ('<div class="refused"><b>refused</b> by the compiler: ' +
-                   ", ".join(html.escape(short_name(r)) for r in refused) + "</div>")
+        rest = len(ok) - len(shown)
+        ref = (f'<div class="refused">top {len(shown)} of {len(sound)} verified designs &middot; '
+               f'<a href="{t["id"]}/">{rest} more on the task page &rarr;</a></div>' if rest > 0 else "")
         n_lean = sum(1 for r in ok if _r10(r))
-        n_bad = sum(1 for r in ok if not _entry_ok(r))
+        n_bad = len(t.get("disqualified") or [])
         stats = (
             f'<div class="stat good"><span>fastest verified</span><b>{fmt(_t(best)) if best else "&ndash;"}</b>'
             f'<small>{html.escape(short_name(best)) if best else "none yet"}</small></div>'
             f'<div class="stat lean"><span>R10 by Lean</span><b>{n_lean}</b><small>of {len(ok)} that run it</small></div>'
             f'<div class="stat"><span>designs</span><b>{len(rows)}</b><small>{len(ok)} run the round</small></div>'
-            f'<div class="stat{" warn" if (refused or n_bad) else ""}"><span>refused &middot; rules failed</span>'
-            f'<b>{len(refused)} &middot; {n_bad}</b><small>{"marked in red" if (refused or n_bad) else "none"}</small></div>')
+            f'<div class="stat{" warn" if (refused or n_bad) else ""}"><span>refused &middot; disqualified</span>'
+            f'<b>{len(refused)} &middot; {n_bad}</b><small>{"by the compiler &middot; by the rules, not listed" if (refused or n_bad) else "none"}</small></div>')
         rows_html.append(
             f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
             f'<p class="desc">{html.escape(t.get("description", ""))}</p>'
             f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p>'
-            f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; ranked by time on the jones table &middot; click a bar to step the programme</p></div>'
-            f'<div><div class="bars">{"".join(bars)}</div>{ref}</div>'
-            f'<div class="stats">{stats}</div></section>')
+            f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; the three fastest verified designs, by time on the jones table &middot; click a bar to step the programme</p></div>'
+            f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div></div></section>')
     legend = ('<div class="legend">' +
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
-              '<span><i style="background:#0b7a4b"></i>fastest verified</span><span><i style="background:#c62828"></i>refused or rules failed</span></div>')
+              '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
     body = ("<h1>Leaderboard</h1><p class=\"sub\">One board per task. A task is a fixed circuit, physics package "
             "and cost table; every design on a board ran one syndrome-extraction round of that circuit, was "
-            "replayed against the 23 rules and, where it passed, checked by the proved Lean checker (R10). "
-            "Each row ranks its designs by running time; open a task for the full plot, where you can rank by "
-            "anything and click a dot to step the programme in the studio.</p>" + legend + "".join(rows_html) +
+            "replayed against the 27 rules and, where it passed, checked by the proved Lean checker (R10). "
+            "A design that fails any rule is disqualified and not listed. Each row shows the three fastest verified designs of its task; open a task for the full ranking of "
+            "every listed design, where you can rank by anything and click a dot to step the programme in the studio.</p>" + legend + "".join(rows_html) +
             "<p class=\"note\">Contributing a design from the studio (Verify &rarr; Contribute) arrives in phase 3 of "
             f"<a href=\"{REPO}/blob/main/docs/WEBSITE_PLAN.md\">the plan</a>; until then the boards carry the study's seed entries.</p>")
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE, extra_css="", body=body)
@@ -577,10 +611,10 @@ def discuss_page() -> str:
     body = ("<h1>Discuss</h1><p class=\"sub\">GitHub Discussions on the repository, embedded here with giscus. "
             "A rule change is a pull request touching the rule's doc, its Python and browser twins and the parity "
             "test together; the discussion happens here, the decision is a merge.</p>"
-            "<p class=\"note\">To point at one spot instead: <b>sign in</b> from the bar (an email and a password; "
-            "an account takes a moment to create), press <b>+ Comment</b>, and click the word, figure or control you "
-            "mean. The note stays pinned there for every signed-in reader, who can reply under it. "
-            "Only signed-in readers see comments.</p>" + "".join(secs))
+            "<p class=\"note\">To point at one spot instead: <b>sign in</b> from the bar, press <b>+ Comment</b>, and "
+            "click the word, figure or control you mean. The note stays pinned there for every signed-in reader, who "
+            "can reply under it. Only signed-in readers see comments, and accounts are by invitation: ask the site "
+            "admin for a link, follow it once, and the account is yours.</p>" + "".join(secs))
     return PAGE.format(title="Discuss - QCCD studio", style=STYLE, extra_css="", body=body)
 
 
@@ -618,10 +652,11 @@ def _verdict(v: dict, focus: str | None, expect: str | None, tag: str | None) ->
     return cls, tag_text, "".join(parts)
 
 
-def _example_card(ex: dict, focus: str | None, root: str) -> str:
+def _example_card(ex: dict, focus: str | None, root: str, device: str | None = None) -> str:
     cls, tag, verdict = _verdict(ex["verdict"], focus, ex.get("expect"), ex.get("tag"))
+    dev = f'<p class="src">device: {html.escape(device)}</p>' if device else ""
     return (f'<div class="ex {cls}"><span class="tag">{tag}</span>'
-            f'<p class="why">{ex["why"]}</p>'
+            f'<p class="why">{ex["why"]}</p>{dev}'
             f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
             f'<div class="verdict">{verdict}</div>'
             f'<div class="runbox"><iframe class="live" loading="lazy" src="{ex["page"]}#embed&amp;step=1" title="the example, on its page"></iframe></div>'
@@ -689,7 +724,7 @@ def _sources(src: str) -> str:
 
 def rules_page(built: dict) -> str:
     body = ["<h1>The rules</h1>",
-            "<p class=\"sub\">Twenty-three rules a programme must obey on a QCCD machine, each traced to a source. "
+            "<p class=\"sub\">Twenty-seven rules a programme must obey on a QCCD machine, each traced to a source. "
             "The verifier replays every cycle and reports each rule as one of four things; a green tick is "
             "only ever printed for a check that ran. Each rule below has a programme that passes it and one "
             "that fails it, both judged by the real verifier and both runnable here as the page the studio "
@@ -705,7 +740,9 @@ def rules_page(built: dict) -> str:
     for R in RULES:
         meta = rule_meta(R["id"])
         b = built[R["id"]]
-        cards = "".join(_example_card(b[w], R["id"], "") for w in ("pass", "fail") if w in b)
+        own = any(isinstance(R.get(w), dict) and R[w].get("device") for w in ("pass", "fail"))
+        cards = "".join(_example_card(b[w], R["id"], "", b[w].get("device") if own else None)
+                        for w in ("pass", "fail") if w in b)
         note = f'<p class="note">{R["note"]}</p>' if R.get("note") else ""
         body.append(
             f'<section class="rule" id="{R["id"]}"><h3>{R["id"]} <span class="st">{html.escape(meta["statement"])}</span></h3>'
@@ -729,19 +766,20 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
         lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html"}
     rules: dict[str, dict] = {}
     for R in RULES:
-        m = machine(R["device"])
         entry: dict = {"model": R.get("model", "corrected")}
         for which in ("pass", "fail"):
             if which not in R:
                 continue
             ex = R[which]
+            m = machine(ex.get("device") or R["device"])
             model = ex.get("model") or R.get("model", "corrected")
             rel = f"rules/ex/{R['id']}_{which}.html"
             r = build_example(ex, m, model, out / rel, kicker=f"RULE {R['id']}",
                               headline=f"{R['id']}: {'passes' if which == 'pass' else 'fails'}" if not ex.get("expect") else f"{R['id']}: {ex.get('tag') or ex['expect']}",
                               lede=R["checks"], focus=R["id"], check_metrics=R.get("check_metrics", False))
             put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True, extra=HASH_JS)
-            entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model}
+            entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model,
+                            "device": (ex.get("device") or R["device"])["about"]}
         rules[R["id"]] = entry
     return lang, rules
 
@@ -878,7 +916,9 @@ def _gate_row(g: dict, page: str) -> str:
               f'<span class="badge lean">O1 Lean: {v.get("lean", "?")}</span>',
               f'<span class="badge {"ok" if str(v.get("o2_semantics", "")).startswith("ok") else "bad"}">O2: {html.escape(str(v.get("o2_semantics", "?")))}</span>']
     body = g["qasm"].split("creg c[2];\n", 1)[-1].strip()
+    dev = m.get("device", "ring6d")
     return (f'<section class="gaterow" id="{g["id"]}"><h3><code>{html.escape(body.splitlines()[0])}</code> <span class="st">{m["note"]}</span></h3>'
+            f'<p class="src">device: <b>{dev}</b>, {html.escape(m.get("device_about", ""))}</p>'
             f'<div class="gr"><div>'
             f'<div class="lab">the circuit</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}'
             f'<div class="lab">input</div><pre><code>{html.escape(body)}</code></pre>'
@@ -901,7 +941,8 @@ def compilation_page(built: list[dict]) -> str:
             "not trusted: everything it emits is replayed against the <a href=\"../rules/\">rules</a>, and R10, "
             "<i>the programme implements the circuit</i>, is decided by a checker written and proved sound in Lean "
             "plus a tableau composed from the emitted pulses. This page walks the pipeline on a Bell pair, then "
-            "compiles and verifies every basic gate on the same six-site ring, and each result can be run here.</p>"]
+            "compiles and verifies every basic gate, each on one of four small devices (a linear register, a racetrack, "
+            "a lattice with junctions, and a ring with docks), and each result can be run here.</p>"]
     # the input
     body.append("<h2 id=\"input\">The input</h2><p class=\"sub\">OpenQASM 2.0 with <code>qelib1.inc</code>. Every gate is lowered to the "
                 "native set of an ion trap: <b>R(&theta;, &phi;)</b>, one laser pulse; <b>VZ(&lambda;)</b>, a virtual "
@@ -923,7 +964,7 @@ def compilation_page(built: list[dict]) -> str:
         ("Route and schedule", "moves, layers", "ops are scheduled in DAG layers; every two-qubit gate's operands are carried to one gate-capable trap. The general router moves one ion at a time along hops the device admits; on rings past about half occupancy the rigid-rotation pass turns the whole loop instead. Every move is recorded."),
         ("Emit", "prog.tsir.json + prog.qcert.json", "the hardware programme in the language, every instruction stamped with the circuit op it serves (<code>meta.op</code>), and the certificate: the mapping, the moves, one witness per gate with its site, ions and pulses."),
         ("Cool", "prog.cooled.tsir.json", "the cooling pass replays the programme under the heating model and inserts cooling where a gate would otherwise fire hot (R7)."),
-        ("Verify the rules", "rules.json", "the same verifier the studio runs replays the cooled programme and reports the 22 structural rules; R10 is what remains."),
+        ("Verify the rules", "rules.json", "the same verifier the studio runs replays the cooled programme and reports the 26 structural rules; R10 is what remains."),
         ("Verify R10", "verdict.json", "<b>O1</b>: the certificate's moves are replayed from <code>init</code>; every gate must find its operands together in a trap that can gate, every hop must be one the device admits, every op witnessed exactly once and in order. The Lean checker <code>QCCDC.Cert.check</code> decides this, and <code>check_sound</code> proves that an accepted input implements the circuit. The device facts it judges against are re-derived from the architecture by code the compiler never runs. <b>O2</b>: the pulses are read out of the emitted programme, composed through the mapping into a stabilizer tableau and compared with the circuit's; outside the Clifford fragment an exact unitary is compared instead. A swapped operand, a dropped gate, a wrong angle or a mis-tracked frame all move the tableau."),
         ("Draw", "the page", "the studio joins the programme and the circuit through the stamps, but only after checking every witness against the stamp on the instruction it names; a disagreement refuses to draw."),
     ]
@@ -933,8 +974,9 @@ def compilation_page(built: list[dict]) -> str:
         c, v = bell["cert"], bell["verdict"]
         final = _positions(c)
         body.append("<h2 id=\"mapping\">The ion mapping, verified</h2>"
-                    "<p class=\"sub\">For the Bell pair the placer binds q0 and q1 to ions and seats them; the CNOT then needs "
-                    "both in one trap, so one ion travels round the loop to the other's dock. O1 recomputes every position "
+                    "<p class=\"sub\">For the Bell pair, compiled here onto the four-site register, the placer binds q0 and q1 to ions "
+                    "and seats them; the CNOT then needs both in one trap, so one ion is shuttled along the register to the "
+                    "other's site. O1 recomputes every position "
                     "from <code>init</code> and the move list and checks each gate's operands are where the witness says.</p>"
                     "<div class=\"two\"><div><table class=\"kv\"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>"
                     + "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion)}</td><td>{final.get(ion)}</td></tr>' for q, ion in sorted(c["map"].items(), key=lambda kv: int(kv[0])))
@@ -947,12 +989,12 @@ def compilation_page(built: list[dict]) -> str:
                     "pulse the compiler emitted but did not witness, or witnessed but did not emit, is caught.</p><div class=\"pulses\">"
                     + "".join(f'<code>op {w["dag"]} ({c["circuit_ops"][w["dag"]]["name"]}) at {w["site"]}, instruction #{w["instr"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c["gates"])
                     + f'</div><p class="sub">Verdict for the Bell pair: rules {len(bell["rules"].get("passed", []))} passed; R10 <b style="color:#0b7a4b">{v.get("R10")}</b> &mdash; {html.escape(str(v.get("R10_reason", "")))}.</p>')
-        body.append(f'<div class="ex pass" style="max-width:820px"><span class="tag">runs</span><p class="why">The compiled Bell pair on the six-site ring: press Play, or step it. The full page shows the circuit stepping beside the programme.</p>'
+        body.append(f'<div class="ex pass"><span class="tag">runs</span><p class="why">The compiled Bell pair on the four-site register: press Play, or step it. The full page shows the circuit stepping beside the programme.</p>'
                     f'<div class="runbox tall"><iframe class="live" loading="lazy" src="ex/bell.html#embed&amp;step=1" title="the Bell pair, on its page"></iframe></div>'
                     f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
     # every basic gate
     body.append("<h2 id=\"gates\">Every basic gate, compiled and verified</h2>"
-                "<p class=\"sub\">One circuit per gate on the same ring, through the same pipeline: the input, the hardware "
+                "<p class=\"sub\">One circuit per gate, each on one of four small devices named on its card, through the same pipeline: the input, the hardware "
                 "programme it became, the ion mapping, the pulses witnessed, and the verdicts of the rules and of R10's two "
                 "halves. The gates that need no laser show a lone frame update; the two-qubit gates show the transport that "
                 "brings the ions together; the non-Clifford ones are checked against the exact unitary.</p>")
@@ -985,14 +1027,18 @@ def build_compiled_pages(out: Path, put) -> list[dict]:
     built = load_compiled()
     if not built:
         return built
-    arch = Architecture.from_json(json.loads((COMPILED / "ring6d.arch.json").read_text(encoding="utf-8")))
+    archs: dict[str, Architecture] = {}
     model = corrected_model()
     for g in built:
+        dev = g["meta"].get("device", "ring6d")
+        if dev not in archs:
+            archs[dev] = Architecture.from_json(json.loads((COMPILED / f"{dev}.arch.json").read_text(encoding="utf-8")))
+        arch = archs[dev]
         prog = TSIR.load(g["dir"] / "prog.cooled.tsir.json")
         source = build_source(prog, g["cert"], g["dir"] / "circuit.qasm")
         res = verify(prog, arch, model, check_metrics=False).result
         rel = f"compilation/ex/{g['id']}.html"
-        render_html(arch, prog, res, model, out / rel, kicker="COMPILED", headline=f'{g["meta"]["title"]} on ring6d',
+        render_html(arch, prog, res, model, out / rel, kicker="COMPILED", headline=f'{g["meta"]["title"]} on {dev}',
                     lede=g["meta"]["note"], source=source, open_pane="Q")
         put(rel, (out / rel).read_text(encoding="utf-8"), 2, "compilation", app=True, extra=HASH_JS)
     return built
@@ -1021,6 +1067,197 @@ def _phys_link(target: str) -> str:
     return f"{REPO}/blob/main/{path}{frag}"
 
 
+
+# ------------------------------------------------------------------------- physics: figures
+
+#: The zone colours the diagrams use; anything else is grey.
+ZONE_HEX = {"trap": "#2a78d6", "data": "#e8b940", "load": "#1baf7a", "big": "#4a3aa7"}
+
+
+def device_svg(m, labels: bool | None = None) -> str:
+    """The device as the system holds it: every node of the expanded graph at its position,
+    every segment as a line.  Sites are discs coloured by zone, lattice junctions small dark
+    squares, and a site where three or more axes meet gets a dark ring.  Drawn straight from
+    `m.arch.device`, so the picture cannot disagree with what the verifier walks."""
+    dev = m.arch.device
+    nodes, segs = dev.nodes, dev.segments
+    if not nodes:
+        return ""
+    deg = {n: 0 for n in nodes}
+    for s in segs.values():
+        for e in s.ends:
+            deg[e] = deg.get(e, 0) + 1
+    xs = [n.pos[0] for n in nodes.values()]
+    ys = [n.pos[1] for n in nodes.values()]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    w, h = max(x1 - x0, 0.5), max(y1 - y0, 0.2)
+    scale = min(150.0, 820.0 / w, 420.0 / h)
+    if labels is None:
+        labels = len(nodes) <= 40
+    r = max(3.5, min(11.0, scale * 0.13))
+    pad = 34 if labels else 18
+    W, H = w * scale + 2 * pad, h * scale + 2 * pad + (14 if labels else 0)
+    X = lambda x: pad + (x - x0) * scale
+    Y = lambda y: pad + (y1 - y) * scale       # y up on the device, down on the screen
+    cx0, cy0 = X((x0 + x1) / 2), Y((y0 + y1) / 2)
+    # a small device is drawn at its natural size, centred; a big one fills the column
+    out = [f'<svg viewBox="0 0 {W:.0f} {H:.0f}" style="max-width:{W:.0f}px;margin:0 auto" xmlns="http://www.w3.org/2000/svg" '
+           f'font-family="ui-sans-serif,system-ui,sans-serif" role="img" aria-label="the device {html.escape(m.name)}">']
+    sw = max(2.0, r * 0.55)
+    for s in segs.values():
+        a, b = nodes[s.ends[0]], nodes[s.ends[1]]
+        ax, ay, bx, by = X(a.pos[0]), Y(a.pos[1]), X(b.pos[0]), Y(b.pos[1])
+        length = ((a.pos[0] - b.pos[0]) ** 2 + (a.pos[1] - b.pos[1]) ** 2) ** 0.5
+        if length > 1.5:
+            # a long segment (a loop closing on itself) is bowed away from the centre, so it
+            # is not drawn through the nodes that happen to lie between its ends
+            mx, my = (ax + bx) / 2, (ay + by) / 2
+            nx, ny = -(by - ay), (bx - ax)
+            nl = (nx * nx + ny * ny) ** 0.5 or 1.0
+            nx, ny = nx / nl, ny / nl
+            if (mx - cx0) * nx + (my - cy0) * ny < 0:
+                nx, ny = -nx, -ny
+            bow = min(0.45 * length * scale, 90.0)
+            out.append(f'<path d="M{ax:.1f} {ay:.1f}Q{mx + nx * bow:.1f} {my + ny * bow:.1f} {bx:.1f} {by:.1f}" fill="none" '
+                       f'stroke="#cfceca" stroke-width="{sw:.1f}" stroke-linecap="round"/>')
+        else:
+            out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{bx:.1f}" y2="{by:.1f}" stroke="#cfceca" stroke-width="{sw:.1f}" stroke-linecap="round"/>')
+    for nid, n in nodes.items():
+        cx, cy = X(n.pos[0]), Y(n.pos[1])
+        if n.kind == "junction":
+            s2 = r * 0.9
+            out.append(f'<rect x="{cx - s2:.1f}" y="{cy - s2:.1f}" width="{2 * s2:.1f}" height="{2 * s2:.1f}" rx="2" fill="#1c2a4a"/>')
+        else:
+            fill = ZONE_HEX.get(n.zone_type or "", "#8a8985")
+            ring = f' stroke="#1c2a4a" stroke-width="{max(1.5, r * 0.28):.1f}"' if deg.get(nid, 0) >= 3 else ' stroke="#fff" stroke-width="1.5"'
+            out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}"{ring}/>')
+        if labels:
+            out.append(f'<text x="{cx:.1f}" y="{cy + r + 12:.1f}" font-size="10.5" text-anchor="middle" fill="#52514e">{html.escape(nid)}</text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _zone_legend(m) -> str:
+    zones = sorted({n.zone_type for n in m.arch.device.nodes.values() if n.zone_type})
+    items = "".join(f'<span><i style="background:{ZONE_HEX.get(z, "#8a8985")}"></i>{html.escape(z)}</span>' for z in zones)
+    if any(n.kind == "junction" for n in m.arch.device.nodes.values()):
+        items += '<span><i style="background:#1c2a4a"></i>lattice junction</span>'
+    return f'<div class="legend zones">{items}<span><i style="background:#fff;border:2px solid #1c2a4a;width:8px;height:8px"></i>a site where three or more axes meet</span></div>'
+
+
+#: Devices the physics page draws besides the examples' small ones: the leaderboard's
+#: 24-site ring with 8 dock spurs, the one the landing page's example runs on.
+PHYS_DEVICES: dict[str, tuple[str, dict]] = {
+    "ring24_8": ("ring", {"width": 12, "height": 2, "verticals": 8}),
+}
+
+
+def _arch_machine(name: str):
+    """A device by name: one of the examples' small devices, or `arch:<file>` from `arch/`."""
+    from .examples import DEVICES as EX_DEVICES, machine as ex_machine
+    from ..api import Machine
+    if name.startswith("arch:"):
+        return Machine.load(ROOT / "arch" / f"{name[5:]}.arch.json")
+    if name in PHYS_DEVICES:
+        gen, params = PHYS_DEVICES[name]
+        return getattr(Machine, gen)(**params, name=name)
+    dev = next((d for d in EX_DEVICES if d["name"] == name), None)
+    if dev is None:
+        raise KeyError(f"physics.md names an unknown device {name!r}")
+    return ex_machine(dev)
+
+
+def _about(name: str) -> str:
+    from .examples import DEVICES as EX_DEVICES
+    dev = next((d for d in EX_DEVICES if d["name"] == name), None)
+    return dev["about"] if dev else ""
+
+
+#: The programmes the physics page runs, in embed mode, beside the prose.  Each is written
+#: in the language and rendered by the studio, like the Language page's examples.
+PHYS_RUNS: dict[str, dict] = {
+    "shuttle": {"device": "grid2x3", "model": "corrected", "headline": "A shuttle through a T-junction, then a cool",
+                "lede": "the walk from T0_0v through J0_1 to T0_1h charges the junction crossing; the cool sets n-bar back to zero",
+                "program": [("init", [{"d0": "T0_0v"}], {}), ("shuttle", ["d0", ["T0_0v", "J0_1", "T0_1h"]], {}), ("cool", [], {})]},
+    "dock": {"device": "ring6d", "model": "corrected", "headline": "Docking: a split at the loop and a merge at the spur",
+             "lede": "d0 walks the loop to S0 and is docked into the trap A0 where d1 waits; the dock entails a split and a merge, and the gate follows a cool",
+             "program": [("init", [{"d0": "S2", "d1": "A0"}], {}), ("shuttle", ["d0", ["S2", "S1", "S0"]], {}),
+                         ("move", ["d0", "S0", "A0"], {"cls": "dock"}), ("cool", [], {}), ("gate", ["CX", [["d0", "d1"]]], {})]},
+    "rotate": {"device": "dual3", "model": "corrected", "headline": "One waveform turns a whole loop",
+               "lede": "the outer trap loop is filled and rotated past the inner data loop: one instruction moves every ion on it",
+               "program": [("init", [{"a0": "AT0", "a1": "AT1", "a2": "AT2", "a3": "AB2", "a4": "AB1", "a5": "AB0", "d0": "DT0", "d1": "DT2"}], {}),
+                           ("rotate", [1], {"loop": "A"}), ("rotate", [1], {"loop": "A"}), ("rotate", [1], {"loop": "A"})]},
+    "budget": {"device": "chain4", "model": "corrected", "headline": "A walk, a cool, a gate: the report prices it",
+               "lede": "d0 walks the register to d1; the Report pane lists the quanta by channel, the wall clock, and the gate error read off n-bar",
+               "program": [("init", [{"d0": "C0", "d1": "C3"}], {}), ("shuttle", ["d0", ["C0", "C1", "C2", "C3"]], {}),
+                           ("cool", [], {}), ("gate", ["CX", [["d0", "d1"]]], {}), ("measure", [["d0", "d1"]], {})]},
+}
+
+
+def build_phys_runs(out: Path, put) -> dict[str, dict]:
+    """Render every PHYS_RUNS programme as a page under physics/ex/ and judge it."""
+    from .examples import build_example, rec
+    built = {}
+    for rid, spec in PHYS_RUNS.items():
+        m = _arch_machine(spec["device"])
+        rel = f"physics/ex/{rid}.html"
+        recs = [rec(meth, *args, **kw) for meth, args, kw in spec["program"]]
+        r = build_example({"program": recs}, m, spec.get("model", "corrected"), out / rel, kicker="PHYSICS",
+                          headline=spec["headline"], lede=spec["lede"])
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "physics", app=True, extra=HASH_JS)
+        built[rid] = {**r, "page": f"ex/{rid}.html", "device": spec["device"]}
+    return built
+
+
+def _figures(body: str, runs: dict[str, dict]) -> str:
+    """Expand the markers physics.md carries, each on a line of its own:
+         {{photo:file|alt|caption|credit}}      a photograph from static/
+         {{device:name|caption}}                one device, drawn from its data
+         {{gallery:name,name,...}}              several devices side by side, captioned from the examples
+         {{run:id|caption}}                     one of PHYS_RUNS, in embed mode
+    """
+    first_run = [True]
+
+    def photo(args):
+        f, alt, cap, credit = (args + ["", "", ""])[:4]
+        alt = html.unescape(re.sub(r"<[^>]+>", "", alt))
+        return (f'<figure class="fig photo"><img src="../static/{html.escape(f)}" alt="{html.escape(alt)}">'
+                f'<figcaption>{cap} <span class="credit">{credit}</span></figcaption></figure>')
+
+    def device(args):
+        name, cap = args[0], (args[1] if len(args) > 1 else "")
+        m = _arch_machine(name)
+        return (f'<figure class="fig"><div class="figsvg">{device_svg(m)}{_zone_legend(m)}</div>'
+                f'<figcaption>{cap}</figcaption></figure>')
+
+    def gallery(args):
+        cells = []
+        for name in args[0].split(","):
+            name = name.strip()
+            m = _arch_machine(name)
+            cells.append(f'<figure><div class="figsvg">{device_svg(m)}</div>'
+                         f'<figcaption><b>{html.escape(name)}</b>: {html.escape(_about(name))}</figcaption></figure>')
+        return f'<div class="gallery">{"".join(cells)}</div>'
+
+    def run(args):
+        rid, cap = args[0], (args[1] if len(args) > 1 else "")
+        r = runs[rid]
+        lazy = "" if first_run[0] else ' loading="lazy"'
+        first_run[0] = False
+        return (f'<figure class="fig run"><iframe class="live"{lazy} src="{r["page"]}#embed&amp;step=1" title="{html.escape(PHYS_RUNS[rid]["headline"])}"></iframe>'
+                f'<figcaption>{cap} <a href="{r["page"]}#step=1">Open the page &rarr;</a></figcaption></figure>')
+
+    kinds = {"photo": photo, "device": device, "gallery": gallery, "run": run}
+
+    def sub(mm):
+        # the captions went through the prose renderer already (links, bold, hover cards)
+        # and stay HTML; file names and device names are plain
+        kind, rest = mm.group(1), mm.group(2)
+        return kinds[kind]([a.strip() for a in rest.split("|")])
+
+    return re.sub(r"<p>\{\{(photo|device|gallery|run):(.*?)\}\}</p>", sub, body, flags=re.S)
+
+
 def render_physics() -> dict:
     """`qccd/site/physics.md` through the docs renderer: the same hover vocabulary, the
     same anchors, one table of contents from its `##` headings."""
@@ -1031,10 +1268,10 @@ def render_physics() -> dict:
     return {"title": title, "body": body, "toc": toc, "headings": r.headings}
 
 
-def physics_page(d: dict) -> str:
+def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
     body = (f'<p class="sub"><a href="../learn/">Learn</a> &rsaquo; background &middot; '
             f'<a href="{REPO}/blob/main/qccd/site/physics.md">qccd/site/physics.md</a></p>'
-            f'<ul class="toc">{d["toc"]}</ul>{d["body"]}')
+            f'<ul class="toc">{d["toc"]}</ul>{_figures(d["body"], runs or {})}')
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
 
@@ -1090,12 +1327,15 @@ def _authors(a: list[str]) -> str:
 def publications_page() -> str:
     """The papers by group, each with where it enters the site; then how to cite the tool."""
     body = ["<h1>Publications</h1>",
-            '<p class="sub">The papers this website is built on, grouped by what each one contributes, and how to '
-            'cite the website itself. Every number in the default device document names one of these as its '
-            'source; the <a href="../physics/">Physics background</a> page says where each enters.</p>',
+            '<p class="sub">The publications of the project, grouped by what each one contributes, and how to '
+            'cite the website itself.</p>',
             '<ul class="toc2">' + "".join(f'<li><a href="#{gid}">{html.escape(t)}</a></li>' for gid, t, _ in PUB_GROUPS
                                           if any(p.get("group") == gid for p in PUBS))
             + '<li><a href="#cite">Citing this website</a></li></ul>']
+    if not PUBS:
+        body.append('<p class="note">No publications are listed yet. The list lives in '
+                    f'<a href="{REPO}/blob/main/qccd/site/publications.py"><code>qccd/site/publications.py</code></a>; '
+                    'each entry names the paper, its authors, venue and links, and one line on where it enters the site.</p>')
     for gid, gtitle, gblurb in PUB_GROUPS:
         mine = [p for p in PUBS if p.get("group") == gid]
         if not mine:
@@ -1165,7 +1405,7 @@ def build(out: Path) -> int:
     index += [{"t": f"p.{v['verb']}", "d": v["what"][:90], "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
     index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": "a rule, with a passing and a failing programme",
                "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
-    index += [{"t": f"compile {title}", "d": note[:90], "u": f"compilation/#{gid}", "k": "compiled"} for gid, body, title, note in GATES]
+    index += [{"t": f"compile {title}", "d": note[:90], "u": f"compilation/#{gid}", "k": "compiled"} for gid, body, title, note, dev in GATES]
     index.append({"t": "Compilation", "d": "from QASM to hardware instructions, and how R10 is decided", "u": "compilation/", "k": "page"})
     index.append({"t": "Physics background", "d": "from trapping one ion to the noise model, and how the website simulates it",
                   "u": "physics/", "k": "page"})
@@ -1183,6 +1423,9 @@ def build(out: Path) -> int:
             if r.get("status") == "ok" and r.get("page"):
                 index.append({"t": r.get("short") or r["key"], "d": f"{t['title']} · {r.get('family', '')}",
                               "u": f"board/{t['id']}/{r['page']}", "k": "entry"})
+    # the logical-gadget tool (qccd/gadget/site.py, docs/GADGETS.md)
+    from ..gadget.site import index_entries as gadget_index_entries
+    index += gadget_index_entries()
     idx = json.dumps(index, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
 
     def put(rel: str, page: str, depth: int, active: str | None, app: bool = False, extra: str = "") -> None:
@@ -1209,7 +1452,8 @@ def build(out: Path) -> int:
     for name in DOC_NAMES:
         put(f"docs/{name}/index.html", doc_page(name, docs[name]), 2, "learn")
     put("discuss/index.html", discuss_page(), 1, "discuss")
-    put("physics/index.html", physics_page(phys), 1, "physics")
+    runs = build_phys_runs(out, put)
+    put("physics/index.html", physics_page(phys, runs), 1, "physics")
     put("people/index.html", people_page(), 1, "people")
     put("publications/index.html", publications_page(), 1, "publications")
     lang, rules = build_examples(out, put)
@@ -1218,6 +1462,8 @@ def build(out: Path) -> int:
     compiled = build_compiled_pages(out, put)
     put("compilation/index.html", compilation_page(compiled), 1, "compilation")
     print(f"  compilation  {len(compiled)} compiled examples")
+    from ..gadget.site import build_section as build_gadget_section
+    build_gadget_section(out, put)
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
     put("board/index.html", board_index(ts), 1, "board")
@@ -1231,9 +1477,16 @@ def build(out: Path) -> int:
         dst.mkdir(parents=True, exist_ok=True)
         put(f"board/{t['id']}/index.html", (src / "index.html").read_text(encoding="utf-8"), 2, "board",
             extra=FOOTER_BLOCK)
-        for name in ("manifest.json", "rows.json"):
-            if (src / name).exists():
-                shutil.copy2(src / name, dst / name)
+        # the published manifest carries only the listed designs; the seed directory keeps
+        # the full record, disqualified rows included
+        (dst / "manifest.json").write_text(json.dumps(t["rows"], indent=1, default=str) + "\n",
+                                           encoding="utf-8", newline="\n")
+        if (src / "rows.json").exists():
+            out_keys = {r["key"] for r in t["rows"]}
+            raw = json.loads((src / "rows.json").read_text(encoding="utf-8"))
+            kept = [r for r in raw if not isinstance(r, dict) or r.get("key") is None or r["key"] in out_keys]
+            (dst / "rows.json").write_text(json.dumps(kept, indent=1, default=str) + "\n",
+                                           encoding="utf-8", newline="\n")
         for r in t["rows"]:
             if r.get("status") != "ok" or not r.get("page"):
                 continue

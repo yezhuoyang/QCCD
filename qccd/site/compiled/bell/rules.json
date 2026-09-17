@@ -1,14 +1,14 @@
 {
  "program": "circuit+cooling",
- "instructions": 16,
- "arch": "ring6d",
+ "instructions": 11,
+ "arch": "chain4",
  "model": "corrected",
- "total_cost": 7.0,
- "total_steps": 15,
- "runtime_us": 985.0,
+ "total_cost": 1.0,
+ "total_steps": 10,
+ "runtime_us": 475.0,
  "contacts": 1,
  "templates": {
-  "class:shuttle": 5
+  "class:shuttle": 1
  },
  "passed": [
   "R1",
@@ -20,7 +20,11 @@
   "R16",
   "R17",
   "R18",
+  "R19",
   "R2",
+  "R20",
+  "R21",
+  "R22",
   "R3",
   "R4",
   "R4b",

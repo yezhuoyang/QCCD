@@ -1,6 +1,6 @@
 {
  "program": "circuit",
- "arch": "ring6d",
+ "arch": "race8",
  "circuit_sha256": "63e63e330244f16b7c3101b5983f3345f5d036a0701d9152cf68f8f29c4f87f7",
  "o1_transport": "ok",
  "lean": "accepted",

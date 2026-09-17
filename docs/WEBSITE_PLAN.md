@@ -24,8 +24,8 @@ executing session (§12).
 |---|---|---|---|
 | The studio page: device editor, program pane, animation, pricing, Report pane, tools bar, search, hover hints, cheat sheet | `qccd/viz/render.py`, `qccd/viz/engine.js`, `qccd/viz/js/editor.js` (built by `python -m qccd studio`) | shipped; one self-contained HTML | the **Design** app and the **Learn** app |
 | The course: 31 lessons, Parts A/B/R/C/D, checks over page verdicts, progress in `localStorage` | `qccd/viz/js/tutorial.js`, Learn tab; plan in `docs/TUTORIAL_PLAN.md` | phase 0 shipped (Part A); B/R/C/D per that plan | the **Learn** tab, untouched |
-| Browser rule set: 17 of 23 rules with a differential parity test against Python | `BROWSER_SET` in `render.py`; `tests/test_engine_parity.py` | shipped | the v1 verifier's rule half |
-| Python verifier: all 23 rules, `qccd open` (the return leg for a `qccd.studio` artifact) | `qccd/verify/rules.py`, `qccd/__main__.py` | shipped | CI's re-check, and the parity oracle for the six rules still to port |
+| Browser rule set: 21 of 27 rules with a differential parity test against Python | `BROWSER_SET` in `render.py`; `tests/test_engine_parity.py` | shipped | the v1 verifier's rule half |
+| Python verifier: all 27 rules, `qccd open` (the return leg for a `qccd.studio` artifact) | `qccd/verify/rules.py`, `qccd/__main__.py` | shipped | CI's re-check, and the parity oracle for the six rules still to port |
 | The compiler: QASM → TSIR + certificate | `Compiler/ocaml` (5.3 k lines OCaml, yojson only; file I/O in `qasm.ml`, `cert.ml`, the CLI) | shipped as `qccdc_cli.exe` | compiled to JavaScript with js_of_ocaml (§4.3) |
 | The proved checker (R10) | `Compiler/lean` — `QCCDC.Cert.check`, `check_sound`; `qcheck` exe imports Lean core only | shipped; ~10 s for small codes, 15 min / 2 GB for BB | compiled to WebAssembly (§4.4); the soundness proof is checked once, in CI |
 | Checker input assembly, stim check, cost, buildability | `Compiler/bridge/mk_qcheck_input.py`, `check_cert.py`, `small_codes.py`, `q06_campaign.py` | shipped (Python) | ported where the browser needs them (§4.2), else CI |
@@ -99,7 +99,7 @@ gets a verdict card. Every step below runs in the page.
 
 ### 4.1 What the studio already does
 Build the device from parts or generators; write a programme in the eleven verbs; replay
-and price it; report 17 rules live; export a `qccd.studio` artifact (device + program
+and price it; report 21 rules live; export a `qccd.studio` artifact (device + program
 records + edits). That is Design today.
 
 ### 4.2 Verification, version 1 ("basic")
@@ -177,7 +177,7 @@ is `write_index` — the plot, the metric pickers, the dots, the click-through �
 from a `rows.json`. Nothing about the page changes; what changes is where rows come from.
 
 **A row is a submission** (§7) that CI verified. The default ranking is total time on the
-jones table among entries whose 23 rules pass and whose R10 badge is Lean; the pickers
+jones table among entries whose 27 rules pass and whose R10 badge is Lean; the pickers
 still let a visitor rank by anything.
 
 **Contributing.** From the verdict card, **Contribute** writes one file,
@@ -295,7 +295,7 @@ in parallel sessions; 3 needs 1; 4 needs 2; 5 needs 4.
 2. **Submission channel.** Decided: issue form + Action-opened PR. A contributor needs a
    GitHub login and nothing else; the Action does the fork-free part.
 3. **R10 levels on the board.** Decided: three badges as in §5, all entries shown. The
-   default ranking is time on the jones table among entries with 23/23 rules and a badge of
+   default ranking is time on the jones table among entries with 27/27 rules and a badge of
    Lean checker or better; the others stay on the plot (hollow, as today) and in the table.
 4. **Compiler in the browser.** Confirmed: §4.3 supersedes `TUTORIAL_PLAN.md` §10 for
    Design; the course does not depend on it.
@@ -394,7 +394,7 @@ check_cert with qcheck), and live in `qccd/site/compiled/` (410 KB) so the site 
 toolchain. Two expert pages were added on request (2026-09-10): **Language** (`language/`), the hardware
 language in PL style — an EBNF of the Write pane's syntax, the machine state and its transitions,
 and every one of the twelve statements with its signature, meaning, cost, the rules that judge it,
-the IR it becomes, and a running example — and **Rules** (`rules/`), all 23 rules with the
+the IR it becomes, and a running example — and **Rules** (`rules/`), all 27 rules with the
 verifier's statement, what it checks, its sources, and a programme that passes and one that fails
 (or, for R7b, R10, R15 and R18, what the verifier honestly reports instead). Both live in
 `qccd/site/examples.py` as the records the Write pane produces, so the text shown is what ran;
@@ -454,6 +454,24 @@ then the three institutions with their marks) and **Publications** (`publication
 line each, arXiv and DOI links, and a BibTeX for citing the software until a paper exists).
 All three are searchable (page, section, person and paper entries) and in the walkthrough.
 
+**2026-09-10, later: widths, physics figures, varied devices, an empty list.** Four requests.
+(1) Text and boxes now share one width: the `76ch`/`70ch`/`52ch` caps on intro paragraphs
+are gone and tables span the column. (2) The Physics page carries figures: three NIST
+photographs (public domain, credited in the captions; `qccd/site/static/nist_*.{jpg,png}`),
+device diagrams drawn straight from `m.arch.device` by `build.py::device_svg` (the five
+example devices as a gallery, the 24-site ring with 8 docks), four programmes rendered by
+the studio and embedded in embed mode (`physics/ex/*.html`, from `PHYS_RUNS`), and a table
+of the formulas with the rule each one enters; `physics.md` places them with `{{photo:}}`,
+`{{device:}}`, `{{gallery:}}` and `{{run:}}` markers on lines of their own. (3) The
+examples no longer all stand on ring6d: `examples.py` defines a four-site chain, an
+eight-site racetrack, a 2x3 lattice (T-junctions beside corners) and a coupled dual loop
+beside the ring variants, each statement and rule on the device that shows it best, and
+`compile_examples.py` compiles the fifteen gates onto four devices (the Bell pair on the
+chain); every verdict was re-judged before the rebuild. (4) `publications.py`'s list is
+empty on purpose, with the entry shape in a comment; the page says so. Also:
+`tests/site.mjs::open` waited for about:blank's load event and could probe a slow page
+before its footer images arrived; it now waits that event out first.
+
 ### Accounts and comments — 2026-09-14
 
 **Asked.** Sign in with an email and a password; comments visible to signed-in readers
@@ -499,3 +517,66 @@ signed in and asserts every page offers Sign in and shows no pins.
 **Not done.** No email verification (no mail on the host); no avatar upload (initials
 in the account's colour); comments are keyed by path, not by the studio's `#learn`/
 `#design` hash (the anchor records it for context).
+
+**2026-09-14, the collaborator's rules.** `QCCD Rules.xlsx` (Ke; Jaewon and Jack on the
+angle rule) became four verifier rules and a technology layer, and every board entry was
+re-judged: R19 (junction degree <= 4), R20 (rails at a node >= 60 degrees), R21 (planar
+rails) read the drawing alone; R22 (one waveform per transport cycle) reads the programme.
+The ring generator's corner docks and the dual loop's end caps were drawing defects that
+R20/R21 caught on every shipped ring; fixed in the generators. The OCaml router now emits
+uniform cycles; the 28 board programmes it had batched were rewritten by
+`qccd/compile/uniform.py` or recompiled (`Codesign/scripts/uniformize_entries.py`,
+`recompile_entries.py`), the small codes fully recompiled, and every board page now takes
+its running time from the replay of the programme it shows (`bb_studio.py::build_one`,
+`numbers.T_source == "replay"`). Consequences on the boards: the torus, annulus, random
+and Tanner designs fail geometry and stay listed as failing; the BB lattices cost ~3x more
+transport time under R22 and the ring answer is unchanged; the site's three-per-task view
+shows only verified designs, so the change is visible mostly on the task pages. The Rules
+page has R19-R22 with explicit devices (a five-rail star, a 30-degree fork, two crossing
+rails) and the physics page explains them; the studio gained a physical scale (the
+technology's nm per unit), micrometre readouts, a measure tool and a true-scale toggle.
+
+### Invitations — 2026-09-17
+
+**Asked.** Anyone could register, and the site should not be open like that: the admin
+(yezhuoyang@cs.ucla.edu) signs in, names an email, sends an invitation to it, and only
+somebody who clicks that link can make an account.
+
+**Built.** (1) `comments_api.py` grew an `invites` table (the address, the token as a
+sha256 hash, who invited, when it expires, when it was sent, and the account it became)
+and a `users.access` column. `POST /api/register` now takes a `token` instead of an
+email: the invitation decides the address, so the person following the link cannot
+register as somebody else, and checking the token and spending it happen inside one
+lock. `GET /api/invite?token=` is the one public read, so the form can say whose
+invitation it is before that person has an account. The admin's endpoints are
+`GET /api/admin/people` (accounts and invitations), `POST /api/admin/invites`
+(`{email, name, note, send}`), `DELETE /api/admin/invites/<id>` and
+`POST /api/admin/users/<id>/access`. Closing an account deletes its sessions, so a
+reader removed is out at once rather than when their cookie expires; admins are always
+let in and cannot close themselves. An invitation lasts `INVITE_DAYS` (14), makes one
+account, and is replaced rather than duplicated when the same address is invited again.
+(2) The mail: a `Mailer` over `smtplib`, any relay that speaks SMTP (Gmail with an app
+password is what the droplet uses), configured from `/etc/qccd/mail.env` through the
+unit's `EnvironmentFile`, so the password is in no command line. A relay that refuses is
+not a failed invitation -- it is made either way and the answer carries the link, which
+is also the whole behaviour when no relay is configured at all. (3) `comments.html`: the
+sign-in dialog has no way into a registration form any more; a page opened as
+`?invite=<token>` reads the invitation, opens *Accept your invitation* with the address
+fixed and unchangeable, and takes the token out of the URL before anything else. The
+admin's menu gained *Readers and invitations*: invite by email with an optional name and
+note, the link to copy, the invitations with their state (waiting, mailed, expired,
+joined) with *Invite again* and *Withdraw*, and the accounts with *Close account* /
+*Let back in*. (4) The command line kept up: `invite`, `invites`, `access --allow
+|--revoke`, and `users` now shows which accounts are closed. (5) Tests:
+`test_comments_api.py` covers registration without a link, a made-up one, an expired
+one, a spent one, an address the browser tried to change, the admin's four endpoints,
+closing and reopening an account, and the invitation mail read out of a small SMTP
+server the test stands up; `comments.mjs` now opens with the admin inviting the reader
+through the panel and the reader following that link, and closes with her account being
+closed and refused.
+
+**Kept deliberately.** The readers who registered while the site was open keep their
+accounts (the migration gives every existing row `access = 1`); the panel lists them and
+closes any one of them in a click. Nothing here verifies that the person who followed
+the link is the person the mail reached -- possession of the link is the proof, as with
+any invitation.

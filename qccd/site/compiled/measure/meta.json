@@ -3,6 +3,8 @@
  "title": "measure",
  "note": "readout in a zone with SPAM; no pulses, so no gate witness",
  "compiler": "1 layers, 0 transport cycles, 0 beams, 0 MS, 0 virtual-Z, 3 instructions",
- "compile_seconds": 0.21,
- "check_seconds": 4.9
+ "device": "chain4",
+ "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
+ "compile_seconds": 0.04,
+ "check_seconds": 1.9
 }
