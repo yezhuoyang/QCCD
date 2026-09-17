@@ -31,7 +31,13 @@ qccd-comments[hidden]{display:none}
 .qc-box{position:absolute;width:290px;background:#fff;border:1px solid var(--qc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);
  pointer-events:auto;overflow:hidden;z-index:2}
 .qc-box:hover,.qc-box:focus-within{z-index:3}
-.qc-head{background:var(--qc);color:#fff;padding:6px 8px;display:flex;align-items:center;gap:7px;min-height:34px}
+/* folded: the note collapses into its pin, and the pin is all that is left over the words */
+.qc-box.qc-fold{display:none}
+/* the header is the handle: drag a note off the text it covers, double-click to put it back */
+.qc-head{background:var(--qc);color:#fff;padding:6px 8px;display:flex;align-items:center;gap:7px;min-height:34px;
+ cursor:grab;touch-action:none;user-select:none}
+.qc-head.qc-dragging{cursor:grabbing}
+.qc-head button{cursor:pointer}
 .qc-head .qc-av{background:rgba(255,255,255,.28)}
 .qc-head b{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
 .qc-head small{font-size:11px;opacity:.85;white-space:nowrap}
@@ -92,9 +98,10 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   var PAGE = location.pathname.replace(/index\.html$/, '');
   var PALETTE = ['#2a78d6','#d64545','#1baf7a','#eb6834','#4a3aa7','#c2308a','#0e9aa7','#8a6d1e','#5b8c1e','#b5471b','#6b4fbb','#2f7f6e'];
   var ME = null, THREADS = [], NODES = {}, DRAFT = null, PLACING = false, HIDDEN = false, LAYER = null, NAV = null, HINT = null, MENU = null;
-  var FOLDED = {};
+  var FOLDED = {}, MOVED = {};
   try { HIDDEN = localStorage.getItem('qc-hidden') === '1'; } catch(e){}
   try { FOLDED = JSON.parse(localStorage.getItem('qc-fold:' + PAGE) || '{}') || {}; } catch(e){ FOLDED = {}; }
+  try { MOVED = JSON.parse(localStorage.getItem('qc-move:' + PAGE) || '{}') || {}; } catch(e){ MOVED = {}; }
 
   // ---- the API -------------------------------------------------------------------------
   function api(method, path, body){
@@ -127,6 +134,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   function stopKeys(node){ ['keydown', 'keyup', 'keypress'].forEach(function(k){ node.addEventListener(k, function(ev){ ev.stopPropagation(); }); }); }
   function canDelete(owner){ return !!ME && (ME.admin || (owner && owner.id === ME.id)); }
   function saveFold(){ try { localStorage.setItem('qc-fold:' + PAGE, JSON.stringify(FOLDED)); } catch(e){} }
+  function saveMoved(){ try { localStorage.setItem('qc-move:' + PAGE, JSON.stringify(MOVED)); } catch(e){} }
 
   // ---- the bar widget ------------------------------------------------------------------
   function mountNav(){
@@ -167,7 +175,8 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     MENU.appendChild(el('div', 'qc-who', ME.name + '\n' + ME.email + (ME.admin ? ' · admin' : '')));
     function item(label, fn, id){ var b = el('button', null, label); b.type = 'button'; if(id) b.id = id; b.addEventListener('click', function(){ closeMenu(); fn(); }); MENU.appendChild(b); }
     item(HIDDEN ? 'Show comments on this page' : 'Hide comments on this page', function(){ HIDDEN = !HIDDEN; try { localStorage.setItem('qc-hidden', HIDDEN ? '1' : '0'); } catch(e){} applyHidden(); renderNav(); }, 'qc-toggle');
-    item('Unfold every thread', function(){ FOLDED = {}; saveFold(); renderAll(); });
+    item('Open every note on this page', function(){ FOLDED = {}; saveFold(); renderAll(); });
+    item('Put every note back on its spot', function(){ MOVED = {}; saveMoved(); for(var k in NODES) NODES[k].off = null; place(); });
     if(ME.admin) item('All comments on the site', openAdmin, 'qc-admin');
     if(ME.admin) item('Readers and invitations', openPeople, 'qc-people-btn');
     item('Change password', openPassword, 'qc-passwd');
@@ -490,9 +499,52 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     var vx = p.x + L.left;
     var bx = (vx + 36 + bw + 8 <= vw) ? p.x + 36 : Math.max(8 - L.left, p.x - 8 - bw);
     var by = p.y - 30;
+    // where the reader dragged it to, as an offset from the spot: the note still follows
+    // its paragraph through a scroll or a reflow, it just sits where it was put
+    if(node.off){ bx += node.off[0]; by += node.off[1]; }
     var docH = Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight);
+    bx = Math.min(Math.max(bx, 8 - L.left), Math.max(8 - L.left, vw - bw - 8 - L.left));
+    by = Math.max(by, 8 - L.top);
     if(by + bh + 8 - L.top > docH + window.scrollY) by = Math.max(8 - L.top, docH + window.scrollY - L.top - bh - 8);
     node.box.style.left = bx + 'px'; node.box.style.top = by + 'px';
+  }
+  // The header is the handle.  Dragging stores an offset from the anchor rather than an
+  // absolute position, so a note the reader pulled off the words it covered goes on
+  // following those words; double-clicking the header drops the offset again.
+  function draggable(node, head){
+    head.title = 'Drag to move this note; double-click to put it back';
+    head.addEventListener('pointerdown', function(ev){
+      if(ev.button !== 0 || (ev.target.closest && ev.target.closest('button'))) return;
+      ev.preventDefault(); ev.stopPropagation();
+      var sx = ev.clientX, sy = ev.clientY, base = (node.off || [0, 0]).slice(), moved = false;
+      head.classList.add('qc-dragging');
+      try { head.setPointerCapture(ev.pointerId); } catch(e){}
+      function move(e2){
+        node.off = [base[0] + (e2.clientX - sx), base[1] + (e2.clientY - sy)];
+        moved = moved || Math.abs(e2.clientX - sx) > 2 || Math.abs(e2.clientY - sy) > 2;
+        layout(node);
+      }
+      function up(){
+        head.classList.remove('qc-dragging');
+        head.removeEventListener('pointermove', move);
+        head.removeEventListener('pointerup', up);
+        head.removeEventListener('pointercancel', up);
+        if(moved) remember(node);
+      }
+      head.addEventListener('pointermove', move);
+      head.addEventListener('pointerup', up);
+      head.addEventListener('pointercancel', up);
+    });
+    head.addEventListener('dblclick', function(ev){
+      if(ev.target.closest && ev.target.closest('button')) return;
+      node.off = null; remember(node); layout(node);
+    });
+  }
+  function remember(node){
+    if(node.id == null) return;                      // a draft is moved, but not remembered
+    if(node.off && (node.off[0] || node.off[1])) MOVED[node.id] = node.off;
+    else delete MOVED[node.id];
+    saveMoved();
   }
   var raf = false;
   function place(){ raf = false; if(!LAYER) return; for(var id in NODES) layout(NODES[id]); if(DRAFT) layout(DRAFT); }
@@ -523,7 +575,8 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   function renderThread(th){
     var node = NODES[th.id];
     if(!node){
-      node = NODES[th.id] = { anchor: th.anchor, el: null, pin: el('div', 'qc-pin'), box: el('div', 'qc-box') };
+      node = NODES[th.id] = { id: th.id, anchor: th.anchor, el: null, pin: el('div', 'qc-pin'),
+                              box: el('div', 'qc-box'), off: MOVED[th.id] || null };
       node.pin.setAttribute('data-id', th.id); node.box.setAttribute('data-id', th.id);
       node.pin.addEventListener('click', function(){ toggleFold(th.id); });
       LAYER.appendChild(node.pin); LAYER.appendChild(node.box);
@@ -536,7 +589,9 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     node.box.innerHTML = '';
     var head = el('div', 'qc-head'); head.appendChild(avatar(th.user));
     head.appendChild(el('b', null, th.user.name)); head.appendChild(el('small', null, when(th.created)));
-    var fold = el('button', 'qc-x', '–'); fold.type = 'button'; fold.title = 'Fold to the pin'; fold.addEventListener('click', function(){ toggleFold(th.id); }); head.appendChild(fold);
+    var fold = el('button', 'qc-x', '–'); fold.type = 'button'; fold.id = 'qc-fold-' + th.id;
+    fold.title = 'Minimise this note to its pin (click the pin to open it again)';
+    fold.addEventListener('click', function(){ toggleFold(th.id); }); head.appendChild(fold);
     if(canDelete(th.user)){
       var del = el('button', 'qc-x qc-delthread', '×'); del.type = 'button'; del.title = ME.admin && th.user.id !== ME.id ? 'Delete this thread (admin)' : 'Delete this thread';
       del.addEventListener('click', function(){
@@ -545,6 +600,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
       });
       head.appendChild(del);
     }
+    draggable(node, head);
     node.box.appendChild(head);
     var msgs = el('div', 'qc-msgs'); th.comments.forEach(function(cm){ msgs.appendChild(msgRow(th, cm)); }); node.box.appendChild(msgs);
     var reply = el('div', 'qc-reply');
@@ -597,6 +653,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     DRAFT.pin.style.setProperty('--qc', c); DRAFT.pin.textContent = initials(ME.name);
     DRAFT.box.style.setProperty('--qc', c); DRAFT.box.id = 'qc-draft';
     var head = el('div', 'qc-head'); head.appendChild(avatar(ME)); head.appendChild(el('b', null, ME.name)); head.appendChild(el('small', null, 'new comment'));
+    draggable(DRAFT, head);
     var x = el('button', 'qc-x', '×'); x.type = 'button'; x.title = 'Cancel'; x.addEventListener('click', closeDraft); head.appendChild(x);
     DRAFT.box.appendChild(head);
     var reply = el('div', 'qc-reply');
@@ -646,7 +703,9 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   }
   window.QCCOMMENTS = {
     state: function(){ return { me: ME, placing: PLACING, hidden: HIDDEN, page: PAGE,
-                                threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null, folded: !!FOLDED[t.id] }; }) }; },
+                                threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null,
+                                                         folded: !!FOLDED[t.id], moved: (n && n.off) || null,
+                                                         shown: !!(n && n.box.offsetParent) }; }) }; },
     reload: load, place: place, invite: openInvite, people: openPeople
   };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
