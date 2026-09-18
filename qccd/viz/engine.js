@@ -335,7 +335,11 @@ function _sample(pts, cap) {
   return out;
 }
 
-function _fit(dx, dy, ux, uy, pad, iso) {
+// `ts` is `[nm_per_unit_x, nm_per_unit_y]` and turns on TRUE SCALE: `sx:sy` is forced to
+// that ratio, so one screen pixel is the same number of nanometres on both axes and an
+// angle read off the drawing is the angle the metal actually makes.  Mirrors
+// `layout.py::_fit`'s `ts` argument exactly, including the early return.
+function _fit(dx, dy, ux, uy, pad, iso, ts) {
   var availW = Math.max(W_MAX - 2 * pad, 80.0);
   var availH = Math.max(H_MAX - 2 * pad, 80.0);
   var sx = dx > _EPS ? availW / dx : Infinity;
@@ -345,6 +349,11 @@ function _fit(dx, dy, ux, uy, pad, iso) {
   if (!isFinite(sx) && !isFinite(sy)) { sx = PITCH_CAP; sy = PITCH_CAP; }
   else if (!isFinite(sx)) { sx = sy; }
   else if (!isFinite(sy)) { sy = sx; }
+  if (ts) {
+    // the largest (sx, sy) in the ratio nx:ny that fits inside the pair above
+    var kts = Math.min(sx / ts[0], sy / ts[1]);
+    return [kts * ts[0], kts * ts[1]];
+  }
   if (iso) { var mn = Math.min(sx, sy); sx = mn; sy = mn; }
   else {
     // These two lines are order-INDEPENDENT, which is worth stating because it looks like
@@ -381,11 +390,12 @@ function _pointSegment(p, a, b) {
   var dx = b[0] - a[0], dy = b[1] - a[1];
   var l2 = dx * dx + dy * dy;
   if (l2 < 1e-18) return [_hyp(p[0] - a[0], p[1] - a[1]), 0.0];
-  var t = Math.max(0.0, Math.min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2));
+  var u = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2;
+  var t = Math.max(0.0, Math.min(1.0, u));
   var qx = a[0] + t * dx, qy = a[1] + t * dy;
   var h = Math.sqrt(l2);
   var nx = -dy / h, ny = dx / h;
-  return [_hyp(p[0] - qx, p[1] - qy), (p[0] - a[0]) * nx + (p[1] - a[1]) * ny];
+  return [_hyp(p[0] - qx, p[1] - qy), (p[0] - a[0]) * nx + (p[1] - a[1]) * ny, u];
 }
 
 // Segments that would otherwise be drawn straight THROUGH a node they do not touch.  This
@@ -411,6 +421,8 @@ function _bows(nodes, segments, pos, posOrder, g, pad, clearance, need) {
       var n = nodes[ni];
       if (n.id === s.a || n.id === s.b) continue;
       var r = _pointSegment(pos.get(n.id), a, b);
+      // only a node the rail would run THROUGH bends it (Python: `u <= 1e-6 or u >= 1 - 1e-6`)
+      if (r[2] <= 1e-6 || r[2] >= 1.0 - 1e-6) continue;
       // strict `<`: the winner is the FIRST strict minimum in node DECLARATION order,
       // exactly as Python's `worst is None or d < worst[0]`.  Comparing sets, or sorting
       // the candidates, would pass a device that then lays out differently.
@@ -439,6 +451,24 @@ function computeLayout(nodes, segments, opts) {
   segments = segments || [];
   var raw = !!(opts && opts.raw);
   var R = raw ? function (v) { return v; } : _q;
+  // TRUE SCALE, or not -- `layout.py`'s `true_scale` / `unit_nm` pair, same refusal rule:
+  // a non-positive or non-finite nm-per-unit cannot mean anything, so it is ignored and
+  // `true_scale` comes back false rather than the page claiming a scale it did not get.
+  // A HELD VIEW -- `layout.py`'s `hold`, same refusal rule.  `(sx, sy, ox, oy)` the
+  // caller insists on: the fit is not recomputed, so an edit cannot move what is already
+  // on the screen.  Everything else still derives from the held scale.
+  var hd = null;
+  if (opts && opts.hold) {
+    var hsx = Number(opts.hold[0]), hsy = Number(opts.hold[1]);
+    var hox = Number(opts.hold[2]), hoy = Number(opts.hold[3]);
+    if (isFinite(hsx) && isFinite(hsy) && isFinite(hox) && isFinite(hoy) &&
+        hsx > 0.0 && hsy > 0.0) hd = [hsx, hsy, hox, hoy];
+  }
+  var ts = null;
+  if (opts && opts.true_scale && opts.unit_nm) {
+    var tsx = Number(opts.unit_nm[0]), tsy = Number(opts.unit_nm[1]);
+    if (isFinite(tsx) && isFinite(tsy) && tsx > 0.0 && tsy > 0.0) ts = [tsx, tsy];
+  }
   var pts = [], i;
   for (i = 0; i < nodes.length; i++) {
     var nd = nodes[i];
@@ -482,7 +512,7 @@ function computeLayout(nodes, segments, opts) {
   // FIVE passes then one final refit.  Do NOT add a convergence early-exit: it is five
   // passes plus a refit, and any early break changes `pad`.
   for (var it = 0; it < 5; it++) {
-    f = _fit(dx, dy, ux, uy, pad, iso); sx = f[0]; sy = f[1];
+    if (hd) { sx = hd[0]; sy = hd[1]; } else { f = _fit(dx, dy, ux, uy, pad, iso, ts); sx = f[0]; sy = f[1]; }
     g = minNearestNeighbour(_scale(sample, sx, sy));
     if (g <= _EPS) g = gd * Math.max(sx, sy);
     var r0 = Math.min(R_ION_MAX, Math.max(Math.min(R_ION_MIN, 0.45 * g), K_ION * g));
@@ -491,14 +521,15 @@ function computeLayout(nodes, segments, opts) {
     var padNeed = Math.max(0.30 * g + 0.10 * g, r0) + bowNeed;
     pad = Math.ceil(Math.max(PAD_A * r0 + PAD_B, padNeed));
   }
-  f = _fit(dx, dy, ux, uy, pad, iso); sx = f[0]; sy = f[1];
+  if (hd) { sx = hd[0]; sy = hd[1]; } else { f = _fit(dx, dy, ux, uy, pad, iso, ts); sx = f[0]; sy = f[1]; }
   g = minNearestNeighbour(_scale(sample, sx, sy));
   if (g <= _EPS) g = gd * Math.max(sx, sy);
 
   var W = Math.min(W_MAX, Math.max(W_MIN, _q(dx * sx + 2 * pad)));
   var H = Math.min(H_MAX, Math.max(H_MIN, _q(dy * sy + 2 * pad)));
-  var ox = (W - dx * sx) / 2.0 - x0 * sx;
-  var oy = (H - dy * sy) / 2.0 - y0 * sy;
+  var ox, oy;
+  if (hd) { ox = hd[2]; oy = hd[3]; }
+  else { ox = (W - dx * sx) / 2.0 - x0 * sx; oy = (H - dy * sy) / 2.0 - y0 * sy; }
 
   var rIon = Math.min(R_ION_MAX, Math.max(Math.min(R_ION_MIN, 0.45 * g), K_ION * g));
   var rRest = Math.min(rIon, Math.max(Math.min(1.6, 0.30 * g), K_REST * g));
@@ -524,6 +555,7 @@ function computeLayout(nodes, segments, opts) {
     g: R(g, 4), gd: R(gd, 6),
     ux: R(ux, 6), uy: R(uy, 6),
     iso: !!iso, axis_aligned: !!axisAligned,
+    true_scale: !!ts,
     n: nodes.length,
     r_ion: R(rIon, 3),
     r_rest: R(rRest, 3),
@@ -636,9 +668,10 @@ function ring(width, height, verticals, kw) {
   verticals = verticals === undefined || verticals === null ? 0 : verticals;
   kw = kw || {};
   var siteZone = kw.site_zone === undefined ? 'data' : kw.site_zone;
-  var ancillaZone = kw.ancilla_zone === undefined ? 'ancilla' : kw.ancilla_zone;
+  var ancillaZone = kw.ancilla_zone === undefined ? 'trap' : kw.ancilla_zone;
   var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
   var loopId = kw.loop_id === undefined ? 'L0' : kw.loop_id;
+  var dockOffset = kw.dock_offset === undefined ? 0 : kw.dock_offset;
 
   var slots = _ringSlots(width, height);
   var capacity = slots.length;
@@ -649,8 +682,18 @@ function ring(width, height, verticals, kw) {
       'the deck spaces docks uniformly around the loop');
   }
   var spacing = verticals ? Math.floor(capacity / verticals) : 0;
+  // `dock_offset` turns the whole dock pattern around the loop.  It exists because slot 0
+  // is a CORNER: on a loop of height >= 3 a corner dock's spur lies along the side rail
+  // and fails DRC, and an offset that keeps every dock on a straight costs nothing in the
+  // transport model (`Codesign/findings/q06`).  Python validates it against one spacing,
+  // in the same words, before it builds anything.
+  if (dockOffset < 0 || (spacing && dockOffset >= spacing)) {
+    throw new ExpansionError(
+      'dock_offset must be in [0, ' + spacing + ') -- one dock spacing -- got ' +
+      dockOffset);
+  }
   var dockSlots = new Set();
-  for (var i = 0; i < verticals; i++) dockSlots.add(i * spacing);
+  for (var i = 0; i < verticals; i++) dockSlots.add((dockOffset + i * spacing) % capacity);
 
   var midX = (width - 1) / 2.0, midY = (height - 1) / 2.0;
   var nodes = {}, segments = {}, s;
@@ -667,9 +710,20 @@ function ring(width, height, verticals, kw) {
   for (var di = 0; di < docks.length; di++) {
     s = docks[di];
     var side = slots[s][0], x = slots[s][1], y = slots[s][2];
-    var ax = (side === 'top' || side === 'bottom') ? x : midX;
-    var ay = (side === 'top' || side === 'bottom') ? midY : y;
-    nodes['A' + s] = _node('A' + s, ax, ay, 'site', ancillaZone, 0, ['ancilla']);
+    // the spur runs inward, perpendicular to the side the dock sits on, to the mid-line.
+    // At a CORNER slot the inward direction runs ALONG the end-cap rail -- the dock would
+    // sit on the rail, at 0 degrees to it (R20, R21) -- so a corner's spur runs outward
+    // instead, perpendicular to its row, over the same length.
+    var corner = (x === 0.0 || x === width - 1) && (y === 0.0 || y === height - 1);
+    var ax, ay;
+    if (corner) {
+      ax = x;
+      ay = side === 'top' ? -midY : (height - 1) + midY;
+    } else {
+      ax = (side === 'top' || side === 'bottom') ? x : midX;
+      ay = (side === 'top' || side === 'bottom') ? midY : y;
+    }
+    nodes['A' + s] = _node('A' + s, ax, ay, 'site', ancillaZone, 0, ['spur_trap']);
     segments['V' + s] = _seg('V' + s, 'S' + s, 'A' + s,
                              Math.abs(ax - x) + Math.abs(ay - y), segCap, null, ['spur']);
   }
@@ -680,32 +734,167 @@ function ring(width, height, verticals, kw) {
     'the rigid-rotation orbit; one movement template shifts every ion on it');
   return _dev(nodes, segments, loops, 'ring', {
     width: width, height: height, verticals: verticals, site_zone: siteZone,
-    ancilla_zone: ancillaZone, segment_capacity: segCap, loop_id: loopId });
+    ancilla_zone: ancillaZone, segment_capacity: segCap, loop_id: loopId,
+    dock_offset: dockOffset });
+}
+
+// `round(x, 6)` -- Python's, not a scale-and-round.  Python rounds the DECIMAL expansion
+// of the double; scaling by 1e6 first rounds a product that has already lost the bit that
+// decides the case.  `toFixed` renders that same decimal expansion, so it is the faithful
+// mirror.  (The half-way rule differs -- Python is half-even, `toFixed` half-up -- but a
+// double whose expansion terminates in ...5 at the 7th place cannot come out of `cos`.)
+function _pyRound6(x) { return Number(Number(x).toFixed(6)); }
+
+// `cylinder(a, b)`: the torus grid drawn as a chip.  `grid(..., periodic=True)` is not
+// planar and cannot be fabricated as drawn; this is the same graph with the fewest
+// crossings there is -- `b` concentric rings of `a` traps joined by `a` radial spokes, so
+// the x-direction wraps for free and nothing crosses (`Codesign/findings/q06k`).
+function cylinder(a, b, kw) {
+  kw = kw || {};
+  var wrapSpokes = kw.wrap_spokes === undefined ? false : !!kw.wrap_spokes;
+  var declareLoops = kw.declare_loops === undefined ? false : !!kw.declare_loops;
+  var siteZone = kw.site_zone === undefined ? 'trap' : kw.site_zone;
+  var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
+  var r0 = kw.r0 === undefined ? 2.0 : kw.r0;
+  var pitch = kw.pitch === undefined ? 1.0 : kw.pitch;
+  if (a < 3 || b < 2) throw new ExpansionError('cylinder needs a >= 3 and b >= 2');
+  var nodes = {}, segments = {}, loops = {}, i, j;
+
+  function at(i, j) {
+    var r = r0 + j * pitch, th = 2 * Math.PI * i / a;
+    return [_pyRound6(r * Math.cos(th)), _pyRound6(r * Math.sin(th))];
+  }
+  function site(tid, pos) {
+    nodes[tid] = _node(tid, pos[0], pos[1], 'site', siteZone, 0, ['trap']);
+  }
+  function link(sid, u, v, length, loop) {
+    segments[sid] = _seg(sid, u, v, length === undefined ? 0.5 : length, segCap,
+                         loop === undefined ? null : loop, []);
+  }
+
+  for (i = 0; i < a; i++) for (j = 0; j < b; j++) {
+    var jp = at(i, j);
+    nodes['J' + i + '_' + j] = _node('J' + i + '_' + j, jp[0], jp[1], 'junction',
+                                     undefined, 0, ['lattice']);
+  }
+  // the rings: closed loops, one trap per wire
+  for (j = 0; j < b; j++) {
+    var lid = 'R' + j, tag = declareLoops ? lid : null, order = [];
+    for (i = 0; i < a; i++) {
+      var tid = 'T' + i + '_' + j + 'h';
+      site(tid, at(i + 0.5, j));
+      link(tid + '.a', 'J' + i + '_' + j, tid, 0.5, tag);
+      link(tid + '.b', tid, 'J' + ((i + 1) % a) + '_' + j, 0.5, tag);
+      order.push('J' + i + '_' + j, tid);
+    }
+    if (declareLoops) loops[lid] = _loop(lid, order, true, 'ring');
+  }
+  // the spokes: open, one trap per ring gap
+  for (i = 0; i < a; i++) for (j = 0; j < b - 1; j++) {
+    var sid = 'T' + i + '_' + j + 'v';
+    site(sid, at(i, j + 0.5));
+    link(sid + '.a', 'J' + i + '_' + j, sid);
+    link(sid + '.b', sid, 'J' + i + '_' + (j + 1));
+  }
+  if (wrapSpokes) {
+    // outer ring back to inner, between spokes i and i+1, crossing rings 1..b-2 on the
+    // wire T{i}_{r}h -- inserted between that wire's junction and its trap.  A crossing IS
+    // a degree-4 node in a surface trap, and R18 charges it as a junction.
+    for (i = 0; i < a; i++) {
+      var wid = 'T' + i + '_' + (b - 1) + 'v';
+      site(wid, at(i + 0.5, b - 0.5));
+      var chain = ['J' + i + '_' + (b - 1), wid];
+      for (var r = b - 2; r > 0; r--) {
+        var xid = 'X' + i + '_' + r, xp = at(i + 0.5, r + 0.02);
+        nodes[xid] = _node(xid, xp[0], xp[1], 'junction', undefined, 0, ['crossing']);
+        // split the ring wire's first segment J -> T into J -> X -> T.  `delete` first,
+        // exactly as Python's `segments.pop`: re-adding a popped key puts it at the END
+        // of the mapping in both languages, and segment ORDER is observable.
+        var w = 'T' + i + '_' + r + 'h', oldLoop = segments[w + '.a'].loop;
+        delete segments[w + '.a'];
+        link(w + '.a', 'J' + i + '_' + r, xid, 0.5, oldLoop);
+        link(w + '.x', xid, w, 0.5, oldLoop);
+        if (own(loops, 'R' + r)) {
+          var lp = loops['R' + r], nl = lp.nodes.slice();
+          nl.splice(nl.indexOf(w), 0, xid);
+          // assignment to an EXISTING key keeps its place in both languages
+          loops['R' + r] = _loop(lp.id, nl, true, 'ring');
+        }
+        chain.push(xid);
+      }
+      chain.push('J' + i + '_0');
+      for (var k = 0; k < chain.length - 1; k++) {
+        link(wid + '.' + k, chain[k], chain[k + 1]);
+      }
+    }
+  }
+  return _dev(nodes, segments, loops, 'cylinder', {
+    a: a, b: b, wrap_spokes: wrapSpokes, declare_loops: declareLoops,
+    site_zone: siteZone, segment_capacity: segCap, r0: r0, pitch: pitch });
 }
 
 function grid(a, b, kw) {
   kw = kw || {};
   var siteZone = kw.site_zone === undefined ? 'trap' : kw.site_zone;
   var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
+  // `spacing` is why this generator is fabricable at all.  At the default 1 the trap sits
+  // at the midpoint of a wire, 112.5 um from each flanking junction in the shipped
+  // technology, inside BOTH of their 180 um keep-outs, so every trap gets zero control
+  // electrodes (`Codesign/findings/q06i`).  At `spacing = s` the wire carries `s - 1`
+  // traps at unit offsets and the nearest is a full lattice unit from a junction.
+  var spacing = kw.spacing === undefined ? 1 : kw.spacing;
+  // `periodic` closes both directions -- the torus the BB code lives on.  It is drawn,
+  // not fabricable: the wrap wires run past the last column and row and a die would have
+  // to fold them.  `cylinder` is the planar drawing of the same graph.
+  var periodic = kw.periodic === undefined ? false : !!kw.periodic;
   if (a < 2 || b < 2) throw new ExpansionError('grid needs a >= 2 and b >= 2');
+  if (spacing < 1) throw new ExpansionError('grid needs spacing >= 1');
   var nodes = {}, segments = {}, i, j;
   for (i = 0; i < a; i++) for (j = 0; j < b; j++) {
-    nodes['J' + i + '_' + j] = _node('J' + i + '_' + j, i, j, 'junction', undefined, 0,
-                                     ['lattice']);
+    nodes['J' + i + '_' + j] = _node('J' + i + '_' + j, i * spacing, j * spacing,
+                                     'junction', undefined, 0, ['lattice']);
   }
-  function addTrap(tid, x, y, u, v) {
-    nodes[tid] = _node(tid, x, y, 'site', siteZone, 0, ['trap']);
-    segments[tid + '.a'] = _seg(tid + '.a', u, tid, 0.5, segCap, null, []);
-    segments[tid + '.b'] = _seg(tid + '.b', tid, v, 0.5, segCap, null, []);
+  // The traps on one junction-to-junction wire, in order, then the chain of hops.  A wire
+  // carrying ONE trap keeps the baseline's bare id and the baseline's `.a` / `.b` segment
+  // names, so spacing 1 and spacing 2 are the same graph under the same names and a
+  // programme compiled against the unbuildable baseline replays on the buildable stretch.
+  function addWire(tag, u, v, at) {
+    var offs = [], k;
+    if (spacing === 1) offs.push(0.5);
+    else for (k = 1; k < spacing; k++) offs.push(k);
+    var ids = [];
+    for (k = 0; k < offs.length; k++) {
+      var tid = offs.length === 1 ? 'T' + tag : 'T' + tag + '_' + k;
+      var xy = at(offs[k]);
+      nodes[tid] = _node(tid, xy[0], xy[1], 'site', siteZone, 0, ['trap']);
+      ids.push(tid);
+    }
+    var run = [u].concat(ids, [v]);
+    var step = spacing === 1 ? 0.5 : 1.0;
+    var names = [];
+    if (run.length === 3) names = ['a', 'b'];
+    else for (k = 0; k < run.length - 1; k++) names.push(String(k));
+    for (k = 0; k < run.length - 1; k++) {
+      var sid = 'T' + tag + '.' + names[k];
+      segments[sid] = _seg(sid, run[k], run[k + 1], step, segCap, null, []);
+    }
   }
-  for (i = 0; i < a - 1; i++) for (j = 0; j < b; j++) {
-    addTrap('T' + i + '_' + j + 'h', i + 0.5, j, 'J' + i + '_' + j, 'J' + (i + 1) + '_' + j);
+  var ai = periodic ? a : a - 1, bj = periodic ? b : b - 1;
+  for (i = 0; i < ai; i++) for (j = 0; j < b; j++) {
+    addWire(i + '_' + j + 'h', 'J' + i + '_' + j, 'J' + ((i + 1) % a) + '_' + j,
+            (function (i, j) {
+              return function (o) { return [i * spacing + o, j * spacing]; };
+            })(i, j));
   }
-  for (i = 0; i < a; i++) for (j = 0; j < b - 1; j++) {
-    addTrap('T' + i + '_' + j + 'v', i, j + 0.5, 'J' + i + '_' + j, 'J' + i + '_' + (j + 1));
+  for (i = 0; i < a; i++) for (j = 0; j < bj; j++) {
+    addWire(i + '_' + j + 'v', 'J' + i + '_' + j, 'J' + i + '_' + ((j + 1) % b),
+            (function (i, j) {
+              return function (o) { return [i * spacing, j * spacing + o]; };
+            })(i, j));
   }
   return _dev(nodes, segments, {}, 'grid',
-              { a: a, b: b, site_zone: siteZone, segment_capacity: segCap });
+              { a: a, b: b, site_zone: siteZone, segment_capacity: segCap,
+                spacing: spacing, periodic: periodic });
 }
 
 function chain(n, kw) {
@@ -822,7 +1011,7 @@ function dualLoop(width, couplings, kw) {
   couplings = couplings === undefined ? null : couplings;
   kw = kw || {};
   var dataZone = kw.data_zone === undefined ? 'data' : kw.data_zone;
-  var ancillaZone = kw.ancilla_zone === undefined ? 'ancilla' : kw.ancilla_zone;
+  var ancillaZone = kw.ancilla_zone === undefined ? 'trap' : kw.ancilla_zone;
   var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
   if (width < 2) throw new ExpansionError('dual_loop needs width >= 2');
   var couplingX = [], x;
@@ -837,18 +1026,29 @@ function dualLoop(width, couplings, kw) {
   }
   var nodes = {}, segments = {}, loops = {};
   var plan = [['D', dataZone, 1.0, 2.0, 'data', 'inner'],
-              ['A', ancillaZone, 0.0, 3.0, 'ancilla', 'outer']];
+              ['A', ancillaZone, 0.0, 3.0, 'outer_ring', 'outer']];
+  // The outer loop's end caps run vertically at x = 0 and x = width - 1, exactly where the
+  // inner loop's end nodes sit: drawn straight, the cap passed THROUGH DT0 and DB0 (R21).
+  // The inner racetrack is the shorter one, so its two end columns are inset by half a
+  // slot; the ids, the loop order and every coupling in between are untouched, and a
+  // coupling at an end column now runs a half-slot diagonal.
+  function innerX(tag, x) {
+    if (tag !== 'D') return x;
+    if (x === 0) return 0.5;
+    if (x === width - 1) return (width - 1) - 0.5;
+    return x;
+  }
   for (var pi = 0; pi < plan.length; pi++) {
     var tag = plan[pi][0], zone = plan[pi][1], yTop = plan[pi][2], yBot = plan[pi][3];
     var label = plan[pi][4], side = plan[pi][5];
     var order = [];
     for (x = 0; x < width; x++) {
-      nodes[tag + 'T' + x] = _node(tag + 'T' + x, x, yTop, 'site', zone, 0,
+      nodes[tag + 'T' + x] = _node(tag + 'T' + x, innerX(tag, x), yTop, 'site', zone, 0,
                                    [label, side, 'top']);
       order.push(tag + 'T' + x);
     }
     for (x = width - 1; x >= 0; x--) {
-      nodes[tag + 'B' + x] = _node(tag + 'B' + x, x, yBot, 'site', zone, 0,
+      nodes[tag + 'B' + x] = _node(tag + 'B' + x, innerX(tag, x), yBot, 'site', zone, 0,
                                    [label, side, 'bottom']);
       order.push(tag + 'B' + x);
     }
@@ -872,6 +1072,7 @@ function dualLoop(width, couplings, kw) {
 // in JS would be a mirror with nothing to check it against, so the DEFAULTS are shipped as
 // data in the page payload and only the positional shape lives here.
 var GENERATORS = {
+  cylinder: function (p) { return cylinder(p.a, p.b, p); },
   ring: function (p) { return ring(p.width, p.height, p.verticals, p); },
   grid: function (p) { return grid(p.a, p.b, p); },
   chain: function (p) { return chain(p.n, p); },
@@ -880,11 +1081,15 @@ var GENERATORS = {
   dual_loop: function (p) { return dualLoop(p.width, p.couplings, p); }
 };
 
-var _GEN_REQUIRED = { ring: ['width'], grid: ['a', 'b'], chain: ['n'],
-                      ladder: ['width'], racetrack: ['straight'], dual_loop: ['width'] };
+var _GEN_REQUIRED = { cylinder: ['a', 'b'], ring: ['width'], grid: ['a', 'b'],
+                      chain: ['n'], ladder: ['width'], racetrack: ['straight'],
+                      dual_loop: ['width'] };
 var _GEN_KNOWN = {
-  ring: ['width', 'height', 'verticals', 'site_zone', 'ancilla_zone', 'segment_capacity', 'loop_id'],
-  grid: ['a', 'b', 'site_zone', 'segment_capacity'],
+  cylinder: ['a', 'b', 'wrap_spokes', 'declare_loops', 'site_zone', 'segment_capacity',
+             'r0', 'pitch'],
+  ring: ['width', 'height', 'verticals', 'site_zone', 'ancilla_zone', 'segment_capacity',
+         'loop_id', 'dock_offset'],
+  grid: ['a', 'b', 'site_zone', 'segment_capacity', 'spacing', 'periodic'],
   chain: ['n', 'site_zone', 'segment_capacity', 'path_id'],
   ladder: ['width', 'rungs', 'highways', 'site_zone', 'highway_zone', 'segment_capacity'],
   racetrack: ['straight', 'site_zone', 'segment_capacity', 'loop_id'],
@@ -1129,6 +1334,30 @@ function _int(v, dflt) {
 }
 // budget values print in the message exactly as Python's f-string would
 function _pyNum(v) { var u = unbox(v); return Number.isInteger(u) ? String(u) : String(u); }
+
+// `format(x, "g")` -- Python's %g, which is NOT `String(x)`.  R20 prints the declared
+// minimum rail angle with `{min_ang:g}` and the value is a FLOAT on the Python side even
+// when the document wrote an integer, so `60.0` has to print as "60" and `62.5` as "62.5".
+// Six significant digits, trailing zeros stripped, exponent form outside [1e-4, 1e6).
+function _pyG(x, prec) {
+  prec = prec === undefined ? 6 : prec;
+  var v = Number(x);
+  if (v !== v) return 'nan';
+  if (!isFinite(v)) return v > 0 ? 'inf' : '-inf';
+  if (v === 0) return Object.is(v, -0) ? '-0' : '0';
+  var e = parseInt(v.toExponential(prec - 1).split('e')[1], 10);
+  var s, m;
+  if (e < -4 || e >= prec) {
+    m = v.toExponential(prec - 1).split('e');
+    s = m[0];
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    var ex = Math.abs(e);
+    return s + 'e' + (e < 0 ? '-' : '+') + (ex < 10 ? '0' : '') + ex;
+  }
+  s = v.toFixed(Math.max(0, prec - 1 - e));
+  if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
 
 // =====================================================================================
 // 5. THE COMMAND INTERPRETER -- the twelve methods `architecture_listing` emits
@@ -1503,6 +1732,11 @@ var CALLS = {
 
   set_zone: function (st, args, kw) {
     var zone = String(args[0]);
+    // twin of `Machine.set_zone`: a capacity below 1 is refused, not stored and ignored
+    var cap = own(kw, 'capacity') ? unbox(kw.capacity) : undefined;
+    if (typeof cap === 'number' && cap < 1) {
+      throw new EditError('a zone type must be able to hold at least one ion', 'zone_cap_lt_1', 'set_zone');
+    }
     // an UNKNOWN zone is created with {capacity: 1} and then updated -- no error
     if (!own(st.zone_types, zone)) st.zone_types[zone] = { capacity: 1 };
     for (var k in kw) if (own(kw, k)) st.zone_types[zone][k] = kw[k];
@@ -3196,6 +3430,181 @@ function architectureViolations(st) {
   return out;
 }
 
+// ------------------------------------------------------- R19 / R20 / R21: the drawing
+//
+// The SECOND family of state-free checks, and the only one that judges the picture rather
+// than the wiring: `qccd/verify/rules.py::geometry_violations`, mirrored term for term.
+// It needs no programme and no technology -- three node positions and a segment list are
+// the whole input -- which is exactly why it belongs beside `architectureViolations`: it
+// is the check a geometry EDIT wants, and the editor has nothing else to offer while the
+// canvas is empty of ions.
+//
+// KEPT SEPARATE FROM `architectureViolations` ON PURPOSE.  That function has a Python
+// oracle of its own (`architecture_violations`, R11's structural half) and the parity
+// harness diffs the two enumerations directly; folding a second rule family into its
+// return value would make that bucket compare R11-against-R11-plus-geometry and fail for
+// a reason that is not a defect.  `_report` and `lint` call both.
+//
+// ORDER IS PART OF THE ANSWER, exactly as it is for R11: Python walks `sorted(dev.nodes)`
+// for the degree and angle passes, `sorted(dev.segments)` for the planarity passes, and
+// the incidence list in SEGMENT DECLARATION ORDER for the i<j rail pairs.  The parity
+// bucket compares the sorted message multiset, so a different pair order inside one node
+// would still agree -- but a different PAIRING would not, and `(segs[i], segs[j])` is
+// printed in the message.
+var RAIL_EPS = 1e-6;
+var DEFAULT_MAX_JUNCTION_DEGREE = 4;
+var DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0;
+//: `math.degrees(x)` is `x * radToDeg` with the constant folded once, not `x * 180 / pi`.
+var RAD_TO_DEG = 180.0 / Math.PI;
+
+// `geometry_limits`: the document's own numbers, else the surface-trap defaults.
+function geometryLimits(st) {
+  var b = (st && st.budget) || {};
+  return {
+    maxDeg: own(b, 'max_junction_degree')
+      ? Math.trunc(Number(unbox(b.max_junction_degree))) : DEFAULT_MAX_JUNCTION_DEGREE,
+    minAng: own(b, 'min_rail_angle_deg')
+      ? Number(unbox(b.min_rail_angle_deg)) : DEFAULT_MIN_RAIL_ANGLE_DEG
+  };
+}
+
+// `_xy(pos)`: a 1-D device declares one coordinate and the second is 0.0.
+function _xyOf(pos) {
+  return [Number(unbox(pos[0])), pos.length > 1 ? Number(unbox(pos[1])) : 0.0];
+}
+
+// `Device.incidence`: node id -> incident segment ids IN DECLARATION ORDER.  A self-loop
+// lands twice, by construction, which is also how `Device.degree` counts it.
+function _incidence(dev) {
+  var inc = {}, nid, sid;
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) inc[nid] = [];
+  for (sid in dev.segments) if (own(dev.segments, sid)) {
+    var s = dev.segments[sid];
+    if (own(inc, s.a)) inc[s.a].push(sid);
+    if (own(inc, s.b)) inc[s.b].push(sid);
+  }
+  return inc;
+}
+
+function _otherEnd(seg, nid) { return seg.a === nid ? seg.b : seg.a; }
+
+// `rail_angle_deg`
+function _railAngleDeg(dev, nid, segA, segB) {
+  var o = _xyOf(dev.nodes[nid].pos);
+  var a = _xyOf(dev.nodes[_otherEnd(dev.segments[segA], nid)].pos);
+  var b = _xyOf(dev.nodes[_otherEnd(dev.segments[segB], nid)].pos);
+  var ax = a[0] - o[0], ay = a[1] - o[1], bx = b[0] - o[0], by = b[1] - o[1];
+  var la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+  if (la === 0.0 || lb === 0.0) return 0.0;
+  var c = (ax * bx + ay * by) / (la * lb);
+  c = c > 1.0 ? 1.0 : c < -1.0 ? -1.0 : c;
+  return Math.acos(c) * RAD_TO_DEG;
+}
+
+// `_point_on_segment`: strictly inside, never at an end.
+function _pointOnSegment(p, a, b) {
+  var abx = b[0] - a[0], aby = b[1] - a[1];
+  var apx = p[0] - a[0], apy = p[1] - a[1];
+  var l2 = abx * abx + aby * aby;
+  if (l2 === 0.0) return false;
+  var cross = abx * apy - aby * apx;
+  if (Math.abs(cross) > RAIL_EPS * Math.sqrt(l2)) return false;
+  var t = (apx * abx + apy * aby) / l2;
+  return RAIL_EPS < t && t < 1.0 - RAIL_EPS;
+}
+
+// `_segments_cross`: an interior crossing of BOTH, so touching at an end and running
+// collinear are not crossings here -- the shared-node case is excluded by the caller and
+// collinear overlap is caught as a node on a rail.
+function _orient3(p, q, r) {
+  return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+}
+function _segmentsCross(a, b, c, d) {
+  var o1 = _orient3(a, b, c), o2 = _orient3(a, b, d);
+  var o3 = _orient3(c, d, a), o4 = _orient3(c, d, b);
+  return ((o1 > RAIL_EPS && o2 < -RAIL_EPS) || (o1 < -RAIL_EPS && o2 > RAIL_EPS)) &&
+         ((o3 > RAIL_EPS && o4 < -RAIL_EPS) || (o3 < -RAIL_EPS && o4 > RAIL_EPS));
+}
+
+// `geometry_violations(arch)`.  `{rule, node|segment, message}`, with the message a
+// byte-for-byte copy of Python's f-string -- the parity bucket compares the multiset of
+// message STRINGS, so a paraphrase is a failure and not a style difference.
+function geometryViolations(st) {
+  if (!st || !st.device) return [];
+  var dev = st.device, out = [], lim = geometryLimits(st);
+  var maxDeg = lim.maxDeg, minAng = lim.minAng, inc = _incidence(dev);
+  var nids = [], sids = [], pos = {}, nid, sid, i, j, k;
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) { nids.push(nid); pos[nid] = _xyOf(dev.nodes[nid].pos); }
+  for (sid in dev.segments) if (own(dev.segments, sid)) sids.push(sid);
+  nids.sort(_cmpStr);
+  sids.sort(_cmpStr);
+
+  for (k = 0; k < nids.length; k++) {
+    nid = nids[k];
+    var segs = inc[nid], d = segs.length;
+    if (d > maxDeg) {
+      out.push({ rule: 'R19', node: nid,
+                 message: 'node ' + nid + ' has degree ' + d + ', but a junction on this ' +
+                          'device may join at most ' + maxDeg +
+                          ' rails (budget.max_junction_degree)' });
+    }
+    for (i = 0; i < segs.length; i++) {
+      for (j = i + 1; j < segs.length; j++) {
+        var ang = _railAngleDeg(dev, nid, segs[i], segs[j]);
+        if (ang < minAng - 1e-9) {
+          out.push({ rule: 'R20', node: nid,
+                     message: 'rails ' + segs[i] + ' and ' + segs[j] + ' meet at ' + nid +
+                              ' at ' + ang.toFixed(1) + ' degrees, less than the ' +
+                              _pyG(minAng) + ' degrees the device requires ' +
+                              '(budget.min_rail_angle_deg)' });
+        }
+      }
+    }
+  }
+
+  // BOUNDING BOXES FIRST.  Both passes are quadratic in the segment count and the shipped
+  // deck is 1,000-odd rails; the box reject is what keeps a live geometry edit inside the
+  // existing debounce, and it is in the Python too, so it is mirrored rather than added.
+  var boxes = {};
+  for (i = 0; i < sids.length; i++) {
+    var sg = dev.segments[sids[i]], pa = pos[sg.a], pb = pos[sg.b];
+    boxes[sids[i]] = [Math.min(pa[0], pb[0]) - RAIL_EPS, Math.min(pa[1], pb[1]) - RAIL_EPS,
+                      Math.max(pa[0], pb[0]) + RAIL_EPS, Math.max(pa[1], pb[1]) + RAIL_EPS];
+  }
+  for (i = 0; i < sids.length; i++) {
+    sid = sids[i];
+    var s1 = dev.segments[sid], bx = boxes[sid];
+    for (k = 0; k < nids.length; k++) {
+      nid = nids[k];
+      if (nid === s1.a || nid === s1.b) continue;
+      var p = pos[nid];
+      if (p[0] < bx[0] || p[0] > bx[2] || p[1] < bx[1] || p[1] > bx[3]) continue;
+      if (_pointOnSegment(p, pos[s1.a], pos[s1.b])) {
+        out.push({ rule: 'R21', segment: sid,
+                   message: 'rail ' + sid + ' (' + s1.a + '-' + s1.b +
+                            ') passes through node ' + nid + ', which it does not end at; ' +
+                            'a rail may only meet a node it is joined to' });
+      }
+    }
+  }
+  for (i = 0; i < sids.length; i++) {
+    var ida = sids[i], sa = dev.segments[ida], ba = boxes[ida];
+    for (j = i + 1; j < sids.length; j++) {
+      var idb = sids[j], sb = dev.segments[idb];
+      if (sa.a === sb.a || sa.a === sb.b || sa.b === sb.a || sa.b === sb.b) continue;
+      var bb = boxes[idb];
+      if (bb[0] > ba[2] || bb[2] < ba[0] || bb[1] > ba[3] || bb[3] < ba[1]) continue;
+      if (_segmentsCross(pos[sa.a], pos[sa.b], pos[sb.a], pos[sb.b])) {
+        out.push({ rule: 'R21', segment: ida,
+                   message: 'rails ' + ida + ' (' + sa.a + '-' + sa.b + ') and ' + idb +
+                            ' (' + sb.a + '-' + sb.b + ') cross without a junction; ' +
+                            'rails may only cross at a node they share' });
+      }
+    }
+  }
+  return out;
+}
+
 // `str(x)` for the values an orbit can hold.  Python does `str(spec.get("orbit", "any"))`
 // unconditionally, so `orbit: null` becomes the string `"None"` -- which matches nothing,
 // and must keep matching nothing -- while a MISSING key becomes `"any"`.
@@ -3295,6 +3704,14 @@ function lint(st) {
   var v = architectureViolations(st);
   for (i = 0; i < v.length; i++) {
     out.push({ code: 'R11', target: 'site:' + v[i].node, message: '[R11] ' + v[i].message });
+  }
+  // R19/R20/R21 ride here too: they are state-free in the same sense R11 is, and a
+  // geometry edit is the ONLY thing that can create or clear one of them.
+  var g = geometryViolations(st);
+  for (i = 0; i < g.length; i++) {
+    out.push({ code: g[i].rule,
+               target: g[i].node ? 'site:' + g[i].node : 'seg:' + g[i].segment,
+               message: '[' + g[i].rule + '] ' + g[i].message });
   }
   return out;
 }
@@ -3791,9 +4208,10 @@ function renderProgramSource(stmts) {
 // 12. THE BROWSER RULE SET -- one walk, two surfaces
 // =====================================================================================
 //
-// `qccd/verify/rules.py` has 23 rules.  Exactly one of them -- `architecture_violations`,
-// R11's structural half -- is state-free; the other 22 need a `CycleView` built from a
-// replay.  `priceFrames` ALREADY IS that replay: it carries `pos` (every ion's site), `q`
+// `qccd/verify/rules.py` has 27 rules.  Four of them -- `architecture_violations` (R11's
+// structural half) and `geometry_violations` (R19-R21) -- are state-free and judge the
+// DRAWING alone; every other one needs a `CycleView` built from a replay.
+// `priceFrames` ALREADY IS that replay: it carries `pos` (every ion's site), `q`
 // (running n-bar), `life` (lifetime deposit) and per-frame cost/steps/us, and it is
 // parity-checked against Python at 349,424 comparisons and zero mismatches.
 //
@@ -3832,14 +4250,20 @@ function renderProgramSource(stmts) {
 //: rather than merely tested against.  `render.py::BROWSER_SET` is asserted equal to this.
 var RULE_FNS = {
   R1: _r1, R2: _r2, R3: _r3, R4: _r4, R4b: _r4b, R5: _r5, R6: _r6, R6b: _r6b,
-  R7: _r7, R8: _r8, R11: _r11, R12: _r12, R13: _r13, R14: _r14
+  R7: _r7, R8: _r8, R11: _r11, R12: _r12, R13: _r13, R14: _r14, R22: _r22
 };
 //: Checked BY CONSTRUCTION rather than by a per-cycle function, exactly as
 //: `qccd/verify/__init__.py` marks them: R17's background term is deposited by `_anom` on
 //: every cycle with a duration (and is bit-compared in the pricing bucket), R18 is enforced
 //: by `makeModel.jpoint`, which THROWS for a degree the architecture cannot price, and R7c
 //: is a program-level check over the whole frame list.
-var RULE_CONSTRUCTED = ['R7c', 'R17', 'R18'];
+//:
+//: R19/R20/R21 join them for the same reason and with the same obligation: they are
+//: state-free, they are reported through `geometryViolations` rather than a per-cycle
+//: function, and `_report` folds their counts into `by_rule` exactly as it already folds
+//: R11's structural half -- so a rule that is advertised here and never counted anywhere
+//: would still be caught by the parity bucket's per-rule count comparison.
+var RULE_CONSTRUCTED = ['R7c', 'R17', 'R18', 'R19', 'R20', 'R21'];
 function mirroredRules() {
   return Object.keys(RULE_FNS).concat(RULE_CONSTRUCTED).sort(_cmpStr);
 }
@@ -4168,12 +4592,90 @@ function _r14(w) {
   return out;
 }
 
+// `loop_node_set(dev)`, cached on the window: the device cannot change inside one
+// `evaluate`, and rebuilding the set once per cycle is 3,861 walks of every loop on the
+// shipped deck programme for an answer that never moves.
+function _onLoopSet(w) {
+  var s = w._onLoop;
+  if (s) return s;
+  s = w._onLoop = {};
+  for (var lid in w.dev.loops) if (own(w.dev.loops, lid)) {
+    var ns = w.dev.loops[lid].nodes;
+    for (var i = 0; i < ns.length; i++) s[ns[i]] = true;
+  }
+  return s;
+}
+
+// `hop_label(dev, on_loop, src, dst, seg)`: a named path gives `L0:+1`, a rail that leaves
+// a path for a dock gives `spur:inward` / `spur:outward`, and everything else falls back to
+// the lab-frame axis.  The fall-through order is Python's and is load-bearing: a segment
+// that NAMES a loop it is not actually on skips the spur branch entirely.
+function _hopLabel(w, m) {
+  var dev = w.dev, seg = dev.segments[m.seg];
+  var loop = seg.loop === undefined ? null : seg.loop;
+  if (loop !== null && own(dev.loops, loop)) {
+    var seq = dev.loops[loop].nodes;
+    var idx = w.loopIdx[loop] || (w.loopIdx[loop] = _indexOfSeq(seq));
+    if (own(idx, m.src) && own(idx, m.dst)) {
+      var k = seq.length, d = ((idx[m.dst] - idx[m.src]) % k + k) % k;
+      if (d > Math.floor(k / 2)) d -= k;
+      return loop + ':' + (d < 0 ? '-' : '+') + Math.abs(d);
+    }
+  }
+  var on = _onLoopSet(w);
+  if (loop === null && own(on, m.src) !== own(on, m.dst)) {
+    return own(on, m.src) ? 'spur:inward' : 'spur:outward';
+  }
+  var a = _xyOf(dev.nodes[m.src].pos), b = _xyOf(dev.nodes[m.dst].pos);
+  var dx = b[0] - a[0], dy = b[1] - a[1];
+  var label = (dx > RAIL_EPS ? '+x' : dx < -RAIL_EPS ? '-x' : '') +
+              (dy > RAIL_EPS ? '+y' : dy < -RAIL_EPS ? '-y' : '');
+  return label || '0';
+}
+
+// R22: one transport cycle is one waveform.
+//
+// ONE PASS OVER THE MOVES, not one per ion.  `motion_signature(v, ion)` re-scans every
+// move of the cycle for each ion, which is O(ions x moves) -- fine for the oracle, fatal
+// here: a 144-ion rotation is 20,736 label computations per cycle and the shipped deck
+// programme has 3,861 of them.  Grouping the hops by ion in a single walk gives the SAME
+// per-ion hop list in the SAME order, because Python's list comprehension preserves move
+// order and filters by ion.
+function _r22(w) {
+  if (w.type !== 'simd' || !w.nmv || w.directControl) return [];
+  var ions = [], hops = {}, i, ion;
+  for (i = 0; i < w.nmv; i++) {
+    ion = w.moves[i].ion;
+    if (!own(hops, ion)) { hops[ion] = []; ions.push(ion); }
+    hops[ion].push(i);
+  }
+  if (ions.length <= 1) return [];
+  var cls = w.cls || 'shuttle', seen = {}, sigs = [];
+  for (i = 0; i < ions.length; i++) {
+    var idxs = hops[ions[i]], labels = [];
+    for (var j = 0; j < idxs.length; j++) labels.push(_hopLabel(w, w.moves[idxs[j]]));
+    var sig = cls + ' ' + labels.join(',');
+    if (!own(seen, sig)) { seen[sig] = true; sigs.push(sig); }
+  }
+  if (sigs.length <= 1) return [];
+  sigs.sort(_cmpStr);
+  return [_v('R22', w.id, ions.length + ' ions move in ' + sigs.length +
+             ' different ways in one cycle (' + sigs[0] + ' and ' + sigs[1] +
+             '); one cycle is one waveform, so unlike motions need ' + sigs.length +
+             ' cycles')];
+}
+
 // ------------------------------------------------------------------ the cycle window
 //
 // ONE object, REUSED across cycles.  Retaining it is a bug -- say so here rather than in a
 // comment nobody reads at the call site.  Materialising 3,860 real snapshots is what makes
 // Python's own rule pass cost 3.4 s; this pass is measured at ~22 ms on the same programme,
 // which is 8-14% of the pricing walk that already runs inside the existing 180 ms debounce.
+function _controlModel(ctx) {
+  var c = (ctx.state && ctx.state.control) || ctx.control || {};
+  return own(c, 'model') ? _pyStrOf(c.model) : 'simd_classes';
+}
+
 function _makeChecker(dev, loops, classes, ctx) {
   ctx = ctx || {};
   var cap = {}, nid;
@@ -4185,6 +4687,11 @@ function _makeChecker(dev, loops, classes, ctx) {
     gateBudget: ctx.gate_threshold === undefined || ctx.gate_threshold === null ||
                 !(Number(ctx.gate_threshold) > 0) ? Infinity : Number(ctx.gate_threshold),
     chainLimit: ctx.chain_limit === undefined ? 15 : Math.trunc(Number(ctx.chain_limit)),
+    // R22 is about BROADCAST control, so a directly-addressed plane opts out of it
+    // entirely -- `str(arch.control.get("model", "simd_classes")) == "direct"`, with the
+    // MISSING key defaulting to `simd_classes` and an explicit null stringifying to
+    // "None", which is not "direct" either.
+    directControl: _controlModel(ctx) === 'direct',
     loopIdx: {}, id: 0, type: null, cls: null, mode: null, f: null,
     // `moves` is a POOL: `nmv` says how much of it this cycle uses, and the entries are
     // overwritten rather than reallocated.  The shipped deck programme resolves 648,000
@@ -4197,7 +4704,10 @@ function _makeChecker(dev, loops, classes, ctx) {
     quanta: {}, transits: {}, over: [], overJ: [], deg: null, added: [],
     // scratch, REUSED across cycles.  One object per rule per cycle is what a
     // 3,861-cycle programme cannot afford; retaining any of it is a bug.
-    _dir: {}
+    _dir: {},
+    // `loop_node_set(dev)`, built on first use and then constant: the device cannot
+    // change inside one `evaluate`, so R22 walks the loops once rather than per cycle.
+    _onLoop: null
   };
   var violations = [], byRule = {}, only = ctx.rules || null;
   var names = Object.keys(RULE_FNS);
@@ -4271,6 +4781,14 @@ function _report(chk, frames, priced, ctx, fatal) {
     for (var a = 0; a < av.length; a++) {
       violations.push(_v('R11', -1, av[a].message));
       byRule.R11 = (byRule.R11 || 0) + 1;
+    }
+    // ...and R19/R20/R21, which `verify()` extends the report with in exactly the same
+    // place and with the same instruction id of -1: they belong to the DRAWING, not to
+    // any one cycle.  Each keeps its own bucket, unlike R11's two halves.
+    var gv = geometryViolations(ctx.state);
+    for (var g = 0; g < gv.length; g++) {
+      violations.push(_v(gv[g].rule, -1, gv[g].message));
+      byRule[gv[g].rule] = (byRule[gv[g].rule] || 0) + 1;
     }
   }
   var r7c = _r7c(frames, priced, ctx.models_heating !== false);
@@ -4758,8 +5276,9 @@ var API = {
   pairIndex: pairIndex, validateProgram: validateProgram, loopLengths: loopLengths,
   // lint
   lint: lint, architectureViolations: architectureViolations,
+  geometryViolations: geometryViolations, geometryLimits: geometryLimits,
   classParticipants: classParticipants, zonesInUse: zonesInUse,
-  // the browser rule set -- 17 of the 23, derived from the dispatcher and never listed
+  // the browser rule set -- 21 of the 27, derived from the dispatcher and never listed
   get MIRRORED_RULES() { return mirroredRules(); },
   checkFrames: checkFrames, evaluate: evaluate, RULE_WORK_CAP: RULE_WORK_CAP,
   // component variants -- the browser half of arch/variants.py

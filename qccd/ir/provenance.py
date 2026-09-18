@@ -316,15 +316,30 @@ def tag(meta: Mapping | None = None, call: int | None = None, **extra) -> dict:
 def thin(log: Mapping | None, level: str = "sites") -> dict | None:
     """A log downgraded for export.
 
-    Two things must not reach a published page: `root`, which is an absolute path on
-    the machine that built it, and -- at level "sites" -- `args`, which is 55 bytes per
-    instruction of information the rendered source line already shows more readably.
+    THE REPOSITORY MUST NOT REACH A PUBLISHED PAGE. `root` is an absolute path on the
+    machine that built it; `args` is 55 bytes per instruction that the rendered line
+    already shows more readably; and `file`, `line` and `text` are a path into a tree the
+    reader does not have, a line number in it, and a line of this project's own Python
+    quoted back at them. A reader can open `qccd/compile/cooling.py` in exactly no sense.
+
+    What survives at "sites" is `func`, and `calls[].op` beside it -- which is the whole
+    claim the page makes with any of this: WHICH PASS emitted this instruction. The page
+    renders `c.op || st.func` and searches both, so nothing on screen is lost. (Shown as
+    `qccd/compile/cooling.py:350` under every hardware instruction until 2026-09-17, and
+    left in the payload of 188 published pages for a further day after the footer was
+    fixed, because the rendering and the data were two separate decisions.)
+
+    A level other than "sites" is a LOCAL tool reading a log on the machine that wrote it,
+    and keeps everything.
     """
     if not log:
         return None
     if level == "off":
         return None
-    sites = [dict(s) for s in log.get("sites", ())]
+    if level == "sites":
+        sites = [{"func": s["func"]} if "func" in s else {} for s in log.get("sites", ())]
+    else:
+        sites = [dict(s) for s in log.get("sites", ())]
     calls = []
     for c in log.get("calls", ()):
         d = {"op": c.get("op", ""), "site": c.get("site")}

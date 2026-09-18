@@ -36,7 +36,9 @@ what makes it testable from Python (`tests/test_viz_layout.py`) instead of only 
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Sequence
 
@@ -55,12 +57,19 @@ from ..cost.hardware import hardware_report
 from ..cost.models import CostModel
 from ..ir.listing import disassemble, to_page_model
 from ..ir.provenance import log_of, thin
-from ..ir.tsir import TSIR, iter_pairs
+from ..ir.tsir import TSIR, iter_operands, iter_pairs
 from ..verify.control import ControlTrace, control_trace
 from ..verify.replay import ReplayResult
 from ..verify.rules import rule_statements
+from . import course as _course
 from .layout import (H_MAX, H_MIN, ISO_ASPECT, K_ANISO, K_ION, K_REST, PAD_A, PAD_B,
                      PITCH_CAP, R_ION_MAX, R_ION_MIN, W_MAX, W_MIN, compute_layout)
+# THE SCALE, and the only thing in this module that knows a technology exists.  Node
+# positions are lattice units, which are not lengths; `qccd/viz/scale.py` is the one
+# narrow seam that turns them into nanometres, and it says in full why it is a separate
+# module rather than an import here.  The METAL still arrives as a parameter -- see the
+# `metal` key below -- because that one IS a build this module must not pay for.
+from .scale import DEFAULT_TECH, tech_view_model
 from .theme import GEOMETRY, PALETTE, SEGMENT_ROLE, css_vars
 
 __all__ = ["render_html", "build_view_model"]
@@ -78,7 +87,8 @@ __all__ = ["render_html", "build_view_model"]
 #: verdict agreed both times, which is exactly why a verdict-only comparison called that
 #: agreement.
 BROWSER_SET = ("R1", "R2", "R3", "R4", "R4b", "R5", "R6", "R6b", "R7", "R7c",
-               "R8", "R11", "R12", "R13", "R14", "R17", "R18")
+               "R8", "R11", "R12", "R13", "R14", "R17", "R18", "R19", "R20",
+               "R21", "R22")
 
 #: A page that cannot resolve a click to a channel id is better than a page that ships
 #: 100 KB to do it.  `direct` wiring puts 4608 channels on 144 sites; above this budget
@@ -128,6 +138,7 @@ def build_view_model(
     template_stems: Sequence[str] | str | None = None,
     metal: dict | None = None,
     source: dict | None = None,
+    tech=None,
 ) -> dict:
     """Everything the page needs, as plain JSON.
 
@@ -221,6 +232,12 @@ def build_view_model(
                 f["entails"] = list(arch.entails(instr.cls) if instr.cls else ())
         elif instr.type == "gate":
             f["pairs"] = [list(p) for p in iter_pairs(instr)]
+            # `iter_pairs` yields nothing for a one-qubit gate, which is what every
+            # two-qubit RULE wants and leaves the picture unable to say which ion a
+            # single-qubit pulse lands on -- the majority of gate frames.  `acts` is
+            # every operand of either arity, so the renderer can light one ion for an R
+            # and two for an MS instead of lighting none for either.
+            f["acts"] = [list(t) for t in iter_operands(instr)]
             f["sites"] = list(instr.sites)
         elif instr.type == "cool":
             f["broadcast"] = bool(instr.broadcast)
@@ -303,14 +320,17 @@ def build_view_model(
             disassemble(prog, arch, res=res, model=model, control=by_id or None))
 
     roles = {sg.id: segment_role(sg.labels) for sg in dev.segments.values()}
-    ion_roles = {}
-    for instr in prog.instructions:
-        if instr.type == "init":
-            for ion, node in instr.placement.items():
-                n = dev.nodes.get(node)
-                ion_roles[ion] = (
-                    "ancilla" if (n is not None and n.zone_type == "ancilla") else "data")
-            break
+    # EVERY ION IS AN ION.  This table used to mark an ion "ancilla" when it started on a
+    # site whose zone was called `ancilla` -- a role a code assigns, read off a zone name
+    # that no longer exists because it described no hardware.  What the stage still
+    # distinguishes is what the MACHINE is doing to an ion: resting, flying, or held in a
+    # gate, which it reads off the frame rather than off a name.
+    ion_roles: dict[str, str] = {}
+
+    # The scale, always: a page with no technology named still gets `DEFAULT_TECH`, so
+    # every emitted page -- the studio, the board pages, the site's examples -- can be
+    # measured in micrometres.
+    tech_block = tech_view_model(tech)
 
     return {
         "kicker": kicker or "ROUTING SCHEME",
@@ -318,7 +338,21 @@ def build_view_model(
         "lede": lede or (arch.description or ""),
         "roles": roles,
         "ion_roles": ion_roles,
+        # TWO LAYOUTS, and the page picks between them with its "true scale" toggle.
+        # `layout` is the FIT -- it may stretch one axis by up to K_ANISO to fill the
+        # viewport, which is legible and lies about every angle.  `layout_true` forces
+        # `sx:sy` to the technology's nm-per-unit ratio, so a pixel is the same number of
+        # nanometres on both axes and an angle read off the screen is the physical angle.
+        # Both are computed HERE rather than one of them in the browser, because
+        # `compute_layout` is the tested implementation and `engine.js` is its mirror;
+        # shipping the pair costs under 2 KB and keeps the first paint server-decided.
         "layout": compute_layout(nodes, segments),
+        "layout_true": compute_layout(
+            nodes, segments, true_scale=True,
+            unit_nm=(tech_block["nm_per_unit_x"], tech_block["nm_per_unit_y"])),
+        # THE SCALE ITSELF.  Node positions are lattice units; every physical length on
+        # the page is this block times one of them.
+        "tech": tech_block,
         "arch": {
             "name": arch.name,
             "description": arch.description or "",
@@ -403,6 +437,10 @@ def build_view_model(
         # them.  Same reasoning as `schema` above -- ship the thing, do not restate it --
         # and it costs nothing to express, because a template is already a program.
         "templates": _template_registry(arch, template_stems),
+        # the generator and parameters each template's device came from, so the start
+        # gallery can OPEN a shipped device (`from_template` with its own geometry)
+        # rather than only borrow its physics
+        "template_devices": _template_devices(arch, template_stems),
         "components": _component_registry(),
         # what an un-named `template=` resolves to, straight off `api.DEFAULT_TEMPLATE`
         "template_default": DEFAULT_TEMPLATE,
@@ -473,10 +511,18 @@ def build_view_model(
             "rules_evaluated": sorted(res.rules.checked),
             "rules_all": sorted(rule_statements()),
         },
-        # All 23 rule statements, so the Report pane can name what it did NOT check
-        # without hard-coding 23 sentences in JavaScript.
+        # All 27 rule statements, so the Report pane can name what it did NOT check
+        # without hard-coding 27 sentences in JavaScript.
         "rule_statements": rule_statements(),
-        # THE RULE HALF OF THE CHECKSUM.  Seventeen integers: how many violations Python
+        # THE COURSE'S PREPARED CASES AND PYTHON'S VERDICTS ON THEM.  Five rules are not
+        # re-implemented in the browser (R4d, R7b, R9, R10, R16); the lessons that teach
+        # them rebuild the case here from the same generator call and records, and show
+        # this verdict labelled as computed at build time.  `tests/test_tutorial.py`
+        # recomputes it from `qccd.viz.course` and compares.
+        "tutorial_cases": _course.cases_for_page(),
+        "tutorial_verdicts": _course.verdicts(model),
+        "tutorial_measured": _course.measured(model),
+        # THE RULE HALF OF THE CHECKSUM.  Twenty-one integers: how many violations Python
         # found for each rule the browser can also check.  COUNTS, not verdicts --
         # `architectureViolations` once reported 2 where Python reported 77 and the
         # verdict agreed both times, which is exactly why a verdict-only comparison called
@@ -509,7 +555,30 @@ def build_view_model(
 #: passing while the page ran the fork -- the exact failure this design exists to prevent.
 _JS_DIR = Path(__file__).parent
 ENGINE_JS = ("js/edit.js", "engine.js")
-EDITOR_JS = ("js/editor.js",)
+#: `tutorial.js` is data -- the course's lessons -- and it registers itself with the editor
+#: at its last line, so it must come after `editor.js` and needs nothing else.
+EDITOR_JS = ("js/editor.js", "js/tutorial.js")
+
+
+def page_stamp() -> str:
+    """A digest of the code every page inlines, as opposed to the data it carries.
+
+    `_TEMPLATE` is the page's own markup and script; `ENGINE_JS` and `EDITOR_JS` are the
+    four files pasted into it.  Together they are everything about a page that comes from
+    this repository rather than from the architecture being shown, so two pages built from
+    the same code agree and a page built before a change does not.
+
+    It is written into the head as `<meta name="qccd-page">` and asserted by
+    `tests/test_board_engine.py`, whose subject -- the board's entry pages -- are COPIED by
+    the site build rather than rendered, and so keep whatever code was current the day they
+    were generated.  That is how eleven live pages spent three months running an engine
+    without the `cylinder` generator in it.
+    """
+    h = hashlib.sha256()
+    h.update(_TEMPLATE.encode("utf-8"))
+    for name in ENGINE_JS + EDITOR_JS:
+        h.update((_JS_DIR / name).read_bytes())
+    return h.hexdigest()[:16]
 
 
 def _js_block(names) -> str:
@@ -577,10 +646,18 @@ def _template_registry(arch: Architecture, stems: "Sequence[str] | str | None" =
     bytes for all nine against ~15 KB for the pair, i.e. about +12% on a 362-420 KB page.
     A PARAMETER, never a branch -- two page kinds would be two implementations of one page.
     """
-    from ..arch import load as _load_arch
     from ..arch.listing import template_records
 
-    out: dict[str, list] = {}
+    return {stem: [dict(r) for r in template_records(a)]
+            for stem, a in _template_archs(arch, stems).items()}
+
+
+def _template_archs(arch: Architecture, stems: "Sequence[str] | str | None" = None) -> dict:
+    """`{stem: Architecture}` for every template the page carries -- the one stem list
+    behind `templates` and `template_devices`, so the two cannot name different sets."""
+    from ..arch import load as _load_arch
+
+    out: dict[str, Architecture] = {}
     cache = {arch.name: arch}
     root = Path(__file__).resolve().parents[2] / "arch"
     if stems == "*" or (stems is not None and "*" in tuple(stems)):
@@ -599,7 +676,29 @@ def _template_registry(arch: Architecture, stems: "Sequence[str] | str | None" =
             if not path.exists():
                 continue
             a = _load_arch(path)
-        out[stem] = [dict(r) for r in template_records(a)]
+        out[stem] = a
+    return out
+
+
+def _template_devices(arch: Architecture, stems: "Sequence[str] | str | None" = None) -> dict:
+    """`{stem: {"generator", "params"}}` -- the GEOMETRY a template's records drop.
+
+    A template is a physics package: `template_records` keeps the zones, curves and
+    control block and drops the device, which is right for `Machine.ring(..., template=)`.
+    But the start gallery also wants to OPEN a shipped device -- `grid9x9` as the 9x9 grid
+    it is, not as a package for some other shape -- and `from_template` needs the
+    generator and its parameters for that.  Reflected off the same architectures, the same
+    way `listing.py` prints them: the non-default parameters only.  An explicit-geometry
+    template has no generator to expand and is left out, so the gallery cannot offer it.
+    """
+    from ..arch.listing import _nondefault_params
+
+    out: dict[str, dict] = {}
+    for stem, a in _template_archs(arch, stems).items():
+        dev = a.device
+        if dev.generator == "explicit" or not dev.nodes:
+            continue
+        out[stem] = {"generator": dev.generator, "params": _nondefault_params(dev)}
     return out
 
 
@@ -655,6 +754,34 @@ def _component_registry() -> dict:
 #: emitted file -- `tests/test_viz_and_devices.py` asserts on exactly this list.
 FORBIDDEN = ("<script src=", "<link ", "@import", "fetch(", "XMLHttpRequest",
              "<img src=", 'href="http')
+
+#: The top-level directories of this repository, as they appear inside a JSON string value.
+#: A reader has none of them; a path into one is a coordinate into something they cannot
+#: open.  The BARE FILE NAME is fine and deliberately not matched -- `micro_chain.tsir.json`
+#: and `demo.lq` are artifacts the reader is looking at and can export, and it is the folder
+#: in front of them that is the tree.
+_REPO_DIRS = ("qccd", "Compiler", "Codesign", "tests", "tools", "arch", "examples",
+              "BBResults", "SmallCode", "out")
+#: Written as an alternation rather than a character class so it survives a shell round
+#: trip -- `[/\\]` loses a backslash to a heredoc and becomes an unterminated class.
+_PAYLOAD_PATH = re.compile(
+    r'"(?:[A-Za-z]:)?(?:\.{0,2}(?:/|\\\\))?(?:' + "|".join(_REPO_DIRS) +
+    r')(?:/|\\\\)[^"]{0,160}"')
+
+
+def _refuse_repository_paths(blob: str) -> None:
+    """Raise if the page's data would tell a reader where this repository keeps its files.
+
+    Called on the JSON *before* it is escaped into the page, so the match is against data
+    the page carries rather than against the source comments of the JavaScript it inlines.
+    """
+    hits = sorted({m.group(0) for m in _PAYLOAD_PATH.finditer(blob)})
+    if hits:
+        raise ValueError(
+            "the page's data would carry " + str(len(hits)) + " path(s) into this "
+            "repository, which a reader cannot open: " + ", ".join(hits[:4]) +
+            (" ..." if len(hits) > 4 else "") +
+            " -- emit the bare artifact name instead of its location in the tree")
 
 
 def _escape_blob(blob: str) -> str:
@@ -714,52 +841,122 @@ def _channel_map(arch: Architecture) -> dict:
 _TEMPLATE = r'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="qccd-page" content="__STAMP__">
 <title>__TITLE__</title>
 <style>
 :root{
 __CSSVARS__
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--bg);color:var(--ink);
 font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:1680px;margin:0 auto;padding:18px}
+/* THE APP FRAME.  The page is one viewport-high column -- a 44 px head, then the row of
+   rail | stage | dock -- and nothing scrolls but the rail, the panes and the stage's own
+   viewBox.  It used to be a document: at 1366x768 the ring page's stage started 835 px
+   below the fold and Play was at y=1279, because the head, the metric tiles and the wide
+   regime's wrapped dock each took their turn first. */
+main{max-width:none;margin:0;padding:0;height:100vh;display:flex;flex-direction:column}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
-.kicker{color:var(--accent);font-size:11.5px;font-weight:700;letter-spacing:.09em;
-text-transform:uppercase;margin-bottom:2px}
-h1{margin:0 0 6px;font-size:27px;line-height:1.15;color:var(--navy);letter-spacing:-.01em}
-.lede{color:var(--muted);max-width:82ch;margin:0 0 4px;font-size:13.5px}
-.head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
-.counters{display:flex;gap:22px;flex:0 0 auto;text-align:right}
-.counter span{display:block;color:var(--muted);font-size:10.5px;letter-spacing:.09em;
+/* scoped to the frame: `.pane` is a `.card` too, and an unscoped rule would beat
+   `.pane{display:none}` and show all six panes at once */
+main>.card{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;border:0;
+  border-radius:0;padding:0}
+/* THE HEAD is one 44 px toolbar: the name, the two counters, the metric chips and the
+   two panel handles, none of which may wrap. */
+.head{flex:0 0 44px;display:flex;align-items:center;gap:12px;padding:0 10px;
+  border-bottom:1px solid var(--line);background:var(--panel);min-width:0;overflow:hidden}
+.ttl{display:flex;align-items:baseline;gap:8px;min-width:0;flex:0 0 auto}
+.kicker{color:var(--accent);font-size:10.5px;font-weight:700;letter-spacing:.09em;
+text-transform:uppercase;white-space:nowrap}
+h1{margin:0;font-size:16px;line-height:1.2;color:var(--navy);letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.lede{color:var(--muted);margin:0;font-size:12px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;flex:1 1 0}
+.counters{display:flex;gap:12px;flex:0 0 auto;text-align:right}
+.counter{display:flex;align-items:baseline;gap:4px}
+.counter span{color:var(--muted);font-size:10px;letter-spacing:.09em;
 text-transform:uppercase}
-.counter b{display:block;font-size:23px;font-variant-numeric:tabular-nums;line-height:1.1}
+.counter b{font-size:15px;font-variant-numeric:tabular-nums;line-height:1.1}
 .counter .now{color:var(--accent)}
-.counter .of{color:var(--muted);font-size:14px}
-.metrics{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
-.m{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:7px 11px;
-min-width:98px}
-.m span{display:block;color:var(--muted);font-size:10.5px;letter-spacing:.05em;
-text-transform:uppercase}
-.m b{display:block;font-size:16px;margin-top:1px;font-variant-numeric:tabular-nums}
-.row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:14px}
-.stage{flex:5 1 720px;min-width:0;position:relative}
+.counter .of{color:var(--muted);font-size:12px}
+/* metrics as inline chips: the block rules they had clipped them to one word each */
+/* chips that do not fit wrap to a second row that the box's height hides, so a chip
+   drops whole instead of being cut mid-word behind the handles */
+.metrics{display:flex;flex-wrap:wrap;gap:5px;flex:0 1 auto;min-width:0;max-height:24px;
+  overflow:hidden;align-content:flex-start;white-space:nowrap}
+.m{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 7px;
+  min-width:0;white-space:nowrap;font-size:11px;flex:0 0 auto}
+.m span{display:inline;color:var(--muted);font-size:10px;letter-spacing:.04em;
+text-transform:uppercase;margin-right:4px}
+.m b{display:inline;font-size:12px;font-variant-numeric:tabular-nums}
+.grips{display:flex;gap:6px;flex:0 0 auto;margin-left:auto}
+/* the narrow regime's head keeps the name, the counters and the handles */
+@media (max-width:899px){.metrics,.lede{display:none}}
+/* THE ROW: rail | stage | dock, a grid that fills the rest of the viewport.  `align-
+   items:stretch`, never flex-start: with flex-start the canvas collapsed to 134 px. */
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;
+  grid-template-rows:minmax(0,1fr);align-items:stretch;flex:1 1 auto;min-height:0;
+  margin:0;gap:0}
+/* THE PROGRAMME COLUMN: the hardware programme and the source circuit beside the
+   animation, the whole height of the frame, so a long programme reads as a listing
+   rather than a slot.  In the wide regime it is always there and the strip under the
+   canvas keeps the other panes; in the tall regime it is pinned or folded from the
+   pane's own header, and it never exists in the narrow regime. */
+.progcol{grid-column:3;grid-row:1;width:360px;min-width:0;display:flex;
+  flex-direction:column;min-height:0;border-left:1px solid var(--line);
+  background:var(--panel);position:relative}
+.progcol[data-collapsed="1"]{display:none}
+.progcol .pane{display:flex}
+.row[data-layout="wide"] .progcol{grid-row:1/3}
+.row[data-layout="narrow"] .progcol{display:none}
+@media (max-width:1500px){.progcol{width:330px}}
+
+/* the two listings inside the Program pane, and the switch between them */
+.pblock{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1 1 0}
+.pblock[data-off="1"]{display:none}
+.pblock h4{margin:0;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted)}
+#paneP[data-view="hw"] #paneQ{display:none}
+#paneP[data-view="gates"] #pHw{display:none}
+#paneP[data-view="both"] .lst{min-height:80px}
+#paneP[data-view="both"] .pblock{flex:1 1 50%}
+.stage{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;
+  grid-column:2;grid-row:1}
 .stage[data-drop="1"] svg{outline:2px dashed var(--accent);outline-offset:-4px}
-.row[data-layout="wide"] .stage{flex:1 1 100%}
-/* THE PALETTE RAIL.  Collapsible, and hidden entirely in the narrow regime, where it
-   becomes a sixth dock tab rather than a squeezed column. */
-.rail{flex:0 0 224px;display:flex;flex-direction:column;gap:9px;max-height:78vh;
-  overflow:auto;min-width:0}
-.rail[data-collapsed="1"]{flex-basis:34px;overflow:hidden}
-.rail[data-collapsed="1"] .pal,.rail[data-collapsed="1"] .palfold{display:none}
-.dock[data-collapsed="1"]{flex:0 0 34px;min-width:34px;max-width:34px;overflow:hidden}
-.dock[data-collapsed="1"] > *:not(.grip){display:none}
-/* THE HANDLE. Small, always in the same place, and it says which way it will go. The
-   collapse itself was already in this stylesheet with nothing to set the attribute. */
-.grip{align-self:flex-start;font:600 12px/1 var(--mono,ui-monospace,monospace);
-  color:var(--muted);background:var(--panel);border:1px solid var(--line);
-  border-radius:6px;padding:5px 7px;cursor:pointer;margin-bottom:2px}
+/* THE WIDE REGIME: a long, thin device takes the whole width and the dock becomes a
+   strip of panes side by side under it.  `data-dock="1"` on the row (written by
+   `foldPanel`) drops the strip's track, so folding the dock gives the canvas its
+   height back. */
+.row[data-layout="wide"]{grid-template-rows:minmax(0,1fr) minmax(220px,40vh)}
+.row[data-layout="wide"][data-dock="1"]{grid-template-rows:minmax(0,1fr)}
+.row[data-layout="wide"] .rail{grid-row:1/3}
+.row[data-layout="wide"] .dock{grid-column:2;grid-row:2;width:auto;max-width:none;
+  border-left:0;border-top:1px solid var(--line)}
+/* ONE PANE AT A TIME, in the strip as in the dock: the menu in the head picks it.  The
+   strip used to show every pane side by side, which was the busiest thing on the page. */
+.row[data-layout="wide"] .panes{display:flex;min-height:0}
+/* a 30vh strip is 229 px at 768: the NOW strip is one line there and the list keeps to
+   the pane, so the pane does not become a second scroller around the list */
+.row[data-layout="wide"] .dock .now{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  min-height:0;padding:3px 9px}
+.row[data-layout="wide"] .lst{min-height:80px}
+/* THE PALETTE RAIL: a fixed-width column that scrolls by itself.  In the narrow regime
+   it is a drawer over the stage, folded on the way in and opened from its handle. */
+.rail{grid-column:1;grid-row:1;width:224px;height:100%;max-height:none;min-height:0;
+  overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;
+  min-width:0;padding:8px;border-right:1px solid var(--line);background:var(--bg);
+  position:relative}
+.row[data-layout="narrow"] .rail{position:fixed;left:0;top:44px;bottom:0;height:auto;
+  width:224px;z-index:5;box-shadow:2px 0 10px rgba(0,0,0,.12)}
+/* folded is folded: the handles live in the head, so nothing of a folded panel shows */
+.rail[data-collapsed="1"]{display:none}
+.dock[data-collapsed="1"]{display:none}
+/* THE HANDLES, in the head, always in the same place, saying which way they go. */
+.grip{font:600 11.5px/1 ui-sans-serif,system-ui,sans-serif;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;
+  cursor:pointer;white-space:nowrap}
 .grip:hover{color:var(--accent);border-color:var(--accent)}
-.rail{position:relative}
 /* The source pane. `.ql` mirrors `.al` (the architecture listing) so the two read the
    same; `.qh` is the statement the executing instruction is discharging and `.qw` one it
    is still travelling towards, which is the distinction somebody debugging a router
@@ -771,7 +968,9 @@ text-transform:uppercase}
 .ql.qw{background:color-mix(in srgb,var(--active) 10%,transparent)}
 .ql.qz .a{color:var(--muted)}
 .tab.off{display:none}
-.pal{border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--panel)}
+.pal{border:1px solid var(--line);border-radius:9px;padding:7px;background:var(--panel)}
+/* the Selection section stays at the foot of the rail, over whatever scrolled under it */
+#palInspect{position:sticky;bottom:0;margin-top:auto;z-index:1}
 .palfold>summary{list-style:none;cursor:pointer;font-size:11.5px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);font-weight:600;padding:1px 0}
 .palfold>summary::-webkit-details-marker{display:none}
@@ -792,8 +991,12 @@ text-transform:uppercase}
 .palgrp h5{margin:0 0 5px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;
   color:var(--muted);font-weight:700}
 .palgrid{display:grid;gap:5px}
+/* the divider between the shapes and the element tiles in Sketch mode: a heading, not a
+   section, so the tiles below it keep their own headings */
+.palnext{margin:12px 0 5px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);border-top:1px solid var(--line);padding-top:9px}
 .pal-item{display:flex;gap:8px;align-items:center;width:100%;text-align:left;
-  padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);
+  padding:3px 5px;border:1px solid var(--line);border-radius:8px;background:var(--panel);
   cursor:pointer}
 .pal-item:hover,.pal-item:focus-visible,
 .pal-item[aria-pressed="true"]{align-items:flex-start}
@@ -802,25 +1005,24 @@ text-transform:uppercase}
 .pal-item[aria-pressed="true"] .pal-why,
 .pal-item[aria-pressed="true"] .pal-meta{color:#c8cfe6}
 .pal-item[aria-pressed="true"] .pal-how{color:#fff}
-.avatar{flex:0 0 auto;display:block;width:52px;height:32px;border-radius:6px;
+.avatar{flex:0 0 auto;display:block;width:40px;height:24px;border-radius:6px;
   background:var(--soft);border:1px solid var(--line);overflow:hidden}
-.avatar svg{display:block;width:52px;height:32px;background:transparent;border:0;
-  border-radius:0;margin:0}
+.avatar svg{display:block;width:40px;height:24px;background:transparent;border:0;
+  border-radius:0;margin:0;min-height:0;flex:none}
 .pal-text{display:flex;flex-direction:column;gap:1px;min-width:0}
 .pal-text b{font-size:12px;font-weight:650}
 .pal-why,.pal-how,.pal-meta{display:none}
-.pal-item:hover .pal-why,.pal-item:hover .pal-how,.pal-item:hover .pal-meta,
-.pal-item:focus-visible .pal-why,.pal-item:focus-visible .pal-how,
-.pal-item:focus-visible .pal-meta,
-.pal-item[aria-pressed="true"] .pal-why,.pal-item[aria-pressed="true"] .pal-how,
-.pal-item[aria-pressed="true"] .pal-meta{display:block}
+/* a tile unfolds only while ARMED, where its gesture line is the instruction being
+   followed; on hover the hint card says what it is, and an unfolding tile used to push
+   the whole list down under the pointer */
+.pal-item[aria-pressed="true"] .pal-how{display:block}
 .pal-why{font-style:normal;font-size:10.5px;line-height:1.32;color:var(--muted)}
 .pal-how{font-style:normal;font-size:10px;color:var(--accent);font-weight:600}
 .pal-meta{font-style:normal;font-size:10px;color:var(--muted)}
 /* BLOCKS ARE NOT TILES.  A budget is not dropped on a canvas and must not look droppable. */
 .palgrp[data-kind="block"] .pal-item{border-style:dashed;background:var(--soft)}
-.palgrp[data-kind="component"] .avatar{width:60px;height:38px;background:var(--soft)}
-.palgrp[data-kind="component"] .avatar svg{width:60px;height:38px}
+.palgrp[data-kind="component"] .avatar{width:48px;height:30px;background:var(--soft)}
+.palgrp[data-kind="component"] .avatar svg{width:48px;height:30px}
 .pal-item[data-blocked]{opacity:.55}
 .cmp-tile{display:block}
 .cmp-form{display:grid;grid-template-columns:auto 1fr;gap:3px 6px;align-items:center;
@@ -848,7 +1050,53 @@ text-transform:uppercase}
 .formbtns button{padding:3px 9px;font-size:11px}
 .rowlist{max-height:190px;overflow:auto}
 .cards{display:flex;flex-wrap:wrap;gap:5px}
-.card2{flex:1 1 88px;padding:5px 7px;font-size:11.5px;border-radius:7px;text-align:left}
+.card2{flex:1 1 88px;padding:5px 7px;font-size:11.5px;border-radius:7px;text-align:left;
+  display:flex;flex-direction:column;gap:1px;min-width:0}
+.card2 b{font-size:12px;font-weight:650}
+.card2 .sub{color:var(--muted);font-size:10.5px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.card2:hover{border-color:var(--accent)}
+#palStartBody h5{margin:6px 0 5px;font-size:10px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted)}
+#palStartBody h5:first-child{margin-top:0}
+/* THE EMPTY STATE over the canvas.  Pointer events pass through everywhere but the cards,
+   so an armed site still lands where you click; the cards sit at the top so the middle
+   of the stage -- where a first click goes -- is free. */
+/* THE EMPTY STAGE IS EMPTY.  The start cards moved to the tools bar (Start), so a blank
+   canvas shows nothing but itself and takes a click at once; the element stays in the
+   DOM (the harness reads its display state) and `!important` beats the inline toggle. */
+.stage-empty{display:none!important}
+.stage-empty{position:absolute;left:0;right:0;top:0;padding:22px 26px 0;
+  pointer-events:none;z-index:2}
+.stage-empty h3{margin:0 0 8px;font-size:15px;font-weight:650}
+.stage-empty .cards{max-width:720px}
+.stage-empty .card2{flex:1 1 150px;max-width:220px;padding:8px 10px;background:var(--panel)}
+.stage-empty .mut{max-width:720px;margin:10px 0 0;font-size:12px;color:var(--muted)}
+/* the package <select>, the shipped-device picker and the two stamp buttons: the start
+   controls the empty state carries, so nothing on the rail is needed to begin */
+.stage-empty .startrow{display:flex;flex-wrap:wrap;align-items:center;
+  gap:6px 10px;max-width:720px;margin:10px 0 0;font-size:12px}
+/* ONLY THE CONTROLS TAKE THE POINTER, never the rows that hold them.  A row is a
+   full-width flex box, so `pointer-events:auto` on the row made every gap between the
+   buttons swallow the click: measured on the blank page at 1366x768, three armed clicks
+   in the top 319 px of the canvas placed nothing at all and said nothing -- the exact
+   spot the empty state's own sentence tells a new user to click. */
+.stage-empty button,.stage-empty select,.stage-empty input,
+.stage-empty label{pointer-events:auto}
+.stage-empty .startrow label{display:inline-flex;align-items:center;gap:5px;
+  color:var(--muted)}
+.stage-empty .startrow .mut{margin:0;flex:0 1 auto}
+/* the row of shape buttons is a row wherever it is used -- the Start popover shows it
+   too, and `.stage-empty .startrow` above only styles the (currently hidden) canvas one */
+.startrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.startrow select,.startrow button{font:12px/1.4 inherit;padding:3px 7px;
+  border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);
+  max-width:260px}
+.startrow button{cursor:pointer;font-weight:600}
+.startrow button:hover{border-color:var(--accent)}
+.startrow button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);
+  color:#fff}
+.fieldrow button{flex:0 0 auto;padding:2px 8px;font-size:11px;border-radius:5px}
 .inert{color:var(--muted);font-style:italic}
 .fieldrow{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11.5px}
 .fieldrow label{flex:0 0 92px;color:var(--muted)}
@@ -856,40 +1104,99 @@ text-transform:uppercase}
   border-radius:5px;padding:2px 5px;font:11.5px/1.4 inherit;background:var(--bg);
   color:var(--ink)}
 .badge.unchecked{background:transparent;border:1px dashed var(--muted);color:var(--muted)}
-svg{width:100%;height:clamp(420px, 62vh, 760px);display:block;margin:0 auto;
-background:var(--panel);border:1px solid var(--line);border-radius:8px;touch-action:none;
-cursor:grab}
-svg.drag{cursor:grabbing}
-/* THE EDIT CURSOR.  `svg.editing{cursor:default}` used to sit here, which is the rule
-   that made every element on the stage look inert in the one mode where all of them are
-   live.  The live cursor is written to `style` by the editor -- a class cannot be read
-   back in the headless harness, so cursor state written as a class is cursor state with
-   no test -- and this is the static floor under it. */
-svg[data-mode="edit"]{cursor:crosshair}
-.step{margin-top:11px;font-size:13.5px}
+/* THE PICTURE fills whatever the frame leaves it -- no clamp, no cap.  Its height used
+   to be `clamp(420px,62vh,760px)` plus a JS `maxHeight`, and the two fought the page. */
+svg{flex:1 1 auto;width:100%;height:100%;min-height:0;display:block;margin:0;
+background:var(--panel);border:0;border-radius:0;touch-action:none;
+cursor:grab;user-select:none;-webkit-user-select:none}
+/* THE LIVE CURSOR is written to `style` by the editor (`setCursor` / `EDITOR.panning`):
+   grab over empty stage, move over an element, grabbing while dragging or panning.  A
+   class cannot be read back in the headless harness, so cursor state written as a class
+   is cursor state with no test; `svg{cursor:grab}` above is the static floor under it. */
+/* ONE-LINE STRIPS between the picture and the toolbar: the step, its reason and the red
+   banner, each one line and ellipsised, so the transport below never moves. */
+.step,.why,.invalid{flex:0 0 auto;margin:0;padding:2px 10px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;min-width:0;background:var(--panel)}
+/* THE STRIP holds four things: the step, the price, the edit count and the problems
+   button.  The two counters keep their width -- the problems button is the stage's only
+   door to the problem list, so it is never the thing that gives way -- and the two texts
+   share the slack: both ellipsise, the price twice as readily as the step (a warning can
+   grow it past 600 px after one drop), and the step keeps a 160 px floor so a 440 px
+   stage still names the step.  `overflow:hidden` is the backstop: the strip is never
+   wider than the stage, so the page never grows a horizontal scrollbar. */
+.strip{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-width:0;
+  overflow:hidden;border-top:1px solid var(--line);background:var(--panel);
+  padding-right:10px}
+.strip .step{flex:1 1 auto;border-top:0;min-width:160px}
+.strip .sub{white-space:nowrap;flex:0 0 auto}
+.strip .sub.price{flex:0 2 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  font-size:11.5px}
+.strip .tgl{flex:0 0 auto;padding:1px 8px}
+.exportrow{flex:0 0 auto}
+.step{font-size:12.5px;border-top:1px solid var(--line)}
 .step b{color:var(--navy)}
-.step code{background:var(--soft);padding:1px 6px;border-radius:4px;font-size:12.5px}
-.why{margin-top:5px;color:var(--muted);font-size:12.5px}
-.invalid{margin-top:9px;padding:8px 11px;border-radius:7px;font-size:12.5px;
-  border:1px solid var(--z);color:var(--z);background:var(--bad_bg)}
-.ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.step code{background:var(--soft);padding:0 5px;border-radius:4px;font-size:11.5px}
+.strip #stDrive{flex:0 0 auto;padding:1px 8px;font-size:11.5px;border-radius:5px;margin:0}
+.why{color:var(--muted);font-size:11.5px;min-height:19px}
+.invalid{padding:3px 10px;font-size:12px;border-top:1px solid var(--z);color:var(--z);
+  background:var(--bad_bg)}
+/* ONE TOOLBAR under the picture: the transport, Snap, Undo, Redo and `?` on one line.
+   It fits a 782 px stage (1366 wide, rail and dock open) because only stage tools live
+   here: the edit and problem counters sit on the status strip beside the price, and the
+   export picker sits beside the text it formats, in the Architecture pane's Source
+   view.  It also fits the 696 px stage of a 1280 window with the slider at its 60 px
+   floor; below ~680 px (a 1024 window with both panels open: 440 px) the tail wraps to
+   a second line, since `overflow-x:auto` instead clipped Snap..? off the stage edge.
+   The row keeps its height while the transport is folded away, so nothing jumps when a
+   programme arrives.  `.ctrl`/`.ebar` are `display:contents`: the markup keeps its two
+   groups and the toolbar lays out their children as one run. */
+.stagebar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:3px 3px;
+  padding:4px 8px;min-height:40px;border-top:1px solid var(--line);
+  background:var(--panel);white-space:nowrap}
+.ctrl,.ebar{display:contents;margin:0}
+.ebar .etools{display:contents}
+/* THE SEGMENTED CONTROLS -- Sketch|Parts, and the four shape tools -- read as one control
+   rather than as loose buttons: no gap between the members, and the run keeps its own
+   rounding.  `display:inline-flex`, not `contents`: these ARE a group. */
+.stagebar .seg{display:inline-flex;align-items:center;gap:0;flex:0 0 auto;
+  border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-right:3px}
+.stagebar .seg button{border:0;border-radius:0;margin:0}
+.stagebar .seg button + button{border-left:1px solid var(--line)}
+.stagebar button{padding:5px 8px;font-size:12.5px;flex:0 0 auto}
+.stagebar select{padding:4px 6px;font-size:12px;flex:0 0 auto}
+/* THE SCALE BAR, at the right end of the toolbar: a bracket as long on screen as the
+   distance it names, and the name beside it.  Not on the canvas -- see placeScaleBar. */
+.scalebar{margin-left:auto;display:inline-flex;align-items:center;gap:7px;padding:0 6px;
+  flex:0 0 auto;white-space:nowrap;font-size:12px;color:var(--muted)}
+.scalebar i{display:block;height:7px;border:1.6px solid var(--ink);border-top:0;box-sizing:border-box}
+.scalebar b{font-weight:650}
 button{background:var(--panel);color:var(--ink);border:1px solid var(--line);
 border-radius:6px;padding:7px 13px;font:inherit;cursor:pointer}
 button.p{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
 button:hover{border-color:var(--muted)}
 select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;
 background:var(--panel)}
-input[type=range]{flex:1 1 240px;min-width:170px;accent-color:var(--navy)}
-.track{height:14px;border-radius:4px;background:var(--soft);border:1px solid var(--line);
-display:flex;overflow:hidden;margin-top:9px}
+input[type=range]{flex:1 1 60px;min-width:60px;max-width:260px;accent-color:var(--navy)}
+.track{flex:0 0 auto;height:10px;background:var(--soft);border-top:1px solid var(--line);
+display:flex;overflow:hidden;margin:0}
 .track i{display:block;height:100%}
 /* THE TRANSPORT APPARATUS FOLDS AWAY WHILE THERE IS NOTHING TO TRANSPORT. */
 body[data-noprog="1"] .ctrl,
 body[data-noprog="1"] #track,
 body[data-noprog="1"] #tl,
-body[data-noprog="1"] #legend{display:none}
-.legend{display:flex;gap:15px;flex-wrap:wrap;margin-top:12px;color:var(--muted);
-font-size:12.5px;align-items:center}
+body[data-noprog="1"] .metrics,
+body[data-noprog="1"] .counters,
+body[data-noprog="1"] #legendFold{display:none}
+/* the legend folds: one summary line by default, the swatches on demand */
+.legendfold{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);
+  padding:1px 10px;font-size:11.5px;color:var(--muted)}
+.legendfold>summary{cursor:pointer;list-style:none;font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;font-weight:600;padding:2px 0}
+.legendfold>summary::-webkit-details-marker{display:none}
+.legendfold>summary::before{content:"\25b8 ";color:var(--accent)}
+.legendfold[open]>summary::before{content:"\25be "}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 4px;color:var(--muted);
+font-size:11.5px;align-items:center}
 .dot{width:10px;height:10px;border-radius:99px;display:inline-block;vertical-align:-1px;
 margin-right:5px}
 .sq{width:10px;height:10px;display:inline-block;vertical-align:-1px;margin-right:5px}
@@ -908,26 +1215,59 @@ code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:12px}
 .note{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.5}
 /* ---- the dock: Program / Architecture / Machine ---------------------------
    Two regimes, one markup, zero inline display writes from JS: JS only adds and
-   removes `.on`, CSS decides whether that means a tab or a grid column. */
-.dock{flex:1 1 320px;min-width:280px;max-width:400px;display:flex;
-  flex-direction:column;gap:9px}
-.row[data-layout="wide"] .dock{flex:1 1 100%;min-width:0}
-.row[data-layout="narrow"] .rail{display:none}
-.panes{display:flex;flex-direction:column;gap:10px;min-width:0}
-.pane{display:none;flex-direction:column;gap:8px;min-width:0;padding:12px}
+   removes `.on`, CSS decides whether that means a tab or a grid column.  The dock is a
+   column of the frame; each pane scrolls by itself and its listing takes the height
+   the pane leaves it (the fixed 420 px list is gone with the JS that wrote it). */
+.dock{grid-column:4;grid-row:1;width:372px;min-width:0;max-width:none;display:flex;
+  flex-direction:column;min-height:0;border-left:1px solid var(--line);
+  background:var(--panel)}
+/* THE TOOLS BAR between the head and the row: everything that used to crowd the rail,
+   each as a button opening a popover, and a search box over every control on the page.
+   The popovers ARE the rail's own sections (the folds `renderPalette` writes into
+   #palBody, the Start fold, the Selection section), shown fixed under their button:
+   nothing moves in the DOM, so the harnesses that walk #palBody see what they saw. */
+.tools{position:relative;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:5px 10px;border-bottom:1px solid var(--line);background:var(--bg);
+  font-size:12.5px;z-index:70}
+.tools .tb{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:4px 10px;cursor:pointer;color:var(--ink)}
+.tools .tb[aria-expanded="true"]{background:var(--soft);border-color:var(--navy);color:var(--navy)}
+.tools .sw{position:relative;margin-left:auto;display:flex;align-items:center;gap:6px}
+#search{width:min(360px,40vw);padding:5px 9px;border:1px solid var(--line);border-radius:6px;
+  font:12.5px ui-sans-serif,system-ui,sans-serif;background:var(--panel);color:var(--ink)}
+#search:focus{outline:2px solid var(--navy);outline-offset:0}
+.sres{position:absolute;right:0;top:100%;margin-top:4px;width:min(520px,80vw);max-height:60vh;
+  overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 8px 28px rgba(0,0,0,.14);z-index:90;display:none}
+.sres[data-open="1"]{display:block}
+.sres .r{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.sres .r:hover,.sres .r[data-sel="1"]{background:var(--soft)}
+.sres .r b{font-size:13px}
+.sres .r .w{color:var(--muted);font-size:11.5px;margin-left:6px}
+.sres .r .d{color:var(--muted);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sres .none{padding:8px 10px;color:var(--muted)}
+/* the rail's popover sections: hidden in the rail, fixed under the bar when open */
+#palBody details.palfold,#palStart{display:none}
+.pop-open{display:block!important;position:fixed;z-index:85;width:400px;max-width:90vw;
+  max-height:72vh;overflow:auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;box-shadow:0 10px 32px rgba(0,0,0,.16);padding:10px 12px;margin:0}
+details.pop-open>summary{display:none}
+details.pop-open{display:block!important}
+.flash{outline:3px solid var(--navy)!important;outline-offset:2px;transition:outline-color .8s}
+#rail{overflow:auto}
+/* THE MENU, in the head: one item per panel.  An item opens its panel (the dock, or the
+   strip under a long device); the lit item closes it again.  Program and Circuit drive the
+   programme column when the programme lives there. */
+.tabs{display:flex;flex-wrap:wrap;gap:2px;flex:0 0 auto;margin-right:6px}
+.panes{flex:1 1 auto;min-height:0;display:flex;min-width:0}
+.pane{display:none;flex:1 1 auto;flex-direction:column;gap:8px;min-width:0;min-height:0;
+  overflow:auto;padding:10px;border:0;border-radius:0;container-type:inline-size}
 .pane.on{display:flex}
-.tabs{display:flex;gap:6px}
-.tab{padding:5px 12px;font-size:12.5px;border-radius:7px 7px 0 0}
+/* the Circuit listing is off unless the page carries a source circuit -- an attribute,
+   so the wide regime (every pane shown) cannot reveal an empty one */
+.row .dock .pane[data-off="1"]{display:none}
+.tab{padding:4px 9px;font-size:11.5px;border-radius:6px}
 .tab.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:650}
-@media (min-width:1180px){
-  .row[data-layout="wide"] .tabs{display:none}
-  /* auto-fit, not three hand-tuned columns: the dock went from three panes to five and a
-     fixed three-column template overflows.  This lays out 3+2 at 1180px and five across
-     on an ultrawide without a fourth set of hand-tuned widths. */
-  .row[data-layout="wide"] .panes{display:grid;gap:12px;
-    grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-  .row[data-layout="wide"] .pane{display:flex}
-}
 .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ph h3{margin:0}
 .grow{flex:1 1 auto}
@@ -950,14 +1290,21 @@ min-height:34px;overflow-x:auto}
 text-overflow:ellipsis;white-space:nowrap}
 .pf code{font-size:11px}
 /* fixed row height is what makes index<->pixel arithmetic exact; nothing measures a row */
-.lst{position:relative;overflow-y:auto;overflow-x:hidden;height:420px;overflow-anchor:none;
+.lst{position:relative;overflow-y:auto;overflow-x:hidden;flex:1 1 auto;height:auto;
+min-height:120px;overflow-anchor:none;
 border:1px solid var(--line);border-radius:7px;background:var(--panel)}
 .lst .pad{position:relative;width:100%}
 .lst .win{position:absolute;left:0;right:0;top:0;will-change:transform}
 .ln,.al{padding:0 8px;height:22px;line-height:22px;overflow:hidden;white-space:nowrap;
 cursor:pointer;border-top:1px solid transparent;display:grid;gap:6px;
 font:12px/22px ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
-.ln{grid-template-columns:40px 52px 68px 1fr 56px 26px}
+.ln{grid-template-columns:28px 44px 56px minmax(80px,1fr) 44px 22px}
+/* six cells stay in the row (the harness reads them by index); the class column is the
+   one that goes when the pane is narrow */
+@container (max-width:310px){
+  .ln{grid-template-columns:28px 44px minmax(80px,1fr) 44px 22px}
+  .ln .cl{display:none}
+}
 .al{grid-template-columns:30px 1fr}
 .ln>i,.al>i{font-style:normal;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .ln:hover,.al:hover{background:var(--soft)}
@@ -979,34 +1326,155 @@ color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.02em}
 padding:4px 11px;font-size:11.5px;font-weight:650;background:var(--navy);color:#fff;
 border:0;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .chip.off{display:none}
-.wrapl{position:relative}
-.tl{position:relative;height:12px;margin-top:6px;border-radius:4px;overflow:hidden;
-background:var(--soft);border:1px solid var(--line);display:flex;cursor:pointer}
+.wrapl{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.tl{position:relative;flex:0 0 auto;height:10px;margin:0;overflow:hidden;
+background:var(--soft);border-top:1px solid var(--line);display:flex;cursor:pointer}
 .tl i{display:block;height:100%}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--accent)}
 .help{position:fixed;inset:0;background:rgba(8,12,20,.72);z-index:9;padding:40px;
 overflow:auto;color:#fff;font-size:13px}
 .help.off{display:none}
-.help div{max-width:640px;margin:0 auto;background:var(--panel);color:var(--ink);
+.help>div{max-width:760px;margin:0 auto;background:var(--panel);color:var(--ink);
 border-radius:12px;padding:22px}
 .help td{padding:2px 8px}
+.help td:last-child{text-align:left;color:var(--ink)}
 
 /* ---- the editor ------------------------------------------------------------ */
-.stage{position:relative}
-.ebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
-.etools{display:none;gap:8px;align-items:center;flex-wrap:wrap}
-.ebar.edit .etools{display:flex}
-.hud{position:absolute;z-index:3;pointer-events:none;background:var(--navy);color:#fff;
- border-radius:6px;padding:3px 8px;white-space:nowrap;transform:translate(12px,-26px);
+.hud{position:fixed;z-index:3;pointer-events:none;background:var(--navy);color:#fff;
+ border-radius:6px;padding:3px 8px;white-space:pre-line;max-width:min(60vw,44ch);
+ transform:translate(12px,-26px);
  font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .hud.off{display:none}
+/* ---- the explain layer: one card, one caption per region, one attribute ------------
+   The card is `position:fixed` at the pointer and takes no pointer events, so it can
+   never sit between the pointer and the thing it explains.  The captions live inside
+   their regions and appear only while <body data-explain="1">. */
+.hint{position:fixed;z-index:8;max-width:320px;background:var(--panel);color:var(--ink);
+  border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
+  padding:7px 10px;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.14);
+  pointer-events:none}
+.hint b{display:block;font-size:12.5px;margin-bottom:2px}
+.hint span{display:block}
+.hint i{display:block;font-style:normal;color:var(--accent);font-size:11px;margin-top:3px}
+.hint i:empty{display:none}
+.cap{display:none;position:absolute;z-index:6;left:8px;top:6px;background:var(--navy);
+  color:#fff;border-radius:6px;padding:4px 9px;font-size:11.5px;line-height:1.35;
+  max-width:min(380px,85%);box-shadow:0 2px 8px rgba(0,0,0,.2);pointer-events:none}
+.cap b{display:block;font-size:12px}
+.cap span{display:block;opacity:.92}
+body[data-explain="1"] .cap{display:block}
+#capStage{left:12px;top:12px}
+#capBar{left:12px;top:auto;bottom:10px}
+.stagebar{position:relative}
+.dock{position:relative}
+.grip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+/* THE HEAD KEEPS FOUR NUMBERS on a laptop -- cost, steps, runtime, DACs -- and the rest
+   appear from 1600 px; the Report carries every one of them at every width. */
+.m[data-tier="2"]{display:none}
+@media (min-width:1600px){.m[data-tier="2"]{display:block}}
+/* the one-line summary is for the empty canvas; a device page says it with numbers */
+body:not([data-noprog="1"]) .lede{display:none}
+/* the rail's folded sections: a title, a count, one click */
+#palBody .palfold{margin:0 0 8px}
+#palBody .palfold>summary{padding:3px 0}
+#palBody .palfold[open]>summary{margin-bottom:5px}
+/* the guide's glossary: the stage's own marks beside their plain sentence */
+.gloss{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;
+  margin:4px 0 12px;font-size:12.5px}
+.gloss .avatar{width:56px;height:34px}
+.gloss .avatar svg{width:56px;height:34px}
+.steps{margin:4px 0 12px;padding-left:20px;font-size:12.5px}
+.steps li{margin:5px 0}
+/* ---- the course ---------------------------------------------------------------------- */
+.learn{display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.45}
+.learn-nav{display:flex;gap:4px;align-items:center}
+.learn-nav select{flex:1 1 auto;min-width:0;font:12px/1.4 inherit;padding:3px 6px;
+  border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.learn-nav button{padding:3px 8px}
+.learn-head{display:flex;align-items:baseline;gap:8px}
+.learn-head b{font-size:14px}
+.learn-stars{color:var(--gold,#d9a400);letter-spacing:.06em;font-size:13px;margin-left:auto}
+.learn-story{color:var(--muted);font-style:italic}
+.learn-p{margin:0}
+.learn .term{border-bottom:1px dotted var(--accent);cursor:help}
+.learn-ex{border:1px solid var(--line);border-left:3px solid var(--navy);border-radius:8px;
+  padding:8px 10px;background:var(--soft)}
+.learn-ex.extra{border-left-color:var(--gold,#d9a400)}
+.learn-exh{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;margin-bottom:3px}
+.learn-btns{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.learn-btns button{padding:4px 10px;font-size:12px}
+.learn-choices{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.learn-fb{border-radius:8px;padding:8px 10px;border:1px solid var(--line)}
+.learn-fb.ok{background:var(--ok_bg);color:var(--cold);border-color:transparent}
+.learn-fb.bad{background:var(--warn_bg);color:var(--warn_ink);border-color:transparent}
+.learn-verdict{border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:8px;
+  padding:8px 10px;background:var(--soft);font-size:12px}
+.learn-verdict .vstate{font-weight:600;padding:1px 6px;border-radius:6px;margin-left:4px}
+.learn-verdict .vstate.failed{background:var(--warn_bg);color:var(--warn_ink)}
+.learn-verdict .vstate.passed{background:var(--ok_bg);color:var(--cold)}
+.learn-verdict .vstate.skipped,.learn-verdict .vstate.partial{background:var(--line);color:var(--ink)}
+.learn-verdict ul{margin:4px 0 0 16px;padding:0}
+.learn-verdict li{margin:2px 0}
+.learn-table{width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0}
+.learn-table th,.learn-table td{padding:2px 6px;text-align:right;border-bottom:1px solid var(--line)}
+.learn-table th:first-child,.learn-table td:first-child{text-align:left}
+.learn-note{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;background:var(--soft)}
+.learn-fbstars{display:block;color:var(--gold,#d9a400);font-size:15px;letter-spacing:.08em;margin-bottom:2px}
+.learn-hints{display:flex;flex-direction:column;gap:4px}
+.learn-hint{display:flex;gap:8px;color:var(--muted)}
+.learn-hint span{flex:0 0 auto;width:16px;height:16px;border-radius:99px;background:var(--navy);
+  color:#fff;font-size:10px;line-height:16px;text-align:center}
+.lesson-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;
+  border:1px solid var(--line);border-left:3px solid var(--navy);border-radius:7px;
+  background:var(--soft);font-size:12px}
+.lesson-strip span{flex:1 1 200px;min-width:0}
+.lesson-strip button{padding:2px 8px;font-size:11.5px}
+/* THE CHEER: a green sweep over the canvas when a check passes.  An attribute the
+   stylesheet animates; the verdict itself never rides on it. */
+@keyframes cheer{0%{box-shadow:inset 0 0 0 0 rgba(15,118,110,0)}
+  30%{box-shadow:inset 0 0 0 6px rgba(15,118,110,.55)}
+  100%{box-shadow:inset 0 0 0 0 rgba(15,118,110,0)}}
+.canvas[data-cheer="1"]{animation:cheer 1.3s ease-out 1}
 .hud.warn{background:var(--warn_ink)}
 .hud.bad{background:var(--z)}
+.canvas{position:relative;flex:1 1 auto;min-height:0;display:flex}
 .toasts{position:absolute;left:12px;bottom:12px;z-index:4;display:flex;
- flex-direction:column;gap:6px;max-width:min(560px,86%)}
-.toast{background:var(--panel);border:1px solid var(--line);
+ flex-direction:column;gap:6px;max-width:min(560px,86%);pointer-events:none}
+.toast{background:var(--panel);border:1px solid var(--line);pointer-events:auto;
  border-left:3px solid var(--accent);border-radius:7px;padding:7px 10px;font-size:12.5px;
- box-shadow:0 2px 10px rgba(0,0,0,.16);cursor:pointer}
+ box-shadow:0 2px 10px rgba(0,0,0,.16);cursor:pointer;white-space:pre-line}
+/* A REFUSAL THAT IS NOT A TOAST.  A toast is dismissible and it fades; "this programme
+   moves an ion where there is no rail" is a standing fact about the picture, so it stays
+   on the canvas until the device or the programme changes.  `style.display`, never a
+   class -- `classList` is a no-op in tests/shim.mjs. */
+.norail{position:absolute;right:12px;top:12px;z-index:4;background:var(--z);color:#fff;
+ border-radius:7px;padding:5px 9px;font-size:12px;font-weight:650;pointer-events:none;
+ box-shadow:0 2px 10px rgba(0,0,0,.2)}
+/* THE ELEMENT MENU, at the pointer: the one place per-element actions live now.  A
+   disabled item keeps its REASON on the screen under it (.cmwhy) rather than only in a
+   tooltip -- a greyed control with no explanation is the exact question this menu exists
+   to answer.  The Modify panel replaces its body in place, anchored where it was. */
+.ctxmenu{position:fixed;z-index:88;min-width:238px;max-width:330px;max-height:78vh;
+ overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+ box-shadow:0 12px 34px rgba(0,0,0,.2);padding:6px}
+.ctxmenu .cmhead{font-weight:650;font-size:11.5px;color:var(--muted);padding:4px 8px 6px;
+ border-bottom:1px solid var(--line);margin-bottom:4px}
+.ctxmenu .cmitem{display:block;width:100%;text-align:left;border:0;background:none;
+ color:var(--ink);padding:5px 8px;border-radius:6px;font-size:12.5px;cursor:pointer}
+.ctxmenu .cmitem:hover:not([disabled]){background:var(--soft)}
+.ctxmenu .cmitem[disabled]{color:var(--muted);cursor:default}
+.ctxmenu .cmmore{font-weight:600}
+.ctxmenu .cmsub{margin:2px 0 4px 10px;border-left:2px solid var(--line);padding-left:6px}
+.ctxmenu .cmwhy{color:var(--muted);font-size:11px;line-height:1.35;padding:0 8px 6px}
+.ctxmenu .cmerr{color:var(--z);font-size:11.5px;line-height:1.4;padding:3px 8px}
+.ctxmenu .cmerr:empty{padding:0}
+.ctxmenu .cmfoot{color:var(--muted);font-size:10.5px;padding:5px 8px 2px;
+ border-top:1px solid var(--line);margin-top:4px}
+.ctxmenu .fieldrow{padding:0 6px}
+.ctxmenu .fieldrow label{flex:0 0 66px}
+.ctxmenu .formbtns{padding:2px 6px}
+.ctxmenu #mdlgExplode{margin:6px;width:calc(100% - 12px);white-space:normal}
 .toast.bad{border-left-color:var(--z)}
 .toast.warn{border-left-color:var(--warn_ink)}
 .toast.ok{border-left-color:var(--teal)}
@@ -1017,135 +1485,256 @@ textarea.src{flex:1;min-height:180px;resize:vertical;width:100%;box-sizing:borde
  background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:7px;
  padding:8px}
 textarea.src.out{min-height:120px;opacity:.85}
+/* in the pane the two textareas share the height (1:1) rather than each taking its
+   floor and pushing the export text below the viewport */
+.srcwrap textarea.src{flex:1 1 0;min-height:90px}
 .srcerr{min-height:1.2em;color:var(--z);
  font:11.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 </style></head><body><main>
 <div class="card">
+  <!-- THE HEAD: one 44 px toolbar -- name, the one-line lede, the two counters, the
+       metric chips and the two panel handles.  The handles live here rather than inside
+       the panels they fold, so a folded panel can be opened from the same place. -->
   <div class="head">
-    <div>
+    <div class="ttl">
       <div class="kicker" id="kicker"></div>
       <h1 id="title"></h1>
-      <p class="lede" id="lede"></p>
     </div>
+    <p class="lede" id="lede"></p>
     <div class="counters">
-      <div class="counter"><span>Steps</span>
+      <div class="counter" data-hint="c:steps"><span>Steps</span>
         <b><i class="now" id="cSteps">0</i><i class="of" id="cStepsOf"></i></b></div>
-      <div class="counter"><span>Cost</span>
+      <div class="counter" data-hint="c:cost"><span>Cost</span>
         <b><i class="now" id="cCost">0</i><i class="of" id="cCostOf"></i></b></div>
     </div>
+    <div class="metrics" id="metrics"></div>
+    <div class="grips">
+      <!-- EXPLAIN labels the regions; the state is `aria-pressed` here and `data-explain`
+           on <body>, both attributes, so the harness and the stylesheet read one truth. -->
+      <button class="grip" id="eExplain" aria-pressed="false" data-hint="explain"
+              title="label the parts of the screen (h)">Explain</button>
+      <button class="grip" id="railGrip" title="hide the element rail ([)" data-hint="gripRail"
+              aria-expanded="true">&#9664; Elements</button>
+      <nav class="tabs" id="tabs" data-prog="dock" aria-label="panels">
+        <button class="tab" id="tabL" data-hint="tab:L">Learn</button>
+        <button class="tab" id="tabP" data-hint="tab:P">Program</button>
+        <button class="tab off" id="tabQ" data-hint="tab:Q">Circuit</button>
+        <button class="tab" id="tabA" data-hint="tab:A">Device</button>
+        <button class="tab" id="tabM" data-hint="tab:M">Machine</button>
+        <button class="tab" id="tabW" data-hint="tab:W">Write</button>
+        <button class="tab" id="tabR" data-hint="tab:R">Report</button>
+      </nav>
+    </div>
   </div>
-  <div class="metrics" id="metrics"></div>
-  <div class="row" id="row">
+  <!-- THE TOOLS BAR.  Each button shows one of the rail's sections as a popover; the
+       search box finds any control, hint or lesson.  `#bbtools` is a marker only: the
+       BBResults overlay (Codesign/scripts/bb_studio.py) builds its own bar unless an
+       element by that id exists, and this page already has the native one. -->
+  <div class="tools" id="tools" data-hint="region:tools">
+    <div class="cap" id="capTools"></div>
+    <button class="tb" id="tbStart" aria-expanded="false" data-pop="start" data-hint="tools:start">Start</button>
+    <button class="tb" id="tbRows" aria-expanded="false" data-pop="row" data-hint="tools:rows">Append a row</button>
+    <button class="tb" id="tbMachine" aria-expanded="false" data-pop="block" data-hint="tools:machine">Machine settings</button>
+    <button class="tb" id="tbComponents" aria-expanded="false" data-pop="component" data-hint="tools:components">Components</button>
+    <!-- NO "Selection" BUTTON.  Its popover showed `#palInspect`, which is the same DOM
+         node the rail already carries, and `window.onInspector` popped it open on every
+         selection -- the busiest thing on the page.  Per-element actions are the
+         right-click menu's now; the inspector stays in the rail, where it is read. -->
+    <div class="sw"><input id="search" type="search" placeholder="find any feature&hellip;  (Ctrl+K)"
+         autocomplete="off" data-hint="search"><div class="sres" id="sres"></div></div>
+    <span id="bbtools" hidden></span>
+  </div>
+  <div class="row" id="row" data-dock="1">
     <!-- THE PALETTE.  Generated from `D.schema` (every CLOSED object, field for field)
          union `D.consumers` (the OPEN maps the schema cannot describe, each field with
          WHO READS IT) union `D.defaults` (dataclass defaults by reflection).  Never a
          literal list: a hand-written palette is a second source of truth, and 27 of the
          65 open fields are read by nothing at all, which the palette has to say. -->
     <aside class="rail" id="rail" data-collapsed="0">
-      <button class="grip" id="railGrip" title="collapse the element rail ([)"
-              aria-expanded="true">&#9664;</button>
-      <section class="pal" id="palElements"><h4>Elements</h4><div id="palBody"></div></section>
+      <div class="cap" id="capRail"></div>
+      <!-- THE START FOLD FIRST, compact, and closed until the user opens it: the stage's
+           own empty state (#stageEmpty) is where a new device starts, so the element
+           tiles below stay on screen at every laptop size.  `renderStart` fills it. -->
       <details class="pal palfold" id="palStart"><summary>Start &mdash; new or template device</summary>
         <div id="palStartBody"></div></details>
+      <section class="pal" id="palElements"><h4>Elements</h4><div id="palBody"></div></section>
       <section class="pal" id="palInspect"><h4>Selection</h4><div id="palInsp"></div></section>
     </aside>
     <div class="stage">
-      <svg id="svg" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="step" id="status"></div>
+      <!-- THE CANVAS BOX: the picture, the drag HUD and the toast strip together, so a
+           refusal is drawn over the picture it refers to and not below the legend. -->
+      <div class="canvas" id="canvas">
+        <svg id="svg" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="cap" id="capStage"></div>
+        <div class="cap" id="capBar"></div>
+        <div class="hud off" id="hud"></div>
+        <!-- THE LOUD FAILURE for a move with no rail under it.  `edgePoint` used to
+             draw a straight chord between two nodes no segment joins, which is the page
+             inventing hardware; it now refuses, parks the ion on its last real node and
+             says so here. -->
+        <div class="norail" id="norail" style="display:none"></div>
+        <div class="toasts" id="toasts"></div>
+        <!-- THE ELEMENT MENU and the Modify panel it opens: what a right-click on a part
+             offers.  `position:fixed` at the pointer and filled entirely by `paintMenu()`
+             in editor.js; its state is `data-open` plus `style.display`, never a class,
+             because `classList` is a no-op in tests/shim.mjs. -->
+        <div class="ctxmenu" id="ctxmenu" data-open="0" style="display:none"
+             data-hint="ctxmenu"></div>
+      </div>
+      <!-- THE EMPTY STATE: the start cards, the physics package, the shipped devices
+           and the two stamp buttons, drawn over the canvas while it has no node.  Shown
+           and hidden through `style.display` from `paint()`, never removed and never a
+           class -- the harness reads it back.  It takes no pointer events except on its
+           controls, so the stage under it still places an armed site. -->
+      <div class="stage-empty" id="stageEmpty" style="display:none"></div>
+      <!-- the step, the price and the two counters share one line: the texts ellipsise
+           (the price first), the counters keep their width, and the toolbar below stays
+           a single row on a wide stage -->
+      <div class="strip"><div class="step" id="status" data-hint="status"></div>
+        <!-- ITS OWN FLEX ITEM, never inside the ellipsised sentence: on a 440 px stage
+             the sentence gives way and the button stays whole and clickable.  Shown
+             and hidden through `style.display` from `draw()` while there are no frames. -->
+        <button id="stDrive" class="p" type="button" style="display:none" data-hint="testdrive">Test drive</button>
+        <span class="sub price" id="ePrice" data-hint="price"></span>
+        <span class="sub" id="eCount" data-hint="edits">0 edits</span>
+        <button class="tgl" id="eProb" data-hint="problems">0 problems</button>
+        <!-- THE SECOND, QUIETER REGISTER.  A note is an observation about what has NOT
+             been drawn yet -- a zone type no site uses, a movement class whose orbit
+             matches no loop -- and counting those as problems is what made a blank canvas
+             open on "10 problems".  Hidden while there are none; `style.display` from
+             `paint()`, never a class. -->
+        <button class="tgl" id="eNotes" data-hint="notes" style="display:none">0 notes</button></div>
       <div class="why" id="why"></div>
       <!-- The loud banner for "the compiled programme is not a programme for this
            device any more".  Shown and hidden through `style.display`, NEVER through a
            class: `classList` is a no-op in tests/shim.mjs, so a class-driven banner is a
            banner no harness can read, and the freeze would ship untested. -->
       <div class="invalid" id="invalid" style="display:none"></div>
+      <!-- ONE TOOLBAR: the transport and the editing tools on one line, always under the
+           picture.  `.stagebar`, not `.bar` -- that class is the legend swatch. -->
+      <div class="stagebar" id="stagebar">
       <div class="ctrl">
-        <button class="p" id="play">Play</button>
-        <button id="step">Next step</button>
-        <button id="glide">Glide one step</button>
-        <button id="phase">Next phase</button>
-        <button id="reset">Reset</button>
-        <button id="fit">Fit</button>
-        <input type="range" id="slider" min="0" value="0">
-        <select id="speed"><option value="1">1x</option>
+        <button class="p" id="play" data-hint="play">Play</button>
+        <button id="step" title="next step (→)" data-hint="step">Step</button>
+        <button id="glide" title="glide one step (Enter)" data-hint="glide">Glide</button>
+        <button id="phase" title="next phase" data-hint="phase">Phase</button>
+        <button id="reset" data-hint="reset">Reset</button>
+        <button id="fit" data-hint="fit">Fit</button>
+        <input type="range" id="slider" min="0" value="0" data-hint="slider">
+        <select id="speed" data-hint="speed"><option value="1">1x</option>
         <option value="4" selected>4x</option>
         <option value="16">16x</option><option value="64">64x</option>
         <option value="256">256x</option></select>
-        <select id="mode"><option value="role" selected>colour: role</option>
-        <option value="heat">colour: heating</option></select>
+        <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
+        <option value="role" selected>role</option>
+        <option value="heat">heating</option></select>
       </div>
       <div class="ebar" id="ebar">
-        <span class="seg"><button class="on" id="mPlay">Play</button
-          ><button id="mEdit" title="edit the architecture (e)">Edit</button></span>
         <span class="etools" id="etools">
-          <button class="tgl on" id="tSnap" aria-pressed="true"
-                  title="snap to the lattice (hold alt to free, shift for quarter steps)">Snap</button>
-          <button id="eUndo" title="undo (ctrl+z)">Undo</button>
-          <button id="eRedo" title="redo (ctrl+shift+z)">Redo</button>
-          <span class="sub" id="eCount">0 edits</span>
-          <button class="tgl" id="eProb">0 problems</button>
-          <select id="eWhich"><option value="py" selected>as Python</option>
-            <option value="json">as .arch.json</option>
-            <option value="tsir">as .tsir.json</option>
-            <option value="edits">as edit ops</option></select>
-          <button id="eCopy">Copy</button>
+          <!-- TWO MODES.  Sketch draws the shape the ions travel on and fills it with
+               trapping sites; Parts is the element-at-a-time tool, unchanged.  The
+               choice is remembered (`qccd.studio.mode`), and a canvas with no device on
+               it opens on Sketch.  Everything in `#etools` is hidden on the website's
+               view-only embeds, so the shape tools cannot be reached there. -->
+          <span class="seg" id="tMode" data-hint="mode">
+            <button class="tgl on" id="tModeSketch" aria-pressed="true" data-hint="mode:sketch"
+                    title="draw the shape first: a rectangle, a circle, a line or a polyline, filled with trapping sites on release (d)">Sketch</button>
+            <button class="tgl" id="tModeParts" aria-pressed="false" data-hint="mode:parts"
+                    title="place sites, junctions and rails one at a time (d)">Parts</button>
+          </span>
+          <!-- NO SHAPE BUTTONS HERE.  These four were pure duplicates of the rail's
+               shape tiles, wired to the same `sketchTool` verb, and r/e/n/p were a third
+               way to the same place.  The tiles say what each shape draws and what the
+               gesture is; a toolbar toggle could only say "Rect". -->
+          <button class="tgl" id="tSnap" aria-pressed="false" data-hint="snap"
+                  title="land parts on the lattice (off: anywhere; shift for quarter steps; alt frees)">Snap</button>
+          <button class="tgl on" id="tTrue" aria-pressed="true" data-hint="truescale"
+                  title="one screen pixel is the same distance on both axes, so an angle on the screen is the angle on the die">True scale</button>
+          <button class="tgl" id="tMeasure" aria-pressed="false" data-hint="measure"
+                  title="measure a distance or an angle: click two points, then a third for the angle between them (M)">Measure</button>
+          <button id="eUndo" title="undo (ctrl+z)" data-hint="undo">Undo</button>
+          <button id="eRedo" title="redo (ctrl+shift+z)" data-hint="redo">Redo</button>
+          <button id="eHelp" title="the guide: what everything is, and every gesture and key (?)" data-hint="help">?</button>
         </span>
-        <span class="grow"></span><span class="sub" id="ePrice"></span>
       </div>
-      <div class="hud off" id="hud"></div>
-      <div class="toasts" id="toasts"></div>
+      <!-- THE SCALE BAR: in the toolbar, under the picture and never on it (placeScaleBar) -->
+      <span class="scalebar" id="scaleBar" data-hint="scalebar"><i id="scaleLine"></i><b id="scaleTxt"></b></span>
+      </div>
       <div class="track" id="track" title="timeline by operation class"></div>
       <div class="tl" id="tl" title="the program in order; click to seek"></div>
-      <div class="legend" id="legend"></div>
+      <details class="legendfold" id="legendFold"><summary>Legend</summary>
+        <div class="legend" id="legend"></div></details>
     </div>
-    <div class="dock" id="dock" data-collapsed="0">
-      <button class="grip" id="dockGrip" title="collapse the side panels (])"
-              aria-expanded="true">&#9654;</button>
-      <div class="tabs" id="tabs">
-        <button class="tab on" id="tabP">Program</button>
-        <button class="tab off" id="tabQ">Circuit</button>
-        <button class="tab" id="tabA">Architecture</button>
-        <button class="tab" id="tabM">Machine</button>
-        <button class="tab" id="tabW">Write</button>
-        <button class="tab" id="tabR">Report</button>
-      </div>
+    <!-- THE PROGRAMME COLUMN.  `placeProgram()` moves #paneP in here (wide regime, or
+         pinned in the tall one) and back into the dock; the pane itself is one node. -->
+    <div class="progcol" id="progcol" data-collapsed="1">
+      <div class="cap" id="capProg"></div>
+    </div>
+    <!-- THE DOCK: closed by default, one pane at a time, opened from the menu in the head
+         (or the 1/2/3 and ] keys).  Under a long device it is the strip below the canvas. -->
+    <div class="dock" id="dock" data-collapsed="1" data-prog="dock">
+      <div class="cap" id="capDock"></div>
       <div class="panes" id="panes">
 
-        <section class="pane card on" id="paneP">
-          <header class="ph"><h3>Hardware program</h3><span class="sub" id="pCount"></span>
-            <span class="grow"></span>
-            <input class="filter" id="pFilter" type="text" spellcheck="false"
-                   placeholder="filter (/)">
-            <button class="tgl on" id="pFollow" aria-pressed="true"
-                    title="keep the executing instruction in view (f)">Follow</button>
-          </header>
-          <div class="now" id="pNow"></div>
-          <div class="wrapl">
-            <div class="lst" id="pScroll">
-              <div class="pad" id="pPad"><div class="win" id="pWin"></div></div>
-            </div>
-            <button class="chip off" id="pChip"></button>
-          </div>
-          <footer class="pf" id="pFoot"></footer>
+        <!-- THE COURSE.  Rendered by `renderLearn()` from the lessons `tutorial.js` registers;
+             every button is an adapter onto a lesson verb on the API. -->
+        <section class="pane card" id="paneL">
+          <header class="ph"><h3>Learn</h3><span class="grow"></span>
+            <span class="sub" id="learnCount"></span></header>
+          <div class="learn" id="learnBody"></div>
         </section>
 
-        <section class="pane card" id="paneQ">
-          <header class="ph"><h3>Source circuit</h3><span class="sub" id="qCount"></span>
+        <!-- THE PROGRAM PANE: two listings, one switch.  The hardware programme and the
+             source circuit it was compiled from (when the page carries one), shown one at
+             a time or stacked, in lockstep with the animation.  `#paneQ` keeps its id and
+             its `data-off` switch: the harnesses read both. -->
+        <section class="pane card on" id="paneP" data-view="hw">
+          <header class="ph"><h3>Program</h3>
+            <span class="seg" id="pView" data-hint="progview" style="display:none">
+              <button class="on" id="pvhw" data-view="hw" title="the hardware instructions">Hardware</button>
+              <button id="pvgates" data-view="gates" title="the circuit statements">Gates</button>
+              <button id="pvboth" data-view="both" title="both, stacked">Both</button>
+            </span>
             <span class="grow"></span>
-            <button class="tgl on" id="qFollow" aria-pressed="true"
-                    title="keep the statement being executed in view">Follow</button>
+            <button class="grip" id="pPin" data-hint="progpin" aria-pressed="false"
+                    title="show the programme beside the animation, or back among the panels">&#9664; Beside the animation</button>
           </header>
-          <div class="now" id="qNow"></div>
-          <div class="wrapl">
-            <div class="lst" id="qScroll">
-              <div class="pad" id="qPad"><div class="win" id="qWin"></div></div>
+          <div class="pblock" id="pHw">
+            <div class="ph"><h4>Hardware program</h4><span class="sub" id="pCount"></span>
+              <span class="grow"></span>
+              <input class="filter" id="pFilter" type="text" spellcheck="false"
+                     placeholder="filter (/)" data-hint="filter">
+              <button class="tgl on" id="pFollow" aria-pressed="true" data-hint="follow"
+                      title="keep the executing instruction in view (f)">Follow</button>
             </div>
+            <div class="now" id="pNow"></div>
+            <div class="wrapl">
+              <div class="lst" id="pScroll">
+                <div class="pad" id="pPad"><div class="win" id="pWin"></div></div>
+              </div>
+              <button class="chip off" id="pChip"></button>
+            </div>
+            <footer class="pf" id="pFoot"></footer>
           </div>
-          <footer class="pf" id="qFoot"></footer>
+          <div class="pblock" id="paneQ" data-off="1">
+            <div class="ph"><h4>Source circuit</h4><span class="sub" id="qCount"></span>
+              <span class="grow"></span>
+              <button class="tgl on" id="qFollow" aria-pressed="true"
+                      title="keep the statement being executed in view">Follow</button>
+            </div>
+            <div class="now" id="qNow"></div>
+            <div class="wrapl">
+              <div class="lst" id="qScroll">
+                <div class="pad" id="qPad"><div class="win" id="qWin"></div></div>
+              </div>
+            </div>
+            <footer class="pf" id="qFoot"></footer>
+          </div>
         </section>
 
         <section class="pane card" id="paneA">
-          <header class="ph"><h3>Architecture</h3>
-            <span class="seg"><button class="on" id="avB">Program</button
+          <header class="ph"><h3>Device</h3>
+            <span class="seg" data-hint="archview"><button class="on" id="avB">Program</button
               ><button id="avD">Device</button><button id="avS"
               title="edit the architecture as source">Source</button></span>
             <span class="grow"></span>
@@ -1162,6 +1751,13 @@ textarea.src.out{min-height:120px;opacity:.85}
             <textarea class="src" id="eSrc" spellcheck="false"
               aria-label="the architecture as Python; edit it and the stage re-renders"></textarea>
             <div class="srcerr" id="eSrcErr"></div>
+            <!-- the export picker lives beside the text it formats, not on the toolbar -->
+            <div class="ph exportrow"><span class="sub">export</span>
+              <select id="eWhich"><option value="py" selected>as Python</option>
+                <option value="json">as .arch.json</option>
+                <option value="tsir">as .tsir.json</option>
+                <option value="edits">as edit ops</option></select>
+              <button id="eCopy">Copy</button></div>
             <textarea class="src out" id="eOut" readonly spellcheck="false"
               aria-label="the edited architecture, ready to copy"></textarea>
           </div>
@@ -1176,11 +1772,15 @@ textarea.src.out{min-height:120px;opacity:.85}
              indented suite, because `logicalLines` joins physical lines on bracket depth
              alone and a second competing rule would break the byte round trip. -->
         <section class="pane card" id="paneW">
-          <header class="ph"><h3>Program</h3>
+          <header class="ph"><h3>Write a programme</h3>
             <span class="sub" id="pwCount"></span>
             <span class="grow"></span>
-            <button id="pwRun" class="p">Evaluate</button>
+            <button id="pwDrive" title="write and play a programme that fits this device">Test drive</button>
+            <button id="pwRun" class="p" data-hint="evaluate">Evaluate</button>
           </header>
+          <!-- the lesson in one line, while one is open: the exercise and the two buttons
+               that matter here, so a programming exercise never needs a tab switch -->
+          <div class="lesson-strip" id="pwLesson" style="display:none"></div>
           <textarea class="src" id="pwText" spellcheck="false"
             aria-label="the test program as Python; edit it and the stage re-renders"></textarea>
           <div class="srcerr" id="pwErr"></div>
@@ -1200,7 +1800,12 @@ textarea.src.out{min-height:120px;opacity:.85}
     </div>
   </div>
 </div>
-<div class="help off" id="help"><div id="helpBody"></div></div>
+<!-- the guide (drawn marks, three steps) and the key tables are two hosts: the tables
+     stay `innerHTML` so the harness census can read every row back, as it always has -->
+<div class="help off" id="help"><div id="helpCard"><div id="guideBody"></div><div id="helpBody"></div></div></div>
+<!-- THE HINT CARD: one element, filled by `EDITOR.hintShow` from HINTS, positioned at
+     the pointer, hidden through `style.display`.  Text only, never markup. -->
+<div class="hint" id="hint" style="display:none" data-on="0"><b id="hintT"></b><span id="hintD"></span><i id="hintK"></i></div>
 </main>
 <script id="data" type="application/json">__DATA__</script>
 __ENGINE__
@@ -1209,6 +1814,56 @@ const D = JSON.parse(document.getElementById('data').textContent);
 const A = D.arch, P = D.program, PH = D.physics, L = D.layout;
 const nodeById = {}; A.nodes.forEach(n => nodeById[n.id] = n);
 const segById = {}; A.segments.forEach(s => segById[s.id] = s);
+
+// ---------- THE SCALE.  A lattice unit is not a length; the technology says what is ----
+// `D.tech` is the technology sidecar's numbers, in INTEGER NANOMETRES, and it is the ONLY
+// place a physical length enters this page.  Every readout below -- the tooltips, the drag
+// HUD, the scale bar, the ruler, and the DC electrode tiling -- is one of these times a
+// lattice distance, and nothing converts units twice.  Every emitted page carries one
+// (`render.py::DEFAULT_TECH`), so there is no unmeasurable-page branch to maintain; the
+// literal below exists only so a page emitted before this block still draws.
+const TECH = D.tech || {preset:'surface_default', nm_per_unit_x:464000,
+  nm_per_unit_y:464000, w_rf:60000, w_dc:50000, l_dc:50000, g_dc:8000, g_rf:10000,
+  n_dc_pairs:3, dc_pitch:58000};
+const NM_X = TECH.nm_per_unit_x, NM_Y = TECH.nm_per_unit_y;
+// LATTICE -> MICROMETRES, PER AXIS.  The two scales are separate numbers with separate
+// sources: a device whose y-extent is 1.0 is not thereby one axial trap pitch tall, and a
+// single global scale would be a drawing convention pretending to be a physical claim.
+function toUm(x, y){ return { x: x*NM_X/1000, y: y*NM_Y/1000 }; }
+// a lattice DISPLACEMENT as a physical length, in um.  Not `hypot(dx,dy)*k`: the two
+// components scale by different numbers, so the hypotenuse has to be taken AFTER.
+function distUm(dx, dy){ const a=dx*NM_X/1000, b=dy*NM_Y/1000; return Math.sqrt(a*a+b*b); }
+// one number, in the unit that keeps it readable
+function fmtUm(v){
+  const a=Math.abs(v);
+  if(a>=1000) return (v/1000).toFixed(3)+' mm';
+  if(a>=1) return v.toFixed(1)+' um';
+  return (v*1000).toFixed(0)+' nm';
+}
+const um1 = v => +v.toFixed(1);
+
+// ---------- TRUE SCALE, on by default ----------
+// On: `sx:sy` is the technology's nm-per-unit ratio, so one pixel is the same number of
+// nanometres on both axes and an angle measured on the screen is the angle the metal
+// makes.  Off: the fit may stretch one axis by up to K_ANISO to fill the viewport -- more
+// legible on a 72:1 device, and wrong about every angle on it.  Remembered exactly as the
+// Snap toggle is, and read HERE rather than in editor.js because `L` has to be right
+// before the first mark is drawn.  `tests/studio.mjs` deliberately does not stub
+// localStorage, so a harness always gets the default.
+const TS_KEY = 'qccd.studio.truescale';
+let TRUE_SCALE = true;
+try {
+  const _tsv = globalThis.localStorage && globalThis.localStorage.getItem(TS_KEY);
+  if(_tsv !== null && _tsv !== undefined) TRUE_SCALE = _tsv === '1';
+} catch(e){ /* no store: the default stands */ }
+// `hold` is `(sx, sy, ox, oy)` an EDIT keeps, so the drawing does not move under the
+// pointer; absent (null) everywhere the view is meant to re-fit: Fit, a new device,
+// the true-scale toggle.
+const layoutOpts = (hold) => ({ true_scale: TRUE_SCALE, unit_nm: [NM_X, NM_Y],
+                                hold: hold || null });
+// Python computed BOTH layouts; the toggle picks one.  `L` is mutated, never replaced --
+// every closure below and in editor.js captured this exact object.
+if(TRUE_SCALE && D.layout_true) Object.assign(L, D.layout_true);
 // THE PALETTE, shipped as data AND as CSS custom properties -- read as data first.
 // `--<k>` is a round trip of `theme.PALETTE` through the stylesheet, and
 // `getComputedStyle` is a stub in the headless harness that answers '#000000' for every
@@ -1224,8 +1879,9 @@ const C = {};
 for (const k of ['bg','panel','ink','muted','line','soft','data','x','z','anc','active',
   'rail','highway','compute','accent','arrow','navy','junction','corner','gold','loop',
   'teal','merge','grid','grid_faint','hot','cold','dc_idle','dc_hot','dc_well',
-  'ion_stroke','neutral','rotate_alt','zone_data','zone_ancilla','zone_trap',
-  'zone_tfactory','zone_load','zone_register','zone_other']) C[k] = css(k);
+  'ion_stroke','neutral','rotate_alt','beam_one','beam_two','beam_meas','beam_init',
+  'zone_data','zone_trap',
+  'zone_load','zone_register','zone_other']) C[k] = css(k);
 const zoneColour = z => C['zone_'+(z||'other')] || C.zone_other;
 const clamp = (lo,v,hi) => Math.max(lo, Math.min(hi, v));
 
@@ -1258,6 +1914,12 @@ svg.append(gMetal,gLoop,gSeg,gElec,gHilite,gNode,gWell,gIon,gTop);
 // the schematic on top of it.  Registering would need this page's sx/sy to equal the
 // technology's nm_per_unit_x / nm_per_unit_y, and on chain72 those are 1.0 and 0.634.
 // One of the two views has to misstate a proportion, and it is not the one in nanometres.
+//
+// TRUE SCALE narrows that gap but does not close it.  With the toggle on, sx:sy IS the
+// technology's nm-per-unit ratio, so the schematic no longer misstates any ANGLE -- but
+// its overall magnification is still chosen to fill the viewport while the metal below is
+// fitted to its own bounding box, so the two are similar rather than coincident.  The
+// scale bar is what makes each of them readable on its own terms.
 if (D.metal){
   const M = D.metal;
   const inner = el('g',{transform:M.transform, opacity:0.5});
@@ -1320,8 +1982,8 @@ const AXIS = {};
 }
 
 // ---------- the static picture: built once, never rebuilt per frame ----------
-const SEGEL={}, SEGINFO={}, PAD_BY_SEG={}, SEG_BY_PAIR={},
-      NODEEL={}, CAPTXT={};
+const SEGEL={}, SEGINFO={}, PAD_BY_SEG={}, PAD_BY_SITE={}, SITE_SPAN={},
+      SEG_BY_PAIR={}, NODEEL={}, CAPTXT={};
 // A SEGMENT'S ROLE COLOUR IS DERIVED FROM ITS LABELS, here as in Python.  `D.roles`
 // is a snapshot keyed by segment id, taken when the page was emitted, and it has no
 // answer for a segment the user creates -- every one of those drew as 'rail' whatever it
@@ -1367,8 +2029,57 @@ function bezPoint(I, t){
   const h=I.len||1;
   return {x:I.ax+I.dx*t, y:I.ay+I.dy*t, tx:I.dx/h, ty:I.dy/h};
 }
-function edgePoint(aId, bId, t){
+// The drawn length of one segment: the chord, or the curve's own arc length when it is
+// bowed.  Sampled once per segment in `buildStatic` and cached on the SEGINFO record,
+// because `pointOnPath` needs it for EVERY ion on EVERY frame.
+function bezLen(I){
+  if(!I.cp) return I.len;
+  let s=0, ax=I.ax, ay=I.ay;
+  for(let i=1;i<=16;i++){ const q=bezPoint(I, i/16);
+    s+=Math.hypot(q.x-ax, q.y-ay); ax=q.x; ay=q.y; }
+  return s;
+}
+function edgeLen(aId, bId){
   const sid=SEG_BY_PAIR[aId+'>'+bId], I=(sid!==undefined)?SEGINFO[sid]:null;
+  if(I) return I.alen || I.len || 0;
+  const a=nodeById[aId], b=nodeById[bId];
+  return (a&&b) ? Math.hypot(px(b)-px(a), py(b)-py(a)) : 0;
+}
+
+// NO RAIL, NO MOVE -- and no silent chord.
+//
+// `edgePoint` used to fall back to a straight line between the two nodes whenever no
+// segment joined them.  That is the page DRAWING A RAIL THE DEVICE DOES NOT HAVE: the ion
+// crosses bare substrate, over electrodes it is not riding, and the picture says the
+// machine can do something it cannot.  The verifier now refuses such a programme outright
+// (R21 forbids a rail through a foreign node or a crossing, and the replay raises when two
+// consecutive path nodes have no segment), so this branch should be unreachable -- which
+// is exactly why it must be loud rather than plausible when it is reached.  Once in the
+// console, once on the canvas, and the ion stays on the last node it was really on.
+const NORAIL = {};
+function noRail(aId, bId){
+  const k = aId+'>'+bId;
+  if(NORAIL[k]) return;
+  NORAIL[k] = 1;
+  try { console.error('no rail between '+aId+' and '+bId+': this programme moves an ion '+
+                      'where the device has no segment, so nothing is drawn between them'); }
+  catch(e){ /* no console */ }
+  const b = document.getElementById('norail');
+  if(b){ b.textContent = 'no rail between '+aId+' and '+bId; b.style.display='block'; }
+}
+function clearNoRail(){
+  for(const k in NORAIL) delete NORAIL[k];
+  const b = document.getElementById('norail');
+  if(b) b.style.display = 'none';
+}
+function edgePoint(aId, bId, t){
+  const sid=SEG_BY_PAIR[aId+'>'+bId];
+  if(sid===undefined){
+    noRail(aId, bId);
+    const a=nodeById[aId] || nodeById[bId];
+    return a ? {x:px(a), y:py(a), norail:true} : null;
+  }
+  const I=SEGINFO[sid];
   if(I && I.cp){ const q=bezPoint(I, segById[sid].a===aId ? t : 1-t);
     return {x:q.x, y:q.y}; }
   const a=nodeById[aId], b=nodeById[bId]; if(!a||!b) return null;
@@ -1386,7 +2097,8 @@ function buildStatic(S){
   const A=S.A, L=S.L, AXIS=S.AXIS, ROLE=S.role, px=S.px, py=S.py, nodeById=S.byId;
   const gLoop=S.into.loop, gSeg=S.into.seg, gElec=S.into.elec, gNode=S.into.node;
   const SEGEL=S.reg.SEGEL, SEGINFO=S.reg.SEGINFO, PAD_BY_SEG=S.reg.PAD_BY_SEG,
-        SEG_BY_PAIR=S.reg.SEG_BY_PAIR, NODEEL=S.reg.NODEEL, CAPTXT=S.reg.CAPTXT;
+        SEG_BY_PAIR=S.reg.SEG_BY_PAIR, NODEEL=S.reg.NODEEL, CAPTXT=S.reg.CAPTXT,
+        PAD_BY_SITE=S.reg.PAD_BY_SITE || {}, SITE_SPAN=S.reg.SITE_SPAN || {};
   const siteLen=c=>_siteLen(c,L), slots=c=>_slots(c);
   // --- loops: which segments form one closed orbit, and which way it is indexed -----
   const LOOPC=[C.anc, C.teal, C.accent, C.rotate_alt]; let li=0;
@@ -1419,6 +2131,7 @@ function buildStatic(S){
     const I={ax,ay,dx,dy,len,cp:null};
     const bw=BOW[sg.id];
     if(bw && len>1e-6) I.cp={x:(ax+bx)/2 - (dy/len)*2*bw, y:(ay+by)/2 + (dx/len)*2*bw};
+    I.alen = bezLen(I);          // the DRAWN length, arc included: pointOnPath needs it
     SEGINFO[sg.id]=I;
     SEG_BY_PAIR[sg.a+'>'+sg.b]=sg.id; SEG_BY_PAIR[sg.b+'>'+sg.a]=sg.id;
     if(len<1e-6) continue;
@@ -1433,41 +2146,153 @@ function buildStatic(S){
     // thing an ion actually travels along told you nothing -- not its id, not which loop
     // it belongs to, not the declared length the cost model reads.
     const stip=el('title',{});
+    // THE LENGTH THAT IS A LENGTH, and the one that is a declaration.  `length` is a
+    // number the architecture declares and only `length_scaling` cost models read; the
+    // physical one is measured off the two endpoint positions through the technology, and
+    // when the two disagree the tooltip is where you find out.
     stip.textContent = sg.id+' · '+sg.a+' → '+sg.b+' · '+role+
                        (sg.loop?' · loop '+sg.loop:' · no loop')+
-                       ' · length '+(+(sg.length===undefined?1:sg.length).toFixed(3))+
+                       ' · '+fmtUm(distUm(b.x-a.x, b.y-a.y))+
+                       ' · declared length '+(+(sg.length===undefined?1:sg.length).toFixed(3))+
                        ' · cap '+(sg.cap===undefined?1:sg.cap);
     ln.append(stip);
     SEGEL[sg.id]=ln; gSeg.append(ln);
     pads += 2*clamp(1, Math.round(len/(L.pad_pitch||1)), 12);
   }
-  // --- DC control electrodes (deck p.19/p.22): a stadium pill tiled along the trap
-  // axis, mirrored across the RF null.  Shuttling IS these pads being ramped in
-  // sequence, so the count comes from the segment's drawn LENGTH, never from the node
-  // count -- the old page put three pads on a one-pixel segment.
-  const sides = pads>4000 ? [1] : [1,-1];
-  const tile  = pads<=8000;
+  // --- DC control electrodes: THE TECHNOLOGY'S OWN TILING, per SITE and per RAIL -----
+  //
+  // A reviewer of the hardware picture asked for two things this section did not do.
+  // (1) EVERY TRAPPING SITE MUST SHOW ITS n PAIRS.  `n_dc_pairs` is a technology number
+  // (3 by default, which is also the collaborator's minimum: one pair each side of the
+  // well plus the pair under it, the smallest set that can both confine and shuttle).
+  // The old code tiled SEGMENTS only, so a site had whatever pads its rail's rounding
+  // happened to leave near it -- sometimes none at all.  (2) THE PITCH MUST BE THE REAL
+  // ONE.  It was `0.34*g`, a fraction of the drawn nearest-neighbour distance, which is a
+  // legibility constant and not a length; it is now `dc_pitch` NANOMETRES converted
+  // through the layout, so two adjacent electrodes on the screen are `l_dc + g_dc` apart
+  // on the die and counting them is a measurement.
+  //
+  // `nmPerPx(ux,uy)` is what makes that conversion honest under a stretched fit: one
+  // pixel along a direction is a different number of nanometres on each axis, so the
+  // conversion is taken along the direction the tiling actually runs.  Under true scale
+  // it is the same number in every direction, which is the point of true scale.
+  //
+  // A site's pads and its rails' pads never overlap: a site reserves `n*pitch` centred on
+  // itself, and the rail tiling runs between what its two ends reserved -- so on a device
+  // dense enough that the two stacks meet, the rail simply gets no pads and dashes.
+  const nmPerPx = (ux, uy) => {
+    const a=ux/(L.sx||1)*NM_X, b=uy/(L.sy||1)*NM_Y;
+    return Math.sqrt(a*a+b*b);
+  };
+  const NPAIR = clamp(1, Math.round(TECH.n_dc_pairs||3), 9);
+  const PITCH_NM = TECH.dc_pitch || ((TECH.l_dc||50000) + (TECH.g_dc||8000));
+  // what fraction of the pitch is metal: `l_dc / (l_dc + g_dc)`, from the technology
+  const PAD_FRAC = Math.min(0.96, Math.max(0.3, (TECH.l_dc||50000)/(PITCH_NM||1)));
+  // ALONG THE RAIL the electrode is true to scale: the pitch is `dc_pitch` and the metal
+  // is `l_dc` of it, so a reader can measure either.  ACROSS the rail it is not: `pad_t`
+  // and `pad_off` stay fractions of `g`, because that is the axis the schematic spends on
+  // legibility -- the site bar, the ion and the rail all live in the same few pixels, and
+  // a `w_dc` drawn to scale there would either vanish or collide depending on the device.
+  // The view that IS true to scale in both directions is the derived metal underlay,
+  // which `qccd phys --html` puts under this same picture from the same technology.
+  const sitePitch = {}, span = {};
+  for (const n of A.nodes){
+    const isJ = (n.kind==='junction' || (n.cap||0)===0);
+    const ax = AXIS[n.id] || {ux:1, uy:0};
+    const nm = nmPerPx(ax.ux, ax.uy);
+    const pit = nm>1e-12 ? PITCH_NM/nm : 0;
+    sitePitch[n.id] = pit;
+    // a junction holds no ions and gets no control electrodes; it still keeps the rail
+    // tiling clear of its own square
+    const sp = isJ ? L.r_junc : NPAIR*pit/2;
+    // NOT CLIPPED to fit between the neighbours.  A site's stack is `n_dc_pairs` at the
+    // technology's pitch or it is not a measurement, and squeezing it to fit would draw a
+    // pitch no process has and let a reader measure it.  When the stack does not fit --
+    // grid9x9 in eth_junction_2201.12579 is exactly saturated, three 75 um electrodes
+    // against a 225 um lattice step -- the rail between two sites gets no room and falls
+    // back to the dash pattern below, which is the picture saying so.  What it means
+    // about the design is `qccd/phys/drc.py`'s answer, in words, not this module's.
+    span[n.id] = sp;
+    SITE_SPAN[n.id] = isJ ? 0 : sp;    // only a SITE lights its own pads
+  }
+  // how many pairs the rail between two ends carries, decided before anything is drawn
+  // so that both tilings share one budget
+  const railPlan = {};
+  let nSitePairs = 0, nRailPairs = 0;
+  for (const n of A.nodes) if(!(n.kind==='junction' || (n.cap||0)===0)) nSitePairs += NPAIR;
   for (const sg of A.segments){
     const I=SEGINFO[sg.id]; if(!I || I.len<1e-6) continue;
-    const k=clamp(1, Math.round(I.len/(L.pad_pitch||1)), 12), pitch=I.len/k;
-    if(!tile){
-      // too many to draw: the tiling becomes a dash pattern on the rail itself
-      const ln=SEGEL[sg.id];
-      if(ln) ln.setAttribute('stroke-dasharray', (0.72*pitch)+' '+(0.28*pitch));
+    const pit = PITCH_NM/Math.max(1e-12, nmPerPx(I.dx/I.len, I.dy/I.len));
+    const ha=span[sg.a]||0, hb=span[sg.b]||0, run=I.len-ha-hb;
+    // FLOOR, NOT ROUND, AND THE PITCH IS NOT RE-DERIVED.  The old tiling took
+    // `k = round(len/pitch)` and then re-spaced at `len/k` so it closed exactly on both
+    // nodes -- which is the right call when the pitch is a legibility constant and the
+    // wrong one now that it is a length: it put the pads up to 9% off the technology's
+    // spacing, and a reader measuring two adjacent electrodes would have measured that
+    // error.  The pads sit at exactly `dc_pitch`, centred in what is left between the two
+    // sites' own stacks, and the remainder shows as a slightly wider gap at each end --
+    // which is where the remainder physically is.
+    const k = (pit>1e-6 && run>=pit) ? Math.min(12, Math.floor(run/pit)) : 0;
+    railPlan[sg.id] = {k, run, pit, off:(ha + (run - k*pit)/2)};
+    nRailPairs += k;
+  }
+  // THE SAME BOUNDS AS BEFORE, counted in pairs rather than rectangles: one side only
+  // past 4,000 rectangles, and past 8,000 the tiling becomes a dash pattern on the rail
+  // -- which still states the true pitch, because the dash IS `l_dc` and the gap IS
+  // `g_dc`.  Site pads are drawn first when the budget is tight: they are what a reader
+  // counts, and the rail between two sites is a road rather than a readout.
+  const sides = 2*(nSitePairs+nRailPairs) > 4000 ? [1] : [1,-1];
+  const nSite = nSitePairs*sides.length, nRail = nRailPairs*sides.length;
+  const tileSite = nSite <= 8000, tileRail = (nSite+nRail) <= 8000;
+  // ONE PAIR is the unit, because the pair is what is energized.  The old flat list let
+  // "the three nearest pads" mean one side of one position and both sides of another.
+  const padPair = (cx0, cy0, tx, ty, w, t, list) => {
+    const nx=-ty, ny=tx, ang=Math.atan2(ty,tx)*180/Math.PI;
+    const pair = {t, x:cx0, y:cy0, tx, ty, w, ang, pads:[]};
+    for(const sign of sides){
+      const cx=cx0+nx*L.pad_off*sign, cy=cy0+ny*L.pad_off*sign;
+      // SQUARE CORNERS.  `rx` was half the height, which rounds a pad's ends into
+      // semicircles and draws something no surface trap has: a DC electrode is a
+      // rectangular metal pad.  The collaborator's note, and he is right.
+      const r=el('rect',{x:cx-w/2, y:cy-L.pad_t/2, width:w, height:L.pad_t,
+        transform:`rotate(${ang} ${cx} ${cy})`,
+        fill:C.dc_idle, opacity:0.42});
+      gElec.append(r); pair.pads.push({el:r, cx, cy, sign});
+    }
+    list.push(pair);
+    return pair;
+  };
+  if(tileSite) for (const n of A.nodes){
+    if(n.kind==='junction' || (n.cap||0)===0) continue;
+    const ax=AXIS[n.id]||{ux:1,uy:0}, x=px(n), y=py(n);
+    // the technology's pitch along the rail this site is drawn on, and nothing else
+    const pit = sitePitch[n.id]||0;
+    if(!(pit>1e-6)) continue;
+    const list=[];
+    for(let i=0;i<NPAIR;i++){
+      const o=(i-(NPAIR-1)/2)*pit;
+      padPair(x+ax.ux*o, y+ax.uy*o, ax.ux, ax.uy, PAD_FRAC*pit, i, list);
+    }
+    list.pitch=pit;
+    PAD_BY_SITE[n.id]=list;
+  }
+  for (const sg of A.segments){
+    const I=SEGINFO[sg.id], plan=railPlan[sg.id]; if(!I || !plan) continue;
+    const k=plan.k;
+    if(!tileRail || !k){
+      // too many to draw, or no room left between the two ends: the tiling becomes the
+      // rail's own dash pattern, at the technology's pitch
+      const ln=SEGEL[sg.id], pit=plan.pit;
+      if(ln && pit>0.4) ln.setAttribute('stroke-dasharray',
+        (PAD_FRAC*pit)+' '+((1-PAD_FRAC)*pit));
       continue;
     }
-    const list=[], w=0.72*pitch;
+    const list=[], pitch=plan.pit, w=PAD_FRAC*pitch;
     for(let i=0;i<k;i++){
-      const tt=(i+0.5)/k, q=bezPoint(I, tt);
-      const nx=-q.ty, ny=q.tx, ang=Math.atan2(q.ty,q.tx)*180/Math.PI;
-      for(const sign of sides){
-        const cx=q.x+nx*L.pad_off*sign, cy=q.y+ny*L.pad_off*sign;
-        const r=el('rect',{x:cx-w/2, y:cy-L.pad_t/2, width:w, height:L.pad_t,
-          rx:L.pad_t/2, transform:`rotate(${ang} ${cx} ${cy})`,
-          fill:C.dc_idle, opacity:0.42});
-        gElec.append(r); list.push({el:r, cx, cy, t:tt});
-      }
+      const tt=(plan.off+(i+0.5)*pitch)/I.len, q=bezPoint(I, tt);
+      padPair(q.x, q.y, q.tx, q.ty, w, tt, list);
     }
+    list.pitch=pitch;
     PAD_BY_SEG[sg.id]=list;
   }
 
@@ -1481,9 +2306,11 @@ function buildStatic(S){
     const tip=el('title',{});
     // WHAT IT IS, WHAT IT HOLDS, AND WHERE IT IS. The position was missing and it is the
     // one field an editor needs constantly -- you cannot check a drag landed without it.
+    const _um = toUm(n.x, n.y);
     tip.textContent = n.id+' · '+(n.kind==='junction'?'junction':(n.zone||'no zone'))+
                       ' · cap '+n.cap+' · deg '+n.deg+(n.corner?' · bend':'')+
-                      ' · at ('+(+n.x.toFixed(3))+', '+(+n.y.toFixed(3))+')';
+                      ' · at ('+(+n.x.toFixed(3))+', '+(+n.y.toFixed(3))+') = ('+
+                      um1(_um.x)+' um, '+um1(_um.y)+' um)';
     if(n.kind==='junction' || (n.cap||0)===0){
       const h=L.r_junc;
       const r=el('rect',{x:x-h, y:y-h, width:2*h, height:2*h, fill:C.panel,
@@ -1526,7 +2353,8 @@ function buildStatic(S){
 // why nothing here is destructured at construction.
 const STAGE = {A, L, AXIS, role:ROLE, px, py, byId:nodeById,
                into:{loop:gLoop, seg:gSeg, elec:gElec, node:gNode},
-               reg:{SEGEL, SEGINFO, PAD_BY_SEG, SEG_BY_PAIR, NODEEL, CAPTXT}};
+               reg:{SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
+                    NODEEL, CAPTXT}};
 buildStatic(STAGE);
 
 // slot offsets, in px along the trap axis, for k ions resting on one site
@@ -1584,6 +2412,24 @@ function applyFrame(st, f) {
 // three of them and forgetting the fourth is exactly the shape of change that produced the
 // 14.68 px overlap defect, and `tests/census.mjs --program` is what would see it.
 let states=[], before=[], cum=[], SLOTS=[], FINAL={pos:{},q:{}};
+// THE RUNNING TOTALS.  `cum` sums the cost Python stamped on each SHIPPED frame; an
+// authored frame carries none, so the head counted 0 of a shipped total under a
+// programme the user had just typed.  For an authored programme the numerators are the
+// prefix sums of the engine's own per-frame price -- the array `priceFrames` already
+// fills -- summed once per PRICE.  A prefix sum is not a second cost model.  Null while
+// the price is refused, and the counter says so rather than printing 0.
+let CUMA=null, CUMA_OF=null;
+function cumAt(i){
+  const ED = globalThis.EDITOR;
+  if(!(ED && ED.authored && ED.authored())) return cum[i]||{cost:0,steps:0};
+  const pr = ED.price();
+  if(!pr || pr.blocked || !pr.perFrame) return null;
+  if(CUMA_OF!==pr){
+    CUMA_OF=pr; CUMA=[]; let cost=0, steps=0;
+    for(const pf of pr.perFrame){ cost+=pf[0]; steps+=pf[1]; CUMA.push({cost, steps}); }
+  }
+  return CUMA[i]||{cost:0,steps:0};
+}
 function deriveStage(frames){
   const st={pos:{},q:{}}, running={cost:0,steps:0};
   states=[]; before=[]; cum=[]; SLOTS=[];
@@ -1605,15 +2451,44 @@ function deriveStage(frames){
 // frame elapsed, and an ion in flight sits at the matching point along its own path.
 // Every return carries x/y: a length-1 path (a loop_shift with delta 0) used to return an
 // object with neither, and the caller wrote cx="undefined" onto a circle.
+// BY ARC LENGTH, not by hop count.  `t` used to be spread uniformly over the HOPS of a
+// path, so an ion crossing a 3-unit corner segment and then a 1-unit one spent half the
+// frame on each and visibly lurched at the join: a constant-velocity shuttle drawn at two
+// different speeds.  The hop lengths are the drawn lengths (the bow's arc where a segment
+// is bowed), summed once per path and cached, so the ion advances at one speed along the
+// whole path and arrives exactly when the frame ends.
+const _PLEN = (typeof WeakMap === 'function') ? new WeakMap() : null;
+function hopLengths(path){
+  let rec = _PLEN && _PLEN.get(path);
+  if(rec) return rec;
+  const segs=[]; let total=0;
+  for(let i=0;i+1<path.length;i++){ const d=edgeLen(path[i], path[i+1]);
+    segs.push(d); total+=d; }
+  rec = {segs, total};
+  if(_PLEN) _PLEN.set(path, rec);
+  return rec;
+}
 function pointOnPath(path, t){
   if(!path || !path.length) return null;
   if(path.length===1){ const n=nodeById[path[0]];
     return n ? {x:px(n), y:py(n), a:null, b:null, u:0} : null; }
-  const span=(path.length-1)*Math.min(Math.max(t,0),1);
-  const i=Math.min(Math.floor(span), path.length-2), local=span-i;
+  const u=Math.min(Math.max(t,0),1), H=hopLengths(path);
+  let i, local;
+  if(H.total<=1e-9){
+    // every hop is a point (a device drawn at zero scale): fall back to hop-uniform
+    const span=(path.length-1)*u;
+    i=Math.min(Math.floor(span), path.length-2); local=span-i;
+  } else {
+    let d=H.total*u; i=0;
+    while(i < H.segs.length-1 && d > H.segs[i]){ d-=H.segs[i]; i++; }
+    local = H.segs[i]>1e-9 ? Math.min(1, d/H.segs[i]) : 0;
+  }
   const q=edgePoint(path[i], path[i+1], local);
   if(!q){ const n=nodeById[path[i]]||nodeById[path[i+1]];
     return n ? {x:px(n), y:py(n), a:null, b:null, u:0} : null; }
+  // a hop with no rail under it is not a hop: the ion is parked on the node it was on,
+  // and nothing downstream may treat it as travelling along a segment
+  if(q.norail) return {x:q.x, y:q.y, a:null, b:null, u:0, norail:true};
   return {x:q.x, y:q.y, a:path[i], b:path[i+1], u:local};
 }
 
@@ -1712,8 +2587,6 @@ function heat(q){ if(!q) return C.cold;
 
 function ionColour(ion, f, stt){
   if (MODE.value === 'heat') return heat(stt.q[ion]||0);
-  const role = (D.ion_roles||{})[ion];
-  if (role === 'ancilla') return C.anc;
   const act = (f.pairs||[]).some(p => p[0]===ion || p[1]===ion);
   if (act) return f.check && f.check[0]==='Z' ? C.z : C.x;
   return C.data;
@@ -1728,12 +2601,19 @@ const IONP={}, HALO=[]; let lastHot=[], lastSegHot=[], showLabels=L.labels;
 function ionMarks(ion){
   let p=IONP[ion];
   if(!p){
+    // `s` is the laser spot and `l` the beam reaching it.  Pooled with the rest: one
+    // pair of elements per ion for the life of the page, hidden unless this frame is
+    // doing something to that ion.  A parallel set created per frame would leak.
     p={ w: el('ellipse',{rx:L.well_rx, ry:L.well_ry, fill:C.anc, opacity:0.16}),
+        s: el('circle',{'pointer-events':'none', display:'none'}),
+        l: el('line',{'stroke-linecap':'round','pointer-events':'none', display:'none'}),
+        k: el('line',{'stroke-linecap':'round','pointer-events':'none', display:'none'}),
         c: el('circle',{stroke:C.ion_stroke, 'stroke-width':L.sw_halo}),
         t: el('text',{'text-anchor':'middle','dominant-baseline':'central',
              fill:C.ion_stroke,'font-weight':700,'pointer-events':'none'}) };
     p.t.textContent = ion.replace(/^[da]/,'');
-    gWell.append(p.w); gIon.append(p.c); gTop.append(p.t);
+    gWell.append(p.w); gWell.append(p.s); gWell.append(p.k); gWell.append(p.l);
+    gIon.append(p.c); gTop.append(p.t);
     IONP[ion]=p;
   }
   return p;
@@ -1808,6 +2688,19 @@ function draw(){
   // `seek()` all reach it too.  A guard anywhere else leaves a path that paints a stale
   // programme, which is how the 14.68 px overlap got onto the stage in the first place.
   if(PROGRAM_STALE){ drawInvalid(); return; }
+  // PHASE IS A FRACTION OF ONE FRAME, so it belongs in [0, 1] and this is where that is
+  // made true.  Every reader downstream assumes it: the smoothstep below turns a phase of
+  // -0.55 into t = 1.24, the swell term `4t(1-t)` then goes NEGATIVE, and every ion is
+  // drawn with a negative radius -- 144 console errors per rotation on ring144_24v, and
+  // the same arithmetic extrapolates positions PAST the ends of their rails.  The clock
+  // can hand us an out-of-range value honestly: `tick` computes `(now - t0)/dur` from a
+  // `t0` that a programme change can leave in the future, and a queued animation frame
+  // can carry a timestamp from before the click that started it.  Clamping the clock
+  // instead would be wrong -- it is measuring real time -- so the drawing clamps what it
+  // draws, once, here.  (Reported 2026-09-17 by another session against the live page;
+  // it predates the sketch and hold work, and reproduces on a page built on 09-16.)
+  if(!(phase >= 0)) phase = 0;              // also catches NaN
+  else if(phase > 1) phase = 1;
   const stt=states[frame]||{pos:{},q:{}}, f=P.frames[frame]||{};
   const paths=pathsFor(frame);
   const hops=hopsIn(frame);
@@ -1939,32 +2832,58 @@ function draw(){
     } else hide(c);
   }
 
-  // --- energized DC pads: a travelling ramp, not a whole segment flashing ---------
+  // --- energized DC pads: the SITE's own pairs while the ion is over the site, the
+  // nearest rail pair while it is between two ------------------------------------
+  //
+  // This is the collaborator's second request made literal.  While an ion sits over a
+  // trapping site, what holds it is that site's own `n_dc_pairs` -- all of them, because
+  // a well is made by the whole stack and not by one electrode of it.  Once it is out on
+  // the rail, what moves it is the pair it is passing, with its two neighbours ramping in
+  // and out around it: the deck's p.4 picture of a well being handed from one electrode
+  // to the next.  The lit set follows the ion continuously, so nothing flashes on a whole
+  // segment at once.
+  //
+  // A PAIR at a time, never a rectangle at a time: the old flat list made "the three
+  // nearest pads" mean one side of one position and both sides of the next.
   clearTransients();
+  const litPair = (pair, peak) => {
+    for(const q of pair.pads){
+      const h=L.pad_t*(peak?1.45:1.2);
+      q.el.setAttribute('fill',C.dc_hot);
+      q.el.setAttribute('opacity', peak ? 0.95 : 0.55);     // the ramp has a peak
+      q.el.setAttribute('y',q.cy-h/2); q.el.setAttribute('height',h);
+      lastHot.push(q);
+    }
+  };
   for(const ion in flying){
     const q=flying[ion]; if(!q.a||!q.b) continue;
+    // over a site, or between two?  Measured against the span that site's own electrodes
+    // occupy, which is the same number the rail tiling was kept out of.
+    const na=nodeById[q.a], nb=nodeById[q.b];
+    const da = na ? Math.hypot(q.x-px(na), q.y-py(na)) : Infinity;
+    const db = nb ? Math.hypot(q.x-px(nb), q.y-py(nb)) : Infinity;
+    let site=null;
+    if(da<=db && da<=(SITE_SPAN[q.a]||0) && PAD_BY_SITE[q.a]) site=q.a;
+    else if(db<=(SITE_SPAN[q.b]||0) && PAD_BY_SITE[q.b]) site=q.b;
+    if(site){ for(const pr of PAD_BY_SITE[site]) litPair(pr, true); continue; }
     const sid=SEG_BY_PAIR[q.a+'>'+q.b]; if(sid===undefined) continue;
-    const I=SEGINFO[sid], list=PAD_BY_SEG[sid]; if(!I||!list) continue;
+    const list=PAD_BY_SEG[sid];
+    if(!list || !list.length){
+      // no electrodes BETWEEN these two sites: the two stacks meet, and the well is
+      // handed straight from one to the other.  Light the one the ion is nearer, rather
+      // than lighting nothing and leaving the ion apparently pushed by no electrode.
+      const near2 = (da<=db ? q.a : q.b);
+      if(PAD_BY_SITE[near2]) for(const pr of PAD_BY_SITE[near2]) litPair(pr, true);
+      continue;
+    }
     const u = (segById[sid].a===q.a) ? q.u : 1-q.u;
-    // light the pad under the ion and its immediate neighbours -- the deck's p.4
-    // picture of a well being handed from one electrode to the next.  Comparing a
-    // normalised parameter against a pixel distance lit every pad on the segment at
-    // once, which is what made a rail read as a solid braid rather than a tiling.
-    let near=-1, best=Infinity;
+    let near=0, best=Infinity;
     for(let i=0;i<list.length;i++){
       const d=Math.abs(list[i].t-u);
       if(d<best){best=d; near=i;}
     }
-    for(let i=0;i<list.length;i++){
-      if(Math.abs(i-near)<=1){
-        const p=list[i];
-        const h=L.pad_t*(i===near?1.45:1.2);
-        p.el.setAttribute('fill',C.dc_hot);
-        p.el.setAttribute('opacity', i===near ? 0.95 : 0.55);   // the ramp has a peak
-        p.el.setAttribute('y',p.cy-h/2); p.el.setAttribute('height',h);
-        lastHot.push(p);
-      }
-    }
+    for(let i=Math.max(0,near-1); i<=Math.min(list.length-1, near+1); i++)
+      litPair(list[i], i===near);
   }
 
   // --- R3: at most `segment.capacity` ions on one shuttling segment.  The number is
@@ -1989,10 +2908,24 @@ function draw(){
   // --- ions ----------------------------------------------------------------------
   const nMoving=Object.keys(flying).length;
   const wells = nMoving<=40;   // a 144-ion rigid rotation must not become one indigo slab
-  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);} }
+  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);hide(p.s);hide(p.l);hide(p.k);} }
   for(const ion in live){
     const pt=live[ion], p=ionMarks(ion);
-    const act = (f.pairs||[]).some(q=>q[0]===ion||q[1]===ion);
+    // WHO IS BEING ACTED ON.  `acts` carries every operand tuple; `pairs` is kept as the
+    // fallback for a page built before the frame carried them, where a one-qubit gate is
+    // still invisible.
+    const ops = (f.acts && f.acts.length) ? f.acts : (f.pairs||[]);
+    const mine = ops.filter(q=>q.indexOf(ion)>=0);
+    const act = mine.length>0;
+    // A LASER IS DOING SOMETHING TO THIS ION, and the picture should say which.  One
+    // beam on one ion is a single-qubit pulse; a beam on each of two co-located ions is
+    // the entangler across both.  Readout and preparation are laser work too and used to
+    // be drawn as nothing at all: blue for measurement, green for init and reset.
+    let beam = null;
+    if(f.type==='gate' && act) beam = mine.some(q=>q.length>1) ? C.beam_two : C.beam_one;
+    else if(f.type==='measure' && (f.ions||[]).indexOf(ion)>=0) beam = C.beam_meas;
+    else if(f.type==='reset' && (f.ions||[]).indexOf(ion)>=0) beam = C.beam_init;
+    else if(f.type==='init' && f.place && Object.prototype.hasOwnProperty.call(f.place, ion)) beam = C.beam_init;
     // an ion in flight, or one taking part in this gate, is the mark the eye should
     // find: it gets the full radius.  A spectator at rest is a bead on the rail, and
     // shrinks further when it has to share a site with another ion.
@@ -2015,6 +2948,32 @@ function draw(){
     p.c.setAttribute('r', r);
     p.c.setAttribute('fill', ionColour(ion,f,stt));
     show(p.c);
+    // THE LASER, on the ion it is actually addressing.  The spot sits under the ion so
+    // the ion stays the mark the eye finds, and the beam comes in from up and left at a
+    // fixed angle -- it is a diagram of "a laser is pointed here", not a ray trace.  An
+    // ion nobody is addressing gets neither, so counting the spots counts the operands:
+    // one for a single-qubit pulse, two for the entangler.
+    if(beam){
+      const rs = r*2.05, d = rs*2.6;
+      p.s.setAttribute('cx',pt.x); p.s.setAttribute('cy',pt.y); p.s.setAttribute('r',rs);
+      p.s.setAttribute('fill',beam); p.s.setAttribute('opacity',0.26); show(p.s);
+      p.l.setAttribute('x1',pt.x-d); p.l.setAttribute('y1',pt.y-d);
+      p.l.setAttribute('x2',pt.x-rs*0.62); p.l.setAttribute('y2',pt.y-rs*0.62);
+      p.l.setAttribute('stroke',beam); p.l.setAttribute('stroke-width',Math.max(1.1, r*0.34));
+      p.l.setAttribute('opacity',0.72); show(p.l);
+    } else { hide(p.s); hide(p.l); }
+    // ONE laser across TWO ions: tie the pair together, drawn once from the first of the
+    // two.  Without this the only thing separating an entangler from a broadcast pulse on
+    // two ions is the colour, and a broadcast R can light two dozen at once.
+    const pair2 = (f.type==='gate') ? mine.find(q=>q.length>1) : null;
+    if(pair2 && pair2[0]===ion && live[pair2[1]]){
+      const o=live[pair2[1]];
+      p.k.setAttribute('x1',pt.x); p.k.setAttribute('y1',pt.y);
+      p.k.setAttribute('x2',o.x);  p.k.setAttribute('y2',o.y);
+      p.k.setAttribute('stroke',C.beam_two);
+      p.k.setAttribute('stroke-width',Math.max(1.3, r*0.55));
+      p.k.setAttribute('opacity',0.5); show(p.k);
+    } else hide(p.k);
     if(showLabels && r >= 6){
       const fs=Math.min(0.66*r, 1.5*r/Math.max(2, p.t.textContent.length));
       p.t.setAttribute('x',pt.x); p.t.setAttribute('y',pt.y);
@@ -2022,20 +2981,30 @@ function draw(){
     } else hide(p.t);
   }
 
-  const c=cum[frame]||{cost:0,steps:0};
-  document.getElementById('cSteps').textContent=c.steps.toLocaleString();
-  document.getElementById('cCost').textContent=c.cost.toLocaleString();
+  const c=cumAt(frame);
+  document.getElementById('cSteps').textContent=c?c.steps.toLocaleString():'—';
+  document.getElementById('cCost').textContent=c?c.cost.toLocaleString():'—';
 
+  // THE STANDING REFUSAL of an authored programme ('' while nothing is refused): the
+  // editor's one sentence for it, so the strip, the toast and the Write pane agree
+  const ED=globalThis.EDITOR, authored=!!(ED && ED.authored && ED.authored()),
+        refused=(authored && ED.refusedLine) ? ED.refusedLine() : '';
+  // the Test drive button is the strip's own flex item, shown while there are no frames
+  document.getElementById('stDrive').style.display = P.frames.length ? 'none' : '';
   document.getElementById('status').innerHTML =
     // `Step 1 / 0 - undefined` is what this printed with no programme: `f` was `{}` and
     // `frame+1` counted a step that does not exist.  A design tool opens on exactly that
     // state, so it is the first sentence a new user reads.
     // and the same condition folds the transport controls away -- set BOTH ways, or
     // writing a programme would leave the page still hiding the controls for it
+    // -- and a programme that WAS written, every statement of it refused, is not
+    // "no programme yet": that sentence names the Write pane it is refused in.
+    // Each sentence ends on "press": the Test drive button follows it in the strip.
     (P.frames.length === 0
       ? (document.body.setAttribute('data-noprog','1'),
-         `<b>no programme</b> &mdash; write one in the <b>Write</b> pane, or open a device `)+
-        `that carries one`
+         refused ? `<b>programme refused</b> &mdash; see the <b>Write</b> pane, or press`
+         : authored ? `<b>no frames</b> &mdash; this programme moves nothing yet; write more in the <b>Write</b> pane, or press`
+         : `<b>no programme yet</b> &mdash; write one in the <b>Write</b> pane, or press`)
       : (document.body.removeAttribute('data-noprog'),
          `<b>Step ${frame+1}</b> / ${P.frames.length} &mdash; <code>${f.type}</code>`)) +
     (f.cls?` <code>${f.cls}</code>`:'') +
@@ -2044,14 +3013,19 @@ function draw(){
     (f.batch!==undefined?` &middot; batch ${f.batch+1}`:'') +
     (f.cost!==undefined?` <span style="color:var(--muted)">[cost ${f.cost} &middot; steps ${f.steps}]</span>`:'');
   const nMoved=f.shift?Object.keys(stt.pos).length:(f.moves?f.moves.length:0);
-  document.getElementById('why').textContent =
+  const why =
     f.type==='simd'
       ? `one class (${f.cls}), ${nMoved} ions moving together; the machine allows `
         + `${P.max_simd_classes} class per step, so nothing of a different class can join`
       : f.type==='gate'
         ? `${(f.pairs||[]).length} contact${(f.pairs||[]).length===1?'':'s'} in this batch`
         : f.type==='cool' ? 'global cooling: one operation, every ion'
-        : f.type==='measure' ? 'ancilla readout' : (f.type==='reset'?'ancilla reset':'');
+        : f.type==='measure' ? 'readout' : (f.type==='reset'?'reset':'');
+  // a refused statement stands on the stage, not only in the Write pane: an edit that
+  // dropped statement 2 of an authored programme used to leave the strip reading
+  // "Step 1 / 1" with nothing to say that the programme had been cut
+  document.getElementById('why').textContent =
+    refused ? refused + ' · see the Write pane' + (why ? ' · ' + why : '') : why;
   slider.value=String(frame);
   syncCursor();
 }
@@ -2088,15 +3062,17 @@ function foldPanel(el, on){
   if(!el) return;
   const now = on === undefined ? el.getAttribute('data-collapsed') !== '1' : !!on;
   el.setAttribute('data-collapsed', now ? '1' : '0');
-  const g = el.querySelector ? null : null;
+  // the wide regime's row reads the dock's fold too: its second track is the dock's
+  if(el.id === 'dock') document.getElementById('row').setAttribute('data-dock', now ? '1' : '0');
   const btn = document.getElementById(el.id === 'rail' ? 'railGrip' : 'dockGrip');
   if(btn){
     btn.setAttribute('aria-expanded', now ? 'false' : 'true');
-    btn.innerHTML = el.id === 'rail' ? (now ? '&#9654;' : '&#9664;')
-                                     : (now ? '&#9664;' : '&#9654;');
-    btn.title = (now ? 'show ' : 'collapse ') +
+    btn.innerHTML = el.id === 'rail' ? (now ? 'Elements &#9654;' : '&#9664; Elements')
+                                     : (now ? '&#9664; Panels' : 'Panels &#9654;');
+    btn.title = (now ? 'show ' : 'hide ') +
                 (el.id === 'rail' ? 'the element rail ([)' : 'the side panels (])');
   }
+  if(el.id === 'dock' && typeof syncMenu === 'function') syncMenu();
   sizeStage();
 }
 const railEl = document.getElementById('rail'), dockEl = document.getElementById('dock');
@@ -2107,28 +3083,127 @@ if(dockGrip) dockGrip.onclick = () => foldPanel(dockEl);
 window.PANELS = { fold: foldPanel, rail: railEl, dock: dockEl,
   state: () => ({ rail: railEl && railEl.getAttribute('data-collapsed') === '1',
                   dock: dockEl && dockEl.getAttribute('data-collapsed') === '1' }) };
+// THE REGIME FOLLOWS THE WINDOW, and the rail folds on the way INTO the narrow regime --
+// only then: there it is a drawer over the stage, and a drawer that opened itself on
+// every resize would cover the picture.  `applyLayout()` itself stays pure (the harness
+// calls it at three widths in a row and must not be left with a folded rail).
+let LAST_LAYOUT = null;
+function relayout(){
+  // the rect under a live drag is about to move: the gesture ends as Escape ends it.
+  // `globalThis.EDITOR`, as `ruleBadges` explains: under the harness `window` is a plain
+  // object, and a guard on it would make this the one branch no script could reach.
+  const ED = globalThis.EDITOR || window.EDITOR;
+  if(ED && ED.dragging && ED.dragging()) ED.cancelGesture();
+  const m = applyLayout();
+  if(m === 'narrow' && LAST_LAYOUT !== 'narrow') foldPanel(railEl, true);
+  LAST_LAYOUT = m;
+  placeProgram();
+  sizeStage();
+  return m;
+}
 
 // ---------- fit, zoom, pan: the viewBox is the only thing that moves ----------
 let VB={x:0,y:0,w:L.W,h:L.H};
-const applyVB=()=>svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`);
-function fit(){ VB={x:0,y:0,w:L.W,h:L.H}; applyVB(); }
+
+// ---------- THE SCALE BAR: the one mark on the page whose LENGTH means a distance ----
+// Its length is a ROUND physical number (100 um, 1 mm) chosen to sit near a fifth of what
+// is on screen, so the number is readable and the bar is comparable to the device.  It is
+// recomputed from `applyVB` (zoom, pan, fit) and from `sizeStage` (resize), so it keeps its
+// meaning whatever the view.
+//
+// IT LIVES IN THE TOOLBAR UNDER THE PICTURE, NEVER ON IT.  It used to be drawn inside the
+// SVG at the view's bottom-left corner, on an opaque plate so its caption could be read
+// over rails -- and wherever a mark on the canvas sits, a fit, a pan or a zoom can bring
+// the device under it: the plate hid part of the chip (reported 2026-09-16).  Nothing can
+// be under the toolbar, and the bar is still an exact screen length: the user units it
+// spans divided by the user units per screen pixel, `vbPerPx()`.
+//
+// It measures along X.  Under true scale that is the whole story; with the fit stretched
+// (up to K_ANISO) a vertical distance is a different number of nanometres per pixel, and
+// the label says so rather than letting the bar be read as isotropic.
+const SBAR = { box: document.getElementById('scaleBar'),
+               line: document.getElementById('scaleLine'),
+               txt: document.getElementById('scaleTxt') };
+const BAR_UM = [0.1,0.2,0.5,1,2,5,10,20,50,100,200,500,1000,2000,5000,
+                10000,20000,50000,100000,200000,500000];
+// ONE SVG USER UNIT, IN SCREEN PIXELS -- inverted, so every number below can be written
+// in the pixels a reader actually sees.  The bar and its caption are furniture: they must
+// stay the same SIZE ON SCREEN whatever the zoom, and only their MEANING may change.
+// Sizing them as a fraction of the viewBox instead put a 100 px caption across a
+// zoomed-in device (the viewBox shrinks, the fraction does not).  `xMidYMid meet` fits the
+// viewBox inside the element, so the factor is the smaller of the two ratios.
+function vbPerPx(){
+  const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  const w = (r && r.width > 0) ? r.width : L.W, h = (r && r.height > 0) ? r.height : L.H;
+  const k = Math.min(w/Math.max(1e-9, VB.w), h/Math.max(1e-9, VB.h));
+  return (k > 0 && isFinite(k)) ? 1/k : 1;
+}
+function scaleBarChoice(){
+  // user units per micrometre, along x, at the CURRENT layout
+  const perUm = (L.sx||0)*1000/NM_X;
+  if(!(perUm>0) || !isFinite(perUm)) return null;
+  // about 150 screen px of bar, and never more than a quarter of what is on screen
+  const want = Math.min(0.25*VB.w, 150*vbPerPx());
+  let um = BAR_UM[0];
+  for(const v of BAR_UM) if(v*perUm <= want) um = v;
+  return { um, w: um*perUm, perUm };
+}
+function placeScaleBar(){
+  const ch = scaleBarChoice();
+  if(!SBAR.box || !SBAR.line || !SBAR.txt) return ch;
+  if(!ch){ SBAR.box.style.display = 'none'; SBAR.txt.textContent = ''; return null; }
+  SBAR.box.style.display = '';
+  // the screen length the drawing gives `ch.w` user units at this zoom
+  SBAR.line.style.width = Math.max(2, ch.w/vbPerPx()).toFixed(1) + 'px';
+  // Say which axis the bar is for when the two scales disagree, because then the
+  // picture has no single scale to state.  A RELATIVE tolerance, not an exact compare:
+  // `sx` and `sy` are quantized to four decimals, so a true-scale pair at a non-1:1
+  // technology ratio (225:355) agrees to about 1e-15 and never bit-exactly.
+  const kx=(L.sx||0)/NM_X, ky=(L.sy||0)/NM_Y;
+  const flat = Math.abs(kx-ky) <= 1e-6*Math.max(1e-12, Math.abs(kx));
+  SBAR.txt.textContent = (ch.um>=1000 ? (ch.um/1000)+' mm' : ch.um+' um') +
+                         ' · ' + TECH.preset + (flat ? '' : ' · x only');
+  return ch;
+}
+const applyVB=()=>{
+  svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`);
+  placeScaleBar();
+};
+placeScaleBar();
+// FIT never draws more than ~1.5 css px per user unit: a two-site canvas used to fill the
+// whole box, 141x47 px per pill.  Past that the viewBox widens around the device's centre
+// instead, and the device sits at a size a hand can still aim at.
+const FIT_MAX_K = 1.5;
+function fit(){
+  // FIT IS WHERE THE DRAWING RE-FITS, and the only place: every edit holds the scale it
+  // was drawn at, so the layout on screen can be older than the device it draws.  Ask the
+  // editor for a fresh one first; a page with no editable state has nothing to ask.
+  try {
+    const ED = globalThis.EDITOR || window.EDITOR;
+    if(ED && ED.refit) ED.refit();
+  } catch(e){ /* not an editable page */ }
+  VB={x:0,y:0,w:L.W,h:L.H};
+  const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  if(r && r.width > 0 && r.height > 0 && Math.min(r.width/L.W, r.height/L.H) > FIT_MAX_K){
+    const w = r.width/FIT_MAX_K, h = r.height/FIT_MAX_K;
+    VB = {x:(L.W-w)/2, y:(L.H-h)/2, w:w, h:h};
+  }
+  applyVB();
+}
 function sizeStage(){
-  // never render larger than 1 css px per user unit, and never taller than 78% of the
-  // viewport, so a 900x900 grid does not push the controls below the fold
-  // a wide device puts the dock BELOW the stage, so the stage may not own 78% of the
-  // viewport or the listing starts under the fold and "keep the cursor in view" is
-  // invisible
   // THE CANVAS IS FURNITURE, NOT A FRAME AROUND THE CONTENT. It used to be capped at
   // `L.W` css px, so its SHAPE followed the device: a 1600x132 chain drew a 61 px strip
   // and a 900x900 grid drew a square, and the drawing area changed every time you opened
-  // a different machine. The box is now a constant set in CSS and the device is fitted
-  // inside it by `preserveAspectRatio="xMidYMid meet"`; zoom and pan reach the rest.
-  const wide = document.getElementById('row').getAttribute('data-layout') === 'wide';
-  svg.style.maxHeight = Math.round((wide ? 0.52 : 0.72)*window.innerHeight) + 'px';
+  // a different machine. The box is whatever the app frame leaves it (CSS; the JS
+  // `maxHeight` that fought the frame is gone) and the device is fitted inside it by
+  // `preserveAspectRatio="xMidYMid meet"`; zoom and pan reach the rest.
   sizeLists();
   const was=showLabels;
   const scale=(svg.clientWidth||L.W)/L.W;
   showLabels = (0.66*L.r_ion*scale) >= 8;
+  // the bar and its caption are sized in SCREEN pixels, so a resize changes them even
+  // though the viewBox has not moved
+  placeScaleBar();
   if(was!==showLabels) draw();
 }
 // THE ZOOM ITSELF, callable without an Event -- the same rule the editor's gestures
@@ -2158,7 +3233,9 @@ function zoomAt(clientX, clientY, deltaY){
     ? EDITOR.toModel(clientX, clientY)
     : { x: VB.x + (clientX - fit.r.left - fit.ox) / fit.s,
         y: VB.y + (clientY - fit.r.top  - fit.oy) / fit.s };
-  const k=clamp(0.12*L.W, VB.w*Math.pow(1.0018, deltaY), 2.5*L.W);
+  // the outer bound admits where `fit()` put the box: on a small device that is wider
+  // than 2.5 x the device, and the first wheel notch must not snap the view in
+  const k=clamp(0.12*L.W, VB.w*Math.pow(1.0018, deltaY), Math.max(2.5*L.W, VB.w));
   const nh=k*(L.H/L.W);
   // keep `m` exactly under the cursor: its offset from the origin scales with the box
   VB.x = m.x - (m.x - VB.x) * (k / VB.w);
@@ -2167,12 +3244,19 @@ function zoomAt(clientX, clientY, deltaY){
   return { x: VB.x, y: VB.y, w: VB.w, h: VB.h };
 }
 svg.addEventListener('wheel', e=>{
-  if(!(e.ctrlKey||e.metaKey||e.shiftKey)) return;   // plain wheel still scrolls the page
+  // A PLAIN WHEEL ZOOMS AT THE POINTER.  It used to need ctrl or shift and otherwise
+  // scrolled the page out from under the stage, which nobody guessed; a wheel that only
+  // reports deltaX (a tilted or horizontal wheel) zooms too.
   e.preventDefault();
-  zoomAt(e.clientX, e.clientY, e.deltaY);
+  zoomAt(e.clientX, e.clientY, e.deltaY || e.deltaX);
 }, {passive:false});
 // published so a harness can zoom, and so the editor can fit to a selection
-window.VIEW = { zoomAt: zoomAt, fit: fit, vb: () => ({x:VB.x,y:VB.y,w:VB.w,h:VB.h}) };
+window.VIEW = { zoomAt: zoomAt, fit: fit, vb: () => ({x:VB.x,y:VB.y,w:VB.w,h:VB.h}),
+  // the scale bar as NUMBERS, so a harness can assert what the page claims a distance is
+  // rather than reading a rectangle back off the DOM
+  bar: () => { const c=scaleBarChoice();
+    return c ? {um:c.um, w:c.w, label:SBAR.txt.textContent} : null; },
+  trueScale: () => TRUE_SCALE, tech: () => TECH };
 let drag=null;
 svg.addEventListener('pointerdown', e=>{
   // ONE ARBITER decides who owns a press, and it lives in the editor.  This handler had
@@ -2181,15 +3265,28 @@ svg.addEventListener('pointerdown', e=>{
   // `EDITOR.claimEvent` is the only rule; nothing here restates it.
   if (window.EDITOR && EDITOR.claimEvent && EDITOR.claimEvent(e) !== 'pan') return;
   drag={x:e.clientX,y:e.clientY,vx:VB.x,vy:VB.y};
-  svg.setPointerCapture(e.pointerId); svg.classList.add('drag');});
+  svg.setPointerCapture(e.pointerId);
+  // the cursor is editor state written to `style`, never a class (unreadable in the shim)
+  if (window.EDITOR && EDITOR.panning) EDITOR.panning(true);});
 svg.addEventListener('pointermove', e=>{ if(!drag) return;
+  // the same 4 px the editor's click threshold uses: a press that never travels is a
+  // click (clear the selection, place the stamp), and it must not nudge the view either
+  if(!drag.live){ if(Math.hypot(e.clientX-drag.x, e.clientY-drag.y) < 4) return; drag.live=true; }
   const r=svg.getBoundingClientRect();
   VB.x=drag.vx-(e.clientX-drag.x)*VB.w/r.width;
   VB.y=drag.vy-(e.clientY-drag.y)*VB.h/r.height; applyVB();});
-const endDrag=()=>{drag=null; svg.classList.remove('drag');};
+const endDrag=()=>{ if(!drag) return; drag=null;
+  if (window.EDITOR && EDITOR.panning) EDITOR.panning(false); };
 svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
+// right-drag pans, so the browser's context menu must not open on top of the gesture
+svg.addEventListener('contextmenu', e=>e.preventDefault());
+// nor on top of the menu the stage just opened
+document.getElementById('ctxmenu').addEventListener('contextmenu', e=>e.preventDefault());
+// the status strip's Test drive button: one adapter, the verb and its toast are the editor's
+document.getElementById('stDrive').addEventListener('click', ()=>{
+  if (window.EDITOR && EDITOR.pressTestDrive) EDITOR.pressTestDrive(); });
 let rt=null;
-window.addEventListener('resize', ()=>{clearTimeout(rt); rt=setTimeout(sizeStage,120);});
+window.addEventListener('resize', ()=>{clearTimeout(rt); rt=setTimeout(relayout,120);});
 
 // ---------- chrome ----------
 const M=D.metrics, hw=A.hardware, rl=D.rules, SUM=A.summary||{};
@@ -2197,17 +3294,53 @@ const fmt=(x,d=0)=>(x==null)?'-':Number(x).toLocaleString(undefined,{maximumFrac
 document.getElementById('kicker').textContent = D.kicker || 'ROUTING SCHEME';
 document.getElementById('title').textContent = D.headline || (A.name+' · '+P.name);
 document.getElementById('lede').textContent = D.lede || A.description || '';
-document.getElementById('cStepsOf').textContent = '/'+fmt(M.total_steps);
-document.getElementById('cCostOf').textContent = '/'+fmt(M.total_cost);
-document.getElementById('metrics').innerHTML =
-  [['cost',fmt(M.total_cost)],['steps',fmt(M.total_steps)],
+// WHAT PYTHON SHIPPED for the head: the two denominators and the metric chips describe
+// the shipped programme on the shipped device.  Kept, so `paintHead` can put them back.
+// ONE CHIP, either way it is rendered: the label is its hint key, and the four a
+// newcomer needs -- cost, steps, runtime, DACs -- are tier 1; the rest wait for a wide
+// window (the Report prints every one of them at every width).
+const TIER1 = ['cost','steps','runtime','DACs'];
+const chip = (l,v) => `<div class="m" data-hint="m:${esc(l)}" data-tier="${TIER1.indexOf(l)>=0?1:2}"><span>${esc(l)}</span><b>${esc(v)}</b></div>`;
+const HEAD_SHIPPED = {
+  stepsOf: '/'+fmt(M.total_steps), costOf: '/'+fmt(M.total_cost),
+  metrics: [['cost',fmt(M.total_cost)],['steps',fmt(M.total_steps)],
    M.runtime_us?['runtime',fmt(M.runtime_us/1000,2)+' ms']:null,
    M.total_quanta?['quanta',fmt(M.total_quanta)]:null,
    M.peak_quanta?['peak n̄',fmt(M.peak_quanta,1)]:null,
    ['contacts',fmt(M.n_gate_pairs)],
    M.n_cool?['cooling',fmt(M.cooling_us/1000,1)+' ms']:null,
    ['DACs',fmt(hw.dacs)],['junctions',fmt(hw.n_junctions)]]
-  .filter(Boolean).map(([l,v])=>`<div class="m"><span>${l}</span><b>${v}</b></div>`).join('');
+  .filter(Boolean).map(([l,v])=>chip(l,v)).join('')
+};
+document.getElementById('cStepsOf').textContent = HEAD_SHIPPED.stepsOf;
+document.getElementById('cCostOf').textContent = HEAD_SHIPPED.costOf;
+document.getElementById('metrics').innerHTML = HEAD_SHIPPED.metrics;
+// THE HEAD FOR AN AUTHORED PROGRAMME.  The denominators are the engine's totals and the
+// chips are the rows the Report's Backed table prints (`EDITOR.metricRows`, one list for
+// both), so the head never carries the shipped programme's 140 over a two-statement
+// shuttle priced at 2.  Written only while a programme is authored, and the shipped
+// strings restored the moment it is not -- a page nobody has changed is never rewritten.
+let HEAD_AUTHORED = false;
+function paintHead(){
+  const ED = globalThis.EDITOR;
+  const authored = !!(ED && ED.authored && ED.authored());
+  if(!authored){
+    if(HEAD_AUTHORED){
+      document.getElementById('cStepsOf').textContent = HEAD_SHIPPED.stepsOf;
+      document.getElementById('cCostOf').textContent = HEAD_SHIPPED.costOf;
+      document.getElementById('metrics').innerHTML = HEAD_SHIPPED.metrics;
+      HEAD_AUTHORED = false;
+    }
+    return;
+  }
+  HEAD_AUTHORED = true;
+  const pr = ED.price();
+  const ok = pr && !pr.blocked;
+  document.getElementById('cStepsOf').textContent = ok ? '/'+fmt(pr.totals.steps) : '';
+  document.getElementById('cCostOf').textContent = ok ? '/'+fmt(pr.totals.cost) : '';
+  document.getElementById('metrics').innerHTML = (ED.metricRows ? ED.metricRows() : [])
+    .map(([l,v])=>chip(l,v)).join('');
+}
 
 const classColour={rotate_cw:C.anc,rotate_ccw:C.rotate_alt,dock:C.active,
   undock:C.accent,gate:C.x,cool:C.highway,measure:C.data,reset:C.neutral,
@@ -2225,18 +3358,21 @@ document.getElementById('legend').innerHTML =
     ? [['rail','data region'],['highway','highway'],['compute','computing region']]
         .filter(([k])=>roleSet.has(k))
         .map(([k,t])=>`<span><i class="bar" style="background:var(--${k})"></i>${t}</span>`).join('')
-    : `<span><i class="bar" style="background:var(--rail)"></i>shuttling segment</span>`)+
-  (nLoops?`<span><i class="bar" style="background:var(--anc);opacity:.35;height:9px"></i>transport loop</span>`:'')+
+    : `<span data-hint="leg:segment"><i class="bar" style="background:var(--rail)"></i>shuttling segment</span>`)+
+  (nLoops?`<span data-hint="leg:loop"><i class="bar" style="background:var(--anc);opacity:.35;height:9px"></i>transport loop</span>`:'')+
   [...zoneSet].slice(0,5).map(z=>
-    `<span><i class="bar" style="background:var(--zone_${['data','ancilla','trap','tfactory','load','register'].indexOf(z)>=0?z:'other'});height:7px;border-radius:4px"></i>${z} site</span>`).join('')+
-  `<span><i class="sq" style="background:var(--panel);border:2px solid var(--grid)"></i>junction (holds no ions)</span>`+
-  `<span><i class="dot" style="background:var(--panel);border:1.5px solid var(--muted)"></i>free capacity slot</span>`+
-  `<span><i class="dot" style="background:var(--data)"></i>data ion</span>`+
-  `<span><i class="dot" style="background:var(--anc)"></i>ancilla</span>`+
-  `<span><i class="dot" style="background:var(--x)"></i>X stabilizer</span>`+
-  `<span><i class="dot" style="background:var(--z)"></i>Z stabilizer</span>`+
-  `<span><i class="bar" style="background:var(--dc_hot);height:4px"></i>energized DC electrode</span>`+
-  `<span><i class="dot" style="background:var(--anc);opacity:.3"></i>moving potential well</span>`;
+    `<span data-hint="leg:zone"><i class="bar" style="background:var(--zone_${['data','trap','load','register'].indexOf(z)>=0?z:'other'});height:7px;border-radius:4px"></i>${z} site</span>`).join('')+
+  `<span data-hint="leg:junction"><i class="sq" style="background:var(--panel);border:2px solid var(--grid)"></i>junction (holds no ions)</span>`+
+  `<span data-hint="leg:slot"><i class="dot" style="background:var(--panel);border:1.5px solid var(--muted)"></i>free capacity slot</span>`+
+  `<span data-hint="leg:ion"><i class="dot" style="background:var(--data)"></i>ion</span>`+
+  // the two gate colours describe the PROGRAMME, so they are named only when it carries
+  // checks; a transport programme on a bare device has nothing to say about X and Z
+  (P.frames.some(f=>f.check)
+    ? `<span><i class="dot" style="background:var(--x)"></i>ion in an X check</span>`+
+      `<span><i class="dot" style="background:var(--z)"></i>ion in a Z check</span>`
+    : `<span data-hint="leg:gate"><i class="dot" style="background:var(--x)"></i>ion in a two-qubit gate</span>`)+
+  `<span data-hint="leg:pad"><i class="bar" style="background:var(--dc_hot);height:4px"></i>energized DC electrode</span>`+
+  `<span data-hint="leg:well"><i class="dot" style="background:var(--anc);opacity:.3"></i>moving potential well</span>`;
 
 const capHist=SUM.capacity_histogram||{};
 // The Machine pane is a FUNCTION, not a one-shot assignment, so the editor can re-render
@@ -2246,8 +3382,8 @@ const capHist=SUM.capacity_histogram||{};
 // all.  Everything on the R1-R18 surface except the structural check needs a CycleView
 // built from a program, so it genuinely cannot be re-run in the browser -- and saying so
 // is the honest behaviour, not a limitation to paper over.
-// THE VERDICT SURFACE.  `RULES_STALE` -- which struck all 23 verdicts through the moment
-// anything was edited -- is GONE, not kept alongside: 17 of the 23 are now re-derived
+// THE VERDICT SURFACE.  `RULES_STALE` -- which struck all 27 verdicts through the moment
+// anything was edited -- is GONE, not kept alongside: 21 of the 27 are now re-derived
 // client-side off the same walk that prices the programme, and only the other 6 go grey.
 // Two mechanisms would give the page two answers about the same rule.
 //
@@ -2272,7 +3408,7 @@ function ruleBadges(){
     `checked in this browser`+
     (bad.length ? ` &middot; <b>${bad.length} failing</b>` : ` &middot; no violation in the `+
       `${n} rules this page can check`)+`</div>`+
-    `<div>`+cov.map(c=>`<span class="badge ${cls[c.state]}" title="${esc(c.statement||c.rule)}">`+
+    `<div>`+cov.map(c=>`<span class="badge ${cls[c.state]}" data-hint="rule:${esc(c.rule)}" title="${esc(c.statement||c.rule)}">`+
       `${c.rule}${c.count?' '+c.count:''}</span>`).join('')+`</div>`;
 }
 function renderSide(){
@@ -2281,7 +3417,7 @@ document.getElementById('side').innerHTML =
   `<h3>Rules</h3>`+
   (evd.replayed_cycles === 0 && !P.frames.length
     ? `<div class="mut">no programme has been replayed, so none of the `+
-      `${(evd.rules_all||[]).length||23} rules has been evaluated. Write one in the `+
+      `${(evd.rules_all||[]).length||27} rules has been evaluated. Write one in the `+
       `<b>Write</b> pane.</div>`
     : (ruleBadges() ||
        `<div>`+
@@ -2323,7 +3459,7 @@ document.getElementById('side').innerHTML =
   (P.truncated?`<br><span class="badge warn">truncated</span> only the first ${P.frames.length} instructions are animated.`:'')+
   `<br>scale ${L.sx.toFixed(1)}&times;${L.sy.toFixed(1)} px/unit &middot; nearest sites `+
   `${L.g.toFixed(1)} px apart &middot; ion radius ${L.r_ion.toFixed(1)} px`+
-  `<br>drag the stage to pan, ctrl (or shift) + wheel to zoom, <b>Fit</b> to reset.`+
+  `<br>drag empty stage to pan, wheel to zoom, <b>Fit</b> to reset.`+
   `</div>`;
 }
 renderSide();
@@ -2368,32 +3504,41 @@ const durOf=i=>{ const k=parseInt(speedSel.value,10)||4;
   return Math.max(40, (MS[k]||225)*Math.min(6, Math.sqrt(hopsIn(i)))); };
 function tick(now){
   const k=parseInt(speedSel.value,10)||4, stride=STRIDE[k]||1;
+  // `lastFrame()`, never `P.frames.length-1`: a tick that lands after the programme was
+  // emptied under it would otherwise write -1 into `frame`
   if(stride>1){                       // fast-forward: skip frames, do not slow the clock
-    phase=1; frame=Math.min(P.frames.length-1, frame+stride); draw();
-    if(frame>=P.frames.length-1){stop(); return;}
+    phase=1; frame=Math.min(lastFrame(), frame+stride); draw();
+    if(frame>=lastFrame()){stop(); return;}
     raf=requestAnimationFrame(tick); return;
   }
   let dur=durOf(frame);
   phase=(now-t0)/dur;
   while(phase>=1){
-    if(frame>=P.frames.length-1){ frame=P.frames.length-1; phase=1; draw(); stop(); return; }
+    if(frame>=lastFrame()){ frame=lastFrame(); phase=1; draw(); stop(); return; }
     frame++; t0+=dur; dur=durOf(frame); phase=(now-t0)/dur;
   }
   draw();
   if(raf) raf=requestAnimationFrame(tick);
 }
+// a button that keeps focus after a click is re-fired by the space bar instead of
+// play/pause; `blur` is feature-detected because the harness's elements have none
+const unfocus=el=>{ if(el&&el.blur) el.blur(); };
+// the last frame there is: `P.frames.length-1` is -1 on a device with no programme, and a
+// seek clamped to it left `frame` at -1
+const lastFrame=()=>Math.max(0, P.frames.length-1);
 playBtn.onclick=()=>{
   // `.disabled` is presentation only and does NOT stop a programmatic call: the
   // space bar calls `playBtn.onclick()` directly, so the button needs a real guard.
-  if(PROGRAM_STALE) return;
+  unfocus(playBtn);
+  if(PROGRAM_STALE || !P.frames.length) return;
   if(raf) return stop();
   playBtn.textContent='Pause';
   if(phase>=1 && frame<P.frames.length-1){frame++; phase=0;}
   t0=performance.now()-phase*durOf(frame);
   raf=requestAnimationFrame(tick);
 };
-document.getElementById('step').onclick=()=>{stop();
-  if(phase<1){phase=1;} else {frame=Math.min(P.frames.length-1,frame+1);phase=1;}
+document.getElementById('step').onclick=()=>{stop(); unfocus(document.getElementById('step'));
+  if(phase<1){phase=1;} else {frame=Math.min(lastFrame(),frame+1);phase=1;}
   draw();};
 function runGlide(){
   const dur=Math.max(320, 260*Math.min(6, Math.sqrt(hopsIn(frame)))), g0=performance.now();
@@ -2401,15 +3546,16 @@ function runGlide(){
     if(phase<1) requestAnimationFrame(run); };
   requestAnimationFrame(run);
 }
-document.getElementById('glide').onclick=()=>{stop();
+document.getElementById('glide').onclick=()=>{stop(); unfocus(document.getElementById('glide'));
   if(frame<P.frames.length-1 && phase>=1){frame++;}
   phase=0; draw(); runGlide();};
-document.getElementById('phase').onclick=()=>{stop();
+document.getElementById('phase').onclick=()=>{stop(); unfocus(document.getElementById('phase'));
   const here=(P.frames[frame]||{}).batch;
   let i=frame+1; while(i<P.frames.length-1 && P.frames[i].batch===here) i++;
-  frame=i; phase=1; draw();};
-document.getElementById('reset').onclick=()=>{stop();frame=0;phase=1;fit();draw();};
-document.getElementById('fit').onclick=()=>fit();
+  frame=Math.min(i, lastFrame()); phase=1; draw();};
+document.getElementById('reset').onclick=()=>{stop();frame=0;phase=1;fit();draw();
+  unfocus(document.getElementById('reset'));};
+document.getElementById('fit').onclick=()=>{fit(); unfocus(document.getElementById('fit'));};
 slider.oninput=e=>{stop();frame=parseInt(e.target.value,10);phase=1;draw();};
 MODE.onchange=draw;
 
@@ -2441,6 +3587,14 @@ function ref(k,id){ return '<b data-k="'+k+'" data-id="'+esc(id)+'">'+esc(id)+'<
 // 16 KB of "0":0,"1":1,... on a program this size, and one pass builds it.
 const LROW = {};
 if(LST) for(let i=0;i<LST.ids.length;i++) LROW[LST.ids[i]] = i;
+// THE JOIN IS FOR THE SHIPPED PROGRAMME ONLY.  An authored programme allocates its frame
+// ids from 0 as well, so `LROW[f.id]` answered for it too -- and the NOW strip printed
+// "x4 · 105 us" from Python's disassembly of the walk under a two-statement shuttle the
+// user had just typed.  Every reader of the listing goes through this one gate.
+function listingRow(f){
+  const ED = globalThis.EDITOR;
+  return (ED && ED.authored && ED.authored()) ? undefined : LROW[f.id];
+}
 
 // ---------- the inverted "which instructions touch this object" index ----------
 // A rigid rotation names 144 ions; expanding those into the index would build 56k
@@ -2448,16 +3602,25 @@ if(LST) for(let i=0;i<LST.ids.length;i++) LROW[LST.ids[i]] = i;
 // query time.  Measured: ~8k entries for the deck program.
 const TOUCH = {};
 function touch(key, i){ (TOUCH[key] || (TOUCH[key] = [])).push(i); }
-for(let i=0;i<P.frames.length;i++){
-  const f = P.frames[i];
-  if(f.shift) touch('loop:'+f.shift[0], i);
-  if(f.moves) for(const m of f.moves){ touch('ion:'+m[0], i);
-    touch('site:'+m[1][0], i); touch('site:'+m[1][m[1].length-1], i); }
-  if(f.pairs) for(const p of f.pairs){ touch('ion:'+p[0], i); touch('ion:'+p[1], i); }
-  if(f.sites) for(const st of f.sites) touch('site:'+st, i);
-  if(f.cls) touch('class:'+f.cls, i);
-  if(f.call != null) touch('src:'+f.call, i);
+// re-indexed whenever the FRAMES change (`rebuildView` sees every such change), so an
+// authored programme's chip counts its own instructions, not the shipped walk's
+let TOUCH_OF = null;
+function indexTouch(){
+  if(TOUCH_OF===P.frames) return;
+  TOUCH_OF = P.frames;
+  for(const k in TOUCH) delete TOUCH[k];
+  for(let i=0;i<P.frames.length;i++){
+    const f = P.frames[i];
+    if(f.shift) touch('loop:'+f.shift[0], i);
+    if(f.moves) for(const m of f.moves){ touch('ion:'+m[0], i);
+      touch('site:'+m[1][0], i); touch('site:'+m[1][m[1].length-1], i); }
+    if(f.pairs) for(const p of f.pairs){ touch('ion:'+p[0], i); touch('ion:'+p[1], i); }
+    if(f.sites) for(const st of f.sites) touch('site:'+st, i);
+    if(f.cls) touch('class:'+f.cls, i);
+    if(f.call != null) touch('src:'+f.call, i);
+  }
 }
+indexTouch();
 
 // ---------- the list widget: one implementation, two instances ----------
 // Fixed 22 px rows, a pool of at most 96, and no call to getBoundingClientRect --
@@ -2554,7 +3717,7 @@ function opColour(f){
   return C[TYPECOL[f.type]] || C.neutral;
 }
 function opText(f){
-  const li=LROW[f.id];
+  const li=listingRow(f);
   if(li!=null) return LST.ops[LST.op[li]];
   return (f.type||'').toUpperCase().slice(0,6);
 }
@@ -2592,7 +3755,7 @@ function argsHTML(f){
       +(n>2?' <i class="mut">+'+(n-2)+'</i>':'');
   }
   if(f.place) return '<i class="mut">place '+Object.keys(f.place).length+' ions</i>';
-  const li=LROW[f.id];
+  const li=listingRow(f);
   return li!=null ? '<i class="mut">'+esc(LST.detail[li])+'</i>' : '';
 }
 const stripTags = h => h.replace(/<[^>]*>/g,' ')
@@ -2603,12 +3766,14 @@ function rowText(f){        // what the filter matches against
   // searching only the latter meant a filter could match 390 rows and be visible on
   // none of them: "cw" matched every rotation while the rows all read "L0 x +13".
   // Searching the union means whatever you can read, you can find.
-  const li=LROW[f.id], bits=[f.type||'', f.cls||'', f.check||'', f.gate||''];
+  const li=listingRow(f), bits=[f.type||'', f.cls||'', f.check||'', f.gate||''];
   bits.push(stripTags(argsHTML(f)));
   if(li!=null) bits.push(LST.ops[LST.op[li]], LST.detail[li]);
   if(f.call!=null && PROV && PROV.calls[f.call]){
     const c=PROV.calls[f.call], st=PROV.sites[c.site];
-    bits.push(c.op); if(st) bits.push(st.file, st.text||'');
+    // whatever you can READ you can find, and the footer now reads the pass name alone:
+    // searching the path or the source text would match a row that shows neither
+    bits.push(c.op); if(st) bits.push(st.func||'');
   }
   return bits.join(' ').toLowerCase();
 }
@@ -2621,7 +3786,7 @@ function renderProgRow(r, row){
       +' further instructions are not animated</i>';
     r._ref=null; return;
   }
-  const f = P.frames[i] || {}, li = LROW[f.id];
+  const f = P.frames[i] || {}, li = listingRow(f);
   r._ref = {kind:'instr', id:f.id, i:i};
   const prev = row>0 ? P.frames[VIEW[row-1]] : null;
   r._bnd = !!(prev && prev.batch !== f.batch);
@@ -2715,7 +3880,11 @@ function archRowOf(kind, id){
 
 // ---------- the NOW strip: what is executing, and what is driving it ----------
 function nowHTML(f){
-  const li = LROW[f.id];
+  // NO INSTRUCTION is a sentence, not `#undefined`: a device with no programme, or a
+  // frame index past the end, used to print the shipped listing's join of `undefined`.
+  if(!P.frames.length || f.id===undefined)
+    return '<span class="mut">no instruction — press Test drive or write a programme</span>';
+  const li = listingRow(f);
   const where = [];
   if(f.group!==undefined) where.push('group '+f.group);
   if(f.batch!==undefined) where.push('batch '+f.batch);
@@ -2767,6 +3936,7 @@ function ctlHTML(f){
   return h;
 }
 function srcHTML(f){
+  if(!P.frames.length) return '';       // nothing is executing, so nothing drove it
   const und = [];
   if(CTLD && f.ctl!=null && CTLD.records[f.ctl])
     for(const u of (CTLD.records[f.ctl].und||[])) und.push(CTLD.notes[u]);
@@ -2774,8 +3944,14 @@ function srcHTML(f){
   if(!PROV || f.call==null || !PROV.calls || !PROV.calls[f.call])
     return '<span class="mut">no source line recorded for this instruction</span>'+note;
   const c=PROV.calls[f.call], st=(PROV.sites||[])[c.site]||{};
-  return 'from <b>'+esc(st.file||'?')+':'+(st.line||0)+'</b> &nbsp;<code>'
-    + esc(st.text || (c.op+'(...)')) + '</code>'+note;
+  // THE PASS, never the file it lives in.  A reader has no clone of this repository, so
+  // `qccd/compile/cooling.py:350` is a coordinate into something they cannot open, and
+  // `st.text` is a line of our Python quoted at them.  `c.op` is the whole claim this
+  // footer makes -- which pass put this instruction here -- and it reads as a name:
+  // "from compile.insert_cooling".  `st.func` is the fallback for a payload that
+  // predates `op`; the file, line and text stay in the payload for a local debugger and
+  // are rendered nowhere.
+  return 'from <b>'+esc(c.op||st.func||'?')+'</b>'+note;
 }
 function archNowHTML(){
   if(!AL) return '';
@@ -2822,7 +3998,7 @@ function seek(i, o){
   if(PROGRAM_STALE) return;
   o = o || {};
   stop();
-  frame = clamp(0, i, P.frames.length-1);
+  frame = clamp(0, i, lastFrame());
   phase = o.glide ? 0 : 1;
   draw();
   // Recentre on the row WITHOUT re-arming Follow. Re-arming here meant every arrow key,
@@ -2845,6 +4021,7 @@ function pickArch(row, ev, r){
 
 // ---------- filtering: VIEW/VIEWPOS only.  P.frames is NEVER touched ----------
 function rebuildView(text, only){
+  indexTouch();
   const q=(text||'').trim().toLowerCase();
   VIEW=[]; VIEWPOS=new Array(P.frames.length).fill(-1);
   for(let i=0;i<P.frames.length;i++){
@@ -2931,13 +4108,22 @@ if(SRC){
   for(let i=0;i<P.frames.length;i++) FIDX[P.frames[i].id] = i;
 }
 
+// THE CIRCUIT BELONGS TO THE SHIPPED PROGRAMME.  `SRC.realises` maps the compiled walk's
+// frame ids to the statements they discharge; an authored frame carries an id from a
+// different programme, and joining it here highlighted `h q[0]` under a shuttle the user
+// wrote by hand.  Every reader of the map goes through this, the way the Program pane's
+// `listingRow` gates the shipped listing: null while the programme is the user's own.
+function circuitOf(){
+  const ED = globalThis.EDITOR;     // `globalThis`, as `listingRow`: the harness's `window` is another object
+  return (ED && ED.authored && ED.authored()) ? null : SRC;
+}
 // line -> 2 (a statement this instruction realises) | 1 (one it is moving towards)
 function qMarksFor(f){
-  const m = {};
-  if(!SRC) return m;
+  const m = {}, S = circuitOf();
+  if(!S) return m;
   for(const k of ['toward','after'])
-    for(const oi of ((SRC[k]||{})[f.id] || [])){ const o=QOP[oi]; if(o && !m[o.line]) m[o.line]=1; }
-  for(const oi of (SRC.realises[f.id] || [])){ const o=QOP[oi]; if(o) m[o.line]=2; }
+    for(const oi of ((S[k]||{})[f.id] || [])){ const o=QOP[oi]; if(o && !m[o.line]) m[o.line]=1; }
+  for(const oi of (S.realises[f.id] || [])){ const o=QOP[oi]; if(o) m[o.line]=2; }
   return m;
 }
 function qFirstLine(m){
@@ -2958,9 +4144,10 @@ function qListHTML(ids, cap){
     + (ids.length>cap ? ' <i class="mut">+'+(ids.length-cap)+' more</i>' : '');
 }
 function qNowHTML(f){
-  if(!SRC) return '';
-  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [],
-        past = (SRC.after||{})[f.id] || [];
+  const S = circuitOf();
+  if(!S) return SRC ? '<i class="mut">no circuit &mdash; this programme was written here</i>' : '';
+  const now = S.realises[f.id] || [], soon = S.toward[f.id] || [],
+        past = (S.after||{})[f.id] || [];
   if(now.length) return '<b>executing</b> &nbsp;'+qListHTML(now,3);
   if(soon.length) return '<span class="mut">shuttling towards</span> &nbsp;'+qListHTML(soon,3);
   if(past.length) return '<span class="mut">clearing after</span> &nbsp;'+qListHTML(past,3);
@@ -2970,9 +4157,10 @@ function qNowHTML(f){
 // the one-line version, for the hardware pane, so the answer is there without changing
 // tabs -- which is the whole point of putting the two side by side
 function qInlineHTML(f){
-  if(!SRC) return '';
-  const now = SRC.realises[f.id] || [], soon = SRC.toward[f.id] || [],
-        past = (SRC.after||{})[f.id] || [];
+  const S = circuitOf();
+  if(!S) return '';
+  const now = S.realises[f.id] || [], soon = S.toward[f.id] || [],
+        past = (S.after||{})[f.id] || [];
   if(now.length) return '<br><span class="mut">circuit &rarr;</span> '+qListHTML(now,2);
   if(soon.length) return '<br><span class="mut">circuit &rarr; towards</span> '+qListHTML(soon,2);
   if(past.length) return '<br><span class="mut">circuit &rarr; after</span> '+qListHTML(past,2);
@@ -2994,7 +4182,8 @@ function renderSrcRow(r,row){
 // looks wrong, you want to see what the machine did about it.
 function pickSrc(row){
   const ops = QOPLINE[row+1];
-  if(!ops) return;
+  // `FIDX` indexes the shipped frames: no statement lands anywhere in an authored programme
+  if(!ops || !circuitOf()) return;
   let best = -1;
   for(const oi of ops) for(const id of (QINSTR[oi] || [])){
     const fi = FIDX[id];
@@ -3005,24 +4194,126 @@ function pickSrc(row){
 }
 
 // ---------- panes ----------
-function setPane(which){
-  PANE=which;
-  for(const k of ['P','Q','A','M','W','R']){
-    document.getElementById('pane'+k).className = 'pane card'+(k===which?' on':'');
-    // `off` is not decoration: it is what keeps the Circuit tab out of the way of every
-    // hand-written programme, and setPane runs on every tab click, so it has to be
-    // reasserted here or the first click reveals a tab with nothing behind it.
-    document.getElementById('tab'+k).className = 'tab'+(k===which?' on':'')
-      + (k==='Q' && !SRC ? ' off' : '');
+// ---------- the programme column ----------
+// WHERE THE PROGRAM PANE LIVES is a layout decision, not a pane: beside the animation
+// (the whole height, so a long programme reads as a listing and the next instructions
+// are in view) or among the dock's panes.  The wide regime always puts it beside; the
+// tall regime pins it there when the window has room (>= 1500 px) or when the user says
+// so; the narrow regime never does.  One DOM node moves; nothing is rendered twice.
+let PROG_COL = false, PROG_PIN = null, PROG_VIEW = 'hw';
+function progPinDefault(){
+  const w = (typeof window !== 'undefined' && window.innerWidth) || 1600;
+  return w >= 1500;
+}
+function placeProgram(){
+  const mode = document.getElementById('row').getAttribute('data-layout');
+  if(PROG_PIN === null){
+    let s = null; try { s = localStorage.getItem('qccd.studio.progpin'); } catch (e) { s = null; }
+    PROG_PIN = s === null ? progPinDefault() : s === '1';
   }
+  const col = mode === 'wide' || (mode === 'tall' && PROG_PIN);
+  const pc = document.getElementById('progcol'), panes = document.getElementById('panes'),
+        pp = document.getElementById('paneP'), dock = document.getElementById('dock');
+  if(!pc || !pp) return false;
+  if(col !== PROG_COL){ PROG_COL = col; (col ? pc : panes).appendChild(pp); }
+  pc.setAttribute('data-collapsed', col ? '0' : '1');
+  dock.setAttribute('data-prog', col ? 'col' : 'dock');
+  const tabs = document.getElementById('tabs'); if(tabs) tabs.setAttribute('data-prog', col ? 'col' : 'dock');
+  const pin = document.getElementById('pPin');
+  if(pin){
+    pin.style.display = mode === 'tall' ? '' : 'none';
+    pin.innerHTML = col ? 'Into the panels &#9654;' : '&#9664; Beside the animation';
+    pin.setAttribute('aria-pressed', col ? 'true' : 'false');
+  }
+  // the dock cannot show a pane that is not in it: fall through to the course
+  setPane(col && PANE === 'P' ? 'L' : PANE);
+  return col;
+}
+function progPinToggle(on){
+  PROG_PIN = on === undefined ? !PROG_PIN : !!on;
+  try { localStorage.setItem('qccd.studio.progpin', PROG_PIN ? '1' : '0'); } catch (e) { /* no store */ }
+  const col = placeProgram();
+  sizeStage();
+  return col;
+}
+// WHAT THE PANE SHOWS: the hardware programme, the circuit statements, or both stacked.
+// Without a source circuit there is nothing to switch and the switch is not shown.
+function setProgView(v){
+  if(!SRC) v = 'hw';
+  if(['hw','gates','both'].indexOf(v) < 0) v = 'hw';
+  PROG_VIEW = v;
+  const pp = document.getElementById('paneP');
+  if(pp) pp.setAttribute('data-view', v);
+  for(const k of ['hw','gates','both']){
+    const b = document.getElementById('pv'+k); if(b) b.className = v === k ? 'on' : '';
+  }
+  const seg = document.getElementById('pView'); if(seg) seg.style.display = SRC ? '' : 'none';
+  try { localStorage.setItem('qccd.studio.progview', v); } catch (e) { /* no store */ }
+  syncQ();
+  sizeLists();
+  return v;
+}
+// the Circuit listing's off switch is an attribute: a pane that shows every block must
+// not show this one with nothing behind it
+function syncQ(){
+  const pq = document.getElementById('paneQ');
+  if(pq){ if(SRC) pq.removeAttribute('data-off'); else pq.setAttribute('data-off','1'); }
+  syncMenu();
+}
+// THE MENU'S LIGHTS, from one place: an item is lit when the thing it opens is showing.
+// Program and Circuit read the column when the programme lives there, the dock otherwise;
+// Circuit is `off` without a source circuit, which is what the harness reads.
+function syncMenu(){
+  const dk = document.getElementById('dock'), pc = document.getElementById('progcol');
+  const open = !!dk && dk.getAttribute('data-collapsed') !== '1';
+  const colOn = PROG_COL && !!pc && pc.getAttribute('data-collapsed') !== '1';
+  for(const k of ['L','P','Q','A','M','W','R']){
+    const t = document.getElementById('tab'+k); if(!t) continue;
+    let on;
+    if(k === 'P') on = PROG_COL ? colOn : (open && PANE === 'P');
+    else if(k === 'Q') on = !!SRC && PROG_VIEW !== 'hw' && (PROG_COL ? colOn : (open && PANE === 'P'));
+    else on = open && PANE === k;
+    t.className = 'tab' + (on ? ' on' : '') + (k === 'Q' && !SRC ? ' off' : '');
+  }
+}
+// WHAT A MENU ITEM DOES: open its panel, or close it if it is the one showing.  With the
+// programme in its column, Program folds and unfolds the column and Circuit switches the
+// column between the hardware listing and both listings.
+function menuPick(k){
+  const dk = document.getElementById('dock'), pc = document.getElementById('progcol');
+  if(PROG_COL && (k === 'P' || k === 'Q')){
+    const hidden = pc.getAttribute('data-collapsed') === '1';
+    if(k === 'P'){ pc.setAttribute('data-collapsed', hidden ? '0' : '1'); }
+    else { if(hidden) pc.setAttribute('data-collapsed', '0'); setProgView(PROG_VIEW === 'hw' ? 'both' : 'hw'); }
+    syncMenu(); sizeStage();
+    return { col: pc.getAttribute('data-collapsed') !== '1', view: PROG_VIEW };
+  }
+  const open = dk.getAttribute('data-collapsed') !== '1', target = k === 'Q' ? 'P' : k;
+  if(open && PANE === target && (k !== 'Q' || PROG_VIEW !== 'hw')){ foldPanel(dk, true); return { pane: null }; }
+  foldPanel(dk, false);
+  setPane(k);
+  return { pane: PANE, view: PROG_VIEW };
+}
+function setPane(which){
+  if(which === 'Q'){ setProgView('gates'); which = 'P'; }
+  // the programme beside the animation is not a dock pane: the dock keeps what it shows
+  if(which === 'P' && PROG_COL){ syncQ(); sizeLists(); return; }
+  PANE=which;
+  for(const k of ['L','P','A','M','W','R']){
+    const on = k === which || (k === 'P' && PROG_COL);
+    document.getElementById('pane'+k).className = 'pane card'+(on?' on':'');
+  }
+  syncQ();
+  // the wide strip scrolls sideways when its panes do not all fit: bring the pane in
+  const panes=document.getElementById('panes'), pe=document.getElementById('pane'+which);
+  if(panes && pe && typeof pe.offsetLeft==='number' &&
+     document.getElementById('row').getAttribute('data-layout')==='wide')
+    panes.scrollLeft = pe.offsetLeft - panes.offsetLeft;
   sizeLists();
 }
-document.getElementById('tabP').onclick=()=>setPane('P');
-document.getElementById('tabQ').onclick=()=>setPane('Q');
-document.getElementById('tabA').onclick=()=>setPane('A');
-document.getElementById('tabM').onclick=()=>setPane('M');
-document.getElementById('tabW').onclick=()=>setPane('W');
-document.getElementById('tabR').onclick=()=>setPane('R');
+for(const k of ['L','P','Q','A','M','W','R']){
+  const t = document.getElementById('tab'+k); if(t) t.onclick = () => menuPick(k);
+}
 // Three views of one object.  Program and Device are read-only renderings; SOURCE is the
 // same object as text you can type into, and it writes through the same applier the drag
 // does -- so the two lanes cannot disagree, because there is only one applier.
@@ -3035,6 +4326,8 @@ function setArchView(v){
   const wrap = document.getElementById('aSrcWrap'), host = document.getElementById('aScroll');
   if(wrap) wrap.className = v==='src' ? 'srcwrap' : 'srcwrap off';
   if(host) host.style.display = v==='src' ? 'none' : '';
+  // the list's flex wrapper folds with it, or the source view opens under a blank band
+  if(host && host.parentNode && host.parentNode.style) host.parentNode.style.display = v==='src' ? 'none' : '';
   if(v==='src'){
     // typing source IS editing, so the stage goes into edit mode with it rather than
     // leaving the user typing into a page that is still animating
@@ -3048,16 +4341,11 @@ document.getElementById('avB').onclick=()=>setArchView('prog');
 document.getElementById('avD').onclick=()=>setArchView('dev');
 { const bs=document.getElementById('avS'); if(bs) bs.onclick=()=>setArchView('src'); }
 
+// the lists take the height their pane leaves them (CSS); this only re-measures it
 function sizeLists(){
   if(!PLIST) return;
-  const h = document.getElementById('row').getAttribute('data-layout') === 'wide'
-    ? clamp(240, Math.round(0.34*window.innerHeight), 520)
-                   : clamp(230, Math.round(0.78*window.innerHeight)-200, 620);
-  document.getElementById('pScroll').style.height = h+'px';
-  document.getElementById('aScroll').style.height = h+'px';
   PLIST.measure(); ALIST.measure(); PLIST.paint(true); ALIST.paint(true);
-  if(QLIST){ document.getElementById('qScroll').style.height = h+'px';
-             QLIST.measure(); QLIST.paint(true); }
+  if(QLIST){ QLIST.measure(); QLIST.paint(true); }
 }
 
 // ---------- build ----------
@@ -3116,98 +4404,256 @@ document.getElementById('aFilter').oninput=e=>rebuildArchView(e.target.value);
 }
 
 // ---------- click the stage, land in the listings ----------
-// One delegated listener, not 288: a click is a pointerup that travelled under 3 px,
-// so the existing pan drag is untouched.
-{
-  let dn=null;
-  svg.addEventListener('pointerdown', e=>{ dn={x:e.clientX,y:e.clientY}; });
-  svg.addEventListener('pointerup', e=>{
-    if(!dn) return;
-    const moved=Math.hypot(e.clientX-dn.x, e.clientY-dn.y); dn=null;
-    if(moved>=3) return;
-    const t=e.target;
-    const nid = t && (t._nid || (t.parentNode && t.parentNode._nid));
-    if(nid) selectRef('site', nid);
+// The editor's click path does this (`selectRef` from its `end` adapter), for every kind
+// of element and at all times.  A second delegated listener used to live here and the
+// two disagreed about what a click on a segment meant; one owner now.
+
+// ---------- keyboard: ONE table, ONE dispatcher, ONE listener ----------
+// The table is `EDITOR.keyGesture` (editor.js); it also renders the `?` overlay, so a
+// binding cannot exist without its line of help.  This dispatcher is callable without an
+// Event -- `tests/drive.mjs` presses keys through it -- and the listener below is a
+// one-line adapter onto it.  Two listeners used to run on the same target: the editor's
+// nudged the selection with the arrows while this one scrubbed the programme, so every
+// nudge also moved the playhead; space panned there and played here.
+// `mods` is `{ctrl, meta, shift, alt}`; `ctx.field` names the focused text field (id or
+// tag) and `ctx.target` is the focused element, if any.
+function clearPageSelection(){
+  SEL=null; ALIST.setSelection(-1);
+  document.getElementById('pChip').className='chip off';
+}
+function pressKey(key, mods, ctx){
+  mods = mods || {}; ctx = ctx || {};
+  // `globalThis`, not `window`: the harness's window is a plain object, the editor
+  // publishes on globalThis, and in a browser the two are the same object
+  const ED = globalThis.EDITOR || window.EDITOR;
+  const verb = (ED && ED.keyGesture) ? ED.keyGesture(key, mods, ctx) : null;
+  let result = null;
+  if(!verb) return { verb: null, result: null };
+  // a key never acts on a focused toolbar button: the space bar would re-fire it
+  if(ctx.target && ctx.target.tagName==='BUTTON') unfocus(ctx.target);
+  switch(verb){
+    case 'blur': unfocus(ctx.target); break;
+    case 'clear-filter': if(ctx.target) ctx.target.value=''; rebuildView('', null); rebuildArchView(''); unfocus(ctx.target); break;
+    case 'save': if(ED.saveProject) ED.saveProject(); break;
+    case 'undo': ED.undoGroup(); break;
+    case 'redo': ED.redoGroup(); break;
+    case 'toggle-play': playBtn.onclick(); result = !!raf; break;
+    // ESCAPE DOES ONE THING PER PRESS, in the editor's order (drag, stamp, selection,
+    // help); only when the editor had nothing to cancel does the page clear its own
+    // listing selection
+    case 'escape': result = ED.cancelGesture(); if(result===null){ clearPageSelection(); result='page'; } break;
+    case 'nudge': result = ED.nudge(key, mods.shift ? 4 : 1); break;
+    case 'remove': result = ED.removeSelected();
+      if(result && !result.ok && result.problems.length && ED.toast) ED.toast('bad', result.problems[0].message); break;
+    case 'reconcile': result = ED.reconcileLast(); break;
+    case 'seek-next': seek(frame+1,{}); result=frame; break;
+    case 'seek-prev': seek(frame-1,{}); result=frame; break;
+    case 'seek-ahead': seek(frame+25,{}); result=frame; break;
+    case 'seek-back': seek(frame-25,{}); result=frame; break;
+    case 'seek-first': seek(0,{}); result=frame; break;
+    case 'seek-last': seek(lastFrame(),{}); result=frame; break;
+    case 'glide': seek(frame,{glide:true}); result=frame; break;
+    case 'fit': fit(); break;
+    case 'explain': result = ED.explainToggle ? ED.explainToggle() : null; break;
+    case 'measure': result = ED.measureToggle ? ED.measureToggle() : null; break;
+    // the sketch: the mode, the four shape tools, and the key that ends a polyline
+    case 'design-mode': result = ED.setDesignMode(ED.designMode() === 'sketch' ? 'parts' : 'sketch'); break;
+    case 'shape-rect': result = ED.sketchTool('rect'); break;
+    case 'shape-ellipse': result = ED.sketchTool('ellipse'); break;
+    case 'shape-line': result = ED.sketchTool('line'); break;
+    case 'shape-poly': result = ED.sketchTool('poly'); break;
+    case 'sketch-finish': result = ED.sketchFinish(false); break;
+    case 'follow': document.getElementById('pFollow').onclick(); result=!!PLIST.follow; break;
+    case 'filter': { const f=document.getElementById('pFilter'); if(f.focus) f.focus(); break; }
+    case 'fold-rail': foldPanel(railEl); result=window.PANELS.state(); break;
+    case 'fold-dock': foldPanel(dockEl); result=window.PANELS.state(); break;
+    // fold both, which is what you want while drawing; unfold both when both are folded
+    case 'fold-both': { const on = !(window.PANELS.state().rail && window.PANELS.state().dock);
+      foldPanel(railEl, on); foldPanel(dockEl, on); result=window.PANELS.state(); break; }
+    // a pane key with the dock folded would change PANE behind a closed door
+    case 'pane-P': foldPanel(dockEl, false); setPane('P'); break;
+    case 'pane-A': foldPanel(dockEl, false); setPane('A'); break;
+    case 'pane-M': foldPanel(dockEl, false); setPane('M'); break;
+    case 'help': result = ED.helpToggle(); break;
+    // the Modify panel's own two keys, from the editor's one keymap
+    case 'modify-apply': result = ED.modifyApply ? ED.modifyApply() : null; break;
+    case 'modify-cancel': result = ED.modifyClose ? ED.modifyClose() : null; break;
+  }
+  return { verb: verb, result: result };
+}
+// ---------- the tools bar: popovers over the rail's sections, and the search ----------
+// A popover is a rail section shown fixed under its button.  The three palette folds are
+// re-created on every palette paint, so the open one is re-applied from the editor's
+// `onPalette` hook; Start and Selection are static.  A selection opens its popover; Escape
+// or a click elsewhere closes any.
+const TOOLS = document.getElementById('tools');
+let POP = null;
+function popEl(key){
+  if(key === 'start') return document.getElementById('palStart');
+  const body = document.getElementById('palBody');
+  if(!body) return null;
+  for(const c of (body.children || [])) if(c.getAttribute && c.getAttribute('data-fold') === key) return c;
+  return null;
+}
+// class toggles by string, not classList: the harness's shim has no classList behaviour
+function setCls(el, c, on){ const parts = ((el.className || '') + '').split(/\s+/).filter(x => x && x !== c); if(on) parts.push(c); el.className = parts.join(' '); }
+const POP_BTN = { start: 'tbStart', row: 'tbRows', block: 'tbMachine', component: 'tbComponents' };
+const POP_KEYS = Object.keys(POP_BTN);
+function popButton(key){ return document.getElementById(POP_BTN[key] || ''); }
+function applyPops(){
+  if(!TOOLS) return;
+  for(const key of POP_KEYS){
+    const el = popEl(key), b = popButton(key), on = POP === key;
+    if(b) b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if(!el) continue;
+    if(on){
+      setCls(el, 'pop-open', true);
+      if(el.tagName === 'DETAILS') el.open = true;
+      const br = b && b.getBoundingClientRect ? b.getBoundingClientRect() : null, tr = TOOLS.getBoundingClientRect ? TOOLS.getBoundingClientRect() : null;
+      if(br && tr){ el.style.left = Math.max(4, br.left) + 'px'; el.style.top = (tr.bottom + 4) + 'px'; }
+    } else setCls(el, 'pop-open', false);
+  }
+}
+function openPop(key){
+  // AN UNKNOWN KEY CHANGES NOTHING.  "selection" was one of these until the right-click
+  // menu took its job; a caller that still asks for it must not leave POP naming a
+  // popover no button opens and no rule shows.
+  if(key && !POP_BTN[key]) return POP;
+  POP = (key && POP === key) ? null : (key || null);
+  // the popovers live in the rail's DOM: a folded rail must come back for one to show
+  try { if(POP && railEl && railEl.getAttribute('data-collapsed') === '1') foldPanel(railEl, false); } catch(e){}
+  applyPops();
+  return POP;
+}
+window.onPalette = applyPops;
+// NOTHING POPS ITSELF OPEN ANY MORE.  `window.onInspector` opened the Selection popover
+// on every single selection, so the one gesture everybody makes constantly threw a panel
+// over the canvas.  The editor still calls the hook if a page defines one; this page does
+// not, and `renderInspector` skips it.
+if(TOOLS){
+  for(const key in POP_BTN){ const b = popButton(key); if(b) b.onclick = () => openPop(key); }
+  document.addEventListener('pointerdown', e => {
+    const t = e.target;
+    // A CLICK ELSEWHERE CLOSES THE ELEMENT MENU -- in the SAME listener that already does
+    // this for the popovers, rather than a second one that would race it.  A press on the
+    // stage is the stage's own: `claim` arbitrates it and the editor closes the menu there.
+    const cm = document.getElementById('ctxmenu');
+    if(cm && cm.getAttribute('data-open') === '1' && !(cm.contains && cm.contains(t))
+       && !(svg.contains && svg.contains(t))){
+      if(window.EDITOR && EDITOR.menuClose) EDITOR.menuClose();
+    }
+    if(TOOLS.contains(t)) return;
+    for(const key of POP_KEYS){ const el = popEl(key); if(el && el.contains && el.contains(t)) return; }
+    if(SRES && SRES.contains && SRES.contains(t)) return;
+    if(POP) openPop(null);
+    const sr = document.getElementById('sres'); if(sr && !sr.contains(t)) sr.setAttribute('data-open', '0');
+  }, true);
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ if(POP) openPop(null); const sr = document.getElementById('sres'); if(sr) sr.setAttribute('data-open', '0'); }
+    if((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')){ e.preventDefault(); const s = document.getElementById('search'); if(s){ s.focus(); s.select(); } }
+  }, true);
+  applyPops();
+}
+// THE SEARCH: every control on the page with its hint text, the course's lessons.  A hit
+// says where it lives; choosing it opens that pane or popover, scrolls to it, flashes it.
+const SRES = document.getElementById('sres'), SINP = document.getElementById('search');
+const PANE_NAMES = { L: 'Learn', P: 'Program', Q: 'Circuit', A: 'Device', M: 'Machine', W: 'Write', R: 'Report' };
+const POP_NAMES = { start: 'Start', row: 'Append a row', block: 'Machine settings', component: 'Components' };
+function sTextOf(el){
+  if(el.classList && el.classList.contains('pal-item')){ const nb = el.querySelector('.pal-text b'); if(nb) return nb.textContent.trim(); const de = el.getAttribute('data-el'); if(de) return de.replace(/^cmp:/, '').replace(/_/g, ' '); }
+  let t = el.getAttribute('aria-label') || el.getAttribute('placeholder') || '';
+  if(!t){ const av = el.querySelector && el.querySelector('.avatar'); let txt = (typeof el.innerText === 'string' && el.innerText) ? el.innerText : (el.textContent || ''); if(av && av.textContent) txt = txt.replace(av.textContent, ' '); t = txt; }
+  return t.trim().replace(/\s+/g, ' ').slice(0, 70);
+}
+function sWhereOf(el){
+  let e = el;
+  while(e && e !== document.body){
+    if(e.id === 'palStart') return { kind: 'pop', key: 'start', name: 'Start (tools bar)' };
+    if(e.id === 'palInspect') return { kind: 'rail', name: 'Selection (left rail)' };
+    if(e.classList && e.classList.contains('palfold') && e.getAttribute('data-fold')) return { kind: 'pop', key: e.getAttribute('data-fold'), name: (POP_NAMES[e.getAttribute('data-fold')] || 'panel') + ' (tools bar)' };
+    if(e.id && /^pane[A-Z]$/.test(e.id)) return { kind: 'pane', key: e.id.slice(4), name: PANE_NAMES[e.id.slice(4)] || 'panel' };
+    if(e.id === 'progcol') return { kind: 'pane', key: 'P', name: 'Program column' };
+    if(e.id === 'rail') return { kind: 'rail', name: 'Elements (left rail)' };
+    if(e.id === 'stagebar') return { kind: 'bar', name: 'transport bar' };
+    if(e.id === 'tools') return { kind: 'tools', name: 'tools bar' };
+    if(e.classList && e.classList.contains('head')) return { kind: 'head', name: 'header' };
+    e = e.parentElement;
+  }
+  return { kind: 'page', name: 'page' };
+}
+function sIndex(){
+  const out = [], seen = new Set();
+  let els = []; try { els = document.querySelectorAll('button, [data-hint], .pal-item, summary, select, input[placeholder], label'); } catch(e){ els = []; }
+  for(const el of els){
+    if(SRES && SRES.contains(el)) continue;
+    const label = sTextOf(el), key = el.getAttribute('data-hint');
+    let h = null; try { h = (key && window.EDITOR && EDITOR.hintFor) ? EDITOR.hintFor(key) : null; } catch(e){}
+    const lab = label || (h ? h.t : '');
+    if(!lab) continue;
+    const w = sWhereOf(el), sig = lab + '|' + (h ? h.t : '') + '|' + w.name;
+    if(seen.has(sig)) continue; seen.add(sig);
+    out.push({ label: lab, title: h ? h.t : (el.getAttribute('title') || ''), desc: h ? (h.d || '') + (h.k ? '  [' + h.k + ']' : '') : (el.getAttribute('title') || ''), where: w, el });
+  }
+  try { (EDITOR.lessonList() || []).forEach(l => out.push({ label: 'Lesson ' + l.id + ' \u00b7 ' + l.title, title: '', desc: 'the course, part ' + l.part, where: { kind: 'lesson', id: l.id, name: 'Learn' }, el: null })); } catch(e){}
+  return out;
+}
+function sReveal(item){
+  const w = item.where, el = item.el;
+  openPop(null); if(SRES) SRES.setAttribute('data-open', '0');
+  if(w.kind === 'lesson'){ try { EDITOR.lessonLoad(w.id); } catch(e){} foldPanel(document.getElementById('dock'), false); setPane('L'); return; }
+  if(w.kind === 'pop') openPop(w.key);
+  if(w.kind === 'pane'){ const dk = document.getElementById('dock'); if(w.key === 'P' && PROG_COL){ const pc = document.getElementById('progcol'); if(pc.getAttribute('data-collapsed') === '1') menuPick('P'); } else { foldPanel(dk, false); setPane(w.key); } }
+  if(w.kind === 'rail'){ try { if(railEl.getAttribute('data-collapsed') === '1') foldPanel(railEl, false); } catch(e){} }
+  if(!el) return;
+  try { el.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch(e){}
+  try { el.focus({ preventScroll: true }); } catch(e){}
+  setCls(el, 'flash', true); setTimeout(() => setCls(el, 'flash', false), 1800);
+}
+let SHITS = [], SSEL = 0;
+function sSearch(q){
+  if(!SRES) return [];
+  q = (q || '').trim().toLowerCase();
+  SRES.replaceChildren();
+  if(!q){ SRES.setAttribute('data-open', '0'); return []; }
+  const words = q.split(/\s+/), all = sIndex();
+  SHITS = all.map(it => {
+    const hay = (it.label + ' ' + it.title + ' ' + it.desc + ' ' + it.where.name).toLowerCase();
+    if(!words.every(w => hay.indexOf(w) >= 0)) return null;
+    const score = words.reduce((a, w) => a + (it.label.toLowerCase().indexOf(w) >= 0 ? 2 : 0) + (it.title.toLowerCase().indexOf(w) >= 0 ? 1 : 0), 0);
+    return { it, score };
+  }).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 14).map(x => x.it);
+  SSEL = 0;
+  if(!SHITS.length){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'nothing matches \u201c' + q + '\u201d'; SRES.appendChild(n); }
+  SHITS.forEach((it, i) => {
+    const r = document.createElement('div'); r.className = 'r'; r.setAttribute('data-sel', i === 0 ? '1' : '0');
+    const b = document.createElement('b'); b.textContent = it.label; r.appendChild(b);
+    const w = document.createElement('span'); w.className = 'w'; w.textContent = 'in ' + it.where.name; r.appendChild(w);
+    if(it.desc || it.title){ const d = document.createElement('div'); d.className = 'd'; d.textContent = (it.title && it.title !== it.label ? it.title + ' \u2014 ' : '') + it.desc; r.appendChild(d); }
+    r.onclick = () => sReveal(it);
+    SRES.appendChild(r);
+  });
+  SRES.setAttribute('data-open', '1');
+  return SHITS.map(it => ({ label: it.label, where: it.where.name }));
+}
+if(SINP){
+  SINP.addEventListener('input', () => sSearch(SINP.value));
+  SINP.addEventListener('focus', () => { if(SINP.value) sSearch(SINP.value); });
+  SINP.addEventListener('keydown', e => {
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); if(!SHITS.length) return; SSEL = (SSEL + (e.key === 'ArrowDown' ? 1 : SHITS.length - 1)) % SHITS.length; Array.from(SRES.children).forEach((r, i) => r.setAttribute('data-sel', i === SSEL ? '1' : '0')); }
+    if(e.key === 'Enter'){ e.preventDefault(); if(SHITS[SSEL]) sReveal(SHITS[SSEL]); }
   });
 }
-
-// ---------- keyboard ----------
-let HELPON=false;
-function nextBatch(dir){
-  const here=(P.frames[frame]||{}).batch;
-  let i=frame+dir;
-  while(i>0 && i<P.frames.length-1 && (P.frames[i]||{}).batch===here) i+=dir;
-  seek(i, {});
-}
+window.TOOLSBAR = { open: openPop, current: () => POP, search: sSearch, reveal: (i) => { if(SHITS[i]) sReveal(SHITS[i]); return POP; } };
+window.KEYS = { press: pressKey };
 document.addEventListener('keydown', e=>{
   const tag = e.target && e.target.tagName;
-  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'){
-    if(e.key==='Escape'){ e.target.value=''; rebuildView('', null); rebuildArchView(''); }
-    return;
-  }
-  // CTRL+S SAVES THE DESIGN. It goes before the modifier guard below, which returns
-  // early on every accelerator -- so the page used to swallow the one shortcut a design
-  // tool must have and let the browser offer to save the HTML instead.
-  if((e.ctrlKey||e.metaKey) && !e.altKey && (e.key==='s'||e.key==='S')){
-    if(window.EDITOR && EDITOR.saveProject){ e.preventDefault(); EDITOR.saveProject(); }
-    return;
-  }
-  if(e.ctrlKey||e.metaKey||e.altKey) return;
-  const k=e.key;
-  // SPACE IS HELD-TO-PAN IN EDIT MODE, and it was also scrubbing the programme:
-  // both listeners fired, so holding space to pan advanced the frame underneath you.
-  // The editor owns the key while it is on; this handler yields rather than competing.
-  if(k===' '){ if(window.EDITOR && EDITOR.mode()==='edit') return;
-               e.preventDefault(); playBtn.onclick(); return; }
-  // fold the side panels away. `\\` does both, which is what you want while drawing.
-  if(k==='['){ foldPanel(railEl); return; }
-  if(k===']'){ foldPanel(dockEl); return; }
-  if(k==='\\\\'){ const on = !(PANELS.state().rail && PANELS.state().dock);
-                 foldPanel(railEl, on); foldPanel(dockEl, on); return; }
-  if(k==='ArrowRight'||k==='.'||k==='j'||k==='ArrowDown'){ seek(frame+1,{}); return; }
-  if(k==='ArrowLeft'||k===','||k==='k'||k==='ArrowUp'){ seek(frame-1,{}); return; }
-  if(k==='PageDown'){ seek(frame+25,{}); return; }
-  if(k==='PageUp'){ seek(frame-25,{}); return; }
-  if(k==='Home'){ seek(0,{}); return; }
-  if(k==='End'){ seek(P.frames.length-1,{}); return; }
-  if(k==='Enter'){ seek(frame,{glide:true}); return; }
-  if(k==='f'){ document.getElementById('pFollow').onclick(); return; }
-  if(k==='/'){ e.preventDefault(); document.getElementById('pFilter').focus(); return; }
-  // ESCAPE CANCELS A LIVE DRAG FIRST.  The editor's own handler runs on the same
-  // target; this one still clears the programme filter afterwards, which is what it has
-  // always done, so neither selection model is left holding a stale answer.
-  if(k==='Escape'){ SEL=null; ALIST.setSelection(-1);
-    document.getElementById('pChip').className='chip off'; return; }
-  if(k==='0'){ fit(); return; }
-  if(k==='1'){ setPane('P'); return; }
-  if(k==='2'){ setPane('A'); return; }
-  if(k==='3'){ setPane('M'); return; }
-  if(k==='?'){ const h=document.getElementById('help');
-    h.className = HELPON ? 'help off' : 'help'; HELPON=!HELPON; return; }
+  const field = (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') ? (e.target.id || tag) : null;
+  // `null` is "not ours" -- ctrl+C, ctrl+F, alt+tab and typing in a field keep their
+  // browser meaning; every verb we take is prevented, space included, so the page never
+  // scrolls under a play/pause press
+  if(pressKey(e.key, {ctrl:e.ctrlKey, meta:e.metaKey, shift:e.shiftKey, alt:e.altKey},
+              {field, target:e.target}).verb) e.preventDefault();
 });
-document.getElementById('helpBody').innerHTML =
-  '<h3>Keys</h3><table>'
-  + [['space','play / pause'],['&larr; &rarr;','previous / next instruction'],
-     ['PgUp PgDn','&plusmn;25 instructions'],['Home End','first / last'],
-     ['enter','glide the current instruction'],['f','toggle Follow'],
-     ['/','filter the program listing'],['esc','clear filter and selection'],
-     ['0','fit the stage'],['1 2 3','Program / Architecture / Machine pane'],
-     ['e','edit mode / play mode'],
-     ['drag an element','move it; alt frees the snap, shift snaps to quarter steps'],
-     ['drag empty stage','marquee-select everything inside the rectangle'],
-     ['shift-drag','rubber-band a new segment from one node to another'],
-     ['click (armed)','place the armed palette element where you click'],
-     ['double-click','place a site on empty stage with nothing armed'],
-     ['middle / right drag','pan &middot; so does space+drag'],
-     ['esc','cancel the drag in progress, else clear the selection'],
-     ['del','remove the selection (a site takes its segments with it)'],
-     ['&larr;&uarr;&rarr;&darr;','nudge the selection one lattice step (shift: four)'],
-     ['L','set the incident segment lengths to match the drawing'],
-     ['ctrl+Z','undo &middot; ctrl+shift+Z redo'],
-     ['space (held)','pan even when the cursor is over a site'],
-     ['?','close this']]
-    .map(r=>'<tr><td><code>'+r[0]+'</code></td><td>'+r[1]+'</td></tr>').join('')
-  + '</table>';
 if(AL) document.getElementById('aFoot').innerHTML =
   'round-trip ' + (AL.round_trip===true ? 'verified' :
                    (AL.round_trip===false ? 'FAILED' : 'not checked'))
@@ -3215,9 +4661,26 @@ if(AL) document.getElementById('aFoot').innerHTML =
 rebuildArchView('');
 rebuildView('', null);
 sizeLists();
-setPane('P');
+// the programme column and its view, after the lists exist
+{
+  const pin = document.getElementById('pPin');
+  if(pin) pin.onclick = () => progPinToggle();
+  for(const k of ['hw','gates','both']){
+    const b = document.getElementById('pv'+k); if(b) b.onclick = () => setProgView(k);
+  }
+  let v = null; try { v = localStorage.getItem('qccd.studio.progview'); } catch (e) { v = null; }
+  placeProgram();
+  setProgView(v || (SRC ? 'both' : 'hw'));
+  // the page opens on the canvas; a page built for the course opens on its Learn pane
+  if(D.open_pane && document.getElementById('pane' + D.open_pane)){
+    foldPanel(document.getElementById('dock'), false);
+    setPane(D.open_pane);
+  }
+  syncMenu();
+}
 
-sizeStage();
+relayout();
+fit();
 draw();
 </script>
 __EDITOR__
@@ -3241,16 +4704,25 @@ def render_html(
     template_stems: "Sequence[str] | str | None" = None,
     metal: dict | None = None,
     source: dict | None = None,
+    open_pane: str | None = None,
+    tech=None,
 ) -> Path:
-    """Write the self-contained page.  Returns the path written."""
+    """Write the self-contained page.  Returns the path written.
+
+    `open_pane` names the dock pane the page opens on (`"L"` for the course); the default
+    is none -- the page opens on the canvas and the menu in the head opens a pane."""
     view = build_view_model(arch, prog, res, model, max_frames=max_frames,
                             kicker=kicker, headline=headline, lede=lede,
                             control=control, provenance=provenance,
                             template_stems=template_stems, metal=metal,
-                            source=source)
+                            source=source, tech=tech)
+    view["open_pane"] = open_pane
     html = _TEMPLATE.replace("__TITLE__", f"{arch.name} - {prog.name}")
+    html = html.replace("__STAMP__", page_stamp())
     html = html.replace("__CSSVARS__", css_vars())
-    html = html.replace("__DATA__", _escape_blob(json.dumps(view, separators=(",", ":"))))
+    blob = json.dumps(view, separators=(",", ":"))
+    _refuse_repository_paths(blob)
+    html = html.replace("__DATA__", _escape_blob(blob))
     html = html.replace("__ENGINE__", _js_block(ENGINE_JS))
     html = html.replace("__EDITOR__", _js_block(EDITOR_JS))
     for bad in FORBIDDEN:
