@@ -202,7 +202,7 @@ def test_the_architecture_listing_names_the_object_every_statement_declares(ring
     listing = architecture_listing(ring, mode="full")
     targets = {l.target for l in listing.lines if l.target}
     assert "class:dock" in targets and "class:rotate_cw" in targets
-    assert "zone:ancilla" in targets and "curve:shuttle_segment" in targets
+    assert "zone:trap" in targets and "curve:shuttle_segment" in targets
     assert "control.channels" in targets and "loop:L0" in targets
     # every declared SIMD class has a record, and it is a `call` record an editor can
     # rewrite rather than a comment it would have to parse
@@ -624,6 +624,36 @@ def test_exporting_provenance_drops_the_absolute_path_of_the_build_machine():
     assert "root" not in thin
     assert all(not c.get("args") for c in thin["calls"])
     assert prov.thin(log, "off") is None
+
+
+def test_exporting_provenance_drops_the_repository_as_well_as_the_machine():
+    """`root` was never the only path in there.
+
+    Each site also carried `file` (`qccd/compile/cooling.py`), `line` and `text` -- a
+    path into a tree the reader does not have, a line number in it, and a line of this
+    project's Python quoted back at them.  The page showed `file:line` under every
+    hardware instruction until 2026-09-17, and the fields stayed in the payload of 188
+    published pages for a day after the rendering was fixed, because the two were
+    separate decisions and only one of them had been made.
+
+    `func` survives because the page uses it: `srcHTML` renders `calls[].op || func`.
+    """
+    m = Machine.load(ARCH_DIR / "ring144_24v.arch.json")
+    prog = m.program("x").fill().rotate(+1).build()
+    log = prov.log_of(prog)
+    assert any(s.get("file") for s in log["sites"]), "recorded in memory"
+
+    thin = prov.thin(log, "sites")
+    leaked = sorted({k for s in thin["sites"] for k in s} - {"func"})
+    assert not leaked, f"a published page would carry {leaked} for every instruction"
+    assert any(s.get("func") for s in thin["sites"]), (
+        "`func` is what the footer falls back to; dropping it empties the panel")
+    assert all(c.get("op") for c in thin["calls"]), "the pass name is the whole claim"
+
+    # a fuller level is a LOCAL tool reading a log on the machine that wrote it
+    full = prov.thin(log, "full")
+    assert any(s.get("file") for s in full["sites"]), (
+        "only the page's level is thinned; a local reader still gets the source site")
 
 
 # ======================================================================== page

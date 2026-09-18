@@ -111,23 +111,59 @@ def _draw_shape(dev):
 
 
 def _fuzz_params(rng) -> list[tuple[str, dict]]:
-    """Seeded random parameter sets over ALL SIX generators, legal and illegal.
+    """Seeded random parameter sets over ALL SEVEN generators, legal and illegal.
 
     Illegal ones matter as much as legal ones: a browser that silently accepts what the
     toolchain refuses would price an architecture that cannot be built.
+
+    EVERY OPTIONAL PARAMETER IS DRAWN, not just the positional ones.  A fuzzer that builds
+    ring from (width, height, verticals) and grid from (a, b) cannot see `dock_offset`,
+    `spacing` or `periodic` at all, and that is not hypothetical: all three went unmirrored
+    in `engine.js`, together with the whole of `cylinder`, and this corpus stayed green
+    while the browser threw `got an unexpected keyword argument` on two architecture
+    documents the SITE SHIPS (`grid2x3`, `ring6d`).  The same argument as the build
+    bucket's mutation guard, one step further out: a corpus that never PASSES an optional
+    argument cannot test it, just as one that never omits it cannot test its default.
     """
     out: list[tuple[str, dict]] = []
     for _ in range(N_FUZZ):
-        which = rng.choice(["ring", "grid", "chain", "ladder", "racetrack", "dual_loop"])
+        which = rng.choice(["ring", "grid", "chain", "ladder", "racetrack", "dual_loop",
+                            "cylinder"])
         if which == "ring":
             w = rng.randint(2, 60)
             h = rng.randint(2, 12)
             cap = 2 * w + 2 * h - 4
             divisors = [d for d in range(1, cap + 1) if cap % d == 0]
             v = rng.choice(divisors + [0, 0, rng.randint(0, 40)])
-            out.append(("ring", {"width": w, "height": h, "verticals": v}))
+            kw: dict = {"width": w, "height": h, "verticals": v}
+            # `dock_offset` is validated against ONE DOCK SPACING, so the legal range
+            # depends on the draw above -- and the illegal draws are the point as much as
+            # the legal ones.  Sometimes omit it, to keep its default covered too.
+            spacing = cap // v if v else 0
+            off = rng.choice([None, 0, 0, rng.randint(0, max(1, spacing)), -1,
+                              spacing, spacing + 1])
+            if off is not None:
+                kw["dock_offset"] = off
+            out.append(("ring", kw))
         elif which == "grid":
-            out.append(("grid", {"a": rng.randint(1, 12), "b": rng.randint(1, 12)}))
+            kw = {"a": rng.randint(1, 12), "b": rng.randint(1, 12)}
+            sp = rng.choice([None, 1, 1, 2, 3, rng.randint(1, 6), 0, -2])
+            if sp is not None:
+                kw["spacing"] = sp
+            per = rng.choice([None, False, True, True])
+            if per is not None:
+                kw["periodic"] = per
+            out.append(("grid", kw))
+        elif which == "cylinder":
+            kw = {"a": rng.randint(2, 14), "b": rng.randint(1, 7)}
+            for key, choices in (("wrap_spokes", [None, False, True, True]),
+                                 ("declare_loops", [None, False, True, True]),
+                                 ("r0", [None, 2.0, 1.0, 3.25, 0.5]),
+                                 ("pitch", [None, 1.0, 0.75, 2.5])):
+                drawn = rng.choice(choices)
+                if drawn is not None:
+                    kw[key] = drawn
+            out.append(("cylinder", kw))
         elif which == "chain":
             out.append(("chain", {"n": rng.randint(0, 300)}))
         elif which == "ladder":
@@ -152,8 +188,43 @@ def _fuzz_params(rng) -> list[tuple[str, dict]]:
             ("ladder", {"width": 1}), ("ladder", {"width": 6, "highways": 3}),
             ("ladder", {"width": 6, "rungs": 0}), ("ladder", {"width": 4, "rungs": [9]}),
             ("dual_loop", {"width": 1}), ("nope", {"width": 4}),
-            ("ring", {"width": 6, "nosuch": 1})]
+            ("ring", {"width": 6, "nosuch": 1}),
+            # the three parameters and the generator that went unmirrored, by hand as well
+            # as by fuzz: the refusal wording quotes the COMPUTED spacing, so a mirror that
+            # validated against `verticals` instead would pass every legal case
+            ("ring", {"width": 5, "height": 3, "verticals": 4, "dock_offset": 3}),
+            ("ring", {"width": 5, "height": 3, "verticals": 4, "dock_offset": -1}),
+            ("ring", {"width": 6, "height": 4, "verticals": 0, "dock_offset": 7}),
+            ("grid", {"a": 3, "b": 4, "spacing": 0}),
+            ("grid", {"a": 9, "b": 9, "spacing": 2}),
+            ("grid", {"a": 2, "b": 2, "spacing": 5, "periodic": True}),
+            ("cylinder", {"a": 2, "b": 3}), ("cylinder", {"a": 3, "b": 1}),
+            ("cylinder", {"a": 4, "b": 2, "wrap_spokes": True, "declare_loops": True}),
+            ("cylinder", {"a": 3, "b": 2, "nosuch": 1}), ("cylinder", {"a": 3}),
+            # THE TWO THE SITE SHIPS, verbatim from qccd/site/compiled/*.arch.json
+            ("grid", {"a": 2, "b": 3, "site_zone": "trap", "segment_capacity": 1,
+                      "spacing": 1, "periodic": False}),
+            ("ring", {"width": 3, "height": 2, "verticals": 2, "site_zone": "data",
+                      "ancilla_zone": "trap", "segment_capacity": 1, "loop_id": "L0",
+                      "dock_offset": 0})]
     return out
+
+
+def _assert_generator_corpus_is_not_vacuous(params: list[tuple[str, dict]]) -> None:
+    """Every generator and every optional parameter must actually appear.
+
+    Without this the fuzz above is one careless edit from silently dropping a whole
+    parameter again, and nothing would go red.
+    """
+    names = {n for n, _ in params}
+    assert names >= set(GENERATORS), (
+        f"the corpus never builds {sorted(set(GENERATORS) - names)}")
+    seen: set[str] = set()
+    for _, kw in params:
+        seen |= set(kw)
+    for key in ("dock_offset", "spacing", "periodic", "wrap_spokes", "declare_loops",
+                "r0", "pitch", "rungs", "highways", "couplings"):
+        assert key in seen, f"no case in the corpus passes {key!r}; it is untested"
 
 
 def _adversarial_layouts(rng) -> list[dict]:
@@ -196,6 +267,107 @@ def _adversarial_layouts(rng) -> list[dict]:
     big = [{"id": f"B{i}", "x": (i % 97) + rng.random() * 0.4,
             "y": (i // 97) + rng.random() * 0.4} for i in range(6001)]
     out.append({"name": "adv:sample_cap:6001", "nodes": big, "segments": []})
+    return out
+
+
+def _true_scale_layouts(rng) -> list[dict]:
+    """The same lattices again, with `compute_layout`'s TRUE SCALE option on.
+
+    True scale forces `sx:sy` to the technology's `nm_per_unit_x : nm_per_unit_y`, so one
+    screen pixel is the same number of nanometres on both axes and an angle read off the
+    drawing is the angle the metal makes.  It is a second branch inside `_fit` -- the one
+    that returns before the `iso` / `K_ANISO` clamps -- and a mirror that diverged there
+    would draw a device to scale in Python and stretched in the browser, which is exactly
+    the class of defect this file exists to make impossible.
+
+    The ratios are not decoration.  `surface_default` is isotropic (464:464) and therefore
+    cannot tell a correct mirror from one that quietly took the isotropic path;
+    `eth_junction_2201.12579` is 225:355; and two extreme pairs push the ratio far past
+    `K_ANISO` in both directions, where `min(sx/nx, sy/ny)` has to pick the other axis.
+    """
+    out: list[dict] = []
+    ratios = [(464000.0, 464000.0), (225000.0, 355000.0), (1.0, 7.0), (1000000.0, 3.0)]
+    archs = [load(f) for f in ARCH_FILES]
+    for i, arch in enumerate(archs):
+        nodes, segments = _draw_shape(arch.device)
+        for nx, ny in ratios:
+            out.append({"name": f"ts:{arch.name}:{nx:g}x{ny:g}",
+                        "nodes": nodes, "segments": segments,
+                        "opts": {"true_scale": True, "unit_nm": [nx, ny]}})
+    # and arbitrary doubles at arbitrary ratios: a drag under true scale
+    for k in range(24):
+        n = rng.randint(1, 30)
+        nodes = [{"id": f"n{j}", "x": rng.uniform(-50.0, 50.0),
+                  "y": rng.uniform(-50.0, 50.0)} for j in range(n)]
+        segs = [{"id": f"e{j}", "a": f"n{j}", "b": f"n{j+1}"} for j in range(n - 1)]
+        nx = float(rng.randint(1, 10 ** 6))
+        ny = float(rng.randint(1, 10 ** 6))
+        out.append({"name": f"ts:rnd{k}:{nx:g}x{ny:g}", "nodes": nodes, "segments": segs,
+                    "opts": {"true_scale": True, "unit_nm": [nx, ny]}})
+    # THE REFUSALS, which must mirror too: an option with nothing usable in it has to
+    # leave the fit alone on BOTH sides rather than one side falling back and the other
+    # dividing by zero.
+    base = {"nodes": [{"id": "A", "x": 0.0, "y": 0.0}, {"id": "B", "x": 6.0, "y": 1.0}],
+            "segments": [{"id": "E", "a": "A", "b": "B"}]}
+    for label, opts in [("off", {"true_scale": False, "unit_nm": [464000.0, 464000.0]}),
+                        ("no_unit", {"true_scale": True}),
+                        ("zero_x", {"true_scale": True, "unit_nm": [0.0, 464000.0]}),
+                        ("neg_y", {"true_scale": True, "unit_nm": [464000.0, -1.0]})]:
+        out.append({"name": f"ts:refuse:{label}", "nodes": base["nodes"],
+                    "segments": base["segments"], "opts": opts})
+    return out
+
+
+def _hold_layouts(rng) -> list[dict]:
+    """The same lattices again, with the view HELD: `compute_layout`'s `hold` option on.
+
+    `hold` is `(sx, sy, ox, oy)` the caller insists on, and it is what an EDIT passes so
+    that placing something does not re-fit the drawing and move the next click somewhere
+    else.  It is a second bypass of `_fit` -- and of the centring that follows it -- so a
+    mirror that diverged here would keep the browser's picture still while Python's moved,
+    or the other way round, and every position the page reports would be about a drawing
+    the other side never drew.
+
+    Every case holds a scale the device was ACTUALLY laid out at (the fit of a subset of
+    its own nodes), because that is what the editor holds: a scale from the previous
+    rebuild, already quantized, applied to a device that has since grown.  The refusals
+    are here for the same reason the true-scale ones are: a hold with nothing usable in it
+    has to leave the fit alone on both sides.
+    """
+    out: list[dict] = []
+    archs = [load(f) for f in ARCH_FILES]
+    for arch in archs:
+        nodes, segments = _draw_shape(arch.device)
+        if len(nodes) < 3:
+            continue
+        # the scale the device had when it was half drawn, held while the rest arrives
+        half = compute_layout(nodes[: max(2, len(nodes) // 2)], [])
+        out.append({"name": f"hold:{arch.name}",
+                    "nodes": nodes, "segments": segments,
+                    "opts": {"hold": [half["sx"], half["sy"], half["ox"], half["oy"]]}})
+        # held AND true-scale: the two bypasses of `_fit` in one call, hold winning
+        out.append({"name": f"hold+ts:{arch.name}",
+                    "nodes": nodes, "segments": segments,
+                    "opts": {"hold": [half["sx"], half["sy"], half["ox"], half["oy"]],
+                             "true_scale": True, "unit_nm": [225000.0, 355000.0]}})
+    # arbitrary doubles: a drag under a held view
+    for k in range(24):
+        n = rng.randint(1, 30)
+        nodes = [{"id": f"n{j}", "x": rng.uniform(-50.0, 50.0),
+                  "y": rng.uniform(-50.0, 50.0)} for j in range(n)]
+        segs = [{"id": f"e{j}", "a": f"n{j}", "b": f"n{j+1}"} for j in range(n - 1)]
+        hold = [rng.uniform(0.01, 200.0), rng.uniform(0.01, 200.0),
+                rng.uniform(-400.0, 400.0), rng.uniform(-400.0, 400.0)]
+        out.append({"name": f"hold:rnd{k}", "nodes": nodes, "segments": segs,
+                    "opts": {"hold": hold}})
+    base = {"nodes": [{"id": "A", "x": 0.0, "y": 0.0}, {"id": "B", "x": 6.0, "y": 1.0}],
+            "segments": [{"id": "E", "a": "A", "b": "B"}]}
+    for label, hold in [("zero_sx", [0.0, 12.0, 3.0, 4.0]),
+                        ("neg_sy", [12.0, -1.0, 3.0, 4.0]),
+                        ("short", [12.0, 12.0, 3.0]),
+                        ("empty", [])]:
+        out.append({"name": f"hold:refuse:{label}", "nodes": base["nodes"],
+                    "segments": base["segments"], "opts": {"hold": hold}})
     return out
 
 
@@ -587,8 +759,10 @@ def _mutate_cases(rng) -> list[dict]:
 
         # and the refusals: an editor that accepts an illegal edit is worse than one that
         # cannot edit at all, so the two implementations must refuse the SAME things
+        zone_b = arch.device.nodes[b].zone_type
         for bad, why in ((
             {"method": "set_site_capacity", "args": [b, 0], "kwargs": {}}, "capacity 0"),
+            ({"method": "set_zone", "args": [zone_b], "kwargs": {"capacity": 0}}, "zone capacity 0"),
             ({"method": "move_site", "args": ["NO_SUCH_NODE", 1.0, 1.0], "kwargs": {}},
              "unknown node"),
         ):
@@ -631,13 +805,72 @@ def _hw_dict(rep) -> dict:
             "total_capacity": rep.total_capacity}
 
 
+def _geom(arch) -> list[dict]:
+    from qccd.verify.rules import geometry_violations
+    return [{"rule": v.rule, "message": v.message} for v in geometry_violations(arch)]
+
+
+def _geometry_shapes() -> list[tuple[str, list]]:
+    """Hand-drawn devices that break R19/R20/R21 AT THE DEFAULT BUDGET.
+
+    The shipped corpus is clean geometry -- that is what shipping it means -- so without
+    these the geometry half of the lint bucket would compare two empty lists on every
+    case and call that agreement, which is exactly the failure mode this whole file
+    exists to refuse.  A generator cannot produce any of them: a fifth rail at one node,
+    two rails that cross in open space, and a fork at 10 degrees are all things only a
+    hand-drawn device (or a drag) can create.
+    """
+    import math
+
+    star = [_C("DeviceBuilder", "explicit"), _C("d.site", "S0", 0.0, 0.0, zone="data")]
+    for i in range(5):
+        a = 2 * math.pi * i / 5
+        star.append(_C("d.site", f"L{i}", round(math.cos(a), 6), round(math.sin(a), 6),
+                       zone="data"))
+    for i in range(5):
+        star.append(_C("d.segment", f"R{i}", "S0", f"L{i}"))
+    star.append(_C("blank_device", name="star5", zones=["data"]))
+
+    # an X with no shared node (R21) and a 10.3-degree fork (R20), in one document
+    cross = [_C("DeviceBuilder", "explicit"),
+             _C("d.site", "A", 0.0, 0.0, zone="data"),
+             _C("d.site", "Bb", 2.0, 2.0, zone="data"),
+             _C("d.site", "Cc", 0.0, 2.0, zone="data"),
+             _C("d.site", "Dd", 2.0, 0.0, zone="data"),
+             _C("d.site", "Ee", 4.0, 0.0, zone="data"),
+             _C("d.site", "Ff", 4.2, 0.4, zone="data"),
+             _C("d.segment", "X0", "A", "Bb"),
+             _C("d.segment", "X1", "Cc", "Dd"),
+             _C("d.segment", "F0", "Dd", "Ee"),
+             _C("d.segment", "F1", "Dd", "Ff"),
+             _C("blank_device", name="cross", zones=["data"])]
+
+    # a node sitting ON a rail it does not end at -- the R21 half a bounding box alone
+    # would never reject, because the point is inside the box of every rail near it
+    on_rail = [_C("DeviceBuilder", "explicit"),
+               _C("d.site", "P0", 0.0, 0.0, zone="data"),
+               _C("d.site", "P1", 4.0, 0.0, zone="data"),
+               _C("d.site", "P2", 1.5, 0.0, zone="data"),
+               _C("d.site", "P3", 1.5, 1.0, zone="data"),
+               _C("d.segment", "S0", "P0", "P1"),
+               _C("d.segment", "S1", "P2", "P3"),
+               _C("blank_device", name="onrail", zones=["data"])]
+    return [("star5", star), ("cross", cross), ("onrail", on_rail)]
+
+
 def _lint_cases() -> list[dict]:
-    """Layer L7: the editor's only state-free legality check.
+    """Layer L7: the editor's only state-free legality checks.
 
     Compare the whole ENUMERATION, not the verdict.  Reporting one violation where Python
     reports 28 still says "illegal", so a verdict-only comparison calls that agreement --
     and that exact drift is live today (R11 is emitted per junction NODE by Python and
     deduped by DEGREE in the mirror).
+
+    TWO ORACLES PER CASE, because there are now two state-free families: R11's structural
+    half (`architecture_violations`) and the geometry rules R19/R20/R21
+    (`geometry_violations`).  They are kept apart on both sides -- one function each, one
+    enumeration each -- so a mirror that folded the second into the first would fail here
+    rather than silently double-count R11.
     """
     from qccd.verify.rules import architecture_violations
 
@@ -650,7 +883,34 @@ def _lint_cases() -> list[dict]:
             "name": f"lint:{arch.name}",
             "calls": base,
             "violations": [{"rule": v.rule, "message": v.message} for v in viol],
+            "geometry": _geom(arch),
         })
+
+        # THE GEOMETRY HALF NEEDS A BROKEN DRAWING, and a drag is how the editor makes
+        # one: two sites moved off the lattice produce sub-60 forks, crossed rails and
+        # nodes sitting on rails they do not end at, all at the default budget.  A budget
+        # edit breaks the same rules from the other direction -- the limits, not the
+        # drawing -- and is the only way R19 fires on a shipped architecture at all.
+        sites = [n.id for n in arch.device.nodes.values() if n.kind == "site"]
+        geom_edits = {
+            "budget": [_P("set_budget", max_junction_degree=2, min_rail_angle_deg=100.5)],
+            "drag": ([_P("move_site", sites[3], 1.5, 3.25),
+                      _P("move_site", sites[5], -2.0, 0.5)] if len(sites) > 6 else []),
+        }
+        for kind, edits in geom_edits.items():
+            if not edits:
+                continue
+            try:
+                m = _replay(base, edits)
+            except Exception:                          # noqa: BLE001
+                continue
+            out.append({
+                "name": f"lint:{arch.name}:{kind}",
+                "calls": base + edits,
+                "violations": [{"rule": v.rule, "message": v.message}
+                               for v in architecture_violations(m.arch)],
+                "geometry": _geom(m.arch),
+            })
 
         # A HEALTHY architecture lints clean on both sides, so comparing only those is
         # vacuous agreement -- two empty lists.  The drift this bucket exists to catch
@@ -671,7 +931,18 @@ def _lint_cases() -> list[dict]:
                 "name": f"lint:{arch.name}:no-junction-curve",
                 "calls": broken,
                 "violations": [{"rule": v.rule, "message": v.message} for v in bviol],
+                "geometry": _geom(m.arch),
             })
+
+    for name, calls in _geometry_shapes():
+        m = _replay(calls)
+        out.append({
+            "name": f"lint:hand:{name}",
+            "calls": calls,
+            "violations": [{"rule": v.rule, "message": v.message}
+                           for v in architecture_violations(m.arch)],
+            "geometry": _geom(m.arch),
+        })
     return out
 
 
@@ -688,7 +959,7 @@ _GEN_NAMES = ("ring", "grid", "chain", "ladder", "racetrack", "dual_loop")
 #: The zone types `DEFAULT_TEMPLATE` declares.  A device sealed with `from_device` takes
 #: the template's zone types wholesale -- there is no `zones=` parameter -- so a fuzz
 #: device that invents a zone name would be refused for a reason the fuzzer did not intend.
-_TMPL_ZONES = ("data", "ancilla", "trap", "tfactory", "load")
+_TMPL_ZONES = ("data", "trap", "load")
 
 N_BUILD_FUZZ = int(os.environ.get("QCCD_BUILD_FUZZ", "400"))
 
@@ -1367,6 +1638,58 @@ def _rule_hand_cases() -> list[dict]:
         p.init({"d0": "A0", "a0": "A0"})
         p.gate("MS", [["d0", "a0"]], sites=["A0"])
     case("r7c-no-cooling", [], r7c)
+
+    # R22: TWO IONS DOING DIFFERENT THINGS IN ONE CYCLE, which under broadcast control is
+    # two waveforms and therefore two cycles.  Two spellings of the signature, because the
+    # label is what the message prints and `hop_label`'s branches are separate code: one
+    # ion travelling twice as far along the same named path, and a path hop beside a spur
+    # hop.  (The lab-frame branch and a NEGATIVE path delta are already covered -- the
+    # grid9x9 / deck_unit_cell walks produce `shuttle -x,-y` and ladder_2x72 `HB:-1`.)
+    #
+    # Deliberately NOT two ions driven in opposite directions on one loop: that also trips
+    # `r4_drivable`, whose violations Python files under R4 and which the browser lists as
+    # skipped rather than mirroring, so the case would fail on the R4 count for a reason
+    # that has nothing to do with R22.
+    def r22_farther(p):
+        p.init({"d0": "S1", "d1": "S4"})
+        p.simd("shuttle", [["d0", "S1", "S2", ["E1"]], ["d1", "S4", "S6", ["E4", "E5"]]])
+    case("r22-one-ion-goes-twice-as-far", [], r22_farther)
+
+    # BOTH spur directions, because `spur:inward` and `spur:outward` are two branches of
+    # one ternary and a mirror that collapsed them would still print a plausible message
+    def r22_spur(p):
+        p.init({"d0": "S1", "a0": "S0"})
+        p.simd("shuttle", [["d0", "S1", "S2", ["E1"]], ["a0", "S0", "A0", ["V0"]]])
+        p.simd("shuttle", [["d0", "S2", "S3", ["E2"]], ["a0", "A0", "S0", ["V0"]]])
+    case("r22-loop-beside-spur", [], r22_spur)
+
+    # ...and the SAME programme under `control.model = "direct"`, where R22 does not apply
+    # at all: a directly-addressed plane has one waveform per site, so Python goes silent
+    # and a mirror that ignored the control model would report a violation nobody made.
+    case("r22-direct-control-opts-out",
+         [{"method": "set_control", "args": [], "kwargs": {"model": "direct"}}], r22_farther)
+
+    # R19/R20/R21: THE DRAWING.  A shipped architecture is clean geometry by construction,
+    # so these break it the two ways a user can: retune the limits the document declares,
+    # or drag a site.  The dragged cases are the ones that matter -- they fire at the
+    # DEFAULT budget, and `{min_ang:g}` has to print 60.0 as "60" while the retuned one
+    # prints "90.5" -- a formatting difference `String(x)` gets wrong in one direction and
+    # `toFixed` in the other.  90.5 against a 90-degree corner also puts the violation
+    # WITHIN a degree of the threshold, which is what makes the 1e-9 tolerance testable.
+    def rot(p):
+        p.init({"d0": "S1", "d1": "S3"})
+        p.rotate(1)
+    case("r19-degree-over-budget",
+         [{"method": "set_budget", "args": [], "kwargs": {"max_junction_degree": 2}}], rot)
+    case("r20-angle-under-budget",
+         [{"method": "set_budget", "args": [], "kwargs": {"min_rail_angle_deg": 90.5}}], rot)
+    # dragging S6 off the rail leaves a 28.1-degree fork AND two rails crossing the far
+    # row in open space
+    case("r21-crossed-rails",
+         [{"method": "move_site", "args": ["S6", 6.0, 4.0], "kwargs": {}}], rot)
+    # ...and dropping the dock trap onto the rail its spur leaves is the other half of R21
+    case("r21-node-on-a-rail",
+         [{"method": "move_site", "args": ["A0", 0.5, 0.0], "kwargs": {}}], rot)
     return out
 
 
@@ -1657,6 +1980,7 @@ def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
         })
 
     # -- fuzzed generator parameters ---------------------------------------------------
+    _assert_generator_corpus_is_not_vacuous(_fuzz_params(random.Random(seed)))
     for i, (name, params) in enumerate(_fuzz_params(rng)):
         rec = {"name": f"fuzz:{name}:{i}", "generator": name, "params": params}
         try:
@@ -1673,8 +1997,12 @@ def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
         cases["generators"].append(rec)
 
     # -- drags and adversarial lattices, both modes -------------------------------------
-    for rec in _drag_layouts(rng) + _adversarial_layouts(rng):
-        rec["layout"] = compute_layout(rec["nodes"], rec["segments"])
+    # `opts` is absent on every case here and present on the true-scale ones below, so one
+    # bucket proves both that the option mirrors and that its ABSENCE changes nothing.
+    for rec in (_drag_layouts(rng) + _adversarial_layouts(rng) + _true_scale_layouts(rng)
+                + _hold_layouts(rng)):
+        rec["layout"] = compute_layout(rec["nodes"], rec["segments"],
+                                       **_layout_opts(rec))
         cases["layouts"].append(rec)
 
     cases["marks"] = _mark_cases(rng)
@@ -1711,7 +2039,7 @@ def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
     cases["build"] = _build_cases(rng)
     cases["build_vocabulary"] = {"build": sorted(BUILD_METHODS),
                                  "seed": sorted(SEED_METHODS)}
-    # the verdicts: 17 of the 23 rules, re-derived client-side off the pricing walk
+    # the verdicts: 21 of the 27 rules, re-derived client-side off the pricing walk
     cases["rules"] = _rule_cases()
     cases["browser_set"] = list(BROWSER_SET)
     # the programme lane: the twelve authoring verbs, lowered to frames and to TSIR
@@ -1859,14 +2187,32 @@ def _schema_cases(rng: random.Random) -> list[dict]:
     return out
 
 
+def _layout_opts(rec) -> dict:
+    """The keyword options one layout case carries, as `compute_layout` takes them.
+
+    A case with no `opts` is the default fit; one with `opts` is exercising `true_scale`.
+    `tests/parity.mjs` hands the SAME dict to `Q.computeLayout` as its third argument, so
+    the two sides cannot disagree about which question was asked.
+    """
+    o = rec.get("opts") or {}
+    out = {}
+    if "true_scale" in o:
+        out["true_scale"] = o["true_scale"]
+    if "unit_nm" in o:
+        out["unit_nm"] = o["unit_nm"]
+    if "hold" in o:
+        out["hold"] = o["hold"]
+    return out
+
+
 def _raw_variant(cases: dict) -> dict:
     """Add the UNQUANTIZED reference to every explicit layout case."""
     for rec in cases["layouts"]:
-        rec["layout_raw"] = _raw_layout(rec["nodes"], rec["segments"])
+        rec["layout_raw"] = _raw_layout(rec["nodes"], rec["segments"], **_layout_opts(rec))
     return cases
 
 
-def _raw_layout(nodes, segments):
+def _raw_layout(nodes, segments, **opts):
     """`compute_layout` with the OUTPUT quantizer bypassed -- and only that one.
 
     The internal quantizers (`_lattice_step`'s nd=9, `_bows`'s nd=3) stay, because they are
@@ -1875,7 +2221,7 @@ def _raw_layout(nodes, segments):
     `raw` that differed between the two sides would have the harness comparing two
     different questions, which is how this very assertion first failed.
     """
-    return compute_layout(nodes, segments, raw=True)
+    return compute_layout(nodes, segments, raw=True, **opts)
 
 
 def run_parity(cases: dict, tmp_path: Path, tag: str = "cases") -> dict:
@@ -1914,6 +2260,16 @@ def test_the_engine_is_bit_identical_to_python(tmp_path):
         "the four listing shapes are the point of this corpus")
     assert len(cases["templates"]) == len(ARCH_FILES)
     assert len(cases["classes"]) > 50 and len(cases["strings"]) > 100
+    # TRUE SCALE is a second branch inside `_fit`; a bucket that stopped emitting it would
+    # read as a pass while the branch went unmirrored.
+    ts = [c for c in cases["layouts"] if (c.get("opts") or {}).get("true_scale")]
+    assert len(ts) >= 4 * len(ARCH_FILES), (
+        "the true-scale layout bucket is gone; `_fit`'s nm-per-unit branch is unmirrored")
+    # THE HELD VIEW is the other bypass of `_fit`, and the one an edit takes on every
+    # gesture; the same vacuity argument applies.
+    hold = [c for c in cases["layouts"] if (c.get("opts") or {}).get("hold")]
+    assert len(hold) >= 2 * len(ARCH_FILES), (
+        "the held-view layout bucket is gone; `compute_layout`'s `hold` is unmirrored")
     assert any(":probe:node_plural" in c["name"] for c in cases["classes"]), (
         "the node-label singular probe is gone; a whole orbit branch is uncovered")
     r = run_parity(cases, tmp_path)
@@ -1939,6 +2295,9 @@ def test_the_unquantized_intermediates_agree_too(tmp_path):
 #: Checked over 200,000 random (sx, sy) pairs before it was dropped.
 @pytest.mark.parametrize("mutation,why", [
     ("0.55 * g", "the `_bows` clearance radius"),
+    ("var kts = Math.min(sx / ts[0], sy / ts[1]);",
+     "true scale's nm-per-unit fit: the pair must be the LARGEST in the required ratio "
+     "that still fits inside the budget both axes passed"),
     ("K_ION = GEOM.ION_D_FRAC_ACTIVE + 0.065", "the ion radius constant"),
     ("Math.floor(v * s + 0.5) / s", "the decimal quantizer"),
     ("set.add(_q(vals[i], 9))", "the internal lattice quantizer that `sx` descends from"),
@@ -1969,6 +2328,11 @@ def test_the_parity_harness_catches_a_planted_drift(tmp_path, mutation, why):
         broken = src.replace(mutation, "set.add(vals[i])", 1)
     elif mutation.startswith("Math.min(Math.trunc"):
         broken = src.replace(mutation, "Math.min(cap || 0, 6)", 1)
+    elif mutation.startswith("var kts ="):
+        # `max` instead of `min`: the true-scale pair would be the SMALLEST that contains
+        # the budget rather than the largest that fits inside it, which overflows the
+        # viewport on every device whose two axes do not already agree.
+        broken = src.replace(mutation, "var kts = Math.max(sx / ts[0], sy / ts[1]);", 1)
     else:
         broken = src.replace(mutation, mutation.replace(", prefix, ['highway']", ", null, ['highway']"), 1)
     assert broken != src
@@ -2186,6 +2550,21 @@ def _js_eval(tmp_path: Path, expr: str):
 # --------------------------------------------------------- the rules bucket + its guard
 
 
+#: The Python half of bucket 15, built ONCE per session.  Nothing in it depends on the
+#: engine under test -- `rules_only_cases` varies only the `engine` path -- and building it
+#: replays every architecture x mutation combination through `verify`, of which the deck
+#: programme alone is ~20 s.  Paid once per planted mutation, that is minutes of wall clock
+#: buying nothing; the guards are what this file is for, so the corpus must not tax them.
+_RULE_CASE_CACHE: "list[dict] | None" = None
+
+
+def _rule_cases_cached() -> list[dict]:
+    global _RULE_CASE_CACHE
+    if _RULE_CASE_CACHE is None:
+        _RULE_CASE_CACHE = _rule_cases()
+    return _RULE_CASE_CACHE
+
+
 def rules_only_cases(engine: Path = ENGINE, edit_js: Path = EDIT_JS) -> dict:
     """Just bucket 15, so the mutation guard costs one corpus rather than fifteen."""
     return {
@@ -2195,7 +2574,7 @@ def rules_only_cases(engine: Path = ENGINE, edit_js: Path = EDIT_JS) -> dict:
         "schema_version": SCHEMA_VERSION,
         "templates": _template_cases(),
         "template_default": DEFAULT_TEMPLATE,
-        "rules": _rule_cases(),
+        "rules": _rule_cases_cached(),
         "browser_set": list(BROWSER_SET),
     }
 
@@ -2212,7 +2591,7 @@ def test_the_rules_bucket_is_not_vacuous(tmp_path):
     for c in cases["rules"]:
         for r, n in c["python"].items():
             tot[r] = tot.get(r, 0) + n
-    for rule in ("R1", "R6", "R6b", "R7", "R7c"):
+    for rule in ("R1", "R6", "R6b", "R7", "R7c", "R19", "R20", "R21", "R22"):
         assert tot.get(rule, 0) > 0, f"no case in the corpus trips {rule}: {tot}"
     assert sum(tot.values()) > 3000, tot
     assert any(not c["python"] for c in cases["rules"]), (
@@ -2221,6 +2600,24 @@ def test_the_rules_bucket_is_not_vacuous(tmp_path):
     r = run_parity(cases, tmp_path, "rules")
     assert r.get("mismatched") == 0, _report(r)
     assert r["compared"] > 3000, r
+
+
+def test_the_geometry_half_of_the_lint_bucket_is_not_vacuous():
+    """A corpus of clean drawings compares two empty lists and calls that agreement.
+
+    Every shipped architecture is clean geometry -- that is what shipping it means -- so
+    R19, R20 and R21 have to be given something broken, and each of the three has to be
+    broken by at least one case or it is untested however green the bucket looks.
+    """
+    tot: dict[str, int] = {}
+    for c in _lint_cases():
+        for v in c.get("geometry", ()):
+            tot[v["rule"]] = tot.get(v["rule"], 0) + 1
+    for rule in ("R19", "R20", "R21"):
+        assert tot.get(rule, 0) > 0, f"no lint case in the corpus trips {rule}: {tot}"
+    assert any(not c.get("geometry") for c in _lint_cases()), (
+        "every case has broken geometry; a mirror that reported a violation for EVERY "
+        "node would pass, and the clean architectures are what refuse that")
 
 
 #: THE MUTATION GUARDS for bucket 15.  The first two are the defects a prototype of this
@@ -2249,6 +2646,44 @@ _RULE_MUTATIONS_JS = [
     ("if (n > budget) {",
      "if (n > budget * 1000) {",
      "R7's budget comparison"),
+    # ...and the four rules that judge the DRAWING and the WAVEFORM, one plant per branch
+    # that can be wrong on its own.  Every one of these leaves the verdict identical on
+    # the cases it changes -- still "illegal", still the same rule id -- and changes only
+    # how many violations are enumerated or exactly what the message says, which is what
+    # the count-and-multiset comparison is for.  Three candidate plants were DROPPED here
+    # because the corpus did not notice them, and each was answered by making a case
+    # sharper rather than by keeping a guard that guards nothing: an inclusive
+    # `_pointOnSegment` (no node in the corpus sits exactly at a rail end), a 1-degree R20
+    # tolerance (until the r20 case asked for 90.5 against a 90-degree corner), and a
+    # collapsed spur direction (until the r22 spur case docked AND undocked).
+    ("    if (d > maxDeg) {",
+     "    if (d > maxDeg + 1) {",
+     "R19's degree comparison -- a mirror one rail more permissive than Python"),
+    ("        if (ang < minAng - 1e-9) {",
+     "        if (ang < minAng - 1.0) {",
+     "R20's angle tolerance, 1e-9 for a whole degree"),
+    ("  if (Math.abs(cross) > RAIL_EPS * Math.sqrt(l2)) return false;",
+     "  if (Math.abs(cross) > 0.5 * Math.sqrt(l2)) return false;",
+     "R21's coincidence tolerance -- 1e-6 of a lattice unit for half of one, which turns "
+     "'this node is ON the rail' into 'this node is NEAR the rail'"),
+    ("      if (bb[0] > ba[2] || bb[2] < ba[0] || bb[1] > ba[3] || bb[3] < ba[1]) continue;",
+     "      if (true) continue;",
+     "R21's crossing pass, which the bounding-box reject must ACCELERATE and never decide"),
+    ("      return loop + ':' + (d < 0 ? '-' : '+') + Math.abs(d);",
+     "      return loop + ':' + Math.abs(d);",
+     "the sign in R22's path label -- `action_label`'s `{delta:+d}`, which is what tells "
+     "two ions driven in opposite directions apart"),
+    ("    return own(on, m.src) ? 'spur:inward' : 'spur:outward';",
+     "    return 'spur:inward';",
+     "R22's spur direction, docking and undocking given the same label"),
+    ("  if (w.type !== 'simd' || !w.nmv || w.directControl) return [];",
+     "  if (w.type !== 'simd' || !w.nmv) return [];",
+     "R22's control-model gate: a directly-addressed plane is not broadcast and R22 does "
+     "not apply to it at all"),
+    ("    var sig = cls + ' ' + labels.join(',');",
+     "    var sig = cls + ' ' + labels[0];",
+     "R22's motion signature, keeping only the FIRST hop -- a multi-hop cycle whose ions "
+     "diverge after the first segment then looks uniform"),
 ]
 
 
@@ -2269,9 +2704,9 @@ def test_the_rules_bucket_catches_a_planted_drift(tmp_path, anchor, replacement,
 
 @requires_node
 def test_the_browser_rule_set_is_derived_on_both_sides(tmp_path):
-    """`BROWSER_SET` in Python and `mirroredRules()` in JS must be the same 17 rules.
+    """`BROWSER_SET` in Python and `mirroredRules()` in JS must be the same 21 rules.
 
-    The JS side is derived from `RULE_FNS` plus the three checked-by-construction rules,
+    The JS side is derived from `RULE_FNS` plus the checked-by-construction rules,
     so a rule that is advertised-but-undispatchable is impossible there; this is what
     stops the PYTHON side shipping a `rule_checksum` entry for a rule nothing checks.
     """
@@ -2456,6 +2891,43 @@ def test_the_js_covers_every_emitted_statement(tmp_path):
         f"generator sets differ: python={sorted(GENERATORS)} js={sorted(got['g'])}")
 
 
+#: WHAT `python -m qccd regen` WRITES, as (what it is, glob under `out/`).  These are the
+#: pages this repository renders and re-renders; everything else under `out/` belongs to
+#: something else and is out of scope -- see `_regen_pages`.
+REGEN_SETS = (
+    ("the demo devices", "*__*__*.html"),
+    ("the studio", "studio.html"),
+    ("the hand-checkable examples", "verify/*.html"),
+    ("the course", "tutorial/*.html"),
+)
+
+
+def _regen_pages() -> list[Path]:
+    """The emitted pages this build owns, with a positive control on every group.
+
+    `out/` is not a directory of this repository's outputs; it is where everything lands.
+    Site-build STAGING COPIES (`out/site-deploy`, `out/site-classical`, ...) sit beside
+    them, and a staging copy preserves the bytes of a past build on purpose -- a site build
+    copies entry pages verbatim instead of rendering them, so such a copy is stale by
+    construction the instant the engine changes and is SUPPOSED to be.  Scratch dumps
+    (`negfix.html`, `studio_ring.html`, the 08-23 `*.metal.html`) are nobody's output any
+    more either.  Asserting on those asks a snapshot not to be a snapshot.
+
+    Each glob must match at least one page.  A scan that quietly matches nothing passes
+    every assertion in the caller and reports a green that means "there was nothing to
+    look at" -- which is the exact failure these tests exist to catch, turned inward.
+    """
+    out: list[Path] = []
+    for what, pattern in REGEN_SETS:
+        got = [q for q in sorted(OUT_DIR.glob(pattern))
+               if '<script id="data"' in q.read_text(encoding="utf-8", errors="replace")]
+        assert got, (
+            f"no pages matched {pattern!r} ({what}); either `python -m qccd regen` has not "
+            f"run in this tree or the glob is stale -- an empty scan is not a pass")
+        out += got
+    return out
+
+
 @requires_node
 def test_the_page_inlines_this_exact_engine():
     """The bytes under test must be the bytes that ship.
@@ -2464,12 +2936,8 @@ def test_the_page_inlines_this_exact_engine():
     rather than conventionally avoided.  Without this, a `render.py` change that pasted a
     fork of the engine would leave the parity test passing while the page ran the fork.
     """
-    # a VISUALIZATION page, identified by its data block -- `out/index.html` is the demo
-    # index and carries no view model, so it is not one
-    pages = [p for p in sorted((ROOT / "out").rglob("*.html"))
-             if '<script id="data"' in p.read_text(encoding="utf-8")]
-    if not pages:
-        pytest.skip("no emitted pages in out/; run `python -m qccd demo` first")
+    # the pages THIS BUILD owns, not everything that has ever been written under `out/`
+    pages = _regen_pages()
     engine = ENGINE.read_text(encoding="utf-8")
     edit = EDIT_JS.read_text(encoding="utf-8")
     editor = (ROOT / "qccd" / "viz" / "js" / "editor.js").read_text(encoding="utf-8")
@@ -2478,7 +2946,9 @@ def test_the_page_inlines_this_exact_engine():
         assert engine in html, f"{p.name} does not contain qccd/viz/engine.js verbatim"
         assert edit in html, f"{p.name} does not contain qccd/viz/js/edit.js verbatim"
         assert editor in html, f"{p.name} does not contain qccd/viz/js/editor.js verbatim"
-    assert len(pages) >= 9, f"only {len(pages)} page(s) checked; the demo emits ten"
+    assert len(pages) >= 18, (
+        f"only {len(pages)} page(s) checked; regen writes ten demo devices, the studio, "
+        f"seven verify pages and the course")
 
 
 def test_layout_py_uses_only_portable_arithmetic():
@@ -2669,9 +3139,8 @@ def test_every_emitted_page_carries_the_live_schema():
     import re
     if not OUT_DIR.exists():
         pytest.skip("no emitted pages to check")
-    pages = [p for p in sorted(OUT_DIR.rglob("*.html")) if p.name != "index.html"]
-    if not pages:
-        pytest.skip("no emitted pages to check")
+    # same scope, same reason: a staging copy ships the schema of the build that made it
+    pages = _regen_pages()
     want = json.dumps(export_schema(), separators=(",", ":"), sort_keys=True)
     for p in pages:
         html = p.read_text(encoding="utf-8")
