@@ -432,7 +432,8 @@ half: a decoder sitting somewhere, wired to every place that measures, and a mem
 what it decides. Both are places on the same map, and the bits between them are drawn
 dashed and dark, because a bit is not an ion. Code: `leaves/classical.py`,
 `logic/decode.py`, the classical parts of `model.py`, `town.py`, `city.py`,
-`place_checks.py`, `logic/flat.py`.
+`place_checks.py`, `logic/flat.py`; the latencies and the decoder profiles come from
+`qccd/analysis/feedback.py`, which the studio and the leaderboard read too.
 
 | category | place | silhouette | master | ops |
 |---|---|---|---|---|
@@ -548,6 +549,25 @@ something that runs after it arrives; no frame or outcome names a measurement th
 happened. G11: no decoding job waits past the next syndrome's arrival (the backlog
 problem), and no classically controlled op starts before its guard has reached it.
 
+**Where the loop shows up outside this section.** The same numbers are the site's, from
+one table (`qccd/analysis/feedback.py`: `LINK`, `DECODERS`, `cycle_report`, and the `cycle`
+analysis, which is sweepable — *how slow may my decoder be before the backlog grows*):
+
+* **the studio's Design tab** (`studio.html#design`) has a **QEC cycle** panel — the round
+  the device on the canvas actually runs (the studio's own priced runtime, via
+  `EDITOR.price()`, and nothing shown at all when that price is blocked), the loop drawn
+  stage by stage, a decoder to pick, and the two verdicts. It is *injected* by
+  `qccd/site/build.py` (`qccd/site/qec_cycle.py::studio_block`), so the studio's own
+  modules are untouched and the panel cannot disagree with the places;
+* **the leaderboard** (`/board/`) carries each board's QEC clock on its row — the round it
+  ranks, cycles per second, the decoder margin and what feedback costs as a fraction of a
+  cycle — and one section comparing every board, with a superconducting round as the
+  yardstick. That contrast is the point: at 55 ms a round a lookup decoder has ~55,000× of
+  margin and feedback costs 0.015% of a cycle; at 1 µs a round the same GPU decoder is
+  0.001× — it falls behind by 999 µs every round — and the reaction time is 830% of a
+  cycle. The ion transport that makes a QCCD round slow is what makes its classical loop
+  nearly free.
+
 **Not established here:** a decoder for more than one window at a time (the table is
 per-round), soft-information decoding, the cost of the classical hardware itself, and
 route-changing branches -- a guard can gate an op, not send a block somewhere else, and
@@ -562,6 +582,21 @@ Clifford frame rather than a Pauli one) is not implemented.
 `index.html` in the build directory, plus `leaf/<master>.js` (one master's device and
 programs, loaded with a plain `<script>` so `file://` works) and, with `--studio`,
 `studio/<master>.<op>.html`. Canvas throughout; no network.
+
+**One visual language with the studio.** A trapping site, a junction, a rail and an ion are
+drawn here by the same numbers `studio.html` draws them by: the page is handed
+`qccd/viz/theme.py`'s `PALETTE` and `GEOMETRY` and reproduces `qccd/viz/render.py`'s
+shapes — a site is a capsule of length `min(0.88g, (0.30 + 0.15m)g)` and thickness
+`0.1992g` rotated onto its trap axis, with one ring per slot and its stroke saying what it
+is (over capacity, in play, a dock at degree ≥ 3, a corner, or just its zone); a junction is
+a sharp white square of side `0.60g`; a rail is a butt-capped line coloured by its role
+(`rail`, `highway`, `compute` thin); an ion is a white-outlined disc of radius `r_ion` when
+it is in play and `r_rest` otherwise, with the gold halo under a site in play and the
+potential-well ellipse under an ion in flight. `g` — the nearest-neighbour distance — is
+measured per device and multiplied by the camera's scale, which is what the studio's fit
+does. Ion colour follows the studio's rule (*what the machine is doing to this ion now*,
+not what role a code gave it): a gate teal, a measurement or reset red, everything else
+slate. Change the palette in `theme.py` and both tools move together.
 
 - **Run.** The stage draws the current level's children as gadget boxes (family colour,
   running op and its progress, an inventory gauge), their ports, and the channels with ions
