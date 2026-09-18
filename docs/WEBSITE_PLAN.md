@@ -580,3 +580,48 @@ accounts (the migration gives every existing row `access = 1`); the panel lists 
 closes any one of them in a click. Nothing here verifies that the person who followed
 the link is the person the mail reached -- possession of the link is the proof, as with
 any invitation.
+
+### The reading design — 2026-09-17
+
+**Asked.** Font, layout and background; everything better organised, elegant, the important
+part highlighted; the text and diagrams in the middle on a lighter background; a table of
+contents on the left of every large page, clickable, smooth, floating with the scroll; code
+blocks in their own font and environment with keywords coloured; and `/compilation/` fixed,
+where the right-hand diagram dwarfed the text beside it, the columns did not align, and the
+rules ran together with nothing between them.
+
+**Built.** (1) Three depths and no more, in `build.py::STYLE`: `--surface` the desk the page
+lies on, `--paper` the sheet `main` is (the lightest thing on screen, so the eye goes to the
+words), `--card` for the cards that carry one item each. Prose and headings are a system
+serif at 16px/1.68 with a measure; anything that is a control, a label or a table of numbers
+is pinned to the sans by an explicit selector list, because it is interface and not prose.
+(2) The contents rail, in `READING_JS`, injected by `with_nav` into every non-app page: built
+from the page's own `h2`/`h3` with ids, three or more or it does nothing, `position:fixed`,
+the section you are in picked out on scroll, `scrollIntoView` with `behavior:smooth` and
+`scroll-margin-top` under the now-sticky bar. A wide page has no gutter, so the rail and the
+sheet are centred as a pair by setting `main`'s left margin -- measured with margins cleared,
+on resize only. It carries its own `<style>` with literal colour fallbacks, so a page that
+takes the script without the sheet is never left with a bare list of links. (3) Code: its own
+panel and face, and a tokenizer over `pre` text nodes (never innerHTML) that colours keywords,
+strings, numbers and comments for Python, OpenQASM, JSON and the hardware listings -- two
+regexes, because `#` opens a comment in Python and numbers an instruction in a listing.
+(4) `/compilation/`: a gate is a card with air around it -- gate and device across the top, a
+rule under them, then two columns of equal weight whose labels start on the same line; the
+circuit capped so it no longer loses to the machine view; the listing scrolls instead of
+stretching the row. The same card treatment for the rules, the language statements, the course
+parts, the board tasks, the people and the publications. (5) `landing.html` carries its own
+stylesheet and would have been left behind; brought to the same palette and type.
+(6) `BOARD_SKIN`: the five leaderboard task pages are written whole by `bb_studio.py` and
+copied in, so `PAGE` never touches them and the redesign stopped at the board index -- they
+name the same CSS variables, so redefining those after their own stylesheet gives them the
+sheet and the type without touching the chart.
+
+**The constraint that shaped it.** Twelve of the thirteen comments readers have left are
+pinned to `/compilation/`, and an anchor is a path through the DOM with a first-80-characters
+text fallback. A wrapper element or a moved node orphans real feedback. So the whole layout
+is CSS inside `<main>`, and everything new is appended to `<body>`.
+
+**Not done, on purpose.** `/gadgets/showcase/` and `/gadgets/demo/` keep their own design:
+they are not documents with an application embedded, they are the application, and their
+drawing was deliberately aligned to the studio's palette and geometry. A document frame
+around a studio canvas would say two things at once. Same line as `studio.html`.

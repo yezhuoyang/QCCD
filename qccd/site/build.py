@@ -333,6 +333,18 @@ FOOTER_CSS = """
 #sitefoot .logos img{display:block;height:38px;width:auto} #sitefoot .logos img[alt="UCLA"]{height:30px}
 """
 FOOTER_BLOCK = "<style>" + FOOTER_CSS + "</style>" + FOOTER
+
+BOARD_SKIN = """<style>
+:root{--surface:#eceae3;--ink:#15141a;--ink2:#56545e;--ink3:#8a8892;--line:#e4e2db;--grid:#efeee9;--accent:#1f5bb5;
+ --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif}
+body{background:var(--surface)}
+main{background:#fff;border:1px solid var(--line);border-radius:16px;margin:26px auto 44px;padding:34px 40px 44px;
+ box-shadow:0 1px 2px rgba(18,16,28,.05),0 12px 34px rgba(18,16,28,.07)}
+h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.02em;line-height:1.14;margin:0 0 8px;color:#1a2540}
+h2,h3{font-family:var(--serif);color:#1a2540}
+.sub{font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--ink2)}
+#sitefoot{background:transparent;border-top:0}
+</style>"""
 STYLE = STYLE + FOOTER_CSS
 
 HASH_JS = """<script>
@@ -1689,7 +1701,7 @@ def build(out: Path) -> int:
         dst = out / "board" / t["id"]
         dst.mkdir(parents=True, exist_ok=True)
         put(f"board/{t['id']}/index.html", (src / "index.html").read_text(encoding="utf-8"), 2, "board",
-            extra=FOOTER_BLOCK)
+            extra=FOOTER_BLOCK + BOARD_SKIN)
         # the published manifest carries only the listed designs; the seed directory keeps
         # the full record, disqualified rows included
         (dst / "manifest.json").write_text(json.dumps(t["rows"], indent=1, default=str) + "\n",
