@@ -271,6 +271,14 @@ svg.qc{display:block;width:100%;max-width:320px;height:auto;background:var(--pap
 @media (max-width:860px){.gr{grid-template-columns:1fr}}
 .kv{font-size:12.5px;border-collapse:collapse} .kv td{padding:2px 12px 2px 0;border:0;vertical-align:top} .kv td:first-child{color:var(--ink3)}
 .pulses code{display:block;font-size:11.5px;background:#f7f6f2;padding:2px 6px;border-radius:4px;margin:2px 0}
+/* a gate set is a long list nobody reads at a glance: name it, and open it if you want it */
+details.gset summary{cursor:pointer;color:var(--accent);font-family:var(--sans);font-size:12.5px;list-style:none}
+details.gset summary::-webkit-details-marker{display:none}
+details.gset summary:before{content:"\25b8 ";color:var(--ink3)} details.gset[open] summary:before{content:"\25be "}
+details.gset code{display:block;margin:6px 0 2px;line-height:1.7}
+dl.native{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin:14px 0 0;align-items:baseline;max-width:74ch}
+dl.native dt{font-family:var(--mono);font-size:13.5px;color:var(--head);font-weight:600;white-space:nowrap}
+dl.native dd{margin:0;color:var(--ink)}
 
 /* physics, people and publications */
 .folk{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:10px 0 0}
@@ -821,6 +829,120 @@ def board_index(ts: list[dict]) -> str:
                        extra_css=qec_cycle.CSS, body=body)
 
 
+CREDIT_CSS = """
+.cr{width:100%;border-collapse:collapse;margin:10px 0 0}
+.cr th{text-align:left;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700;padding:0 10px 8px 0}
+.cr td{padding:10px 10px 10px 0;border-top:1px solid var(--grid);vertical-align:middle}
+.cr td.n{font-variant-numeric:tabular-nums;text-align:right;padding-right:18px}
+.cr .who{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--head)}
+.cr .av{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+ color:#fff;font:600 11px/1 var(--sans);flex:0 0 auto}
+.cr .tot{font-size:19px;font-weight:600;color:var(--head)}
+.cr .gone{color:var(--ink3);font-weight:400;font-size:12px;margin-left:6px}
+.crbar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--grid);min-width:90px}
+.crbar i{display:block;height:100%} .crbar .a{background:#0b7a4b} .crbar .o{background:#d59a00}
+.crkey{font-family:var(--sans);font-size:12px;color:var(--ink2);margin:14px 0 0}
+.crkey i{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 5px 0 14px;vertical-align:0}
+.crkey i:first-child{margin-left:0}
+.crlist{list-style:none;padding:0;margin:10px 0 0;font-family:var(--sans)}
+.crlist li{border-top:1px solid var(--grid);padding:10px 0;display:flex;gap:12px;align-items:flex-start;font-size:13px}
+.crlist .b{flex:1 1 auto;min-width:0} .crlist .b p{margin:3px 0 0;color:var(--ink);white-space:pre-wrap;word-wrap:break-word}
+.crlist small{color:var(--ink3)} .crlist .tag{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;
+ padding:2px 8px;border-radius:10px;white-space:nowrap;flex:0 0 auto}
+.crlist .tag.a{background:#e6f4ec;color:#0b7a4b} .crlist .tag.o{background:#fff3e0;color:#b26a00}
+"""
+
+
+def credit_page() -> str:
+    """Who has read the site closely enough to say something about it.
+
+    The numbers come from `/api/credit`, an append-only ledger in the comments database:
+    one row per comment, written when it is posted and marked rather than deleted when the
+    comment is dealt with.  So addressing a comment clears it off the page it was pinned to
+    and never off this one."""
+    body = r"""<h1>Credit</h1>
+<p class="sub">Who has read this site closely enough to say something about it. A comment counts
+once, when it is posted. Addressing one takes it off the page it was pinned to and never off
+this page &mdash; the record of having noticed the thing is the part worth keeping.</p>
+<div id="crmsg" class="note">Sign in from the bar above to see this.</div>
+<div id="crbody" hidden>
+  <h2 id="people">Who has commented</h2>
+  <table class="cr"><thead><tr><th>Collaborator</th><th class="n">Comments</th>
+    <th>Addressed &middot; still open</th><th>Latest</th></tr></thead><tbody id="crpeople"></tbody></table>
+  <p class="crkey"><i style="background:#0b7a4b"></i>addressed &mdash; dealt with and taken off the page
+    <i style="background:#d59a00"></i>still on the page</p>
+  <h2 id="every">Every comment, newest first</h2>
+  <ul class="crlist" id="critems"></ul>
+</div>
+<script>
+(function(){
+  if(typeof fetch !== 'function') return;
+  var PAL = ['#2a78d6','#d64545','#1baf7a','#eb6834','#4a3aa7','#c2308a','#0e9aa7','#8a6d1e','#5b8c1e','#b5471b','#6b4fbb','#2f7f6e'];
+  function el(t, c, x){ var e = document.createElement(t); if(c) e.className = c; if(x != null) e.textContent = x; return e; }
+  function initials(n){ var w = String(n || '?').trim().split(/\s+/).filter(Boolean);
+    return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); }
+  function when(t){ if(!t) return ''; var d = new Date(t * 1000);
+    try { return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch(e){ return d.toISOString().slice(0, 10); } }
+  // ask who we are first: a signed-out reader then gets the message without a refused
+  // request, which would otherwise be a console error on an ordinary visit to this page
+  fetch('/api/me', { credentials: 'same-origin' }).then(function(r){
+    return r.ok ? r.json() : { user: null };
+  }).then(function(m){
+    if(!m || !m.user) throw new Error('sign-in');
+    return fetch('/api/credit', { credentials: 'same-origin' });
+  }).then(function(r){
+    if(r.status === 401) throw new Error('sign-in');
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(d){
+    document.getElementById('crmsg').hidden = true;
+    document.getElementById('crbody').hidden = false;
+    var tb = document.getElementById('crpeople');
+    d.people.forEach(function(p){
+      var tr = el('tr');
+      var td = el('td'), who = el('div', 'who');
+      var av = el('span', 'av', initials(p.name)); av.style.background = PAL[(p.color || 0) % PAL.length];
+      who.appendChild(av); who.appendChild(el('span', null, p.name));
+      if(p.gone) who.appendChild(el('span', 'gone', 'account closed'));
+      td.appendChild(who); tr.appendChild(td);
+      var n = el('td', 'n'); n.appendChild(el('span', 'tot', String(p.total))); tr.appendChild(n);
+      var bt = el('td'), bar = el('div', 'crbar');
+      var a = el('i', 'a'), o = el('i', 'o');
+      a.style.width = (100 * p.addressed / (p.total || 1)) + '%';
+      o.style.width = (100 * p.open / (p.total || 1)) + '%';
+      bar.appendChild(a); bar.appendChild(o);
+      bar.title = p.addressed + ' addressed, ' + p.open + ' still open';
+      bt.appendChild(bar); tr.appendChild(bt);
+      tr.appendChild(el('td', null, when(p.last)));
+      tb.appendChild(tr);
+    });
+    var ul = document.getElementById('critems');
+    d.items.forEach(function(it){
+      var li = el('li');
+      var tag = el('span', 'tag ' + (it.removed ? 'a' : 'o'), it.removed ? 'addressed' : 'open');
+      var b = el('div', 'b');
+      b.appendChild(el('small', null, it.name + ' \u00b7 ' + when(it.created) + ' \u00b7 ' + it.page));
+      b.appendChild(el('p', null, it.text));
+      li.appendChild(tag); li.appendChild(b);
+      ul.appendChild(li);
+    });
+    if(!d.people.length){
+      document.getElementById('crbody').hidden = true;
+      var m = document.getElementById('crmsg');
+      m.hidden = false; m.textContent = 'Nobody has commented yet.';
+    }
+  }).catch(function(e){
+    var m = document.getElementById('crmsg');
+    m.textContent = (e && e.message === 'sign-in')
+      ? 'Sign in from the bar above to see this.'
+      : 'The credit list could not be loaded: ' + (e && e.message);
+  });
+})();
+</script>"""
+    return PAGE.format(title="Credit - QCCD studio", style=STYLE, extra_css=CREDIT_CSS, body=body)
+
+
 def discuss_page() -> str:
     cfg = json.loads((HERE / "giscus.json").read_text(encoding="utf-8"))
     secs = []
@@ -1018,7 +1140,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
 # ---------------------------------------------------------------- compilation
 
 QASM_GATES = [("single-qubit, via u3(&theta;, &phi;, &lambda;)", "id x y z h s sdg t tdg sx sxdg rx ry rz u1 p u2 u3 u",
-               "one frame update VZ(&lambda;) and one beam R(&theta;, &phi;); when &theta; is 0 the frame update carries the whole gate and the beam has angle 0"),
+               "one free VZ(&lambda;), then one laser pulse R(&theta;, &phi;)"),
               ("two-qubit", "cx cz cy ch swap cu1 cp", "cx is the primitive: R, MS(&pi;/2), R, R, R; the others are cx with single-qubit gates around it"),
               ("three-qubit", "ccx", "the standard six-CNOT decomposition"),
               ("non-unitary", "measure reset barrier", "readout and preparation in a zone with SPAM; barrier orders, and costs nothing")]
@@ -1167,21 +1289,35 @@ def compilation_page(built: list[dict]) -> str:
     by = {g["id"]: g for g in built}
     bell = by.get("bell")
     body = ["<h1>Compilation</h1>",
-            "<p class=\"sub\">A circuit comes in as OpenQASM and leaves as a hardware programme in the "
-            "<a href=\"../language/\">language</a> the machine runs, together with a certificate. The compiler is "
-            "not trusted: everything it emits is replayed against the <a href=\"../rules/\">rules</a>, and R10, "
-            "<i>the programme implements the circuit</i>, is decided by a checker written and proved sound in Lean "
-            "plus a tableau composed from the emitted pulses. This page walks the pipeline on a Bell pair, then "
-            "compiles and verifies every basic gate, each on one of four small devices (a linear register, a racetrack, "
-            "a lattice with junctions, and a ring with docks), and each result can be run here.</p>"]
+            "<p class=\"sub\">You write a quantum circuit. This page shows what the machine actually has to "
+            "do to run it: which ion is which qubit, which ions have to be moved next to each other, and which laser "
+            "pulses fire in what order. Every example here can be played.</p>"
+            "<p>Nothing on this page is taken on trust. The compiler's output is checked twice over &mdash; once "
+            "against the <a href=\"../rules/\">rules</a> the hardware imposes, and once against the circuit you "
+            "started from, to prove the machine really does compute what you asked for.</p>"]
     # the input
-    body.append("<h2 id=\"input\">The input</h2><p class=\"sub\">OpenQASM 2.0 with <code>qelib1.inc</code>. Every gate is lowered to the "
-                "native set of an ion trap: <b>R(&theta;, &phi;)</b>, one laser pulse; <b>VZ(&lambda;)</b>, a virtual "
-                "frame update that costs nothing; and <b>MS(&theta;)</b>, the M&oslash;lmer&ndash;S&oslash;rensen entangler on two "
-                "co-located ions. The lowering is two identities proved in Lean (<code>u3_decomp</code> and "
-                "<code>cx_decomp</code>), and the table that emits them is checked against the defining unitaries.</p>"
-                "<div class=\"tw\"><table><thead><tr><th>gates</th><th>accepted</th><th>lowered to</th></tr></thead><tbody>"
-                + "".join(f"<tr><td>{a}</td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in QASM_GATES) + "</tbody></table></div>")
+    body.append("<h2 id=\"input\">What goes in</h2>"
+                "<p class=\"sub\">A circuit in OpenQASM &mdash; the same text you would run on any quantum computer. "
+                "An ion trap cannot perform those gates directly, so each one is rewritten into the only three things "
+                "this machine can do:</p>"
+                "<dl class=\"native\">"
+                "<dt>R(&theta;, &phi;)</dt><dd>A laser pulse on one ion, turning that qubit by an angle &theta;. "
+                "The second angle &phi; picks which way it turns. This is the workhorse.</dd>"
+                "<dt>VZ(&lambda;)</dt><dd>A turn the machine gets for free: instead of firing a laser it simply "
+                "remembers the angle and adjusts the pulses that come afterwards. Costs no time.</dd>"
+                "<dt>MS(&theta;)</dt><dd>One laser across <i>two</i> ions sitting in the same trap. This is the only "
+                "way the machine entangles two qubits &mdash; which is why ions have to be moved next to each other "
+                "before a two-qubit gate can happen.</dd>"
+                "</dl>"
+                "<p>Any single-qubit gate at all can be written as <code>u3(&theta;, &phi;, &lambda;)</code> &mdash; "
+                "three angles are enough to describe every one of them &mdash; and on this machine that becomes one "
+                "free VZ and one laser pulse. The rewrite is not hand-written: both identities are machine-checked "
+                "proofs, so the gate you wrote and the pulses that fire are the same operation.</p>"
+                "<div class=\"tw\"><table><thead><tr><th>what you write</th><th>which gates</th>"
+                "<th>what the machine actually does</th></tr></thead><tbody>"
+                + "".join(f'<tr><td>{a}</td><td><details class="gset"><summary>{len(b.split())} gates</summary>'
+                          f'<code>{b}</code></details></td><td>{c}</td></tr>' for a, b, c in QASM_GATES)
+                + "</tbody></table></div>")
     if bell:
         c = bell["cert"]
         body.append(f'<div class="two"><pre><code>{html.escape(bell["qasm"].strip())}</code></pre>'
@@ -1198,7 +1334,12 @@ def compilation_page(built: list[dict]) -> str:
         ("Verify R10", "verdict.json", "<b>O1</b>: the certificate's moves are replayed from <code>init</code>; every gate must find its operands together in a trap that can gate, every hop must be one the device admits, every op witnessed exactly once and in order. The Lean checker <code>QCCDC.Cert.check</code> decides this, and <code>check_sound</code> proves that an accepted input implements the circuit. The device facts it judges against are re-derived from the architecture by code the compiler never runs. <b>O2</b>: the pulses are read out of the emitted programme, composed through the mapping into a stabilizer tableau and compared with the circuit's; outside the Clifford fragment an exact unitary is compared instead. A swapped operand, a dropped gate, a wrong angle or a mis-tracked frame all move the tableau."),
         ("Draw", "the page", "the studio joins the programme and the circuit through the stamps, but only after checking every witness against the stamp on the instruction it names; a disagreement refuses to draw."),
     ]
-    body.append("<h2 id=\"pipeline\">The pipeline</h2><ol class=\"stages\">" + "".join(
+    body.append("<h2 id=\"pipeline\">How a circuit becomes a machine programme</h2>"
+                "<p class=\"sub\">In short: read the circuit, rewrite every gate as laser pulses, decide which ion "
+                "plays which qubit, move ions so that the pairs that must interact end up in the same trap, write out "
+                "the instruction list, add cooling where the ions would be too hot to gate &mdash; then check the "
+                "result, twice. The nine steps below are that in full.</p>"
+                "<ol class=\"stages\">" + "".join(
         f'<li><div><b>{t}</b><span class="art">{a}</span></div><div class="out">{d}</div></li>' for t, a, d in stages) + "</ol>")
     if bell:
         c, v = bell["cert"], bell["verdict"]
@@ -1665,6 +1806,22 @@ def build(out: Path) -> int:
     put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True,
         extra=HASH_JS + qec_cycle.studio_block())
 
+    # the compiled companion Part D steps through.  A lesson with `page:` set runs on a
+    # COMPILED page, and says so; it links to this one by bare file name, beside the
+    # studio.  Built here from the shipped artifact because the browser cannot compile.
+    comp_tsir = ROOT / "Compiler" / "build" / "matrix" / "micro_grid9x9.cooled.tsir.json"
+    comp_qasm = ROOT / "Compiler" / "examples" / "micro.qasm"
+    if comp_tsir.exists() and comp_qasm.exists():
+        companion = out / "micro_grid9x9.html"
+        qccd_main(["studio", "-o", str(companion),
+                   "--tsir", str(comp_tsir), "--qasm", str(comp_qasm)])
+        put("micro_grid9x9.html", companion.read_text(encoding="utf-8"), 0, None,
+            app=True, extra=HASH_JS)
+        print("  companion    micro_grid9x9.html, the page Part D runs on")
+    else:
+        missing = comp_tsir if not comp_tsir.exists() else comp_qasm
+        print(f"  companion    SKIPPED, {missing} is missing -- Part D will 404")
+
     put("index.html", landing(ts), 0, None)
     put("learn/index.html", learn_page(parts, less, docs, ts), 1, "learn")
     put("design/index.html",
@@ -1676,6 +1833,7 @@ def build(out: Path) -> int:
     for name in DOC_NAMES:
         put(f"docs/{name}/index.html", doc_page(name, docs[name]), 2, "learn")
     put("discuss/index.html", discuss_page(), 1, "discuss")
+    put("credit/index.html", credit_page(), 1, None)
     runs = build_phys_runs(out, put)
     put("physics/index.html", physics_page(phys, runs), 1, "physics")
     put("people/index.html", people_page(), 1, "people")
