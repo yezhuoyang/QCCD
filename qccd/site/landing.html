@@ -1,30 +1,33 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QCCD studio</title><style>
-:root{color-scheme:light}
+:root{color-scheme:light;
+ --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+ --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+ --shadow:0 1px 2px rgba(18,16,28,.05),0 12px 34px rgba(18,16,28,.07)}
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;overflow:auto;background:#fcfcfb;color:#0b0b0b;font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+body{margin:0;overflow:auto;background:#eceae3;color:#15141a;font:15.5px/1.55 var(--sans);display:flex;flex-direction:column}
 main{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;max-width:1160px;width:100%;margin:0 auto;padding:18px 28px 14px}
 .hero{display:grid;grid-template-columns:1fr 1.2fr;gap:36px;align-items:center;margin-bottom:22px}
-h1{font-size:32px;font-weight:600;letter-spacing:-.02em;margin:0 0 10px;line-height:1.15}
-h1 span{color:#2a78d6}
-.one{font-size:16.5px;color:#52514e;margin:0 0 20px}
-.cta a{display:inline-block;padding:9px 16px;border-radius:8px;background:#2a78d6;color:#fff;font-weight:600;text-decoration:none;margin:0 8px 8px 0}
-.cta a.alt{background:#fff;color:#0b0b0b;border:1px solid #cfceca}
+h1{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.022em;margin:0 0 12px;line-height:1.12;color:#1a2540}
+h1 span{color:#1f5bb5}
+.one{font-family:var(--serif);font-size:18.5px;line-height:1.6;color:#56545e;margin:0 0 22px}
+.cta a{display:inline-block;padding:10px 18px;border-radius:9px;background:#1f5bb5;color:#fff;font-weight:600;text-decoration:none;margin:0 8px 8px 0}
+.cta a.alt{background:#fff;color:#15141a;border:1px solid #d9d6cd}
 .cta a:hover{filter:brightness(.95)}
-.clip{display:block;border:1px solid #e6e5e1;border-radius:12px;overflow:hidden;background:#fff}
+.clip{display:block;border:1px solid #e4e2db;border-radius:16px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
 .clip iframe{display:block;width:100%;height:420px;border:0;background:#fff}
 .clip .cap{display:block;padding:9px 14px;font-size:12.5px;line-height:1.45;color:#52514e;border-top:1px solid #efeeeb;text-decoration:none}
 .clip .cap:hover{color:#2a78d6}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.tile{display:flex;flex-direction:column;gap:5px;padding:14px 18px;min-height:92px;border:1px solid #e6e5e1;border-radius:12px;background:#fff;color:inherit;text-decoration:none}
-.tile:hover{border-color:#2a78d6}
-.tile b{font-size:18px;font-weight:600} .tile span{color:#52514e;font-size:13.5px}
-.tile:nth-child(1) b{color:#2a78d6}.tile:nth-child(2) b{color:#eb6834}.tile:nth-child(3) b{color:#1baf7a}.tile:nth-child(4) b{color:#4a3aa7}
-.foot{color:#8a8985;font-size:12.5px;margin:12px 0 0}
-.foot a{color:#8a8985}
-@media (max-width:900px){.hero{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}h1{font-size:26px}.one{font-size:15px}}
+.tile{display:flex;flex-direction:column;gap:5px;padding:16px 20px;min-height:96px;border:1px solid #e4e2db;border-radius:14px;background:#fff;color:inherit;text-decoration:none;box-shadow:0 1px 2px rgba(18,16,28,.04)}
+.tile:hover{border-color:#1f5bb5;box-shadow:var(--shadow)}
+.tile b{font-family:var(--serif);font-size:20px;font-weight:600} .tile span{color:#56545e;font-size:13.5px}
+.tile:nth-child(1) b{color:#1f5bb5}.tile:nth-child(2) b{color:#c2541f}.tile:nth-child(3) b{color:#0b7a4b}.tile:nth-child(4) b{color:#4a3aa7}
+.foot{color:#8a8892;font-size:12.5px;margin:14px 0 0}
+.foot a{color:#8a8892}
+@media (max-width:900px){.hero{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}h1{font-size:30px}.one{font-size:16.5px}}
 </style></head><body>
 <main>
   <section class="hero">
