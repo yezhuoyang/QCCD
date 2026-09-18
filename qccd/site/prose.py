@@ -46,7 +46,9 @@ PATH = re.compile(
     rf"(?:(?:{'|'.join(_DIRS)})/(?:{_W}*{_WEND})?"
     rf"|(?:{_W}*[A-Za-z0-9_]\.(?:{'|'.join(_SRC)}))\b)"
     rf"(?:::{_W}*{_WEND})?")
-ARTIFACT = re.compile(rf"(?:(?:{'|'.join(_DIRS)})/)+({_W}*\.(?:{'|'.join(_ARTIFACT)}))\b")
+#: A folder in front of an artifact's name -- the tree's, or a scratch one a command wrote
+#: it to -- is dropped with the same rule: the name is the reader's, the folder is not.
+ARTIFACT = re.compile(rf"(?:(?:{'|'.join((*_DIRS, 'out', 'build'))})/)+({_W}*\.(?:{'|'.join(_ARTIFACT)}))\b")
 #: A command line that runs something out of the tree (as opposed to the tool itself).
 SCRIPT_CMD = re.compile(rf"^\s*(?:python\s+)?(?:{'|'.join(_DIRS)})/\S+|qccdc_cli|qcheck\.exe|_build/default")
 
