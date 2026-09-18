@@ -45,5 +45,5 @@ INSTITUTIONS = (
 )
 
 #: How to be listed: the sentence on the page, so the process is written down once.
-JOIN = ("To be listed here, add yourself to `qccd/site/people.py` in a pull request, or open a "
-        "thread on the Discuss page. Contributors to the code are also on GitHub's contributor graph.")
+JOIN = ("To be listed here, add yourself in a pull request, or open a thread on the Discuss "
+        "page. Contributors to the code are also on GitHub's contributor graph.")

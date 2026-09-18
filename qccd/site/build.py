@@ -37,6 +37,7 @@ from pathlib import Path
 from .compile_examples import GATES, OUT as COMPILED, load_compiled
 from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, machine, rule_meta
 from .md import Renderer, hints, slug
+from . import prose
 from .people import GROUPS as PEOPLE_GROUPS, INSTITUTIONS, JOIN, PEOPLE
 from .publications import GROUPS as PUB_GROUPS, PUBS, SOFTWARE
 
@@ -109,18 +110,49 @@ def short_name(r: dict) -> str:
 
 
 STYLE = """
-:root{color-scheme:light;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--ink3:#8a8985;--line:#e6e5e1;--grid:#efeeeb;--accent:#2a78d6}
+/* Three depths and no more: the desk the page lies on (--surface), the sheet the words
+   are printed on (--paper), and the cards that carry one item each (--card).  The sheet is
+   the lightest thing on the screen, so the eye goes to the words. */
+:root{color-scheme:light;
+ --surface:#eceae3;--paper:#fff;--card:#fbfaf7;
+ --ink:#15141a;--ink2:#56545e;--ink3:#8a8892;--head:#1a2540;
+ --line:#e4e2db;--grid:#efeee9;--accent:#1f5bb5;--soft:#eaf0fa;
+ --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+ --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+ --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+ --radius:16px;--shadow:0 1px 2px rgba(18,16,28,.05),0 12px 34px rgba(18,16,28,.07)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--surface);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:920px;margin:0 auto;padding:28px 24px 64px}
-h1{font-size:34px;font-weight:600;margin:0 0 8px;letter-spacing:-.015em;line-height:1.15}
-h2{font-size:22px;font-weight:600;margin:34px 0 8px} h3{font-size:17px;font-weight:600;margin:22px 0 6px}
-p,li{color:var(--ink)} .sub{color:var(--ink2)}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.68 var(--serif);
+ -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+#sitenav{position:sticky;top:0}
+main{max-width:868px;margin:26px auto 44px;padding:46px 52px 60px;background:var(--paper);
+ border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+main.wide{max-width:1180px}
+/* prose keeps a readable measure even when the sheet is wide */
+main>p,main>ul,main>ol,main>blockquote,main>.sub{max-width:80ch}
+h1,h2,h3,h4{font-family:var(--serif);color:var(--head)}
+h1{font-size:42px;font-weight:600;margin:0 0 12px;letter-spacing:-.022em;line-height:1.1}
+h2{font-size:27px;font-weight:600;margin:46px 0 10px;letter-spacing:-.012em;line-height:1.22}
+h3{font-size:19.5px;font-weight:600;margin:28px 0 7px;line-height:1.3}
+main h2[id],main h3[id],main section[id],main article[id],main li[id]{scroll-margin-top:72px}
+p,li{color:var(--ink)} p{margin:0 0 15px}
+.sub{color:var(--ink2);font-size:18.5px;line-height:1.6}
+h1+.sub{font-size:19.5px;margin-bottom:26px}
 a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
-code{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f3f2ee;padding:1px 4px;border-radius:4px}
-pre{background:#f7f6f2;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto}
-pre code{background:none;padding:0;font-size:12.5px}
-.tw{overflow-x:auto} table{border-collapse:collapse;font-size:13px;margin:8px 0;width:100%}
+strong,b{font-weight:600}
+/* the code face is its own world: mono, panelled, and the words that matter picked out */
+code{font-family:var(--mono);font-size:.855em;background:#f2f1ec;padding:.1em .38em;border-radius:5px;color:#26304a}
+pre{font-family:var(--mono);font-size:13px;line-height:1.62;background:#faf9f5;color:#22212a;
+ border:1px solid var(--line);border-left:3px solid #cfd6e4;border-radius:10px;
+ padding:14px 16px;overflow-x:auto;margin:16px 0}
+pre code{background:none;padding:0;font-size:inherit;color:inherit}
+/* anything that is a control, a label or a table of numbers reads as interface, not prose */
+.card,.doc,.pt,.task,.stat,.stats,.bar,.badge,.legend,.stages,.ex,.verdict,.contract,.kv,
+table,dl.sem,.toc,.toc2,.lessons,.person,.inst,.pub,.fig figcaption,.gallery figcaption,
+.note,.refused,.tag,.lab,.src,.meta,.prog{font-family:var(--sans)}
+.tw{overflow-x:auto;margin:14px 0} table{border-collapse:collapse;font-size:13px;margin:8px 0;width:100%}
 th,td{padding:5px 10px 5px 0;border-bottom:1px solid var(--grid);vertical-align:top} th{color:var(--ink3);font-weight:500}
 blockquote{margin:0;padding:0 0 0 14px;border-left:3px solid var(--line);color:var(--ink2)}
 hr{border:0;border-top:1px solid var(--line);margin:24px 0}
@@ -131,28 +163,29 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
  background:#fff;color:var(--ink);border:1px solid #cfceca;border-radius:6px;padding:7px 10px;font-size:12.5px;line-height:1.4;box-shadow:0 2px 10px rgba(0,0,0,.1);white-space:normal}
 .toc{font-size:13px;color:var(--ink2);margin:0 0 18px;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px 16px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px}
-.card{display:block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;color:inherit}
+.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;color:inherit}
 .card:hover{border-color:var(--accent);text-decoration:none} .card h2{font-size:16px;margin:0 0 6px;color:#1c2a4a}
 .card p{margin:0 0 6px;color:var(--ink2);font-size:13px} .card .best{color:var(--ink)}
 .card table{width:100%;font-size:12.5px} .card td:nth-child(n+2),.card th:nth-child(n+2){text-align:right;font-variant-numeric:tabular-nums}
 .lessons{list-style:none;padding:0;margin:4px 0 0} .lessons li{padding:3px 0;display:flex;gap:10px;align-items:baseline}
 .lessons .id{color:var(--ink3);font-variant-numeric:tabular-nums;width:2.4em;flex:0 0 auto} .lessons .stars{color:#d59a00;margin-left:auto;font-size:12px;white-space:nowrap}
 .part{margin:18px 0 0} .part h3{margin:0 0 2px} .part .ms{color:var(--ink2);font-size:13px;margin:0}
-.note{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:14px 0;color:var(--ink2)}
+.note{background:var(--soft);border:1px solid #d6e2f4;border-left:3px solid var(--accent);border-radius:10px;
+ padding:12px 16px;margin:18px 0;color:#32425e;font-size:13.5px;max-width:78ch}
 /* learn: the path, one row per part */
 .path{display:flex;flex-direction:column;gap:14px;margin:10px 0 0}
-.pt{display:grid;grid-template-columns:72px 1fr;gap:18px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.pt{display:grid;grid-template-columns:72px 1fr;gap:20px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 24px}
 .pt .ic{width:64px;height:64px;display:block} .pt h3{margin:0 0 2px;font-size:16px}
 .pt .kick{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;margin-bottom:2px}
 .pt .sum{color:var(--ink2);margin:0 0 8px;font-size:13.5px}
 .pt .lessons{columns:2;column-gap:28px} .pt .lessons li{break-inside:avoid}
 .pt .prog{font-size:12px;color:var(--ink3);margin-left:auto;white-space:nowrap}
 .docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
-.doc{display:block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;color:inherit}
+.doc{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;color:inherit}
 .doc:hover{border-color:var(--accent);text-decoration:none} .doc b{display:block;color:#1c2a4a;margin-bottom:2px} .doc span{color:var(--ink2);font-size:13px}
 .doc .tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:4px}
 /* board: one row per task */
-.task{display:grid;grid-template-columns:240px 1fr;gap:26px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:14px 0}
+.task{display:grid;grid-template-columns:240px 1fr;gap:28px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 26px;margin:18px 0}
 .task h2{margin:0 0 4px;font-size:17px} .task h2 a{color:#1c2a4a} .task .desc{color:var(--ink2);font-size:13px;margin:0 0 10px}
 .task .more{font-size:13px} .task .meta{font-size:12.5px;color:var(--ink3);margin:8px 0 0}
 .bars{display:flex;flex-direction:column;gap:3px}
@@ -177,12 +210,16 @@ h1:hover .anchor,h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
 /* language and rules: statements and rules with their running examples */
 main.wide{max-width:1120px}
 pre.grammar{font-size:12.5px;line-height:1.6}
-.verb,.rule{border-top:1px solid var(--line);padding:20px 0 10px;scroll-margin-top:48px}
-.verb h3,.rule h3{margin:0 0 6px;font-size:20px} .verb h3 code{font-size:18px;background:none;padding:0;color:#1c2a4a}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+/* one statement, one rule, one gate: each is a card with air around it, never a run of
+   paragraphs separated by a hairline that the eye slides straight past */
+.verb,.rule,.gaterow{background:var(--card);border:1px solid var(--line);border-radius:14px;
+ padding:24px 26px 20px;margin:26px 0;scroll-margin-top:72px;box-shadow:0 1px 2px rgba(18,16,28,.04)}
+.verb h3,.rule h3{margin:0 0 8px;font-size:21px}
+.verb h3 code,.rule h3 code{font-size:19px;background:none;padding:0;color:var(--head)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
 dl.sem{margin:8px 0 0;display:grid;grid-template-columns:64px 1fr;gap:5px 10px;font-size:13px}
 dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;padding-top:3px} dl.sem dd{margin:0}
-.ex{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;position:relative}
+.ex{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;position:relative}
 .ex pre{margin:0 0 8px;background:#f7f6f2;font-size:12px;padding:10px 12px;overflow-x:auto} .ex pre.ir{white-space:pre-wrap;word-break:break-all}
 .two>*,.pair>*{min-width:0}
 .ex .tag{position:absolute;top:10px;right:12px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
@@ -195,49 +232,58 @@ dl.sem dt{color:var(--ink3);text-transform:uppercase;font-size:10.5px;letter-spa
 .runbox iframe.live{display:block;width:100%;height:300px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .ex .open{font-size:12px}
 .rule h3 .st{font-weight:400;color:var(--ink2);font-size:16px} .rule .checks{margin:0 0 4px;font-size:14px}
-.rule .src{font-size:12px;color:var(--ink3);margin:0 0 10px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.rule .src{font-size:12px;color:var(--ink3);margin:0 0 12px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch}
 /* the two cards of a pair share their rows, so programme, verdict and the running machine line up */
 .pair>.ex{display:grid;grid-template-rows:subgrid;grid-row:span 5;align-content:start}
 .pair>.ex>.runbox{align-self:end} .pair>.ex>.verdict{align-self:start}
 .toc2{font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;padding:0;list-style:none}
-.contract{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 0} .contract div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff}
+.contract{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 0} .contract div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;background:var(--card)}
 .contract b{display:block;margin-bottom:2px} .contract .ok b{color:#0b7a4b} .contract .bad b{color:#c62828} .contract .skip b{color:#52514e} .contract .partial b{color:#b26a00}
 @media (max-width:860px){.two,.pair{grid-template-columns:1fr}.contract{grid-template-columns:1fr 1fr}}
 /* compilation: the pipeline and the compiled gates */
 .stages{counter-reset:st;list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
-.stages li{display:grid;grid-template-columns:34px 190px 1fr;gap:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.stages li{display:grid;grid-template-columns:34px 190px 1fr;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;font-size:13.5px}
 .stages li:before{counter-increment:st;content:counter(st);width:26px;height:26px;border-radius:13px;background:#1c2a4a;color:#fff;font-weight:700;font-size:12.5px;display:flex;align-items:center;justify-content:center}
 .stages b{color:#1c2a4a} .stages .art{color:var(--ink3);font-size:12px;display:block;margin-top:2px}
 .stages .out{font-size:12.5px;color:var(--ink2)} .stages .out code{font-size:11.5px}
 .badge{font-size:11.5px;padding:2px 8px;border-radius:10px;background:#efeeeb;color:#52514e}
 .badge.ok{background:#e6f4ec;color:#0b7a4b} .badge.bad{background:#fbe9e7;color:#c62828} .badge.lean{background:#eef3fb;color:#2a78d6}
 .runbox.tall iframe.live{height:360px}
-.gaterow{border-top:1px solid var(--line);padding:20px 0 12px;scroll-margin-top:48px}
-.gaterow h3{margin:0 0 10px;font-size:20px} .gaterow h3 code{font-size:18px;background:none;padding:0;color:#1c2a4a} .gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:14.5px}
-.gr{display:grid;grid-template-columns:1fr 1.15fr;gap:26px;align-items:stretch} .gr>*{min-width:0;display:flex;flex-direction:column}
-/* both columns of a gate row are one height: the machine view grows to fill it */
-.gr .runbox.tall{flex:1 1 auto;display:flex;flex-direction:column;min-height:360px} .gr .runbox.tall iframe.live{flex:1 1 auto;height:auto;min-height:360px}
+.gaterow>h3{margin:0 0 6px;font-size:21px;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.gaterow h3 code{font-size:19px;background:none;padding:0;color:var(--head)}
+.gaterow h3 .st{font-weight:400;color:var(--ink2);font-size:14.5px;font-family:var(--sans)}
+.gaterow>.src{margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+/* the two columns carry the same weight: neither the drawing nor the words dwarf the other,
+   and both start on the same line so the reader knows where to begin */
+.gr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;align-items:start}
+.gr>*{min-width:0;display:flex;flex-direction:column}
+.gr .runbox.tall{flex:0 0 auto;display:block;min-height:0}
+.gr .runbox.tall iframe.live{height:330px;min-height:330px;flex:0 0 auto}
+/* a listing is a listing, not a column of its own: it scrolls rather than stretching the row */
+.gr pre{max-height:320px;overflow:auto}
 .gr .lab,.gr pre,.gr table,.gr .badges,.gr .open,.gr .pulses,.gr svg{flex:0 0 auto}
 .gr pre{margin:0 0 6px;font-size:11.5px;padding:8px 10px;background:#f7f6f2;overflow-x:auto}
-.gr .lab{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:10px 0 3px} .gr .lab:first-child{margin-top:0}
+.gr .lab{font-family:var(--sans);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+ font-weight:700;color:var(--ink3);margin:16px 0 5px} .gr .lab:first-child{margin-top:0}
 .gr .badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
-svg.qc{display:block;max-width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;margin:0 0 6px}
+svg.qc{display:block;width:100%;max-width:320px;height:auto;background:var(--paper);
+ border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 8px}
 @media (max-width:860px){.gr{grid-template-columns:1fr}}
 .kv{font-size:12.5px;border-collapse:collapse} .kv td{padding:2px 12px 2px 0;border:0;vertical-align:top} .kv td:first-child{color:var(--ink3)}
 .pulses code{display:block;font-size:11.5px;background:#f7f6f2;padding:2px 6px;border-radius:4px;margin:2px 0}
 
 /* physics, people and publications */
 .folk{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:10px 0 0}
-.person{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;scroll-margin-top:48px}
+.person{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;scroll-margin-top:72px}
 .person b{display:block;font-size:16px;color:#1c2a4a} .person .role{color:var(--accent);font-size:12.5px;font-weight:600;letter-spacing:.02em}
 .person .aff{color:var(--ink2);font-size:13px;margin:2px 0 8px} .person p{margin:0 0 8px;font-size:13.5px}
 .person .links a{font-size:12.5px;margin-right:10px}
 .inst{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin:10px 0 0}
-.inst a{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit}
+.inst a{display:flex;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit}
 .inst a:hover{border-color:var(--accent);text-decoration:none} .inst img{height:34px;width:auto;flex:0 0 auto} .inst img[alt="UCLA"]{height:26px}
 .inst b{display:block;color:#1c2a4a} .inst span{color:var(--ink2);font-size:12.5px}
 .pubs{list-style:none;padding:0;margin:8px 0 0}
-.pub{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 10px;scroll-margin-top:48px}
+.pub{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:0 0 12px;scroll-margin-top:72px}
 .pub .ti{font-size:15px;font-weight:600;color:#1c2a4a;margin:0 0 2px} .pub .au{font-size:13px;margin:0 0 2px}
 .pub .ve{font-size:12.5px;color:var(--ink2);margin:0 0 6px} .pub .ve a{margin-left:10px;white-space:nowrap}
 .pub .use{font-size:12.5px;color:var(--ink2);margin:0;padding-top:6px;border-top:1px dashed var(--grid)}
@@ -246,14 +292,19 @@ svg.qc{display:block;max-width:100%;height:auto;background:#fff;border:1px solid
 
 /* physics: figures drawn from the device data, embeds, photographs */
 .fig{margin:16px 0 22px} .fig figcaption{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.45}
-.fig .credit{color:var(--ink3)} .fig img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
-.figsvg{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px} .figsvg svg{display:block;width:100%;height:auto}
+.fig .credit{color:var(--ink3)} .fig img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.figsvg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px} .figsvg svg{display:block;width:100%;height:auto}
 .fig iframe.live{display:block;width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#fff}
 .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:12px 0 22px}
 .gallery figure{margin:0} .gallery .figsvg{padding:8px 10px}
 .gallery figcaption{font-size:12.5px;color:var(--ink2);margin-top:6px} .gallery figcaption b{color:#1c2a4a}
 .legend.zones{margin:6px 0 0;font-size:12px}
 table.formulas td:first-child{white-space:nowrap;color:var(--ink)} table.formulas td:nth-child(2) code{font-size:12.5px;white-space:nowrap}
+
+@media (max-width:760px){
+ main{margin:0;border-radius:0;border-left:0;border-right:0;padding:28px 20px 44px}
+ body{font-size:15.5px} h1{font-size:32px} h2{font-size:23px} h3{font-size:18px}
+ .verb,.rule,.gaterow{padding:18px 16px 14px;margin:20px 0}}
 """
 
 
@@ -274,7 +325,7 @@ FOOTER = """<footer id="sitefoot">
   </div>
 </footer>"""
 FOOTER_CSS = """
-#sitefoot{background:#fff;border-top:1px solid #e6e5e1;padding:22px 24px 26px;text-align:center;color:#52514e;
+#sitefoot{background:transparent;border-top:0;padding:8px 24px 34px;text-align:center;color:#56545e;
  font:13.5px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #sitefoot p{margin:0 auto 16px;max-width:72ch;color:#52514e}
 #sitefoot a{color:#0b0b0b;text-decoration:none} #sitefoot p a{border-bottom:1px solid #cfceca} #sitefoot p a:hover{border-bottom-color:#2a78d6}
@@ -340,6 +391,155 @@ body[data-embed="1"] #ebar,body[data-embed="1"] #glide,body[data-embed="1"] #pha
 body[data-embed="1"] #stagebar label,body[data-embed="1"] #rail,body[data-embed="1"] #toasts,
 body[data-embed="1"] #eCount,body[data-embed="1"] #eProb{display:none!important}
 </style>"""
+
+# The reading furniture every document page carries: the contents rail and the code
+# blocks.  It is appended to `<body>`, never woven into the words, so a comment pinned to
+# a paragraph still finds that paragraph after it runs.
+READING_JS = r"""
+<style>
+#sitetoc{position:fixed;top:58px;width:218px;max-height:calc(100vh - 92px);overflow:auto;z-index:40;
+ font:13px/1.4 var(--sans,ui-sans-serif,system-ui,sans-serif);padding-right:6px}
+#sitetoc .tc-l{margin:0 0 10px 13px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--ink3,#8a8892)}
+#sitetoc a{display:block;color:var(--ink2,#56545e);text-decoration:none;padding:5px 10px 5px 13px;
+ border-left:2px solid var(--line,#e4e2db);border-radius:0 7px 7px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sitetoc a:hover{color:var(--ink,#15141a);border-left-color:var(--ink3,#8a8892);background:rgba(21,20,26,.04);text-decoration:none}
+#sitetoc a.tc-3{padding-left:26px;font-size:12.2px;color:var(--ink3,#8a8892)}
+#sitetoc a.tc-on{color:var(--accent,#1f5bb5);border-left-color:var(--accent,#1f5bb5);background:var(--soft,#eaf0fa);font-weight:600}
+#sitetoc::-webkit-scrollbar{width:7px} #sitetoc::-webkit-scrollbar-thumb{background:#d8d5cc;border-radius:4px}
+@media (max-width:1159px){#sitetoc{display:none!important}}
+@media (min-width:1160px){main>.toc{display:none}}
+.tk-k{color:#6d28d9;font-weight:600} .tk-s{color:#0b7a4b} .tk-n{color:#b05a00}
+.tk-c{color:#8a8892;font-style:italic} .tk-t{color:#1f5bb5}
+</style>
+<script>
+(function(){
+  if(typeof document === 'undefined' || !document.querySelector) return;
+  var main = document.querySelector('main');
+  if(!main) return;
+
+  // ---- code: one face, and the words that carry the meaning in their own colour -------
+  var KW = {
+    py: 'from import def class return None True False and or not in is for while if else with as lambda',
+    qasm: 'OPENQASM include qreg creg gate opaque barrier measure reset if',
+    tsir: 'init cool shuttle gate measure reset swap split merge rotate barrier op idle',
+    json: 'true false null'
+  };
+  function guess(t){
+    if(/^\s*OPENQASM|\bqreg\b|\bcreg\b/.test(t)) return 'qasm';
+    if(/^\s*[[{]/.test(t)) return 'json';
+    if(/^\s*(from|import|def|class)\s/m.test(t)) return 'py';
+    if(/^#\d+\s/m.test(t) || /\b(shuttle|init|cool)\b/.test(t)) return 'tsir';
+    return '';
+  }
+  var RX_HASH = /(#[^\n]*|\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|(\b\d+(?:\.\d+)?(?:e[-+]?\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+  var RX_PLAIN = /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|(#\d+|\b\d+(?:\.\d+)?(?:e[-+]?\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+  function paint(el){
+    var text = el.textContent, lang = guess(text), words = ' ' + (KW[lang] || '') + ' ';
+    var rx = (lang === 'py' || lang === '') ? RX_HASH : RX_PLAIN;
+    rx.lastIndex = 0;
+    var frag = document.createDocumentFragment(), i = 0, m;
+    while((m = rx.exec(text))){
+      if(m.index > i) frag.appendChild(document.createTextNode(text.slice(i, m.index)));
+      var cls = m[1] ? 'tk-c' : m[2] ? 'tk-s' : m[3] ? 'tk-n'
+              : (m[4] && words.indexOf(' ' + m[4] + ' ') >= 0 ? 'tk-k' : '');
+      if(cls){ var sp = document.createElement('span'); sp.className = cls; sp.textContent = m[0]; frag.appendChild(sp); }
+      else frag.appendChild(document.createTextNode(m[0]));
+      i = m.index + m[0].length;
+    }
+    if(i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
+    el.textContent = '';
+    el.appendChild(frag);
+  }
+  Array.prototype.forEach.call(main.querySelectorAll('pre'), function(pre){
+    var el = (pre.children.length === 1 && pre.firstElementChild.tagName === 'CODE') ? pre.firstElementChild : pre;
+    if(el.children.length) return;                    // already marked up by whoever wrote it
+    if(el.textContent.length > 20000) return;
+    paint(el);
+  });
+
+  // ---- the contents rail, built from the page's own headings --------------------------
+  var items = [];
+  Array.prototype.forEach.call(main.querySelectorAll('h2,h3'), function(h){
+    var id = h.id;
+    if(!id){ var q = h.parentElement; if(q && q !== main && q.id && q.firstElementChild === h) id = q.id; }
+    if(!id) return;
+    var c = h.querySelector('code'), t;
+    if(c) t = c.textContent || '';
+    else { var k = h.cloneNode(true), an = k.querySelector('.anchor'); if(an) an.parentNode.removeChild(an); t = k.textContent || ''; }
+    t = t.replace(/\s+/g, ' ').trim();
+    if(!t) return;
+    if(t.length > 44) t = t.slice(0, 43) + '…';
+    items.push({ id: id, t: t, lvl: h.tagName === 'H3' ? 3 : 2 });
+  });
+  if(items.length < 3) return;                        // not a page anyone needs a map of
+
+  var nav = document.createElement('nav');
+  nav.id = 'sitetoc'; nav.setAttribute('aria-label', 'on this page');
+  var lbl = document.createElement('p'); lbl.className = 'tc-l'; lbl.textContent = 'On this page';
+  nav.appendChild(lbl);
+  items.forEach(function(it){
+    var a = document.createElement('a');
+    a.href = '#' + it.id; a.textContent = it.t; a.title = it.t;
+    if(it.lvl === 3) a.className = 'tc-3';
+    nav.appendChild(a);
+  });
+  document.body.appendChild(nav);
+
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  nav.addEventListener('click', function(ev){
+    var a = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+    if(!a || !nav.contains(a)) return;
+    var t = document.getElementById(a.getAttribute('href').slice(1));
+    if(!t) return;
+    ev.preventDefault();
+    t.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+    try { history.replaceState(null, '', a.getAttribute('href')); } catch(e){}
+  });
+
+  var RAIL = 218, GAP = 26, cardW = 0;
+  function measure(){
+    main.style.marginLeft = ''; main.style.marginRight = '';
+    cardW = main.offsetWidth;
+    place();
+  }
+  function place(){
+    var room = window.innerWidth - (cardW + RAIL + GAP);
+    if(room < 34 || window.innerWidth < 1160){
+      nav.style.display = 'none';
+      main.style.marginLeft = ''; main.style.marginRight = '';
+      return;
+    }
+    var left = Math.round(room / 2);
+    nav.style.display = '';
+    nav.style.left = left + 'px';
+    main.style.marginLeft = (left + RAIL + GAP) + 'px';
+    main.style.marginRight = '0';
+  }
+  var on = null;
+  function spy(){
+    var y = window.scrollY + 120, cur = items[0].id;
+    for(var i = 0; i < items.length; i++){
+      var e = document.getElementById(items[i].id);
+      if(e && e.getBoundingClientRect().top + window.scrollY <= y) cur = items[i].id;
+    }
+    if(cur === on) return;
+    on = cur;
+    Array.prototype.forEach.call(nav.getElementsByTagName('a'), function(a){
+      var base = a.className.replace(/\s*tc-on/, '');
+      a.className = base + (a.getAttribute('href') === '#' + cur ? ' tc-on' : '');
+    });
+  }
+  var tick = false;
+  function frame(){ tick = false; spy(); }
+  function ask(){ if(tick) return; tick = true; (window.requestAnimationFrame || setTimeout)(frame, 16); }
+  window.addEventListener('scroll', ask, { passive: true });
+  window.addEventListener('resize', function(){ measure(); ask(); });
+  if(window.ResizeObserver){ try { new ResizeObserver(function(){ measure(); }).observe(document.body); } catch(e){} }
+  measure();
+  spy();
+})();
+</script>"""
+
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -416,9 +616,12 @@ def with_nav(page: str, depth: int, active: str | None, index_json: str,
     # the real tag, not the `<body data-explain>` a stylesheet comment in the studio quotes
     i = page.index("<body", page.index("</head>"))
     i = page.index(">", i) + 1
-    if extra:
+    # a document page also gets the contents rail and the code blocks; an app page is its
+    # own thing and gets neither
+    tail = extra + ("" if app else READING_JS)
+    if tail:
         j = page.rindex("</body>")
-        page = page[:j] + extra + page[j:]
+        page = page[:j] + tail + page[j:]
     return page[:i] + bar + page[i:]
 
 
@@ -441,7 +644,9 @@ def render_docs() -> dict[str, dict]:
     out = {}
     for name in DOC_NAMES:
         r = Renderer(table, _doc_link)
-        body = r.render((DOCS / f"{name}.md").read_text(encoding="utf-8"))
+        # the reference pages are the project's own engineering documents; `prose.strip`
+        # takes the repository out of them, since a reader here has no such files
+        body = r.render(prose.strip((DOCS / f"{name}.md").read_text(encoding="utf-8"), name))
         title = re.sub(r"<[^>]+>", "", r.headings[0][2]) if r.headings else name
         toc = "".join(f'<li><a href="#{sid}">{text}</a></li>' for lvl, sid, text in r.headings if lvl == 2)
         out[name] = {"title": html.unescape(title), "body": body, "toc": toc, "headings": r.headings}
@@ -482,8 +687,8 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
             "this browser by the course itself. <a href=\"../studio.html#learn\">Open the course</a>.</p>",
             "<h2>The course</h2>"]
     if not parts:
-        body.append('<p class="note">This build carries no course: <code>qccd/viz/js/tutorial.js</code> '
-                    'is not in the tree it was built from.</p>')
+        body.append('<p class="note">This build carries no course: the lessons were not in the tree it was '
+                    'built from.</p>')
     body.append('<div class="path">')
     for p in parts:
         mine = [L for L in less if L["part"] == p["id"]]
@@ -535,8 +740,13 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
 
 def board_index(ts: list[dict]) -> str:
     """One row per task: the ranked designs as bars coloured by family, the fastest verified
-    one in green, refused and rule-failing ones called out, and the numbers that matter."""
-    rows_html = []
+    one in green, refused and rule-failing ones called out, and the numbers that matter.
+
+    Each row also carries its QEC clock cycle -- the round it ranks with the classical
+    feedback loop composed onto it -- and the boards are compared that way in one section
+    at the end (`qec_cycle`)."""
+    from . import qec_cycle
+    rows_html, cycles = [], []
     for t in ts:
         rows = t["rows"]
         ok = [r for r in rows if r.get("status") == "ok" and _t(r) is not None]
@@ -570,12 +780,17 @@ def board_index(ts: list[dict]) -> str:
             f'<div class="stat"><span>designs</span><b>{len(rows)}</b><small>{len(ok)} run the round</small></div>'
             f'<div class="stat{" warn" if (refused or n_bad) else ""}"><span>refused &middot; disqualified</span>'
             f'<b>{len(refused)} &middot; {n_bad}</b><small>{"by the compiler &middot; by the rules, not listed" if (refused or n_bad) else "none"}</small></div>')
+        # the QEC clock cycle of this board: the round it ranks, plus the classical loop
+        # around it (qccd/site/qec_cycle.py, from qccd.analysis.feedback)
+        cycles.append({"id": t["id"], "title": t["title"],
+                       "round_us": (_t(best) or 0.0) * 1000.0, "n_data": t.get("n_data")})
         rows_html.append(
             f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
             f'<p class="desc">{html.escape(t.get("description", ""))}</p>'
             f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p>'
             f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; the three fastest verified designs, by time on the jones table &middot; click a bar to step the programme</p></div>'
-            f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div></div></section>')
+            f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div>'
+            f'{qec_cycle.board_block(_t(best) * 1000.0 if best else None)}</div></section>')
     legend = ('<div class="legend">' +
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
@@ -584,10 +799,14 @@ def board_index(ts: list[dict]) -> str:
             "and cost table; every design on a board ran one syndrome-extraction round of that circuit, was "
             "replayed against the 27 rules and, where it passed, checked by the proved Lean checker (R10). "
             "A design that fails any rule is disqualified and not listed. Each row shows the three fastest verified designs of its task; open a task for the full ranking of "
-            "every listed design, where you can rank by anything and click a dot to step the programme in the studio.</p>" + legend + "".join(rows_html) +
+            "every listed design, where you can rank by anything and click a dot to step the programme in the studio. "
+            "A round is only half of a QEC cycle, so every board also carries "
+            "<a href=\"#cycle\">the classical loop</a> around it.</p>" + legend + "".join(rows_html) +
+            qec_cycle.board_section(cycles) +
             "<p class=\"note\">Contributing a design from the studio (Verify &rarr; Contribute) arrives in phase 3 of "
             f"<a href=\"{REPO}/blob/main/docs/WEBSITE_PLAN.md\">the plan</a>; until then the boards carry the study's seed entries.</p>")
-    return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE, extra_css="", body=body)
+    return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE,
+                       extra_css=qec_cycle.CSS, body=body)
 
 
 def discuss_page() -> str:
@@ -605,7 +824,7 @@ def discuss_page() -> str:
             widget = (f'<p class="note">This category is not wired yet: the repository owner enables Discussions on '
                       f'<a href="https://github.com/{cfg["repo"]}/settings">the repository</a>, installs the '
                       f'<a href="https://github.com/apps/giscus">giscus app</a>, and pastes the category id from '
-                      f'<a href="https://giscus.app">giscus.app</a> into <code>qccd/site/giscus.json</code>. '
+                      f'<a href="https://giscus.app">giscus.app</a> into the site\'s giscus configuration. '
                       f'Until then, <a href="https://github.com/{cfg["repo"]}/discussions">discuss on GitHub</a>.</p>')
         secs.append(f'<h2 id="{cat.lower()}">{cat}</h2><p class="sub">{blurb}</p>{widget}')
     body = ("<h1>Discuss</h1><p class=\"sub\">GitHub Discussions on the repository, embedded here with giscus. "
@@ -700,8 +919,8 @@ def language_page(built: dict) -> str:
                 "<div class=\"tw\"><table><thead><tr><th>statement</th><th>instruction type</th><th>carries</th></tr></thead><tbody>"
                 + "".join(f"<tr><td><code>{a}</code></td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in IR_TABLE)
                 + "</tbody></table></div>"
-                "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">docs/tsir</a>; the device language "
-                "the programmes run on is <a href=\"../docs/adl/\">docs/adl</a>.</p>")
+                "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the device language "
+                "the programmes run on is <a href=\"../docs/adl/\">the architecture description</a>.</p>")
     return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
                        body="\n".join(body))
 
@@ -728,8 +947,8 @@ def rules_page(built: dict) -> str:
             "The verifier replays every cycle and reports each rule as one of four things; a green tick is "
             "only ever printed for a check that ran. Each rule below has a programme that passes it and one "
             "that fails it, both judged by the real verifier and both runnable here as the page the studio "
-            "would open on them. The rules are code: <a href=\"../docs/rules/\">docs/rules</a> is the prose, "
-            "<code>qccd/verify/rules.py</code> the checks, <code>engine.js</code> their browser twins, and a "
+            "would open on them. The rules are code: <a href=\"../docs/rules/\">the rules reference</a> is the prose, "
+            "the verifier holds the checks, the browser carries their twins, and a "
             "parity test holds the two implementations to identical verdicts.</p>",
             '<div class="contract"><div class="ok"><b>passed</b>the check ran and found nothing</div>'
             '<div class="bad"><b>failed</b>the check ran and names the cycle and the reason</div>'
@@ -947,9 +1166,8 @@ def compilation_page(built: list[dict]) -> str:
     body.append("<h2 id=\"input\">The input</h2><p class=\"sub\">OpenQASM 2.0 with <code>qelib1.inc</code>. Every gate is lowered to the "
                 "native set of an ion trap: <b>R(&theta;, &phi;)</b>, one laser pulse; <b>VZ(&lambda;)</b>, a virtual "
                 "frame update that costs nothing; and <b>MS(&theta;)</b>, the M&oslash;lmer&ndash;S&oslash;rensen entangler on two "
-                "co-located ions. The lowering is two identities proved in Lean (<code>u3_decomp</code>, "
-                "<code>cx_decomp</code> in <code>Compiler/lean/QCCDC/Pulse/Decompose.lean</code>) and the OCaml table that "
-                "emits them is checked against the defining unitaries.</p>"
+                "co-located ions. The lowering is two identities proved in Lean (<code>u3_decomp</code> and "
+                "<code>cx_decomp</code>), and the table that emits them is checked against the defining unitaries.</p>"
                 "<div class=\"tw\"><table><thead><tr><th>gates</th><th>accepted</th><th>lowered to</th></tr></thead><tbody>"
                 + "".join(f"<tr><td>{a}</td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in QASM_GATES) + "</tbody></table></div>")
     if bell:
@@ -1000,17 +1218,10 @@ def compilation_page(built: list[dict]) -> str:
                 "brings the ions together; the non-Clifford ones are checked against the exact unitary.</p>")
     body.append("".join(_gate_row(g, f'ex/{g["id"]}.html') for g in built if g["id"] != "bell"))
     if not built:
-        body.append('<p class="note">No compiled examples in this build: <code>python -m qccd.site.compile_examples</code> '
-                    'writes them with the OCaml compiler and the Lean checker, and the site build reads them.</p>')
-    body.append("<h2 id=\"try\">Reproduce it</h2><p class=\"sub\">The same commands, from the repository root, on any circuit and device:</p>"
-                "<pre><code>python Compiler/bridge/export_arch.py arch/&lt;device&gt;.arch.json -o build/&lt;device&gt;.expanded.json\n"
-                "Compiler/ocaml/_build/default/bin/qccdc_cli.exe compile circuit.qasm --arch build/&lt;device&gt;.expanded.json -o build/out\n"
-                "python Compiler/bridge/insert_cooling.py build/out.tsir.json --arch arch/&lt;device&gt;.arch.json -o build/out.cooled.tsir.json\n"
-                "python Compiler/bridge/check_tsir.py build/out.cooled.tsir.json --arch arch/&lt;device&gt;.arch.json --model corrected\n"
-                "python Compiler/bridge/mk_qcheck_input.py build/out --arch build/&lt;device&gt;.expanded.json -o build/out.qcheck.json\n"
-                "python Compiler/bridge/check_cert.py build/out --qasm circuit.qasm --arch arch/&lt;device&gt;.arch.json --qcheck build/out.qcheck.json\n"
-                "python -m qccd studio --tsir build/out.cooled.tsir.json --qasm circuit.qasm --cert build/out.qcert.json</code></pre>"
-                "<p class=\"sub\">Phase 2 of the plan brings the compiler itself into the browser, so the Design page can do this without a command line.</p>")
+        body.append('<p class="note">No compiled examples in this build: the compiler and the proof checker write them, '
+                    'and the site build reads them.</p>')
+    body.append("<p class=\"sub\">Phase 2 of the plan brings the compiler itself into the browser, so the Design page "
+                "can compile and check a circuit without leaving it.</p>")
     return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
                        body="\n".join(body))
 
@@ -1045,8 +1256,7 @@ def build_compiled_pages(out: Path, put) -> list[dict]:
 
 
 def doc_page(name: str, d: dict) -> str:
-    body = (f'<p class="sub"><a href="../../learn/">Learn</a> &rsaquo; reference &middot; '
-            f'<a href="{REPO}/blob/main/docs/{name}.md">docs/{name}.md</a></p>'
+    body = (f'<p class="sub"><a href="../../learn/">Learn</a> &rsaquo; reference</p>'
             f'<ul class="toc">{d["toc"]}</ul>{d["body"]}')
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
@@ -1262,15 +1472,14 @@ def render_physics() -> dict:
     """`qccd/site/physics.md` through the docs renderer: the same hover vocabulary, the
     same anchors, one table of contents from its `##` headings."""
     r = Renderer(hints(), _phys_link)
-    body = r.render((HERE / "physics.md").read_text(encoding="utf-8"))
+    body = r.render(prose.strip((HERE / "physics.md").read_text(encoding="utf-8"), "physics"))
     title = html.unescape(re.sub(r"<[^>]+>", "", r.headings[0][2])) if r.headings else "Physics background"
     toc = "".join(f'<li><a href="#{sid}">{text}</a></li>' for lvl, sid, text in r.headings if lvl == 2)
     return {"title": title, "body": body, "toc": toc, "headings": r.headings}
 
 
 def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
-    body = (f'<p class="sub"><a href="../learn/">Learn</a> &rsaquo; background &middot; '
-            f'<a href="{REPO}/blob/main/qccd/site/physics.md">qccd/site/physics.md</a></p>'
+    body = (f'<p class="sub"><a href="../learn/">Learn</a> &rsaquo; background</p>'
             f'<ul class="toc">{d["toc"]}</ul>{_figures(d["body"], runs or {})}')
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
@@ -1333,9 +1542,8 @@ def publications_page() -> str:
                                           if any(p.get("group") == gid for p in PUBS))
             + '<li><a href="#cite">Citing this website</a></li></ul>']
     if not PUBS:
-        body.append('<p class="note">No publications are listed yet. The list lives in '
-                    f'<a href="{REPO}/blob/main/qccd/site/publications.py"><code>qccd/site/publications.py</code></a>; '
-                    'each entry names the paper, its authors, venue and links, and one line on where it enters the site.</p>')
+        body.append('<p class="note">No publications are listed yet. Each entry names the paper, its authors, '
+                    'venue and links, and one line on where it enters the site.</p>')
     for gid, gtitle, gblurb in PUB_GROUPS:
         mine = [p for p in PUBS if p.get("group") == gid]
         if not mine:
@@ -1439,7 +1647,11 @@ def build(out: Path) -> int:
     from ..__main__ import main as qccd_main
     studio = out / "studio.html"
     qccd_main(["studio", "-o", str(studio)])
-    put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True, extra=HASH_JS)
+    from . import qec_cycle
+    # the QEC-cycle panel rides in with the hash router: the studio itself is untouched,
+    # and the panel reads the page's own priced round (qccd/site/qec_cycle.py)
+    put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True,
+        extra=HASH_JS + qec_cycle.studio_block())
 
     put("index.html", landing(ts), 0, None)
     put("learn/index.html", learn_page(parts, less, docs, ts), 1, "learn")
@@ -1467,6 +1679,7 @@ def build(out: Path) -> int:
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
     put("board/index.html", board_index(ts), 1, "board")
+    from . import qec_cycle
     n_pages = 0
     for t in ts:
         src = t["seed_dir"]
@@ -1490,8 +1703,10 @@ def build(out: Path) -> int:
         for r in t["rows"]:
             if r.get("status") != "ok" or not r.get("page"):
                 continue
+            # an entry page IS a circuit: it gets the classical layer and the cycle panel
+            # too, so the half of the machine that reads the ions is visible there as well
             put(f"board/{t['id']}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, "board",
-                app=True, extra=HASH_JS)
+                app=True, extra=HASH_JS + qec_cycle.studio_block())
             n_pages += 1
             gif = r.get("gif")
             if gif and (src.parent / gif).exists():
