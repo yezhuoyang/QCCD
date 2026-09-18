@@ -218,6 +218,158 @@
     return `X̄^(${ax}) Z̄^(${az})`;
   }
 
+  // ------------------------------------------------------------------ the studio's shapes
+  //
+  // A trapping site, a junction, a rail and an ion are drawn here by the SAME numbers the
+  // studio draws them by (qccd/viz/theme.py's PALETTE and GEOMETRY, qccd/viz/layout.py's
+  // fractions of `g`, and the shapes in qccd/viz/render.py::buildStatic).  Both tables are
+  // shipped into this page, so the two tools cannot drift apart: a site is a capsule
+  // rotated onto its trap axis with one ring per slot, a junction is a sharp white square,
+  // a rail is a butt-capped line coloured by its role, and an ion is a white-outlined disc
+  // whose colour says what the machine is doing to it this instant.
+  //
+  // `g` is the one number everything is a fraction of: the nearest-neighbour distance of
+  // the device, in the units it is drawn at.  The studio measures it in px after its own
+  // fit; here it is measured in device units per master and multiplied by the camera's
+  // scale at draw time, which comes to the same thing.
+  const PAL = D.palette || {};
+  const GEO = D.geometry || {};
+  const P = (k, fallback) => PAL[k] || fallback;
+  const RAIL_W_FRAC = GEO.RAIL_W_FRAC || 0.083, RUNG_W_FRAC = GEO.RUNG_W_FRAC || 0.065;
+  const K_ION = (GEO.ION_D_FRAC_ACTIVE || 0.175) + 0.065, K_REST = GEO.ION_D_FRAC || 0.13;
+  // theme.py::SEGMENT_ROLE, first match wins
+  const SEG_ROLE = [["highway", "highway"], ["onramp", "highway"], ["rung", "compute"],
+                    ["compute", "compute"], ["spur", "compute"], ["coupling", "compute"],
+                    ["rail", "rail"]];
+  function segRole(sg) {
+    const labels = sg.labels || [];
+    for (const [needle, role] of SEG_ROLE) if (labels.indexOf(needle) >= 0) return role;
+    return "rail";
+  }
+  function zoneColour(z) { return P("zone_" + (z || "other"), P("zone_other", "#98a2b3")); }
+
+  // Per master: the lattice step `gd`, and each node's trap axis -- the incident arm that
+  // maximises the alignment with the others (render.py's AXIS), which is what a site's
+  // capsule and its slot rings are rotated onto.
+  const geomCache = {};
+  function deviceGeom(mname) {
+    if (geomCache[mname]) return geomCache[mname];
+    const d = M.leafData[mname];
+    if (!d) return null;
+    const pos = {}, arms = {};
+    for (const n of d.device.nodes) { pos[n.id] = n.pos; arms[n.id] = []; }
+    let gd = Infinity;
+    for (const sg of d.device.segments) {
+      const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
+      if (!a || !b) continue;
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 1e-9) {
+        gd = Math.min(gd, len);
+        arms[sg.ends[0]].push([dx / len, dy / len]);
+        arms[sg.ends[1]].push([-dx / len, -dy / len]);
+      }
+    }
+    if (!isFinite(gd)) {                       // no segments: fall back to node spacing
+      const ns = d.device.nodes;
+      for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) {
+        const dx = ns[j].pos[0] - ns[i].pos[0], dy = ns[j].pos[1] - ns[i].pos[1];
+        const l = Math.sqrt(dx * dx + dy * dy);
+        if (l > 1e-9) gd = Math.min(gd, l);
+      }
+    }
+    if (!isFinite(gd) || gd <= 0) gd = 1;
+    const axis = {};
+    for (const n of d.device.nodes) {
+      const list = (arms[n.id] || []).map(([ux, uy]) => (ux < -1e-9 || (Math.abs(ux) <= 1e-9 && uy < 0))
+        ? [-ux, -uy] : [ux, uy]);            // sign-normalised to the right/up half-plane
+      let best = [1, 0], score = -1;
+      for (const cand of list) {
+        let s = 0;
+        for (const other of list) s += Math.abs(cand[0] * other[0] + cand[1] * other[1]);
+        if (s > score) { score = s; best = cand; }
+      }
+      axis[n.id] = best;
+    }
+    return (geomCache[mname] = { gd, axis, pos });
+  }
+
+  // the studio's per-`g` marks, in px for the current camera
+  function marks(g) {
+    const rIon = Math.min(26, Math.max(Math.min(3, 0.45 * g), K_ION * g));
+    return {
+      g,
+      siteT: RAIL_W_FRAC * 2.4 * g,
+      siteMax: 0.88 * g,
+      swNode: Math.max(1.0, 0.05 * g),
+      swRail: Math.max(1.2, RAIL_W_FRAC * g),
+      swThin: Math.max(1.0, RUNG_W_FRAC * g),
+      swHalo: Math.max(0.7, 0.055 * g),
+      slotR: 0.085 * g,
+      rJunc: 0.30 * g,
+      rIon,
+      rRest: Math.min(rIon, Math.max(Math.min(1.6, 0.30 * g), K_REST * g)),
+      rActive: 0.46 * g,
+      wellRx: 0.44 * g, wellRy: 0.30 * g,
+    };
+  }
+  function siteLen(cap, g) {                   // layout.py::_site_len
+    const m = Math.max(1, Math.min(cap || 1, 6));
+    return Math.min(0.88 * g, (0.30 + 0.15 * m) * g);
+  }
+  function slots(cap) { return Math.max(1, Math.min(cap || 1, 6)); }
+
+  // one capsule + its slot rings, rotated onto the trap axis
+  function drawSite(ctx, n, sx, sy, mk, ax, state) {
+    const cap = n.capacity === undefined ? 1 : n.capacity;
+    const len = siteLen(cap, mk.g), t = mk.siteT, zc = zoneColour(n.zone_type);
+    const dock = (n.degree || 0) >= 3, corner = !!n.corner;
+    const big = dock || corner || state === "active";
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(Math.atan2(ax[1], ax[0]));
+    ctx.beginPath();
+    const r = Math.min(t / 2, len / 2);
+    ctx.moveTo(-len / 2 + r, -t / 2);
+    ctx.lineTo(len / 2 - r, -t / 2);
+    ctx.arc(len / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(-len / 2 + r, t / 2);
+    ctx.arc(-len / 2 + r, 0, r, Math.PI / 2, -Math.PI / 2);
+    ctx.closePath();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = zc;
+    ctx.fill();
+    ctx.globalAlpha = (big || state === "over") ? 0.95 : 0.55;
+    ctx.strokeStyle = state === "over" ? P("z", "#b42318")
+      : state === "active" ? P("active", "#f6c34a")
+        : dock ? P("gold", "#e8b84b") : corner ? P("corner", "#f6c34a") : zc;
+    ctx.lineWidth = (state === "over" ? 2.4 : 1) * (big ? mk.swNode * 1.7 : mk.swNode);
+    ctx.stroke();
+    const m = slots(cap), sr = Math.min(mk.slotR, 0.36 * len / m);
+    if (sr > 0.6) {
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = zc;
+      ctx.lineWidth = Math.max(0.7, mk.swNode * 0.8);
+      for (let i = 0; i < m; i++) {
+        ctx.beginPath();
+        ctx.arc(((i + 0.5) / m - 0.5) * len, 0, sr, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function drawJunction(ctx, n, sx, sy, mk) {
+    const h = mk.rJunc;
+    ctx.fillStyle = P("panel", "#ffffff");
+    ctx.strokeStyle = n.corner ? P("corner", "#f6c34a") : P("grid", "#8a94a6");
+    ctx.lineWidth = mk.swNode;
+    ctx.beginPath();
+    ctx.rect(sx - h, sy - h, 2 * h, 2 * h);
+    ctx.fill();
+    ctx.stroke();
+  }
+
   // ------------------------------------------------------------------ state
 
   const S = {
@@ -723,44 +875,150 @@
     }
   }
 
-  function drawLeafInterior(ctx, path, ox, oy, depth, pxWidth) {
+  // The device, in the studio's own z-order: rails, the halo under a site in play, the
+  // nodes, the potential well under a flying ion, then the ions and their labels.  Every
+  // size is a fraction of `g` exactly as qccd/viz/layout.py computes it, so a trap here
+  // and a trap on studio.html are the same object drawn twice.
+  function drawDevice(ctx, path, ox, oy, depth) {
     const m = M.master(path);
     const d = M.leafData[m.name];
-    if (!d) return;
-    const s = S.cam.s;
-    // rails and spurs
-    ctx.lineWidth = depth === 0 ? Math.max(1, Math.min(3, s * 0.12)) : 0.8;
-    ctx.globalAlpha = depth <= 1 ? 0.95 : 0.7;
-    const pos = {};
-    for (const n of d.device.nodes) pos[n.id] = n.pos;
-    ctx.beginPath();
+    const geom = deviceGeom(m.name);
+    if (!d || !geom) return;
+    const g = geom.gd * S.cam.s;
+    const mk = marks(g);
+    const pos = geom.pos;
+    const tiny = g < 4;                  // too small for the real shapes: keep it cheap
+    // -- rails, coloured by role
+    const byRole = {};
     for (const sg of d.device.segments) {
-      if (!sg.loop) continue;
-      const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
-      ctx.moveTo(X(ox + a[0]), Y(oy + a[1])); ctx.lineTo(X(ox + b[0]), Y(oy + b[1]));
+      const role = segRole(sg);
+      (byRole[role] || (byRole[role] = [])).push(sg);
     }
-    ctx.strokeStyle = COLOR.rail;
-    ctx.stroke();
-    ctx.beginPath();
-    for (const sg of d.device.segments) {
-      if (sg.loop) continue;
-      const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
-      ctx.moveTo(X(ox + a[0]), Y(oy + a[1])); ctx.lineTo(X(ox + b[0]), Y(oy + b[1]));
+    for (const role in byRole) {
+      const thin = role === "compute";
+      ctx.strokeStyle = P(role, P("rail", "#f2b8b5"));
+      ctx.lineWidth = thin ? mk.swThin : mk.swRail;
+      ctx.lineCap = "butt";
+      ctx.globalAlpha = thin ? 0.9 : 1;
+      ctx.beginPath();
+      for (const sg of byRole[role]) {
+        const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
+        if (!a || !b) continue;
+        ctx.moveTo(X(ox + a[0]), Y(oy + a[1]));
+        ctx.lineTo(X(ox + b[0]), Y(oy + b[1]));
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
-    ctx.strokeStyle = COLOR.spur;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
     if (!S.showIons && depth > 0) return;
     const st = leafIons(path);
+    const active = new Set();
+    if (st && st.step) {
+      for (const ion of st.ions) if (ion.active) active.add(ion.xy.join(","));
+    }
+    // -- the halo under a site that is in play this instant
+    if (!tiny && active.size) {
+      ctx.fillStyle = P("active", "#f6c34a");
+      ctx.globalAlpha = 0.5;
+      for (const n of d.device.nodes) {
+        if (!active.has(n.pos.join(","))) continue;
+        ctx.beginPath();
+        ctx.arc(X(ox + n.pos[0]), Y(oy + n.pos[1]), mk.rActive, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // -- the nodes
+    const stubs = stubSet(d);
+    for (const n of d.device.nodes) {
+      const sx = X(ox + n.pos[0]), sy = Y(oy + n.pos[1]);
+      if (tiny) {
+        ctx.fillStyle = n.kind === "junction" ? P("grid", "#8a94a6") : zoneColour(n.zone_type);
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(sx - 1, sy - 1, 2, 2);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (n.kind === "junction" || (n.capacity || 0) === 0) {
+        if (stubs.has(n.id)) {           // a testbench stub: the channel a parent attaches
+          ctx.save();
+          ctx.setLineDash([3, 2]);
+          ctx.strokeStyle = COLOR.muted;
+          ctx.lineWidth = mk.swNode;
+          ctx.strokeRect(sx - mk.rJunc, sy - mk.rJunc, 2 * mk.rJunc, 2 * mk.rJunc);
+          ctx.restore();
+        } else {
+          drawJunction(ctx, n, sx, sy, mk);
+        }
+        continue;
+      }
+      const state = active.has(n.pos.join(",")) ? "active" : "";
+      drawSite(ctx, n, sx, sy, mk, geom.axis[n.id] || [1, 0], state);
+    }
     if (!st) return;
     spread(st.ions);
-    const r = Math.max(0.8, Math.min(depth === 0 ? 7 : 3.2, s * 0.3));
+    // -- the potential well under an ion that is moving (`leafIons` returns the sim
+    // state, whose own `.step` is the instruction record with the moves in it)
+    const rec = st.step ? st.step.step : null;
+    const moving = rec ? rec.moves.length : 0;
+    if (!tiny && moving && moving <= 40) {
+      ctx.fillStyle = P("anc", "#4338ca");
+      ctx.globalAlpha = 0.16;
+      for (const [i2] of rec.moves) {
+        const ion = st.ions[i2];
+        if (!ion) continue;
+        ctx.beginPath();
+        ctx.ellipse(X(ox + ion.xy[0] + (ion.dx || 0)), Y(oy + ion.xy[1]),
+                    mk.wellRx, mk.wellRy, 0, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // -- the ions: white-outlined discs, coloured by what is being done to them
+    const kind = st.step ? st.step.step.ins.type : null;
     for (const ion of st.ions) {
       const x = X(ox + ion.xy[0] + (ion.dx || 0)), y = Y(oy + ion.xy[1]);
-      const color = S.follow === ion.gid ? "#000000" : ion.active ? COLOR.accent : (ROLE[ion.role] || COLOR.teal);
-      mark(color, x, y, S.follow === ion.gid ? r * 1.8 : r);
-      if (depth <= 1 && r >= 2) hits.push([x - r - 1, y - r - 1, x + r + 1, y + r + 1, "ion", { gid: ion.gid, leaf: path, name: ion.name }]);
+      const r = ion.active ? mk.rIon : mk.rRest;
+      // the studio colours an ion by what the machine is doing to it, not by any role it
+      // was given: a Z-check red, an X-check teal, everything else slate.  The gadget
+      // layer has the instruction rather than the check, so a measurement or a reset
+      // reads as Z and a gate as X -- the same two colours, from the same table.
+      ctx.fillStyle = S.follow === ion.gid ? P("accent", "#e4572e")
+        : !ion.active ? P("data", "#475467")
+          : (kind === "measure" || kind === "reset") ? P("z", "#b42318") : P("x", "#0f766e");
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.6, r), 0, 2 * Math.PI);
+      ctx.fill();
+      if (r >= 1.6) {
+        ctx.strokeStyle = P("ion_stroke", "#ffffff");
+        ctx.lineWidth = mk.swHalo;
+        ctx.stroke();
+      }
+      if (depth <= 1 && r >= 2) {
+        hits.push([x - r - 1, y - r - 1, x + r + 1, y + r + 1, "ion",
+                   { gid: ion.gid, leaf: path, name: ion.name }]);
+      }
     }
+    // -- the ion's own number, white on the disc, exactly when the studio shows it
+    if (0.66 * mk.rIon >= 8) {
+      ctx.fillStyle = P("ion_stroke", "#ffffff");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const ion of st.ions) {
+        const label = ion.name.replace(/^[da]/, "");
+        const r = ion.active ? mk.rIon : mk.rRest;
+        if (r < 6) continue;
+        ctx.font = "700 " + Math.min(0.66 * r, 1.5 * r / Math.max(2, label.length)).toFixed(1) +
+                   "px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillText(label, X(ox + ion.xy[0] + (ion.dx || 0)), Y(oy + ion.xy[1]));
+      }
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    }
+  }
+
+  function drawLeafInterior(ctx, path, ox, oy, depth, pxWidth) {
+    drawDevice(ctx, path, ox, oy, depth);
   }
 
   function drawLeafLevel(ctx, w, h) {
@@ -773,34 +1031,24 @@
       ctx.fillText(`loading ${m.name} …`, 20, 60);
       return;
     }
-    // nodes: sites by zone, junctions as squares, stubs dashed
     const s = S.cam.s;
-    drawLeafInterior(ctx, path, 0, 0, 0, w);
-    const zones = d.zones || {};
+    drawDevice(ctx, path, 0, 0, 0);
+    // the node ids, once the zoom gives them room -- the studio keeps identity in its
+    // tooltips, and this view is the one that exists to be read instruction by instruction
+    const geom = deviceGeom(m.name);
+    const mk = marks((geom ? geom.gd : 1) * s);
     for (const n of d.device.nodes) {
       const x = X(n.pos[0]), y = Y(n.pos[1]);
-      const half = Math.max(2, Math.min(9, s * 0.28));
-      if (n.kind === "junction") {
-        ctx.fillStyle = "#f3d58a";
-        ctx.fillRect(x - half * 0.7, y - half * 0.7, half * 1.4, half * 1.4);
-        continue;
-      }
-      const z = zones[n.zone_type] || {};
-      const stub = (n.labels || []).includes("port_stub");
-      ctx.strokeStyle = stub ? COLOR.muted : z.gate ? "#6ca86c" : "#b8c0cc";
-      ctx.lineWidth = 1;
-      if (stub) ctx.setLineDash([3, 2]);
-      ctx.strokeRect(x - half, y - half * 0.45, 2 * half, half * 0.9);
-      ctx.setLineDash([]);
+      const half = Math.max(2, mk.rJunc);
       hits.push([x - half, y - half, x + half, y + half, "node", { node: n, leaf: path }]);
       if (s > 44) {
         ctx.fillStyle = COLOR.muted;
         ctx.font = "10px ui-monospace, monospace";
-        ctx.fillText(n.id, x - half, y + half + 9);
+        ctx.fillText(n.id, x - half, y + half + 11);
       }
     }
     const st = leafIons(path);
-    if (st && s > 34) {
+    if (st && s > 34 && 0.66 * mk.rIon < 8) {
       ctx.font = "10px ui-monospace, monospace";
       ctx.fillStyle = COLOR.ink;
       for (const ion of st.ions) ctx.fillText(ion.name, X(ion.xy[0] + (ion.dx || 0)) + 6, Y(ion.xy[1]) - 6);
@@ -1492,11 +1740,15 @@
     const used = new Set(Object.values(M.gir.leaves).map((v) => M.masters[v[0]].family));
     if (Object.keys(WIRES).length) used.add("wire");
     const cats = CAT_ORDER.filter((c) => CATS[c] && used.has(c));
-    const roles = cats.length ? { data: "data", ancilla: "ancilla", magic: "magic", fresh: "fresh" }
-      : { data: "data ion", ancilla: "ancilla", messenger: "messenger", magic: "magic" };
+    // the ion colours are the studio's: what the machine is doing to an ion this instant,
+    // not what role a code gave it (qccd/viz/render.py::ionColour)
+    const swatches = [[P("data", "#475467"), "an ion"],
+                      [P("x", "#0f766e"), "in a gate"],
+                      [P("z", "#b42318"), "measured or reset"],
+                      [P("active", "#f6c34a"), "the site in play"],
+                      [P("accent", "#e4572e"), "the ion you follow"]];
     $("legend").innerHTML = (cats.length ? `<div class="lg-cats">${cats.map((c) => `<span>${shapeSvg(c, 12)}${escapeHtml(CATS[c].title)}</span>`).join("")}</div>` : "") +
-      `<div class="lg-roles">` + Object.entries(roles).map(([k, v]) => `<span><i style="background:${ROLE[k]}"></i>${v}</span>`).join("") +
-      `<span><i style="background:${COLOR.accent}"></i>in the running instruction</span></div>`;
+      `<div class="lg-roles">` + swatches.map(([c, v]) => `<span><i style="background:${c}"></i>${v}</span>`).join("") + `</div>`;
   }
 
   // ------------------------------------------------------------------ the library

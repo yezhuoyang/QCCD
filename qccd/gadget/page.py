@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..viz.theme import css_vars
+from ..viz.theme import GEOMETRY, PALETTE, css_vars
 
 __all__ = ["render_page"]
 
@@ -42,6 +42,11 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
         "signoff": signoff,
         "categories": categories,
         "categoryOrder": category_order or list(categories),
+        # the studio's own palette and shape ratios: a trapping site, a junction, a rail
+        # and an ion are drawn here by the same numbers as on studio.html, so the two
+        # tools cannot drift apart (qccd/viz/theme.py, qccd/viz/layout.py)
+        "palette": dict(PALETTE),
+        "geometry": dict(GEOMETRY),
     }
     html = (WEB / "page.html").read_text(encoding="utf-8")
     html = html.replace("__CSSVARS__", css_vars())

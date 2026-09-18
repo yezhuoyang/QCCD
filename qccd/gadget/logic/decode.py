@@ -30,21 +30,24 @@ from .faults import propagate
 
 __all__ = ["lookup_table", "LATENCY"]
 
-#: The latencies the place model charges, each from a measured system in the literature.
+#: The latencies the place model charges.  One source of truth for the whole project:
+#: `qccd.analysis.feedback` holds the classical path (with the measured system each number
+#: comes from) and the decoder profiles, so the places, the studio's QEC-cycle panel and
+#: the leaderboard cannot disagree about how long a feedback loop takes.
+from ...analysis.feedback import DECODERS as _DECODERS
+from ...analysis.feedback import LINK as _LINK
+
 LATENCY = {
-    "link_us": 5.0,
-    "link_note": "measurement to a conditional branch on the control FPGA: 5 µs on a "
-                 "trapped-ion QCCD machine (AQT M-ACTION, 2101.11390)",
-    "lookup_us": 1.0,
-    "lookup_note": "one table read for a distance-3 window; an FPGA belief-propagation "
-                   "iteration is 24 ns (IBM real-time decoder, 2510.21600), so a lookup "
-                   "of this size is sub-µs -- 1 µs is charged",
-    "write_us": 0.1,
-    "write_note": "a frame update or an outcome written into the classical memory",
-    "resolve_us": 0.2,
-    "resolve_note": "reading the frame back to answer one question (a guard, a basis)",
-    "decision_us": 2.0,
-    "decision_note": "the guard travelling from the memory to the place that waits for it",
+    "link_us": _LINK["readout_to_control_us"],
+    "link_note": _LINK["readout_to_control_note"],
+    "lookup_us": _DECODERS["lut"]["latency_us"],
+    "lookup_note": _DECODERS["lut"]["note"] + "; " + _DECODERS["lut"]["source"],
+    "write_us": _LINK["frame_write_us"],
+    "write_note": _LINK["frame_write_note"],
+    "resolve_us": _LINK["resolve_us"],
+    "resolve_note": _LINK["resolve_note"],
+    "decision_us": _LINK["decision_us"],
+    "decision_note": _LINK["decision_note"],
 }
 
 

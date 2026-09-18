@@ -53,7 +53,8 @@ def _render_plan():
         return f"{REPO}/tree/compiler/{path}{frag}"
 
     r = Renderer(hints(), link)
-    body = r.render(PLAN.read_text(encoding="utf-8"))
+    from ..site import prose
+    body = r.render(prose.strip(PLAN.read_text(encoding="utf-8"), PLAN.stem))
     return body, r.headings
 
 
@@ -159,8 +160,8 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print) -
         toc = "".join(f'<li><a href="#{sid}">{text}</a></li>' for lvl, sid, text in heads if lvl == 2)
         put(f"{SECTION}/plan/index.html",
             PAGE.format(title="Logical gadgets: the design - QCCD studio", style=STYLE, extra_css="",
-                        body=f'<p class="sub"><a href="../">Logical gadgets</a> &rsaquo; the design '
-                             f'&middot; docs/GADGETS.md</p><ul class="toc">{toc}</ul>{body}'),
+                        body=f'<p class="sub"><a href="../">Logical gadgets</a> &rsaquo; the design'
+                             f'</p><ul class="toc">{toc}</ul>{body}'),
             2, SECTION)
     n_studio = len(list(studio.glob("*.html"))) if studio.exists() else 0
     log(f"  gadgets      {len(algs)} verified algorithms, beta showcase "
@@ -407,8 +408,7 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         "readout the frame anticommutes with is flipped when the archive reports it.</li>"
         "<li><b>And the sign-off allows exactly those.</b> The flat check reads the frames the "
         "archive holds and nothing else: drop one outcome from a correction, or empty the "
-        "archive, and the schedule stops matching the algorithm "
-        "(<code>tests/test_gadget_classical.py</code>).</li>"
+        "archive, and the schedule stops matching the algorithm, and a test says so.</li>"
         "<li><b>Classically controlled execution.</b> <code>if m: s q0</code> is a dynamic "
         "circuit: the ions travel and the place reserves the op either way &mdash; the worst "
         "case, so the schedule stays static &mdash; and only the pulses depend on a bit "
@@ -460,8 +460,7 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         "one or two faults anywhere in the schedule may flip a result unseen.</li>"
         "<li><b>Cross-checked.</b> The tableau agrees with stim on thousands of random flows, "
         "every place's fault distance agrees with stim's own search, and mutated programs "
-        "&mdash; a CNOT turned around, a hook-unsafe order, a missing reset &mdash; fail "
-        "(<code>tests/test_gadget_logic.py</code>).</li></ul>")
+        "&mdash; a CNOT turned around, a hook-unsafe order, a missing reset &mdash; fail.</li></ul>")
     body.append(
         '<h2>What is established, and what is not</h2><ul class="steps">'
         "<li>Established: every place op above passes the hardware rules; every quantum op "
@@ -485,8 +484,8 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
             f"without H layers or CNOT orientation, a parity is taken once by one bare ancilla, "
             f"and the T-gate correction is tracked classically. They stay to show the scale the "
             f"hierarchy handles, not as correct programs.</p></div>")
-    body.append('<p class="muted" style="margin-top:28px"><a href="plan/">The design document</a> '
-                "(docs/GADGETS.md) &middot; source in <code>qccd/gadget/</code></p>")
+    body.append('<p class="muted" style="margin-top:28px"><a href="plan/">The design document</a>'
+                " &middot; every place in this library is checked twice, as hardware and as logic.</p>")
     return "".join(body)
 
 

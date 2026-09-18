@@ -30,7 +30,7 @@ from .base import QCCDAnalysis
 from .budget import _Scaled, error_budget
 from .reach import reach_report
 
-__all__ = ["ReachAnalysis", "BudgetAnalysis", "PhysicalAnalysis",
+__all__ = ["ReachAnalysis", "BudgetAnalysis", "PhysicalAnalysis", "CycleAnalysis",
            "ANALYSES", "get_analysis"]
 
 _MODELS = {"corrected": corrected_model, "deck": deck_model}
@@ -127,10 +127,60 @@ class BudgetAnalysis(QCCDAnalysis):
         }
 
 
+class CycleAnalysis(QCCDAnalysis):
+    """The QEC clock cycle of a design, with the classical feedback loop in it.
+
+    The quantum round is measured -- either given as `round_us`, or replayed here from a
+    program on the device -- and the classical path is composed onto it
+    (`analysis.feedback`).  The knob worth sweeping is the decoder: *how slow may my
+    decoder be before the undecoded backlog grows*, which for a QCCD round is a question
+    with a very comfortable answer and for a microsecond round is not.
+    """
+
+    summary = ("one syndrome-extraction round with its classical loop: throughput margin "
+               "against the decoder, and the reaction time for feeding a result back")
+
+    default_setup = {
+        "device": None,
+        "program": "deck",
+        "model": "corrected",
+        #: a measured round time in µs; None means replay `program` on `device` for it
+        "round_us": None,
+        "decoder": "lut",
+        #: `store` (the answer stops in the classical memory) or `react` (an op waits)
+        "mode": "store",
+        "detectors": None,
+        "rounds_per_decode": 1,
+    }
+    data_labels = ("cycle_us", "cycles_per_s", "round_us", "classical_us", "reaction_us",
+                   "reaction_fraction", "decoder_margin", "keeps_up", "report")
+
+    def _run(self) -> dict:
+        from ..verify.replay import replay
+        from ..compile.programs import build
+        from .feedback import cycle_report
+
+        s = self._setup
+        round_us = s["round_us"]
+        if round_us is None:
+            arch = _resolve_arch(s["device"])
+            model = _resolve_model(s["model"])
+            prog = build(arch, s["program"])
+            round_us = replay(prog, arch, model, check_rules=False,
+                              keep_cycles=False).total_us
+        rep = cycle_report(float(round_us), decoder=s["decoder"], mode=s["mode"],
+                           detectors=s["detectors"],
+                           rounds_per_decode=s["rounds_per_decode"])
+        return {k: rep[k] for k in ("cycle_us", "cycles_per_s", "round_us", "classical_us",
+                                    "reaction_us", "reaction_fraction", "decoder_margin",
+                                    "keeps_up")} | {"report": rep}
+
+
 from .field import PhysicalAnalysis  # noqa: E402  (imports qccd.phys, which is heavier)
 
 #: every analysis the tool can offer, by the name an architect would pick
-ANALYSES = {"reach": ReachAnalysis, "budget": BudgetAnalysis, "field": PhysicalAnalysis}
+ANALYSES = {"reach": ReachAnalysis, "budget": BudgetAnalysis, "field": PhysicalAnalysis,
+            "cycle": CycleAnalysis}
 
 
 def get_analysis(name: str) -> type[QCCDAnalysis]:
