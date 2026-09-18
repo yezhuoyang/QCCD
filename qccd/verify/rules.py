@@ -41,6 +41,11 @@ __all__ = [
     "CYCLE_RULES",
     "check_cycle",
     "rule_statements",
+    "geometry_violations",
+    "geometry_limits",
+    "motion_signature",
+    "hop_label",
+    "loop_node_set",
 ]
 
 
@@ -68,6 +73,10 @@ RULE_SOURCES: Mapping[str, str] = {
     "R16": "2510.23519, 2605.25118",
     "R17": "2605.25118",
     "R18": "quant-ph/0702175, 2305.03828, 1210.3655",
+    "R19": "collaborator review 2026-09 (Ke), 2201.12579",
+    "R20": "collaborator review 2026-09 (Ke; Jaewon; Jack), 2201.12579",
+    "R21": "collaborator review 2026-09 (Ke), quant-ph/0702175",
+    "R22": "collaborator review 2026-09 (Ke), 2510.23519, 2305.12773",
 }
 
 RULE_STATEMENTS: Mapping[str, str] = {
@@ -96,6 +105,10 @@ RULE_STATEMENTS: Mapping[str, str] = {
     "R16": "2Q gate error is a function of accumulated n-bar at gate time",
     "R17": "anomalous heating accrues with elapsed time whether or not an ion moves",
     "R18": "a node is a junction only if three or more trap axes meet at it",
+    "R19": "a junction joins at most max_junction_degree rails (4 on a 2D surface trap)",
+    "R20": "two rails meeting at a node subtend at least min_rail_angle_deg (60 degrees)",
+    "R21": "rails are planar: a rail meets only the nodes it ends at, and rails cross only at a shared node",
+    "R22": "one transport cycle is one waveform: every moving ion performs the same motion; a site may only opt out",
 }
 
 
@@ -374,6 +387,42 @@ def path_actions(v: CycleView) -> dict[str, dict[str, int]]:
     return by_path
 
 
+def spur_actions(v: CycleView) -> tuple[dict[str, str], frozenset[str]]:
+    """`({acting site: "spur:inward" | "spur:outward"}, every site that has a spur)`.
+
+    The second thing a broadcast machine does besides rotate a loop: lift every rider that
+    is beside a dock into its dock, together, with one waveform on the spur electrodes.
+    A dock is a move off every named path, so `path_actions` says nothing about it -- and
+    the schedules that win do so by docking a SUBSET of the docks in every batch (38 of
+    55 batches on the code-aware BB round dock 12 of 24). That is drivable only where
+    every spur site has its own switch; without switches every spur is all-or-nothing.
+    So the action is judged against the sites that HAVE a spur, not against the whole
+    channel: a rail slot with no spur cannot dock anything, and a waveform it ignores is
+    not a site idling while its channel-mates move.
+    """
+    dev = v.arch.device
+    on_loop: set[str] = set()
+    for lp in dev.loops.values():
+        on_loop.update(lp.nodes)
+    spur_sites: set[str] = set()
+    for sg in dev.segments.values():
+        if sg.loop is not None:
+            continue
+        a, b = sg.ends
+        if dev.nodes[a].kind == "site" and dev.nodes[b].kind == "site" \
+                and (a in on_loop) != (b in on_loop):
+            spur_sites.update((a, b))
+    acts: dict[str, str] = {}
+    for m in v.moves:
+        seg = m.seg
+        if seg.loop is not None or m.src not in spur_sites or m.dst not in spur_sites:
+            continue
+        label = "spur:inward" if (m.src in on_loop and m.dst not in on_loop) else "spur:outward"
+        acts[m.src] = label
+        acts[m.dst] = label
+    return acts, frozenset(spur_sites)
+
+
 def r4_drivable(v: CycleView) -> list[Violation]:
     """R4, derived from the wiring rather than declared.
 
@@ -396,13 +445,101 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     plane = v.arch.control_plane
     if not plane.declared or not plane.groups:
         return []
+    dev = v.arch.device
+    occ = getattr(v, "occ_before", {}) or {}
+
+    def judge(where: str, labels: dict[str, str], must_act: set[str]) -> None:
+        """Two failures, one channel at a time: two different things on one waveform
+        (impossible with or without switches), and -- without switches -- a site in
+        `must_act` idling while its channel-mates move.  `must_act` is the set the
+        all-or-nothing rule is judged over: the OCCUPIED sites of this path, or the
+        riders standing beside a dock.  An empty slot under a waveform is not a site
+        idling, it is a site with nothing to move; and a site off this path gets no
+        verdict here, because whether one waveform moves a rail ion and a spur-end ion
+        alike is a field solve over the electrode layout (PLAN §2), not a rule."""
+        for e in plane.engagement(labels):
+            g = e.group
+            if len(e.actions) > 1:
+                a, b = sorted(e.actions)[:2]
+                out.append(Violation(
+                    "R4", v.instr.id,
+                    f"{where}: channel {g.id!r} drives {len(g.sites)} sites with one "
+                    f"waveform, but they are asked to do {len(e.actions)} different "
+                    f"things ({a} and {b}); that needs {len(e.actions)} channels"))
+            elif not plane.switch_per_site:
+                idle = sorted((g.sites & must_act) - set(labels))
+                if idle:
+                    out.append(Violation(
+                        "R4", v.instr.id,
+                        f"{where}: channel {g.id!r} has no per-site switch, so its "
+                        f"{len(g.sites & must_act)} loaded sites here are all-or-nothing; "
+                        f"{len(idle)} would have to idle while the rest move "
+                        f"(e.g. {idle[:4]})"))
+
     out: list[Violation] = []
     for loop, deltas in sorted(path_actions(v).items()):
         labels = {s: action_label(loop, d) for s, d in deltas.items()}
-        ok, problems = plane.drivable(labels)
-        if not ok:
-            out += [Violation("R4", v.instr.id, f"on path {loop!r}: {p}")
-                    for p in problems]
+        loaded = {s for s in dev.loops[loop].nodes if occ.get(s, 0) > 0}
+        judge(f"on path {loop!r}", labels, loaded)
+    # Moves on no named path at all -- a lattice, a rung, a highway on-ramp.  There is no
+    # conveyor to take a direction along, so the action is the direction in the LAB frame.
+    #
+    # Asking something here matters: a grid has no loops, so `path_actions` is empty and
+    # R4d judged nothing at all on the whole family, which let a lattice report the same
+    # programme under broadcast wiring as under direct -- 57 DACs against 12,480.
+    #
+    # But only the COUNTING question can be asked, and this is the correction to the first
+    # version of this clause.  That version asked, per channel group, whether the sites
+    # sharing it were being asked to do two different things -- the same question the
+    # named-path clause asks.  It is the wrong question here, because NO device document in
+    # this repository partitions its sites across channels: every declared plane makes each
+    # channel an all-sites group (checked across `arch/*.arch.json` and the built devices),
+    # since the documents record a channel COUNT and a per-site switch, never which sites a
+    # given channel reaches.  Under an all-sites plane the per-group question always finds
+    # a conflict as soon as an instruction moves two ions differently anywhere on the
+    # device -- which failed `deck_unit_cell` on a walk that merely turns a corner, and
+    # would fail every lattice programme ever compiled.  It was a false positive, not a
+    # discovery, and the honest verdict on WHICH waveform drives which site is silence:
+    # with a per-site switch the assignment of sites to channels is free, so the document
+    # simply does not say.
+    #
+    # What the document does say is how many channels exist.  An instruction that asks for
+    # `k` distinct lab-frame directions needs `k` of them, whatever the layout and whatever
+    # the switch assignment -- so `k > len(groups)` is a real, layout-independent
+    # impossibility, and it is the only one available at this level of description.
+    acts, spur_sites = spur_actions(v)
+    free = {}
+    for m in v.moves:
+        # a spur is the mirrored case, and it has its own clause below: a dock on the top
+        # rail moves an ion down while a dock on the bottom rail moves one up, and one
+        # waveform on symmetric spur electrodes does both.  In the lab frame those look
+        # like two directions, and judging them there would fail every ring ever compiled.
+        if (m.seg.loop is not None or dev.nodes[m.src].kind != "site"
+                or m.src in spur_sites or m.dst in spur_sites):
+            continue
+        a, b = dev.nodes[m.src].pos, dev.nodes[m.dst].pos
+        free[m.src] = f"dir:{round(b[0] - a[0], 6):+g},{round(b[1] - a[1], 6):+g}"
+    want = sorted(set(free.values()))
+    if len(want) > len(plane.groups):
+        out.append(Violation(
+            "R4", v.instr.id,
+            f"off any named path: {len(free)} ions are asked to move in {len(want)} "
+            f"different directions at once (e.g. {want[0]} and {want[1]}), but the "
+            f"device declares {len(plane.groups)} channels; that needs {len(want)}"))
+
+    # the spurs: every acting spur must do the same thing, and without per-site switches
+    # every rider standing beside a dock must dock (inward) and every docked rider must
+    # leave (outward) together
+    if acts:
+        on_loop: set[str] = set()
+        for lp in dev.loops.values():
+            on_loop.update(lp.nodes)
+        inward = any(a == "spur:inward" for a in acts.values())
+        if inward:
+            must = {s for s in spur_sites if s in on_loop and occ.get(s, 0) > 0}
+        else:
+            must = {s for s in spur_sites if s not in on_loop and occ.get(s, 0) > 1}
+        judge("on the spurs", acts, must)
     return out
 
 
@@ -661,6 +798,212 @@ def architecture_violations(arch: Architecture) -> list[Violation]:
     return out
 
 
+# ---------------------------------------------------------------- R19-R21: geometry
+
+#: The limits a document may declare in `budget`; these are the surface-trap defaults.
+DEFAULT_MAX_JUNCTION_DEGREE = 4
+DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0
+#: Coincidence tolerance for R21, in lattice units.  Positions are declared numbers, so
+#: a rail is "through" a node when the node is within this distance of the rail's axis.
+RAIL_EPS = 1e-6
+
+
+def geometry_limits(arch: Architecture) -> tuple[int, float]:
+    """`(max_junction_degree, min_rail_angle_deg)` from the document's `budget`, else the
+    surface-trap defaults (4 rails at a junction, 60 degrees between rails)."""
+    b = arch.budget or {}
+    return (int(b.get("max_junction_degree", DEFAULT_MAX_JUNCTION_DEGREE)),
+            float(b.get("min_rail_angle_deg", DEFAULT_MIN_RAIL_ANGLE_DEG)))
+
+
+def _xy(pos) -> tuple[float, float]:
+    return (float(pos[0]), float(pos[1]) if len(pos) > 1 else 0.0)
+
+
+def rail_angle_deg(dev, node_id: str, seg_a: str, seg_b: str) -> float:
+    """The angle, in degrees, between two rails leaving `node_id`: each rail's direction
+    is the straight line from the node to the rail's other end."""
+    o = _xy(dev.nodes[node_id].pos)
+    a = _xy(dev.nodes[dev.segments[seg_a].other(node_id)].pos)
+    b = _xy(dev.nodes[dev.segments[seg_b].other(node_id)].pos)
+    ax, ay, bx, by = a[0] - o[0], a[1] - o[1], b[0] - o[0], b[1] - o[1]
+    la, lb = math.hypot(ax, ay), math.hypot(bx, by)
+    if la == 0.0 or lb == 0.0:
+        return 0.0
+    c = (ax * bx + ay * by) / (la * lb)
+    c = 1.0 if c > 1.0 else -1.0 if c < -1.0 else c
+    return math.degrees(math.acos(c))
+
+
+def _point_on_segment(p, a, b, eps: float = RAIL_EPS) -> bool:
+    """Is `p` strictly inside the straight segment `a`-`b` (not at either end)?"""
+    abx, aby = b[0] - a[0], b[1] - a[1]
+    apx, apy = p[0] - a[0], p[1] - a[1]
+    l2 = abx * abx + aby * aby
+    if l2 == 0.0:
+        return False
+    cross = abx * apy - aby * apx
+    if abs(cross) > eps * math.sqrt(l2):
+        return False
+    t = (apx * abx + apy * aby) / l2
+    return eps < t < 1.0 - eps
+
+
+def _segments_cross(a, b, c, d, eps: float = RAIL_EPS) -> bool:
+    """Do the straight segments `a`-`b` and `c`-`d` cross at an interior point of both?
+    Touching at an end or running collinear is not a crossing here: the shared-node case
+    is excluded by the caller, and collinear overlap is caught as a node on a rail."""
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    o1, o2, o3, o4 = orient(a, b, c), orient(a, b, d), orient(c, d, a), orient(c, d, b)
+    return (o1 > eps and o2 < -eps or o1 < -eps and o2 > eps) and \
+           (o3 > eps and o4 < -eps or o3 < -eps and o4 > eps)
+
+
+def geometry_violations(arch: Architecture) -> list[Violation]:
+    """R19, R20 and R21: the shape of the rail graph, judged from the declared node
+    positions alone.  These need no programme and no technology; they say whether the
+    drawing is a surface trap at all.
+
+    R19  no node has more rails than `budget.max_junction_degree` (default 4)
+    R20  at every node with two or more rails, any two of them subtend at least
+         `budget.min_rail_angle_deg` (default 60)
+    R21  rails are planar: no rail passes through a node it does not end at, and no
+         two rails cross except at a node they share
+    """
+    out: list[Violation] = []
+    dev = arch.device
+    max_deg, min_ang = geometry_limits(arch)
+    for nid in sorted(dev.nodes):
+        deg = dev.degree(nid)
+        if deg > max_deg:
+            out.append(Violation(
+                "R19", -1,
+                f"node {nid} has degree {deg}, but a junction on this device may join at "
+                f"most {max_deg} rails (budget.max_junction_degree)"))
+        segs = list(dev.incidence[nid])
+        for i in range(len(segs)):
+            for j in range(i + 1, len(segs)):
+                ang = rail_angle_deg(dev, nid, segs[i], segs[j])
+                if ang < min_ang - 1e-9:
+                    out.append(Violation(
+                        "R20", -1,
+                        f"rails {segs[i]} and {segs[j]} meet at {nid} at {ang:.1f} degrees, "
+                        f"less than the {min_ang:g} degrees the device requires "
+                        f"(budget.min_rail_angle_deg)"))
+    pos = {nid: _xy(n.pos) for nid, n in dev.nodes.items()}
+    sids = sorted(dev.segments)
+    boxes = {}
+    for sid in sids:
+        a, b = dev.segments[sid].ends
+        pa, pb = pos[a], pos[b]
+        boxes[sid] = (min(pa[0], pb[0]) - RAIL_EPS, min(pa[1], pb[1]) - RAIL_EPS,
+                      max(pa[0], pb[0]) + RAIL_EPS, max(pa[1], pb[1]) + RAIL_EPS)
+    for sid in sids:
+        a, b = dev.segments[sid].ends
+        x0, y0, x1, y1 = boxes[sid]
+        for nid in sorted(dev.nodes):
+            if nid == a or nid == b:
+                continue
+            p = pos[nid]
+            if p[0] < x0 or p[0] > x1 or p[1] < y0 or p[1] > y1:
+                continue
+            if _point_on_segment(p, pos[a], pos[b]):
+                out.append(Violation(
+                    "R21", -1,
+                    f"rail {sid} ({a}-{b}) passes through node {nid}, which it does not "
+                    f"end at; a rail may only meet a node it is joined to"))
+    for i in range(len(sids)):
+        s1 = sids[i]
+        a, b = dev.segments[s1].ends
+        bx0, by0, bx1, by1 = boxes[s1]
+        for j in range(i + 1, len(sids)):
+            s2 = sids[j]
+            c, d = dev.segments[s2].ends
+            if a == c or a == d or b == c or b == d:
+                continue
+            cx0, cy0, cx1, cy1 = boxes[s2]
+            if cx0 > bx1 or cx1 < bx0 or cy0 > by1 or cy1 < by0:
+                continue
+            if _segments_cross(pos[a], pos[b], pos[c], pos[d]):
+                out.append(Violation(
+                    "R21", -1,
+                    f"rails {s1} ({a}-{b}) and {s2} ({c}-{d}) cross without a junction; "
+                    f"rails may only cross at a node they share"))
+    return out
+
+
+# ---------------------------------------------------------------- R22: one waveform
+
+def motion_signature(v: CycleView, ion: str) -> str:
+    """What one ion does in this cycle, as the waveform it needs: the class and, hop by
+    hop, the direction -- along a named path as `L0:+1`, on a spur as `spur:inward` /
+    `spur:outward`, and anywhere else as the lab-frame axis `+x`, `-y`, `+x+y`.
+
+    Two ions with the same signature ride the same waveform; two with different ones
+    need two cycles under broadcast control.  The compiler's uniformising pass and R22
+    agree because they both call this.
+    """
+    dev = v.arch.device
+    on_loop = loop_node_set(dev)
+    hops = [hop_label(dev, on_loop, m.src, m.dst, m.seg) for m in v.moves if m.ion == ion]
+    return f"{v.instr.cls or 'shuttle'} {','.join(hops)}"
+
+
+def loop_node_set(dev) -> frozenset[str]:
+    """Every node that lies on a named loop or path."""
+    out: set[str] = set()
+    for lp in dev.loops.values():
+        out.update(lp.nodes)
+    return frozenset(out)
+
+
+def hop_label(dev, on_loop, src: str, dst: str, seg) -> str:
+    """One hop's motion label, the unit R22's signature is made of: `L0:+1` along a
+    named path, `spur:inward` / `spur:outward` on a spur, else the lab-frame axis."""
+    loop = seg.loop
+    # CLOSED loops only.  A rotation is one waveform whose ions move in different lab-frame
+    # directions, so the loop-relative step is the honest label there.  An open path's `+1`
+    # is a plain translation, and two parallel rails shifted the same way are one waveform:
+    # labelling those `TOP:+1` and `BOTTOM:+1` invents a difference the electrodes do not
+    # have, and made R22 refuse a legal shift of both rails of a ladder.
+    if loop is not None and loop in dev.loops and dev.loops[loop].closed:
+        seq = dev.loops[loop].nodes
+        if src in seq and dst in seq:
+            k = len(seq)
+            d = (seq.index(dst) - seq.index(src)) % k
+            d = d if d <= k // 2 else d - k
+            return action_label(loop, d)
+    if loop is None and (src in on_loop) != (dst in on_loop):
+        return "spur:inward" if src in on_loop else "spur:outward"
+    a, b = _xy(dev.nodes[src].pos), _xy(dev.nodes[dst].pos)
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    label = ("+x" if dx > RAIL_EPS else "-x" if dx < -RAIL_EPS else "") + \
+            ("+y" if dy > RAIL_EPS else "-y" if dy < -RAIL_EPS else "")
+    return label or "0"
+
+
+def r22_uniform_motion(v: CycleView) -> list[Violation]:
+    """R22.  Under broadcast control one cycle is one waveform, so every ion that moves in
+    a cycle must do the exact same thing; a site may opt out, never do something else."""
+    if v.instr.type != "simd" or not v.moves:
+        return []
+    if str(v.arch.control.get("model", "simd_classes")) == "direct":
+        return []
+    ions: list[str] = []
+    for m in v.moves:
+        if m.ion not in ions:
+            ions.append(m.ion)
+    sigs = sorted({motion_signature(v, ion) for ion in ions})
+    if len(sigs) <= 1:
+        return []
+    return [Violation(
+        "R22", v.instr.id,
+        f"{len(ions)} ions move in {len(sigs)} different ways in one cycle "
+        f"({sigs[0]} and {sigs[1]}); one cycle is one waveform, so unlike motions need "
+        f"{len(sigs)} cycles")]
+
+
 def r12_intra_parallelism(v: CycleView) -> list[Violation]:
     if v.instr.type != "gate":
         return []
@@ -735,6 +1078,7 @@ CYCLE_RULES: Mapping[str, Callable[[CycleView], list[Violation]]] = {
     "R12": r12_intra_parallelism,
     "R13": r13_chain_length,
     "R14": r14_split_at_edge,
+    "R22": r22_uniform_motion,
 }
 
 

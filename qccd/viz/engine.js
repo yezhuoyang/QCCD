@@ -4613,7 +4613,10 @@ function _onLoopSet(w) {
 function _hopLabel(w, m) {
   var dev = w.dev, seg = dev.segments[m.seg];
   var loop = seg.loop === undefined ? null : seg.loop;
-  if (loop !== null && own(dev.loops, loop)) {
+  // CLOSED loops only -- see `rules.py::hop_label`.  A rotation is one waveform whose ions
+  // move in different lab-frame directions; an open path's step is a plain translation, and
+  // two parallel rails shifted the same way are one waveform.
+  if (loop !== null && own(dev.loops, loop) && dev.loops[loop].closed) {
     var seq = dev.loops[loop].nodes;
     var idx = w.loopIdx[loop] || (w.loopIdx[loop] = _indexOfSeq(seq));
     if (own(idx, m.src) && own(idx, m.dst)) {
