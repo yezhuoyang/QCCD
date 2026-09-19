@@ -1139,8 +1139,8 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
 
 # ---------------------------------------------------------------- compilation
 
-QASM_GATES = [("single-qubit, via u3(&theta;, &phi;, &lambda;)", "id x y z h s sdg t tdg sx sxdg rx ry rz u1 p u2 u3 u",
-               "one free VZ(&lambda;), then one laser pulse R(&theta;, &phi;)"),
+QASM_GATES = [("single-qubit", "id x y z h s sdg t tdg sx sxdg rx ry rz u1 p u2 u3 u",
+               "a turn about z, then one laser pulse"),
               ("two-qubit", "cx cz cy ch swap cu1 cp", "cx is the primitive: R, MS(&pi;/2), R, R, R; the others are cx with single-qubit gates around it"),
               ("three-qubit", "ccx", "the standard six-CNOT decomposition"),
               ("non-unitary", "measure reset barrier", "readout and preparation in a zone with SPAM; barrier orders, and costs nothing")]
@@ -1292,27 +1292,28 @@ def compilation_page(built: list[dict]) -> str:
             "<p class=\"sub\">You write a quantum circuit. This page shows what the machine actually has to "
             "do to run it: which ion is which qubit, which ions have to be moved next to each other, and which laser "
             "pulses fire in what order. Every example here can be played.</p>"
-            "<p>Nothing on this page is taken on trust. The compiler's output is checked twice over &mdash; once "
-            "against the <a href=\"../rules/\">rules</a> the hardware imposes, and once against the circuit you "
-            "started from, to prove the machine really does compute what you asked for.</p>"]
+            "<p>Everything here is checked by machine: that the plan obeys what the "
+            "<a href=\"../rules/\">hardware can do</a>, and that it still computes the circuit you wrote.</p>"]
     # the input
     body.append("<h2 id=\"input\">What goes in</h2>"
-                "<p class=\"sub\">A circuit in OpenQASM &mdash; the same text you would run on any quantum computer. "
-                "An ion trap cannot perform those gates directly, so each one is rewritten into the only three things "
-                "this machine can do:</p>"
+                "<p class=\"sub\">A circuit, written the ordinary way. No trapped-ion machine can perform those "
+                "gates as written, so each one is rewritten into the only three things this machine can actually "
+                "do:</p>"
                 "<dl class=\"native\">"
-                "<dt>R(&theta;, &phi;)</dt><dd>A laser pulse on one ion, turning that qubit by an angle &theta;. "
-                "The second angle &phi; picks which way it turns. This is the workhorse.</dd>"
-                "<dt>VZ(&lambda;)</dt><dd>A turn the machine gets for free: instead of firing a laser it simply "
-                "remembers the angle and adjusts the pulses that come afterwards. Costs no time.</dd>"
-                "<dt>MS(&theta;)</dt><dd>One laser across <i>two</i> ions sitting in the same trap. This is the only "
-                "way the machine entangles two qubits &mdash; which is why ions have to be moved next to each other "
-                "before a two-qubit gate can happen.</dd>"
+                "<dt>A pulse on one ion</dt><dd>The laser turns that one qubit. Two numbers say how far it turns "
+                "and about which axis. Almost everything is built out of these.</dd>"
+                "<dt>A turn about z</dt><dd>A turn of the qubit about the other axis. On some machines this is free "
+                "&mdash; you leave the ion alone and adjust the pulses that come afterwards &mdash; but not on this "
+                "one: the laser beams are shared between ions, so there is no way to change what just one ion sees. "
+                "Here it costs real pulses, three of them, unless the trap has a dedicated beam for the job.</dd>"
+                "<dt>A pulse across two ions</dt><dd>One laser reaching <i>two</i> ions that sit in the same trap. "
+                "It is the only way this machine can make two qubits interact &mdash; which is why ions have to be "
+                "moved next to each other before a two-qubit gate can happen at all.</dd>"
                 "</dl>"
-                "<p>Any single-qubit gate at all can be written as <code>u3(&theta;, &phi;, &lambda;)</code> &mdash; "
-                "three angles are enough to describe every one of them &mdash; and on this machine that becomes one "
-                "free VZ and one laser pulse. The rewrite is not hand-written: both identities are machine-checked "
-                "proofs, so the gate you wrote and the pulses that fire are the same operation.</p>"
+                "<p>Every single-qubit gate is a turn of the qubit, and three angles are enough to describe any turn "
+                "&mdash; how far, and about which axis. So each one becomes a turn about z followed by a laser pulse. "
+                "The rewrite is not done by hand: it is a proved identity, so the gate you wrote and the pulses that "
+                "fire are the same operation.</p>"
                 "<div class=\"tw\"><table><thead><tr><th>what you write</th><th>which gates</th>"
                 "<th>what the machine actually does</th></tr></thead><tbody>"
                 + "".join(f'<tr><td>{a}</td><td><details class="gset"><summary>{len(b.split())} gates</summary>'
@@ -1325,7 +1326,7 @@ def compilation_page(built: list[dict]) -> str:
     # the pipeline
     stages = [
         ("Parse", "circuit_ops, a DAG", "the QASM becomes a list of operations with their qubits, parameters and source lines, and the per-qubit order between them; a second front end in Python agrees on 507 of 507 test circuits."),
-        ("Lower", "pulses per op", "each single-qubit gate becomes u3(&theta;, &phi;, &lambda;) and then VZ(&lambda;) followed by R(&theta;, &phi;); cx becomes R, MS(&pi;/2), R, R, R; composites unfold to those."),
+        ("Rewrite", "pulses per gate", "every gate is rewritten as pulses this machine can fire: a single-qubit gate becomes a turn about z and one pulse, a CNOT becomes four single-ion pulses around one two-ion pulse, and anything bigger unfolds into those."),
         ("Place", "map, init", "qubits are bound to ions (<code>map</code>) and ions to sites (<code>init</code>): the ion mapping. Candidates from a greedy and a spectral placement are scored by weighted interaction distance and the better one kept."),
         ("Route and schedule", "moves, layers", "ops are scheduled in DAG layers; every two-qubit gate's operands are carried to one gate-capable trap. The general router moves one ion at a time along hops the device admits; on rings past about half occupancy the rigid-rotation pass turns the whole loop instead. Every move is recorded."),
         ("Emit", "prog.tsir.json + prog.qcert.json", "the hardware programme in the language, every instruction stamped with the circuit op it serves (<code>meta.op</code>), and the certificate: the mapping, the moves, one witness per gate with its site, ions and pulses."),
@@ -1345,9 +1346,12 @@ def compilation_page(built: list[dict]) -> str:
         c, v = bell["cert"], bell["verdict"]
         final = _positions(c)
         body.append("<h2 id=\"mapping\">The ion mapping, verified</h2>"
-                    "<p class=\"sub\">For the Bell pair, compiled here onto the four-site register, the placer binds q0 and q1 to ions "
-                    "and seats them; the CNOT then needs both in one trap, so one ion is shuttled along the register to the "
-                    "other's site. O1 recomputes every position "
+                    "<p class=\"sub\">For the Bell pair, compiled here onto the four-site register, each qubit is given an ion and "
+                    "a starting trap. The CNOT needs both ions in one trap, and that happens in two steps: one ion is "
+                    "carried along the register until its trap sits right beside the other &mdash; the ion waiting there "
+                    "does not move &mdash; and then the two traps are merged into one. The waiting ion shifts by a couple "
+                    "of micrometres as the merge completes, against the hundreds it would move if it were the one being "
+                    "carried. The check recomputes every position "
                     "from <code>init</code> and the move list and checks each gate's operands are where the witness says.</p>"
                     "<div class=\"two\"><div><table class=\"kv\"><tr><td>qubit</td><td>ion</td><td>starts</td><td>ends</td></tr>"
                     + "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion)}</td><td>{final.get(ion)}</td></tr>' for q, ion in sorted(c["map"].items(), key=lambda kv: int(kv[0])))

@@ -1,7 +1,7 @@
 {
  "id": "z",
  "title": "z",
- "note": "a phase flip: u3(0, 0, \u03c0), so the frame update carries the gate and the emitted beam has angle 0",
+ "note": "a phase flip: a half turn about z. Free on some machines, three pulses on this one",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
  "device": "ring6d",
  "device_about": "the six-site ring with two dock spurs",

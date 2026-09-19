@@ -1,7 +1,7 @@
 {
  "id": "measure",
  "title": "measure",
- "note": "readout in a zone with SPAM; no pulses, so no gate witness",
+ "note": "reading the qubit out, in a trap that can do it: a laser asks the ion whether it is 0 or 1",
  "compiler": "1 layers, 0 transport cycles, 0 beams, 0 MS, 0 virtual-Z, 3 instructions",
  "device": "chain4",
  "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",

@@ -1,7 +1,7 @@
 {
  "id": "s",
  "title": "s",
- "note": "u3(0, 0, \u03c0/2): the frame update carries the gate, the beam has angle 0",
+ "note": "a quarter turn about z: three pulses here, for the same reason as z",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
  "device": "chain4",
  "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",

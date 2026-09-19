@@ -9,6 +9,7 @@ asserted is what a reader or an admin is allowed to do, and what a stranger is n
     that admin named, once, before it expires -- and never by asking;
   * a closed account is signed out at once and refused at the door;
   * a reader deletes their own comments and nobody else's; an admin deletes anything;
+  * a deleted comment still counts on the Credit page: the ledger is marked, never emptied;
   * a session ends on sign-out and on a password change elsewhere;
   * a cross-site request, a malformed body, an oversized body and a burst of sign-in
     attempts are refused with the status that names them.
@@ -398,6 +399,72 @@ def test_admin_manages_everything(srv):
     assert {u["email"] for u in srv[2].store.users()} == {"ada@example.org", ADMIN}
 
 
+def test_credit_survives_the_comment_being_deleted(srv):
+    """The ledger is the point of the Credit page: addressing a comment takes it off the
+    page it was pinned to and never off the record of who noticed the thing."""
+    ada = reader(srv)
+    anchor = {"sel": "#p1", "tag": "p"}
+    th = ada.post("/api/threads", {"page": "/docs/rules/", "anchor": anchor, "text": "the first thing"})[1]["thread"]
+    cid = ada.post("/api/threads/%d/comments" % th["id"], {"text": "the second thing"})[1]["comment"]["id"]
+
+    st, d = ada.get("/api/credit")
+    assert st == 200 and d["total"] == 2 and d["addressed"] == 0
+    me = [p for p in d["people"] if p["name"] == "Ada Reader"][0]
+    assert (me["total"], me["open"], me["addressed"]) == (2, 2, 0)
+    assert [i["text"] for i in d["items"]] == ["the second thing", "the first thing"]
+    assert d["items"][0]["page"] == "/docs/rules/" and d["items"][0]["removed"] is None
+
+    # deal with the reply: it leaves the page, it does not leave the ledger
+    assert ada.delete("/api/comments/%d" % cid)[0] == 200
+    assert len(ada.get("/api/threads?page=/docs/rules/")[1]["threads"][0]["comments"]) == 1
+    d = ada.get("/api/credit")[1]
+    assert d["total"] == 2 and d["addressed"] == 1
+    me = [p for p in d["people"] if p["name"] == "Ada Reader"][0]
+    assert (me["total"], me["open"], me["addressed"]) == (2, 1, 1)
+    assert [bool(i["removed"]) for i in d["items"]] == [True, False]
+
+    # and deleting the whole thread marks the rest rather than dropping it
+    assert ada.delete("/api/threads/%d" % th["id"])[0] == 200
+    assert ada.get("/api/threads?page=/docs/rules/")[1]["threads"] == []
+    d = ada.get("/api/credit")[1]
+    assert d["total"] == 2 and d["addressed"] == 2
+    assert [p["total"] for p in d["people"]] == [2]
+
+
+def test_credit_counts_each_person_and_needs_a_session(srv):
+    ada = reader(srv)
+    bob = reader(srv, "bob@example.org", "Bob Other", "other-pass-123")
+    anchor = {"sel": "#p1", "tag": "p"}
+    th = ada.post("/api/threads", {"page": "/p/", "anchor": anchor, "text": "ada one"})[1]["thread"]
+    bob.post("/api/threads/%d/comments" % th["id"], {"text": "bob one"})
+    bob.post("/api/threads", {"page": "/q/", "anchor": anchor, "text": "bob two"})
+
+    d = ada.get("/api/credit")[1]
+    assert {p["name"]: p["total"] for p in d["people"]} == {"Ada Reader": 1, "Bob Other": 2}
+    assert [p["name"] for p in d["people"]] == ["Bob Other", "Ada Reader"]   # most first
+    assert d["total"] == 3
+
+    # a reader sees everyone's credit -- the site is by invitation, so that is the collaborators
+    assert {p["name"] for p in bob.get("/api/credit")[1]["people"]} == {"Ada Reader", "Bob Other"}
+    # but a stranger sees none of it
+    assert Client(srv[0], srv[1]).get("/api/credit")[0] == 401
+
+
+def test_credit_is_seeded_from_comments_that_predate_the_ledger(srv):
+    """A database written before the ledger existed still counts what is in it."""
+    store = srv[2].store
+    ada = reader(srv)
+    th = ada.post("/api/threads", {"page": "/p/", "anchor": {"sel": "#p1", "tag": "p"}, "text": "before"})[1]["thread"]
+    with store.connect() as c:                       # forget it, as an older copy would have
+        c.execute("DELETE FROM credits")
+    assert ada.get("/api/credit")[1]["total"] == 0
+    capi.Store(store.path, set())                    # a restart re-seeds from the comments
+    d = ada.get("/api/credit")[1]
+    assert d["total"] == 1 and d["items"][0]["text"] == "before"
+    assert d["items"][0]["page"] == "/p/" and d["people"][0]["name"] == "Ada Reader"
+    assert th["id"] == d["items"][0].get("thread_id", th["id"])
+
+
 def test_password_change_ends_other_sessions(srv):
     ada = reader(srv)
     other = Client(srv[0], srv[1])
@@ -475,3 +542,39 @@ def test_password_hashes_are_salted_scrypt():
     assert a != b and a.startswith("scrypt$16384$8$1$")
     assert capi.check_password("reader-pass-123", a) and not capi.check_password("reader-pass-124", a)
     assert not capi.check_password("x", "garbage")
+
+
+def test_a_note_can_be_marked_addressed_without_deleting_it(srv):
+    """Ke asked how to mark a comment as addressed; deleting it was the only answer, and
+    deleting takes the words with it.  Marking keeps the note and says who dealt with it."""
+    ada = reader(srv)
+    th = ada.post("/api/threads", {"page": "/compilation/", "anchor": {"sel": "#p1", "tag": "p"},
+                                   "text": "these expressions are hard to read"})[1]["thread"]
+    assert th["resolved"] is None
+
+    # anybody signed in may mark it: the person who fixes a thing is rarely the reporter
+    adm = admin_client(srv)
+    st, d = adm.post("/api/threads/%d/resolve" % th["id"], {"resolved": True})
+    assert st == 200
+    done = d["thread"]["resolved"]
+    assert done["by"]["name"] == "Site Admin" and done["at"] > 0
+    assert [c["text"] for c in d["thread"]["comments"]] == ["these expressions are hard to read"]
+
+    # it is still on its page, and it still reads the same
+    t = ada.get("/api/threads?page=/compilation/")[1]["threads"][0]
+    assert t["resolved"]["by"]["name"] == "Site Admin"
+    assert t["comments"][0]["text"] == "these expressions are hard to read"
+
+    # the Credit page counts it as addressed, the same as if it had been taken off the page
+    c = ada.get("/api/credit")[1]
+    assert (c["total"], c["addressed"]) == (1, 1)
+
+    # and it is reversible, counter and all
+    assert adm.post("/api/threads/%d/resolve" % th["id"], {"resolved": False})[1]["thread"]["resolved"] is None
+    c = ada.get("/api/credit")[1]
+    assert (c["total"], c["addressed"]) == (1, 0)
+
+    # refusals
+    assert adm.post("/api/threads/9999/resolve", {"resolved": True})[0] == 404
+    assert adm.post("/api/threads/%d/resolve" % th["id"], {"resolved": "yes"})[0] == 400
+    assert Client(srv[0], srv[1]).post("/api/threads/%d/resolve" % th["id"], {"resolved": True})[0] == 401
