@@ -1,7 +1,7 @@
 {
  "id": "cx",
  "title": "cx",
- "note": "the entangler: transport to co-locate, then R, MS, R, R, R (the proved decomposition)",
+ "note": "the entangler: carry one ion to the other, then one two-ion pulse with four single-ion pulses around it",
  "compiler": "1 layers, 2 transport cycles, 4 beams, 1 MS, 0 virtual-Z, 9 instructions",
  "device": "grid2x3",
  "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",

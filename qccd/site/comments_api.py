@@ -17,6 +17,11 @@ pinned to one page at one anchor (the element and the fraction of it the reader 
 as JSON the browser wrote), and holds one or more comments.  Only a signed-in reader sees
 any of it; a reader deletes their own comments; an admin (`--admins`) deletes anything.
 
+Comments are also counted.  `credits` is an append-only ledger with one row per comment,
+written when it is posted and marked rather than removed when the comment is deleted, so a
+comment that has been dealt with and taken off the page still counts for whoever noticed the
+thing.  `/api/credit` is what the Credit page reads.
+
 The site is by invitation.  Nobody registers unasked: an admin names an email, the server
 mails that address a one-time link carrying a token it keeps only as a hash, and following
 the link is the only way to make an account -- with the address the admin named, which the
@@ -35,9 +40,11 @@ it imports nothing outside the standard library and needs no install.
     POST   /api/login     {email, password}
     POST   /api/logout
     POST   /api/password  {old, new}
+    GET    /api/credit                      -> {"people": [...], "items": [...]}  (signed in)
     GET    /api/threads?page=/physics/      -> {"threads": [...]}          (signed in)
     POST   /api/threads   {page, anchor, text}                           (signed in)
     POST   /api/threads/<id>/comments  {text}                            (signed in)
+    POST   /api/threads/<id>/resolve  {resolved}   (signed in: mark it addressed, or reopen)
     DELETE /api/threads/<id>                       (the thread's author, or an admin)
     DELETE /api/comments/<id>                      (the comment's author, or an admin)
     GET    /api/admin/people                       (admin: every account and invitation)
@@ -109,7 +116,12 @@ CREATE TABLE IF NOT EXISTS threads(
 CREATE TABLE IF NOT EXISTS comments(
   id INTEGER PRIMARY KEY, thread_id INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, text TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS credits(
+  id INTEGER PRIMARY KEY, comment_id INTEGER NOT NULL UNIQUE, thread_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL, name TEXT NOT NULL, page TEXT NOT NULL, text TEXT NOT NULL,
+  created REAL NOT NULL, removed REAL);
 CREATE INDEX IF NOT EXISTS threads_page ON threads(page);
+CREATE INDEX IF NOT EXISTS credits_user ON credits(user_id);
 CREATE INDEX IF NOT EXISTS comments_thread ON comments(thread_id);
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS invites_token ON invites(token_hash);
@@ -161,6 +173,19 @@ class Store:
             # their account, and is closed one at a time from the panel or `access`.
             if "access" not in {r["name"] for r in c.execute("PRAGMA table_info(users)")}:
                 c.execute("ALTER TABLE users ADD COLUMN access INTEGER NOT NULL DEFAULT 1")
+            # a note can be marked ADDRESSED instead of deleted: the reader who wrote it
+            # asked how to say "this one is done" without losing what was said.  Null is
+            # open, which is what every thread written before this was.
+            tcols = {r["name"] for r in c.execute("PRAGMA table_info(threads)")}
+            if "resolved" not in tcols:
+                c.execute("ALTER TABLE threads ADD COLUMN resolved REAL")
+                c.execute("ALTER TABLE threads ADD COLUMN resolved_by INTEGER")
+            # every comment that exists earns its credit, including the ones posted before
+            # this ledger did.  `OR IGNORE` on the unique comment_id makes it idempotent, so
+            # it also catches anything written while an older copy of this file was running.
+            c.execute("INSERT OR IGNORE INTO credits(comment_id,thread_id,user_id,name,page,text,created) "
+                      "SELECT cm.id, cm.thread_id, cm.user_id, u.name, t.page, cm.text, cm.created "
+                      "FROM comments cm JOIN threads t ON t.id=cm.thread_id JOIN users u ON u.id=cm.user_id")
 
     def connect(self) -> sqlite3.Connection:
         c = sqlite3.connect(self.path, timeout=10, isolation_level=None)
@@ -338,8 +363,14 @@ class Store:
                    "user": {"id": r["user_id"], "name": r["name"], "color": r["color"]}}
                   for r in c.execute("SELECT c.*, u.name, u.color FROM comments c JOIN users u ON u.id=c.user_id "
                                      "WHERE c.thread_id=? ORDER BY c.id", (t["id"],))]
+            done = None
+            if t["resolved"]:
+                by = c.execute("SELECT id, name, color FROM users WHERE id=?", (t["resolved_by"],)).fetchone()
+                done = {"at": t["resolved"],
+                        "by": {"id": by["id"], "name": by["name"], "color": by["color"]} if by else None}
             out.append({"id": t["id"], "page": t["page"], "anchor": json.loads(t["anchor"]), "created": t["created"],
-                        "user": {"id": t["user_id"], "name": t["name"], "color": t["color"]}, "comments": cs})
+                        "user": {"id": t["user_id"], "name": t["name"], "color": t["color"]},
+                        "resolved": done, "comments": cs})
         return out
 
     def threads(self, page: str) -> list[dict]:
@@ -357,28 +388,89 @@ class Store:
             raise HttpError(404, "no such thread")
         return rows[0]
 
+    def _credit(self, c, comment_id: int, thread_id: int, user, page: str, text: str, when: float) -> None:
+        """The ledger: one row per comment, written the moment it is posted and never taken
+        out.  Addressing a comment deletes it from the page it was pinned to; the credit for
+        having noticed the thing stays here, which is the whole point of keeping it apart."""
+        c.execute("INSERT OR IGNORE INTO credits(comment_id,thread_id,user_id,name,page,text,created) "
+                  "VALUES(?,?,?,?,?,?,?)",
+                  (comment_id, thread_id, user["id"], user["name"], page, text, when))
+
     def create_thread(self, user, page: str, anchor: dict, text: str) -> dict:
         now = time.time()
         with self.lock, self.connect() as c:
             cur = c.execute("INSERT INTO threads(page,anchor,user_id,created) VALUES(?,?,?,?)",
                             (page, json.dumps(anchor, separators=(",", ":")), user["id"], now))
-            c.execute("INSERT INTO comments(thread_id,user_id,text,created) VALUES(?,?,?,?)", (cur.lastrowid, user["id"], text, now))
             tid = cur.lastrowid
+            cm = c.execute("INSERT INTO comments(thread_id,user_id,text,created) VALUES(?,?,?,?)", (tid, user["id"], text, now))
+            self._credit(c, cm.lastrowid, tid, user, page, text, now)
         return self.thread(tid)
 
     def create_comment(self, user, tid: int, text: str) -> dict:
         with self.lock, self.connect() as c:
-            if not c.execute("SELECT 1 FROM threads WHERE id=?", (tid,)).fetchone():
+            t = c.execute("SELECT * FROM threads WHERE id=?", (tid,)).fetchone()
+            if t is None:
                 raise HttpError(404, "no such thread")
+            now = time.time()
             cur = c.execute("INSERT INTO comments(thread_id,user_id,text,created) VALUES(?,?,?,?)",
-                            (tid, user["id"], text, time.time()))
+                            (tid, user["id"], text, now))
+            self._credit(c, cur.lastrowid, tid, user, t["page"], text, now)
             r = c.execute("SELECT c.*, u.name, u.color FROM comments c JOIN users u ON u.id=c.user_id WHERE c.id=?",
                           (cur.lastrowid,)).fetchone()
         return {"id": r["id"], "text": r["text"], "created": r["created"],
                 "user": {"id": r["user_id"], "name": r["name"], "color": r["color"]}}
 
+    def credit(self, limit: int = 400) -> dict:
+        """Who has said something about this site, and how often.  Counted from the ledger,
+        so a comment that has been dealt with and taken off the page still counts."""
+        with self.connect() as c:
+            live = {r["id"]: r for r in c.execute("SELECT * FROM users")}
+            people = []
+            for r in c.execute(
+                    "SELECT user_id, COUNT(*) AS total, "
+                    "SUM(CASE WHEN removed IS NULL THEN 1 ELSE 0 END) AS open, "
+                    "SUM(CASE WHEN removed IS NOT NULL THEN 1 ELSE 0 END) AS addressed, "
+                    "MIN(created) AS first, MAX(created) AS last, MAX(id) AS seq "
+                    "FROM credits GROUP BY user_id ORDER BY total DESC, seq"):
+                u = live.get(r["user_id"])
+                name = u["name"] if u else c.execute(
+                    "SELECT name FROM credits WHERE user_id=? ORDER BY id DESC LIMIT 1", (r["user_id"],)).fetchone()[0]
+                people.append({"id": r["user_id"], "name": name, "color": u["color"] if u else 0,
+                               "total": r["total"], "open": r["open"], "addressed": r["addressed"],
+                               "first": r["first"], "last": r["last"], "gone": u is None})
+            items = [{"name": r["name"], "page": r["page"], "text": r["text"],
+                      "created": r["created"], "removed": r["removed"]}
+                     for r in c.execute("SELECT * FROM credits ORDER BY id DESC LIMIT ?", (limit,))]
+        return {"people": people, "items": items,
+                "total": sum(p["total"] for p in people),
+                "addressed": sum(p["addressed"] for p in people)}
+
     def is_admin(self, user) -> bool:
         return user is not None and user["email"].lower() in self.admins
+
+    def set_resolved(self, user, tid: int, resolved: bool) -> dict:
+        """Mark a note as addressed, or reopen it.
+
+        Anyone signed in may do it and the name is recorded, because the person who fixes a
+        thing is usually not the person who reported it -- the author marking their own note
+        would be the one case that does not happen.  It is reversible, and the text stays on
+        the page either way: this is the "done" that is not deletion.
+
+        The credit ledger follows, so the Credit page's *addressed* count means the same
+        thing whether a note was marked or taken off the page.
+        """
+        with self.lock, self.connect() as c:
+            t = c.execute("SELECT * FROM threads WHERE id=?", (tid,)).fetchone()
+            if t is None:
+                raise HttpError(404, "no such thread")
+            now = time.time()
+            if resolved:
+                c.execute("UPDATE threads SET resolved=?, resolved_by=? WHERE id=?", (now, user["id"], tid))
+                c.execute("UPDATE credits SET removed=? WHERE thread_id=? AND removed IS NULL", (now, tid))
+            else:
+                c.execute("UPDATE threads SET resolved=NULL, resolved_by=NULL WHERE id=?", (tid,))
+                c.execute("UPDATE credits SET removed=NULL WHERE thread_id=?", (tid,))
+        return self.thread(tid)
 
     def delete_thread(self, user, tid: int) -> None:
         with self.lock, self.connect() as c:
@@ -387,6 +479,7 @@ class Store:
                 raise HttpError(404, "no such thread")
             if t["user_id"] != user["id"] and not self.is_admin(user):
                 raise HttpError(403, "only the thread's author or an admin can delete it")
+            c.execute("UPDATE credits SET removed=? WHERE thread_id=? AND removed IS NULL", (time.time(), tid))
             c.execute("DELETE FROM threads WHERE id=?", (tid,))
 
     def delete_comment(self, user, cid: int) -> dict:
@@ -398,9 +491,11 @@ class Store:
                 raise HttpError(404, "no such comment")
             if r["user_id"] != user["id"] and not self.is_admin(user):
                 raise HttpError(403, "only the comment's author or an admin can delete it")
+            c.execute("UPDATE credits SET removed=? WHERE comment_id=? AND removed IS NULL", (time.time(), cid))
             c.execute("DELETE FROM comments WHERE id=?", (cid,))
             left = c.execute("SELECT COUNT(*) FROM comments WHERE thread_id=?", (r["thread_id"],)).fetchone()[0]
             if left == 0:
+                c.execute("UPDATE credits SET removed=? WHERE thread_id=? AND removed IS NULL", (time.time(), r["thread_id"]))
                 c.execute("DELETE FROM threads WHERE id=?", (r["thread_id"],))
             return {"thread": r["thread_id"], "gone": left == 0}
 
@@ -563,9 +658,11 @@ class App:
             ("POST", re.compile(r"^/api/login$"), self.login),
             ("POST", re.compile(r"^/api/logout$"), self.logout),
             ("POST", re.compile(r"^/api/password$"), self.password),
+            ("GET", re.compile(r"^/api/credit$"), self.credit),
             ("GET", re.compile(r"^/api/threads$"), self.threads),
             ("POST", re.compile(r"^/api/threads$"), self.thread_create),
             ("POST", re.compile(r"^/api/threads/(\d+)/comments$"), self.comment_create),
+            ("POST", re.compile(r"^/api/threads/(\d+)/resolve$"), self.thread_resolve),
             ("DELETE", re.compile(r"^/api/threads/(\d+)$"), self.thread_delete),
             ("DELETE", re.compile(r"^/api/comments/(\d+)$"), self.comment_delete),
             ("GET", re.compile(r"^/api/admin/threads$"), self.admin_threads),
@@ -619,6 +716,11 @@ class App:
         self.store.change_password(u, old, new, req.token)
         return 200, {"ok": True}, []
 
+    def credit(self, req):
+        """Open to anyone signed in: the site is by invitation, so that is the collaborators."""
+        req.require_user()
+        return 200, self.store.credit(), []
+
     def threads(self, req):
         req.require_user()
         page = norm_page((req.query.get("page") or [""])[0])
@@ -634,6 +736,14 @@ class App:
         u = req.require_user()
         b = req.json()
         return 200, {"comment": self.store.create_comment(u, int(tid), norm_text(b.get("text")))}, []
+
+    def thread_resolve(self, req, tid):
+        u = req.require_user()
+        b = req.json()
+        want = b.get("resolved", True)
+        if not isinstance(want, bool):
+            raise HttpError(400, "resolved must be true or false")
+        return 200, {"thread": self.store.set_resolved(u, int(tid), want)}, []
 
     def thread_delete(self, req, tid):
         self.store.delete_thread(req.require_user(), int(tid))

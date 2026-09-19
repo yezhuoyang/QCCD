@@ -380,6 +380,29 @@ try {
   await until("document.querySelectorAll('.qc-pin[data-id]').length === 1", "the reader's pin for the admin");
   const s3 = await state();
   step('admin: signed in, sees the thread, has the delete control', s3.me.admin === true && s3.threads.length === 1 && await evaluate("!!document.querySelector('.qc-box[data-id] .qc-delthread')"));
+  // ADDRESSED, without deleting: the note stays, greys out, and says who dealt with it
+  await evaluate("document.querySelector('.qc-box[data-id] .qc-resolve').click()");
+  await until("document.querySelectorAll('.qc-pin.qc-done').length === 1", 'the pin marked addressed');
+  const doneNote = await evaluate("(document.querySelector('.qc-done-note') || {}).textContent || ''");
+  const doneCount = await evaluate("(document.getElementById('qc-count') || {}).textContent || ''");
+  const doneState = await state();
+  step('admin: marked the note addressed; it is still there, attributed, and counted',
+       doneNote.includes('Addressed by ' + ADMIN.name) && doneCount === '0 open · 1 addressed'
+       && doneState.threads.length === 1 && !!doneState.threads[0].resolved,
+       { note: doneNote, count: doneCount });
+  await shot('05b_addressed');
+  // hiding them takes the pin off the page; showing them brings it back
+  await openMenu('qc-toggle-done');
+  await until("document.querySelectorAll('.qc-pin[data-id]').length === 0", 'the addressed pin hidden');
+  await openMenu('qc-toggle-done');
+  await until("document.querySelectorAll('.qc-pin.qc-done').length === 1", 'the addressed pin back');
+  // and it reopens
+  await evaluate("document.querySelector('.qc-pin[data-id]').click()");
+  await until("!!document.querySelector('.qc-box[data-id] .qc-resolve')", 'the note open again');
+  await evaluate("document.querySelector('.qc-box[data-id] .qc-resolve').click()");
+  await until("document.querySelectorAll('.qc-pin.qc-done').length === 0", 'the note reopened');
+  step('admin: reopening it puts it back as it was', !(await state()).threads[0].resolved);
+
   await openMenu('qc-admin');
   await until("document.querySelectorAll('#qc-all .qc-list li').length === 1", 'the all-comments list');
   const listed = await evaluate("document.querySelector('#qc-all .qc-list li').textContent");

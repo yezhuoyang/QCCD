@@ -1,7 +1,7 @@
 {
  "id": "y",
  "title": "y",
- "note": "u3(\u03c0, \u03c0/2, \u03c0/2), one beam",
+ "note": "a bit flip with a phase: one pulse, about a different axis",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
  "device": "grid2x3",
  "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",

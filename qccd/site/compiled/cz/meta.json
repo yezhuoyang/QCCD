@@ -1,7 +1,7 @@
 {
  "id": "cz",
  "title": "cz",
- "note": "h \u00b7 cx \u00b7 h on the target, so two extra single-qubit pulses around the same MS",
+ "note": "a CNOT with two more pulses around it, on the same pair of ions",
  "compiler": "1 layers, 2 transport cycles, 6 beams, 1 MS, 2 virtual-Z, 13 instructions",
  "device": "race8",
  "device_about": "an eight-site racetrack S0\u2013S7: one loop of trap sites, no junctions",

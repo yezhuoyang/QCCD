@@ -1,7 +1,7 @@
 {
  "id": "ry",
  "title": "ry(\u03b8)",
- "note": "u3(\u03b8, 0, 0): one beam",
+ "note": "any angle at all, about y: one pulse",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
  "device": "ring6d",
  "device_about": "the six-site ring with two dock spurs",

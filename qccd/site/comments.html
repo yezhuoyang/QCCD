@@ -28,6 +28,15 @@ qccd-comments[hidden]{display:none}
  box-shadow:0 1px 6px rgba(0,0,0,.28);cursor:pointer;pointer-events:auto;z-index:1;display:flex;align-items:center;justify-content:center;
  color:#fff;font-weight:600;font-size:11px;background:var(--qc);user-select:none}
 .qc-pin:hover{transform:scale(1.08)} .qc-pin.qc-approx{border-style:dashed}
+/* ADDRESSED: the note is done with, so it stops shouting -- grey pin with a tick, and the
+   box keeps its text for anyone who opens it.  Deleting was the only way to say this
+   before, and deleting takes the words with it. */
+.qc-pin.qc-done{background:#9a9a94;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.qc-pin.qc-done::after{content:"¹3";position:absolute;font-size:13px}
+.qc-pin.qc-done span{display:none}
+.qc-box.qc-done .qc-head{background:#9a9a94}
+.qc-done-note{background:#f3f6f1;color:#3f6b3a;border-bottom:1px solid #e2e8df;padding:5px 9px;font-size:12px}
+.qc-x.qc-on{background:rgba(255,255,255,.35)}
 .qc-pin{touch-action:none} .qc-pin.qc-dragging{cursor:grabbing;transform:none}
 .qc-box{position:absolute;width:290px;background:#fff;border:1px solid var(--qc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);
  pointer-events:auto;overflow:hidden;z-index:2}
@@ -99,8 +108,11 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   var PAGE = location.pathname.replace(/index\.html$/, '');
   var PALETTE = ['#2a78d6','#d64545','#1baf7a','#eb6834','#4a3aa7','#c2308a','#0e9aa7','#8a6d1e','#5b8c1e','#b5471b','#6b4fbb','#2f7f6e'];
   var ME = null, THREADS = [], NODES = {}, DRAFT = null, PLACING = false, HIDDEN = false, LAYER = null, NAV = null, HINT = null, MENU = null;
+  // addressed notes stay on the page, quietly, until a reader asks for them to go away
+  var HIDEDONE = false;
   var FOLDED = {}, MOVED = {};
   try { HIDDEN = localStorage.getItem('qc-hidden') === '1'; } catch(e){}
+  try { HIDEDONE = localStorage.getItem('qc-hidedone') === '1'; } catch(e){}
   try { FOLDED = JSON.parse(localStorage.getItem('qc-fold:' + PAGE) || '{}') || {}; } catch(e){ FOLDED = {}; }
   try { MOVED = JSON.parse(localStorage.getItem('qc-move:' + PAGE) || '{}') || {}; } catch(e){ MOVED = {}; }
 
@@ -158,10 +170,14 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     add.title = PLACING ? 'Press Escape to stop' : 'Pin a comment to any spot on this page';
     add.addEventListener('click', function(){ setPlacing(!PLACING); });
     NAV.appendChild(add);
-    var n = THREADS.length;
+    var n = THREADS.length, ndone = THREADS.filter(function(t){ return !!t.resolved; }).length;
     if(n || HIDDEN){
-      var c = el('span', null, HIDDEN ? 'hidden' : (n + (n === 1 ? ' comment' : ' comments'))); c.id = 'qc-count';
-      c.title = HIDDEN ? 'Comments on this page are hidden; show them from your menu' : 'Comments pinned on this page';
+      var open = n - ndone;
+      var label = HIDDEN ? 'hidden'
+        : (ndone ? open + ' open · ' + ndone + ' addressed' : n + (n === 1 ? ' comment' : ' comments'));
+      var c = el('span', null, label); c.id = 'qc-count';
+      c.title = HIDDEN ? 'Comments on this page are hidden; show them from your menu'
+        : (ndone ? ndone + ' of the ' + n + ' notes here are marked addressed' : 'Comments pinned on this page');
       NAV.appendChild(c);
     }
     var me = el('button'); me.id = 'qc-me'; me.type = 'button'; me.title = ME.name + ' · ' + ME.email;
@@ -176,10 +192,15 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     MENU.appendChild(el('div', 'qc-who', ME.name + '\n' + ME.email + (ME.admin ? ' · admin' : '')));
     function item(label, fn, id){ var b = el('button', null, label); b.type = 'button'; if(id) b.id = id; b.addEventListener('click', function(){ closeMenu(); fn(); }); MENU.appendChild(b); }
     item(HIDDEN ? 'Show comments on this page' : 'Hide comments on this page', function(){ HIDDEN = !HIDDEN; try { localStorage.setItem('qc-hidden', HIDDEN ? '1' : '0'); } catch(e){} applyHidden(); renderNav(); }, 'qc-toggle');
+    item(HIDEDONE ? 'Show addressed notes' : 'Hide addressed notes', function(){
+      HIDEDONE = !HIDEDONE; try { localStorage.setItem('qc-hidedone', HIDEDONE ? '1' : '0'); } catch(e){}
+      renderAll();
+    }, 'qc-toggle-done');
     item('Open every note on this page', function(){ FOLDED = {}; saveFold(); renderAll(); });
     item('Put every note back on its spot', function(){ MOVED = {}; saveMoved(); for(var k in NODES) NODES[k].off = NODES[k].pinOff = null; place(); }, 'qc-putback');
     if(ME.admin) item('All comments on the site', openAdmin, 'qc-admin');
     if(ME.admin) item('Readers and invitations', openPeople, 'qc-people-btn');
+    item('Credit: who has commented', function(){ location.href = '/credit/'; }, 'qc-credit');
     item('Change password', openPassword, 'qc-passwd');
     item('Sign out', signOut, 'qc-signout');
     NAV.appendChild(MENU);
@@ -589,9 +610,14 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     row.appendChild(b);
     return row;
   }
+  function detachThread(id){
+    // the pin and the box leave the page; the thread stays in THREADS, so a view filter
+    // can put it back without reloading
+    var n = NODES[id]; if(n){ if(n.pin.parentNode) LAYER.removeChild(n.pin); if(n.box.parentNode) LAYER.removeChild(n.box); delete NODES[id]; }
+  }
   function removeThread(id){
     THREADS = THREADS.filter(function(t){ return t.id !== id; });
-    var n = NODES[id]; if(n){ if(n.pin.parentNode) LAYER.removeChild(n.pin); if(n.box.parentNode) LAYER.removeChild(n.box); delete NODES[id]; }
+    detachThread(id);
     renderNav();
   }
   function renderThread(th){
@@ -608,13 +634,33 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     var c = colour(th.user);
     node.pin.style.setProperty('--qc', c); node.pin.textContent = initials(th.user.name);
     node.pin.title = th.user.name + ' · ' + when(th.created)
+                   + (th.resolved ? ' · addressed'
+                        + (th.resolved.by ? ' by ' + th.resolved.by.name : '') : '')
                    + (FOLDED[th.id] ? ' · click to open it' : ' · click to fold it')
                    + ' · drag to move it';
     node.box.style.setProperty('--qc', c);
     node.box.classList.toggle('qc-fold', !!FOLDED[th.id]);
+    node.pin.classList.toggle('qc-done', !!th.resolved);
+    node.box.classList.toggle('qc-done', !!th.resolved);
     node.box.innerHTML = '';
     var head = el('div', 'qc-head'); head.appendChild(avatar(th.user));
     head.appendChild(el('b', null, th.user.name)); head.appendChild(el('small', null, when(th.created)));
+    var done = !!th.resolved;
+    var mark = el('button', 'qc-x qc-resolve' + (done ? ' qc-on' : ''), '✓'); mark.type = 'button';
+    mark.id = 'qc-resolve-' + th.id;
+    mark.title = done ? 'Addressed — click to reopen it' : 'Mark this as addressed';
+    mark.addEventListener('click', function(){
+      mark.disabled = true;
+      api('POST', '/threads/' + th.id + '/resolve', { resolved: !done }).then(function(d){
+        var i = THREADS.map(function(t){ return t.id; }).indexOf(th.id);
+        if(i >= 0) THREADS[i] = d.thread;
+        // a note just marked addressed folds itself out of the way; reopening shows it again
+        if(d.thread.resolved) FOLDED[th.id] = 1; else delete FOLDED[th.id];
+        saveFold();
+        renderAll();
+      }).catch(function(e){ mark.disabled = false; alert(e.message); });
+    });
+    head.appendChild(mark);
     var fold = el('button', 'qc-x', '–'); fold.type = 'button'; fold.id = 'qc-fold-' + th.id;
     fold.title = 'Minimise this note to its pin (click the pin to open it again)';
     fold.addEventListener('click', function(){ toggleFold(th.id); }); head.appendChild(fold);
@@ -628,6 +674,10 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     }
     draggable(node, head, 'off');
     node.box.appendChild(head);
+    if(th.resolved){
+      node.box.appendChild(el('div', 'qc-done-note', '✓ Addressed'
+        + (th.resolved.by ? ' by ' + th.resolved.by.name : '') + ' · ' + when(th.resolved.at)));
+    }
     var msgs = el('div', 'qc-msgs'); th.comments.forEach(function(cm){ msgs.appendChild(msgRow(th, cm)); }); node.box.appendChild(msgs);
     var reply = el('div', 'qc-reply');
     var ta = el('textarea', 'qc-ta'); ta.placeholder = 'Reply…'; ta.rows = 1; reply.appendChild(ta);
@@ -646,7 +696,10 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   function toggleFold(id){ if(FOLDED[id]) delete FOLDED[id]; else FOLDED[id] = 1; saveFold(); var th = THREADS.filter(function(t){ return t.id === id; })[0]; if(th) renderThread(th); }
   function renderAll(){
     for(var id in NODES){ if(!THREADS.some(function(t){ return String(t.id) === String(id); })) removeThread(+id); }
-    THREADS.forEach(renderThread);
+    THREADS.forEach(function(th){
+      if(HIDEDONE && th.resolved){ detachThread(th.id); return; }
+      renderThread(th);
+    });
     renderNav(); schedule();
   }
 
@@ -732,6 +785,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     state: function(){ return { me: ME, placing: PLACING, hidden: HIDDEN, page: PAGE,
                                 threads: THREADS.map(function(t){ var n = NODES[t.id]; return { id: t.id, n: t.comments.length, anchor: t.anchor, point: n ? pointOf(n) : null,
                                                          folded: !!FOLDED[t.id], moved: (n && n.off) || null, movedPin: (n && n.pinOff) || null,
+                                                         resolved: t.resolved || null,
                                                          shown: !!(n && n.box.offsetParent) }; }) }; },
     reload: load, place: place, invite: openInvite, people: openPeople
   };

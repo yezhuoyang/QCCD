@@ -1,7 +1,7 @@
 {
  "id": "rz",
  "title": "rz(\u03b8)",
- "note": "u3(0, 0, \u03b8): the frame update carries the angle, the beam has angle 0",
+ "note": "any angle about z, which this machine pays for in pulses",
  "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
  "device": "chain4",
  "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
