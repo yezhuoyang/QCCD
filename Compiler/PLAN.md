@@ -649,6 +649,30 @@ BB[[144,12,12]] on `ring144_24v`, which the general router cannot compile at all
 Different trade-off rather than a win: fewer hops (less transport heating), more batches
 (more cycles). All 20 checkable rules pass; R10 passes.
 
+**And on the other eight devices it does not compile at all.** `bb144_esm.qasm` is now a
+tenth example, so `run_matrix.py` with no arguments runs 90 pairs rather than 81. Its row
+(`Codesign/data/q01b_matrix.json`, and the write-up in
+`Codesign/findings/q01b-bb144-and-the-floor.md`):
+
+| outcome | devices | why |
+|---|---|---|
+| `ok` | `ring144_24v` | 20/20 rules, R10 `passed` |
+| `too-small` | `stationary_chain` (64 slots), `h2_racetrack` (80), `chain` (144) | fewer ion slots than the circuit's 168 qubits — real, not a router limit |
+| `unroutable` | `grid9x9`, `deck_unit_cell`, `cyclone_base` (58 % occ), `ladder_2x72` (29 %) | the individual-ion router declines, and rotation does not apply |
+| `unrealised` | `cyclone_dual_loop` | 1 272 ops unplaced |
+
+The reason only the ring survives is the one §11.9a already gives: rotation needs *a closed
+loop with **docks***. `cyclone_dual_loop` has two closed loops and still declines, because its
+gate sites sit **on** the loops rather than on spurs off them. `qccdc rotate` says so directly
+on all eight.
+
+One narrowness worth recording. The rotation fallback at
+[`qccdc_cli.ml:360`](ocaml/bin/qccdc_cli.ml#L360) hangs off the `Route.Unroutable` *exception*.
+`cyclone_dual_loop` returns normally with `UNREALISED ops`, so rotation is never tried there —
+the comment says "trying it only AFTER the general router has declined", and a partial
+placement is a decline too. Invoking `qccdc rotate` by hand on it declines anyway, so no device
+was lost; the gap is latent, not active.
+
 Getting the batch count there took three passes, and the order is worth recording because
 only the last is geometric. Emitting in program order costs 864 rotations and 19 464 hops.
 A readiness scheduler — serve whatever is reachable now — gets to 788 batches / 4 956 hops.

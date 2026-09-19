@@ -1,0 +1,1040 @@
+{
+ "calibration": {
+  "eps0": 0.0018399999999999528,
+  "slope": 0.002,
+  "n_ref": 2,
+  "kappa": 0.00034657359027997266,
+  "eps0_prime": 0.0008399999999999528,
+  "r7_max_quanta": 1.0
+ },
+ "curve": [
+  {
+   "N": 2,
+   "raw_ratio": 1.0,
+   "eps_cold": 0.0018399999999999528,
+   "eps_hot": 0.003839999999999953
+  },
+  {
+   "N": 3,
+   "raw_ratio": 0.9463946303571862,
+   "eps_cold": 0.0018399999999999528,
+   "eps_hot": 0.003839999999999953
+  },
+  {
+   "N": 4,
+   "raw_ratio": 1.0,
+   "eps_cold": 0.0018399999999999528,
+   "eps_hot": 0.003839999999999953
+  },
+  {
+   "N": 5,
+   "raw_ratio": 1.0766913951834827,
+   "eps_cold": 0.0019166913951834356,
+   "eps_hot": 0.004070074185550401
+  },
+  {
+   "N": 6,
+   "raw_ratio": 1.1605584217036249,
+   "eps_cold": 0.002000558421703578,
+   "eps_hot": 0.004321675265110827
+  },
+  {
+   "N": 8,
+   "raw_ratio": 1.3333333333333335,
+   "eps_cold": 0.0021733333333332863,
+   "eps_hot": 0.004839999999999953
+  },
+  {
+   "N": 10,
+   "raw_ratio": 1.5051499783199058,
+   "eps_cold": 0.0023451499783198586,
+   "eps_hot": 0.00535544993495967
+  },
+  {
+   "N": 12,
+   "raw_ratio": 1.673657673906779,
+   "eps_cold": 0.0025136576739067315,
+   "eps_hot": 0.00586097302172029
+  },
+  {
+   "N": 15,
+   "raw_ratio": 1.9196851860736162,
+   "eps_cold": 0.002759685186073569,
+   "eps_hot": 0.0065990555582208016
+  }
+ ],
+ "rows": [
+  {
+   "circuit": "adder3",
+   "device": "chain",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.100210999999998,
+   "gate_error_legacy": 0.100210999999998,
+   "neg_log_fidelity": 0.10671774999999818,
+   "neg_log_fidelity_legacy": 0.10671774999999818
+  },
+  {
+   "circuit": "adder3",
+   "device": "grid9x9",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.07727999999999802,
+   "gate_error_legacy": 0.07727999999999802,
+   "neg_log_fidelity": 0.0839987499999982,
+   "neg_log_fidelity_legacy": 0.0839987499999982
+  },
+  {
+   "circuit": "adder3",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.07727999999999802,
+   "gate_error_legacy": 0.07727999999999802,
+   "neg_log_fidelity": 0.0839987499999982,
+   "neg_log_fidelity_legacy": 0.0839987499999982
+  },
+  {
+   "circuit": "adder3",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.08221799999999801,
+   "gate_error_legacy": 0.08221799999999801,
+   "neg_log_fidelity": 0.0887902499999982,
+   "neg_log_fidelity_legacy": 0.0887902499999982
+  },
+  {
+   "circuit": "adder3",
+   "device": "ring144_24v",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.07727999999999802,
+   "gate_error_legacy": 0.07727999999999802,
+   "neg_log_fidelity": 0.08408033333333154,
+   "neg_log_fidelity_legacy": 0.08408033333333154
+  },
+  {
+   "circuit": "adder3",
+   "device": "cyclone_base",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 23,
+    "3": 16,
+    "4": 3
+   },
+   "max_chain": 4,
+   "gate_error": 0.10206449999999799,
+   "gate_error_legacy": 0.10206449999999799,
+   "neg_log_fidelity": 0.10856374999999817,
+   "neg_log_fidelity_legacy": 0.10856374999999817
+  },
+  {
+   "circuit": "adder3",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.09862099999999799,
+   "gate_error_legacy": 0.09862099999999799,
+   "neg_log_fidelity": 0.1051348333333315,
+   "neg_log_fidelity_legacy": 0.1051348333333315
+  },
+  {
+   "circuit": "adder3",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 42,
+   "chain_hist": {
+    "2": 42
+   },
+   "max_chain": 2,
+   "gate_error": 0.09862099999999799,
+   "gate_error_legacy": 0.09862099999999799,
+   "neg_log_fidelity": 0.1051268333333315,
+   "neg_log_fidelity_legacy": 0.1051268333333315
+  },
+  {
+   "circuit": "bell2",
+   "device": "stationary_chain",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "chain",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "grid9x9",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0018399999999999528,
+   "gate_error_legacy": 0.0018399999999999528,
+   "neg_log_fidelity": 0.005042983333333377,
+   "neg_log_fidelity_legacy": 0.005042983333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0018399999999999528,
+   "gate_error_legacy": 0.0018399999999999528,
+   "neg_log_fidelity": 0.005042983333333377,
+   "neg_log_fidelity_legacy": 0.005042983333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "ring144_24v",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0018399999999999528,
+   "gate_error_legacy": 0.0018399999999999528,
+   "neg_log_fidelity": 0.005043333333333378,
+   "neg_log_fidelity_legacy": 0.005043333333333378
+  },
+  {
+   "circuit": "bell2",
+   "device": "cyclone_base",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bell2",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 1,
+   "chain_hist": {
+    "2": 1
+   },
+   "max_chain": 2,
+   "gate_error": 0.0020414999999999526,
+   "gate_error_legacy": 0.0020414999999999526,
+   "neg_log_fidelity": 0.005243083333333377,
+   "neg_log_fidelity_legacy": 0.005243083333333377
+  },
+  {
+   "circuit": "bv6",
+   "device": "chain",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.007768499999999858,
+   "gate_error_legacy": 0.007768499999999858,
+   "neg_log_fidelity": 0.017379758333333467,
+   "neg_log_fidelity_legacy": 0.017379758333333467
+  },
+  {
+   "circuit": "bv6",
+   "device": "grid9x9",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.015148641666666799,
+   "neg_log_fidelity_legacy": 0.015148641666666799
+  },
+  {
+   "circuit": "bv6",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.015148641666666799,
+   "neg_log_fidelity_legacy": 0.015148641666666799
+  },
+  {
+   "circuit": "bv6",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.006559999999999858,
+   "gate_error_legacy": 0.006559999999999858,
+   "neg_log_fidelity": 0.016175808333333465,
+   "neg_log_fidelity_legacy": 0.016175808333333465
+  },
+  {
+   "circuit": "bv6",
+   "device": "ring144_24v",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.015155000000000134,
+   "neg_log_fidelity_legacy": 0.015155000000000134
+  },
+  {
+   "circuit": "bv6",
+   "device": "cyclone_base",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.006366999999999859,
+   "gate_error_legacy": 0.006366999999999859,
+   "neg_log_fidelity": 0.0159781416666668,
+   "neg_log_fidelity_legacy": 0.0159781416666668
+  },
+  {
+   "circuit": "bv6",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.006766999999999858,
+   "gate_error_legacy": 0.006766999999999858,
+   "neg_log_fidelity": 0.016378200000000134,
+   "neg_log_fidelity_legacy": 0.016378200000000134
+  },
+  {
+   "circuit": "bv6",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.006766999999999858,
+   "gate_error_legacy": 0.006766999999999858,
+   "neg_log_fidelity": 0.016378200000000134,
+   "neg_log_fidelity_legacy": 0.016378200000000134
+  },
+  {
+   "circuit": "ghz16",
+   "device": "stationary_chain",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 1,
+    "15": 14
+   },
+   "max_chain": 15,
+   "gate_error": 0.044502065338281604,
+   "gate_error_legacy": 0.029793999999999293,
+   "neg_log_fidelity": 0.07017646533828234,
+   "neg_log_fidelity_legacy": 0.05546840000000003
+  },
+  {
+   "circuit": "ghz16",
+   "device": "chain",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.03223949999999929,
+   "gate_error_legacy": 0.03223949999999929,
+   "neg_log_fidelity": 0.057915633333333355,
+   "neg_log_fidelity_legacy": 0.057915633333333355
+  },
+  {
+   "circuit": "ghz16",
+   "device": "grid9x9",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.027599999999999292,
+   "gate_error_legacy": 0.027599999999999292,
+   "neg_log_fidelity": 0.05344306666666669,
+   "neg_log_fidelity_legacy": 0.05344306666666669
+  },
+  {
+   "circuit": "ghz16",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.027599999999999292,
+   "gate_error_legacy": 0.027599999999999292,
+   "neg_log_fidelity": 0.05344306666666669,
+   "neg_log_fidelity_legacy": 0.05344306666666669
+  },
+  {
+   "circuit": "ghz16",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.03046199999999929,
+   "gate_error_legacy": 0.03046199999999929,
+   "neg_log_fidelity": 0.05617013333333336,
+   "neg_log_fidelity_legacy": 0.05617013333333336
+  },
+  {
+   "circuit": "ghz16",
+   "device": "ring144_24v",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.027599999999999292,
+   "gate_error_legacy": 0.027599999999999292,
+   "neg_log_fidelity": 0.05348613333333336,
+   "neg_log_fidelity_legacy": 0.05348613333333336
+  },
+  {
+   "circuit": "ghz16",
+   "device": "cyclone_base",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 5,
+    "3": 5,
+    "4": 5
+   },
+   "max_chain": 4,
+   "gate_error": 0.03909099999999929,
+   "gate_error_legacy": 0.03909099999999929,
+   "neg_log_fidelity": 0.06479980000000002,
+   "neg_log_fidelity_legacy": 0.06479980000000002
+  },
+  {
+   "circuit": "ghz16",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.03223949999999929,
+   "gate_error_legacy": 0.03223949999999929,
+   "neg_log_fidelity": 0.057915633333333355,
+   "neg_log_fidelity_legacy": 0.057915633333333355
+  },
+  {
+   "circuit": "ghz16",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 15,
+   "chain_hist": {
+    "2": 15
+   },
+   "max_chain": 2,
+   "gate_error": 0.03223949999999929,
+   "gate_error_legacy": 0.03223949999999929,
+   "neg_log_fidelity": 0.057915633333333355,
+   "neg_log_fidelity_legacy": 0.057915633333333355
+  },
+  {
+   "circuit": "ghz4",
+   "device": "stationary_chain",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "4": 3
+   },
+   "max_chain": 4,
+   "gate_error": 0.005548499999999858,
+   "gate_error_legacy": 0.005548499999999858,
+   "neg_log_fidelity": 0.011953833333333375,
+   "neg_log_fidelity_legacy": 0.011953833333333375
+  },
+  {
+   "circuit": "ghz4",
+   "device": "chain",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.0061514999999998585,
+   "gate_error_legacy": 0.0061514999999998585,
+   "neg_log_fidelity": 0.012556933333333374,
+   "neg_log_fidelity_legacy": 0.012556933333333374
+  },
+  {
+   "circuit": "ghz4",
+   "device": "grid9x9",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.011933833333333376,
+   "neg_log_fidelity_legacy": 0.011933833333333376
+  },
+  {
+   "circuit": "ghz4",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.011933833333333376,
+   "neg_log_fidelity_legacy": 0.011933833333333376
+  },
+  {
+   "circuit": "ghz4",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005946999999999859,
+   "gate_error_legacy": 0.005946999999999859,
+   "neg_log_fidelity": 0.012355100000000042,
+   "neg_log_fidelity_legacy": 0.012355100000000042
+  },
+  {
+   "circuit": "ghz4",
+   "device": "ring144_24v",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.005519999999999858,
+   "gate_error_legacy": 0.005519999999999858,
+   "neg_log_fidelity": 0.011935933333333374,
+   "neg_log_fidelity_legacy": 0.011935933333333374
+  },
+  {
+   "circuit": "ghz4",
+   "device": "cyclone_base",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 1,
+    "3": 1,
+    "4": 1
+   },
+   "max_chain": 4,
+   "gate_error": 0.006351999999999859,
+   "gate_error_legacy": 0.006351999999999859,
+   "neg_log_fidelity": 0.012757466666666708,
+   "neg_log_fidelity_legacy": 0.012757466666666708
+  },
+  {
+   "circuit": "ghz4",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.0061514999999998585,
+   "gate_error_legacy": 0.0061514999999998585,
+   "neg_log_fidelity": 0.012556933333333374,
+   "neg_log_fidelity_legacy": 0.012556933333333374
+  },
+  {
+   "circuit": "ghz4",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 3,
+   "chain_hist": {
+    "2": 3
+   },
+   "max_chain": 2,
+   "gate_error": 0.0061514999999998585,
+   "gate_error_legacy": 0.0061514999999998585,
+   "neg_log_fidelity": 0.012556933333333374,
+   "neg_log_fidelity_legacy": 0.012556933333333374
+  },
+  {
+   "circuit": "qft8",
+   "device": "chain",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.14406099999999677,
+   "gate_error_legacy": 0.14406099999999677,
+   "neg_log_fidelity": 0.15700379999999714,
+   "neg_log_fidelity_legacy": 0.15700379999999714
+  },
+  {
+   "circuit": "qft8",
+   "device": "grid9x9",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.1251199999999968,
+   "gate_error_legacy": 0.1251199999999968,
+   "neg_log_fidelity": 0.1381633333333305,
+   "neg_log_fidelity_legacy": 0.1381633333333305
+  },
+  {
+   "circuit": "qft8",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.1251199999999968,
+   "gate_error_legacy": 0.1251199999999968,
+   "neg_log_fidelity": 0.1381633333333305,
+   "neg_log_fidelity_legacy": 0.1381633333333305
+  },
+  {
+   "circuit": "qft8",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.1263309999999968,
+   "gate_error_legacy": 0.1263309999999968,
+   "neg_log_fidelity": 0.13933879999999718,
+   "neg_log_fidelity_legacy": 0.13933879999999718
+  },
+  {
+   "circuit": "qft8",
+   "device": "ring144_24v",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.1251199999999968,
+   "gate_error_legacy": 0.1251199999999968,
+   "neg_log_fidelity": 0.13831966666666382,
+   "neg_log_fidelity_legacy": 0.13831966666666382
+  },
+  {
+   "circuit": "qft8",
+   "device": "cyclone_base",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 43,
+    "3": 22,
+    "4": 3
+   },
+   "max_chain": 4,
+   "gate_error": 0.15436999999999673,
+   "gate_error_legacy": 0.15436999999999673,
+   "neg_log_fidelity": 0.1672851999999971,
+   "neg_log_fidelity_legacy": 0.1672851999999971
+  },
+  {
+   "circuit": "qft8",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.13667199999999677,
+   "gate_error_legacy": 0.13667199999999677,
+   "neg_log_fidelity": 0.14964993333333046,
+   "neg_log_fidelity_legacy": 0.14964993333333046
+  },
+  {
+   "circuit": "qft8",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 68,
+   "chain_hist": {
+    "2": 68
+   },
+   "max_chain": 2,
+   "gate_error": 0.13667199999999677,
+   "gate_error_legacy": 0.13667199999999677,
+   "neg_log_fidelity": 0.14964139999999712,
+   "neg_log_fidelity_legacy": 0.14964139999999712
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "stationary_chain",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 1,
+    "3": 1,
+    "15": 14
+   },
+   "max_chain": 15,
+   "gate_error": 0.04548654637492057,
+   "gate_error_legacy": 0.03119049999999925,
+   "neg_log_fidelity": 0.05834292970825427,
+   "neg_log_fidelity_legacy": 0.044046883333332953
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "chain",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.03387599999999925,
+   "gate_error_legacy": 0.03387599999999925,
+   "neg_log_fidelity": 0.04673549999999961,
+   "neg_log_fidelity_legacy": 0.04673549999999961
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "grid9x9",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.029439999999999245,
+   "gate_error_legacy": 0.029439999999999245,
+   "neg_log_fidelity": 0.04250888333333294,
+   "neg_log_fidelity_legacy": 0.04250888333333294
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.029439999999999245,
+   "gate_error_legacy": 0.029439999999999245,
+   "neg_log_fidelity": 0.04250888333333294,
+   "neg_log_fidelity_legacy": 0.04250888333333294
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.032221999999999244,
+   "gate_error_legacy": 0.032221999999999244,
+   "neg_log_fidelity": 0.04513249999999961,
+   "neg_log_fidelity_legacy": 0.04513249999999961
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "ring144_24v",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.029439999999999245,
+   "gate_error_legacy": 0.029439999999999245,
+   "neg_log_fidelity": 0.042613291666666275,
+   "neg_log_fidelity_legacy": 0.042613291666666275
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "cyclone_base",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 6,
+    "3": 5,
+    "4": 5
+   },
+   "max_chain": 4,
+   "gate_error": 0.04232849999999925,
+   "gate_error_legacy": 0.04232849999999925,
+   "neg_log_fidelity": 0.05522908333333295,
+   "neg_log_fidelity_legacy": 0.05522908333333295
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.036696999999999244,
+   "gate_error_legacy": 0.036696999999999244,
+   "neg_log_fidelity": 0.04955749166666628,
+   "neg_log_fidelity_legacy": 0.04955749166666628
+  },
+  {
+   "circuit": "rep9_esm",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 16,
+   "chain_hist": {
+    "2": 16
+   },
+   "max_chain": 2,
+   "gate_error": 0.036696999999999244,
+   "gate_error_legacy": 0.036696999999999244,
+   "neg_log_fidelity": 0.04955749166666628,
+   "neg_log_fidelity_legacy": 0.04955749166666628
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "grid9x9",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05394167499999914,
+   "neg_log_fidelity_legacy": 0.05394167499999914
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05394167499999914,
+   "neg_log_fidelity_legacy": 0.05394167499999914
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05392444999999914,
+   "neg_log_fidelity_legacy": 0.05392444999999914
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "ring144_24v",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05414750833333248,
+   "neg_log_fidelity_legacy": 0.05414750833333248
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "cyclone_base",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 16,
+    "3": 6,
+    "4": 2
+   },
+   "max_chain": 4,
+   "gate_error": 0.05790499999999886,
+   "gate_error_legacy": 0.05790499999999886,
+   "neg_log_fidelity": 0.06755255833333247,
+   "neg_log_fidelity_legacy": 0.06755255833333247
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "cyclone_dual_loop",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.048507999999998865,
+   "gate_error_legacy": 0.048507999999998865,
+   "neg_log_fidelity": 0.05822326666666581,
+   "neg_log_fidelity_legacy": 0.05822326666666581
+  },
+  {
+   "circuit": "steane_esm",
+   "device": "h2_racetrack",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04847599999999887,
+   "gate_error_legacy": 0.04847599999999887,
+   "neg_log_fidelity": 0.05817046666666581,
+   "neg_log_fidelity_legacy": 0.05817046666666581
+  },
+  {
+   "circuit": "surface17_esm",
+   "device": "grid9x9",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05716909999999923,
+   "neg_log_fidelity_legacy": 0.05716909999999923
+  },
+  {
+   "circuit": "surface17_esm",
+   "device": "deck_unit_cell",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.05716909999999923,
+   "neg_log_fidelity_legacy": 0.05716909999999923
+  },
+  {
+   "circuit": "surface17_esm",
+   "device": "ladder_2x72",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.0572096166666659,
+   "neg_log_fidelity_legacy": 0.0572096166666659
+  },
+  {
+   "circuit": "surface17_esm",
+   "device": "ring144_24v",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 24
+   },
+   "max_chain": 2,
+   "gate_error": 0.04415999999999887,
+   "gate_error_legacy": 0.04415999999999887,
+   "neg_log_fidelity": 0.0574820416666659,
+   "neg_log_fidelity_legacy": 0.0574820416666659
+  },
+  {
+   "circuit": "surface17_esm",
+   "device": "cyclone_base",
+   "n_gate_pairs": 24,
+   "chain_hist": {
+    "2": 17,
+    "3": 6,
+    "4": 1
+   },
+   "max_chain": 4,
+   "gate_error": 0.04802649999999886,
+   "gate_error_legacy": 0.04802649999999886,
+   "neg_log_fidelity": 0.06093459166666589,
+   "neg_log_fidelity_legacy": 0.06093459166666589
+  },
+  {
+   "circuit": "bb144_esm",
+   "device": "ring144_24v",
+   "n_gate_pairs": 864,
+   "chain_hist": {
+    "2": 864
+   },
+   "max_chain": 2,
+   "gate_error": 1.5897599999999947,
+   "gate_error_legacy": 1.5897599999999947,
+   "neg_log_fidelity": 2.5664096000000014,
+   "neg_log_fidelity_legacy": 2.5664096000000014
+  }
+ ],
+ "chain_hist_all": {
+  "2": 2258,
+  "3": 62,
+  "4": 23,
+  "15": 28
+ }
+}

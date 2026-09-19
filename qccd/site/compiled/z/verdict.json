@@ -1,0 +1,12 @@
+{
+ "program": "circuit",
+ "arch": "ring6d",
+ "circuit_sha256": "ceaaf506ff7ab31c93e708f43eacc8789cb87bdac45eb7babf111d8bca37ec71",
+ "o1_transport": "ok",
+ "lean": "accepted",
+ "unrealised_ops": 0,
+ "o2_semantics": "ok",
+ "method": "stabilizer tableau, composed from the emitted pulses",
+ "R10": "passed",
+ "R10_reason": "O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses"
+}

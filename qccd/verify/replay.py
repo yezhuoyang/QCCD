@@ -21,6 +21,7 @@ also what a broadcast-wired machine physically does.
 
 from __future__ import annotations
 
+import inspect
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
@@ -76,6 +77,10 @@ class ReplayResult:
     gate_error_sum: float = 0.0
     gate_quanta_sum: float = 0.0
     max_gate_quanta_seen: float = 0.0
+    #: G1: how many ions shared the trap at each two-qubit gate -- the same quantity R13
+    #: caps at 15.  Histogram rather than a mean, because the mean of a distribution that
+    #: is 99 % twos hides the tail that the chain-length term is about.
+    chain_len_at_gate: Counter = field(default_factory=Counter)
     us_by_type: dict[str, float] = field(default_factory=dict)
     us_by_class: dict[str, float] = field(default_factory=dict)
     cost_by_class: dict[str, float] = field(default_factory=dict)
@@ -117,6 +122,7 @@ class ReplayResult:
             "n_gate_pairs": self.n_gate_pairs,
             "gate_error_sum": self.gate_error_sum,
             "max_gate_quanta_seen": self.max_gate_quanta_seen,
+            "chain_len_at_gate": {str(k): v for k, v in sorted(self.chain_len_at_gate.items())},
         }
 
 
@@ -170,6 +176,26 @@ def _segments_for(arch: Architecture, p: Participant) -> list:
         raise ReplayError(f"ion {p.ion}: {exc}") from None
 
 
+def _accepts_chain(fn) -> bool:
+    """Does this cost-model method take G1's `n_chain` argument?
+
+    `False` for anything written against the pre-G1 signature, and `False` when the
+    signature cannot be read at all (a C extension, a callable object) -- because the
+    safe default is the argument the method definitely has, not the one it might.
+    A `**kwargs` catch-all counts as accepting it.
+    """
+    if fn is None:
+        return False
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):          # pragma: no cover - unreadable signature
+        return False
+    return "n_chain" in params or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD or p.kind is inspect.Parameter.VAR_POSITIONAL
+        for p in params.values()
+    )
+
+
 def replay(
     prog: TSIR,
     arch: Architecture,
@@ -198,6 +224,15 @@ def replay(
         arch_name=arch.name, program_name=prog.name, model=model.describe()
     )
     res.quanta_components = {c: 0.0 for c in QUANTA_COMPONENTS}
+
+    # G1 widened `gate` and `gate_error` with an `n_chain` argument.  A model written
+    # before that -- and any subclass overriding the old three-argument `gate` -- must
+    # keep working unchanged, so ask each method whether it accepts the argument rather
+    # than assuming it does.  Passing it blind is what broke `test_review_regressions`'s
+    # `HotGate`, and a user's own cost model would have broken the same way with no test
+    # to catch it.  Probed once per replay, not once per gate.
+    takes_chain = {name: _accepts_chain(getattr(model, name, None))
+                   for name in ("gate", "gate_error")}
 
     pos: dict[str, str] = {}
     current: dict[str, float] = {}
@@ -385,7 +420,15 @@ def replay(
                 for a in singles:
                     res.gates_per_ion[a] += 1
             else:
-                charge = model.gate(arch, instr.gate or "MS", n_pairs)
+                # G1: how many ions share the trap, which is what R13 caps at 15 and what
+                # the chain-length term of the gate model reads.  A gate instruction can
+                # hold several pairs in several traps; its DURATION is set by the longest
+                # chain involved, because the cycle ends when its slowest gate does.
+                chains = [occ_before.get(pos_before[a], 0) for a, b in pairs]
+                longest = max(chains) if chains else None
+                charge = (model.gate(arch, instr.gate or "MS", n_pairs, longest)
+                          if takes_chain["gate"]
+                          else model.gate(arch, instr.gate or "MS", n_pairs))
             res.n_gates += 1
             res.n_gate_pairs += n_pairs
             for a, b in pairs:
@@ -396,8 +439,16 @@ def replay(
                 # two sets the pair's error, since both share the motional mode.  This
                 # is the same n-bar R7 tests, by construction -- see `quanta_at_start`.
                 nbar = max(current.get(a, 0.0), current.get(b, 0.0))
-                res.gate_error_sum += model.gate_error(arch, nbar)
+                # R6b puts both ions of a pair in ONE gate zone, so either one names the
+                # chain.  Read it the way R13 does -- occupancy of the site before the
+                # cycle -- so the error model and the rule that caps it cannot disagree.
+                n_chain = occ_before.get(pos_before[a], 0)
+                res.gate_error_sum += (
+                    model.gate_error(arch, nbar, n_chain) if takes_chain["gate_error"]
+                    else model.gate_error(arch, nbar)
+                )
                 res.gate_quanta_sum += nbar
+                res.chain_len_at_gate[n_chain] += 1
                 if nbar > res.max_gate_quanta_seen:
                     res.max_gate_quanta_seen = nbar
         elif instr.type in ("cool", "measure", "reset"):

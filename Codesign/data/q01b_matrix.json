@@ -1,0 +1,59 @@
+[
+ {
+  "circuit": "bb144_esm",
+  "device": "stationary_chain",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: statio"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "chain",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: chain7"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "grid9x9",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "deck_unit_cell",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "ladder_2x72",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "ring144_24v",
+  "ms": 522.32,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "cyclone_base",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "cyclone_dual_loop",
+  "cycles": 0,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 1272 (0,1,2,3,4,5,6,7)"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "h2_racetrack",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: h2_rac"
+ }
+]

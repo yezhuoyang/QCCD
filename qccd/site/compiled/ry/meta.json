@@ -1,0 +1,10 @@
+{
+ "id": "ry",
+ "title": "ry(\u03b8)",
+ "note": "any angle at all, about y: one pulse",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "device": "ring6d",
+ "device_about": "the six-site ring with two dock spurs",
+ "compile_seconds": 0.04,
+ "check_seconds": 0.7
+}

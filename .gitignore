@@ -33,3 +33,6 @@ Knowledge/
 # present; the tests that need it skip by name when it is not, so a clone without it
 # reports 72 skips rather than a broken suite.
 /visualizer_24_ancillas_24_junctions_standalone.html
+
+# The website, built by `python -m qccd site`; GitHub Pages deploys the workflow artefact
+/site/

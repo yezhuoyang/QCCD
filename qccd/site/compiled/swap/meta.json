@@ -1,0 +1,10 @@
+{
+ "id": "swap",
+ "title": "swap",
+ "note": "three CNOTs in a row, so three two-ion pulses at one trap",
+ "compiler": "1 layers, 10 transport cycles, 12 beams, 3 MS, 0 virtual-Z, 27 instructions",
+ "device": "ring6d",
+ "device_about": "the six-site ring with two dock spurs",
+ "compile_seconds": 0.04,
+ "check_seconds": 2.8
+}

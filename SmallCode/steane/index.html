@@ -1,0 +1,227 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Steane code [[7,1,3]] on QCCD — every architecture, ranked</title>
+<style>
+:root{color-scheme:light;
+ --surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--ink3:#8a8985;--line:#e6e5e1;--grid:#efeeeb;
+ --ring:#2a78d6;--lattice:#eb6834;--loops:#1baf7a;--refused:#8a8985;--accent:#2a78d6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--ink);
+ font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1280px;margin:0 auto;padding:26px 28px 60px}
+h1{font-size:22px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--ink2);margin:0 0 18px;max-width:80ch}
+.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;padding:10px 0 6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:8px}
+.controls label{display:flex;gap:8px;align-items:center;color:var(--ink2);font-size:13px}
+select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:var(--ink)}
+.seg{display:inline-flex;border:1px solid #cfceca;border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;padding:5px 10px;border:0;background:#fff;color:var(--ink2);cursor:pointer}
+.seg button[aria-pressed="true"]{background:#eef3fb;color:var(--ink);font-weight:600}
+.chartwrap{position:relative}
+svg{display:block;width:100%;height:auto}
+.axis text{font-size:12px;fill:var(--ink2)} .axis line{stroke:var(--line)}
+.grid line{stroke:var(--grid)}
+.axtitle{font-size:12.5px;fill:var(--ink2)}
+.dot{cursor:pointer} .dot circle.hit{fill:transparent}
+.dot circle.mark{fill:currentColor;stroke:var(--surface);stroke-width:2}
+.dot.hollow circle.mark{fill:var(--surface);stroke:currentColor;stroke-width:2.5}
+.dot circle.halo{fill:none;stroke:none} .dot.sel circle.halo{stroke:var(--ink);stroke-width:1.5}
+.dot text{font-size:12px;fill:var(--ink);pointer-events:none}
+.dot text.mut{fill:var(--ink2)}
+.cross{cursor:pointer} .cross line{stroke:var(--refused);stroke-width:2}
+.cross.sel line{stroke:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:18px;color:var(--ink2);font-size:12.5px;margin:4px 0 14px;align-items:center}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.legend .sw.hollow{background:#fff!important;border:2px solid var(--ink2)}
+.legend .x{display:inline-block;width:10px;height:10px;margin-right:6px;position:relative;vertical-align:-1px}
+.legend .x:before,.legend .x:after{content:"";position:absolute;left:4px;top:-1px;width:2px;height:12px;background:var(--refused);transform:rotate(45deg)}
+.legend .x:after{transform:rotate(-45deg)}
+.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid #cfceca;border-radius:6px;padding:6px 9px;font-size:12.5px;box-shadow:0 2px 10px rgba(0,0,0,.08);display:none;max-width:320px}
+.tip b{font-size:13px}
+.detail{border-top:1px solid var(--line);padding-top:16px;display:grid;grid-template-columns:minmax(300px,1fr) minmax(340px,1.3fr);gap:28px}
+.detail.empty{color:var(--ink3);display:block}
+.detail h2{font-size:17px;margin:0 0 4px;font-weight:600}
+.detail .fam{color:var(--ink2);font-size:12.5px;margin-bottom:8px}
+.detail p{margin:0 0 10px;color:var(--ink2)}
+.detail table{width:100%;border-collapse:collapse;font-size:13px}
+.detail td{padding:4px 0;border-bottom:1px solid var(--grid)}
+.detail td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:#008300} .bad{color:#c62828}
+.btns{display:flex;gap:10px;margin:8px 0 14px;flex-wrap:wrap}
+.btn{display:inline-block;padding:7px 12px;border-radius:6px;border:1px solid #cfceca;background:#fff;color:var(--ink);text-decoration:none;font-size:13px}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.steps{list-style:none;margin:0;padding:0;font-size:13px}
+.steps li{padding:3px 0;border-bottom:1px solid var(--grid)}
+.steps a{color:var(--accent);text-decoration:none;font-variant-numeric:tabular-nums;margin-right:8px}
+.steps li[data-kind=fail] a{color:#c62828} .steps li[data-kind=warn] a{color:#9a6b00}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{text-align:left} .tbl th{color:var(--ink2);font-weight:500;cursor:pointer}
+.tbl tr{cursor:pointer} .tbl tr:hover td{background:#f4f6fa} .tbl tr.sel td{background:#eef3fb}
+[hidden]{display:none!important}
+</style></head><body><main>
+<h1>Steane code [[7,1,3]] on QCCD — every architecture, ranked</h1>
+<p class="sub">One syndrome-extraction round of the Steane code [[7,1,3]] compiled onto every architecture, shipped and from the study's families; the circuit checked in stim, every program checked against the 20 rules and, where it passed, by the proved Lean checker (R10). Each dot is a design; pick what to rank by, click a dot for its numbers and the steps in the design tool where each claim can be checked.</p>
+<div class="controls">
+ <label>Rank by <select id="ysel"></select></label>
+ <label>against <select id="xsel"><option value="rank">rank (best → worst)</option></select></label>
+ <label><input type="checkbox" id="log"> log scale</label>
+ <span class="seg" role="group" aria-label="view"><button id="vchart" aria-pressed="true">chart</button><button id="vtable" aria-pressed="false">table</button></span>
+ <span id="count" style="color:var(--ink3);font-size:12.5px;margin-left:auto"></span>
+</div>
+<div class="chartwrap" id="chartwrap"><svg id="svg" viewBox="0 0 1224 560" aria-label="ranking plot"></svg><div class="tip" id="tip"></div></div>
+<div class="legend" id="legend"></div>
+<div id="tablewrap" hidden></div>
+<div class="detail empty" id="detail">Click a dot to see the design's numbers, its claim, and the steps to check it on.</div>
+</main>
+<script>
+var DATA = [{"key":"01_cyclone_base","title":"Steane code [[7,1,3]] on cyclone_base \u2014 a loop with no junctions","family":"junction-free loop","short":"cyclone_base","answer":true,"page":"01_cyclone_base.html","gif":null,"claim":"Cyclone's base: rotation on a loop without spurs","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":116,"sites":72,"junctions":0,"loops":1,"numbers":{"T_jones":2.195,"p_eff_vs_threshold":0.322,"T_transport":2.594,"ions_per_instruction":1.67,"transport_instructions":57,"us_per_ion":3.0,"dacs":38,"area_mm2":5.721,"pads_per_trap":8.25,"buildable":true,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle / 2 directions at once","kind":"note"},{"step":15,"label":"the busiest shuttle (4 ions)","kind":"note"}]},{"key":"02_h2_racetrack","title":"Steane code [[7,1,3]] on h2_racetrack \u2014 Quantinuum's H2 loop","family":"junction-free loop","short":"h2_racetrack","answer":false,"page":"02_h2_racetrack.html","gif":null,"claim":"one continuous racetrack, no junctions","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":313,"sites":40,"junctions":0,"loops":1,"numbers":{"T_jones":4.36,"p_eff_vs_threshold":0.277,"T_transport":6.11,"ions_per_instruction":1.28,"transport_instructions":250,"us_per_ion":3.91,"dacs":72,"area_mm2":3.183,"pads_per_trap":7.65,"buildable":true,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":24,"label":"3 directions at once","kind":"note"},{"step":70,"label":"the busiest shuttle (5 ions)","kind":"note"}]},{"key":"03_cyclone_dual_loop","title":"Steane code [[7,1,3]] on cyclone_dual_loop \u2014 data loop and ancilla loop","family":"two loops","short":"cyclone_dual_loop","answer":false,"page":"03_cyclone_dual_loop.html","gif":null,"claim":"two loops, the ancilla loop rotating","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":505,"sites":144,"junctions":0,"loops":2,"numbers":{"T_jones":5.32,"p_eff_vs_threshold":0.277,"T_transport":8.414,"ions_per_instruction":1.23,"transport_instructions":442,"us_per_ion":4.06,"dacs":44,"area_mm2":11.638,"pads_per_trap":8.58,"buildable":false,"drc_clean":false,"r10":true},"drc":24,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":24,"label":"3 directions at once","kind":"note"},{"step":102,"label":"the busiest shuttle (5 ions)","kind":"note"}]},{"key":"04_tanner","title":"Steane code [[7,1,3]] on the code's Tanner graph as the machine","family":"random graph","short":"tanner","answer":false,"page":"04_tanner.html","gif":null,"claim":"a hub per check and per data qubit, a contact trap on every Tanner edge: every contact one hop","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":93,"sites":37,"junctions":13,"loops":0,"numbers":{"T_jones":7.385,"p_eff_vs_threshold":0.257,"T_transport":7.574,"ions_per_instruction":1.93,"transport_instructions":27,"us_per_ion":64.9,"dacs":1480,"area_mm2":1.452,"pads_per_trap":1.38,"buildable":false,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":17,"label":"the busiest shuttle (4 ions) / 4 directions at once","kind":"note"}]},{"key":"05_ladder_2x72","title":"Steane code [[7,1,3]] on ladder_2x72 \u2014 rails and highways","family":"rails + highways","short":"ladder_2x72","answer":false,"page":"05_ladder_2x72.html","gif":null,"claim":"two rails joined by rungs","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":172,"sites":288,"junctions":46,"loops":0,"numbers":{"T_jones":7.59,"p_eff_vs_threshold":0.257,"T_transport":8.122,"ions_per_instruction":1.55,"transport_instructions":106,"us_per_ion":21.83,"dacs":56,"area_mm2":22.846,"pads_per_trap":6.0,"buildable":true,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":18,"label":"the busiest shuttle (4 ions)","kind":"note"},{"step":29,"label":"2 directions at once","kind":"note"}]},{"key":"06_cylinder6x4","title":"Steane code [[7,1,3]] on cylinder 6x4 \u2014 four concentric rings with spokes","family":"torus","short":"cylinder6x4","answer":false,"page":"06_cylinder6x4.html","gif":null,"claim":"the torus drawn as a chip: 42 traps, no crossings","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":95,"sites":42,"junctions":24,"loops":0,"numbers":{"T_jones":7.595,"p_eff_vs_threshold":0.257,"T_transport":7.798,"ions_per_instruction":1.93,"transport_instructions":29,"us_per_ion":64.02,"dacs":1680,"area_mm2":0.787,"pads_per_trap":0.86,"buildable":false,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":12,"label":"the busiest shuttle (5 ions) / 5 directions at once","kind":"note"}]},{"key":"07_random16","title":"Steane code [[7,1,3]] on random 4-regular graph, 16 junctions","family":"random graph","short":"random16","answer":false,"page":"07_random16.html","gif":null,"claim":"32 traps on a random expander: short paths, no drawing","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":95,"sites":32,"junctions":16,"loops":0,"numbers":{"T_jones":7.635,"p_eff_vs_threshold":0.257,"T_transport":7.838,"ions_per_instruction":1.86,"transport_instructions":29,"us_per_ion":67.13,"build_error":"TypeError","r10":true},"drc":null,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":13,"label":"the busiest shuttle (4 ions) / 4 directions at once","kind":"note"}]},{"key":"08_torus4x4","title":"Steane code [[7,1,3]] on torus 4x4 \u2014 a periodic lattice","family":"torus","short":"torus4x4","answer":false,"page":"08_torus4x4.html","gif":null,"claim":"every row and column a closed loop, 32 traps","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":96,"sites":32,"junctions":16,"loops":0,"numbers":{"T_jones":7.76,"p_eff_vs_threshold":0.257,"T_transport":7.97,"ions_per_instruction":1.9,"transport_instructions":30,"us_per_ion":65.79,"dacs":1280,"area_mm2":1.453,"pads_per_trap":7.5,"buildable":false,"drc_clean":false,"r10":true},"drc":353,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":14,"label":"the busiest shuttle (5 ions) / 4 directions at once","kind":"note"}]},{"key":"09_grid5x5","title":"Steane code [[7,1,3]] on grid5x5 \u2014 a small planar lattice","family":"lattice","short":"grid5x5","answer":false,"page":"09_grid5x5.html","gif":null,"claim":"40 traps on the wires of a 5x5 junction grid","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":99,"sites":40,"junctions":21,"loops":0,"numbers":{"T_jones":8.095,"p_eff_vs_threshold":0.257,"T_transport":8.326,"ions_per_instruction":1.88,"transport_instructions":33,"us_per_ion":65.89,"dacs":1600,"area_mm2":1.894,"pads_per_trap":0.0,"buildable":false,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":14,"label":"the busiest shuttle (4 ions)","kind":"note"},{"step":33,"label":"4 directions at once","kind":"note"}]},{"key":"10_grid9x9","title":"Steane code [[7,1,3]] on grid9x9 \u2014 the baseline lattice","family":"lattice","short":"grid9x9","answer":false,"page":"10_grid9x9.html","gif":null,"claim":"traps on the wires of a 9x9 junction grid","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":101,"sites":144,"junctions":77,"loops":0,"numbers":{"T_jones":8.385,"p_eff_vs_threshold":0.257,"T_transport":8.63,"ions_per_instruction":1.77,"transport_instructions":35,"us_per_ion":70.56,"dacs":5760,"area_mm2":6.286,"pads_per_trap":0.0,"buildable":false,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":35,"label":"the busiest shuttle (4 ions) / 4 directions at once","kind":"note"}]},{"key":"11_deck_unit_cell","title":"Steane code [[7,1,3]] on deck_unit_cell \u2014 the same lattice, broadcast-wired","family":"lattice","short":"deck_unit_cell","answer":false,"page":"11_deck_unit_cell.html","gif":null,"claim":"grid9x9 with the 32-channel WISE control block","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":101,"sites":144,"junctions":77,"loops":0,"numbers":{"T_jones":8.385,"p_eff_vs_threshold":0.257,"T_transport":8.63,"ions_per_instruction":1.77,"transport_instructions":35,"us_per_ion":70.56,"dacs":44,"area_mm2":6.286,"pads_per_trap":0.0,"buildable":false,"drc_clean":true,"r10":true},"drc":0,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":35,"label":"the busiest shuttle (4 ions) / 4 directions at once","kind":"note"}]},{"key":"12_ring24_8","title":"Steane code [[7,1,3]] on ring(12, 2, 8) \u2014 a small ring with 8 docks","family":"ring + docks","short":"ring24_8","answer":false,"page":"12_ring24_8.html","gif":null,"claim":"the study's family at the code's scale: 24 slots, 8 dock spurs","refusal":null,"compiled":true,"rules_failed":[],"rules_passed":20,"instructions":111,"sites":32,"junctions":8,"loops":1,"numbers":{"T_jones":10.475,"p_eff_vs_threshold":0.257,"T_transport":8.506,"ions_per_instruction":3.79,"transport_instructions":33,"us_per_ion":21.09,"dacs":35,"area_mm2":1.914,"pads_per_trap":1.69,"buildable":false,"drc_clean":false,"r10":true},"drc":12,"marks":[{"step":5,"label":"rigid rotation","kind":"note"},{"step":6,"label":"batch 1 of 11 / a 1-contact batch (3 of 11)","kind":"warn"},{"step":8,"label":"forced cool","kind":"note"},{"step":9,"label":"contact gates (1 pairs at once)","kind":"note"},{"step":13,"label":"undock","kind":"note"},{"step":42,"label":"the fullest batch (4 contacts)","kind":"note"}]},{"key":"13_ring144_24v","title":"Steane code [[7,1,3]] on ring144_24v \u2014 the shipped ring, 24 docks","family":"ring + docks","short":"ring144_24v","answer":false,"page":"13_ring144_24v.html","gif":null,"claim":"the study's shipped conveyor: rigid rotation with dock spurs","refusal":null,"compiled":true,"rules_failed":["R4"],"rules_passed":19,"instructions":618,"sites":168,"junctions":24,"loops":1,"numbers":{"T_jones":17.885,"p_eff_vs_threshold":0.258,"T_transport":20.93,"ions_per_instruction":1.31,"transport_instructions":552,"us_per_ion":19.16,"dacs":46,"area_mm2":11.432,"pads_per_trap":5.04,"buildable":false,"drc_clean":false,"r10":true},"drc":44,"marks":[{"step":2,"label":"cool","kind":"note"},{"step":5,"label":"a typical shuttle","kind":"note"},{"step":38,"label":"R4 fails here / the busiest shuttle (4 ions) / 3 directions at once","kind":"fail"}]},{"key":"14_stationary_chain","title":"Steane code [[7,1,3]] on stationary_chain \u2014 no transport at all","family":"line","short":"stationary_chain","answer":false,"page":"14_stationary_chain.html","gif":null,"claim":"one trap holding everything: the breakeven baseline","refusal":"12 circuit ops unrealised: the router emitted a partial programme (ops [14, 15, 17, 21, 22, 23]...)","compiled":false,"rules_failed":[],"rules_passed":20,"instructions":0,"sites":2,"junctions":0,"loops":0,"numbers":{"r10":false},"drc":null,"marks":[]},{"key":"15_chain","title":"Steane code [[7,1,3]] on chain \u2014 a line of traps","family":"line","short":"chain","answer":false,"page":"15_chain.html","gif":null,"claim":"one linear trap","refusal":"unroutable: q1 cannot reach C30 from C39 within 150 cycles","compiled":false,"rules_failed":[],"rules_passed":20,"instructions":0,"sites":72,"junctions":0,"loops":0,"numbers":{"r10":false},"drc":null,"marks":[]}];
+var METRICS = [
+ {k:'T_jones', name:'Total running time — jones table', unit:'ms', better:'low', log:true},
+ {k:'T_transport', name:'Total running time — transport table', unit:'ms', better:'low', log:true},
+ {k:'p_eff_vs_threshold', name:'Error — p_eff / threshold', unit:'', better:'low', nd:3},
+ {k:'dacs', name:'Resource — DACs', unit:'', better:'low', log:true, nd:0},
+ {k:'area_mm2', name:'Resource — die area', unit:'mm²', better:'low'},
+ {k:'pads_per_trap', name:'Resource — control electrodes per trap', unit:'', better:'high', nd:2},
+ {k:'ions_per_instruction', name:'Parallelism — ions per transport instruction', unit:'', better:'high'},
+ {k:'pairs_per_gate', name:'Parallelism — pairs per gate instruction', unit:'', better:'high'},
+ {k:'batches', name:'Schedule — batches', unit:'', better:'low', nd:0},
+ {k:'hops', name:'Schedule — rigid hops', unit:'', better:'low', nd:0},
+ {k:'rotation_gap_pct', name:'Schedule — rotation above its lower bound', unit:'%', better:'low'},
+ {k:'us_per_ion', name:'Transport — µs per ion moved', unit:'µs', better:'low', nd:2, log:true},
+ {k:'diameter', name:'Graph — diameter (hops)', unit:'', better:'low', nd:0}
+];
+var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','two loops':'#8a8985'};
+var $ = function(id){ return document.getElementById(id); };
+var ysel = $('ysel'), xsel = $('xsel'), logbox = $('log');
+METRICS.forEach(function(m){ var o = document.createElement('option'); o.value = m.k; o.textContent = m.name; ysel.appendChild(o);
+  var o2 = document.createElement('option'); o2.value = m.k; o2.textContent = m.name; xsel.appendChild(o2); });
+var SEL = null, VIEW = 'chart';
+function metric(k){ for (var i=0;i<METRICS.length;i++) if (METRICS[i].k===k) return METRICS[i]; return null; }
+function val(d, k){ var v = d.numbers ? d.numbers[k] : null; return (typeof v === 'number' && isFinite(v)) ? v : null; }
+function fmt(v, m){ if (v==null) return '–'; var nd = (m && m.nd!=null) ? m.nd : (Math.abs(v)>=100?0:1); return v.toLocaleString(undefined,{maximumFractionDigits:nd, minimumFractionDigits:nd}) + (m && m.unit ? ' '+m.unit : ''); }
+function ranked(k){
+  var m = metric(k), xs = DATA.filter(function(d){ return d.compiled && val(d,k)!=null; });
+  xs.sort(function(a,b){ return m.better==='low' ? val(a,k)-val(b,k) : val(b,k)-val(a,k); });
+  return xs;
+}
+function svgEl(n, attrs){ var e = document.createElementNS('http://www.w3.org/2000/svg', n); for (var a in attrs) e.setAttribute(a, attrs[a]); return e; }
+function ticks(lo, hi, log){
+  if (log){ var t=[], p=Math.pow(10, Math.floor(Math.log10(lo))); while (p<=hi*1.0001){ [1,2,5].forEach(function(f){ var v=p*f; if (v>=lo*0.999 && v<=hi*1.001) t.push(v); }); p*=10; } return t; }
+  var span = hi-lo, step = Math.pow(10, Math.floor(Math.log10(span/5))); var err = span/5/step; step *= err>=5?5:err>=2?2:1;
+  var t=[], v=Math.ceil(lo/step)*step; while (v<=hi+1e-9){ t.push(+v.toFixed(10)); v+=step; } return t;
+}
+function draw(){
+  var yk = ysel.value, xk = xsel.value, ym = metric(yk), xm = xk==='rank' ? null : metric(xk);
+  var rows = ranked(yk); if (xm) rows = rows.filter(function(d){ return val(d,xk)!=null; });
+  var refused = DATA.filter(function(d){ return !d.compiled; });
+  var missing = DATA.filter(function(d){ return d.compiled && rows.indexOf(d)<0; });
+  var svg = $('svg'); while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var W=1224, H=560, L=78, R=refused.length?150:28, T=26, B=52, pw=W-L-R, ph=H-T-B;
+  var useLog = logbox.checked;
+  var yv = rows.map(function(d){ return val(d,yk); }), ylo=Math.min.apply(null,yv), yhi=Math.max.apply(null,yv);
+  if (ylo===yhi){ ylo*=0.9; yhi*=1.1; }
+  if (useLog && ylo<=0) useLog=false;
+  var ypad = useLog ? 1 : (yhi-ylo)*0.1;
+  var y0 = useLog ? ylo/1.4 : (ylo-ypad < 0 && ylo>=0 ? 0 : ylo-ypad), y1 = useLog ? yhi*1.4 : yhi+ypad;
+  var Y = function(v){ return useLog ? T + ph - (Math.log(v)-Math.log(y0))/(Math.log(y1)-Math.log(y0))*ph : T + ph - (v-y0)/(y1-y0)*ph; };
+  var X;
+  if (!xm){ X = function(d,i){ return L + 24 + (rows.length>1 ? i/(rows.length-1) : 0.5)*(pw-48); }; }
+  else { var xv = rows.map(function(d){ return val(d,xk); }), xlo=Math.min.apply(null,xv), xhi=Math.max.apply(null,xv); if (xlo===xhi){ xlo*=0.9; xhi*=1.1; }
+    var xlog = useLog && xlo>0; var x0 = xlog? xlo/1.4 : xlo-(xhi-xlo)*0.1, x1 = xlog? xhi*1.4 : xhi+(xhi-xlo)*0.1;
+    X = function(d){ var v=val(d,xk); return xlog ? L + (Math.log(v)-Math.log(x0))/(Math.log(x1)-Math.log(x0))*pw : L + (v-x0)/(x1-x0)*pw; };
+    var xt = ticks(xlo, xhi, xlog), gx = svgEl('g',{class:'axis'});
+    xt.forEach(function(v){ var o={}; o[xk]=v; var x = X({numbers:o}); if (x<L||x>L+pw) return;
+      gx.appendChild(svgEl('line',{x1:x,x2:x,y1:T+ph,y2:T+ph+5})); var t=svgEl('text',{x:x,y:T+ph+18,'text-anchor':'middle'}); t.textContent=fmt(v,xm); gx.appendChild(t); });
+    svg.appendChild(gx);
+  }
+  var g = svgEl('g',{class:'grid'}), ga = svgEl('g',{class:'axis'});
+  ticks(ylo, yhi, useLog).forEach(function(v){ var y=Y(v); if (y<T||y>T+ph) return; g.appendChild(svgEl('line',{x1:L,x2:L+pw,y1:y,y2:y}));
+    var t=svgEl('text',{x:L-8,y:y+4,'text-anchor':'end'}); t.textContent=fmt(v,ym); ga.appendChild(t); });
+  svg.appendChild(g); svg.appendChild(ga);
+  svg.appendChild(svgEl('line',{x1:L,x2:L+pw,y1:T+ph,y2:T+ph,stroke:'#cfceca'}));
+  var yt = svgEl('text',{x:L,y:14,class:'axtitle'}); yt.textContent = ym.name + (ym.unit?' ('+ym.unit+')':'') + ' — ' + (ym.better==='low'?'lower is better':'higher is better'); svg.appendChild(yt);
+  var xt2 = svgEl('text',{x:L+pw/2,y:H-8,class:'axtitle','text-anchor':'middle'}); xt2.textContent = xm ? xm.name + (xm.unit?' ('+xm.unit+')':'') : 'rank (best on the left)'; svg.appendChild(xt2);
+  var best = rows[0];
+  rows.forEach(function(d,i){
+    var x = X(d,i), y = Y(val(d,yk)), col = FAMHEX[d.family]||'#8a8985';
+    var gd = svgEl('g',{class:'dot'+(d.numbers.buildable?'':' hollow')+(SEL===d.key?' sel':''),'data-key':d.key,style:'color:'+col});
+    gd.appendChild(svgEl('circle',{class:'halo',cx:x,cy:y,r:11}));
+    gd.appendChild(svgEl('circle',{class:'mark',cx:x,cy:y,r:d.answer?7.5:5.5}));
+    gd.appendChild(svgEl('circle',{class:'hit',cx:x,cy:y,r:16}));
+    if (d.answer || d===best){ var lab = svgEl('text',{x:x, y:y-15, 'text-anchor':'middle', class:d.answer?'':'mut'}); lab.textContent = (d.answer?'recommended · ':'') + shortName(d); gd.appendChild(lab); }
+    gd.addEventListener('mousemove', function(ev){ tip(ev, d, yk, xk); });
+    gd.addEventListener('mouseleave', hideTip);
+    gd.addEventListener('click', function(){ select(d.key); });
+    svg.appendChild(gd);
+  });
+  if (refused.length){
+    var cx = L+pw+34, t=svgEl('text',{x:cx-6,y:T+8,class:'axtitle'}); t.textContent='compiler refused'; svg.appendChild(t);
+    svg.appendChild(svgEl('line',{x1:L+pw+16,x2:L+pw+16,y1:T,y2:T+ph,stroke:'#e6e5e1','stroke-dasharray':'3 4'}));
+    refused.forEach(function(d,i){ var y = T+44+i*((ph-70)/Math.max(1,refused.length-1));
+      var gc = svgEl('g',{class:'cross'+(SEL===d.key?' sel':''),'data-key':d.key});
+      gc.appendChild(svgEl('line',{x1:cx-5,y1:y-5,x2:cx+5,y2:y+5})); gc.appendChild(svgEl('line',{x1:cx-5,y1:y+5,x2:cx+5,y2:y-5}));
+      gc.appendChild(svgEl('circle',{cx:cx,cy:y,r:14,fill:'transparent'}));
+      var lab = svgEl('text',{x:cx+12,y:y+4,style:'font-size:11.5px;fill:#52514e'}); lab.textContent = shortName(d); gc.appendChild(lab);
+      gc.addEventListener('mousemove', function(ev){ tip(ev, d, yk, xk); }); gc.addEventListener('mouseleave', hideTip);
+      gc.addEventListener('click', function(){ select(d.key); }); svg.appendChild(gc); });
+  }
+  $('count').textContent = rows.length + ' designs plotted' + (missing.length ? ' · ' + missing.length + (missing.length===1?' has':' have') + ' no value for this measure (see the table)' : '') + (refused.length ? ' · ' + refused.length + ' refused' : '');
+  legend(); if (VIEW==='table') table();
+}
+function shortName(d){ return d.short || d.title; }
+function legend(){ var el=$('legend'); el.innerHTML='';
+  Object.keys(FAMHEX).forEach(function(f){ var s=document.createElement('span'); var sw=document.createElement('i'); sw.className='sw'; sw.style.background=FAMHEX[f]; s.appendChild(sw); s.appendChild(document.createTextNode(f)); el.appendChild(s); });
+  var h=document.createElement('span'); var hs=document.createElement('i'); hs.className='sw hollow'; h.appendChild(hs); h.appendChild(document.createTextNode('hollow = not buildable in this technology')); el.appendChild(h);
+  var x=document.createElement('span'); var xs=document.createElement('i'); xs.className='x'; x.appendChild(xs); x.appendChild(document.createTextNode('the compiler could not serve the device')); el.appendChild(x);
+  var g=document.createElement('span'); var gs=document.createElement('i'); gs.className='sw'; gs.style.background='#8a8985'; g.appendChild(gs); g.appendChild(document.createTextNode('grey = a loop without docks, a line, rails, or two loops')); el.appendChild(g);
+  var a=document.createElement('span'); a.textContent='larger dot = the recommended design'; el.appendChild(a); }
+function tip(ev, d, yk, xk){ var t=$('tip'), ym=metric(yk), xm=xk==='rank'?null:metric(xk); t.innerHTML='';
+  var b=document.createElement('b'); b.textContent=shortName(d); t.appendChild(b); t.appendChild(document.createElement('br'));
+  if (d.compiled){ var v=document.createElement('b'); v.textContent=fmt(val(d,yk),ym); t.appendChild(v); t.appendChild(document.createTextNode(' '+(ym.name.split(' — ')[1]||ym.name)));
+    if (xm){ t.appendChild(document.createElement('br')); t.appendChild(document.createTextNode(fmt(val(d,xk),xm)+' '+(xm.name.split(' — ')[1]||xm.name))); } }
+  else t.appendChild(document.createTextNode(d.refusal||'refused'));
+  t.appendChild(document.createElement('br')); var s=document.createElement('span'); s.style.color='#8a8985'; s.textContent=d.family+' · click for details'; t.appendChild(s);
+  var w=$('chartwrap').getBoundingClientRect(); t.style.display='block'; t.style.left=(ev.clientX-w.left+14)+'px'; t.style.top=(ev.clientY-w.top+14)+'px'; }
+function hideTip(){ $('tip').style.display='none'; }
+function select(key){ SEL=key; draw(); detail(DATA.filter(function(d){return d.key===key;})[0]); pushState(); }
+function row(k,v,cls){ var tr=document.createElement('tr'), a=document.createElement('td'), b=document.createElement('td'); a.textContent=k; if (cls) b.className=cls; b.textContent=v; tr.appendChild(a); tr.appendChild(b); return tr; }
+function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
+  var left=document.createElement('div'), right=document.createElement('div');
+  var h=document.createElement('h2'); h.textContent=d.title; left.appendChild(h);
+  var f=document.createElement('div'); f.className='fam'; f.textContent=d.family + (d.compiled ? ' · '+d.instructions+' instructions' : ' · '+d.sites+' sites, '+d.junctions+' junctions, '+d.loops+' closed loops'); left.appendChild(f);
+  var c=document.createElement('p'); c.textContent=d.claim; left.appendChild(c);
+  if (d.refusal){ var rf=document.createElement('p'); rf.className='bad'; rf.textContent='Compiler: '+d.refusal; left.appendChild(rf); }
+  var btns=document.createElement('div'); btns.className='btns';
+  var a=document.createElement('a'); a.className='btn primary'; a.href=d.page; a.textContent=d.compiled?'Open in studio — step every instruction':'Open in studio — inspect the device'; btns.appendChild(a);
+  if (d.gif){ var g=document.createElement('a'); g.className='btn'; g.href='../'+d.gif; g.textContent='animated clip'; btns.appendChild(g); }
+  left.appendChild(btns);
+  if (d.marks && d.marks.length){ var sh=document.createElement('div'); sh.style.cssText='font-size:12.5px;color:#52514e;margin-bottom:4px'; sh.textContent='Check each claim on its step:'; left.appendChild(sh);
+    var ul=document.createElement('ul'); ul.className='steps'; d.marks.forEach(function(m){ var li=document.createElement('li'); li.setAttribute('data-kind',m.kind); var la=document.createElement('a'); la.href=d.page+'#step='+m.step; la.textContent='step '+m.step; li.appendChild(la); li.appendChild(document.createTextNode(m.label)); ul.appendChild(li); }); left.appendChild(ul); }
+  if (d.compiled){ var tb=document.createElement('table'); var n=d.numbers;
+    METRICS.forEach(function(m){ if (val(d,m.k)!=null) tb.appendChild(row(m.name.replace(' — ',': '), fmt(val(d,m.k),m))); });
+    tb.appendChild(row('buildable', n.buildable ? 'yes' : (n.drc_clean ? 'DRC clean, but no control electrodes survive' : 'no'+(d.drc?' ('+d.drc+' design-rule violations)':'')), n.buildable?'ok':'bad'));
+    tb.appendChild(row('rules', d.rules_failed.length ? d.rules_failed.join(' ')+' FAILED' : d.rules_passed+' passed', d.rules_failed.length?'bad':'ok'));
+    tb.appendChild(row('R10 by the Lean checker', n.r10 ? 'passed' : 'not run', n.r10?'ok':''));
+    right.appendChild(tb); }
+  el.appendChild(left); el.appendChild(right); }
+function table(){ var w=$('tablewrap'); w.innerHTML=''; var yk=ysel.value;
+  var cols=['T_jones','T_transport','p_eff_vs_threshold','dacs','area_mm2','pads_per_trap','ions_per_instruction','batches','hops'].map(metric);
+  var t=document.createElement('table'); t.className='tbl'; var tr=document.createElement('tr');
+  ['design','family','buildable'].concat(cols.map(function(m){ return m.name.split(' — ')[1]||m.name; })).forEach(function(h,i){ var th=document.createElement('th'); th.textContent=h; if (i>=3){ th.onclick=function(){ ysel.value=cols[i-3].k; draw(); }; th.title='rank by this'; if (cols[i-3].k===yk) th.style.color='#0b0b0b'; } tr.appendChild(th); }); t.appendChild(tr);
+  var rows = ranked(yk).concat(DATA.filter(function(d){ return d.compiled && val(d,yk)==null; }), DATA.filter(function(d){ return !d.compiled; }));
+  rows.forEach(function(d){ var r=document.createElement('tr'); if (SEL===d.key) r.className='sel';
+    [shortName(d), d.family, d.compiled ? (d.numbers.buildable?'yes':(d.numbers.drc_clean?'no wells':'no')) : 'refused'].concat(cols.map(function(m){ return fmt(val(d,m.k),m); })).forEach(function(v){ var td=document.createElement('td'); td.textContent=v; r.appendChild(td); });
+    r.onclick=function(){ select(d.key); }; t.appendChild(r); });
+  w.appendChild(t); }
+function setView(v){ VIEW=v; if (typeof pushState==='function') setTimeout(pushState,0); $('vchart').setAttribute('aria-pressed', v==='chart'); $('vtable').setAttribute('aria-pressed', v==='table'); $('chartwrap').hidden = v!=='chart'; $('legend').hidden = v!=='chart'; $('tablewrap').hidden = v!=='table'; if (v==='table') table(); }
+ysel.onchange = function(){ var m=metric(ysel.value); logbox.checked=!!m.log; draw(); }; xsel.onchange=draw; logbox.onchange=draw;
+$('vchart').onclick=function(){ setView('chart'); }; $('vtable').onclick=function(){ setView('table'); };
+// a view is shareable: ?y=<measure>&x=<measure|rank>&log=0|1&sel=<key>
+var Q = {}; try { location.search.replace(/^\?/,'').split('&').forEach(function(kv){ if(!kv) return; var i=kv.indexOf('='); Q[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1)); }); } catch(e){}
+ysel.value = metric(Q.y||'') ? Q.y : 'T_jones'; xsel.value = (Q.x==='rank' || metric(Q.x||'')) ? Q.x : 'rank';
+logbox.checked = Q.log!=null ? Q.log==='1' : !!metric(ysel.value).log; draw(); if (Q.view==='table') setView('table');
+function pushState(){ try { var q='?y='+ysel.value+'&x='+xsel.value+'&log='+(logbox.checked?1:0)+(SEL?'&sel='+SEL:'')+(VIEW==='table'?'&view=table':''); history.replaceState(null,'',q); } catch(e){} }
+[ysel,xsel,logbox].forEach(function(el){ el.addEventListener('change', pushState); });
+var ans = DATA.filter(function(d){ return d.key===Q.sel; })[0] || DATA.filter(function(d){ return d.answer; })[0]; if (ans) select(ans.key);
+</script></body></html>

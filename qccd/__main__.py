@@ -787,6 +787,12 @@ def _load(name: str) -> Architecture:
     return load(p)
 
 
+def cmd_site(args) -> int:
+    """`qccd site` -- the website as static files; see `qccd/site/build.py`."""
+    from .site.build import build
+    return build(Path(args.out))
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The parser, as a value.
 
@@ -954,6 +960,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_open.add_argument("--html", default=None)
     p_open.add_argument("--max-frames", type=int, default=20000)
 
+    p_site = sub.add_parser("site", help="the website, as static files (docs/WEBSITE_PLAN.md)")
+    p_site.add_argument("-o", "--out", default=str(ROOT / "site"))
+
     return ap
 
 
@@ -966,7 +975,7 @@ def main(argv=None) -> int:
             "phys": cmd_phys, "gds": cmd_gds,
             "analyses": cmd_analyses,
             "arch": cmd_arch,
-            "source": cmd_arch, "studio": cmd_studio, "open": cmd_open,
+            "source": cmd_arch, "studio": cmd_studio, "open": cmd_open, "site": cmd_site,
             "listing": cmd_listing, "disasm": cmd_listing}[args.cmd](args)
 
 
