@@ -2951,15 +2951,18 @@ def test_the_page_inlines_this_exact_engine():
     """
     # the pages THIS BUILD owns, not everything that has ever been written under `out/`
     pages = _regen_pages()
-    engine = ENGINE.read_text(encoding="utf-8")
-    edit = EDIT_JS.read_text(encoding="utf-8")
-    editor = (ROOT / "qccd" / "viz" / "js" / "editor.js").read_text(encoding="utf-8")
+    # EVERY file `render.py` inlines, asked of `render.py` rather than retyped here.  This
+    # was a literal naming three of them; `js/transit.js` joined `ENGINE_JS` on 2026-09-19
+    # and the literal did not, so a stale copy of it would have passed unnoticed.
+    from qccd.viz.render import EDITOR_JS, ENGINE_JS
+    names = tuple(ENGINE_JS) + tuple(EDITOR_JS)
+    assert len(names) >= 5, f"only {len(names)} inlined file(s): {names}"
+    src = [("qccd/viz/" + n, (ROOT / "qccd" / "viz" / n).read_text(encoding="utf-8"))
+           for n in names]
     stale = []
     for p in pages:
         html = p.read_text(encoding="utf-8")
-        missing = [n for n, t in (("qccd/viz/engine.js", engine),
-                                  ("qccd/viz/js/edit.js", edit),
-                                  ("qccd/viz/js/editor.js", editor)) if t not in html]
+        missing = [n for n, t in src if t not in html]
         if missing:
             stale.append(f"  {p.relative_to(OUT_DIR)}: stale {', '.join(missing)}"
                          f"  -- rebuild with `{_command_for(p)}`")
