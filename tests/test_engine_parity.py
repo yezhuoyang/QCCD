@@ -2891,14 +2891,19 @@ def test_the_js_covers_every_emitted_statement(tmp_path):
         f"generator sets differ: python={sorted(GENERATORS)} js={sorted(got['g'])}")
 
 
-#: WHAT `python -m qccd regen` WRITES, as (what it is, glob under `out/`).  These are the
-#: pages this repository renders and re-renders; everything else under `out/` belongs to
-#: something else and is out of scope -- see `_regen_pages`.
+#: THE PAGES THIS REPOSITORY RENDERS, as (what it is, glob under `out/`, the command that
+#: writes it).  Everything else under `out/` belongs to something else and is out of scope
+#: -- see `_regen_pages`.
+#:
+#: The command is part of the entry because `qccd regen` does NOT write them all: the
+#: course pages are `qccd tutorial`'s, and saying "run regen" for those sends whoever hits
+#: this straight past the fix.  (Which it did, on 2026-09-19: `tutorial/` happened to be
+#: current when this table was first measured, so the wrong command went in unnoticed.)
 REGEN_SETS = (
-    ("the demo devices", "*__*__*.html"),
-    ("the studio", "studio.html"),
-    ("the hand-checkable examples", "verify/*.html"),
-    ("the course", "tutorial/*.html"),
+    ("the demo devices", "*__*__*.html", "python -m qccd regen"),
+    ("the studio", "studio.html", "python -m qccd regen"),
+    ("the hand-checkable examples", "verify/*.html", "python -m qccd regen"),
+    ("the course", "tutorial/*.html", "python -m qccd tutorial -o out/tutorial"),
 )
 
 
@@ -2918,14 +2923,22 @@ def _regen_pages() -> list[Path]:
     look at" -- which is the exact failure these tests exist to catch, turned inward.
     """
     out: list[Path] = []
-    for what, pattern in REGEN_SETS:
+    for what, pattern, cmd in REGEN_SETS:
         got = [q for q in sorted(OUT_DIR.glob(pattern))
                if '<script id="data"' in q.read_text(encoding="utf-8", errors="replace")]
         assert got, (
-            f"no pages matched {pattern!r} ({what}); either `python -m qccd regen` has not "
-            f"run in this tree or the glob is stale -- an empty scan is not a pass")
+            f"no pages matched {pattern!r} ({what}); either `{cmd}` has not run in this "
+            f"tree or the glob is stale -- an empty scan is not a pass")
         out += got
     return out
+
+
+def _command_for(page: Path) -> str:
+    """The command that rewrites `page`, for a failure message that can be acted on."""
+    for what, pattern, cmd in REGEN_SETS:
+        if page in set(OUT_DIR.glob(pattern)):
+            return cmd
+    return "python -m qccd regen"
 
 
 @requires_node
@@ -2941,11 +2954,17 @@ def test_the_page_inlines_this_exact_engine():
     engine = ENGINE.read_text(encoding="utf-8")
     edit = EDIT_JS.read_text(encoding="utf-8")
     editor = (ROOT / "qccd" / "viz" / "js" / "editor.js").read_text(encoding="utf-8")
+    stale = []
     for p in pages:
         html = p.read_text(encoding="utf-8")
-        assert engine in html, f"{p.name} does not contain qccd/viz/engine.js verbatim"
-        assert edit in html, f"{p.name} does not contain qccd/viz/js/edit.js verbatim"
-        assert editor in html, f"{p.name} does not contain qccd/viz/js/editor.js verbatim"
+        missing = [n for n, t in (("qccd/viz/engine.js", engine),
+                                  ("qccd/viz/js/edit.js", edit),
+                                  ("qccd/viz/js/editor.js", editor)) if t not in html]
+        if missing:
+            stale.append(f"  {p.relative_to(OUT_DIR)}: stale {', '.join(missing)}"
+                         f"  -- rebuild with `{_command_for(p)}`")
+    assert not stale, ("emitted pages do not carry the shipped JavaScript verbatim:\n"
+                       + "\n".join(stale))
     assert len(pages) >= 18, (
         f"only {len(pages)} page(s) checked; regen writes ten demo devices, the studio, "
         f"seven verify pages and the course")
