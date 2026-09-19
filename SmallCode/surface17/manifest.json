@@ -1,0 +1,860 @@
+[
+ {
+  "key": "01_cyclone_base",
+  "family": "junction-free loop",
+  "title": "Surface code, distance 3 (17 qubits) on cyclone_base \u2014 a loop with no junctions",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\cyclone_base.arch.json",
+  "claim": "Cyclone's base: rotation on a loop without spurs",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "cyclone_base",
+  "answer": true,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\cyclone_base_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 3.815,
+   "p_eff_vs_threshold": 0.272,
+   "T_transport": 4.634,
+   "ions_per_instruction": 1.26,
+   "transport_instructions": 117,
+   "us_per_ion": 3.98,
+   "dacs": 38,
+   "area_mm2": 5.721,
+   "pads_per_trap": 8.25,
+   "buildable": true,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "01_cyclone_base.html",
+  "instructions": 182,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 7,
+    "step": 8,
+    "id": 7,
+    "label": "the busiest shuttle (3 ions) / 2 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.3. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 2 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 2 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1277676,
+  "sites": 72,
+  "junctions": 0,
+  "loops": 1
+ },
+ {
+  "key": "02_cylinder6x4",
+  "family": "torus",
+  "title": "Surface code, distance 3 (17 qubits) on cylinder 6x4 \u2014 four concentric rings with spokes",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\cylinder6x4.arch.json",
+  "claim": "the torus drawn as a chip: 42 traps, no crossings",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "cylinder6x4",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\cylinder6x4_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 7.3,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 7.482,
+   "ions_per_instruction": 2.19,
+   "transport_instructions": 26,
+   "us_per_ion": 55.61,
+   "dacs": 1680,
+   "area_mm2": 0.787,
+   "pads_per_trap": 0.86,
+   "buildable": false,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "02_cylinder6x4.html",
+  "instructions": 94,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 51,
+    "step": 52,
+    "id": 46,
+    "label": "the busiest shuttle (4 ions) / 4 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.2. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 4 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 4 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1288505,
+  "sites": 42,
+  "junctions": 24,
+  "loops": 0
+ },
+ {
+  "key": "03_grid5x5",
+  "family": "lattice",
+  "title": "Surface code, distance 3 (17 qubits) on grid5x5 \u2014 a small planar lattice",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\grid5x5.arch.json",
+  "claim": "40 traps on the wires of a 5x5 junction grid",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "grid5x5",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\grid5x5_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 7.36,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 7.542,
+   "ions_per_instruction": 1.96,
+   "transport_instructions": 26,
+   "us_per_ion": 63.33,
+   "dacs": 1600,
+   "area_mm2": 1.894,
+   "pads_per_trap": 0.0,
+   "buildable": false,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "03_grid5x5.html",
+  "instructions": 94,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "the busiest shuttle (3 ions) / a typical shuttle",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 13,
+    "step": 14,
+    "id": 12,
+    "label": "3 directions at once",
+    "note": "ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1283811,
+  "sites": 40,
+  "junctions": 21,
+  "loops": 0
+ },
+ {
+  "key": "04_grid9x9",
+  "family": "lattice",
+  "title": "Surface code, distance 3 (17 qubits) on grid9x9 \u2014 the baseline lattice",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\grid9x9.arch.json",
+  "claim": "traps on the wires of a 9x9 junction grid",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "grid9x9",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\grid9x9_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 7.38,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 7.562,
+   "ions_per_instruction": 1.96,
+   "transport_instructions": 26,
+   "us_per_ion": 63.73,
+   "dacs": 5760,
+   "area_mm2": 6.286,
+   "pads_per_trap": 0.0,
+   "buildable": false,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "04_grid9x9.html",
+  "instructions": 94,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "the busiest shuttle (3 ions) / a typical shuttle",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 13,
+    "step": 14,
+    "id": 12,
+    "label": "3 directions at once",
+    "note": "ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1348138,
+  "sites": 144,
+  "junctions": 77,
+  "loops": 0
+ },
+ {
+  "key": "05_deck_unit_cell",
+  "family": "lattice",
+  "title": "Surface code, distance 3 (17 qubits) on deck_unit_cell \u2014 the same lattice, broadcast-wired",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\deck_unit_cell.arch.json",
+  "claim": "grid9x9 with the 32-channel WISE control block",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "deck_unit_cell",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\deck_unit_cell_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 7.38,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 7.562,
+   "ions_per_instruction": 1.96,
+   "transport_instructions": 26,
+   "us_per_ion": 63.73,
+   "dacs": 44,
+   "area_mm2": 6.286,
+   "pads_per_trap": 0.0,
+   "buildable": false,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "05_deck_unit_cell.html",
+  "instructions": 94,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "the busiest shuttle (3 ions) / a typical shuttle",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 13,
+    "step": 14,
+    "id": 12,
+    "label": "3 directions at once",
+    "note": "ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1353665,
+  "sites": 144,
+  "junctions": 77,
+  "loops": 0
+ },
+ {
+  "key": "06_tanner",
+  "family": "random graph",
+  "title": "Surface code, distance 3 (17 qubits) on the code's Tanner graph as the machine",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\tanner.arch.json",
+  "claim": "a hub per check and per data qubit, a contact trap on every Tanner edge: every contact one hop",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "tanner",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\tanner_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 7.985,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 8.202,
+   "ions_per_instruction": 1.74,
+   "transport_instructions": 31,
+   "us_per_ion": 71.39,
+   "dacs": 1640,
+   "area_mm2": 26.933,
+   "pads_per_trap": 2.56,
+   "buildable": false,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "06_tanner.html",
+  "instructions": 99,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "the busiest shuttle (3 ions) / a typical shuttle / 3 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.7. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.  ALSO: ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1330841,
+  "sites": 41,
+  "junctions": 17,
+  "loops": 0
+ },
+ {
+  "key": "07_torus4x4",
+  "family": "torus",
+  "title": "Surface code, distance 3 (17 qubits) on torus 4x4 \u2014 a periodic lattice",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\torus4x4.arch.json",
+  "claim": "every row and column a closed loop, 32 traps",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "torus4x4",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\torus4x4_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 8.005,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 8.222,
+   "ions_per_instruction": 1.84,
+   "transport_instructions": 31,
+   "us_per_ion": 67.98,
+   "dacs": 1280,
+   "area_mm2": 1.453,
+   "pads_per_trap": 7.5,
+   "buildable": false,
+   "drc_clean": false,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 169,
+    "rf_dc_clearance": 184
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "07_torus4x4.html",
+  "instructions": 99,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle / 3 directions at once",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.  ALSO: ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   },
+   {
+    "frame": 24,
+    "step": 25,
+    "id": 22,
+    "label": "the busiest shuttle (4 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.8. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1271646,
+  "sites": 32,
+  "junctions": 16,
+  "loops": 0
+ },
+ {
+  "key": "08_random16",
+  "family": "random graph",
+  "title": "Surface code, distance 3 (17 qubits) on random 4-regular graph, 16 junctions",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\random16.arch.json",
+  "claim": "32 traps on a random expander: short paths, no drawing",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "random16",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\random16_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 8.005,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 8.222,
+   "ions_per_instruction": 1.87,
+   "transport_instructions": 31,
+   "us_per_ion": 66.81,
+   "build_error": "TypeError",
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "08_random16.html",
+  "instructions": 99,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 12,
+    "step": 13,
+    "id": 11,
+    "label": "the busiest shuttle (4 ions) / 4 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.9. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 4 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 4 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1316624,
+  "sites": 32,
+  "junctions": 16,
+  "loops": 0
+ },
+ {
+  "key": "09_ladder_2x72",
+  "family": "rails + highways",
+  "title": "Surface code, distance 3 (17 qubits) on ladder_2x72 \u2014 rails and highways",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\ladder_2x72.arch.json",
+  "claim": "two rails joined by rungs",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "ladder_2x72",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\ladder_2x72_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 8.81,
+   "p_eff_vs_threshold": 0.255,
+   "T_transport": 9.118,
+   "ions_per_instruction": 1.62,
+   "transport_instructions": 85,
+   "us_per_ion": 33.91,
+   "dacs": 56,
+   "area_mm2": 22.846,
+   "pads_per_trap": 6.0,
+   "buildable": true,
+   "drc_clean": true,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 0
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "09_ladder_2x72.html",
+  "instructions": 153,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 15,
+    "step": 16,
+    "id": 14,
+    "label": "2 directions at once",
+    "note": "ions moving 2 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 2 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   },
+   {
+    "frame": 126,
+    "step": 127,
+    "id": 119,
+    "label": "the busiest shuttle (4 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.6. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1421465,
+  "sites": 288,
+  "junctions": 46,
+  "loops": 0
+ },
+ {
+  "key": "10_ring144_24v",
+  "family": "ring + docks",
+  "title": "Surface code, distance 3 (17 qubits) on ring144_24v \u2014 the shipped ring, 24 docks",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\ring144_24v.arch.json",
+  "claim": "the study's shipped conveyor: rigid rotation with dock spurs",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "ring144_24v",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\ring144_24v_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 18.425,
+   "p_eff_vs_threshold": 0.257,
+   "T_transport": 21.498,
+   "ions_per_instruction": 1.35,
+   "transport_instructions": 560,
+   "us_per_ion": 18.96,
+   "dacs": 46,
+   "area_mm2": 11.432,
+   "pads_per_trap": 5.04,
+   "buildable": false,
+   "drc_clean": false,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 44
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "10_ring144_24v.html",
+  "instructions": 628,
+  "rules_failed": [
+   "R4"
+  ],
+  "rules_passed": 19,
+  "marks": [
+   {
+    "frame": 1,
+    "step": 2,
+    "id": 1,
+    "label": "cool",
+    "note": "the lattice cools too; 13% of its round.",
+    "kind": "note"
+   },
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
+   },
+   {
+    "frame": 111,
+    "step": 112,
+    "id": 110,
+    "label": "R4 fails here / 3 directions at once",
+    "note": "on the spurs: channel 'linear_h.all.0' drives 168 sites with one waveform, but they are asked to do 2 different things (spur:inward and spur:outward); that needs 2 channels  ALSO: ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "fail"
+   },
+   {
+    "frame": 473,
+    "step": 474,
+    "id": 466,
+    "label": "the busiest shuttle (4 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.3. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1446954,
+  "sites": 168,
+  "junctions": 24,
+  "loops": 1
+ },
+ {
+  "key": "11_ring24_8",
+  "family": "ring + docks",
+  "title": "Surface code, distance 3 (17 qubits) on ring(12, 2, 8) \u2014 a small ring with 8 docks",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\ring24_8.arch.json",
+  "claim": "the study's family at the code's scale: 24 slots, 8 dock spurs",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "ring24_8",
+  "answer": false,
+  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\SmallCode\\surface17\\ring24_8_surface17",
+  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\surface17_esm.qasm",
+  "numbers": {
+   "T_jones": 19.32,
+   "p_eff_vs_threshold": 0.257,
+   "T_transport": 15.846,
+   "ions_per_instruction": 3.79,
+   "transport_instructions": 53,
+   "us_per_ion": 27.47,
+   "dacs": 35,
+   "area_mm2": 1.914,
+   "pads_per_trap": 1.69,
+   "buildable": false,
+   "drc_clean": false,
+   "drc": {
+    "min_width": 0,
+    "min_gap": 0,
+    "rf_dc_clearance": 12
+   },
+   "r10": true
+  },
+  "r10": true,
+  "status": "ok",
+  "page": "11_ring24_8.html",
+  "instructions": 178,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [
+   {
+    "frame": 4,
+    "step": 5,
+    "id": 4,
+    "label": "batch 1 of 18 / a 1-contact batch (12 of 18)",
+    "note": "a dock: 1 riders pull into their spurs at once. Each batch pays dock + undock + one forced cool (about 725 us) whatever its size; mean fill here is 1.3 contacts of 2 possible.  ALSO: one rider docks alone, and the batch still pays its full overhead: 12 such batches cost about 8.8 ms for 50.0% of the contacts.",
+    "kind": "warn"
+   },
+   {
+    "frame": 6,
+    "step": 7,
+    "id": 160,
+    "label": "forced cool",
+    "note": "300 us, once per batch: an ion that has crossed a junction carries 3 quanta against a 1-quantum gate budget, so the cool is structural, not a policy. It is about a quarter of the round.",
+    "kind": "note"
+   },
+   {
+    "frame": 7,
+    "step": 8,
+    "id": 6,
+    "label": "contact gates (1 pairs at once)",
+    "note": "the two-qubit gates of one batch, all in one instruction; each pair sits in its own dock. The Circuit pane shows which QASM statements this discharges.",
+    "kind": "note"
+   },
+   {
+    "frame": 11,
+    "step": 12,
+    "id": 10,
+    "label": "undock",
+    "note": "the riders leave their spurs. Entering the degree-3 rail node is charged as a junction crossing -- the price of the only mechanism a loop has.",
+    "kind": "note"
+   },
+   {
+    "frame": 12,
+    "step": 13,
+    "id": 11,
+    "label": "rigid rotation",
+    "note": "one loop_shift template turns the whole loop: every rider moves with one waveform. This is the broadcast primitive the ring is built around, and the reason it moves 72 ions per transport instruction.",
+    "kind": "note"
+   },
+   {
+    "frame": 22,
+    "step": 23,
+    "id": 20,
+    "label": "the fullest batch (2 contacts)",
+    "note": "every ancilla in use at once: this is what the lockstep placement is engineered to make happen, and the per-batch overhead is amortised best here.",
+    "kind": "note"
+   }
+  ],
+  "bytes": 1268307,
+  "sites": 32,
+  "junctions": 8,
+  "loops": 1
+ },
+ {
+  "key": "12_stationary_chain",
+  "family": "line",
+  "title": "Surface code, distance 3 (17 qubits) on stationary_chain \u2014 no transport at all",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\stationary_chain.arch.json",
+  "claim": "one trap holding everything: the breakeven baseline",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "stationary_chain",
+  "answer": false,
+  "refusal": "12 circuit ops unrealised: the router emitted a partial programme (ops [14, 15, 19, 24, 25, 26]...)",
+  "status": "ok",
+  "page": "12_stationary_chain.html",
+  "instructions": 0,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [],
+  "numbers": {
+   "r10": false
+  },
+  "bytes": 1176176,
+  "sites": 2,
+  "junctions": 0,
+  "loops": 0
+ },
+ {
+  "key": "13_h2_racetrack",
+  "family": "junction-free loop",
+  "title": "Surface code, distance 3 (17 qubits) on h2_racetrack \u2014 Quantinuum's H2 loop",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\h2_racetrack.arch.json",
+  "claim": "one continuous racetrack, no junctions",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "h2_racetrack",
+  "answer": false,
+  "refusal": "unroutable: q3 cannot reach S37 from S5 within 48 cycles",
+  "status": "ok",
+  "page": "13_h2_racetrack.html",
+  "instructions": 0,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [],
+  "numbers": {
+   "r10": false
+  },
+  "bytes": 1203384,
+  "sites": 40,
+  "junctions": 0,
+  "loops": 1
+ },
+ {
+  "key": "14_cyclone_dual_loop",
+  "family": "two loops",
+  "title": "Surface code, distance 3 (17 qubits) on cyclone_dual_loop \u2014 data loop and ancilla loop",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\cyclone_dual_loop.arch.json",
+  "claim": "two loops, the ancilla loop rotating",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "cyclone_dual_loop",
+  "answer": false,
+  "refusal": "unroutable: q9 cannot reach AB3 from AT4 within 80 cycles",
+  "status": "ok",
+  "page": "14_cyclone_dual_loop.html",
+  "instructions": 0,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [],
+  "numbers": {
+   "r10": false
+  },
+  "bytes": 1264424,
+  "sites": 144,
+  "junctions": 0,
+  "loops": 2
+ },
+ {
+  "key": "15_chain",
+  "family": "line",
+  "title": "Surface code, distance 3 (17 qubits) on chain \u2014 a line of traps",
+  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\chain.arch.json",
+  "claim": "one linear trap",
+  "kicker": "SURFACE-17 CODESIGN",
+  "short": "chain",
+  "answer": false,
+  "refusal": "unroutable: q3 cannot reach C38 from C29 within 150 cycles",
+  "status": "ok",
+  "page": "15_chain.html",
+  "instructions": 0,
+  "rules_failed": [],
+  "rules_passed": 20,
+  "marks": [],
+  "numbers": {
+   "r10": false
+  },
+  "bytes": 1217910,
+  "sites": 72,
+  "junctions": 0,
+  "loops": 0
+ }
+]

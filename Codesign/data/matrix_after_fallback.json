@@ -1,0 +1,845 @@
+[
+ {
+  "circuit": "adder3",
+  "device": "stationary_chain",
+  "cycles": 25,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 32 (13,29,38,40,41,42,43,44)"
+ },
+ {
+  "circuit": "adder3",
+  "device": "chain",
+  "cycles": 116,
+  "ms": 6.41,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "grid9x9",
+  "cycles": 80,
+  "ms": 19.12,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "deck_unit_cell",
+  "cycles": 80,
+  "ms": 19.12,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "ladder_2x72",
+  "cycles": 124,
+  "ms": 10.34,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "ring144_24v",
+  "cycles": 604,
+  "ms": 24.02,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "cyclone_base",
+  "cycles": 86,
+  "ms": 5.96,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "cyclone_dual_loop",
+  "cycles": 261,
+  "ms": 6.83,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "adder3",
+  "device": "h2_racetrack",
+  "cycles": 165,
+  "ms": 6.35,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "stationary_chain",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: statio"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "chain",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: chain7"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "grid9x9",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "deck_unit_cell",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "ladder_2x72",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "ring144_24v",
+  "ms": 522.32,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "cyclone_base",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "cyclone_dual_loop",
+  "cycles": 0,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 1272 (0,1,2,3,4,5,6,7)"
+ },
+ {
+  "circuit": "bb144_esm",
+  "device": "h2_racetrack",
+  "status": "too-small",
+  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: h2_rac"
+ },
+ {
+  "circuit": "bell2",
+  "device": "stationary_chain",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "chain",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "grid9x9",
+  "cycles": 1,
+  "ms": 0.9,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "deck_unit_cell",
+  "cycles": 1,
+  "ms": 0.9,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "ladder_2x72",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "ring144_24v",
+  "cycles": 8,
+  "ms": 1.0,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "cyclone_base",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "cyclone_dual_loop",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bell2",
+  "device": "h2_racetrack",
+  "cycles": 1,
+  "ms": 0.47,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "stationary_chain",
+  "cycles": 3,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 7 (3,4,5,6,7,14,16)"
+ },
+ {
+  "circuit": "bv6",
+  "device": "chain",
+  "cycles": 7,
+  "ms": 0.96,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "grid9x9",
+  "cycles": 5,
+  "ms": 2.46,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "deck_unit_cell",
+  "cycles": 5,
+  "ms": 2.46,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "ladder_2x72",
+  "cycles": 6,
+  "ms": 1.35,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "ring144_24v",
+  "cycles": 44,
+  "ms": 3.0,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "cyclone_base",
+  "cycles": 5,
+  "ms": 0.95,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "cyclone_dual_loop",
+  "cycles": 6,
+  "ms": 0.96,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "bv6",
+  "device": "h2_racetrack",
+  "cycles": 6,
+  "ms": 0.96,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "stationary_chain",
+  "cycles": 2,
+  "ms": 2.79,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "chain",
+  "cycles": 15,
+  "ms": 2.85,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "grid9x9",
+  "cycles": 15,
+  "ms": 9.12,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "deck_unit_cell",
+  "cycles": 15,
+  "ms": 9.12,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "ladder_2x72",
+  "cycles": 18,
+  "ms": 4.05,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "ring144_24v",
+  "cycles": 120,
+  "ms": 10.73,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "cyclone_base",
+  "cycles": 80,
+  "ms": 4.08,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "cyclone_dual_loop",
+  "cycles": 15,
+  "ms": 2.85,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz16",
+  "device": "h2_racetrack",
+  "cycles": 15,
+  "ms": 2.85,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "stationary_chain",
+  "cycles": 0,
+  "ms": 0.8,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "chain",
+  "cycles": 3,
+  "ms": 0.81,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "grid9x9",
+  "cycles": 3,
+  "ms": 2.08,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "deck_unit_cell",
+  "cycles": 3,
+  "ms": 2.08,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "ladder_2x72",
+  "cycles": 4,
+  "ms": 1.22,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "ring144_24v",
+  "cycles": 24,
+  "ms": 2.39,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "cyclone_base",
+  "cycles": 4,
+  "ms": 0.82,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "cyclone_dual_loop",
+  "cycles": 3,
+  "ms": 0.81,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "ghz4",
+  "device": "h2_racetrack",
+  "cycles": 3,
+  "ms": 0.81,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "stationary_chain",
+  "cycles": 2,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 1 (4)"
+ },
+ {
+  "circuit": "micro",
+  "device": "chain",
+  "cycles": 6,
+  "ms": 0.59,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "grid9x9",
+  "cycles": 6,
+  "ms": 2.21,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "deck_unit_cell",
+  "cycles": 6,
+  "ms": 2.21,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "ladder_2x72",
+  "cycles": 8,
+  "ms": 1.09,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "ring144_24v",
+  "cycles": 46,
+  "ms": 2.73,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "cyclone_base",
+  "cycles": 6,
+  "ms": 0.59,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "cyclone_dual_loop",
+  "cycles": 5,
+  "ms": 0.58,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "micro",
+  "device": "h2_racetrack",
+  "cycles": 5,
+  "ms": 0.58,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "stationary_chain",
+  "cycles": 16,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 11 (15,16,17,18,21,22,23,26)"
+ },
+ {
+  "circuit": "qft8",
+  "device": "chain",
+  "cycles": 62,
+  "ms": 10.71,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "grid9x9",
+  "cycles": 34,
+  "ms": 18.25,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "deck_unit_cell",
+  "cycles": 34,
+  "ms": 18.25,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "ladder_2x72",
+  "cycles": 76,
+  "ms": 15.59,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "ring144_24v",
+  "cycles": 592,
+  "ms": 29.98,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "cyclone_base",
+  "cycles": 68,
+  "ms": 8.64,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "cyclone_dual_loop",
+  "cycles": 349,
+  "ms": 13.35,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "qft8",
+  "device": "h2_racetrack",
+  "cycles": 221,
+  "ms": 12.71,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "stationary_chain",
+  "cycles": 2,
+  "ms": 1.99,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "chain",
+  "cycles": 24,
+  "ms": 2.1,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "grid9x9",
+  "cycles": 22,
+  "ms": 9.49,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "deck_unit_cell",
+  "cycles": 22,
+  "ms": 9.49,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "ladder_2x72",
+  "cycles": 30,
+  "ms": 3.9,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "ring144_24v",
+  "cycles": 234,
+  "ms": 13.18,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "cyclone_base",
+  "cycles": 134,
+  "ms": 3.55,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "cyclone_dual_loop",
+  "cycles": 31,
+  "ms": 2.13,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "rep9_esm",
+  "device": "h2_racetrack",
+  "cycles": 31,
+  "ms": 2.13,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "stationary_chain",
+  "cycles": 14,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 12 (14,15,17,21,22,23,26,27)"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "chain",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "grid9x9",
+  "cycles": 35,
+  "ms": 8.38,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "deck_unit_cell",
+  "cycles": 35,
+  "ms": 8.38,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "ladder_2x72",
+  "cycles": 106,
+  "ms": 7.59,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "ring144_24v",
+  "cycles": 552,
+  "ms": 17.89,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "cyclone_base",
+  "cycles": 57,
+  "ms": 2.19,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "cyclone_dual_loop",
+  "cycles": 442,
+  "ms": 5.32,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "steane_esm",
+  "device": "h2_racetrack",
+  "cycles": 250,
+  "ms": 4.36,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "stationary_chain",
+  "cycles": 17,
+  "status": "unrealised",
+  "detail": "UNREALISED ops: 12 (14,15,19,24,25,26,27,30)"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "chain",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "grid9x9",
+  "cycles": 26,
+  "ms": 7.38,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "deck_unit_cell",
+  "cycles": 26,
+  "ms": 7.38,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "ladder_2x72",
+  "cycles": 85,
+  "ms": 8.81,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "ring144_24v",
+  "cycles": 560,
+  "ms": 18.43,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "cyclone_base",
+  "cycles": 117,
+  "ms": 3.81,
+  "rules": 20,
+  "r10": "passed",
+  "status": "ok"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "cyclone_dual_loop",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ },
+ {
+  "circuit": "surface17_esm",
+  "device": "h2_racetrack",
+  "status": "unroutable",
+  "detail": "  rotation does not apply either: the device has no closed loop with d"
+ }
+]

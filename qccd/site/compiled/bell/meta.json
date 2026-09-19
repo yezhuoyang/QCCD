@@ -1,0 +1,10 @@
+{
+ "id": "bell",
+ "title": "A Bell pair",
+ "note": "the worked example: a Hadamard, a CNOT that needs transport, and two measurements",
+ "compiler": "3 layers, 1 transport cycles, 5 beams, 1 MS, 1 virtual-Z, 11 instructions",
+ "device": "chain4",
+ "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
+ "compile_seconds": 0.04,
+ "check_seconds": 1.6
+}
