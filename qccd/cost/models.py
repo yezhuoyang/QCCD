@@ -409,12 +409,37 @@ class CorrectedModel(CostModel):
             return us
         return us * max(int(n_chain), 2) / n_ref
 
+    #: How many `1q_gate` pulses a Z rotation costs on a machine with no light shift:
+    #: Rx(pi/2) Ry(pi) Rx(pi/2) = Rz(pi), the composition that needs nothing the machine
+    #: does not already have.
+    Z_AS_PULSES = 3
+
     def gate_1q(self, arch: Architecture, gate: str, n: int) -> Charge:
-        # A virtual-Z is a frame update: the controller advances the phase of every later
-        # pulse on that ion and no laser fires, so it takes no time.  It is still a real
-        # operation on the state, which is why it appears in the program at all.
+        """A single-qubit gate, including a Z rotation -- which is NOT free here.
+
+        A "virtual" Z is a frame update: the controller advances the phase of every later
+        pulse on that ion and no laser fires.  That trick needs the phase of the beam
+        reaching THAT ion to be settable on its own, and on a QCCD machine it is not: the
+        beams are shared, so there is no per-ion phase to advance (reported by Ke Sun,
+        2026-09-17, against this page's claim that the turn was free).
+
+        So a Z is a real operation, and there are two ways to do one:
+
+        * a **light-shift gate**, one pulse that turns the qubit about z through any
+          angle.  An architecture that has one declares `z_gate` and is charged for it;
+        * otherwise **Rx(pi/2) Ry(pi) Rx(pi/2)**, which is `Z_AS_PULSES` ordinary pulses
+          and needs no capability beyond the ones every machine here already declares.
+
+        The second is the default because it is the one that is always available: a device
+        is charged the cheap price only when its own document says it can do the cheap
+        thing.
+        """
         if gate == "VZ":
-            return Charge(cost=0.0, depth=1, us=0.0)
+            z = arch.primitives.scalars.get("z_gate")
+            if z:
+                return Charge(cost=0.0, depth=1, us=float(z["us"]))
+            spec = arch.primitives.scalar("1q_gate")
+            return Charge(cost=0.0, depth=1, us=self.Z_AS_PULSES * float(spec["us"]))
         spec = arch.primitives.scalar("1q_gate")
         return Charge(cost=0.0, depth=1, us=float(spec["us"]))
 
