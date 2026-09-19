@@ -48,11 +48,34 @@ from qccd.site.build import tasks  # noqa: E402
 from qccd.viz.render import page_stamp  # noqa: E402
 
 VIZ = ROOT / "qccd" / "viz"
-#: The three files `render.py` inlines into a page, in the order it inlines them.  Kept as
-#: paths rather than as a copy of `render.ENGINE_JS`/`EDITOR_JS` so that a file added to
-#: either tuple without being added here shows up as a gap in this docstring rather than
-#: silently narrowing the check.
-SHIPPED_JS = ("engine.js", "js/edit.js", "js/editor.js", "js/tutorial.js")
+
+
+def _shipped_js() -> tuple[str, ...]:
+    """Every file `render.py` inlines into a page, asked of `render.py`.
+
+    Derived rather than retyped.  This list used to be a literal beside a comment saying
+    that a file added to `ENGINE_JS` without being added here "shows up as a gap in this
+    docstring" -- a note, and a note cannot fail.  `js/transit.js` was added on 2026-09-19
+    and the literal in `test_engine_parity.py` was not updated with it, so that scan
+    checked three of five and a stale `transit.js` would have passed.
+
+    Derivation cannot see a file REMOVED from those tuples, which would narrow the check
+    silently, so the floor below is the positive control: the four that have always been
+    there must still be, and the count must not shrink.
+    """
+    from qccd.viz.render import EDITOR_JS, ENGINE_JS
+    names = tuple(ENGINE_JS) + tuple(EDITOR_JS)
+    core = {"engine.js", "js/edit.js", "js/editor.js", "js/tutorial.js"}
+    missing = sorted(core - set(names))
+    assert not missing, (
+        f"{missing} no longer appear in render.ENGINE_JS/EDITOR_JS. If a file really was "
+        f"dropped, drop it from `core` here in the same change -- otherwise this check has "
+        f"just been narrowed without anyone deciding to narrow it.")
+    assert len(names) >= 5, f"only {len(names)} inlined file(s): {names}"
+    return names
+
+
+SHIPPED_JS = _shipped_js()
 
 
 def _entry_pages() -> list[tuple[str, Path]]:
