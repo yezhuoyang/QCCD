@@ -74,9 +74,7 @@ PALETTE = {
     "dc_well": "#8d080b",    # the well floor of the energized triple
     # ---- zone types, so a t-factory is not a spectator trap -------------
     "zone_data": "#475467",
-    "zone_ancilla": "#4338ca",
     "zone_trap": "#0f766e",
-    "zone_tfactory": "#e4572e",
     "zone_load": "#f6c34a",
     "zone_register": "#7c5bfa",
     "zone_other": "#98a2b3",
@@ -84,6 +82,15 @@ PALETTE = {
     "ion_stroke": "#ffffff",
     "neutral": "#98a2b3",
     "rotate_alt": "#7c5bfa",
+    # ---- the laser, which the picture used to leave out entirely ---------
+    # A gate, a measurement and a state preparation are all a laser doing something to a
+    # particular ion, and a reader could not see which ion or which kind.  One beam on one
+    # ion is a single-qubit pulse; a beam on each of two co-located ions is the entangler
+    # across both.  Blue reads out, green prepares.
+    "beam_one": "#e8890c",
+    "beam_two": "#c2308a",
+    "beam_meas": "#2a78d6",
+    "beam_init": "#12a150",
     "ok_bg": "#e7f5ec",
     "bad_bg": "#fdeceb",
     "warn_bg": "#fdf3d9",
