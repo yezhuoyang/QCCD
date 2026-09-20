@@ -2495,6 +2495,9 @@ const TRANSIT = new QCCDTransit.Transit({
   axis: id => { const a=AXIS[id]; return a ? [a.ux, a.uy] : [1,0]; },
   site: id => SITE_OF[id] || id,
   slotOffsets: (id, k) => slotOffsets(nodeById[id], k),
+  // half the drawn site bar: how far from the node the trap itself still extends
+  span: id => { const n=nodeById[id];
+    return (n && (n.cap||0) > 0) ? siteLen(n.cap)/2 : 0; },
   edgeLen: (a, b) => edgeLen(a, b),
   edgePoint: (a, b, u) => edgePoint(a, b, u),
   get bow(){ return L.swap_bow; },     // `L` is mutated in place by the true-scale toggle
@@ -2863,6 +2866,12 @@ function draw(){
       // no swelling while threading past a trap-mate: it needs the room, not the bulk
       const bulge = (pt.swap||pt.tight) ? 0 : 4*pt.tt*(1-pt.tt);  // 0 at ends, 1 mid-flight
       r = rA + (rB-rA)*pt.tt + (L.r_ion - Math.max(rA,rB))*bulge;
+      // NEVER WIDER THAN THE GAP IT IS THREADING.  The two ends of the interpolation are
+      // the stacks at either end of the walk, so an ion leaving a crowded trap for an
+      // empty one grows to full size while it is still among its old neighbours -- and
+      // covers them.  `transit.js` measures the real distance to the ions this one has to
+      // get past and reports half of it as `room`.
+      if(pt.room) r = Math.min(r, pt.room);
     } else if(pt.pitch) r = Math.min(r, 0.44*pt.pitch);
     if(pt.fly && wells){
       p.w.setAttribute('cx',pt.x); p.w.setAttribute('cy',pt.y); show(p.w);

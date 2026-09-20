@@ -40,6 +40,18 @@ def natural_key(name: str) -> tuple:
     return tuple(int(p) if p.isdigit() else p.lower() for p in _NUM.split(str(name)))
 
 
+def _slot_weights(q, t: float) -> tuple[float, float]:
+    """How much of each end's slot offset applies at this point of the walk."""
+    hops = q[6] if len(q) > 6 else 0
+    if not hops or hops < 2:
+        return 1.0 - t, t
+    if q[5] == 0:
+        return 1.0 - q[4], 0.0
+    if q[5] == hops - 1:
+        return 0.0, q[4]
+    return 0.0, 0.0
+
+
 def _cmp(a: str, b: str) -> int:
     ka, kb = natural_key(a), natural_key(b)
     return -1 if ka < kb else (1 if ka > kb else 0)
@@ -63,6 +75,9 @@ class Geometry:
     edge_point: Callable[[str, str, float], tuple[float, float] | None] | None = None
     #: which PLACE a node is.  Two nodes at one coordinate are one place to the eye.
     site: Callable[[str], str] = lambda i: i
+    #: half the drawn length of a node's site bar -- the scale the detour tapers over.
+    #: Not the slot pitch: a capacity-4 trap is 0.88 g long against a lattice step of g.
+    span: Callable[[str], float] = lambda _i: 0.0
     #: the detour amplitude an ion takes round one it has to get past
     bow: float = 0.0
 
@@ -90,6 +105,9 @@ class Placed:
     pitch_b: float = 0.0
     swap: bool = False
     tight: bool = False
+    #: an upper bound on the mark's radius: half the gap to the nearest ion
+    #: it has to pass, so a mark never covers the neighbour it is getting by
+    room: float = 0.0
     hop: tuple[str, str, float] | None = None   # which hop it is on, and how far along
 
 
@@ -112,6 +130,12 @@ class Transit:
 
     def _site(self, node: str) -> str:
         return self.geom.site(node) or node
+
+    def _span(self, node: str) -> float:
+        try:
+            return float(self.geom.span(node) or 0.0)
+        except Exception:
+            return 0.0
 
     def _slots(self, node: str, k: int) -> tuple[list[float], float]:
         if self.geom.slot_offsets is None:
@@ -155,7 +179,7 @@ class Transit:
             return None
         if len(path) == 1:
             p = self._pos(path[0])
-            return None if p is None else (p[0], p[1], None, None, 0.0)
+            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0)
         u = min(max(t, 0.0), 1.0)
         segs, total = self._hops(path)
         if total <= 1e-9:
@@ -171,8 +195,8 @@ class Transit:
         q = self._edge_point(path[i], path[i + 1], local)
         if q is None:
             p = self._pos(path[i]) or self._pos(path[i + 1])
-            return None if p is None else (p[0], p[1], None, None, 0.0)
-        return (q[0], q[1], path[i], path[i + 1], local)
+            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0)
+        return (q[0], q[1], path[i], path[i + 1], local, i, len(path) - 1)
 
     # ------------------------------------------------------------------ slot order
 
@@ -297,7 +321,10 @@ class Transit:
                         queue.append(nb)
             for c, ion in enumerate(sorted(comp, key=natural_key)):
                 sides[ion] = 1 if c % 2 == 0 else -1
-        return {"pairs": pairs, "side": sides, "kinds": seen}
+        # which ions are trading ends of one run: the one conflict with no on-rail
+        # drawing, and a step R5 refuses, so this is empty on a verified programme
+        exch = {i for p in pairs if p[2] == "exchange" for i in p[:2]}
+        return {"pairs": pairs, "side": sides, "kinds": seen, "exchange": exch}
 
     # ------------------------------------------------------------------ placement
 
@@ -335,7 +362,9 @@ class Transit:
 
         pas = self.passes(step, ord_start, ord_end)
         bow0 = float(self.geom.bow or 0.0)
-        out: dict[str, Placed] = {}
+
+        # ---- pass one: where everyone is before anybody gets out of anybody's way
+        base: dict[str, dict] = {}
         for ion in src:
             walk = step.paths.get(ion)
             ax_, ay_, pa, a_node = slot_at(src[ion], occ_s[src[ion]], ion)
@@ -344,19 +373,11 @@ class Transit:
                 q = self.point_on_path(walk, t)
                 if q is None or not math.isfinite(q[0]):
                     continue
-                sd = pas["side"].get(ion, 0)
-                bow = sd * bow0 * 4 * t * (1 - t) if (sd and bow0) else 0.0
-                dx = dy = 0.0
-                if bow:
-                    axn = self._axis(a_node)
-                    dx, dy = -axn[1] * bow, axn[0] * bow
-                tight = len(ord_start.get(a_node, [])) > 1 or len(ord_end.get(b_node, [])) > 1
-                out[ion] = Placed(
-                    x=q[0] + ax_ + (bx_ - ax_) * t + dx,
-                    y=q[1] + ay_ + (by_ - ay_) * t + dy,
-                    fly=True, node=b_node, t=t, pitch_a=pa, pitch_b=pb,
-                    swap=bool(bow), tight=tight,
-                    hop=(q[2], q[3], q[4]) if q[2] and q[3] else None)
+                # the slot offset belongs to the trap, not to the walk -- see the JS
+                wa, wb = _slot_weights(q, t)
+                base[ion] = dict(x=q[0] + ax_ * wa + bx_ * wb,
+                                 y=q[1] + ay_ * wa + by_ * wb, fly=True, q=q, u=t,
+                                 pa=pa, pb=pb, a=a_node, b=b_node)
             else:
                 p0, p1 = self._pos(a_node), self._pos(b_node)
                 if p0 is None or p1 is None:
@@ -364,7 +385,68 @@ class Transit:
                 u = 1.0 if rest else t
                 x0, y0 = p0[0] + ax_, p0[1] + ay_
                 x1, y1 = p1[0] + bx_, p1[1] + by_
+                base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
+                                 q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node)
+
+        partners: dict[str, list[str]] = {}
+        for a, b, _ in pas["pairs"]:
+            partners.setdefault(a, []).append(b)
+            partners.setdefault(b, []).append(a)
+
+        # THE DETOUR IS EXACTLY AS BIG AS IT HAS TO BE.  See the JS twin for why: an ion
+        # already `clear` of everything it must pass needs no detour and is drawn on the
+        # rail, and one that is closer is lifted by the perpendicular leg that restores
+        # `clear`.  It vanishes on its own at both ends of a walk, so it needs no ramp,
+        # and nothing rests at a junction, so a crossing is drawn on the metal.
+        # less than one slot pitch, or the detour never switches off and an ion is
+        # lifted where it stands -- see the JS twin
+        def clear_of(pitch):
+            return 0.95 * pitch if pitch > 0 else 0.62 * bow0
+        out: dict[str, Placed] = {}
+        for ion, me in base.items():
+            dx = dy = room = 0.0
+            mates = partners.get(ion) or []
+            my_pitch = max(me["pa"], me["pb"])
+            if me["fly"] and mates:
+                sd = pas["side"].get(ion, 1) or 1
+                worst = 0.0
+                for mate in mates:
+                    other = base.get(mate)
+                    if other is None:
+                        continue
+                    # per pair, on the wider of the two traps -- see the JS twin
+                    clear = clear_of(max(my_pitch, other["pa"], other["pb"]))
+                    if clear <= 0:
+                        continue
+                    d = math.dist((me["x"], me["y"]), (other["x"], other["y"]))
+                    if d >= clear:
+                        continue
+                    lift = math.sqrt(max(0.0, clear * clear - d * d))
+                    worst = max(worst, lift)
+                if worst > 0:
+                    axn = self._axis(me["a"])
+                    dx, dy = -axn[1] * sd * worst, axn[0] * sd * worst
+                # and no bigger than the gap it is going through -- see the JS twin
+                gap = math.inf
+                for mate in mates:
+                    o2 = base.get(mate)
+                    if o2 is not None:
+                        gap = min(gap, math.dist((me["x"] + dx, me["y"] + dy),
+                                                 (o2["x"], o2["y"])))
+                if math.isfinite(gap):
+                    room = 0.45 * gap
+            if me["fly"]:
+                tight = (len(ord_start.get(me["a"], [])) > 1
+                         or len(ord_end.get(me["b"], [])) > 1)
+                q = me["q"]
                 out[ion] = Placed(
-                    x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False, node=b_node,
-                    t=u, pitch=(pa + (pb - pa) * u) if (pa and pb) else (pb or pa))
+                    x=me["x"] + dx, y=me["y"] + dy, fly=True, node=me["b"], t=t,
+                    pitch_a=me["pa"], pitch_b=me["pb"], swap=bool(mates), tight=tight,
+                    room=room,
+                    hop=(q[2], q[3], q[4]) if (q and q[2] and q[3]) else None)
+            else:
+                pa, pb, u = me["pa"], me["pb"], me["u"]
+                out[ion] = Placed(
+                    x=me["x"], y=me["y"], fly=False, node=me["b"], t=u,
+                    pitch=(pa + (pb - pa) * u) if (pa and pb) else (pb or pa))
         return out
