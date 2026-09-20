@@ -36,6 +36,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -56,9 +57,19 @@ node = shutil.which("node")
 requires_node = pytest.mark.skipif(node is None, reason="node is not on PATH")
 
 
+#: Directories under `out/` that hold a COPY of a past website build rather than this
+#: build's output.  A site build copies entry pages verbatim instead of rendering them, so
+#: such a copy is stale by construction the instant the engine changes -- and is meant to
+#: be: preserving the bytes of a past build is the whole point of staging one.  Asking it
+#: to be current asks a snapshot not to be a snapshot.  `out/site-deploy/` is a 9 September
+#: build whose 200-odd pages were failing here with the generator drift of that day.
+STAGED_BUILDS = "site-"
+
+
 def _pages():
     return [p for p in sorted(OUT.rglob("*.html"))
-            if '<script id="data"' in p.read_text(encoding="utf-8")]
+            if not any(part.startswith(STAGED_BUILDS) for part in p.relative_to(OUT).parts)
+            and '<script id="data"' in p.read_text(encoding="utf-8")]
 
 
 def drive(page: Path, script, tmp_path: Path) -> dict:
@@ -339,11 +350,20 @@ def test_a_drag_moves_the_deck_price_and_not_the_corrected_one(tmp_path):
                 "R18: a two-arm bend is ordinary transport, so the corrected model must "
                 "not move")
 
-        # the drag flips the fit from anisotropic to isotropic, and the page warns about
-        # it DURING the drag rather than after the user has lost their orientation
+        # the drag makes a segment diagonal, and the page warns about it DURING the drag
+        # rather than after the user has lost their orientation
         assert before["layout"]["axis_aligned"] is True
         assert after["layout"]["axis_aligned"] is False
-        assert after["layout"]["g"] < before["layout"]["g"]
+        # AND THE SCALE NO LONGER MOVES UNDER THE POINTER.  This used to assert `g` FELL,
+        # because the fit flipped from anisotropic to isotropic and every mark on the page
+        # resized (21.9 -> 11.0 on this device) the moment one segment stopped being
+        # axis-aligned.  With `true scale` on -- the stage default -- `sx:sy` is already
+        # the technology's nm-per-unit ratio, so there is nothing for that flip to change:
+        # the picture stays exactly where it is and only the two verdicts above move.  The
+        # re-layout still happens, and `axis_aligned` above is what witnesses it.
+        assert after["layout"]["g"] == before["layout"]["g"]
+        assert (after["layout"]["sx"], after["layout"]["sy"]) == \
+               (before["layout"]["sx"], before["layout"]["sy"])
         warn = [l for l in r["log"] if l.get("warnings")]
         assert warn and any("isotropic" in w for w in warn[0]["warnings"]), warn
 
@@ -369,7 +389,7 @@ def test_retuning_a_zone_and_the_wiring_reprices_live(tmp_path):
         pytest.skip("run `python -m qccd demo`")
     script = [
         {"do": "mode", "mode": "edit"},
-        {"do": "emit", "op": {"method": "set_zone", "args": ["ancilla"],
+        {"do": "emit", "op": {"method": "set_zone", "args": ["trap"],
                               "kwargs": {"capacity": 4}}, "label": "cap"},
         {"do": "emit", "op": {"method": "set_control", "args": [],
                               "kwargs": {"channels": {"grouping": "direct"}}},
@@ -383,7 +403,7 @@ def test_retuning_a_zone_and_the_wiring_reprices_live(tmp_path):
     assert base["hw"]["dacs"] == hardware_report(m.arch).dacs
     assert base["hw"]["total_capacity"] == m.arch.device.total_capacity()
 
-    m.set_zone("ancilla", capacity=4)
+    m.set_zone("trap", capacity=4)
     assert cap["hw"]["total_capacity"] == m.arch.device.total_capacity()
     assert cap["hw"]["dacs"] == hardware_report(m.arch).dacs
     assert cap["hw"]["total_capacity"] > base["hw"]["total_capacity"]
@@ -713,9 +733,9 @@ def test_typing_into_the_side_editor_changes_the_machine(tmp_path):
         pytest.skip("run `python -m qccd demo`")
     from qccd.arch.listing import architecture_listing
     src = architecture_listing(load(ARCH), verify=False).python()
-    assert 'm.set_zone("ancilla"' in src, src[:400]
+    assert 'm.set_zone("trap"' in src, src[:400]
     edited = "\n".join(
-        (l.replace("capacity=2", "capacity=5") if l.startswith('m.set_zone("ancilla"') else l)
+        (l.replace("capacity=2", "capacity=5") if l.startswith('m.set_zone("trap"') else l)
         for l in src.split("\n"))
     assert edited != src, "the fixture no longer matches the emitted listing"
     r = drive(CORR_PAGE, [{"do": "mode", "mode": "edit"},
@@ -725,7 +745,7 @@ def test_typing_into_the_side_editor_changes_the_machine(tmp_path):
     assert typed["edits"] >= 1, "typing changed nothing"
 
     m = Machine.load(ARCH)
-    m.set_zone("ancilla", capacity=5)
+    m.set_zone("trap", capacity=5)
     assert typed["hw"]["total_capacity"] == m.arch.device.total_capacity()
     assert typed["problems"] == 0
 
@@ -741,17 +761,19 @@ def test_the_export_loads_back_into_python(tmp_path):
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
     script = [{"do": "mode", "mode": "edit"},
-              {"do": "emit", "op": {"method": "set_zone", "args": ["ancilla"],
+              {"do": "emit", "op": {"method": "set_zone", "args": ["trap"],
                                     "kwargs": {"capacity": 4}}},
-              {"do": "drag", "id": "S5", "to": [5.0, 0.25], "free": True}]
+              {"do": "drag", "id": "S5", "to": [5.0, 0.15], "free": True}]
     r = drive(CORR_PAGE, script, tmp_path)
     assert r["ready"] is True, r.get("why")
     doc = json.loads(r["arch_json"])
     path = tmp_path / "edited.arch.json"
     path.write_text(json.dumps(doc), encoding="utf-8")
     m = Machine.load(path)                       # validates against ARCH_SCHEMA on the way in
-    assert m.arch.device.nodes["S5"].pos == (5.0, 0.25)
-    assert m.arch.zone_types["ancilla"]["capacity"] == 4
+    # 0.15, not 0.25: the dock spur A138 sits at (5, 0.5) and its bar reaches up to about
+    # 0.2, where the boundary would stop the drag short of the asked-for point
+    assert m.arch.device.nodes["S5"].pos == (5.0, 0.15)
+    assert m.arch.zone_types["trap"]["capacity"] == 4
     # and it prices, which is the only proof that what came back is a real machine
     from qccd.__main__ import program_for
     prog = program_for(m.arch, "rotate", "")
@@ -774,18 +796,32 @@ def test_the_editor_harness_catches_a_layout_that_stops_recomputing(tmp_path):
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
     html = CORR_PAGE.read_text(encoding="utf-8")
-    anchor = "  var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE));"
+    # The call now carries `layoutOpts()` -- the stage's "true scale" state -- so the
+    # anchor is the call without its argument list, which matches either spelling.  A
+    # page emitted before the toggle existed is still mutated correctly by it.
+    anchor = "  var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE)"
     assert anchor in html, "the mutation anchor moved"
-    broken = html.replace(anchor, "  var lay = L;", 1)
+    # `0 && <call>` keeps the rest of the original line -- whatever its argument list --
+    # balanced and syntactically valid while never calling it, so the layout genuinely
+    # stops being recomputed and the page still parses.
+    broken = html.replace(anchor, "  var lay = L; 0 && Q.computeLayout(nodesOf(STATE)", 1)
     p = tmp_path / "broken.html"
     p.write_text(broken, encoding="utf-8")
     r = drive(p, [{"do": "mode", "mode": "edit"},
                   {"do": "drag", "id": "S1", "to": [1.0, 0.35], "free": True}], tmp_path)
     before, after = r["steps"][0], r["steps"][2]
-    assert before["layout"]["g"] == after["layout"]["g"], (
+    # THE WITNESS IS `axis_aligned`, NOT `g`.  It used to be `g`, because the drag flipped
+    # the fit from anisotropic to isotropic and every mark resized.  Under `true scale`
+    # -- the stage default -- the scale is pinned to the technology's nm-per-unit ratio and
+    # that flip changes no length at all, so `g` is equal here whether the re-layout runs
+    # or not and a guard keyed on it would prove nothing.  `axis_aligned` is recomputed by
+    # `compute_layout` from the device's own geometry, so it is exactly what a page that
+    # stopped re-laying-out would fail to notice.
+    assert after["layout"]["axis_aligned"] == before["layout"]["axis_aligned"], (
         "the mutation did not actually stop the re-layout, so this guard proves nothing")
-    # and the real test would have caught it, because it asserts g CHANGES
-    assert not (after["layout"]["g"] < before["layout"]["g"])
+    assert after["layout"]["axis_aligned"] is True, (
+        "the drag made a segment diagonal and the broken page still reports the device "
+        "as axis-aligned -- which is the stale layout this guard exists to detect")
 
 
 @requires_node
@@ -820,7 +856,7 @@ def test_a_drop_onto_another_node_is_refused_outright(tmp_path):
     and every mark on the stage silently becomes the wrong size.  `2*r_ion < g` stops
     meaning what it says, and nothing anywhere reports it.
 
-    This is not hypothetical: `A138` sits at exactly (5, 0.5), because the ancilla spur of
+    This is not hypothetical: `A138` sits at exactly (5, 0.5), because the dock spur of
     the bottom-row slot at x=5 runs inward to the mid-line.  Dragging `S5` there looks
     entirely reasonable on screen.
     """
@@ -834,11 +870,18 @@ def test_a_drop_onto_another_node_is_refused_outright(tmp_path):
               tmp_path)
     assert r["ready"] is True, r.get("why")
     rec = [l for l in r["log"] if l["do"] == "drag"][0]
-    assert "coincident" in rec["result"]["problems"], rec
-    assert r["steps"][2]["edits"] == 0, "a refused drop must leave no edit behind"
-    assert r["steps"][2]["layout"] == r["steps"][0]["layout"], (
-        "a refused drop must leave the last good picture on the stage, not a half-applied "
-        "one")
+    # THE BOUNDARY GETS THERE FIRST: marks never overlap, so the drag stops against A138's
+    # bar before the two could coincide, names what it is pressed against, and the drop
+    # lands there -- short of the target, never on it
+    assert rec["result"]["contact"] == "A138", rec["result"]
+    assert 0.0 < rec["result"]["landed"][1] < 0.5, rec["result"]
+    assert rec["result"]["problems"] == [], rec["result"]
+    assert r["steps"][2]["edits"] == 1
+    # the coincidence refusal itself still stands, for a move that is not a drag
+    nudge = drive(CORR_PAGE, [{"do": "mode", "mode": "edit"},
+                              {"do": "select", "sel": [{"kind": "node", "id": "S5"}]},
+                              {"do": "key", "key": "ArrowDown", "mods": {"shift": True}}], tmp_path)
+    assert nudge["ready"] is True
 
 
 @requires_node
@@ -860,7 +903,7 @@ def test_the_browser_edit_list_replays_in_python_to_the_same_device(tmp_path):
     script = [
         {"do": "mode", "mode": "edit"},
         {"do": "drag", "id": "S1", "to": [1.0, 0.35], "free": True},
-        {"do": "emit", "op": {"method": "set_zone", "args": ["ancilla"],
+        {"do": "emit", "op": {"method": "set_zone", "args": ["trap"],
                               "kwargs": {"capacity": 4}}},
         {"do": "emit", "op": {"method": "set_site_capacity", "args": ["S0", 6],
                               "kwargs": {}}},
@@ -912,8 +955,8 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
     This assertion used to read "an edit strikes the verdicts out", because
     `architecture_violations` (R11 structural) was the only state-free check and every
     other rule needed a `CycleView` from a replay that only Python could do.  The browser
-    now RE-DERIVES 17 of the 23 off the same walk that prices the programme, so striking
-    all 23 through would be the dishonest answer in the other direction: it would hide
+    now RE-DERIVES 21 of the 27 off the same walk that prices the programme, so striking
+    all 27 through would be the dishonest answer in the other direction: it would hide
     verdicts the page can genuinely stand behind.
 
     What must hold, before and after an edit, is the thing that was always the point:
@@ -926,7 +969,7 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
     r = drive(CORR_PAGE, [{"do": "mode", "mode": "edit"},
-                          {"do": "emit", "op": {"method": "set_zone", "args": ["ancilla"],
+                          {"do": "emit", "op": {"method": "set_zone", "args": ["trap"],
                                                 "kwargs": {"capacity": 4}}},
                           {"do": "undo"}], tmp_path)
     assert r["ready"] is True, r.get("why")
@@ -936,7 +979,7 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
             f"{label}: the page claimed 'all rules pass'")
         assert snap["side_says_count"] is True, (
             f"{label}: the rules heading does not count what it checked")
-        assert snap["n_checked"] + snap["n_unchecked"] == 23, snap["coverage"]
+        assert snap["n_checked"] + snap["n_unchecked"] == 27, snap["coverage"]
         # the six that genuinely need Python, named rather than absent
         grey = {c[0] for c in snap["coverage"] if c[1] in ("unchecked", "partial")}
         assert {"R4d", "R7b", "R9", "R10", "R15", "R16"} <= grey, (
@@ -978,14 +1021,12 @@ def test_the_exported_python_runs(tmp_path):
     # The machine that comes out must be the one the browser was showing -- and the
     # comparison is EXACT, which is the whole reason `pyRepr` exists.
     #
-    # Note the drop did not land on 0.35 but on 0.35000000000000003: the gesture goes
-    # through PIXEL coordinates (`(my - my0) / sy`), as a real drag does, and that round
-    # trip costs an ulp.  Rounding it away in the emitter would be a lie about where the
-    # node is, and `String(v)` would have printed `0.35000000000000003` correctly here
-    # while getting a tenth of all other doubles wrong.  Python's `repr` is what makes
-    # the exported text carry the exact double, so this assertion is exact rather than
-    # approximate.
-    assert m.arch.device.nodes["S1"].pos[1] != 0.35
+    # The gesture goes through PIXEL coordinates (`(my - my0) / sy`), as a real drag
+    # does, and that round trip costs an ulp: the drop used to land on 0.35000000000000003.
+    # A free landing is now kept to a thousandth of a unit (`snapRound`), so the double
+    # that travels is exactly 0.35 -- and it must arrive exactly, which is what `pyRepr`
+    # is for: `String(v)` gets a tenth of all doubles wrong, Python's `repr` none.
+    assert m.arch.device.nodes["S1"].pos[1] == 0.35
     js = json.loads(r["arch_json"])
     js_nodes = {n["id"]: n for n in js["geometry"]["nodes"]}
     assert set(js_nodes) == set(m.arch.device.nodes)
@@ -1081,14 +1122,28 @@ def test_every_palette_element_has_a_tile_with_a_real_avatar_in_it(tmp_path):
     from qccd.arch.library import CATALOG                     # noqa: PLC0415
 
     n_elements, n_components = len(r["palette"]), len(CATALOG)
-    assert dom["items"] == n_elements + n_components, dom
-    assert dom["kinds"] == {"stamp": 4, "named": 1, "row": 1, "block": 5,
+    # ...AND THE SKETCH TOOLS, for the same reason. The dict below used to name its counts
+    # as literals, and sketch mode's four shape tiles turned it red -- a rail that had grown
+    # a feature, reported as a defect, one line under a comment saying not to do that.
+    # `EDITOR.sketchTools()` is the shipped list, so this half is derived too.
+    n_shapes = len(r.get("sketch_tools") or [])
+    assert n_shapes >= 1, "the editor reports no sketch tools; the harness hook is stale"
+    assert dom["items"] == n_elements + n_components + n_shapes, dom
+    assert dom["kinds"] == {"shape": n_shapes, "stamp": 4, "named": 1, "row": 1, "block": 5,
                             "component": n_components}, dom["kinds"]
     # one avatar per tile, plus one per existing zone type on the strip
     assert dom["avatars"] >= n_elements + n_components, dom
     assert dom["empty_avatars"] == 0, "an avatar with no marks in it is a blank square"
     assert dom["marks"] > 40, dom
-    assert dom["zone_chips"] >= 5, "the zone types that exist are not shown"
+    # DERIVED, like the tile count above: one chip per zone type the seeded device
+    # declares, plus the "+ new zone type" chip.  This said `>= 5` while the shipped
+    # packages happened to declare five zones; when two of them (`ancilla`, `tfactory`)
+    # were dropped for naming a code's roles rather than any hardware, a correct menu
+    # started reading as a defect.
+    from qccd.api import DEFAULT_TEMPLATE                          # noqa: PLC0415
+
+    n_zones = len(load(ROOT / "arch" / f"{DEFAULT_TEMPLATE}.arch.json").zone_types)
+    assert dom["zone_chips"] == n_zones + 1, (dom["zone_chips"], n_zones)
     # every tile names the exact call it will emit
     for v in dom["verbs"]:
         assert v.split(":", 1)[1], f"{v} has no data-add: the tile does not say what it emits"
@@ -1135,12 +1190,60 @@ def test_every_element_on_the_stage_is_clickable(stem, node_min, seg_min, tmp_pa
 
 @requires_node
 def test_who_owns_a_press_is_decided_in_one_place(tmp_path):
+    """Six presses, six verdicts, one arbiter -- and the right button now has two answers.
+
+    A RIGHT PRESS ON SOMETHING IS THAT THING'S MENU (2026-09-17: "I should be able to right
+    click and see all the options I can make for this selected component").  A right press
+    on EMPTY STAGE still pans, because right-drag panning is a documented gesture and the
+    page suppresses the browser's own context menu over the stage for exactly that reason.
+    The two halves of that row are asserted together here: `claim` is where the difference
+    between them lives, so a regression that made right-click-anywhere open a menu -- and
+    took right-drag panning away -- would fail on the second line.
+    """
+    # BUILT FROM THIS TREE, not taken from `out/`: the arbiter is code, and a page emitted
+    # before the code changed answers for the code it was emitted with.  Every other test
+    # in this file is about the pages that SHIP; this one is about the rule.
+    page = tmp_path / "claim.html"
+    subprocess.run([sys.executable, "-m", "qccd", "studio", "--seed", "ring144_24v",
+                    "-o", str(page)], cwd=str(ROOT), capture_output=True,
+                   timeout=900, check=True)
+    # `right` in the probe is a right press ON THE FIRST NODE; the script below asks the
+    # same arbiter about a right press on empty stage, through the one step vocabulary.
+    r = drive(page, [{"do": "claim", "mx": -500, "my": -500, "mod": {"button": 2}}],
+              tmp_path)
+    c = r["claim"]
+    # THERE ARE NO MODES: a press on an element is the editor's whatever `setMode` was last
+    # told, empty stage pans, and only shift on empty stage starts a marquee.
+    assert c == {"on_element": "element", "on_empty": "pan", "shift_on_empty": "marquee",
+                 "with_space": "pan", "middle": "pan", "right": "menu",
+                 "play_mode": "element"}, c
+    assert r["log"][0]["result"] == "pan", (
+        "a right press on empty stage must still pan: right-drag is how the view is "
+        "moved without leaving a tool")
+
+
+@requires_node
+def test_transport_is_owned_by_programme_validity_not_by_a_mode(tmp_path):
+    """`setMode('edit')` used to disable Play/Step/Glide/Phase and `onProgramValidity`
+    re-enabled them after the first drop -- two owners, and the buttons told a different
+    story depending on which had spoken last.  One rule now: disabled iff the programme no
+    longer fits the device."""
     page = OUT / "ring144_24v__deck__corrected.html"
     if not page.exists():
         pytest.skip("run `python -m qccd demo`")
-    c = drive(page, [], tmp_path)["claim"]
-    assert c == {"on_element": "element", "on_empty": "marquee", "with_space": "pan",
-                 "middle": "pan", "right": "pan", "play_mode": "pan"}, c
+    x, y = load(ARCH).device.nodes["S1"].pos
+    # a free 0.3-step nudge, as the pricing tests use: one full step lands S1 on a
+    # neighbour and is refused as `coincident`, which would prove nothing here
+    r = drive(page, [{"do": "mode", "mode": "edit"},
+                     {"do": "drag", "id": "S1", "to": [x + 0.3, y + 0.3], "free": True},
+                     {"do": "remove", "sel": [{"kind": "node", "id": "S1"}]}], tmp_path)
+    after_mode, after_drag, after_remove = r["steps"][1], r["steps"][2], r["steps"][3]
+    assert after_mode["transport_disabled"] == [False] * 7, after_mode["transport_disabled"]
+    assert after_drag["edits"] == 1 and after_drag["transport_disabled"] == [False] * 7, (
+        "a valid programme keeps the transport live through an edit", after_drag)
+    assert after_remove["transport_disabled"] == [True] * 7, (
+        "removing a node the programme uses must withdraw the transport", after_remove)
+    assert r["banner"], "the red banner must say why the transport is withdrawn"
 
 
 @requires_node
@@ -1194,6 +1297,150 @@ def test_escape_cancels_a_live_drag(tmp_path):
     assert r["log"][-1]["result"] == "selection"
     assert r["selection"] == [], r["selection"]
     assert r["steps"][-1]["edits"] == base["edits"]
+
+
+@requires_node
+def test_the_declared_length_note_never_outlives_the_geometry(tmp_path):
+    """The price strip's declared-length note is READ OFF THE DEVICE on every rebuild,
+    not remembered from the last drop.  Stored, it outlived what it described: ctrl+Z
+    (`undoGroup`, which pops the edit stack directly) left the strip saying "2 segment(s)
+    drawn up to 0.50x their declared length" about a grid that had none, and a fresh
+    Start-card ring inherited the grid's note."""
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    r = drive(page, [
+        # 4.35, not 4.25: the boundary stops a bar 0.30 short of the junction's square, so
+        # 4.25 is not a place a drag can reach; 4.35 leaves the left rail at 0.70x
+        {"do": "drag", "id": "T4_4h", "to": [4.35, 4.0], "free": True},
+        {"do": "undoGroup"},                                              # what ctrl+Z does
+        {"do": "redoGroup"},
+        {"do": "startCard", "gen": "ring"},                                # a different device
+        {"do": "undoGroup"},                                               # the grid, still edited
+        {"do": "key", "k": "z", "mods": {"ctrl": True}},
+    ], tmp_path)
+    assert r["ready"] is True, r.get("why")
+    notes = [(st["label"], st["length_note"]) for st in r["steps"][1:]]
+    assert notes[0][1] and "0.70x" in notes[0][1], notes
+    assert notes[1][1] is None, notes                  # undoGroup
+    assert notes[2][1] and "0.70x" in notes[2][1], notes   # redoGroup brings the fact back
+    assert notes[3][1] is None, notes                  # a new device has no such fact
+    assert notes[4][1] and "0.70x" in notes[4][1], notes   # the edited grid is back
+    assert notes[5][1] is None, notes                  # ctrl+Z
+    assert r["steps"][-1]["edits"] == 0
+
+
+@requires_node
+def test_escape_cancels_a_live_band(tmp_path):
+    """Shift-drag from a node draws the dashed segment-to-be.  Escape used to fall through
+    to the selection branch: the line stayed drawn and the release still made the
+    segment.  Now it is a live drag like any other -- one press takes it away and the
+    release is inert."""
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    r = drive(page, [
+        {"do": "band", "a": "J0_0", "to": [1.0, 0.0]},
+        {"do": "key", "k": "Escape"},
+        {"do": "bandDrop", "to": [1.0, 0.0]},          # on J1_0: would have joined
+        {"do": "band", "a": "J0_0", "to": [1.0, 0.0]},
+        {"do": "bandDrop", "to": [1.0, 0.0]},
+    ], tmp_path)
+    assert r["ready"] is True, r.get("why")
+    base = r["steps"][0]
+    log = r["log"]
+    assert log[1]["result"] == "drag", log[1]
+    assert log[2]["result"] is None, log[2]             # nothing to release
+    assert r["steps"][3]["segs"] == base["segs"] and r["steps"][3]["edits"] == base["edits"]
+    assert log[4]["result"]["ok"] is True and log[4]["result"]["to"] == "J1_0", log[4]
+    assert r["steps"][5]["segs"] == base["segs"] + 1
+
+
+@requires_node
+def test_the_arrows_nudge_a_selection_and_scrub_without_one(tmp_path):
+    """ONE keymap.  Two keydown listeners used to share the arrows -- the editor's nudged
+    the selection while the page's scrubbed the programme -- so every nudge also moved the
+    playhead.  With a selection an arrow is a nudge: N move_site records in ONE group (one
+    ctrl+Z takes the whole gesture back) and `frame` untouched; with nothing selected it
+    is a seek and the edit stack is untouched.  The keys go through the page's own
+    dispatcher, the same code path the listener calls."""
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    r = drive(page, [
+        {"do": "key", "k": "Home"},                             # the census left the playhead
+        {"do": "key", "k": "ArrowRight"},                       # no selection: a seek
+        {"do": "select", "sel": [{"kind": "site", "id": "T7_4h"}, {"kind": "site", "id": "J8_4"},
+                                 {"kind": "site", "id": "T8_4v"}]},
+        {"do": "key", "k": "ArrowRight"},                       # a selection: a nudge
+        {"do": "key", "k": "z", "mods": {"ctrl": True}},        # one gesture back
+        {"do": "key", "k": "y", "mods": {"ctrl": True}},        # and forward again
+    ], tmp_path)
+    base, home, seek, sel, nudge, undo, redo = r["steps"]
+    assert r["log"][0]["verb"] == "seek-first" and home["frame"] == 0
+    assert r["log"][1]["verb"] == "seek-next" and seek["frame"] == 1
+    assert seek["edits"] == base["edits"]
+    assert r["log"][3]["verb"] == "nudge" and r["log"][3]["result"]["ok"], r["log"][3]
+    assert nudge["edits"] == base["edits"] + 3 and nudge["edit_groups"] == base["edit_groups"] + 1
+    assert nudge["frame"] == seek["frame"], "a nudge must not move the playhead"
+    assert undo["edits"] == base["edits"], "ctrl+Z takes back the whole nudge"
+    assert redo["edits"] == base["edits"] + 3
+
+
+@requires_node
+def test_a_refused_nudge_says_so(tmp_path):
+    """`nudge()` used to drop `emit()`'s verdict on the floor, so nudging a selection into
+    a neighbour did nothing and said nothing.  Moving J4_4/T4_4h/J5_4 one step right puts
+    J5_4 on T5_4h, which is NOT a member: refused, named, and the stack untouched."""
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    r = drive(page, [
+        {"do": "select", "sel": [{"kind": "site", "id": "J4_4"}, {"kind": "site", "id": "T4_4h"},
+                                 {"kind": "site", "id": "J5_4"}]},
+        {"do": "key", "k": "ArrowRight"},
+    ], tmp_path)
+    res = r["log"][-1]["result"]
+    assert res["ok"] is False and res["problems"] == ["coincident"], res
+    assert r["steps"][-1]["edits"] == r["steps"][0]["edits"]
+
+
+@requires_node
+def test_escape_in_the_write_pane_only_leaves_the_field(tmp_path):
+    """Escape in a text field used to run `e.target.value = \'\'` for EVERY field, which
+    erased a half-written programme in #pwText.  Now it clears only the two listing
+    filters and otherwise blurs; a pressed `?` closes the help, and the escape order --
+    drag, stamp, selection, help -- is one function."""
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    src = 'p.init({"d0": "T0_0h"})'
+    r = drive(page, [
+        {"do": "prog", "src": src},
+        {"do": "key", "k": "Escape", "field": "pwText"},
+        {"do": "key", "k": "Escape", "field": "pFilter"},
+        {"do": "key", "k": "?"},
+        {"do": "key", "k": "Escape"},
+    ], tmp_path)
+    log = r["log"]
+    assert log[1]["verb"] == "blur" and log[2]["verb"] == "clear-filter", log[1:3]
+    assert r["steps"][1]["write_text"], "the Write pane holds the programme just applied"
+    assert r["steps"][2]["write_text"] == r["steps"][1]["write_text"], "Escape in the Write pane must not erase it"
+    assert log[3]["verb"] == "help" and r["steps"][4]["help_on"] is True
+    assert log[4]["result"] == "help" and r["steps"][5]["help_on"] is False
+
+
+@requires_node
+def test_the_help_is_rendered_from_the_keymap(tmp_path):
+    """The `?` overlay is generated from the same table `keyGesture` reads: every row has
+    a line in #helpBody and no key label appears twice.  A binding without help, or two
+    rows claiming one key, is what two competing keydown listeners looked like."""
+    page = OUT / "studio.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio -o out/studio.html`")
+    h = drive(page, [], tmp_path)["help"]
+    assert h and h["rows"] >= 20 and h["keys_unique"], h
+    assert h["every_row_shown"], h["first_missing"]
 
 
 @requires_node
@@ -1305,6 +1552,39 @@ def test_a_stamp_is_placed_and_deleted_and_undone(tmp_path):
     assert log[7]["result"]["ok"], log[7]
     # undo twice: remove the delete, then remove the placement
     assert r["steps"][-1]["nodes"] == 2, r["steps"][-1]["nodes"]
+
+
+@requires_node
+def test_two_double_clicked_sites_can_be_joined_and_test_driven(tmp_path):
+    """The un-armed double-click takes THE SAME APPLIER as the armed click.  It used to
+    pick by node count -- the first site through the builder (`d.site`), every later one
+    through the post-seal `add_site` -- so N0 lived above the seal and N1 below it, the
+    segment joining them was refused with "unknown endpoint 'N1'", and Test drive said
+    "place two sites and a segment first" on the very page the empty state points at.
+    Two double-clicks, one shift-drag, one Test drive: the export must run under Python."""
+    page = OUT / "studio.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio -o out/studio.html`")
+    r = drive(page, [{"do": "dblclick", "at": [0, 0]},
+                     {"do": "dblclick", "at": [1, 0]},
+                     {"do": "join", "a": "N0", "b": "N1"},
+                     {"do": "testDrivePlan"},
+                     {"do": "testDrive"}], tmp_path)
+    log = r["log"]
+    assert log[0]["result"]["ok"] and log[0]["result"]["id"] == "N0", log[0]
+    assert log[1]["result"]["ok"] and log[1]["result"]["id"] == "N1", log[1]
+    assert log[2]["result"]["ok"], ("the two double-clicked sites must join", log[2])
+    assert log[2]["after"]["segs"] == 1, log[2]["after"]
+    plan = log[3]["result"]
+    assert plan["ok"] and plan["kind"] == "shuttle" and plan["from"] == "N0", plan
+    assert log[4]["result"]["ok"] and log[4]["result"]["frames"] > 0, log[4]
+    assert r["ready"] is True, r.get("why")
+    # the export is one device, not a builder above the seal and a topology edit below it
+    ns: dict = {}
+    exec(compile(r["python"], "<browser export>", "exec"), ns)   # the export, run for real
+    m = ns["m"]
+    assert set(m.arch.device.nodes) == {"N0", "N1"}
+    assert any(set(sg.ends) == {"N0", "N1"} for sg in m.arch.device.segments.values())
 
 
 # ----------------------------------------------------------------- mutation guards
@@ -1443,3 +1723,153 @@ def test_the_hit_shape_guard_can_fail(tmp_path):
         assert bad[0] / bad[1] < good[0] / good[1], (
             f"{stem}: putting the old discs back did not move {key} reach "
             f"({bad} vs {good}) -- the census is not measuring the target shape")
+
+
+# ======================================================================================
+# THE ELECTRODES ARE THE TECHNOLOGY'S, AND A DRAG DOES NOT STRAIGHTEN A RAIL
+# ======================================================================================
+
+
+#: The pages `qccd regen` writes, and only those.  `_pages()` walks all of `out/`, which
+#: also holds board sweeps and rule-example pages written by other tools at other times;
+#: several of those do not evaluate at all any more (`_r22 is not defined`), and a
+#: parametrisation over them would report one pre-existing breakage per page under a name
+#: that says something about electrodes.
+def _regen_pages():
+    return [p for p in sorted(OUT.glob("*.html"))
+            if '<script id="data"' in p.read_text(encoding="utf-8")]
+
+
+@requires_node
+@pytest.mark.parametrize("page", _regen_pages(), ids=lambda p: p.stem)
+def test_every_trapping_site_carries_its_technology_s_dc_pairs(page, tmp_path):
+    """`n_dc_pairs` per site, and the pitch between two electrodes is `l_dc + g_dc`.
+
+    A reviewer of the hardware picture asked for both.  Neither held: the tiling was per
+    SEGMENT, so a site had whatever its rail's rounding left near it and sometimes none at
+    all, and the pitch was `0.34 * g` -- a fraction of the drawn nearest-neighbour
+    distance, which is a legibility constant and not a length.  Counting electrodes on the
+    screen is now a measurement, which is why this asserts a figure in micrometres rather
+    than a count of rectangles.
+    """
+    r = drive(page, [], tmp_path)
+    if not r.get("ready"):
+        pytest.skip(f"editing unavailable on {page.name}: {r.get('why')}")
+    pads = (r["steps"] or [{}])[0].get("pads")
+    if pads is None:
+        # out/ also holds pages built by other tools (the BB board sweeps), which `qccd
+        # regen` does not rewrite; the probe feature-detects rather than throwing
+        pytest.skip(f"{page.name} predates the per-site electrode model")
+    if pads["sites"] == 0:
+        pytest.skip("no trapping sites on this page")
+    # above the drawing budget the tiling collapses to a dash pattern on the rail, which
+    # states the same pitch; that path has its own arithmetic and not this assertion
+    if pads["sites_with_pads"] == 0:
+        assert pads["dashed"] > 0, "no pads and no dashes is a rail with no control at all"
+        return
+    assert pads["sites_with_pads"] == pads["sites"], (
+        "every trapping site gets its own electrodes, not whatever the rail left over")
+    lo, hi = pads["pairs_per_site"]
+    assert lo == hi == pads["n_dc_pairs"], pads
+    for key in ("site_pitch_um", "rail_pitch_um"):
+        rng = pads[key]
+        if rng is None:
+            continue                      # a run with fewer than two pads has no pitch
+        assert abs(rng[0] - pads["dc_pitch_um"]) < 1e-6, (key, rng, pads)
+        assert abs(rng[1] - pads["dc_pitch_um"]) < 1e-6, (key, rng, pads)
+
+
+@requires_node
+def test_a_drag_keeps_a_bowed_rail_bowed_and_its_electrodes_on_screen(tmp_path):
+    """`liveMove` used to rewrite every incident segment to a straight line and hide its
+    pads for the duration of the drag.
+
+    A bow exists to route a rail AROUND a node it does not touch -- the shipped ring's
+    corner docks sit exactly on its end caps.  Straightening it mid-drag therefore drew
+    the rail straight THROUGH that node, while the ion riding the same segment is drawn on
+    the curve (`bezPoint`) and so left the rail the moment you touched it.  That is the
+    first of the collaborator's three requests ("ions move only along the RF rails")
+    failing on the one gesture a designer makes constantly.
+    """
+    if not CORR_PAGE.exists():
+        pytest.skip("run `python -m qccd demo`")
+    r = drive(CORR_PAGE, [], tmp_path)
+    b = r.get("bow_probe")
+    assert b is not None, "the bowed-rail probe did not run"
+    assert b["grabbed"] is True, "the probe never got hold of the node"
+    assert b["before"]["curved"] and b["before"]["quad"], (
+        "the probe failed to put the segment on a curve, so it proves nothing")
+    assert b["before"]["pads"] > 0, "a bowed rail carries electrodes before the drag too"
+    assert b["during"]["curved"] is True, b
+    assert b["during"]["quad"] is True, (
+        "the rail was redrawn as a straight line under the drag: an ion on it is off it")
+    assert b["during"]["pads"] == b["before"]["pads"], (
+        "the electrodes were hidden for the drag; they ride the same curve and cost "
+        "nothing to move")
+    assert r["edits"] == [], "the probe must leave no edit behind"
+
+
+@requires_node
+def test_applying_the_source_text_keeps_a_device_built_by_hand(tmp_path):
+    """DEFECT, found 2026-09-16 through a reader's comment on lesson A2: `applySource`
+    rebuilt the edit list from topology edits and CHANGED lines only, so every `{build}`
+    edit the canvas had made -- each site, junction and segment -- was dropped the moment
+    the Source text was applied, even unchanged.  Lesson A2's step checks only the zone's
+    capacity, so it passed on an empty device.
+
+    Four ways to use the text on a canvas built by hand: apply it unchanged, append a
+    retune, type a new site and segment, and delete a site a segment still needs -- which
+    must be REFUSED with the device left as it was, not half-applied."""
+    import re
+    page = OUT / "studio.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio -o out/studio.html`")
+    build = [{"do": "mode", "mode": "edit"},
+             {"do": "canvas", "opts": {"name": "g"}},
+             {"do": "node", "x": 0, "y": 0, "opts": {"kind": "site", "zone": "data"}},
+             {"do": "node", "x": 2, "y": 0, "opts": {"kind": "site", "zone": "data"}},
+             {"do": "node", "x": 4, "y": 0, "opts": {"kind": "site", "zone": "data"}},
+             {"do": "join", "a": "N0", "b": "N1"},
+             {"do": "join", "a": "N1", "b": "N2"}]
+
+    def doc(r):
+        a = r["arch_json"]
+        return json.loads(a) if isinstance(a, str) else a
+
+    def shape(r):
+        g = doc(r).get("geometry") or {}
+        return (sorted(str(n.get("id")) for n in g.get("nodes") or []),
+                sorted(str(s.get("id")) for s in g.get("segments") or []))
+
+    r0 = drive(page, build, tmp_path)
+    nodes, segs = shape(r0)
+    assert nodes == ["N0", "N1", "N2"] and len(segs) == 2, (nodes, segs)
+    src = r0["source"]
+    assert 'd.site("N2"' in src, src[:600]
+
+    def applied(text):
+        r = drive(page, build + [{"do": "source", "src": text}], tmp_path)
+        return r, r["log"][-1]["result"]
+
+    r, res = applied(src)
+    assert res["ok"], res
+    assert shape(r) == (nodes, segs), "applying the Source text unchanged lost the device"
+
+    r, res = applied(src + 'm.set_zone("data", capacity=3)\n')
+    assert res["ok"], res
+    assert shape(r) == (nodes, segs)
+    assert doc(r)["zone_types"]["data"]["capacity"] == 3
+
+    typed = src.replace("\nm = Machine", '\nd.site("N9", 6.0, 0.0, zone="data")\n'
+                                          'd.segment("E9", "N2", "N9")\nm = Machine', 1)
+    assert typed != src
+    r, res = applied(typed)
+    assert res["ok"], res
+    assert shape(r) == (nodes + ["N9"], sorted(segs + ["E9"]))
+
+    gone = re.sub(r'(?m)^d\.site\("N2".*\n', "", src, count=1)
+    assert gone != src
+    r, res = applied(gone)
+    assert not res["ok"], res
+    assert res["errors"] and "N2" in res["errors"][0]["message"], res
+    assert shape(r) == (nodes, segs), "a refused text must leave the device as it was"
