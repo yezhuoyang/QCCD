@@ -483,7 +483,7 @@
     var self = this;
     var pos = step.pos || {}, paths = step.paths || {};
     var ordStart = step.ordStart || {}, ordEnd = step.ordEnd || {};
-    var srcOf = {}, dstOf = {}, occS = {}, occ = {};
+    var srcOf = {}, dstOf = {}, occS = {}, occ = {}, srcNode = {}, dstNode = {};
     for (var ion in pos) {
       var path = paths[ion];
       // the PLACE each end is, not the node: two traps at one coordinate are one stack
@@ -491,6 +491,8 @@
       var b = self.site(path ? path[path.length - 1] : pos[ion]);
       if (!self.pos(a) || !self.pos(b)) continue;
       srcOf[ion] = a; dstOf[ion] = b;
+      srcNode[ion] = path ? path[0] : pos[ion];
+      dstNode[ion] = path ? path[path.length - 1] : pos[ion];
       (occS[a] || (occS[a] = [])).push(ion);
       (occ[b] || (occ[b] = [])).push(ion);       // occupancy at the END of the step
     }
@@ -517,15 +519,31 @@
       var key = id + "\u0000" + k;
       return slots[key] || (slots[key] = self.slotOffsets(id, k));
     };
-    var slotAt = function (id, list, at) {
-      var k = list.length, s = slotsFor(id, k), ax = self.axis(id), o = s.off[at] || 0;
-      return { ox: ax[0] * o, oy: ax[1] * o, pitch: k > 1 ? s.pitch : 0, node: id };
+    // THE STACK BELONGS TO THE PLACE, THE DIRECTION BELONGS TO THE NODE.
+    //
+    // Grouping by place is what lets two traps at one coordinate share a slot stack, and
+    // that is right.  Taking the slot AXIS from the place's representative is not: on a
+    // device that piles several nodes on one point -- `28_tanner_own` has 168 such groups,
+    // 1,440 nodes at 834 positions -- the representative can be any of them, and its axis
+    // points along its own rail rather than the one this ion is riding.  `K68_70` is
+    // represented by `K27_111`, whose axis is [0.817, 0.577]; that was exactly the
+    // direction of a 0.19 g stray on an ion with no conflict and no detour.  So the
+    // number of slots and the pitch come from the place, and the direction from the ion's
+    // own node.
+    var slotAt = function (place, node, list, at) {
+      var k = list.length, s = slotsFor(place, k), ax = self.axis(node), o = s.off[at] || 0;
+      return { ox: ax[0] * o, oy: ax[1] * o, pitch: k > 1 ? s.pitch : 0,
+               node: place, axisNode: node };
     };
     var A = {}, B = {};
-    for (var p1 in occS) for (var i1 = 0; i1 < occS[p1].length; i1++)
-      A[occS[p1][i1]] = slotAt(p1, occS[p1], i1);
-    for (var p2 in occ) for (var i2 = 0; i2 < occ[p2].length; i2++)
-      B[occ[p2][i2]] = slotAt(p2, occ[p2], i2);
+    for (var p1 in occS) for (var i1 = 0; i1 < occS[p1].length; i1++) {
+      var a1 = occS[p1][i1];
+      A[a1] = slotAt(p1, srcNode[a1], occS[p1], i1);
+    }
+    for (var p2 in occ) for (var i2 = 0; i2 < occ[p2].length; i2++) {
+      var b2 = occ[p2][i2];
+      B[b2] = slotAt(p2, dstNode[b2], occ[p2], i2);
+    }
 
     var rec = {
       before: step.before, pos: step.pos, paths: step.paths,
@@ -658,7 +676,7 @@
           if (lift > worst) worst = lift;
         }
         if (worst > 0) {
-          var ax2 = self.axis(A.node);
+          var ax2 = self.axis(A.axisNode || A.node);
           bx = -ax2[1] * sd * worst; by = ax2[0] * sd * worst;
           lifted = true;
         }
