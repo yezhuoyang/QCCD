@@ -2498,6 +2498,11 @@ const TRANSIT = new QCCDTransit.Transit({
   // half the drawn site bar: how far from the node the trap itself still extends
   span: id => { const n=nodeById[id];
     return (n && (n.cap||0) > 0) ? siteLen(n.cap)/2 : 0; },
+  // half the site bar's thickness: all the room there is ACROSS a trap
+  across: id => { const n=nodeById[id];
+    return (n && (n.cap||0) > 0) ? L.site_t/2 : 0; },
+  // and half a rail's, which is all there is out between the traps
+  rail: L.sw_rail/2,
   edgeLen: (a, b) => edgeLen(a, b),
   edgePoint: (a, b, u) => edgePoint(a, b, u),
   get bow(){ return L.swap_bow; },     // `L` is mutated in place by the true-scale toggle
@@ -2872,7 +2877,13 @@ function draw(){
       // covers them.  `transit.js` measures the real distance to the ions this one has to
       // get past and reports half of it as `room`.
       if(pt.room) r = Math.min(r, pt.room);
-    } else if(pt.pitch) r = Math.min(r, 0.44*pt.pitch);
+    } else {
+      if(pt.pitch) r = Math.min(r, 0.44*pt.pitch);
+      // A STANDING ION GIVES WAY TOO.  It is as much of a pass as the one moving, and
+      // leaving it at full size while the mover shrank is how one mark came to cover
+      // another that had made all the room for it.
+      if(pt.room) r = Math.min(r, pt.room);
+    }
     if(pt.fly && wells){
       p.w.setAttribute('cx',pt.x); p.w.setAttribute('cy',pt.y); show(p.w);
     } else hide(p.w);

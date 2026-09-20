@@ -26,6 +26,18 @@ Two assertions, because the rule has two halves.  A TRAP has length and a stack 
 inside it, so a mark may sit off the rail's centre line by the trap's own slot pitch.
 OPEN RAIL has no such licence: out between the traps, and at every junction, an ion is on
 the metal.
+
+THEN IT WAS REPORTED AGAIN, from the same place and about the other half: "when ions
+swap, they shouldn't jump outside the site".  The licence a trap has is ALONG its bar,
+which is where the stack is; across the bar there is none, and the detour that lets two
+ions get past each other was spending 0.21 g on a bar whose half-thickness is 0.10 g.  So
+`on_metal.mjs` asks the question with no licence in it at all -- is every mark inside the
+union of the trap capsules and the rails, the metal that is actually drawn? -- and
+`test_no_ion_is_drawn_off_the_metal_at_all` is the standing check.  Three things had to
+change for it to read zero, and they are in `qccd/viz/js/transit.js`: the detour is capped
+by the metal under the ion (half a bar's thickness, half a rail's), a slot offset is taken
+up over an arc that depends on the angle between the rail and the bar, and a mark is held
+to half the space it is in whether it is the ion moving or the ion being got past.
 """
 
 from __future__ import annotations
@@ -46,6 +58,7 @@ from qccd.compile.programs import build as build_program  # noqa: E402
 from qccd.cost import corrected_model, deck_model  # noqa: E402
 
 HARNESS = Path(__file__).parent / "on_rail.mjs"
+METAL = Path(__file__).parent / "on_metal.mjs"
 NODE = shutil.which("node")
 ARCH = ROOT / "arch"
 
@@ -62,8 +75,8 @@ OPEN_RAIL_TOL = 0.02
 IN_TRAP_TOL = 0.40
 
 
-def _probe(page: Path, frames: int = 60) -> dict:
-    out = subprocess.run([NODE, str(HARNESS), str(page), str(frames), "8"],
+def _probe(page: Path, frames: int = 60, harness: Path = HARNESS) -> dict:
+    out = subprocess.run([NODE, str(harness), str(page), str(frames), "8"],
                          capture_output=True, text=True, timeout=900)
     assert out.returncode == 0, f"harness failed:\n{out.stdout}\n{out.stderr}"
     return json.loads(out.stdout)
@@ -97,10 +110,19 @@ CASES = [
 
 
 @pytest.fixture(scope="module", params=CASES, ids=lambda c: f"{c[0]}_{c[1]}")
-def probed(request, tmp_path_factory) -> dict:
+def rendered(request, tmp_path_factory) -> Path:
     name, kind = request.param
-    tmp = tmp_path_factory.mktemp("on_rail")
-    return _probe(_page(tmp, name, kind))
+    return _page(tmp_path_factory.mktemp("on_rail"), name, kind)
+
+
+@pytest.fixture(scope="module")
+def probed(rendered) -> dict:
+    return _probe(rendered)
+
+
+@pytest.fixture(scope="module")
+def on_metal(rendered) -> dict:
+    return _probe(rendered, harness=METAL)
 
 
 def test_no_ion_is_drawn_off_the_rail_out_between_the_traps(probed):
@@ -122,10 +144,36 @@ def test_no_ion_strays_further_than_its_own_trap_is_wide(probed):
         f"{probed['page']}: worst stray {probed['worst_off_rail_g']} g at {w}")
 
 
-def test_the_measurement_saw_ions_move(probed):
+def test_no_ion_is_drawn_off_the_metal_at_all(on_metal):
+    """THE SECOND REPORT, and the whole rule in one number.
+
+    `worst_on_open_rail_g` above allows a mark inside a trap to sit off the rail's centre
+    line, because a trap has a stack to arrange ALONG its bar.  That licence is along the
+    bar; across it there is none, and the second thing the reader saw was a swapping ion
+    stepping sideways out of its own site -- 0.21 g across a bar whose half-thickness is
+    0.10 g -- to get round the ion it was exchanging with.
+
+    So this asks the question with no licence in it: is every mark inside the union of
+    the trap capsules and the rails, the metal that is actually drawn?  Where the room to
+    pass is not there, it is the MARKS that give way and not the confinement: a mark is
+    capped at half the gap it is threading, so the exchange is still drawn as an
+    exchange, with the two ions on opposite sides and in each other's slots at the end.
+    """
+    w = on_metal["worst_at"]
+    assert on_metal["worst_outside_metal_g"] <= on_metal["tolerance_g"], (
+        f"{on_metal['page']}: {on_metal['marks_off_metal']} of "
+        f"{on_metal['marks']} marks are drawn off the metal, the worst "
+        f"{on_metal['worst_outside_metal_g']} g outside it -- ion {w and w['ion']} at "
+        f"frame {w and w['frame']} phase {w and w['phase']}, nearest bar "
+        f"{w and w['nearest_bar']}. An ion is in a trap or on a rail; there is nothing "
+        f"else to hold one.")
+
+
+def test_the_measurement_saw_ions_move(probed, on_metal):
     """A page that drew nothing would pass both assertions above."""
     assert probed["marks"] > 300, f"only {probed['marks']} marks sampled"
     assert probed["frames"] > 1, probed["frames"]
+    assert on_metal["marks"] == probed["marks"], "the two probes saw different pictures"
 
 
 @pytest.mark.parametrize("name,kind", [("grid9x9", "walk"), ("cyclone_base", "oddeven")])
@@ -139,21 +187,48 @@ def test_the_probe_would_catch_a_detour_that_ignores_the_geometry(tmp_path, name
     page = _page(tmp_path, name, kind)
     html = page.read_text(encoding="utf-8")
     # put back the detour as it was: applied to every flier, peaking at mid-flight, at
-    # the full `swap_bow` amplitude, with no reference to what is or is not in the way
-    gate = "if (me.fly && mates && mates.length) {"
+    # the full `swap_bow` amplitude, with no reference to what is or is not in the way,
+    # and free to leave the metal (`lim`, the confinement, is what stops it now)
+    gate = "if (mates && mates.length && me.fly) {"
     amp = "        var worst = 0;"
     loop = "for (var mi = 0; mi < mates.length; mi++) {"
-    gap = "for (var mj = 0; mj < mates.length; mj++) {"
-    for needle in (gate, amp, loop, gap):
+    cap = "if (lim > 0 && worst > 0.5 * lim) worst = 0.5 * lim;"
+    for needle in (gate, amp, loop, cap):
         assert needle in html, f"the detour moved; update this mutation ({needle!r})"
     broken = tmp_path / f"{name}_broken.html"
     safe = "(mates ? mates.length : 0)"
     broken.write_text(html.replace(gate, "if (me.fly) {")
                           .replace(amp, "        var worst = bow0 * 4 * t * (1 - t);")
                           .replace(loop, f"for (var mi = 0; mi < {safe}; mi++) {{")
-                          .replace(gap, f"for (var mj = 0; mj < {safe}; mj++) {{"),
+                          .replace(cap, ";"),
                       encoding="utf-8")
     r = _probe(broken, frames=40)
     assert r["worst_on_open_rail_g"] > OPEN_RAIL_TOL, (
         "the probe passed a page whose ions leave the rail on every walk -- it would not "
         "have caught the defect it exists to catch")
+    m = _probe(broken, frames=40, harness=METAL)
+    assert m["worst_outside_metal_g"] > m["tolerance_g"], (
+        "the same page, and the off-metal probe did not see it either")
+
+
+@pytest.mark.parametrize("name,kind", [("cyclone_base", "oddeven")])
+def test_the_probe_would_catch_a_slot_taken_up_out_on_the_rail(tmp_path, name, kind):
+    """The OTHER half, and the one `on_rail.mjs` cannot see.
+
+    A slot offset lies along its own trap's bar, so adding it never changes how far the
+    ion is from the bar's centre line -- that distance is the rail's own.  Take the angle
+    between rail and bar out of the ramp, so the offset is always taken up over the whole
+    bar, and an ion turning into a trap whose bar lies ACROSS the rail it arrives on cuts
+    the corner of the T.  It stays within a trap's own scale of the rail centre line the
+    whole time, so the open-rail assertion above never sees it; this one must.
+    """
+    page = _page(tmp_path, name, kind)
+    html = page.read_text(encoding="utf-8")
+    needle = "var r = sin > 1e-6 ? a / sin : (sp || a);"
+    assert needle in html, "the slot ramp moved; update this mutation"
+    broken = tmp_path / f"{name}_corner.html"
+    broken.write_text(html.replace(needle, "var r = (sp || a);"), encoding="utf-8")
+    m = _probe(broken, frames=40, harness=METAL)
+    assert m["worst_outside_metal_g"] > m["tolerance_g"], (
+        "an ion took up its slot a whole bar-length out along the rail and the probe "
+        "called it on the metal")

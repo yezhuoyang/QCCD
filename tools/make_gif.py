@@ -241,11 +241,25 @@ class Clip:
             # flight, not applied on top of it
             return ([(j - (k - 1) / 2) * slot for j in range(k)], slot)
 
+        def span(nid):
+            # half the drawn site bar, the scale the detour tapers over; a junction has
+            # none, so an ion crossing one is drawn on the metal rather than beside it
+            n = self.nodes.get(nid)
+            if not n or n.get("kind") == "junction" or not n.get("cap"):
+                return 0.0
+            m = max(1, min(int(n["cap"]), 6))
+            g = self.L["g"] * self.k
+            return min(0.88 * g, (0.30 + 0.15 * m) * g) / 2
+
         return Transit(Geometry(
             pos=lambda nid: self.xy(nid) if nid in self.nodes else None,
             axis=lambda nid: self.axis.get(nid, (1.0, 0.0)),
             slot_offsets=slot_offsets,
             site=lambda nid: site.get(nid, nid),
+            span=span,
+            across=lambda nid: (self.L["site_t"] * self.k / 2
+                                if span(nid) else 0.0),
+            rail=self.L["sw_rail"] * self.k / 2,
             bow=min(0.62 * self.L["g"] * self.k, 1.9 * 2 * slot),
         ))
 
@@ -328,6 +342,11 @@ class Clip:
             rr = min(r, 0.44 * pitch) if pitch else r
             if p.fly:
                 rr *= 1.18
+            # and never wider than the gap it is threading, moving or standing: the two
+            # ions of a pass both give way, and `transit.py` measures how much room each
+            # of them actually has
+            if p.room:
+                rr = min(rr, p.room)
             if p.fly and halo:
                 d.ellipse([x - rr * 1.9, y - rr * 1.9, x + rr * 1.9, y + rr * 1.9],
                           fill=(*rgb("arrow"), 60))

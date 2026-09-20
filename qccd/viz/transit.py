@@ -40,16 +40,24 @@ def natural_key(name: str) -> tuple:
     return tuple(int(p) if p.isdigit() else p.lower() for p in _NUM.split(str(name)))
 
 
-def _slot_weights(q, t: float) -> tuple[float, float]:
-    """How much of each end's slot offset applies at this point of the walk."""
-    hops = q[6] if len(q) > 6 else 0
-    if not hops or hops < 2:
+def _slot_weights(q, t: float, ramp_a: float, ramp_b: float) -> tuple[float, float]:
+    """How much of each end's slot offset applies here -- see the JS twin.
+
+    Measured in ARC over a ramp that is as long as the bar keeps the rail beside it,
+    which is `Transit._ramp_at`.
+    """
+    if q is None or len(q) < 9:
         return 1.0 - t, t
-    if q[5] == 0:
-        return 1.0 - q[4], 0.0
-    if q[5] == hops - 1:
-        return 0.0, q[4]
-    return 0.0, 0.0
+    # a ramp of zero is "no bar to slide along", not "no offset" -- see the JS twin
+    wa = 1.0 - min(1.0, q[7] / ramp_a) if ramp_a > 1e-9 else 1.0 - t
+    wb = 1.0 - min(1.0, q[8] / ramp_b) if ramp_b > 1e-9 else t
+    if t <= 0.0:
+        return 1.0, 0.0
+    if t >= 1.0:
+        return 0.0, 1.0
+    if wa + wb > 1.0:
+        wb = 1.0 - wa
+    return wa, wb
 
 
 def _cmp(a: str, b: str) -> int:
@@ -78,6 +86,12 @@ class Geometry:
     #: half the drawn length of a node's site bar -- the scale the detour tapers over.
     #: Not the slot pitch: a capacity-4 trap is 0.88 g long against a lattice step of g.
     span: Callable[[str], float] = lambda _i: 0.0
+    #: half its THICKNESS -- how far across its own trap an ion may be drawn.  An ion
+    #: outside its own capsule is drawn where no well exists.
+    across: Callable[[str], float] = lambda _i: 0.0
+    #: half a RAIL's width -- the room there is out between the traps, where ions run
+    #: single file and never need to step around one another.
+    rail: float = 0.0
     #: the detour amplitude an ion takes round one it has to get past
     bow: float = 0.0
 
@@ -137,6 +151,57 @@ class Transit:
         except Exception:
             return 0.0
 
+    def _across(self, node: str) -> float:
+        try:
+            return float(self.geom.across(node) or 0.0)
+        except Exception:
+            return 0.0
+
+    def _ramp_at(self, node: str, toward: str) -> float:
+        """Over how much arc this node's slot offset is taken up -- see the JS twin.
+
+        A slot offset lies along the bar, so it never changes how far the ion is from the
+        bar's centre line: that distance is the rail's own.  A rail leaving ALONG the bar
+        never leaves the line; one leaving ACROSS it departs as fast as the ion travels.
+        """
+        a = self._across(node)
+        if a <= 0:
+            return 0.0
+        sp, p, o = self._span(node), self._pos(node), self._pos(toward)
+        if p is None or o is None:
+            return a
+        dx, dy = o[0] - p[0], o[1] - p[1]
+        d = math.hypot(dx, dy)
+        if d <= 1e-9:
+            return a
+        ax = self._axis(node)
+        sin = abs((dx * ax[1] - dy * ax[0]) / d)
+        r = a / sin if sin > 1e-6 else (sp or a)
+        return min(max(r, a), sp) if sp > 0 else max(r, a)
+
+    def _room_across(self, x: float, y: float, ends) -> float:
+        """How much room across the metal there is where this ion stands.
+
+        Half a bar's thickness inside its own trap, half a rail's out between them,
+        ramped at slope one between the two -- see the JS twin.
+        """
+        best = float(self.geom.rail or 0.0)
+        for node in ends:
+            if not node:
+                continue
+            a = self._across(node)
+            if a <= best:
+                continue
+            p = self._pos(node)
+            if p is None:
+                continue
+            ax = self._axis(node)
+            along = abs((x - p[0]) * ax[0] + (y - p[1]) * ax[1])
+            out = along - self._span(node)
+            room = a if out <= 0 else (a - out if out < a - best else best)
+            best = max(best, room)
+        return best
+
     def _slots(self, node: str, k: int) -> tuple[list[float], float]:
         if self.geom.slot_offsets is None:
             return [0.0] * k, 0.0
@@ -179,7 +244,7 @@ class Transit:
             return None
         if len(path) == 1:
             p = self._pos(path[0])
-            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0)
+            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0, 0.0, 0.0)
         u = min(max(t, 0.0), 1.0)
         segs, total = self._hops(path)
         if total <= 1e-9:
@@ -195,8 +260,12 @@ class Transit:
         q = self._edge_point(path[i], path[i + 1], local)
         if q is None:
             p = self._pos(path[i]) or self._pos(path[i + 1])
-            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0)
-        return (q[0], q[1], path[i], path[i + 1], local, i, len(path) - 1)
+            return None if p is None else (p[0], p[1], None, None, 0.0, 0, 0, 0.0, 0.0)
+        # the ARC travelled and the arc remaining, which is what the slot offsets are
+        # shed and taken up over -- see `_slot_weights`
+        done = sum(segs[:i]) + (segs[i] if i < len(segs) else 0.0) * local
+        return (q[0], q[1], path[i], path[i + 1], local, i, len(path) - 1,
+                done, total - done)
 
     # ------------------------------------------------------------------ slot order
 
@@ -383,11 +452,12 @@ class Transit:
                 if q is None or not math.isfinite(q[0]):
                     continue
                 # the slot offset belongs to the trap, not to the walk -- see the JS
-                wa, wb = _slot_weights(q, t)
+                wa, wb = _slot_weights(q, t, self._ramp_at(a_axis, walk[1]),
+                                       self._ramp_at(b_axis, walk[-2]))
                 base[ion] = dict(x=q[0] + ax_ * wa + bx_ * wb,
                                  y=q[1] + ay_ * wa + by_ * wb, fly=True, q=q, u=t,
                                  pa=pa, pb=pb, a=a_node, b=b_node,
-                                 ax=a_axis)
+                                 ax=a_axis, bx=b_axis)
             else:
                 p0, p1 = self._pos(a_node), self._pos(b_node)
                 if p0 is None or p1 is None:
@@ -414,10 +484,11 @@ class Transit:
             return 0.95 * pitch if pitch > 0 else 0.62 * bow0
         out: dict[str, Placed] = {}
         for ion, me in base.items():
-            dx = dy = room = 0.0
+            dx = dy = room = lim = 0.0
+            lifted = False
             mates = partners.get(ion) or []
             my_pitch = max(me["pa"], me["pb"])
-            if me["fly"] and mates:
+            if mates and me["fly"]:
                 sd = pas["side"].get(ion, 1) or 1
                 worst = 0.0
                 for mate in mates:
@@ -433,18 +504,36 @@ class Transit:
                         continue
                     lift = math.sqrt(max(0.0, clear * clear - d * d))
                     worst = max(worst, lift)
+                # and never off the metal, taking HALF the room so the mark fits in
+                # the other half -- see the JS twin
+                axn = self._axis(me.get("ax") or me["a"])
                 if worst > 0:
-                    axn = self._axis(me.get("ax") or me["a"])
+                    q = me.get("q") or (me["x"], me["y"])
+                    lim = self._room_across(q[0], q[1],
+                                            [me.get("ax") or me["a"],
+                                             me.get("bx") or me["b"]])
+                    if lim > 0:
+                        worst = min(worst, 0.5 * lim)
+                if worst > 0:
                     dx, dy = -axn[1] * sd * worst, axn[0] * sd * worst
-                # and no bigger than the gap it is going through -- see the JS twin
-                gap = math.inf
-                for mate in mates:
-                    o2 = base.get(mate)
-                    if o2 is not None:
-                        gap = min(gap, math.dist((me["x"] + dx, me["y"] + dy),
-                                                 (o2["x"], o2["y"])))
-                if math.isfinite(gap):
-                    room = 0.45 * gap
+                    lifted = True
+            # A mark is never wider than half the space it is in, measured against every
+            # ion around it and not only the ones `passes` calls partners, and for the
+            # ion standing still as much as the one moving -- see the JS twin.
+            nbrs = set(mates)
+            nbrs.update(occ_s.get(me["a"]) or ())
+            nbrs.update(occ_e.get(me["b"]) or ())
+            nbrs.discard(ion)
+            gap = math.inf
+            for mate in nbrs:
+                o2 = base.get(mate)
+                if o2 is not None:
+                    gap = min(gap, math.dist((me["x"] + dx, me["y"] + dy),
+                                             (o2["x"], o2["y"])))
+            if math.isfinite(gap):
+                room = 0.45 * gap
+            if lifted and lim > 0:
+                room = min(room or lim, lim - abs(worst))
             if me["fly"]:
                 tight = (len(ord_start.get(me["a"], [])) > 1
                          or len(ord_end.get(me["b"], [])) > 1)
@@ -457,6 +546,6 @@ class Transit:
             else:
                 pa, pb, u = me["pa"], me["pb"], me["u"]
                 out[ion] = Placed(
-                    x=me["x"], y=me["y"], fly=False, node=me["b"], t=u,
+                    x=me["x"], y=me["y"], fly=False, node=me["b"], t=u, room=room,
                     pitch=(pa + (pb - pa) * u) if (pa and pb) else (pb or pa))
         return out

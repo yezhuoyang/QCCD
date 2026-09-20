@@ -128,6 +128,48 @@
     return this.geom.span ? (+this.geom.span(id) || 0) : 0;
   };
 
+  // HALF THE THICKNESS OF THE SITE BAR -- how far ACROSS its own trap an ion may go.
+  // The detour that lets two ions get past each other has to happen somewhere, and the
+  // somewhere is inside the trap: a bar is `site_t` thick (0.199 g in the shipped
+  // layout), so half of that is the whole of the room there is.  Going further draws an
+  // ion outside the capsule it is supposed to be confined in, which is what "when ions
+  // swap they should not jump outside the site" means.
+  Transit.prototype.across = function (id) {
+    return this.geom.across ? (+this.geom.across(id) || 0) : 0;
+  };
+
+  // The same question for a RAIL, which is the metal between the traps.  A rail is
+  // narrower than a site bar -- it carries one ion at a time and has no stack to arrange
+  // -- so out between the traps there is almost no room to step aside, and there is no
+  // need for any: ions are single file on a rail and `r5_no_exchange` forbids two of
+  // them trading places along one.
+  Transit.prototype.railAcross = function () {
+    return this.geom.rail ? (+this.geom.rail || 0) : 0;
+  };
+
+  // HOW MUCH ROOM ACROSS THE METAL THERE IS WHERE THIS ION IS STANDING.  Inside its own
+  // bar, half the bar's thickness; out on the rail, half the rail's.  The step between
+  // them is ramped at slope one -- the confinement narrows no faster than the ion
+  // travels -- so an ion leaving its trap is walked back to the centre line rather than
+  // snapped to it.
+  Transit.prototype.roomAcross = function (x, y, ends) {
+    var best = this.railAcross();
+    for (var i = 0; i < ends.length; i++) {
+      var S = ends[i];
+      if (!S) continue;
+      var nd = S.axisNode || S.node, a = this.across(nd);
+      if (!(a > best)) continue;
+      var p = this.pos(nd);
+      if (!p) continue;
+      var ax = this.axis(nd), h = this.span(nd);
+      var along = Math.abs((x - p[0]) * ax[0] + (y - p[1]) * ax[1]);
+      var out = along - h;                       // how far past the end of the bar
+      var room = out <= 0 ? a : (out < a - best ? a - out : best);
+      if (room > best) best = room;
+    }
+    return best;
+  };
+
   // ------------------------------------------------------- a point along a node path
 
   // BY ARC LENGTH, not by hop count.  Spreading `t` uniformly over the HOPS of a path
@@ -173,8 +215,14 @@
     // and nothing downstream may treat it as travelling along a segment
     if (q.norail) return { x: q.x, y: q.y, a: null, b: null, u: 0, norail: true,
                            hop: i, hops: path.length - 1 };
+    // `s` / `left` are the ARC travelled and the arc remaining, in drawn units.  The slot
+    // offsets are shed and taken up over those, not over `t`: a bar has a length and that
+    // length is how far an ion has to slide to get out of its stack.
+    var done = 0;
+    for (var k = 0; k < i; k++) done += H.segs[k];
+    done += (H.segs[i] || 0) * local;
     return { x: q.x, y: q.y, a: path[i], b: path[i + 1], u: local,
-             hop: i, hops: path.length - 1 };
+             hop: i, hops: path.length - 1, s: done, left: H.total - done };
   };
 
   // ------------------------------------------------------------------- slot order
@@ -565,13 +613,49 @@
     var srcOf = P.srcOf, occS = P.occS, occ = P.occ, pass = P.pass;
     var live = {}, flying = {}, base = {};
     var bow0 = self.bow();
-    // how much of each end's slot offset applies at this point of the walk
-    var slotWeights = function (q, tt) {
-      var hops = q && q.hops;
-      if (!hops || hops < 2) return [1 - tt, tt];       // one hop: the old linear blend
-      if (q.hop === 0) return [1 - q.u, 0];             // letting go of the source slot
-      if (q.hop === hops - 1) return [0, q.u];          // taking up the destination slot
-      return [0, 0];                                    // in between: on the rail
+    // OVER HOW MUCH ARC AN END'S SLOT OFFSET IS TAKEN UP.
+    //
+    // A slot offset lies along its own trap's BAR, so adding it never changes how far the
+    // ion is from the bar's centre LINE -- that distance is the rail's own, and the ion
+    // is inside the capsule exactly while the rail is within half a thickness of the
+    // line.  Which depends entirely on the angle between the two.
+    //
+    // A rail that leaves ALONG the bar (a chain, a ring: the common case) never leaves the
+    // line at all, and the offset may be taken up over the whole bar.  A rail that leaves
+    // ACROSS it -- `cyclone_base` does, a vertical rail into a horizontal bar -- departs
+    // the line as fast as the ion travels, so the offset may only be taken up over the
+    // last half-thickness, or the ion cuts the corner of the T and is drawn on neither.
+    // `across / sin(rail, bar)` is both at once, and everything in between.
+    var rampAt = function (node, toward) {
+      var a = self.across(node);
+      if (!(a > 0)) return 0;                       // no bar: the plain blend, below
+      var sp = self.span(node), p = self.pos(node), o = self.pos(toward);
+      if (!p || !o) return a;
+      var dx = o[0] - p[0], dy = o[1] - p[1], d = Math.hypot(dx, dy);
+      if (!(d > 1e-9)) return a;
+      var ax = self.axis(node);
+      var sin = Math.abs((dx * ax[1] - dy * ax[0]) / d);
+      var r = sin > 1e-6 ? a / sin : (sp || a);
+      if (r < a) r = a;
+      if (sp > 0 && r > sp) r = sp;
+      return r;
+    };
+
+    // How much of each end's slot offset applies at this point of the walk.  The frame
+    // boundaries are exact: at t=0 the source weight is 1, at t=1 the destination weight
+    // is 1, whatever the ramps are.
+    var slotWeights = function (q, tt, rampA, rampB) {
+      if (!q || q.s === undefined) return [1 - tt, tt];
+      // A ramp of zero is "no bar to slide along", not "no offset": a junction has no
+      // slots, so its weight is moot, and a geometry that supplies no `across` at all
+      // wants the plain blend.  Either way the ends stay exact.
+      var wa = rampA > 1e-9 ? 1 - Math.min(1, q.s / rampA) : 1 - tt;
+      var wb = rampB > 1e-9 ? 1 - Math.min(1, q.left / rampB) : tt;
+      if (tt <= 0) { wa = 1; wb = 0; } else if (tt >= 1) { wa = 0; wb = 1; }
+      // two ramps longer than the rail between them overlap, and an ion cannot be a
+      // whole slot offset into both at once
+      else if (wa + wb > 1) wb = 1 - wa;
+      return [wa, wb];
     };
 
     // ---- pass one: where every ion is before anybody gets out of anybody's way
@@ -589,13 +673,12 @@
         // lattice units from the nearest junction, on an ion with no conflict and no
         // detour at all.
         //
-        // So each offset is tied to the hop that owns it: the source slot is let go over
-        // the first hop, the destination slot is taken up over the last, and on a hop
-        // that is neither the ion rides the rail exactly.  On a single-hop walk the two
-        // ramps are the old linear blend, which is right, because both ends are the same
-        // rail.  The frame boundaries are untouched: at t=0 the source weight is exactly
-        // 1 and at t=1 the destination weight is exactly 1.
-        var w1 = slotWeights(q1, t);
+        // So each offset is taken up WITHIN THE BAR IT BELONGS TO, measured in arc over
+        // a ramp that is as long as the bar keeps the rail -- see `rampAt`.  The frame
+        // boundaries stay exact at t=0 and t=1 whatever those ramps come to.
+        var w1 = slotWeights(q1, t,
+                             rampAt(A1.axisNode || A1.node, p1[1]),
+                             rampAt(B1.axisNode || B1.node, p1[p1.length - 2]));
         base[i1] = { x: q1.x + A1.ox * w1[0] + B1.ox * w1[1],
                      y: q1.y + A1.oy * w1[0] + B1.oy * w1[1], fly: true, q: q1, u: t };
       } else {
@@ -653,7 +736,7 @@
       var bx = 0, by = 0, lifted = false, room = 0;
       var mates = partners[ion2];
       var myPitch = Math.max(A.pitch || 0, B.pitch || 0);
-      if (me.fly && mates && mates.length) {
+      if (mates && mates.length && me.fly) {
         var sd = pass.side[ion2] || 1;
         var worst = 0;
         for (var mi = 0; mi < mates.length; mi++) {
@@ -675,8 +758,34 @@
           var lift = Math.sqrt(Math.max(0, clear * clear - d * d));
           if (lift > worst) worst = lift;
         }
+        // AND NEVER OFF THE METAL.  Whatever the arithmetic asks for, the ion stays on
+        // the electrodes it is being carried by: half a bar's thickness inside its trap,
+        // half a rail's out between them.  An ion drawn beside its trap is drawn where no
+        // well exists, which is the second thing reported from the site -- "when ions
+        // swap, they shouldn't jump outside the site".
+        //
+        // The base position is already on the metal by construction (each slot offset is
+        // taken up within its own bar, see `slotWeights`), so capping the LIFT caps the
+        // whole excursion.  And only the lift gives way: an ion with nothing to pass is
+        // left exactly where it is, so no frame boundary can snap.  Where the cap leaves
+        // two marks too close for their size, it is the MARKS that shrink (`room`,
+        // below) -- the exchange is still drawn as an exchange, on opposite sides and
+        // ending in each other's slots.
+        //
+        // HALF the room, not all of it, because the mark has to fit in the other half.
+        // A mark is 0.44 of its slot pitch and a bar is `site_t` thick, which on the
+        // shipped layout makes a resting mark very nearly as wide as its own bar is
+        // deep: an ion lifted the full half-thickness is inside the bar by its centre
+        // and outside it by its whole radius.  So the lift takes half the half-width
+        // and `room` below holds the mark to the rest.
+        var ax2 = self.axis(A.axisNode || A.node), lim = 0;
         if (worst > 0) {
-          var ax2 = self.axis(A.axisNode || A.node);
+          var qq = me.q || me;
+          lim = self.roomAcross(qq.x !== undefined ? qq.x : qq[0],
+                                qq.y !== undefined ? qq.y : qq[1], [A, B]);
+          if (lim > 0 && worst > 0.5 * lim) worst = 0.5 * lim;
+        }
+        if (worst > 0) {
           bx = -ax2[1] * sd * worst; by = ax2[0] * sd * worst;
           lifted = true;
         }
@@ -687,14 +796,37 @@
         // gap of 0.011, which swallows thirteen of them.  `room` is half the distance to
         // the nearest ion it has to pass: a mark never covers the neighbour it is
         // getting by, and it grows naturally as it leaves.
-        var gap = Infinity;
-        for (var mj = 0; mj < mates.length; mj++) {
-          var o2 = base[mates[mj]];
-          if (!o2) continue;
-          gap = Math.min(gap, Math.hypot(me.x + bx - o2.x, me.y + by - o2.y));
-        }
-        if (isFinite(gap)) room = 0.45 * gap;
       }
+      // A MARK IS NEVER WIDER THAN HALF THE SPACE IT IS IN, and the space is measured
+      // against every ion around it rather than only the ones `passes` calls partners.
+      //
+      // Both of those matter, and each came from a picture.  BOTH SIDES: the ion being
+      // got past is as much of the pair as the one getting past it, and leaving it at
+      // full size while the mover shrank is how two marks 0.118 g apart came to have
+      // radii of 0.097 and 0.053 -- the drawing asked one of them to make all the room.
+      // EVERY NEIGHBOUR: an ion entering a trap through the middle of its bar is not
+      // passing anybody, so `passes` pairs it with nobody, and it is still drawn through
+      // the stack that is already in there -- `cyclone_base` enters S36 across the bar,
+      // and at the moment the mark reaches the centre line it is 4.6 px from the ion in
+      // the inner slot and 4.2 px wide.  So the gap is measured against the stacks at
+      // both ends of the walk as well.  An ion at rest among its own trap-mates sits a
+      // pitch from each, and 0.45 of a pitch is what it is drawn at anyway, so this
+      // costs nothing where there is nothing going on.
+      var nbrs = {}, nb;
+      if (mates) for (nb = 0; nb < mates.length; nb++) nbrs[mates[nb]] = 1;
+      var lsA = occS[A.node] || [], lsB = occ[B.node] || [];
+      for (nb = 0; nb < lsA.length; nb++) nbrs[lsA[nb]] = 1;
+      for (nb = 0; nb < lsB.length; nb++) nbrs[lsB[nb]] = 1;
+      delete nbrs[ion2];
+      var gap = Infinity;
+      for (var mj in nbrs) {
+        var o2 = base[mj];
+        if (!o2) continue;
+        gap = Math.min(gap, Math.hypot(me.x + bx - o2.x, me.y + by - o2.y));
+      }
+      if (isFinite(gap)) room = 0.45 * gap;
+      // and inside the metal, alongside the lift that has already been taken out of it
+      if (lifted && lim > 0) room = Math.min(room || lim, lim - Math.abs(worst));
       if (me.fly) {
         // `swap` says THIS ION IS THREADING PAST ANOTHER, so the drawing knows not to let
         // it swell to full radius on the way: a mark that has to fit through a gap does
@@ -711,7 +843,7 @@
         // the step -- an ion leaving frees a slot and the one staying behind shifts into
         // the middle -- so pinning it to the end-state slot makes it jump the moment the
         // step begins, straight into the ion still departing.
-        live[ion2] = { x: me.x, y: me.y, fly: false, node: B.node,
+        live[ion2] = { x: me.x, y: me.y, fly: false, node: B.node, room: room,
                        pitch: (A.pitch && B.pitch) ? A.pitch + (B.pitch - A.pitch) * me.u
                                                    : (B.pitch || A.pitch) };
       }
