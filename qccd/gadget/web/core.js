@@ -397,6 +397,8 @@
       pos: (id) => (byId[id] ? byId[id].pos : null),
       axis: (id) => this.geom.axis[id] || [1, 0],
       site: (id) => rep[id] || id,
+      // half the site bar, in device units: the scale the swap detour tapers over
+      span: (id) => (capOf(id) > 0 ? siteLenOf(capOf(id)) / 2 : 0),
       slotOffsets: (id, k) => {
         const cap = capOf(id), m = slotsOf(cap), pitch = siteLenOf(cap) / m;
         const step = Math.min(pitch, 0.86 * g / Math.max(k, 1));
@@ -563,7 +565,11 @@
     if (!p.fly) return p.pitch ? Math.min(base, 0.44 * p.pitch * s) : base;
     const rA = fit(p.pitchA), rB = fit(p.pitchB);
     const bulge = (p.swap || p.tight) ? 0 : 4 * p.tt * (1 - p.tt);
-    return rA + (rB - rA) * p.tt + (rIon - Math.max(rA, rB)) * bulge;
+    const r = rA + (rB - rA) * p.tt + (rIon - Math.max(rA, rB)) * bulge;
+    // never wider than the gap it is threading: an ion leaving a crowded trap for an
+    // empty one would otherwise be drawn growing to full size while it is still among
+    // its old neighbours (`transit.js` derives `room` from the real distance to them)
+    return p.room ? Math.min(r, p.room * s) : r;
   }
 
   root.GadgetCore = { Model, LeafSim, lowerBound, naturalCmp, geomOf, ionRadius };

@@ -118,6 +118,16 @@
     return this.geom.site ? (this.geom.site(id) || id) : id;
   };
 
+  // HOW FAR A TRAP'S OWN BUSINESS REACHES: half the drawn length of its site bar.  This
+  // is the scale the detour tapers over, and it is not the slot pitch -- a capacity-4 trap
+  // on `cyclone_base` is 0.88 g long against a lattice step of g, so its ions are still
+  // inside their own trap a quarter of the way to the next one, while its slot pitch is
+  // 0.22 g.  Tapering on the pitch switched the detour off exactly where an ion leaving
+  // that trap has to get past the one standing in the outer slot.
+  Transit.prototype.span = function (id) {
+    return this.geom.span ? (+this.geom.span(id) || 0) : 0;
+  };
+
   // ------------------------------------------------------- a point along a node path
 
   // BY ARC LENGTH, not by hop count.  Spreading `t` uniformly over the HOPS of a path
@@ -161,8 +171,10 @@
     }
     // a hop with no rail under it is not a hop: the ion is parked on the node it was on,
     // and nothing downstream may treat it as travelling along a segment
-    if (q.norail) return { x: q.x, y: q.y, a: null, b: null, u: 0, norail: true };
-    return { x: q.x, y: q.y, a: path[i], b: path[i + 1], u: local };
+    if (q.norail) return { x: q.x, y: q.y, a: null, b: null, u: 0, norail: true,
+                           hop: i, hops: path.length - 1 };
+    return { x: q.x, y: q.y, a: path[i], b: path[i + 1], u: local,
+             hop: i, hops: path.length - 1 };
   };
 
   // ------------------------------------------------------------------- slot order
@@ -420,7 +432,17 @@
       comp.sort(naturalCmp);
       for (var c = 0; c < comp.length; c++) side_[comp[c]] = (c % 2 === 0) ? 1 : -1;
     }
-    return { pairs: pairs, side: side_, kinds: seen };
+    // WHICH IONS ARE TRADING ENDS OF ONE RUN.  Every other conflict is about a trap and
+    // can be drawn inside it; an exchange is two ions moving in opposite directions along
+    // the same metal, and there is no position on that metal where they are not in each
+    // other's way.  It is also a step R5 refuses -- "no two ions exchange positions along
+    // one segment in a single step" -- so on a verified programme this set is empty, and
+    // where it is not, going round is the only honest picture.
+    var exch_ = {};
+    for (var pe = 0; pe < pairs.length; pe++) {
+      if (pairs[pe][2] === "exchange") { exch_[pairs[pe][0]] = 1; exch_[pairs[pe][1]] = 1; }
+    }
+    return { pairs: pairs, side: side_, kinds: seen, exchange: exch_ };
   };
 
   // ------------------------------------------------------------------- placement
@@ -523,39 +545,156 @@
     var rest = !!step.rest;
     var P = this._prep(step);
     var srcOf = P.srcOf, occS = P.occS, occ = P.occ, pass = P.pass;
-    var live = {}, flying = {};
+    var live = {}, flying = {}, base = {};
     var bow0 = self.bow();
+    // how much of each end's slot offset applies at this point of the walk
+    var slotWeights = function (q, tt) {
+      var hops = q && q.hops;
+      if (!hops || hops < 2) return [1 - tt, tt];       // one hop: the old linear blend
+      if (q.hop === 0) return [1 - q.u, 0];             // letting go of the source slot
+      if (q.hop === hops - 1) return [0, q.u];          // taking up the destination slot
+      return [0, 0];                                    // in between: on the rail
+    };
 
-    for (var ion2 in srcOf) {
-      var pth = paths[ion2];
-      var A = P.A[ion2], B = P.B[ion2];
-      if (pth && !rest) {
-        var q = self.pointOnPath(pth, t);
-        if (!q || !isFinite(q.x)) continue;
-        // the detour, zero at both ends and `bow` at mid-flight, on this ion's own side
-        var sd = pass.side[ion2] || 0;
-        var bow = (sd && bow0) ? sd * bow0 * 4 * t * (1 - t) : 0;
-        var bx = 0, by = 0;
-        if (bow) { var ax2 = self.axis(A.node); bx = -ax2[1] * bow; by = ax2[0] * bow; }
-        // an ion moving into or out of an OCCUPIED trap gets no flourish -- it needs the
-        // room, not the bulk
+    // ---- pass one: where every ion is before anybody gets out of anybody's way
+    for (var i1 in srcOf) {
+      var p1 = paths[i1], A1 = P.A[i1], B1 = P.B[i1];
+      if (p1 && !rest) {
+        var q1 = self.pointOnPath(p1, t);
+        if (!q1 || !isFinite(q1.x)) continue;
+        // THE SLOT OFFSET BELONGS TO THE TRAP, NOT TO THE WALK.
+        //
+        // A1's offset lies along the SOURCE trap's axis and B1's along the DESTINATION
+        // trap's, and those are different directions whenever the walk turns a corner.
+        // Blending them linearly over the whole walk therefore puts the ion off BOTH
+        // rails in the middle of it -- measured at 0.21 g on `28_tanner_own`, eleven
+        // lattice units from the nearest junction, on an ion with no conflict and no
+        // detour at all.
+        //
+        // So each offset is tied to the hop that owns it: the source slot is let go over
+        // the first hop, the destination slot is taken up over the last, and on a hop
+        // that is neither the ion rides the rail exactly.  On a single-hop walk the two
+        // ramps are the old linear blend, which is right, because both ends are the same
+        // rail.  The frame boundaries are untouched: at t=0 the source weight is exactly
+        // 1 and at t=1 the destination weight is exactly 1.
+        var w1 = slotWeights(q1, t);
+        base[i1] = { x: q1.x + A1.ox * w1[0] + B1.ox * w1[1],
+                     y: q1.y + A1.oy * w1[0] + B1.oy * w1[1], fly: true, q: q1, u: t };
+      } else {
+        var pa1 = self.pos(A1.node), pb1 = self.pos(B1.node);
+        if (!pa1 || !pb1) continue;
+        var u1 = rest ? 1 : t;
+        base[i1] = { x: (pa1[0] + A1.ox) + ((pb1[0] + B1.ox) - (pa1[0] + A1.ox)) * u1,
+                     y: (pa1[1] + A1.oy) + ((pb1[1] + B1.oy) - (pa1[1] + A1.oy)) * u1,
+                     fly: false, u: u1 };
+      }
+    }
+
+    // ---- who each ion has to get past, as a list it can measure itself against
+    var partners = {};
+    for (var pp = 0; pp < pass.pairs.length; pp++) {
+      var a0 = pass.pairs[pp][0], b0 = pass.pairs[pp][1];
+      (partners[a0] || (partners[a0] = [])).push(b0);
+      (partners[b0] || (partners[b0] = [])).push(a0);
+    }
+
+    // THE DETOUR IS EXACTLY AS BIG AS IT HAS TO BE, AND NOT ONE PIXEL MORE.
+    //
+    // An ion is carried by the electrodes under the rail it is riding, so a picture that
+    // puts one BESIDE the rail draws a motion the machine cannot make.  At a junction --
+    // where mid-flight of a two-hop walk lands precisely on the corner -- that reads as
+    // the ion cutting across the junction instead of entering it and turning, which is
+    // exactly what was reported against `board/bb144/22_planar12_own_a72`: measured at
+    // 0.62 g clear of the metal beside J0_6, the whole of `swap_bow`, because the
+    // amplitude peaked at mid-flight no matter what was or was not there to avoid.
+    //
+    // The detour cannot simply go -- without it, 213 frames of `cyclone_base`'s odd-even
+    // sort draw one ion through another -- so it is DERIVED rather than shaped.  `clear`
+    // is the centre distance two marks need in order not to intersect.  An ion already
+    // that far from everything it has to pass needs no detour and is drawn on the rail;
+    // one that is closer is lifted by exactly the amount that restores `clear`, which is
+    // sqrt(clear^2 - d^2), the perpendicular leg of the triangle.
+    //
+    // It needs no ramp to vanish at the ends of the walk, because it vanishes on its own:
+    // an ion begins and finishes in its own slot, a slot pitch from its neighbour, and a
+    // slot pitch is already `clear` -- so the lift is zero there and the mark lands where
+    // the next frame expects it.  And nothing rests at a junction, which has no capacity
+    // at all, so a crossing has nothing to get past and is drawn on the metal.
+    // HOW FAR APART TWO MARKS HAVE TO BE, and it must be LESS than a slot pitch or the
+    // detour never switches off: an ion resting in its own slot is one pitch from its
+    // neighbour, so a `clear` above that lifts it where it stands and it drops back at
+    // the frame boundary -- a 13.7 px jump, measured, which is the teleport this whole
+    // module exists to prevent.  A mark in a stack is 0.44 of the pitch, so two of them
+    // need 0.88; 0.95 clears that and still stops short of the pitch itself.  Where there
+    // is no stack to measure, the marks are whatever the canvas draws them and `bow`
+    // already carries that number (it is 1.9 times the two radii).
+    var clearOf = function (pitch) { return pitch > 0 ? 0.95 * pitch : 0.62 * bow0; };
+
+    for (var ion2 in base) {
+      var me = base[ion2], A = P.A[ion2], B = P.B[ion2];
+      var bx = 0, by = 0, lifted = false, room = 0;
+      var mates = partners[ion2];
+      var myPitch = Math.max(A.pitch || 0, B.pitch || 0);
+      if (me.fly && mates && mates.length) {
+        var sd = pass.side[ion2] || 1;
+        var worst = 0;
+        for (var mi = 0; mi < mates.length; mi++) {
+          var mate = mates[mi], other = base[mate];
+          if (!other) continue;
+          // PER PAIR, on the WIDER of the two traps.  A mark is 0.44 of its own slot
+          // pitch, so the room two of them need is set by the bigger one; measuring only
+          // the mover's trap let an ion slip past a neighbour standing in a roomier one
+          // and be drawn through it -- 1.9% of instants on `tcx72`, which the Design
+          // canvas's own stage test caught.  Two ions that rest a pitch apart are in the
+          // SAME trap and share the pitch, so taking the larger cannot lift either of
+          // them where they stand.
+          var mA = P.A[mate], mB = P.B[mate];
+          var pitch = Math.max(myPitch, (mA && mA.pitch) || 0, (mB && mB.pitch) || 0);
+          var clear = clearOf(pitch);
+          if (!(clear > 0)) continue;
+          var d = Math.hypot(me.x - other.x, me.y - other.y);
+          if (d >= clear) continue;
+          var lift = Math.sqrt(Math.max(0, clear * clear - d * d));
+          if (lift > worst) worst = lift;
+        }
+        if (worst > 0) {
+          var ax2 = self.axis(A.node);
+          bx = -ax2[1] * sd * worst; by = ax2[0] * sd * worst;
+          lifted = true;
+        }
+        // AND NO BIGGER THAN THE GAP IT IS GOING THROUGH.  A flier's mark is sized by
+        // interpolating between the stack it leaves and the stack it arrives in, so an
+        // ion leaving a 71-ion trap for an EMPTY one is drawn growing to full size while
+        // it is still threading its old neighbours -- radius 0.005 to 0.068 against a
+        // gap of 0.011, which swallows thirteen of them.  `room` is half the distance to
+        // the nearest ion it has to pass: a mark never covers the neighbour it is
+        // getting by, and it grows naturally as it leaves.
+        var gap = Infinity;
+        for (var mj = 0; mj < mates.length; mj++) {
+          var o2 = base[mates[mj]];
+          if (!o2) continue;
+          gap = Math.min(gap, Math.hypot(me.x + bx - o2.x, me.y + by - o2.y));
+        }
+        if (isFinite(gap)) room = 0.45 * gap;
+      }
+      if (me.fly) {
+        // `swap` says THIS ION IS THREADING PAST ANOTHER, so the drawing knows not to let
+        // it swell to full radius on the way: a mark that has to fit through a gap does
+        // not also get bigger.  It is a fact about the step, not about how much lateral
+        // room the drawing happened to give it.
         var tight = ((ordStart[A.node] || []).length > 1) || ((ordEnd[B.node] || []).length > 1);
-        live[ion2] = { x: q.x + A.ox + (B.ox - A.ox) * t + bx,
-                       y: q.y + A.oy + (B.oy - A.oy) * t + by,
-                       fly: true, tt: t, pitchA: A.pitch, pitchB: B.pitch,
-                       swap: !!bow, tight: tight };
-        flying[ion2] = q;
+        live[ion2] = { x: me.x + bx, y: me.y + by, fly: true, tt: t,
+                       pitchA: A.pitch, pitchB: B.pitch,
+                       swap: !!(mates && mates.length), tight: tight, lifted: lifted,
+                       room: room };
+        flying[ion2] = me.q;
       } else {
         // A resting ion interpolates its slot too.  Its site's POPULATION changes during
         // the step -- an ion leaving frees a slot and the one staying behind shifts into
         // the middle -- so pinning it to the end-state slot makes it jump the moment the
         // step begins, straight into the ion still departing.
-        var pa = self.pos(A.node), pb = self.pos(B.node);
-        if (!pa || !pb) continue;
-        var x0 = pa[0] + A.ox, y0 = pa[1] + A.oy, x1 = pb[0] + B.ox, y1 = pb[1] + B.oy;
-        var u2 = rest ? 1 : t;
-        live[ion2] = { x: x0 + (x1 - x0) * u2, y: y0 + (y1 - y0) * u2, fly: false, node: B.node,
-                       pitch: (A.pitch && B.pitch) ? A.pitch + (B.pitch - A.pitch) * u2
+        live[ion2] = { x: me.x, y: me.y, fly: false, node: B.node,
+                       pitch: (A.pitch && B.pitch) ? A.pitch + (B.pitch - A.pitch) * me.u
                                                    : (B.pitch || A.pitch) };
       }
     }
