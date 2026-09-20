@@ -399,6 +399,11 @@
       site: (id) => rep[id] || id,
       // half the site bar, in device units: the scale the swap detour tapers over
       span: (id) => (capOf(id) > 0 ? siteLenOf(capOf(id)) / 2 : 0),
+      // half its THICKNESS -- how far across its own trap an ion may be drawn.
+      // `qccd/viz/layout.py`: site_t = RAIL_W_FRAC * 2.4 * g, RAIL_W_FRAC = 0.083.
+      across: (id) => (capOf(id) > 0 ? 0.083 * 2.4 * g / 2 : 0),
+      // and half a RAIL's, which is all the room there is out between the traps
+      rail: 0.083 * g / 2,
       slotOffsets: (id, k) => {
         const cap = capOf(id), m = slotsOf(cap), pitch = siteLenOf(cap) / m;
         const step = Math.min(pitch, 0.86 * g / Math.max(k, 1));
@@ -562,7 +567,11 @@
     const base = active ? rIon : rRest;
     if (!p) return base;
     const fit = (pitch) => Math.min(rRest, pitch ? 0.44 * pitch * s : rRest);
-    if (!p.fly) return p.pitch ? Math.min(base, 0.44 * p.pitch * s) : base;
+    if (!p.fly) {
+      // a STANDING ion gives way too, where it is one of a pair getting past each other
+      const rr = p.pitch ? Math.min(base, 0.44 * p.pitch * s) : base;
+      return p.room ? Math.min(rr, p.room * s) : rr;
+    }
     const rA = fit(p.pitchA), rB = fit(p.pitchB);
     const bulge = (p.swap || p.tight) ? 0 : 4 * p.tt * (1 - p.tt);
     const r = rA + (rB - rA) * p.tt + (rIon - Math.max(rA, rB)) * bulge;
