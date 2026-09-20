@@ -60,6 +60,21 @@ var MODE = 'play';                 // 'play' | 'edit'
 var EDITS = [], UNDONE = [];
 var STATE = null;                  // the ArchState the last rebuild produced
 var PROBLEMS = [], LINTS = [];
+//: A NOTE IS NOT A PROBLEM.  Two of `lint()`'s findings are observations about what has
+//: NOT been drawn yet rather than faults in what has: a zone type no site uses, and a
+//: movement class whose orbit matches no loop.  On a blank canvas from the shipped
+//: template EVERY finding is one of those, so the page greeted an empty stage with
+//: "10 problems" -- ten statements about a device the user had not started drawing.
+//: Nothing is silenced: they keep their own chip and their own heading in the list, and
+//: `lints()` still hands back all of them.  The problems chip counts what is wrong with
+//: what was actually drawn: a geometry-rule finding, a structural warning, a refusal.
+var NOTE_CODES = { zone_unused: 1, class_no_participants: 1 };
+function lintNotes() {
+  return LINTS.filter(function (l) { return !!NOTE_CODES[l.code]; });
+}
+function lintProblems() {
+  return LINTS.filter(function (l) { return !NOTE_CODES[l.code]; });
+}
 // clean | edited | stale | exact | blocked | unoracled
 //
 // `unoracled` is the fifth, and it exists because the per-frame self-check -- the thing
@@ -69,8 +84,45 @@ var PROBLEMS = [], LINTS = [];
 // zero for a check that never ran.  The badge says so instead.
 var PRICE = null, PRICE_STATUS = 'clean';
 var GROUP = 0;
-var SNAP = true, SELSET = [];
-var DOWN = null, ARMED = null, GHOST = null;
+// FREE BY DEFAULT.  A coordinate is any real number; the lattice is an aid you switch on
+// (the Snap button, remembered), or hold for one drop (shift).  Alt frees a snapped drag.
+var SNAP = false, SELSET = [];
+var SNAP_KEY = 'qccd.studio.snap';
+// THE BOUNDARY'S UNITS: the size of every mark in MODEL units, taken from the layout of
+// the device as it was first drawn and kept through its edits.  Marks on screen are sized
+// to the smallest gap, so if the boundary were read off the screen two parts pushed
+// together would shrink every mark and then fit closer still -- a feedback loop with no
+// floor.  Frozen per device (refreshed whenever a device has no edits), the boundary is
+// a property of the part, not of the zoom.
+var BOUND = null;
+function boundaryFrom(lay) {
+  // A COPY, never the live layout: `L` is mutated in place on every rebuild, and a
+  // boundary that read it would shrink with the marks -- the loop this exists to break.
+  // IN THE PIXELS OF THAT LAYOUT, not in model units: a long thin ring is drawn with
+  // 22 px per unit across and 144 up, and a bar's rotation only means what it means in
+  // the space it is drawn in.  Positions are scaled by the frozen sx/sy on the way in.
+  var snap = {}, k;
+  for (k in lay) if (has(lay, k)) snap[k] = lay[k];
+  return { sx: snap.sx || 1, sy: snap.sy || snap.sx || 1,
+           len: function (cap) { return _siteLen(cap, snap); },
+           t: snap.site_t, rj: snap.r_junc };
+}
+// THE SWEEP: a move is tested along its whole path, not only at its end, or a quick
+// pointer steps clean over a mark narrower than the step.  Samples every half-thickness.
+function firstContact(p0, from, to, member) {
+  var dist = Math.sqrt((to.ox - from.ox) * (to.ox - from.ox) + (to.oy - from.oy) * (to.oy - from.oy));
+  // the sample step is half a bar's thickness, in UNITS (the box is in pixels)
+  if (!BOUND) BOUND = boundaryFrom(L);
+  var step = Math.max(0.002, (BOUND.t / 2) / Math.max(BOUND.sx, BOUND.sy)), n = Math.max(1, Math.ceil(dist / step));
+  for (var i = 1; i <= n; i++) {
+    var t = i / n;
+    var c = contactAt(p0, from.ox + (to.ox - from.ox) * t, from.oy + (to.oy - from.oy) * t, member);
+    if (c) return { t: t, t0: (i - 1) / n, hit: c };
+  }
+  return null;
+}
+function snapRound(v) { return Math.round(v * 1000) / 1000 || 0; }
+var DOWN = null, ARMED = null, GHOST = null, LASTPT = null;
 var HW = null, HW0 = null;
 var READY = false, WHY_NOT = null;
 
@@ -306,13 +358,22 @@ function rebuild(opts) {
   //    selection and dragging for the rest of the session.
   GRID = null;
 
-  // 1. re-lay-out
-  var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE));
+  // 1. re-lay-out, under whatever scale mode the stage is in -- `layoutOpts()` is the
+  //    page's own "true scale" state, so an edit cannot silently change the scale rule
+  var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts());
   for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  // a device with no edits is a fresh device: its first layout is the boundary's unit
+  if (!EDITS.length) BOUND = boundaryFrom(lay);
 
   // 2. rewrite the page's own view of the device, IN PLACE: `A` is captured by every
   //    closure in the main script, so it is mutated rather than replaced.
   syncArch();
+  // THE DECLARED-LENGTH NOTE IS A PROPERTY OF THE DEVICE, read off it here on every
+  // rebuild -- never a fact remembered from the last drop.  Stored, it outlived the
+  // geometry it described: ctrl+Z (undoGroup) popped the edit and the strip went on
+  // saying "2 segment(s) drawn up to 0.50x their declared length" about a device that
+  // had none, and a fresh Start-card ring inherited the grid's note.
+  LENGTH_NOTE = mismatchShort(deviceMismatch());
 
   // 3. LOWER, then redraw, then re-price.  Lowering runs on every ARCHITECTURE edit as
   //    well, which is what keeps an authored programme's `entails` from going stale: it
@@ -324,21 +385,38 @@ function rebuild(opts) {
   // FREEZES on, and freezing is the honest answer, not silently re-deriving a picture of
   // a programme that cannot run.
   if (LAST_FRAMES !== P.frames) {
+    var nWas = LAST_FRAMES ? LAST_FRAMES.length : 0;
     LAST_FRAMES = P.frames;
     if (typeof deriveStage === 'function') deriveStage(P.frames);
     if (typeof slider !== 'undefined' && slider) {
       slider.max = String(Math.max(0, P.frames.length - 1));
-      if (typeof frame === 'number' && frame > P.frames.length - 1) frame = 0;
+      // `< 0` as well: a play tick that ran while the programme was empty left `frame`
+      // at -1, and the next programme then opened on "Step 0 / 2 - undefined"
+      if (typeof frame === 'number' && (frame < 0 || frame > P.frames.length - 1)) frame = 0;
+    }
+    // A PROGRAMME OF ANOTHER LENGTH IS ANOTHER PROGRAMME: the tick queued over the old
+    // one is stopped so it cannot write its last frame into the new one.  A drag while
+    // an authored programme plays re-lowers to the same length and keeps playing.
+    if (typeof stop === 'function' && P.frames.length !== nWas) stop();
+    // THE LISTING FOLLOWS THE FRAMES.  The Program pane's row count, its filter view
+    // and its NOW strip were built once at load over the shipped frames, so an authored
+    // programme of 2 statements sat under a header reading "13 / 13 instructions" with
+    // 11 ghost rows below it.  `rebuildView` is the page's own filter path; it is
+    // guarded because the editor's first rebuild can run before the page defines it.
+    if (typeof rebuildView === 'function') {
+      rebuildView(($('pFilter') && $('pFilter').value) || '', null);
     }
   }
   rebuildStatic();
   repriceNow();
   // THE VERDICTS ARE RE-DERIVED, not struck through.  `RULES_STALE` used to invalidate
-  // all 23 at once because none of them could be re-run here; 17 of them now can, off the
+  // all 27 at once because none of them could be re-run here; 21 of them now can, off the
   // walk `repriceNow` just did, and only the other 6 go grey.  Keeping both mechanisms
   // would leave the page with two answers about the same rule.
   if (typeof renderSide === 'function') renderSide();
   if (typeof renderReport === 'function') renderReport();
+  // the regime is a property of the device's shape (`L.wide`), so it is re-read here
+  if (typeof applyLayout === 'function') applyLayout();
   if (typeof sizeStage === 'function') sizeStage();
   if (typeof draw === 'function') draw();
   paint();
@@ -371,6 +449,10 @@ function syncArch() {
   for (lid in dev.loops) if (has(dev.loops, lid)) loops[lid] = dev.loops[lid].nodes.slice();
   A.nodes = nodes; A.segments = segments; A.loops = loops;
   A.zone_types = STATE.zone_types;
+  // THE NAME TOO: a device from a gallery card is named after what made it, and the
+  // price line, the export header and the recompile hint all read `A.name` -- which
+  // otherwise kept naming the page's shipped device for ever
+  if (STATE.name !== undefined && STATE.name !== null) A.name = STATE.name;
   for (var kk in nodeById) if (has(nodeById, kk)) delete nodeById[kk];
   for (var k2 in segById) if (has(segById, k2)) delete segById[k2];
   for (var i = 0; i < nodes.length; i++) nodeById[nodes[i].id] = nodes[i];
@@ -388,7 +470,8 @@ function clearGroup(g) {
 
 function rebuildStatic() {
   clearGroup(gLoop); clearGroup(gSeg); clearGroup(gElec); clearGroup(gNode);
-  var maps = [SEGEL, SEGINFO, PAD_BY_SEG, SEG_BY_PAIR, NODEEL, CAPTXT];
+  var maps = [SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
+              NODEEL, CAPTXT];
   for (var m = 0; m < maps.length; m++) {
     for (var k in maps[m]) if (has(maps[m], k)) delete maps[m][k];
   }
@@ -399,6 +482,11 @@ function rebuildStatic() {
   // with the freeze path, so the first frozen draw after a rebuild would write to pad
   // objects nothing renders.
   lastHot = []; lastSegHot = []; lastMark = [];
+  // THE FRAME MOVES ONLY WHEN THE DRAWING WAS RE-FITTED.  A held edit keeps the same
+  // scale, origin and viewBox, so there is nothing to re-frame and re-framing would be
+  // the shift the hold exists to prevent; `LASTFIT` still follows `L` so the next real
+  // fit can tell whether the frame was showing the whole device.
+  REFRAME = REFIT_NEXT;
   rebuildAxis();
   // THE STAGE IS ONE SCENE among the ones buildStatic can draw; the palette avatars are
   // the others.  Same function, same layout constants, same palette -- so the picture in
@@ -406,6 +494,23 @@ function rebuildStatic() {
   buildStatic(STAGE);
   refitVB();
   svg.setAttribute('viewBox', VB.x + ' ' + VB.y + ' ' + VB.w + ' ' + VB.h);
+  // the bar is in user units and the viewBox just moved; and a "no rail between A and B"
+  // badge is a claim about the device that was, so a new device clears it
+  if (typeof placeScaleBar === 'function') placeScaleBar();
+  if (typeof clearNoRail === 'function') clearNoRail();
+  // A MEASUREMENT IS ABOUT A GEOMETRY.  Every path here is a geometry change -- an edit,
+  // an undo, the true-scale toggle -- so the two picked points no longer mean what they
+  // meant.  Keeping them would leave a ruler pinned to pixels nothing is at any more.
+  // (A pan or a zoom does NOT come through here, and a measurement survives both.)
+  measureClear();
+  // A HALF-DRAWN SHAPE IS ABOUT A GEOMETRY TOO: its points are model coordinates the new
+  // layout no longer puts in the same place, and a preview left pinned to the old ones
+  // would commit a shape nobody drew.
+  sketchClear();
+  // THE FLAG IS CLEARED BY THE REDRAW THAT HONOURED IT, not by its caller: `rebuild` and
+  // `rescale` both end here, and one of them forgetting would leave every later edit
+  // re-fitting -- which is the defect, silently back.
+  REFIT_NEXT = false;
 }
 
 // The layout is recomputed on every geometry edit -- `g`, `W` and `H` all move -- but the
@@ -417,7 +522,9 @@ function rebuildStatic() {
 // had zoomed in, keep their zoom -- but never let the content escape the frame entirely:
 // grow the box just enough to contain it.
 var LASTFIT = { w: L.W, h: L.H };
+var REFRAME = true;
 function refitVB() {
+  if (!REFRAME) { LASTFIT.w = L.W; LASTFIT.h = L.H; return; }
   var fitted = Math.abs(VB.x) < 0.5 && Math.abs(VB.y) < 0.5 &&
                Math.abs(VB.w - LASTFIT.w) < 0.5 && Math.abs(VB.h - LASTFIT.h) < 0.5;
   if (fitted) {
@@ -511,7 +618,11 @@ function repriceNow() {
   // Python is silent, so parity holds and a differential test could never catch it.  Only
   // a structural check can.
   var bad = Q.validateProgram(dev, P.frames, classes);
-  var lens = Q.loopLengths(dev), baseLens = BASE_LOOPS;
+  // `shift: [loop, delta]` frames were compiled for a loop of ONE length, so the shipped
+  // programme goes stale when that loop is resized.  An authored programme is re-lowered
+  // against the live loop on every rebuild, and a device with no programme has nothing
+  // to go stale -- so the guard reads the compiled lengths only for the compiled frames.
+  var lens = Q.loopLengths(dev), baseLens = programmeIsShipped() ? BASE_LOOPS : {};
   for (var lid in baseLens) if (has(baseLens, lid)) {
     if (has(lens, lid) && lens[lid] !== baseLens[lid]) {
       bad.push({ kind: 'loop_resized', loop: lid, was: baseLens[lid], now: lens[lid],
@@ -698,9 +809,19 @@ function loopPointList(lid) {
   return out;
 }
 
-function hit(mx, my, coarse) {
+// A MINIMUM PICK RADIUS OF 8 CLIENT PX, taken only when nothing was hit exactly.  The
+// ring page draws its junction squares and site bars 1.8-2.7 px across at fit, and the
+// perpendicular slop is 0.06g = 1.3 px there: a target you can see but cannot aim at.
+// `widen` re-runs the NODE pass -- the same lines, the same drawn bodies -- with the slop
+// raised to 8 px across the bar and around the junction, and the LOOP pass with its halo
+// widened to the same 8 px; nothing along the bar's axis changes and no segment is
+// widened, so every exact answer stays exactly what it was and the widened one is
+// offered only where the exact pass answered nothing.  (The loop halo is what the rails
+// do not own -- 1.25 px a side on the ring page at fit, a target no pointer can land on.)
+function hit(mx, my, coarse, widen) {
   if (!GRID) buildIndex();
-  var S = slop(), SS = coarse ? 2 * S : S;
+  var S = slop(), SS = coarse ? 2 * S : S, SJ = 0;
+  if (widen) { S = Math.max(S, 8 * userPerPx()); SJ = S; }
   var bestJ = null, bestS = null;
   var cx = Math.floor(mx / GRID.cell), cy = Math.floor(my / GRID.cell);
   for (var i = -1; i <= 1; i++) for (var j = -1; j <= 1; j++) {
@@ -718,7 +839,7 @@ function hit(mx, my, coarse) {
         // take the pixel away from the three or four rails that meet inside it.
         var h = L.r_junc;
         var dj = Math.max(Math.abs(mx - X), Math.abs(my - Y));
-        if (dj <= h && (bestJ === null || dj < bestJ.dist)) {
+        if (dj <= h + SJ && (bestJ === null || dj < bestJ.dist)) {
           bestJ = { kind: 'junction', id: n.id, dist: dj };
         }
         continue;
@@ -745,7 +866,7 @@ function hit(mx, my, coarse) {
   if (bestJ) return bestJ;
   if (bestS) return bestS;
   var best = null;
-  for (var sI = 0; sI < A.segments.length; sI++) {
+  for (var sI = 0; sI < (widen ? 0 : A.segments.length); sI++) {
     var sg = A.segments[sI], a = nodeById[sg.a], b = nodeById[sg.b];
     if (!a || !b) continue;
     var I = SEGINFO[sg.id];
@@ -792,30 +913,72 @@ function hit(mx, my, coarse) {
       var dq = Q.pointSegment([mx, my], pts[q2], r2)[0];
       if (dq < dl) dl = dq;
     }
-    if (dl <= 0.5 * L.sw_loop && (bl === null || dl < bl.dist)) {
+    if (dl <= Math.max(0.5 * L.sw_loop, SJ) && (bl === null || dl < bl.dist)) {
       bl = { kind: 'loop', id: lid, dist: dl };
     }
   }
-  return bl;
+  if (bl) return bl;
+  return widen ? null : hit(mx, my, coarse, true);
 }
 
 // THE ONE ARBITER of who owns a press.  The page's pan handler had no mode guard at all,
 // so both it and the editor ran on every pointerdown and the stage panned out from under
 // a node drag (measured: VB.x 0 -> -8.96 on a replayed drag).  render.py asks this and
-// restates nothing; play mode is byte-for-byte as it was.
+// restates nothing.
+//
+// THERE ARE NO MODES.  A press on an element is the editor's (drag = move, click =
+// select); shift on empty stage is a marquee; everything else -- empty stage, middle or
+// right button -- pans.  The page used to open in a "play" mode in which this answered
+// 'pan' for every press, so the first drag any user made slid the stage instead of the
+// node under the pointer, and nothing on screen said why.  (`mod.space` is still honoured
+// for a caller that says it; the page itself no longer holds space to pan, because space
+// is play/pause and empty-stage drag already pans.)
 //
 // Pure, and callable without an Event, so a harness can assert the RULE rather than the
 // handler that happens to obey it.
+// VIEW-ONLY: the page shows a programme running and nothing may be edited -- the
+// embedded examples on the website.  Every press pans, every editing key is dead, and
+// the transport (play, step, seek, fit) is all that answers.
+var VIEW_ONLY = false;
+function setViewOnly(on) {
+  VIEW_ONLY = !!on;
+  if (VIEW_ONLY) {
+    if (GHOST) cancel();
+    if (ARMED_EL) arm(null);
+    if (MEASURE) measureToggle(false);
+    if (SKETCH) { SKETCH = null; sketchClear(); }
+    menuClose();
+    document.body.setAttribute('data-viewonly', '1');
+  } else {
+    document.body.removeAttribute('data-viewonly');
+  }
+  paint();
+}
+var VIEW_ONLY_VERBS = { 'toggle-play': 1, 'glide': 1, 'escape': 1, 'seek-first': 1, 'seek-last': 1,
+                        'seek-back': 1, 'seek-ahead': 1, 'seek-next': 1, 'seek-prev': 1, 'fit': 1,
+                        'follow': 1, 'help': 1, 'explain': 1 };
 function claim(mx, my, mod) {
   mod = mod || {};
-  if (MODE !== 'edit') return 'pan';
+  if (VIEW_ONLY) return 'pan';
+  // THE RULER TAKES EVERY LEFT PRESS while it is on: a click is a measurement, and a
+  // measurement you have to aim around a drag would be no measurement at all.  A middle
+  // or right press still pans, so the view can be moved without leaving the tool.
+  if (MEASURE && !(mod.button === 1 || mod.button === 2)) return 'measure';
+  // AND SO DOES AN ARMED SHAPE TOOL, for the same reason: a drag you had to aim around
+  // the parts already on the canvas would be no drawing tool at all.  Middle and right
+  // still pan, so the view can be moved without leaving the tool.
+  if (SKETCH && !(mod.button === 1 || mod.button === 2)) return 'sketch';
+  // A RIGHT PRESS ON SOMETHING IS THAT THING'S MENU.  A right press on EMPTY STAGE still
+  // pans, because right-drag panning is a documented gesture and `render.py` suppresses
+  // the browser's own context menu over the stage for exactly that reason -- so the only
+  // place the browser menu is given up is where this page has a better one to offer.
+  if (mod.button === 2 && hit(mx, my)) return 'menu';
   if (mod.space || mod.button === 1 || mod.button === 2) return 'pan';
-  return hit(mx, my) ? 'element' : 'marquee';
+  return hit(mx, my) ? 'element' : (mod.shift ? 'marquee' : 'pan');
 }
 function claimEvent(e) {
-  if (MODE !== 'edit') return 'pan';
   var m = toModel(e.clientX, e.clientY);
-  return claim(m.x, m.y, { button: e.button, space: SPACE, alt: e.altKey,
+  return claim(m.x, m.y, { button: e.button, alt: e.altKey,
                            shift: e.shiftKey, ctrl: e.ctrlKey });
 }
 
@@ -857,25 +1020,44 @@ function outlineOf(kind, id) {
 }
 
 // ------------------------------------------------------------------- snapping
-function snapTo(x, y, free, fine) {
-  if (!SNAP || free) return { x: x, y: y, guides: [] };
+// `hard` rounds to the nearest lattice step UNCONDITIONALLY -- no window, no `free`.  A
+// stamp has no drag to preserve, and a placement that landed 0.31 of a step off the
+// lattice (measured: `L.sx` is 72 on the blank page, so the window is 22 px wide and a
+// click misses it as often as not) shrank every mark on the stage.  One lattice rule,
+// here, with one extra switch -- not a second rounding somewhere else.
+function snapTo(x, y, free, fine, hard) {
+  // free: where the pointer is, to a thousandth of a lattice unit so the source stays
+  // readable (`d.site("S3", 2.417, 0.0)`), never `2.41700000001`
+  if (!hard && !fine && (!SNAP || free)) return { x: snapRound(x), y: snapRound(y), guides: [] };
   var stepx = (L.ux || 1) / (fine ? 4 : 1), stepy = (L.uy || L.ux || 1) / (fine ? 4 : 1);
-  var rx = Math.round(x / stepx) * stepx, ry = Math.round(y / stepy) * stepy;
-  var out = { x: x, y: y, guides: [] };
-  if (Math.abs(rx - x) * L.sx < 0.30 * stepx * L.sx) out.x = rx;
-  if (Math.abs(ry - y) * L.sy < 0.30 * stepy * L.sy) out.y = ry;
+  // `Math.round(-0.2)` is -0, which the Python export prints as `-0.0`: a node at the
+  // origin that reads as if it were somewhere else.  `|| 0` folds it to +0.
+  //
+  // THE NEAREST LATTICE POINT, UNCONDITIONALLY.  A 0.30-step window used to decide
+  // whether to round at all, so 41% of drops -- every release in the 40% of a step the
+  // window did not cover -- landed off-lattice, and ONE off-lattice node makes the
+  // nearest-neighbour gap `g` shrink and every mark on the stage with it (measured: g
+  // 50.9 -> 22.7 px after a single 120 px drag).  Snap on means on; `alt` (free) is the
+  // one way off it and `shift` (fine) quarters the step.
+  var rx = Math.round(x / stepx) * stepx || 0, ry = Math.round(y / stepy) * stepy || 0;
+  var out = { x: rx, y: ry, guides: [] };
   // alignment snap.  Not cosmetic: `compute_layout` tests `axis_aligned` and falls back
   // from anisotropic to isotropic the instant ONE diagonal segment exists, which visibly
   // rescales the whole picture.  Keeping a drag on-axis is what keeps that from happening
-  // by accident.
+  // by accident.  AT MOST ONE GUIDE PER AXIS -- the nearest -- so the HUD's two guide
+  // lines are the two that decided the point rather than the first two of many.
+  var gx = null, gy = null;
   for (var i = 0; i < A.nodes.length; i++) {
     var n = A.nodes[i];
     // every member of the drag, not only the one pressed: a group drag that snapped to
     // its own passengers would pin itself in place
     if (GHOST && (GHOST.ids ? GHOST.ids.indexOf(n.id) >= 0 : n.id === GHOST.id)) continue;
-    if (Math.abs((n.x - out.x) * L.sx) < 0.15 * L.g) { out.x = n.x; out.guides.push(['x', n.x]); }
-    if (Math.abs((n.y - out.y) * L.sy) < 0.15 * L.g) { out.y = n.y; out.guides.push(['y', n.y]); }
+    var ex = Math.abs((n.x - out.x) * L.sx), ey = Math.abs((n.y - out.y) * L.sy);
+    if (ex < 0.15 * L.g && (gx === null || ex < gx.d)) gx = { v: n.x, d: ex };
+    if (ey < 0.15 * L.g && (gy === null || ey < gy.d)) gy = { v: n.y, d: ey };
   }
+  if (gx) { out.x = gx.v; out.guides.push(['x', gx.v]); }
+  if (gy) { out.y = gy.v; out.guides.push(['y', gy.v]); }
   return out;
 }
 
@@ -887,27 +1069,8 @@ function validate(op) {
   var problems = [];
   if (!STATE) return problems;
   if (op.method === 'move_site') {
-    var nid = op.args[0], x = +Q.unbox(op.args[1]), y = +Q.unbox(op.args[2]);
-    if (!isFinite(x) || !isFinite(y) || Math.abs(x) > Q.COORD_MAX || Math.abs(y) > Q.COORD_MAX) {
-      problems.push({ code: 'coord_range', targets: [nid],
-                      message: nid + ' would sit outside the range the layout can measure' });
-    }
-    // COINCIDENCE IS A HARD REFUSAL, not a warning.  `min_nearest_neighbour` SKIPS
-    // coincident points, so two nodes at one position make `g` get measured off the NEXT
-    // pair and every mark on the stage silently becomes the wrong size -- `2*r_ion < g`
-    // stops meaning what it says.  Completely invisible, which is why it cannot be a
-    // warning.
-    for (var i = 0; i < A.nodes.length; i++) {
-      var n = A.nodes[i];
-      if (n.id === nid) continue;
-      var d = Math.sqrt((n.x - x) * (n.x - x) + (n.y - y) * (n.y - y));
-      if (d < 0.05 * (L.gd || 1)) {
-        problems.push({ code: 'coincident', targets: [nid, n.id],
-                        message: nid + ' would sit on top of ' + n.id +
-                          '. The layout measures the nearest-neighbour gap, and two nodes ' +
-                          'at one point make every mark the wrong size.' });
-      }
-    }
+    problems = problems.concat(moveProblems(op.args[0], +Q.unbox(op.args[1]),
+                                            +Q.unbox(op.args[2]), null));
   }
   if (op.method === 'set_site_capacity') {
     var site = typeof op.args[0] === 'string' ? op.args[0] : op.args[0][0];
@@ -922,6 +1085,148 @@ function validate(op) {
     }
   }
   return problems;
+}
+// THE ONE RULE FOR A NODE AT A POINT, asked three times: by `validate` for a single
+// `move_site`, by `move()` for every member of a live drag (so the HUD turns red BEFORE
+// the release, not a toast after it) and by `drop()` for the same members.  `skip` names
+// the other members of a rigid group -- a member landing where another member WAS is
+// not a coincidence, and the other member's own move says where it is going.
+function moveProblems(nid, x, y, skip) {
+  var problems = [];
+  if (!isFinite(x) || !isFinite(y) || Math.abs(x) > Q.COORD_MAX || Math.abs(y) > Q.COORD_MAX) {
+    problems.push({ code: 'coord_range', targets: [nid],
+                    message: nid + ' would sit outside the range the layout can measure' });
+  }
+  // COINCIDENCE IS A HARD REFUSAL, not a warning.  `min_nearest_neighbour` SKIPS
+  // coincident points, so two nodes at one position make `g` get measured off the NEXT
+  // pair and every mark on the stage silently becomes the wrong size -- `2*r_ion < g`
+  // stops meaning what it says.  Completely invisible, which is why it cannot be a
+  // warning.
+  for (var i = 0; i < A.nodes.length; i++) {
+    var n = A.nodes[i];
+    if (n.id === nid || (skip && skip[n.id])) continue;
+    var d = Math.sqrt((n.x - x) * (n.x - x) + (n.y - y) * (n.y - y));
+    if (d < 0.05 * (L.gd || 1)) {
+      problems.push({ code: 'coincident', targets: [nid, n.id],
+                      message: nid + ' would sit on top of ' + n.id +
+                        '. The layout measures the nearest-neighbour gap, and two nodes ' +
+                        'at one point make every mark the wrong size.' });
+    }
+  }
+  return problems;
+}
+// EVERY MEMBER OF A DRAG, checked against everything that is NOT moving with it.  The
+// warnings used to be asked of `GHOST.id`, which for a segment or loop drag is a segment
+// or loop id that no node has, so those drags warned about nothing; and the refusal was
+// asked only at the drop.  One scan, at `p0 + (ox, oy)`, feeding the HUD and the drop.
+// ---- THE BOUNDARY ------------------------------------------------------------------
+// Two marks never overlap.  Each node is an oriented box in stage pixels -- a site is its
+// drawn bar (length from its capacity, thickness `site_t`, at its own angle), a junction
+// its square -- and a drag is stopped against the first box in its way.  The same box the
+// stage draws and the hit test uses, so the boundary is where the eye says it is.
+// THE BAR'S AXIS AT A POSITION: the same rule the stage draws by (`axisOf`) -- the arm
+// direction most of its arms agree with -- evaluated with the moving nodes where they
+// are going, so the box a drag is tested with is the box the drop will draw.
+function axisAt(id, pos) {
+  if (!BOUND) BOUND = boundaryFrom(L);
+  var arms = [], i, sx = BOUND.sx, sy = BOUND.sy;
+  var p = pos[id] || nodeById[id];
+  for (i = 0; i < A.segments.length; i++) {
+    var sg = A.segments[i];
+    if (sg.a !== id && sg.b !== id) continue;
+    var oid = sg.a === id ? sg.b : sg.a, o = pos[oid] || nodeById[oid];
+    if (!o || !p) continue;
+    var dx = (o.x - p.x) * sx, dy = (o.y - p.y) * sy, h = Math.sqrt(dx * dx + dy * dy);
+    if (h < 1e-9) continue;
+    var ux = dx / h, uy = dy / h;
+    if (ux < -1e-12 || (Math.abs(ux) < 1e-12 && uy < 0)) { ux = -ux; uy = -uy; }
+    arms.push([ux, uy]);
+  }
+  if (!arms.length) return null;
+  var best = arms[0], bs = -1;
+  for (i = 0; i < arms.length; i++) {
+    var sc = 0;
+    for (var o2 = 0; o2 < arms.length; o2++) sc += Math.abs(arms[i][0] * arms[o2][0] + arms[i][1] * arms[o2][1]);
+    if (sc > bs) { bs = sc; best = arms[i]; }
+  }
+  return { ux: best[0], uy: best[1] };
+}
+function nodeBoxAt(n, x, y, axis) {
+  // the shipped layout is the unit until the first edit re-lays the device out
+  if (!BOUND) BOUND = boundaryFrom(L);
+  var B = BOUND, cx = x * B.sx, cy = y * B.sy;
+  if (isJunctionNode(n)) return { cx: cx, cy: cy, hl: B.rj, ht: B.rj, ux: 1, uy: 0 };
+  var G = siteHalfAxis(n), E = NODEEL[n.id], ux, uy;
+  if (axis) { ux = axis.ux; uy = axis.uy; }
+  else {
+    var ang = (E && E.ang !== undefined) ? E.ang * Math.PI / 180 : Math.atan2(G.ax.uy, G.ax.ux);
+    ux = Math.cos(ang); uy = Math.sin(ang);
+  }
+  return { cx: cx, cy: cy, hl: B.len(n.cap || 0) / 2, ht: B.t / 2, ux: ux, uy: uy };
+}
+// separating-axis test over the four axes of two oriented rectangles
+function boxesOverlap(a, b, margin) {
+  var axes = [[a.ux, a.uy], [-a.uy, a.ux], [b.ux, b.uy], [-b.uy, b.ux]];
+  var dx = b.cx - a.cx, dy = b.cy - a.cy;
+  for (var i = 0; i < 4; i++) {
+    var ax = axes[i][0], ay = axes[i][1];
+    var ra = Math.abs(a.ux * ax + a.uy * ay) * a.hl + Math.abs(-a.uy * ax + a.ux * ay) * a.ht;
+    var rb = Math.abs(b.ux * ax + b.uy * ay) * b.hl + Math.abs(-b.uy * ax + b.ux * ay) * b.ht;
+    if (Math.abs(dx * ax + dy * ay) >= ra + rb + margin) return false;
+  }
+  return true;
+}
+// ONE TOLERANCE, EVERYWHERE.  Marks may touch; an overlap smaller than this (a
+// thousandth of a unit is what a coordinate is kept to) is touching.  A cosmetic gap on
+// top of it would let rounding leave a part a hair inside the gap, where a drag toward
+// the obstacle is stuck and a drag away starts 'already overlapping' and is exempt.
+function boundaryMargin() { return 0; }
+// the first fixed node any member of a drag would overlap at offset (ox, oy), or null
+function contactAt(p0, ox, oy, member, mg) {
+  var margin = mg === undefined ? boundaryMargin() : mg, pos = {}, k;
+  for (k = 0; k < p0.length; k++) pos[p0[k].id] = { x: p0[k].x + ox, y: p0[k].y + oy };
+  for (var i = 0; i < p0.length; i++) {
+    var r = p0[i], n = nodeById[r.id];
+    if (!n) continue;
+    var a = nodeBoxAt(n, r.x + ox, r.y + oy, isJunctionNode(n) ? null : axisAt(r.id, pos));
+    for (var j = 0; j < A.nodes.length; j++) {
+      var m = A.nodes[j];
+      if (member[m.id]) continue;
+      if (boxesOverlap(a, nodeBoxAt(m, m.x, m.y), margin)) return { id: r.id, against: m.id };
+    }
+  }
+  return null;
+}
+// the node a stamp (a pseudo-node: kind, capacity, position) would overlap, or null
+function stampContact(pseudo, x, y) {
+  var a = nodeBoxAt(pseudo, x, y), margin = boundaryMargin();
+  for (var j = 0; j < A.nodes.length; j++) {
+    var m = A.nodes[j];
+    if (boxesOverlap(a, nodeBoxAt(m, m.x, m.y), margin)) return m.id;
+  }
+  return null;
+}
+function groupCheck(p0, ox, oy) {
+  var member = {}, i, warnings = [], brief = [], problems = [];
+  for (i = 0; i < p0.length; i++) member[p0[i].id] = 1;
+  var diag = false, agg = { count: 0, worst: null };
+  for (i = 0; i < p0.length; i++) {
+    var r = p0[i], x = r.x + ox, y = r.y + oy;
+    problems = problems.concat(moveProblems(r.id, x, y, member));
+    if (!diag && breaksAxisAlignment(r.id, x, y, member)) diag = true;
+    mismatchScan(r.id, x, y, member, agg);
+  }
+  if (diag && L.axis_aligned) {
+    warnings.push('this makes a segment diagonal: the fit switches from anisotropic (' +
+                  L.sx + ' x ' + L.sy + ' px/unit) to isotropic and the whole picture ' +
+                  'rescales');
+    brief.push('makes a segment diagonal: the whole picture rescales');
+  }
+  var decl = mismatchText(agg);
+  if (decl) { warnings.push(decl); brief.push(mismatchHud(agg)); }
+  // `brief[i]` is `warnings[i]` sized for the HUD's second line: a cut of the long
+  // sentence at 72 characters landed mid-number ('anisotropic (101.7...')
+  return { warnings: warnings, brief: brief, problems: problems, mismatch: agg.worst ? agg : null };
 }
 // max occupancy per site over the whole programme -- ONE integer per site, precomputed
 // once.  A per-frame occupancy table would be 1,975 x 168 on the deck page.
@@ -947,15 +1252,53 @@ function buildMaxOcc() {
 // used to return null and a segment could be selected but never moved; a loop could be
 // neither.  One place expands a press into the nodes that will actually move, and a press
 // INSIDE a multi-selection moves the whole selection rather than dropping it.
-function subjectOf(kind, id) {
+//
+// A PLACED COMPONENT IS ONE THING.  A press on any part of a stamped component -- a node
+// or one of its segments -- that is not already inside the selection moves every member
+// of that instance (`instanceMembers`, the same list select- and delete-as-a-unit use);
+// `opts.alt` takes the one part under the pointer instead.  Measured before this: a drag
+// on `c1.s0` of a freshly stamped grid tile moved 1 of its 8 nodes.
+function subjectOf(kind, id, opts) {
   var out = [], i, q;
+  opts = opts || {};
   function push(nid) { if (nodeById[nid] && out.indexOf(nid) < 0) out.push(nid); }
-  if (kind === 'segment') { var sg = segById[id]; if (sg) { push(sg.a); push(sg.b); } return out; }
+  function inSelection() {
+    for (var k = 0; k < SELSET.length; k++) if (SELSET[k].kind === kind && SELSET[k].id === id) return true;
+    return false;
+  }
+  function members() {
+    var inst = (!opts.alt && typeof instanceAt === 'function') ? instanceAt(id) : null;
+    if (!inst) return false;
+    var mem = instanceMembers(inst);
+    for (var m = 0; m < mem.length; m++) {
+      if (mem[m].kind === 'segment') { var s3 = segById[mem[m].id]; if (s3) { push(s3.a); push(s3.b); } }
+      else push(mem[m].id);
+    }
+    return out.length > 0;
+  }
+  if (kind === 'segment') {
+    if (inSelection()) return selectionNodes();
+    if (members()) return out;
+    var sg = segById[id]; if (sg) { push(sg.a); push(sg.b); } return out;
+  }
   if (kind === 'loop') {
+    if (inSelection()) return selectionNodes();
     var w = (A.loops || {})[id] || [];
     for (i = 0; i < w.length; i++) push(w[i]);
     return out;
   }
+  out = selectionNodes();
+  if (out.indexOf(id) >= 0) return out;
+  out = [];
+  if (members()) return out;
+  return nodeById[id] ? [id] : [];
+}
+// THE NODES THE SELECTION MOVES -- a segment brings both ends, a loop its whole walk.
+// One expansion for a drag from inside the selection and for an arrow-key nudge, so the
+// two gestures cannot disagree about what "move the selection" means.
+function selectionNodes() {
+  var out = [], i, q;
+  function push(nid) { if (nodeById[nid] && out.indexOf(nid) < 0) out.push(nid); }
   for (i = 0; i < SELSET.length; i++) {
     var sl = SELSET[i];
     if (sl.kind === 'segment') { var s2 = segById[sl.id]; if (s2) { push(s2.a); push(s2.b); } }
@@ -964,12 +1307,11 @@ function subjectOf(kind, id) {
       for (q = 0; q < w2.length; q++) push(w2[q]);
     } else push(sl.id);
   }
-  if (out.indexOf(id) >= 0) return out;
-  return nodeById[id] ? [id] : [];
+  return out;
 }
 
-function begin(kind, id, mx, my) {
-  var ids = subjectOf(kind, id);
+function begin(kind, id, mx, my, opts) {
+  var ids = subjectOf(kind, id, opts);
   if (!ids.length) return null;
   var anchor = nodeById[id] ? id : ids[0];
   var n = nodeById[anchor];
@@ -977,17 +1319,120 @@ function begin(kind, id, mx, my) {
   var p0 = [], i;
   for (i = 0; i < ids.length; i++) p0.push({ id: ids[i], x: nodeById[ids[i]].x,
                                              y: nodeById[ids[i]].y });
+  // the device's own extent BEFORE the drag, for `stageBox`: every node, members at the
+  // positions they are leaving
+  var bb = null;
+  for (i = 0; i < A.nodes.length; i++) {
+    var q = A.nodes[i];
+    if (!bb) bb = { x0: q.x, x1: q.x, y0: q.y, y1: q.y };
+    else { bb.x0 = Math.min(bb.x0, q.x); bb.x1 = Math.max(bb.x1, q.x);
+           bb.y0 = Math.min(bb.y0, q.y); bb.y1 = Math.max(bb.y1, q.y); }
+  }
   GHOST = { kind: kind, id: id, anchor: anchor, ids: ids, p0: p0,
             x0: n.x, y0: n.y, mx0: mx, my0: my,
-            px0: px(n), py0: py(n), group: 'g' + GROUP };
+            px0: px(n), py0: py(n), group: 'g' + GROUP,
+            warnings: [], problems: [], bbox: bb };
   return GHOST;
+}
+// WHERE A SNAPPED DRAG MAY LAND, in lattice units: the visible stage, rounded inward to
+// the step, widened to the device's own box plus one step on every side.  A release
+// outside the stage then lands the node on the nearest lattice point that is still on
+// the canvas -- a pointer that leaves the window keeps arriving (the svg holds the
+// capture), so the user can come back; what they cannot do any more is lose a node
+// off-screen.  The device box is the floor because the visible padding is not always a
+// whole step: on the ring page `sy` is 144 px/unit and the stage's margin is a fifth of
+// a step, so the stage alone would have pinned every site to the row it started on.
+// `null` when nothing legal is inside either box.
+function stageBox(stepx, stepy, bb) {
+  var b = null;
+  if (typeof VB !== 'undefined' && VB && VB.w > 0) {
+    // the WHOLE svg box, letterbox included: `meet` shows more than the viewBox on the
+    // axis it does not fill, and every pixel of the box is canvas the user can see
+    var f = fitBox();
+    var mx0 = VB.x - f.ox / f.k, mx1 = VB.x + (Math.max(1, f.r.width) - f.ox) / f.k;
+    var my0 = VB.y - f.oy / f.k, my1 = VB.y + (Math.max(1, f.r.height) - f.oy) / f.k;
+    var lx0 = (mx0 - L.ox) / (L.sx || 1), lx1 = (mx1 - L.ox) / (L.sx || 1);
+    var ly0 = (my0 - L.oy) / (L.sy || 1), ly1 = (my1 - L.oy) / (L.sy || 1);
+    b = { x0: Math.ceil(Math.min(lx0, lx1) / stepx) * stepx, x1: Math.floor(Math.max(lx0, lx1) / stepx) * stepx,
+          y0: Math.ceil(Math.min(ly0, ly1) / stepy) * stepy, y1: Math.floor(Math.max(ly0, ly1) / stepy) * stepy };
+  }
+  if (bb) {
+    var d = { x0: Math.floor(bb.x0 / stepx) * stepx - stepx, x1: Math.ceil(bb.x1 / stepx) * stepx + stepx,
+              y0: Math.floor(bb.y0 / stepy) * stepy - stepy, y1: Math.ceil(bb.y1 / stepy) * stepy + stepy };
+    b = b ? { x0: Math.min(b.x0, d.x0), x1: Math.max(b.x1, d.x1),
+              y0: Math.min(b.y0, d.y0), y1: Math.max(b.y1, d.y1) } : d;
+  }
+  return (b && b.x0 <= b.x1 && b.y0 <= b.y1) ? b : null;
 }
 
 function move(mx, my, opts) {
   if (!GHOST) return null;
   opts = opts || {};
+  // remembered in LATTICE units: the drop re-lays the device out, so a model point kept
+  // from before it would name the wrong place once `L.sx`/`L.ox` have moved
+  LASTPT = { lx: (mx - L.ox) / (L.sx || 1), ly: (my - L.oy) / (L.sy || 1) };
   var dx = (mx - GHOST.mx0) / (L.sx || 1), dy = (my - GHOST.my0) / (L.sy || 1);
   var s = snapTo(GHOST.x0 + dx, GHOST.y0 + dy, opts.free, opts.fine);
+  // NEVER OFF-CANVAS: a snapped drag stays inside the visible stage (`stageBox`), so a
+  // release past its edge -- or outside the window -- lands on the nearest lattice point
+  // that is still on screen instead of somewhere no one can grab it back from.  A free
+  // (alt) drag is the user's own business; Snap off is not -- it only stops the rounding.
+  if (!opts.free) {
+    var box = stageBox((L.ux || 1) / (opts.fine ? 4 : 1), (L.uy || L.ux || 1) / (opts.fine ? 4 : 1), GHOST.bbox);
+    if (box) {
+      s.x = Math.max(box.x0, Math.min(box.x1, s.x));
+      s.y = Math.max(box.y0, Math.min(box.y1, s.y));
+    }
+  }
+  // THE BOUNDARY.  The wanted offset is tested against every mark that is not moving;
+  // if it overlaps one, the drag goes as far along its path as it can (a bisection from
+  // the last accepted offset) and then slides along the obstacle -- the pointer's x with
+  // the accepted y, or the accepted x with the pointer's y -- so a part moves along the
+  // side of the one it is pressed against instead of sticking to it.  A snapped drag
+  // simply keeps its last lattice point.  A drag that STARTS overlapping (a device drawn
+  // that way) is exempt, or it could never be pulled apart.
+  var member = {}, mk;
+  for (mk = 0; mk < GHOST.p0.length; mk++) member[GHOST.p0[mk].id] = 1;
+  if (GHOST.acc === undefined) {
+    GHOST.acc = { ox: 0, oy: 0 };
+    // exempt only a REAL overlap (a device drawn that way), never a hairline one
+    GHOST.noBoundary = !!contactAt(GHOST.p0, 0, 0, member, -0.5);
+  }
+  GHOST.contact = null;
+  if (!GHOST.noBoundary) {
+    var want = { ox: s.x - GHOST.x0, oy: s.y - GHOST.y0 }, acc = GHOST.acc;
+    var fc = firstContact(GHOST.p0, acc, want, member);
+    if (fc) {
+      var best = acc;
+      if (!(SNAP && !opts.free)) {
+        // the farthest free point between the last free sample and the first blocked one
+        var lo = fc.t0, hi = fc.t, t, it;
+        for (it = 0; it < 8; it++) {
+          t = (lo + hi) / 2;
+          if (contactAt(GHOST.p0, acc.ox + (want.ox - acc.ox) * t, acc.oy + (want.oy - acc.oy) * t, member)) hi = t; else lo = t;
+        }
+        best = { ox: acc.ox + (want.ox - acc.ox) * lo, oy: acc.oy + (want.oy - acc.oy) * lo };
+        // then slide along the obstacle, each slide swept too
+        var cA = { ox: want.ox, oy: best.oy }, cB = { ox: best.ox, oy: want.oy };
+        if (!firstContact(GHOST.p0, best, cA, member)) best = cA;
+        else if (!firstContact(GHOST.p0, best, cB, member)) best = cB;
+      }
+      // ROUND AWAY FROM THE OBSTACLE.  A landing kept to a thousandth can round a hair
+      // INTO the mark it stopped against, and the next drag would then creep deeper by
+      // that hair every step; so a rounded landing that touches is backed off along its
+      // own path until it is clear, and the last accepted offset is the floor.
+      var rx = snapRound(GHOST.x0 + best.ox), ry = snapRound(GHOST.y0 + best.oy);
+      var bl = Math.sqrt((best.ox - acc.ox) * (best.ox - acc.ox) + (best.oy - acc.oy) * (best.oy - acc.oy)) || 1;
+      for (var bk = 1; bk <= 4 && contactAt(GHOST.p0, rx - GHOST.x0, ry - GHOST.y0, member); bk++) {
+        rx = snapRound(GHOST.x0 + best.ox - (best.ox - acc.ox) / bl * 0.001 * bk);
+        ry = snapRound(GHOST.y0 + best.oy - (best.oy - acc.oy) / bl * 0.001 * bk);
+      }
+      if (contactAt(GHOST.p0, rx - GHOST.x0, ry - GHOST.y0, member)) { rx = GHOST.x0 + acc.ox; ry = GHOST.y0 + acc.oy; }
+      s.x = rx; s.y = ry; s.guides = [];
+      GHOST.contact = fc.hit.against;
+    }
+    GHOST.acc = { ox: s.x - GHOST.x0, oy: s.y - GHOST.y0 };
+  }
   GHOST.x = s.x; GHOST.y = s.y; GHOST.guides = s.guides;
   // THE SNAP IS COMPUTED ON THE PRESSED MEMBER ONLY and applied to the rest as one
   // translation, so a rigid group keeps the shape it started with instead of every
@@ -997,21 +1442,22 @@ function move(mx, my, opts) {
   // ox, oy and g and therefore EVERY mark, and rebuilding the static picture creates
   // thousands of SVG elements.  So the dragged node's own marks move and its incident
   // segments get new endpoints; everything else waits for the drop.
-  var warnings = [];
-  if (breaksAxisAlignment(GHOST.id, s.x, s.y) && L.axis_aligned) {
-    warnings.push('this makes a segment diagonal: the fit switches from anisotropic (' +
-                  L.sx + ' x ' + L.sy + ' px/unit) to isotropic and the whole picture ' +
-                  'rescales');
-  }
-  var decl = declaredMismatch(GHOST.id, s.x, s.y);
-  if (decl) warnings.push(decl);
-  GHOST.warnings = warnings;
+  //
+  // THE VERDICT IS LIVE.  Every member is checked at its landing point against everything
+  // that is not moving with it, so the HUD says "this drop will be refused" while the
+  // pointer is still down, and a slide of one more step is all it takes.
+  var chk = groupCheck(GHOST.p0, ox, oy);
+  GHOST.warnings = chk.warnings; GHOST.brief = chk.brief; GHOST.problems = chk.problems;
   for (var mi = 0; mi < GHOST.p0.length; mi++) {
     var r0 = GHOST.p0[mi];
     liveMove(r0.id, r0.x + ox, r0.y + oy);
   }
+  // the selection outline follows what it outlines: it is drawn from the same
+  // `nodeById` positions `liveMove` just wrote
+  paintOverlay();
   return { x: s.x, y: s.y, snapped: (s.x !== GHOST.x0 + dx) || (s.y !== GHOST.y0 + dy),
-           guides: s.guides, warnings: warnings, ids: GHOST.ids.slice() };
+           guides: s.guides, warnings: chk.warnings, brief: chk.brief, problems: chk.problems,
+           ids: GHOST.ids.slice(), contact: GHOST.contact || null };
 }
 
 function drop() {
@@ -1020,7 +1466,18 @@ function drop() {
   var ox = (g.x === undefined ? 0 : g.x - g.x0), oy = (g.y === undefined ? 0 : g.y - g.y0);
   // ONE move_site PER MEMBER, all stamped with the SAME meta.group, so a group drag is
   // one entry in the undo stack rather than N.
-  var ops = [], problems = [], op = null;
+  var ops = [], op = null;
+  // THE SAME CHECK THE HUD SHOWED, at the same points: a drop cannot be refused for a
+  // reason the drag did not already say
+  var chk = groupCheck(g.p0, ox, oy), problems = chk.problems;
+  if (!g.noBoundary && (ox || oy)) {
+    var memb = {}; for (i = 0; i < g.p0.length; i++) memb[g.p0[i].id] = 1;
+    // a hair looser than the drag's own test, so rounding the landing to a thousandth
+    // can never refuse a drop the drag accepted
+    var touch = contactAt(g.p0, ox, oy, memb, boundaryMargin() - 0.15);
+    if (touch) problems = problems.concat([{ code: 'overlap', targets: [touch.id, touch.against],
+      message: touch.id + ' would overlap ' + touch.against + ' \u2014 marks do not overlap' }]);
+  }
   for (i = 0; i < g.p0.length; i++) {
     var r = g.p0[i];
     var o = { method: 'move_site',
@@ -1028,15 +1485,29 @@ function drop() {
               kwargs: {}, meta: { group: g.group, src: 'stage' } };
     ops.push(o);
     if (r.id === g.anchor) op = o;
-    problems = problems.concat(validate(o));
   }
   if (!op) op = ops[0];
   GHOST = null;
-  if (problems.length) { rebuild(); return { op: op, ops: ops, problems: problems }; }
+  hideHud();
+  // THE CURSOR RESETS HERE, not only in the pointer adapter: the harness's drag step never
+  // runs `end`, so a cursor left at 'grabbing' by the drop was a cursor no test could see.
+  var pt = LASTPT;
+  if (problems.length) {
+    rebuild();
+    if (pt) hover(L.ox + pt.lx * (L.sx || 1), L.oy + pt.ly * (L.sy || 1));
+    return { op: op, ops: ops, problems: problems };
+  }
   for (i = 0; i < ops.length; i++) EDITS.push(ops[i]);
   UNDONE.length = 0;
+  // `L` reconciles the node this drop moved -- remembered here, not in the pointer
+  // adapter, so a harness drop can press L too
+  LASTMOVED = op.args[0];
+  // THE DECLARED-LENGTH NOTE GOES TO THE PRICE STRIP, not to a toast per drop: `rebuild`
+  // reads it off the device it just produced, and a toast that fired on every one of a
+  // dozen drags was the noise that hid the one refusal that mattered.
   rebuild();
-  return { op: op, ops: ops, problems: [] };
+  if (pt) hover(L.ox + pt.lx * (L.sx || 1), L.oy + pt.ly * (L.sy || 1));
+  return { op: op, ops: ops, problems: [], warnings: chk.warnings };
 }
 
 // ------------------------------------------------------------------- marquee select
@@ -1102,44 +1573,92 @@ function setSelection(list) {
   return SELSET;
 }
 
-function cancel() { GHOST = null; rebuild(); }
+// ESCAPE MID-DRAG ENDS THE WHOLE PRESS.  The HUD and the ghost go with the drag, and the
+// press that started it is forgotten too, so the pointer that is still down does nothing
+// more -- it used to keep feeding `move()` and the "cancelled" drag carried on under a
+// HUD that never went away.
+function cancel() {
+  GHOST = null;
+  hideHud();
+  DOWN = null; ARMED = null;
+  rebuild();
+}
 
 // WHAT ESCAPE MEANS, in one place.  It used to be bound only in the page's own handler,
 // which cleared the programme filter and never told the editor -- so the two selection
 // models disagreed and `drop()` after Escape still committed the move.  The key handler
 // and the headless harness both call this, so there is one order and one answer.
 function escapeGesture() {
+  // THE MENU IS THE THING NEAREST THE HAND: a panel at the pointer, opened by the press
+  // just made, so it goes FIRST -- before the ruler and before the sketch.  Its submenu
+  // is one more thing on the screen, and therefore one more press.
+  if (MDLG) { modifyClose(); return 'menu'; }
+  if (MENU && MENU.sub) { MENU.sub = null; paintMenu(); return 'menu'; }
+  if (MENU) { menuClose(); return 'menu'; }
+  // ONE THING PER PRESS, and a half-taken measurement is the thing nearest the hand: the
+  // first Escape drops the points, the second leaves the tool.
+  if (MEASURE && MPTS.length) { measureClear(); return 'measure'; }
+  if (MEASURE) { measureToggle(false); return 'measure'; }
+  // THE SAME TWO-PRESS RULE FOR A SHAPE: the first Escape drops the points of the shape
+  // being drawn, the second leaves the tool.
+  if (SKETCH && (SKPTS.length || SKDRAG)) { sketchClear(); return 'sketch'; }
+  if (SKETCH) { sketchTool(null); return 'sketch'; }
   if (GHOST) { cancel(); setCursor(HOVERED); return 'drag'; }
-  if (typeof PGHOST !== 'undefined' && PGHOST) { ghostCancel(); return 'placement'; }
-  if (MARQ) { MARQ = null; paintOverlay(); return 'marquee'; }
+  // A LIVE BAND IS A LIVE DRAG: Escape takes the dashed line away and the release makes
+  // nothing.  It used to fall through to the selection branch, the line stayed drawn and
+  // the release still created the segment.  The rest of the press is inert, as after
+  // `cancel()`.
+  if (BAND) { bandCancel(); DOWN = null; ARMED = null; return 'drag'; }
+  // AN ARMED STAMP DISARMS IN ONE PRESS, ghost and all.  It used to take two: the first
+  // Escape removed the ghost and left the tile armed, so the next pointer move drew the
+  // ghost straight back and the second press was the one that actually disarmed.
+  // (a ghost without an armed tile cannot exist: `ghostBegin` arms, `setArmed` cancels)
+  if (ARMED_EL) { ghostCancel(); arm(null); return 'armed'; }
+  if (MARQ) { MARQ = null; DOWN = null; ARMED = null; paintOverlay(); return 'marquee'; }
   if (SELSET.length) {
     setSelection([]);
     if (typeof selectRef === 'function') selectRef(null, null);
     return 'selection';
   }
-  if (ARMED_EL) { arm(null); return 'armed'; }
   if (FORM) { FORM = null; paint(); return 'form'; }
+  if (HELPON) { helpToggle(false); return 'help'; }
   return null;
 }
 
 // THE CURSOR IS STATE, and it must be readable.  CSS said `svg.editing{cursor:default}`,
 // so in edit mode nothing on the stage looked draggable -- and `classList` is a no-op in
 // the harness, so no test could have caught that.  Written to `style`, published here.
-var CURSOR = '';
+var CURSOR = '', PANNING = false;
 function cursor() { return CURSOR; }
 function setCursor(h) {
-  var c = MODE !== 'edit' ? '' :
-          GHOST ? 'grabbing' :
-          SPACE ? 'grab' :
-          h ? 'move' : 'crosshair';
+  // MEASURE MODE OWNS THE CURSOR.  It owns every press too (`claim` below), so a stage
+  // that still said "grab" would be promising a drag that cannot happen.
+  var c = (MEASURE || SKETCH) ? 'crosshair' :
+          (GHOST || PANNING) ? 'grabbing' :
+          h ? 'move' : 'grab';
   CURSOR = c;
   if (typeof svg !== 'undefined' && svg && svg.style) svg.style.cursor = c;
   return c;
 }
+// THE PAN IS THE PAGE'S GESTURE BUT THE CURSOR IS THE EDITOR'S STATE.  render.py's pan
+// handler used to write `svg.classList.add('drag')`, which the harness cannot read back
+// and which fought the inline cursor written here.  One writer, one channel.
+function panning(on) {
+  PANNING = !!on;
+  return setCursor(PANNING ? null : HOVERED);
+}
 
+// A NEW EDIT FORGETS WHAT WAS UNDONE -- on both stacks.  `UNDONE` was always cleared,
+// but the canvas redo stack survived a new edit: undo a gallery pick, drag a node on the
+// device that came back, press Redo, and the other device replaced the one just edited.
+// Linear history, one rule, one place to apply it.
+function forgetRedo() {
+  UNDONE.length = 0;
+  CANVAS_REDO.length = 0;
+}
 function commit(op) {
   EDITS.push(op);
-  UNDONE.length = 0;
+  forgetRedo();
   rebuild();
   return { ok: true, problems: PROBLEMS };
 }
@@ -1168,13 +1687,84 @@ function emit(op) {
   return { ok: true, problems: PROBLEMS };
 }
 
-function undo() { if (EDITS.length) { UNDONE.push(EDITS.pop()); rebuild(); } }
-function redo() { if (UNDONE.length) { EDITS.push(UNDONE.pop()); rebuild(); } }
+// A NEW DEVICE IS A GESTURE, SO IT IS UNDOABLE.  A gallery pick or a blank canvas used to
+// set `EDITS = []` and throw the previous device away with its whole edit history, so the
+// one click that could lose an hour of work was the one click with no undo.  The previous
+// device is kept here as the same snapshot `saveProject` writes, and `undo()` reaches for
+// it only once the edit stack is empty -- so ctrl+Z takes back the drags made on the new
+// device first, then the device itself, in the order the user made them.  Restoring goes
+// through `restore()`, the one applier a snapshot has; nothing here replays anything.
+var CANVAS_UNDO = [], CANVAS_REDO = [];
+function canvasRecord() {
+  // the document without the architecture: `restore` rebuilds it from geom/seed/post/
+  // edits/program, so serialising a 168-node device here would be work thrown away
+  var s = documentRecord(null);
+  // the redo stack belongs to the device it was popped from: restoring a device and then
+  // redoing the OTHER device's last edit onto it is what the record exists to prevent.
+  // `transaction` blanks this on the record it keeps -- a new device is a new gesture.
+  s.undone = UNDONE.slice();
+  return s;
+}
+function canvasHistory() { return { undo: CANVAS_UNDO.length, redo: CANVAS_REDO.length }; }
+function sameCanvas(a, b) {
+  var key = function (s) { return JSON.stringify([s.geom, s.seed, s.post, s.edits, s.program]); };
+  return key(a) === key(b);
+}
+function restoreCanvas(rec) {
+  var r = restore(rec);
+  if (r.ok) {
+    UNDONE.length = 0;
+    for (var i = 0; i < (rec.undone || []).length; i++) UNDONE.push(rec.undone[i]);
+    paint();
+  }
+  return r;
+}
+// a refused restore is said out loud: a ctrl+Z that does nothing, with Undo still lit,
+// is the one silent failure a history can have
+// The stacks move BEFORE the restore: `restoreCanvas` paints, and the paint reads both
+// stacks for the Undo/Redo buttons -- pushed afterwards, the button for the step just
+// made stayed disabled until some unrelated paint.  A refused restore puts both back.
+function canvasStep(from, to) {
+  var rec = from.pop(), now = canvasRecord();
+  to.push(now);
+  var r = restoreCanvas(rec);
+  if (r.ok) return;
+  to.pop();
+  from.push(rec);
+  toast('bad', ((r.problems || [])[0] || {}).message || 'the other device could not be restored');
+}
+function undo() {
+  if (EDITS.length) { UNDONE.push(EDITS.pop()); rebuild(); return; }
+  if (CANVAS_UNDO.length) canvasStep(CANVAS_UNDO, CANVAS_REDO);
+}
+function redo() {
+  if (UNDONE.length) { EDITS.push(UNDONE.pop()); rebuild(); return; }
+  if (CANVAS_REDO.length) canvasStep(CANVAS_REDO, CANVAS_UNDO);
+}
 
 // During a drag: write the dragged node's marks and its incident segment endpoints
-// directly, without recomputing the layout.  Incident DC pads are hidden -- retiling them
-// is the expensive part and a rail without pads reads perfectly well for the ~300 ms of a
-// drag.
+// directly, without recomputing the layout.
+//
+// A BOWED SEGMENT STAYS BOWED, and it keeps its electrodes.  This used to rewrite every
+// incident segment to a straight `M ... L ...` and hide its DC pads for the duration of
+// the drag.  Both were lies about the hardware, and both were visible: a bow exists to
+// route a rail AROUND a node it does not touch, so straightening it mid-drag drew the
+// rail straight THROUGH that node -- and an ion riding the same segment is drawn on the
+// curve (`bezPoint`), so the ion left the rail the moment you touched it.  The control
+// point is the one thing that has to be recomputed: `L.bows` is a per-segment offset in
+// pixels and the layout is frozen for the whole drag, so the bow amount is carried and
+// only the endpoints move.  The pads then ride the new curve -- they were already
+// evaluated on it, they were just being hidden.
+function rebowSegment(sg, I, ax, ay, bx, by) {
+  var bw = (L.bows || {})[sg.id];
+  var dx = bx - ax, dy = by - ay, len = Math.sqrt(dx * dx + dy * dy);
+  I.ax = ax; I.ay = ay; I.dx = dx; I.dy = dy; I.len = len;
+  I.cp = (bw && len > 1e-6)
+    ? { x: (ax + bx) / 2 - (dy / len) * 2 * bw, y: (ay + by) / 2 + (dx / len) * 2 * bw }
+    : null;
+  I.alen = (typeof bezLen === 'function') ? bezLen(I) : len;
+  return I;
+}
 function liveMove(nid, x, y) {
   var n = nodeById[nid];
   if (!n) return;
@@ -1186,25 +1776,70 @@ function liveMove(nid, x, y) {
     rec.grp.setAttribute('transform', 'rotate(' + rec.ang + ' ' + nx + ' ' + ny + ')');
     rec.el.setAttribute('x', nx - rec.len / 2); rec.el.setAttribute('y', ny - L.site_t / 2);
   }
+  // the moved node's OWN electrodes travel with it, rigidly: they are its well, and a
+  // well that stayed behind while its site moved would be the clearest possible way to
+  // say the wrong thing about what holds an ion
+  movePadRun(PAD_BY_SITE[nid], nx, ny, (rec && rec.ax) || AXIS[nid] || { ux: 1, uy: 0 });
   for (var i = 0; i < A.segments.length; i++) {
     var sg = A.segments[i];
     if (sg.a !== nid && sg.b !== nid) continue;
     var a = nodeById[sg.a], b = nodeById[sg.b], ln = SEGEL[sg.id];
     if (!a || !b || !ln) continue;
     var ax = px(a), ay = py(a), bx = px(b), by = py(b);
-    if (ln.tagName === 'path') ln.setAttribute('d', 'M ' + ax + ' ' + ay + ' L ' + bx + ' ' + by);
-    else { ln.setAttribute('x1', ax); ln.setAttribute('y1', ay);
-           ln.setAttribute('x2', bx); ln.setAttribute('y2', by); }
-    var pads = PAD_BY_SEG[sg.id];
-    if (pads) for (var k = 0; k < pads.length; k++) pads[k].el.style.display = 'none';
+    var I = SEGINFO[sg.id];
+    if (I) rebowSegment(sg, I, ax, ay, bx, by);
+    if (ln.tagName === 'path') {
+      ln.setAttribute('d', (I && I.cp)
+        ? 'M ' + ax + ' ' + ay + ' Q ' + I.cp.x + ' ' + I.cp.y + ' ' + bx + ' ' + by
+        : 'M ' + ax + ' ' + ay + ' L ' + bx + ' ' + by);
+    } else { ln.setAttribute('x1', ax); ln.setAttribute('y1', ay);
+             ln.setAttribute('x2', bx); ln.setAttribute('y2', by); }
+    if (I) movePadsOnSegment(PAD_BY_SEG[sg.id], I);
+  }
+}
+// Re-place one pair of electrodes at a point, facing along (tx, ty).  The same arithmetic
+// `buildStatic`'s `padPair` uses, and the only copy of it that is allowed to exist: it
+// writes the SAME record fields, so `clearTransients` keeps working on a pad that moved.
+function placePair(pair, x, y, tx, ty, w) {
+  var ang = Math.atan2(ty, tx) * 180 / Math.PI, nx = -ty, ny = tx, j;
+  pair.x = x; pair.y = y; pair.tx = tx; pair.ty = ty; pair.w = w; pair.ang = ang;
+  for (j = 0; j < pair.pads.length; j++) {
+    var q = pair.pads[j];
+    q.cx = x + nx * L.pad_off * q.sign; q.cy = y + ny * L.pad_off * q.sign;
+    q.el.setAttribute('x', q.cx - w / 2); q.el.setAttribute('y', q.cy - L.pad_t / 2);
+    q.el.setAttribute('width', w);
+    q.el.setAttribute('transform', 'rotate(' + ang + ' ' + q.cx + ' ' + q.cy + ')');
+  }
+}
+// a site's own pairs: `pair.t` is the index of the pair in the stack, so the offsets are
+// rebuilt from the pitch the tiling was drawn at rather than remembered per pad
+function movePadRun(list, x, y, ax) {
+  if (!list || !list.length) return;
+  var pit = list.pitch || 0, m = list.length, i;
+  for (i = 0; i < m; i++) {
+    var o = (i - (m - 1) / 2) * pit;
+    placePair(list[i], x + ax.ux * o, y + ax.uy * o, ax.ux, ax.uy, list[i].w);
+  }
+}
+// a rail's pairs: each keeps its parameter along the segment and is re-evaluated on the
+// curve the drag just produced
+function movePadsOnSegment(list, I) {
+  if (!list || !list.length || typeof bezPoint !== 'function') return;
+  for (var i = 0; i < list.length; i++) {
+    var q = bezPoint(I, list[i].t);
+    placePair(list[i], q.x, q.y, q.tx, q.ty, list[i].w);
   }
 }
 
-function breaksAxisAlignment(nid, x, y) {
+// `skip`: the other members of a rigid group -- a segment whose far end moves with this
+// node keeps its direction and its length, so it is not the one to warn about
+function breaksAxisAlignment(nid, x, y, skip) {
   for (var i = 0; i < A.segments.length; i++) {
     var sg = A.segments[i];
     if (sg.a !== nid && sg.b !== nid) continue;
-    var other = nodeById[sg.a === nid ? sg.b : sg.a];
+    var oid = sg.a === nid ? sg.b : sg.a;
+    if (skip && skip[oid]) continue;
+    var other = nodeById[oid];
     if (!other) continue;
     if (Math.abs(other.x - x) > 1e-9 && Math.abs(other.y - y) > 1e-9) return true;
   }
@@ -1216,19 +1851,48 @@ function breaksAxisAlignment(nid, x, y) {
 // `length_scaling` models read.  So the page SAYS the geometry and the declaration now
 // disagree, and offers to reconcile, instead of quietly changing a number the user did not
 // ask to change.
-function declaredMismatch(nid, x, y) {
-  var worst = 0, which = null, count = 0;
+//
+// THE ONE TEST FOR A SEGMENT: its drawn length against its declared one, 20% tolerance.
+// `agg.count` segments are off, `agg.worst` is [id, ratio, declared, |ratio-1|] of the
+// worst of them.  Asked of a live drag (`mismatchScan`, members at their landing points)
+// and of the whole device (`deviceMismatch`, once per rebuild, for the price strip).
+function segMismatch(sg, drawn, agg) {
+  var decl = sg.len === undefined ? 1.0 : sg.len;
+  if (decl <= 0) return agg;
+  var ratio = drawn / decl;
+  if (Math.abs(ratio - 1) > 0.2) {
+    agg.count++;
+    if (!agg.worst || Math.abs(ratio - 1) > agg.worst[3]) agg.worst = [sg.id, ratio, decl, Math.abs(ratio - 1)];
+  }
+  return agg;
+}
+// ONE SCAN, accumulated over a group: a member at (x, y) against the segments it is on.
+// A segment whose far end is another member (`skip`) keeps its drawn length and is not
+// counted.
+function mismatchScan(nid, x, y, skip, agg) {
   for (var i = 0; i < A.segments.length; i++) {
     var sg = A.segments[i];
     if (sg.a !== nid && sg.b !== nid) continue;
-    var other = nodeById[sg.a === nid ? sg.b : sg.a];
+    var oid = sg.a === nid ? sg.b : sg.a;
+    if (skip && skip[oid]) continue;
+    var other = nodeById[oid];
     if (!other) continue;
-    var drawn = Math.sqrt((other.x - x) * (other.x - x) + (other.y - y) * (other.y - y));
-    var decl = sg.len === undefined ? 1.0 : sg.len;
-    if (decl <= 0) continue;
-    var ratio = drawn / decl;
-    if (Math.abs(ratio - 1) > 0.2) { count++; if (Math.abs(ratio - 1) > worst) { worst = Math.abs(ratio - 1); which = [sg.id, ratio, decl]; } }
+    segMismatch(sg, Math.sqrt((other.x - x) * (other.x - x) + (other.y - y) * (other.y - y)), agg);
   }
+  return agg;
+}
+// every segment of the device as it stands, each counted once; null when none is off
+function deviceMismatch() {
+  var agg = { count: 0, worst: null };
+  for (var i = 0; i < A.segments.length; i++) {
+    var sg = A.segments[i], a = nodeById[sg.a], b = nodeById[sg.b];
+    if (!a || !b) continue;
+    segMismatch(sg, Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)), agg);
+  }
+  return agg.worst ? agg : null;
+}
+function mismatchText(agg) {
+  var which = agg.worst, count = agg.count;
   if (!which) return null;
   var scaling = !!(D.model && D.model.length_scaling);
   return count + ' incident segment(s) are now up to ' + which[1].toFixed(2) +
@@ -1238,6 +1902,21 @@ function declaredMismatch(nid, x, y) {
                   : 'This model ignores segment length, so this changes the drawing, not '
                   + 'the cost.');
 }
+// the same fact, sized for the price strip -- written by `rebuild()` only, so it can
+// never describe a device other than the one on the stage
+var LENGTH_NOTE = null;
+function mismatchShort(agg) {
+  if (!agg || !agg.worst) return null;
+  var scaling = !!(D.model && D.model.length_scaling);
+  return agg.count + ' segment(s) drawn up to ' + agg.worst[1].toFixed(2) + 'x their declared length' +
+         (scaling ? ' (this model prices length: press L to reconcile)' : ' (press L to reconcile)');
+}
+// and sized for the HUD's second line
+function mismatchHud(agg) {
+  if (!agg || !agg.worst) return null;
+  return agg.count + ' segment(s) up to ' + agg.worst[1].toFixed(2) + 'x declared length';
+}
+function lengthNote() { return LENGTH_NOTE; }
 
 // Reconcile: append `set_segment_length` ops with the SAME meta.group as the move, so the
 // whole thing is one undo.
@@ -1257,7 +1936,7 @@ function reconcileLengths(nid) {
                  kwargs: {}, meta: { group: group, src: 'reconcile' } });
     made++;
   }
-  if (made) { UNDONE.length = 0; rebuild(); }
+  if (made) { forgetRedo(); rebuild(); }
   return made;
 }
 
@@ -1275,17 +1954,51 @@ function freshId(prefix) {
   }
 }
 
-function addSite(x, y, near) {
+// A TOPOLOGY ADD: applied to the sealed device, exported through `m.apply_edits`.  With
+// `near` it copies zone and capacity from that node (the double-click on an existing
+// device); with `opts.kind`/`opts.zone` it places what the palette asked for, inheriting
+// the capacity from the zone as `d.site(zone=...)` would.
+function addSite(x, y, near, opts) {
+  opts = opts || {};
   var proto = near ? nodeById[near] : null;
-  var op = { topology: { op: 'add_site', args: {
-    id: freshId('N'), pos: [x, y], zone: proto ? proto.zone : null,
-    capacity: proto ? proto.cap : 1, labels: ['added'],
-    zone_types: STATE.zone_types } },
-    meta: { group: 'g' + (++GROUP), src: 'stage' } };
-  return tryTopology(op);
+  var kind = opts.kind === 'junction' ? 'junction' : 'site';
+  // `add_junction` is its own whitelist entry on both sides: Python's `add_site` lambda
+  // does not forward `kind`, so a junction sent as `add_site` would come back a SITE
+  // with no zone and be refused by the toolchain the export is for.
+  // THE SAME REFUSAL AS `addNodeAt`: the double-click and the armed click on a generator
+  // device come through here after a hard lattice snap, so the point they land on can be
+  // one a node already holds while the pointer is outside that node's hit halo.  The
+  // engine accepts the second node -- `min_nearest_neighbour` skips the coincident pair,
+  // so nothing downstream would ever say so.
+  var coin = coincidentAt(x, y);
+  if (coin) return { ok: false, problems: [coin] };
+  var args = { id: freshId(kind === 'junction' ? 'J' : 'N'), pos: [x, y], labels: ['added'] };
+  if (kind === 'site') {
+    // a junction has no zone to copy, so the nearest node being one used to refuse the
+    // double-click outright ("a site needs capacity >= 1"); a declared zone is the
+    // honest default there, exactly as the armed stamp would use
+    var fromProto = !!(proto && proto.zone);
+    var zone = opts.zone !== undefined ? (opts.zone || null)
+             : fromProto ? proto.zone
+             : defaultZone();
+    args.zone = zone;
+    args.capacity = opts.capacity !== undefined ? opts.capacity
+                  : fromProto ? proto.cap : (zone ? 0 : 1);
+    args.zone_types = STATE.zone_types;
+  }
+  var op = { topology: { op: kind === 'junction' ? 'add_junction' : 'add_site', args: args },
+             meta: { group: 'g' + (++GROUP), src: 'stage' } };
+  var r = tryTopology(op);
+  // an id only for a node that exists: a refusal used to carry the id it did not place
+  if (r.ok) r.id = args.id;
+  return r;
 }
+// does the device still have a builder, i.e. can a `d.site` be hoisted above its seal?  A
+// generator device (`blank`, `from_template`) has none: its nodes are topology edits.
+function hasBuilder() { return !!(STATE && STATE.builder); }
 
-function addSegment(a, b) {
+function addSegment(a, b, opts) {
+  opts = opts || {};
   if (a === b) return { ok: false, problems: [{ code: 'self_loop', targets: [a],
     message: 'a segment must join two different nodes' }] };
   for (var sid in STATE.device.segments) if (has(STATE.device.segments, sid)) {
@@ -1312,11 +2025,17 @@ function addSegment(a, b) {
   // contradict.  A chord stays `loop: null` -- `corner_endpoints` scores a segment by the
   // corners of the loop it lies on, so a chord joining two corners would be charged a whole
   // turn it does not contain.
-  var op = { topology: { op: 'add_segment', args: {
-    id: freshId('X'), a: a, b: b, labels: ['chord'],
-    length: Math.round(len * 100) / 100 || 1.0, capacity: 1 } },
-    meta: { group: 'g' + (++GROUP), src: 'stage' } };
-  return tryTopology(op);
+  var hasLen = opts.length !== undefined && opts.length !== null;
+  var hasCap = opts.capacity !== undefined && opts.capacity !== null;
+  var args = { id: freshId('X'), a: a, b: b,
+               labels: (opts.labels && opts.labels.length) ? opts.labels.slice() : ['chord'],
+               length: hasLen ? Number(opts.length) : (Math.round(len * 100) / 100 || 1.0),
+               capacity: hasCap ? Math.trunc(Number(opts.capacity)) : 1 };
+  var op = { topology: { op: 'add_segment', args: args },
+             meta: { group: 'g' + (++GROUP), src: 'stage' } };
+  var r = tryTopology(op);
+  if (r.ok) r.id = args.id;
+  return r;
 }
 
 function removeSelected() {
@@ -1328,9 +2047,10 @@ function removeSelected() {
     // `edit.js` has no `remove_loop` op, so it would have issued `remove_node` with a
     // loop id and leaked the mirror's bare `topology` refusal.  Name it instead.
     if (sel.kind === 'loop') {
+      // ONE SENTENCE, ONE PLACE: the menu shows this as a DISABLED item carrying the
+      // same words, so the two can never drift into different explanations of one gap.
       return { ok: false, problems: [{ code: 'no_remove_loop', targets: [sel.id],
-        message: sel.id + ' is a transport loop; there is no delete verb for one yet -- ' +
-                 'delete one of its segments to open it, or edit the loop in the text lane.' }] };
+        message: noRemoveLoopWhy(sel.id) }] };
     }
     var op = sel.kind === 'segment'
       ? { topology: { op: 'remove_segment', args: { id: sel.id, on_loop: 'open' } },
@@ -1354,7 +2074,7 @@ function tryTopology(op) {
     return { ok: false, problems: [{ code: 'topology', targets: [], message: err.message }] };
   }
   EDITS.push(op);
-  UNDONE.length = 0;
+  forgetRedo();
   rebuild();
   return { ok: true, problems: PROBLEMS };
 }
@@ -1413,19 +2133,65 @@ function applySource(src) {
   // record: `sourceText` quotes Python's own text for untouched statements, so anything
   // else here would make every line with an integral float read as edited.
   var base = baseTexts();
-  var next = [];
-  for (var i = 0; i < p.stmts.length; i++) {
-    var s = p.stmts[i];
-    if (i < base.length && Q.render(s) === base[i]) continue;             // unchanged
-    if (i < base.length && s.text !== undefined && s.text === base[i]) continue;
+  function same(s, text) {
+    return text !== undefined && (Q.render(s) === text || (s.text !== undefined && s.text === text));
+  }
+  // THE CANVAS'S OWN BUILDER STATEMENTS ARE IN THE TEXT TOO.  `baseTexts()` lists the
+  // shipped builder lines (GEOM), then the `{build}` edits the canvas made, then the seal
+  // and the retunes.  A line matching the base was skipped as unchanged, and the
+  // `EDITS = topo.concat(next)` that followed kept no `{build}` edit -- so on a device
+  // built by hand, applying the Source text emptied it.  Measured 2026-09-16 on lesson
+  // A2's canvas: the text applied UNCHANGED took the device from 6 nodes and 4 segments
+  // to none, and the lesson's step, which checks only the zone, still passed.
+  //
+  // So the leading builder statements are matched to the build edits that wrote them (a
+  // match keeps the edit, its label and group), a new or retyped one becomes a build
+  // edit, and one deleted from the text is dropped.  A shipped builder line (GEOM) that
+  // was changed goes through as a command edit, as before, and is refused there.
+  var builds = EDITS.filter(function (o) { return !!o.build; });
+  var nb = GEOM.length + builds.length;          // builder lines at the head of `base`
+  var head = 0;
+  while (head < p.stmts.length && kindOf(p.stmts[head].method) === 'build') head++;
+  var keep = [], next = [], typedBuild = null, bi = 0, i, s;
+  for (i = 0; i < head; i++) {
+    s = p.stmts[i];
+    if (i < GEOM.length) {
+      if (same(s, base[i])) continue;                                    // shipped, unchanged
+      next.push({ method: s.method, args: s.args, kwargs: s.kwargs, meta: { group: 'text', src: 'text' } });
+      continue;
+    }
+    var hit = -1;
+    for (var k = bi; k < builds.length && hit < 0; k++) if (same(s, base[GEOM.length + k])) hit = k;
+    if (hit >= 0) { keep.push(builds[hit]); bi = hit + 1; continue; }
+    if (!typedBuild) typedBuild = s;
+    keep.push({ build: { method: s.method, args: s.args, kwargs: s.kwargs }, meta: { group: 'text', src: 'text' } });
+  }
+  // From the seal on, index by index against the base from ITS seal on: a builder line
+  // added or removed above must not shift every later line into an "edit".
+  for (i = head; i < p.stmts.length; i++) {
+    s = p.stmts[i];
+    if (same(s, base[nb + (i - head)])) continue;                        // unchanged
     next.push({ method: s.method, args: s.args, kwargs: s.kwargs,
                 meta: { group: 'text', src: 'text' } });
   }
   // A typed program is authoritative for the whole command list, so it REPLACES the
   // command edits; topology edits are geometry and survive.
   var topo = EDITS.filter(function (o) { return !!o.topology; });
-  EDITS = topo.concat(next);
-  UNDONE.length = 0;
+  var edits = keep.concat(topo, next);
+  // TRY IT FIRST, as `transaction` does: a builder statement that breaks the seal (a
+  // segment to a node the text no longer has) makes the whole base program refuse, and
+  // committing that would leave the page with no architecture rather than a refused line.
+  var trial = Q.applyProgram(baseCallsFrom(GEOM, SEED, POST, edits));
+  if (trial.error) {
+    var blame = Q.buildProblems(baseCallsFrom(GEOM, SEED, POST, edits));
+    var why = blame.length ? blame[0].message : trial.error.message;
+    return { ok: false,
+             errors: [{ line: (typedBuild && typedBuild.line) || 1, col: 1, message: why }],
+             problems: blame.map(function (b) {
+               return { i: null, code: b.code, method: b.method, message: b.message }; }) };
+  }
+  EDITS = edits;
+  forgetRedo();
   rebuild();
   // `ok` reports whether the SOURCE WAS APPLIED, and a statement `rebuild()` refused was
   // not applied. Returning ok:true beside a non-empty `problems` said "your text went in"
@@ -1448,9 +2214,15 @@ function exportPython() {
   // `build` edits are hoisted into `baseTexts()` at their statement position already
   var ops = EDITS.filter(function (o) { return !o.build; });
   var anyTopo = ops.some(function (o) { return !!o.topology; });
+  // `DeviceBuilder` is not exported from the package root, and every explicit listing
+  // opens with `d = DeviceBuilder(...)` -- so the blank page's own export died on its
+  // first line with a NameError.  Imported whenever a builder statement will be printed.
+  var anyBuild = GEOM.length > 0 || EDITS.some(function (o) { return !!o.build; });
   var head = '# edited in the browser, from ' + A.name + '\n' +
              '# ' + EDITS.length + ' edit(s) on top of the shipped architecture\n' +
-             'from qccd import Machine\n' + (anyTopo ? 'import json\n' : '') + '\n';
+             (anyBuild ? 'from qccd.api import Machine, DeviceBuilder\n'
+                       : 'from qccd import Machine\n') +
+             (anyTopo ? 'import json\n' : '') + '\n';
   var rows = baseTexts();
 
   // IN EDIT ORDER.  Partitioning -- every command edit, then every topology edit --
@@ -1553,18 +2325,55 @@ function $(id) { return document.getElementById(id); }
 function paint() {
   if (!EL.bar) return;
   EL.count.textContent = EDITS.length + (EDITS.length === 1 ? ' edit' : ' edits');
-  var nprob = PROBLEMS.length + LINTS.length;
+  var nprob = PROBLEMS.length + lintProblems().length, nnote = lintNotes().length;
   EL.prob.textContent = nprob + (nprob === 1 ? ' problem' : ' problems');
-  EL.undo.disabled = !EDITS.length;
-  EL.redo.disabled = !UNDONE.length;
-  EL.bar.className = 'ebar' + (MODE === 'edit' ? ' edit' : '');
-  EL.mPlay.className = MODE === 'play' ? 'on' : '';
-  EL.mEdit.className = MODE === 'edit' ? 'on' : '';
+  if (EL.notes) {
+    EL.notes.textContent = nnote + (nnote === 1 ? ' note' : ' notes');
+    // `style.display`, never a class: `classList` is a no-op in tests/shim.mjs
+    if (EL.notes.style) EL.notes.style.display = nnote ? '' : 'none';
+  }
+  EL.undo.disabled = !EDITS.length && !CANVAS_UNDO.length;
+  EL.redo.disabled = !UNDONE.length && !CANVAS_REDO.length;
+  // THE EMPTY STATE lives on the stage, not below the fold: with no node to look at, the
+  // canvas itself carries the start cards.  `style.display`, never a class, and never
+  // removed -- the harness reads it back.
+  var empty = $('stageEmpty');
+  if (empty && empty.style) empty.style.display = (STATE && nodesOf(STATE).length) ? 'none' : 'block';
   EL.snap.setAttribute('aria-pressed', SNAP ? 'true' : 'false');
   EL.snap.className = 'tgl' + (SNAP ? ' on' : '');
-  EL.price.textContent = priceLine();
+  if (EL.trueS) {
+    EL.trueS.setAttribute('aria-pressed', TRUE_SCALE ? 'true' : 'false');
+    EL.trueS.className = 'tgl' + (TRUE_SCALE ? ' on' : '');
+  }
+  if (EL.meas) {
+    EL.meas.setAttribute('aria-pressed', MEASURE ? 'true' : 'false');
+    EL.meas.className = 'tgl' + (MEASURE ? ' on' : '');
+  }
+  var dm = designMode();
+  if (EL.mode) {
+    for (var mk in EL.mode) if (has(EL.mode, mk) && EL.mode[mk]) {
+      EL.mode[mk].setAttribute('aria-pressed', dm === mk ? 'true' : 'false');
+      EL.mode[mk].className = 'tgl' + (dm === mk ? ' on' : '');
+    }
+  }
+  // THE SHAPE TOOLS ARE THE RAIL'S TILES AND THE r/e/n/p KEYS, and nothing else.  The
+  // stage toolbar carried a third copy of the same four buttons wired to the same
+  // `sketchTool` verb; `renderPalette` already paints each rail tile's `aria-pressed`
+  // from `SKETCH` on every paint, so there is nothing left here to keep in step -- and
+  // `#tShapes`, the span that had to be hidden in Parts mode, is gone with them.
+  // numbers only on the strip; the sentence about what they are worth is the Report's
+  EL.price.textContent = priceHead();
   if (EL.src && document.activeElement !== EL.src) EL.src.value = sourceText();
-  if (EL.out) {
+  // ONLY WHEN THE BOX IS ON SCREEN.  Serialising the whole document to Python or JSON is
+  // 6-7 ms of every paint on the shipped grid and ring (measured: exportPython 2.7 ms +
+  // exportJson 4.6 ms), and the box lives in the Architecture pane's Source view, which
+  // is closed almost always -- so a drag paid for a string nobody could read.  Opening
+  // that view calls `setArchView('src')`, which makes the wrapper visible and then calls
+  // `setMode('edit')`, and `setMode` always paints: by then `offsetParent` is set and the
+  // box fills.  `!== null` rather than a truth test on purpose -- `tests/shim.mjs`
+  // elements have no `offsetParent` at all, so the harness keeps computing it and every
+  // export assertion still runs.
+  if (EL.out && EL.out.offsetParent !== null) {
     // A refused export is shown IN the box, not swallowed: the box is where the user
     // looks for the file, so it is where the reason there is no file belongs.  Letting
     // the throw escape would abort the rest of `paint()` and leave the whole bar stale.
@@ -1582,7 +2391,68 @@ function paint() {
   renderInspector();
   renderWrite();
   renderReport();
+  renderHead();
   paintOverlay();
+}
+
+// THE HEAD SAYS WHAT IS ON THE STAGE.  Python wrote the name, the one-line lede and the
+// window title for the device and programme it shipped, and they stayed put through a
+// generator card, a blank canvas and an authored programme -- "an empty canvas: ..."
+// over an 8-site ring.  The moment the state is not the shipped one those three lines
+// are re-derived from it; the moment it is the shipped one again they are put back
+// exactly, so a page nobody has changed is never rewritten.  The counters and the metric
+// chips are the page's own (`paintHead`), told the same thing.
+var HEAD0 = null;
+function renderHead() {
+  var title = $('title'), lede = $('lede');
+  var mine = !!(STATE && nodesOf(STATE).length &&
+                (!shippedSeed() || AUTHORED || SHIPPED_EMPTY));
+  if (!mine) {
+    if (HEAD0) {
+      if (title) title.textContent = HEAD0.title;
+      if (lede) lede.textContent = HEAD0.lede;
+      document.title = HEAD0.doc;
+      HEAD0 = null;
+    }
+  } else {
+    if (!HEAD0) {
+      HEAD0 = { title: title ? title.textContent : '', lede: lede ? lede.textContent : '',
+                doc: String(document.title || '') };
+    }
+    var sites = 0, nid;
+    for (nid in STATE.device.nodes) if (has(STATE.device.nodes, nid)) {
+      if (STATE.device.nodes[nid].kind !== 'junction') sites++;
+    }
+    var k = P.n_instructions === undefined ? P.frames.length : P.n_instructions;
+    var name = STATE.name + ' - ' + (PROG.length ? 'programme' : 'design');
+    if (title) title.textContent = name;
+    if (lede) {
+      lede.textContent = sites + ' site' + (sites === 1 ? '' : 's') + ' · ' +
+        segsOf(STATE).length + ' segment' + (segsOf(STATE).length === 1 ? '' : 's') +
+        ' · ' + k + ' instruction' + (k === 1 ? '' : 's');
+    }
+    document.title = name;
+  }
+  if (typeof paintHead === 'function') paintHead();
+}
+
+// THE NUMBERS THE HEAD AND THE REPORT SHARE: one list, read by both, so the chips over
+// the stage and the Backed table cannot print different figures for the same price.
+// Empty while the price is refused -- a chip for a number that was not computed is the
+// one thing this surface must never show.
+function metricRows() {
+  if (!PRICE || PRICE.blocked) return [];
+  var rows = [
+    ['cost', fmt(PRICE.totals.cost)],
+    ['steps', fmt(PRICE.totals.steps)],
+    ['runtime', fmt(PRICE.totals.us / 1000, 2) + ' ms'],
+    ['peak n-bar', fmt(PRICE.peak, 3) + (PRICE.peakIon ? ' (' + PRICE.peakIon + ')' : '')],
+    ['junction transits', fmt(PRICE.transits)]];
+  if (HW) {
+    rows.push(['DACs', fmt(HW.dacs)], ['electrodes', fmt(HW.electrodes)],
+              ['switches', fmt(HW.switches)], ['ion capacity', fmt(HW.total_capacity)]);
+  }
+  return rows;
 }
 
 // ONE sentence per break, said by BOTH surfaces.  The price line and the stage banner
@@ -1606,14 +2476,14 @@ function breakMessage(b) {
 
 // The price line is the honest one.  It never shows a number it cannot stand behind: a
 // geometry edit invalidates the compiled programme, and the page says so instead of
-// animating a programme whose node ids may no longer exist.
-function priceLine() {
+// animating a programme whose node ids may no longer exist.  Two halves: `priceHead` is
+// the numbers, for the toolbar strip; `priceNote` is the sentence about what they are
+// worth -- the oracle, the CLI to re-verify with -- which lives in the Report pane, where
+// there is room for a sentence.
+function priceHead() {
   if (!READY) return WHY_NOT || 'editing unavailable';
   if (!PRICE) return '';
-  if (PRICE.blocked) {
-    return 'price unavailable · ' + breakMessage(PRICE.blocked[0]) +
-           ' · recompile in Python';
-  }
+  if (PRICE.blocked) return 'price unavailable · ' + breakMessage(PRICE.blocked[0]);
   var t = PRICE.totals;
   var same = !EDITS.length && !PROG.length;
   var head = 'cost ' + fmt(t.cost) + ' · steps ' + fmt(t.steps) +
@@ -1621,25 +2491,46 @@ function priceLine() {
              fmt(PRICE.comp.shuttle + PRICE.comp.junction + PRICE.comp.split_merge, 1);
   if (HW) head += ' · ' + fmt(HW.dacs) + ' DACs';
   if (HW0 && HW && HW.dacs !== HW0.dacs) head += ' (' + (HW.dacs > HW0.dacs ? '+' : '') + fmt(HW.dacs - HW0.dacs) + ')';
-  if (same) return head + ' · unedited';
+  if (LENGTH_NOTE) head += ' · ' + LENGTH_NOTE;
+  // a device from a gallery card or a blank canvas is NEW, not "unedited": nothing about
+  // it shipped with the page, and the word would claim a baseline that does not exist
+  if (same) return head + (shippedSeed() ? ' · unedited' : ' · new device');
+  return head;
+}
+function priceNote() {
+  if (!READY || !PRICE) return '';
+  if (PRICE.blocked) return 'recompile in Python';
+  if (!EDITS.length && !PROG.length) return '';
   // THE FIFTH STATE.  The per-frame self-check compares each re-priced frame against the
   // cost PYTHON shipped for it; an AUTHORED programme has no such frames, so there is
   // nothing to compare and reporting `frameDrift === 0` over `frameChecked === 0` would be
   // a confident zero for a check that never ran.  The arithmetic is parity-tested; THIS
   // PROGRAMME is not, and the difference is the whole point of saying so.
+  // NO PROGRAMME AT ALL comes first: with zero frames there is no pair to download and
+  // no `--program` to name, and both sentences below would have named one anyway
+  if (!P.frames.length) {
+    return 'no programme yet: press Test drive, or write one in the Write pane';
+  }
   if (PRICE_STATUS === 'unoracled' || !PRICE.frameChecked) {
-    return head + ' · no per-frame oracle: these frames were never priced by Python. ' +
+    // a programme written HERE has no tsir pair to download: its return leg to Python is
+    // the saved snapshot, which `qccd open` replays and prices from first principles
+    if (AUTHORED) {
+      return 'no per-frame oracle: these frames were never priced by Python. ' +
+             'Save (ctrl+S) and run: python -m qccd open ' +
+             ((STATE && STATE.name) || 'design') + '.studio.json';
+    }
+    return 'no per-frame oracle: these frames were never priced by Python. ' +
            'Download the pair and run: python -m qccd run ' + A.name +
            '.arch.json --tsir ' + A.name + '.tsir.json';
   }
   if (PRICE.frameDrift === 0) {
-    return head + ' · re-priced client-side; every one of ' + fmt(PRICE.frameChecked) +
+    return 're-priced client-side; every one of ' + fmt(PRICE.frameChecked) +
            ' frames still agrees with the Python verifier';
   }
   if (!EDITS.some(function (o) { return priceAffecting(o); })) {
-    return head + ' · price unchanged: this model ignores the geometry you changed';
+    return 'price unchanged: this model ignores the geometry you changed';
   }
-  return head + ' · re-priced client-side · re-verify in Python: ' +
+  return 're-priced client-side · re-verify in Python: ' +
          'python -m qccd run ' + A.name + ' --program ' + P.name;
 }
 function priceAffecting(op) {
@@ -1723,12 +2614,6 @@ function drawOutline(o, style) {
 function paintOverlay() {
   poolReset();
   if (!gEdit) return;
-  if (MODE !== 'edit') {
-    EHOVER.style.display = 'none'; EGHOST.style.display = 'none';
-    EBAND.style.display = 'none';
-    EGUIDE[0].style.display = 'none'; EGUIDE[1].style.display = 'none';
-    return;
-  }
   var i, sw = Math.max(1.5, 0.07 * L.g);
   for (i = 0; i < SELSET.length; i++) {
     drawOutline(outlineOf(SELSET[i].kind, SELSET[i].id),
@@ -1750,29 +2635,18 @@ function paintOverlay() {
 }
 
 // ------------------------------------------------------------------- mode
+// A COMPATIBILITY SHIM.  There are no modes: every gesture works at all times, while the
+// animation runs or not, and `.disabled` on the transport has exactly one writer --
+// render.py's `onProgramValidity` (disabled iff PROGRAM_STALE).  This used to stop the
+// animation and disable four buttons that `onProgramValidity` then re-enabled after the
+// first drop, so two owners disagreed about whether Play was available; and pressed
+// mid-gesture it left a live drag orphaned, which `drop()` then committed.  It stays
+// because the harness's `{do:'mode'}` step and about forty tests call it; what it still
+// does is finish any gesture that was in flight, so no press can outlive the call.
 function setMode(m) {
-  if (m === MODE) return;
-  if (m === 'edit') {
-    if (!READY) return;
-    if (typeof stop === 'function') stop();
-  }
+  if (GHOST) cancel();
+  if (ARMED_EL) arm(null);
   MODE = m;
-  HOVERED = null;
-  setCursor(null);
-  if (typeof svg !== 'undefined' && svg && svg.setAttribute) svg.setAttribute('data-mode', m);
-  // In edit mode the transport controls are disabled but the SLIDER stays live: scrubbing
-  // is read-only and it is how you understand what you are about to edit.  And the FRAME
-  // INDEX is kept -- re-running from 0 throws away the user's position, which is the single
-  // most annoying thing an editing animator can do.
-  var ids = ['play', 'step', 'glide', 'phase'];
-  for (var i = 0; i < ids.length; i++) {
-    var b = $(ids[i]);
-    if (b) b.disabled = (MODE === 'edit');
-  }
-  // the mode lives on `data-mode` (written in setMode) and the cursor on `style`;
-  // `classList` is a no-op in the harness, so anything routed through it is state no
-  // test can read -- the same trade `data-layout` already made.
-  if (svg.classList) svg.classList.toggle('editing', MODE === 'edit');
   paint();
 }
 function fmt(x, d) {
@@ -1783,14 +2657,48 @@ function fmt(x, d) {
 //
 // `textContent` only, never `innerHTML`: an id typed into the side editor is untrusted
 // text and it ends up in these messages.
+//
+// KEYED BY KIND + MESSAGE, so the same refusal twice is shown once (re-shown, moved to
+// the end, its timer restarted) rather than stacked; CAPPED at the last three, so a run
+// of refusals cannot climb over the toolbar; and a click dismisses one.  Hidden toasts
+// are dropped from the host when the next one arrives -- `remove()` is a no-op in the
+// harness, so the host is rebuilt with `replaceChildren` from the ones still showing.
+var TOASTS = {}, TOAST_MAX = 3;
 function toast(kind, message) {
   var host = $('toasts');
-  if (!host) return;
-  var t = document.createElement('div');
-  t.className = 'toast' + (kind ? ' ' + kind : '');
-  t.textContent = message;
-  host.append(t);
-  if (!SYNC) setTimeout(function () { t.style.display = 'none'; }, 4500);
+  if (!host) return null;
+  var key = (kind || '') + ':' + message, t = TOASTS[key];
+  if (!t) {
+    t = document.createElement('div');
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.textContent = message;
+    t.onclick = function () { t.style.display = 'none'; };
+    TOASTS[key] = t;
+  }
+  t.style.display = '';
+  var keep = [], i;
+  for (i = 0; i < host.children.length; i++) {
+    var c = host.children[i];
+    if (c !== t && c.style && c.style.display !== 'none') keep.push(c);
+  }
+  keep.push(t);
+  while (keep.length > TOAST_MAX) keep.shift();
+  host.replaceChildren.apply(host, keep);
+  if (!SYNC) {
+    if (t._timer) clearTimeout(t._timer);
+    t._timer = setTimeout(function () { t.style.display = 'none'; t._timer = null; }, 4500);
+  }
+  return t;
+}
+// what is showing, oldest first -- the harness's view of the strip
+function toasts() {
+  var host = $('toasts'), out = [];
+  if (!host) return out;
+  for (var i = 0; i < host.children.length; i++) {
+    var c = host.children[i];
+    if (c.style && c.style.display !== 'none') out.push({ kind: (c.className || '').replace(/^toast ?/, ''), message: c.textContent });
+  }
+  return out;
 }
 
 // ------------------------------------------------------------------- wiring
@@ -1800,33 +2708,77 @@ function toast(kind, message) {
 function wire() {
   EL.bar = $('ebar');
   if (!EL.bar) return;
-  EL.mPlay = $('mPlay'); EL.mEdit = $('mEdit'); EL.snap = $('tSnap');
+  EL.snap = $('tSnap');
   EL.undo = $('eUndo'); EL.redo = $('eRedo'); EL.count = $('eCount');
-  EL.prob = $('eProb'); EL.price = $('ePrice'); EL.src = $('eSrc');
+  EL.prob = $('eProb'); EL.notes = $('eNotes');
+  EL.price = $('ePrice'); EL.src = $('eSrc');
   EL.out = $('eOut'); EL.outWhich = 'py';
 
-  EL.mPlay.onclick = function () { setMode('play'); };
-  EL.mEdit.onclick = function () { setMode('edit'); };
-  EL.snap.onclick = function () { SNAP = !SNAP; paint(); };
-  EL.undo.onclick = function () { undo(); };
-  EL.redo.onclick = function () { redo(); };
+  EL.snap.onclick = function () { setSnap(!SNAP); unfocus(this); };
+  try { var sv = STORE.getItem(SNAP_KEY); if (sv !== null) SNAP = sv === '1'; } catch (err) { /* no store */ }
+  // The two stage tools the ruler work added.  `TRUE_SCALE` was already read from the
+  // store by the page script -- it has to be, because `L` must be right before the first
+  // mark is drawn -- so this only binds the button to the setter.
+  EL.trueS = $('tTrue'); EL.meas = $('tMeasure');
+  if (EL.trueS) EL.trueS.onclick = function () { setTrueScale(!TRUE_SCALE); unfocus(this); };
+  if (EL.meas) EL.meas.onclick = function () { measureToggle(); unfocus(this); };
+  // THE TWO MODES, and the shape tools that only mean anything in one of them.  The mode
+  // is remembered exactly as Snap and True scale are; with nothing stored, a canvas with
+  // no device on it opens on Sketch.
+  try { var mv = STORE.getItem(MODE_KEY); if (mv === 'sketch' || mv === 'parts') DMODE = mv; }
+  catch (err) { /* no store */ }
+  EL.mode = { sketch: $('tModeSketch'), parts: $('tModeParts') };
+  if (EL.mode.sketch) EL.mode.sketch.onclick = function () { setDesignMode('sketch'); unfocus(this); };
+  if (EL.mode.parts) EL.mode.parts.onclick = function () { setDesignMode('parts'); unfocus(this); };
+  // (no shape buttons to wire here any more: the rail's tiles and r/e/n/p own the tools)
+  // ONE GESTURE PER PRESS: a group drag or a nudge comes back in one step, not N.  The
+  // single-edit `undo`/`redo` stay on the API for scripts that want the finer grain.
+  EL.undo.onclick = function () { undoGroup(); unfocus(this); };
+  EL.redo.onclick = function () { redoGroup(); unfocus(this); };
+  // BOTH REGISTERS, EACH UNDER ITS OWN HEADING.  The chip counts problems; the notes are
+  // one click away here as well as on their own chip, so the split changes which number
+  // is shouted and nothing about what can be read.
   EL.prob.onclick = function () {
-    var rows = PROBLEMS.map(function (p) { return 'statement ' + p.i + ': ' + p.message; })
-      .concat(LINTS.map(function (l) { return l.code + ': ' + l.message; }));
-    toast(rows.length ? 'warn' : 'ok', rows.length ? rows.join('  ·  ') : 'no problems');
+    var probs = PROBLEMS.map(function (p) { return 'statement ' + p.i + ': ' + p.message; })
+      .concat(lintProblems().map(function (l) { return l.code + ': ' + l.message; }));
+    var notes = lintNotes().map(function (l) { return l.code + ': ' + l.message; });
+    var rows = [];
+    rows.push(probs.length ? ('Problems \u2014 ' + probs.join('  \u00b7  '))
+                           : 'No problems: nothing you have drawn breaks a rule.');
+    if (notes.length) {
+      rows.push('Notes, about what is not there yet \u2014 ' + notes.join('  \u00b7  '));
+    }
+    toast(probs.length ? 'warn' : 'ok', rows.join('\n'));
+    unfocus(this);
   };
+  if (EL.notes) EL.notes.onclick = function () {
+    var notes = lintNotes().map(function (l) { return l.code + ': ' + l.message; });
+    toast('ok', notes.length
+      ? ('Nothing is wrong \u2014 these are about what is not there yet:\n' +
+         notes.join('  \u00b7  '))
+      : 'no notes');
+    unfocus(this);
+  };
+  var helpBtn = $('eHelp');
+  if (helpBtn) helpBtn.onclick = function () { helpToggle(); unfocus(this); };
+  var helpHost = $('help');
+  if (helpHost && helpHost.addEventListener) {
+    // the backdrop closes it; a click inside the card does not
+    helpHost.addEventListener('click', function (e) { if (e.target === helpHost) helpToggle(false); });
+  }
+  renderHelp();
   var pw = $('pwText');
   if (pw) {
+    // ONE WAY TO RUN A PROGRAMME: the Evaluate button.  The pane used to apply itself on
+    // blur as well, silently and without the button's feedback -- so Escape, which is
+    // documented as "only leaves the field", ran whatever was half-typed.  Typing only
+    // marks the text as the user's, so a repaint does not overwrite it.
     pw.oninput = function () { pw._touched = true; };
-    pw.onchange = function () { pw._touched = true; applyProgramSource(pw.value); };
   }
   var run = $('pwRun');
-  if (run) run.onclick = function () {
-    var ta = $('pwText');
-    var r = applyProgramSource(ta ? ta.value : '');
-    if (!r.ok) toast('bad', (r.errors[0] || {}).message || 'the programme did not parse');
-    else toast('ok', PROG.length + ' statements, ' + P.frames.length + ' frames');
-  };
+  if (run) run.onclick = function () { evaluateWrite(); };
+  var drive = $('pwDrive');
+  if (drive) drive.onclick = function () { pressTestDrive(); };
   var seg = $('eWhich');
   if (seg) seg.onchange = function () { EL.outWhich = seg.value; paint(); };
   var copy = $('eCopy');
@@ -1844,6 +2796,7 @@ function wire() {
       EL.out.select();
       toast('ok', 'selected: press ctrl+C to copy');
     }
+    unfocus(copy);
   };
   if (EL.src) {
     EL.src.oninput = function () {
@@ -1853,28 +2806,66 @@ function wire() {
         var r = applySource(EL.src.value);
         var strip = $('eSrcErr');
         if (strip) {
+          // a statement the applier REFUSED arrives with `problems` and no parse error:
+          // `r.errors[0].line` threw there, and the strip said nothing
+          var e0 = r.errors && r.errors[0], p0 = r.problems && r.problems[0];
           strip.textContent = r.ok ? ''
-            : ('line ' + r.errors[0].line + ' col ' + r.errors[0].col + ': ' + r.errors[0].message);
+            : e0 ? ('line ' + e0.line + ' col ' + e0.col + ': ' + e0.message)
+            : (p0 ? p0.message : 'not applied');
         }
       };
       if (SYNC) run(); else SRCT = setTimeout(run, 220);
     };
   }
 
+  // -- the explain layer: one-line adapters ------------------------------------------
+  var ex = $('eExplain');
+  if (ex) ex.onclick = function () { explainToggle(); unfocus(ex); };
+  if (document.addEventListener) {
+    document.addEventListener('mouseover', function (e) { hintFrom(e.target, e.clientX, e.clientY); });
+    document.addEventListener('focusin', function (e) { hintFrom(e.target); });
+    document.addEventListener('focusout', function () { hintHide(); });
+  }
+  renderCaptions();
+
   // -- the stage ---------------------------------------------------------------------
-  // Pan behaviour in PLAY mode is byte-for-byte unchanged, so no existing test can
-  // regress: this handler returns immediately unless the editor is on.
+  // No mode guard anywhere below: `claim` arbitrates every press, at all times.
   svg.addEventListener('pointerdown', function (e) {
-    if (MODE !== 'edit') return;
     var m = toModel(e.clientX, e.clientY);
     // THE SAME ARBITER the page's pan handler asked, so the two can never disagree about
     // who owns this press.
-    var who = claim(m.x, m.y, { button: e.button, space: SPACE, alt: e.altKey,
+    var who = claim(m.x, m.y, { button: e.button, alt: e.altKey,
                                 shift: e.shiftKey, ctrl: e.ctrlKey });
-    if (who === 'pan') { DOWN = null; ARMED = null; return; }
-    DOWN = { cx: e.clientX, cy: e.clientY, mx: m.x, my: m.y, hit: hit(m.x, m.y),
-             shift: e.shiftKey, claim: who, id: e.pointerId };
+    // A PAN-CLAIMED PRESS IS STILL REMEMBERED, because a press that never moves is a
+    // click and not a pan: releasing on empty stage clears the selection or places the
+    // armed stamp.  `pointermove` leaves it alone (the page pans) and `end` reads it back
+    // only when the pointer travelled under the click threshold with the left button.
+    // ANY OTHER PRESS PUTS THE MENU AWAY.  There is one panel and it belongs to the
+    // press that opened it; a press inside the panel never reaches this handler.
+    if ((MENU || MDLG) && who !== 'menu') menuClose();
+    // THE RIGHT-CLICK MENU.  The press SELECTS what is under it (unless that is already
+    // part of the selection, in which case the menu acts on all of it) and opens every
+    // verb that applies.  All the logic is in `menuOpen`; this is the adapter.
+    if (who === 'menu') {
+      DOWN = null; ARMED = null;
+      menuOpen(m.x, m.y, { cx: e.clientX, cy: e.clientY });
+      return;
+    }
+    if (who === 'measure') { DOWN = null; ARMED = null; measureClick(m.x, m.y); return; }
+    // THE SHAPE TOOL, function for function as the ruler: the press begins the drag (or,
+    // for the polyline, drops one point), `pointermove` drives the preview and the release
+    // commits.  A drag that leaves the stage must keep arriving, so it captures too.
+    if (who === 'sketch') {
+      DOWN = null; ARMED = null;
+      sketchDown(m.x, m.y, { shift: e.shiftKey });
+      if (svg.setPointerCapture) { try { svg.setPointerCapture(e.pointerId); } catch (err) {} }
+      return;
+    }
+    DOWN = { cx: e.clientX, cy: e.clientY, mx: m.x, my: m.y,
+             hit: who === 'pan' ? null : hit(m.x, m.y),
+             shift: e.shiftKey, alt: e.altKey, claim: who, id: e.pointerId, button: e.button };
     ARMED = null;
+    if (who === 'pan') return;
     // A drag that leaves the stage must keep arriving.  The page's pan handler used to
     // capture on every press and the editor rode along on that capture; now that pan
     // yields, the editor has to take it itself or a drag stops halfway to wherever it
@@ -1882,16 +2873,18 @@ function wire() {
     if (svg.setPointerCapture) { try { svg.setPointerCapture(e.pointerId); } catch (err) {} }
   });
   svg.addEventListener('pointermove', function (e) {
-    if (MODE !== 'edit') return;
     var m = toModel(e.clientX, e.clientY);
+    if (SKETCH) { sketchMove(m.x, m.y, { shift: e.shiftKey }); return; }
     if (!DOWN) {
-      hover(m.x, m.y);
-      // the ghost IS the element, drawn by the stage's own code at stage scale
-      if (ARMED_EL === 'site' || ARMED_EL === 'junction') {
-        if (!PGHOST) ghostBegin(ARMED_EL, m.x, m.y); else ghostMove(m.x, m.y, {});
+      hover(m.x, m.y, e.clientX, e.clientY);
+      // the ghost IS the element, drawn by the stage's own code at stage scale -- a
+      // whole component as much as a single site
+      if (isStampType(ARMED_EL)) {
+        if (!PGHOST) ghostBegin(ARMED_EL, m.x, m.y); else ghostMove(m.x, m.y);
       } else if (PGHOST) ghostCancel();
       return;
     }
+    if (DOWN.claim === 'pan') return;   // the page's pan handler owns this drag
     // 4 px, not 3: the existing click threshold is 3, so one pixel of hysteresis means a
     // click can never become a drag.
     if (!ARMED && Math.sqrt((e.clientX - DOWN.cx) * (e.clientX - DOWN.cx) +
@@ -1905,8 +2898,8 @@ function wire() {
             : ((DOWN.shift || ARMED_EL === 'segment') && DOWN.hit.kind !== 'segment' &&
                DOWN.hit.kind !== 'loop') ? 'band'
             : 'node';
-      if (ARMED === 'node') begin(DOWN.hit.kind, DOWN.hit.id, DOWN.mx, DOWN.my);
-      if (ARMED === 'band') { BAND = DOWN.hit.id; }
+      if (ARMED === 'node') begin(DOWN.hit.kind, DOWN.hit.id, DOWN.mx, DOWN.my, { alt: DOWN.alt });
+      if (ARMED === 'band') bandBegin(DOWN.hit.id);
       if (ARMED === 'marquee') marqueeBegin(DOWN.mx, DOWN.my);
       setCursor(DOWN.hit);
     }
@@ -1916,15 +2909,16 @@ function wire() {
     } else if (ARMED === 'marquee') {
       marqueeMove(m.x, m.y);
     } else if (ARMED === 'band') {
-      var n = nodeById[BAND];
-      EBAND.style.display = '';
-      EBAND.setAttribute('x1', px(n)); EBAND.setAttribute('y1', py(n));
-      EBAND.setAttribute('x2', m.x); EBAND.setAttribute('y2', m.y);
+      bandMove(m.x, m.y);
     }
   });
   var end = function (e) {
-    if (MODE !== 'edit') { DOWN = null; ARMED = null; return; }
     var m = toModel(e.clientX, e.clientY);
+    if (SKETCH) {
+      if (svg.releasePointerCapture) { try { svg.releasePointerCapture(e.pointerId); } catch (err) {} }
+      sketchUp(m.x, m.y, { shift: e.shiftKey });
+      return;
+    }
     var wasArmed = ARMED, down = DOWN;
     DOWN = null; ARMED = null;
     if (down && svg.releasePointerCapture) {
@@ -1932,14 +2926,12 @@ function wire() {
     }
     hideHud();
     if (wasArmed === 'node') {
+      // `drop()` resets the cursor itself, through the layout it just produced (the
+      // harness needs that); a second hover here was a second hit test per release
       var r = drop();
-      if (r && r.problems.length) {
-        toast('bad', r.problems[0].message);
-      } else if (r) {
-        var d = declaredMismatch(r.op.args[0], +Q.unbox(r.op.args[1]), +Q.unbox(r.op.args[2]));
-        if (d) toast('warn', d + '  (press L to set the lengths to match)');
-        LASTMOVED = r.op.args[0];
-      }
+      // the declared-length note is on the price strip (`rebuild` derives it); a toast
+      // per drop was the noise that hid the refusals
+      if (r && r.problems.length) toast('bad', r.problems[0].message);
       return;
     }
     if (wasArmed === 'marquee') {
@@ -1947,168 +2939,1436 @@ function wire() {
       setCursor(hit(m.x, m.y));
       return;
     }
-    if (wasArmed === 'band') {
-      EBAND.style.display = 'none';
-      var target = hit(m.x, m.y);
-      if (target && target.kind !== 'segment' && target.kind !== 'loop' && target.id !== BAND) {
-        var res = joinNodes(BAND, target.id);
-        if (!res.ok && (res.problems[0] || {}).code === 'no_builder') res = addSegment(BAND, target.id);
-        if (!res.ok) toast('bad', (res.problems[0] || {}).message || 'refused');
-      } else if (!target) {
-        toast('warn', 'a segment joins two nodes -- drop it on a second one');
-      }
-      BAND = null;
-      return;
-    }
-    if (!wasArmed && down &&
+    if (wasArmed === 'band') { bandDrop(m.x, m.y); return; }
+    if (!wasArmed && down && !down.button &&
         Math.sqrt((e.clientX - down.cx) * (e.clientX - down.cx) +
                   (e.clientY - down.cy) * (e.clientY - down.cy)) < 4) {
-      var h = down.hit;
-      // AN ARMED STAMP PLACES ON A PLAIN CLICK.  Double-click still works and is still in
-      // the help table, but requiring it was most of "I cannot flexibly add anything":
-      // you arm an element, click where you want it, and it is there.
-      if (!h && (ARMED_EL === 'site' || ARMED_EL === 'junction')) {
-        var sp = snapTo((down.mx - L.ox) / (L.sx || 1), (down.my - L.oy) / (L.sy || 1),
-                        e.altKey, e.shiftKey);
-        var pr = placeStamp(ARMED_EL, sp.x, sp.y);
-        if (!pr.ok) toast('bad', (pr.problems[0] || {}).message || 'refused');
-        return;
-      }
-      if (!h) setSelection([]);
-      else if (e.shiftKey) {
-        // shift-click TOGGLES, which is what every other editor does and what makes a
-        // marquee correctable without starting over
-        var was = false, keep = [];
-        for (var si = 0; si < SELSET.length; si++) {
-          if (SELSET[si].id === h.id && SELSET[si].kind === h.kind) was = true;
-          else keep.push(SELSET[si]);
-        }
-        setSelection(was ? keep : SELSET.concat([{ kind: h.kind, id: h.id }]));
-      } else setSelection([{ kind: h.kind, id: h.id }]);
-      // extend the EXISTING selection bus rather than building a second one
-      if (h && typeof selectRef === 'function') {
-        selectRef(h.kind === 'segment' ? 'segment' : 'site', h.id);
-      }
+      clickStage(down.mx, down.my, { shift: e.shiftKey });
     }
   };
   svg.addEventListener('pointerup', end);
   svg.addEventListener('pointercancel', end);
   svg.addEventListener('dblclick', function (e) {
-    if (MODE !== 'edit') return;
     var m = toModel(e.clientX, e.clientY);
-    if (hit(m.x, m.y)) return;
-    var x = (m.x - L.ox) / (L.sx || 1), y = (m.y - L.oy) / (L.sy || 1);
-    var s = snapTo(x, y, false, false);
-    // WITH A PALETTE ELEMENT ARMED this places THAT element through the builder verbs, so
-    // the same double-click is the from-scratch gesture on a blank canvas and the
-    // add-a-node-to-an-existing-device gesture otherwise.  Without one it falls back to
-    // `add_site`, which copies zone and capacity from the nearest node -- the right
-    // default when there IS a nearest node and meaningless when there is not.
-    var res;
-    // THE TWO STAMPS THAT ARE NOT PLACED BY A POINT say so instead of quietly placing a
-    // site.  Arming `segment` or `loop` and double-clicking used to fall through to
-    // `addSite`, so the menu looked like it worked and produced the wrong element.
-    if (ARMED_EL === 'segment') {
-      toast('warn', 'a segment joins two nodes: drag from one node to another');
-      return;
-    }
-    if (ARMED_EL === 'loop') {
-      toast('warn', 'a loop is a walk over nodes that already exist: select them in ' +
-                    'orbit order, then press Close loop');
-      return;
-    }
-    if (String(ARMED_EL).slice(0, 4) === 'cmp:') {
-      res = stampComponent(String(ARMED_EL).slice(4), s.x, s.y, 0);
-      if (res.ok !== false) {
-        toast('ok', 'placed ' + String(ARMED_EL).slice(4));
-        arm(null);
-      }
-    } else if (ARMED_EL === 'site' || ARMED_EL === 'junction') {
-      res = addNodeAt(s.x, s.y, { kind: ARMED_EL, zone: ARMED_EL === 'site'
-        ? (nearestZone() || Object.keys(STATE.zone_types).sort()[0]) : undefined });
-    } else if (!nodesOf(STATE).length) {
-      // an EMPTY canvas has no nearest node to copy from, so `add_site` cannot work at
-      // all; the builder verb is the only gesture that can start a device
-      res = addNodeAt(s.x, s.y, { kind: 'site',
-                                  zone: Object.keys(STATE.zone_types).sort()[0] });
-    } else {
-      res = addSite(s.x, s.y, nearestId(m.x, m.y));
-    }
-    if (!res.ok) toast('bad', (res.problems[0] || {}).message || 'refused');
+    // a double-click FINISHES A POLYLINE, open; it never places a site while a shape tool
+    // is armed, because the two single clicks before it were points of the shape
+    if (SKETCH === 'poly') { sketchFinish(false); return; }
+    if (SKETCH) return;
+    dblclickStage(m.x, m.y);
   });
+  // the ghost follows the pointer, so it goes when the pointer leaves the stage; the tile
+  // stays armed and the next `pointermove` begins a fresh one (the rule `setArmed` uses)
+  svg.addEventListener('pointerleave', function () { leaveStage(); });
 
-  // -- keys ---------------------------------------------------------------------------
-  // The existing handler early-returns on ctrl/meta/alt, and that guard is what keeps
-  // browser shortcuts working, so undo/redo are checked BEFORE it rather than by relaxing
-  // it.  This listener runs first because it is registered later on the same target only
-  // for the combos it owns.
-  document.addEventListener('keydown', function (e) {
-    var tag = e.target && e.target.tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    var k = e.key;
-    if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')) {
-      e.preventDefault();
-      if (e.shiftKey) redo(); else undo();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && (k === 'y' || k === 'Y')) { e.preventDefault(); redo(); return; }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (k === ' ') { SPACE = true; setCursor(HOVERED); return; }
-    // ESCAPE CANCELS THE LIVE DRAG FIRST.  It was bound only in the page's own handler,
-    // which cleared the programme filter and left the editor's selection untouched -- so
-    // the two selection models disagreed and `drop()` after Escape still committed the
-    // move.  One order, said once.
-    if (k === 'Escape') { escapeGesture(); return; }
-    if (k === 'e' || k === 'E') { setMode(MODE === 'edit' ? 'play' : 'edit'); return; }
-    if (MODE !== 'edit') return;
-    if (k === 'Delete' || k === 'Backspace') {
-      e.preventDefault();
-      var r = removeSelected();
-      if (r && !r.ok && r.problems.length) toast('bad', r.problems[0].message);
-      return;
-    }
-    if (k === 'L' || k === 'l') {
-      if (LASTMOVED) toast('ok', reconcileLengths(LASTMOVED) + ' segment length(s) set to match the drawing');
-      return;
-    }
-    if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') {
-      if (!SELSET.length) return;
-      e.preventDefault();
-      nudge(k, e.shiftKey ? 4 : 1);
-      return;
-    }
-  });
-  document.addEventListener('keyup', function (e) {
-    if (e.key === ' ') { SPACE = false; setCursor(HOVERED); }
-  });
+  // -- keys: NONE HERE.  The page owns the one `keydown` listener and dispatches on
+  // `keyGesture` below; a second listener on the same target is how the arrows came to
+  // nudge AND scrub at once.
 }
-var SPACE = false, BAND = null, SRCT = null, LASTMOVED = null;
-
-function nearestId(mx, my) {
-  var best = null, bd = Infinity;
-  for (var i = 0; i < A.nodes.length; i++) {
-    var n = A.nodes[i];
-    var d = (px(n) - mx) * (px(n) - mx) + (py(n) - my) * (py(n) - my);
-    if (d < bd) { bd = d; best = n.id; }
+var BAND = null, SRCT = null, LASTMOVED = null;
+// THE BAND -- shift-drag from a node to a second one makes a segment -- as verbs, like
+// begin/move/drop: the pointer adapter calls these and holds no state of its own, so
+// the harness can hold a band open and ask what Escape does to it.
+function bandBegin(id) {
+  if (!nodeById[id]) return null;
+  BAND = id;
+  return { from: BAND };
+}
+function bandMove(mx, my) {
+  var n = BAND ? nodeById[BAND] : null;
+  if (!n) return null;
+  EBAND.style.display = '';
+  EBAND.setAttribute('x1', px(n)); EBAND.setAttribute('y1', py(n));
+  EBAND.setAttribute('x2', mx); EBAND.setAttribute('y2', my);
+  return { from: BAND, x: mx, y: my };
+}
+function bandDrop(mx, my) {
+  if (!BAND) return null;
+  EBAND.style.display = 'none';
+  var from = BAND, target = hit(mx, my), res = null;
+  BAND = null;
+  if (target && target.kind !== 'segment' && target.kind !== 'loop' && target.id !== from) {
+    // `joinNodes` toasts its own refusal
+    res = joinNodes(from, target.id);
+  } else if (!target) {
+    toast('warn', 'a segment joins two nodes -- drop it on a second one');
   }
-  return best;
+  return { from: from, to: target ? target.id : null,
+           ok: !!(res && res.ok), problems: res ? res.problems : [] };
+}
+function bandCancel() {
+  if (!BAND) return false;
+  if (EBAND) EBAND.style.display = 'none';
+  BAND = null;
+  return true;
+}
+// a toolbar button keeps focus after a click, and then the space bar re-fires it instead
+// of playing; `blur` is feature-detected because the harness's elements have none
+function unfocus(el) { if (el && el.blur) el.blur(); }
+
+// THE POINTER LEFT THE STAGE, callable without an Event.  A press in flight keeps its
+// ghost (pointer capture brings the pointer back); otherwise the placement preview goes
+// and the tile stays armed.  Returns whether the ghost was dropped, so the harness can
+// drive the decision the adapter used to make on its own.
+function leaveStage() {
+  if (DOWN) return false;
+  ghostCancel();
+  hintHide();
+  return true;
 }
 
-// Arrow-key nudge: coalesced into ONE undo entry by an explicit meta.group stamped at the
-// start of the repeat, never by guessing from timestamps at undo time.  Time-based
-// coalescing would be exactly the kind of second implementation this codebase has been
-// burned by.
+// Arrow-key nudge: ONE gesture.  Every member's `move_site` is built from its pre-move
+// position, validated as a set (a member may land where another member was), stamped
+// with one fresh group id -- the constant `'nudge'` used to glue every nudge ever made
+// into a single undo step -- and committed with ONE rebuild rather than one per node.
+// A refusal is returned AND toasted: `emit()`'s verdict used to be dropped on the floor,
+// so nudging two adjacent sites into each other did nothing and said nothing.
 function nudge(key, mult) {
   var dx = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
   var dy = key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0;
-  var stepx = (L.ux || 1) * mult, stepy = (L.uy || L.ux || 1) * mult;
-  for (var i = 0; i < SELSET.length; i++) {
-    var n = nodeById[SELSET[i].id];
-    if (!n) continue;
-    emit({ method: 'move_site',
-           args: [n.id, Q.pyFloat(n.x + dx * stepx), Q.pyFloat(n.y + dy * stepy)],
-           kwargs: {}, meta: { group: 'nudge', src: 'keys' } });
+  var stepx = (L.ux || 1) * (mult || 1), stepy = (L.uy || L.ux || 1) * (mult || 1);
+  var ids = selectionNodes(), ops = [], problems = [], i, j;
+  if (!ids.length) return { ok: false, ops: [], problems: [{ code: 'no_selection', message: 'nothing is selected to nudge' }] };
+  var group = 'g' + (++GROUP), member = {};
+  for (i = 0; i < ids.length; i++) member[ids[i]] = 1;
+  for (i = 0; i < ids.length; i++) {
+    var n = nodeById[ids[i]];
+    ops.push({ method: 'move_site',
+               args: [n.id, Q.pyFloat(n.x + dx * stepx), Q.pyFloat(n.y + dy * stepy)],
+               kwargs: {}, meta: { group: group, src: 'keys' } });
   }
+  for (i = 0; i < ops.length; i++) {
+    var ps = validate(ops[i]);
+    for (j = 0; j < ps.length; j++) {
+      // the set moves together: a member sitting where another member WAS is not a
+      // coincidence, and the other member's own op says where it is going
+      if (ps[j].code === 'coincident' && member[ps[j].targets[1]]) continue;
+      problems.push(ps[j]);
+    }
+  }
+  if (problems.length) { toast('bad', problems[0].message); return { ok: false, ops: ops, problems: problems }; }
+  // COMMIT AS ONE, THEN CHECK THE APPLIER -- the same take-it-back-out rule `emit` uses,
+  // over the whole set, so a refused nudge leaves no half of itself in the stack.
+  var at = EDITS.length;
+  for (i = 0; i < ops.length; i++) EDITS.push(ops[i]);
+  forgetRedo();
+  rebuild();
+  var mine = PROBLEMS.filter(function (p) { return p.i >= at; });
+  if (mine.length) {
+    EDITS.length = at;
+    rebuild();
+    toast('bad', mine[0].message);
+    return { ok: false, ops: ops, problems: mine };
+  }
+  LASTMOVED = ids[0];
+  return { ok: true, ops: ops, problems: [] };
+}
+// `L`: the last moved node's segment lengths are set to what the drawing shows
+function reconcileLast() {
+  if (!LASTMOVED) return { ok: false, n: 0 };
+  var n = reconcileLengths(LASTMOVED);
+  toast('ok', n + ' segment length(s) set to match the drawing');
+  return { ok: true, n: n };
+}
+
+// ------------------------------------------------------- the ruler, and the true scale
+//
+// WHAT THIS EXISTS FOR.  A reviewer asked that anyone be able to measure the distance
+// between any two points on this picture, in micrometres, and the angle between any two
+// rails.  Neither was possible before: node coordinates are LATTICE UNITS, which are not
+// a length, and the fit is free to stretch one axis by up to `K_ANISO`, which makes every
+// angle on the screen a different angle from the one on the die.
+//
+// So there are two things here, and they are separate on purpose.
+//
+//   * TRUE SCALE fixes the drawing: `sx:sy` is forced to the technology's nm-per-unit
+//     ratio, so one pixel is the same number of nanometres on both axes.  On by default,
+//     remembered like Snap.  With it off the ruler still reads correctly -- every number
+//     below is computed from LATTICE positions through the technology, never off the
+//     screen -- but the picture no longer agrees with the numbers, so the scale bar says
+//     which axis it is for and the ruler still tells the truth.
+//   * THE RULER measures.  Click two points for a distance, a third for the angle at the
+//     middle one, or two points on two different rails for the angle between those rails.
+//
+// EVERY NUMBER IS PHYSICAL, AND NONE IS READ OFF THE SCREEN.  `physVec` maps a pixel
+// displacement back through `sx`/`sy` into lattice units and then through the technology
+// into nanometres, so a measurement taken on a stretched drawing is the same measurement
+// as one taken on a true-scale drawing.  That is the whole reason the ruler is worth
+// having: a protractor held against a distorted picture measures the distortion.
+var MEASURE = false, MPTS = [], gMeas = null;
+var MDOT = [], MLINE = [], MTXT = [], MARC = null;
+
+// A pixel displacement as a physical one, in NANOMETRES, per axis.
+function physVec(dxpx, dypx) {
+  return { x: dxpx / (L.sx || 1) * NM_X, y: dypx / (L.sy || 1) * NM_Y };
+}
+// The direction of one rail, from its two NODES in physical units -- not from the two
+// points the user happened to click on it, and not from the pixels it is drawn in.  This
+// is what makes "the angle between two rails" correct on an anisotropic drawing.
+function railDirection(sid) {
+  var sg = segById[sid];
+  if (!sg) return null;
+  var a = nodeById[sg.a], b = nodeById[sg.b];
+  if (!a || !b) return null;
+  return { x: (b.x - a.x) * NM_X, y: (b.y - a.y) * NM_Y };
+}
+// Degrees between two vectors.  `smaller` folds 170 degrees to 10: two RAILS cross at one
+// angle and its supplement, and the angle a reader means is the acute one.  A three-point
+// angle is not folded -- there the order of the clicks says which of the two is meant.
+function angleBetween(u, v, smaller) {
+  if (!u || !v) return null;
+  var lu = Math.sqrt(u.x * u.x + u.y * u.y), lv = Math.sqrt(v.x * v.x + v.y * v.y);
+  if (lu < 1e-12 || lv < 1e-12) return null;
+  var c = (u.x * v.x + u.y * v.y) / (lu * lv);
+  if (c > 1) c = 1; else if (c < -1) c = -1;
+  var deg = Math.acos(c) * 180 / Math.PI;
+  return smaller ? Math.min(deg, 180 - deg) : deg;
+}
+// The nearest point ON a drawn segment, curve included: a bowed rail is not its chord,
+// and snapping to the chord would put the ruler's end in the middle of nothing.
+function nearestOnSegment(I, mx, my) {
+  if (!I.cp) {
+    var l2 = I.dx * I.dx + I.dy * I.dy;
+    var t = l2 > 1e-12 ? ((mx - I.ax) * I.dx + (my - I.ay) * I.dy) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    var x = I.ax + I.dx * t, y = I.ay + I.dy * t;
+    return { x: x, y: y, t: t, d: Math.sqrt((x - mx) * (x - mx) + (y - my) * (y - my)) };
+  }
+  var best = null;
+  for (var i = 0; i <= 24; i++) {
+    var q = bezPoint(I, i / 24);
+    var d = Math.sqrt((q.x - mx) * (q.x - mx) + (q.y - my) * (q.y - my));
+    if (!best || d < best.d) best = { x: q.x, y: q.y, t: i / 24, d: d };
+  }
+  return best;
+}
+// SNAP TO SOMETHING REAL FIRST.  A ruler whose ends land wherever the pointer was is a
+// ruler that measures the hand: a node centre wins, then the nearest rail, and only past
+// both does the click stand where it fell (and says so, so the reading is not mistaken
+// for a measurement between two parts).
+function measureSnap(mx, my) {
+  var R = Math.max(2 * slop(), 8 * userPerPx()), best = null, i;
+  for (i = 0; i < A.nodes.length; i++) {
+    var n = A.nodes[i], dx = px(n) - mx, dy = py(n) - my;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= R && (!best || d < best.d)) best = { x: px(n), y: py(n), d: d, kind: 'node', id: n.id };
+  }
+  if (best) return best;
+  for (i = 0; i < A.segments.length; i++) {
+    var sg = A.segments[i], I = SEGINFO[sg.id];
+    if (!I || I.len < 1e-6) continue;
+    var q = nearestOnSegment(I, mx, my);
+    if (q.d <= R && (!best || q.d < best.d)) best = { x: q.x, y: q.y, d: q.d, kind: 'rail', id: sg.id };
+  }
+  return best || { x: mx, y: my, d: 0, kind: 'free', id: null };
+}
+
+// THE OVERLAY IS ITS OWN GROUP, and nothing else writes into it.  `clearTransients()` --
+// the page's single undo point for the DC ramp, the over-capacity restroke and the
+// in-play site marks -- runs on every frame; a ruler drawn into any of those groups would
+// be wiped by the next animation tick, which is exactly the failure that makes people
+// stop trusting a measurement tool.  Pooled and hidden, never removed: `remove()` is a
+// no-op in tests/shim.mjs.
+function ensureMeasure() {
+  if (gMeas) return;
+  gMeas = el('g', { 'pointer-events': 'none' });
+  svg.append(gMeas);
+  var i;
+  for (i = 0; i < 3; i++) {
+    var d = el('circle', { r: 3.4, fill: 'none', stroke: C.accent, 'stroke-width': 1.6 });
+    d.style.display = 'none'; gMeas.append(d); MDOT.push(d);
+  }
+  for (i = 0; i < 2; i++) {
+    var ln = el('line', { stroke: C.accent, 'stroke-width': 1.6, 'stroke-dasharray': '6 3' });
+    ln.style.display = 'none'; gMeas.append(ln); MLINE.push(ln);
+  }
+  MARC = el('path', { fill: 'none', stroke: C.gold, 'stroke-width': 1.8 });
+  MARC.style.display = 'none'; gMeas.append(MARC);
+  for (i = 0; i < 2; i++) {
+    var t = el('text', { 'font-size': 11, 'font-weight': 650, fill: C.ink });
+    t.style.display = 'none'; gMeas.append(t); MTXT.push(t);
+  }
+}
+
+// THE NUMBERS, as numbers.  Published so a harness can assert what the page claims a
+// distance is, rather than scraping a label -- and so the labels below have exactly one
+// source.
+function measureReadout() {
+  var out = { on: MEASURE, n: MPTS.length, points: [], distance_um: null, lattice: null,
+              dx_um: null, dy_um: null, angle_deg: null, rail_angle_deg: null,
+              rails: [], preset: TECH.preset, true_scale: !!TRUE_SCALE };
+  var i;
+  for (i = 0; i < MPTS.length; i++) {
+    out.points.push({ x: MPTS[i].x, y: MPTS[i].y, kind: MPTS[i].kind, id: MPTS[i].id });
+    if (MPTS[i].kind === 'rail') out.rails.push(MPTS[i].id);
+  }
+  if (MPTS.length >= 2) {
+    var v = physVec(MPTS[1].x - MPTS[0].x, MPTS[1].y - MPTS[0].y);
+    out.dx_um = v.x / 1000; out.dy_um = v.y / 1000;
+    out.distance_um = Math.sqrt(v.x * v.x + v.y * v.y) / 1000;
+    var lx = (MPTS[1].x - MPTS[0].x) / (L.sx || 1), ly = (MPTS[1].y - MPTS[0].y) / (L.sy || 1);
+    out.lattice = Math.sqrt(lx * lx + ly * ly);
+    if (MPTS[0].kind === 'rail' && MPTS[1].kind === 'rail' && MPTS[0].id !== MPTS[1].id) {
+      out.rail_angle_deg = angleBetween(railDirection(MPTS[0].id), railDirection(MPTS[1].id), true);
+    }
+  }
+  if (MPTS.length >= 3) {
+    out.angle_deg = angleBetween(physVec(MPTS[0].x - MPTS[1].x, MPTS[0].y - MPTS[1].y),
+                                 physVec(MPTS[2].x - MPTS[1].x, MPTS[2].y - MPTS[1].y), false);
+  }
+  return out;
+}
+
+function measureRedraw() {
+  if (!gMeas) { if (!MEASURE) return; ensureMeasure(); }
+  var r = measureReadout(), i;
+  // THE RULER IS FURNITURE, SIZED IN SCREEN PIXELS.  Everything below is written in the
+  // pixels a reader sees and converted once: a mark sized in user units grows with the
+  // zoom, and a ruler whose tick marks swell as you look closer is a ruler that argues
+  // with the thing it is measuring.
+  var u = userPerPx(), sw = 1.6 * u;
+  for (i = 0; i < MDOT.length; i++) {
+    if (i < MPTS.length) {
+      MDOT[i].setAttribute('cx', MPTS[i].x); MDOT[i].setAttribute('cy', MPTS[i].y);
+      MDOT[i].setAttribute('r', 4 * u);
+      MDOT[i].setAttribute('stroke-width', sw);
+      // a point that snapped to nothing is drawn hollow-red, so a reading taken in empty
+      // space cannot be mistaken for one taken between two parts
+      MDOT[i].setAttribute('stroke', MPTS[i].kind === 'free' ? C.z : C.accent);
+      MDOT[i].style.display = '';
+    } else MDOT[i].style.display = 'none';
+  }
+  for (i = 0; i < MLINE.length; i++) {
+    if (i + 1 < MPTS.length) {
+      MLINE[i].setAttribute('x1', MPTS[i].x); MLINE[i].setAttribute('y1', MPTS[i].y);
+      MLINE[i].setAttribute('x2', MPTS[i + 1].x); MLINE[i].setAttribute('y2', MPTS[i + 1].y);
+      MLINE[i].setAttribute('stroke-width', sw);
+      MLINE[i].setAttribute('stroke-dasharray', (6 * u) + ' ' + (3 * u));
+      MLINE[i].style.display = '';
+    } else MLINE[i].style.display = 'none';
+  }
+  for (i = 0; i < MTXT.length; i++) MTXT[i].style.display = 'none';
+  MARC.style.display = 'none';
+  if (MPTS.length >= 2 && r.distance_um !== null) {
+    var t0 = MTXT[0], mx = (MPTS[0].x + MPTS[1].x) / 2, my = (MPTS[0].y + MPTS[1].y) / 2;
+    t0.setAttribute('x', mx + 6 * u); t0.setAttribute('y', my - 6 * u);
+    t0.setAttribute('font-size', 12 * u);
+    t0.textContent = fmtUm(r.distance_um) + '  ·  ' + (+r.lattice.toFixed(3)) + ' u  ·  d(' +
+                     um1(r.dx_um) + ', ' + um1(r.dy_um) + ') um' +
+                     (r.rail_angle_deg !== null
+                        ? '  ·  rails ' + r.rail_angle_deg.toFixed(2) + '\u00b0' : '');
+    t0.style.display = '';
+  }
+  if (MPTS.length >= 3 && r.angle_deg !== null) {
+    var b = MPTS[1], a0 = Math.atan2(MPTS[0].y - b.y, MPTS[0].x - b.x);
+    var a2 = Math.atan2(MPTS[2].y - b.y, MPTS[2].x - b.x);
+    var dA = a2 - a0;
+    while (dA > Math.PI) dA -= 2 * Math.PI;
+    while (dA < -Math.PI) dA += 2 * Math.PI;
+    var rr = Math.min(0.5 * L.g, 40 * u), pts = [];
+    for (i = 0; i <= 16; i++) {
+      var aa = a0 + dA * (i / 16);
+      pts.push((i ? 'L ' : 'M ') + (b.x + rr * Math.cos(aa)) + ' ' + (b.y + rr * Math.sin(aa)));
+    }
+    MARC.setAttribute('d', pts.join(' '));
+    MARC.setAttribute('stroke-width', 1.8 * u);
+    MARC.style.display = '';
+    var t1 = MTXT[1], am = a0 + dA / 2;
+    t1.setAttribute('x', b.x + (rr + 6 * u) * Math.cos(am));
+    t1.setAttribute('y', b.y + (rr + 6 * u) * Math.sin(am));
+    t1.setAttribute('font-size', 12 * u);
+    t1.setAttribute('fill', C.gold);
+    t1.textContent = r.angle_deg.toFixed(2) + '\u00b0';
+    t1.style.display = '';
+  }
+  return r;
+}
+
+// ONE CLICK, ONE POINT.  Two points are a distance, three are an angle at the middle one,
+// and a fourth starts over -- so the tool never accumulates a reading nobody asked for.
+function measureClick(mx, my) {
+  if (!MEASURE) return null;
+  ensureMeasure();
+  if (MPTS.length >= 3) MPTS = [];
+  MPTS.push(measureSnap(mx, my));
+  measureRedraw();
+  return measureReadout();
+}
+function measureClear() { MPTS = []; measureRedraw(); return measureReadout(); }
+function measureToggle(on) {
+  MEASURE = (on === undefined) ? !MEASURE : !!on;
+  MPTS = [];
+  ensureMeasure();
+  measureRedraw();
+  setCursor(null);
+  paint();
+  return MEASURE;
+}
+
+// ------------------------------------------------------------------- the true scale
+// The toggle, and the one place the page re-lays-out without an edit behind it.  `L` is
+// MUTATED, never replaced: every closure in the page script and in this file captured
+// this object.  With no editable state (a page whose listing does not replay) there is
+// nothing to recompute from, so the pair Python shipped is used instead -- which is why
+// `build_view_model` emits both layouts rather than one.
+//
+// NOT `relayout`: render.py owns that name for the window-resize path, and these scripts
+// share one scope -- a second `function relayout()` here would silently replace it.
+// THE VIEW IS HELD ACROSS AN EDIT.  Re-fitting on every edit moved the picture under
+// the pointer: place four sites along one row and they come out as a staircase, because
+// each placement re-scaled the drawing and the next click meant another model point
+// (reported 2026-09-17).  So an edit passes the scale and origin it was drawn at to
+// `computeLayout` and nothing on the screen moves; a REPLACEMENT -- Fit, a new device
+// from a card or a file, the true-scale toggle -- calls `refitNext()` first and the
+// drawing is fitted afresh.  One flag, cleared by the rebuild that honours it.
+var REFIT_NEXT = false;
+function refitNext() { REFIT_NEXT = true; }
+function holdOpts() {
+  return layoutOpts(REFIT_NEXT ? null : [L.sx, L.sy, L.ox, L.oy]);
+}
+function refit() { refitNext(); rescale(); }
+function rescale() {
+  var lay = STATE ? Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts())
+                  : ((TRUE_SCALE && D.layout_true) ? D.layout_true : D.layout);
+  for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  if (!EDITS.length) BOUND = boundaryFrom(L);
+  GRID = null;
+  rebuildStatic();
+  REFIT_NEXT = false;
+  if (typeof sizeStage === 'function') sizeStage();
+  if (typeof draw === 'function') draw();
+}
+function setTrueScale(on) {
+  TRUE_SCALE = !!on;
+  try { STORE.setItem(TS_KEY, TRUE_SCALE ? '1' : '0'); } catch (err) { /* no store */ }
+  refitNext();                       // another scale rule is another drawing: fit it
+  rescale();
+  paint();
+  return TRUE_SCALE;
+}
+
+
+// =====================================================================================
+// THE SKETCH: the shape first, the parts after
+// =====================================================================================
+//
+// WHY THIS EXISTS.  Every device in `qccd/arch/generators.py` is a SHAPE first -- a ring,
+// a grid, a chain -- and the studio made you build one site at a time.  Asked for
+// (2026-09-17): "it would be much more direct if the design can start from a Sketch of
+// the shuttling shape, before the details are filled in".  So there are two modes.
+// SKETCH is the default on a canvas with no device on it: arm a shape, drag it, and the
+// release lays trapping sites along what was drawn, ONE LATTICE UNIT apart -- the spacing
+// every generator uses -- declares the orbit if the shape closed, and puts a JUNCTION
+// wherever the new rail meets or crosses one that is already there.  PARTS is the tool as
+// it was: every gesture it had still works, untouched, and the course and the detail work
+// live there.
+//
+// WHAT A CORNER IS.  A corner of a drawn shape is a degree-2 node, and R18 prices a
+// degree-2 node as ordinary transport: a BEND, not a junction.  The shipped ring has four
+// of them and pays nothing for any of them.  So a corner gets a SITE and the readout says
+// so -- declaring a degree-2 `junction` would contradict R18 and the verifier would price
+// the whole device wrong.  A junction is minted only where three or four rails actually
+// meet, which is the "a Junction should be automatically added" the request asked for.
+//
+// WHERE IT COMMITS.  One `transaction`, so one `meta.group` and one Ctrl+Z, and the
+// records go through `cmpInstantiate` -- the component palette's own instantiator -- so
+// every id is namespaced and every part carries the `cmp:<inst>` label that makes
+// `instanceMembers` / `instanceAt` treat the finished sketch as ONE thing to select, drag
+// or delete.
+//
+// A SKETCH IS AN EDIT, so it HOLDS THE VIEW: nothing here calls `refitNext()`, and the
+// shape stays exactly where it was drawn.
+
+var MODE_KEY = 'qccd.studio.mode';
+// `null` means "not chosen": Sketch on a canvas with nothing on it, Parts once there is a
+// device to work on.  A stored choice, or a press of the segmented control, pins it.
+var DMODE = null;
+var SK_TOOLS = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', poly: 'Polyline' };
+var SK_ORDER = ['rect', 'ellipse', 'line', 'poly'];
+function designMode() {
+  if (DMODE === 'sketch' || DMODE === 'parts') return DMODE;
+  return (STATE && nodesOf(STATE).length) ? 'parts' : 'sketch';
+}
+function setDesignMode(m) {
+  m = (String(m) === 'parts') ? 'parts' : 'sketch';
+  DMODE = m;
+  try { STORE.setItem(MODE_KEY, m); } catch (err) { /* no store */ }
+  if (m === 'parts') { SKETCH = null; sketchClear(); } else arm(null);
+  setCursor(HOVERED);
+  paint();
+  return m;
+}
+
+// ---- the armed tool -------------------------------------------------------------------
+var SKETCH = null;            // 'rect' | 'ellipse' | 'line' | 'poly' | null
+var SKPTS = [];               // the polyline's committed vertices, in DEVICE units
+var SKDRAG = null;            // { a, b, shift } while a drag is live
+var SKHOVER = null;           // where the pointer is, in DEVICE units (the poly's band)
+var SK_N = 0;
+function sketchOn() { return SKETCH; }
+function sketchTool(t) {
+  t = (t && has(SK_TOOLS, String(t))) ? String(t) : null;
+  if (VIEW_ONLY) t = null;
+  var next = (SKETCH === t) ? null : t;
+  SKETCH = next;
+  SKPTS = []; SKDRAG = null; SKHOVER = null;
+  if (next) {
+    if (designMode() !== 'sketch') setDesignMode('sketch');
+    arm(null);                                  // one stage tool at a time
+    if (MEASURE) measureToggle(false);
+  }
+  ensureSketch();
+  sketchRedraw();
+  setCursor(null);
+  paint();
+  return SKETCH;
+}
+
+// ---- units ----------------------------------------------------------------------------
+// ONE LATTICE UNIT is what every generator spaces its sites by, and `L.ux` / `L.uy` is what
+// the layout measured it to be.  On an empty canvas there is nothing to measure, so it is
+// 0 and the fallback is 1 -- exactly `snapTo`'s rule, not a second one.
+function skUnit() { return { x: L.ux || 1, y: L.uy || L.ux || 1 }; }
+function skToU(mx, my) { return { x: (mx - L.ox) / (L.sx || 1), y: (my - L.oy) / (L.sy || 1) }; }
+function skToPx(x, y) { return { x: L.ox + x * (L.sx || 1), y: L.oy + y * (L.sy || 1) }; }
+function sk3(v) { var x = Math.round(v * 1000) / 1000; return x === 0 ? 0 : x; }
+function skHyp(x, y) { return Math.sqrt(x * x + y * y); }
+
+// ---- the shape's own vertices ---------------------------------------------------------
+function skVerts(tool, a, b, mod) {
+  mod = mod || {};
+  var lim = Q.geometryLimits(STATE), i;
+  if (tool === 'line') return { verts: [[sk3(a.x), sk3(a.y)], [sk3(b.x), sk3(b.y)]], closed: false };
+  if (tool === 'rect') {
+    return { verts: [[sk3(a.x), sk3(a.y)], [sk3(b.x), sk3(a.y)],
+                     [sk3(b.x), sk3(b.y)], [sk3(a.x), sk3(b.y)]], closed: true };
+  }
+  if (tool === 'ellipse') {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    // shift constrains to a CIRCLE: the longer of the two drags drives both axes and the
+    // corner the drag started from stays put, which is what a drawing tool does.
+    if (mod.shift) {
+      var mm = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = (dx < 0 ? -mm : mm); dy = (dy < 0 ? -mm : mm);
+    }
+    var rx = Math.abs(dx) / 2, ry = Math.abs(dy) / 2;
+    var cx = a.x + dx / 2, cy = a.y + dy / 2;
+    if (rx < 1e-9 || ry < 1e-9) return { verts: [], closed: true };
+    var U = skUnit(), step = (U.x + U.y) / 2;
+    // Ramanujan's circumference, then ONE SIDE PER LATTICE UNIT -- the same spacing the
+    // straight edges get, so a circle and a rectangle of one perimeter hold one number of
+    // ions.
+    var C2 = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+    var n = Math.max(3, Math.round(C2 / Math.max(1e-9, step)));
+    // R20 BY CONSTRUCTION: a regular n-gon's two rails meet at 180 - 360/n degrees, so a
+    // circle too small to carry enough sides cannot satisfy this device's minimum, and is
+    // refused with the angle it would have made rather than drawn and refused later.
+    var ang = 180 - 360 / n;
+    if (ang < lim.minAng - 1e-9) {
+      return { verts: [], closed: true, rule: 'R20',
+               why: 'a circle this small polygonises to ' + n + ' sides, whose rails meet ' +
+                    'at ' + ang.toFixed(1) + ' degrees -- less than the ' + lim.minAng +
+                    ' this device requires (budget.min_rail_angle_deg): drag a bigger one' };
+    }
+    var ph = Math.atan2((a.y - cy) / ry, (a.x - cx) / rx);
+    var verts = [];
+    for (i = 0; i < n; i++) {
+      var th = ph + 2 * Math.PI * i / n;
+      verts.push([sk3(cx + rx * Math.cos(th)), sk3(cy + ry * Math.sin(th))]);
+    }
+    return { verts: verts, closed: true };
+  }
+  if (tool === 'poly') {
+    var pts = (a && a.pts) ? a.pts : [];
+    return { verts: pts.map(function (p) { return [sk3(p[0]), sk3(p[1])]; }),
+             closed: !!(a && a.closed) };
+  }
+  return { verts: [], closed: false, why: 'no shape tool is armed' };
+}
+
+// ---- the sites the shape lays down ----------------------------------------------------
+//
+// ONE LATTICE UNIT APART, the first site at the shape's start, every CORNER a site.  The
+// last spacing on an edge may be short: what the user drew is the authority, so the shape
+// is never silently resized to make the arithmetic come out even.
+function skSites(verts, closed) {
+  var U = skUnit(), out = [], i, j;
+  var m = verts.length;
+  if (m < 2) return out;
+  var last = closed ? m : m - 1;
+  var push = function (x, y) {
+    var p = [sk3(x), sk3(y)], k = out.length - 1;
+    if (k >= 0 && skHyp(out[k][0] - p[0], out[k][1] - p[1]) < 1e-9) return;
+    out.push(p);
+  };
+  for (i = 0; i < last; i++) {
+    var p0 = verts[i], p1 = verts[(i + 1) % m];
+    var dx = p1[0] - p0[0], dy = p1[1] - p0[1], len = skHyp(dx, dy);
+    if (len < 1e-9) continue;
+    var ux = dx / len, uy = dy / len;
+    var step = skHyp(ux * U.x, uy * U.y);
+    if (!(step > 1e-9)) step = 1;
+    for (j = 0; ; j++) {
+      var t = j * step;
+      if (t > len - 0.5 * step + 1e-9) break;
+      push(p0[0] + ux * t, p0[1] + uy * t);
+    }
+  }
+  if (!closed) push(verts[m - 1][0], verts[m - 1][1]);
+  if (closed && out.length > 1 &&
+      skHyp(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) < 1e-9) {
+    out.pop();
+  }
+  return out;
+}
+
+// ---- the graph the shape meets --------------------------------------------------------
+//
+// The engine's own crossing predicates, in the one place a sketch needs them BEFORE the
+// commit.  `geometryViolations` (engine.js, not edited here) is what JUDGES the committed
+// document against R19 / R20 / R21; these are the same tests run while the shape is still
+// under the pointer, so the refusal arrives in the readout rather than as a lint
+// afterwards.
+var SK_EPS = 1e-6;
+function skOrient(p, q, r) {
+  return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+}
+function skCross(a, b, c, d) {
+  var o1 = skOrient(a, b, c), o2 = skOrient(a, b, d);
+  var o3 = skOrient(c, d, a), o4 = skOrient(c, d, b);
+  return ((o1 > SK_EPS && o2 < -SK_EPS) || (o1 < -SK_EPS && o2 > SK_EPS)) &&
+         ((o3 > SK_EPS && o4 < -SK_EPS) || (o3 < -SK_EPS && o4 > SK_EPS));
+}
+function skCrossPoint(a, b, c, d) {
+  var r = [b[0] - a[0], b[1] - a[1]], s = [d[0] - c[0], d[1] - c[1]];
+  var den = r[0] * s[1] - r[1] * s[0];
+  if (Math.abs(den) < 1e-12) return null;
+  var t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
+  return { t: t, p: [sk3(a[0] + t * r[0]), sk3(a[1] + t * r[1])] };
+}
+function skOnSegment(p, a, b) {
+  var abx = b[0] - a[0], aby = b[1] - a[1];
+  var apx = p[0] - a[0], apy = p[1] - a[1];
+  var l2 = abx * abx + aby * aby;
+  if (l2 === 0) return null;
+  var cr = abx * apy - aby * apx;
+  if (Math.abs(cr) > SK_EPS * Math.sqrt(l2)) return null;
+  var t = (apx * abx + apy * aby) / l2;
+  return (SK_EPS < t && t < 1 - SK_EPS) ? t : null;
+}
+function skDevSegs() {
+  var out = [], sid, dev = STATE ? STATE.device : null;
+  if (!dev) return out;
+  for (sid in dev.segments) if (has(dev.segments, sid)) {
+    var s = dev.segments[sid], a = dev.nodes[s.a], b = dev.nodes[s.b];
+    if (!a || !b) continue;
+    out.push({ id: sid, a: s.a, b: s.b, loop: s.loop === undefined ? null : s.loop,
+               cap: s.cap || 1,
+               pa: [+Q.unbox(a.pos[0]), +Q.unbox(a.pos[1])],
+               pb: [+Q.unbox(b.pos[0]), +Q.unbox(b.pos[1])] });
+  }
+  out.sort(function (x, y) { return x.id < y.id ? -1 : x.id > y.id ? 1 : 0; });
+  return out;
+}
+function skDegree(nid) {
+  var dev = STATE ? STATE.device : null, d = 0, sid;
+  if (!dev) return 0;
+  for (sid in dev.segments) if (has(dev.segments, sid)) {
+    var s = dev.segments[sid];
+    if (s.a === nid) d++;
+    if (s.b === nid) d++;
+  }
+  return d;
+}
+// Is this rail an edge of some declared orbit?  `remove_segment` refuses to take a loop
+// edge away, so a rail that carries an orbit has to be split the other way -- see the
+// note in `sketchPlan`.
+function skOnLoop(sg) {
+  var dev = STATE ? STATE.device : null, lid;
+  if (!dev) return null;
+  if (sg.loop) return sg.loop;
+  for (lid in dev.loops) if (has(dev.loops, lid)) {
+    var ns = dev.loops[lid].nodes, k = ns.length, i;
+    for (i = 0; i + 1 < k; i++) {
+      if ((ns[i] === sg.a && ns[i + 1] === sg.b) ||
+          (ns[i] === sg.b && ns[i + 1] === sg.a)) return lid;
+    }
+    if (dev.loops[lid].closed && k > 1 &&
+        ((ns[k - 1] === sg.a && ns[0] === sg.b) ||
+         (ns[k - 1] === sg.b && ns[0] === sg.a))) return lid;
+  }
+  return null;
+}
+
+// WEAVING THE NEW RAIL INTO THE OLD ONE.  Three things can happen where a drawn shape
+// meets a device that is already there, and R21 says all three must end with a SHARED
+// NODE:
+//
+//   * a generated site lands on an existing node  ->  that node is REUSED.  Its zone and
+//     capacity are kept: R18 already makes a degree-3 node a junction by DEGREE, and
+//     re-declaring it `kind: junction` would throw away a trap the user built.
+//   * a generated site, or an edge of the shape, lands on an existing RAIL  ->  a JUNCTION
+//     is minted there and the crossed rail is split in two.
+//   * an existing node lies on an edge of the shape  ->  the edge is split at it.
+//
+// The answer is the path, in order, each point either new, reused, or a split.
+function skWeave(sites, closed) {
+  var dev = STATE ? STATE.device : null;
+  var pts = [], i, j, k;
+  if (!dev) {
+    for (i = 0; i < sites.length; i++) {
+      pts.push({ x: sites[i][0], y: sites[i][1], node: null, split: null });
+    }
+    return { pts: pts };
+  }
+  var segs = skDevSegs();
+  for (i = 0; i < sites.length; i++) {
+    var x = sites[i][0], y = sites[i][1], p = { x: x, y: y, node: null, split: null };
+    var coin = coincidentAt(x, y);
+    if (coin) p.node = coin.targets[0];
+    else {
+      for (j = 0; j < segs.length; j++) {
+        if (skOnSegment([x, y], segs[j].pa, segs[j].pb) !== null) { p.split = segs[j]; break; }
+      }
+    }
+    pts.push(p);
+  }
+  var out = [], m = pts.length, last = closed ? m : m - 1;
+  var nodes = nodesOf(STATE);
+  for (i = 0; i < last; i++) {
+    var A0 = pts[i], B0 = pts[(i + 1) % m];
+    var a = [A0.x, A0.y], b = [B0.x, B0.y], ev = [];
+    for (k = 0; k < nodes.length; k++) {
+      if (nodes[k].id === A0.node || nodes[k].id === B0.node) continue;
+      var tn = skOnSegment([nodes[k].x, nodes[k].y], a, b);
+      if (tn !== null) ev.push({ t: tn, x: nodes[k].x, y: nodes[k].y, node: nodes[k].id, split: null });
+    }
+    for (j = 0; j < segs.length; j++) {
+      var sg = segs[j];
+      if (sg.a === A0.node || sg.b === A0.node || sg.a === B0.node || sg.b === B0.node) continue;
+      if (A0.split && A0.split.id === sg.id) continue;
+      if (B0.split && B0.split.id === sg.id) continue;
+      if (!skCross(a, b, sg.pa, sg.pb)) continue;
+      var xp = skCrossPoint(a, b, sg.pa, sg.pb);
+      if (!xp) continue;
+      ev.push({ t: xp.t, x: xp.p[0], y: xp.p[1], node: null, split: sg });
+    }
+    ev.sort(function (p1, p2) { return p1.t - p2.t; });
+    out.push(A0);
+    for (k = 0; k < ev.length; k++) {
+      out.push({ x: ev[k].x, y: ev[k].y, node: ev[k].node, split: ev[k].split });
+    }
+  }
+  if (!closed) out.push(pts[m - 1]);
+  // A JUNCTION MAY BE MINTED ONLY ONCE PER CROSSED RAIL: two events on one rail would be
+  // two nodes on one segment, and the second `on=` would name a segment that is gone.
+  var seen = {}, clean = [];
+  for (i = 0; i < out.length; i++) {
+    var q = out[i];
+    if (q.split) {
+      if (has(seen, q.split.id)) q = { x: q.x, y: q.y, node: null, split: null };
+      else seen[q.split.id] = 1;
+    }
+    clean.push(q);
+  }
+  return { pts: clean };
+}
+
+// ---- the whole plan, judged before anything is committed ------------------------------
+function skAngleAt(prev, at, next) {
+  var ax = prev[0] - at[0], ay = prev[1] - at[1];
+  var bx = next[0] - at[0], by = next[1] - at[1];
+  var la = skHyp(ax, ay), lb = skHyp(bx, by);
+  if (la < 1e-12 || lb < 1e-12) return 180;
+  var c = (ax * bx + ay * by) / (la * lb);
+  c = c > 1 ? 1 : c < -1 ? -1 : c;
+  return Math.acos(c) * 180 / Math.PI;
+}
+
+function sketchPlan(tool, a, b, mod) {
+  tool = tool || SKETCH;
+  mod = mod || {};
+  var lim = Q.geometryLimits(STATE), i;
+  var bad = function (why, rule) {
+    return { ok: false, why: why, rule: rule || null, tool: tool, verts: [], sites: [],
+             pts: [], closed: false, n_sites: 0, n_junctions: 0, n_shared: 0, bends: 0,
+             w_um: 0, h_um: 0, loop: false };
+  };
+  if (!tool || !has(SK_TOOLS, tool)) return bad('no shape tool is armed');
+  if (!STATE) return bad('there is no device to draw on');
+  var g = skVerts(tool, a, b, mod);
+  if (g.why) return bad(g.why, g.rule);
+  var verts = g.verts, closed = !!g.closed;
+  if (verts.length < 2) return bad('drag further: a shape needs two ends');
+  var sites = skSites(verts, closed);
+  if (sites.length < 2) {
+    return bad('that is shorter than one lattice unit: a rail needs at least two trapping sites');
+  }
+  // R20 ON THE SHAPE'S OWN CORNERS, before the device is asked anything.  A corner tighter
+  // than the minimum is refused with the angle it would have made.
+  var n = sites.length, first = closed ? 0 : 1, lastI = closed ? n : n - 1;
+  var worst = null, bends = 0;
+  for (i = first; i < lastI; i++) {
+    var ang = skAngleAt(sites[(i - 1 + n) % n], sites[i], sites[(i + 1) % n]);
+    if (worst === null || ang < worst) worst = ang;
+    if (Math.abs(ang - 180) > 1e-6) bends++;
+    if (ang < lim.minAng - 1e-9) {
+      return bad('a corner of ' + ang.toFixed(1) + ' degrees: two rails meeting at one ' +
+                 'node must subtend at least ' + lim.minAng + ' degrees on this device ' +
+                 '(budget.min_rail_angle_deg)', 'R20');
+    }
+  }
+  // A SHAPE WHOSE SITES WOULD SIT ON TOP OF EACH OTHER IS NOT A DEVICE.  Along one edge
+  // the spacing is a lattice unit by construction, but a polygonised circle's SIDE can be
+  // shorter than one -- and two traps half a unit apart make `min_nearest_neighbour`
+  // shrink every mark on the stage, which is the same reason `coincidentAt` exists.
+  var U0 = skUnit(), floorStep = 0.5 * (U0.x + U0.y) / 2, gap = null;
+  for (i = 0; i < (closed ? n : n - 1); i++) {
+    var q0 = sites[i], q1 = sites[(i + 1) % n];
+    var dd = skHyp(q1[0] - q0[0], q1[1] - q0[1]);
+    if (gap === null || dd < gap) gap = dd;
+  }
+  if (gap !== null && gap < floorStep) {
+    return bad('this shape would put trapping sites ' + gap.toFixed(2) + ' lattice units ' +
+               'apart, closer than the half unit two marks can be drawn at: drag a bigger one');
+  }
+  var pts = skWeave(sites, closed).pts, m = pts.length;
+  if (m < 2) return bad('drag further: a shape needs two ends');
+  // R19 where the new rail meets the old one
+  var deg = {}, meets = [], nj = 0, nshared = 0, nnew = 0;
+  for (i = 0; i < m; i++) {
+    var p = pts[i];
+    var arms = (closed || (i > 0 && i < m - 1)) ? 2 : 1;
+    if (p.node) {
+      nshared++;
+      deg[p.node] = (deg[p.node] === undefined ? skDegree(p.node) : deg[p.node]) + arms;
+      meets.push({ kind: 'node', id: p.node, x: p.x, y: p.y, degree: deg[p.node] });
+    } else if (p.split) {
+      nj++;
+      meets.push({ kind: 'junction', on: p.split.id, x: p.x, y: p.y, degree: 2 + arms });
+    } else nnew++;
+  }
+  for (i = 0; i < meets.length; i++) {
+    if (meets[i].degree > lim.maxDeg) {
+      return bad('this would make ' + (meets[i].id || 'the new junction on rail ' + meets[i].on) +
+                 ' degree ' + meets[i].degree + ', and a node on this device may join at ' +
+                 'most ' + lim.maxDeg + ' rails (budget.max_junction_degree)', 'R19');
+    }
+  }
+  // A CLOSED ORBIT CANNOT BE DECLARED ACROSS A POST-SEAL JUNCTION.  `d.loop` is a BUILDER
+  // statement and every builder statement is hoisted above the seal, so a node minted by
+  // the `add_junction` topology edit does not exist when the walk is written -- and there
+  // is no `add_loop` after the seal (`qccd/viz/js/edit.js`'s OPS table is the whole
+  // vocabulary).  The rail that has to be split that way is exactly one that already
+  // carries an orbit, because `remove_segment` refuses to take a loop edge away and the
+  // builder split is therefore unavailable for it.  One junction, one `on=`: at most one
+  // of the two orbits can be re-walked, so a ring crossing a ring is refused and said so.
+  var topoSplit = false;
+  for (i = 0; i < m; i++) if (pts[i].split && skOnLoop(pts[i].split)) topoSplit = true;
+  if (closed && topoSplit) {
+    return bad('this ring crosses a rail that already carries an orbit, and the studio ' +
+               'cannot declare a second orbit across a junction added after the device was ' +
+               'sealed -- draw the shape to meet that loop at one of its own sites instead',
+               'R21');
+  }
+  var xs = verts.map(function (v) { return v[0]; }), ys = verts.map(function (v) { return v[1]; });
+  var um = toUm(Math.max.apply(null, xs) - Math.min.apply(null, xs),
+                Math.max.apply(null, ys) - Math.min.apply(null, ys));
+  return { ok: true, why: null, rule: null, tool: tool, verts: verts, sites: sites,
+           pts: pts, closed: closed, edges: closed ? m : m - 1, meets: meets,
+           n_sites: nnew, n_junctions: nj, n_shared: nshared, bends: bends,
+           min_angle: worst, w_um: um.x, h_um: um.y, loop: !topoSplit };
+}
+
+// ---- committing -----------------------------------------------------------------------
+//
+// ONE TRANSACTION.  The shape's own sites, rails and orbit are BUILDER records put through
+// `cmpInstantiate`, so every local id is namespaced, `loop=` and the `d.loop` walk are
+// rewritten with them, and every part carries `cmp:<inst>`.  A junction on a rail that
+// carries an orbit is the one piece that cannot be a builder record (see `sketchPlan`) and
+// is emitted as the `add_junction(on=...)` topology edit, whose Python twin
+// (`qccd/arch/edit.py`) already splices the split node into every loop that contained the
+// rail.
+function sketchCommit(plan) {
+  if (!plan || !plan.ok) {
+    return { ok: false, problems: [{ code: (plan && plan.rule) || 'sketch',
+                                     message: (plan && plan.why) || 'nothing to commit' }] };
+  }
+  // A GENERATOR DEVICE HAS NO BUILDER, so `d.site` cannot be hoisted into it and there is
+  // no post-seal verb that declares a loop.  Rather than emit half a shape, say what to
+  // press: `explode to explicit…` turns the generator into the builder statements a sketch
+  // can join.
+  if (!hasBuilder()) {
+    return { ok: false, problems: [{ code: 'no_builder',
+      message: 'this device came from a generator, so a sketch cannot be added to it as ' +
+               'builder statements -- press "explode to explicit…" at the bottom of ' +
+               'Elements first' }] };
+  }
+  var zone = defaultZone();
+  if (zone && postSeedZones()[zone]) {
+    return { ok: false, problems: [{ code: 'zone_after_seal', targets: [zone],
+      message: "zone '" + zone + "' was added after this device was sealed, so a new site " +
+               'cannot use it — pick another zone chip.' }] };
+  }
+  var missing = componentBlocked({ requires: { zones: zone ? [zone] : [] } });
+  if (missing.length) {
+    return { ok: false, problems: [{ code: 'missing_zone', targets: missing,
+      message: 'a sketch places sites in zone ' + Q.pyRepr(missing[0]) + ', which this ' +
+               'machine does not declare -- add it from Elements first' }] };
+  }
+  var pts = plan.pts, m = pts.length, closed = plan.closed, i;
+  var inst = 'k' + (++SK_N);
+  while (STATE && STATE.device && has(STATE.device.nodes, inst + '.s0')) inst = 'k' + (++SK_N);
+
+  var recs = [], topo = [], ids = [], si = 0, ji = 0, ei = 0, xi = 0;
+  for (i = 0; i < m; i++) {
+    var p = pts[i];
+    if (p.node) { ids.push(p.node); continue; }
+    if (p.split && skOnLoop(p.split)) {                    // a junction made after the seal
+      var jid = inst + '.j' + (ji++);
+      ids.push(jid);
+      topo.push({ op: 'add_junction',
+                  args: { id: jid, pos: [sk3(p.x), sk3(p.y)], on: p.split.id,
+                          segment_ids: [jid + 'a', jid + 'b'],
+                          labels: ['cmp:' + inst, 'sketch', 'junction'] } });
+      continue;
+    }
+    if (p.split) {                                          // a junction the builder can hold
+      var bj = 'j' + (ji++), S = p.split;
+      ids.push(bj);
+      recs.push({ method: 'd.junction', args: [bj, Q.pyFloat(p.x), Q.pyFloat(p.y)],
+                  kwargs: { labels: ['junction'] } });
+      // the crossed rail, re-declared as its two halves; the original goes after the seal
+      var la = sk3(skHyp(p.x - S.pa[0], p.y - S.pa[1])) || 1;
+      var lb = sk3(skHyp(S.pb[0] - p.x, S.pb[1] - p.y)) || 1;
+      recs.push({ method: 'd.segment', args: ['x' + xi + 'a', S.a, bj],
+                  kwargs: { length: Q.pyFloat(la), capacity: S.cap, labels: ['rail'] } });
+      recs.push({ method: 'd.segment', args: ['x' + xi + 'b', bj, S.b],
+                  kwargs: { length: Q.pyFloat(lb), capacity: S.cap, labels: ['rail'] } });
+      xi++;
+      topo.push({ op: 'remove_segment', args: { id: S.id, on_loop: 'refuse' } });
+      continue;
+    }
+    var sid = 's' + (si++);
+    ids.push(sid);
+    var kw = {};
+    if (zone) kw.zone = zone; else kw.capacity = 1;
+    recs.push({ method: 'd.site', args: [sid, Q.pyFloat(p.x), Q.pyFloat(p.y)], kwargs: kw });
+  }
+  // the ids as they will read AFTER `cmpInstantiate` renames the local ones
+  var localIds = {};
+  for (i = 0; i < recs.length; i++) localIds[String(recs[i].args[0])] = 1;
+  var full = function (id) { return has(localIds, id) ? inst + '.' + id : id; };
+
+  var edges = closed ? m : m - 1, topoEdge = {}, loopId = plan.loop ? (closed ? 'L' : 'P') : null;
+  for (i = 0; i < edges; i++) {
+    var pa0 = pts[i], pb0 = pts[(i + 1) % m];
+    if ((pa0.split && skOnLoop(pa0.split)) || (pb0.split && skOnLoop(pb0.split))) {
+      topoEdge[i] = 1; loopId = null;
+    }
+  }
+  for (i = 0; i < edges; i++) {
+    var ia = ids[i], ib = ids[(i + 1) % m];
+    var pa = pts[i], pb = pts[(i + 1) % m];
+    var len = sk3(skHyp(pb.x - pa.x, pb.y - pa.y)) || 1;
+    if (topoEdge[i]) {
+      topo.push({ op: 'add_segment',
+                  args: { id: inst + '.e' + (ei++), a: full(ia), b: full(ib),
+                          length: len, capacity: 1,
+                          labels: ['rail', 'cmp:' + inst, 'sketch'] } });
+    } else {
+      var kw2 = { length: Q.pyFloat(len), capacity: 1, labels: ['rail'] };
+      if (loopId) kw2.loop = loopId;
+      recs.push({ method: 'd.segment', args: ['e' + (ei++), ia, ib], kwargs: kw2 });
+    }
+  }
+  // A CLOSED SHAPE DECLARES A CLOSED LOOP over its sites in orbit order, `kind: 'ring'`;
+  // an OPEN one declares the path loop `chain()` gives a linear register, `kind: 'path'`.
+  if (loopId) {
+    var walk = [];
+    for (i = 0; i < m; i++) walk.push(ids[i]);
+    recs.push({ method: 'd.loop', args: [loopId, walk],
+                kwargs: { closed: !!closed, kind: closed ? 'ring' : 'path' } });
+  }
+  // the refusals a stamp already makes, made here before anything is written
+  for (i = 0; i < recs.length; i++) {
+    if (recs[i].method !== 'd.site' && recs[i].method !== 'd.junction') continue;
+    var cx0 = Number(Q.unbox(recs[i].args[1])), cy0 = Number(Q.unbox(recs[i].args[2]));
+    var coin2 = coincidentAt(cx0, cy0);
+    if (coin2) return { ok: false, problems: [coin2] };
+    var over = stampContact({ id: '__sk', kind: recs[i].method === 'd.junction' ? 'junction' : 'site',
+                              cap: 2 }, cx0, cy0);
+    if (over) {
+      return { ok: false, problems: [{ code: 'overlap', targets: [over],
+        message: 'a site of this shape would overlap the mark ' + over +
+                 ' already on the canvas; draw it clear of that part' }] };
+    }
+  }
+  var spec = { name: 'sketch', records: recs, requires: { zones: zone ? [zone] : [] }, pins: [] };
+  var ops = cmpInstantiate(spec, inst, 0, 0, 0, ['sketch:' + plan.tool])
+              .map(function (o) { return { build: o }; });
+  for (i = 0; i < topo.length; i++) ops.push({ topology: topo[i] });
+
+  var was = skGeomLints();
+  var r = transaction(ops, 'sketch ' + plan.tool);
+  if (!r.ok) return r;
+  // THE GUARANTEE, CHECKED RATHER THAN ARGUED.  `Q.lint` is what judges R19 / R20 / R21 on
+  // the committed document; a sketch that added one of those findings is taken back through
+  // the same single undo group it was committed as, and the rule is named.
+  var now = skGeomLints(), fresh = [];
+  for (i = 0; i < now.list.length; i++) {
+    if (!has(was.seen, now.list[i].message)) fresh.push(now.list[i]);
+  }
+  if (fresh.length) {
+    undoGroup();
+    return { ok: false, problems: [{ code: fresh[0].code, message: fresh[0].message }] };
+  }
+  r.instance = inst;
+  r.nodes = ids.map(full);
+  r.loop = loopId ? inst + '.' + loopId : null;
+  return r;
+}
+function skGeomLints() {
+  var out = { list: [], seen: {} }, i;
+  for (i = 0; i < LINTS.length; i++) {
+    var c = LINTS[i].code;
+    if (c !== 'R19' && c !== 'R20' && c !== 'R21') continue;
+    out.list.push(LINTS[i]);
+    out.seen[LINTS[i].message] = 1;
+  }
+  return out;
+}
+
+// ---- the preview ----------------------------------------------------------------------
+//
+// ITS OWN GROUP, and nothing else writes into it -- the ruler's rule, for the ruler's
+// reason: `clearTransients()` wipes the animation groups on every frame, so a preview
+// drawn into one of those would blink out from under the drag.  Pooled and hidden, never
+// removed (`remove()` is a no-op in tests/shim.mjs).
+var gSketch = null, SKPATH = null, SKDOT = [], SKTXT = null, SKDOT_MAX = 600;
+function ensureSketch() {
+  if (gSketch || typeof svg === 'undefined' || !svg) return;
+  gSketch = el('g', { 'pointer-events': 'none' });
+  svg.append(gSketch);
+  SKPATH = el('path', { fill: 'none', stroke: C.navy, 'stroke-width': 1.8,
+                        'stroke-dasharray': '7 4' });
+  SKPATH.style.display = 'none'; gSketch.append(SKPATH);
+  SKTXT = el('text', { 'font-size': 11, 'font-weight': 650, fill: C.ink });
+  SKTXT.style.display = 'none'; gSketch.append(SKTXT);
+}
+function skDot(i) {
+  if (i >= SKDOT_MAX) return null;
+  while (SKDOT.length <= i) {
+    var d = el('circle', { r: 3, fill: 'none', stroke: C.navy, 'stroke-width': 1.4 });
+    d.style.display = 'none';
+    gSketch.append(d);
+    SKDOT.push(d);
+  }
+  return SKDOT[i];
+}
+// WHAT THE PREVIEW CLAIMS, as numbers: the size on both axes in micrometres, how many
+// trapping sites the release will make, what the corners are, and -- in red -- the reason
+// the shape would be refused.  Published so a harness can assert the claim rather than
+// scrape a label.
+function sketchReadout() {
+  var out = { on: SKETCH, tool: SKETCH, mode: designMode(), dragging: !!SKDRAG,
+              points: SKPTS.length, ok: false, why: null, rule: null, n_sites: 0,
+              n_junctions: 0, n_shared: 0, bends: 0, closed: false,
+              w_um: null, h_um: null, text: '' };
+  var plan = sketchLive();
+  if (!plan) return out;
+  out.ok = !!plan.ok; out.why = plan.why; out.rule = plan.rule;
+  out.n_sites = plan.n_sites || 0; out.n_junctions = plan.n_junctions || 0;
+  out.n_shared = plan.n_shared || 0;
+  out.bends = plan.bends || 0; out.closed = !!plan.closed;
+  out.w_um = plan.w_um === undefined ? null : plan.w_um;
+  out.h_um = plan.h_um === undefined ? null : plan.h_um;
+  out.text = plan.ok
+    ? (fmtUm(plan.w_um) + ' × ' + fmtUm(plan.h_um) + '  ·  ' + plan.n_sites +
+       ' trapping site' + (plan.n_sites === 1 ? '' : 's') +
+       (plan.n_junctions ? '  ·  ' + plan.n_junctions + ' junction' +
+                           (plan.n_junctions === 1 ? '' : 's') : '') +
+       (plan.closed ? '  ·  a closed orbit' : '') +
+       (plan.bends ? '  ·  corner: a bend (R18), not a junction' : ''))
+    : ((plan.rule ? plan.rule + ': ' : '') + plan.why);
+  return out;
+}
+// the plan for whatever is being drawn right now, or null when nothing is
+function sketchLive() {
+  if (!SKETCH) return null;
+  if (SKETCH === 'poly') {
+    var pts = SKPTS.slice();
+    if (SKHOVER && !skPolyWouldClose()) pts.push([SKHOVER.x, SKHOVER.y]);
+    if (pts.length < 2) return null;
+    return sketchPlan('poly', { pts: pts, closed: skPolyWouldClose() }, null, {});
+  }
+  if (!SKDRAG) return null;
+  return sketchPlan(SKETCH, SKDRAG.a, SKDRAG.b, { shift: SKDRAG.shift });
+}
+function skPolyWouldClose() {
+  if (SKPTS.length < 3 || !SKHOVER) return false;
+  var U = skUnit();
+  return skHyp((SKHOVER.x - SKPTS[0][0]) / (U.x || 1),
+               (SKHOVER.y - SKPTS[0][1]) / (U.y || 1)) < 0.45;
+}
+function sketchRedraw() {
+  if (!gSketch) { if (!SKETCH) return; ensureSketch(); }
+  if (!gSketch) return;
+  var plan = sketchLive(), i, u = userPerPx();
+  for (i = 0; i < SKDOT.length; i++) SKDOT[i].style.display = 'none';
+  SKPATH.style.display = 'none';
+  SKTXT.style.display = 'none';
+  if (!plan) return;
+  var verts = plan.verts || [], sites = plan.sites || [];
+  if (verts.length >= 2) {
+    var d = '';
+    for (i = 0; i < verts.length; i++) {
+      var q = skToPx(verts[i][0], verts[i][1]);
+      d += (i ? ' L ' : 'M ') + q.x + ' ' + q.y;
+    }
+    if (plan.closed) d += ' Z';
+    SKPATH.setAttribute('d', d);
+    SKPATH.setAttribute('stroke', plan.ok ? C.navy : C.z);
+    SKPATH.setAttribute('stroke-width', 1.8 * u);
+    SKPATH.setAttribute('stroke-dasharray', (7 * u) + ' ' + (4 * u));
+    SKPATH.style.display = '';
+  }
+  for (i = 0; i < sites.length; i++) {
+    var dot = skDot(i);
+    if (!dot) break;
+    var s = skToPx(sites[i][0], sites[i][1]);
+    dot.setAttribute('cx', s.x); dot.setAttribute('cy', s.y);
+    dot.setAttribute('r', 3.4 * u);
+    dot.setAttribute('stroke-width', 1.4 * u);
+    dot.setAttribute('stroke', plan.ok ? C.navy : C.z);
+    dot.style.display = '';
+  }
+  var r = sketchReadout();
+  if (r.text && verts.length) {
+    var x0 = Math.min.apply(null, verts.map(function (v) { return v[0]; }));
+    var y0 = Math.min.apply(null, verts.map(function (v) { return v[1]; }));
+    var at = skToPx(x0, y0);
+    SKTXT.setAttribute('x', at.x); SKTXT.setAttribute('y', at.y - 8 * u);
+    SKTXT.setAttribute('font-size', 12 * u);
+    SKTXT.setAttribute('fill', r.ok ? C.ink : C.z);
+    SKTXT.textContent = r.text;
+    SKTXT.style.display = '';
+  }
+}
+function sketchClear() {
+  SKPTS = []; SKDRAG = null; SKHOVER = null;
+  sketchRedraw();
+  return sketchReadout();
+}
+
+// ---- the pointer, as five adapters ----------------------------------------------------
+//
+// A POINT THE SHAPE STARTS OR ENDS AT SNAPS TO SOMETHING REAL FIRST -- the ruler's own
+// `measureSnap`, reused rather than re-derived: an end within a few pixels of a site or a
+// rail belongs to that site or that rail, and a rail end becomes the junction.
+function skPoint(mx, my, endpoint) {
+  if (endpoint) {
+    var s = measureSnap(mx, my);
+    if (s && s.kind !== 'free') return skToU(s.x, s.y);
+  }
+  var u = skToU(mx, my);
+  var sn = snapTo(u.x, u.y, false, false, SNAP);
+  return { x: sn.x, y: sn.y };
+}
+function sketchDown(mx, my, mod) {
+  if (!SKETCH) return null;
+  mod = mod || {};
+  ensureSketch();
+  if (SKETCH === 'poly') return sketchClick(mx, my, mod);
+  var a = skPoint(mx, my, true);
+  SKDRAG = { a: a, b: { x: a.x, y: a.y }, shift: !!mod.shift };
+  sketchRedraw();
+  return sketchReadout();
+}
+function sketchMove(mx, my, mod) {
+  if (!SKETCH) return null;
+  mod = mod || {};
+  if (SKETCH === 'poly') SKHOVER = skPoint(mx, my, true);
+  else if (SKDRAG) { SKDRAG.b = skPoint(mx, my, true); SKDRAG.shift = !!mod.shift; }
+  else return sketchReadout();
+  sketchRedraw();
+  return sketchReadout();
+}
+function sketchUp(mx, my, mod) {
+  if (!SKETCH || SKETCH === 'poly' || !SKDRAG) return null;
+  mod = mod || {};
+  SKDRAG.b = skPoint(mx, my, true);
+  SKDRAG.shift = !!mod.shift;
+  // A PRESS THAT NEVER MOVED IS A CLICK, NOT A SHAPE.  It used to release into "that is
+  // shorter than one lattice unit", which is a refusal for a gesture nobody made -- the
+  // same noise `clickStage` avoids when nothing is armed.  Below the 4 px the drag
+  // threshold already uses, the tool stays armed and says nothing.
+  var moved = skHyp((SKDRAG.b.x - SKDRAG.a.x) * (L.sx || 1),
+                    (SKDRAG.b.y - SKDRAG.a.y) * (L.sy || 1));
+  if (moved < 4 * userPerPx()) { SKDRAG = null; sketchRedraw(); return null; }
+  var plan = sketchPlan(SKETCH, SKDRAG.a, SKDRAG.b, { shift: SKDRAG.shift });
+  SKDRAG = null;
+  sketchRedraw();
+  // A REFUSED SHAPE DOES NOT COMMIT.  The reason was already in the readout, in red; the
+  // toast names the rule so it survives the release.
+  if (!plan.ok) {
+    toast('bad', (plan.rule ? plan.rule + ': ' : '') + plan.why);
+    return { ok: false, problems: [{ code: plan.rule || 'sketch', message: plan.why }] };
+  }
+  return skFinish(plan);
+}
+function sketchClick(mx, my, mod) {
+  if (SKETCH !== 'poly') return null;
+  ensureSketch();
+  var p = skPoint(mx, my, true);
+  SKHOVER = p;
+  if (skPolyWouldClose()) return sketchFinish(true);
+  SKPTS.push([p.x, p.y]);
+  sketchRedraw();
+  return sketchReadout();
+}
+// double-click, or Enter: the polyline ends OPEN.  Clicking the first point again closes it.
+function sketchFinish(closed) {
+  if (SKETCH !== 'poly') return null;
+  var pts = SKPTS.slice();
+  if (pts.length < 2) {
+    sketchClear();
+    return { ok: false, problems: [{ code: 'sketch',
+      message: 'a polyline needs at least two points' }] };
+  }
+  var plan = sketchPlan('poly', { pts: pts, closed: !!closed }, null, {});
+  SKPTS = []; SKHOVER = null;
+  sketchRedraw();
+  if (!plan.ok) {
+    toast('bad', (plan.rule ? plan.rule + ': ' : '') + plan.why);
+    return { ok: false, problems: [{ code: plan.rule || 'sketch', message: plan.why }] };
+  }
+  return skFinish(plan);
+}
+function skFinish(plan) {
+  var r = sketchCommit(plan);
+  if (!r.ok) {
+    toast('bad', ((r.problems || [])[0] || {}).message || 'refused');
+    return r;
+  }
+  toast('ok', SK_TOOLS[plan.tool].toLowerCase() + ': ' + plan.n_sites + ' trapping site' +
+              (plan.n_sites === 1 ? '' : 's') +
+              (plan.n_junctions ? ', ' + plan.n_junctions + ' junction' +
+                                  (plan.n_junctions === 1 ? '' : 's') : '') +
+              (plan.closed ? ', one closed orbit' : '') +
+              (plan.bends ? ' · a corner is a bend (R18), not a junction' : ''));
+  // ONE SHAPE PER ARMING, exactly as a tile disarms the moment its element lands.
+  SKETCH = null;
+  if (!DMODE) DMODE = 'sketch';       // a shape was drawn: the rail stays on the shapes
+  sketchRedraw();
+  setCursor(null);
+  paint();
+  return r;
+}
+// THE HEADLESS GESTURE -- what the pointer does, in MODEL (lattice) units and callable
+// without an Event, so the harness drives the rule rather than the handler.
+function sketchDraw(tool, from, to, mod) {
+  mod = mod || {};
+  if (tool) { SKETCH = null; sketchTool(tool); }
+  if (!SKETCH) {
+    return { ok: false, problems: [{ code: 'sketch', message: 'no shape tool is armed' }] };
+  }
+  if (SKETCH === 'poly') {
+    SKPTS = (from || []).map(function (p) { return [p[0], p[1]]; });
+    return sketchFinish(!!mod.closed);
+  }
+  var a = { x: from[0], y: from[1] }, b = { x: to[0], y: to[1] };
+  var plan = sketchPlan(SKETCH, a, b, { shift: !!mod.shift });
+  if (!plan.ok) {
+    toast('bad', (plan.rule ? plan.rule + ': ' : '') + plan.why);
+    return { ok: false, problems: [{ code: plan.rule || 'sketch', message: plan.why }] };
+  }
+  return skFinish(plan);
+}
+
+// ------------------------------------------------------------------- the keymap
+//
+// ONE TABLE.  Two `keydown` listeners used to compete for the same keys: this file's
+// nudged the selection with the arrows while the page's scrubbed the programme, so a
+// nudge also moved the playhead; space was held-to-pan here and play/pause there, and
+// `e` flipped a mode the pointer no longer has.  `keyGesture` is the only reading of a
+// key now -- pure, no Event -- and the page's one listener dispatches on the verb it
+// returns.  The `?` overlay is rendered from the same rows, so a binding cannot exist
+// without its line of help, or the other way round.
+var KEYMAP = [
+  { keys: [' '], verb: 'toggle-play', label: 'space', doc: 'play / pause' },
+  { keys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'], verb: 'nudge-or-seek',
+    label: '\u2190 \u2191 \u2192 \u2193',
+    doc: 'nudge the selection one lattice step (shift: four) \u00b7 with nothing selected, previous / next instruction' },
+  { keys: ['Enter'], verb: 'glide', label: 'enter',
+    doc: 'glide the current instruction \u00b7 in the Modify panel, apply it' },
+  { keys: ['Delete', 'Backspace'], verb: 'remove', label: 'del',
+    doc: 'remove the selection (a site takes its segments with it)' },
+  { keys: ['Escape'], verb: 'escape', label: 'esc',
+    doc: 'one thing per press: close the element menu, cancel the drag, disarm the stamp, clear the selection, close this help \u00b7 in a text field it only leaves the field, and in the Modify panel it cancels it' },
+  { keys: ['Home'], verb: 'seek-first', label: 'home', doc: 'first instruction' },
+  { keys: ['End'], verb: 'seek-last', label: 'end', doc: 'last instruction' },
+  { keys: ['PageUp'], verb: 'seek-back', label: 'pgup', doc: '25 instructions back' },
+  { keys: ['PageDown'], verb: 'seek-ahead', label: 'pgdn', doc: '25 instructions ahead' },
+  { keys: ['j', '.'], verb: 'seek-next', label: 'j  .', doc: 'next instruction' },
+  { keys: ['k', ','], verb: 'seek-prev', label: 'k  ,', doc: 'previous instruction' },
+  { keys: ['f', '0'], verb: 'fit', label: 'f  0', doc: 'fit the stage' },
+  { keys: ['F'], verb: 'follow', label: 'F', doc: 'toggle Follow in the programme listing' },
+  { keys: ['1'], verb: 'pane-P', label: '1', doc: 'Program pane' },
+  { keys: ['2'], verb: 'pane-A', label: '2', doc: 'Device pane' },
+  { keys: ['3'], verb: 'pane-M', label: '3', doc: 'Machine pane' },
+  { keys: ['['], verb: 'fold-rail', label: '[', doc: 'fold the element rail' },
+  { keys: [']'], verb: 'fold-dock', label: ']', doc: 'fold the side panels' },
+  { keys: ['\\'], verb: 'fold-both', label: '\\', doc: 'fold both' },
+  { keys: ['/'], verb: 'filter', label: '/', doc: 'filter the programme listing' },
+  { keys: ['L', 'l'], verb: 'reconcile', label: 'L',
+    doc: 'set the last moved node\u2019s segment lengths to match the drawing' },
+  { keys: ['m', 'M'], verb: 'measure', label: 'm',
+    doc: 'Measure: click two points for the distance in micrometres, a third for the angle at the middle one, or two rails for the angle between them \u00b7 esc clears' },
+  { keys: ['d', 'D'], verb: 'design-mode', label: 'd',
+    doc: 'switch between Sketch (draw the shape the ions travel on) and Parts (place sites, junctions and rails one at a time)' },
+  { keys: ['r', 'R'], verb: 'shape-rect', label: 'r',
+    doc: 'Sketch: Rectangle \u00b7 drag corner to corner for a closed rectangular rail' },
+  { keys: ['e', 'E'], verb: 'shape-ellipse', label: 'e',
+    doc: 'Sketch: Ellipse \u00b7 drag a box for a closed rounded rail; shift makes it a circle' },
+  { keys: ['n', 'N'], verb: 'shape-line', label: 'n',
+    doc: 'Sketch: Line \u00b7 drag end to end for an open register' },
+  { keys: ['p', 'P'], verb: 'shape-poly', label: 'p',
+    doc: 'Sketch: Polyline \u00b7 click point after point; double-click or enter ends it open, clicking the first point again closes it' },
+  { keys: ['?'], verb: 'help', label: '?', doc: 'toggle this guide' },
+  { keys: ['h', 'H'], verb: 'explain', label: 'h', doc: 'Explain: label the parts of the screen' },
+  { keys: ['z', 'Z'], ctrl: true, verb: 'undo', label: 'ctrl+Z',
+    doc: 'undo one whole gesture (a group drag or a nudge is one step) \u00b7 ctrl+shift+Z redo' },
+  { keys: ['y', 'Y'], ctrl: true, verb: 'redo', label: 'ctrl+Y', doc: 'redo one gesture' },
+  { keys: ['s', 'S'], ctrl: true, verb: 'save', label: 'ctrl+S', doc: 'save the design' }
+];
+var POINTER_HELP = [
+  ['drag an element', 'move it anywhere \u00b7 Snap (button) lands it on the lattice, shift on quarter steps, alt frees a snapped drag \u00b7 a member of a selection, a segment or a loop moves the whole thing as one \u00b7 a red HUD before release means this drop will be refused: slide a little further'],
+  ['drag a placed component', 'the whole component moves as one step \u00b7 alt+drag takes just the part under the pointer'],
+  ['drag empty stage', 'pan \u00b7 so does a middle-drag, and a right-drag that STARTS on empty stage'],
+  ['shift+drag empty stage', 'marquee-select everything inside the rectangle'],
+  ['shift+drag element to element', 'a new segment between them'],
+  ['click', 'select (shift adds) \u00b7 click empty stage to clear'],
+  ['right-click a part', 'its menu: everything the page can do to the thing under the pointer \u00b7 Modify\u2026 opens its own fields (a site\u2019s capacity and position, a rail\u2019s length, a loop\u2019s kind), and beside it Set zone, place another, delete \u00b7 on a rail, drop a trapping site into it \u00b7 on a placed component, select or delete the whole part \u00b7 right-clicking one member of a selection keeps the selection and acts on all of it \u00b7 an action that cannot run here is shown greyed with the reason, never hidden'],
+  ['double-click empty stage', 'place a site, or the armed element'],
+  ['armed tile + click', 'place the element where you click, once: the tile disarms as it lands \u00b7 shift-click places and stays armed for a run of them'],
+  ['wheel', 'zoom at the pointer'],
+  ['Measure on + click', 'a ruler end: it snaps to the nearest site or rail \u00b7 two clicks give a distance, three give an angle'],
+  ['Sketch: a shape armed + drag', 'draw the shape the ions travel on \u00b7 the readout gives its size in micrometres, how many trapping sites the release will make, and in red the rule that would refuse it \u00b7 the release lays sites one lattice unit apart, declares the orbit if the shape closed, and puts a junction where the new rail meets or crosses one that is already there'],
+  ['Sketch: Polyline armed + click', 'one point per click \u00b7 double-click or enter finishes it open, clicking the first point again closes it']
+];
+// THE VERB A KEY MEANS, from the table above and nothing else.  `mods` is
+// `{ctrl, meta, shift, alt}`; `ctx.field` names the text field that has focus (its id,
+// or its tag), because a field keeps its own keys: there Escape only leaves the field --
+// clearing the two listing filters -- and everything else is the browser's.  `null`
+// means "not ours": the listener must not preventDefault, so browser accelerators keep
+// working.  Reads `SELSET` for the arrows (nudge with a selection, scrub without); no
+// side effects.
+function keyGesture(key, mods, ctx) {
+  mods = mods || {}; ctx = ctx || {};
+  var accel = !!(mods.ctrl || mods.meta);
+  // THE MODIFY PANEL'S OWN TWO KEYS.  Its rows are text inputs, so the generic field
+  // branch below would answer 'blur' for Escape and nothing at all for Enter -- and a
+  // form that cannot be submitted or abandoned from the keyboard is a form nobody
+  // finishes.  No new KEYMAP row: these are the meanings enter and esc already have,
+  // in one more place, and the two rows say so.
+  if (ctx.field && String(ctx.field).slice(0, 5) === 'mdlg_') {
+    if (key === 'Enter' && !accel) return 'modify-apply';
+    if (key === 'Escape') return 'modify-cancel';
+  }
+  if (ctx.field) {
+    if (key === 'Escape') return (ctx.field === 'pFilter' || ctx.field === 'aFilter') ? 'clear-filter' : 'blur';
+    if (accel && !mods.alt && (key === 's' || key === 'S')) return 'save';
+    return null;
+  }
+  if (mods.alt) return null;
+  // ENTER ENDS THE POLYLINE while one is being drawn.  Its other meaning -- glide the
+  // instruction -- is what it keeps everywhere else, and the KEYMAP row still documents it.
+  if (key === 'Enter' && !accel && SKETCH === 'poly' && SKPTS.length && !VIEW_ONLY) {
+    return 'sketch-finish';
+  }
+  for (var i = 0; i < KEYMAP.length; i++) {
+    var row = KEYMAP[i];
+    if (!!row.ctrl !== accel || row.keys.indexOf(key) < 0) continue;
+    if (row.verb === 'undo') return mods.shift ? 'redo' : 'undo';
+    // a fold moves the stage under a live drag, and the drop would land a lattice step
+    // from the pointer: the fold keys wait.  (The arrows do not: a nudge or a seek moves
+    // nothing under the pointer.)
+    if ((GHOST || BAND) && row.verb.indexOf('fold-') === 0) return null;
+    if (row.verb === 'nudge-or-seek') {
+      if (SELSET.length && !VIEW_ONLY) return 'nudge';
+      return (key === 'ArrowRight' || key === 'ArrowDown') ? 'seek-next' : 'seek-prev';
+    }
+    if (VIEW_ONLY && !VIEW_ONLY_VERBS[row.verb]) return null;
+    return row.verb;
+  }
+  return null;
+}
+function keyHelp() {
+  return { keys: KEYMAP.map(function (r) { return [r.label, r.doc]; }), pointer: POINTER_HELP.slice() };
+}
+// THE GUIDE.  It opens on what you are looking at -- each mark drawn by the stage's own
+// avatar code beside its plain sentence -- then how to use the page in three steps, then
+// the gesture and key tables.  A newcomer reads the top; the tables are for later.
+var GLOSSARY = [
+  ['el:site', { type: 'site' }, { zone: 'trap', cap: 2 }],
+  ['el:junction', { type: 'junction' }, {}],
+  ['el:segment', { type: 'segment' }, {}],
+  ['el:loop', { type: 'loop' }, {}],
+  ['el:zone_type', { type: 'zone_type' }, { zone: 'load', cap: 8 }],
+  ['el:component', { type: 'cmp:spur_dock' }, {}]
+];
+var STEPS = [
+  ['Build a device', 'Pick a card on the empty canvas for a ready-made one, or press Trapping site and click the canvas a few times, then shift-drag one site onto another to lay a rail between them.'],
+  ['Run a programme on it', 'Press Test drive for a small valid programme, or write your own in the Write panel and press Evaluate. The ions move on the canvas; the counters in the head keep score.'],
+  ['Read the verdict', 'The status line names the instruction, the price line says what it costs, and the Report panel lists every hardware rule the design passes or fails, with the reason.']
+];
+function renderHelp() {
+  var host = $('helpBody'), guide = $('guideBody');
+  if (!host) return;
+  var h = keyHelp(), i;
+  var tr = function (r) { return '<tr><td><code>' + esc2(r[0]) + '</code></td><td>' + esc2(r[1]) + '</td></tr>'; };
+  // the tables, as markup on their own host -- what the harness census reads
+  host.innerHTML = '<h3>Pointer</h3><table>' + h.pointer.map(tr).join('') + '</table>' +
+                   '<h3>Keys</h3><table>' + h.keys.map(tr).join('') + '</table>' +
+                   '<p class="mut">Hover anything on the page for what it is; press <b>Explain</b> in the head to label the regions. Esc, or a click outside this card, closes it.</p>';
+  if (!guide) return;
+  guide.replaceChildren();
+  var h3 = function (t) { var e = elh('h3'); e.textContent = t; return e; };
+  guide.append(h3('What you are looking at'));
+  var gl = elh('div', 'gloss');
+  for (i = 0; i < GLOSSARY.length; i++) {
+    var g = GLOSSARY[i], e = hintFor(g[0]);
+    if (!e) continue;
+    var av = elh('span', 'avatar');
+    try { av.append(kindAvatar(g[1], g[2])); } catch (err) { /* a component the page does not ship */ }
+    var tx = elh('span');
+    var b = elh('b'); b.textContent = e.t; tx.append(b);
+    var d = elh('span'); d.textContent = ' ' + e.d; tx.append(d);
+    gl.append(av, tx);
+  }
+  guide.append(gl);
+  guide.append(h3('How to use it'));
+  var ol = elh('ol', 'steps');
+  for (i = 0; i < STEPS.length; i++) {
+    var li = elh('li'), sb = elh('b');
+    sb.textContent = STEPS[i][0] + '. ';
+    var st = elh('span'); st.textContent = STEPS[i][1];
+    li.append(sb, st);
+    ol.append(li);
+  }
+  guide.append(ol);
+}
+// the overlay's state, readable: the class is what the stylesheet keys on, the inline
+// display is what a harness can read back
+var HELPON = false;
+function helpToggle(on) {
+  HELPON = (on === undefined) ? !HELPON : !!on;
+  var h = $('help');
+  if (h) {
+    h.className = HELPON ? 'help' : 'help off';
+    if (h.style) h.style.display = HELPON ? '' : 'none';
+  }
+  return HELPON;
 }
 
 // EVERY KIND HOVERS.  This used to bail out for a segment (`if (!h || h.kind ===
@@ -2116,24 +4376,60 @@ function nudge(key, mult) {
 // gave no feedback whatever.  Returns the hit, so the pointer handler is a one-line
 // adapter and the harness can assert what the cursor is about to say.
 var HOVERED = null;
-function hover(mx, my) {
+function hover(mx, my, cx, cy) {
   var h = hit(mx, my);
   HOVERED = h;
   setCursor(h);
   paintOverlay();
+  // the on-canvas hint follows the pointer; the adapter passes client coordinates and the
+  // harness, which has none, passes nothing and gets no card
+  if (cx !== undefined) stageHint(h, cx, cy);
   return h;
 }
 
+// THE HUD SITS AT THE POINTER.  It is `position:fixed`, so the client coordinates the
+// pointer event carries are exactly its coordinates -- they used to be written into a
+// stage-relative box and the HUD drew 287 px right and 196 px below the pointer.  Two
+// lines: where the drop lands and how far it moved, then the one thing worth saying
+// about it, cut short (the full sentence is in `move()`'s return).  Red means "this
+// release will be refused"; it flips to the left of the pointer near the stage's right
+// edge so it never runs off the window.
+function hudBrief(s) {
+  s = String(s || '');
+  var dot = s.indexOf('. ');
+  if (dot > 0) s = s.slice(0, dot);
+  return s.length > 72 ? s.slice(0, 71) + '\u2026' : s;
+}
 function showHud(cx, cy, r) {
   var hud = $('hud');
   if (!hud || !r || !GHOST) return;
-  hud.className = r.warnings.length ? 'hud warn' : 'hud';
-  hud.style.left = cx + 'px'; hud.style.top = cy + 'px';
+  var bad = (r.problems || []).length > 0, warn = (r.warnings || []).length > 0;
+  hud.className = bad ? 'hud bad' : warn ? 'hud warn' : 'hud';
+  var f = fitBox(), right = (f.r.left || 0) + (f.r.width || 0);
+  var flip = cx > right - 320;
+  // A FLIPPED HUD IS ANCHORED BY ITS RIGHT EDGE, not translated: a fixed box at
+  // `left: 1536px` in a 1600 px window is laid out in the 64 px that remain and wraps
+  // every two words, and the transform moves the squeezed box, it does not widen it.
+  var iw = (typeof innerWidth === 'number' && innerWidth > 0) ? innerWidth : right;
+  hud.style.top = cy + 'px';
+  if (flip) { hud.style.left = 'auto'; hud.style.right = (iw - cx + 12) + 'px'; }
+  else { hud.style.right = 'auto'; hud.style.left = (cx + 12) + 'px'; }
+  hud.style.transform = 'translate(0, -26px)';
   var d = Math.sqrt((r.x - GHOST.x0) * (r.x - GHOST.x0) + (r.y - GHOST.y0) * (r.y - GHOST.y0));
-  hud.textContent = GHOST.id + ' -> (' + r.x.toFixed(2) + ', ' + r.y.toFixed(2) + ')  d=' +
-                    d.toFixed(2) + (r.warnings.length ? '  ·  ' + r.warnings[0] : '');
+  var note = bad ? 'refused: ' + r.problems[0].message
+           : warn ? ((r.brief || [])[0] || r.warnings[0])
+           : (r.contact ? 'against ' + r.contact + ' \u2014 marks do not overlap' : '');
+  // LATTICE AND MICROMETRES, both.  A drag is where a designer decides a distance, and
+  // until now the only number it offered was in lattice units -- which are not a length.
+  var um = toUm(r.x, r.y);
+  hud.textContent = GHOST.id + ' -> (' + r.x.toFixed(2) + ', ' + r.y.toFixed(2) + ') = (' +
+                    um1(um.x) + ', ' + um1(um.y) + ') um  d=' + d.toFixed(2) + ' u = ' +
+                    fmtUm(distUm(r.x - GHOST.x0, r.y - GHOST.y0)) +
+                    (note ? '\n' + hudBrief(note) : '');
   EGHOST.setAttribute('cx', GHOST.px0); EGHOST.setAttribute('cy', GHOST.py0);
   EGHOST.setAttribute('r', 0.45 * L.g); EGHOST.style.display = '';
+  EGHOST.setAttribute('stroke', bad ? C.z : C.muted);
+  EGHOST.setAttribute('opacity', bad ? 0.9 : 0.5);
   for (var i = 0; i < 2; i++) EGUIDE[i].style.display = 'none';
   for (i = 0; i < Math.min(2, (r.guides || []).length); i++) {
     var g = r.guides[i], ln = EGUIDE[i];
@@ -2155,6 +4451,1119 @@ function hideHud() {
   if (EGHOST) EGHOST.style.display = 'none';
   for (var i = 0; i < EGUIDE.length; i++) EGUIDE[i].style.display = 'none';
 }
+
+// ------------------------------------------------------------------- the explain layer
+//
+// ONE TABLE SAYS WHAT EVERYTHING IS.  Someone new to trapped-ion hardware -- or only new
+// to this picture of it -- should be able to point at any control, tile, chip, tab, rule
+// or mark and be told in plain words what it is and what it does here.  Every such
+// sentence lives in HINTS, keyed by the `data-hint` an element carries, and four surfaces
+// read it and nothing else: the hover card, the region captions the Explain toggle
+// shows, the guide behind `?`, and the on-canvas line that names what is under the
+// pointer.  The physics stays where it was -- the schema's own blurb (`docOf`) is shown
+// under the plain sentence, never rewritten here -- so the tool has one voice for "what
+// is this" and one source for "what does it cost".
+var HINTS = {
+  // the three regions of the screen
+  'region:rail':  { t: '1 \u00b7 Elements', d: 'The standard parts: press a tile, then click the canvas to place it there; pick a zone type first for a site. Everything else about the device is in the tools bar above.' },
+  'region:tools': { t: '0 \u00b7 Tools', d: 'One button per thing that used to crowd the rail: Start a device, append a row, the machine settings, whole components. Each opens a panel under its button; Escape closes it. What you can do to one PART of the device is on the part itself — right-click it. The search box finds any feature on the page (Ctrl+K).' },
+  'tools:start': { t: 'Start', d: 'A new device: a blank canvas, a generator, or one of the shipped devices opened as itself.' },
+  'tools:rows': { t: 'Append a row', d: 'Add a row to the device as code: a curve point, a zone, a class, a wiring or budget setting.' },
+  'tools:machine': { t: 'Machine settings', d: 'The physics and the control plane: primitives, heating, species, budgets, wiring.' },
+  'tools:components': { t: 'Components', d: 'Whole parts placed as one: a trap with its junction, a register, a dock spur. Press one, then click the canvas.' },
+  // (no 'tools:selection': the button it described is gone.  The rail's own Selection
+  //  section is inside `region:rail`, and per-element actions are `ctxmenu` below.)
+  'search': { t: 'Search', d: 'Type any words: every control on the page, its hint, and every lesson is indexed. Choose a hit to open where it lives, scroll to it and flash it. Ctrl+K focuses this box.' },
+  'region:stage': { t: '2 \u00b7 Canvas', d: 'The device, drawn to scale. Drag a part to move it; drag empty space to pan; wheel to zoom; shift-drag one site onto another to join them with a rail.' },
+  'region:bar':   { t: 'Transport', d: 'Plays the hardware programme on this device: every step is one instruction that moves, gates or measures ions.' },
+  'region:dock':  { t: '4 \u00b7 Panel', d: 'One panel at a time, opened from the menu in the head: the course, the device as code, the machine settings, a place to write your own test programme, or the report. Press its menu item again to close it.' },
+  'region:prog':  { t: '3 \u00b7 Program', d: 'The hardware programme one instruction per row, and the circuit it was compiled from, beside the animation: the executing instruction is marked and the next ones are in view. Hardware, Gates or Both.' },
+  'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both stacked. Only a compiled page has a circuit.' },
+  'progpin': { t: 'Beside the animation', d: 'Keep the programme in its own column next to the canvas, the whole height, or put it back among the panels to give the canvas the width.' },
+  // the picture, element by element
+  'el:site':       { t: 'Trapping site', d: 'A pocket in the electric field where ions sit still. Each site holds a few ions (its capacity), and its zone says what may happen there: a gate, a measurement, cooling.', k: 'press the tile, then click the canvas' },
+  'el:junction':   { t: 'Junction', d: 'A crossing where rails meet. Ions pass through it on the way somewhere else and never rest in it, and every crossing heats the ion a little.', k: 'press the tile, then click the canvas' },
+  'el:segment':    { t: 'Segment', d: 'One stretch of rail between two sites or junctions: the road an ion travels along, paved with the electrodes that push it.', k: 'shift-drag from one site to another' },
+  'el:loop':       { t: 'Loop', d: 'A closed ring of sites. The machine can rotate every ion on a loop by one step in a single instruction \u2014 the cheapest way to move many ions at once.', k: 'select the sites in order, then Close loop' },
+  'el:zone_type':  { t: 'Zone type', d: 'A label a site carries: how many ions fit, and whether a gate, a measurement or cooling can happen there. Pick the chip you want before placing sites.', k: 'click a chip to choose it for the next site' },
+  'zone:new':      { t: 'New zone type', d: 'Declare another kind of site \u2014 a different capacity, or different things allowed in it.' },
+  'el:curve_point': { t: 'Curve point', d: 'One measured data point of how fast an operation runs against how much it heats the ion. The price of every move is read off these curves.', k: 'adds a row to a named curve' },
+  'el:primitives': { t: 'Primitives', d: 'The physics of the machine: how long a shuttle, a split, a merge, a crossing or a gate takes, and how much each heats the ion. Every price on this page comes from here.', k: 'edit in place' },
+  'el:control':    { t: 'Control plane', d: 'The wiring: how many voltage sources (DACs) drive how many electrodes, and how many different motions can happen in one step. This is what the DAC count measures.', k: 'edit in place' },
+  'el:heating':    { t: 'Heating', d: 'How fast an ion warms up just by waiting, in quanta per millisecond. A hot ion makes a bad gate, so time itself has a price.', k: 'edit in place' },
+  'el:species':    { t: 'Species', d: 'Which ion carries the qubit, which one is used for cooling, and how long the qubit stays coherent.', k: 'edit in place' },
+  'el:budget':     { t: 'Budget', d: 'Hard ceilings for the design \u2014 at most this many DACs, junctions or square millimetres. The report says when a design goes over.', k: 'edit in place' },
+  'explode': { t: 'Convert parts to plain sites', d: 'Turns every placed component into ordinary sites and rails so they can be edited one by one. The device stays the same; only its description changes.' },
+  'el:component':  { t: 'Component', d: 'A whole part made of several sites and rails \u2014 a dock, a tile, a register \u2014 placed as one piece and moved as one piece.', k: 'press the tile, then click the canvas' },
+  // the toolbar
+  'play':   { t: 'Play / Pause', d: 'Run the programme as an animation: ions move along the rails one instruction at a time.', k: 'space' },
+  'step':   { t: 'Step', d: 'Jump to the end of the next instruction.', k: '\u2192' },
+  'glide':  { t: 'Glide', d: 'Animate just the next instruction, then stop.', k: 'enter' },
+  'phase':  { t: 'Phase', d: 'Jump to the next batch of instructions that run together.' },
+  'reset':  { t: 'Reset', d: 'Back to the first instruction.', k: 'home' },
+  'fit':    { t: 'Fit', d: 'Zoom so the whole device fills the canvas.', k: 'f' },
+  'slider': { t: 'Position', d: 'Where you are in the programme. Drag to scrub.' },
+  'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
+  'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
+  'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
+  'truescale': { t: 'True scale', d: 'On (the default): one screen pixel is the same distance across and down, so an angle you measure on the screen is the angle on the chip. Off: a long thin device is stretched to fill the canvas \u2014 easier to see, and wrong about every angle. The bar at the bottom left of the canvas always says what a length on screen is worth.' },
+  'scalebar': { t: 'Scale bar', d: 'The bracket is as long, on the chip, as the distance written beside it, at the zoom you are looking at, and it re-measures as you zoom. It sits under the picture so it never covers the device.' },
+  'mode': { t: 'Sketch \u00b7 Parts', d: 'Two ways to design. Sketch: draw the shape the ions travel on \u00b7 a rectangle, a circle, a line, a polyline \u00b7 and the release fills it with trapping sites one lattice unit apart, declares the orbit if the shape closed, and adds a junction where the new rail meets an existing one. Parts: place a site, a junction or a rail one at a time, which is what the course teaches and what detail work needs. Remembered between visits; a canvas with nothing on it opens on Sketch.', k: 'd' },
+  'mode:sketch': { t: 'Sketch', d: 'Draw the shape first and fill in the details after: arm a shape, drag it on the canvas, and the release lays the trapping sites along what you drew. The default on a canvas with no device on it.', k: 'd' },
+  'mode:parts': { t: 'Parts', d: 'The element-at-a-time tool: press a tile, click the canvas, shift-drag one site onto another for a rail. Everything it could ever do, unchanged.', k: 'd' },
+  'shape:rect': { t: 'Rectangle', d: 'Drag corner to corner. The release makes a closed rectangular rail with a trapping site every lattice unit and a site at each corner \u00b7 a corner is a BEND, which R18 prices as ordinary transport, not a junction.', k: 'r' },
+  'shape:ellipse': { t: 'Ellipse / circle', d: 'Drag a box; hold shift for a circle. The ring is polygonised at one side per lattice unit, and a circle too small for its rails to subtend the device\u2019s minimum angle is refused by R20 while you are still dragging.', k: 'e' },
+  'shape:line': { t: 'Line', d: 'Drag end to end for an open register: trapping sites one lattice unit apart and no orbit to rotate \u00b7 the shape the chain generator makes.', k: 'n' },
+  'shape:poly': { t: 'Polyline', d: 'Click point after point. Double-click or press enter to finish it open; click the first point again to close it into an orbit. A corner tighter than the device\u2019s minimum angle is refused by R20 with the angle it would have made.', k: 'p' },
+  // The QEC-cycle panel is another session's (qccd/site/qec_cycle.py); it rides into the
+  // page through the site build and adds its `data-hint` only once this entry resolves.
+  'qec:cycle': { t: 'QEC cycle', d: 'One syndrome-extraction round and the classical loop around it: the outcomes cross a wire to a decoder, and its answer either stays in the classical memory as a Pauli-frame update or comes back to gate an operation. The panel reads this device’s own round time and says whether the decoder keeps up with the rounds and what waiting for its answer costs.' },
+  'measure': { t: 'Measure', d: 'A ruler. Click two points and it gives the distance in micrometres, in lattice units, and as a pair of offsets; click a third and it gives the angle at the middle one; click two different rails and it also gives the angle between those rails. Each click snaps to the nearest site or rail. Escape clears it, and pressing the button again leaves the tool.', k: 'm' },
+  'undo':   { t: 'Undo', d: 'Take back the last gesture: a drag, a placement, a nudge.', k: 'ctrl+Z' },
+  'redo':   { t: 'Redo', d: 'Put back what you just undid.', k: 'ctrl+Y' },
+  'help':   { t: 'Guide', d: 'What everything on this screen is, how to use it in three steps, and every gesture and key.', k: '?' },
+  'explain': { t: 'Explain', d: 'Label the parts of the screen. Hovering anything already tells you what it is.', k: 'h' },
+  'status': { t: 'Now', d: 'Which instruction the animation is on, and what that instruction does.' },
+  'price':  { t: 'Price', d: 'What the programme costs on this device: heating (cost), instructions (steps), wall-clock time, and the voltage sources the wiring needs (DACs).' },
+  'edits':  { t: 'Edits', d: 'How many changes you have made to the device. Undo takes them back one gesture at a time.' },
+  'problems': { t: 'Problems', d: 'Things wrong with the device you have drawn: a geometry rule broken, a site with no zone, a segment with a missing end, a statement the applier refused. Click to list them. Observations about what has NOT been drawn yet are counted separately, as notes.' },
+  'notes': { t: 'Notes', d: 'Observations about what is not there yet \u2014 a zone type no site uses, a movement class whose orbit matches no loop. Nothing is wrong; they are here so an empty canvas does not open on a pile of red. Click to read them.' },
+  'ctxmenu': { t: 'Element menu', d: 'Everything the page can do to the part you right-clicked: change its capacity, position and zone, place another one, delete it, drop a trapping site into a rail, or take a whole placed component. An action that cannot run here is greyed with the reason rather than hidden.', k: 'right-click a part' },
+  'menu:item': { t: 'Menu action', d: 'One thing the page can do to the part under the pointer. Greyed means it cannot run on this device, and the line under it says why.' },
+  'menu:modify': { t: 'Modify', d: 'Opens a small panel of this part\u2019s own fields \u2014 a site\u2019s capacity and position, a rail\u2019s length, a loop\u2019s kind \u2014 built from the file format itself, so it can never offer a field the format cannot hold. Enter applies, Escape cancels, and a refusal is shown in the panel beside the field.' },
+  'menu:zone': { t: 'Set zone', d: 'Give this trapping site one of the zone types the device declares: how many ions it holds, and whether a gate, a measurement or cooling may happen in it.' },
+  'menu:place': { t: 'Place another one of these', d: 'Arms the same kind of element, so the next click on the canvas puts one where you click.' },
+  'menu:delete': { t: 'Delete', d: 'Removes the selection. A site takes its rails with it, and one Undo brings the whole thing back.', k: 'del' },
+  'menu:insert': { t: 'Insert a trapping site here', d: 'Splits this rail where you clicked and drops a trap into the gap. The two halves inherit the rail\u2019s loop, labels and capacity, its declared length is split at that point, and the new site is spliced into the orbit in the right place \u2014 the only add that can safely put a node on a transport loop.' },
+  'menu:component': { t: 'The whole component', d: 'This part was placed as one piece \u2014 a dock, a tile, a register. Select or delete every site and rail it owns, in one step.' },
+  'menu:close-loop': { t: 'Close loop', d: 'Declares the selected sites, in the order you selected them, as an orbit the machine can rotate by one step in a single instruction. It needs at least three.' },
+  'testdrive': { t: 'Test drive', d: 'Writes a small valid programme for this device \u2014 a rotation if it has a loop, otherwise a shuttle out and back \u2014 and plays it.' },
+  'gripRail': { t: 'Elements', d: 'Hide or show the elements rail.', k: '[' },
+  'gripDock': { t: 'Panels', d: 'Hide or show the side panels.', k: ']' },
+  // the head
+  'c:steps': { t: 'Steps', d: 'Instructions executed so far, out of the total. A step is one hardware instruction: a move, a gate, a measurement.' },
+  'c:cost':  { t: 'Cost', d: 'Heating spent so far, in motional quanta summed over every ion, out of the programme\u2019s total. Lower is better: a hot ion gates badly.' },
+  'm:cost':  { t: 'Cost', d: 'The heating the whole programme puts into the ions, in motional quanta. The number a design is judged by.' },
+  'm:steps': { t: 'Steps', d: 'How many hardware instructions the programme takes.' },
+  'm:runtime': { t: 'Runtime', d: 'Wall-clock time to run the programme once.' },
+  'm:quanta': { t: 'Quanta', d: 'Heating summed over every ion: moves, crossings and waiting.' },
+  'm:peak n\u0304': { t: 'Peak n\u0304', d: 'The hottest any single ion gets, in average motional quanta. A gate on an ion above the budget fails rule R7.' },
+  'm:peak n-bar': { t: 'Peak n\u0304', d: 'The hottest any single ion gets, in average motional quanta. A gate on an ion above the budget fails rule R7.' },
+  'm:contacts': { t: 'Contacts', d: 'How many two-ion gates the programme performs.' },
+  'm:cooling': { t: 'Cooling', d: 'Time spent cooling ions back down.' },
+  'm:DACs':   { t: 'DACs', d: 'Independent voltage sources the wiring needs. The headline hardware cost: a broadcast scheme keeps it flat as the device grows, a direct scheme pays one per electrode.' },
+  'm:junctions': { t: 'Junctions', d: 'Crossings in the device. Every ion that passes one is heated.' },
+  'm:junction transits': { t: 'Junction transits', d: 'How many times an ion crosses a junction in the programme.' },
+  'm:electrodes': { t: 'Electrodes', d: 'The metal pads that shape the field along every rail.' },
+  'm:switches': { t: 'Switches', d: 'Per-site switches that let one voltage source serve many electrodes.' },
+  'm:ion capacity': { t: 'Ion capacity', d: 'How many ions the whole device can hold at once.' },
+  // the panels
+  'tab:P': { t: 'Program', d: 'The hardware programme, one instruction per row. Click a row to jump the animation there.' },
+  'tab:Q': { t: 'Circuit', d: 'The quantum circuit this programme was compiled from, stepping in lockstep with the animation.' },
+  'tab:A': { t: 'Device', d: 'The device as code: every site, rail and setting as the statements that rebuild it. Edit the source and the picture follows.' },
+  'tab:M': { t: 'Machine', d: 'Hardware totals, and which of the rules this page could check.' },
+  'tab:W': { t: 'Write', d: 'Write your own test programme \u2014 place ions, shuttle them, rotate a loop \u2014 then press Evaluate to price it and play it.' },
+  'menu': { t: 'Panels', d: 'One item per panel. Click to open it beside (or under) the canvas; click the lit item to close it and give the canvas the room back.' },
+  'tab:L': { t: 'Learn', d: 'The course: what the machine is, how to build and program it by hand, every rule it must obey, and how to choose an architecture. Small lessons, each with an exercise the page checks.' },
+  'learn:pick': { t: 'Lessons', d: 'Jump to any lesson. Stars show what you have passed.' },
+  'learn:load': { t: 'Load', d: 'Put this lesson\u2019s device and programme on the canvas. Undo takes you back to what was there.' },
+  'learn:check': { t: 'Check', d: 'Test your answer against what the page measures: the frames, the verdicts, the price.' },
+  'learn:hint': { t: 'Hint', d: 'Three hints, each deeper. Taking one costs nothing.' },
+  'learn:solution': { t: 'Solution', d: 'Show one way to do it, applied to the canvas so you can read it back.' },
+  'learn:next': { t: 'Next', d: 'On to the next lesson.' },
+  'learn:verdict': { t: 'Python\u2019s verdict', d: 'Five rules are not checked in the browser. For these lessons the page carries the verdict Python computed on this exact programme when the page was built \u2014 the rule, its state, and the verifier\u2019s own sentences.' },
+  'p:init': { t: 'p.init', d: 'Puts named ions on named sites: p.init({"d0": "S0"}). The first line of every programme; a device starts empty.' },
+  'p:shuttle': { t: 'p.shuttle', d: 'Pushes one ion along a path of site ids, one rail per step: p.shuttle("d0", ["S0", "S1", "S2"]). A third argument names the movement class (default: shuttle).' },
+  'p:move': { t: 'p.move', d: 'One ion, one hop: p.move("d0", "S0", "S1"). The same thing p.shuttle does for one rail.' },
+  'p:simd': { t: 'p.simd', d: 'Several ions in one step: p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]]). The class first, then a list of [ion, from, to]. One instruction, one step, judged as a whole by the rules.' },
+  'p:gate': { t: 'p.gate', d: 'A gate. Two-qubit: p.gate("CX", [["d0", "d1"]]) -- both ions in one site, control first. Single-qubit: p.gate("H", [], ["S0"]) names the site.' },
+  'p:cool': { t: 'p.cool', d: 'Cools the ions back toward the ground state: p.cool() for all of them, p.cool(["d0"]) for some. Transport heats; a gate on a hot ion is refused (R7, R7c).' },
+  'p:measure': { t: 'p.measure', d: 'Reads ions out: p.measure(["d0", "d1"]). Needs a site whose zone has spam (state preparation and measurement).' },
+  'p:reset': { t: 'p.reset', d: 'Puts ions back to |0>: p.reset(["d0"]). Same zone requirement as measuring.' },
+  'p:fill': { t: 'p.fill', d: 'Puts one ion on every site of a loop, d0 on its first site and so on: p.fill() for the only loop, p.fill("L0") to name it.' },
+  'p:rotate': { t: 'p.rotate', d: 'Turns a closed loop: p.rotate(2) moves every ion on it two sites forward, p.rotate(-1) one site back. One instruction, every ion.' },
+  'p:barrier': { t: 'p.barrier', d: 'A step in which nothing happens; a marker between phases of a programme.' },
+  'tab:R': { t: 'Report', d: 'The verdict: every cost figure with its provenance, and each of the 27 hardware rules \u2014 passed, failed, or not checkable here.' },
+  'follow': { t: 'Follow', d: 'Keep the executing instruction scrolled into view.', k: 'F' },
+  'filter': { t: 'Filter', d: 'Show only the rows containing this text.', k: '/' },
+  'evaluate': { t: 'Evaluate', d: 'Price the programme, check it against the rules, and play it.' },
+  'archview': { t: 'View', d: 'Program: the statements that build the device \u00b7 Device: every node and rail \u00b7 Source: edit it as text.' },
+  // the legend
+  'leg:segment': { t: 'Rail', d: 'A segment an ion can travel along.' },
+  'leg:site':    { t: 'Trapping site', d: 'Where ions sit; the ticks are its capacity.' },
+  'leg:junction': { t: 'Junction', d: 'A crossing. Ions pass through and never rest here.' },
+  'leg:slot':    { t: 'Free slot', d: 'Room for one more ion in a site.' },
+  'leg:ion':     { t: 'Ion', d: 'One ion. When it moves, the pads under it light up.' },
+  'leg:gate':    { t: 'Ion in a gate', d: 'Two ions in the same site being gated together.' },
+  'leg:pad':     { t: 'Energized electrode', d: 'A pad carrying the potential well that is pushing an ion along.' },
+  'leg:well':    { t: 'Moving well', d: 'The potential well in flight along a rail.' },
+  'leg:loop':    { t: 'Transport loop', d: 'A ring the machine can rotate as one.' },
+  'leg:zone':    { t: 'Site colour', d: 'Sites are coloured by their zone type.' }
+};
+// THE 27 RULES IN PLAIN WORDS.  The formal statement each badge carries as its title is
+// the contract (`docs/rules.md`); this is what it means to someone who has not read it.
+var RULE_HINTS = {
+  R1: 'No site ever holds more ions than its capacity.',
+  R2: 'A junction holds at most one ion, and at most one ion crosses it per step.',
+  R3: 'No more ions travel one rail in a step than it is rated for.',
+  R4: 'Only declared kinds of motion, and no more of them per step than the control plane can drive at once.',
+  R4b: 'A step is either transport or gates, never both.',
+  R4d: 'Everything sharing one control channel moves the same way in a step.',
+  R5: 'Two ions never pass each other on one rail in the same step.',
+  R6: 'A gate, a measurement or cooling only happens in a zone that allows it.',
+  R6b: 'Both ions of a gate are in the same site.',
+  R7: 'An ion is cool enough (n\u0304 under budget) when it enters a gate.',
+  R7b: 'Per-zone duty-cycle budgets \u2014 no device declares one yet.',
+  R7c: 'A programme with gates, under a heating model, schedules some cooling.',
+  R8: 'Ions are neither created nor lost, and none moves twice in one step.',
+  R9: 'The totals the programme claims match what the replay measures.',
+  R10: 'The compiled programme implements the circuit it came from.',
+  R11: 'A loop rotates one way per step, and every junction has a price.',
+  R12: 'At most one gate per site per step.',
+  R13: 'At most 15 ions in a site when a gate fires.',
+  R14: 'Splitting a chain longer than two is accounted as a swap.',
+  R15: 'Heating adds up (the replay counts an upper bound).',
+  R16: 'Gate error is read off the ion\u2019s actual heating, not a constant.',
+  R17: 'Ions heat up just by waiting.',
+  R18: 'A junction is charged by how many rails meet there.',
+  R19: 'No more rails meet at one node than the device says a junction can join.',
+  R20: 'Two rails leaving the same node are far enough apart in angle to be built.',
+  R21: 'The drawing is flat: a rail touches only the nodes it ends at, and two rails cross only where they share a node.',
+  R22: 'Every ion that moves in one step moves the same way; a site may sit the step out, but it may not do something else.'
+};
+
+// The entry a key names, resolved: `el:cmp:*` is a component, `rule:*` reads the rule
+// table, and a key with no entry is no hint (never a blank card).
+function hintFor(key) {
+  key = String(key || '');
+  if (!key) return null;
+  if (key.slice(0, 7) === 'el:cmp:') {
+    var cn = key.slice(7), spec = componentSpec(cn), base = HINTS['el:component'];
+    return { t: cn.replace(/_/g, ' '), d: (spec && spec.blurb ? spec.blurb + ' ' : '') + base.d, k: base.k };
+  }
+  if (key.slice(0, 5) === 'rule:') {
+    var r = key.slice(5);
+    return RULE_HINTS[r] ? { t: 'Rule ' + r, d: RULE_HINTS[r] } : null;
+  }
+  if (key.slice(0, 3) === 'el:' && HINTS[key]) {
+    var e = HINTS[key], doc = docOf(key.slice(3));
+    // the plain sentence first; the schema's own words under it, for the physics
+    return { t: e.t, d: e.d, k: e.k, more: doc && doc.blurb && doc.blurb !== e.d ? doc.blurb : '' };
+  }
+  return HINTS[key] || null;
+}
+// The element a hover or a focus belongs to: the nearest ancestor carrying `data-hint`,
+// or the stage itself, which draws its own hint from the hit and must not be hidden by
+// the pointer crossing into one of its thousands of marks.  No `closest`: the shim has
+// none, and six levels is every control on this page.
+function hintOwner(el) {
+  for (var i = 0; el && i < 8; i++) {
+    if (el.getAttribute && el.getAttribute('data-hint')) return el;
+    if (el.getAttribute && el.getAttribute('id') === 'svg') return el;
+    el = el.parentNode;
+  }
+  return null;
+}
+function hintFrom(el, cx, cy) {
+  var owner = hintOwner(el);
+  if (!owner) { hintHide(); return null; }
+  if (owner.getAttribute('id') === 'svg') return null;
+  var key = owner.getAttribute('data-hint');
+  var entry = hintFor(key);
+  if (!entry) { hintHide(); return null; }
+  var x = cx, y = cy;
+  if (x === undefined && owner.getBoundingClientRect) {
+    var r = owner.getBoundingClientRect();
+    x = r.left; y = r.bottom;
+  }
+  hintShow(entry, x, y);
+  return key;
+}
+// The card at (x, y), flipped away from whichever window edge it would otherwise leave.
+// Text only, never markup: a component's blurb and an id typed by the user end up here.
+function hintShow(entry, x, y) {
+  var card = $('hint');
+  if (!card) return;
+  var T = $('hintT'), Dd = $('hintD'), K = $('hintK');
+  if (T) T.textContent = entry.t || '';
+  if (Dd) Dd.textContent = (entry.d || '') + (entry.more ? '  \u2014  ' + entry.more : '');
+  if (K) K.textContent = entry.k || '';
+  var iw = (typeof innerWidth === 'number' && innerWidth > 0) ? innerWidth : 1600;
+  var ih = (typeof innerHeight === 'number' && innerHeight > 0) ? innerHeight : 1000;
+  x = (x === undefined ? 0 : x); y = (y === undefined ? 0 : y);
+  var flipX = x > iw - 340, flipY = y > ih - 140;
+  if (card.style) {
+    card.style.display = '';
+    card.style.left = flipX ? 'auto' : (x + 14) + 'px';
+    card.style.right = flipX ? (iw - x + 10) + 'px' : 'auto';
+    card.style.top = flipY ? 'auto' : (y + 16) + 'px';
+    card.style.bottom = flipY ? (ih - y + 10) + 'px' : 'auto';
+  }
+  card.setAttribute('data-on', '1');
+}
+function hintHide() {
+  var card = $('hint');
+  if (!card) return;
+  if (card.style) card.style.display = 'none';
+  card.setAttribute('data-on', '0');
+}
+// WHAT IS UNDER THE POINTER, in words: the kind, the id, and the facts a newcomer wants --
+// what zone it is, how many ions fit, how many are there right now (read off the replay
+// at the current frame).  Nothing while a drag or a placement is in progress: the HUD
+// speaks then.
+function stageHint(h, cx, cy) {
+  if (!h || DOWN || GHOST || PGHOST || BAND) { hintHide(); return null; }
+  var entry = null, dev = STATE && STATE.device;
+  if (h.kind === 'site' || h.kind === 'junction') {
+    // the page's own node record: the capacity and the degree the picture was drawn with
+    var n = nodeById[h.id], base = HINTS[n && n.kind === 'junction' ? 'el:junction' : 'el:site'];
+    if (!n) { hintHide(); return null; }
+    var here = 0;
+    if (typeof states !== 'undefined' && typeof frame !== 'undefined' && states[frame] && states[frame].pos) {
+      var pos = states[frame].pos, ion;
+      for (ion in pos) if (has(pos, ion) && pos[ion] === h.id) here++;
+    }
+    var deg = n.deg || 0, cap = n.cap || 0;
+    entry = n.kind === 'junction'
+      ? { t: base.t + ' ' + h.id, d: deg + ' rail' + (deg === 1 ? '' : 's') + ' meet here. Ions pass through and never rest in it.' }
+      : { t: base.t + ' ' + h.id, d: 'zone ' + (n.zone || '—') + ' · holds up to ' + cap +
+             ' ion' + (cap === 1 ? '' : 's') + ' · ' + here + ' here now · ' + deg + ' rail' + (deg === 1 ? '' : 's') + ' attached',
+          k: 'drag to move · shift-drag onto another site to join' };
+  } else if (h.kind === 'segment') {
+    var sg = dev && dev.segments[h.id];
+    if (!sg) { hintHide(); return null; }
+    entry = { t: 'Segment ' + h.id, d: sg.a + ' ↔ ' + sg.b + ' · length ' + fmt(sg.length, 2) +
+             (sg.loop ? ' · part of loop ' + sg.loop : ''), k: 'drag to move both ends' };
+  } else if (h.kind === 'loop') {
+    var lp = dev && dev.loops[h.id];
+    if (!lp) { hintHide(); return null; }
+    entry = { t: 'Loop ' + h.id, d: lp.nodes.length + ' sites in a ring. One instruction rotates every ion on it by one step.', k: 'drag to move the whole ring' };
+  } else { hintHide(); return null; }
+  hintShow(entry, cx, cy);
+  return entry;
+}
+
+// EXPLAIN MODE labels the regions.  The state is an attribute on <body>, which the
+// stylesheet keys on and a harness can read; the captions are rendered once from HINTS.
+var EXPLAIN = false;
+function explainToggle(on) {
+  EXPLAIN = (on === undefined) ? !EXPLAIN : !!on;
+  if (document.body && document.body.setAttribute) document.body.setAttribute('data-explain', EXPLAIN ? '1' : '0');
+  var b = $('eExplain');
+  if (b) b.setAttribute('aria-pressed', EXPLAIN ? 'true' : 'false');
+  // the legend is part of the explanation: open it with the captions, leave it as found
+  var lf = $('legendFold');
+  if (lf && EXPLAIN && lf.setAttribute) lf.setAttribute('open', 'open');
+  return EXPLAIN;
+}
+function renderCaptions() {
+  var ids = { capTools: 'region:tools', capRail: 'region:rail', capStage: 'region:stage', capBar: 'region:bar', capProg: 'region:prog', capDock: 'region:dock' };
+  for (var id in ids) if (has(ids, id)) {
+    var el = $(id), e = HINTS[ids[id]];
+    if (!el || !e) continue;
+    el.replaceChildren();
+    var b = elh('b'); b.textContent = e.t; el.append(b);
+    var t = elh('span'); t.textContent = e.d; el.append(t);
+  }
+}
+
+// THE RAIL FOLDS ITS EXPERT SECTIONS AWAY.  Four tiles and the zone chips are what a
+// first device needs; the physics settings and the whole-part components are there, one
+// click down, with a count on the fold so nothing looks missing.  The fold state is the
+// user's for the life of the page -- `renderPalette` runs on every paint and would
+// otherwise snap an opened fold shut on the next drag.
+var PAL_OPEN = { row: false, block: false, component: false };
+function foldSection(kind, node, count) {
+  var det = elh('details', 'palfold');
+  det.setAttribute('data-fold', kind);
+  if (PAL_OPEN[kind]) det.setAttribute('open', 'open');
+  var sm = elh('summary');
+  sm.textContent = (SECTION[kind] || kind) + (count ? ' \u00b7 ' + count : '');
+  det.append(sm, node);
+  if (det.addEventListener) det.addEventListener('toggle', function () { setFold(kind, !!det.open); });
+  return det;
+}
+function setFold(kind, open) { PAL_OPEN[kind] = !!open; return PAL_OPEN[kind]; }
+
+// ------------------------------------------------------------------- the course
+//
+// LESSONS ARE DATA; THE ENGINE IS SMALL.  `tutorial.js` registers a table of lessons after
+// this file has booted.  A lesson's SETUP is a list of editor verbs applied in order -- the
+// same verbs the pointer adapters call -- so loading a lesson is indistinguishable from a
+// user building the device by hand and can be undone the same way.  Its CHECK is an
+// expression over the page's own measurements (`[name, ...args]`, evaluated by `CHECKS`),
+// never a second reading of any rule or price.  What a pass says is generated from the
+// facts the check gathered, so praise is always true and always specific; what a failure
+// says is a nudge keyed to the predicate that failed, never a mark.
+var COURSE = null;
+var COURSE_KEY = 'qccd.studio.tutorial';
+var LSTATE = { id: null, stage: 0, attempts: 0, hints: 0, recorded: {}, feedback: null,
+               answer: null, passed: false, shown: false };
+
+function courseProgress() {
+  var raw = null;
+  try { raw = STORE.getItem(COURSE_KEY); } catch (err) { raw = null; }
+  var p = null;
+  try { p = raw ? JSON.parse(raw) : null; } catch (err) { p = null; }
+  if (!p || typeof p !== 'object') p = {};
+  if (!p.stars) p.stars = {};
+  if (!p.best) p.best = {};
+  return p;
+}
+function courseSave(p) { try { STORE.setItem(COURSE_KEY, JSON.stringify(p)); } catch (err) { /* no store */ } }
+
+function lessonsReady(t) {
+  if (!t || !t.lessons || !t.lessons.length) return 0;
+  COURSE = t;
+  var prog = courseProgress();
+  if (prog.current && lessonById(prog.current)) LSTATE.id = prog.current;
+  renderLearn();
+  renderLessonStrip();
+  return t.lessons.length;
+}
+function lessonById(id) {
+  if (!COURSE) return null;
+  for (var i = 0; i < COURSE.lessons.length; i++) if (COURSE.lessons[i].id === id) return COURSE.lessons[i];
+  return null;
+}
+function lessonIndex(id) {
+  if (!COURSE) return -1;
+  for (var i = 0; i < COURSE.lessons.length; i++) if (COURSE.lessons[i].id === id) return i;
+  return -1;
+}
+function partById(id) {
+  if (!COURSE) return null;
+  for (var i = 0; i < COURSE.parts.length; i++) if (COURSE.parts[i].id === id) return COURSE.parts[i];
+  return null;
+}
+function lessonList() {
+  if (!COURSE) return [];
+  var prog = courseProgress();
+  return COURSE.lessons.map(function (L) {
+    return { id: L.id, part: L.part, title: L.title, stars: prog.stars[L.id] || 0,
+             breaks: L.breaks || null, page: L.page || null,
+             stageBreaks: L.stages ? L.stages.map(function (s) { return s.breaks || null; }) : null,
+             verdict: !!(L.verdict || (L.stages || []).some(function (s) { return !!s.verdict; })) };
+  });
+}
+function lessonState() {
+  return { id: LSTATE.id, stage: LSTATE.stage, attempts: LSTATE.attempts, hints: LSTATE.hints,
+           passed: LSTATE.passed, shown: LSTATE.shown, feedback: LSTATE.feedback,
+           stars: LSTATE.id ? (courseProgress().stars[LSTATE.id] || 0) : 0 };
+}
+
+// A setup or a solution is a list of `[verb, ...args]`; each verb is a function on the
+// API, so there is no second vocabulary to keep in step with the pointer adapters.
+function runSteps(steps) {
+  steps = steps || [];
+  for (var i = 0; i < steps.length; i++) {
+    var st = steps[i], verb = st[0], f = API[verb];
+    if (typeof f !== 'function') {
+      return { ok: false, problems: [{ code: 'no_verb', message: 'the lesson names a verb this page does not have: ' + verb }] };
+    }
+    var r;
+    try { r = f.apply(null, st.slice(1)); }
+    catch (err) { return { ok: false, problems: [{ code: 'threw', message: verb + ' threw: ' + (err && err.message ? err.message : err) }] }; }
+    if (r && r.ok === false) {
+      return { ok: false, problems: [{ code: 'refused', message: verb + ': ' + (((r.problems || [])[0] || {}).message || 'refused') }] };
+    }
+  }
+  return { ok: true };
+}
+// the facts the lesson may refer back to ("cost fell from {cost0}")
+function courseFacts() {
+  var f = { sites: 0, junctions: 0, segments: 0, loops: 0, frames: P.frames.length, edits: EDITS.length };
+  if (STATE && STATE.device) {
+    var id;
+    for (id in STATE.device.nodes) if (has(STATE.device.nodes, id)) {
+      if (STATE.device.nodes[id].kind === 'junction') f.junctions++; else f.sites++;
+    }
+    f.segments = Object.keys(STATE.device.segments || {}).length;
+    f.loops = Object.keys(STATE.device.loops || {}).length;
+  }
+  if (PRICE && !PRICE.blocked) {
+    f.cost = PRICE.totals.cost; f.steps = PRICE.totals.steps; f.us = PRICE.totals.us;
+    f.transits = PRICE.transits; f.peak = PRICE.peak;
+  }
+  if (HW) { f.dacs = HW.dacs; f.scheme = HW.scheme; f.electrodes = HW.electrodes; f.switches = HW.switches; }
+  if (typeof frame === 'number') f.frame = frame;
+  return f;
+}
+
+function lessonLoad(id) {
+  var L = lessonById(id);
+  if (!L) return { ok: false, problems: [{ code: 'no_lesson', message: 'no lesson ' + id }] };
+  if (GHOST) cancel();
+  if (ARMED_EL) arm(null);
+  if (FORM) openForm(null);
+  LSTATE = { id: id, stage: 0, attempts: 0, hints: 0, recorded: {}, feedback: null,
+             answer: null, passed: false, shown: false };
+  var r = runSteps(L.setup);
+  if (r.ok) r = enterStage(L, 0);
+  if (!r.ok) {
+    LSTATE.feedback = { kind: 'bad', text: 'this lesson could not be set up: ' + r.problems[0].message };
+    renderLearn();
+    return r;
+  }
+  LSTATE.recorded = courseFacts();
+  var prog = courseProgress();
+  prog.current = id;
+  courseSave(prog);
+  setSelection([]);
+  renderLearn();
+  renderLessonStrip();
+  return { ok: true, id: id, stages: L.stages ? L.stages.length : 1 };
+}
+function loadCase(id, which) {
+  var c = (D.tutorial_cases || {})[id];
+  if (!c) return { ok: false, problems: [{ code: 'no_case', message: 'this page carries no prepared case ' + id }] };
+  var r = newFromGenerator(c.device.generator, c.device.params, { name: c.device.name });
+  if (!r.ok) return r;
+  setProgram((which === 'fixed' ? c.fixed : c.program) || []);
+  return { ok: true, id: id, which: which === 'fixed' ? 'fixed' : 'program' };
+}
+function shippedVerdict(id, which) {
+  var v = (D.tutorial_verdicts || {})[id];
+  return v ? (v[which || 'loaded'] || null) : null;
+}
+function verdictState(summary, rule) {
+  summary = summary || {};
+  if ((summary.failed || []).indexOf(rule) >= 0) return 'failed';
+  if (has(summary.partial || {}, rule)) return 'partial';
+  if (has(summary.skipped || {}, rule)) return 'skipped';
+  if ((summary.passed || []).indexOf(rule) >= 0) return 'passed';
+  return 'unknown';
+}
+// a stage may load its own device and programme; entering it runs that setup
+function enterStage(L, k) {
+  LSTATE.stage = k;
+  var st = L && L.stages ? L.stages[k] : null;
+  if (st && st.setup) {
+    var r = runSteps(st.setup);
+    if (!r.ok) return r;
+    setSelection([]);
+  }
+  return { ok: true };
+}
+function lessonTask(L) {
+  if (!L) return null;
+  if (L.stages) return L.stages[Math.min(LSTATE.stage, L.stages.length - 1)];
+  return { exercise: L.exercise, check: L.check };
+}
+function lessonTotalStages(L) { return L && L.stages ? L.stages.length : 1; }
+
+// ---- the check vocabulary -----------------------------------------------------------
+// Each predicate returns {ok, why, facts}; `why` names what is missing in the user's
+// terms and `facts` is what a pass may quote.  `all`/`any`/`not` compose them.
+function lastPos() {
+  if (typeof states === 'undefined' || !states.length) return null;
+  return states[states.length - 1].pos || null;
+}
+function rec(key) { return LSTATE.recorded ? LSTATE.recorded[key] : undefined; }
+function num(v, key) { return v === 'setup' ? rec(key) : Number(v); }
+var CHECKS = {
+  all: function () {
+    var facts = {}, i;
+    for (i = 0; i < arguments.length; i++) {
+      var r = evalCheck(arguments[i]);
+      var k; for (k in r.facts) if (has(r.facts, k)) facts[k] = r.facts[k];
+      if (!r.ok) { r.facts = facts; return r; }
+    }
+    return { ok: true, facts: facts };
+  },
+  any: function () {
+    var last = null;
+    for (var i = 0; i < arguments.length; i++) { var r = evalCheck(arguments[i]); if (r.ok) return r; last = r; }
+    return last || { ok: false, why: 'nothing to check', facts: {} };
+  },
+  not: function (spec) { var r = evalCheck(spec); return { ok: !r.ok, why: r.ok ? 'that is still true' : '', pred: r.pred, facts: r.facts }; },
+  sites: function (n) { var f = courseFacts(); return { ok: f.sites === n, why: 'sites', have: f.sites, facts: { sites: f.sites } }; },
+  junctions: function (n) { var f = courseFacts(); return { ok: f.junctions === n, why: 'junctions', have: f.junctions, facts: { junctions: f.junctions } }; },
+  segments: function (n) { var f = courseFacts(); return { ok: f.segments === n, why: 'rails', have: f.segments, facts: { segments: f.segments } }; },
+  loops: function (n, closed) {
+    var lp = (STATE && STATE.device && STATE.device.loops) || {}, k = 0, id;
+    for (id in lp) if (has(lp, id) && (closed === undefined || !!lp[id].closed === !!closed)) k++;
+    return { ok: k === n, why: 'loops', have: k, facts: { loops: k } };
+  },
+  zoneCapacity: function (z, n) {
+    var zt = (STATE && STATE.zone_types) || {}, have = zt[z] ? zt[z].capacity : null;
+    return { ok: have === n, why: 'zone capacity', have: have, facts: { cap: have, zone: z } };
+  },
+  anyNodeZone: function (z) {
+    var ns = (STATE && STATE.device && STATE.device.nodes) || {}, id;
+    for (id in ns) if (has(ns, id) && ns[id].zone === z) return { ok: true, facts: { zone: z } };
+    return { ok: false, why: 'no site in zone ' + z, facts: {} };
+  },
+  wiring: function (scheme) { return { ok: !!HW && HW.scheme === scheme, why: 'wiring', have: HW ? HW.scheme : null, facts: { scheme: HW ? HW.scheme : null } }; },
+  dacsAbove: function (v) { var d = HW ? HW.dacs : null, ref = num(v, 'dacs'); return { ok: d !== null && d > ref, why: 'DACs', have: d, facts: { dacs: d, dacs0: ref } }; },
+  dacsBelow: function (v) { var d = HW ? HW.dacs : null, ref = num(v, 'dacs'); return { ok: d !== null && d < ref, why: 'DACs', have: d, facts: { dacs: d, dacs0: ref } }; },
+  dacsSame: function (v) { var d = HW ? HW.dacs : null, ref = num(v, 'dacs'); return { ok: d !== null && d === ref, why: 'DACs moved', have: d, facts: { dacs: d, dacs0: ref } }; },
+  electrodesAbove: function (v) { var e = HW ? HW.electrodes : null, ref = num(v, 'electrodes'); return { ok: e !== null && e > ref, why: 'electrodes', have: e, facts: { electrodes: e, electrodes0: ref } }; },
+  selected: function (want) {
+    var s = SELSET.length ? SELSET[0] : null;
+    if (!s) return { ok: false, why: 'nothing selected', have: null, facts: {} };
+    var n = nodeById[s.id];
+    if (want.id !== undefined) return { ok: s.id === want.id, why: 'wrong element', have: s.id, facts: { selected: s.id } };
+    if (want.kind === 'junction') return { ok: !!n && n.kind === 'junction', why: 'not a junction', have: s.id, facts: { selected: s.id } };
+    if (want.kind === 'site') return { ok: !!n && n.kind !== 'junction', why: 'not a site', have: s.id, facts: { selected: s.id } };
+    return { ok: s.kind === want.kind, why: 'wrong kind', have: s.kind, facts: { selected: s.id } };
+  },
+  frames: function (min, max) { var n = P.frames.length; return { ok: n >= min && (max === undefined || n <= max), why: 'instructions', have: n, facts: { frames: n } }; },
+  ionAt: function (ion, site) { var pos = lastPos(); var at = pos ? pos[ion] : null; return { ok: at === site, why: 'where ' + ion + ' ends', have: at, facts: { ion: ion, at: at } }; },
+  ionsPresent: function (ions) {
+    var pos = lastPos() || {}, missing = [];
+    for (var i = 0; i < ions.length; i++) if (!has(pos, ions[i])) missing.push(ions[i]);
+    return { ok: !missing.length, why: 'missing ions', have: missing.join(', '), facts: {} };
+  },
+  occupancy: function (site, n) {
+    var pos = lastPos() || {}, k = 0, ion;
+    for (ion in pos) if (has(pos, ion) && pos[ion] === site) k++;
+    return { ok: k === n, why: 'ions in ' + site, have: k, facts: { occupancy: k } };
+  },
+  gateBetween: function (a, b, name) {
+    for (var i = 0; i < P.frames.length; i++) {
+      var f = P.frames[i];
+      if (f.type !== 'gate' || (name && f.gate !== name)) continue;
+      var pp = f.pairs || [];
+      for (var j = 0; j < pp.length; j++) {
+        if ((pp[j][0] === a && pp[j][1] === b) || (pp[j][0] === b && pp[j][1] === a)) return { ok: true, facts: { gate: f.gate, pair: a + ',' + b, gateFrame: i } };
+      }
+    }
+    return { ok: false, why: 'no ' + (name || 'gate') + ' between ' + a + ' and ' + b, facts: {} };
+  },
+  measured: function (ions) {
+    var seen = {}, i, j;
+    for (i = 0; i < P.frames.length; i++) if (P.frames[i].type === 'measure') for (j = 0; j < (P.frames[i].ions || []).length; j++) seen[P.frames[i].ions[j]] = 1;
+    var missing = ions.filter(function (x) { return !seen[x]; });
+    return { ok: !missing.length, why: 'not measured', have: missing.join(', '), facts: {} };
+  },
+  cooled: function () { for (var i = 0; i < P.frames.length; i++) if (P.frames[i].type === 'cool') return { ok: true, facts: { coolFrame: i } }; return { ok: false, why: 'no cooling', facts: {} }; },
+  lowered: function () {
+    var errs = lowerErrors();
+    if (PARSE_ERRS.length) return { ok: false, why: 'the programme does not parse', have: PARSE_ERRS[0].message, facts: {} };
+    if (errs.length) return { ok: false, why: 'the programme was refused', have: errs[0].message, facts: {} };
+    if (!P.frames.length) return { ok: false, why: 'no instructions', have: 0, facts: {} };
+    return { ok: true, facts: { frames: P.frames.length } };
+  },
+  rulesPass: function () {
+    var low = CHECKS.lowered(); if (!low.ok) return low;
+    if (PRICE && PRICE.blocked) return { ok: false, why: 'the price is blocked', have: (PRICE.blocked[0] || {}).message, facts: {} };
+    var cov = ruleCoverage(), bad = cov.filter(function (c) { return c.state === 'failed'; });
+    if (bad.length) {
+      var m = ((RULES && RULES.messages) || []).filter(function (v) { return v.rule === bad[0].rule; })[0];
+      return { ok: false, why: bad[0].rule + ' fails', have: m ? m.message : bad[0].statement, rule: bad[0].rule, facts: {} };
+    }
+    var f = courseFacts();
+    return { ok: true, facts: { cost: f.cost, steps: f.steps, frames: f.frames, rulesChecked: cov.filter(function (c) { return c.state === 'checked'; }).length } };
+  },
+  ruleFails: function (r) {
+    var cov = ruleCoverage().filter(function (c) { return c.rule === r; })[0];
+    return { ok: !!cov && cov.state === 'failed', why: r + ' does not fail', have: cov ? cov.state : 'unknown', facts: { rule: r } };
+  },
+  ruleState: function (r, state) {
+    var cov = ruleCoverage().filter(function (c) { return c.rule === r; })[0];
+    return { ok: !!cov && cov.state === state, why: r + ' is ' + (cov ? cov.state : 'unknown'), have: cov ? cov.state : null, facts: { rule: r } };
+  },
+  instructionsAtMost: function (n) { return { ok: P.frames.length <= n, why: 'too many instructions', have: P.frames.length, facts: { frames: P.frames.length } }; },
+  stepsAtMost: function (n) { var f = courseFacts(); return { ok: f.steps !== undefined && f.steps <= n, why: 'too many steps', have: f.steps, facts: { steps: f.steps } }; },
+  costAtMost: function (x) { var f = courseFacts(); return { ok: f.cost !== undefined && f.cost <= x, why: 'too costly', have: f.cost, facts: { cost: f.cost } }; },
+  costBelow: function (v) { var f = courseFacts(), ref = num(v, 'cost'); return { ok: f.cost !== undefined && ref !== undefined && f.cost < ref, why: 'cost', have: f.cost, facts: { cost: f.cost, cost0: ref } }; },
+  transitsAtMost: function (n) { var f = courseFacts(); return { ok: f.transits !== undefined && f.transits <= n, why: 'junction transits', have: f.transits, facts: { transits: f.transits } }; },
+  runtimeAtMost: function (us) { var f = courseFacts(); return { ok: f.us !== undefined && f.us <= us, why: 'runtime', have: f.us, facts: { us: f.us } }; },
+  runtimeBelow: function (v) { var f = courseFacts(), ref = num(v, 'us'); return { ok: f.us !== undefined && ref !== undefined && f.us < ref, why: 'runtime', have: f.us, facts: { us: f.us, us0: ref } }; },
+  peakAbove: function (v) { var f = courseFacts(), ref = num(v, 'peak'); return { ok: f.peak !== undefined && ref !== undefined && f.peak > ref, why: 'peak heating', have: f.peak, facts: { peak: f.peak, peak0: ref } }; },
+  editsAtMost: function (n) { return { ok: EDITS.length <= n, why: 'gestures', have: EDITS.length, facts: { edits: EDITS.length } }; },
+  frameIs: function (which) {
+    var want = frameFor(which);
+    if (want < 0 && typeof which === 'string' && which.slice(0, 9) === 'realises:') {
+      return { ok: false, why: 'this lesson runs on the compiled page', have: D.source ? 'no instruction realises that statement' : 'not a compiled page', facts: {} };
+    }
+    var now = (typeof frame === 'number') ? frame : -1;
+    var cost = (PRICE && PRICE.perFrame && PRICE.perFrame[now]) ? PRICE.perFrame[now][0] : undefined;
+    return { ok: now === want, why: 'instruction', have: now, facts: { frame: now, cost: cost } };
+  },
+  answer: function (x) { return { ok: LSTATE.answer === x, why: 'answer', have: LSTATE.answer, facts: { answer: LSTATE.answer } }; },
+  // every ion that started on `loop` ends `delta` sites along it (mod the loop's length)
+  rotated: function (loop, delta) {
+    var lp = (STATE && STATE.device && STATE.device.loops) ? STATE.device.loops[loop] : null;
+    var f0 = P.frames[0], pos = lastPos();
+    if (!lp || !f0 || f0.type !== 'init' || !pos) return { ok: false, why: 'the loop has not turned', have: 'no ions on it', facts: {} };
+    var seq = lp.nodes, k = seq.length, idx = {}, i, n = 0, bad = null, ion;
+    for (i = 0; i < k; i++) idx[seq[i]] = i;
+    var want = ((delta % k) + k) % k;
+    for (ion in f0.place) if (has(f0.place, ion) && idx[f0.place[ion]] !== undefined) {
+      n++;
+      var to = pos[ion];
+      if (idx[to] === undefined || (((idx[to] - idx[f0.place[ion]]) % k) + k) % k !== want) { if (!bad) bad = ion + ' at ' + to; }
+    }
+    return { ok: n > 0 && !bad, why: 'the loop has not turned by ' + delta, have: bad || 'no ions on it', facts: { loop: loop, delta: delta, ions: n } };
+  },
+  // a gate named `name` fired at `site`: declared on the instruction, or where its ions sat
+  gateAt: function (name, site) {
+    for (var i = 0; i < P.frames.length; i++) {
+      var f = P.frames[i];
+      if (f.type !== 'gate' || f.gate !== name) continue;
+      if ((f.sites || []).indexOf(site) >= 0) return { ok: true, facts: { gate: name, site: site } };
+      var pos = (typeof states !== 'undefined' && states[i]) ? (states[i].pos || {}) : {}, pp = f.pairs || [];
+      for (var j = 0; j < pp.length; j++) if (pos[pp[j][0]] === site || pos[pp[j][1]] === site) return { ok: true, facts: { gate: name, site: site } };
+    }
+    return { ok: false, why: 'no ' + name + ' at ' + site, facts: {} };
+  },
+  gateCount: function (name, min) {
+    var n = 0;
+    for (var i = 0; i < P.frames.length; i++) if (P.frames[i].type === 'gate' && P.frames[i].gate === name) n++;
+    return { ok: n >= min, why: name + ' gates', have: n, facts: { gates: n } };
+  },
+  hasFrame: function (type) {
+    for (var i = 0; i < P.frames.length; i++) if (P.frames[i].type === type) return { ok: true, facts: {} };
+    return { ok: false, why: 'no ' + type + ' instruction', facts: {} };
+  },
+  classUsed: function (cls) {
+    for (var i = 0; i < P.frames.length; i++) if (P.frames[i].type === 'simd' && P.frames[i].cls === cls) return { ok: true, facts: { cls: cls } };
+    return { ok: false, why: 'no move of class ' + cls, facts: {} };
+  },
+  // Python's verdict, shipped with the page for a prepared case
+  shipped: function (id, which, rule, state) {
+    var v = shippedVerdict(id, which);
+    if (!v) return { ok: false, why: 'no shipped verdict for ' + id, have: null, facts: {} };
+    var s = (v.focus && v.focus.rule === rule) ? v.focus.state : verdictState(v.rules, rule);
+    return { ok: s === state, why: rule + ' is ' + s + ' in Python\u2019s verdict', have: s,
+             facts: { rule: rule, state: s, gateError: v.metrics ? v.metrics.gate_error_sum : undefined } };
+  },
+  // the price is withheld: the programme asks for something the device cannot price
+  priceBlocked: function () {
+    var b = (PRICE && PRICE.blocked && PRICE.blocked.length) ? PRICE.blocked[0] : null;
+    return { ok: !!b, why: 'the price is not blocked', have: b ? (b.message || breakMessage(b)) : null,
+             facts: { blocked: b ? (b.kind || b.code || '') : '' } };
+  },
+  // the language refused a statement, with a message naming `sub`
+  refused: function (sub) {
+    var msgs = PARSE_ERRS.concat(lowerErrors()).map(function (e) { return String((e && e.message) || ''); });
+    var hit = msgs.filter(function (m) { return m.indexOf(sub) >= 0; });
+    return { ok: hit.length > 0, why: 'nothing refused naming ' + sub, have: msgs[0] || 'nothing refused',
+             facts: { refusal: hit[0] || '' } };
+  },
+  // the programme claims `key` = `value` (R9's subject)
+  claimIs: function (key, value) {
+    var have;
+    for (var i = 0; i < PROG.length; i++) if (PROG[i].method === 'claim' && PROG[i].kwargs && has(PROG[i].kwargs, key)) have = PROG[i].kwargs[key];
+    return { ok: have !== undefined && Number(have) === Number(value), why: 'the claim for ' + key,
+             have: have === undefined ? 'no claim' : have, facts: { claimKey: key, claim: have } };
+  },
+  // Part D: the answer names the device the measured table says is smaller on `metric`
+  measuredLess: function (kind, metric, a, b) {
+    var ra = measuredRow(kind, a), rb = measuredRow(kind, b);
+    if (!ra || !rb) return { ok: false, why: 'no measured result for ' + (ra ? b : a), have: null, facts: {} };
+    var win = Number(ra[metric]) < Number(rb[metric]) ? a : Number(rb[metric]) < Number(ra[metric]) ? b : null;
+    return { ok: !!win && LSTATE.answer === win, why: 'answer', have: LSTATE.answer,
+             facts: { winner: win, a: a, b: b, va: ra[metric], vb: rb[metric] } };
+  },
+  measuredSame: function (kind, metric, a, b) {
+    var ra = measuredRow(kind, a), rb = measuredRow(kind, b);
+    if (!ra || !rb) return { ok: false, why: 'no measured result for ' + (ra ? b : a), have: null, facts: {} };
+    return { ok: Number(ra[metric]) === Number(rb[metric]), why: metric + ' differs', have: ra[metric] + ' vs ' + rb[metric],
+             facts: { va: ra[metric], vb: rb[metric] } };
+  },
+  dacsAtMost: function (n) { var d = HW ? HW.dacs : null; return { ok: d !== null && d <= n, why: 'DACs', have: d, facts: { dacs: d } }; },
+  broadcastCool: function () { for (var i = 0; i < P.frames.length; i++) if (P.frames[i].type === 'cool' && P.frames[i].broadcast) return { ok: true, why: 'a cooling pulse is broadcast to every ion', have: 'broadcast', facts: {} }; return { ok: false, why: 'no broadcast cooling', have: 'targeted', facts: {} }; },
+  // the replay put `ion` on `site` at some point
+  visited: function (ion, site) {
+    if (typeof states === 'undefined') return { ok: false, why: 'no replay', facts: {} };
+    for (var i = 0; i < states.length; i++) if ((states[i].pos || {})[ion] === site) return { ok: true, facts: { ion: ion, site: site, visitFrame: i } };
+    return { ok: false, why: ion + ' never reached ' + site, facts: {} };
+  }
+};
+function evalCheck(spec) {
+  if (!spec || !spec.length) return { ok: false, why: 'no check', facts: {} };
+  var name = spec[0], f = CHECKS[name];
+  if (typeof f !== 'function') return { ok: false, why: 'unknown check ' + name, facts: {} };
+  var r = f.apply(null, spec.slice(1));
+  if (!r.pred) r.pred = name;
+  if (!r.facts) r.facts = {};
+  return r;
+}
+
+// ---- the feedback ---------------------------------------------------------------------
+function checkUses(spec, name) {
+  if (!spec || typeof spec !== 'object') return false;
+  if (spec[0] === name) return true;
+  for (var i = 1; i < spec.length; i++) if (checkUses(spec[i], name)) return true;
+  return false;
+}
+function fillFacts(tpl, facts) {
+  return String(tpl || '').replace(/\{(\w+)\}/g, function (m, k) {
+    var v = facts[k];
+    if (v === undefined || v === null) return m;
+    return typeof v === 'number' ? fmt(v, 2) : String(v);
+  });
+}
+function pickNudge(L, r) {
+  var pool = (L.nudges && (L.nudges[r.pred] || L.nudges['default'])) || ['Not there yet.'];
+  var i = (LSTATE.attempts - 1) % pool.length;
+  var facts = {}, fk;
+  for (fk in (r.facts || {})) if (has(r.facts, fk)) facts[fk] = r.facts[fk];
+  facts.have = r.have === undefined || r.have === null ? '?' : r.have;
+  var text = fillFacts(pool[i], facts);
+  if (r.have !== undefined && r.have !== null && r.why && text.indexOf(String(r.have)) < 0 && r.pred !== 'selected' && r.pred !== 'answer' && r.pred !== 'measuredLess') {
+    text += ' (' + r.why + ': ' + r.have + ')';
+  }
+  return text;
+}
+// THE CELEBRATION: the praise, made of the facts that earned it; the stage plays the
+// user's own programme back; a green sweep runs over the canvas (an attribute the
+// stylesheet animates -- nothing behavioural rides on it).
+function cheer() {
+  var st = $('canvas');
+  if (!st || !st.setAttribute) return;
+  st.setAttribute('data-cheer', '1');
+  var off = function () { st.setAttribute('data-cheer', '0'); };
+  if (SYNC) off(); else setTimeout(off, 1400);
+  if (P.frames.length && typeof seek === 'function' && !SYNC) seek(0, { play: true });
+}
+function awardStar(id, n) {
+  var prog = courseProgress();
+  if ((prog.stars[id] || 0) < n) prog.stars[id] = n;
+  courseSave(prog);
+  return prog.stars[id];
+}
+function partDone(part) {
+  if (!COURSE) return false;
+  var prog = courseProgress();
+  for (var i = 0; i < COURSE.lessons.length; i++) {
+    if (COURSE.lessons[i].part === part && !(prog.stars[COURSE.lessons[i].id] > 0)) return false;
+  }
+  return true;
+}
+
+function lessonCheck() {
+  var L = lessonById(LSTATE.id);
+  if (!L) return { ok: false, why: 'no lesson loaded' };
+  var task = lessonTask(L), r;
+  if (!LSTATE.passed) {
+    r = evalCheck(task.check);
+    var facts = r.facts || {}, k, base = courseFacts();
+    for (k in base) if (has(base, k) && facts[k] === undefined) facts[k] = base[k];
+    var k0;
+    for (k0 in LSTATE.recorded) if (has(LSTATE.recorded, k0) && facts[k0 + '0'] === undefined) facts[k0 + '0'] = LSTATE.recorded[k0];
+    if (r.ok) {
+      LSTATE.attempts = 0;
+      if (L.stages && LSTATE.stage < L.stages.length - 1) {
+        var en = enterStage(L, LSTATE.stage + 1), fresh = !!(L.stages[LSTATE.stage] && L.stages[LSTATE.stage].setup);
+        LSTATE.recorded = courseFacts();
+        LSTATE.feedback = en.ok
+          ? { kind: 'ok', text: 'Yes. ' + (L.stages.length - LSTATE.stage) + ' to go' + (fresh ? ' -- a new programme is loaded: ' : ': ') + plain(lessonTask(L).exercise) }
+          : { kind: 'bad', text: 'the next step could not be set up: ' + en.problems[0].message };
+      } else {
+        LSTATE.passed = true;
+        var stars = LSTATE.shown ? 0 : awardStar(L.id, 1);
+        var text = fillFacts(L.praise || 'Done.', facts);
+        if (!LSTATE.shown && partDone(L.part)) {
+          var pt = partById(L.part);
+          if (pt && pt.milestone) text += '\n\n' + pt.milestone;
+        }
+        LSTATE.feedback = { kind: 'ok', text: text, stars: stars };
+        cheer();
+      }
+    } else {
+      LSTATE.attempts++;
+      var nudge = pickNudge(L, r);
+      // the third miss opens the next hint on its own: nobody should have to ask
+      if (LSTATE.attempts >= 3 && L.hints && LSTATE.hints < L.hints.length) LSTATE.hints++;
+      LSTATE.feedback = { kind: 'bad', text: nudge };
+    }
+  } else {
+    // the lesson is passed: the boundary and the challenge are the second and third stars,
+    // earned in order, and never after the solution was shown -- a star says "you did it"
+    var have = courseProgress().stars[L.id] || 0;
+    var extra = LSTATE.shown || have < 1 ? null
+              : (L.boundary && have < 2) ? L.boundary
+              : (L.challenge && have < (L.boundary ? 3 : 2)) ? L.challenge : null;
+    if (!extra) {
+      LSTATE.feedback = { kind: 'ok', text: LSTATE.shown
+        ? 'You have seen one way. The next lesson is yours to do from scratch.'
+        : 'This one is done. Next!' };
+      r = { ok: true, facts: {} };
+    } else {
+      r = evalCheck(extra.check);
+      if (r.ok) {
+        var n = extra === L.boundary ? 2 : (L.boundary ? 3 : 2);
+        awardStar(L.id, n);
+        LSTATE.feedback = { kind: 'ok', text: fillFacts(extra.praise || (extra === L.boundary ? 'Boundary found.' : 'Sharp.'), r.facts || {}), stars: n };
+        cheer();
+      } else {
+        LSTATE.attempts++;
+        LSTATE.feedback = { kind: 'bad', text: pickNudge(L, r) };
+      }
+    }
+  }
+  renderLearn();
+  renderLessonStrip();
+  return { ok: !!r.ok, why: r.why, pred: r.pred, have: r.have, stage: LSTATE.stage, passed: LSTATE.passed,
+           feedback: LSTATE.feedback ? LSTATE.feedback.text : '' };
+}
+function lessonHint() {
+  var L = lessonById(LSTATE.id);
+  if (!L || !L.hints) return null;
+  if (LSTATE.hints < L.hints.length) LSTATE.hints++;
+  renderLearn();
+  return L.hints[LSTATE.hints - 1];
+}
+function lessonSolution(opts) {
+  var L = lessonById(LSTATE.id);
+  if (!L || !L.solution) return { ok: false, problems: [{ message: 'no solution for this lesson' }] };
+  var sol = L.solution, r = { ok: true }, one = !!(opts && opts.one);
+  LSTATE.shown = true;
+  if (sol.program !== undefined) r = applyProgramSource(sol.program);
+  else if (sol.stages) {
+    // `one`: solve only the current stage and let the check advance to the next (which
+    // then runs that stage's own setup); otherwise every remaining stage, in order
+    var start = LSTATE.stage;
+    for (var i = start; i < sol.stages.length && r.ok; i++) {
+      if (i > start) r = enterStage(L, i);
+      if (r.ok) r = runSteps(sol.stages[i]);
+      if (one) break;
+    }
+  } else if (sol.steps) r = runSteps(sol.steps);
+  else if (sol.answer !== undefined) LSTATE.answer = sol.answer;
+  if (!r.ok) {
+    LSTATE.feedback = { kind: 'bad', text: 'the solution could not be applied here: ' + (((r.problems || r.errors || [])[0] || {}).message || 'refused') };
+    renderLearn();
+    return r;
+  }
+  var c = lessonCheck();
+  if (c.ok) LSTATE.feedback = { kind: 'ok', text: 'Here is one way -- read it back off the canvas, then try the next one yourself.' };
+  renderLearn();
+  return { ok: c.ok, shown: true };
+}
+function lessonNext() {
+  if (!COURSE) return null;
+  var i = lessonIndex(LSTATE.id);
+  var nxt = COURSE.lessons[Math.min(i + 1, COURSE.lessons.length - 1)];
+  if (!nxt || nxt.id === LSTATE.id) return null;
+  lessonLoad(nxt.id);
+  return nxt.id;
+}
+function lessonAnswer(choice) { LSTATE.answer = choice; return lessonCheck(); }
+function setAnswer(choice) { LSTATE.answer = choice; return { ok: true, answer: choice }; }
+
+// ---- rendering --------------------------------------------------------------------------
+// Three marks: **bold**, `code`, [[term|hint-key]].  Everything is escaped first.
+function inline(t) {
+  var h = esc2(t);
+  h = h.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, function (m, term, key) {
+    return '<span class="term" data-hint="' + esc2(key) + '">' + term + '</span>';
+  });
+  h = h.replace(/\{\{([^}|]+)\|([^}]+)\}\}/g, function (m, label, href) {
+    return '<a href="' + esc2(href) + '" target="_blank" rel="noopener">' + label + '</a>';
+  });
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return h;
+}
+// the frame a lesson names: an index, the dearest instruction, or the one that realises
+// a circuit statement on a compiled page (`realises:<op>`, from the certificate's join)
+function frameFor(which) {
+  if (typeof which === 'string' && which.slice(0, 9) === 'realises:') {
+    var S = D.source, op = Number(which.slice(9));
+    if (!S || !S.realises) return -1;
+    for (var i = 0; i < P.frames.length; i++) {
+      var ops = S.realises[P.frames[i].id] || [];
+      if (ops.indexOf(op) >= 0) return i;
+    }
+    return -1;
+  }
+  if (which === 'maxcost') {
+    var best = -1, bi = -1;
+    for (var k = 0; k < P.frames.length; k++) {
+      var c = (PRICE && PRICE.perFrame && PRICE.perFrame[k]) ? Number(PRICE.perFrame[k][0]) : Number(P.frames[k].cost || 0);
+      if (c > best) { best = c; bi = k; }
+    }
+    return bi;
+  }
+  return Number(which);
+}
+// Part D's measured table, rendered from what the page shipped
+function measuredRow(kind, arch) {
+  var M = D.tutorial_measured || {};
+  if (kind === 'planes') return (M.planes || {})[arch] || null;
+  var mi = (M.micro || {})[arch];
+  return mi ? (mi.cooled || mi.raw || null) : null;
+}
+function renderMeasured(kind) {
+  var M = D.tutorial_measured;
+  if (!M) return '<div class="learn-note">this page carries no measured results</div>';
+  var arches = Object.keys(kind === 'planes' ? (M.planes || {}) : (M.micro || {})), i, h;
+  if (!arches.length) return '<div class="learn-note">no measured results shipped for ' + esc2(kind) + '</div>';
+  if (kind === 'planes') {
+    h = '<table class="learn-table"><tr><th>device</th><th>wiring</th><th>electrodes</th><th>DACs</th><th>junctions</th></tr>';
+    for (i = 0; i < arches.length; i++) {
+      var p = M.planes[arches[i]];
+      h += '<tr><td>' + esc2(arches[i]) + '</td><td>' + esc2(p.scheme) + '</td><td>' + p.electrodes + '</td><td>' + p.dacs + '</td><td>' + p.junctions + '</td></tr>';
+    }
+    return h + '</table><div class="mut">hardware_report(arch) at page-build time</div>';
+  }
+  h = '<table class="learn-table"><tr><th>device</th><th>instructions</th><th>cost</th><th>steps</th><th>runtime</th><th>DACs</th></tr>';
+  for (i = 0; i < arches.length; i++) {
+    var r = measuredRow('micro', arches[i]), pl = (M.planes || {})[arches[i]] || {};
+    if (!r) continue;
+    h += '<tr><td>' + esc2(arches[i]) + '</td><td>' + r.instructions + '</td><td>' + fmt(r.total_cost, 1) + '</td><td>' + r.total_steps + '</td><td>' + fmt(r.runtime_us / 1000, 2) + ' ms</td><td>' + (pl.dacs === undefined ? '' : pl.dacs) + '</td></tr>';
+  }
+  return h + '</table><div class="mut">' + esc2(M.circuit) + ' compiled for each device, replayed under the ' + esc2(M.model) + ' model at page-build time (cooled artifacts)</div>';
+}
+function plain(t) { return String(t || '').replace(/\[\[([^\]|]+)\|[^\]]+\]\]/g, '$1').replace(/\*\*/g, '').replace(/`/g, ''); }
+function starsMax(L) { return 1 + (L && L.boundary ? 1 : 0) + (L && L.challenge ? 1 : 0); }
+function starsOf(n, max) {
+  var out = '', k = max === undefined ? 3 : max;
+  for (var i = 1; i <= k; i++) out += (n >= i ? '\u2605' : '\u2606');
+  return out;
+}
+
+function renderLearn() {
+  var host = $('learnBody');
+  if (!host) return;
+  if (!COURSE) { host.innerHTML = '<div class="mut">the course did not load with this page</div>'; return; }
+  var prog = courseProgress(), h = '', i;
+  var L = lessonById(LSTATE.id);
+  // the picker: every lesson, grouped by part, with its stars
+  h += '<div class="learn-nav"><button id="lnPrev" title="previous lesson">\u25c0</button>' +
+       '<select id="lnPick" data-hint="learn:pick">';
+  for (i = 0; i < COURSE.parts.length; i++) {
+    var pt = COURSE.parts[i];
+    h += '<optgroup label="' + esc2(pt.id + ' \u00b7 ' + pt.title) + '">';
+    for (var j = 0; j < COURSE.lessons.length; j++) {
+      var M = COURSE.lessons[j];
+      if (M.part !== pt.id) continue;
+      h += '<option value="' + esc2(M.id) + '"' + (L && M.id === L.id ? ' selected' : '') + '>' +
+           esc2(M.id + ' \u00b7 ' + M.title) + '  ' + starsOf(prog.stars[M.id] || 0, starsMax(M)) + '</option>';
+    }
+    h += '</optgroup>';
+  }
+  h += '</select><button id="lnNext" title="next lesson" data-hint="learn:next">\u25b6</button></div>';
+  if (!L) {
+    var first = COURSE.lessons[0];
+    h += '<div class="learn-story">A course for people who have never seen one of these machines: ' +
+         COURSE.lessons.length + ' lessons in ' + COURSE.parts.length + ' parts, each a few minutes, each with an exercise this page checks.</div>' +
+         '<div class="learn-btns"><button class="p" id="lnLoad" data-hint="learn:load">Start with ' + esc2(first.id) + ' \u00b7 ' + esc2(first.title) + '</button></div>';
+    host.innerHTML = h;
+    wireLearn(host);
+    return;
+  }
+  var task = lessonTask(L), nst = lessonTotalStages(L), stars = prog.stars[L.id] || 0;
+  h += '<div class="learn-head"><b>' + esc2(L.id) + ' \u00b7 ' + esc2(L.title) + '</b><span class="learn-stars" title="' +
+       (L.boundary && L.challenge ? 'done \u00b7 boundary \u00b7 sharp' : L.boundary ? 'done \u00b7 boundary' : L.challenge ? 'done \u00b7 sharp' : 'done') +
+       '">' + starsOf(stars, starsMax(L)) + '</span></div>';
+  if (L.story) h += '<div class="learn-story">' + inline(L.story) + '</div>';
+  for (i = 0; i < (L.text || []).length; i++) h += '<p class="learn-p">' + inline(L.text[i]) + '</p>';
+  h += '<div class="learn-ex"><div class="learn-exh">Exercise' + (nst > 1 ? ' \u00b7 step ' + (LSTATE.stage + 1) + ' of ' + nst : '') + '</div>' +
+       '<div>' + inline(task.exercise) + '</div>';
+  if (L.choices && (checkUses(task.check, 'answer') || checkUses(task.check, 'measuredLess'))) {
+    h += '<div class="learn-choices">';
+    for (i = 0; i < L.choices.length; i++) {
+      h += '<label><input type="radio" name="lnChoice" value="' + esc2(L.choices[i].id) + '"' + (LSTATE.answer === L.choices[i].id ? ' checked' : '') + '> ' + inline(L.choices[i].text) + '</label>';
+    }
+    h += '</div>';
+  }
+  h += '<div class="learn-btns">' +
+       '<button id="lnLoad" data-hint="learn:load">Load</button>' +
+       '<button class="p" id="lnCheck" data-hint="learn:check">Check</button>' +
+       '<button id="lnHint" data-hint="learn:hint"' + (L.hints && LSTATE.hints < L.hints.length ? '' : ' disabled') + '>Hint</button>' +
+       '<button id="lnSol" data-hint="learn:solution"' + (L.solution ? '' : ' disabled') + '>Solution</button>' +
+       '<button id="lnGo" data-hint="learn:next"' + (LSTATE.passed ? ' class="p"' : '') + '>Next \u25b6</button></div></div>';
+  if (L.page && !D.source) {
+    h += '<div class="learn-note">This lesson runs on the <b>compiled</b> page, which this one is not. ' +
+         inline('Build both with `python -m qccd tutorial -o out/tutorial` and open {{' + L.page + '.html|' + L.page + '.html}} beside this page.') + '</div>';
+  }
+  if (L.table) h += renderMeasured(L.table);
+  var vd = task.verdict || L.verdict;
+  if (vd) h += renderVerdict(vd);
+  if (LSTATE.feedback) {
+    h += '<div class="learn-fb ' + (LSTATE.feedback.kind === 'ok' ? 'ok' : 'bad') + '" id="learnFeedback">' +
+         (LSTATE.feedback.stars ? '<span class="learn-fbstars">' + starsOf(LSTATE.feedback.stars, starsMax(L)) + '</span>' : '') +
+         esc2(LSTATE.feedback.text).replace(/\n/g, '<br>') + '</div>';
+  }
+  if (LSTATE.hints > 0) {
+    h += '<div class="learn-hints">';
+    for (i = 0; i < LSTATE.hints; i++) h += '<div class="learn-hint"><span>' + (i + 1) + '</span>' + inline(L.hints[i]) + '</div>';
+    h += '</div>';
+  }
+  if (LSTATE.passed && (L.boundary || L.challenge)) {
+    var extra = (L.boundary && stars < 2) ? L.boundary : (L.challenge && stars < 3) ? L.challenge : null;
+    if (extra) h += '<div class="learn-ex extra"><div class="learn-exh">' + (extra === L.boundary ? 'Second star \u00b7 the boundary' : 'Third star \u00b7 sharp') + '</div><div>' + inline(extra.exercise) + '</div></div>';
+  }
+  host.innerHTML = h;
+  wireLearn(host);
+}
+function renderVerdict(vd) {
+  var V = shippedVerdict(vd['case'], vd.which);
+  if (!V) return '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">Python\u2019s verdict</div><div class="mut">this page carries no verdict for case ' + esc2(vd['case']) + '</div></div>';
+  var h = '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">Python\u2019s verdict on the ' +
+          (vd.which === 'fixed' ? 'repaired' : 'loaded') + ' programme \u00b7 computed when this page was built \u00b7 ' + esc2(V.model || '') + ' model</div>';
+  var f = V.focus, i;
+  if (f) {
+    h += '<div><b data-hint="rule:' + esc2(f.rule) + '">' + esc2(f.rule) + '</b><span class="vstate ' + esc2(f.state) + '">' + esc2(f.state) + '</span>' +
+         (f.why ? ' <span class="mut">' + esc2(f.why) + '</span>' : '') + '</div>';
+    if (f.messages && f.messages.length) {
+      h += '<ul>';
+      for (i = 0; i < Math.min(2, f.messages.length); i++) h += '<li>' + esc2(f.messages[i].message) + '</li>';
+      if (f.messages.length > 2) h += '<li class="mut">and ' + (f.messages.length - 2) + ' more like it</li>';
+      h += '</ul>';
+    }
+  }
+  var R = V.rules || {}, sk = R.skipped || {}, pa = R.partial || {}, k;
+  var others = [];
+  for (i = 0; i < (R.failed || []).length; i++) if (!f || R.failed[i] !== f.rule) others.push(R.failed[i] + ' failed');
+  for (k in sk) if (has(sk, k) && (!f || k !== f.rule)) others.push(k + ' skipped: ' + sk[k]);
+  for (k in pa) if (has(pa, k) && (!f || k !== f.rule)) others.push(k + ' partial: ' + pa[k]);
+  h += '<div class="mut" style="margin-top:4px">' + (R.passed || []).length + ' rules passed' + (others.length ? '; ' + esc2(others.join('; ')) : '') + '.</div>';
+  var M = V.metrics || {};
+  if (M.total_cost !== undefined && M.total_cost !== null) {
+    h += '<div class="mut">cost ' + fmt(M.total_cost, 2) + ' \u00b7 ' + M.total_steps + ' steps \u00b7 ' + fmt(M.runtime_us, 1) + ' us \u00b7 peak n-bar ' + fmt(M.peak_quanta, 3) +
+         (M.gate_error_sum !== undefined && M.gate_error_sum !== null ? ' \u00b7 gate error (R16) ' + Number(M.gate_error_sum).toExponential(2) : '') + '</div>';
+  }
+  return h + '</div>';
+}
+function wireLearn(host) {
+  var on = function (id, f) { var e = $(id); if (e) e.onclick = function () { f(); unfocus(e); }; };
+  on('lnLoad', function () { lessonLoad(LSTATE.id || (COURSE.lessons[0] && COURSE.lessons[0].id)); });
+  on('lnCheck', lessonCheck);
+  on('lnHint', lessonHint);
+  on('lnSol', lessonSolution);
+  on('lnGo', lessonNext);
+  on('lnNext', lessonNext);
+  on('lnPrev', function () { var i = lessonIndex(LSTATE.id); if (i > 0) lessonLoad(COURSE.lessons[i - 1].id); });
+  var pick = $('lnPick');
+  if (pick) pick.onchange = function () { lessonLoad(pick.value); };
+  var radios = host.querySelectorAll ? host.querySelectorAll('input[name="lnChoice"]') : [];
+  for (var i = 0; i < radios.length; i++) {
+    radios[i].onchange = (function (r) { return function () { LSTATE.answer = r.value; }; })(radios[i]);
+  }
+}
+// THE STRIP over the Write pane: the exercise in one line and the two buttons that matter
+// there, so a programming exercise never needs a tab switch.
+function renderLessonStrip() {
+  var el = $('pwLesson');
+  if (!el) return;
+  var L = lessonById(LSTATE.id);
+  if (!L) { if (el.style) el.style.display = 'none'; return; }
+  var task = lessonTask(L);
+  el.innerHTML = '<b>' + esc2(L.id) + '</b> <span>' + inline(task.exercise) + '</span>' +
+                 '<button class="p" id="lsCheck" data-hint="learn:check">Check</button>' +
+                 '<button id="lsHint" data-hint="learn:hint">Hint</button>';
+  if (el.style) el.style.display = '';
+  var c = $('lsCheck'), hh = $('lsHint');
+  if (c) c.onclick = function () { lessonCheck(); unfocus(c); setPaneL(); };
+  if (hh) hh.onclick = function () { lessonHint(); unfocus(hh); setPaneL(); };
+}
+function setPaneL() { if (typeof setPane === 'function') setPane('L'); }
+
+// verbs the lessons use that had no API entry of their own
+function seekTo(which) {
+  var i = frameFor(which);
+  if (i < 0 || !P.frames.length) return null;
+  if (typeof seek === 'function') seek(i, {});
+  return (typeof frame === 'number') ? frame : i;
+}
+function fitStage() { if (typeof fit === 'function') fit(); return true; }
 
 // ------------------------------------------------------------------- boot
 //
@@ -2187,6 +5596,10 @@ function boot() {
     return;
   }
   splitListing();
+  // The seal the shipped frames were compiled against is read NOW: a generator card as
+  // the very first gesture would otherwise be the first caller of `lowerNow`, and it
+  // would record the new device's seal as the shipped one.
+  captureShipped();
   // The page script already ran `deriveStage(P.frames)` at load, against the device this
   // page was emitted for.  Recording the array identity here is what stops the first
   // rebuild re-deriving it: those four tables describe a PROGRAMME on the device it was
@@ -2251,15 +5664,21 @@ function boot() {
 // see, and undo would restore only half of it.
 //
 // Same rollback semantics as `emit`, one undo group, one applier.
+function isCanvasOps(ops) {
+  for (var i = 0; ops && i < ops.length; i++) if (ops[i] && ops[i].canvas) return true;
+  return false;
+}
 function transaction(ops, label) {
-  var i, at = EDITS.length;
+  var i, at = EDITS.length, prev = null;
   var g0 = GEOM.slice(), s0 = SEED, p0 = POST.slice(), e0 = EDITS.slice();
   var geom = GEOM.slice(), seed = SEED, post = POST.slice(), edits = EDITS.slice();
   var group = GROUP + 1;
   for (i = 0; i < ops.length; i++) {
     var op = ops[i];
     if (op.canvas) {
-      // a hard reset: a new device replaces the geometry, the seal and the retunes
+      // a hard reset: a new device replaces the geometry, the seal and the retunes --
+      // and the device it replaces is kept for `undo()`, edits and programme included
+      if (!prev && STATE) prev = canvasRecord();
       geom = op.canvas.geom.slice();
       seed = op.canvas.seed;
       post = (op.canvas.post || []).slice();
@@ -2290,14 +5709,29 @@ function transaction(ops, label) {
   }
   GROUP = group;
   GEOM = geom; SEED = seed; POST = post; EDITS = edits;
-  UNDONE.length = 0;
+  // a new edit forgets both redo stacks; a new DEVICE keeps the canvas stack for the
+  // record it pushes below (and `prev === null` there means nothing changed)
+  if (prev) UNDONE.length = 0; else forgetRedo();
+  // A CANVAS OP IS A NEW DEVICE, and the one transaction that re-fits: every other holds
+  // the view, because an edit that re-fitted moved the drawing under the pointer.
+  if (isCanvasOps(ops)) refitNext();
   rebuild();
   var mine = PROBLEMS.filter(function (p) { return p.i !== null && p.i >= at; });
   if (mine.length) {
     GEOM = g0; SEED = s0; POST = p0; EDITS = e0;
+    if (isCanvasOps(ops)) refitNext();
     rebuild();
     return { ok: false, problems: mine, label: label };
   }
+  // A NEW DEVICE IS A NEW GESTURE: the redo stack of the device it replaces is discarded
+  // exactly as `UNDONE.length = 0` above discards it for an edit, so undoing the pick
+  // brings the old device back and the NEXT redo re-picks the new one -- not an edit the
+  // old device had undone before the pick.  Linear history, one rule.
+  // A PICK THAT CHANGES NOTHING IS NOT A GESTURE: the same card pressed twice used to
+  // push an identical record, so the first ctrl+Z restored the device already on the
+  // stage and looked dead.  Same geometry, seal, retunes and (no) edits: no record.
+  if (prev && sameCanvas(prev, canvasRecord())) prev = null;
+  if (prev) { prev.undone = []; CANVAS_UNDO.push(prev); CANVAS_REDO.length = 0; }
   return { ok: true, problems: PROBLEMS, label: label };
 }
 
@@ -2363,10 +5797,19 @@ function newCanvas(opts) {
   // in `post` did not work either: `post` runs AFTER `blank_device`, and a zone declared
   // after the seal cannot be used by a site placed later (`zone_after_seal`). They belong
   // in the seed, which is what `blank_device(zones=...)` is for.
+  //
+  // WHAT A ZONE MAY BE NAMED AFTER: the physics of the site, never the role a code would
+  // give the ion sitting in it.  This is a hardware design tool -- a zone says whether a
+  // gate can be driven there, whether it can be measured, cooled or loaded -- and
+  // `ancilla` says none of those things; it says what an error-correcting code would use
+  // the site for, which is a layer this tool does not model.  So a canvas starts with the
+  // four HARDWARE zones and nothing else.  A device that wants a code's vocabulary can
+  // still declare it (Elements > zone type, or a template that ships one), and every
+  // shipped `arch/*.arch.json` keeps whatever it already declares -- this is the studio's
+  // own default, not a change to the format.
   var ZONES = {
     data:    { capacity: 2 },
     trap:    { capacity: 2, gate: true, spam: true, cool: true },
-    ancilla: { capacity: 2, gate: true, spam: true, cool: true },
     gate:    { capacity: 2, gate: true },
     load:    { capacity: 8, spam: true, cool: true, photoionization: true }
   };
@@ -2376,7 +5819,7 @@ function newCanvas(opts) {
   // Seed the one key that makes a blank canvas RUNNABLE. `control.model` is required by
   // the schema, and without it `declare_class` is refused ("$.control: missing required
   // key 'model'") -- so a from-scratch device could be built and exported but never
-  // priced, and every one of the 23 rules stayed `unchecked` forever. `simd_classes` is
+  // priced, and every one of the 27 rules stayed `unchecked` forever. `simd_classes` is
   // the model every shipped architecture uses; `set_control` changes it.
   // Plus the smallest primitive set that makes a device PRICEABLE. Without these,
   // `declare_class` succeeds and pricing then dies on "architecture declares no
@@ -2429,15 +5872,23 @@ function nodeIds() {
   for (var nid in STATE.device.nodes) if (has(STATE.device.nodes, nid)) out.push(nid);
   return out;
 }
-function builderNodeIds() {
-  // the ids the BUILDER holds, which is what a new id must not collide with -- the
-  // builder survives a seal, so it can hold nodes the sealed device does not
+// the ids the BUILDER itself holds: every `d.site` / `d.junction` above the seal.  A
+// node the sealed device has but the builder does not (a post-seal `add_site`) is one a
+// builder `d.segment` cannot reach -- it is hoisted above the seal, where that node does
+// not exist yet -- which is what `joinNodes` reads this for.
+function builderHeldIds() {
   var out = {}, calls = baseCalls(), i;
   for (i = 0; i < calls.length; i++) {
     if (calls[i].method === 'd.site' || calls[i].method === 'd.junction') {
       out[String(calls[i].args[0])] = true;
     }
   }
+  return out;
+}
+function builderNodeIds() {
+  // the ids a NEW id must not collide with: what the builder holds -- the builder
+  // survives a seal, so it can hold nodes the sealed device does not -- plus the device's
+  var out = builderHeldIds(), i;
   for (i = 0; i < nodeIds().length; i++) out[nodeIds()[i]] = true;
   return out;
 }
@@ -2450,6 +5901,22 @@ function builderSegIds() {
     for (var sid in STATE.device.segments) if (has(STATE.device.segments, sid)) out[sid] = true;
   }
   return out;
+}
+
+// COINCIDENT PLACEMENT: `min_nearest_neighbour` SKIPS coincident points, so two nodes on
+// one spot silently resize every mark on the stage -- the same reason `validate()`
+// already refuses a coincident `move_site`.  The one check for a single node and for
+// every node of a component about to land.
+function coincidentAt(x, y) {
+  var ns = nodesOf(STATE);
+  for (var i = 0; i < ns.length; i++) {
+    if (Math.abs(ns[i].x - x) < 1e-9 && Math.abs(ns[i].y - y) < 1e-9) {
+      return { code: 'coincident', targets: [ns[i].id],
+        message: 'a node already sits at (' + x + ', ' + y + '); two nodes on one point ' +
+                 'make the drawn scale meaningless' };
+    }
+  }
+  return null;
 }
 
 // `d.site` / `d.junction`.  THE BUILDER OVERWRITES A DUPLICATE ID SILENTLY -- measured on
@@ -2467,17 +5934,8 @@ function addNodeAt(x, y, opts) {
       message: "a node called '" + id + "' already exists; the builder would overwrite it " +
                'silently and nothing downstream would notice' }] };
   }
-  // coincident placement: `min_nearest_neighbour` SKIPS coincident points, so two nodes on
-  // one spot silently resize every mark on the stage -- the same reason `validate()`
-  // already refuses a coincident `move_site`.
-  var ns = nodesOf(STATE);
-  for (var i = 0; i < ns.length; i++) {
-    if (Math.abs(ns[i].x - x) < 1e-9 && Math.abs(ns[i].y - y) < 1e-9) {
-      return { ok: false, problems: [{ code: 'coincident',
-        message: 'a node already sits at (' + x + ', ' + y + '); two nodes on one point ' +
-                 'make the drawn scale meaningless' }] };
-    }
-  }
+  var coin = coincidentAt(x, y);
+  if (coin) return { ok: false, problems: [coin] };
   var kw = {};
   if (kind === 'site') {
     var hasZone = opts.zone !== undefined && opts.zone !== null && opts.zone !== '';
@@ -2555,6 +6013,18 @@ function joinNodes(a, b, opts) {
     }
   }
   if (probs.length) return { ok: false, problems: probs };
+  // THE APPLIER THE ENDPOINTS HAVE.  A builder `d.segment` is hoisted above the seal, so
+  // it can only join nodes the builder holds; a generator device holds none, and a node
+  // added after the seal (`add_site`) is one the builder never saw.  Either way the
+  // segment is a post-seal topology edit -- the same `add_segment` the shift-drag's
+  // `joinNodes` lands on, decided here (not retried after a refusal) so the harness's
+  // `join`, the inspector and the pointer cannot disagree.  A loop edge stays a builder
+  // statement:
+  // `add_segment` has no `loop=`.
+  var held = builderHeldIds();
+  if (!opts.loop && (!hasBuilder() || !has(held, a) || !has(held, b))) {
+    return addSegment(a, b, { length: len, capacity: capv, labels: opts.labels });
+  }
   var kw = {};
   if (opts.loop) kw.loop = String(opts.loop);
   if (len !== null) kw.length = Q.pyFloat(len);
@@ -2691,7 +6161,40 @@ function explodeToExplicit() {
 // discipline.  `P.frames` stays the single source the stage, the price and the rules all
 // read, so an authored programme costs the rest of the page nothing.
 var PROG = [], PROG_SRC = null, LOWER = null, AUTHORED = false;
-var SHIPPED_FRAMES = null, SHIPPED_PROV = null;
+// THE PARSE ERRORS, kept beside `PROG` so the pane can show them AT THE LINE: a text
+// that does not parse leaves the records as they were, and until this existed the only
+// trace of the failure was a toast that had already faded.
+var PARSE_ERRS = [];
+// WHAT THE PAGE SHIPPED WITH, recorded once so `lowerNow` can hand it back: the compiled
+// frames and their provenance, the instruction count and the programme name -- and the
+// SEAL they were compiled against.  `SEED0` is the witness that decides whether the
+// shipped programme is a programme for the device on the stage at all.
+var SHIPPED_FRAMES = null, SHIPPED_PROV = null, SHIPPED_N = 0, SHIPPED_NAME = null;
+var SEED0 = null, SEED0_KEY = null, NO_FRAMES = [];
+// WHETHER THE PAGE SHIPPED EMPTY: the blank page's headline ("an empty canvas: build a
+// device ...") is true of nothing once a site is on the stage, where a seeded page's
+// headline stays true of the device it describes.  Read once, from the arch the page was
+// emitted with, before any rebuild can touch it.
+var SHIPPED_EMPTY = false;
+
+function captureShipped() {
+  if (SHIPPED_FRAMES !== null) return;
+  SHIPPED_EMPTY = !!(typeof A !== 'undefined' && A && A.nodes && A.nodes.length === 0);
+  SHIPPED_FRAMES = P.frames;
+  SHIPPED_PROV = (typeof PROV !== 'undefined') ? PROV : null;
+  SHIPPED_N = P.n_instructions === undefined ? P.frames.length : P.n_instructions;
+  SHIPPED_NAME = P.name;
+  SEED0 = SEED;
+  SEED0_KEY = JSON.stringify(SEED0);
+}
+// The shipped programme fits exactly one device: the one whose seal it was compiled
+// against.  BY VALUE, not identity: a snapshot that went through JSON (autoload, a file
+// import) comes back with a fresh seed object for the very same device, and the 13
+// shipped frames are still its programme.
+function shippedSeed() {
+  return SEED === SEED0 || JSON.stringify(SEED) === SEED0_KEY;
+}
+function programmeIsShipped() { return P.frames === SHIPPED_FRAMES; }
 
 function setProgram(records) {
   PROG = (records || []).map(function (r) {
@@ -2699,6 +6202,10 @@ function setProgram(records) {
              text: r.text, line: r.line };
   });
   PROG_SRC = null;
+  PARSE_ERRS = [];
+  // the pane repaints from the records now, not from the previous device's text
+  var ta = $('pwText');
+  if (ta) ta._touched = false;
   rebuild();
   return { ok: true, errors: lowerErrors() };
 }
@@ -2708,16 +6215,24 @@ function lowerErrors() { return LOWER ? LOWER.errors : []; }
 // Re-lowered on EVERY architecture edit as well as every programme edit, which is why an
 // authored programme's `entails` can never go stale: it is read from the live class table
 // at lowering time rather than baked at emit time.
+//
+// DECIDED ONCE, HERE: with no authored programme the stage shows the SHIPPED frames only
+// while the seal is the one they were compiled against.  A device from a generator card,
+// a blank canvas, a restored foreign snapshot or an imported file is a different device,
+// and it used to inherit the previous programme's frames -- so every new device opened
+// under a red "programme invalid" banner blaming an edit nobody made (measured: 31
+// `unknown_node` breaks on a fresh 8-site ring).  A new device has NO programme, and the
+// honest sentence for that is "no programme yet", never a verdict.
 function lowerNow() {
-  if (SHIPPED_FRAMES === null) {
-    SHIPPED_FRAMES = P.frames;
-    SHIPPED_PROV = (typeof PROV !== 'undefined') ? PROV : null;
-  }
+  captureShipped();
   if (!PROG.length) {
     AUTHORED = false;
     LOWER = null;
-    P.frames = SHIPPED_FRAMES;
-    if (typeof PROV !== 'undefined') PROV = SHIPPED_PROV;
+    var shipped = shippedSeed();
+    P.frames = shipped ? SHIPPED_FRAMES : NO_FRAMES;
+    P.n_instructions = shipped ? SHIPPED_N : 0;
+    P.name = shipped ? SHIPPED_NAME : 'none';
+    if (typeof PROV !== 'undefined') PROV = shipped ? SHIPPED_PROV : null;
     return;
   }
   AUTHORED = true;
@@ -2753,14 +6268,17 @@ function programSource() {
 function applyProgramSource(src) {
   PROG_SRC = src;
   var p = Q.parse(src);
-  if (p.errors.length) return { ok: false, errors: p.errors };
-  var wrong = p.arch.length ? p.arch[0] : null;
-  if (wrong) {
-    return { ok: false, errors: [{ line: wrong.line, col: 1,
+  var wrong = (!p.errors.length && p.arch.length) ? p.arch[0] : null;
+  if (p.errors.length || wrong) {
+    // the records stand; the pane shows the failure at its line until the next parse
+    PARSE_ERRS = p.errors.length ? p.errors : [{ line: wrong.line, col: 1,
       message: JSON.stringify(wrong.method) + ' is an architecture statement; the ' +
                'programme pane takes `p.` verbs only (have: ' +
-               Q.PROGRAM_METHODS.join(', ') + ')', text: wrong.text }] };
+               Q.PROGRAM_METHODS.join(', ') + ')', text: wrong.text }];
+    renderWrite();
+    return { ok: false, errors: PARSE_ERRS.slice() };
   }
+  PARSE_ERRS = [];
   PROG = p.prog.map(function (r) {
     return { method: r.method, args: r.args, kwargs: r.kwargs, text: r.text, line: r.line };
   });
@@ -2769,12 +6287,207 @@ function applyProgramSource(src) {
   return { ok: true, errors: [], problems: lowerErrors() };
 }
 
+// THE ENGINE'S WORDS, said for THIS pane.  The parser is shared with the architecture
+// lane, so its "must start with `m = Machine.`..." names four prefixes of which none
+// is the one the programme pane takes; and a KeyError is Python's exact `repr(x)`,
+// which says what was not found but not where.  Reworded here, never in engine.js.
+function humanMessage(e) {
+  var m = String((e && e.message) || '');
+  if (/must start with/.test(m)) {
+    return 'a programme statement must start with `p.` (have: ' +
+           Q.PROGRAM_METHODS.map(function (v) { return 'p.' + v; }).join(', ') + ')';
+  }
+  // a bare `'T9'` is Python's KeyError for a lookup that found nothing; a KeyError that
+  // already carries a sentence ("no segment between ...") says where by itself
+  if (e && e.code === 'KeyError' && /^'[^']*'$/.test(m)) {
+    return m + ' — no such node, segment or loop on ' + ((STATE && STATE.name) || 'this device');
+  }
+  return m;
+}
+// one line per problem, for the strip and the toast alike: a parse error is AT a line,
+// a lowering error is AT a statement
+function problemLine(e) {
+  if (e && e.line !== undefined && e.i === undefined) {
+    return 'line ' + e.line + ' col ' + (e.col || 1) + ': ' + humanMessage(e);
+  }
+  return 'statement ' + ((!e || e.i === null || e.i === undefined) ? '?' : e.i + 1) +
+         ': ' + humanMessage(e);
+}
+
+// WHAT THE EVALUATE BUTTON DOES, as one verb.  The button used to say "ok: 2 statements,
+// 1 frames" about a programme whose second statement had been refused -- a truncated
+// programme reported as a success.  Every problem the two checkers already produce (the
+// parse, then `Q.lowerProgram` through `rebuild`) is a refusal here, said with how much
+// of the programme did run; an empty text clears the programme and says so.
+// HOW MANY STATEMENTS RAN: the records minus every statement a lowering error names.
+function statementsRun(probs) {
+  var ran = PROG.length, seen = {};
+  for (var i = 0; i < probs.length; i++) {
+    var k = probs[i].i === null || probs[i].i === undefined ? '?' : probs[i].i;
+    if (!seen[k]) { seen[k] = true; ran--; }
+  }
+  return ran;
+}
+// THE STANDING REFUSAL, one sentence: what the Evaluate toast says, and what the stage's
+// reason strip says for as long as it holds -- an ARCHITECTURE edit can refuse an
+// authored statement too (delete the junction it routes over), and until this line stood
+// under the picture the only trace was the Write pane, off-screen behind another tab.
+// '' while nothing is refused.
+function refusedLine() {
+  var probs = lowerErrors();
+  if (!AUTHORED || !probs.length) return '';
+  return problemLine(probs[0]) + ' — ' + statementsRun(probs) + ' of ' + PROG.length +
+         ' statements run';
+}
+function evaluateWrite(text) {
+  if (text === undefined) { var ta = $('pwText'); text = ta ? (ta.value || '') : ''; }
+  var r = applyProgramSource(text);
+  var probs = r.ok ? (r.problems || []) : r.errors;
+  var ran = r.ok ? statementsRun(probs) : 0;
+  if (r.ok && !text.trim()) toast('ok', 'programme cleared');
+  else if (probs.length) toast('bad', r.ok ? refusedLine() : problemLine(probs[0]));
+  else toast('ok', PROG.length + ' statements, ' + P.frames.length + ' frames');
+  return { ok: r.ok && !probs.length, parsed: r.ok, problems: probs,
+           ran: ran, statements: PROG.length, frames: P.frames.length };
+}
+
+// THE PREDICATE THAT FREEZES THE STAGE: the structural break list, `[]` when the
+// programme fits.  `price().blocked` is this list PLUS the cost-model failures
+// (`no_curve`, `price_error`), which do not freeze because the picture is still true.
+function programBreaks() {
+  return (typeof PROGRAM_STALE !== 'undefined' && PROGRAM_STALE)
+    ? PROGRAM_STALE.breaks.slice() : [];
+}
+
+// ------------------------------------------------------------------- test drive
+//
+// ONE CLICK FROM A DEVICE TO AN ANIMATION.  Getting there by hand took eight steps
+// including two off-screen scrolls and hand-typed node ids, and a new generator device
+// opened with no programme at all.  `testDrivePlan` reads ONLY `STATE.device` and writes
+// the smallest programme that exercises it: rotate a closed loop if there is one, else
+// shuttle one ion out over real segments and back.  It is a plan, not a verdict --
+// `testDrive` runs it through exactly the lowering and validation `rebuild` already does
+// and rolls back if the device refuses it.  There is no second checker here.
+function testDrivePlan(opts) {
+  opts = opts || {};
+  var dev = STATE && STATE.device;
+  var refuse = function (code, message) {
+    return { ok: false, problems: [{ code: code, message: message }] }; };
+  if (!dev) return refuse('no_device', 'no device to drive');
+  var lid;
+  // `opts.noLoop`: the shuttle route even when a closed loop exists -- what `testDrive`
+  // asks for after the device refused the rotation (a physics package with no rotate
+  // class, say), because a loop the device cannot turn still has segments to drive
+  if (!opts.noLoop) for (lid in dev.loops) if (has(dev.loops, lid)) {
+    var lp = dev.loops[lid];
+    if (lp.closed && lp.nodes.length >= 2) {
+      return { ok: true, kind: 'rotate', loop: lid, from: lp.nodes[0], statements: [
+        { method: 'fill', args: [lid], kwargs: {} },
+        { method: 'rotate', args: [1, lid], kwargs: {} },
+        { method: 'rotate', args: [1, lid], kwargs: {} },
+        { method: 'rotate', args: [-2, lid], kwargs: {} }] };
+    }
+  }
+  // no closed loop: breadth-first over the segments from the first site that has one, to
+  // the farthest site within 8 hops of it -- a node path `p.shuttle` can drive, because
+  // every consecutive pair is a real segment
+  var adj = {}, sid, nid;
+  for (sid in dev.segments) if (has(dev.segments, sid)) {
+    var sg = dev.segments[sid];
+    (adj[sg.a] = adj[sg.a] || []).push(sg.b);
+    (adj[sg.b] = adj[sg.b] || []).push(sg.a);
+  }
+  var start = null;
+  for (nid in dev.nodes) if (has(dev.nodes, nid)) {
+    if (dev.nodes[nid].kind === 'site' && adj[nid] && adj[nid].length) { start = nid; break; }
+  }
+  if (start === null) return refuse('no_route', 'place two sites and a segment first');
+  var dist = {}, prev = {}, queue = [start], far = null, qi = 0;
+  dist[start] = 0;
+  while (qi < queue.length) {
+    var u = queue[qi++];
+    if (dist[u] >= 8) continue;
+    var nb = adj[u] || [];
+    for (var i = 0; i < nb.length; i++) {
+      var v = nb[i];
+      if (has(dist, v)) continue;
+      dist[v] = dist[u] + 1; prev[v] = u; queue.push(v);
+      if (dev.nodes[v] && dev.nodes[v].kind === 'site' &&
+          (far === null || dist[v] > dist[far])) far = v;
+    }
+  }
+  // one site joined only to junctions: an ion could leave but has nowhere to stop
+  if (far === null) return refuse('no_route', 'place two sites and a segment first');
+  var path = [far];
+  while (path[path.length - 1] !== start) path.push(prev[path[path.length - 1]]);
+  path.reverse();
+  var back = path.slice().reverse();
+  return { ok: true, kind: 'shuttle', from: start, to: far, statements: [
+    { method: 'init', args: [{ d0: start }], kwargs: {} },
+    { method: 'shuttle', args: ['d0', path], kwargs: {} },
+    { method: 'shuttle', args: ['d0', back], kwargs: {} }] };
+}
+
+// Writes the plan as the authored programme, through `setProgram` -- the same lane the
+// Write pane uses, so the pane shows its source -- and keeps it only if the lowering and
+// the structural validation `rebuild` just ran accept it.  Synchronous: `P.frames` and
+// the return value are correct before this returns; the autoplay is the one deferred
+// thing and it is skipped under `SYNC`, where no animation frame ever fires.
+function testDrive() {
+  var plan = testDrivePlan();
+  if (!plan.ok) return plan;
+  var ta = $('pwText');
+  var prog0 = PROG, src0 = PROG_SRC, touched0 = ta ? ta._touched : false;
+  var tryPlan = function (pl) {
+    setProgram(pl.statements);
+    var bad = lowerErrors().map(function (e) {
+      return { code: e.code || 'lower_error', message: e.message }; });
+    bad = bad.concat(programBreaks().map(function (b) {
+      return { code: b.kind, message: breakMessage(b) }; }));
+    if (!bad.length && PRICE && PRICE.blocked && PRICE.blocked.length) {
+      bad = PRICE.blocked.map(function (b) {
+        return { code: b.kind, message: b.message || breakMessage(b) }; });
+    }
+    return bad;
+  };
+  var bad = tryPlan(plan);
+  // A LOOP THE DEVICE CANNOT TURN still has segments to shuttle over: an 8-node ring on
+  // a package with no rotate class refused the rotation, and the button said "refused"
+  // about a device a two-statement shuttle drives perfectly well.  The second plan is
+  // the same planner told to skip the loop, judged by the same lowering.
+  if (bad.length && plan.kind === 'rotate') {
+    var alt = testDrivePlan({ noLoop: true });
+    if (alt.ok) {
+      var bad2 = tryPlan(alt);
+      if (!bad2.length) { plan = alt; bad = bad2; }
+    }
+  }
+  if (bad.length) {
+    PROG = prog0; PROG_SRC = src0;
+    if (ta) ta._touched = touched0;
+    rebuild();
+    return { ok: false, kind: plan.kind, problems: bad };
+  }
+  if (typeof seek === 'function' && !SYNC) seek(0, { play: true });
+  return { ok: true, kind: plan.kind, statements: PROG.slice(), frames: P.frames.length,
+           problems: [] };
+}
+
+// The two Test drive buttons share this: the verb, then the one sentence about it.
+function pressTestDrive() {
+  var r = testDrive();
+  if (!r.ok) toast('bad', 'test drive refused: ' + ((r.problems[0] || {}).message || 'no route'));
+  else toast('ok', 'test drive: ' + r.statements.length + ' statements, ' + r.frames + ' frames');
+  return r;
+}
+
 // One record, appended.  The palette's programme buttons and a future drag-to-author both
 // write through this, so the text lane and the button lane cannot disagree.
 function emitProgram(rec) {
   var before = PROG.slice();
   PROG.push({ method: rec.method, args: (rec.args || []).slice(), kwargs: rec.kwargs || {} });
   PROG_SRC = null;
+  PARSE_ERRS = [];
   rebuild();
   var mine = lowerErrors().filter(function (e) { return e.i === before.length; });
   if (mine.length) {
@@ -2817,8 +6530,8 @@ function framesAsTsir(stem) {
 
 // ------------------------------------------------------------------- the verdicts
 //
-// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 23 is
-// state-free; the browser re-derives 17 of them off the pricing walk; the other 6 need
+// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 27 is
+// state-free; the browser re-derives 21 of them off the pricing walk; the other 6 need
 // Python, and each is named WITH ITS REASON rather than being absent.
 var RULES = null;
 function ruleReport() { return RULES; }
@@ -2828,7 +6541,7 @@ function evaluateNow(model) {
   if (!STATE || !model) return;
   if (PRICE && PRICE.blocked) return;    // a broken programme has no verdicts to report
   // NO PROGRAMME, NO VERDICTS.  Every rule is vacuously satisfied over zero cycles, so a
-  // report built from an empty replay would show 17 green badges for a machine nothing has
+  // report built from an empty replay would show 21 green badges for a machine nothing has
   // ever been run on -- the same shape of lie as a self-check whose loop body never
   // executed.  An empty canvas is the FIRST thing a user of this tool sees.
   if (!P.frames.length) return;
@@ -2869,7 +6582,7 @@ function evaluateNow(model) {
   }
 }
 
-// 23 entries, one per rule, each with its state and its reason.  The header text is
+// 27 entries, one per rule, each with its state and its reason.  The header text is
 // DERIVED from this array and never written down.
 function ruleCoverage() {
   var all = (D.evidence && D.evidence.rules_all) || [];
@@ -3000,10 +6713,13 @@ var STORE = (function () {
 })();
 var STORE_KEY = 'qccd.studio.autosave';
 
-function snapshot() {
+function snapshot() { return documentRecord(STATE ? Q.serialize(STATE) : null); }
+// the document part of a snapshot, with the architecture supplied by the caller: the
+// saved file carries `Q.serialize(STATE)`, the canvas history carries none
+function documentRecord(arch) {
   return {
     kind: 'qccd.studio', version: 1,
-    arch: STATE ? Q.serialize(STATE) : null,
+    arch: arch,
     program: { calls: PROG.map(function (r) {
       return { method: r.method, args: r.args, kwargs: r.kwargs }; }) },
     geom: GEOM.slice(), seed: SEED, post: POST.slice(),
@@ -3024,8 +6740,13 @@ function restore(snap) {
   PROG = ((snap.program || {}).calls || []).map(function (r) {
     return { method: r.method, args: (r.args || []).slice(), kwargs: r.kwargs || {} }; });
   PROG_SRC = null;
+  // a parse error stands only while the text that produced it is the pane's text
+  PARSE_ERRS = [];
+  var ta = $('pwText');
+  if (ta) ta._touched = false;
   var was = WHY_NOT;
   WHY_NOT = null;
+  refitNext();                       // an imported device is a new drawing
   rebuild();
   // A REPLAY THAT DIED LEAVES NO PROBLEM TO FIND. `rebuild()` returns early on
   // `replay().error`, so `STATE` and `PROBLEMS` still describe the PREVIOUS build -- and
@@ -3041,6 +6762,7 @@ function restore(snap) {
   if (bad.length) {
     GEOM = g0; SEED = s0; POST = p0; EDITS = e0; PROG = pr0;
     WHY_NOT = was;
+    refitNext();
     rebuild();
     return { ok: false, problems: bad };
   }
@@ -3220,55 +6942,270 @@ function esc2(t) {
 // cannot trap an ion, cannot be priced, and (until the export boundary started consulting
 // `check_structure`) exported a file Python refused while reporting 576 DACs.  A template
 // seed produces a real machine, so that is what the gallery offers first.
-function renderStart() {
-  var host = $('palStartBody');
-  if (!host) return;
-  var stems = Q.templates(), i, h = '';
-  h += '<div class="cards">';
-  for (i = 0; i < stems.length; i++) {
-    h += '<button class="card2" data-tpl="' + esc2(stems[i]) + '">' + esc2(stems[i]) + '</button>';
+//
+// THE STAGE IS THE START SURFACE.  While the canvas has no node it carries the build
+// cards (a blank canvas, or a generator with the parameters it will use written on the
+// card), the physics package as one <select> (the template whose zones, curves and
+// control block the device borrows), the shipped devices as one <select> and an "open"
+// button, and two buttons that arm a site or a junction stamp -- so the sentence "press
+// Trapping site, then click here" points at something on screen.  The rail's Start fold
+// is the same controls, compact, and it stays closed unless the user opens it: an open
+// fold that listed ten packages with a card each pushed the first element tile 1,200 px
+// below the top of the page, off every laptop screen, with the empty state pointing at
+// it.
+//
+// THE PARAMETERS A GENERATOR CARD USES, in one place: a starting value for every
+// REQUIRED positional of `generator_signatures` (reflected off Python) and NOTHING else.
+// The defaults are not forwarded: a default is what the generator does when the keyword
+// is absent, so sending it changes nothing -- except when Python has grown a keyword the
+// engine's twin has not (`ring(dock_offset=)` did exactly that, and the card refused with
+// "unexpected keyword argument" on every page).  The card label, its tooltip and the
+// click read the same table, and the call the tooltip shows is the call that is made.
+function generatorParams(gen) {
+  var sig = (D.generator_signatures || {})[gen] || { required: [], defaults: {} };
+  var params = {}, j;
+  for (j = 0; j < sig.required.length; j++) params[sig.required[j]] = 4;
+  return params;
+}
+function generatorLabel(gen) {
+  var sig = (D.generator_signatures || {})[gen] || { required: [], defaults: {} };
+  var p = generatorParams(gen), parts = [], i;
+  if (sig.required.length === 2) return String(p[sig.required[0]]) + '×' + String(p[sig.required[1]]);
+  for (i = 0; i < sig.required.length; i++) parts.push(sig.required[i] + ' ' + p[sig.required[i]]);
+  return parts.join(' · ');
+}
+function paramsLabel(params) {
+  var out = [], k;
+  for (k in params) if (has(params, k)) {
+    out.push(k + '=' + (Array.isArray(params[k]) ? '[' + params[k].length + ']' : Q.pyRepr(params[k])));
   }
-  h += '</div>';
-  h += '<div class="fieldrow"><label>name</label>' +
-       '<input id="palName" value="' + esc2(STATE ? STATE.name : 'design') + '"></div>';
-  h += '<div class="cards" style="margin-top:5px">' +
-       '<button class="card2" id="palBlank">Blank canvas</button>';
-  var gens = Q.generators();
+  return out.join(', ');
+}
+// the cards themselves, one builder for the rail and the stage
+function startCards(where) {
+  var gens = Q.generators(), i, h = '<div class="cards" data-start="' + where + '">';
+  h += '<button class="card2" data-blank="1"' + (where === 'rail' ? ' id="palBlank"' : '') +
+       ' title="an empty canvas on the chosen physics package"><b>Blank canvas</b>' +
+       '<span class="sub">place sites by hand</span></button>';
   for (i = 0; i < gens.length; i++) {
-    h += '<button class="card2" data-gen="' + esc2(gens[i]) + '">' + esc2(gens[i]) + '</button>';
+    h += '<button class="card2" data-gen="' + esc2(gens[i]) + '" title="Machine.' +
+         esc2(gens[i]) + '(' + esc2(paramsLabel(generatorParams(gens[i]))) + ')"><b>' +
+         esc2(gens[i]) + '</b><span class="sub">' + esc2(generatorLabel(gens[i])) + '</span></button>';
   }
-  h += '</div>';
-  h += '<div class="mut" style="margin-top:5px;font-size:11px">a blank canvas borrows the ' +
-       'selected package’s curves, zone types and control block, because a device with ' +
-       'no <code>shuttle_segment</code> curve cannot be priced at all.</div>';
-  host.innerHTML = h;
-  var kids = host.querySelectorAll ? host.querySelectorAll('button') : [];
-  for (i = 0; i < (kids.length || 0); i++) wireStartButton(kids[i]);
+  return h + '</div>';
+}
+var NAME_EDIT = null;              // what was typed into #palName, or null for the default
+// A CLEARED BOX IS AN UNTOUCHED BOX: the generator or template stem names the device,
+// and a typed name replaces it.  The box itself is empty until something is typed, so
+// the placeholder can say the rule instead of a value the user has to delete first.
+function typedName() { var t = NAME_EDIT === null ? '' : String(NAME_EDIT).trim(); return t || null; }
+// what typing into #palName does, callable without an input event
+function setName(text) {
+  NAME_EDIT = (text === null || text === undefined) ? null : String(text);
+  var b = $('palName');
+  if (b) b.value = NAME_EDIT || '';
+  return typedName();
+}
+function defaultName(gen) { return typedName() || gen || 'design'; }
+// the physics package, as one <select>: `data-start="tpl"`, the picked stem selected
+function packageSelect(id) {
+  var stems = Q.templates(), td = D.template_devices || {}, i;
+  var on = PICKED_TEMPLATE || Q.templateDefault();
+  var h = '<select id="' + id + '" data-start="tpl" title="the zones, curves and control ' +
+          'block a new device borrows">';
+  for (i = 0; i < stems.length; i++) {
+    h += '<option value="' + esc2(stems[i]) + '"' + (on === stems[i] ? ' selected' : '') + '>' +
+         esc2(stems[i]) +
+         (td[stems[i]] ? ' · ' + esc2(td[stems[i]].generator) + ' ' +
+                         esc2(paramsLabel(td[stems[i]].params)) : '') +
+         '</option>';
+  }
+  return h + '</select>';
+}
+// the shipped devices, as one <select> and the button that opens the chosen one; `short`
+// lists the stems alone, for the 224 px rail
+function openPicker(id, short) {
+  var stems = Q.templates(), td = D.template_devices || {}, i;
+  var h = '<select id="' + id + '" data-start="open" title="a device this page ships, ' +
+          'opened as itself on its own physics">';
+  for (i = 0; i < stems.length; i++) {
+    if (!td[stems[i]]) continue;
+    h += '<option value="' + esc2(stems[i]) + '">' + esc2(stems[i]) +
+         (short ? '' : ' · ' + esc2(td[stems[i]].generator) + ' ' +
+                       esc2(paramsLabel(td[stems[i]].params))) +
+         '</option>';
+  }
+  return h + '</select><button data-open-pick="' + id + '" title="open the chosen device">' +
+         'open</button>';
+}
+// THE SHAPE BUTTONS ON THE EMPTY CANVAS.  Same verb as the tools bar and the rail; the
+// empty state is where a first-time reader is looking, so the shapes are named there in
+// the words the request used.
+function shapeButtons() {
+  var h = '', i;
+  for (i = 0; i < SK_ORDER.length; i++) {
+    var t = SK_ORDER[i];
+    h += '<button data-shape="' + t + '" data-hint="shape:' + t + '" aria-pressed="' +
+         (SKETCH === t ? 'true' : 'false') + '" title="' + esc2(SHAPE_DOC[t][1]) + '">' +
+         esc2(SHAPE_DOC[t][0]) + '</button>';
+  }
+  return h;
+}
+// the two stamps a hand-built device starts with, armed from the stage itself
+function armButtons() {
+  var kinds = [['site', 'Trapping site'], ['junction', 'Junction']], h = '', i;
+  for (i = 0; i < kinds.length; i++) {
+    h += '<button data-arm="' + kinds[i][0] + '" aria-pressed="' +
+         (ARMED_EL === kinds[i][0] ? 'true' : 'false') + '" title="arm the ' + kinds[i][1] +
+         ' stamp, then click the canvas to place one">' + kinds[i][1] + '</button>';
+  }
+  return h;
+}
+function wireStartControls(host) {
+  if (!host || !host.querySelectorAll) return;
+  var kids = host.querySelectorAll('button'), i;
+  for (i = 0; i < (kids.length || 0); i++) {
+    var b = kids[i];
+    if (b.getAttribute('data-open-pick')) wireStartOpen(b);
+    else if (b.getAttribute('data-arm')) wireArmButton(b);
+    else if (b.getAttribute('data-shape')) wireShapeButton(b);
+    else wireStartButton(b);
+  }
+  var sels = host.querySelectorAll('select');
+  for (i = 0; i < (sels.length || 0); i++) {
+    if (sels[i].getAttribute('data-start') === 'tpl') wireStartSelect(sels[i]);
+  }
+}
+function wireShapeButton(b) {
+  if (!b || !b.addEventListener) return;
+  b.addEventListener('click', function () {
+    sketchTool(b.getAttribute('data-shape'));
+    unfocus(b);
+  });
+}
+function renderStart() {
+  var host = $('palStartBody'), empty = $('stageEmpty');
+  var n = STATE ? nodesOf(STATE).length : 0;
+  if (host) {
+    var h = '';
+    h += '<h5>Draw the shape your ions travel on</h5>' +
+         '<div class="startrow">' + shapeButtons() + '</div>' +
+         '<div class="mut" style="margin:5px 0 9px;font-size:11px">drag one on the canvas: ' +
+         'the release lays trapping sites along it one lattice unit apart, declares the ' +
+         'orbit if the shape closed, and adds a junction where the new rail meets an ' +
+         'existing one. A corner is a <b>bend</b> (R18), not a junction.</div>';
+    h += '<div class="fieldrow"><label>physics</label>' + packageSelect('palTpl') + '</div>';
+    h += '<div class="fieldrow"><label>name</label>' +
+         '<input id="palName" value="' + esc2(typedName() || '') +
+         '" placeholder="named after the card you pick, unless you type one"></div>';
+    h += '<h5>Build a device</h5>' + startCards('rail');
+    h += '<div class="fieldrow"><label>open</label>' + openPicker('palOpen', true) + '</div>';
+    h += '<div class="mut" style="margin-top:5px;font-size:11px">a blank canvas borrows the ' +
+         'selected package’s curves, zone types and control block, because a device with ' +
+         'no <code>shuttle_segment</code> curve cannot be priced at all.</div>';
+    host.innerHTML = h;
+    wireStartControls(host);
+    var nameBox = $('palName');
+    if (nameBox && nameBox.addEventListener) {
+      nameBox.addEventListener('input', function () { NAME_EDIT = nameBox.value; });
+    }
+  }
+  // THE FOLD IS THE USER'S: `open` is whatever they last set it to.  It used to open
+  // itself on an empty stage, and being 900 px tall it pushed the element tiles the
+  // empty state pointed at off every laptop screen.  The stage carries the start now.
+  if (empty) {
+    empty.innerHTML = n ? '' :
+      '<h3>Draw the shape your ions travel on</h3>' +
+      '<div class="startrow"><span class="mut">press a shape, then drag on the canvas:</span>' +
+      shapeButtons() + '</div>' +
+      '<p class="mut">the release lays trapping sites along what you drew, one lattice ' +
+      'unit apart \u00b7 a closed shape also declares the orbit the machine can rotate \u00b7 ' +
+      'a corner is a <b>bend</b>, which R18 prices as ordinary transport, not a junction ' +
+      '\u00b7 a junction is added by itself where the new rail meets or crosses one that is ' +
+      'already there.</p>' +
+      '<h3>or start from a ready-made device</h3>' + startCards('stage') +
+      '<div class="startrow"><label>physics package ' + packageSelect('stageTpl') + '</label>' +
+      '<label>shipped device ' + openPicker('stageOpen') + '</label></div>' +
+      '<div class="startrow"><span class="mut">or build one by hand (Parts): press</span>' + armButtons() +
+      '<span class="mut">then click the canvas — a double-click on empty canvas also ' +
+      'places a site; shift-drag one site onto another joins them.</span></div>' +
+      '<p class="mut">a generator device comes with a <b>Test drive</b> programme and ' +
+      'animates at once.</p>' +
+      '<p class="mut">New here? Hover anything for what it is, press <b>Explain</b> (top right) to label ' +
+      'the parts of the screen, or <b>?</b> for the guide.</p>';
+    wireStartControls(empty);
+  }
+}
+
+// OPEN A SHIPPED DEVICE AS ITSELF.  `newCanvas({template})` yields an EMPTY canvas on
+// that package, which is not what "grid9x9" on a card promises; the device is
+// `from_template` with the generator and parameters the page ships for that stem.
+function newFromTemplate(stem, opts) {
+  opts = opts || {};
+  var td = (D.template_devices || {})[String(stem)];
+  if (!td) {
+    return { ok: false, problems: [{ code: 'no_template_device',
+      message: 'this page carries no device for template ' + Q.pyRepr(String(stem)) +
+               '; have: ' + Object.keys(D.template_devices || {}).sort().join(', ') }] };
+  }
+  var params = {};
+  for (var k in td.params) if (has(td.params, k)) params[k] = td.params[k];
+  return newFromGenerator(td.generator, params,
+                          { name: opts.name === undefined ? String(stem) : opts.name,
+                            template: String(stem) });
 }
 
 var PICKED_TEMPLATE = null;
+// A START CARD, callable without an Event: `{tpl}` picks the physics package; `{open}`,
+// `{gen}` or `{blank}` makes the device, named after what made it unless a name was
+// typed, and drives it at once.  A blank canvas has nothing to drive and that refusal is
+// silent: the status strip already says "no programme yet".
+function pressStartCard(card) {
+  card = card || {};
+  var tpl = card.tpl, gen = card.gen, open = card.open;
+  if (tpl) {
+    PICKED_TEMPLATE = String(tpl);
+    toast('ok', 'physics package: ' + tpl);
+    renderStart();
+    return { ok: true, tpl: PICKED_TEMPLATE, r: null, drive: null, name: null };
+  }
+  var nm = defaultName(gen || open || null);
+  var r;
+  if (open) r = newFromTemplate(open, { name: nm });
+  else if (gen) r = newFromGenerator(gen, generatorParams(gen), { name: nm, template: PICKED_TEMPLATE });
+  else r = newCanvas({ name: nm, template: PICKED_TEMPLATE });
+  if (!r.ok) {
+    toast('bad', (r.problems[0] || {}).message || 'refused');
+    return { ok: false, r: r, drive: null, name: nm };
+  }
+  var d = testDrive();
+  toast('ok', (open ? ('opened ' + open) : gen ? ('new ' + gen) : 'blank canvas') +
+              (d.ok ? (' · test drive: ' + d.frames + ' frames') : ''));
+  return { ok: true, r: r, drive: d, name: nm };
+}
 function wireStartButton(b) {
   if (!b || !b.addEventListener) return;
   b.addEventListener('click', function () {
-    var tpl = b.getAttribute('data-tpl'), gen = b.getAttribute('data-gen');
-    var nm = ($('palName') && $('palName').value) || 'design';
-    if (tpl) { PICKED_TEMPLATE = tpl; toast('ok', 'physics package: ' + tpl); renderStart(); return; }
-    var r;
-    if (gen) {
-      var sig = (D.generator_signatures || {})[gen] || { required: [], defaults: {} };
-      var params = {};
-      for (var k in sig.defaults) if (has(sig.defaults, k)) params[k] = sig.defaults[k];
-      // `generator_defaults` drops every REQUIRED positional, so a gallery built from it
-      // alone constructs an illegal call for four of the six generators.  The shipped
-      // `generator_signatures` names them and the palette supplies a starting value.
-      for (var j = 0; j < sig.required.length; j++) params[sig.required[j]] = 4;
-      r = newFromGenerator(gen, params, { name: nm, template: PICKED_TEMPLATE });
-    } else {
-      r = newCanvas({ name: nm, template: PICKED_TEMPLATE });
-    }
-    if (!r.ok) toast('bad', (r.problems[0] || {}).message || 'refused');
-    else toast('ok', gen ? ('new ' + gen) : 'blank canvas');
+    pressStartCard({ gen: b.getAttribute('data-gen'), open: b.getAttribute('data-open') });
   });
+}
+// the <select> for the physics package: choosing is the press
+function wireStartSelect(sel) {
+  if (!sel || !sel.addEventListener) return;
+  sel.addEventListener('change', function () { pressStartCard({ tpl: sel.value }); });
+}
+// the "open" button beside a shipped-device <select>, named by `data-open-pick`
+function wireStartOpen(b) {
+  if (!b || !b.addEventListener) return;
+  b.addEventListener('click', function () {
+    var sel = $(b.getAttribute('data-open-pick'));
+    if (sel && sel.value) pressStartCard({ open: sel.value });
+  });
+}
+// the stage's own "Trapping site" / "Junction": the palette tile's verb, from the stage
+function wireArmButton(b) {
+  if (!b || !b.addEventListener) return;
+  b.addEventListener('click', function () { arm(b.getAttribute('data-arm')); });
 }
 
 // ===================================================================== ELEMENT AVATARS
@@ -3418,8 +7355,8 @@ function elementAvatar(type, opt) {
   // 4. throwaway groups and registries -- nothing on the stage is touched
   var into = { loop: el('g', {}), seg: el('g', {}), elec: el('g', {}), node: el('g', {}),
                pin: el('g', {}) };
-  var reg = { SEGEL: {}, SEGINFO: {}, PAD_BY_SEG: {}, SEG_BY_PAIR: {},
-              NODEEL: {}, CAPTXT: {} };
+  var reg = { SEGEL: {}, SEGINFO: {}, PAD_BY_SEG: {}, PAD_BY_SITE: {}, SITE_SPAN: {},
+              SEG_BY_PAIR: {}, NODEEL: {}, CAPTXT: {} };
 
   // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> THE ONE CALL <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   buildStatic({ A: { nodes: nodes, segments: segments, loops: D0.loops },
@@ -3430,11 +7367,14 @@ function elementAvatar(type, opt) {
   // one pad energized, so "control plane" shows what it physically means: the electrodes
   // and the DACs that ramp them.  The stage's own `lastHot` mark, not a second one.
   if (opt.hot) {
+    // A PAIR, as the stage lights a pair: both electrodes across the RF null at one
+    // position.  The registry holds pair records now, so the avatar reads pair.pads.
     var pads = reg.PAD_BY_SEG[D0.onSeg || 's0'] || [];
     for (i = 0; i < pads.length; i++) {
-      if (Math.abs(pads[i].t - 0.5) < 0.2) {
-        pads[i].el.setAttribute('fill', C.dc_hot);
-        pads[i].el.setAttribute('opacity', 0.95);
+      if (Math.abs(pads[i].t - 0.5) >= 0.2) continue;
+      for (var hp = 0; hp < pads[i].pads.length; hp++) {
+        pads[i].pads[hp].el.setAttribute('fill', C.dc_hot);
+        pads[i].pads[hp].el.setAttribute('opacity', 0.95);
       }
     }
   }
@@ -3767,7 +7707,7 @@ function cmpInstantiate(spec, inst, dx, dy, quarter, extraLabels) {
       labs.push('cmp:' + inst);
       // AND WHICH COMPONENT, AT WHICH VARIANT. Without this, a placed instance's identity
       // has to be guessed from its node ids -- which is what `pinNode` used to do, and it
-      // cannot tell `ancilla_dock` from `trap_junction` because both call their first pin
+      // cannot tell `spur_dock` from `trap_junction` because both call their first pin
       // node 'j'. The label carries integers only, so no float formatting is involved.
       for (var li = 0; li < (extraLabels || []).length; li++) labs.push(extraLabels[li]);
       kw.labels = labs;
@@ -3819,6 +7759,13 @@ function stampComponent(name, x, y, quarter) {
   }
   var labels = vb ? [Q.variantLabel(name, vb, cmpSel(name).dim)] : [];
   var ops = cmpInstantiate(spec, inst, x, y, quarter || 0, labels);
+  // the same refusal a single site gets: a part dropped twice on one point would put
+  // eight pairs of nodes on eight points, and nothing downstream would say so
+  for (var oi = 0; oi < ops.length; oi++) {
+    if (ops[oi].method !== 'd.site' && ops[oi].method !== 'd.junction') continue;
+    var coin = coincidentAt(Number(Q.unbox(ops[oi].args[1])), Number(Q.unbox(ops[oi].args[2])));
+    if (coin) return { ok: false, problems: [coin] };
+  }
   var r = transaction(ops.map(function (o) { return { build: o }; }), 'place ' + name);
   r.instance = inst;
   return r;
@@ -3827,7 +7774,7 @@ function stampComponent(name, x, y, quarter) {
 // ---- PINS: what turns placed parts into an assembled machine -------------------
 //
 // A component declares PINS -- named nodes it expects to be joined to something else. An
-// `ancilla_dock` sitting next to a rail is two disconnected pieces; joined at its `rail`
+// `spur_dock` sitting next to a rail is two disconnected pieces; joined at its `rail`
 // pin it is a dock, and the rail node becomes degree 3, which is what makes the cost model
 // charge a junction on every rigid hop through it (R18). The difference between placing
 // parts and assembling a machine is exactly this call.
@@ -3837,9 +7784,9 @@ function stampComponent(name, x, y, quarter) {
 // mark on the stage, which `addNodeAt` already refuses for the same reason.
 // WHICH COMPONENT, AND AT WHICH VARIANT. This used to recover the answer by probing for
 // `inst + '.' + CMP[k].pins[0].node` and taking the first catalogue entry that matched --
-// which is wrong twice over. `ancilla_dock` and `trap_junction` BOTH call that node 'j'
+// which is wrong twice over. `spur_dock` and `trap_junction` BOTH call that node 'j'
 // and `CMP` is in sorted order, so every pin of a placed `trap_junction` resolved against
-// `ancilla_dock` and came back `no_pin`: the component whose whole purpose is "attach all
+// `spur_dock` and came back `no_pin`: the component whose whole purpose is "attach all
 // four arms" could not be attached at all. And once `n` is live, `linear_register`'s east
 // pin is `s{n-1}` rather than `s7`, so the probe would have welded a rail to a node that
 // EXISTS -- passing every existence check and putting the R18 junction charge silently in
@@ -3986,23 +7933,84 @@ function paletteEntry(type) {
   return null;
 }
 
+// THE SHAPE GROUP: what the rail leads with in Sketch mode.  The four tools, the sentence
+// that says what each one draws, and the one gesture that draws it -- the same buttons as
+// the ones in the tools bar, wired to the same verb, so neither can be armed while the
+// other says it is not.
+var SHAPE_DOC = {
+  rect: ['Rectangle', 'drag corner to corner', 'a closed rectangular rail: sites one lattice unit apart, a site at each corner'],
+  ellipse: ['Ellipse / circle', 'drag a box \u00b7 shift for a circle', 'a closed rounded rail, polygonised at one side per lattice unit'],
+  line: ['Line', 'drag end to end', 'an open register: no orbit to rotate'],
+  poly: ['Polyline', 'click, click, click', 'double-click or enter ends it open \u00b7 the first point again closes it']
+};
+function shapeSection() {
+  var sec = elh('div', 'palgrp'), i;
+  sec.setAttribute('data-kind', 'shape');
+  var h = elh('h5');
+  h.textContent = 'Draw the shape your ions travel on';
+  sec.append(h);
+  var grid = elh('div', 'palgrid');
+  for (i = 0; i < SK_ORDER.length; i++) {
+    (function (t) {
+      var doc = SHAPE_DOC[t], b = elh('button', 'pal-item');
+      b.setAttribute('data-el', 'shape:' + t);
+      b.setAttribute('data-kind', 'shape');
+      b.setAttribute('data-hint', 'shape:' + t);
+      b.setAttribute('aria-pressed', SKETCH === t ? 'true' : 'false');
+      var txt = elh('span', 'pal-text');
+      var nb = elh('b');
+      nb.textContent = doc[0];
+      var why = elh('i', 'pal-why');
+      why.textContent = doc[2];
+      var how = elh('i', 'pal-how');
+      how.textContent = doc[1];
+      txt.append(nb, why, how);
+      b.append(txt);
+      if (b.addEventListener) b.addEventListener('click', function () { sketchTool(t); unfocus(b); });
+      grid.append(b);
+    }(SK_ORDER[i]));
+  }
+  sec.append(grid);
+  return sec;
+}
+
 function renderPalette() {
   var host = $('palBody');
   if (!host) return;
   var pal = palette(), by = { stamp: [], named: [], row: [], block: [] }, i;
   for (i = 0; i < pal.length; i++) (by[pal[i].kind] || (by[pal[i].kind] = [])).push(pal[i]);
   host.replaceChildren();
+  // SKETCH MODE LEADS WITH THE SHAPES and puts the element tiles under "fill in the
+  // details" -- reachable, and second.  PARTS MODE IS EXACTLY WHAT IT WAS: the same
+  // sections, in the same order, with no extra heading.
+  if (designMode() === 'sketch') {
+    host.append(shapeSection());
+    var det = elh('h5', 'palnext');
+    det.textContent = 'or fill in the details by hand';
+    host.append(det);
+  }
   var order = ['stamp', 'named', 'row', 'block'];
   for (i = 0; i < order.length; i++) {
     if (!by[order[i]] || !by[order[i]].length) continue;
-    host.append(paletteSection(order[i], by[order[i]]));
+    var sec = paletteSection(order[i], by[order[i]]);
+    host.append(has(PAL_OPEN, order[i]) ? foldSection(order[i], sec, by[order[i]].length) : sec);
   }
   // A THROW HERE USED TO ABORT THE WHOLE BAR. `paint()` guards only the export box, so
   // an exception from a tile skipped `renderInspector`, `renderWrite` and `renderReport`
   // -- and kept skipping them, because whatever caused it persisted.
+  // "explode" acts on placed components, so it lives in their fold, last
+  var ex = elh('button', 'tool');
+  ex.setAttribute('id', 'palExplode');
+  ex.setAttribute('data-hint', 'explode');
+  ex.textContent = 'explode to explicit…';
+  wirePaletteButton(ex);
   try {
     var cmp = componentSection();
-    if (cmp) host.append(cmp);
+    if (cmp) {
+      var ncmp = cmp.querySelectorAll ? cmp.querySelectorAll('.pal-item').length : 0;
+      cmp.append(ex);
+      host.append(foldSection('component', cmp, ncmp));
+    } else host.append(ex);
   } catch (err) {
     var oops = elh('div', 'palgrp');
     var oh = elh('h5');
@@ -4011,13 +8019,10 @@ function renderPalette() {
     msg.textContent = 'the component menu could not be drawn: ' +
                       String(err && err.message ? err.message : err);
     oops.append(oh, msg);
-    host.append(oops);
+    host.append(oops, ex);
   }
-  var ex = elh('button', 'tool');
-  ex.setAttribute('id', 'palExplode');
-  ex.textContent = 'explode to explicit…';
-  wirePaletteButton(ex);
-  host.append(ex);
+  // the page's tools bar shows the folds as popovers and re-applies the open one here
+  if (typeof window !== 'undefined' && typeof window.onPalette === 'function') { try { window.onPalette(); } catch (err) { /* page hook */ } }
 }
 
 // ---- COMPONENTS: whole parts, not single elements ------------------------------------
@@ -4208,6 +8213,7 @@ function paletteItem(e) {
   b.setAttribute('data-el', e.type);
   b.setAttribute('data-kind', e.kind);
   b.setAttribute('data-add', e.verb || '');          // the exact call it will emit
+  b.setAttribute('data-hint', 'el:' + e.type);
   b.setAttribute('aria-pressed', ARMED_EL === e.type ? 'true' : 'false');
   var av = elh('span', 'avatar');
   var pic = cachedAvatar(e, avatarOptsFor(e));
@@ -4245,6 +8251,7 @@ function zoneStrip() {
     var z = names[i];
     var b = elh('button', 'zonechip');
     b.setAttribute('data-zone', z);
+    b.setAttribute('data-hint', 'el:zone_type');
     b.setAttribute('aria-pressed', NEW_ZONE === z ? 'true' : 'false');
     if (after[z]) {
       // declared after the seal: real, exportable, and unusable by a new site
@@ -4263,6 +8270,7 @@ function zoneStrip() {
   }
   var add = elh('button', 'zonechip');
   add.setAttribute('data-zone-new', '1');
+  add.setAttribute('data-hint', 'zone:new');
   add.textContent = '+ new zone type';
   wireZoneChip(add);
   strip.append(add);
@@ -4273,6 +8281,15 @@ function zoneStrip() {
 var ARMED_EL = null;
 var NEW_ZONE = null;              // the zone the next placed site inherits
 function armed() { return ARMED_EL; }
+// THE GHOST BELONGS TO THE ARMED TILE: whenever the armed element changes -- to another
+// tile, or to nothing -- the preview drawn for the old one goes with it, and the next
+// pointer move begins a ghost of the new one.  Without this the stage kept drawing a SITE
+// after the user had clicked Junction, and drew a ghost for a tile no longer armed.
+function setArmed(type) {
+  if (ARMED_EL === type) return;
+  ARMED_EL = type;
+  ghostCancel();
+}
 function arm(type) {
   // A COMPONENT ARMS LIKE A STAMP. It has no `palette()` entry -- that list is generated
   // from the schema and a component is not a schema element -- so it is matched by name
@@ -4286,9 +8303,8 @@ function arm(type) {
                     'Elements > zone type first, or this placement would be refused');
       return null;
     }
-    ARMED_EL = (ARMED_EL === type) ? null : type;
+    setArmed((ARMED_EL === type) ? null : type);
     FORM = null;
-    if (ARMED_EL) setMode('edit');
     paint();
     return ARMED_EL ? { type: ARMED_EL, kind: 'component', verb: 'component' } : null;
   }
@@ -4298,14 +8314,13 @@ function arm(type) {
   // than arming a stage gesture it does not have.  Arming all eleven and honouring two of
   // them is what made the old menu feel broken: arm `loop`, double-click, get a SITE.
   if (e && e.kind !== 'stamp') {
-    ARMED_EL = null;
+    setArmed(null);
     FORM = (FORM && FORM.type === type) ? null : { type: type };
     paint();
     return FORM ? { type: type, kind: e.kind, verb: e.verb, defaults: e.defaults } : null;
   }
-  ARMED_EL = (ARMED_EL === type || !type) ? null : type;
+  setArmed((ARMED_EL === type || !type) ? null : type);
   FORM = null;
-  if (ARMED_EL) setMode('edit');
   paint();
   return ARMED_EL ? { type: ARMED_EL, kind: e.kind, verb: e.verb, defaults: e.defaults }
                   : null;
@@ -4323,56 +8338,241 @@ function ghostGroup() {
                           gEdit.append(gGhost); }
   return gGhost;
 }
-function ghostMarks(type, x, y) {
+// The three things a POINT places: a site, a junction, a whole component.  A segment and
+// a loop are stamps too but have no single-point gesture, so they are not ghosted.
+function isStampType(t) {
+  return t === 'site' || t === 'junction' || String(t).slice(0, 4) === 'cmp:';
+}
+
+// The ghost's scene in DEVICE units at (x, y): one node for a site or a junction, and for
+// a component the very records `stampComponent` will replay, translated the way
+// `cmpInstantiate` translates them (quarter 0).  `componentScene` is what the menu tile
+// is drawn from, so the tile, the ghost and the placed part are one description.
+function ghostScene(type, x, y) {
+  var nodes = [], segs = [], loops = {}, i;
+  if (String(type).slice(0, 4) === 'cmp:') {
+    var sc = componentScene(String(type).slice(4));
+    if (!sc) return null;
+    for (i = 0; i < sc.nodes.length; i++) {
+      var q = sc.nodes[i], p2 = cmpTranslate(q[1], q[2], x, y, 0);
+      nodes.push([q[0], p2[0], p2[1], q[3], q[4], q[5]]);
+    }
+    segs = sc.segs; loops = sc.loops;
+  } else {
+    var z = defaultZone();
+    var cap = (A.zone_types && A.zone_types[z] && A.zone_types[z].capacity) || 1;
+    nodes.push(['__ghost', x, y, type, type === 'site' ? z : null, type === 'site' ? cap : 0]);
+  }
+  return { nodes: nodes, segs: segs, loops: loops };
+}
+
+function ghostMarks(type, x, y, scene) {
   var g = ghostGroup();
   if (!g) return;
   clearGroup(g);
-  if (!type || (type !== 'site' && type !== 'junction')) return;
-  var z = nearestZone() || Object.keys((A.zone_types || {})).sort()[0] || null;
-  var cap = (A.zone_types && A.zone_types[z] && A.zone_types[z].capacity) || 1;
-  var n = { id: '__ghost', x: x, y: y, kind: type,
-            zone: type === 'site' ? z : null, cap: type === 'site' ? cap : 0,
-            deg: 0, corner: false, labels: [], cap_explicit: true };
-  var byId = { __ghost: n };
-  var into = { loop: el('g', {}), seg: el('g', {}), elec: el('g', {}), node: g };
-  buildStatic({ A: { nodes: [n], segments: [], loops: {} }, L: L,
-                AXIS: { __ghost: { ux: 1, uy: 0 } }, role: {}, px: px, py: py, byId: byId,
-                into: into,
+  var sc = scene || (isStampType(type) ? ghostScene(type, x, y) : null);
+  if (!sc) return;
+  // the same drawing shape `syncArch` writes and `elementAvatar` builds, at STAGE scale
+  var byId = {}, nodes = [], segments = [], i, k;
+  for (i = 0; i < sc.nodes.length; i++) {
+    var q = sc.nodes[i], isJ = q[3] === 'junction', deg = 0;
+    for (k = 0; k < sc.segs.length; k++) if (sc.segs[k][1] === q[0] || sc.segs[k][2] === q[0]) deg++;
+    var n = { id: q[0], x: q[1], y: q[2], kind: isJ ? 'junction' : 'site',
+              zone: isJ ? null : (q[4] === undefined || q[4] === null ? defaultZone() : q[4]),
+              cap: isJ ? 0 : (q[5] === undefined ? 1 : q[5]),
+              deg: deg, corner: false, labels: [], cap_explicit: true };
+    byId[q[0]] = n; nodes.push(n);
+  }
+  for (i = 0; i < sc.segs.length; i++) {
+    segments.push({ id: sc.segs[i][0], a: sc.segs[i][1], b: sc.segs[i][2], loop: null,
+                    labels: [], cap: 1, len: 1, corner_endpoints: 0 });
+  }
+  var into = { loop: el('g', {}), seg: g, elec: el('g', {}), node: g };
+  buildStatic({ A: { nodes: nodes, segments: segments, loops: sc.loops }, L: L,
+                AXIS: axisOf(nodes, segments, px, py, byId), role: {}, px: px, py: py,
+                byId: byId, into: into,
                 reg: { SEGEL: {}, SEGINFO: {}, PAD_BY_SEG: {}, SEG_BY_PAIR: {},
                        NODEEL: {}, CAPTXT: {} } });
 }
+// A STAMP LANDS ON THE LATTICE, always: `snapTo(..., hard)`.  There is no drag whose
+// intent a window could be preserving, and a stamp 0.3 of a step off the grid is the
+// one placement that quietly shrinks every mark on the stage.
+function ghostPoint(mx, my) {
+  // on the lattice only while Snap is on: a stamp is free by the same rule a drag is
+  return snapTo((mx - L.ox) / (L.sx || 1), (my - L.oy) / (L.sy || 1), false, false, SNAP);
+}
+function setSnap(on) {
+  SNAP = !!on;
+  try { STORE.setItem(SNAP_KEY, SNAP ? '1' : '0'); } catch (err) { /* no store */ }
+  paint();
+  return SNAP;
+}
 function ghostBegin(type, mx, my) {
-  var e = paletteEntry(type);
-  if (!e || e.kind !== 'stamp') return null;
+  if (String(type).slice(0, 4) === 'cmp:') {
+    if (!CMP[String(type).slice(4)]) return null;
+  } else {
+    var e = paletteEntry(type);
+    if (!e || e.kind !== 'stamp') return null;
+  }
   ARMED_EL = type;
-  PGHOST = { type: type, mx: mx, my: my,
-             x: (mx - L.ox) / (L.sx || 1), y: (my - L.oy) / (L.sy || 1),
+  var sn = ghostPoint(mx, my);
+  PGHOST = { type: type, mx: mx, my: my, x: sn.x, y: sn.y, guides: sn.guides,
              valid: true, why: null };
   ghostMarks(type, PGHOST.x, PGHOST.y);
   return PGHOST;
 }
-function ghostMove(mx, my, opts) {
+function ghostMove(mx, my) {
   if (!PGHOST) return null;
-  opts = opts || {};
   var raw = { x: (mx - L.ox) / (L.sx || 1), y: (my - L.oy) / (L.sy || 1) };
-  var sn = snapTo(raw.x, raw.y, opts.free, opts.fine);
-  var h = hit(mx, my);
+  var sn = ghostPoint(mx, my);
+  // THE SNAPPED POINT IS WHAT LANDS, so the ghost's verdict is read there and not under
+  // the raw pointer: a hard snap can put the stamp on a node the pointer is 0.35 of a
+  // step away from, outside its hit halo.  `coincidentAt` over the ghost's own scene is
+  // the check the drop makes (`addNodeAt`, `addSite`, `stampComponent`), for every node
+  // of a component as much as for one site, so the preview and the refusal agree.
+  var sc = ghostScene(PGHOST.type, sn.x, sn.y), coin = null, h = null, i;
+  for (i = 0; sc && i < sc.nodes.length && !coin; i++) coin = coincidentAt(sc.nodes[i][1], sc.nodes[i][2]);
+  if (!coin && (PGHOST.type === 'site' || PGHOST.type === 'junction')) h = hit(mx, my);
+  // the boundary: the stamp's own box against every mark on the stage
+  var over = null;
+  for (i = 0; !coin && !h && sc && i < sc.nodes.length && !over; i++) {
+    var q = sc.nodes[i];
+    over = stampContact({ id: q[0], kind: q[3], cap: q[5] || 0 }, q[1], q[2]);
+  }
   PGHOST.x = sn.x; PGHOST.y = sn.y; PGHOST.mx = mx; PGHOST.my = my;
   PGHOST.guides = sn.guides;
-  PGHOST.valid = !h;
-  PGHOST.why = h ? (h.id + ' is already here') : null;
-  ghostMarks(PGHOST.type, sn.x, sn.y);
+  PGHOST.valid = !coin && !h && !over;
+  PGHOST.why = coin ? coin.message : h ? (h.id + ' is already here')
+            : over ? ('would overlap ' + over + ' \u2014 marks do not overlap') : null;
+  PGHOST.on = coin ? coin.targets[0] : h ? h.id : over;
+  ghostMarks(PGHOST.type, sn.x, sn.y, sc);
   return { x: sn.x, y: sn.y, snapped: (sn.x !== raw.x) || (sn.y !== raw.y),
-           guides: sn.guides, valid: PGHOST.valid, why: PGHOST.why };
+           guides: sn.guides, valid: PGHOST.valid, why: PGHOST.why, on: PGHOST.on };
 }
+// THE ONE DROP for everything a point places: the armed click, the double-click and the
+// harness's `stamp` step all come through here, so a site and a whole component are
+// placed by one path and cannot be refused for different reasons.
 function ghostDrop() {
   if (!PGHOST) return { ok: false, problems: [{ code: 'no_ghost',
     message: 'nothing is being placed' }] };
-  var t = PGHOST.type, x = PGHOST.x, y = PGHOST.y;
+  var t = PGHOST.type, x = PGHOST.x, y = PGHOST.y, why = PGHOST.valid ? null : PGHOST.why;
   ghostCancel();
+  // what the ghost said could not land does not land: on a mark, or overlapping one
+  if (why) {
+    return { ok: false, problems: [{ code: /overlap/.test(why) ? 'overlap' : 'blocked', message: why }] };
+  }
+  if (String(t).slice(0, 4) === 'cmp:') {
+    var r = stampComponent(String(t).slice(4), x, y, 0);
+    if (r.ok === false) return r;
+    r.ok = true;
+    return r;
+  }
   return placeStamp(t, x, y);
 }
 function ghostCancel() { PGHOST = null; clearGroup(ghostGroup()); }
+
+// A CLICK ON THE STAGE, callable without an Event.  With a stamp armed and nothing under
+// the pointer it PLACES -- the ghost is put where the press was and dropped, so the click
+// and the hover preview cannot disagree about where the element lands.  `segment` and
+// `loop` say what their gesture is on the first click instead of silently doing nothing.
+// Otherwise it selects: click = this one, shift-click = toggle, click empty = clear.
+function clickStage(mx, my, mods) {
+  mods = mods || {};
+  var h = hit(mx, my);
+  if (!h && ARMED_EL) {
+    // `mods.quiet`: the double-click's own two clicks have already said this
+    if (ARMED_EL === 'segment') {
+      if (!mods.quiet) toast('warn', 'a segment joins two nodes: drag from one node to another');
+      return { ok: false, placed: null, problems: [{ code: 'gesture', message: GESTURE.segment }] };
+    }
+    if (ARMED_EL === 'loop') {
+      if (!mods.quiet) toast('warn', 'a loop is a walk over nodes that already exist: select them in ' +
+                                     'orbit order, then press Close loop');
+      return { ok: false, placed: null, problems: [{ code: 'gesture', message: GESTURE.loop }] };
+    }
+    if (isStampType(ARMED_EL)) {
+      var t = ARMED_EL;
+      if (!PGHOST || PGHOST.type !== t) { ghostCancel(); ghostBegin(t, mx, my); }
+      ghostMove(mx, my);
+      // THE LATTICE POINT, NOT THE MARK RADIUS, IS WHAT A STAMP CLICK MEANS: the second
+      // click of a double-click lands on the point the first one filled, 28 px from a
+      // 9 px mark, so `hit()` sees nothing and the placement would be refused out loud
+      // twice.  A single node aimed at a point that holds one is a click on that node.
+      if (PGHOST && PGHOST.on && (t === 'site' || t === 'junction')) {
+        var on = PGHOST.on;
+        setSelection([{ kind: 'node', id: on }]);
+        if (typeof selectRef === 'function') selectRef('site', on);
+        return { ok: true, placed: null, selected: SELSET.slice() };
+      }
+      var pr = ghostDrop();
+      if (!pr.ok) {
+        var p0 = pr.problems[0] || {};
+        // a component is builder statements, and a generator device has no builder: say
+        // what to do rather than leak the interpreter's `no_builder`
+        toast('bad', p0.code === 'no_builder'
+          ? 'this device came from a generator, so a part cannot be added to it as builder ' +
+            'statements -- press "explode to explicit…" at the bottom of Elements first'
+          : (p0.message || 'refused'));
+      } else {
+        // ONE PLACEMENT PER ARMING.  The tile disarms the moment its element lands, so the
+        // pointer goes back to selecting and dragging and a stray click cannot drop a
+        // second site nobody asked for; press the tile again to place another, or hold
+        // shift to stay armed for a run of them (asked for 2026-09-17).
+        if (String(t).slice(0, 4) === 'cmp:') toast('ok', 'placed ' + String(t).slice(4));
+        if (!mods.shift) arm(null);
+      }
+      pr.placed = t;
+      return pr;
+    }
+  }
+  if (!h) { setSelection([]); return { ok: true, placed: null, selected: [] }; }
+  if (mods.shift) {
+    // shift-click TOGGLES, which is what every other editor does and what makes a
+    // marquee correctable without starting over
+    var was = false, keep = [];
+    for (var si = 0; si < SELSET.length; si++) {
+      if (SELSET[si].id === h.id && SELSET[si].kind === h.kind) was = true;
+      else keep.push(SELSET[si]);
+    }
+    setSelection(was ? keep : SELSET.concat([{ kind: h.kind, id: h.id }]));
+  } else setSelection([{ kind: h.kind, id: h.id }]);
+  // extend the EXISTING selection bus rather than building a second one
+  if (typeof selectRef === 'function') selectRef(h.kind === 'segment' ? 'segment' : 'site', h.id);
+  return { ok: true, placed: null, selected: SELSET.slice() };
+}
+
+// A DOUBLE-CLICK ON EMPTY STAGE PLACES A SITE.  With a stamp armed the two single clicks
+// that precede it have already placed through `clickStage` (the first placed, the second
+// selected what it placed), so the double-click itself does nothing more; a segment or
+// a loop armed gets its guidance, quietly, since the two clicks said it.  Otherwise this
+// is the un-armed gesture, and it is THE SAME APPLIER AS THE ARMED CLICK: `placeStamp`,
+// which hoists a `d.site` into the builder when the device has one and falls back to a
+// post-seal `add_site` when it does not.  It used to choose by node count -- the first
+// double-click through the builder, every later one through `add_site` -- so N0 lived
+// above the seal and N1 below it, and the segment joining them was refused with
+// "unknown endpoint 'N1'" on the very page the empty state points at.  One device, one
+// applier, one rule.
+function dblclickStage(mx, my) {
+  if (VIEW_ONLY) return;
+  if (hit(mx, my)) return null;
+  if (isStampType(ARMED_EL)) return null;
+  if (ARMED_EL) return clickStage(mx, my, { quiet: true });
+  var s = ghostPoint(mx, my);
+  // THE CLICK THAT PLACED HAS ALREADY RUN.  A stamp disarms as soon as it lands, so the
+  // second click of a double-click arrives with nothing armed and the point under it
+  // holds the node the first click placed: placing again there is a coincident refusal
+  // the user never asked for.  Selecting what is there is what a click on it would do.
+  var coin = coincidentAt(s.x, s.y);
+  if (coin && coin.targets && coin.targets.length) {
+    var onId = coin.targets[0];
+    setSelection([{ kind: 'node', id: onId }]);
+    if (typeof selectRef === 'function') selectRef('site', onId);
+    return { ok: true, placed: null, selected: SELSET.slice() };
+  }
+  var res = placeStamp('site', s.x, s.y);
+  if (!res.ok) toast('bad', (res.problems[0] || {}).message || 'refused');
+  return res;
+}
 
 // THE ONE PLACEMENT CALL, so the double-click, the armed click and the harness verb all
 // land on the same defaults.  `palette().defaults.node.capacity` is 0 and a capacity of 0
@@ -4380,17 +8580,56 @@ function ghostCancel() { PGHOST = null; clearGroup(ghostGroup()); }
 // supplies 1 when neither a zone nor a capacity is given, and a named zone supplies its
 // own.
 function placeStamp(type, x, y) {
+  var z = defaultZone();
+  // A GENERATOR DEVICE HAS NO BUILDER, so there is nothing to hoist a `d.site` into and
+  // the builder verb is refused with `no_builder` -- on every shipped page.  The node is
+  // a topology edit instead, applied AFTER the seal (so any declared zone is usable) and
+  // exported through the method whitelist: the same fallback `joinNodes` already makes
+  // to `addSegment`.  One gesture, the applier the device actually has.
+  if (!hasBuilder()) {
+    return addSite(x, y, null, { kind: type, zone: type === 'site' ? (z || null) : undefined });
+  }
   if (type === 'junction') return addNodeAt(x, y, { kind: 'junction' });
-  var z = nearestZone() || Object.keys((STATE && STATE.zone_types) || {}).sort()[0];
   if (z && postSeedZones()[z]) {
     return { ok: false, problems: [{ code: 'zone_after_seal', targets: [z],
-      message: "'" + z + "' was declared with set_zone AFTER the machine was sealed, and " +
-        "a site is a BUILDER statement, which is hoisted above the seal -- so Python " +
-        "would refuse it with \"no zone type '" + z + "' is declared\".  Place the site " +
-        'in a zone the physics package declares, or start the canvas from a package that ' +
-        'has this one.' }] };
+      message: "zone '" + z + "' was added after this device was sealed, so a new site " +
+               'cannot use it — pick another zone chip.' }] };
   }
   return addNodeAt(x, y, { kind: 'site', zone: z || undefined });
+}
+
+// WHICH ZONE TYPES THE SEAL DECLARES, read off the seed record itself.  `blank` and
+// `blank_device` carry them as `zones=` (names or a block); a `blank_device` with none
+// infers them from the builder's own sites, as Python's `_zonesOfDevice` does; a template
+// seed (`from_template`, `from_device`) borrows every zone the template's records declare.
+// Nothing is replayed to find out: the answer is in the record.
+function sealZones() {
+  var out = {}, i, k;
+  if (!SEED) return out;
+  var kw = SEED.kwargs || {};
+  if (SEED.method === 'blank' || SEED.method === 'blank_device') {
+    var zs = kw.zones;
+    if (Array.isArray(zs)) {
+      for (i = 0; i < zs.length; i++) out[String(zs[i])] = true;
+    } else if (zs && typeof zs === 'object') {
+      for (k in zs) if (has(zs, k)) out[k] = true;
+    } else if (SEED.method === 'blank_device') {
+      var calls = baseCallsFrom(GEOM, null, [], EDITS);
+      for (i = 0; i < calls.length; i++) {
+        var c = calls[i], cz = c.kwargs && c.kwargs.zone;
+        if (c.method === 'd.site' && cz !== undefined && cz !== null) out[String(Q.unbox(cz))] = true;
+      }
+    }
+    return out;
+  }
+  var key = (kw.template === undefined || kw.template === null || String(kw.template) === '')
+    ? Q.templateDefault() : String(kw.template);
+  var recs = ((D.templates || {})[key]) || [];
+  for (i = 0; i < recs.length; i++) {
+    var r = recs[i];
+    if (r && r.method === 'set_zone' && r.args && r.args.length) out[String(r.args[0])] = true;
+  }
+  return out;
 }
 
 // WHICH ZONE TYPES A NEW SITE CANNOT USE.  `set_zone` is a post-seal MUTATE and `d.site`
@@ -4400,12 +8639,17 @@ function placeStamp(type, x, y) {
 // format, not of this menu, so the menu says so instead of offering the trap.
 //
 // Read off the LISTING, which is the only thing that knows the order: any `set_zone`
-// after the seed, whether it shipped with the page or you just typed it.
+// after the seed that the seed itself did not declare.  Every shipped listing retunes
+// each zone with `set_zone` after the seal -- which is legal for a zone the seal already
+// named -- and counting those as "added after the seal" is what refused the first click
+// on "Trapping site" on every shipped page (measured: `zone_after_seal` on all four).
 function postSeedZones() {
-  var out = {}, i, recs = POST.concat(EDITS);
+  var out = {}, i, recs = POST.concat(EDITS), pre = sealZones();
   for (i = 0; i < recs.length; i++) {
     var r = recs[i];
-    if (r && r.method === 'set_zone' && r.args && r.args.length) out[String(r.args[0])] = true;
+    if (r && r.method === 'set_zone' && r.args && r.args.length && !pre[String(r.args[0])]) {
+      out[String(r.args[0])] = true;
+    }
   }
   return out;
 }
@@ -4431,6 +8675,27 @@ function closeLoopFromSelection(opts) {
   return closeLoop(id, walk, closed, closed ? 'ring' : 'path');
 }
 
+// THE ZONE A NEW SITE GETS when nothing says otherwise: the chip the user picked, else
+// the zone of the first node on the stage, else the first declared zone type by name.
+// One rule, read by the double-click, the ghost and the armed stamp alike.
+// WHAT ZONE A HAND-PLACED SITE LANDS IN.  The fallback used to be
+// `Object.keys(zone_types).sort()[0]`, which is alphabetical order, which on every shipped
+// package is `ancilla` -- so the first site anyone placed on an empty canvas came out as a
+// code's ancilla rather than as a trap.  Alphabetical order is not a preference, it is an
+// accident of spelling.  Prefer the zones that describe HARDWARE, most general first: a
+// plain trap, then storage, then a gate-only zone, then the loading zone.  Anything else
+// (a code's own vocabulary, or a name this device invented) is used only when the package
+// declares nothing better, and `nearestZone()` still wins when there is a device to copy.
+var ZONE_PREFERENCE = ['trap', 'data', 'gate', 'load'];
+function defaultZone() {
+  var near = nearestZone();
+  if (near) return near;
+  var have = (STATE && STATE.zone_types) || {};
+  for (var i = 0; i < ZONE_PREFERENCE.length; i++) {
+    if (has(have, ZONE_PREFERENCE[i])) return ZONE_PREFERENCE[i];
+  }
+  return Object.keys(have).sort()[0] || null;
+}
 function nearestZone() {
   if (NEW_ZONE) return NEW_ZONE;
   var ns = nodesOf(STATE);
@@ -4465,6 +8730,734 @@ function wireZoneChip(b) {
     toast('ok', NEW_ZONE ? ('new sites will be ' + NEW_ZONE) : 'new sites take the nearest zone');
     paint();
   });
+}
+
+// ============================================================ THE RIGHT-CLICK MENU
+//
+// WHAT IS UNDER THE POINTER, AND EVERY VERB THAT APPLIES TO IT.  Until this existed the
+// only way to reach a site's capacity was the Selection popover, which opened itself on
+// every click and was the busiest thing on the page; the only way to change a zone was to
+// retype the statement in the text lane; and a rail could not be subdivided at all
+// without knowing that `add_site(on=...)` existed.
+//
+// IT ADDS NO VERB AND NO PERSISTENCE.  Every item below is an adapter onto a function
+// that already shipped -- `removeSelected`, `arm`, `emit`, `transaction`, `add_site`,
+// `closeLoopFromSelection`, `explodeToExplicit` -- so the menu cannot do anything the
+// rest of the page could not already do, and cannot disagree with it about what is
+// refused.
+//
+// EVENT-FREE, like every other gesture on this page: `menuOpen` / `menuItems` /
+// `menuInvoke` / `menuClose` / `menuState` are the whole of it, and the pointer handler
+// is a one-line adapter.  `tests/shim.mjs` has no events, no `classList`, no timers and
+// a `remove()` that does nothing, so anything that lived inside a listener would be
+// logic with no test.
+var MENU = null;          // { mx, my, cx, cy, subject, sub }
+var MDLG = null;          // the Modify panel, anchored where the menu was
+
+// the inverse of `toModel`: where a stage point sits on the screen, so the panel opens
+// under the pointer without the caller having to carry client coordinates
+function toClient(x, y) {
+  var f = fitBox();
+  return { x: (f.r.left || 0) + f.ox + (x - VB.x) * f.k,
+           y: (f.r.top || 0) + f.oy + (y - VB.y) * f.k };
+}
+// stage pixels -> LATTICE units, the coordinates every record is written in
+function latticeAt(mx, my) {
+  return { x: (mx - L.ox) / (L.sx || 1), y: (my - L.oy) / (L.sy || L.sx || 1) };
+}
+function subjectWord(kind) {
+  return kind === 'site' ? 'trapping site' : kind === 'junction' ? 'junction'
+       : kind === 'segment' ? 'rail' : kind === 'loop' ? 'transport loop' : String(kind);
+}
+function subjectAlive(s) {
+  if (!s || !STATE || !STATE.device) return false;
+  if (s.kind === 'loop') return has(STATE.device.loops || {}, s.id);
+  if (s.kind === 'segment') return has(STATE.device.segments, s.id);
+  return has(STATE.device.nodes, s.id);
+}
+// THE ONE SENTENCE FOR "a loop has no delete verb", so `removeSelected` and the menu's
+// disabled item cannot drift into two different explanations of the same gap.
+function noRemoveLoopWhy(id) {
+  return id + ' is a transport loop; there is no delete verb for one yet -- delete one ' +
+         'of its segments to open it, or edit the loop in the text lane.';
+}
+
+function menuOpen(mx, my, opts) {
+  opts = opts || {};
+  // THE WEBSITE'S EMBEDS ARE READ-ONLY and `claim` already answers 'pan' for every press
+  // there, so this is unreachable from the pointer -- but a harness can call it, and a
+  // menu of edits on a page where nothing may be edited would be a lie.
+  if (VIEW_ONLY) return null;
+  var h = hit(mx, my);
+  if (!h) { menuClose(); return null; }
+  var sub = { kind: normKind(h.kind, h.id), id: h.id };
+  // THE PRESS SELECTS WHAT IS UNDER IT -- unless that is already part of the selection,
+  // in which case the selection stands and the menu acts on all of it.  Right-clicking
+  // one member of a marquee to delete the other nine would be the worst kind of surprise.
+  var inSel = false, i;
+  for (i = 0; i < SELSET.length; i++) {
+    if (SELSET[i].id === sub.id && SELSET[i].kind === sub.kind) inSel = true;
+  }
+  if (!inSel) {
+    setSelection([{ kind: sub.kind, id: sub.id }]);
+    if (typeof selectRef === 'function') {
+      selectRef(sub.kind === 'segment' ? 'segment' : 'site', sub.id);
+    }
+  }
+  var pt = (opts.cx === undefined) ? toClient(mx, my) : { x: opts.cx, y: opts.cy };
+  MDLG = null;
+  MENU = { mx: mx, my: my, cx: pt.x, cy: pt.y, subject: sub, sub: null };
+  paintMenu();
+  return menuState();
+}
+function menuClose() {
+  var was = !!(MENU || MDLG);
+  MENU = null; MDLG = null;
+  paintMenu();
+  return was;
+}
+
+function menuItem(id, label, enabled, why, hint) {
+  return { kind: 'item', id: id, label: label, enabled: !!enabled, why: why || '',
+           hint: hint || 'menu:item' };
+}
+
+// WHY a builder-backed field cannot be written, in the device's own terms -- or '' when
+// it can.  A generator device has no builder at all; a node added after the seal as a
+// topology edit has a builder but no statement of its own to rewrite.
+function builderWhy(method, id) {
+  if (!hasBuilder()) {
+    return 'this device came from a generator, so it has no builder statements to ' +
+           'rewrite -- explode it to explicit geometry first.';
+  }
+  if (!builderRecordFor(method, id)) {
+    return id + ' was added after the seal as a topology edit, so there is no ' + method +
+           ' statement to rewrite. Explode to explicit geometry to get one.';
+  }
+  return '';
+}
+// The LAST builder statement that names this object, which is the one in force: a
+// rewrite is another statement of the same kind, and `d.site` overwrites by id.
+function builderRecordFor(method, id) {
+  var calls = baseCalls(), found = null;
+  for (var i = 0; i < calls.length; i++) {
+    if (calls[i].method === method && String((calls[i].args || [])[0]) === String(id)) {
+      found = calls[i];
+    }
+  }
+  if (!found) return null;
+  var kw = {}, k;
+  for (k in (found.kwargs || {})) if (has(found.kwargs, k)) kw[k] = found.kwargs[k];
+  return { method: found.method, args: (found.args || []).slice(), kwargs: kw };
+}
+// ONE BUILDER RECORD, REWRITTEN.  `d.site`/`d.segment`/`d.loop` all key on the id, so a
+// second statement with the same id replaces the first -- this is the same path
+// `addNodeAt` and `joinNodes` take, with the args carried through verbatim so a rewrite
+// of the zone cannot silently move the node.
+function rewriteBuilder(method, id, changes, label) {
+  var why = builderWhy(method, id);
+  if (why) return { ok: false, problems: [{ code: 'no_builder_record', message: why }] };
+  var rec = builderRecordFor(method, id), k;
+  for (k in (changes || {})) if (has(changes, k)) {
+    if (changes[k] === null || changes[k] === undefined) delete rec.kwargs[k];
+    else rec.kwargs[k] = changes[k];
+  }
+  return transaction([{ build: rec }], label || ('modify ' + id));
+}
+
+// THE ZONE SUBMENU: the zone types this device declares, each one applied to the site
+// under the pointer.  A zone declared AFTER the seal is offered but disabled with the
+// sentence the zone chips already give, because a builder statement is hoisted above the
+// seal and could not name it.
+function zoneMenuItem(sub) {
+  var zt = (STATE && STATE.zone_types) || {};
+  var names = Object.keys(zt).sort();
+  var why = builderWhy('d.site', sub.id);
+  if (!why && !names.length) why = 'this device declares no zone types';
+  var post = postSeedZones();
+  var kids = names.map(function (z) {
+    var w = why || (post[z]
+      ? (z + ' was declared after the machine was sealed; a site cannot use it, because ' +
+         'builder statements are hoisted above the seal')
+      : '');
+    var cap = zt[z] && zt[z].capacity !== undefined ? Q.unbox(zt[z].capacity) : '?';
+    return menuItem('zone:' + z, z + ' · holds ' + cap, !w, w, 'menu:zone');
+  });
+  return { kind: 'submenu', id: 'zone', label: 'Set zone', enabled: !why, why: why,
+           hint: 'menu:zone', items: kids };
+}
+
+// Would `closeLoopFromSelection` work?  Asked without calling it, because asking must not
+// commit -- the same walk it builds, and the same sentence it refuses with.
+function closeLoopReady() {
+  var walk = [], i;
+  for (i = 0; i < SELSET.length; i++) {
+    if (SELSET[i].kind === 'segment' || SELSET[i].kind === 'loop') continue;
+    if (walk.indexOf(SELSET[i].id) < 0) walk.push(SELSET[i].id);
+  }
+  if (walk.length < 3) {
+    return { ok: false, why: 'a loop needs at least three nodes; select them in orbit ' +
+                             'order first (' + walk.length + ' selected)' };
+  }
+  return { ok: true, why: '' };
+}
+
+function menuItems() {
+  if (!MENU || !subjectAlive(MENU.subject)) return [];
+  var sub = MENU.subject, out = [], i;
+  var sel = SELSET.slice(), kinds = {}, kindList;
+  for (i = 0; i < sel.length; i++) kinds[sel[i].kind] = 1;
+  kindList = Object.keys(kinds).sort();
+  var multi = sel.length > 1;
+  var inst = instanceAt(sub.id);
+
+  out.push({ kind: 'head', id: 'head', enabled: false, why: '',
+             label: multi ? (sel.length + ' selected · ' + kindList.join(' + '))
+                          : (sub.id + ' · ' + subjectWord(sub.kind)) });
+
+  if (multi) {
+    var same = kindList.length === 1;
+    out.push(menuItem('modify', 'Modify…', same,
+      same ? '' : ('the selection mixes ' + kindList.join(' and ') +
+                   '; one form cannot describe them all'), 'menu:modify'));
+    var loopIn = null;
+    for (i = 0; i < sel.length; i++) if (sel[i].kind === 'loop') loopIn = sel[i].id;
+    out.push(menuItem('delete', 'Delete (' + sel.length + ')', !loopIn,
+                      loopIn ? noRemoveLoopWhy(loopIn) : '', 'menu:delete'));
+  } else if (sub.kind === 'site') {
+    out.push(menuItem('modify', 'Modify…', true, '', 'menu:modify'));
+    out.push(zoneMenuItem(sub));
+    out.push(menuItem('place', 'Place another one of these', true, '', 'menu:place'));
+    out.push(menuItem('delete', 'Delete', true, '', 'menu:delete'));
+  } else if (sub.kind === 'junction') {
+    // A JUNCTION HAS NO ZONE AND NO CAPACITY -- `DeviceBuilder.junction` raises TypeError
+    // on either -- so there is nothing to set and nothing to copy: two items, and both
+    // of them do something.
+    out.push(menuItem('modify', 'Modify…', true, '', 'menu:modify'));
+    out.push(menuItem('delete', 'Delete', true, '', 'menu:delete'));
+  } else if (sub.kind === 'segment') {
+    out.push(menuItem('modify', 'Modify…', true, '', 'menu:modify'));
+    var iw = insertWhy(sub.id);
+    out.push(menuItem('insert-site', 'Insert a trapping site here', !iw, iw, 'menu:insert'));
+    out.push(menuItem('delete', 'Delete', true, '', 'menu:delete'));
+  } else if (sub.kind === 'loop') {
+    out.push(menuItem('modify', 'Modify…', true, '', 'menu:modify'));
+    // NOT A DEAD BUTTON AND NOT A HIDDEN ONE: the verb does not exist, so the item says
+    // so and says what to do instead.  Offering it and refusing on the click would be
+    // the same information one gesture later.
+    out.push(menuItem('delete', 'Delete', false, noRemoveLoopWhy(sub.id), 'menu:delete'));
+  }
+
+  if (inst) {
+    out.push({ kind: 'head', id: 'cmp', enabled: false, why: '',
+               label: 'part of ' + String(inst).replace(/_/g, ' ') });
+    out.push(menuItem('select-component', 'Select the whole component', true, '', 'menu:component'));
+    out.push(menuItem('delete-component', 'Delete the whole component', true, '', 'menu:component'));
+  }
+
+  var cl = closeLoopReady();
+  out.push(menuItem('close-loop', 'Close loop', cl.ok, cl.why, 'menu:close-loop'));
+  return out;
+}
+function menuFlat() {
+  var items = menuItems(), out = [], i, j;
+  for (i = 0; i < items.length; i++) {
+    out.push(items[i]);
+    for (j = 0; j < (items[i].items || []).length; j++) out.push(items[i].items[j]);
+  }
+  return out;
+}
+
+// Why a rail cannot take a site dropped into it, or '' when it can.
+function insertWhy(segId) {
+  var sg = (STATE && STATE.device) ? STATE.device.segments[segId] : null;
+  if (!sg) return 'no such rail';
+  return '';
+}
+// THE SUBDIVIDE GESTURE: `add_site(on="<segment>")`, which is the only add that can put a
+// node onto a transport loop -- it is the only one with an unambiguous splice index (see
+// qccd/arch/edit.py).  The new site lands at the point of the rail nearest the pointer.
+function insertSiteOn(segId, mx, my) {
+  var dev = STATE && STATE.device;
+  var sg = dev ? dev.segments[segId] : null;
+  if (!sg) return { ok: false, problems: [{ code: 'no_segment', message: 'no rail ' + segId }] };
+  var na = dev.nodes[sg.a], nb = dev.nodes[sg.b];
+  if (!na || !nb) return { ok: false, problems: [{ code: 'no_endpoint',
+    message: segId + ' has an endpoint this device does not have' }] };
+  var ax = +Q.unbox(na.pos[0]), ay = +Q.unbox(na.pos[1]);
+  var bx = +Q.unbox(nb.pos[0]), by = +Q.unbox(nb.pos[1]);
+  var p = latticeAt(mx, my);
+  var dx = bx - ax, dy = by - ay, d2 = dx * dx + dy * dy;
+  var t = d2 > 1e-12 ? ((p.x - ax) * dx + (p.y - ay) * dy) / d2 : 0.5;
+  // never on top of an endpoint: two nodes at one point make `min_nearest_neighbour`
+  // skip the pair and every mark on the stage silently becomes the wrong size
+  t = Math.max(0.2, Math.min(0.8, t));
+  var x = Q.pyFloat(Math.round((ax + t * dx) * 1000) / 1000);
+  var y = Q.pyFloat(Math.round((ay + t * dy) * 1000) / 1000);
+  // the zone an endpoint already carries, else whatever a hand-placed site would get
+  var z = (na.kind === 'site' && na.zone) ? na.zone
+        : (nb.kind === 'site' && nb.zone) ? nb.zone : defaultZone();
+  var args = { id: freshId('N'), pos: [x, y], labels: ['added'], on: segId,
+               zone: z || null, capacity: z ? 0 : 1, zone_types: STATE.zone_types };
+  var op = { topology: { op: 'add_site', args: args },
+             meta: { group: 'g' + (++GROUP), src: 'menu' } };
+  var r = tryTopology(op);
+  if (r.ok) { r.id = args.id; setSelection([{ kind: 'site', id: args.id }]); }
+  return r;
+}
+
+function menuInvoke(id) {
+  if (!MENU) {
+    return { ok: false, problems: [{ code: 'no_menu', message: 'no menu is open' }] };
+  }
+  var flat = menuFlat(), it = null, i;
+  for (i = 0; i < flat.length; i++) if (flat[i].id === id) it = flat[i];
+  if (!it) {
+    return { ok: false, problems: [{ code: 'no_item', message: 'no menu item ' + id }] };
+  }
+  if (it.kind === 'head') {
+    return { ok: false, problems: [{ code: 'not_an_action',
+      message: it.label + ' names what the menu is about; it is not an action' }] };
+  }
+  // A DISABLED ITEM STATES ITS REASON and does nothing.  It is never hidden: a verb that
+  // does not exist here is a fact about the device, and hiding it leaves the user
+  // hunting for a menu item that was never going to be there.
+  if (!it.enabled) {
+    toast('warn', it.why);
+    return { ok: false, problems: [{ code: 'disabled', message: it.why }] };
+  }
+  var sub = MENU.subject, r;
+  if (it.kind === 'submenu') {
+    MENU.sub = (MENU.sub === it.id) ? null : it.id;
+    paintMenu();
+    return { ok: true, submenu: MENU.sub };
+  }
+  if (id === 'modify') return modifyOpen();
+  if (String(id).slice(0, 5) === 'zone:') {
+    var z = String(id).slice(5);
+    r = rewriteBuilder('d.site', sub.id, { zone: z }, 'set zone');
+    toast(r.ok ? 'ok' : 'bad', r.ok ? (sub.id + ' is now ' + z)
+                                    : ((r.problems[0] || {}).message || 'refused'));
+    if (r.ok) menuClose();
+    return r;
+  }
+  if (id === 'place') {
+    arm(sub.kind === 'junction' ? 'junction' : 'site');
+    menuClose();
+    return { ok: true, armed: armed() };
+  }
+  if (id === 'delete') {
+    r = removeSelected();
+    if (r && !r.ok && r.problems.length) toast('bad', r.problems[0].message);
+    menuClose();
+    return r;
+  }
+  if (id === 'insert-site') {
+    r = insertSiteOn(sub.id, MENU.mx, MENU.my);
+    toast(r.ok ? 'ok' : 'bad', r.ok ? (r.id + ' dropped into ' + sub.id)
+                                    : ((r.problems[0] || {}).message || 'refused'));
+    menuClose();
+    return r;
+  }
+  if (id === 'select-component') {
+    var mem = instanceMembers(instanceAt(sub.id));
+    setSelection(mem);
+    menuClose();
+    return { ok: true, selected: mem.length };
+  }
+  if (id === 'delete-component') {
+    setSelection(instanceMembers(instanceAt(sub.id)));
+    r = removeSelected();
+    if (r && !r.ok && r.problems.length) toast('bad', r.problems[0].message);
+    menuClose();
+    return r;
+  }
+  if (id === 'close-loop') {
+    r = closeLoopFromSelection({});
+    toast(r.ok ? 'ok' : 'bad', r.ok ? 'loop closed'
+                                    : ((r.problems[0] || {}).message || 'refused'));
+    menuClose();
+    return r;
+  }
+  return { ok: false, problems: [{ code: 'no_item', message: 'no menu item ' + id }] };
+}
+
+function menuState() {
+  var strip = function (it) {
+    return { id: it.id, kind: it.kind, label: it.label, enabled: !!it.enabled,
+             why: it.why || '',
+             items: (it.items || []).map(function (k) {
+               return { id: k.id, label: k.label, enabled: !!k.enabled, why: k.why || '' };
+             }) };
+  };
+  return {
+    open: !!MENU, dialog: !!MDLG,
+    at: MENU ? [MENU.mx, MENU.my] : (MDLG ? [MDLG.mx, MDLG.my] : null),
+    subject: MENU ? { kind: MENU.subject.kind, id: MENU.subject.id }
+           : (MDLG ? { kind: MDLG.kind, id: MDLG.ids[0] } : null),
+    submenu: MENU ? MENU.sub : null,
+    selection: SELSET.map(function (s) { return s.kind + ':' + s.id; }),
+    items: (MENU ? menuItems() : []).map(strip),
+    fields: MDLG ? modifyFields().map(function (f) {
+      return { name: f.name, value: f.value === null ? '' : String(f.value),
+               layer: f.layer, enabled: !!f.enabled, why: f.why || '',
+               mixed: !!f.mixed }; }) : [],
+    why: MDLG ? MDLG.why : '',
+    explode: MDLG ? !!MDLG.explode : false,
+    confirm: MDLG ? !!MDLG.confirm : false
+  };
+}
+
+// ------------------------------------------------------------------- the Modify panel
+//
+// THE FIELDS ARE NOT A LITERAL LIST.  Each row names a field of the SCHEMA (through
+// `paletteEntry(kind).fields`, which is generated from the shipped schema), so a field
+// the file format stops carrying disappears from this panel rather than becoming a form
+// that writes something no loader accepts.  `layer` says which applier owns it:
+//
+//   mutate  -- `emit({method, args, kwargs})`: validated, committed, rolled back on a
+//              refusal.  Works on EVERY device, generator or hand-built, because these
+//              are post-seal retunes.
+//   builder -- ONE `d.site` / `d.segment` / `d.loop` record rewritten through
+//              `transaction`, the same path `addNodeAt` / `joinNodes` / `closeLoop` take.
+//              A generator device has no builder, so these rows are DISABLED with the
+//              reason and the panel offers the one thing that would fix it.
+var MOD_SPEC = {
+  site: [
+    { name: 'capacity', schema: 'capacity', layer: 'mutate', type: 'integer',
+      note: 'ions this trap holds · set_site_capacity' },
+    { name: 'x', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
+    { name: 'y', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
+    { name: 'zone', schema: 'zone_type', layer: 'builder', type: 'string',
+      note: 'what may happen here · d.site(zone=)' },
+    { name: 'labels', schema: 'labels', layer: 'builder', type: 'list',
+      note: 'space separated · d.site(labels=)' }
+  ],
+  junction: [
+    { name: 'x', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
+    { name: 'y', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' }
+  ],
+  segment: [
+    { name: 'length', schema: 'length', layer: 'mutate', type: 'number',
+      note: 'lattice units · set_segment_length' },
+    { name: 'capacity', schema: 'capacity', layer: 'builder', type: 'integer',
+      note: 'ions in flight · d.segment(capacity=)' },
+    { name: 'loop', schema: 'loop', layer: 'builder', type: 'string',
+      note: 'the orbit this rail lies on · "none" clears it' },
+    { name: 'labels', schema: 'labels', layer: 'builder', type: 'list',
+      note: 'space separated · d.segment(labels=)' }
+  ],
+  loop: [
+    { name: 'closed', schema: 'closed', layer: 'builder', type: 'boolean',
+      note: 'true is a ring the machine can rotate' },
+    { name: 'kind', schema: 'kind', layer: 'builder', type: 'string', note: 'ring or path' },
+    { name: 'note', schema: 'note', layer: 'builder', type: 'string', note: 'free text' }
+  ]
+};
+var MOD_BUILD = { site: 'd.site', junction: 'd.junction', segment: 'd.segment', loop: 'd.loop' };
+
+function num3(v) {
+  var n = Number(Q.unbox(v));
+  if (!isFinite(n)) return '';
+  return String(Math.round(n * 1000) / 1000);
+}
+function modifyValue(kind, id, name) {
+  var dev = STATE && STATE.device;
+  if (!dev) return null;
+  if (kind === 'site' || kind === 'junction') {
+    var n = dev.nodes[id];
+    if (!n) return null;
+    if (name === 'capacity') return n.cap;
+    if (name === 'x') return num3(n.pos[0]);
+    if (name === 'y') return num3(n.pos[1]);
+    if (name === 'zone') return n.zone || '';
+    if (name === 'labels') return (n.labels || []).join(' ');
+  } else if (kind === 'segment') {
+    var s = dev.segments[id];
+    if (!s) return null;
+    if (name === 'length') return num3(s.length);
+    if (name === 'capacity') return s.cap;
+    if (name === 'loop') return s.loop || '';
+    if (name === 'labels') return (s.labels || []).join(' ');
+  } else if (kind === 'loop') {
+    var lp = (dev.loops || {})[id];
+    if (!lp) return null;
+    if (name === 'closed') return lp.closed ? 'true' : 'false';
+    if (name === 'kind') return lp.kind || 'ring';
+    if (name === 'note') return lp.note === null || lp.note === undefined ? '' : String(lp.note);
+  }
+  return null;
+}
+// the rows the SCHEMA still admits for this kind, in the order above
+function modifySpec(kind) {
+  var spec = MOD_SPEC[kind] || [], e = paletteEntry(kind), known = {}, out = [], i;
+  var fs = (e && e.fields) || [];
+  for (i = 0; i < fs.length; i++) known[fs[i].name] = fs[i];
+  for (i = 0; i < spec.length; i++) if (has(known, spec[i].schema)) out.push(spec[i]);
+  return out;
+}
+function modifyFields() {
+  if (!MDLG) return [];
+  var spec = modifySpec(MDLG.kind), out = [], i, j;
+  var ids = MDLG.ids, multi = ids.length > 1, noBuilder = false;
+  for (i = 0; i < spec.length; i++) {
+    var f = spec[i], why = '';
+    var vals = [];
+    for (j = 0; j < ids.length; j++) vals.push(modifyValue(MDLG.kind, ids[j], f.name));
+    var mixed = false;
+    for (j = 1; j < vals.length; j++) if (String(vals[j]) !== String(vals[0])) mixed = true;
+    if (f.one && multi) {
+      why = 'a position belongs to one ' + subjectWord(MDLG.kind) +
+            '; ' + ids.length + ' of them cannot share it. Drag them instead.';
+    } else if (f.layer === 'builder') {
+      for (j = 0; j < ids.length && !why; j++) why = builderWhy(MOD_BUILD[MDLG.kind], ids[j]);
+      if (why && !hasBuilder()) noBuilder = true;
+    }
+    out.push({ name: f.name, value: vals[0], mixed: mixed, layer: f.layer, type: f.type,
+               note: f.note || '', enabled: !why, why: why });
+  }
+  MDLG.explode = noBuilder;
+  return out;
+}
+
+function modifyOpen(opts) {
+  opts = opts || {};
+  var sel = SELSET.slice(), kinds = {}, i;
+  if (!sel.length) return { ok: false, problems: [{ code: 'no_selection',
+    message: 'nothing is selected' }] };
+  for (i = 0; i < sel.length; i++) kinds[sel[i].kind] = 1;
+  var kindList = Object.keys(kinds);
+  if (kindList.length !== 1) {
+    return { ok: false, problems: [{ code: 'mixed_selection',
+      message: 'the selection mixes ' + kindList.sort().join(' and ') +
+               '; one form cannot describe them all' }] };
+  }
+  var anchor = MENU || MDLG || { mx: 0, my: 0, cx: 40, cy: 80 };
+  MDLG = { kind: kindList[0], ids: sel.map(function (s) { return s.id; }),
+           mx: anchor.mx, my: anchor.my, cx: anchor.cx, cy: anchor.cy,
+           why: '', explode: false, confirm: false };
+  MENU = null;
+  paintMenu();
+  return { ok: true, dialog: menuState() };
+}
+function modifyClose() {
+  var was = !!MDLG;
+  MDLG = null;
+  paintMenu();
+  return was;
+}
+// THE SHARED `coerce` DOES THE WORK, so this panel cannot disagree with the zone form and
+// the block forms about what "3" or "true" means.  Two things it has no type for: a list
+// of labels, and the one convention that CLEARS a kwarg rather than setting it (there is
+// no "unset" in a merge, so a field needs a word for empty).
+function modifyCoerce(raw, f) {
+  var s = String(raw);
+  if (f.type === 'list') {
+    return s.split(/[\s,]+/).filter(function (x) { return !!x; });
+  }
+  if (f.type === 'string' && (s === 'none' || s === 'null')) return null;
+  return coerce(s, { type: f.type });
+}
+function modifyFail(r) {
+  MDLG.why = ((r.problems || [])[0] || {}).message || 'refused';
+  paintMenu();
+  return { ok: false, problems: r.problems || [] };
+}
+// APPLY.  `vals` is a map of field name -> raw text; with none given the live inputs are
+// read, which is what the Apply button does.  A field left blank, or unchanged, is not
+// written: `set_*` is a merge with no way to unset, so writing a value back is
+// indistinguishable from the user asserting it.
+function modifyApply(vals) {
+  if (!MDLG) {
+    return { ok: false, problems: [{ code: 'no_dialog',
+      message: 'no Modify panel is open' }] };
+  }
+  var fields = modifyFields(), changes = {}, i, f, raw;
+  for (i = 0; i < fields.length; i++) {
+    f = fields[i];
+    raw = (vals && has(vals, f.name)) ? vals[f.name] : val('mdlg_' + f.name);
+    if (raw === undefined || raw === null) continue;
+    raw = String(raw);
+    if (raw === '') continue;
+    if (!f.mixed && raw === String(f.value === null ? '' : f.value)) continue;
+    if (!f.enabled) return modifyFail({ problems: [{ code: 'disabled', message: f.why }] });
+    changes[f.name] = raw;
+  }
+  var kind = MDLG.kind, ids = MDLG.ids.slice(), spec = modifySpec(kind);
+  var build = {}, anyBuild = false, n = 0, r;
+  for (i = 0; i < spec.length; i++) {
+    f = spec[i];
+    if (!has(changes, f.name)) continue;
+    if (f.layer === 'builder') { build[f.name] = modifyCoerce(changes[f.name], f); anyBuild = true; continue; }
+    if (f.name === 'x' || f.name === 'y') continue;          // both at once, below
+    if (kind === 'site' && f.name === 'capacity') {
+      r = emit({ method: 'set_site_capacity', args: [ids.slice(), modifyCoerce(changes[f.name], f)], kwargs: {} });
+    } else if (kind === 'segment' && f.name === 'length') {
+      r = emit({ method: 'set_segment_length', args: [ids.slice(), modifyCoerce(changes[f.name], f)], kwargs: {} });
+    } else continue;
+    n++;
+    if (!r.ok) return modifyFail(r);
+  }
+  // X AND Y TRAVEL TOGETHER: `move_site` takes a whole position, and sending the old y
+  // with a new x is still a move -- one that `moveProblems` must judge as a whole.
+  if (has(changes, 'x') || has(changes, 'y')) {
+    var nd = STATE.device.nodes[ids[0]];
+    if (!nd) return modifyFail({ problems: [{ code: 'gone', message: ids[0] + ' is no longer on the stage' }] });
+    var nx = Q.pyFloat(has(changes, 'x') ? Number(changes.x) : +Q.unbox(nd.pos[0]));
+    var ny = Q.pyFloat(has(changes, 'y') ? Number(changes.y) : +Q.unbox(nd.pos[1]));
+    r = emit({ method: 'move_site', args: [ids[0], nx, ny], kwargs: {} });
+    n++;
+    if (!r.ok) return modifyFail(r);
+  }
+  if (anyBuild) {
+    for (i = 0; i < ids.length; i++) {
+      r = rewriteBuilder(MOD_BUILD[kind], ids[i], build, 'modify ' + ids[i]);
+      n++;
+      if (!r.ok) return modifyFail(r);
+    }
+  }
+  if (!n) {
+    MDLG.why = 'nothing changed';
+    paintMenu();
+    return { ok: false, problems: [{ code: 'no_change', message: 'nothing changed' }] };
+  }
+  toast('ok', ids.join(', ') + ': ' + n + ' change(s)');
+  modifyClose();
+  return { ok: true, problems: [], n: n };
+}
+// THE ONE IRREVERSIBLE OFFER, behind a confirmation.  `clickStage` already tells the user
+// in words that a generator device has no builder and that "explode to explicit" is the
+// way out; this closes that loop where the refusal is.
+function modifyExplode() {
+  if (!MDLG) {
+    return { ok: false, problems: [{ code: 'no_dialog', message: 'no Modify panel is open' }] };
+  }
+  if (!MDLG.confirm) {
+    MDLG.confirm = true;
+    MDLG.why = 'this device will stop reproducing from its generator: it would be saved ' +
+               'as explicit statements instead. Press again to do it.';
+    paintMenu();
+    return { ok: false, confirm: true,
+             problems: [{ code: 'confirm', message: MDLG.why }] };
+  }
+  var r = explodeToExplicit();
+  MDLG.confirm = false;
+  MDLG.why = r.ok ? '' : (((r.problems || [])[0] || {}).message || 'refused');
+  if (r.ok) toast('warn', r.warning);
+  paintMenu();
+  return r;
+}
+
+// ---- the panel, drawn ----------------------------------------------------------------
+function menuButton(it) {
+  var b = elh('button', 'cmitem' + (it.kind === 'submenu' ? ' cmmore' : ''));
+  b.setAttribute('data-item', it.id);
+  b.setAttribute('data-hint', it.hint || 'menu:item');
+  b.textContent = it.label + (it.kind === 'submenu' ? ' ▸' : '');
+  if (!it.enabled) {
+    b.setAttribute('disabled', 'disabled');
+    b.setAttribute('title', it.why);
+  }
+  if (b.addEventListener) b.addEventListener('click', function () { menuInvoke(it.id); });
+  return b;
+}
+function whyLine(text) {
+  var w = elh('div', 'cmwhy');
+  w.textContent = text;
+  return w;
+}
+function renderMenuInto(host) {
+  var items = menuItems(), i, j;
+  for (i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (it.kind === 'head') {
+      var h = elh('div', 'cmhead');
+      h.textContent = it.label;
+      host.append(h);
+      continue;
+    }
+    host.append(menuButton(it));
+    // THE REASON IS ON THE SCREEN, not only in a tooltip: a greyed item with no
+    // explanation is exactly the "why can't I?" this menu exists to answer.
+    if (!it.enabled && it.why) host.append(whyLine(it.why));
+    if (it.kind === 'submenu' && MENU.sub === it.id) {
+      var box = elh('div', 'cmsub');
+      for (j = 0; j < (it.items || []).length; j++) {
+        box.append(menuButton(it.items[j]));
+        if (!it.items[j].enabled && it.items[j].why) box.append(whyLine(it.items[j].why));
+      }
+      host.append(box);
+    }
+  }
+  var foot = elh('div', 'cmfoot');
+  foot.textContent = 'esc closes · right-click any part of the canvas';
+  host.append(foot);
+}
+function renderModifyInto(host) {
+  var head = elh('div', 'cmhead');
+  head.textContent = 'Modify ' + (MDLG.ids.length > 1
+    ? (MDLG.ids.length + ' × ' + subjectWord(MDLG.kind))
+    : (MDLG.ids[0] + ' · ' + subjectWord(MDLG.kind)));
+  host.append(head);
+  var fields = modifyFields(), i;
+  for (i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var inp = textInput('mdlg_' + f.name, f.mixed ? '' : (f.value === null ? '' : f.value));
+    if (!f.enabled) {
+      inp.setAttribute('disabled', 'disabled');
+      inp.setAttribute('title', f.why);
+    }
+    if (f.mixed && inp.setAttribute) inp.setAttribute('placeholder', '(mixed)');
+    host.append(fieldRow(f.name, inp, f.enabled ? f.note : ''));
+    if (!f.enabled && f.why) host.append(whyLine(f.why));
+  }
+  // THE REFUSAL IS INLINE, not a toast: it belongs to the field the user just typed in
+  // and it must still be on screen while they fix it.
+  var err = elh('div', 'cmerr');
+  err.setAttribute('id', 'mdlgErr');
+  err.textContent = MDLG.why || '';
+  host.append(err);
+  var bar = elh('div', 'formbtns');
+  var ap = btn('mdlgApply', 'Apply', true);
+  if (ap.addEventListener) ap.addEventListener('click', function () { modifyApply(); });
+  bar.append(ap);
+  var cl = btn('mdlgClose', 'Cancel');
+  if (cl.addEventListener) cl.addEventListener('click', function () { modifyClose(); });
+  bar.append(cl);
+  host.append(bar);
+  if (MDLG.explode) {
+    var ex = btn('mdlgExplode', MDLG.confirm
+      ? 'Yes — write it out as explicit statements'
+      : 'Make this editable (explode to explicit…)');
+    ex.setAttribute('data-hint', 'explode');
+    if (ex.addEventListener) ex.addEventListener('click', function () { modifyExplode(); });
+    host.append(ex);
+  }
+  var note = elh('div', 'cmfoot');
+  note.textContent = 'enter applies · esc cancels';
+  host.append(note);
+}
+function paintMenu() {
+  var host = $('ctxmenu');
+  if (!host) return;
+  if (host.replaceChildren) host.replaceChildren();
+  host.innerHTML = '';
+  if ((MENU && !subjectAlive(MENU.subject)) ) { MENU = null; }
+  if (!MENU && !MDLG) {
+    host.setAttribute('data-open', '0');
+    if (host.style) host.style.display = 'none';
+    return;
+  }
+  host.setAttribute('data-open', '1');
+  var cx = MENU ? MENU.cx : MDLG.cx, cy = MENU ? MENU.cy : MDLG.cy;
+  var W = (typeof innerWidth === 'number' && innerWidth > 0) ? innerWidth : 1600;
+  var H = (typeof innerHeight === 'number' && innerHeight > 0) ? innerHeight : 900;
+  if (host.style) {
+    host.style.display = '';
+    host.style.left = Math.max(4, Math.min(cx, W - 268)) + 'px';
+    host.style.top = Math.max(4, Math.min(cy, H - (MDLG ? 320 : 250))) + 'px';
+  }
+  if (MDLG) renderModifyInto(host); else renderMenuInto(host);
 }
 
 // ===================================================================== THE FORMS
@@ -4608,13 +9601,14 @@ function curveForm(host, e) {
   var add = btn('cfAdd', 'add', true);
   add.addEventListener('click', function () {
     curveAddPoint(which, { us: Number(val('cfNewUs')), quanta: Number(val('cfNewQ')),
-                           table: last.table || 'qccdsim_jones' });
+                           table: policyTable() });
   });
   addLine.append(add);
   host.append(addLine);
   var note = elh('div', 'mut');
-  note.textContent = 'set_curve replaces the whole curve, so every untouched row is ' +
-    'carried through verbatim -- source and label included, never reconstructed.';
+  note.textContent = 'a new point goes into ' + policyTable() + ', the table the model ' +
+    'prices: it takes the fastest point there. set_curve replaces the whole curve, so ' +
+    'every untouched row is carried through verbatim -- source and label included.';
   host.append(note);
 }
 function curveRows(name) {
@@ -4631,11 +9625,19 @@ function curveRows(name) {
 // THE ROW VERBS, as functions.  `addEventListener` is a no-op in the harness, so logic
 // left inside a button's click handler is logic with no test -- the same reason every
 // pointer handler on the stage is a thin adapter.  The buttons call these.
+// THE TABLE THE MODEL PRICES.  The operating-point policy restricts a curve to one
+// table and takes the fastest point in it, so a point in any other table is never priced
+// at all.  A new point therefore defaults to the policy's table -- it used to inherit the
+// last row's, which on the shipped physics is not the priced one, so a point added from
+// the form changed nothing on the page and there was no field to say why.
+function policyTable() {
+  return (typeof PH !== 'undefined' && PH && PH.policy && PH.policy.table) || 'qccdsim_jones';
+}
 function curveAddPoint(name, pt) {
   var rows = curveRows(name), last = rows.length ? rows[rows.length - 1] : {};
   var p = { us: Q.pyFloat(+((pt || {}).us !== undefined ? pt.us : (last.us || 5.0))),
             quanta: Q.pyFloat(+((pt || {}).quanta !== undefined ? pt.quanta : (last.quanta || 0.1))),
-            table: (pt || {}).table || last.table || 'qccdsim_jones' };
+            table: (pt || {}).table || policyTable() };
   // `source` and `label` are PROVENANCE and are never invented: a made-up citation is
   // worse than none.
   if ((pt || {}).source) p.source = pt.source;
@@ -4687,12 +9689,13 @@ function emitCurve(name, rows, add, dropIx) {
   if (add) out.push(add);
   if (!out.length) {
     toast('bad', 'a curve with no points is refused by the schema; edit a value instead');
-    return;
+    return { ok: false, problems: [{ code: 'empty_curve', message: 'a curve with no points is refused by the schema' }] };
   }
   var res = emit({ method: 'set_curve', args: [name, out], kwargs: {} });
   toast(res.ok ? 'ok' : 'bad', res.ok ? (name + ': ' + out.length + ' point(s)')
                                       : ((res.problems[0] || {}).message || 'refused'));
   paint();
+  return res;
 }
 
 function blockForm(host, e) {
@@ -4754,6 +9757,7 @@ function blockForm(host, e) {
 // ones nothing reads marked as such.  It also hosts the forms for the elements that are
 // never placed on a canvas.
 function renderInspector() {
+  if (typeof window !== 'undefined' && typeof window.onInspector === 'function') { try { window.onInspector(SELSET.length); } catch (err) { /* page hook */ } }
   var host = $('palInsp');
   if (!host) return;
   host.replaceChildren();
@@ -4766,7 +9770,7 @@ function renderInspector() {
           ? ('armed: ' + String(ARMED_EL).slice(4).replace(/_/g, ' ') +
              ' — click the canvas to place the whole part')
           : ('armed: ' + docOf(ARMED_EL).name + ' — ' + (GESTURE[ARMED_EL] || '')))
-      : 'nothing selected. Pick an element above, then use the gesture it names.';
+      : 'Nothing selected. Click a part on the canvas to see its details here, or press a tile above to add one.';
     host.append(m);
     return;
   }
@@ -4778,8 +9782,8 @@ function renderInspector() {
     h += '<div class="fieldrow"><label>zone</label><span>' + esc2(n.zone || '—') + '</span></div>';
     h += '<div class="fieldrow"><label>capacity</label><span>' + n.cap +
          (n.capacity_explicit ? ' (explicit)' : ' (from zone)') + '</span></div>';
-    h += '<div class="fieldrow"><label>pos</label><span>' + Q.unbox(n.pos[0]) + ', ' +
-         Q.unbox(n.pos[1]) + '</span></div>';
+    h += '<div class="fieldrow"><label>pos</label><span>' + fmt(Q.unbox(n.pos[0]), 3) + ', ' +
+         fmt(Q.unbox(n.pos[1]), 3) + '</span></div>';
   } else if (sel.kind === 'segment' && STATE.device.segments[sel.id]) {
     var sg = STATE.device.segments[sel.id];
     h += '<b>' + esc2(sel.id) + '</b> <span class="sub">' + esc2(sg.a) + ' – ' + esc2(sg.b) + '</span>';
@@ -4831,19 +9835,38 @@ function renderWrite() {
   var ta = $('pwText');
   if (!ta) return;
   if (ta.value === undefined || ta.value === '' || !ta._touched) ta.value = programSource();
-  var errs = lowerErrors();
+  // the parse errors first (at their line), then the lowering errors (at their
+  // statement) -- the same lines the Evaluate toast says, so the strip and the toast
+  // cannot disagree about what was refused
+  var errs = PARSE_ERRS.concat(lowerErrors());
   var e = $('pwErr');
   if (e) {
+    // one line per problem; joined with a newline so `textContent` reads as lines too
     e.innerHTML = errs.length
-      ? errs.map(function (x) {
-          return '<div>statement ' + ((x.i === null || x.i === undefined) ? '?' : x.i + 1) +
-                 ': ' + esc2(x.message) + '</div>'; }).join('')
+      ? errs.map(function (x) { return '<div>' + esc2(problemLine(x)) + '</div>'; }).join('\n')
       : '';
   }
   var c = $('pwCount');
   if (c) {
     c.textContent = PROG.length ? (PROG.length + ' statements → ' + P.frames.length + ' frames')
-                                : (P.frames.length + ' shipped frames');
+                  : P.frames.length ? (P.frames.length + ' shipped frames')
+                  : 'no programme';
+  }
+  // THE PLACEHOLDER IS WHAT TEST DRIVE WOULD WRITE, rendered by the same function that
+  // renders the pane's text -- so the grey hint names this device's own sites and is a
+  // programme that runs, not an example from some other device.
+  // -- and only when there is no programme: a shipped or authored programme fills the
+  // pane, and planning a test drive on every paint of a 168-node device would be work
+  // nobody sees
+  if (ta.setAttribute) {
+    if (PROG.length || P.frames.length) ta.setAttribute('placeholder', '');
+    else {
+      var plan = testDrivePlan();
+      var first = plan.ok ? plan.from : firstSiteId();
+      ta.setAttribute('placeholder',
+        (plan.ok ? Q.renderProgramSource(plan.statements) + '\n' : '') +
+        '# no programme yet \u2014 press Test drive or type p.init({"d0": "' + first + '"})');
+    }
   }
   var f = $('pwFoot');
   if (f) {
@@ -4852,9 +9875,19 @@ function renderWrite() {
         'so the per-frame oracle does not apply: <code>frameChecked</code> is ' +
         ((PRICE && PRICE.frameChecked) || 0) + '. Download the pair and run ' +
         '<code>python -m qccd run &lt;name&gt;.arch.json --tsir &lt;name&gt;.tsir.json</code>.'
-      : 'the shipped programme. Type <code>p.init({...})</code> and the stage re-renders ' +
-        'from what you wrote; <b>Evaluate</b> re-prices and re-checks.';
+      : P.frames.length
+      ? 'the shipped programme. Type <code>p.init({...})</code> and the stage re-renders ' +
+        'from what you wrote; <b>Evaluate</b> re-prices and re-checks.'
+      : 'no programme yet \u2014 press <b>Test drive</b> or type <code>p.init({"d0": "' +
+        esc2(first) + '"})</code> and press <b>Evaluate</b>.';
   }
+}
+function firstSiteId() {
+  var dev = STATE && STATE.device;
+  if (dev) {
+    for (var nid in dev.nodes) if (has(dev.nodes, nid) && dev.nodes[nid].kind === 'site') return nid;
+  }
+  return '<first site>';
 }
 
 // THE REPORT.  Three registers and never a fourth.
@@ -4870,14 +9903,9 @@ function renderReport() {
   // -- BACKED ------------------------------------------------------------------
   h += '<h3>Backed</h3>';
   if (PRICE && !PRICE.blocked) {
+    // the same rows the head's chips show for an authored programme
     h += '<table>' +
-      row('cost', fmt(PRICE.totals.cost)) +
-      row('steps', fmt(PRICE.totals.steps)) +
-      row('runtime', fmt(PRICE.totals.us / 1000, 2) + ' ms') +
-      row('peak n-bar', fmt(PRICE.peak, 3) + (PRICE.peakIon ? ' (' + esc2(PRICE.peakIon) + ')' : '')) +
-      row('junction transits', fmt(PRICE.transits)) +
-      (HW ? row('DACs', fmt(HW.dacs)) + row('electrodes', fmt(HW.electrodes)) +
-            row('switches', fmt(HW.switches)) + row('ion capacity', fmt(HW.total_capacity)) : '') +
+      metricRows().map(function (r) { return row(r[0], esc2(r[1])); }).join('') +
       '</table>';
     h += '<div class="mut">' + (
       PRICE.frameChecked
@@ -4889,6 +9917,10 @@ function renderReport() {
   } else {
     h += '<div class="mut">no price: see below.</div>';
   }
+  // the sentence the price strip used to carry: what these numbers are worth, and the
+  // command that would verify them in Python
+  var note = priceNote();
+  if (note) h += '<div class="mut" id="rPrice">' + esc2(note) + '</div>';
 
   // -- REFUSED -----------------------------------------------------------------
   var refused = [];
@@ -4915,8 +9947,8 @@ function renderReport() {
   }
   h += '<div>' + cov.map(function (c) {
     var cls = { checked: 'ok', failed: 'bad', partial: 'warn', unchecked: 'unchecked' }[c.state];
-    return '<span class="badge ' + cls + '" title="' + esc2(c.statement) + '">' + c.rule +
-           (c.count ? ' ' + c.count : '') + '</span>';
+    return '<span class="badge ' + cls + '" data-hint="rule:' + esc2(c.rule) + '" title="' +
+           esc2(c.statement) + '">' + c.rule + (c.count ? ' ' + c.count : '') + '</span>';
   }).join('') + '</div>';
   if (failed.length) {
     h += '<div class="mut" style="margin-top:6px">' + failed.map(function (c) {
@@ -4953,11 +9985,33 @@ var API = {
   hit: hit, begin: begin, move: move, drop: drop, cancel: cancel,
   // the arbiter, the geometry and the feedback -- all callable without an Event, which is
   // the property that keeps every gesture on this page drivable headlessly
-  claim: claim, claimEvent: claimEvent, hover: hover, cursor: cursor,
+  claim: claim, claimEvent: claimEvent, hover: hover, cursor: cursor, panning: panning,
   outline: outlineOf, hitRadii: hitRadii, slop: slop,
   marqueeBegin: marqueeBegin, marqueeMove: marqueeMove, marqueeDrop: marqueeDrop,
+  bandBegin: bandBegin, bandMove: bandMove, bandDrop: bandDrop, bandCancel: bandCancel,
   cancelGesture: escapeGesture,
-  subjectOf: subjectOf,
+  // THE RULER AND THE SCALE, callable without an Event like every other gesture here, so
+  // a harness can assert a distance in micrometres rather than a rectangle in pixels
+  measureToggle: measureToggle, measureClick: measureClick, measureClear: measureClear,
+  measure: measureReadout, measureOn: function () { return MEASURE; },
+  setTrueScale: setTrueScale, trueScale: function () { return TRUE_SCALE; },
+  rescale: rescale, refit: refit, refitNext: refitNext,
+  toUm: toUm, physVec: physVec, railAngle: angleBetween,
+  // Redraw the static scene from the CURRENT layout, without recomputing it.  `rescale`
+  // recomputes and would overwrite anything written into `L` by hand -- so this is the
+  // only way to see the effect of a change made to the layout in place, which is how a
+  // harness reaches the bowed-segment branch that no shipped device is in.
+  redraw: rebuildStatic,
+  dragging: function () { return !!(GHOST || BAND); },
+  // the live feedback, callable without an Event: the HUD the pointer adapter shows and
+  // the toast strip as the page holds it
+  showHud: showHud, hideHud: hideHud, toasts: toasts, lengthNote: lengthNote,
+  groupCheck: groupCheck,
+  // THE KEYMAP: the verb a key means, the rows the help shows, and the overlay's state
+  keyGesture: keyGesture, keyHelp: keyHelp, helpToggle: helpToggle,
+  helpOn: function () { return HELPON; },
+  nudge: nudge, reconcileLast: reconcileLast, toast: toast,
+  subjectOf: subjectOf, selectionNodes: selectionNodes,
   emit: emit, validate: validate, undo: undo, redo: redo,
   addSite: addSite, addSegment: addSegment, removeSelected: removeSelected,
   reconcileLengths: reconcileLengths,
@@ -4987,22 +10041,52 @@ var API = {
   },
   markup: markup,
   openForm: openForm, form: formState,
+  // THE RIGHT-CLICK MENU AND ITS MODIFY PANEL, Event-free like every other gesture here:
+  // the model, the items, invoking one, and the panel's fields and verdict
+  menuOpen: menuOpen, menuItems: menuItems, menuInvoke: menuInvoke, menuClose: menuClose,
+  menuState: menuState,
+  modifyOpen: modifyOpen, modifyFields: modifyFields, modifyApply: modifyApply,
+  modifyClose: modifyClose, modifyExplode: modifyExplode,
+  insertSiteOn: insertSiteOn, rewriteBuilder: rewriteBuilder,
+  // the two registers of `lints()`: what is wrong, and what is merely not there yet
+  notes: lintNotes, lintProblems: lintProblems,
   ghostBegin: ghostBegin, ghostMove: ghostMove, ghostDrop: ghostDrop,
   ghostCancel: ghostCancel, placeStamp: placeStamp,
+  clickStage: clickStage, dblclickStage: dblclickStage, isStampType: isStampType,
+  setViewOnly: setViewOnly, viewOnly: function () { return VIEW_ONLY; },
+  leaveStage: leaveStage,
+  sealZones: sealZones, canvasHistory: canvasHistory, pressStartCard: pressStartCard,
+  setName: setName,
   zone: function (z) { if (z !== undefined) { NEW_ZONE = z; AVCACHE = {}; paint(); }
                        return NEW_ZONE; },
   closeLoopFromSelection: closeLoopFromSelection,
   elementDocs: function () { return D.element_docs || {}; },
   toModel: toModel, snapTo: snapTo, rebuild: rebuild,
+  setSnap: setSnap, snap: function () { return SNAP; },
+  // ---- the sketch: the shape first -----------------------------------------------
+  // The mode, the armed tool, the live preview's own numbers, the plan a release would
+  // commit, and every gesture -- all callable without an Event, so a harness drives the
+  // rule rather than the handler that happens to obey it.
+  designMode: designMode, setDesignMode: setDesignMode,
+  sketchTool: sketchTool, sketchOn: sketchOn,
+  sketchTools: function () { return SK_ORDER.slice(); },
+  sketchPlan: sketchPlan, sketchReadout: sketchReadout, sketchCommit: sketchCommit,
+  sketchDown: sketchDown, sketchMove: sketchMove, sketchUp: sketchUp,
+  sketchClick: sketchClick, sketchFinish: sketchFinish, sketchClear: sketchClear,
+  sketchDraw: sketchDraw,
+  sketchPoints: function () { return SKPTS.slice(); },
+  // the boundary, readable: the frozen mark sizes in model units, a node's box, and
+  // the first mark a set of members would overlap at an offset
+  boundary: function () { return BOUND ? { len2: BOUND.len(2), len0: BOUND.len(0), t: BOUND.t, rj: BOUND.rj, sx: BOUND.sx, sy: BOUND.sy } : null; },
+  nodeBox: function (id, x, y) { var n = nodeById[id]; return n ? nodeBoxAt(n, x === undefined ? n.x : x, y === undefined ? n.y : y) : null; },
+  dragState: function () { return GHOST ? { x: GHOST.x, y: GHOST.y, x0: GHOST.x0, y0: GHOST.y0, acc: GHOST.acc, contact: GHOST.contact, noBoundary: GHOST.noBoundary, mx0: GHOST.mx0, my0: GHOST.my0 } : null; },
+  contactAt: function (p0, ox, oy) { var m = {}; for (var i = 0; i < p0.length; i++) m[p0[i].id] = 1; return contactAt(p0, ox || 0, oy || 0, m); },
   // numbers
   price: function () { return PRICE; }, hardware: function () { return HW; },
   // THE PREDICATE THAT FREEZES THE STAGE: the structural break list, `[]` when the
   // programme fits.  `price().blocked` is this list PLUS the cost-model failures
   // (`no_curve`, `price_error`), which do not freeze because the picture is still true.
-  programBreaks: function () {
-    return (typeof PROGRAM_STALE !== 'undefined' && PROGRAM_STALE)
-      ? PROGRAM_STALE.breaks.slice() : [];
-  },
+  programBreaks: programBreaks,
   hardware0: function () { return HW0; }, repriceNow: repriceNow,
   layout: function () { return L; },
   digest: function () {
@@ -5018,7 +10102,7 @@ var API = {
   exportJson: exportJson, exportEdits: exportEdits,
   // ---- the design tool ----------------------------------------------------------
   transaction: transaction, undoGroup: undoGroup, redoGroup: redoGroup,
-  newCanvas: newCanvas, newFromGenerator: newFromGenerator,
+  newCanvas: newCanvas, newFromGenerator: newFromGenerator, newFromTemplate: newFromTemplate,
   addNodeAt: addNodeAt, joinNodes: joinNodes, closeLoop: closeLoop, nameZone: nameZone,
   zoneFields: zoneFields, postSeedZones: postSeedZones,
   curveAddPoint: curveAddPoint, curveRemovePoint: curveRemovePoint,
@@ -5032,11 +10116,30 @@ var API = {
   setProgram: setProgram, emitProgram: emitProgram,
   programSource: programSource, applyProgramSource: applyProgramSource,
   programErrors: lowerErrors, authored: function () { return AUTHORED; },
+  parseErrors: function () { return PARSE_ERRS.slice(); },
+  evaluateWrite: evaluateWrite, problemLine: problemLine, metricRows: metricRows,
+  refusedLine: refusedLine,
+  testDrivePlan: testDrivePlan, testDrive: testDrive, pressTestDrive: pressTestDrive,
   programToTsir: programToTsir, exportPair: exportPair,
   // the verdicts
   rules: ruleReport, ruleCoverage: ruleCoverage,
   // the palette, GENERATED from the shipped schema + consumer table
   palette: palette,
+  // the explain layer
+  hintFor: hintFor, hintFrom: hintFrom, hintHide: hintHide, stageHint: stageHint,
+  explainToggle: explainToggle, explain: function () { return EXPLAIN; },
+  setFold: setFold, folds: function () { return { row: PAL_OPEN.row, block: PAL_OPEN.block, component: PAL_OPEN.component }; },
+  // the course
+  lessonsReady: lessonsReady, lessonList: lessonList, lessonState: lessonState,
+  lessonLoad: lessonLoad, lessonCheck: lessonCheck, lessonHint: lessonHint,
+  lessonSolution: lessonSolution, lessonNext: lessonNext, lessonAnswer: lessonAnswer, setAnswer: setAnswer,
+  courseProgress: courseProgress, evalCheck: evalCheck, loadCase: loadCase, shippedVerdict: shippedVerdict,
+  courseBlob: function () {
+    return { model: D.model || null, table: (PH && PH.policy) ? PH.policy.table : null,
+             cases: D.tutorial_cases || null, verdicts: D.tutorial_verdicts || null };
+  },
+  // verbs the lessons drive that the pointer adapters reach by other names
+  setSelection: setSelection, seekTo: seekTo, fit: fitStage,
   // persistence -- pure functions; storage is a three-line adapter over them
   snapshot: snapshot, restore: restore, autosave: autosave, autoload: autoload,
   autosaveSoon: autosaveSoon, importText: importText, snapshotOf: snapshotOf,

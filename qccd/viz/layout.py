@@ -215,8 +215,18 @@ def _sample(pts: Sequence[tuple[float, float]], cap: int = 6000):
 
 
 def _fit(dx: float, dy: float, ux: float, uy: float, pad: float,
-         iso: bool) -> tuple[float, float]:
-    """px per data unit on each axis, given a margin."""
+         iso: bool, ts: tuple[float, float] | None = None) -> tuple[float, float]:
+    """px per data unit on each axis, given a margin.
+
+    `ts` is `(nm_per_unit_x, nm_per_unit_y)` and turns on TRUE SCALE: `sx:sy` is forced to
+    that ratio, so one screen pixel is the same number of nanometres on both axes and an
+    angle measured off the drawing is the angle the metal actually makes.  Without it the
+    fit is free to stretch one axis by up to `K_ANISO`, which is legible but lies about
+    every angle -- a 72:1 device is drawn 12:1 and its 90 degree corners are not 90
+    degrees on screen.  Nothing else changes: the true-scale pair is the largest pair in
+    the required ratio that still fits inside the budget both axes already passed, so the
+    pitch cap and the viewport ceiling still bind.
+    """
     avail_w = max(W_MAX - 2 * pad, 80.0)
     avail_h = max(H_MAX - 2 * pad, 80.0)
     sx = avail_w / dx if dx > _EPS else math.inf
@@ -232,6 +242,10 @@ def _fit(dx: float, dy: float, ux: float, uy: float, pad: float,
         sx = sy                       # degenerate x: never contribute a constant
     elif not math.isfinite(sy):
         sy = sx                       # degenerate y: ditto (this is the chain(n) bug)
+    if ts is not None:
+        # the largest (sx, sy) in the ratio nx:ny that fits inside the pair above
+        k = min(sx / ts[0], sy / ts[1])
+        return k * ts[0], k * ts[1]
     if iso:
         sx = sy = min(sx, sy)
     else:
@@ -275,11 +289,12 @@ def _point_segment(p, a, b):
     l2 = dx * dx + dy * dy
     if l2 < 1e-18:
         return _hyp(p[0] - a[0], p[1] - a[1]), 0.0
-    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2))
+    u = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2
+    t = max(0.0, min(1.0, u))
     qx, qy = a[0] + t * dx, a[1] + t * dy
     h = math.sqrt(l2)
     nx, ny = -dy / h, dx / h
-    return _hyp(p[0] - qx, p[1] - qy), (p[0] - a[0]) * nx + (p[1] - a[1]) * ny
+    return _hyp(p[0] - qx, p[1] - qy), (p[0] - a[0]) * nx + (p[1] - a[1]) * ny, u
 
 
 def _bows(nodes, segments, pos, g, pad, clearance=0.0, need=0.0):
@@ -317,7 +332,13 @@ def _bows(nodes, segments, pos, g, pad, clearance=0.0, need=0.0):
         for n in nodes:
             if n["id"] == s["a"] or n["id"] == s["b"]:
                 continue
-            d, side = _point_segment(pos[n["id"]], a, b)
+            d, side, u = _point_segment(pos[n["id"]], a, b)
+            # only a node the rail would run THROUGH bends it: one that projects onto the
+            # rail's interior.  A node beside an end -- every trap next to a junction on
+            # a lattice -- is not in the way, and bending the rail there made the ion
+            # detour around the junction instead of walking through it (2026-09-15)
+            if u <= 1e-6 or u >= 1.0 - 1e-6:
+                continue
             if d < 0.55 * g and (worst is None or d < worst[0]):
                 worst = (d, side)
         if worst is None:
@@ -337,7 +358,9 @@ def _bows(nodes, segments, pos, g, pad, clearance=0.0, need=0.0):
 
 
 def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
-                   *, raw: bool = False) -> dict:
+                   *, raw: bool = False, true_scale: bool = False,
+                   unit_nm: "Sequence[float] | None" = None,
+                   hold: "Sequence[float] | None" = None) -> dict:
     """Everything the page needs to place a mark, as ~40 plain scalars.
 
     `raw=True` skips the OUTPUT quantizer only -- the internal ones (`_lattice_step`'s
@@ -351,6 +374,33 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
     different questions.
     """
     R = (lambda v, nd=None: v) if raw else _q
+    # TRUE SCALE, or not.  `unit_nm` is the technology's `(nm_per_unit_x, nm_per_unit_y)`;
+    # with `true_scale` on, `_fit` forces `sx:sy` to that ratio so a pixel means the same
+    # length on both axes.  Refused silently only when it cannot mean anything -- a
+    # non-positive or non-finite scale -- because a page that fell back to a stretched fit
+    # while still SAYING true scale would be worse than one that never offered it.
+    # A HELD VIEW: `hold` is `(sx, sy, ox, oy)` the caller insists on, and the fit is not
+    # recomputed.  An EDIT must not move what is already on the screen -- every placement
+    # re-fitted the whole drawing, so the picture shifted under the pointer and the next
+    # click landed somewhere else (reported 2026-09-17: four sites meant for one row came
+    # out as a staircase).  Only the fit is held: `g` and every mark size are still derived
+    # from it, so two ions still cannot be drawn on top of each other, and `W`/`H` still
+    # grow with the device so `Fit` has something to fit to.  Refused, like `true_scale`,
+    # when it cannot mean anything rather than half-applied.
+    hd = None
+    if hold is not None:
+        try:
+            _h = [float(hold[0]), float(hold[1]), float(hold[2]), float(hold[3])]
+        except (TypeError, ValueError, IndexError, KeyError):
+            _h = None
+        if _h is not None and all(math.isfinite(v) for v in _h) and _h[0] > 0.0 and _h[1] > 0.0:
+            hd = (_h[0], _h[1], _h[2], _h[3])
+    ts = None
+    if true_scale and unit_nm is not None:
+        _nx = float(unit_nm[0])
+        _ny = float(unit_nm[1])
+        if math.isfinite(_nx) and math.isfinite(_ny) and _nx > 0.0 and _ny > 0.0:
+            ts = (_nx, _ny)
     pts = [(_coord(n["x"], f"node {n.get('id', '?')} x"),
             _coord(n["y"], f"node {n.get('id', '?')} y")) for n in nodes]
     if not pts:
@@ -387,7 +437,7 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
     pad = 24.0
     sx = sy = g = 0.0
     for _ in range(5):
-        sx, sy = _fit(dx, dy, ux, uy, pad, iso)
+        sx, sy = (hd[0], hd[1]) if hd else _fit(dx, dy, ux, uy, pad, iso, ts)
         g = min_nearest_neighbour([(p[0] * sx, p[1] * sy) for p in sample])
         if g <= _EPS:
             g = gd * max(sx, sy)
@@ -402,16 +452,20 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
         bow_need = r + rr + 3.0
         pad_need = max(0.30 * g + 0.10 * g, r) + bow_need
         pad = math.ceil(max(PAD_A * r + PAD_B, pad_need))
-    sx, sy = _fit(dx, dy, ux, uy, pad, iso)
+    sx, sy = (hd[0], hd[1]) if hd else _fit(dx, dy, ux, uy, pad, iso, ts)
     g = min_nearest_neighbour([(p[0] * sx, p[1] * sy) for p in sample])
     if g <= _EPS:
         g = gd * max(sx, sy)
 
     W = min(W_MAX, max(W_MIN, _q(dx * sx + 2 * pad)))
     H = min(H_MAX, max(H_MIN, _q(dy * sy + 2 * pad)))
-    # centre the REAL extent, not the padded span
-    ox = (W - dx * sx) / 2.0 - x0 * sx
-    oy = (H - dy * sy) / 2.0 - y0 * sy
+    # centre the REAL extent, not the padded span -- unless the view is held, when the
+    # origin is the caller's and nothing on the screen moves
+    if hd:
+        ox, oy = hd[2], hd[3]
+    else:
+        ox = (W - dx * sx) / 2.0 - x0 * sx
+        oy = (H - dy * sy) / 2.0 - y0 * sy
 
     # The legibility floor must never beat the no-overlap guarantee: on a dense device
     # (chain(288) gives g = 5.5 px) an unconditional 3 px floor put 2*r_ion above g and
@@ -433,6 +487,12 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
         "g": R(g, 4), "gd": R(gd, 6),
         "ux": R(ux, 6), "uy": R(uy, 6),
         "iso": bool(iso), "axis_aligned": bool(axis_aligned),
+        # WHETHER THE DRAWING IS MEASURABLE.  True means sx:sy is the technology's
+        # nm-per-unit ratio, so an angle read off the screen is the physical angle and a
+        # ruler reading in x means the same as one in y.  `iso` above is a different
+        # claim (the FIT chose one scale for both axes) and is still reported, because
+        # true scale bypasses it rather than implying it.
+        "true_scale": bool(ts is not None),
         "n": len(nodes),
         # -- every mark, as a fraction of g --------------------------------
         "r_ion": R(r_ion, 3),          # in flight / in the current gate
