@@ -13,7 +13,7 @@
 
 (function () {
   "use strict";
-  const { Model, LeafSim, lowerBound, naturalCmp } = window.GadgetCore;
+  const { Model, LeafSim, lowerBound, naturalCmp, geomOf, ionRadius } = window.GadgetCore;
   const D = JSON.parse(document.getElementById("gdata").textContent);
   const M = new Model(D);
   const $ = (id) => document.getElementById(id);
@@ -252,45 +252,16 @@
   // maximises the alignment with the others (render.py's AXIS), which is what a site's
   // capsule and its slot rings are rotated onto.
   const geomCache = {};
+  // ONE derivation of the trap axis, in `core.js::geomOf`.  It lived here, and `LeafSim`
+  // needs the same numbers to place an ion in its slot -- two derivations of one axis
+  // would be two pictures of one trap, and the ions would sit in the second while the
+  // capsules were drawn along the first.
   function deviceGeom(mname) {
     if (geomCache[mname]) return geomCache[mname];
     const d = M.leafData[mname];
     if (!d) return null;
-    const pos = {}, arms = {};
-    for (const n of d.device.nodes) { pos[n.id] = n.pos; arms[n.id] = []; }
-    let gd = Infinity;
-    for (const sg of d.device.segments) {
-      const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
-      if (!a || !b) continue;
-      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy);
-      if (len > 1e-9) {
-        gd = Math.min(gd, len);
-        arms[sg.ends[0]].push([dx / len, dy / len]);
-        arms[sg.ends[1]].push([-dx / len, -dy / len]);
-      }
-    }
-    if (!isFinite(gd)) {                       // no segments: fall back to node spacing
-      const ns = d.device.nodes;
-      for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) {
-        const dx = ns[j].pos[0] - ns[i].pos[0], dy = ns[j].pos[1] - ns[i].pos[1];
-        const l = Math.sqrt(dx * dx + dy * dy);
-        if (l > 1e-9) gd = Math.min(gd, l);
-      }
-    }
-    if (!isFinite(gd) || gd <= 0) gd = 1;
-    const axis = {};
-    for (const n of d.device.nodes) {
-      const list = (arms[n.id] || []).map(([ux, uy]) => (ux < -1e-9 || (Math.abs(ux) <= 1e-9 && uy < 0))
-        ? [-ux, -uy] : [ux, uy]);            // sign-normalised to the right/up half-plane
-      let best = [1, 0], score = -1;
-      for (const cand of list) {
-        let s = 0;
-        for (const other of list) s += Math.abs(cand[0] * other[0] + cand[1] * other[1]);
-        if (s > score) { score = s; best = cand; }
-      }
-      axis[n.id] = best;
-    }
-    return (geomCache[mname] = { gd, axis, pos });
+    const sim = sims[mname];
+    return (geomCache[mname] = (sim && sim.geom) || geomOf(d.device));
   }
 
   // the studio's per-`g` marks, in px for the current camera
@@ -842,7 +813,9 @@
         const nodeId = d.device.nodes[st.step.before[i]].id;
         if (!moving && stubs.has(nodeId)) return;
         const gid = binds[name] !== undefined ? binds[name] : localId[name];
-        out.push({ name, gid, xy: st.xy[i], role: roleOf(d, m, name), active: st.active.includes(i) });
+        out.push({ name, gid, xy: st.xy[i], role: roleOf(d, m, name), active: st.active.includes(i),
+                   // how the mark is sized and whether it is threading past a neighbour
+                   p: (st.live && st.live[name]) || null });
       });
       return { ions: out, step: st, event: e, local: lt };
     }
@@ -864,16 +837,25 @@
     return "messenger";
   }
 
-  function spread(ions) {
-    // ions sharing a position (a docked pair, two in one trap) sit side by side
-    const seen = new Map();
-    for (const ion of ions) {
-      const key = ion.xy[0].toFixed(3) + "," + ion.xy[1].toFixed(3);
-      const k = seen.get(key) || 0;
-      seen.set(key, k + 1);
-      ion.dx = k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.32 : 0;
-    }
-  }
+  // WHERE `spread` USED TO BE.  It pushed apart ions whose coordinates agreed to three
+  // decimal places, by a fixed 0.32 along x, re-indexing the whole stack each time it ran.
+  // Three things were wrong with that and all three were visible: the test was an exact
+  // one, so the correction switched on and off between adjacent animation frames (23,496
+  // such flicks over `site/gadgets/demo`, the worst of them 22.7 lattice units); the
+  // offset was along x whatever direction the trap ran in; and it did nothing at all for
+  // the far commoner case of two ions merely CLOSE together, which is every approach to an
+  // occupied trap and every exchange along a rail -- 41% of sampled instants drew two ions
+  // through each other, the worst pair at a separation of exactly zero.
+  //
+  // Ions now arrive here already in their slots: `LeafSim.state` places the whole stage
+  // through `transit.js`, the same law the studio stage runs, so the order is carried
+  // forward across instructions and each ion interpolates from the slot it leaves to the
+  // slot it arrives in.  Nothing downstream needs a `dx`, and there is no second pass.
+  // The mark's SIZE is the other half of it, and that is `core.js::ionRadius` -- kept
+  // there so `tests/gadget_stage.mjs` can measure what this canvas draws rather than a
+  // second opinion about it.  A pitch arrives in device units, so it scales by the camera
+  // exactly as a position does.
+  const ionR = (ion, mk, s) => ionRadius(ion.p, mk.rIon, mk.rRest, s, ion.active);
 
   // The device, in the studio's own z-order: rails, the halo under a site in play, the
   // nodes, the potential well under a flying ion, then the ions and their labels.  Every
@@ -956,7 +938,6 @@
       drawSite(ctx, n, sx, sy, mk, geom.axis[n.id] || [1, 0], state);
     }
     if (!st) return;
-    spread(st.ions);
     // -- the potential well under an ion that is moving (`leafIons` returns the sim
     // state, whose own `.step` is the instruction record with the moves in it)
     const rec = st.step ? st.step.step : null;
@@ -968,7 +949,7 @@
         const ion = st.ions[i2];
         if (!ion) continue;
         ctx.beginPath();
-        ctx.ellipse(X(ox + ion.xy[0] + (ion.dx || 0)), Y(oy + ion.xy[1]),
+        ctx.ellipse(X(ox + ion.xy[0]), Y(oy + ion.xy[1]),
                     mk.wellRx, mk.wellRy, 0, 0, 2 * Math.PI);
         ctx.fill();
       }
@@ -977,8 +958,8 @@
     // -- the ions: white-outlined discs, coloured by what is being done to them
     const kind = st.step ? st.step.step.ins.type : null;
     for (const ion of st.ions) {
-      const x = X(ox + ion.xy[0] + (ion.dx || 0)), y = Y(oy + ion.xy[1]);
-      const r = ion.active ? mk.rIon : mk.rRest;
+      const x = X(ox + ion.xy[0]), y = Y(oy + ion.xy[1]);
+      const r = ionR(ion, mk, S.cam.s);
       // the studio colours an ion by what the machine is doing to it, not by any role it
       // was given: a Z-check red, an X-check teal, everything else slate.  The gadget
       // layer has the instruction rather than the check, so a measurement or a reset
@@ -1006,11 +987,11 @@
       ctx.textBaseline = "middle";
       for (const ion of st.ions) {
         const label = ion.name.replace(/^[da]/, "");
-        const r = ion.active ? mk.rIon : mk.rRest;
+        const r = ionR(ion, mk, S.cam.s);
         if (r < 6) continue;
         ctx.font = "700 " + Math.min(0.66 * r, 1.5 * r / Math.max(2, label.length)).toFixed(1) +
                    "px ui-sans-serif, system-ui, sans-serif";
-        ctx.fillText(label, X(ox + ion.xy[0] + (ion.dx || 0)), Y(oy + ion.xy[1]));
+        ctx.fillText(label, X(ox + ion.xy[0]), Y(oy + ion.xy[1]));
       }
       ctx.textAlign = "start";
       ctx.textBaseline = "alphabetic";
@@ -1051,7 +1032,7 @@
     if (st && s > 34 && 0.66 * mk.rIon < 8) {
       ctx.font = "10px ui-monospace, monospace";
       ctx.fillStyle = COLOR.ink;
-      for (const ion of st.ions) ctx.fillText(ion.name, X(ion.xy[0] + (ion.dx || 0)) + 6, Y(ion.xy[1]) - 6);
+      for (const ion of st.ions) ctx.fillText(ion.name, X(ion.xy[0]) + 6, Y(ion.xy[1]) - 6);
     }
   }
 

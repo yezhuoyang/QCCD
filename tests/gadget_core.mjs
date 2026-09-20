@@ -11,6 +11,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dir = process.argv[2];
+// `transit.js` first, exactly as `qccd/gadget/page.py` orders the two script tags: it is
+// the occupancy law `LeafSim` places ions with, and it is shared with the studio stage.
+new Function(readFileSync(join(here, "..", "qccd", "viz", "js", "transit.js"), "utf8"))();
 new Function(readFileSync(join(here, "..", "qccd", "gadget", "web", "core.js"), "utf8"))();
 const { Model, LeafSim } = globalThis.GadgetCore;
 

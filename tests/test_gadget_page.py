@@ -39,7 +39,11 @@ def test_the_build_writes_a_self_contained_page(built):
     out, res = built
     html = (out / "index.html").read_text(encoding="utf-8")
     assert res["checks"]["failed"] == []
-    assert "__DATA__" not in html and "__APP__" not in html and "__CORE__" not in html
+    for marker in ("__DATA__", "__APP__", "__CORE__", "__TRANSIT__", "__EDITOR__"):
+        assert marker not in html, f"{marker} was not substituted"
+    # the occupancy law is the studio's own file, inlined here rather than copied into
+    # `gadget/web/` -- if this ever stops being true the two canvases have forked
+    assert "QCCDTransit" in html
     for forbidden in ("http://", "https://", "fetch(", "XMLHttpRequest"):
         assert forbidden not in html.split('<script id="gdata"')[0]
     data = html.split('<script id="gdata" type="application/json">', 1)[1].split("</script>", 1)[0]

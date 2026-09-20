@@ -316,6 +316,51 @@
 
   // ------------------------------------------------------------------ leaf replay
 
+  // ------------------------------------------------------ the device, as geometry
+
+  // `gd` (the nearest-neighbour distance), and a trap axis per node: the direction its
+  // slots run in, taken as the incident rail direction most parallel to the others, with
+  // the sign normalised so two ends of one segment agree.  `app.js::deviceGeom` used to
+  // own this and now reads it from here, because `LeafSim` needs the same numbers to
+  // place ions and two derivations of one axis is two pictures of one trap.
+  function geomOf(device) {
+    const pos = {}, arms = {};
+    for (const n of device.nodes) { pos[n.id] = n.pos; arms[n.id] = []; }
+    let gd = Infinity;
+    for (const sg of device.segments) {
+      const a = pos[sg.ends[0]], b = pos[sg.ends[1]];
+      if (!a || !b) continue;
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 1e-9) {
+        gd = Math.min(gd, len);
+        arms[sg.ends[0]].push([dx / len, dy / len]);
+        arms[sg.ends[1]].push([-dx / len, -dy / len]);
+      }
+    }
+    if (!isFinite(gd)) {                       // no segments: fall back to node spacing
+      const ns = device.nodes;
+      for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) {
+        const dx = ns[j].pos[0] - ns[i].pos[0], dy = ns[j].pos[1] - ns[i].pos[1];
+        const l = Math.sqrt(dx * dx + dy * dy);
+        if (l > 1e-9) gd = Math.min(gd, l);
+      }
+    }
+    if (!isFinite(gd) || gd <= 0) gd = 1;
+    const axis = {};
+    for (const n of device.nodes) {
+      const list = (arms[n.id] || []).map(([ux, uy]) => (ux < -1e-9 || (Math.abs(ux) <= 1e-9 && uy < 0))
+        ? [-ux, -uy] : [ux, uy]);            // sign-normalised to the right/up half-plane
+      let best = [1, 0], score = -1;
+      for (const cand of list) {
+        let s = 0;
+        for (const other of list) s += Math.abs(cand[0] * other[0] + cand[1] * other[1]);
+        if (s > score) { score = s; best = cand; }
+      }
+      axis[n.id] = best;
+    }
+    return { gd, axis, pos };
+  }
+
   // A leaf's TSIR, replayed for drawing: positions after every instruction, and the path
   // each moving ion takes during it.  Built once per (master, op) and kept.
   function LeafSim(data) {
@@ -328,6 +373,41 @@
     this.loops = {};
     for (const lp of data.device.loops || []) this.loops[lp.id] = lp.nodes;
     this.cache = {};
+    this.geom = geomOf(data.device);
+    // THE OCCUPANCY LAW, in device units.  Everything below is `qccd/viz/layout.py`'s
+    // arithmetic with `g` read as the device's own nearest-neighbour distance instead of
+    // a pixel count, so a trap here stacks its ions exactly as the studio stacks them.
+    const T = (typeof globalThis !== "undefined" && globalThis.QCCDTransit)
+      || (typeof window !== "undefined" && window.QCCDTransit);
+    if (!T) throw new Error("core.js needs qccd/viz/js/transit.js loaded before it");
+    const g = this.geom.gd, byId = {}, rep = {}, atPos = {};
+    for (const n of this.nodes) {
+      byId[n.id] = n;
+      // two nodes at one coordinate are ONE place as far as the drawing is concerned, and
+      // this device has twelve such pairs; `spread()` used to discover that by comparing
+      // coordinates every animation frame, which is where its flicker came from
+      const key = n.pos[0] + "," + n.pos[1];
+      if (!(key in atPos)) atPos[key] = n.id;
+      rep[n.id] = atPos[key];
+    }
+    const capOf = (id) => { const n = byId[id]; return n && n.capacity !== undefined ? n.capacity : 1; };
+    const slotsOf = (cap) => Math.max(1, Math.min(cap || 1, 6));
+    const siteLenOf = (cap) => Math.min(0.88 * g, (0.30 + 0.15 * slotsOf(cap)) * g);
+    this.transit = new T.Transit({
+      pos: (id) => (byId[id] ? byId[id].pos : null),
+      axis: (id) => this.geom.axis[id] || [1, 0],
+      site: (id) => rep[id] || id,
+      slotOffsets: (id, k) => {
+        const cap = capOf(id), m = slotsOf(cap), pitch = siteLenOf(cap) / m;
+        const step = Math.min(pitch, 0.86 * g / Math.max(k, 1));
+        const off = [], p = (k <= m) ? pitch : step;
+        for (let j = 0; j < k; j++) off.push((j - (k - 1) / 2) * p);
+        return { off, pitch: Math.min(pitch, step) };
+      },
+      // `qccd/viz/layout.py::swap_bow` -- min(0.62*g, 1.9*(r_ion + r_rest)) with the
+      // theme's ION_D_FRAC_ACTIVE + 0.065 and ION_D_FRAC, which is 0.62*g at these numbers
+      bow: Math.min(0.62 * g, 1.9 * (0.24 + 0.13) * g),
+    });
   }
 
   LeafSim.prototype.prepare = function (op) {
@@ -386,11 +466,54 @@
       const tt = times[k] || [I.id, 0, 0];
       steps.push({ ins: I, t0: tt[1], t1: tt[2], before, moves, active });
     }
-    return (this.cache[op] = { ions, idx, steps, final: pos.slice() });
+    // The same three tables `transit.js` reads on the studio stage, keyed by ion NAME and
+    // node ID rather than by the indices this replay works in.
+    //
+    // BUILT WHEN REACHED, not for the whole op.  Three objects with an entry per ion, per
+    // instruction, is 376,000 property writes on the 1,292-instruction memory leaf, and
+    // it was being paid inside `prepare` -- so opening the gadget's top level, where
+    // sixteen instances prepare their masters at once, cost an eighth of a second before
+    // the first frame appeared.  The walker asks for them in order and stops where the
+    // playhead is; `place` asks for the one it is drawing.
+    const self = this, id = (ni) => self.nodes[ni].id;
+    const tcache = new Array(steps.length);
+    const tstep = (k) => {
+      let T = tcache[k];
+      if (T) return T;
+      const st = steps[k], before_ = {}, pos_ = {}, paths_ = {};
+      st.before.forEach((ni, i) => { before_[ions[i]] = id(ni); pos_[ions[i]] = id(ni); });
+      for (const [i, path] of st.moves) {
+        if (path.length > 1) paths_[ions[i]] = path.map(id);
+        pos_[ions[i]] = id(path[path.length - 1]);
+      }
+      T = steps[k].T = tcache[k] = { before: before_, pos: pos_, paths: paths_ };
+      return T;
+    };
+    // ORDER CARRIED FORWARD over the op, not re-derived per instant.  This is the table
+    // that stops an ion changing slot -- and therefore jumping a whole pitch -- between
+    // one instruction and the next.
+    //
+    // A WALKER, not a table: it is extended to the step being drawn and no further.
+    // Computing the whole thing here costs a quarter of a second over this build's five
+    // masters, and it would be spent on the frame that first opens the top level, where
+    // sixteen leaf instances all prepare at once.  `at(k)` is memoized inside the walker,
+    // so playing forward pays a step at a time and seeking backwards is free.
+    const walk = this.transit.orderWalker({ length: steps.length, get: tstep });
+    return (this.cache[op] = { ions, idx, steps, walk, tstep, final: pos.slice() });
   };
 
   // Where every ion is at local time `local` of `op`: [x, y] per ion (in device units),
   // the instruction index, and which ions the instruction acts on.
+  //
+  // THIS USED TO INTERPOLATE EACH MOVER ALONG ITS OWN PATH AND NOTHING ELSE.  Every ion
+  // was placed without reference to any other, so an ion arriving at an occupied trap was
+  // drawn converging on the resident and finishing exactly on top of it, and two ions
+  // exchanging ends of a rail met in the middle at a separation of zero.  `app.js::spread`
+  // then pushed apart only those whose coordinates agreed to three decimal places, which
+  // made the correction appear and disappear between one animation frame and the next --
+  // a sideways flick of a third of a lattice unit, or of twenty-two when it re-indexed a
+  // whole stack.  Measured on `site/gadgets/demo`: 41% of instants overlapping, 23,496
+  // flicks.  Both are gone; `transit.js` places every ion on the stage under one law.
   LeafSim.prototype.state = function (op, local) {
     const P = this.prepare(op);
     if (!P) return null;
@@ -399,18 +522,49 @@
     if (k < 0) k = 0;
     const st = steps[k];
     const frac = st.t1 > st.t0 ? Math.max(0, Math.min(1, (local - st.t0) / (st.t1 - st.t0))) : 1;
-    const nodes = this.nodes;
-    const xy = st.before.map((ni) => nodes[ni].pos.slice());
-    for (const [i, path] of st.moves) {
-      if (path.length < 2) continue;
-      const u = frac * (path.length - 1);
-      const s = Math.min(path.length - 2, Math.floor(u));
-      const w = u - s;
-      const a = nodes[path[s]].pos, b = nodes[path[s + 1]].pos;
-      xy[i] = [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w];
-    }
-    return { k, frac, xy, ions: P.ions, active: st.active, step: st };
+    const T = P.tstep(k);
+    const PL = this.transit.place({
+      before: T.before, pos: T.pos, paths: T.paths,
+      t: frac, rest: false, ordStart: P.walk.at(k - 1), ordEnd: P.walk.at(k),
+    });
+    // back to the array shape every caller reads, in the ions' own order
+    const xy = P.ions.map((name, i) => {
+      const p = PL.live[name];
+      if (p) return [p.x, p.y];
+      const n = this.nodes[st.before[i]];       // an ion on a node the device has lost
+      return n ? n.pos.slice() : [0, 0];
+    });
+    // `live` carries the rest of what the drawing needs and the array cannot hold: whether
+    // an ion is in flight, whether it is threading past another, and the SLOT PITCH at
+    // each end.  The last one is not decoration -- a site holding 72 ions stacks them
+    // 0.012 lattice units apart, and an ion drawn at its full radius there is drawn
+    // through five of its neighbours.  The studio shrinks the mark to 0.44 of the pitch
+    // (`render.py`'s ion block) and this canvas must too, or the law is only half applied.
+    return { k, frac, xy, ions: P.ions, active: st.active, step: st,
+             live: PL.live, passes: PL.passes };
   };
 
-  root.GadgetCore = { Model, LeafSim, lowerBound, naturalCmp };
+  // HOW BIG THE MARK IS, which is the other half of "two ions do not overlap": a site can
+  // hold more ions than there is room for at full size.  `tcx72` has two traps of capacity
+  // 72 and `slotOffsets` stacks those 0.012 lattice units apart, so an ion drawn at its
+  // full radius there covers five of its neighbours -- which is what 2,080 of 2,100
+  // sampled instants of its `cx` op looked like.  This is `render.py`'s ion block: resting
+  // size in the slot it leaves, full radius mid-flight (the mark the eye should find),
+  // resting size again in the slot it arrives at, and no swelling at all while threading
+  // past a neighbour, which needs the room and not the bulk.
+  //
+  // It lives here rather than in `app.js` so that a test can measure what the canvas
+  // draws instead of a second opinion about it.  `p` is one entry of `LeafSim.state`'s
+  // `live`; `s` scales a device-unit pitch into the radii's own units.
+  function ionRadius(p, rIon, rRest, s, active) {
+    const base = active ? rIon : rRest;
+    if (!p) return base;
+    const fit = (pitch) => Math.min(rRest, pitch ? 0.44 * pitch * s : rRest);
+    if (!p.fly) return p.pitch ? Math.min(base, 0.44 * p.pitch * s) : base;
+    const rA = fit(p.pitchA), rB = fit(p.pitchB);
+    const bulge = (p.swap || p.tight) ? 0 : 4 * p.tt * (1 - p.tt);
+    return rA + (rB - rA) * p.tt + (rIon - Math.max(rA, rB)) * bulge;
+  }
+
+  root.GadgetCore = { Model, LeafSim, lowerBound, naturalCmp, geomOf, ionRadius };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -439,6 +439,10 @@ function rebuildAxis() {
   var got = axisOf(A.nodes, A.segments, px, py, nodeById), k;
   for (k in AXIS) if (has(AXIS, k)) delete AXIS[k];
   for (k in got) if (has(got, k)) AXIS[k] = got[k];
+  // The other per-node table the stage derives from the device: which PLACE each node is,
+  // so two sites dropped on one coordinate share a slot stack instead of drawing two ions
+  // at the same point.  It goes stale for exactly the reasons the axis does.
+  if (typeof rebuildSites === 'function') rebuildSites();
 }
 
 // The SAME derivation, taking its scene explicitly.  A palette avatar lays out its own
