@@ -29,6 +29,7 @@ from qccd.cost import corrected_model, deck_model  # noqa: E402
 from qccd.verify import verify  # noqa: E402
 from qccd.viz.render import build_view_model  # noqa: E402
 from qccd.viz.theme import PALETTE, SEGMENT_ROLE  # noqa: E402
+from qccd.viz.transit import Geometry, Step, Transit  # noqa: E402
 
 ARCH = ROOT / "arch"
 HTML = ROOT / "visualizer_24_ancillas_24_junctions_standalone.html"
@@ -187,6 +188,12 @@ class Clip:
                      if source else 0)
         self.H = int(round(self.L["H"] * self.k)) + self.head + self.foot
         self.axis = self._axes()
+        # the shared occupancy law, and the slot order it carries forward over the whole
+        # programme -- computed once, exactly as the page computes it at load
+        self.transit = self._transit()
+        self.tsteps = [Step(before=self.before[i], pos=self.after[i], paths=self.paths[i])
+                       for i in range(len(self.frames))]
+        self.order = self.transit.slot_order(self.tsteps)
 
     # -- geometry ---------------------------------------------------------
     def xy(self, nid):
@@ -208,15 +215,39 @@ class Clip:
 
     def point(self, path, t):
         """Where an ion sits `t` of the way along its walk for this frame."""
-        if not path:
-            return None
-        if len(path) == 1:
-            return self.xy(path[0])
-        span = (len(path) - 1) * min(max(t, 0.0), 1.0)
-        i = min(int(span), len(path) - 2)
-        u = span - i
-        (x0, y0), (x1, y1) = self.xy(path[i]), self.xy(path[i + 1])
-        return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u
+        q = self.transit.point_on_path(path, t)
+        return None if q is None else (q[0], q[1])
+
+    def _transit(self):
+        """The occupancy law, over this clip's own geometry.
+
+        Every number this uses -- the slot pitch, the natural order, the detour round a
+        trap-mate -- was a private and different answer here until now: `point` walked a
+        path hop-uniformly, and `draw` stacked ions by `sorted(ions)` (so `d10` before
+        `d2`) against the END state while they were still in flight.  The page had been
+        fixed for all three; the GIF, which is the artefact a reader keeps, had not.
+        """
+        first_at = {}
+        site = {}
+        for nid, n in self.nodes.items():
+            key = (n["x"], n["y"])
+            first_at.setdefault(key, nid)
+            site[nid] = first_at[key]
+        slot = max(2 * SS, int(round(self.L["r_ion"] * 0.92 * self.k))) * 1.15
+
+        def slot_offsets(nid, k):
+            # the GIF draws one comb per place at a fixed pitch, as it always has; what
+            # changes is WHO is in which tooth and that the pitch is now shared with the
+            # flight, not applied on top of it
+            return ([(j - (k - 1) / 2) * slot for j in range(k)], slot)
+
+        return Transit(Geometry(
+            pos=lambda nid: self.xy(nid) if nid in self.nodes else None,
+            axis=lambda nid: self.axis.get(nid, (1.0, 0.0)),
+            slot_offsets=slot_offsets,
+            site=lambda nid: site.get(nid, nid),
+            bow=min(0.62 * self.L["g"] * self.k, 1.9 * 2 * slot),
+        ))
 
     # -- the static picture, built once -----------------------------------
     def board(self):
@@ -263,16 +294,18 @@ class Clip:
         walking = self.paths[i]
         pos = self.before[i] if walking else self.after[i]
         r = max(2 * SS, int(round(self.L["r_ion"] * 0.92 * self.k)))
-        slot = r * 1.15
 
-        here, stack = {}, {}
-        for ion, at in pos.items():
-            p = (self.point(walking[ion], t) if ion in walking
-                 else self.xy(at) if at in self.nodes else None)
-            if p is None:
-                continue
-            stack.setdefault(walking[ion][-1] if ion in walking else at, []).append(ion)
-            here[ion] = p
+        # WHERE EVERY ION IS, from the shared law.  What stood here placed each ion on its
+        # own path with no reference to any other, then stacked whoever ENDED at one node
+        # by `sorted(ions)` and applied that end-state offset for the whole flight.  Three
+        # consequences, all of them visible in the shipped GIFs: an ion that shares a trap
+        # was drawn a slot away from where the flight put it and snapped back at the frame
+        # boundary; `d10` took `d2`'s slot, and the two changed places whenever the
+        # population moved; and an ion converging on an occupied trap finished on top of
+        # the resident.  `place` answers all three in one go.
+        here = self.transit.place(self.tsteps[i], t,
+                                  self.order[i - 1] if i > 0 else {},
+                                  self.order[i], rest=not walking)
 
         if f["type"] == "gate":
             for site in f.get("sites", ()):
@@ -286,23 +319,20 @@ class Clip:
         # rigid rotation that is EVERY ion, and a halo on everything says nothing -- so
         # it is drawn only when the movement is selective.
         halo = walking and len(walking) < 0.6 * max(len(pos), 1)
-        for site, ions in stack.items():
-            ax, ay = self.axis.get(site, (1.0, 0.0))
-            for j, ion in enumerate(sorted(ions)):
-                x, y = here[ion]
-                if len(ions) > 1:
-                    off = (j - (len(ions) - 1) / 2) * slot
-                    x, y = x + ax * off, y + ay * off
-                moving = ion in walking and len(walking[ion]) > 1
-                col = (rgb("accent") if ion in flagged else
-                       rgb("anc") if self.ion_roles.get(ion) == "ancilla"
-                       else rgb("data"))
-                rr = r * (1.18 if moving else 1.0)
-                if moving and halo:
-                    d.ellipse([x - rr * 1.9, y - rr * 1.9, x + rr * 1.9, y + rr * 1.9],
-                              fill=(*rgb("arrow"), 60))
-                d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=col,
-                          outline=rgb("ion_stroke"), width=max(1, SS // 2))
+        for ion, p in here.items():
+            x, y = p.x, p.y
+            col = rgb("accent") if ion in flagged else rgb("data")
+            # the mark shrinks to fit its slot, as it does on the page: a trap packed
+            # tighter than the disc is wide would otherwise draw one ion over another
+            pitch = max(p.pitch, p.pitch_a, p.pitch_b)
+            rr = min(r, 0.44 * pitch) if pitch else r
+            if p.fly:
+                rr *= 1.18
+            if p.fly and halo:
+                d.ellipse([x - rr * 1.9, y - rr * 1.9, x + rr * 1.9, y + rr * 1.9],
+                          fill=(*rgb("arrow"), 60))
+            d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=col,
+                      outline=rgb("ion_stroke"), width=max(1, SS // 2))
 
         self.caption(d, i, f_small, f_mono, caption)
         if self.foot:
@@ -578,7 +608,7 @@ def render_design(out, *, width=880, colors=48, ms=1400):
         base = clip.board()
         cap = (f"Machine.ring(72, 2, verticals={v})",
                f"{s['n_junction_nodes']} junctions",
-               f"{v} ancillas   {s['n_nodes']} nodes   {hw.dacs} DACs")
+               f"{v} docks   {s['n_nodes']} nodes   {hw.dacs} DACs")
         imgs.append(clip.draw(base, len(clip.frames) - 1, 1.0, f_small, f_mono, cap))
         durs.append(ms)
     durs[-1] = ms + 600

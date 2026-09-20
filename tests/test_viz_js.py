@@ -164,23 +164,39 @@ def test_a_one_dimensional_trap_is_drawn_at_a_readable_scale(tmp_path):
 def test_the_harness_actually_catches_an_oversized_ion(tmp_path):
     """A test that cannot fail is not a test. Mutate the drawn radius in the emitted page
     and confirm the census reports the overlap -- this is the exact mutation that slipped
-    past all 107 layout tests."""
+    past all 107 layout tests.
+
+    THE FACTOR IS FOUND, NOT WRITTEN DOWN, and that is the point of this version.  It was
+    2.5x, then 4x, each time because the clearance between two marks had grown and the old
+    number had quietly stopped breaching it -- the second time silently, until a change to
+    something else entirely (`layout.py` making true scale the default, which re-fits the
+    ring at a smaller magnification) turned this red without anybody having touched the
+    thing it tests.  A hard-coded factor is a second, invisible assertion about a margin
+    nobody is maintaining.  So the test escalates until the census fires and then says how
+    far it had to go: the assertion is that the harness IS sensitive, at a sane scale, and
+    the number it took is evidence rather than a constant to be edited.
+    """
     page = _page(tmp_path, "ring144_24v", lambda m: m.program("t").fill().rotate(+1))
     assert census(page)["overlap_frames"] == 0
 
     html = page.read_text(encoding="utf-8")
     marker = "let r = (pt.fly||act) ? L.r_ion : L.r_rest;"
     assert marker in html, "the radius line moved; update this mutation"
-    broken = tmp_path / "broken.html"
-    # 2.5x does NOT overlap any more -- the marks now carry that much clearance, which
-    # is exactly the margin the rebuild bought. Breach it properly: at 4x, 2*r_rest
-    # exceeds the lattice gap and neighbouring ions must intersect.
-    broken.write_text(html.replace(marker, marker + " r *= 4.0;"), encoding="utf-8")
 
-    r = census(broken)
-    assert r["overlap_frames"] > 0, (
-        "the census passed a page drawing ions at 4x radius -- it would not have "
+    fired = None
+    for factor in (2.0, 4.0, 8.0, 16.0, 32.0):
+        broken = tmp_path / f"broken_{factor:g}.html"
+        broken.write_text(html.replace(marker, f"{marker} r *= {factor};"),
+                          encoding="utf-8")
+        if census(broken)["overlap_frames"] > 0:
+            fired = factor
+            break
+    assert fired is not None, (
+        "the census passed a page drawing ions at 32x radius -- it would not have "
         "caught the defect it exists to catch")
+    assert fired <= 16.0, (
+        f"the census only noticed at {fired:g}x: the marks now carry so much clearance "
+        f"that this is no longer a meaningful probe of its sensitivity")
 
 
 # ------------------------------------------------- the dock: what the panels render

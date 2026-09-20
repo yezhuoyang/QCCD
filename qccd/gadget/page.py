@@ -16,6 +16,8 @@ from ..viz.theme import GEOMETRY, PALETTE, css_vars
 __all__ = ["render_page"]
 
 WEB = Path(__file__).parent / "web"
+#: The occupancy law, shared with the studio stage rather than copied into `web/`.
+TRANSIT_JS = Path(__file__).resolve().parents[1] / "viz" / "js" / "transit.js"
 
 
 def _blob(obj) -> str:
@@ -51,6 +53,11 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
     html = (WEB / "page.html").read_text(encoding="utf-8")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__TITLE__", title or f"{gir['program']['name']} — QCCD gadgets")
+    # THE SAME BYTES THE STUDIO INLINES (`qccd/viz/render.py::ENGINE_JS`).  Where an ion is
+    # drawn while the machine is moving it, and what it does when another ion is in the
+    # way, is one rule for both canvases; this page had its own, and it drew 41% of its
+    # sampled instants with two ions through each other.  `core.js` needs it loaded first.
+    html = html.replace("__TRANSIT__", TRANSIT_JS.read_text(encoding="utf-8"))
     html = html.replace("__CORE__", (WEB / "core.js").read_text(encoding="utf-8"))
     html = html.replace("__EDITOR__", (WEB / "editor.js").read_text(encoding="utf-8"))
     html = html.replace("__APP__", (WEB / "app.js").read_text(encoding="utf-8"))

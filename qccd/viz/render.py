@@ -554,7 +554,12 @@ def build_view_model(
 #: one thing.  If a future change here forked the engine, the parity test would keep
 #: passing while the page ran the fork -- the exact failure this design exists to prevent.
 _JS_DIR = Path(__file__).parent
-ENGINE_JS = ("js/edit.js", "engine.js")
+#: `js/transit.js` is the occupancy law -- where an ion is drawn while the machine is
+#: moving it, and what it does when another ion is in the way.  It is listed FIRST because
+#: it depends on nothing (it is handed its geometry) and because the page's own script and
+#: the gadget Design canvas both call it: `qccd/gadget/page.py` inlines the same bytes.
+#: Two canvases, one rule -- see the header of that file for what having two of them cost.
+ENGINE_JS = ("js/transit.js", "js/edit.js", "engine.js")
 #: `tutorial.js` is data -- the course's lessons -- and it registers itself with the editor
 #: at its last line, so it must come after `editor.js` and needs nothing else.
 EDITOR_JS = ("js/editor.js", "js/tutorial.js")
@@ -2236,13 +2241,30 @@ function buildStatic(S){
     railPlan[sg.id] = {k, run, pit, off:(ha + (run - k*pit)/2)};
     nRailPairs += k;
   }
-  // THE SAME BOUNDS AS BEFORE, counted in pairs rather than rectangles: one side only
-  // past 4,000 rectangles, and past 8,000 the tiling becomes a dash pattern on the rail
-  // -- which still states the true pitch, because the dash IS `l_dc` and the gap IS
-  // `g_dc`.  Site pads are drawn first when the budget is tight: they are what a reader
-  // counts, and the rail between two sites is a road rather than a readout.
-  const sides = 2*(nSitePairs+nRailPairs) > 4000 ? [1] : [1,-1];
-  const nSite = nSitePairs*sides.length, nRail = nRailPairs*sides.length;
+  // A PAIR IS TWO ELECTRODES, ONE EACH SIDE OF THE RAIL, AND IT IS NEVER DRAWN AS ONE.
+  //
+  // This line used to read `2*(nSitePairs+nRailPairs) > 4000 ? [1] : [1,-1]`: over a
+  // budget it dropped the south side and drew half of every pair.  That is not a coarser
+  // picture of the same hardware, it is a different and impossible one -- a surface trap
+  // confines and shuttles with a control electrode on EACH side of the RF rail
+  // (`qccd/phys/build.py::_segment_polys` emits the `north` and `south` bands at
+  // +-(dc_setback .. dc_setback+dc_width) for exactly that reason), and a reader counting
+  // pads on the screen would have counted a device that cannot trap an ion.  It fired on
+  // `grid11x11` at junction pitch 2 -- 660 site pairs and 1,760 rail pairs, so 4,840 > 4,000
+  // -- which is the buildable 11x11 lattice, the one worth demonstrating.
+  //
+  // The budget itself stays, spent where it can be spent honestly: on HOW MANY POSITIONS
+  // are tiled, never on how many sides a position has.  Past 8,000 rectangles the rail
+  // tiling becomes a dash pattern -- which still states the true pitch, because the dash
+  // IS `l_dc` and the gap IS `g_dc` -- and site pads are drawn first, because they are
+  // what a reader counts and the rail between two sites is a road rather than a readout.
+  //
+  // (The derived metal has a THIRD column, `centre`, between the two RF rails.  It is not
+  // drawn here and that is deliberate: this schematic draws a rail as one stroked line, so
+  // a centre pad would be hidden underneath it, and `qccd/phys/build.py::dc_pairs_by_site`
+  // does not count it as a pair either.  `qccd phys --html` is the view that has it.)
+  const sides = [1,-1];
+  const nSite = 2*nSitePairs, nRail = 2*nRailPairs;
   const tileSite = nSite <= 8000, tileRail = (nSite+nRail) <= 8000;
   // ONE PAIR is the unit, because the pair is what is energized.  The old flat list let
   // "the three nearest pads" mean one side of one position and both sides of another.
@@ -2449,48 +2471,35 @@ function deriveStage(frames){
 // A shuttle is a continuous translation, not a jump: the well is ramped from one
 // electrode group to the next and the ion rides it. `u` in [0,1] is the fraction of the
 // frame elapsed, and an ion in flight sits at the matching point along its own path.
-// Every return carries x/y: a length-1 path (a loop_shift with delta 0) used to return an
-// object with neither, and the caller wrote cx="undefined" onto a circle.
-// BY ARC LENGTH, not by hop count.  `t` used to be spread uniformly over the HOPS of a
-// path, so an ion crossing a 3-unit corner segment and then a 1-unit one spent half the
-// frame on each and visibly lurched at the join: a constant-velocity shuttle drawn at two
-// different speeds.  The hop lengths are the drawn lengths (the bow's arc where a segment
-// is bowed), summed once per path and cached, so the ion advances at one speed along the
-// whole path and arrives exactly when the frame ends.
-const _PLEN = (typeof WeakMap === 'function') ? new WeakMap() : null;
-function hopLengths(path){
-  let rec = _PLEN && _PLEN.get(path);
-  if(rec) return rec;
-  const segs=[]; let total=0;
-  for(let i=0;i+1<path.length;i++){ const d=edgeLen(path[i], path[i+1]);
-    segs.push(d); total+=d; }
-  rec = {segs, total};
-  if(_PLEN) _PLEN.set(path, rec);
-  return rec;
+//
+// THE ARITHMETIC IS NOT HERE ANY MORE.  `js/transit.js` owns it -- arc-length walking of
+// a path, slot order carried forward, and the detour an ion takes round one it has to get
+// past -- because the gadget Design canvas needs exactly the same law and had grown its
+// own, weaker one.  What stays here is the GEOMETRY: `edgeLen`/`edgePoint` know about
+// bowed rails and `px`/`py` about the anisotropic fit, and neither belongs in an
+// occupancy rule.  The six functions below are the whole adapter.
+// Two sites dropped on the same model coordinate are ONE place to the eye, and this is a
+// design tool: nothing stops a user stacking them.  Keyed on the MODEL position, not the
+// drawn one, so the grouping does not change with the zoom.  No shipped architecture has
+// a repeated position, so on all nine this is the identity.
+let SITE_OF = {};
+function rebuildSites(){
+  SITE_OF = {}; const first = {};
+  for(const n of A.nodes){ const k = n.x+','+n.y;
+    if(!(k in first)) first[k] = n.id;
+    SITE_OF[n.id] = first[k]; }
 }
-function pointOnPath(path, t){
-  if(!path || !path.length) return null;
-  if(path.length===1){ const n=nodeById[path[0]];
-    return n ? {x:px(n), y:py(n), a:null, b:null, u:0} : null; }
-  const u=Math.min(Math.max(t,0),1), H=hopLengths(path);
-  let i, local;
-  if(H.total<=1e-9){
-    // every hop is a point (a device drawn at zero scale): fall back to hop-uniform
-    const span=(path.length-1)*u;
-    i=Math.min(Math.floor(span), path.length-2); local=span-i;
-  } else {
-    let d=H.total*u; i=0;
-    while(i < H.segs.length-1 && d > H.segs[i]){ d-=H.segs[i]; i++; }
-    local = H.segs[i]>1e-9 ? Math.min(1, d/H.segs[i]) : 0;
-  }
-  const q=edgePoint(path[i], path[i+1], local);
-  if(!q){ const n=nodeById[path[i]]||nodeById[path[i+1]];
-    return n ? {x:px(n), y:py(n), a:null, b:null, u:0} : null; }
-  // a hop with no rail under it is not a hop: the ion is parked on the node it was on,
-  // and nothing downstream may treat it as travelling along a segment
-  if(q.norail) return {x:q.x, y:q.y, a:null, b:null, u:0, norail:true};
-  return {x:q.x, y:q.y, a:path[i], b:path[i+1], u:local};
-}
+rebuildSites();
+const TRANSIT = new QCCDTransit.Transit({
+  pos: id => { const n=nodeById[id]; return n ? [px(n), py(n)] : null; },
+  axis: id => { const a=AXIS[id]; return a ? [a.ux, a.uy] : [1,0]; },
+  site: id => SITE_OF[id] || id,
+  slotOffsets: (id, k) => slotOffsets(nodeById[id], k),
+  edgeLen: (a, b) => edgeLen(a, b),
+  edgePoint: (a, b, u) => edgePoint(a, b, u),
+  get bow(){ return L.swap_bow; },     // `L` is mutated in place by the true-scale toggle
+});
+function pointOnPath(path, t){ return TRANSIT.pointOnPath(path, t); }
 
 function pathsOf(f, prev){
   // ion -> the node sequence it walks during this frame
@@ -2517,26 +2526,17 @@ function pathsOf(f, prev){
 // seam at every dock. So the order is computed ONCE, forward, exactly as a real trap
 // evolves: departures leave, arrivals join at the end they approach from, and everyone
 // already in the trap keeps their place.
+// The walk itself is `transit.js::slotOrder`; what stays here is turning frames into the
+// three plain tables it reads.
 function deriveSlots(frames){
   SLOTS.length = 0;
-  let cur={};
+  const steps=[];
   for(let i=0;i<frames.length;i++){
-    const ps=pathsOf(frames[i]||{}, before[i]||{}), pos=states[i].pos, next={};
-    for(const site in cur){
-      const keep=cur[site].filter(ion => pos[ion]===site);
-      if(keep.length) next[site]=keep;
-    }
-    for(const ion in pos){
-      const site=pos[ion], n=nodeById[site]; if(!n) continue;
-      const list=next[site]||(next[site]=[]);
-      if(list.indexOf(ion)>=0) continue;
-      const from=(ps[ion]&&ps[ion][0]) || (before[i]||{})[ion] || site;
-      const o=nodeById[from], ax=AXIS[site];
-      const d=(o&&ax) ? (px(o)-px(n))*ax.ux+(py(o)-py(n))*ax.uy : 0;
-      if(d<0) list.unshift(ion); else list.push(ion);   // join at the end you arrive from
-    }
-    SLOTS[i]=next; cur=next;
+    steps.push({before: before[i]||{}, pos: states[i].pos,
+                paths: pathsOf(frames[i]||{}, before[i]||{})});
   }
+  const ord = TRANSIT.slotOrder(steps);
+  for(let i=0;i<ord.length;i++) SLOTS[i]=ord[i];
 }
 deriveStage(P.frames);
 
@@ -2714,110 +2714,33 @@ function draw(){
   // EVERY ion jumped by one slot offset at each frame boundary, because `pointOnPath`
   // starts and ends at the node while a resting ion is drawn off it. Both are the same
   // bug: flight and rest disagreed about where an ion in a site actually sits.
-  const live={}, segLoad={}, flying={};
-  const natural=(a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});
-  const srcOf={}, dstOf={}, occS={}, occ={};
-  for(const ion in stt.pos){
-    const path=paths[ion];
-    const a=path?path[0]:stt.pos[ion], b=path?path[path.length-1]:stt.pos[ion];
-    if(!nodeById[a] || !nodeById[b]) continue;
-    srcOf[ion]=a; dstOf[ion]=b;
-    (occS[a]||(occS[a]=[])).push(ion);
-    (occ[b]||(occ[b]=[])).push(ion);      // occupancy at the END of the frame
-  }
-  // Slots are ordered ALONG THE SITE'S OWN AXIS by where each ion comes from (arrivals)
-  // or goes to (departures), so no ion has to cross a sibling to reach its slot. Ordering
-  // by id instead handed a docking ion the far slot and sent it straight through the
-  // ancilla waiting in the near one. Natural order breaks ties -- and it has to be
-  // natural, because plain .sort() puts 'd10' before 'd2' and the slot an ion holds then
-  // changes from frame to frame as the population around it changes.
-  const proj=(id, other)=>{
-    const n=nodeById[id], o=nodeById[other], ax=AXIS[id];
-    if(!n || !o || !ax) return 0;
-    return (px(o)-px(n))*ax.ux + (py(o)-py(n))*ax.uy;
-  };
-  // ONE key for both lists -- where the ion starts this frame. Using different keys for
-  // the two ends lets the order invert mid-frame, and two ions swapping slots pass
-  // straight through each other (measured: 350 frames with centres exactly coincident).
-  // With a single key the order is fixed for the whole frame, so an ion arriving from
-  // the precomputed order: end of the previous frame for the start state, this frame's
-  // for the end state, so the two agree at the seam AND agree with each other
+  //
+  // THE LAW IS `js/transit.js`; the geometry is the adapter at `TRANSIT` above.  Every
+  // number that used to be computed in the two hundred lines that stood here is computed
+  // there now, and the gadget Design canvas computes it with the same code.
+  const segLoad={};
+  // The two slot orders come out of the precomputed table: end of the PREVIOUS frame for
+  // the start state, this frame's for the end state, so the two agree at the seam AND
+  // agree with each other.
   const ordEnd=SLOTS[frame]||{}, ordStart=(frame>0?SLOTS[frame-1]:null)||{};
-  // an ion must pass a trap-mate when someone stays behind on the side it exits towards
-  const mustPass = (ion, A, B) => {
-    if(A.node === B.node) return false;
-    const side = (here, there) => {
-      const n=nodeById[here], o=nodeById[there], ax=AXIS[here];
-      return (n&&o&&ax) ? (px(o)-px(n))*ax.ux+(py(o)-py(n))*ax.uy : 0;
-    };
-    const blocked = (list, ion2, dir, resident) => {
-      const i=list.indexOf(ion2);
-      if(i<0 || list.length<2 || !dir) return false;
-      for(let k=0;k<list.length;k++){
-        if(k===i) continue;
-        if((dir>0 ? k>i : k<i) && resident.indexOf(list[k])>=0) return true;
-      }
-      return false;
-    };
-    // leaving: does anyone STAY BEHIND on the side it exits towards?
-    if(blocked(ordStart[A.node]||[], ion, side(A.node,B.node), ordEnd[A.node]||[]))
-      return true;
-    // arriving: is anyone ALREADY THERE between the end it enters by and its own slot?
-    return blocked(ordEnd[B.node]||[], ion, side(B.node,A.node), ordStart[B.node]||[]);
-  };
-  const orderBy = (ord,id) => (a,b) => {
-    const L=ord[id]||[], ia=L.indexOf(a), ib=L.indexOf(b);
-    return ((ia<0?1e9:ia)-(ib<0?1e9:ib)) || natural(a,b);
-  };
-  for(const id in occS) occS[id].sort(orderBy(ordStart,id));
-  for(const id in occ)  occ[id].sort(orderBy(ordEnd,id));
-  const slotAt=(id, list, ion)=>{
-    const n=nodeById[id], k=list.length, j=Math.max(0, list.indexOf(ion));
-    const s=slotOffsets(n, k), ax=AXIS[id], o=s.off[j];
-    return {ox:ax.ux*o, oy:ax.uy*o, pitch:k>1?s.pitch:0, node:id};
-  };
-
+  const PL = TRANSIT.place({before: before[frame]||{}, pos: stt.pos, paths: paths,
+                            t: t, rest: !(phase<1), ordStart: ordStart, ordEnd: ordEnd});
+  const live=PL.live, flying=PL.flying;
   const over={};
-  for(const ion in srcOf){
-    const path=paths[ion];
-    const A=slotAt(srcOf[ion], occS[srcOf[ion]], ion);
-    const B=slotAt(dstOf[ion], occ[dstOf[ion]], ion);
-    if(path && phase<1){
-      const q=pointOnPath(path, t); if(!q || !isFinite(q.x)) continue;
-      // Does this ion have to get PAST a trap-mate to leave? Two ions exchanging order
-      // inside one trap is a real, expensive event -- it is what the corpus calls a swap,
-      // and it is not free. Drawing it as a straight line through the neighbour would
-      // both overlap and quietly misrepresent the physics, so it is drawn going around.
-      const bow = mustPass(ion, A, B) ? L.swap_bow*4*t*(1-t) : 0;
-      let bx=0, by=0;
-      if(bow){ const ax=AXIS[A.node]; bx=-ax.uy*bow; by=ax.ux*bow; }
-      // an ion moving into or out of an OCCUPIED trap gets no flourish -- it needs the
-      // room, not the bulk. Approach can be perpendicular to the slot axis (a corner
-      // site stacks its slots across the rail), where no detour applies but the swell
-      // alone is still enough to put two circles through each other.
-      const tight = ((ordStart[A.node]||[]).length>1) || ((ordEnd[B.node]||[]).length>1);
-      live[ion]={x:q.x+A.ox+(B.ox-A.ox)*t+bx, y:q.y+A.oy+(B.oy-A.oy)*t+by,
-                 fly:true, tt:t, pitchA:A.pitch, pitchB:B.pitch,
-                 swap:!!bow, tight:tight};
-      flying[ion]=q;
-      if(q.a && q.b){ const sid=SEG_BY_PAIR[q.a+'>'+q.b];
-        if(sid!==undefined) segLoad[sid]=(segLoad[sid]||0)+1; }
-    } else {
-      // A resting ion interpolates its slot too. Its site's POPULATION changes during
-      // the frame -- an ion leaving frees a slot and the one staying behind shifts into
-      // the middle -- so pinning it to the end-state slot made it jump the moment the
-      // frame began, straight into the ion still departing. Source slot to destination
-      // slot, same rule as a flier: every ion on the stage obeys one law.
-      const a=nodeById[A.node], b=nodeById[B.node];
-      const x0=px(a)+A.ox, y0=py(a)+A.oy, x1=px(b)+B.ox, y1=py(b)+B.oy;
-      const u = phase<1 ? t : 1;
-      live[ion]={x:x0+(x1-x0)*u, y:y0+(y1-y0)*u, fly:false, node:B.node,
-                 pitch:(A.pitch&&B.pitch) ? A.pitch+(B.pitch-A.pitch)*u
-                                          : (B.pitch||A.pitch)};
-    }
+  for(const ion in flying){
+    const q=flying[ion];
+    if(q.a && q.b){ const sid=SEG_BY_PAIR[q.a+'>'+q.b];
+      if(sid!==undefined) segLoad[sid]=(segLoad[sid]||0)+1; }
   }
-  for(const id in occ){ const k=occ[id].length;
-    if(k > (nodeById[id].cap||0)) over[id]=k; }
+  // R1 IS PER TRAP, NOT PER PLACE.  `PL.occEnd` groups by the coordinate a node is drawn
+  // at, because that is what "two marks overlap" means; capacity is a property of the
+  // metal, and two traps that happen to sit at one point are still two traps.  Counting
+  // the groups would read four ions in a pair of co-located cap-2 sites as a violation
+  // of a rule neither of them breaks.
+  const occ={};
+  for(const ion in stt.pos) (occ[stt.pos[ion]]||(occ[stt.pos[ion]]=[])).push(ion);
+  for(const id in occ){ const n=nodeById[id]; if(!n) continue;
+    if(occ[id].length > (n.cap||0)) over[id]=occ[id].length; }
 
   // --- the sites in play, under the node markers they are highlighting ------------
   const sites=f.sites||[];
