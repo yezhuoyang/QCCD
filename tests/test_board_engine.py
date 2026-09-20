@@ -225,3 +225,37 @@ def test_the_payload_scan_would_notice_a_path(pages):
     assert PAYLOAD_PATHS.search(planted), "the payload scan cannot see the string it is for"
     assert not PAYLOAD_PATHS.search('"file":"demo.lq"'), (
         "a bare artifact name is what the reader is looking at, not the tree")
+
+
+def test_the_inlined_javascript_is_clean_text():
+    """No stray control bytes in the files `render.py` pastes into every page.
+
+    `transit.js` carried two literal NUL bytes for part of 2026-09-19, from an edit that
+    wrote the character instead of the escape.  It parsed, every test passed, and it was
+    found only because `grep` began reporting the file as binary.  Those bytes would have
+    been inlined raw into all 69 entry pages and every rendered page beside them.
+
+    Tab, newline and carriage return are the only control characters a source file has any
+    business containing.  Checked at the source rather than in the output, so it fails
+    before a page is built rather than after one is published.
+    """
+    ALLOWED = {0x09, 0x0A, 0x0D}
+    dirty: list[str] = []
+    for name in SHIPPED_JS:
+        raw = (VIZ / name).read_bytes()
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            dirty.append(f"  {name}: not valid UTF-8 -- {exc}")
+            continue
+        seen = sorted({b for b in raw if b < 0x20 and b not in ALLOWED} |
+                      {b for b in raw if b == 0x7F})
+        if seen:
+            at = next(i for i, b in enumerate(raw) if b in set(seen))
+            line = raw[:at].count(b"\n") + 1
+            dirty.append(f"  {name}: control byte(s) "
+                         + ", ".join(f"0x{b:02x}" for b in seen)
+                         + f", first at line {line}")
+    assert not dirty, (
+        "the JavaScript inlined into every page carries control characters, which are "
+        "pasted in raw and are invisible in an editor:\n" + "\n".join(dirty))
