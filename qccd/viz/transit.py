@@ -333,6 +333,7 @@ class Transit:
         """Where every ion is drawn at `t` in [0, 1] of one step."""
         t = min(1.0, max(0.0, float(t)))
         src, dst, occ_s, occ_e = {}, {}, {}, {}
+        src_node, dst_node = {}, {}
         for ion, node in step.pos.items():
             walk = step.paths.get(ion)
             a = self._site(walk[0] if walk else node)
@@ -340,6 +341,8 @@ class Transit:
             if self._pos(a) is None or self._pos(b) is None:
                 continue
             src[ion], dst[ion] = a, b
+            src_node[ion] = walk[0] if walk else node
+            dst_node[ion] = walk[-1] if walk else node
             occ_s.setdefault(a, []).append(ion)
             occ_e.setdefault(b, []).append(ion)
 
@@ -352,13 +355,17 @@ class Transit:
         for place, ions in occ_e.items():
             ions.sort(key=order_key(ord_end, place))
 
-        def slot_at(place, lst, ion):
+        # The stack belongs to the PLACE, the direction to the NODE -- see the JS twin.
+        # Taking the axis from the place's representative points the slot offset along
+        # whatever rail that node happens to sit on, which on a device that piles several
+        # nodes at one coordinate is not the rail this ion is riding.
+        def slot_at(place, node, lst, ion):
             k = len(lst)
             j = lst.index(ion) if ion in lst else 0
             off, pitch = self._slots(place, k)
-            ax = self._axis(place)
+            ax = self._axis(node)
             o = off[j] if j < len(off) else 0.0
-            return (ax[0] * o, ax[1] * o, pitch if k > 1 else 0.0, place)
+            return (ax[0] * o, ax[1] * o, pitch if k > 1 else 0.0, place, node)
 
         pas = self.passes(step, ord_start, ord_end)
         bow0 = float(self.geom.bow or 0.0)
@@ -367,8 +374,10 @@ class Transit:
         base: dict[str, dict] = {}
         for ion in src:
             walk = step.paths.get(ion)
-            ax_, ay_, pa, a_node = slot_at(src[ion], occ_s[src[ion]], ion)
-            bx_, by_, pb, b_node = slot_at(dst[ion], occ_e[dst[ion]], ion)
+            ax_, ay_, pa, a_node, a_axis = slot_at(
+                src[ion], src_node[ion], occ_s[src[ion]], ion)
+            bx_, by_, pb, b_node, b_axis = slot_at(
+                dst[ion], dst_node[ion], occ_e[dst[ion]], ion)
             if walk and not rest:
                 q = self.point_on_path(walk, t)
                 if q is None or not math.isfinite(q[0]):
@@ -377,7 +386,8 @@ class Transit:
                 wa, wb = _slot_weights(q, t)
                 base[ion] = dict(x=q[0] + ax_ * wa + bx_ * wb,
                                  y=q[1] + ay_ * wa + by_ * wb, fly=True, q=q, u=t,
-                                 pa=pa, pb=pb, a=a_node, b=b_node)
+                                 pa=pa, pb=pb, a=a_node, b=b_node,
+                                 ax=a_axis)
             else:
                 p0, p1 = self._pos(a_node), self._pos(b_node)
                 if p0 is None or p1 is None:
@@ -424,7 +434,7 @@ class Transit:
                     lift = math.sqrt(max(0.0, clear * clear - d * d))
                     worst = max(worst, lift)
                 if worst > 0:
-                    axn = self._axis(me["a"])
+                    axn = self._axis(me.get("ax") or me["a"])
                     dx, dy = -axn[1] * sd * worst, axn[0] * sd * worst
                 # and no bigger than the gap it is going through -- see the JS twin
                 gap = math.inf
