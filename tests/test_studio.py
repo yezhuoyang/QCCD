@@ -13,7 +13,7 @@ and every one of them was MEASURED SAYING SOMETHING FALSE on this tree before th
     object, so `drift` stayed 0 and the loop body never ran.  A green tick for a check
     that did not happen, in the one panel that asserts the page is trustworthy.
   * `Step 1 / 0 - undefined` as the first sentence a new user reads.
-  * an empty `<div>` where the 23 rule verdicts go, which reads as "nothing wrong".
+  * an empty `<div>` where the 27 rule verdicts go, which reads as "nothing wrong".
   * `exportJson()` handing over an `.arch.json` Python refuses with 24 structural errors,
     while the same page reported 576 DACs for a machine whose total ion capacity was 0.
 
@@ -24,6 +24,7 @@ vector wearing a disguise.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -94,9 +95,9 @@ def test_the_empty_canvas_loads_and_claims_nothing_it_did_not_check(tmp_path):
     assert b["status_invents_a_step"] is False, b["status"]
     assert b["says_no_programme_replayed"] is True
     assert b["says_all_pass"] is False
-    assert b["n_checked"] == 0 and b["n_unchecked"] == 23, (
+    assert b["n_checked"] == 0 and b["n_unchecked"] == 27, (
         "every rule is vacuously satisfied over zero cycles; reporting them as CHECKED "
-        "would be 17 green badges for a machine nothing has ever been run on")
+        "would be 21 green badges for a machine nothing has ever been run on")
 
     # the degenerate layout is a good default, not a survival value: one data unit at the
     # maximum pitch the tool ever uses, so the first site lands dead centre and the second
@@ -223,7 +224,7 @@ def test_the_export_guard_can_fail(tmp_path):
 # C. FROM SCRATCH, AND BACK INTO PYTHON
 # ======================================================================================
 
-#: A device built entirely by clicking: four sites, a junction, an ancilla, six segments
+#: A device built entirely by clicking: four sites, a junction, a spur trap, six segments
 #: and one closed loop.  This is the path V8 coverage showed was never executed -- the
 #: eight builder verbs -- driven the way a user would drive it.
 _SCRATCH = [
@@ -233,7 +234,7 @@ _SCRATCH = [
     {"do": "node", "x": 1.0, "y": 1.0, "opts": {"id": "T2", "zone": "data"}},
     {"do": "node", "x": 0.0, "y": 1.0, "opts": {"id": "T3", "zone": "data"}},
     {"do": "node", "x": 2.0, "y": 0.5, "opts": {"id": "J0", "kind": "junction"}},
-    {"do": "node", "x": 3.0, "y": 0.5, "opts": {"id": "A0", "zone": "ancilla"}},
+    {"do": "node", "x": 3.0, "y": 0.5, "opts": {"id": "A0", "zone": "trap"}},
     {"do": "join", "a": "T0", "b": "T1", "opts": {"id": "E0"}},
     {"do": "join", "a": "T1", "b": "T2", "opts": {"id": "E1"}},
     {"do": "join", "a": "T2", "b": "T3", "opts": {"id": "E2"}},
@@ -370,10 +371,12 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     """THE WHOLE POINT.  Build a device from nothing, write a test programme against it,
     and get numbers and verdicts the real toolchain reproduces exactly.
 
-    The programme is deliberately WRONG in two ways a designer would not notice: the
-    rotation puts a second ion on a degree-3 node (R2) and the gate happens at n-bar 3.411
-    against a 1.0 budget (R7).  A tool that reported "all rules pass" here would be worse
-    than one that reported nothing.
+    The programme is deliberately WRONG in three ways a designer would not notice: the
+    rotation puts a second ion on a degree-3 node (R2), the same rotation asks two ions to
+    travel in two different lab-frame directions in one broadcast cycle (R22 -- the drawn
+    ring turns a corner and its rails carry no loop name, so `hop_label` falls through to
+    the axis), and the gate happens at n-bar 3.411 against a 1.0 budget (R7).  A tool that
+    reported "all rules pass" here would be worse than one that reported nothing.
     """
     script = list(_SCRATCH) + [{"do": "prog", "src": _PROGRAM}]
     r = drive(STUDIO, script, tmp_path)
@@ -389,8 +392,10 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     # them against and the page has to say so rather than reporting drift 0.
     assert price["frameChecked"] == 0
 
-    assert after["rules"]["by_rule"] == {"R2": 1, "R7": 1}, after["rules"]
+    assert after["rules"]["by_rule"] == {"R2": 1, "R7": 1, "R22": 1}, after["rules"]
     assert after["rules"]["messages"] == [
+        "2 ions move in 2 different ways in one cycle (rotate_cw +x and rotate_cw +y); "
+        "one cycle is one waveform, so unlike motions need 2 cycles",
         "junction T1 (degree 3) holds 2 ions",
         "ion d1 enters a 2Q gate at n-bar=3.411 > 1.0; a cooling operation must precede it",
     ]
@@ -402,7 +407,7 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     rep = verify(prog, arch, corrected_model("qccdsim_jones"))
     assert rep.result.total_cost == 7
     assert rep.result.total_steps == 7
-    assert sorted(rep.rules.failed()) == ["R2", "R7"]
+    assert sorted(rep.rules.failed()) == ["R2", "R22", "R7"]
     assert [v.message for v in rep.rules.violations] == after["rules"]["messages"]
 
 
@@ -443,7 +448,7 @@ def test_the_programme_lane_refuses_a_programme_python_cannot_run(tmp_path):
     assert after["price"] is None
     assert after["n_checked"] == 0, (
         "the page reported verdicts for a programme it could not replay")
-    assert after["n_unchecked"] == 23
+    assert after["n_unchecked"] == 27
 
 
 @requires_node
@@ -499,16 +504,21 @@ def test_the_persistence_guard_can_fail(tmp_path):
     the price comparison must go red -- proving the round trip exercises the applier
     rather than a shortcut past it."""
     html = STUDIO.read_text(encoding="utf-8")
-    # Anchored on the CALL, not on the lines around it: the block gained a `WHY_NOT`
-    # check when importing a document that cannot be rebuilt started being possible, and
-    # a guard pinned to its neighbours goes red for an edit that changed nothing it tests.
-    anchor = """  var was = WHY_NOT;
-  WHY_NOT = null;
-  rebuild();"""
-    assert html.count(anchor) == 1, "restore's rebuild moved"
+    # ANCHORED ON THE CALL, with whatever `restore` does in between.  This used to be a
+    # three-line literal ending in `rebuild();`, which is not the same thing: inserting
+    # `refitNext();` between the WHY_NOT reset and the rebuild turned the guard red for an
+    # edit that changed nothing it tests, which is exactly what the comment promised it
+    # would not do.  A regex that allows intervening lines pins the claim -- restore clears
+    # WHY_NOT and then rebuilds -- rather than the shape of the block on one particular day.
+    block = re.compile(r"  var was = WHY_NOT;\n  WHY_NOT = null;\n"
+                       r"((?:  [^\n]*\n){0,4}?)  rebuild\(\);")
+    found = block.findall(html)
+    assert len(found) == 1, f"restore's rebuild moved: {len(found)} match(es)"
     broken = tmp_path / "shortcut.html"
-    broken.write_text(html.replace(anchor, """  var was = WHY_NOT;
-  WHY_NOT = null;""", 1), encoding="utf-8")
+    # remove the CALL and keep everything else the block does, so the mutation is exactly
+    # "assign the record lists without rebuilding" and not "delete three lines"
+    broken.write_text(block.sub(lambda m: "  var was = WHY_NOT;\n  WHY_NOT = null;\n"
+                                          + m.group(1), html, count=1), encoding="utf-8")
     r = drive(broken, list(_SCRATCH) + [{"do": "prog", "src": _PROGRAM}], tmp_path)
     assert not (r["restore_same_digest"] and r["restore_same_price"]), (
         "restore without a rebuild still produced the same device AND the same price, so "
@@ -710,11 +720,44 @@ def test_the_program_census_catches_a_stage_that_stops_following_the_frames(tmp_
 # ======================================================================================
 
 
+#: The pages `python -m qccd regen` writes under `out/` -- the same set
+#: `test_engine_parity.py::_regen_pages` sweeps, named the same way.
+REGEN_GLOBS = ("*__*__*.html", "studio.html", "verify/*.html")
+
+
+def _pages_this_build_made() -> list[Path]:
+    """The emitted pages this build OWNS, by name rather than by freshness.
+
+    `out/` is not a directory of this build's outputs; it is where everything lands.  A
+    plain glob held `out/studio_micro.html` -- 9 September, written by a manual run, nothing
+    in the tree writes it -- to today's rule counts, and it failed for the honest reason
+    that the browser checked 17 rules the day it was made rather than 21.
+
+    Scoped by GLOB and not by `render.page_stamp()`, which was the first attempt and is
+    subtly wrong: the stamp moves whenever anyone edits one of the five inlined files, so in
+    a shared tree with another session mid-edit the filter matches nothing and the sweep
+    covers zero pages while every test in it reports green.  A page in this set that is
+    STALE should fail on the rule counts and say so -- that is a real finding -- but a page
+    outside it was never this build's to judge.
+    """
+    out: list[Path] = []
+    for pat in REGEN_GLOBS:
+        out += [q for q in OUT.glob(pat) if q.name != "index.html"]
+    return sorted(set(out), key=lambda q: q.name)
+
+
+def test_the_sweep_below_actually_found_pages():
+    """Anti-vacuity.  A scan that matches nothing passes every assertion in its caller and
+    reports a green that means "there was nothing to look at" -- the failure mode this file
+    is full of guards against, turned inward."""
+    pages = _pages_this_build_made()
+    assert len(pages) >= 15, (
+        f"only {len(pages)} page(s) matched {REGEN_GLOBS}; run `python -m qccd regen` "
+        f"-- an empty sweep is not a pass")
+
+
 @requires_node
-@pytest.mark.parametrize("page", sorted(
-    [p for p in list(OUT.glob("*.html")) + list((OUT / "verify").glob("*.html"))
-     if p.name != "index.html"], key=lambda p: p.name),
-    ids=lambda p: p.stem)
+@pytest.mark.parametrize("page", _pages_this_build_made(), ids=lambda p: p.stem)
 def test_every_page_agrees_with_the_rule_counts_python_shipped(page, tmp_path):
     """`D.rule_checksum` is SEVENTEEN INTEGERS -- how many violations Python found for each
     rule the browser also checks -- and the page diffs its own counts against them before
@@ -735,7 +778,7 @@ def test_every_page_agrees_with_the_rule_counts_python_shipped(page, tmp_path):
     oracle = b["rules"]["oracle"]
     assert oracle is not None, "the page did not run its own rule self-check"
     assert oracle["ok"] is True, oracle
-    assert oracle["n"] == 17, oracle
+    assert oracle["n"] == 21, oracle
     assert b["says_all_pass"] is False
     assert b["says_rule_count"] is True
 
@@ -768,7 +811,7 @@ def test_the_rule_self_check_withdraws_the_verdicts_when_it_disagrees(tmp_path):
 
 @requires_node
 @requires_studio
-def test_qccd_open_replays_a_browser_design_and_reports_all_23_rules(tmp_path):
+def test_qccd_open_replays_a_browser_design_and_reports_all_27_rules(tmp_path):
     """`qccd studio` without `qccd open` is a ONE-WAY DOOR: designs leave for the browser
     and never come back with evidence, so the Report pane's grey "not checked here"
     register never clears and the tool permanently cannot answer "does my architecture
@@ -800,16 +843,322 @@ def test_qccd_open_replays_a_browser_design_and_reports_all_23_rules(tmp_path):
                          cwd=str(ROOT))
     assert out.returncode == 0, out.stderr[-3000:]
     browser = json.loads(out.stdout)
-    assert browser == {"R2": 1, "R7": 1}, browser
+    assert browser == {"R2": 1, "R7": 1, "R22": 1}, browser
 
     cli = subprocess.run([sys.executable, "-m", "qccd", "open", str(snap)],
                          capture_output=True, text=True, timeout=900, cwd=str(ROOT))
     text = cli.stdout
     assert "nodes 6  segments 6  loops 1" in text, text
     assert "total_cost     7" in text and "total_steps    7" in text, text
-    assert "rules failed   R2 R7" in text, text
-    # and the SIX the browser could not check are named by Python, with verdicts
+    assert "rules failed   R2 R22 R7" in text, text
+    # and the ones the browser could not check are named by Python, with verdicts
     assert "rules skipped  R10 R7b" in text, text
     assert "[R2] instruction 2: junction T1 (degree 3) holds 2 ions" in text, text
     # the return leg is a FAILING run, so the exit code says so
     assert cli.returncode == 1
+
+
+@requires_node
+@requires_studio
+def test_the_programme_pane_describes_the_authored_programme_not_the_shipped_one(tmp_path):
+    """After Evaluate of a two-statement programme the Program pane must describe THAT
+    programme: `#pCount` counts its instructions (it read "13 / 13" -- the shipped walk --
+    under a two-frame shuttle), `#pNow` never joins an authored frame to Python's listing
+    (`x4 . 105 us` was the shipped instruction's width and duration, printed under a
+    frame it had nothing to do with; `#undefined` was the join over no frame at all),
+    and the head's denominators are the engine's totals for it.  A refused statement is a
+    refusal, said with how much of the programme ran -- the button used to toast "ok".
+    """
+    page = OUT / "studio_grid.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd studio --seed arch/grid9x9.arch.json --program walk -o out/studio_grid.html`")
+    good = 'p.init({"d0": "T0_0h"})\np.shuttle("d0", ["T0_0h", "J0_0", "T0_0v"])'
+    cut = 'p.init({"d0": "T0_0h"})\np.shuttle("d0", ["T0_0h", "J0_0", "T4_4h"])'
+    r = drive(page, [
+        {"do": "evaluate", "src": good},
+        {"do": "evaluate", "src": cut},
+        {"do": "evaluate", "src": 'p.init({"d0":"T0_0h")'},
+        {"do": "evaluate", "src": ""},
+    ], tmp_path)
+    base = r["base"]
+    # 19, not the 13 this pinned before `qccd/compile/programs.py::walk` changed: the
+    # number is the SHIPPED programme's instruction count, read off the page that was
+    # regenerated from the current builder, and the claim under test is that an authored
+    # programme replaces it -- not what it happens to be.
+    assert base["p_count"] == "19 / 19 instructions" and base["authored"] is False
+
+    ok = r["steps"][0]
+    assert ok["result"] == {"ok": True, "parsed": True, "ran": 2, "statements": 2,
+                            "frames": 2, "problems": []}, ok["result"]
+    after = ok["after"]
+    assert after["p_count"] == "2 / 2 instructions", after["p_count"]
+    assert "#undefined" not in after["p_now"] and "105 us" not in after["p_now"], after["p_now"]
+    assert after["counters"]["stepsOf"] == "/" + str(after["price"]["steps"]), after["counters"]
+    assert after["counters"]["costOf"] == "/" + str(after["price"]["cost"]), after["counters"]
+    # the head's chips are the Report's rows: the same price, not the shipped 140
+    assert after["metrics"][:2] == ["cost=%d" % after["price"]["cost"],
+                                    "steps=%d" % after["price"]["steps"]], after["metrics"]
+    # (the separators are middle dots, which the console decoding here does not keep)
+    words = after["lede"].split()
+    assert words[0:2] == ["144", "sites"] and words[3:5] == ["288", "segments"] \
+        and words[6:8] == ["2", "instructions"], after["lede"]
+    assert after["toasts"][-1] == {"kind": "ok", "message": "2 statements, 2 frames"}
+
+    # a statement the device refuses is a REFUSAL, with how much of the programme ran
+    cut_step = r["steps"][1]
+    assert cut_step["result"]["ok"] is False and cut_step["result"]["ran"] == 1
+    t = cut_step["after"]["toasts"][-1]
+    assert t["kind"] == "bad", t
+    assert t["message"].startswith("statement 2: "), t
+    assert t["message"].endswith("1 of 2 statements run"), t
+    assert cut_step["after"]["p_count"] == "1 / 1 instructions"
+
+    # a parse error is AT its line, in the pane and not only in a toast that fades
+    parse = r["steps"][2]
+    assert parse["result"]["parsed"] is False
+    assert "line 1 col 21" in parse["after"]["pw_err"], parse["after"]["pw_err"]
+    assert parse["after"]["frames"] == 1, "the records stand until a text parses"
+
+    # an empty text clears the programme; the shipped one and the shipped head come back
+    cleared = r["steps"][3]["after"]
+    assert cleared["toasts"][-1] == {"kind": "ok", "message": "programme cleared"}
+    assert cleared["authored"] is False and cleared["p_count"] == "19 / 19 instructions"
+    assert cleared["counters"] == base["counters"] and cleared["lede"] == base["lede"]
+
+    # THE BLANK PAGE'S HEADLINE is true of nothing once a site is on the stage: two stamps
+    # by hand, and the lede counts them instead of saying "an empty canvas"
+    blank = OUT / "studio.html"
+    if blank.exists():
+        rb = drive(blank, [{"do": "stamp", "type": "site", "at": [0, 0]},
+                           {"do": "stamp", "type": "site", "at": [1, 0]}], tmp_path)
+        assert "empty canvas" in rb["base"]["lede"], rb["base"]["lede"]
+        built = rb["steps"][1]["after"]
+        assert built["lede"].split()[0:2] == ["2", "sites"], built["lede"]
+        assert built["doc_title"].endswith(" - design"), built["doc_title"]
+
+    # THE CIRCUIT LANE belongs to the shipped programme: an authored frame must not be
+    # joined to the compiled walk's statement map (it highlighted `h q[0]` under a
+    # hand-written shuttle), and the Program pane's inline "circuit ->" note goes with it
+    micro = OUT / "studio_micro.html"
+    if micro.exists():
+        rm = drive(micro, [{"do": "evaluate", "src": good}], tmp_path)
+        assert "circuit" in rm["base"]["q_now"] or "executing" in rm["base"]["q_now"] \
+            or "shuttling" in rm["base"]["q_now"], rm["base"]["q_now"]
+        authored = rm["steps"][0]["after"]
+        assert authored["authored"] is True and authored["frames"] == 2
+        assert "circuit &rarr;" not in authored["p_now"], authored["p_now"]
+        assert "written here" in authored["q_now"], authored["q_now"]
+        assert "executing" not in authored["q_now"], authored["q_now"]
+
+
+# ======================================================================================
+# H. THE PICTURE IS MEASURABLE: MICROMETRES, DEGREES, AND A SCALE THAT DOES NOT LIE
+# ======================================================================================
+#
+# A node position is a LATTICE UNIT, which is not a length.  For as long as that was all a
+# page carried, no distance on it had a value and no angle on it was the angle on the die:
+# `_fit` may stretch one axis by up to `K_ANISO` to fill the viewport, and on the shipped
+# ring it does -- 21.9 px per unit across against 144 down, so a right angle is drawn at
+# 8.1 degrees.  Both of those are now answerable, and both are answered with NUMBERS the
+# harness can assert rather than a picture someone has to look at.
+
+
+@requires_node
+@requires_studio
+def test_every_page_carries_the_scale_it_is_drawn_in(tmp_path):
+    """The technology reaches the page, and the page is fitted to it.
+
+    `surface_default` is the fallback for every entry point that names none, so a board
+    page and the studio both measure -- the studio never loaded a technology at all before
+    this, and `qccd phys --html` was the only page on which a length meant anything.
+    """
+    for page in [STUDIO] + [p for p in (OUT / "ring144_24v__deck__corrected.html",
+                                        OUT / "grid9x9__walk__corrected.html")
+                            if p.exists()]:
+        r = drive(page, [], tmp_path)
+        sc = r["base"]["scale"]
+        assert sc is not None, f"{page.name} carries no technology"
+        assert sc["preset"] == "surface_default"
+        assert sc["nm_x"] == 464000 and sc["nm_y"] == 464000
+        assert sc["n_dc_pairs"] == 3 and sc["dc_pitch"] == 58000
+        # TRUE SCALE IS THE DEFAULT, and the layout the page is actually drawn at says so.
+        # `tests/studio.mjs` deliberately does not stub localStorage, so this is the
+        # first-visit state and not a remembered one.
+        assert sc["true_scale"] is True and sc["layout_true"] is True
+        # the bar is a ROUND physical length, and it names the process it is measured in
+        assert sc["bar_um"] in (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500,
+                                1000, 2000, 5000, 10000, 20000, 50000, 100000,
+                                200000, 500000), sc
+        assert sc["preset"] in sc["bar_label"]
+        # ... and it does NOT claim a single scale on a drawing that has two
+        assert "x only" not in sc["bar_label"], (
+            "the page is at true scale, so one length means the same in both directions")
+
+
+@requires_node
+@requires_studio
+def test_the_ruler_measures_in_micrometres_and_degrees(tmp_path):
+    """Two clicks are a distance, three are an angle, two rails are the angle between them.
+
+    The numbers are the point.  `ring144_24v` is a lattice of unit steps and the default
+    technology is 464 um per unit, so the distance between two adjacent sites is 464 um
+    exactly -- and its rails meet at 90 degrees, which the DRAWING does not show, because
+    the fit is free to stretch one axis.  The ruler computes from node positions through
+    the technology rather than off the screen for exactly that reason.
+    """
+    page = OUT / "ring144_24v__deck__corrected.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd demo`")
+    r = drive(page, [], tmp_path)
+    ruler = r["ruler"]
+    assert ruler is not None and ruler["on"] is True
+    # while the tool is on it owns every left press: a click is a measurement
+    assert ruler["claim"] == "measure" and ruler["claim_after"] == "pan"
+    two = ruler["two"]
+    assert two["kinds"] == ["node", "node"], "a click must snap to the site it is near"
+    assert two["lattice"] == 1
+    assert two["distance_um"] == 464, two
+    assert (two["dx_um"], two["dy_um"]) == (464, 0)
+    rails = ruler["rails"]
+    assert rails is not None and rails["kinds"] == ["rail", "rail"]
+    assert abs(rails["rail_angle_deg"] - 90.0) < 1e-9, rails
+    assert ruler["off"] is False, "pressing the button again leaves the tool"
+
+
+@requires_node
+def test_a_right_click_offers_every_verb_that_applies_to_what_is_under_it(tmp_path):
+    """The element menu, on the page `qccd studio` ships.
+
+    It is the only per-element surface left -- the Selection popover, which opened itself
+    on every click, is gone -- so what a right-click offers has to be data rather than a
+    screenshot.  Three properties, each one a thing that would otherwise fail silently:
+
+    * the claim table's new row, both halves: a right press on a PART is its menu, a right
+      press on EMPTY STAGE still pans;
+    * every item that cannot run says WHY, on the screen, rather than being hidden or
+      offered and then refused;
+    * the Modify panel's rows name which applier owns each -- `mutate` works on every
+      device, `builder` needs a device with builder statements -- and a device that has
+      none is told so and offered the one thing that would fix it.
+    """
+    page = tmp_path / "menu_probe.html"
+    subprocess.run([sys.executable, "-m", "qccd", "studio", "-o", str(page)],
+                   cwd=str(ROOT), capture_output=True, timeout=900, check=True)
+    r = drive(page, [], tmp_path)["menu"]
+    assert r is not None, "the page carries no element menu at all"
+    assert r["claim_on_empty"] == "pan", "right-drag on empty stage still pans"
+    assert r["drew"] is True, "the probe could not put a device on the scratch canvas"
+    assert r["claim_on_element"] == "menu", "a right press on a part is its menu"
+    assert r["open"] is True and r["subject"] is not None, r
+    ids = [i[0] for i in r["items"]]
+    assert ids[0] == "head", "the menu names what it is about first"
+    assert "modify" in ids and "delete" in ids, ids
+    assert ids[-1] == "close-loop", "the loop gesture is always the last offer"
+    assert r["disabled_say_why"] is True, (
+        "an item that cannot run must carry its reason; hiding it leaves the user "
+        "hunting for a menu item that was never going to be there")
+    m = r["modify"]
+    assert m["ok"] is True, m
+    layers = {f[0]: f[1] for f in m["fields"]}
+    assert layers.get("capacity") == "mutate", m["fields"]
+    assert set(layers.values()) <= {"mutate", "builder"}, m["fields"]
+    # THE PANEL IS HONEST ABOUT WHAT THIS DEVICE CAN TAKE: a builder-backed row is either
+    # writable or disabled with the explode offer, never both and never silently dead.
+    builder_off = [f[0] for f in m["fields"] if f[1] == "builder" and not f[2]]
+    assert (not builder_off) or m["explode_offered"], m
+    assert r["escape"] == "menu", "Escape closes the menu before it closes anything else"
+    assert r["closed"] is True
+    assert r["restored"] is True, "the probe left the page as it found it"
+
+
+@requires_node
+def test_the_page_can_draw_a_shape_and_not_only_measure_one(tmp_path):
+    """SKETCH MODE, end to end on the page `qccd studio` ships.
+
+    The ruler probe above proves this page can MEASURE; this one proves it can DRAW.  A
+    6 x 4 rectangle has a perimeter of 20 lattice units, so at the one-unit spacing every
+    generator uses it holds 20 trapping sites and 20 rails and declares one closed orbit
+    over them -- and `Q.lint`, the pass that judges R19, R20 and R21 on the committed
+    document, must find nothing the shape put there.  The whole thing comes back in one
+    `undoGroup`, because a sketch is ONE gesture.
+
+    The page is built fresh: the probe is on the harness, so a page emitted before it
+    existed reports `null` and could not assert anything.
+    """
+    page = tmp_path / "sketch_probe.html"
+    subprocess.run([sys.executable, "-m", "qccd", "studio", "-o", str(page)],
+                   cwd=str(ROOT), capture_output=True, timeout=900, check=True)
+    sk = drive(page, [], tmp_path)["sketch"]
+    assert sk is not None, "the page carries no sketch verbs at all"
+    assert sk["mode"] == "sketch", "a canvas with nothing on it opens on Sketch"
+    assert sk["tools"] == ["rect", "ellipse", "line", "poly"]
+    # an armed shape owns every left press, exactly as the ruler does, and gives it back
+    assert sk["armed"] == "rect" and sk["claim"] == "sketch"
+    assert sk["claim_after"] == "pan"
+    assert sk["ok"] is True, sk["problems"]
+    assert sk["nodes"] == 20 and sk["segments"] == 20, sk
+    assert sk["loop"] == {"id": sk["loop"]["id"], "n": 20, "closed": True, "kind": "ring"}
+    assert sk["geometry_lints"] == [], sk["geometry_lints"]
+    assert sk["instance_members"] == 40, (
+        "the finished sketch is one unit: every site and rail carries its instance label")
+    assert sk["after_undo"] == 0, "one undo takes the whole shape back"
+    # and a corner tighter than the device's minimum angle is refused BY NAME
+    assert sk["tight"] == {"ok": False, "rule": "R20"}
+    assert sk["restored"] is True, "the probe left the page as it found it"
+
+
+@requires_node
+@requires_studio
+def test_true_scale_is_a_toggle_and_the_fit_is_the_other_setting(tmp_path):
+    """Off, `sx` and `sy` may differ by up to K_ANISO; on, their ratio is the technology's.
+
+    On `ring144_24v` the two are 21.9 and 144 under the fit -- a 6.6:1 stretch, which is
+    what makes the device legible and what makes every angle on it wrong.
+    """
+    page = OUT / "ring144_24v__deck__corrected.html"
+    if not page.exists():
+        pytest.skip("run `python -m qccd demo`")
+    r = drive(page, [], tmp_path)
+    t = r["scale_toggle"]
+    assert t is not None and t["was"] is True and t["off"] is False
+    assert t["fit"]["true_scale"] is False and t["on"]["true_scale"] is True
+    assert t["fit"]["sx"] != t["fit"]["sy"], "this device is the anisotropic case"
+    # one pixel, the same number of nanometres on both axes.  Not bit-exact: `sx` and `sy`
+    # are quantized to four decimals, so a true-scale pair agrees to about 1e-15 relative.
+    kx = t["on"]["sx"] / 464000.0
+    ky = t["on"]["sy"] / 464000.0
+    assert abs(kx - ky) <= 1e-9 * kx, t
+
+
+@requires_node
+@requires_studio
+def test_the_scale_guard_can_fail(tmp_path):
+    """MUTATION GUARD.  Take the technology away and the readouts must stop claiming one.
+
+    Without this the block above would pass on a page whose `tech` came from the literal
+    fallback in the page script rather than from Python, which is a page that measures in
+    whatever the last person to edit that literal believed.
+    """
+    html = STUDIO.read_text(encoding="utf-8")
+    anchor = '"nm_per_unit_x":464000'
+    assert anchor in html, "the technology is not in the shipped view model"
+    broken = tmp_path / "unscaled.html"
+    broken.write_text(html.replace(anchor, '"nm_per_unit_x":1', 1), encoding="utf-8")
+    r = drive(broken, [], tmp_path)
+    assert r["base"]["scale"]["nm_x"] == 1, (
+        "the mutation did not reach the page, so the assertion above is reading a literal")
+
+
+@requires_studio
+def test_the_scale_bar_is_never_drawn_over_the_chip():
+    """DEFECT, reported 2026-09-16: the scale bar was drawn INSIDE the SVG at the view's
+    bottom-left corner, on an opaque plate, so a fit, a pan or a zoom that brought the device
+    into that corner hid part of the chip.  It lives in the toolbar under the picture now,
+    where nothing on the canvas can be under it: the bar is in the toolbar, not in the canvas
+    box, and nothing draws a scale group into the SVG any more."""
+    html = STUDIO.read_text(encoding="utf-8")
+    canvas = html[html.index('<div class="canvas" id="canvas">'):html.index('<div class="stage-empty"')]
+    toolbar = html[html.index('<div class="stagebar" id="stagebar">'):html.index('<div class="track" id="track"')]
+    assert 'id="scaleBar"' in toolbar and 'id="scaleLine"' in toolbar and 'id="scaleTxt"' in toolbar
+    assert 'id="scaleBar"' not in canvas
+    assert "gScale" not in html and "SBAR.plate" not in html
