@@ -15,6 +15,8 @@ prep q0 X
 prep q1 Z
 prep a  X
 read a  Z    -> m
+decode a           # the guard below reads m: it must be decoded first
 if m: cx q0 q1
 read q0 X    -> u
 read q1 X    -> v
+decode

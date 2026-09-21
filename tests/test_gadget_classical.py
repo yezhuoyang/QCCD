@@ -335,8 +335,10 @@ def test_a_conditional_correction_may_be_read_out_afterwards(lib, leaves):
 prep q0 X
 prep a X
 read a Z -> m
+decode a
 if m: z q0
 read q0 X -> u
+decode
 """, "cond_read")
     gir = schedule(alg, lib, leaves)
     assert not gir["refused"]
@@ -374,8 +376,10 @@ def test_a_branch_that_cannot_happen_says_so(lib, leaves):
 prep q0 X
 prep a Z
 read a Z -> m
+decode a
 if m: x q0
 store q0
+decode
 """, "impossible")
     gir = schedule(alg, lib, leaves)
     assert not gir["refused"]
@@ -391,7 +395,9 @@ def test_a_place_that_cannot_be_told_refuses_the_guard(lib, leaves):
 prep q0 X
 prep a X
 read a Z -> m
+decode a
 if m: se q0 1
+decode
 """, "nope")
     gir = schedule(alg, lib, leaves)
     assert gir["refused"], "syndrome extraction cannot be told whether to run"

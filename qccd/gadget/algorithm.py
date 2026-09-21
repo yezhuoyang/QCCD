@@ -14,10 +14,21 @@ one d = 3 surface-code logical qubit.
     x     q0                   a logical Pauli, kept in software              -> the archive
     z     q0                     (also `y`); no ion is touched
     store q0                   rest the block in a logical zone
+    decode q0                  call the decoder on the syndromes q0 has left      -> the decoder
+    decode                       (no block: every syndrome not yet decoded)
     if m: s q0                 any instruction may be guarded: it runs only when the
     if m ^ k: cx q0 q1           condition holds (`!m`, `m == 0`, `m ^ k` also spell one)
 
 Any instruction may end in `@ name` to pin it to one instance of the design.
+
+**Decoding is an instruction.**  Every place that measures leaves a *syndrome window* in its
+readout buffer; nothing is decoded until the program says `decode`.  Then each window's bits
+travel down that place's syndrome wire to the decoder, the decoder runs one job per window,
+and the Pauli-frame update it produces goes down the frame wire to the classical memory.
+`decode q0 q1` takes the windows those blocks were measured in (and those of any resource
+block an S̄ gadget consumed into them); a bare `decode` takes every window still waiting.
+A logical outcome is not a result until its window is decoded, so a guard may not read one
+before that, and a program must decode everything it measured before it ends (G11).
 
 **Guards.** `if <condition>: <instruction>` is a classically controlled operation: the ions
 travel to the place and the place reserves the op either way (the worst case, so the
@@ -49,15 +60,20 @@ from pathlib import Path
 from .logic.circuit import Circuit
 
 __all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_OF",
-           "parse_condition", "SOFTWARE"]
+           "parse_condition", "SOFTWARE", "CLASSICAL"]
 
 #: which place category an instruction needs
 CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "xx": "surgery",
                "read": "readout", "inject": "injection", "store": "zone", "s": "injection",
-               "x": "archive", "y": "archive", "z": "archive"}
+               "x": "archive", "y": "archive", "z": "archive", "decode": "decoder"}
 
 #: instructions that touch no ion at all: they are writes into the classical memory
 SOFTWARE = ("x", "y", "z")
+
+#: instructions that run entirely in the classical half: no ion moves and no block is held
+#: at a door for them, so a block waiting for its next quantum instruction is not parked
+#: just because the decoder was called in between
+CLASSICAL = SOFTWARE + ("decode",)
 
 
 class AlgorithmError(ValueError):
@@ -103,7 +119,7 @@ class Instr:
             return "inject.Y"
         if self.kind in SOFTWARE:
             return "update"
-        return self.kind
+        return self.kind          # `decode` is the decoder's own op
 
     def to_json(self) -> dict:
         d = {"id": self.index, "line": self.line, "text": self.text.strip(), "kind": self.kind,
@@ -163,13 +179,31 @@ class Algorithm:
         return {ins.cvar: ins.index for ins in self.instructions if ins.cvar}
 
     def next_use(self) -> dict[tuple[int, str], int | None]:
-        """(instruction index, block) -> the next instruction that uses the block."""
+        """(instruction index, block) -> the next instruction that uses the block.
+
+        A `decode` does not count: it reads the block's syndromes out of the places that
+        measured them and never touches the block's ions."""
         out: dict[tuple[int, str], int | None] = {}
         last: dict[str, int] = {}
         for ins in reversed(self.instructions):
+            if ins.kind == "decode":
+                continue
             for b in ins.blocks:
                 out[(ins.index, b)] = last.get(b)
                 last[b] = ins.index
+        return out
+
+    def next_quantum(self) -> dict[int, int | None]:
+        """instruction index -> the next instruction that is not a `decode`.
+
+        What a block is waiting for: the decoder can be called in between without the block
+        having to leave the door it is standing at."""
+        out: dict[int, int | None] = {}
+        nxt = None
+        for ins in reversed(self.instructions):
+            out[ins.index] = nxt
+            if ins.kind != "decode":
+                nxt = ins.index
         return out
 
     def ideal_circuit(self, branch: dict[str, int] | None = None
@@ -328,6 +362,23 @@ def parse_algorithm(source: str, name: str = "algorithm") -> Algorithm:
             alive(args[0])
             alive(args[1])
             ins.blocks = [args[0], args[1]]
+        elif word == "decode":
+            if guard_text is not None:
+                raise AlgorithmError(lineno, raw, "the decoder cannot be guarded: every "
+                                     "syndrome is decoded in every branch, or a later frame "
+                                     "would depend on whether it was")
+            if cvar:
+                raise AlgorithmError(lineno, raw, "decode names no outcome: it corrects the "
+                                     "ones the measurements already named")
+            for b in args:
+                if b not in born:
+                    raise AlgorithmError(lineno, raw, f"block {b} has not been measured: it "
+                                         f"was never prepared or injected")
+            if len(set(args)) != len(args):
+                raise AlgorithmError(lineno, raw, "a block is named twice")
+            # a block that has been read out may still be decoded: that is when its last
+            # window, the readout's own, becomes a result
+            ins.blocks = list(args)
         elif word == "read":
             need(2)
             if args[1].upper() not in ("Z", "X"):

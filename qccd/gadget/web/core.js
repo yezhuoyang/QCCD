@@ -261,6 +261,14 @@
       const s = this.insSpan[i];
       this.insSpan[i] = s ? [Math.min(s[0], c[4]), Math.max(s[1], c[11])] : [c[4], c[11]];
     }
+    // and its bits: a `decode` begins when the first syndrome LEAVES the place that measured
+    // it, not when the decoder starts on it, and nothing else it does is an event on a wire
+    for (const m of this.gir.messages || []) {
+      const i = m[10];
+      if (i < 0 || i >= n) continue;
+      const s = this.insSpan[i];
+      this.insSpan[i] = s ? [Math.min(s[0], m[6]), Math.max(s[1], m[7])] : [m[6], m[7]];
+    }
     this.refused = {};
     for (const r of this.gir.refused) this.refused[r[0]] = r[1];
     this.blockOfLeaf = {};

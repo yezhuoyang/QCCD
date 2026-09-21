@@ -8,4 +8,6 @@ zz a b -> m1
 xx t a -> m2
 read t Z -> m3
 read a Z -> m4
+decode              # every outcome so far becomes a result
 se b 3
+decode b

@@ -3,5 +3,7 @@ title Bell pair by lattice surgery
 prep q0 X
 prep q1 X
 zz q0 q1 -> m
+decode q0 q1      # m is a result once the surgery's syndrome is decoded
 read q0 Z -> a
 read q1 Z -> b
+decode
