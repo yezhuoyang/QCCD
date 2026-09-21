@@ -189,17 +189,16 @@ def test_the_probe_would_catch_a_detour_that_ignores_the_geometry(tmp_path, name
     # put back the detour as it was: applied to every flier, peaking at mid-flight, at
     # the full `swap_bow` amplitude, with no reference to what is or is not in the way,
     # and free to leave the metal (`lim`, the confinement, is what stops it now)
-    gate = "if (mates && mates.length && me.fly) {"
-    amp = "        var worst = 0;"
-    loop = "for (var mi = 0; mi < mates.length; mi++) {"
-    cap = "if (lim > 0 && worst > 0.5 * lim) worst = 0.5 * lim;"
-    for needle in (gate, amp, loop, cap):
+    # (the detour is `need` per pair, then `lift` per ion: every flier is given one, of
+    # the mid-flight bow, and the cap is taken off)
+    gate = "for (io3 in need) if (base[io3].fly) order.push(io3);"
+    amp = "h3 = need[ion3]"
+    cap = "if (lim3 > 0 && h3 > 0.5 * lim3) h3 = 0.5 * lim3;"
+    for needle in (gate, amp, cap):
         assert needle in html, f"the detour moved; update this mutation ({needle!r})"
     broken = tmp_path / f"{name}_broken.html"
-    safe = "(mates ? mates.length : 0)"
-    broken.write_text(html.replace(gate, "if (me.fly) {")
-                          .replace(amp, "        var worst = bow0 * 4 * t * (1 - t);")
-                          .replace(loop, f"for (var mi = 0; mi < {safe}; mi++) {{")
+    broken.write_text(html.replace(gate, "for (io3 in base) if (base[io3].fly) order.push(io3);")
+                          .replace(amp, "h3 = bow0 * 4 * t * (1 - t)")
                           .replace(cap, ";"),
                       encoding="utf-8")
     r = _probe(broken, frames=40)
