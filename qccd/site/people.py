@@ -26,11 +26,15 @@ PEOPLE: list[dict] = [
     },
     {
         "name": "Ke Sun",
-        "role": "Team member",
-        "affiliation": "",
+        "role": "Team Lead",
+        "affiliation": "University of California, Berkeley",
         "group": "team",
-        "about": "Author of the ion-transport deck whose schedule and cost model are the oracle the "
-                 "replay engine reproduces, and the source of the gate budget behind rule R7.",
+        "about": "I originated the project idea within the NVQL FTL project to design a compiler "
+                 "mapping user-level quantum circuits down to QCCD ion-trap hardware. Working "
+                 "alongside students across QEC, compilation, and hardware engineering, we "
+                 "developed a collaborative web platform where I focused on defining ion movement "
+                 "and gate primitives, analyzing fabrication constraints, and exploring 3D "
+                 "shuttling concepts.",
         "links": {},
     },
     {
