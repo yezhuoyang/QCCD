@@ -3770,7 +3770,7 @@ function cornerEndpoints(dev) {
 var PCALLS = {
   init: _pInit, fill: _pFill, rotate: _pRotate, simd: _pSimd, move: _pMove,
   shuttle: _pShuttle, gate: _pGate, cool: _pCool, measure: _pMeasure, reset: _pReset,
-  barrier: _pBarrier, claim: _pClaim
+  barrier: _pBarrier, decode: _pDecode, claim: _pClaim
 };
 function programMethods() { return Object.keys(PCALLS).sort(_cmpStr); }
 
@@ -3993,6 +3993,36 @@ function _pBarrier(ctx, args, kw) {
   _emitFrame(ctx, { type: 'barrier', cls: null, mode: null });
 }
 
+// `Program.decode`: call the decoder on the outcomes of `ions` -- by default every ion
+// measured since the last decode, in the order they were last measured.  Classical: no
+// ion moves and it costs no machine time, so pricing gives it the zero every unpriced
+// type gets.  The default is walked off the frames already emitted, exactly as
+// `Program._undecoded` walks the instructions, and the refusal is Python's sentence.
+function _pDecode(ctx, args, kw) {
+  var given = args[0] === undefined ? kw.ions : args[0];
+  var ions;
+  if (given === undefined || given === null) {
+    var out = [];
+    for (var i = ctx.frames.length - 1; i >= 0; i--) {
+      var f = ctx.frames[i];
+      if (f.type === 'decode') break;
+      if (f.type !== 'measure') continue;
+      var fi = f.ions || [];
+      for (var j = fi.length - 1; j >= 0; j--) {
+        if (out.indexOf(String(fi[j])) < 0) out.push(String(fi[j]));
+      }
+    }
+    ions = out.reverse();
+  } else {
+    ions = given.map(String);
+  }
+  if (!ions.length) {
+    throw ProgError('nothing to decode: no ion has been measured since the last decode',
+                    'ValueError');
+  }
+  _emitFrame(ctx, { type: 'decode', cls: null, mode: null, ions: ions });
+}
+
 // `claim` emits NO frame -- it is R9's subject, an assertion about what the replay should
 // produce.  The browser records it and the report says whether it was checked.
 function _pClaim(ctx, args, kw) {
@@ -4037,7 +4067,7 @@ var PARG_NAMES = {
   rotate: ['delta', 'loop', 'cls'], simd: ['cls', 'moves', 'mode'],
   move: ['ion', 'src', 'dst', 'via', 'cls'], shuttle: ['ion', 'path', 'cls'],
   gate: ['name', 'pairs', 'sites'], cool: ['ions'], measure: ['ions'], reset: ['ions'],
-  barrier: [], claim: []
+  barrier: [], decode: ['ions'], claim: []
 };
 
 function lowerProgram(stmts, dev, loops, opts) {

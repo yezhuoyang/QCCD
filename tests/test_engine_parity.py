@@ -1776,6 +1776,20 @@ def _prog_scripts(arch):
         _P("barrier"),
         _P("claim", cost=0, steps=0),
     ]))
+    # THE DECODER, in every form a mirror can get wrong: the DEFAULT (every ion measured
+    # since the last decode, in the order they were LAST measured -- `d1` is measured twice
+    # here, so a mirror that ordered by first measurement names them the other way round),
+    # a default that must STOP at the previous decode, a list, and the keyword
+    out.append(("measure-decode", [
+        _P("init", {"d0": a, "d1": b}),
+        _P("measure", ["d1"]),
+        _P("measure", ["d0", "d1"]),
+        _P("decode"),
+        _P("measure", ["d0"]),
+        _P("decode"),
+        _P("decode", ["d1"]),
+        _P("decode", ions=["d0", "d1"]),
+    ]))
     if closed:
         lid = closed[0]
         out.append(("fill-rotate", [
@@ -1864,6 +1878,10 @@ def _prog_refusals(arch):
         ("bad-mode", [_P("init", {"d0": a}),
                       _P("simd", "shuttle", [["d0", a, a]], "sideways")]),
         ("empty-cycle", [_P("init", {"d0": a}), _P("simd", "shuttle", [])]),
+        # nothing measured: the decoder has nothing to be sent, and says so in both
+        ("decode-nothing-measured", [_P("init", {"d0": a}), _P("decode")]),
+        ("decode-twice", [_P("init", {"d0": a}), _P("measure", ["d0"]), _P("decode"),
+                          _P("decode")]),
     ]
     if len(sites) > 3:
         out.append(("shuttle-no-segment",
