@@ -30,6 +30,10 @@ const T = new globalThis.QCCDTransit.Transit({
     return { off, pitch };
   },
   bow: S.bow === undefined ? 0.5 : S.bow,
+  // the metal: half a bar's length and thickness, half a rail's width (0 = none given)
+  span: S.span === undefined ? undefined : () => S.span,
+  across: S.across === undefined ? undefined : () => S.across,
+  rail: S.rail || 0,
 });
 
 const ord = T.slotOrder(S.steps);
@@ -46,7 +50,7 @@ for (let k = 0; k < S.steps.length; k++) {
     for (const ion in PL.live) {
       const p = PL.live[ion];
       row[ion] = [round(p.x), round(p.y), p.fly ? 1 : 0, p.swap ? 1 : 0, round(p.pitch || 0),
-                  round(p.pitchA || 0), round(p.pitchB || 0)];
+                  round(p.pitchA || 0), round(p.pitchB || 0), round(p.room || 0)];
     }
     out.frames.push({ step: k, t: s / NS, at: row,
                       passes: PL.passes.pairs, side: PL.passes.side });

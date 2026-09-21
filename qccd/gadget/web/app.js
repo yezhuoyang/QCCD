@@ -411,8 +411,21 @@
     // the `decode` instructions running now (see DECODES), and how much the playhead is
     // being slowed through them
     lit: null, slowed: 0,
+    showClassical: shownClassical(),
     cam: { s: 1, x: 0, y: 0 }, tl: { t0: 0, t1: Math.max(1, M.makespan) },
   };
+
+  // THE READER MAY PUT THE CLASSICAL HALF AWAY: the decoder, the classical memory and the
+  // wires to them, and a decode's glow with them -- together, because a wire drawn to a
+  // place that is not there reads as a bug.  One setting with the studio's "Classical" box
+  // (`qccd/site/qec_cycle.js`, the same key), remembered per viewer where the browser keeps
+  // anything at all.  Only the drawing changes: the programme, the listing and the checks
+  // still say what the decoder does.
+  function shownClassical() {
+    try { return window.localStorage.getItem("qccd.classical") !== "0"; } catch (e) { return true; }
+  }
+  const CLASSICAL = new Set(["decoder", "archive"]);
+  const putAway = (cm) => !S.showClassical && CLASSICAL.has(cm.family);
   const sims = {};
   window.__gadgetLeaf = function (d) {
     M.leafData[d.master] = d;
@@ -591,7 +604,7 @@
     const m = M.master(S.path);
     for (const inst of m.instances) {
       const cm = M.masters[inst.master];
-      if (cm.family === "road") continue;
+      if (cm.family === "road" || putAway(cm)) continue;
       for (const p of cm.ports || []) {
         const xy = portXY(cm.name, p.name);
         if (!xy) continue;
@@ -619,6 +632,7 @@
     for (const inst of m.instances) {
       const cpath = childPath(path, inst.name);
       const cm = M.masters[inst.master];
+      if (putAway(cm)) continue;
       const cx = ox + inst.x, cy = oy + inst.y;
       const r = rectOf(cpath, cx, cy);
       const rw = r[2] - r[0], rh = r[3] - r[1];
@@ -650,7 +664,7 @@
       }
       // a place at the end of a lit wire glows: the one sending its syndrome, the decoder
       // working on it, the memory taking the frame
-      const lit = S.lit && S.lit.places.has(cpath);
+      const lit = S.showClassical && S.lit && S.lit.places.has(cpath);
       if (lit) {
         ctx.save();
         ctx.setLineDash([]);
@@ -795,7 +809,7 @@
     for (const ch of m.channels || []) {
       const pts = ch.points;
       if (!pts || pts.length < 2) continue;
-      if (ch.kind === "wire") { drawWire(ctx, path, ch, pts, ox, oy, depth); continue; }
+      if (ch.kind === "wire") { if (S.showClassical) drawWire(ctx, path, ch, pts, ox, oy, depth); continue; }
       ctx.strokeStyle = depth === 0 ? COLOR.rail : "#efc9c7";
       ctx.lineWidth = depth === 0 ? Math.max(1.5, Math.min(5, S.cam.s * 0.35)) : 1;
       ctx.lineJoin = "round";
@@ -1109,7 +1123,9 @@
       ctx.fill();
       if (r >= 1.6) {
         ctx.strokeStyle = P("ion_stroke", "#ffffff");
-        ctx.lineWidth = mk.swHalo;
+        // a mark squeezed to make room shrinks whole, halo and all (the studio's rule)
+        const r0 = ion.p && ion.p.room ? ionRadius(ion.p, mk.rIon, mk.rRest, S.cam.s, ion.active, true) : r;
+        ctx.lineWidth = r < r0 ? mk.swHalo * r / r0 : mk.swHalo;
         ctx.stroke();
       }
       if (depth <= 1 && r >= 2) {
@@ -1879,6 +1895,8 @@
   function legend() {
     const used = new Set(Object.values(M.gir.leaves).map((v) => M.masters[v[0]].family));
     if (Object.keys(WIRES).length) used.add("wire");
+    // a key names only what is drawn
+    if (!S.showClassical) for (const c of ["wire", ...CLASSICAL]) used.delete(c);
     const cats = CAT_ORDER.filter((c) => CATS[c] && used.has(c));
     // the ion colours are the studio's: what the machine is doing to an ion this instant,
     // not what role a code gave it (qccd/viz/render.py::ionColour)
@@ -1887,7 +1905,7 @@
                       [P("z", "#b42318"), "measured or reset"],
                       [P("active", "#f6c34a"), "the site in play"],
                       [P("accent", "#e4572e"), "the ion you follow"]];
-    if (DECODES.length) swatches.push([WIRE_LIT, "bits sent by a decode"]);
+    if (DECODES.length && S.showClassical) swatches.push([WIRE_LIT, "bits sent by a decode"]);
     $("legend").innerHTML = (cats.length ? `<div class="lg-cats">${cats.map((c) => `<span>${shapeSvg(c, 12)}${escapeHtml(CATS[c].title)}</span>`).join("")}</div>` : "") +
       `<div class="lg-roles">` + swatches.map(([c, v]) => `<span><i style="background:${c}"></i>${v}</span>`).join("") + `</div>`;
   }
@@ -2223,6 +2241,13 @@
   $("bUp").onclick = up;
   $("bFit").onclick = fit;
   $("bIons").onclick = () => { S.showIons = !S.showIons; $("bIons").className = S.showIons ? "on" : ""; S.dirty = true; };
+  $("bClassical").onclick = () => {
+    S.showClassical = !S.showClassical;
+    try { window.localStorage.setItem("qccd.classical", S.showClassical ? "1" : "0"); } catch (e) { /* not kept */ }
+    $("bClassical").className = S.showClassical ? "on" : "";
+    legend();
+    S.dirty = true;
+  };
   function closeLibrary() { $("library").classList.remove("open"); $("bLib").className = ""; }
   $("bLib").onclick = () => { const lib = $("library"); lib.classList.toggle("open"); $("bLib").className = lib.classList.contains("open") ? "on" : ""; if (lib.classList.contains("open")) renderLibrary(); };
   $("checksBadge").onclick = () => { $("checks").scrollIntoView(); for (const el of document.querySelectorAll(".ck")) if (el.querySelector(".fail")) el.classList.add("open"); };
@@ -2245,6 +2270,7 @@
     else if (ev.key === "f" || ev.key === "F") fit();
     else if (ev.key === "l" || ev.key === "L") $("bLib").onclick();
     else if (ev.key === "i" || ev.key === "I") $("bIons").onclick();
+    else if (ev.key === "c" || ev.key === "C") $("bClassical").onclick();
     else if (ev.key === "Enter" && S.sel && S.sel.kind === "inst") go(S.sel.path);
   });
   window.addEventListener("resize", () => { DPR = window.devicePixelRatio || 1; fit(); });
@@ -2320,6 +2346,7 @@
   document.title = `${M.gir.program.title || M.gir.program.name} — QCCD gadgets`;
   $("rate").value = String(S.rate);
   $("bIons").className = S.showIons ? "on" : "";
+  $("bClassical").className = S.showClassical ? "on" : "";
   S.tl = { t0: 0, t1: Math.max(1, M.makespan) };
   for (const p of M.ancestors(S.path)) treeOpen.add(p);
   renderChecks();

@@ -134,6 +134,30 @@ SCENARIOS: dict[str, dict] = {
         "steps": [{"before": {"a": "W", "b": "X"}, "pos": {"a": "Q", "b": "Y"},
                    "paths": {"a": ["W", "X", "Q"], "b": ["X", "Y"]}}],
     },
+    # TWO TRAP-MATES GOING ROUND EACH OTHER INSIDE A BAR OF REAL THICKNESS: `a` leaves past
+    # `b`, and both step off the centre line, on opposite sides, capped by the bar -- the
+    # only scenarios here where the confinement and the mark sizes (`room`) have anything
+    # to say, so they are what pins those two halves of the law between the twins
+    "trap_mates_swap": {
+        "nodes": _line(2), "span": 0.44, "across": 0.1, "rail": 0.02,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "N0"}},
+                  {"before": {"a": "N0", "b": "N0"}, "pos": {"a": "N1", "b": "N0"},
+                   "paths": {"a": ["N0", "N1"]}}],
+    },
+    "trap_mates_swap_vertical": {
+        "nodes": {"N0": [0.0, 0.0], "N1": [0.0, 1.0]},
+        "axis": {"N0": [0.0, 1.0], "N1": [0.0, 1.0]},
+        "span": 0.44, "across": 0.1, "rail": 0.02,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "N0", "c": "N0"}},
+                  {"before": {"a": "N0", "b": "N0", "c": "N0"},
+                   "pos": {"a": "N1", "b": "N0", "c": "N0"},
+                   "paths": {"a": ["N0", "N1"]}}],
+    },
+    "exchange_in_a_bar": {
+        "nodes": _line(2), "span": 0.44, "across": 0.1, "rail": 0.02,
+        "steps": [{"before": {"a": "N0", "b": "N1"}, "pos": {"a": "N1", "b": "N0"},
+                   "paths": {"a": ["N0", "N1"], "b": ["N1", "N0"]}}],
+    },
     # a vertical rail, so the axis is not the default
     "vertical": {
         "nodes": {"N0": [0.0, 0.0], "N1": [0.0, 1.0]},
@@ -160,6 +184,9 @@ def _python(scn: dict) -> dict:
         slot_offsets=slots,
         site=lambda nid: site.get(nid, nid),
         bow=scn.get("bow", BOW),
+        span=lambda _nid: scn.get("span", 0.0),
+        across=lambda _nid: scn.get("across", 0.0),
+        rail=scn.get("rail", 0.0),
     ))
     steps = [Step(before=s["before"], pos=s["pos"], paths=s.get("paths") or {})
              for s in scn["steps"]]
@@ -174,7 +201,7 @@ def _python(scn: dict) -> dict:
                 "step": k, "t": t,
                 "at": {i: [round(p.x, 9), round(p.y, 9), 1 if p.fly else 0,
                            1 if p.swap else 0, round(p.pitch, 9),
-                           round(p.pitch_a, 9), round(p.pitch_b, 9)]
+                           round(p.pitch_a, 9), round(p.pitch_b, 9), round(p.room, 9)]
                        for i, p in placed.items()},
                 "passes": [list(x) for x in pas["pairs"]],
                 "side": pas["side"],
@@ -207,7 +234,7 @@ def test_the_two_implementations_place_every_ion_identically(name, tmp_path):
         for ion in a["at"]:
             pa, pb = a["at"][ion], b["at"][ion]
             for j, what in enumerate(("x", "y", "fly", "swap", "pitch",
-                                      "pitchA", "pitchB")):
+                                      "pitchA", "pitchB", "room")):
                 assert abs(pa[j] - pb[j]) < 1e-9, (
                     f"{name} step {a['step']} t={a['t']} {ion}.{what}: "
                     f"python {pa[j]}, javascript {pb[j]}")

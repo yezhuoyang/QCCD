@@ -2863,6 +2863,7 @@ function draw(){
     // find: it gets the full radius.  A spectator at rest is a bead on the rail, and
     // shrinks further when it has to share a site with another ion.
     let r = (pt.fly||act) ? L.r_ion : L.r_rest;
+    let r0 = r;                          // before `room` takes its share (the halo, below)
     if(pt.fly){
       // resting size in the slot it leaves, full radius mid-flight (the mark the eye
       // should find), resting size again in the slot it arrives at -- so it settles
@@ -2878,12 +2879,14 @@ function draw(){
       // empty one grows to full size while it is still among its old neighbours -- and
       // covers them.  `transit.js` measures the real distance to the ions this one has to
       // get past and reports half of it as `room`.
+      r0 = r;
       if(pt.room) r = Math.min(r, pt.room);
     } else {
       if(pt.pitch) r = Math.min(r, 0.44*pt.pitch);
       // A STANDING ION GIVES WAY TOO.  It is as much of a pass as the one moving, and
       // leaving it at full size while the mover shrank is how one mark came to cover
       // another that had made all the room for it.
+      r0 = r;
       if(pt.room) r = Math.min(r, pt.room);
     }
     if(pt.fly && wells){
@@ -2891,6 +2894,14 @@ function draw(){
     } else hide(p.w);
     p.c.setAttribute('cx',pt.x); p.c.setAttribute('cy',pt.y);
     p.c.setAttribute('r', r);
+    // A MARK SQUEEZED TO MAKE ROOM SHRINKS WHOLE, HALO AND ALL.  The white halo is a fixed
+    // 0.055 g stroke, so two ions going round each other in a trap -- each drawn at half a
+    // bar's thickness, which is as large as two fit side by side across it -- came out as
+    // two white rings with specks in them, and the swap still read as nothing much.  Only
+    // `room` scales it: a mark that is small because its trap is crowded keeps the halo it
+    // always had.
+    const sw = r < r0 ? L.sw_halo*r/r0 : L.sw_halo;
+    if(p.sw !== sw){ p.c.setAttribute('stroke-width', sw); p.sw = sw; }
     p.c.setAttribute('fill', ionColour(ion,f,stt));
     show(p.c);
     // THE LASER, on the ion it is actually addressing.  The spot sits under the ion so

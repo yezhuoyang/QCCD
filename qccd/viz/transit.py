@@ -541,7 +541,7 @@ class Transit:
                 x1, y1 = p1[0] + bx_, p1[1] + by_
                 base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
                                  q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node,
-                                 ends=((x0, y0), (x1, y1)))
+                                 ax=a_axis, bx=b_axis, ends=((x0, y0), (x1, y1)))
 
         partners: dict[str, list[str]] = {}
         for a, b, _ in pas["pairs"]:
@@ -557,49 +557,73 @@ class Transit:
         # lifted where it stands -- see the JS twin
         def clear_of(pitch):
             return 0.95 * pitch if pitch > 0 else 0.62 * bow0
+        # A PASS IS TWO IONS GOING ROUND EACH OTHER, AND BOTH OF THEM MOVE -- see the JS
+        # twin.  Lifting only the one in flight took the whole of the room out of one side
+        # of the bar and drew the swap as two specks sliding through each other; each of
+        # the pair takes HALF the perpendicular leg that restores `clear`, on opposite
+        # sides.  Per pair, on the wider of the two traps, and never more than the pair is
+        # apart at either end of the step, so the detour is zero at both frame boundaries.
+        need: dict[str, float] = {}
+        cause: dict[str, str] = {}
+        for a, b, _ in pas["pairs"]:
+            ma, mb = base.get(a), base.get(b)
+            if ma is None or mb is None or not (ma["fly"] or mb["fly"]):
+                continue
+            clear = clear_of(max(ma["pa"], ma["pb"], mb["pa"], mb["pb"]))
+            if "ends" in ma and "ends" in mb:
+                (a0, a1), (b0, b1) = ma["ends"], mb["ends"]
+                clear = min(clear, math.dist(a0, b0), math.dist(a1, b1))
+            if clear <= 0:
+                continue
+            d = math.dist((ma["x"], ma["y"]), (mb["x"], mb["y"]))
+            if d >= clear:
+                continue
+            h = 0.5 * math.sqrt(max(0.0, clear * clear - d * d))
+            if a not in need or need[a] < h:
+                need[a], cause[a] = h, b
+            if b not in need or need[b] < h:
+                need[b], cause[b] = h, a
+
+        # And never off the metal, taking HALF the room so the mark fits in the other
+        # half.  The ion in flight goes to the side `passes` gave it; the one it is
+        # getting past goes to the other side OF IT, or straight away from it where the
+        # two bars are square to each other -- see the JS twin.
+        lift: dict[str, tuple] = {}
+        order = [i for i in need if base[i]["fly"]] + [i for i in need if not base[i]["fly"]]
+        for ion in order:
+            me, h = base[ion], need[ion]
+            q = me.get("q") or (me["x"], me["y"])
+            lim = self._room_across(q[0], q[1], [me.get("ax") or me["a"],
+                                                 me.get("bx") or me["b"]])
+            if lim > 0 and h > 0.5 * lim:
+                h = 0.5 * lim
+            if not h > 0:
+                continue
+            axn = self._axis(me.get("ax") or me["a"])
+            nx, ny = -axn[1], axn[0]
+            if me["fly"]:
+                sd = pas["side"].get(ion, 1) or 1
+            else:
+                sd = 1
+                c = cause[ion]
+                v, o = lift.get(c), base.get(c)
+                dot = (nx * v[0] + ny * v[1]) / v[2] if v else 0.0
+                if abs(dot) > 0.5:
+                    sd = -1 if dot > 0 else 1
+                elif o is not None and nx * (me["x"] - o["x"]) + ny * (me["y"] - o["y"]) < 0:
+                    sd = -1
+            lift[ion] = (nx * sd * h, ny * sd * h, h, lim)
+
         out: dict[str, Placed] = {}
         for ion, me in base.items():
-            dx = dy = room = lim = 0.0
-            lifted = False
             mates = partners.get(ion) or []
-            my_pitch = max(me["pa"], me["pb"])
-            if mates and me["fly"]:
-                sd = pas["side"].get(ion, 1) or 1
-                worst = 0.0
-                for mate in mates:
-                    other = base.get(mate)
-                    if other is None:
-                        continue
-                    # per pair, on the wider of the two traps -- see the JS twin
-                    clear = clear_of(max(my_pitch, other["pa"], other["pb"]))
-                    # and never more than the pair is apart at either end of the step, so
-                    # the detour is zero at both frame boundaries -- see the JS twin
-                    if "ends" in me and "ends" in other:
-                        (m0, m1), (o0, o1) = me["ends"], other["ends"]
-                        clear = min(clear, math.dist(m0, o0), math.dist(m1, o1))
-                    if clear <= 0:
-                        continue
-                    d = math.dist((me["x"], me["y"]), (other["x"], other["y"]))
-                    if d >= clear:
-                        continue
-                    lift = math.sqrt(max(0.0, clear * clear - d * d))
-                    worst = max(worst, lift)
-                # and never off the metal, taking HALF the room so the mark fits in
-                # the other half -- see the JS twin
-                axn = self._axis(me.get("ax") or me["a"])
-                if worst > 0:
-                    q = me.get("q") or (me["x"], me["y"])
-                    lim = self._room_across(q[0], q[1],
-                                            [me.get("ax") or me["a"],
-                                             me.get("bx") or me["b"]])
-                    if lim > 0:
-                        worst = min(worst, 0.5 * lim)
-                if worst > 0:
-                    dx, dy = -axn[1] * sd * worst, axn[0] * sd * worst
-                    lifted = True
+            up = lift.get(ion)
+            dx, dy = (up[0], up[1]) if up else (0.0, 0.0)
+            room = 0.0
             # A mark is never wider than half the space it is in, measured against every
-            # ion around it and not only the ones `passes` calls partners, and for the
-            # ion standing still as much as the one moving -- see the JS twin.
+            # ion around it and not only the ones `passes` calls partners, to where each
+            # of them is DRAWN, and for the ion standing still as much as the one moving
+            # -- see the JS twin.
             nbrs = set(mates)
             nbrs.update(occ_s.get(me["a"]) or ())
             nbrs.update(occ_e.get(me["b"]) or ())
@@ -608,12 +632,14 @@ class Transit:
             for mate in nbrs:
                 o2 = base.get(mate)
                 if o2 is not None:
+                    u2 = lift.get(mate)
                     gap = min(gap, math.dist((me["x"] + dx, me["y"] + dy),
-                                             (o2["x"], o2["y"])))
+                                             (o2["x"] + (u2[0] if u2 else 0.0),
+                                              o2["y"] + (u2[1] if u2 else 0.0))))
             if math.isfinite(gap):
                 room = 0.45 * gap
-            if lifted and lim > 0:
-                room = min(room or lim, lim - abs(worst))
+            if up and up[3] > 0:
+                room = min(room or up[3], up[3] - up[2])
             if me["fly"]:
                 tight = (len(ord_start.get(me["a"], [])) > 1
                          or len(ord_end.get(me["b"], [])) > 1)
@@ -626,6 +652,7 @@ class Transit:
             else:
                 pa, pb, u = me["pa"], me["pb"], me["u"]
                 out[ion] = Placed(
-                    x=me["x"], y=me["y"], fly=False, node=me["b"], t=u, room=room,
+                    x=me["x"] + dx, y=me["y"] + dy, fly=False, node=me["b"], t=u,
+                    room=room,
                     pitch=(pa + (pb - pa) * u) if (pa and pb) else (pb or pa))
         return out

@@ -203,6 +203,50 @@ def test_two_ions_exchanging_along_one_rail_go_round_each_other_not_through():
     assert worst > 0.2, f"the two marks come within {worst:.4f} of each other"
 
 
+def test_two_trap_mates_getting_past_each_other_both_step_aside_inside_the_bar():
+    """"When a pair of ions swap, show they are swapped: not directly through each other,
+    but slightly off the middle, to show the ions swap in the site" (a collaborator,
+    2026-09-21).
+
+    `a` leaves N0 past its trap-mate `b`, who stays.  Only the ion in flight used to step
+    aside, so the whole of the room came out of one side of the bar, and both marks were
+    shrunk to specks passing on the centre line: 0.058 g apart, radii 0.026 and 0.013 g on
+    `cyclone_base`'s odd-even sort.  Now BOTH step off the line, on opposite sides, by half
+    of what the pair needs each -- and neither leaves the bar it is confined to.
+    """
+    nodes, half = line(2), 0.1                      # the bar is 0.2 thick
+
+    def slots(_node, k):
+        return [(j - (k - 1) / 2) * PITCH for j in range(k)], PITCH
+
+    T = Transit(Geometry(pos=lambda nid: nodes.get(nid), axis=lambda nid: (1.0, 0.0),
+                         slot_offsets=slots, site=lambda nid: nid, span=lambda nid: 0.44,
+                         across=lambda nid: half, rail=0.02, bow=0.5))
+    steps = [Step(before={}, pos={"a": "N0", "b": "N0"}, paths={}),
+             Step(before={"a": "N0", "b": "N0"}, pos={"a": "N1", "b": "N0"},
+                  paths={"a": ["N0", "N1"]})]
+    order = T.slot_order(steps)
+    rows = [(t, T.place(steps[1], t, order[0], order[1])) for t in (k / 80 for k in range(81))]
+    # the frame's two ends are on the centre line, exactly
+    for t, r in (rows[0], rows[-1]):
+        assert r["a"].y == 0.0 and r["b"].y == 0.0, (t, r["a"].y, r["b"].y)
+    # at the closest approach, both are off the middle, on opposite sides, by as much
+    t, r = min(rows, key=lambda tr: math.dist((tr[1]["a"].x, tr[1]["a"].y),
+                                              (tr[1]["b"].x, tr[1]["b"].y)))
+    a, b = r["a"], r["b"]
+    assert a.y * b.y < 0, f"at t={t} a is at y={a.y} and b at y={b.y}: not on opposite sides"
+    assert math.isclose(abs(a.y), abs(b.y), rel_tol=1e-9), (a.y, b.y)
+    assert abs(a.y) >= 0.4 * half, f"a pass drawn only {abs(a.y):.4f} off the middle"
+    # the marks fit: neither covers the other, and each keeps a real size -- not a speck
+    d = math.dist((a.x, a.y), (b.x, b.y))
+    assert a.room + b.room <= d + 1e-12, (a.room, b.room, d)
+    assert min(a.room, b.room) >= 0.4 * half, (a.room, b.room)
+    # and nobody, at any instant, is drawn outside the bar -- centre or mark
+    for t, r in rows:
+        for p in r.values():
+            assert abs(p.y) + (p.room if p.y else 0.0) <= half + 1e-12, (t, p)
+
+
 def test_a_swap_ends_with_the_two_ions_in_each_other_s_places():
     """Identities, not just positions: after the exchange `a` is where `b` was."""
     nodes = line(2)
