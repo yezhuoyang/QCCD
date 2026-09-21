@@ -821,90 +821,111 @@
     // already carries that number (it is 1.9 times the two radii).
     var clearOf = function (pitch) { return pitch > 0 ? 0.95 * pitch : 0.62 * bow0; };
 
+    // A PASS IS TWO IONS GOING ROUND EACH OTHER, AND BOTH OF THEM MOVE.
+    //
+    // Lifting only the ion in flight left the one it was getting past on the centre line,
+    // so the whole of the room came out of one side of the bar.  On `cyclone_base`'s
+    // odd-even sort the pair went by 0.058 g apart, both marks shrank to specks (radii
+    // 0.026 and 0.013 g) to fit, and the swap read as two ions sliding THROUGH each other
+    // -- which is how a collaborator described it.  Two ions exchanging places in a trap
+    // turn about their middle: each steps off the line to its own side, they go past, and
+    // they step back.  So the need is shared -- each of the pair takes HALF the
+    // perpendicular leg, on opposite sides -- and the two marks have the whole thickness
+    // of the bar between them rather than half of it.
+    var need = {}, cause = {};
+    for (var pp2 = 0; pp2 < pass.pairs.length; pp2++) {
+      var ia = pass.pairs[pp2][0], ib = pass.pairs[pp2][1];
+      var ma = base[ia], mb = base[ib];
+      // a pass takes an ion in flight; `rest` pins everybody and nobody gets past anybody
+      if (!ma || !mb || !(ma.fly || mb.fly)) continue;
+      // PER PAIR, on the WIDER of the two traps.  A mark is 0.44 of its own slot pitch,
+      // so the room two of them need is set by the bigger one; measuring only the
+      // mover's trap let an ion slip past a neighbour standing in a roomier one and be
+      // drawn through it -- 1.9% of instants on `tcx72`, which the Design canvas's own
+      // stage test caught.  Two ions that rest a pitch apart are in the SAME trap and
+      // share the pitch, so taking the larger cannot lift either of them where they stand.
+      var clear = clearOf(Math.max(P.A[ia].pitch || 0, P.B[ia].pitch || 0,
+                                   P.A[ib].pitch || 0, P.B[ib].pitch || 0));
+      // AND NEVER MORE THAN THE PAIR IS APART AT EITHER END OF THE STEP.  Where they
+      // stand is where they were drawn at rest, so a clearance wider than that lifts an
+      // ion at t=0 and drops it at t=1 -- a jump at the frame boundary.  The pair's wider
+      // pitch made exactly that happen: `c65` in tcx72's 72-ion trap, 2.66 px from its
+      // partner, which is leaving for a trap with a wider pitch, was lifted 1.08 px where
+      // it stood (`tests/census.mjs` on `tcx72.cx`).  A detour bounded by both ends is
+      // zero at both ends by construction -- for the ion standing still as much as for
+      // the one moving.
+      if (ma.s0x !== undefined && mb.s0x !== undefined) {
+        clear = Math.min(clear,
+                         Math.hypot(ma.s0x - mb.s0x, ma.s0y - mb.s0y),
+                         Math.hypot(ma.s1x - mb.s1x, ma.s1y - mb.s1y));
+      }
+      if (!(clear > 0)) continue;
+      var d = Math.hypot(ma.x - mb.x, ma.y - mb.y);
+      if (d >= clear) continue;
+      var h = 0.5 * Math.sqrt(Math.max(0, clear * clear - d * d));
+      if (!(need[ia] >= h)) { need[ia] = h; cause[ia] = ib; }
+      if (!(need[ib] >= h)) { need[ib] = h; cause[ib] = ia; }
+    }
+
+    // AND NEVER OFF THE METAL.  Whatever the arithmetic asks for, the ion stays on the
+    // electrodes it is being carried by: half a bar's thickness inside its trap, half a
+    // rail's out between them.  An ion drawn beside its trap is drawn where no well
+    // exists, which is the second thing reported from the site -- "when ions swap, they
+    // shouldn't jump outside the site".
+    //
+    // The base position is already on the metal by construction (each slot offset is
+    // taken up within its own bar, see `slotWeights`), so capping the LIFT caps the whole
+    // excursion.  And only the lift gives way: an ion with nothing to pass is left exactly
+    // where it is, so no frame boundary can snap.  Where the cap leaves two marks too
+    // close for their size, it is the MARKS that shrink (`room`, below).
+    //
+    // HALF the room, not all of it, because the mark has to fit in the other half.  A
+    // mark is 0.44 of its slot pitch and a bar is `site_t` thick, which on the shipped
+    // layout makes a resting mark very nearly as wide as its own bar is deep: an ion
+    // lifted the full half-thickness is inside the bar by its centre and outside it by
+    // its whole radius.  So the lift takes half the half-width and `room` holds the mark
+    // to the rest -- and with BOTH of the pair stepping aside, that is two marks of half
+    // a bar's thickness side by side across it, which is as large as two can be drawn
+    // inside it.
+    //
+    // WHICH SIDE.  The ion in flight goes to the side `passes` gave it, which is what
+    // keeps the two of an exchange apart.  The ion it is getting past goes to the OTHER
+    // side of it, and that is a statement about the pair rather than about either ion's
+    // own axis: an axis has no preferred sign, so "the opposite normal" can point the
+    // same way.  Where the two bars are square to each other there is no other side to
+    // speak of, and it steps straight away from the ion going by.
+    var lift = {}, order = [], io3;
+    for (io3 in need) if (base[io3].fly) order.push(io3);
+    for (io3 in need) if (!base[io3].fly) order.push(io3);
+    for (var k3 = 0; k3 < order.length; k3++) {
+      var ion3 = order[k3], m3 = base[ion3], h3 = need[ion3], S3 = P.A[ion3];
+      var q3 = m3.q || m3;
+      var lim3 = self.roomAcross(q3.x !== undefined ? q3.x : q3[0],
+                                 q3.y !== undefined ? q3.y : q3[1], [S3, P.B[ion3]]);
+      if (lim3 > 0 && h3 > 0.5 * lim3) h3 = 0.5 * lim3;
+      if (!(h3 > 0)) continue;
+      var ax3 = self.axis(S3.axisNode || S3.node), nx = -ax3[1], ny = ax3[0], s3 = 1;
+      if (m3.fly) s3 = pass.side[ion3] || 1;
+      else {
+        var c3 = cause[ion3], v3 = lift[c3], o3 = base[c3];
+        var dot = v3 ? (nx * v3[0] + ny * v3[1]) / v3[2] : 0;
+        if (Math.abs(dot) > 0.5) s3 = dot > 0 ? -1 : 1;
+        else if (o3 && nx * (m3.x - o3.x) + ny * (m3.y - o3.y) < 0) s3 = -1;
+      }
+      lift[ion3] = [nx * s3 * h3, ny * s3 * h3, h3, lim3];
+    }
+
     for (var ion2 in base) {
       var me = base[ion2], A = P.A[ion2], B = P.B[ion2];
-      var bx = 0, by = 0, lifted = false, room = 0;
-      var mates = partners[ion2];
-      var myPitch = Math.max(A.pitch || 0, B.pitch || 0);
-      if (mates && mates.length && me.fly) {
-        var sd = pass.side[ion2] || 1;
-        var worst = 0;
-        for (var mi = 0; mi < mates.length; mi++) {
-          var mate = mates[mi], other = base[mate];
-          if (!other) continue;
-          // PER PAIR, on the WIDER of the two traps.  A mark is 0.44 of its own slot
-          // pitch, so the room two of them need is set by the bigger one; measuring only
-          // the mover's trap let an ion slip past a neighbour standing in a roomier one
-          // and be drawn through it -- 1.9% of instants on `tcx72`, which the Design
-          // canvas's own stage test caught.  Two ions that rest a pitch apart are in the
-          // SAME trap and share the pitch, so taking the larger cannot lift either of
-          // them where they stand.
-          var mA = P.A[mate], mB = P.B[mate];
-          var pitch = Math.max(myPitch, (mA && mA.pitch) || 0, (mB && mB.pitch) || 0);
-          var clear = clearOf(pitch);
-          // AND NEVER MORE THAN THE PAIR IS APART AT EITHER END OF THE STEP.  Where they
-          // stand is where they were drawn at rest, so a clearance wider than that lifts an
-          // ion at t=0 and drops it at t=1 -- a jump at the frame boundary.  The pair's wider
-          // pitch made exactly that happen: `c65` in tcx72's 72-ion trap, 2.66 px from its
-          // partner, which is leaving for a trap with a wider pitch, was lifted 1.08 px where
-          // it stood (`tests/census.mjs` on `tcx72.cx`).  A detour bounded by both ends is
-          // zero at both ends by construction.
-          if (me.s0x !== undefined && other.s0x !== undefined) {
-            clear = Math.min(clear,
-                             Math.hypot(me.s0x - other.s0x, me.s0y - other.s0y),
-                             Math.hypot(me.s1x - other.s1x, me.s1y - other.s1y));
-          }
-          if (!(clear > 0)) continue;
-          var d = Math.hypot(me.x - other.x, me.y - other.y);
-          if (d >= clear) continue;
-          var lift = Math.sqrt(Math.max(0, clear * clear - d * d));
-          if (lift > worst) worst = lift;
-        }
-        // AND NEVER OFF THE METAL.  Whatever the arithmetic asks for, the ion stays on
-        // the electrodes it is being carried by: half a bar's thickness inside its trap,
-        // half a rail's out between them.  An ion drawn beside its trap is drawn where no
-        // well exists, which is the second thing reported from the site -- "when ions
-        // swap, they shouldn't jump outside the site".
-        //
-        // The base position is already on the metal by construction (each slot offset is
-        // taken up within its own bar, see `slotWeights`), so capping the LIFT caps the
-        // whole excursion.  And only the lift gives way: an ion with nothing to pass is
-        // left exactly where it is, so no frame boundary can snap.  Where the cap leaves
-        // two marks too close for their size, it is the MARKS that shrink (`room`,
-        // below) -- the exchange is still drawn as an exchange, on opposite sides and
-        // ending in each other's slots.
-        //
-        // HALF the room, not all of it, because the mark has to fit in the other half.
-        // A mark is 0.44 of its slot pitch and a bar is `site_t` thick, which on the
-        // shipped layout makes a resting mark very nearly as wide as its own bar is
-        // deep: an ion lifted the full half-thickness is inside the bar by its centre
-        // and outside it by its whole radius.  So the lift takes half the half-width
-        // and `room` below holds the mark to the rest.
-        var ax2 = self.axis(A.axisNode || A.node), lim = 0;
-        if (worst > 0) {
-          var qq = me.q || me;
-          lim = self.roomAcross(qq.x !== undefined ? qq.x : qq[0],
-                                qq.y !== undefined ? qq.y : qq[1], [A, B]);
-          if (lim > 0 && worst > 0.5 * lim) worst = 0.5 * lim;
-        }
-        if (worst > 0) {
-          bx = -ax2[1] * sd * worst; by = ax2[0] * sd * worst;
-          lifted = true;
-        }
-        // AND NO BIGGER THAN THE GAP IT IS GOING THROUGH.  A flier's mark is sized by
-        // interpolating between the stack it leaves and the stack it arrives in, so an
-        // ion leaving a 71-ion trap for an EMPTY one is drawn growing to full size while
-        // it is still threading its old neighbours -- radius 0.005 to 0.068 against a
-        // gap of 0.011, which swallows thirteen of them.  `room` is half the distance to
-        // the nearest ion it has to pass: a mark never covers the neighbour it is
-        // getting by, and it grows naturally as it leaves.
-      }
+      var mates = partners[ion2], up = lift[ion2];
+      var bx = up ? up[0] : 0, by = up ? up[1] : 0, room = 0;
       // A MARK IS NEVER WIDER THAN HALF THE SPACE IT IS IN, and the space is measured
-      // against every ion around it rather than only the ones `passes` calls partners.
+      // against every ion around it rather than only the ones `passes` calls partners,
+      // and to where each of them is DRAWN -- stepped aside or not.
       //
-      // Both of those matter, and each came from a picture.  BOTH SIDES: the ion being
-      // got past is as much of the pair as the one getting past it, and leaving it at
-      // full size while the mover shrank is how two marks 0.118 g apart came to have
+      // Both of the first two matter, and each came from a picture.  BOTH SIDES: the ion
+      // being got past is as much of the pair as the one getting past it, and leaving it
+      // at full size while the mover shrank is how two marks 0.118 g apart came to have
       // radii of 0.097 and 0.053 -- the drawing asked one of them to make all the room.
       // EVERY NEIGHBOUR: an ion entering a trap through the middle of its bar is not
       // passing anybody, so `passes` pairs it with nobody, and it is still drawn through
@@ -914,6 +935,12 @@
       // both ends of the walk as well.  An ion at rest among its own trap-mates sits a
       // pitch from each, and 0.45 of a pitch is what it is drawn at anyway, so this
       // costs nothing where there is nothing going on.
+      //
+      // It is also what keeps a flier no bigger than the gap it is going through.  A
+      // flier's mark is sized by interpolating between the stack it leaves and the stack
+      // it arrives in, so an ion leaving a 71-ion trap for an EMPTY one is drawn growing
+      // to full size while it is still threading its old neighbours -- radius 0.005 to
+      // 0.068 against a gap of 0.011, which swallows thirteen of them.
       var nbrs = {}, nb;
       if (mates) for (nb = 0; nb < mates.length; nb++) nbrs[mates[nb]] = 1;
       var lsA = occS[A.node] || [], lsB = occ[B.node] || [];
@@ -922,13 +949,14 @@
       delete nbrs[ion2];
       var gap = Infinity;
       for (var mj in nbrs) {
-        var o2 = base[mj];
+        var o2 = base[mj], u2 = lift[mj];
         if (!o2) continue;
-        gap = Math.min(gap, Math.hypot(me.x + bx - o2.x, me.y + by - o2.y));
+        gap = Math.min(gap, Math.hypot(me.x + bx - o2.x - (u2 ? u2[0] : 0),
+                                       me.y + by - o2.y - (u2 ? u2[1] : 0)));
       }
       if (isFinite(gap)) room = 0.45 * gap;
       // and inside the metal, alongside the lift that has already been taken out of it
-      if (lifted && lim > 0) room = Math.min(room || lim, lim - Math.abs(worst));
+      if (up && up[3] > 0) room = Math.min(room || up[3], up[3] - up[2]);
       if (me.fly) {
         // `swap` says THIS ION IS THREADING PAST ANOTHER, so the drawing knows not to let
         // it swell to full radius on the way: a mark that has to fit through a gap does
@@ -937,7 +965,7 @@
         var tight = ((ordStart[A.node] || []).length > 1) || ((ordEnd[B.node] || []).length > 1);
         live[ion2] = { x: me.x + bx, y: me.y + by, fly: true, tt: t,
                        pitchA: A.pitch, pitchB: B.pitch,
-                       swap: !!(mates && mates.length), tight: tight, lifted: lifted,
+                       swap: !!(mates && mates.length), tight: tight, lifted: !!up,
                        room: room };
         flying[ion2] = me.q;
       } else {
@@ -945,7 +973,7 @@
         // the step -- an ion leaving frees a slot and the one staying behind shifts into
         // the middle -- so pinning it to the end-state slot makes it jump the moment the
         // step begins, straight into the ion still departing.
-        live[ion2] = { x: me.x, y: me.y, fly: false, node: B.node, room: room,
+        live[ion2] = { x: me.x + bx, y: me.y + by, fly: false, node: B.node, room: room,
                        pitch: (A.pitch && B.pitch) ? A.pitch + (B.pitch - A.pitch) * me.u
                                                    : (B.pitch || A.pitch) };
       }

@@ -570,15 +570,16 @@
   //
   // It lives here rather than in `app.js` so that a test can measure what the canvas
   // draws instead of a second opinion about it.  `p` is one entry of `LeafSim.state`'s
-  // `live`; `s` scales a device-unit pitch into the radii's own units.
-  function ionRadius(p, rIon, rRest, s, active) {
+  // `live`; `s` scales a device-unit pitch into the radii's own units.  `unsqueezed` asks
+  // for the radius before `room` takes its share, which is what the halo scales against.
+  function ionRadius(p, rIon, rRest, s, active, unsqueezed) {
     const base = active ? rIon : rRest;
     if (!p) return base;
     const fit = (pitch) => Math.min(rRest, pitch ? 0.44 * pitch * s : rRest);
     if (!p.fly) {
       // a STANDING ion gives way too, where it is one of a pair getting past each other
       const rr = p.pitch ? Math.min(base, 0.44 * p.pitch * s) : base;
-      return p.room ? Math.min(rr, p.room * s) : rr;
+      return p.room && !unsqueezed ? Math.min(rr, p.room * s) : rr;
     }
     const rA = fit(p.pitchA), rB = fit(p.pitchB);
     const bulge = (p.swap || p.tight) ? 0 : 4 * p.tt * (1 - p.tt);
@@ -586,7 +587,7 @@
     // never wider than the gap it is threading: an ion leaving a crowded trap for an
     // empty one would otherwise be drawn growing to full size while it is still among
     // its old neighbours (`transit.js` derives `room` from the real distance to them)
-    return p.room ? Math.min(r, p.room * s) : r;
+    return p.room && !unsqueezed ? Math.min(r, p.room * s) : r;
   }
 
   root.GadgetCore = { Model, LeafSim, lowerBound, naturalCmp, geomOf, ionRadius };

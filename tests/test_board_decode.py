@@ -13,6 +13,13 @@ every ring against its site's own mark before and after a zoom, and what playing
 default speed shows.  A mutation that switches the highlight off must turn it red.  The
 stage now FRAMES the classical floor (`fit()` reads `STAGE_EXTENT`), or the outcomes would
 be seen leaving for somewhere off the edge of the picture.
+
+AND A READER CAN PUT ALL OF IT AWAY ("allow user to disable showing the decoder ... also
+including classical wires/memories").  The "Classical" box in the tools bar hides the wires,
+the decoder, the memory and a decode's lit path together, remembers that per viewer, and
+gives the frame back to the device unless the reader has moved the camera.
+`tests/classical_toggle_browser.mjs` checks it against the picture as well: unticked, on a
+decode frame, the stage rasterises to exactly the page with the layer cut out of it.
 """
 
 from __future__ import annotations
@@ -28,11 +35,16 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / "tests" / "board_decode_browser.mjs"
+TOGGLE = ROOT / "tests" / "classical_toggle_browser.mjs"
 CHROME = os.environ.get("CHROME") or next((p for p in (
     "C:/Program Files/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser", "/usr/bin/chromium") if Path(p).exists()), None)
 NODE = shutil.which("node")
 SCRIPTS = ROOT / "Codesign" / "scripts"
+
+# the classical layer is the site's (`qccd/site/qec_cycle.js`), which lives on the website
+# branch: in a checkout without it there is no page to look at
+pytest.importorskip("qccd.site.qec_cycle", reason="the site package is not in this tree")
 
 pytestmark = [pytest.mark.skipif(NODE is None or CHROME is None,
                                  reason="node and Chrome are needed to look at the page"),
@@ -134,3 +146,65 @@ def test_the_probe_would_see_a_highlight_that_never_comes_on(page, tmp_path):
     px = off["pixels"]
     assert not (px["during"][0] - px["before"][0] > 200
                 and px["during"][0] >= 5 * max(1, px["before"][0])), px
+
+
+# ------------------------------------------------------------------ putting it away
+
+def toggle_probe(p: Path) -> dict:
+    r = subprocess.run([NODE, str(TOGGLE), str(p)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=300)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+@pytest.fixture(scope="module")
+def put_away(page):
+    return toggle_probe(page)
+
+
+def test_the_classical_half_goes_away_whole_and_leaves_nothing_behind(put_away):
+    s = put_away
+    assert s["errors"] == [] and "fatal" not in s, s.get("fatal")
+    # shown by default, on a decode frame, so the lit path is part of what has to go
+    assert s["decode_frame"] >= 0, s
+    assert s["shown"]["box"] is True and s["shown"]["extent"], s["shown"]
+    assert s["shown"]["layer"] > 0 and s["shown"]["lit"] > 0, s["shown"]
+    h = s["hidden"]
+    assert h["visible_px"] > 1000, h            # the layer is really there to take away
+    assert h["left_px"] == 0, h                 # ...and none of it is left: the device alone
+    assert h["state"]["layer"] == 0 and h["state"]["lit"] == 0, h
+    assert h["state"]["box"] is False and not h["state"]["extent"], h
+
+
+def test_putting_it_away_gives_the_frame_back_to_the_device(put_away):
+    r = put_away["refit"]
+    assert r["camera"] == r["device_fit"] != r["shown_camera"], r
+
+
+def test_the_choice_is_remembered_and_the_panel_box_is_the_same_setting(put_away):
+    m = put_away["remembered"]
+    assert m["stored"] == "0" and m["box"] is False, m
+    assert m["layer"] == 0 and m["lit"] == 0 and not m["extent"], m
+    p = put_away["panel"]
+    assert p["before"] is False and p["panel_after"] is True, p
+    assert p["after"]["box"] is True and p["after"]["layer"] > 0 and p["after"]["lit"] > 0, p
+    # and turning it back on frames the classical floor again, exactly as on first load
+    assert p["after"]["camera"] == put_away["shown"]["camera"], p
+
+
+def test_a_reader_who_has_zoomed_in_keeps_their_view(put_away):
+    z = put_away["zoomed"]
+    assert z["off"]["camera"] == z["on"]["camera"] == z["camera"], z
+    assert z["off"]["layer"] == 0 and z["on"]["layer"] > 0, z
+
+
+def test_the_probe_would_see_a_layer_left_behind(page, tmp_path):
+    """Unticking must CLEAR the layer, not merely stop redrawing it: leave it drawn and
+    the pixel comparison above must go red."""
+    html = page.read_text(encoding="utf-8")
+    needle = 'if (!LAYER.on) { el.innerHTML = ""; return; }'
+    assert needle in html, "the layer's off branch moved; update this mutation"
+    broken = tmp_path / page.name
+    broken.write_text(html.replace(needle, "if (!LAYER.on) { return; }"),
+                      encoding="utf-8", newline="")
+    assert toggle_probe(broken)["hidden"]["left_px"] > 1000

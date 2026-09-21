@@ -42,6 +42,7 @@ from qccd.gadget.town import town
 ROOT = Path(__file__).resolve().parent.parent
 ALGS = ROOT / "examples" / "gadgets" / "algorithms"
 PROBE = ROOT / "tests" / "gadget_decode_browser.mjs"
+CLASSICAL = ROOT / "tests" / "gadget_classical_browser.mjs"
 CHROME = os.environ.get("CHROME") or next((p for p in (
     "C:/Program Files/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser", "/usr/bin/chromium") if Path(p).exists()), None)
@@ -323,10 +324,49 @@ def test_the_probe_would_see_a_highlight_that_never_comes_on(page, tmp_path):
     needle = "const lit = !!(S.lit && S.lit.nets.has(net));"
     assert needle in html, "the wire highlight moved; update this mutation"
     html = html.replace(needle, "const lit = false;")
-    html = html.replace("const lit = S.lit && S.lit.places.has(cpath);", "const lit = false;")
+    glow = "const lit = S.showClassical && S.lit && S.lit.places.has(cpath);"
+    assert glow in html, "the place glow moved; update this mutation"
+    html = html.replace(glow, "const lit = false;")
     (broken / "index.html").write_text(html, encoding="utf-8")
     off = probe(broken)
     assert off["errors"] == []
     px = off["pixels"][0]
     assert not (px["during"][0] >= 4 * px["before"][0] and px["during"][0] - px["before"][0] > 500), (
         "the pixel test passed a page whose wires never light up")
+
+
+# ------------------------------------------------------------------ putting it away
+
+
+@pytest.fixture(scope="module")
+def put_away(page):
+    r = subprocess.run([NODE, str(CLASSICAL), str(page)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=300)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def test_the_classical_half_can_be_put_away(put_away):
+    """"Allow user to disable showing the decoder ... also including classical wires/memories."
+    Asked of the canvas at a moment a decode is running, which is the most the classical
+    half ever draws, against the device ALONE drawn by a route that never touches the
+    switch: the classical places and wires taken out of the model, no decode running."""
+    s = put_away
+    assert s["errors"] == [] and "fatal" not in s, s.get("fatal")
+    on, off = s["on"], s["off"]
+    assert on["removed"][0] == 2 and on["removed"][1] >= 1, on    # decoder, memory, wires
+    assert on["state"]["shown"] is True and on["state"]["button"] == "on", on
+    assert on["differs_px"] > 2000, on                  # there is something to put away
+    assert off["state"]["shown"] is False and off["state"]["button"] == "", off
+    assert off["state"]["stored"] == "0", off
+    assert off["differs_px"] == 0, off                  # ...and none of it is left
+    # and the key names only what is drawn
+    assert "Decoder" in on["state"]["legend"] and "Decoder" not in off["state"]["legend"]
+
+
+def test_putting_it_away_is_remembered_and_c_brings_it_back(put_away):
+    m, k = put_away["remembered"], put_away["key"]
+    assert m["state"]["shown"] is False and m["state"]["button"] == "", m
+    assert m["differs_px"] == 0, m
+    assert k["state"]["shown"] is True and k["state"]["stored"] == "1", k
+    assert k["differs_px"] > 2000, k
