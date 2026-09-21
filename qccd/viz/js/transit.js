@@ -225,6 +225,36 @@
              hop: i, hops: path.length - 1, s: done, left: H.total - done };
   };
 
+  // A point at ARC `arc` along the path, in drawn units -- beyond either end, continued
+  // along the rail's own tangent there, which is the direction of the bar an ion is
+  // arriving in or leaving from.  `s` / `left` are clamped to the path.
+  Transit.prototype.pointAtArc = function (path, arc) {
+    var H = this.hopLengths(path);
+    if (!path || path.length < 2 || !(H.total > 1e-9)) return this.pointOnPath(path, 0);
+    if (arc >= 0 && arc <= H.total) return this.pointOnPath(path, arc / H.total);
+    var end = arc > H.total;
+    var q = this.pointOnPath(path, end ? 1 : 0);
+    if (!q) return q;
+    var tg = this.tangentAt(path, end), over = end ? arc - H.total : arc;
+    return { x: q.x + tg[0] * over, y: q.y + tg[1] * over, a: q.a, b: q.b, u: q.u,
+             hop: q.hop, hops: q.hops, s: end ? H.total : 0, left: end ? 0 : H.total };
+  };
+
+  // The unit direction of travel at the start (`atEnd` false) or the end of a path.
+  Transit.prototype.tangentAt = function (path, atEnd) {
+    var a = atEnd ? path[path.length - 2] : path[0], b = atEnd ? path[path.length - 1] : path[1];
+    var p0 = this.edgePoint(a, b, atEnd ? 0.98 : 0), p1 = this.edgePoint(a, b, atEnd ? 1 : 0.02);
+    var dx, dy;
+    if (p0 && p1 && !p0.norail && !p1.norail) { dx = p1.x - p0.x; dy = p1.y - p0.y; }
+    else {
+      var P0 = this.pos(a), P1 = this.pos(b);
+      if (!P0 || !P1) return [1, 0];
+      dx = P1[0] - P0[0]; dy = P1[1] - P0[1];
+    }
+    var L = Math.hypot(dx, dy);
+    return L > 1e-12 ? [dx / L, dy / L] : [1, 0];
+  };
+
   // ------------------------------------------------------------------- slot order
 
   // A WALKER, because the whole programme is more than anyone is looking at.
@@ -290,6 +320,35 @@
           var old = cur[p] || [], keep = [];
           for (var j = 0; j < old.length; j++) if (now[old[j]] === p) keep.push(old[j]);
           rebuilt[p] = keep;
+        }
+        // A CHAIN ARRIVES IN THE ORDER IT TRAVELLED.  Ions that come from one place into
+        // one place together are a chain in one well: the one in FRONT goes deepest, so the
+        // one behind still joins at the end they came in by.  Taken in `pos` order instead,
+        // the leader was pushed to the outside and the pair arrived swapped -- the two
+        // passing through each other half-way, which no detour is drawn for because
+        // nothing in the programme asks them to pass.  Every other arrival keeps `pos`
+        // order, so nothing that was not a chain changes.
+        if (arrived.length > 1) {
+          var gFirst = {}, meta = [];
+          for (var a0 = 0; a0 < arrived.length; a0++) {
+            var io = arrived[a0], at0 = now[io];
+            var s0 = (ps[io] && ps[io][0]);
+            if (s0 === undefined) s0 = was[io];
+            var sp = s0 === undefined ? undefined : siteFor(s0);
+            var key = at0 + "\u0000" + sp;
+            if (gFirst[key] === undefined) gFirst[key] = a0;
+            var lead = 0, ls = sp !== undefined ? cur[sp] : null;
+            if (ls && ls.length > 1) {
+              var ix = ls.indexOf(io), po = posFor(at0), pf = posFor(sp), axs = axFor(s0);
+              if (ix >= 0 && po && pf) {
+                lead = (ix - (ls.length - 1) / 2) *
+                       ((po[0] - pf[0]) * axs[0] + (po[1] - pf[1]) * axs[1]);
+              }
+            }
+            meta.push({ ion: io, g: gFirst[key], lead: lead, k: a0 });
+          }
+          meta.sort(function (x, y) { return (x.g - y.g) || (y.lead - x.lead) || (x.k - y.k); });
+          arrived = meta.map(function (m) { return m.ion; });
         }
         for (var a = 0; a < arrived.length; a++) {
           ion = arrived[a]; at = now[ion];
@@ -662,8 +721,8 @@
     for (var i1 in srcOf) {
       var p1 = paths[i1], A1 = P.A[i1], B1 = P.B[i1];
       if (p1 && !rest) {
-        var q1 = self.pointOnPath(p1, t);
-        if (!q1 || !isFinite(q1.x)) continue;
+        var q0 = self.pointOnPath(p1, t);
+        if (!q0 || !isFinite(q0.x)) continue;
         // THE SLOT OFFSET BELONGS TO THE TRAP, NOT TO THE WALK.
         //
         // A1's offset lies along the SOURCE trap's axis and B1's along the DESTINATION
@@ -674,20 +733,51 @@
         // detour at all.
         //
         // So each offset is taken up WITHIN THE BAR IT BELONGS TO, measured in arc over
-        // a ramp that is as long as the bar keeps the rail -- see `rampAt`.  The frame
-        // boundaries stay exact at t=0 and t=1 whatever those ramps come to.
+        // a ramp that is as long as the bar keeps the rail -- see `rampAt`.
+        //
+        // BUT THE PART OF IT THAT LIES ALONG THE RAIL IS CARRIED, NOT SHED.  Two ions in
+        // one well move together, and a chain in a moving well keeps its spacing along the
+        // direction it moves.  Shedding the whole offset put both of them on the rail's
+        // centre, on top of each other -- `centres_apart: 0` on a ring144 rotation with
+        // two ions in one trap, 7 frames of it (`tests/test_studio.py`'s census).  So the
+        // along-rail part becomes a shift in ARC POSITION, interpolated from the source
+        // slot's to the destination's -- on the metal the whole way, and the spacing kept
+        // -- and only what is left (the sideways part, and the chord a bow does not
+        // follow) is ramped in and out within the bars.  Both ends are exact: at t=0 the
+        // ion is at its source slot and at t=1 at its destination slot, to the bit.
+        var tA = self.tangentAt(p1, false), tB = self.tangentAt(p1, true);
+        var aA = A1.ox * tA[0] + A1.oy * tA[1], aB = B1.ox * tB[0] + B1.oy * tB[1];
+        var tot = self.hopLengths(p1).total;
+        var q1 = self.pointAtArc(p1, tot * t + aA + (aB - aA) * t) || q0;
+        var e0 = self.pointAtArc(p1, aA), e1 = self.pointAtArc(p1, tot + aB);
+        var qs = self.pointOnPath(p1, 0), qe = self.pointOnPath(p1, 1);
+        // what the carried arc does not reach: the rest of each end's slot offset,
+        // measured from the very points the ends are drawn at
+        var rAx = (qs && e0) ? qs.x + A1.ox - e0.x : A1.ox, rAy = (qs && e0) ? qs.y + A1.oy - e0.y : A1.oy;
+        var rBx = (qe && e1) ? qe.x + B1.ox - e1.x : B1.ox, rBy = (qe && e1) ? qe.y + B1.oy - e1.y : B1.oy;
         var w1 = slotWeights(q1, t,
                              rampAt(A1.axisNode || A1.node, p1[1]),
                              rampAt(B1.axisNode || B1.node, p1[p1.length - 2]));
-        base[i1] = { x: q1.x + A1.ox * w1[0] + B1.ox * w1[1],
-                     y: q1.y + A1.oy * w1[0] + B1.oy * w1[1], fly: true, q: q1, u: t };
+        // the two ends in exactly the arithmetic they always had, so a frame boundary is
+        // continuous to the bit and not merely to within rounding
+        if (t <= 0) base[i1] = { x: q0.x + A1.ox, y: q0.y + A1.oy, fly: true, q: q0, u: t };
+        else if (t >= 1) base[i1] = { x: q0.x + B1.ox, y: q0.y + B1.oy, fly: true, q: q0, u: t };
+        else base[i1] = { x: q1.x + rAx * w1[0] + rBx * w1[1],
+                          y: q1.y + rAy * w1[0] + rBy * w1[1], fly: true, q: q1, u: t };
+        // where it stands at the two ends of the step, for the detour's clearance
+        if (qs && qe) {
+          base[i1].s0x = qs.x + A1.ox; base[i1].s0y = qs.y + A1.oy;
+          base[i1].s1x = qe.x + B1.ox; base[i1].s1y = qe.y + B1.oy;
+        }
       } else {
         var pa1 = self.pos(A1.node), pb1 = self.pos(B1.node);
         if (!pa1 || !pb1) continue;
         var u1 = rest ? 1 : t;
         base[i1] = { x: (pa1[0] + A1.ox) + ((pb1[0] + B1.ox) - (pa1[0] + A1.ox)) * u1,
                      y: (pa1[1] + A1.oy) + ((pb1[1] + B1.oy) - (pa1[1] + A1.oy)) * u1,
-                     fly: false, u: u1 };
+                     fly: false, u: u1,
+                     s0x: pa1[0] + A1.ox, s0y: pa1[1] + A1.oy,
+                     s1x: pb1[0] + B1.ox, s1y: pb1[1] + B1.oy };
       }
     }
 
@@ -752,6 +842,18 @@
           var mA = P.A[mate], mB = P.B[mate];
           var pitch = Math.max(myPitch, (mA && mA.pitch) || 0, (mB && mB.pitch) || 0);
           var clear = clearOf(pitch);
+          // AND NEVER MORE THAN THE PAIR IS APART AT EITHER END OF THE STEP.  Where they
+          // stand is where they were drawn at rest, so a clearance wider than that lifts an
+          // ion at t=0 and drops it at t=1 -- a jump at the frame boundary.  The pair's wider
+          // pitch made exactly that happen: `c65` in tcx72's 72-ion trap, 2.66 px from its
+          // partner, which is leaving for a trap with a wider pitch, was lifted 1.08 px where
+          // it stood (`tests/census.mjs` on `tcx72.cx`).  A detour bounded by both ends is
+          // zero at both ends by construction.
+          if (me.s0x !== undefined && other.s0x !== undefined) {
+            clear = Math.min(clear,
+                             Math.hypot(me.s0x - other.s0x, me.s0y - other.s0y),
+                             Math.hypot(me.s1x - other.s1x, me.s1y - other.s1y));
+          }
           if (!(clear > 0)) continue;
           var d = Math.hypot(me.x - other.x, me.y - other.y);
           if (d >= clear) continue;

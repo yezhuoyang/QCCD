@@ -289,6 +289,21 @@ def replay(
             )
             continue
 
+        if instr.type == "decode":
+            # THE DECODER WORKS ALONGSIDE THE IONS.  A decode sends measured outcomes to the
+            # classical processor and moves no ion, heats none, occupies no site and holds
+            # no rail, so on the machine's clock it takes no time: the next instruction
+            # starts when the ions are ready, exactly as if the line were not there.  Its
+            # classical latency is real and is drawn and budgeted by the QEC-cycle layer
+            # (`qccd.analysis.feedback`); charging it here would move every board's
+            # runtime for a cost the ions never pay.  No rule sees it, because there is
+            # nothing on the device for a rule to judge.
+            res.cycles.append(
+                CycleRecord(instr.id, "decode", None, t0, t0, 0.0, 0, 0,
+                            instr.meta.get("batch"))
+            )
+            continue
+
         # ---------------------------------------------------------- transport
         if instr.type == "simd":
             entails = arch.entails(instr.cls) if instr.cls else ()

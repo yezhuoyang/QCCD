@@ -242,13 +242,15 @@ def build_view_model(
         elif instr.type == "cool":
             f["broadcast"] = bool(instr.broadcast)
             f["ions"] = list(instr.ions)
-        elif instr.type in ("measure", "reset"):
+        elif instr.type in ("measure", "reset", "decode"):
+            # a decode names the ions whose outcomes it sends; the classical layer lights
+            # the wires from where each was measured to the decoder
             f["ions"] = list(instr.ions)
         if instr.gate:
             f["gate"] = instr.gate
         meta = instr.meta or {}
         for key in ("batch", "check", "kind", "round", "group", "phase", "trigger",
-                    "hops"):
+                    "hops", "window"):
             if key in meta:
                 f[key] = meta[key]
         if isinstance(meta.get("call"), int) and not isinstance(meta.get("call"), bool):
@@ -3125,11 +3127,25 @@ function fit(){
     const ED = globalThis.EDITOR || window.EDITOR;
     if(ED && ED.refit) ED.refit();
   } catch(e){ /* not an editable page */ }
-  VB={x:0,y:0,w:L.W,h:L.H};
+  // THE FRAME IS THE DEVICE, AND WHAT THE PAGE DRAWS AROUND IT THAT BELONGS IN IT.  The
+  // site's classical layer puts the decoder and the classical memory on a floor below the
+  // device; a fit that stopped at the device drew a `decode` sending its outcomes down
+  // wires that left the frame for nowhere.  A drawing that extends the stage publishes how
+  // far (`STAGE_EXTENT`, in model units); a page with none fits exactly as it always did.
+  let bx0=0, by0=0, bx1=L.W, by1=L.H;
+  try {
+    const ex = globalThis.STAGE_EXTENT && globalThis.STAGE_EXTENT();
+    if(ex && [ex.x0, ex.y0, ex.x1, ex.y1].every(Number.isFinite)){
+      bx0=Math.min(bx0, ex.x0); by0=Math.min(by0, ex.y0);
+      bx1=Math.max(bx1, ex.x1); by1=Math.max(by1, ex.y1);
+    }
+  } catch(e){ /* nothing extends the stage */ }
+  const bw=bx1-bx0, bh=by1-by0;
+  VB={x:bx0,y:by0,w:bw,h:bh};
   const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
-  if(r && r.width > 0 && r.height > 0 && Math.min(r.width/L.W, r.height/L.H) > FIT_MAX_K){
+  if(r && r.width > 0 && r.height > 0 && Math.min(r.width/bw, r.height/bh) > FIT_MAX_K){
     const w = r.width/FIT_MAX_K, h = r.height/FIT_MAX_K;
-    VB = {x:(L.W-w)/2, y:(L.H-h)/2, w:w, h:h};
+    VB = {x:bx0+(bw-w)/2, y:by0+(bh-h)/2, w:w, h:h};
   }
   applyVB();
 }
@@ -3179,7 +3195,13 @@ function zoomAt(clientX, clientY, deltaY){
   // the outer bound admits where `fit()` put the box: on a small device that is wider
   // than 2.5 x the device, and the first wheel notch must not snap the view in
   const k=clamp(0.12*L.W, VB.w*Math.pow(1.0018, deltaY), Math.max(2.5*L.W, VB.w));
-  const nh=k*(L.H/L.W);
+  // The box keeps ITS OWN shape when a fit framed more than the device (the classical
+  // floor below it), or its first wheel notch would crop that back out.  Otherwise the
+  // arithmetic is exactly what it always was: `m` stays under the cursor to the bit, which
+  // `tests/test_aim.py` holds it to, and a rewrite that was merely equal in exact
+  // arithmetic drifted by 3e-14.
+  const own = Math.abs(VB.h*L.W - VB.w*L.H) > 1e-9*Math.max(1, VB.w*L.H);
+  const nh = own ? VB.h*(k/Math.max(1e-9, VB.w)) : k*(L.H/L.W);
   // keep `m` exactly under the cursor: its offset from the origin scales with the box
   VB.x = m.x - (m.x - VB.x) * (k / VB.w);
   VB.y = m.y - (m.y - VB.y) * (nh / VB.h);
@@ -3654,7 +3676,7 @@ function makeList(scId, padId, winId, opt){
 
 // ---------- program rows ----------
 const TYPECOL = {gate:'x', cool:'highway', measure:'data', reset:'neutral',
-                 init:'neutral', barrier:'line'};
+                 init:'neutral', barrier:'line', decode:'line'};
 function opColour(f){
   if(f.type==='simd') return classColour[f.cls] || C.anc;
   return C[TYPECOL[f.type]] || C.neutral;

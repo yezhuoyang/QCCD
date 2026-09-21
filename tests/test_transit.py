@@ -86,6 +86,61 @@ def closest(row) -> tuple[float, tuple[str, str] | None]:
 # ------------------------------------------------------- moving into an occupied cell
 
 
+def test_two_ions_moving_together_keep_their_spacing():
+    """A chain in a moving well keeps its spacing along the direction it moves.
+
+    Two ions share N0 and walk N0 -> N1 -> N2 together, the way every ion of a trap does in
+    a rigid rotation.  The slot offset used to be SHED on the rail -- the fix for single
+    ions cutting corners -- which put both of them on the rail's centre line at the same
+    point: `centres_apart: 0`, measured by `tests/test_studio.py`'s census on a ring144
+    rotation with two ions in one trap.  The along-rail part of the offset is carried as an
+    arc shift now, so they are a pitch apart the whole way, on the rail.
+    """
+    nodes = line(3)
+    T = transit(nodes)
+    steps = [Step(before={}, pos={"a": "N0", "b": "N0"}, paths={}),       # the init
+             Step(before={"a": "N0", "b": "N0"}, pos={"a": "N2", "b": "N2"},
+                  paths={"a": ["N0", "N1", "N2"], "b": ["N0", "N1", "N2"]})]
+    rows = walk(T, steps, samples=40)
+    worst = min(closest(r)[0] for _, _, r in rows)
+    assert worst >= PITCH - 1e-9, f"two ions moving together drawn {worst:.4f} apart, pitch {PITCH}"
+    # b led the chain, so b is still in front when it arrives: the order is kept
+    assert T.slot_order(steps)[-1] == {"N2": ["a", "b"]}
+    # and on the rail: the line is y = 0, so nothing strays from it
+    assert max(abs(v[1]) for _, _, r in rows for v in r.values()) < 1e-12
+
+
+def test_the_detour_is_zero_at_the_frame_boundaries():
+    """Nothing moves at a frame boundary, even when the pair's pitches differ.
+
+    `a` leaves a TIGHT trap (pitch 0.1) for a WIDE one (pitch 0.5), past `b`.  The detour's
+    clearance is the wider pitch's, which is more than `a` and `b` stand apart -- so it used
+    to lift `a` at t = 0, where it was still resting, and the picture jumped at the seam:
+    1.08 px on `tcx72.cx`, whose 72-ion traps sit beside two-slot ones.  The clearance is
+    now capped by where the pair stand at both ends of the step.
+    """
+    nodes = line(2)
+    pitch = {"N0": 0.1, "N1": 0.5}
+
+    def slots(node, k):
+        return [(j - (k - 1) / 2) * pitch[node] for j in range(k)], pitch[node]
+
+    T = Transit(Geometry(pos=lambda nid: nodes.get(nid), axis=lambda nid: (1.0, 0.0),
+                         slot_offsets=slots, site=lambda nid: nid, bow=0.5))
+    steps = [Step(before={}, pos={"a": "N0", "b": "N0", "d": "N1"}, paths={}),
+             Step(before={"a": "N0", "b": "N0", "d": "N1"}, pos={"a": "N1", "b": "N0", "d": "N1"},
+                  paths={"a": ["N0", "N1"]})]
+    order = T.slot_order(steps)
+    end = T.place(steps[0], 1.0, {}, order[0])
+    start = T.place(steps[1], 0.0, order[0], order[1])
+    for ion in ("a", "b", "d"):
+        jump = math.dist((end[ion].x, end[ion].y), (start[ion].x, start[ion].y))
+        assert jump < 1e-12, f"{ion} jumps {jump:.4f} at the frame boundary"
+    # and the detour is still there in the middle, where `a` has to get past `b`
+    mid = T.place(steps[1], 0.25, order[0], order[1])
+    assert abs(mid["a"].y) > 0 or math.dist((mid["a"].x, mid["a"].y), (mid["b"].x, mid["b"].y)) >= 0.1 - 1e-9
+
+
 def test_an_ion_entering_an_occupied_trap_is_never_drawn_on_top_of_the_resident():
     """The commonest case on any lattice, and the one the Design canvas got wrong.
 

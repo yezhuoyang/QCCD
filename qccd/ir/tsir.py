@@ -48,6 +48,11 @@ INSTRUCTION_TYPES = (
     "reset",
     "cool",  # broadcast or per-ion sympathetic/Doppler cooling
     "barrier",  # explicit synchronization; costs nothing
+    # call the decoder on the outcomes of the named ions: their syndrome bits go down the
+    # wire from where they were measured, and the decoder's frame update goes on to the
+    # classical memory.  CLASSICAL -- it moves no ion and costs no machine time, because
+    # the decoder works alongside the ions; only something that reads its answer waits.
+    "decode",
 )
 
 
@@ -358,6 +363,9 @@ def validate_program(prog: TSIR) -> list[str]:
         seen.add(instr.id)
         if instr.type == "init" and not instr.placement:
             errors.append(f"{where}: init carries no placement")
+        if instr.type == "decode" and not instr.ions:
+            errors.append(f"{where}: decode names no ions -- it sends the outcomes of ions "
+                          f"measured before it")
         if instr.type == "simd":
             if instr.cls is None:
                 errors.append(f"{where}: simd carries no class (R4 needs one)")

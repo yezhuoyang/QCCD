@@ -355,6 +355,36 @@ class Program:
                                    meta=self._meta(meta)))
         return self
 
+    @_traced
+    def decode(self, ions: Sequence[str] | None = None, **meta) -> "Program":
+        """Call the decoder on the outcomes of `ions` -- by default, every ion measured
+        since the last `decode`, in the order they were last measured.
+
+        Classical: it moves no ion and costs no machine time (the decoder works alongside
+        the ions), and on the studio the wires from where those ions were measured to the
+        decoder light while it runs."""
+        if ions is None:
+            ions = self._undecoded()
+        ions = tuple(str(i) for i in ions)
+        if not ions:
+            raise ValueError("nothing to decode: no ion has been measured since the last "
+                             "decode")
+        self._prog.add(Instruction(type="decode", id=self._prog.next_id(), ions=ions,
+                                   meta=self._meta(meta)))
+        return self
+
+    def _undecoded(self) -> tuple[str, ...]:
+        """The ions measured since the last `decode`, in the order they were last measured."""
+        out: list[str] = []
+        for instr in reversed(self._prog.instructions):
+            if instr.type == "decode":
+                break
+            if instr.type == "measure":
+                for ion in reversed(instr.ions):
+                    if ion not in out:
+                        out.append(ion)
+        return tuple(reversed(out))
+
     # -- claims and output ---------------------------------------------------
 
     def claim(self, **metrics) -> "Program":

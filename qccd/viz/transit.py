@@ -267,6 +267,38 @@ class Transit:
         return (q[0], q[1], path[i], path[i + 1], local, i, len(path) - 1,
                 done, total - done)
 
+    def point_at_arc(self, path: Sequence[str], arc: float):
+        """The point at ARC `arc` along the path, continued along the rail's own tangent
+        beyond either end -- see the JS twin."""
+        segs, total = self._hops(path)
+        if len(path) < 2 or total <= 1e-9:
+            return self.point_on_path(path, 0.0)
+        if 0.0 <= arc <= total:
+            return self.point_on_path(path, arc / total)
+        end = arc > total
+        q = self.point_on_path(path, 1.0 if end else 0.0)
+        if q is None:
+            return q
+        tg = self.tangent_at(path, end)
+        over = arc - total if end else arc
+        return (q[0] + tg[0] * over, q[1] + tg[1] * over, q[2], q[3], q[4], q[5], q[6],
+                total if end else 0.0, 0.0 if end else total)
+
+    def tangent_at(self, path: Sequence[str], at_end: bool) -> tuple[float, float]:
+        """The unit direction of travel at the start or the end of a path."""
+        a, b = (path[-2], path[-1]) if at_end else (path[0], path[1])
+        p0 = self._edge_point(a, b, 0.98 if at_end else 0.0)
+        p1 = self._edge_point(a, b, 1.0 if at_end else 0.02)
+        if p0 is None or p1 is None:
+            P0, P1 = self._pos(a), self._pos(b)
+            if P0 is None or P1 is None:
+                return (1.0, 0.0)
+            dx, dy = P1[0] - P0[0], P1[1] - P0[1]
+        else:
+            dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        n = math.hypot(dx, dy)
+        return (dx / n, dy / n) if n > 1e-12 else (1.0, 0.0)
+
     # ------------------------------------------------------------------ slot order
 
     def slot_order(self, steps: Sequence[Step]) -> list[dict[str, list[str]]]:
@@ -284,7 +316,28 @@ class Transit:
                 keep = [i for i in ions if i in st.pos and self._site(st.pos[i]) == place]
                 if keep:
                     nxt[place] = keep
-            for ion, at_node in st.pos.items():
+            # a chain arrives in the order it travelled -- see the JS twin: arrivals from
+            # one place into one place go leader first, every other arrival in `pos` order
+            arrivals = []
+            first: dict[tuple, int] = {}
+            for k, (ion, at_node) in enumerate(st.pos.items()):
+                at = self._site(at_node)
+                if self._pos(at) is None or ion in nxt.get(at, ()):
+                    continue
+                walk = st.paths.get(ion)
+                s0 = walk[0] if walk else st.before.get(ion)
+                sp = self._site(s0) if s0 is not None else None
+                g = first.setdefault((at, sp), len(arrivals))
+                lead = 0.0
+                ls = cur.get(sp) if sp is not None else None
+                if ls and len(ls) > 1 and ion in ls:
+                    po, pf, axs = self._pos(at), self._pos(sp), self._axis(s0)
+                    if po is not None and pf is not None:
+                        lead = (ls.index(ion) - (len(ls) - 1) / 2) * (
+                            (po[0] - pf[0]) * axs[0] + (po[1] - pf[1]) * axs[1])
+                arrivals.append((g, -lead, k, ion, at_node))
+            arrivals.sort(key=lambda r: (r[0], r[1], r[2]))
+            for _g, _l, _k, ion, at_node in arrivals:
                 at = self._site(at_node)
                 n = self._pos(at)
                 if n is None:
@@ -448,16 +501,37 @@ class Transit:
             bx_, by_, pb, b_node, b_axis = slot_at(
                 dst[ion], dst_node[ion], occ_e[dst[ion]], ion)
             if walk and not rest:
-                q = self.point_on_path(walk, t)
-                if q is None or not math.isfinite(q[0]):
+                q0 = self.point_on_path(walk, t)
+                if q0 is None or not math.isfinite(q0[0]):
                     continue
-                # the slot offset belongs to the trap, not to the walk -- see the JS
+                # the slot offset belongs to the trap, not to the walk; its part ALONG the
+                # rail is carried as a shift in arc, so two ions in one well keep their
+                # spacing, and only the rest is ramped within the bars -- see the JS
+                tA, tB = self.tangent_at(walk, False), self.tangent_at(walk, True)
+                aA = ax_ * tA[0] + ay_ * tA[1]
+                aB = bx_ * tB[0] + by_ * tB[1]
+                tot = self._hops(walk)[1]
+                q = self.point_at_arc(walk, tot * t + aA + (aB - aA) * t) or q0
+                e0, e1 = self.point_at_arc(walk, aA), self.point_at_arc(walk, tot + aB)
+                qs, qe = self.point_on_path(walk, 0.0), self.point_on_path(walk, 1.0)
+                rAx = qs[0] + ax_ - e0[0] if (qs and e0) else ax_
+                rAy = qs[1] + ay_ - e0[1] if (qs and e0) else ay_
+                rBx = qe[0] + bx_ - e1[0] if (qe and e1) else bx_
+                rBy = qe[1] + by_ - e1[1] if (qe and e1) else by_
                 wa, wb = _slot_weights(q, t, self._ramp_at(a_axis, walk[1]),
                                        self._ramp_at(b_axis, walk[-2]))
-                base[ion] = dict(x=q[0] + ax_ * wa + bx_ * wb,
-                                 y=q[1] + ay_ * wa + by_ * wb, fly=True, q=q, u=t,
+                # the ends in exactly the arithmetic they always had -- see the JS twin
+                if t <= 0:
+                    x, y, q = q0[0] + ax_, q0[1] + ay_, q0
+                elif t >= 1:
+                    x, y, q = q0[0] + bx_, q0[1] + by_, q0
+                else:
+                    x, y = q[0] + rAx * wa + rBx * wb, q[1] + rAy * wa + rBy * wb
+                base[ion] = dict(x=x, y=y, fly=True, q=q, u=t,
                                  pa=pa, pb=pb, a=a_node, b=b_node,
                                  ax=a_axis, bx=b_axis)
+                if qs and qe:
+                    base[ion]["ends"] = ((qs[0] + ax_, qs[1] + ay_), (qe[0] + bx_, qe[1] + by_))
             else:
                 p0, p1 = self._pos(a_node), self._pos(b_node)
                 if p0 is None or p1 is None:
@@ -466,7 +540,8 @@ class Transit:
                 x0, y0 = p0[0] + ax_, p0[1] + ay_
                 x1, y1 = p1[0] + bx_, p1[1] + by_
                 base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
-                                 q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node)
+                                 q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node,
+                                 ends=((x0, y0), (x1, y1)))
 
         partners: dict[str, list[str]] = {}
         for a, b, _ in pas["pairs"]:
@@ -497,6 +572,11 @@ class Transit:
                         continue
                     # per pair, on the wider of the two traps -- see the JS twin
                     clear = clear_of(max(my_pitch, other["pa"], other["pb"]))
+                    # and never more than the pair is apart at either end of the step, so
+                    # the detour is zero at both frame boundaries -- see the JS twin
+                    if "ends" in me and "ends" in other:
+                        (m0, m1), (o0, o1) = me["ends"], other["ends"]
+                        clear = min(clear, math.dist(m0, o0), math.dist(m1, o1))
                     if clear <= 0:
                         continue
                     d = math.dist((me["x"], me["y"]), (other["x"], other["y"]))

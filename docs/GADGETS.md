@@ -467,7 +467,7 @@ in every branch) and names no outcome. Two rules make it more than a label:
 * **an outcome is not a result until its window is decoded.** A logical measurement of a
   surface code is a parity the decoder corrects, so a guard may not read one before that:
   the scheduler waits for the decode, and if the program never asked it refuses the
-  guarded line with the one it needs (``add `decode a` before this line``);
+  guarded line with the one it needs: add `decode a` before this line;
 * **every window is decoded before the program ends** -- G11 fails a program that
   measures something and never decodes it, naming each window.
 

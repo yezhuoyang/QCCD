@@ -43,6 +43,7 @@ MNEMONIC_BY_TYPE = {
     "reset": "RESET",
     "cool": "COOL",
     "barrier": "BARRIER",
+    "decode": "DECODE",
     "simd": "MOVE",
 }
 
@@ -477,6 +478,11 @@ def _detail(instr: Instruction, arch, mv: Movement, n_from_replay: int,
 
     if instr.type in ("measure", "reset"):
         return (f"x{len(instr.ions)} {_run(list(instr.ions))}", len(instr.ions),
+                tuple(Operand(ion=i) for i in instr.ions), note)
+
+    if instr.type == "decode":
+        # the outcomes it sends, and that it is classical: the width is the syndrome's
+        return (f"x{len(instr.ions)} {_run(list(instr.ions))}  -> decoder", len(instr.ions),
                 tuple(Operand(ion=i) for i in instr.ions), note)
 
     return (note or "sync", 0, (), None)

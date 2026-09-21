@@ -4583,6 +4583,7 @@ var HINTS = {
   'p:fill': { t: 'p.fill', d: 'Puts one ion on every site of a loop, d0 on its first site and so on: p.fill() for the only loop, p.fill("L0") to name it.' },
   'p:rotate': { t: 'p.rotate', d: 'Turns a closed loop: p.rotate(2) moves every ion on it two sites forward, p.rotate(-1) one site back. One instruction, every ion.' },
   'p:barrier': { t: 'p.barrier', d: 'A step in which nothing happens; a marker between phases of a programme.' },
+  'p:decode': { t: 'p.decode', d: 'Calls the decoder: p.decode() sends the outcomes of every ion measured since the last decode down the wires to the decoder, and its correction on to the classical memory. p.decode(["a0"]) names them. It moves no ion and takes no machine time -- the decoder works alongside the ions -- and the wires light while it runs.' },
   'tab:R': { t: 'Report', d: 'The verdict: every cost figure with its provenance, and each of the 27 hardware rules \u2014 passed, failed, or not checkable here.' },
   'follow': { t: 'Follow', d: 'Keep the executing instruction scrolled into view.', k: 'F' },
   'filter': { t: 'Filter', d: 'Show only the rows containing this text.', k: '/' },

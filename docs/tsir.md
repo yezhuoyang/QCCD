@@ -48,6 +48,7 @@ red failure that means nothing.
 | `measure` / `reset` | `ions` | |
 | `cool` | `broadcast` or `ions` | global by default: one op cools every ion |
 | `barrier` | — | explicit synchronization, costs nothing |
+| `decode` | `ions` | call the decoder on those ions' outcomes; classical, costs no machine time |
 
 ```jsonc
 { "type": "simd", "id": 1, "class": "rotate_cw", "mode": "inter",
@@ -62,6 +63,45 @@ red failure that means nothing.
 { "type": "gate", "id": 3, "gate": "CX", "mode": "intra",
   "pairs": [["d108", "a120"]], "sites": ["A120"] }
 ```
+
+## Calling the decoder
+
+`decode` is the instruction that says where a measurement's outcome goes: down the wire
+from the site where each named ion was measured to the decoder, and the decoder's frame
+update on to the classical memory. Before it existed a compiled error-correction programme
+measured its ancillas and stopped, and the studio's QEC-cycle layer drew a decoder that
+nothing in the programme ever used.
+
+```jsonc
+{ "type": "decode", "id": 5382, "ions": ["q144", "q149", ...],
+  "meta": { "kind": "decode", "window": 0, "reads": [565, 580, ...] } }
+```
+
+It is **classical**: it moves no ion, heats none, holds no rail and takes **no machine
+time** -- the replay records it at `t0 == t1` with zero cost, and no rule sees it, because
+the decoder works alongside the ions and only something that reads its answer would wait.
+Its latency is real and is budgeted by the QEC-cycle layer (`qccd.analysis.feedback`), not
+charged to the ions. That is what lets `qccd.compile.decode.insert_decodes` add one to every
+leaderboard programme without moving a single ranking: every board's replayed time is
+identical to the microsecond, under both cost models, with and without it.
+
+**Authoring:** `p.decode()` sends every ion measured since the last decode, in the order
+they were last measured; `p.decode(["a0"])` names them; with nothing measured it refuses
+("nothing to decode ..."). The browser's `engine.js` twin is pinned by the programme lane of
+`tests/test_engine_parity.py`.
+
+**The pass** (`qccd.compile.decode`) calls the decoder once per *window*: a window ends
+where an ion would be measured a second time, or where the programme ends. That is a whole
+syndrome round when every check has its own ancilla, and a slice of one when ancillas are
+re-used -- `ring144_24v a24` measures 144 checks with 24 ancillas, so it decodes six windows
+of 24. New decodes take ids above every existing one (`id_seq`), so the certificate and the
+circuit join, which key on instruction id, are untouched.
+
+**On the page**, a decode frame lights the wires from every site where one of its ions was
+measured, down to the bus, along it to the decoder and on to the memory, with the outcomes
+moving down them as the frame plays (`qccd/site/qec_cycle.js`; `tests/test_board_decode.py`
+measures it in pixels). The stage frames the classical floor too (`fit()` reads
+`STAGE_EXTENT`), so the outcomes are seen arriving rather than leaving the picture.
 
 ## The movement template
 

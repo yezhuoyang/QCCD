@@ -89,6 +89,11 @@ def resources_of(
     elif instr.type == "barrier":
         res.update({TRANSPORT, OPTICS})
         ions.add("*all")
+    elif instr.type == "decode":
+        # classical: it holds no rail and no beam.  Naming its ions orders it after the
+        # measurements it reads; it takes no time, so ordering the next use of those ions
+        # after it costs nothing
+        ions.update(instr.ions)
     return res, ions
 
 
