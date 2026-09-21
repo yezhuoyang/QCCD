@@ -86,8 +86,6 @@ const DIFF = (a, b) => `(() => { const A = window.__R[${JSON.stringify(a)}], B =
 const at = (f, ph) => `(() => { if (typeof stop === "function") { try { stop(); } catch (e) {} }
   frame = ${f}; phase = ${ph}; draw(); return [frame, phase]; })()`;
 const cam = `[VB.x, VB.y, VB.w, VB.h].map((v) => +v.toFixed(4)).join(",")`;
-const setCam = (s) => `(() => { const v = ${JSON.stringify(s)}.split(",").map(Number);
-  VB = { x: v[0], y: v[1], w: v[2], h: v[3] }; applyVB(); draw(); })()`;
 const STATE = `(() => ({
   box: document.getElementById("qcShowOn") ? document.getElementById("qcShowOn").checked : null,
   layer: document.querySelectorAll("#qcLayer *").length,
@@ -119,6 +117,9 @@ try {
   await sleep(100);
   out.shown = await evaluate(STATE);
   const shownCam = out.shown.camera;
+  // the camera exactly, not the rounded string: a view restored to four decimals is a
+  // sub-pixel shift, and anti-aliasing counts it as pixels the layer left behind
+  await evaluate(`window.__shownVB = Object.assign({}, VB)`);
   await evaluate(RASTER("on", false));
   await evaluate(RASTER("bare", true));
   const visible = await evaluate(DIFF("on", "bare"));
@@ -130,9 +131,8 @@ try {
   await evaluate(`(() => { const e = window.STAGE_EXTENT; window.STAGE_EXTENT = null; fit(); window.__deviceFit = ${cam};
     window.STAGE_EXTENT = e; })()`);
   const deviceFit = await evaluate(`window.__deviceFit`);
-  await evaluate(setCam(off.camera));
   // the picture, at the camera the layer was shown at
-  await evaluate(setCam(shownCam));
+  await evaluate(`(() => { VB = Object.assign({}, window.__shownVB); applyVB(); draw(); })()`);
   await evaluate(at(f, ph));
   await sleep(100);
   await evaluate(RASTER("off", false));
