@@ -3,4 +3,5 @@ title A logical magic state
 # night in a logical zone
 inject t
 se t 3
+decode t
 store t

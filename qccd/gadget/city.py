@@ -30,6 +30,14 @@ The classical half is scheduled in the same way, with its own two moves:
   `record` an outcome, `update` a frame -- reserved on that place's calendar like any other
   op, so two decoding jobs never overlap.
 
+**Decoding is an instruction.**  An op that measures leaves a *syndrome window* in its
+place's readout buffer and nothing more; the `decode` instruction is what sends it.  Each
+window's bits then leave the place that measured them, cross its syndrome wire, are decoded
+in one job, and the frame update crosses the frame wire into the archive.  A logical outcome
+is not a result until its window is decoded, so a guard that reads one waits for that -- and
+is refused if the program never asked -- and a window still waiting when the program ends is
+reported (G11).
+
 **Classically controlled execution.** A guarded instruction (`if m: s q0`) is scheduled
 exactly like an unguarded one -- same route, same place, same reserved duration, the worst
 case -- and what depends on the bit is only whether the pulses fire: a pre-compiled branch
@@ -140,7 +148,16 @@ class City:
         #: one has arrived, so no bundle ever queues in a channel shorter than itself (G4)
         self.road_free = 0.0
         self.next_use = alg.next_use()
+        self.next_quantum = alg.next_quantum()
         self.messages: list[list] = []
+        #: the syndrome windows, in the order they were measured: each waits in its place's
+        #: readout buffer until a `decode` instruction sends it to the decoder
+        self.windows: list[dict] = []
+        #: a resource block an S̄ gadget consumed -> the block it was consumed into, so that
+        #: `decode q` also takes the windows the |Ȳ⟩ block was measured in
+        self.merged_into: dict[str, str] = {}
+        #: a named outcome -> the window its measurement left
+        self.cvar_window: dict[str, int] = {}
         #: block -> (ax, az): the Pauli frame the archive holds for it
         self.pf: dict[str, tuple] = {}
         #: (instruction, flow) -> the corrected logical outcome, as a parity expression
@@ -314,19 +331,15 @@ class City:
         li = self.leaf[path]
         t_meas = row[1] + self.last_measure_us(li.master.name, opname)
         ports = {p.signal: p for p in li.master.ports if p.kind == "classical"}
+        window = None
         if "syndrome" in ports and self.decoder and self.archive:
-            t1, _ = self.message((path, "syn"), t_meas, bits=ports["syndrome"].bits,
-                                 signal="syndrome", ins=ins, grp=grp, event=row[0],
-                                 label=f"{ports['syndrome'].bits} check outcomes")
-            _, t_dec, dec = self.classical(self.decoder, "decode", t1, ins, grp)
-            t2, _ = self.message((self.decoder, "frame"), t_dec, bits=2, signal="frame",
-                                 ins=ins, grp=grp, label="Pauli-frame update", event=dec[0])
-            _, t_up, up = self.classical(self.archive, "update", t2, ins, grp)
-            for b in blocks:
-                self.frame_row(t_up, b, "window", f"window correction for {b}", ins=ins,
-                               event=up[0], why="the decoder's update for this round; the "
-                               "gadget's own report declares it as a frame, and the "
-                               "sign-off allows exactly that")
+            # the syndrome stays in the place's readout buffer until the program calls the
+            # decoder: a window is left, and `decode` is what sends it
+            window = len(self.windows)
+            self.windows.append({"id": window, "place": path, "op": opname, "event": row[0],
+                                 "instruction": ins, "measured_us": round(t_meas, 3),
+                                 "bits": ports["syndrome"].bits, "blocks": list(blocks),
+                                 "decoded_by": None})
         if outcome is not None and self.archive:
             flow, flip, cvar = outcome
             res = ports.get("outcome")
@@ -347,6 +360,8 @@ class City:
                 if cvar in self.guard_reads:
                     for block, _, _ in correct:
                         self.certain(block, f"the outcome {cvar}, which a guard reads,")
+                if window is not None:
+                    self.cvar_window[cvar] = window
                 self.cvars[(ins, cvar)] = cvar
                 self.cvar_value[cvar] = value
                 self.cvar_time[cvar] = t_rec
@@ -356,6 +371,65 @@ class City:
                                "gadget's flow report names, corrected by the block's frame")
             return value
         return None
+
+    def decode(self, ins: Instr, grp: str, t0: float) -> None:
+        """Call the decoder: send the windows the named blocks left, decode each, and write
+        the frame updates into the archive.
+
+        One window at a time, in the order they were measured: its bits leave the place that
+        measured them down that place's syndrome wire (no earlier than they exist, and no
+        earlier than the instruction), the decoder runs one job on them, and the frame it
+        decides goes down the frame wire to the archive."""
+        if not (self.decoder and self.archive):
+            raise CityError("this design has no decoder to call")
+        if ins.at and ins.at != self.decoder:
+            raise CityError(f"{ins.at} is not the decoder ({self.decoder})")
+        want = set(ins.blocks)
+        for y, q in self.merged_into.items():
+            if q in want:
+                want.add(y)
+        todo = [w for w in self.windows if w["decoded_by"] is None
+                and (not ins.blocks or want & set(w["blocks"]))]
+        if not todo:
+            said = " ".join(ins.blocks) or "the program"
+            raise CityError(f"nothing to decode: every syndrome {said} has left is decoded "
+                            f"already")
+        for w in todo:
+            t_send = max(t0, w["measured_us"])
+            t1, _ = self.message((w["place"], "syn"), t_send, bits=w["bits"],
+                                 signal="syndrome", ins=ins.index, grp=grp, event=w["event"],
+                                 label=f"{w['bits']} check outcomes from {w['op']}")
+            _, t_dec, dec = self.classical(self.decoder, "decode", t1, ins.index, grp)
+            t2, _ = self.message((self.decoder, "frame"), t_dec, bits=2, signal="frame",
+                                 ins=ins.index, grp=grp, label="Pauli-frame update",
+                                 event=dec[0])
+            _, t_up, up = self.classical(self.archive, "update", t2, ins.index, grp)
+            for b in w["blocks"]:
+                self.frame_row(t_up, b, "window", f"window correction for {b}",
+                               ins=ins.index, event=up[0],
+                               why=f"the decoder's update for the round {w['op']} measured; "
+                                   f"the gadget's own report declares it as a frame, and "
+                                   f"the sign-off allows exactly that")
+            w.update(decoded_by=ins.index, sent_us=round(t_send, 3), decode_event=dec[0],
+                     decoded_us=round(t_dec, 3), written_us=round(t_up, 3))
+
+    def decoded_by(self, name: str, what: str) -> float:
+        """When the outcome `name` became a result: recorded, and its window decoded.
+
+        A logical outcome of a surface code is a parity of measured ions that the decoder
+        corrects, so nothing may act on it before the decoder has.  If the program has not
+        called the decoder on it, that is refused here, with the line it needs."""
+        t = self.cvar_time[name]
+        w = self.cvar_window.get(name)
+        if w is None:
+            return t
+        win = self.windows[w]
+        if win["decoded_by"] is None:
+            blocks = " ".join(win["blocks"])
+            raise CityError(f"{what} reads {name}, whose syndrome has not been decoded: a "
+                            f"logical outcome is not a result until the decoder has corrected "
+                            f"it -- add `decode {blocks}` before this line")
+        return max(t, win["written_us"])
 
     # -- guards: a classically controlled op --------------------------------------------------
 
@@ -389,7 +463,7 @@ class City:
         if missing:
             raise CityError(f"the guard reads {missing[0]}, which nothing has measured yet")
         if ins.index not in self.resolved:
-            t_ready = max([self.cvar_time[n] for n in names] or [0.0])
+            t_ready = max([self.decoded_by(n, "the guard") for n in names] or [0.0])
             _, t_end, row = self.classical(self.archive, "resolve", t_ready, ins.index, grp)
             expr = ZERO if not const else ONE
             for n in names:
@@ -762,6 +836,7 @@ class City:
                                                    "in": (g8, farr, ftrip)},
                                    t0, ins.index, grp, guard=self.guard_row(ins, gd))
             y = f"{q}.Y{ins.index}"
+            self.merged_into[y] = q
             ybundle = Bundle(y, outs["out"][0], I, "out", outs["out"][1])
             self.block_info[y] = {"ions": outs["out"][0], "born": row[1], "born_at": I,
                                   "code": "surface_d3", "n": 9, "k": 1,
@@ -803,6 +878,9 @@ class City:
                              text=f"S̄ on {q}: Z̄ if the two outcomes disagree",
                              why="the gadget applies S̄ up to Z̄^(m_zz ⊕ m_x); the frame "
                                  "also conjugates through S̄ (X̄ → Ȳ)")
+        elif kind == "decode":
+            # no ion moves: the syndromes cross their wires and the decoder works
+            self.decode(ins, grp, t0)
         elif kind in ("x", "y", "z"):
             # A logical Pauli costs nothing on the ions: it is a line in the archive
             # (Pauli-frame tracking), and every later readout is corrected by it.
@@ -813,7 +891,8 @@ class City:
                 # a *conditional* Pauli: no ion is involved, so there is nothing to gate at
                 # a place -- the archive folds the Pauli into the frame in the branches
                 # where the condition holds, once the outcomes it reads are recorded
-                t0 = max(t0, max([self.cvar_time.get(n, 0.0) for n in ins.cond[1]] or [0.0]))
+                t0 = max(t0, max([self.decoded_by(n, "the guard") for n in ins.cond[1]]
+                                 or [0.0]))
             self.write_frame(q, t0, ins=ins.index, grp=grp, dax=dax, daz=daz,
                              guard=self.cond_json(ins),
                              text=f"{kind.upper()}̄ on {q}, in software"
@@ -826,11 +905,19 @@ class City:
 
         for q, bundle in produced.items():
             self.blocks[q] = bundle
-        # a block the very next instruction does not use rests in a zone
+        # a block the very next instruction does not use rests in a zone ("next" skipping
+        # any `decode`, which reads syndromes out of places and never touches a block)
         for q, bundle in produced.items():
             nxt = self.next_use.get((ins.index, q))
-            if nxt != ins.index + 1:
+            if nxt is None or nxt != self.next_quantum.get(ins.index):
                 self.park(bundle, t0, ins.index, grp)
+        if kind == "decode":
+            # THE DECODER WORKS ALONGSIDE THE IONS.  A decode holds up nothing that does not
+            # read what it decides: the next instruction starts when the ions are ready, and
+            # a guard that reads a decoded outcome waits for it by itself (`decoded_by`).
+            # Counting the decoder's microseconds into the barrier would make calling it
+            # move every ion after it, which is a cost the hardware does not pay.
+            return
         ends = ([e[2] for e in self.events[before:]] + [c[11] for c in self.carries]
                 + [m[7] for m in self.messages])
         self.t_now = max([self.t_now] + ends)
@@ -857,6 +944,10 @@ class City:
         for m in self.messages:
             if m[13] >= 0:
                 m[13] = remap[m[13]]
+        for w in self.windows:
+            w["event"] = remap[w["event"]]
+            if w.get("decode_event") is not None:
+                w["decode_event"] = remap[w["decode_event"]]
         for f in self.frames:
             f["event"] = remap[f["event"]]
             f["ax"], f["az"] = fix(f["ax"]), fix(f["az"])
@@ -903,6 +994,9 @@ class City:
             "wires": {w.path: [w.a[0], w.a[1], w.b[0], w.b[1], w.latency_us]
                       for w in self.wires.values()},
             "messages": self.messages,
+            # every syndrome window, decoded or not: `decoded_by` is the `decode`
+            # instruction that sent it, or None if the program never did (G11)
+            "windows": self.windows,
             "frames": self.frames,
             "block_frames": {b: {"ax": expr_json(ax), "az": expr_json(az)}
                              for b, (ax, az) in sorted(self.pf.items())},

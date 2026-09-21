@@ -16,5 +16,7 @@ zz   a b  -> m1
 xx   t a  -> m2
 read t Z  -> m3
 read a Z  -> m4
+decode              # the correction below reads m2
 if m2: z b
 read b X  -> r
+decode b

@@ -14,5 +14,7 @@ prep   q0 X
 inject t
 zz     q0 t -> m
 read   t X   -> k
+decode             # both corrections read an outcome: decode them first
 if m:  s q0        # the Clifford correction: the S-bar gadget runs only when m = 1
 if k:  z q0        # the Pauli correction: a line in the archive, no ions touched
+decode q0          # the S-bar gadget's own rounds

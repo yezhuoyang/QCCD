@@ -371,8 +371,9 @@ flows and fails the distance with a two-fault witness.
 
 A program over blocks (`algorithm.py`), one instruction per line: `prep q Z|X`,
 `se q 1|3`, `cx c t`, `zz a b -> m`, `xx a b -> m`, `read q Z|X -> m`, `inject t`,
-`store q`, `s q` (the S̄ gadget, §10) and `x|y|z q` (a Pauli kept in software, §10),
-each optionally `@ instance` and each optionally guarded by `if <condition>:` (§10). Its ideal circuit is the obvious one on one qubit per
+`store q`, `s q` (the S̄ gadget, §10), `x|y|z q` (a Pauli kept in software, §10) and
+`decode [q …]` (call the decoder, §10), each optionally `@ instance` and each but `decode`
+optionally guarded by `if <condition>:` (§10). Its ideal circuit is the obvious one on one qubit per
 block, with `inject` as a free input: the factory is verified by state vector, everything
 after it is Clifford.
 
@@ -406,7 +407,7 @@ decoders).
 | `teleport` | 3 | 88 | 566.8 ms | 66 ions, 176 records | 1 → X̄_b ⊕ m₂ | ≥ 3 (8,116) |
 | `magic_state` | 1 | 70 | 290.1 ms | 25 ions, 32 records | X̄_t → X̄_t, Z̄_t → Z̄_t (from the magic ion) | injection: 1 by design |
 | `magic_teleport` | 3 | 88 | 791.1 ms | 74 ions, 192 records | X̄_t → X̄_b ⊕ m₂; Z̄_t → Z̄_b ⊕ m₁ ⊕ m₃ ⊕ m₄ | injection: 1 by design |
-| `frames` | 2 | 79 | 110.2 ms | 34 ions, 42 records | m = 1, n = 1 (both flipped by a frame the archive holds) | ≥ 3 (1,290) |
+| `frames` | 2 | 79 | 110.3 ms | 34 ions, 42 records | m = 1, n = 1 (both flipped by a frame the archive holds) | ≥ 3 (1,290) |
 | `s_gate` | 1 | 88 | 524.6 ms | 74 ions, 185 records | m = 1 (two S̄ gadgets make a Z̄) | injection: 1 by design |
 | `cond_cx` | 3 | 88 | 140.5 ms | 2 branches | `m=0`: u = 0 · `m=1`: u ⊕ v = 0 | ≥ 3 per branch |
 | `teleport_fix` | 3 | 88 | 542.7 ms | 2 branches | r = 0 in **both** branches | ≥ 3 per branch |
@@ -454,16 +455,43 @@ wires them up: `place.syn → decoder.syn` (5 µs), `decoder.frame → archive.f
 `place.res → archive.in` (5 µs), `archive.ctl → place.ctl` (2 µs). The wires run down to a
 bus line below the town and along it, so they never pretend to be streets.
 
+**Decoding is an instruction.** A place that measures keeps its syndrome in its readout
+buffer; nothing reaches the decoder until the program says `decode`. Then each waiting
+*window* -- one op's syndrome, `bits` wide -- leaves the place that measured it down that
+place's `syn` wire, the decoder runs one `decode` job on it, and the frame update goes down
+`decoder.frame` into the archive. `decode q0 q1` takes the windows those blocks were
+measured in, including those of a |Ȳ⟩ block an S̄ gadget consumed into them; a bare
+`decode` takes every window still waiting. It cannot be guarded (every syndrome is decoded
+in every branch) and names no outcome. Two rules make it more than a label:
+
+* **an outcome is not a result until its window is decoded.** A logical measurement of a
+  surface code is a parity the decoder corrects, so a guard may not read one before that:
+  the scheduler waits for the decode, and if the program never asked it refuses the
+  guarded line with the one it needs (``add `decode a` before this line``);
+* **every window is decoded before the program ends** -- G11 fails a program that
+  measures something and never decodes it, naming each window.
+
+**The decoder works alongside the ions.** A `decode` holds up nothing that does not read
+what it decides: the next instruction starts when the ions are ready, exactly as if the
+line were not there (`tests/test_gadget_decode.py` checks that adding `decode` lines moves
+no ion by a microsecond), and only a guard waits for it. The shipped programs decode after
+the rounds that make their results and at the end, so a makespan grows by the last
+decode's few microseconds at most (`frames`: 110.2 → 110.3 ms). On the Design canvas a
+`decode` lights exactly the wires it uses, and the places at their ends, while it runs,
+and the playhead slows through it (§11).
+
 **Latencies**, each from a measured system (`logic/decode.py::LATENCY`): 5 µs from a
 measurement to a conditional branch on the control processor (AQT M-ACTION,
 arXiv:2101.11390); 1 µs for one lookup (an FPGA belief-propagation iteration is 24 ns, IBM
 real-time decoder arXiv:2510.21600, so a d = 3 table read is sub-µs); 0.1 µs to write the
 archive; 0.2 µs to read it back; 2 µs for a guard to reach the place that waits for it.
 The **reaction time** — last measurement to decoded result, the quantity Walking Cat
-(arXiv:2604.19481) budgets a syndrome round for — is 6.1 µs here, against milliseconds per
-place op, so the classical half costs these schedules nothing. A message leaves when its
-bits exist (the op's *last measurement*, read from the replayed instruction times), not
-when the op ends.
+(arXiv:2604.19481) budgets a syndrome round for — is 6.1 µs here when the program decodes
+straight after the round, against milliseconds per place op, so the classical half costs
+these schedules nothing. That is the least it can be: a program that decodes later has
+chosen to wait, and the decode's inspector shows the wait per window. A message leaves no
+earlier than its bits exist (the op's *last measurement*, read from the replayed
+instruction times); a syndrome then waits in its place until a `decode` sends it.
 
 **The decoder is verified, not asserted.** `logic/decode.py::lookup_table` builds its
 function from the syndrome-extraction gadget's own fault experiment (§9.2): group every
@@ -544,10 +572,14 @@ statement about a non-Clifford state, and it is checked on the state itself
 T-ness of the resource comes from the factory's own state-vector check (§9.2).
 
 **The new checks.** G10: every message crosses a wire the design has, takes that wire's
-latency, leaves no earlier than the op that measured its bits began, and is used by
-something that runs after it arrives; no frame or outcome names a measurement that has not
-happened. G11: no decoding job waits past the next syndrome's arrival (the backlog
-problem), and no classically controlled op starts before its guard has reached it.
+latency, leaves no earlier than the op that measured its bits began (and, unless it is a
+syndrome a `decode` sent from the readout buffer, no later than that op's end), and is used
+by something that runs after it arrives; no frame or outcome names a measurement that has
+not happened. G11: every syndrome window is decoded, by a `decode` whose message carries it
+from the place that measured it; no decoding job waits past the next syndrome's arrival
+(the backlog problem); no classically controlled op starts before its guard has reached
+it; and no guard, nor any guarded frame write, reads an outcome before the decoder has
+corrected it.
 
 **Where the loop shows up outside this section.** The same numbers are the site's, from
 one table (`qccd/analysis/feedback.py`: `LINK`, `DECODERS`, `cycle_report`, and the `cycle`
@@ -608,6 +640,17 @@ slate. Change the palette in `theme.py` and both tools move together.
   clicking a line opens the smallest level holding everything it touches. The inspector
   shows the selected instance (ports, ops with status badges and notes), channel, port,
   instruction, or ion — and **follows an ion** across the whole program.
+- **Decode.** While a `decode` instruction runs, the dashed wires it uses are lit -- the
+  syndrome wire from each place that measured, and the frame wire from the decoder to the
+  memory -- with the dashes marching the way the bits go, a packet per burst saying how
+  many bits and windows it carries, the places at the ends outlined, and every other wire
+  stepped back. The stage badge names the instruction and how far into it the playhead is.
+  A decode is a few microseconds of a program hundreds of milliseconds long, so playing
+  stops at it and slows through it (it takes 2.5 s on screen, and the badge says how many
+  times slower that is); clicking it in the Program pane or on the timeline puts the
+  playhead where its syndromes are half-way down their wires. Its inspector lists the
+  windows: which op measured them, where, how many bits, how long each waited in its buffer.
+  Colours come from the `wire` entry of `categories.py` (`lit`, `glow`).
 - **Descend.** Double-click an instance, pick it in the hierarchy tree, or use the
   breadcrumb; `Esc` goes up. A leaf level is the ion-by-ion view: its device, its ions by
   role, the instruction running (`visit.X1 · instruction 30/35 · cool`), with the op's TSIR

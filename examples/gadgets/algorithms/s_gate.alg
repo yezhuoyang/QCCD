@@ -8,4 +8,6 @@ prep q0 X
 s    q0
 se   q0 1
 s    q0
+decode q0      # both S gadgets' rounds, their |Y> blocks' included
 read q0 X -> m
+decode q0

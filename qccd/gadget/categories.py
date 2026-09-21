@@ -105,6 +105,9 @@ CATEGORIES: dict[str, dict] = {
     "wire": {
         "title": "Classical Data Bus", "place": "Wire", "shape": "wire", "glyph": "",
         "stroke": "#065f46", "fill": "#ecfdf5",
+        # a wire CARRYING bits right now: lit, with its glow, while a `decode` instruction
+        # sends syndromes down it -- and the places at its ends outlined in the same colour
+        "lit": "#b45309", "glow": "#fcd34d",
         "job": "Classical messages: syndromes to the decoder, frame updates to the archive, "
                "guards back to the places. Drawn dashed and dark -- these are bits with a "
                "latency, not ions on a conveyor.",

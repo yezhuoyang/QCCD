@@ -186,6 +186,68 @@
     if (!ms) return [];
     return ms.filter((m) => m[6] <= t && t <= m[7]);
   }
+
+  // THE DECODER IS CALLED BY AN INSTRUCTION.  A place that measures keeps its syndrome in
+  // its readout buffer; `decode` is what sends it -- down the wire from that place to the
+  // decoder, and the frame the decoder decides down its wire to the classical memory.  While
+  // a `decode` runs, exactly those wires are lit, with the places at their ends, and every
+  // other wire steps back.
+  //
+  // And the playhead SLOWS through it.  The whole exchange is a few microseconds of a
+  // program measured in hundreds of milliseconds, so at any rate that shows ions moving it
+  // is over inside one frame: a highlight that is honest about time would never be seen.
+  // `DECODE_WALL_S` is how long one `decode` takes on screen; the clock says it is slowed.
+  const DECODE_WALL_S = 2.5;
+  const DECODES = [];
+  for (const ins of M.gir.program.instructions) {
+    if (ins.kind !== "decode") continue;
+    const ms = MSGS.filter((m) => m[10] === ins.id);
+    if (!ms.length) continue;
+    const sp = M.insSpan[ins.id] || [Infinity, -Infinity];
+    const d = {
+      id: ins.id, text: ins.text,
+      t0: Math.min(sp[0], ...ms.map((m) => m[6])), t1: Math.max(sp[1], ...ms.map((m) => m[7])),
+      nets: new Set(ms.map((m) => m[1])),
+      // the places at either end of a lit wire, and which of them are SENDING a syndrome
+      places: new Set(ms.flatMap((m) => [m[2], m[4]])),
+      senders: new Set(ms.filter((m) => m[9] === "syndrome").map((m) => m[2])),
+      // which way the bits go on each wire, from the first message on it
+      from: {},
+      windows: (M.gir.windows || []).filter((w) => w.decoded_by === ins.id),
+      bits: ms.filter((m) => m[9] === "syndrome").reduce((a, m) => a + (+m[8] || 0), 0),
+      // where to put the playhead to see it: the first syndromes half-way down their wires
+      show: 0,
+    };
+    for (const m of ms) if (!(m[1] in d.from)) d.from[m[1]] = m[2];
+    const first = ms.filter((m) => m[9] === "syndrome").sort((a, b) => a[6] - b[6])[0] || ms[0];
+    d.show = first[6] + 0.5 * (first[7] - first[6]);
+    DECODES.push(d);
+  }
+  DECODES.sort((a, b) => a.t0 - b.t0);
+  const DECODE_OF = {};
+  for (const d of DECODES) DECODE_OF[d.id] = d;
+  // what is lit at time t: the union over the `decode` instructions running then
+  function litAt(t) {
+    const on = DECODES.filter((d) => d.t0 <= t && t <= d.t1);
+    if (!on.length) return null;
+    const lit = { list: on, nets: new Set(), places: new Set(), senders: new Set(), from: {},
+                  sent: {} };
+    for (const d of on) {
+      for (const n of d.nets) lit.nets.add(n);
+      for (const p of d.places) lit.places.add(p);
+      for (const p of d.senders) lit.senders.add(p);
+      Object.assign(lit.from, d.from);
+      for (const w of d.windows) lit.sent[w.place] = (lit.sent[w.place] || 0) + (+w.bits || 0);
+    }
+    return lit;
+  }
+  // the next `decode` still to finish after t, for the playhead
+  function nextDecode(t) {
+    for (const d of DECODES) if (d.t1 > t + 1e-9) return d;
+    return null;
+  }
+  const WIRE_LIT = (CATS.wire && CATS.wire.lit) || "#b45309";
+  const WIRE_GLOW = (CATS.wire && CATS.wire.glow) || "#fcd34d";
   function archiveAt(t) {
     // the last write per (block, kind), and every outcome, up to t
     const frames = {}, outcomes = [];
@@ -346,6 +408,9 @@
   const S = {
     path: "", t: 0, playing: false, rate: 10000, sel: null, follow: null,
     showIons: true, dirty: true, lastProg: -1,
+    // the `decode` instructions running now (see DECODES), and how much the playhead is
+    // being slowed through them
+    lit: null, slowed: 0,
     cam: { s: 1, x: 0, y: 0 }, tl: { t0: 0, t1: Math.max(1, M.makespan) },
   };
   const sims = {};
@@ -486,6 +551,7 @@
     ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, w, h);
     hits.length = 0;
+    S.lit = litAt(S.t);
     const node = M.node(S.path);
     if (node.leaf) drawLeafLevel(ctx, w, h);
     else drawCompositeLevel(ctx, w, h);
@@ -582,6 +648,18 @@
       } else {
         outline = new Path2D(shapeD(sty.shape, r[0], r[1], rw, rh));
       }
+      // a place at the end of a lit wire glows: the one sending its syndrome, the decoder
+      // working on it, the memory taking the frame
+      const lit = S.lit && S.lit.places.has(cpath);
+      if (lit) {
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = WIRE_GLOW;
+        ctx.lineWidth = depth === 0 ? 9 : 5;
+        ctx.stroke(outline);
+        ctx.restore();
+      }
       ctx.fill(outline);
       ctx.stroke(outline);
       ctx.setLineDash([]);
@@ -595,6 +673,20 @@
         if (guardOf(busy)) ctx.setLineDash([7, 4]);
         ctx.stroke(outline);
         ctx.setLineDash([]);
+      }
+      if (lit) {
+        ctx.strokeStyle = WIRE_LIT;
+        ctx.lineWidth = depth === 0 ? 2.2 : 1.4;
+        ctx.stroke(outline);
+        if (depth === 0 && S.lit.senders.has(cpath)) {
+          const bits = S.lit.sent[cpath] || 0;
+          labels.push(() => {
+            ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+            const text = `sends ${bits} bits`;
+            const tw = ctx.measureText(text).width;
+            haloText(ctx, text, (r[0] + r[2]) / 2 - tw / 2, r[3] + 27, WIRE_LIT);
+          });
+        }
       }
       ctx.globalAlpha = 1;
       if (depth === 0) hits.push([r[0], r[1], r[2], r[3], "inst", { path: cpath }]);
@@ -746,16 +838,44 @@
   }
 
   // A classical wire: dashed and dark, with a square packet per message crossing it now.
+  // While a `decode` sends bits down it, it is LIT: a glow under it, the dashes in the lit
+  // colour and marching the way the bits go, the packets bigger and saying how many bits
+  // they carry.  The wires that decode does not use step back while it runs.
   function drawWire(ctx, path, ch, pts, ox, oy, depth) {
     const style = CATS.wire || { stroke: "#065f46" };
     const net = path + "/" + ch.name;
+    const lit = !!(S.lit && S.lit.nets.has(net));
+    const quiet = !!(S.lit && !lit);
+    const base = depth === 0 ? Math.max(1, Math.min(2.2, S.cam.s * 0.14)) : 0.8;
+    const dash = [Math.max(3, S.cam.s * 0.5), Math.max(2, S.cam.s * 0.35)];
+    const trace = () => {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(X(ox + p[0]), Y(oy + p[1])) : ctx.moveTo(X(ox + p[0]), Y(oy + p[1]))));
+    };
     ctx.save();
-    ctx.strokeStyle = style.stroke;
-    ctx.globalAlpha = depth === 0 ? 0.75 : 0.5;
-    ctx.lineWidth = depth === 0 ? Math.max(1, Math.min(2.2, S.cam.s * 0.14)) : 0.8;
-    ctx.setLineDash([Math.max(3, S.cam.s * 0.5), Math.max(2, S.cam.s * 0.35)]);
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(X(ox + p[0]), Y(oy + p[1])) : ctx.moveTo(X(ox + p[0]), Y(oy + p[1]))));
+    if (lit) {
+      ctx.strokeStyle = WIRE_GLOW;
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = base * 5 + 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      trace();
+      ctx.stroke();
+    }
+    ctx.strokeStyle = lit ? WIRE_LIT : style.stroke;
+    ctx.globalAlpha = lit ? 1 : quiet ? 0.28 : depth === 0 ? 0.75 : 0.5;
+    ctx.lineWidth = lit ? base * 2 + 0.6 : base;
+    ctx.setLineDash(dash);
+    if (lit) {
+      // the dashes march from the sending end: six dash periods over one `decode`, by the
+      // clock rather than the wall, so a paused frame and a screenshot agree
+      const d = S.lit.list[0];
+      const f = (S.t - d.t0) / Math.max(1e-9, d.t1 - d.t0);
+      const period = dash[0] + dash[1];
+      const fromA = S.lit.from[net] === ch.a.split(".")[0];
+      ctx.lineDashOffset = (fromA ? -1 : 1) * f * period * 6;
+    }
+    trace();
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
@@ -773,7 +893,15 @@
       lengths.push(d); total += d;
     }
     const forward = ch.a.split(".")[0] === (M.gir.wires[net] ? M.gir.wires[net][0] : "");
+    // two windows a place sends at once cross its wire as one burst: drawn as one packet
+    // carrying both, so the label says what is really on the wire
+    const bursts = new Map();
     for (const msg of live) {
+      const key = `${msg[2]}|${msg[6]}|${msg[7]}`;
+      const b = bursts.get(key);
+      if (b) { b.n++; b.bits += +msg[8] || 0; } else bursts.set(key, { msg, n: 1, bits: +msg[8] || 0 });
+    }
+    for (const { msg, n: count, bits } of bursts.values()) {
       const span = Math.max(1e-6, msg[7] - msg[6]);
       let f = (S.t - msg[6]) / span;
       const fromA = msg[2] === ch.a.split(".")[0];
@@ -783,9 +911,18 @@
       const p0 = pts[k], p1 = pts[k + 1];
       const u = lengths[k] > 0 ? Math.min(1, d / lengths[k]) : 0;
       const x = X(ox + p0[0] + (p1[0] - p0[0]) * u), y = Y(oy + p0[1] + (p1[1] - p0[1]) * u);
-      const r = Math.max(2, Math.min(5, S.cam.s * 0.3));
-      ctx.fillStyle = style.stroke;
+      const r = Math.max(2, Math.min(5, S.cam.s * 0.3)) * (lit ? 1.6 : 1);
+      if (lit) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x - r - 1.5, y - r * 0.7 - 1.5, 2 * r + 3, 1.4 * r + 3);
+      }
+      ctx.fillStyle = lit ? WIRE_LIT : style.stroke;
       ctx.fillRect(x - r, y - r * 0.7, 2 * r, 1.4 * r);       // a packet, not an ion
+      if (lit && depth === 0 && S.cam.s > 2.5) {
+        ctx.font = "600 10px ui-monospace, monospace";
+        haloText(ctx, `${bits} bit${bits === 1 ? "" : "s"}` + (count > 1 ? ` · ${count} windows` : ""),
+                 x + r + 4, y - r - 2, WIRE_LIT);
+      }
       hits.push([x - r - 2, y - r - 2, x + r + 2, y + r + 2, "msg", { msg, net, ch }]);
     }
   }
@@ -1173,9 +1310,12 @@
       if (lane < 0) { lane = lanes.length; lanes.push(0); }
       lanes[lane] = sp[1];
       if (lane >= Math.floor((TL.progH - 4) / (laneH + 1))) return;
-      const x = tx(sp[0]), x1 = Math.max(x + 1.5, tx(sp[1]));
       const ins = M.gir.program.instructions[i];
-      ctx.fillStyle = S.hoverIns === i ? COLOR.accent : kindColor(ins.kind);
+      // a `decode` is microseconds long: it gets a mark wide enough to see and to click
+      const x = tx(sp[0]), x1 = Math.max(x + (ins.kind === "decode" ? 4 : 1.5), tx(sp[1]));
+      ctx.fillStyle = S.hoverIns === i ? COLOR.accent
+        : ins.kind === "decode" && S.lit && S.lit.list.some((d) => d.id === i) ? WIRE_LIT
+        : kindColor(ins.kind);
       ctx.fillRect(x, y0 + 2 + lane * (laneH + 1), x1 - x, laneH);
       insHits.push([x, y0 + lane * (laneH + 1), x1, y0 + 2 + (lane + 1) * (laneH + 1), i]);
     });
@@ -1223,7 +1363,7 @@
 
   function kindColor(kind) {
     const cat = { prep: "prep", se: "se", cx: "operation", zz: "surgery", xx: "surgery", read: "readout",
-                  inject: "injection", store: "zone" }[kind];
+                  inject: "injection", store: "zone", decode: "decoder" }[kind];
     if (cat && CATS[cat]) return CATS[cat].stroke;
     return { ppm: COLOR.accent, tcnot_batch: COLOR.teal, transversal: COLOR.violet, pauli: COLOR.ink,
              magic: "#b42318" }[kind] || COLOR.muted;
@@ -1465,7 +1605,8 @@
       if (ids.length) {
         div.onclick = () => {
           const sp = M.insSpan[ids[0]];
-          if (sp) { seek(sp[0]); focusInstruction(ids[0]); }
+          const dec = DECODE_OF[ids[0]];
+          if (sp) { seek(dec ? dec.show : sp[0]); focusInstruction(ids[0]); }
         };
         div.onmouseenter = () => { S.hoverIns = ids[0]; S.tlDirty = true; };
         div.onmouseleave = () => { S.hoverIns = null; S.tlDirty = true; };
@@ -1703,6 +1844,24 @@
       `holds. The sign-off checks every branch of it separately.</div>`;
     if (M.refused[id] !== undefined) h += `<div class="note" style="color:var(--bad)">not realised: ${escapeHtml(M.refused[id])}</div>`;
     if (sp) h += `<div class="note">runs ${fmtTime(sp[0])} → ${fmtTime(sp[1])} (${fmtTime(sp[1] - sp[0])}) on ${M.insLeaves[id].size} leaf gadgets</div>`;
+    const dec = DECODE_OF[id];
+    if (dec) {
+      h += `<div class="note">a call to the decoder: each place below sends the syndrome it ` +
+        `kept in its readout buffer down its wire to the decoder, the decoder runs one job ` +
+        `per window, and the Pauli-frame update goes down the frame wire to the classical ` +
+        `memory. ${dec.bits} syndrome bits in all; the wires are lit while it runs, and ` +
+        `playing slows through it (${(dec.t1 - dec.t0).toFixed(1)} µs, shown over ` +
+        `${DECODE_WALL_S} s). <a href="#" data-seek="${dec.show}">show it</a></div>`;
+      h += `<table><tr><th>measured by</th><th>at</th><th class="num">bits</th><th class="num">waited</th><th class="num">decoded</th></tr>`;
+      for (const w of dec.windows) {
+        h += `<tr><td>${escapeHtml(w.op)} · ${escapeHtml(w.blocks.join(" "))}</td>` +
+          `<td><a href="#" data-sel="${escapeHtml(w.place)}">${escapeHtml(w.place)}</a></td>` +
+          `<td class="num">${w.bits}</td>` +
+          `<td class="num" title="measured at ${fmtTime(w.measured_us)}, sent at ${fmtTime(w.sent_us)}">${fmtTime(w.sent_us - w.measured_us)}</td>` +
+          `<td class="num"><a href="#" data-seek="${w.sent_us}">${fmtTime(w.decoded_us)}</a></td></tr>`;
+      }
+      h += `</table>`;
+    }
     const evs = M.gir.events.filter((e) => e[6] === id).slice(0, 40);
     h += `<table><tr><th>when</th><th>op</th><th>where</th></tr>`;
     for (const e of evs) h += `<tr><td class="num"><a href="#" data-seek="${e[1]}">${fmtTime(e[1])}</a></td><td>${escapeHtml(e[4])}</td><td><a href="#" data-sel="${escapeHtml(e[3])}">${escapeHtml(e[3])}</a></td></tr>`;
@@ -1728,6 +1887,7 @@
                       [P("z", "#b42318"), "measured or reset"],
                       [P("active", "#f6c34a"), "the site in play"],
                       [P("accent", "#e4572e"), "the ion you follow"]];
+    if (DECODES.length) swatches.push([WIRE_LIT, "bits sent by a decode"]);
     $("legend").innerHTML = (cats.length ? `<div class="lg-cats">${cats.map((c) => `<span>${shapeSvg(c, 12)}${escapeHtml(CATS[c].title)}</span>`).join("")}</div>` : "") +
       `<div class="lg-roles">` + swatches.map(([c, v]) => `<span><i style="background:${c}"></i>${v}</span>`).join("") + `</div>`;
   }
@@ -1983,9 +2143,13 @@
     }
     if (y < TL.ruler) tdrag = { kind: "pan", x, t0: S.tl.t0, t1: S.tl.t1 };
     else {
-      for (const hh of TL.insHits || []) if (x >= hh[0] - 1 && x <= hh[2] + 1 && y >= hh[1] && y <= hh[3] + 1) { focusInstruction(hh[4]); }
+      let hitIns = null;
+      for (const hh of TL.insHits || []) if (x >= hh[0] - 1 && x <= hh[2] + 1 && y >= hh[1] && y <= hh[3] + 1) { focusInstruction(hh[4]); hitIns = hh[4]; }
       tdrag = { kind: "scrub" };
-      seek(tToX(x, r.width, true));
+      // a `decode` is too short to land in by pointing: clicking it puts the playhead
+      // where its syndromes are half-way down their wires
+      if (hitIns !== null && DECODE_OF[hitIns]) { seek(DECODE_OF[hitIns].show); tdrag = null; }
+      else seek(tToX(x, r.width, true));
     }
   });
   tl.addEventListener("pointermove", (ev) => {
@@ -2085,14 +2249,42 @@
   });
   window.addEventListener("resize", () => { DPR = window.devicePixelRatio || 1; fit(); });
 
+  // what the stage says while a `decode` runs: which one, how far in, and -- because the
+  // playhead is slowed through it -- by how much, so nobody reads the pace as the machine's
+  function decodeBadge() {
+    const el = $("hudDecode");
+    if (!el) return;
+    const lit = litAt(S.t);
+    el.hidden = !lit;
+    if (!lit) return;
+    const d = lit.list[0];
+    const into = Math.max(0, S.t - d.t0), len = d.t1 - d.t0;
+    const slowed = S.playing && S.slowed > 1
+      ? ` · shown ${S.slowed >= 100 ? Math.round(S.slowed).toLocaleString() : S.slowed.toFixed(0)}× slower` : "";
+    el.style.color = WIRE_LIT;
+    el.style.borderColor = WIRE_GLOW;
+    el.textContent = `${d.text.trim().split("#")[0].trim()} · ${d.windows.length} syndrome ` +
+      `window${d.windows.length === 1 ? "" : "s"} to the decoder · ${into.toFixed(1)} of ` +
+      `${len.toFixed(1)} µs${slowed}`;
+  }
+
   // ------------------------------------------------------------------ the loop
 
-  let last = performance.now(), lastPanel = 0, lastHash = 0;
+  let last = performance.now(), lastPanel = 0, lastHash = 0, panelDue = false;
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (S.playing) {
-      S.t += dt * S.rate;
+      let step = dt * S.rate;
+      S.slowed = 0;
+      const d = nextDecode(S.t);
+      if (d && S.t < d.t0 && S.t + step >= d.t0) {
+        step = d.t0 - S.t;                    // stop at a `decode` rather than jump it
+      } else if (d && S.t >= d.t0) {
+        const slow = (d.t1 - d.t0) / DECODE_WALL_S;
+        if (slow < S.rate) { step = Math.min(step, dt * slow); S.slowed = S.rate / slow; }
+      }
+      S.t += step;
       if (S.t >= M.makespan) { S.t = M.makespan; S.playing = false; $("bPlay").textContent = "▶"; }
       if (S.t > S.tl.t1) { const span = S.tl.t1 - S.tl.t0; S.tl.t0 = S.t - span * 0.1; S.tl.t1 = S.tl.t0 + span; }
       S.dirty = true;
@@ -2104,11 +2296,20 @@
       drawStage();
       drawTimeline();
       $("clock").innerHTML = `${fmtTime(S.t)} <small>/ ${fmtTime(M.makespan)}</small>`;
+      decodeBadge();
       // the level and instance inspectors quote live counts, so they follow the clock too
-      if (now - lastPanel > 180) { updateProgram(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector(); lastPanel = now; }
+      if (now - lastPanel > 180) { updateProgram(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector(); lastPanel = now; panelDue = false; }
+      else panelDue = true;
       if (now - lastHash > 1000) { writeHash(); lastHash = now; }
       S.dirty = false; S.tlDirty = false;
     } else if (S.tlDirty) { drawTimeline(); S.tlDirty = false; }
+    // A PANEL REFRESH THE THROTTLE SKIPPED IS OWED, NOT DROPPED.  Two seeks inside 180 ms --
+    // clicking a `decode` just after anything else -- used to leave the Program pane showing
+    // the first moment until something else moved the clock.
+    if (panelDue && !S.dirty && now - lastPanel > 180) {
+      updateProgram(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector();
+      lastPanel = now; panelDue = false;
+    }
     requestAnimationFrame(frame);
   }
 
@@ -2132,6 +2333,7 @@
   // the handle a headless test drives
   window.GADGETS = { M, S, D, go, seek, select, fit, leafIons, drawStage, drawTimeline,
     WIRES, MSGS, FRAMES, CONTROL, messagesOn, archiveAt, frameText, guardOf, guardText,
+    DECODES, litAt, nextDecode, DECODE_WALL_S, WIRE_LIT, WIRE_GLOW,
     portXY, portCache, COLOR, FAMILY, ROLE, CATS, styleOf, shapeD, shapeSvg, roundRect, haloText, clip, sizeCanvas, stage, sctx,
     X, Y, fmtTime, escapeHtml, renderLibrary, renderInspector, renderTree, crumbs,
     redraw: () => { S.dirty = true; },

@@ -31,9 +31,11 @@ PLACE_RULES = {
     "G9": "every op the schedule uses is verified: hardware rules and logic (a classical "
           "op is modeled: its latency is a stated number, and its function is checked)",
     "G10": "every classical bit is used after it exists: a message leaves when its op has "
-           "measured, arrives one wire latency later, and nothing reads it before that",
-    "G11": "the decoder keeps up: no decoding job waits for another to finish past the "
-           "next syndrome, and every frame is written before anything depends on it",
+           "measured (a syndrome may wait in its place until the program calls the "
+           "decoder), arrives one wire latency later, and nothing reads it before that",
+    "G11": "the decoder is called and keeps up: every syndrome the machine measures is "
+           "decoded, no decoding job waits for another past the next syndrome, and nothing "
+           "reads an outcome or a frame before the decoder has written it",
 }
 
 #: the place families that hold no ions: their ops are modeled, not replayed
@@ -285,6 +287,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     # -- G10: the classical half's causality --------------------------------------------------
     messages = gir.get("messages") or []
     wires = gir.get("wires") or {}
+    kind_of = {i["id"]: i["kind"] for i in gir["program"]["instructions"]}
     by_id = {e[0]: e for e in events}
     ends = {e[0]: e[2] for e in events}
     g10 = []
@@ -310,7 +313,11 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             if src is not None and t0 < src[1] - 1e-6:
                 g10.append(f"message {mid} leaves {sl} at {t0:.1f} us, before the op that "
                            f"measured those bits started ({src[1]:.1f} us)")
-            if src is not None and t0 > src[2] + 1e-6 and masters[sl].family not in CLASSICAL_FAMILIES:
+            # a syndrome is the one message that may leave after its op: it waits in the
+            # place's readout buffer until a `decode` instruction sends it
+            held = m[9] == "syndrome" and kind_of.get(m[10]) == "decode"
+            if (src is not None and t0 > src[2] + 1e-6 and not held
+                    and masters[sl].family not in CLASSICAL_FAMILIES):
                 g10.append(f"message {mid} leaves {sl} at {t0:.1f} us, after its op ended "
                            f"({src[2]:.1f} us)")
             got = [e for e in by_leaf_class.get(dl, []) if e[1] >= t1 - 1e-6 and e[6] == m[10]]
@@ -393,6 +400,51 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             g11.append(f"{e[3]} {e[4]} starts at {e[1]:.1f} us but the guard only arrives "
                        f"at {min(m[7] for m in wanted):.1f} us")
     out["metrics"]["guarded_ops"] = guarded
+
+    # every syndrome is decoded -- the program has to ask -- and nothing reads an outcome
+    # before its syndrome has been: a logical outcome is a parity the decoder corrects
+    windows = gir.get("windows") or []
+    written = {}
+    for w in windows:
+        if w.get("decoded_by") is None:
+            g11.append(f"the syndrome {w['op']} measured at {w['place']} for "
+                       f"{' '.join(w['blocks']) or 'its block'} (instruction "
+                       f"{w['instruction']}) is never decoded: the program must call "
+                       f"`decode` on it")
+            continue
+        sent = [m for m in messages if m[9] == "syndrome" and m[2] == w["place"]
+                and m[10] == w["decoded_by"] and len(m) > 13 and m[13] == w["event"]]
+        if not sent:
+            g11.append(f"instruction {w['decoded_by']} decodes the syndrome {w['op']} left at "
+                       f"{w['place']}, but no syndrome message carries it to the decoder")
+        elif min(m[6] for m in sent) < w["measured_us"] - 1e-6:
+            g11.append(f"the syndrome {w['op']} left at {w['place']} is sent at "
+                       f"{min(m[6] for m in sent):.1f} us, before it was measured "
+                       f"({w['measured_us']:.1f} us)")
+        written[w["event"]] = float(w.get("written_us", 0.0))
+    ready_of = {}
+    for o in gir.get("outcomes") or []:
+        if o.get("cvar"):
+            ready_of[o["cvar"]] = o.get("event")
+    for e in events:
+        g = e[10] if len(e) > 10 else None
+        if not g:
+            continue
+        for name in (g.get("cond") or {}).get("cvars") or []:
+            ev = ready_of.get(name)
+            if ev in written and written[ev] > float(g.get("ready_us", 0.0)) + 1e-6:
+                g11.append(f"{e[3]} {e[4]} is guarded by ({g.get('guard')}), which reads "
+                           f"{name} before the decoder has corrected it "
+                           f"({written[ev]:.1f} us)")
+    for f in gir.get("frames") or []:
+        for name in (f.get("guard") or {}).get("cvars") or []:
+            ev = ready_of.get(name)
+            if ev in written and written[ev] > float(f["t"]) + 1e-6:
+                g11.append(f"frame row {f['id']} is written when {name} holds, at "
+                           f"{f['t']:.1f} us, before the decoder has corrected {name} "
+                           f"({written[ev]:.1f} us)")
+    out["metrics"]["syndrome_windows"] = len(windows)
+    out["metrics"]["undecoded_windows"] = sum(1 for w in windows if w.get("decoded_by") is None)
     verdict("G11", g11, skipped=None if (decoder or guarded)
             else "this design has no decoder and no conditional op")
     return out
