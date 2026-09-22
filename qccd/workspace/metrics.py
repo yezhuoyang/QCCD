@@ -25,10 +25,20 @@ METRIC_UNITS = {"T_jones": "ms", "T_transport": "ms", "instructions": "count", "
                 "total_cost": "model cost units", "total_steps": "machine steps"}
 
 
+def _fastest_model(table: str):
+    """The cost model at each primitive's fastest operating point.  A cost model with
+    operating-point policies takes `objective`; one without them has a single point per
+    primitive, which is then the fastest."""
+    import inspect
+    if "objective" in inspect.signature(corrected_model).parameters:
+        return corrected_model(table, objective="fastest")
+    return corrected_model(table)
+
+
 def replay_time(arch: Architecture, prog: TSIR, table: str) -> tuple:
     """Modelled execution time of `prog` on `arch` under one physics table (objective
     `fastest`, as the boards use): `(ms, ReplayResult)`."""
-    model = corrected_model(table, objective="fastest")
+    model = _fastest_model(table)
     res = replay(prog, arch, model, check_rules=False, keep_cycles=False)
     return res.total_us / 1000.0, res
 
