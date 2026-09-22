@@ -153,6 +153,55 @@ SCENARIOS: dict[str, dict] = {
                    "pos": {"a": "N1", "b": "N0", "c": "N0"},
                    "paths": {"a": ["N0", "N1"]}}],
     },
+    # a bar TILTED against the rail its ion leaves by (`24_cylinder12_own_a72`: 22 degrees
+    # against 9), where the side a pair goes round is read off the geometry, not handed out
+    "tilted_bar_leave": {
+        "nodes": {"N0": [0.0, 0.0], "N1": [1.0, 0.15]},
+        "axis": {"N0": [0.9271838546, 0.3746065934], "N1": [0.9890, 0.1478]},
+        "span": 0.44, "across": 0.1, "rail": 0.02,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "N0"}},
+                  {"before": {"a": "N0", "b": "N0"}, "pos": {"a": "N1", "b": "N0"},
+                   "paths": {"a": ["N0", "N1"]}}],
+    },
+    # a crowded trap, where one swap is drawn at the same size as in a roomy one
+    "crowded_swap": {
+        "nodes": _line(2), "span": 0.44, "across": 0.1, "rail": 0.02, "pitch": 0.05,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "N0", "c": "N0", "d": "N0"}},
+                  {"before": {"a": "N0", "b": "N0", "c": "N0", "d": "N0"},
+                   "pos": {"a": "N1", "b": "N0", "c": "N0", "d": "N0"},
+                   "paths": {"a": ["N0", "N1"]}}],
+    },
+    # two ions leaving one trap by opposite ends, each past the other: nobody stays, and
+    # they still pass (`cross`, found on `torus4x4`)
+    "cross_leave": {
+        "nodes": {"L": [-1.0, 0.0], "N0": [0.0, 0.0], "R": [1.0, 0.0]},
+        "span": 0.44, "across": 0.1, "rail": 0.02,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "N0"}},
+                  {"before": {"a": "N0", "b": "N0"}, "pos": {"a": "R", "b": "L"},
+                   "paths": {"a": ["N0", "R"], "b": ["N0", "L"]}}],
+    },
+    # in through the MIDDLE of a bar, from a rail across it, past a resident on the way
+    # to its slot (`cyclone_base`'s vertical rails)
+    "middle_entry": {
+        "nodes": {"N0": [0.0, 0.0], "U": [0.0, -1.0]},
+        "axis": {"N0": [1.0, 0.0], "U": [0.0, 1.0]},
+        "span": 0.44, "across": 0.1, "rail": 0.02, "pitch": 0.2,
+        "steps": [{"before": {}, "pos": {"b": "N0", "c": "N0"}},
+                  {"before": {}, "pos": {"a": "U", "b": "N0", "c": "N0"}},
+                  {"before": {"a": "U", "b": "N0", "c": "N0"},
+                   "pos": {"a": "N0", "b": "N0", "c": "N0"}, "paths": {"a": ["U", "N0"]}}],
+    },
+    # round a corner into a bar, past its resident, in an order the programme sets: the
+    # pair steps aside across the bar it MEETS in, not across the arriving ion's own
+    "corner_arrive": {
+        "nodes": {"V": [-1.0, 0.0], "N0": [0.0, 0.0]},
+        "axis": {"V": [0.0, 1.0], "N0": [1.0, 0.0]},
+        "span": 0.44, "across": 0.1, "rail": 0.02, "pitch": 0.22,
+        "steps": [{"before": {}, "pos": {"a": "N0", "b": "V"}},
+                  {"before": {"a": "N0", "b": "V"}, "pos": {"a": "N0", "b": "N0"},
+                   "paths": {"b": ["V", "N0"]}}],
+        "orders": [{"N0": ["a"], "V": ["b"]}, {"N0": ["a", "b"]}],
+    },
     "exchange_in_a_bar": {
         "nodes": _line(2), "span": 0.44, "across": 0.1, "rail": 0.02,
         "steps": [{"before": {"a": "N0", "b": "N1"}, "pos": {"a": "N1", "b": "N0"},
@@ -175,8 +224,10 @@ def _python(scn: dict) -> dict:
     axis = {k: tuple(v) for k, v in (scn.get("axis") or {}).items()}
     site = scn.get("site") or {}
 
+    pitch = scn.get("pitch", PITCH)
+
     def slots(_node, k):
-        return [(j - (k - 1) / 2) * PITCH for j in range(k)], PITCH
+        return [(j - (k - 1) / 2) * pitch for j in range(k)], pitch
 
     T = Transit(Geometry(
         pos=lambda nid: nodes.get(nid),
@@ -190,7 +241,7 @@ def _python(scn: dict) -> dict:
     ))
     steps = [Step(before=s["before"], pos=s["pos"], paths=s.get("paths") or {})
              for s in scn["steps"]]
-    order = T.slot_order(steps)
+    order = scn.get("orders") or T.slot_order(steps)
     frames = []
     for k, st in enumerate(steps):
         for s in range(SAMPLES + 1):
@@ -212,7 +263,7 @@ def _python(scn: dict) -> dict:
 def _javascript(scn: dict, tmp_path: Path) -> dict:
     path = tmp_path / "scenario.json"
     path.write_text(json.dumps({**scn, "samples": SAMPLES,
-                                "pitch": PITCH, "bow": scn.get("bow", BOW)}),
+                                "pitch": scn.get("pitch", PITCH), "bow": scn.get("bow", BOW)}),
                     encoding="utf-8")
     out = subprocess.run([NODE, str(HARNESS), str(path)],
                          capture_output=True, text=True, timeout=120)

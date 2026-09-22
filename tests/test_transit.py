@@ -247,6 +247,147 @@ def test_two_trap_mates_getting_past_each_other_both_step_aside_inside_the_bar()
             assert abs(p.y) + (p.room if p.y else 0.0) <= half + 1e-12, (t, p)
 
 
+def _bar_transit(nodes, pitch, *, axis=None, half=0.1):
+    """A geometry with real bars: `half` across, 0.44 along, a thin rail between."""
+    def slots(_node, k):
+        return [(j - (k - 1) / 2) * pitch for j in range(k)], pitch
+
+    return Transit(Geometry(pos=lambda nid: nodes.get(nid),
+                            axis=axis or (lambda nid: (1.0, 0.0)),
+                            slot_offsets=slots, site=lambda nid: nid, span=lambda nid: 0.44,
+                            across=lambda nid: half, rail=0.02, bow=0.5))
+
+
+def _crossing(T, steps, a, b, axis):
+    """The pair at the sample where they are most nearly side by side along `axis`, as
+    each one's offset ACROSS it from the trap centre at the origin."""
+    order = T.slot_order(steps)
+    ux, uy = axis
+    best = None
+    for k in range(1, 160):
+        r = T.place(steps[1], k / 160, order[0], order[1])
+        pa, pb = r[a], r[b]
+        gap = abs((pa.x - pb.x) * ux + (pa.y - pb.y) * uy)
+        if best is None or gap < best[0]:
+            best = (gap, k / 160, -pa.x * uy + pa.y * ux, -pb.x * uy + pb.y * ux, pa, pb)
+    return best
+
+
+def test_a_pair_steps_aside_to_the_sides_it_actually_passes_on():
+    """The side is read off the geometry, not handed out.
+
+    On `24_cylinder12_own_a72` a trap's bar is tilted 22 degrees while the rail its ion
+    leaves by runs at 9, so the leaver already passes its trap-mate on one side -- and
+    `passes`' alternation sent it to the other.  The two lifts then carried the pair ACROSS
+    each other diagonally: 482 passes on that board drawn 0.025 g apart at radius 0.011.
+    Here the same shape: a bar tilted 22 degrees, the rail out of it at 8.5.
+    """
+    c, s = math.cos(math.radians(22)), math.sin(math.radians(22))
+    nodes = {"N0": (0.0, 0.0), "N1": (1.0, 0.15)}
+    T = _bar_transit(nodes, 0.22, axis=lambda nid: (c, s) if nid == "N0" else (0.99, 0.148))
+    steps = [Step(before={}, pos={"a": "N0", "b": "N0"}, paths={}),
+             Step(before={"a": "N0", "b": "N0"}, pos={"a": "N1", "b": "N0"},
+                  paths={"a": ["N0", "N1"]})]
+    gap, t, oa, ob, pa, pb = _crossing(T, steps, "a", "b", (c, s))
+    # side by side, one each side of the bar's centre line, and further apart across it
+    # than either stepped: they went round each other, not through
+    assert oa * ob < 0, f"at t={t:.3f} both on one side of the bar: {oa:.4f}, {ob:.4f}"
+    assert abs(oa - ob) >= 0.09, f"only {abs(oa - ob):.4f} apart across the bar at the crossing"
+    assert math.dist((pa.x, pa.y), (pb.x, pb.y)) >= pa.room + pb.room
+
+
+def test_a_swap_in_a_crowded_trap_steps_aside_as_far_as_in_a_roomy_one():
+    """One size for every swap.
+
+    The leg that restores `clear` is proportional to the slot pitch, so in a crowded trap
+    the pair stepped aside by a fraction of what a roomy one did: 0.029 g in
+    `stationary_chain`'s long trap against 0.050 g everywhere else.  Now both reach half
+    the bar's half-thickness at the crossing.
+    """
+    got = {}
+    for pitch in (0.3, 0.05):
+        T = _bar_transit(line(2), pitch)
+        steps = [Step(before={}, pos={"a": "N0", "b": "N0"}, paths={}),
+                 Step(before={"a": "N0", "b": "N0"}, pos={"a": "N1", "b": "N0"},
+                      paths={"a": ["N0", "N1"]})]
+        _, _, oa, ob, _, _ = _crossing(T, steps, "a", "b", (1.0, 0.0))
+        got[pitch] = (oa, ob)
+        assert oa * ob < 0, (pitch, oa, ob)
+    for pitch, (oa, ob) in got.items():
+        for o in (oa, ob):
+            assert abs(abs(o) - 0.05) <= 0.005, f"pitch {pitch}: stepped aside {abs(o):.4f}, not 0.05"
+
+
+def test_two_ions_leaving_one_trap_by_opposite_ends_go_round_each_other():
+    """`cross`: nobody stays behind, and they still pass.
+
+    `leave` asked whether a trap-mate STAYS on the side an ion exits towards, so two ions
+    leaving one trap by opposite ends -- each past the other -- were no pair at all and
+    were drawn through each other (`torus4x4`, trap `T3_3h`).
+    """
+    nodes = {"L": (-1.0, 0.0), "N0": (0.0, 0.0), "R": (1.0, 0.0)}
+    T = _bar_transit(nodes, 0.22)
+    steps = [Step(before={}, pos={"a": "N0", "b": "N0"}, paths={}),
+             Step(before={"a": "N0", "b": "N0"}, pos={"a": "R", "b": "L"},
+                  paths={"a": ["N0", "R"], "b": ["N0", "L"]})]
+    order = T.slot_order(steps)
+    assert order[0] == {"N0": ["a", "b"]}       # a on the left, leaving right: past b
+    kinds = {(p[0], p[1]): p[2] for p in T.passes(steps[1], order[0], order[1])["pairs"]}
+    assert kinds.get(("a", "b")) == "cross", kinds
+    _, t, oa, ob, pa, pb = _crossing(T, steps, "a", "b", (1.0, 0.0))
+    assert oa * ob < 0 and min(abs(oa), abs(ob)) >= 0.04, (t, oa, ob)
+
+
+def test_an_ion_entering_through_the_middle_of_a_bar_goes_round_the_resident_it_passes():
+    """In through the middle, and past a resident on the way to its slot.
+
+    `cyclone_base`'s vertical rails meet its horizontal bars in the middle, where there is
+    no side along the bar to read -- so `arrive` found nobody to pass, and the resident
+    sliding over to make room was drawn straight under the ion coming in.
+    """
+    nodes = {"N0": (0.0, 0.0), "U": (0.0, -1.0)}
+    T = _bar_transit(nodes, 0.2, axis=lambda nid: (1.0, 0.0) if nid == "N0" else (0.0, 1.0))
+    steps = [Step(before={}, pos={"b": "N0", "c": "N0"}, paths={}),
+             Step(before={}, pos={"a": "U", "b": "N0", "c": "N0"}, paths={}),
+             Step(before={"a": "U", "b": "N0", "c": "N0"}, pos={"a": "N0", "b": "N0", "c": "N0"},
+                  paths={"a": ["U", "N0"]})]
+    order = T.slot_order(steps)
+    assert order[2] == {"N0": ["b", "c", "a"]} or order[2]["N0"][-1] == "a", order
+    kinds = {(p[0], p[1]): p[2] for p in T.passes(steps[2], order[1], order[2])["pairs"]}
+    assert kinds.get(("a", "c")) == "arrive", kinds
+    _, t, oa, oc, pa, pc = _crossing(T, steps[1:], "a", "c", (1.0, 0.0))
+    assert oa * oc < 0, (t, oa, oc)
+
+
+def test_an_ion_arriving_round_a_corner_steps_aside_across_the_trap_it_arrives_in():
+    """Across the bar they MEET in.
+
+    The lift was taken across the ion's SOURCE trap, so an ion arriving from a vertical
+    trap into a horizontal one stepped sideways along the horizontal bar -- which is not
+    stepping aside at all.  The pair's node is the one they meet in, and both use it.
+    """
+    # V is a VERTICAL trap standing just left of the horizontal N0; the rail between them
+    # runs along N0's axis, so the pass happens inside N0 and across V's axis is along N0's
+    nodes = {"V": (-1.0, 0.0), "N0": (0.0, 0.0)}
+    T = _bar_transit(nodes, 0.22, axis=lambda nid: (1.0, 0.0) if nid == "N0" else (0.0, 1.0))
+    # `a` rests in N0; `b` comes in from V, at the left end, and settles to the RIGHT of
+    # it -- the order a programme may set, which the slot walker would not choose itself
+    step = Step(before={"a": "N0", "b": "V"}, pos={"a": "N0", "b": "N0"},
+                paths={"b": ["V", "N0"]})
+    o0, o1 = {"N0": ["a"], "V": ["b"]}, {"N0": ["a", "b"]}
+    pairs = T.passes(step, o0, o1)["pairs"]
+    assert [p[2:] for p in pairs] == [("arrive", "N0")], pairs
+    best = None
+    for k in range(1, 160):
+        r = T.place(step, k / 160, o0, o1)
+        gap = abs(r["a"].x - r["b"].x)
+        if best is None or gap < best[0]:
+            best = (gap, r["a"].y, r["b"].y)
+    _, ya, yb = best
+    # side by side along the horizontal bar, and apart ACROSS it
+    assert ya * yb < 0 and abs(ya - yb) >= 0.08, best
+
+
 def test_a_swap_ends_with_the_two_ions_in_each_other_s_places():
     """Identities, not just positions: after the exchange `a` is where `b` was."""
     nodes = line(2)

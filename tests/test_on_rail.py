@@ -189,17 +189,15 @@ def test_the_probe_would_catch_a_detour_that_ignores_the_geometry(tmp_path, name
     # put back the detour as it was: applied to every flier, peaking at mid-flight, at
     # the full `swap_bow` amplitude, with no reference to what is or is not in the way,
     # and free to leave the metal (`lim`, the confinement, is what stops it now)
-    # (the detour is `need` per pair, then `lift` per ion: every flier is given one, of
-    # the mid-flight bow, and the cap is taken off)
+    # (the detour is `need` per pair, then `lift` per ion, sized off the bar: every flier
+    # is given one, of the mid-flight bow, which no bar bounds)
     gate = "for (io3 in need) if (base[io3].fly) order.push(io3);"
-    amp = "h3 = need[ion3]"
-    cap = "if (lim3 > 0 && h3 > 0.5 * lim3) h3 = 0.5 * lim3;"
-    for needle in (gate, amp, cap):
+    amp = "var h3 = lim3 > 0 ? 0.5 * lim3 * need[ion3] : raw[ion3];"
+    for needle in (gate, amp):
         assert needle in html, f"the detour moved; update this mutation ({needle!r})"
     broken = tmp_path / f"{name}_broken.html"
     broken.write_text(html.replace(gate, "for (io3 in base) if (base[io3].fly) order.push(io3);")
-                          .replace(amp, "h3 = bow0 * 4 * t * (1 - t)")
-                          .replace(cap, ";"),
+                          .replace(amp, "var h3 = bow0 * 4 * t * (1 - t);"),
                       encoding="utf-8")
     r = _probe(broken, frames=40)
     assert r["worst_on_open_rail_g"] > OPEN_RAIL_TOL, (
