@@ -1,0 +1,112 @@
+{
+ "$defs": {
+  "Operation": {
+   "additionalProperties": true,
+   "description": "One semantic operation; `type` names an entry of `operations.OPERATIONS` (or\n`protect` / `unprotect`).  Its parameters are listed by `qccd_read_reference(section=\n\"operations\")`, generated from the same registry.",
+   "properties": {
+    "type": {
+     "title": "Type",
+     "type": "string"
+    }
+   },
+   "required": [
+    "type"
+   ],
+   "title": "Operation",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/change_set_request.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "branch": {
+   "default": "main",
+   "title": "Branch",
+   "type": "string"
+  },
+  "expected_revision": {
+   "minimum": 0,
+   "title": "Expected Revision",
+   "type": "integer"
+  },
+  "mode": {
+   "default": "preview",
+   "enum": [
+    "preview",
+    "apply"
+   ],
+   "title": "Mode",
+   "type": "string"
+  },
+  "operations": {
+   "items": {
+    "$ref": "#/$defs/Operation"
+   },
+   "maxItems": 5000,
+   "minItems": 1,
+   "title": "Operations",
+   "type": "array"
+  },
+  "origin_prompt_id": {
+   "anyOf": [
+    {
+     "maxLength": 64,
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Origin Prompt Id"
+  },
+  "rebase": {
+   "default": "never",
+   "enum": [
+    "never",
+    "if_disjoint"
+   ],
+   "title": "Rebase",
+   "type": "string"
+  },
+  "request_id": {
+   "maxLength": 128,
+   "minLength": 1,
+   "title": "Request Id",
+   "type": "string"
+  },
+  "summary": {
+   "anyOf": [
+    {
+     "maxLength": 500,
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Summary"
+  },
+  "workspace_id": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Workspace Id"
+  }
+ },
+ "required": [
+  "expected_revision",
+  "request_id",
+  "operations"
+ ],
+ "title": "ChangeSetRequest",
+ "type": "object"
+}

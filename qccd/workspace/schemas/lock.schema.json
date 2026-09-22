@@ -1,0 +1,72 @@
+{
+ "$id": "https://qccd.academy/schemas/workspace/v1/lock.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "evaluator": {
+   "additionalProperties": true,
+   "title": "Evaluator",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.lock",
+   "title": "Kind",
+   "type": "string"
+  },
+  "mode": {
+   "enum": [
+    "task",
+    "exploratory"
+   ],
+   "title": "Mode",
+   "type": "string"
+  },
+  "numerical_policy": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Numerical Policy"
+  },
+  "schemas": {
+   "additionalProperties": {
+    "type": "string"
+   },
+   "title": "Schemas",
+   "type": "object"
+  },
+  "task": {
+   "additionalProperties": {
+    "type": "string"
+   },
+   "title": "Task",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  },
+  "workspace_id": {
+   "title": "Workspace Id",
+   "type": "string"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "workspace_id",
+  "mode",
+  "task",
+  "evaluator",
+  "schemas",
+  "numerical_policy"
+ ],
+ "title": "LockFile",
+ "type": "object"
+}

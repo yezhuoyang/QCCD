@@ -1,0 +1,82 @@
+{
+ "$defs": {
+  "FileRef": {
+   "additionalProperties": false,
+   "properties": {
+    "bytes": {
+     "minimum": 0,
+     "title": "Bytes",
+     "type": "integer"
+    },
+    "digest": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "title": "Digest",
+     "type": "string"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path",
+    "digest",
+    "bytes"
+   ],
+   "title": "FileRef",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/bundle_manifest.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "files": {
+   "additionalProperties": {
+    "$ref": "#/$defs/FileRef"
+   },
+   "propertyNames": {
+    "enum": [
+     "device",
+     "program",
+     "certified_program",
+     "certificate",
+     "presentation"
+    ]
+   },
+   "title": "Files",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.submission_bundle",
+   "title": "Kind",
+   "type": "string"
+  },
+  "provenance": {
+   "additionalProperties": true,
+   "title": "Provenance",
+   "type": "object"
+  },
+  "task": {
+   "additionalProperties": {
+    "type": "string"
+   },
+   "title": "Task",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "task",
+  "files",
+  "provenance"
+ ],
+ "title": "BundleManifest",
+ "type": "object"
+}

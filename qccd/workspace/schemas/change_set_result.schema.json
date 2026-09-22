@@ -1,0 +1,143 @@
+{
+ "$defs": {
+  "Diff": {
+   "additionalProperties": false,
+   "properties": {
+    "added": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Added",
+     "type": "array"
+    },
+    "changed": {
+     "additionalProperties": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "title": "Changed",
+     "type": "object"
+    },
+    "final_program_changed": {
+     "title": "Final Program Changed",
+     "type": "boolean"
+    },
+    "program_changed": {
+     "title": "Program Changed",
+     "type": "boolean"
+    },
+    "removed": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Removed",
+     "type": "array"
+    },
+    "summary": {
+     "title": "Summary",
+     "type": "string"
+    }
+   },
+   "required": [
+    "added",
+    "removed",
+    "changed",
+    "program_changed",
+    "final_program_changed",
+    "summary"
+   ],
+   "title": "Diff",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/change_set_result.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "attribution": {
+   "additionalProperties": true,
+   "title": "Attribution",
+   "type": "object"
+  },
+  "base_revision": {
+   "title": "Base Revision",
+   "type": "integer"
+  },
+  "branch": {
+   "title": "Branch",
+   "type": "string"
+  },
+  "change_set_id": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Change Set Id"
+  },
+  "contract": {
+   "const": "1",
+   "title": "Contract",
+   "type": "string"
+  },
+  "diagnostics": {
+   "additionalProperties": true,
+   "title": "Diagnostics",
+   "type": "object"
+  },
+  "diff": {
+   "$ref": "#/$defs/Diff"
+  },
+  "revision": {
+   "anyOf": [
+    {
+     "type": "integer"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Revision"
+  },
+  "status": {
+   "enum": [
+    "previewed",
+    "committed",
+    "noop"
+   ],
+   "title": "Status",
+   "type": "string"
+  },
+  "touched": {
+   "items": {
+    "type": "string"
+   },
+   "title": "Touched",
+   "type": "array"
+  },
+  "workspace_id": {
+   "title": "Workspace Id",
+   "type": "string"
+  }
+ },
+ "required": [
+  "contract",
+  "status",
+  "workspace_id",
+  "branch",
+  "base_revision",
+  "revision",
+  "change_set_id",
+  "diff",
+  "touched",
+  "diagnostics",
+  "attribution"
+ ],
+ "title": "ChangeSetResult",
+ "type": "object"
+}

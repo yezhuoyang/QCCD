@@ -1,0 +1,331 @@
+{
+ "$defs": {
+  "Diagnostic": {
+   "additionalProperties": false,
+   "properties": {
+    "entities": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Entities"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "instructions": {
+     "anyOf": [
+      {
+       "items": {},
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Instructions"
+    },
+    "message": {
+     "title": "Message",
+     "type": "string"
+    },
+    "pointer": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Pointer"
+    },
+    "reference": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Reference"
+    },
+    "rule": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Rule"
+    },
+    "severity": {
+     "title": "Severity",
+     "type": "string"
+    },
+    "stage": {
+     "title": "Stage",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "severity",
+    "stage",
+    "message"
+   ],
+   "title": "Diagnostic",
+   "type": "object"
+  },
+  "Metric": {
+   "additionalProperties": false,
+   "properties": {
+    "better": {
+     "anyOf": [
+      {
+       "enum": [
+        "low",
+        "high"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Better"
+    },
+    "ranked": {
+     "title": "Ranked",
+     "type": "boolean"
+    },
+    "unit": {
+     "title": "Unit",
+     "type": "string"
+    },
+    "value": {
+     "title": "Value"
+    }
+   },
+   "required": [
+    "value",
+    "unit",
+    "better",
+    "ranked"
+   ],
+   "title": "Metric",
+   "type": "object"
+  },
+  "Stage": {
+   "additionalProperties": false,
+   "properties": {
+    "coverage": {
+     "title": "Coverage",
+     "type": "string"
+    },
+    "detail": {
+     "additionalProperties": true,
+     "title": "Detail",
+     "type": "object"
+    },
+    "diagnostics": {
+     "items": {
+      "$ref": "#/$defs/Diagnostic"
+     },
+     "title": "Diagnostics",
+     "type": "array"
+    },
+    "id": {
+     "enum": [
+      "bundle",
+      "device",
+      "physics_lock",
+      "program",
+      "rules",
+      "correspondence",
+      "certificate_binding",
+      "lean_certificate",
+      "semantics",
+      "metrics"
+     ],
+     "title": "Id",
+     "type": "string"
+    },
+    "required": {
+     "title": "Required",
+     "type": "boolean"
+    },
+    "status": {
+     "enum": [
+      "passed",
+      "failed",
+      "partial",
+      "skipped",
+      "unsupported",
+      "timeout",
+      "cancelled",
+      "internal_error"
+     ],
+     "title": "Status",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "required",
+    "status",
+    "coverage",
+    "detail",
+    "diagnostics"
+   ],
+   "title": "Stage",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/evaluation_report.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "bundle": {
+   "additionalProperties": true,
+   "title": "Bundle",
+   "type": "object"
+  },
+  "cost_breakdown": {
+   "additionalProperties": true,
+   "title": "Cost Breakdown",
+   "type": "object"
+  },
+  "diagnostics": {
+   "items": {
+    "$ref": "#/$defs/Diagnostic"
+   },
+   "title": "Diagnostics",
+   "type": "array"
+  },
+  "eligibility": {
+   "additionalProperties": true,
+   "title": "Eligibility",
+   "type": "object"
+  },
+  "evaluator": {
+   "additionalProperties": true,
+   "title": "Evaluator",
+   "type": "object"
+  },
+  "input": {
+   "additionalProperties": true,
+   "title": "Input",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.evaluation_report",
+   "title": "Kind",
+   "type": "string"
+  },
+  "metrics": {
+   "additionalProperties": {
+    "$ref": "#/$defs/Metric"
+   },
+   "title": "Metrics",
+   "type": "object"
+  },
+  "numerical_policy": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Numerical Policy"
+  },
+  "profile": {
+   "enum": [
+    "draft",
+    "reference"
+   ],
+   "title": "Profile",
+   "type": "string"
+  },
+  "rank_by": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Rank By"
+  },
+  "run": {
+   "additionalProperties": true,
+   "title": "Run",
+   "type": "object"
+  },
+  "stages": {
+   "items": {
+    "$ref": "#/$defs/Stage"
+   },
+   "title": "Stages",
+   "type": "array"
+  },
+  "task": {
+   "additionalProperties": {
+    "type": "string"
+   },
+   "title": "Task",
+   "type": "object"
+  },
+  "timing": {
+   "additionalProperties": true,
+   "title": "Timing",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "task",
+  "bundle",
+  "input",
+  "evaluator",
+  "profile",
+  "stages",
+  "eligibility",
+  "metrics",
+  "rank_by",
+  "cost_breakdown",
+  "diagnostics",
+  "numerical_policy",
+  "run",
+  "timing"
+ ],
+ "title": "EvaluationReport",
+ "type": "object"
+}

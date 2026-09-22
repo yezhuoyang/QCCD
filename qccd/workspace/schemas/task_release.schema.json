@@ -1,0 +1,91 @@
+{
+ "$id": "https://qccd.academy/schemas/workspace/v1/task_release.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "circuit": {
+   "additionalProperties": {
+    "type": "string"
+   },
+   "title": "Circuit",
+   "type": "object"
+  },
+  "evaluator": {
+   "additionalProperties": true,
+   "title": "Evaluator",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.task_release",
+   "title": "Kind",
+   "type": "string"
+  },
+  "metrics": {
+   "items": {
+    "additionalProperties": true,
+    "type": "object"
+   },
+   "title": "Metrics",
+   "type": "array"
+  },
+  "numerical_policy": {
+   "additionalProperties": true,
+   "title": "Numerical Policy",
+   "type": "object"
+  },
+  "physics": {
+   "additionalProperties": true,
+   "title": "Physics",
+   "type": "object"
+  },
+  "rank_by": {
+   "title": "Rank By",
+   "type": "string"
+  },
+  "release": {
+   "title": "Release",
+   "type": "string"
+  },
+  "required_checks": {
+   "items": {
+    "type": "string"
+   },
+   "title": "Required Checks",
+   "type": "array"
+  },
+  "task": {
+   "title": "Task",
+   "type": "string"
+  },
+  "title": {
+   "title": "Title",
+   "type": "string"
+  },
+  "track": {
+   "title": "Track",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "task",
+  "release",
+  "title",
+  "track",
+  "circuit",
+  "physics",
+  "required_checks",
+  "metrics",
+  "rank_by",
+  "numerical_policy",
+  "evaluator"
+ ],
+ "title": "TaskRelease",
+ "type": "object"
+}

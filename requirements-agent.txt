@@ -1,0 +1,13 @@
+# The co-design service and MCP adapter (qccd/workspace/service.py, mcp_server.py).
+# The toolchain itself (qccd/arch, verify, cost, ir, compile, viz) needs none of these.
+# Versions are the combination tested on 2026-09-22 (Python 3.14.3, Windows 11):
+fastapi==0.135.3
+starlette==1.0.0
+uvicorn==0.43.0
+pydantic==2.13.5
+anyio==4.13.0
+websockets==16.0          # Codex app-server bridge (qccd/workspace/agents/codex.py)
+mcp==2.2.0                # official Python MCP SDK (stdio adapter)
+mcp-types==2.2.0
+# Official service in a deployment (qccd/official/db.py): PostgreSQL driver.
+# psycopg[binary]==3.2.*  -- installed by deploy/official/Dockerfile; not needed for SQLite/dev

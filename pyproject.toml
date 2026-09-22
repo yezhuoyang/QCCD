@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qccd"
+version = "0.9.0"
+description = "Trapped-ion QCCD architecture/algorithm co-design: the toolchain, the studio, and local-first agent-native workspaces"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+# The toolchain is standard-library Python; the co-design service and MCP adapter are an extra.
+dependencies = []
+
+[project.optional-dependencies]
+agent = [
+  "fastapi==0.135.3", "starlette==1.0.0", "uvicorn==0.43.0", "pydantic==2.13.5", "anyio==4.13.0",
+  "websockets==16.0", "mcp==2.2.0", "mcp-types==2.2.0",
+]
+official = ["fastapi==0.135.3", "uvicorn==0.43.0", "psycopg[binary]>=3.2,<3.3"]
+
+[project.scripts]
+qccd = "qccd.workspace.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["qccd*"]
+
+[tool.setuptools.package-data]
+"qccd.workspace" = ["web/*", "skill/**/*", "releases/**/*", "releases/.gitattributes"]
+"qccd.viz" = ["*.js", "js/*.js"]

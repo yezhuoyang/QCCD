@@ -1,0 +1,2 @@
+# Task releases are digest-pinned byte for byte: never convert line endings.
+* -text
