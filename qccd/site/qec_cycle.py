@@ -223,14 +223,34 @@ def board_section(tasks: list[dict]) -> str:
 
 
 def studio_payload() -> dict:
-    """What the studio's QEC-cycle panel needs, so its JS hardcodes no latency."""
-    return {"link": LINK, "decoders": DECODERS, "modes": MODES,
+    """What the studio's QEC-cycle panel needs, so its JS hardcodes no latency.
+
+    `places` carries the decoder, the classical memory and the wire as the gadget library
+    defines them -- title, silhouette and colours -- so the decoder drawn over the studio's
+    device is the same place, in the same shape and the same green, as the decoder in the
+    gadget tool.  Retyping those three colours here is how two pictures of one thing start.
+    """
+    from ..gadget.categories import CATEGORIES
+    places = {k: {"title": CATEGORIES[k]["title"], "shape": CATEGORIES[k]["shape"],
+                  "stroke": CATEGORIES[k]["stroke"], "fill": CATEGORIES[k]["fill"]}
+              for k in ("decoder", "archive", "wire") if k in CATEGORIES}
+    # a wire CARRYING bits right now: lit while a `decode` instruction runs -- the same two
+    # colours the gadget canvas lights its wires with, from the same entry
+    if "wire" in places:
+        for key in ("lit", "glow"):
+            if key in CATEGORIES["wire"]:
+                places["wire"][key] = CATEGORIES["wire"][key]
+    return {"link": LINK, "decoders": DECODERS, "modes": MODES, "places": places,
             "reference": ROUND_REFERENCE, "shown": list(SHOWN_DECODERS)}
 
 
 #: the panel's own styling, injected with it (the studio's CSS variables are in scope)
 STUDIO_CSS = """
 #tools #qcBtn.on { background: var(--navy, #1e2761); color: #fff; border-color: var(--navy, #1e2761); }
+#tools #qcShow { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+  border: 1px solid var(--line, #d0d5dd); border-radius: 6px; background: var(--panel, #fff);
+  color: var(--ink, #182230); cursor: pointer; user-select: none; white-space: nowrap; }
+#tools #qcShow input { margin: 0; }
 .qc-box { position: fixed; z-index: 60; width: 452px; max-height: 76vh; overflow: auto;
   background: #fff; border: 1px solid var(--line, #d0d5dd); border-radius: 8px;
   box-shadow: 0 10px 28px rgba(16,24,40,.16); padding: 10px 12px 12px;
