@@ -287,8 +287,8 @@ dl.native dd{margin:0;color:var(--ink)}
 .person .aff{color:var(--ink2);font-size:13px;margin:2px 0 8px} .person p{margin:0 0 8px;font-size:13.5px}
 .person .links a{font-size:12.5px;margin-right:10px}
 .inst{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin:10px 0 0}
-.inst a{display:flex;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit}
-.inst a:hover{border-color:var(--accent);text-decoration:none} .inst img{height:34px;width:auto;flex:0 0 auto} .inst img[alt="UCLA"]{height:26px}
+.inst a,.inst .card{display:flex;flex-direction:column;align-items:flex-start;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit}
+.inst a:hover{border-color:var(--accent);text-decoration:none} .inst img{height:34px;width:auto;max-width:100%;object-fit:contain;object-position:left center;flex:0 0 auto} .inst img[alt="UCLA"]{height:26px}
 .inst b{display:block;color:#1c2a4a} .inst span{color:var(--ink2);font-size:12.5px}
 .pubs{list-style:none;padding:0;margin:8px 0 0}
 .pub{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:0 0 12px;scroll-margin-top:72px}
@@ -325,7 +325,7 @@ FOOTER = """<footer id="sitefoot">
   <p>Led by a collaboration between <a href="https://www.ucla.edu/">UCLA</a> and
   <a href="https://www.berkeley.edu/">UC Berkeley</a>, funded by the
   <a href="https://ciqc.berkeley.edu/">Challenge Institute for Quantum Computation</a> (CIQC),
-  an NSF Quantum Leap Challenge Institute.</p>
+  an NSF Quantum Leap Challenge Institute, and by NQVL FTL.</p>
   <div class="logos">
     <a href="https://www.ucla.edu/" title="UCLA"><img src="__SITEROOT__static/ucla.svg" alt="UCLA"></a>
     <a href="https://www.berkeley.edu/" title="University of California, Berkeley"><img src="__SITEROOT__static/berkeley.svg" alt="University of California, Berkeley"></a>
@@ -1648,7 +1648,9 @@ def people_page() -> str:
     body = ["<h1>People</h1>",
             '<p class="sub">Who takes part in the project. The work is led by a collaboration between UCLA and '
             'UC Berkeley and funded by the Challenge Institute for Quantum Computation, an NSF Quantum Leap '
-            'Challenge Institute.</p>']
+            'Challenge Institute, and by NQVL FTL, within which the project began. Its contributors are '
+            'also based at the University of Arizona, the University of Michigan, UC San Diego and '
+            'Cornell University.</p>']
     for gid, gtitle, gblurb in PEOPLE_GROUPS:
         mine = [p for p in PEOPLE if group_of(p) == gid]
         if not mine:
@@ -1665,8 +1667,14 @@ def people_page() -> str:
         body.append("</div>")
     body.append('<h2 id="institutions">Institutions</h2><div class="inst">')
     for i in INSTITUTIONS:
-        body.append(f'<a href="{i["url"]}"><img src="../static/{i["logo"]}" alt="{html.escape(i["short"])}">'
-                    f'<div><b>{html.escape(i["name"])}</b><span>{html.escape(i["what"])}</span></div></a>')
+        # a logo and a link are both optional: a place with no mark on file is a text card,
+        # and a funder with no page to point at is a card that is not a link
+        mark = (f'<img src="../static/{i["logo"]}" alt="{html.escape(i["short"])}">'
+                if i.get("logo") else "")
+        inner = (f'{mark}<div><b>{html.escape(i["name"])}</b>'
+                 f'<span>{html.escape(i["what"])}</span></div>')
+        body.append(f'<a href="{html.escape(i["url"])}">{inner}</a>' if i.get("url")
+                    else f'<div class="card">{inner}</div>')
     body.append("</div>")
     body.append(f'<p class="note">{Renderer({}, lambda t: t).inline(JOIN, hint=False)} '
                 f'<a href="{REPO}/graphs/contributors">Contributors on GitHub &rarr;</a></p>')
