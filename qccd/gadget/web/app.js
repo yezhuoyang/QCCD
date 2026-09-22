@@ -1579,6 +1579,13 @@
         vv.textContent = v.slice(0, 8).join("\n");
         vv.style.whiteSpace = "pre-line";
         div.appendChild(vv);
+        // A FAILED CHECK SHOWS ITS REASON WITHOUT BEING ASKED.  The reason was already in
+        // the page, one click away, which for a reader is the same as not being there:
+        // `gadgets/demo` reports G7 failed because the programme asks for a transversal H
+        // that this code does not admit -- refused on purpose, and the page explained that
+        // only on hover.  A red verdict a reader cannot explain is a bug report waiting to
+        // be filed, and one was.
+        if (state === "fail") div.classList.add("open");
         div.onclick = () => div.classList.toggle("open");
       } else if ((ck.skipped || {})[id]) {
         div.title = ck.skipped[id];
