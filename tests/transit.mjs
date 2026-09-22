@@ -36,7 +36,8 @@ const T = new globalThis.QCCDTransit.Transit({
   rail: S.rail || 0,
 });
 
-const ord = T.slotOrder(S.steps);
+// a scenario may state the slot orders a programme sets, which the walker would not choose
+const ord = S.orders || T.slotOrder(S.steps);
 const out = { order: ord, frames: [] };
 for (let k = 0; k < S.steps.length; k++) {
   const st = S.steps[k];

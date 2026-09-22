@@ -358,18 +358,19 @@ class Transit:
     # ------------------------------------------------- who has to get past whom
 
     def passes(self, step: Step, ord_start, ord_end) -> dict:
-        """Every unordered pair of ions that cannot both hold a straight line, and the
-        side of the axis each one goes round on.  Four kinds: `exchange`, `leave`,
-        `arrive`, `over` -- see the JS twin's header for what each means."""
-        pairs: list[tuple[str, str, str]] = []
+        """Every unordered pair of ions that cannot both hold a straight line, the node
+        they meet in, and the side of the axis each one goes round on.  Five kinds:
+        `exchange`, `leave`, `arrive`, `cross`, `over` -- see the JS twin's header for what
+        each means, and for the two (the middle of a bar, and `cross`) that were missing."""
+        pairs: list[tuple[str, str, str, str]] = []
         seen: dict[tuple[str, str], str] = {}
 
-        def add(a: str, b: str, kind: str) -> None:
+        def add(a: str, b: str, kind: str, at: str) -> None:
             key = (a, b) if _cmp(a, b) <= 0 else (b, a)
             if key in seen:
                 return
             seen[key] = kind
-            pairs.append((key[0], key[1], kind))
+            pairs.append((key[0], key[1], kind, at))
 
         def side(here: str, there: str) -> float:
             n, o, ax = self._pos(here), self._pos(there), self._axis(here)
@@ -381,6 +382,23 @@ class Transit:
             i = lst.index(ion)
             return [lst[k] for k in range(len(lst))
                     if k != i and (k > i if direction > 0 else k < i) and lst[k] in resident]
+
+        def toward_middle(lst, ion, among):
+            if ion not in lst or len(lst) < 2:
+                return []
+            i, mid = lst.index(ion), (len(lst) - 1) / 2
+            return [lst[k] for k in range(len(lst))
+                    if k != i and ((i < k <= mid) if i < mid else (mid <= k < i))
+                    and lst[k] in among]
+
+        def opposite(other, place, direction, leaving):
+            q = step.paths.get(other)
+            if not q or len(q) < 2:
+                return False
+            a, b = self._site(q[0]), self._site(q[-1])
+            if a == b or (a if leaving else b) != place:
+                return False
+            return side(place, b if leaving else a) * direction < 0
 
         at_start: dict[str, list[str]] = {}
         for ion, node in step.before.items():
@@ -401,18 +419,32 @@ class Transit:
                     continue
                 op = step.paths.get(other)
                 if op and self._site(op[0]) == to:
-                    add(ion, other, "exchange")
-            for who in blocked_by(ord_start.get(frm, []), ion, side(frm, to),
-                                  ord_end.get(frm, [])):
-                add(ion, who, "leave")
-            for who in blocked_by(ord_end.get(to, []), ion, side(to, frm),
-                                  ord_start.get(to, [])):
-                add(ion, who, "arrive")
+                    add(ion, other, "exchange", walk[0])
+            # leaving: a stayer on the side it exits towards, or between its slot and the
+            # middle when it leaves through the middle; and a leaver by the other end
+            d_out, l_out = side(frm, to), ord_start.get(frm, [])
+            outs = (blocked_by(l_out, ion, d_out, ord_end.get(frm, [])) if d_out
+                    else toward_middle(l_out, ion, ord_end.get(frm, [])))
+            for who in outs:
+                add(ion, who, "leave", step.pos[who])
+            for who in (blocked_by(l_out, ion, d_out, l_out) if d_out else []):
+                if opposite(who, frm, d_out, True):
+                    add(ion, who, "cross", walk[0])
+            # arriving: a resident between the end it enters by (or the middle) and its
+            # slot; and an arrival by the other end settling on that side
+            d_in, l_in = side(to, frm), ord_end.get(to, [])
+            ins = (blocked_by(l_in, ion, d_in, ord_start.get(to, [])) if d_in
+                   else toward_middle(l_in, ion, ord_start.get(to, [])))
+            for who in ins:
+                add(ion, who, "arrive", step.pos[who])
+            for who in (blocked_by(l_in, ion, d_in, l_in) if d_in else []):
+                if opposite(who, to, d_in, False):
+                    add(ion, who, "cross", walk[-1])
             for h in range(1, len(walk) - 1):
                 at = self._site(walk[h])
                 for occ in at_start.get(at, ()):
                     if occ != ion and self._site(step.pos.get(occ, "")) == at:
-                        add(ion, occ, "over")
+                        add(ion, occ, "over", step.pos[occ])
 
         # A resting ion never gets a detour, so a mover passing one keeps the default
         # side; two ions that BOTH move and must pass each other take opposite sides, or
@@ -424,7 +456,7 @@ class Transit:
             return bool(w and len(w) > 1 and self._site(w[0]) != self._site(w[-1]))
 
         adj: dict[str, list[str]] = {}
-        for a, b, _ in pairs:
+        for a, b, *_ in pairs:
             if moves(a) and moves(b):
                 adj.setdefault(a, []).append(b)
                 adj.setdefault(b, []).append(a)
@@ -492,59 +524,65 @@ class Transit:
         pas = self.passes(step, ord_start, ord_end)
         bow0 = float(self.geom.bow or 0.0)
 
-        # ---- pass one: where everyone is before anybody gets out of anybody's way
-        base: dict[str, dict] = {}
-        for ion in src:
-            walk = step.paths.get(ion)
-            ax_, ay_, pa, a_node, a_axis = slot_at(
-                src[ion], src_node[ion], occ_s[src[ion]], ion)
-            bx_, by_, pb, b_node, b_axis = slot_at(
-                dst[ion], dst_node[ion], occ_e[dst[ion]], ion)
-            if walk and not rest:
-                q0 = self.point_on_path(walk, t)
-                if q0 is None or not math.isfinite(q0[0]):
-                    continue
-                # the slot offset belongs to the trap, not to the walk; its part ALONG the
-                # rail is carried as a shift in arc, so two ions in one well keep their
-                # spacing, and only the rest is ramped within the bars -- see the JS
-                tA, tB = self.tangent_at(walk, False), self.tangent_at(walk, True)
-                aA = ax_ * tA[0] + ay_ * tA[1]
-                aB = bx_ * tB[0] + by_ * tB[1]
-                tot = self._hops(walk)[1]
-                q = self.point_at_arc(walk, tot * t + aA + (aB - aA) * t) or q0
-                e0, e1 = self.point_at_arc(walk, aA), self.point_at_arc(walk, tot + aB)
-                qs, qe = self.point_on_path(walk, 0.0), self.point_on_path(walk, 1.0)
-                rAx = qs[0] + ax_ - e0[0] if (qs and e0) else ax_
-                rAy = qs[1] + ay_ - e0[1] if (qs and e0) else ay_
-                rBx = qe[0] + bx_ - e1[0] if (qe and e1) else bx_
-                rBy = qe[1] + by_ - e1[1] if (qe and e1) else by_
-                wa, wb = _slot_weights(q, t, self._ramp_at(a_axis, walk[1]),
-                                       self._ramp_at(b_axis, walk[-2]))
-                # the ends in exactly the arithmetic they always had -- see the JS twin
-                if t <= 0:
-                    x, y, q = q0[0] + ax_, q0[1] + ay_, q0
-                elif t >= 1:
-                    x, y, q = q0[0] + bx_, q0[1] + by_, q0
+        # ---- pass one: where everyone is before anybody gets out of anybody's way, as a
+        # function of the instant, because the side a pair goes round is read off the whole
+        # step -- see the JS twin
+        def base_at(t: float) -> dict[str, dict]:
+            base: dict[str, dict] = {}
+            for ion in src:
+                walk = step.paths.get(ion)
+                ax_, ay_, pa, a_node, a_axis = slot_at(
+                    src[ion], src_node[ion], occ_s[src[ion]], ion)
+                bx_, by_, pb, b_node, b_axis = slot_at(
+                    dst[ion], dst_node[ion], occ_e[dst[ion]], ion)
+                if walk and not rest:
+                    q0 = self.point_on_path(walk, t)
+                    if q0 is None or not math.isfinite(q0[0]):
+                        continue
+                    # the slot offset belongs to the trap, not to the walk; its part ALONG the
+                    # rail is carried as a shift in arc, so two ions in one well keep their
+                    # spacing, and only the rest is ramped within the bars -- see the JS
+                    tA, tB = self.tangent_at(walk, False), self.tangent_at(walk, True)
+                    aA = ax_ * tA[0] + ay_ * tA[1]
+                    aB = bx_ * tB[0] + by_ * tB[1]
+                    tot = self._hops(walk)[1]
+                    q = self.point_at_arc(walk, tot * t + aA + (aB - aA) * t) or q0
+                    e0, e1 = self.point_at_arc(walk, aA), self.point_at_arc(walk, tot + aB)
+                    qs, qe = self.point_on_path(walk, 0.0), self.point_on_path(walk, 1.0)
+                    rAx = qs[0] + ax_ - e0[0] if (qs and e0) else ax_
+                    rAy = qs[1] + ay_ - e0[1] if (qs and e0) else ay_
+                    rBx = qe[0] + bx_ - e1[0] if (qe and e1) else bx_
+                    rBy = qe[1] + by_ - e1[1] if (qe and e1) else by_
+                    wa, wb = _slot_weights(q, t, self._ramp_at(a_axis, walk[1]),
+                                           self._ramp_at(b_axis, walk[-2]))
+                    # the ends in exactly the arithmetic they always had -- see the JS twin
+                    if t <= 0:
+                        x, y, q = q0[0] + ax_, q0[1] + ay_, q0
+                    elif t >= 1:
+                        x, y, q = q0[0] + bx_, q0[1] + by_, q0
+                    else:
+                        x, y = q[0] + rAx * wa + rBx * wb, q[1] + rAy * wa + rBy * wb
+                    base[ion] = dict(x=x, y=y, fly=True, q=q, u=t,
+                                     pa=pa, pb=pb, a=a_node, b=b_node,
+                                     ax=a_axis, bx=b_axis)
+                    if qs and qe:
+                        base[ion]["ends"] = ((qs[0] + ax_, qs[1] + ay_), (qe[0] + bx_, qe[1] + by_))
                 else:
-                    x, y = q[0] + rAx * wa + rBx * wb, q[1] + rAy * wa + rBy * wb
-                base[ion] = dict(x=x, y=y, fly=True, q=q, u=t,
-                                 pa=pa, pb=pb, a=a_node, b=b_node,
-                                 ax=a_axis, bx=b_axis)
-                if qs and qe:
-                    base[ion]["ends"] = ((qs[0] + ax_, qs[1] + ay_), (qe[0] + bx_, qe[1] + by_))
-            else:
-                p0, p1 = self._pos(a_node), self._pos(b_node)
-                if p0 is None or p1 is None:
-                    continue
-                u = 1.0 if rest else t
-                x0, y0 = p0[0] + ax_, p0[1] + ay_
-                x1, y1 = p1[0] + bx_, p1[1] + by_
-                base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
-                                 q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node,
-                                 ax=a_axis, bx=b_axis, ends=((x0, y0), (x1, y1)))
+                    p0, p1 = self._pos(a_node), self._pos(b_node)
+                    if p0 is None or p1 is None:
+                        continue
+                    u = 1.0 if rest else t
+                    x0, y0 = p0[0] + ax_, p0[1] + ay_
+                    x1, y1 = p1[0] + bx_, p1[1] + by_
+                    base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
+                                     q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node,
+                                     ax=a_axis, bx=b_axis, ends=((x0, y0), (x1, y1)))
+            return base
+
+        base = base_at(t)
 
         partners: dict[str, list[str]] = {}
-        for a, b, _ in pas["pairs"]:
+        for a, b, *_ in pas["pairs"]:
             partners.setdefault(a, []).append(b)
             partners.setdefault(b, []).append(a)
 
@@ -564,8 +602,10 @@ class Transit:
         # sides.  Per pair, on the wider of the two traps, and never more than the pair is
         # apart at either end of the step, so the detour is zero at both frame boundaries.
         need: dict[str, float] = {}
+        raw: dict[str, float] = {}
         cause: dict[str, str] = {}
-        for a, b, _ in pas["pairs"]:
+        meet: dict[str, str] = {}
+        for a, b, _, at2 in pas["pairs"]:
             ma, mb = base.get(a), base.get(b)
             if ma is None or mb is None or not (ma["fly"] or mb["fly"]):
                 continue
@@ -578,30 +618,76 @@ class Transit:
             d = math.dist((ma["x"], ma["y"]), (mb["x"], mb["y"]))
             if d >= clear:
                 continue
-            h = 0.5 * math.sqrt(max(0.0, clear * clear - d * d))
-            if a not in need or need[a] < h:
-                need[a], cause[a] = h, b
-            if b not in need or need[b] < h:
-                need[b], cause[b] = h, a
+            # how far into the pass: 0 at arm's length, 1 side by side; and the leg that
+            # restores `clear`, halved, for a geometry with no bar -- see the JS twin
+            pr = math.sqrt(max(0.0, 1 - (d * d) / (clear * clear)))
+            h = 0.5 * clear * pr
+            if a not in need or need[a] < pr:
+                need[a], cause[a], meet[a] = pr, b, at2
+            if b not in need or need[b] < pr:
+                need[b], cause[b], meet[b] = pr, a, at2
+            if a not in raw or raw[a] < h:
+                raw[a] = h
+            if b not in raw or raw[b] < h:
+                raw[b] = h
 
         # And never off the metal, taking HALF the room so the mark fits in the other
         # half.  The ion in flight goes to the side `passes` gave it; the one it is
         # getting past goes to the other side OF IT, or straight away from it where the
         # two bars are square to each other -- see the JS twin.
+        # A SWAP IS SHOWN AT ONE SIZE -- half the bar's half-thickness side by side,
+        # whatever the pitch -- and WHICH SIDE is read once per step off where each pair
+        # actually goes by, the alternation standing only where a pair is exactly in line.
+        # See the JS twin for the two boards that needed each.
         lift: dict[str, tuple] = {}
         order = [i for i in need if base[i]["fly"]] + [i for i in need if not base[i]["fly"]]
+
+        # across the bar the pair MEETS in -- see the JS twin
+        def normal_of(ion, at=None):
+            me = base[ion]
+            axn = self._axis(at if at is not None else (me.get("ax") or me["a"]))
+            return -axn[1], axn[0]
+
+        sides: dict[str, int] | None = None
+
+        def sides_of_step() -> dict[str, int]:
+            looks = [base_at(sk / 16) for sk in range(1, 16)]
+            total: dict[str, float] = {}
+            for ea, eb, _, at4 in pas["pairs"]:
+                bi, bd = -1, math.inf
+                for si, look in enumerate(looks):
+                    xa, xb = look.get(ea), look.get(eb)
+                    if xa is None or xb is None:
+                        continue
+                    dd = math.hypot(xa["x"] - xb["x"], xa["y"] - xb["y"])
+                    if dd < bd:
+                        bi, bd = si, dd
+                if bi < 0:
+                    continue
+                XA, XB = looks[bi][ea], looks[bi][eb]
+                na, nb = normal_of(ea, at4), normal_of(eb, at4)
+                ka, kb = (ea, at4), (eb, at4)
+                total[ka] = total.get(ka, 0.0) + na[0] * (XA["x"] - XB["x"]) + na[1] * (XA["y"] - XB["y"])
+                total[kb] = total.get(kb, 0.0) + nb[0] * (XB["x"] - XA["x"]) + nb[1] * (XB["y"] - XA["y"])
+            eps = 1e-6 * max(1.0, bow0)
+            return {k: (1 if v > 0 else -1) for k, v in total.items() if abs(v) > eps}
+
         for ion in order:
-            me, h = base[ion], need[ion]
+            me = base[ion]
             q = me.get("q") or (me["x"], me["y"])
+            at3 = meet.get(ion)
             lim = self._room_across(q[0], q[1], [me.get("ax") or me["a"],
-                                                 me.get("bx") or me["b"]])
-            if lim > 0 and h > 0.5 * lim:
-                h = 0.5 * lim
+                                                 me.get("bx") or me["b"]]
+                                    + ([at3] if at3 is not None else []))
+            h = 0.5 * lim * need[ion] if lim > 0 else raw[ion]
             if not h > 0:
                 continue
-            axn = self._axis(me.get("ax") or me["a"])
-            nx, ny = -axn[1], axn[0]
-            if me["fly"]:
+            nx, ny = normal_of(ion, at3)
+            if sides is None:
+                sides = sides_of_step()
+            if (ion, at3) in sides:
+                sd = sides[(ion, at3)]
+            elif me["fly"]:
                 sd = pas["side"].get(ion, 1) or 1
             else:
                 sd = 1

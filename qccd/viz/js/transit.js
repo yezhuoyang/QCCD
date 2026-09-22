@@ -389,9 +389,22 @@
   // Four kinds, all of which the picture must draw as a detour rather than a glide:
   //
   //   exchange  A ends where B began and B ends where A began -- they trade places
-  //   leave     A exits its trap towards a side a trap-mate is staying on
-  //   arrive    A enters a trap past a resident already between it and its own slot
+  //   leave     A exits its trap towards a side a trap-mate is staying on -- or through
+  //             the MIDDLE of its bar, past the stayers between its slot and the middle
+  //   arrive    A enters a trap past a resident already between it and its own slot --
+  //             or through the middle, past the residents between the middle and its slot
+  //   cross     A and B both leave one trap (or both enter one) by opposite ends, each
+  //             past the other
   //   over      A's path runs THROUGH a node a resting ion holds for the whole step
+  //
+  // Each pair carries the NODE it meets in, fourth: the bar they step aside across.
+  //
+  // THE TWO THAT WERE MISSING are how two ions traded places in one trap with neither
+  // stepping aside, found by `tests/swap_visible.mjs` asking the drawing rather than this
+  // list.  Entering or leaving through the middle of a bar (`cyclone_base`'s vertical rails
+  // meet its horizontal bars there) has no side to read along the bar, so it was treated as
+  // passing nobody; and two ions leaving one trap by opposite ends pass each other with
+  // nobody STAYING, which is what `leave` looked for (`torus4x4`, `T3_3h`).
   //
   // `kinds` is returned as well as `side` so a caller can report what it drew.
   Transit.prototype.passes = function (step, ranks) {
@@ -406,13 +419,35 @@
     // and the single most expensive thing this file did.
     var rank = ranks || { start: _rankOf(ordStart), end: _rankOf(ordEnd) };
 
-    function add(a, b, kind) {
+    function add(a, b, kind, at) {
       var swap = naturalCmp(a, b) > 0;
       var lo = swap ? b : a, hi = swap ? a : b;
       var k = lo + "\u0000" + hi;
       if (seen[k]) return;
       seen[k] = kind;
-      pairs.push([lo, hi, kind]);
+      pairs.push([lo, hi, kind, at]);
+    }
+    // who in `list` sits between index `at` and the middle of it (the middle included,
+    // `at` not), among `among` -- the ions an ion entering or leaving through the middle of
+    // its bar goes past
+    function towardMiddle(list, at, among) {
+      var out = [];
+      if (at === undefined || list.length < 2) return out;
+      var mid = (list.length - 1) / 2;
+      for (var k = 0; k < list.length; k++) {
+        if (k === at) continue;
+        var between = at < mid ? (k > at && k <= mid) : (k < at && k >= mid);
+        if (between && among[list[k]] !== undefined) out.push(list[k]);
+      }
+      return out;
+    }
+    // is `other` leaving `place` for (or arriving in it from) the far side of `dir`?
+    function opposite(other, place, dir, leaving) {
+      var q = paths[other];
+      if (!q || q.length < 2) return false;
+      var a = self.site(q[0]), b = self.site(q[q.length - 1]);
+      if (a === b || (leaving ? a : b) !== place) return false;
+      return side(place, leaving ? b : a) * dir < 0;
     }
 
     // which side of `here` is `there` on, measured along the site's own axis
@@ -461,18 +496,32 @@
         var other = back[bi];
         if (other === ion) continue;
         var op = paths[other];
-        if (op && self.site(op[0]) === to) add(ion, other, "exchange");
+        if (op && self.site(op[0]) === to) add(ion, other, "exchange", path[0]);
       }
 
-      // -- leaving: does anyone STAY BEHIND on the side it exits towards?
-      var outs = blockedBy(ordStart[from] || [], (rank.start[from] || {})[ion],
-                           side(from, to), rank.end[from] || {});
-      for (var i1 = 0; i1 < outs.length; i1++) add(ion, outs[i1], "leave");
+      // -- leaving: does anyone STAY BEHIND on the side it exits towards -- or, out
+      // through the middle of the bar, between its slot and the middle?  And does anyone
+      // on that side leave by the OTHER end?
+      var dOut = side(from, to), lOut = ordStart[from] || [], kOut = (rank.start[from] || {})[ion];
+      var outs = dOut ? blockedBy(lOut, kOut, dOut, rank.end[from] || {})
+                      : towardMiddle(lOut, kOut, rank.end[from] || {});
+      for (var i1 = 0; i1 < outs.length; i1++) add(ion, outs[i1], "leave", pos[outs[i1]]);
+      var beyond = dOut ? blockedBy(lOut, kOut, dOut, rank.start[from] || {}) : [];
+      for (var i4 = 0; i4 < beyond.length; i4++) {
+        if (opposite(beyond[i4], from, dOut, true)) add(ion, beyond[i4], "cross", path[0]);
+      }
 
-      // -- arriving: is anyone ALREADY THERE between the end it enters by and its slot?
-      var ins = blockedBy(ordEnd[to] || [], (rank.end[to] || {})[ion],
-                          side(to, from), rank.start[to] || {});
-      for (var i2 = 0; i2 < ins.length; i2++) add(ion, ins[i2], "arrive");
+      // -- arriving: is anyone ALREADY THERE between the end it enters by and its slot --
+      // or, in through the middle, between the middle and its slot?  And does anyone
+      // settling on that side come in by the OTHER end?
+      var dIn = side(to, from), lIn = ordEnd[to] || [], kIn = (rank.end[to] || {})[ion];
+      var ins = dIn ? blockedBy(lIn, kIn, dIn, rank.start[to] || {})
+                    : towardMiddle(lIn, kIn, rank.start[to] || {});
+      for (var i2 = 0; i2 < ins.length; i2++) add(ion, ins[i2], "arrive", pos[ins[i2]]);
+      var before_ = dIn ? blockedBy(lIn, kIn, dIn, rank.end[to] || {}) : [];
+      for (var i5 = 0; i5 < before_.length; i5++) {
+        if (opposite(before_[i5], to, dIn, false)) add(ion, before_[i5], "cross", path[path.length - 1]);
+      }
 
       // -- passing OVER a node someone is holding for the whole step.  This is the case
       // the studio never tested for: its `mustPass` looked only at the two ENDS of the
@@ -486,7 +535,7 @@
           if (occ === ion) continue;
           // only a RESTING ion is passed over; one that is itself leaving this node is
           // getting out of the way, and the two are a convoy rather than a conflict
-          if (self.site(pos[occ]) === at3) add(ion, occ, "over");
+          if (self.site(pos[occ]) === at3) add(ion, occ, "over", pos[occ]);
         }
       }
     }
@@ -670,7 +719,7 @@
     var rest = !!step.rest;
     var P = this._prep(step);
     var srcOf = P.srcOf, occS = P.occS, occ = P.occ, pass = P.pass;
-    var live = {}, flying = {}, base = {};
+    var live = {}, flying = {}, base;
     var bow0 = self.bow();
     // OVER HOW MUCH ARC AN END'S SLOT OFFSET IS TAKEN UP.
     //
@@ -717,7 +766,11 @@
       return [wa, wb];
     };
 
-    // ---- pass one: where every ion is before anybody gets out of anybody's way
+    // ---- pass one: where every ion is before anybody gets out of anybody's way.  A
+    // function of the instant, because which side a pair goes round is decided by looking
+    // at the whole step (`sides`, below), not at this one moment of it.
+    var baseAt = function (t) {
+    var base = {};
     for (var i1 in srcOf) {
       var p1 = paths[i1], A1 = P.A[i1], B1 = P.B[i1];
       if (p1 && !rest) {
@@ -780,6 +833,9 @@
                      s1x: pb1[0] + B1.ox, s1y: pb1[1] + B1.oy };
       }
     }
+    return base;
+    };
+    base = baseAt(t);
 
     // ---- who each ion has to get past, as a list it can measure itself against
     var partners = {};
@@ -832,9 +888,9 @@
     // they step back.  So the need is shared -- each of the pair takes HALF the
     // perpendicular leg, on opposite sides -- and the two marks have the whole thickness
     // of the bar between them rather than half of it.
-    var need = {}, cause = {};
+    var need = {}, raw = {}, cause = {}, meet = {};
     for (var pp2 = 0; pp2 < pass.pairs.length; pp2++) {
-      var ia = pass.pairs[pp2][0], ib = pass.pairs[pp2][1];
+      var ia = pass.pairs[pp2][0], ib = pass.pairs[pp2][1], at2 = pass.pairs[pp2][3];
       var ma = base[ia], mb = base[ib];
       // a pass takes an ion in flight; `rest` pins everybody and nobody gets past anybody
       if (!ma || !mb || !(ma.fly || mb.fly)) continue;
@@ -862,9 +918,14 @@
       if (!(clear > 0)) continue;
       var d = Math.hypot(ma.x - mb.x, ma.y - mb.y);
       if (d >= clear) continue;
-      var h = 0.5 * Math.sqrt(Math.max(0, clear * clear - d * d));
-      if (!(need[ia] >= h)) { need[ia] = h; cause[ia] = ib; }
-      if (!(need[ib] >= h)) { need[ib] = h; cause[ib] = ia; }
+      // how far into the pass the pair is: 0 at arm's length, 1 side by side -- and the
+      // perpendicular leg that restores `clear`, halved, for a geometry with no bar
+      var pr = Math.sqrt(Math.max(0, 1 - (d * d) / (clear * clear)));
+      var h = 0.5 * clear * pr;
+      if (!(need[ia] >= pr)) { need[ia] = pr; cause[ia] = ib; meet[ia] = at2; }
+      if (!(need[ib] >= pr)) { need[ib] = pr; cause[ib] = ia; meet[ib] = at2; }
+      if (!(raw[ia] >= h)) raw[ia] = h;
+      if (!(raw[ib] >= h)) raw[ib] = h;
     }
 
     // AND NEVER OFF THE METAL.  Whatever the arithmetic asks for, the ion stays on the
@@ -894,18 +955,74 @@
     // own axis: an axis has no preferred sign, so "the opposite normal" can point the
     // same way.  Where the two bars are square to each other there is no other side to
     // speak of, and it steps straight away from the ion going by.
-    var lift = {}, order = [], io3;
+    //
+    // A SWAP IS SHOWN AT ONE SIZE.  The leg that restores `clear` is proportional to the
+    // slot pitch, so a pair passing in a crowded trap stepped aside by a fraction of what a
+    // pair in a roomy one did -- 0.029 g in `stationary_chain`'s long trap against 0.050 g
+    // everywhere else, which is two ions sliding through each other to the eye.  So where
+    // there is a bar, the pair goes to the same place every time: half its half-thickness
+    // at the moment they are side by side, tapering to nothing at arm's length along the
+    // same curve the leg follows.  It is still zero at both ends of the step (a pair is at
+    // least `clear` apart there), so no frame boundary can snap.
+    //
+    // WHICH SIDE IS DECIDED ONCE PER STEP, FROM WHERE THE PAIR ACTUALLY GOES BY.  The side
+    // `passes` alternates is a label, and it was applied whatever the geometry said: on
+    // `24_cylinder12_own_a72` a trap's bar is tilted 22 degrees while the rail its ion leaves
+    // by runs at 9, so the leaver already goes by on one side of the ion it passes -- and was
+    // sent to the other, and the two lifts carried them across each other diagonally, 0.025 g
+    // apart at radius 0.011 (482 such passes on that board).  So the step is looked at as a
+    // whole: at the instant each pair is closest, which side of its partner each ion is on,
+    // across its own bar.  Once per step, so a side can never change in the middle of one
+    // and nobody jumps; and where a pair is exactly in line (the common case, a trap on its
+    // own rail) there is no side to read, and the alternation stands.
+    var lift = {}, order = [], io3, sides = null;
     for (io3 in need) if (base[io3].fly) order.push(io3);
     for (io3 in need) if (!base[io3].fly) order.push(io3);
+    // ACROSS THE BAR THEY MEET IN, which is the pair's node and not either ion's own
+    // source: an ion arriving round a corner met its partner in the trap it arrived in, and
+    // stepping aside across the trap it came from is stepping along the one it is in.
+    var normalOf = function (ion, at) {
+      var S = P.A[ion], a = self.axis(at !== undefined ? at : (S.axisNode || S.node));
+      return [-a[1], a[0]];
+    };
+    var sidesOfStep = function () {
+      if (P.sides) return P.sides;
+      var out = {}, sum = {}, looks = [];
+      for (var sk = 1; sk < 16; sk++) looks.push(baseAt(sk / 16));
+      for (var pq = 0; pq < pass.pairs.length; pq++) {
+        var ea = pass.pairs[pq][0], eb = pass.pairs[pq][1], bi = -1, bd = Infinity;
+        for (var si = 0; si < looks.length; si++) {
+          var xa = looks[si][ea], xb = looks[si][eb];
+          if (!xa || !xb) continue;
+          var dd = Math.hypot(xa.x - xb.x, xa.y - xb.y);
+          if (dd < bd) { bd = dd; bi = si; }
+        }
+        if (bi < 0) continue;
+        var at4 = pass.pairs[pq][3], XA = looks[bi][ea], XB = looks[bi][eb];
+        var na = normalOf(ea, at4), nb = normalOf(eb, at4);
+        var ka = ea + "\u0000" + at4, kb = eb + "\u0000" + at4;
+        sum[ka] = (sum[ka] || 0) + na[0] * (XA.x - XB.x) + na[1] * (XA.y - XB.y);
+        sum[kb] = (sum[kb] || 0) + nb[0] * (XB.x - XA.x) + nb[1] * (XB.y - XA.y);
+      }
+      var eps = 1e-6 * Math.max(1, bow0);
+      for (var es in sum) if (Math.abs(sum[es]) > eps) out[es] = sum[es] > 0 ? 1 : -1;
+      if (!rest) P.sides = out;
+      return out;
+    };
     for (var k3 = 0; k3 < order.length; k3++) {
-      var ion3 = order[k3], m3 = base[ion3], h3 = need[ion3], S3 = P.A[ion3];
+      var ion3 = order[k3], m3 = base[ion3], S3 = P.A[ion3];
       var q3 = m3.q || m3;
+      var at3 = meet[ion3];
       var lim3 = self.roomAcross(q3.x !== undefined ? q3.x : q3[0],
-                                 q3.y !== undefined ? q3.y : q3[1], [S3, P.B[ion3]]);
-      if (lim3 > 0 && h3 > 0.5 * lim3) h3 = 0.5 * lim3;
+                                 q3.y !== undefined ? q3.y : q3[1],
+                                 [S3, P.B[ion3], at3 !== undefined ? { node: at3 } : null]);
+      var h3 = lim3 > 0 ? 0.5 * lim3 * need[ion3] : raw[ion3];
       if (!(h3 > 0)) continue;
-      var ax3 = self.axis(S3.axisNode || S3.node), nx = -ax3[1], ny = ax3[0], s3 = 1;
-      if (m3.fly) s3 = pass.side[ion3] || 1;
+      var n3 = normalOf(ion3, at3), nx = n3[0], ny = n3[1], s3 = 1;
+      if (!sides) sides = sidesOfStep();
+      var sk3 = ion3 + "\u0000" + at3;
+      if (sides[sk3] !== undefined) s3 = sides[sk3];
+      else if (m3.fly) s3 = pass.side[ion3] || 1;
       else {
         var c3 = cause[ion3], v3 = lift[c3], o3 = base[c3];
         var dot = v3 ? (nx * v3[0] + ny * v3[1]) / v3[2] : 0;
