@@ -483,7 +483,12 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
             f"but their logic is <b>not</b> verified: the syndrome rounds are contact schedules "
             f"without H layers or CNOT orientation, a parity is taken once by one bare ancilla, "
             f"and the T-gate correction is tracked classically. They stay to show the scale the "
-            f"hierarchy handles, not as correct programs.</p></div>")
+            f"hierarchy handles, not as correct programs.</p>"
+            f"<p>The demo reports <b>G7 failed</b>, and that is the demo working: its programme asks "
+            f"for a transversal H on a bivariate-bicycle block, which does not preserve that code's "
+            f"stabilizers, so the synthesizer refuses the instruction &mdash; for the same reason "
+            f"LogicQ's own checker refuses it &mdash; and G7 reports that one instruction of the "
+            f"programme was never realised. A refused instruction is meant to be visible.</p></div>")
     body.append('<p class="muted" style="margin-top:28px"><a href="plan/">The design document</a>'
                 " &middot; every place in this library is checked twice, as hardware and as logic.</p>")
     return "".join(body)

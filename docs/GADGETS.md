@@ -685,6 +685,13 @@ slate. Change the palette in `theme.py` and both tools move together.
 | one frame at the top level, every leaf's ions replayed | 2.5 ms | 10.9 ms |
 | JS heap | — | 21 MB |
 
+**A frame costs what it draws.** The 10.9 ms above is a 1200 × 800 window; the same page,
+same build, measured across three windows: **11.2 ms at 1200 × 800, 15.7 at 1400 × 900,
+47.9 at 1700 × 1050** (best of 40 calls, showcase, 9,720 ions). So quote the window with
+the number or the number means nothing -- a figure remembered without its window looks
+like a 4x regression the next time somebody measures on a bigger screen. It is not one:
+that is what this note exists to say.
+
 Tests: `tests/test_gadget_frontend.py` (23), `test_gadget_schedule.py` (25, including a
 mutation for every G-rule), `test_gadget_page.py` (3: the page's JS replay of every leaf
 program ends on exactly the Python verifier's positions), `test_gadget_browser.py` (7:
