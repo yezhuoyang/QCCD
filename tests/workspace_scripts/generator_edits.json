@@ -1,0 +1,9 @@
+[
+  {"do": "mode", "mode": "edit"},
+  {"do": "generator", "gen": "ring", "params": {"width": 6, "height": 2, "verticals": 2}},
+  {"do": "addSite", "x": 2.5, "y": -1.5, "near": null},
+  {"do": "emit", "op": {"method": "set_site_capacity", "args": [["S1"], 3], "kwargs": {}}},
+  {"do": "emit", "op": {"method": "set_zone", "args": ["data"], "kwargs": {"capacity": 3}}},
+  {"do": "remove", "sel": [{"kind": "site", "id": "S4"}]},
+  {"do": "snapshot"}
+]

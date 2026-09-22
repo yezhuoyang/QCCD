@@ -1,0 +1,13 @@
+[
+  {"do": "mode", "mode": "edit"},
+  {"do": "node", "x": 0, "y": 0, "opts": {"id": "T0", "zone": "trap"}},
+  {"do": "node", "x": 2, "y": 0, "opts": {"id": "T1", "zone": "trap"}},
+  {"do": "node", "x": 4, "y": 0, "opts": {"id": "J0", "kind": "junction"}},
+  {"do": "node", "x": 4, "y": 2, "opts": {"id": "T2", "zone": "trap"}},
+  {"do": "join", "a": "T0", "b": "T1"},
+  {"do": "join", "a": "T1", "b": "J0"},
+  {"do": "join", "a": "J0", "b": "T2"},
+  {"do": "emit", "op": {"method": "set_site_capacity", "args": [["T1"], 3], "kwargs": {}}},
+  {"do": "emit", "op": {"method": "move_site", "args": ["T2", 4.0, 3.0], "kwargs": {}}},
+  {"do": "snapshot"}
+]

@@ -1,0 +1,57 @@
+/* QCCD live co-design layer: injected by the workspace service after the page renders. */
+#qcl-dock{position:fixed;right:12px;bottom:12px;width:380px;max-height:72vh;z-index:9000;
+  background:var(--panel,#fff);color:var(--ink,#182230);border:1px solid var(--line,#d0d5dd);
+  border-radius:10px;box-shadow:0 8px 28px rgba(16,24,40,.18);font:13px/1.4 system-ui,Segoe UI,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+#qcl-dock.qcl-min{height:auto;max-height:none}
+#qcl-dock.qcl-min .qcl-body,#qcl-dock.qcl-min .qcl-tabs{display:none}
+.qcl-head{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line,#d0d5dd);
+  background:var(--soft,#eef2f6)}
+.qcl-head b{font-size:12px;letter-spacing:.02em}
+.qcl-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;font-size:11px;
+  border:1px solid var(--line,#d0d5dd);background:var(--panel,#fff);white-space:nowrap}
+.qcl-chip.ok{background:var(--ok_bg,#e7f5ec);border-color:#9ad3ae}
+.qcl-chip.bad{background:var(--bad_bg,#fdeceb);border-color:#f0a8a2}
+.qcl-chip.warn{background:var(--warn_bg,#fdf3d9);border-color:#ecd28a;color:var(--warn_ink,#8a6d1f)}
+.qcl-dot{width:8px;height:8px;border-radius:50%;background:#98a2b3;display:inline-block}
+.qcl-dot.on{background:#12a150}.qcl-dot.busy{background:#e8890c}.qcl-dot.off{background:#b42318}
+.qcl-sp{flex:1}
+.qcl-tabs{display:flex;border-bottom:1px solid var(--line,#d0d5dd)}
+.qcl-tabs button{flex:1;border:0;background:none;padding:6px 4px;font:inherit;cursor:pointer;color:var(--muted,#667085)}
+.qcl-tabs button.on{color:var(--ink,#182230);box-shadow:inset 0 -2px 0 var(--accent,#e4572e)}
+.qcl-body{overflow:auto;padding:8px 10px;flex:1}
+.qcl-btn{border:1px solid var(--line,#d0d5dd);background:var(--panel,#fff);border-radius:6px;padding:3px 8px;
+  font:inherit;font-size:12px;cursor:pointer;color:var(--ink,#182230)}
+.qcl-btn:hover{background:var(--soft,#eef2f6)}
+.qcl-btn.pri{background:var(--navy,#1e2761);color:#fff;border-color:var(--navy,#1e2761)}
+.qcl-btn.on{outline:2px solid var(--accent,#e4572e)}
+.qcl-btn[disabled]{opacity:.5;cursor:default}
+.qcl-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:4px 0}
+.qcl-ta{width:100%;box-sizing:border-box;min-height:64px;resize:vertical;border:1px solid var(--line,#d0d5dd);
+  border-radius:6px;padding:6px;font:inherit}
+.qcl-sel{border:1px solid var(--line,#d0d5dd);border-radius:6px;padding:2px 4px;font:inherit;font-size:12px}
+.qcl-item{border:1px solid var(--line,#d0d5dd);border-radius:8px;padding:6px 8px;margin:6px 0;cursor:pointer}
+.qcl-item:hover{background:var(--soft,#eef2f6)}
+.qcl-item .qcl-meta{color:var(--muted,#667085);font-size:11px}
+.qcl-reply{margin:4px 0 4px 10px;padding:4px 8px;border-left:3px solid var(--line,#d0d5dd);white-space:pre-wrap}
+.qcl-reply.agent{border-left-color:var(--anc,#4338ca)}
+.qcl-mono{font-family:ui-monospace,Consolas,monospace;font-size:11px;word-break:break-all}
+.qcl-note{color:var(--muted,#667085);font-size:11px}
+.qcl-label{font-weight:600;font-size:12px;margin-top:8px}
+.qcl-local{background:var(--warn_bg,#fdf3d9);color:var(--warn_ink,#8a6d1f);border-radius:6px;padding:3px 6px;
+  font-size:11px;font-weight:600;display:inline-block}
+.qcl-table{width:100%;border-collapse:collapse;font-size:11px}
+.qcl-table td,.qcl-table th{border-bottom:1px solid var(--soft,#eef2f6);padding:2px 3px;text-align:left}
+#qcl-capture{position:absolute;inset:0;z-index:50;cursor:crosshair;background:transparent}
+#qcl-notice{position:fixed;left:50%;transform:translateX(-50%);top:10px;z-index:9001;display:flex;flex-direction:column;
+  gap:6px;align-items:center;pointer-events:none}
+#qcl-notice .qcl-toast{pointer-events:auto;background:var(--panel,#fff);border:1px solid var(--line,#d0d5dd);
+  border-radius:8px;padding:6px 10px;box-shadow:0 4px 14px rgba(16,24,40,.15);font:13px system-ui,sans-serif;
+  display:flex;gap:8px;align-items:center;max-width:560px}
+#qcl-notice .qcl-toast.bad{border-color:#f0a8a2;background:var(--bad_bg,#fdeceb)}
+#qcl-unpaired{position:fixed;inset:auto 12px 12px auto;z-index:9002;background:var(--bad_bg,#fdeceb);
+  border:1px solid #f0a8a2;border-radius:8px;padding:10px 12px;font:13px system-ui,sans-serif;max-width:380px}
+.qcl-modal{position:fixed;inset:0;background:rgba(16,24,40,.35);z-index:9100;display:flex;align-items:center;
+  justify-content:center}
+.qcl-modal>div{background:var(--panel,#fff);border-radius:10px;padding:14px 16px;width:560px;max-height:80vh;
+  overflow:auto;font:13px system-ui,sans-serif;color:var(--ink,#182230)}

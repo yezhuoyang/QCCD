@@ -1,0 +1,170 @@
+{
+ "$defs": {
+  "Anchor": {
+   "additionalProperties": true,
+   "properties": {
+    "kind": {
+     "enum": [
+      "entity",
+      "entity_group",
+      "region",
+      "point",
+      "instruction",
+      "circuit_op",
+      "field",
+      "metric",
+      "diagnostic",
+      "event",
+      "panel",
+      "workspace"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "Anchor",
+   "type": "object"
+  },
+  "Sketch": {
+   "additionalProperties": true,
+   "properties": {
+    "kind": {
+     "enum": [
+      "stroke",
+      "arrow",
+      "lasso"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "points": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "maxItems": 2000,
+     "minItems": 1,
+     "title": "Points",
+     "type": "array"
+    }
+   },
+   "required": [
+    "kind",
+    "points"
+   ],
+   "title": "Sketch",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/context_snapshot.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "anchors": {
+   "items": {
+    "$ref": "#/$defs/Anchor"
+   },
+   "title": "Anchors",
+   "type": "array"
+  },
+  "arch_digest": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Arch Digest"
+  },
+  "branch": {
+   "title": "Branch",
+   "type": "string"
+  },
+  "coordinates": {
+   "title": "Coordinates",
+   "type": "string"
+  },
+  "demonstration": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Demonstration"
+  },
+  "design_revision": {
+   "title": "Design Revision",
+   "type": "integer"
+  },
+  "head_at_send": {
+   "title": "Head At Send",
+   "type": "integer"
+  },
+  "id": {
+   "title": "Id",
+   "type": "string"
+  },
+  "input_digest": {
+   "title": "Input Digest",
+   "type": "string"
+  },
+  "protected": {
+   "additionalProperties": true,
+   "title": "Protected",
+   "type": "object"
+  },
+  "selection": {
+   "items": {
+    "type": "string"
+   },
+   "title": "Selection",
+   "type": "array"
+  },
+  "sketches": {
+   "items": {
+    "$ref": "#/$defs/Sketch"
+   },
+   "title": "Sketches",
+   "type": "array"
+  },
+  "view_id": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "View Id"
+  }
+ },
+ "required": [
+  "id",
+  "branch",
+  "design_revision",
+  "head_at_send",
+  "input_digest",
+  "arch_digest",
+  "view_id",
+  "selection",
+  "anchors",
+  "sketches",
+  "demonstration",
+  "protected",
+  "coordinates"
+ ],
+ "title": "ContextSnapshot",
+ "type": "object"
+}

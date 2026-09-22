@@ -1,0 +1,117 @@
+{
+ "$defs": {
+  "Anchor": {
+   "additionalProperties": true,
+   "properties": {
+    "kind": {
+     "enum": [
+      "entity",
+      "entity_group",
+      "region",
+      "point",
+      "instruction",
+      "circuit_op",
+      "field",
+      "metric",
+      "diagnostic",
+      "event",
+      "panel",
+      "workspace"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "Anchor",
+   "type": "object"
+  },
+  "Sketch": {
+   "additionalProperties": true,
+   "properties": {
+    "kind": {
+     "enum": [
+      "stroke",
+      "arrow",
+      "lasso"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "points": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "maxItems": 2000,
+     "minItems": 1,
+     "title": "Points",
+     "type": "array"
+    }
+   },
+   "required": [
+    "kind",
+    "points"
+   ],
+   "title": "Sketch",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/prompt_body.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "anchors": {
+   "items": {
+    "$ref": "#/$defs/Anchor"
+   },
+   "maxItems": 200,
+   "title": "Anchors",
+   "type": "array"
+  },
+  "intent": {
+   "default": "propose_change",
+   "enum": [
+    "comment",
+    "question",
+    "propose_change",
+    "apply_change",
+    "constraint"
+   ],
+   "title": "Intent",
+   "type": "string"
+  },
+  "mode": {
+   "default": "propose",
+   "enum": [
+    "ask",
+    "propose",
+    "apply"
+   ],
+   "title": "Mode",
+   "type": "string"
+  },
+  "sketches": {
+   "items": {
+    "$ref": "#/$defs/Sketch"
+   },
+   "maxItems": 50,
+   "title": "Sketches",
+   "type": "array"
+  },
+  "text": {
+   "maxLength": 8000,
+   "title": "Text",
+   "type": "string"
+  }
+ },
+ "required": [
+  "text"
+ ],
+ "title": "PromptBody",
+ "type": "object"
+}

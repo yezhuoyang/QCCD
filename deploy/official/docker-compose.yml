@@ -1,0 +1,71 @@
+# A LOCAL DEVELOPMENT deployment of the official submission service.
+#
+#   docker compose -f deploy/official/docker-compose.yml up --build
+#   docker compose -f deploy/official/docker-compose.yml run --rm api \
+#       python -m qccd.official.service add-uploader dev          # prints an upload token once
+#   QCCD_UPLOAD_TOKEN=<token> qccd publish --approval <id> --server http://127.0.0.1:8300
+#
+# The API is published on 127.0.0.1 only.  There is no development bypass: uploads need a
+# token created with add-uploader, and with none configured they fail closed.  Nothing here
+# is a production deployment (no TLS, a fixed development database password).
+
+name: qccd-official
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: qccd
+      POSTGRES_PASSWORD: qccd-dev-only
+      POSTGRES_DB: qccd
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [backend]
+
+  api:
+    build: { context: ../.., dockerfile: deploy/official/Dockerfile }
+    command: ["python", "-m", "qccd.official.service", "serve", "--host", "0.0.0.0", "--port", "8300"]
+    environment:
+      QCCD_OFFICIAL_DB: postgresql://qccd:qccd-dev-only@db:5432/qccd
+      QCCD_OFFICIAL_ARTIFACTS: /artifacts
+    volumes: [artifacts:/artifacts]
+    ports: ["127.0.0.1:8300:8300"]
+    depends_on: [db]
+    networks: [backend]
+
+  worker:
+    build: { context: ../.., dockerfile: deploy/official/Dockerfile }
+    command: ["python", "-m", "qccd.official.worker", "worker"]
+    environment:
+      QCCD_OFFICIAL_DB: postgresql://qccd:qccd-dev-only@db:5432/qccd
+      QCCD_OFFICIAL_ARTIFACTS: /artifacts
+      QCCD_OFFICIAL_SPOOL: /spool
+    volumes: [artifacts:/artifacts:ro, spool:/spool]
+    depends_on: [db]
+    networks: [backend]
+
+  # The grader holds no credentials and has no network at all; its only writable storage is
+  # the spool and a tmpfs.  Bundles are data; the toolchain runs as an unprivileged user
+  # under per-job time and memory limits (qccd/workspace/procs.py).
+  grader:
+    build: { context: ../.., dockerfile: deploy/official/Dockerfile }
+    command: ["python", "-m", "qccd.official.worker", "grader", "--spool", "/spool"]
+    network_mode: none
+    read_only: true
+    tmpfs: ["/tmp:size=2g"]
+    environment:
+      QCCD_GRADER_MEM_MB: "12288"
+      HOME: /tmp
+    volumes: [spool:/spool]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 16g
+    cpus: 4
+
+volumes:
+  pgdata: {}
+  artifacts: {}
+  spool: {}
+
+networks:
+  backend: {}
