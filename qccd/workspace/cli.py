@@ -398,7 +398,29 @@ def main(argv=None) -> int:
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard}[a.cmd]
-    return fn(a)
+    from .core import WorkspaceError
+    from .tasks import LOCK_NAME
+    try:
+        return fn(a)
+    except WorkspaceError as exc:
+        # a refusal the workspace explains itself: one line and what to do, not a traceback
+        print(f"qccd {a.cmd}: {exc}", file=sys.stderr)
+        hint = _HINTS.get(exc.code)
+        if hint:
+            print(f"  {hint}", file=sys.stderr)
+        return 1
+    except FileNotFoundError as exc:
+        if LOCK_NAME not in str(exc):
+            raise                          # not ours: keep the traceback
+        print(f"qccd {a.cmd}: {exc}", file=sys.stderr)
+        return 1
+
+
+#: what to do next, for the refusals a person meets at the terminal
+_HINTS = {
+    "exists": "Nothing was changed. If it is the workspace you made earlier, cd into it and carry on "
+              "(qccd studio --keep-alive); otherwise choose another name.",
+}
 
 
 if __name__ == "__main__":
