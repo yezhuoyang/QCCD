@@ -359,3 +359,42 @@ def test_keep_alive_restarts_a_killed_service_but_not_a_stopped_one(live):
     assert read_runtime(info["workspace_id"]) is None                     # and it stayed stopped
     info.update(info2)
 
+
+def test_a_studio_page_that_cannot_be_built_says_why(svc, monkeypatch):
+    """A failure while building the page is an HTML page with the error and what to run,
+    not a bare 500 (a person following the website's steps saw only the status code)."""
+    import qccd.workspace.service as service_mod
+    ws, state, client = svc
+
+    def broken(*a, **k):
+        raise ModuleNotFoundError("No module named 'qccd.viz.scale'")
+    monkeypatch.setattr(service_mod, "_render", broken)
+    r = client.get("/studio")
+    assert r.status_code == 500 and r.headers["content-type"].startswith("text/html")
+    assert "could not be built" in r.text and "ModuleNotFoundError" in r.text and "qccd stop" in r.text
+    state.info["code"] = "code-from-before-an-update"          # the service predates the files on disk
+    assert "changed after this service started" in client.get("/studio").text
+
+
+def test_studio_restarts_a_service_running_older_code(live):
+    """After `git pull`, a running service still runs the code it started with; `qccd
+    studio` must not hand the person that service (it served the old 500 again).  Only the
+    person's command restarts it -- an agent's adapter reuses whatever runs."""
+    import json as _json
+    root, info = live
+    from qccd.workspace.runtime import code_identity, ensure_service, read_runtime, runtime_path
+    assert info["code"] == code_identity()
+    assert ensure_service(root, restart_stale=True)["pid"] == info["pid"]     # current: reused
+    p = runtime_path(info["workspace_id"])
+    rec = _json.loads(p.read_text(encoding="utf-8"))
+    rec.pop("code")                                   # as written by a service from before the update
+    p.write_text(_json.dumps(rec), encoding="utf-8")
+    assert ensure_service(root)["pid"] == info["pid"]                           # an adapter: reused
+    fresh = ensure_service(root, restart_stale=True, python=MCP_PY or sys.executable)
+    assert fresh.get("restarted_stale") is True
+    assert fresh["pid"] != info["pid"] and fresh["port"] == info["port"]         # same port, new code
+    assert read_runtime(info["workspace_id"])["code"] == code_identity()
+    from qccd.workspace.core import _pid_alive
+    assert not _pid_alive(info["pid"])
+    info.update(fresh)
+

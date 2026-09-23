@@ -220,6 +220,8 @@ def create_app(state: ServiceState) -> FastAPI:
             html = await asyncio.to_thread(_studio_page, state, None)
         except WorkspaceError as e:
             return err(e)
+        except Exception as e:                      # say why on the page, not a bare 500
+            return _page_failed(state, e)
         return HTMLResponse(html, headers={"Content-Security-Policy": _CSP})
 
     @app.get("/run/{snapshot_id}")
@@ -671,6 +673,34 @@ def _css() -> str:
 
 # ---------------------------------------------------------------------- serve
 
+def _page_failed(state: ServiceState, exc: Exception) -> HTMLResponse:
+    """The Studio page could not be built: an HTML page that says why and what to do, and
+    the full traceback in .qccd/service.log."""
+    import html as _html
+    import logging
+    logging.getLogger("qccd.service").exception("building the Studio page failed")
+    from .runtime import code_identity
+    started = state.info.get("code")
+    stale = bool(started) and started != code_identity()
+    if stale:
+        why = ("QCCD's files changed after this service started (an update, or a <code>git pull</code>), "
+               "and a running service keeps the code it started with.")
+    else:
+        why = "The full traceback is in <code>.qccd/service.log</code> inside the workspace."
+    body = (f"<h1>The Studio page could not be built</h1>"
+            f"<pre>{_html.escape(type(exc).__name__ + ': ' + str(exc))}</pre>"
+            f"<p>{why}</p>"
+            "<p>Restart the service with the current code, in the workspace folder:</p>"
+            "<pre>qccd stop\nqccd studio --keep-alive</pre>"
+            "<p>If the same error comes back, send <code>.qccd/service.log</code> to the maintainers.</p>")
+    page = ("<!doctype html><html><head><meta charset=\"utf-8\"><title>QCCD Studio: page error</title>"
+            "<style>body{font:15px/1.5 system-ui,sans-serif;max-width:760px;margin:48px auto;padding:0 16px;color:#1d1d1b}"
+            "pre{background:#f5f4f1;padding:10px 12px;border-radius:6px;white-space:pre-wrap;word-break:break-word}"
+            "code{background:#f5f4f1;padding:1px 4px;border-radius:4px}</style></head>"
+            f"<body>{body}</body></html>")
+    return HTMLResponse(page, status_code=500, headers={"Content-Security-Policy": _CSP})
+
+
 def _single_instance(root: Path):
     """Take `.qccd/service.lock` exclusively (released by the OS when the process ends,
     however it ends).  None if another process holds it."""
@@ -697,7 +727,9 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
     import sys as _sys
     import uvicorn
     from .delivery import DeliveryWorker
-    from .runtime import bind_listener, read_runtime, read_sticky, remove_runtime, write_runtime, write_sticky
+    from .runtime import (bind_listener, code_identity, read_runtime, read_sticky, remove_runtime,
+                          write_runtime, write_sticky)
+    code = code_identity()                      # the code this process loaded, for `qccd studio`'s staleness check
 
     faulthandler.enable(file=_sys.stderr)
     logging.basicConfig(stream=_sys.stderr, level=logging.INFO,
@@ -716,7 +748,7 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
     sock = bind_listener(port, fallback=False) if port else bind_listener(read_sticky(ws.id).get("port"))
     port = sock.getsockname()[1]
     write_sticky(ws.id, port=port)
-    info = write_runtime(ws.id, ws.root, port, os.getpid())
+    info = write_runtime(ws.id, ws.root, port, os.getpid(), code=code)
     state = ServiceState(ws, info, sticky=True)
     app = create_app(state)
     worker = DeliveryWorker(state)

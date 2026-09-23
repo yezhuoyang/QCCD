@@ -24,6 +24,7 @@ a dead port with a cookie nobody knows.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
@@ -39,7 +40,7 @@ from .tasks import LOCK_NAME, read_lock
 
 __all__ = ["runtime_dir", "runtime_path", "find_workspace_root", "read_runtime", "write_runtime",
            "remove_runtime", "ensure_service", "service_request", "free_port", "health",
-           "read_sticky", "write_sticky", "bind_listener", "keep_alive"]
+           "read_sticky", "write_sticky", "bind_listener", "keep_alive", "code_identity"]
 
 
 def runtime_dir() -> Path:
@@ -117,10 +118,30 @@ def bind_listener(preferred: int | None = None, host: str = "127.0.0.1", *, fall
     raise OSError(f"cannot listen on {host}:{preferred}" if preferred else "no port to listen on")
 
 
-def write_runtime(ws_id: str, root: Path, port: int, pid: int) -> dict:
+def code_identity() -> str:
+    """Which code a process runs: a digest of the qccd package's source files (path, size,
+    modification time; about 150 files, ~10 ms).  A service keeps the code it started with,
+    so after a `git pull` it runs the OLD code until it restarts -- this is how `qccd studio`
+    tells.  `qccd/site` (the website builder) is left out: the service never loads it."""
+    pkg = Path(__file__).resolve().parents[1]
+    h = hashlib.sha256()
+    for dirpath, dirnames, filenames in os.walk(pkg):
+        dirnames[:] = sorted(d for d in dirnames if d not in ("__pycache__", "site") and not d.startswith("."))
+        for name in sorted(filenames):
+            if name.endswith((".py", ".js", ".css", ".html")):
+                p = Path(dirpath) / name
+                try:
+                    st = p.stat()
+                except OSError:
+                    continue
+                h.update(f"{p.relative_to(pkg).as_posix()}|{st.st_size}|{st.st_mtime_ns}\n".encode())
+    return h.hexdigest()[:16]
+
+
+def write_runtime(ws_id: str, root: Path, port: int, pid: int, *, code: str | None = None) -> dict:
     info = {"workspace_id": ws_id, "root": str(root), "host": "127.0.0.1", "port": port, "pid": pid,
             "agent_token": secrets.token_urlsafe(32), "owner_token": secrets.token_urlsafe(32),
-            "started_at": time.time(), "version": 1}
+            "started_at": time.time(), "code": code, "version": 1}
     _write_private(runtime_path(ws_id), info)
     return info
 
@@ -174,13 +195,42 @@ def _holder_alive(ws_id: str) -> bool:
     return _pid_alive(int(info.get("pid", 0)))
 
 
-def ensure_service(root: Path, *, wait: float = 60.0, python: str | None = None) -> dict:
-    """Return the running service for `root`, starting one (detached) if needed."""
+def ensure_service(root: Path, *, wait: float = 60.0, python: str | None = None,
+                   restart_stale: bool = False) -> dict:
+    """Return the running service for `root`, starting one (detached) if needed.
+
+    `restart_stale`: a running service started from OTHER code than this process's (QCCD was
+    updated since, or it predates this check) is stopped and started again, and the result
+    carries `restarted_stale: True`.  Only `qccd studio` asks for it: an agent adapter must
+    not stop the service the person is using."""
     root = Path(root).resolve()
     ws_id = read_lock(root)["workspace_id"]
     info = read_runtime(ws_id)
+    restarted = False
+    if info and restart_stale and info.get("code") != code_identity():
+        _stop_stale(info)
+        info, restarted = None, True
     if info:
         return info
+    return dict(_start_service(root, ws_id, wait=wait, python=python), **({"restarted_stale": True} if restarted else {}))
+
+
+def _stop_stale(info: dict, wait: float = 20.0) -> None:
+    """Stop a service that runs older code, the way `qccd stop` does, and wait for it to go."""
+    from .core import _pid_alive
+    try:
+        service_request(info, "POST", "/api/shutdown", {}, token="owner", timeout=10)
+    except Exception:
+        pass
+    t0 = time.time()
+    while _pid_alive(int(info.get("pid", 0))) and time.time() - t0 < wait:
+        time.sleep(0.25)
+    if _pid_alive(int(info.get("pid", 0))):
+        raise RuntimeError(f"the running service (pid {info.get('pid')}) was started from older code and "
+                           f"did not stop; run `qccd stop`, then `qccd studio` again")
+
+
+def _start_service(root: Path, ws_id: str, *, wait: float, python: str | None) -> dict:
     # a live process holds the record but did not answer: give it time, never start a twin
     t0 = time.time()
     while _holder_alive(ws_id) and time.time() - t0 < 20:

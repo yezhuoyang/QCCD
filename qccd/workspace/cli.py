@@ -95,7 +95,10 @@ def cmd_serve(a) -> int:
 
 
 def cmd_studio(a) -> int:
-    info = _svc(a)
+    from .runtime import ensure_service
+    info = ensure_service(_root(a), restart_stale=True)
+    if info.get("restarted_stale"):
+        print("the running service was started from older code (QCCD was updated since); restarted it")
     code = _call(info, "POST", "/api/pair-code", {})["code"]
     url = f"http://127.0.0.1:{info['port']}/studio#pair={code}"
     print(f"Studio: {url}")
@@ -132,7 +135,9 @@ def cmd_status(a) -> int:
     if info:
         ctx = _call(info, "GET", "/api/context")
         sessions = _call(info, "GET", "/api/sessions")["sessions"]
-        out["service"] = {"port": info["port"], "pid": info["pid"]}
+        from .runtime import code_identity
+        out["service"] = {"port": info["port"], "pid": info["pid"],
+                          "stale": info.get("code") != code_identity()}
         out["revision"] = ctx["revision"]
         out["mode"] = ctx["mode"]
         out["sessions"] = [{k: s[k] for k in ("id", "client", "mode", "status", "label", "write_fence")} for s in sessions]
@@ -148,6 +153,8 @@ def _fmt_status(o) -> str:
         lines.append("service   not running (`qccd studio` starts it)")
         return "\n".join(lines)
     lines.append(f"service   127.0.0.1:{o['service']['port']} pid {o['service']['pid']}  design r{o['revision']} ({o['mode']})")
+    if o["service"].get("stale"):
+        lines.append("          started from older code (QCCD was updated since): `qccd studio` restarts it")
     for s in o["sessions"]:
         lines.append(f"agent     {s['id']}  {s['client']}/{s['mode']}  {s['status']}"
                      + ("  STOPPED" if s["write_fence"] else "") + f"  {s['label'] or ''}")
