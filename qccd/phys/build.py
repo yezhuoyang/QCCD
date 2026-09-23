@@ -8,9 +8,35 @@ already determine, so storing it would only create something to lose.
 
 **What a segment becomes.**  Two RF rails flanking its axis at `w_g/2`, each `w_rf` wide;
 one segmented centre control electrode between them; two segmented control columns
-outboard at `dc_setback`.  Pads are tiled at `dc_pitch` with one fabrication gap between
-them, and a site gets a `well_gap` break so that a trapping position is visible in the
-metal rather than being an invisible boundary between two abutting pads.
+outboard at `dc_setback`.  Pads are tiled at `dc_pitch` with one `g_dc` between them, and
+a site gets a `well_gap` break so that a trapping position is visible in the metal rather
+than being an invisible boundary between two abutting pads.
+
+**RF is kept clear by `g_rf`, control metal by `g_dc`.**  They were one number -- `gap` --
+until a reviewer asked for two, and they are not the same claim: `g_dc` is what the
+process can resolve between two control electrodes, `g_rf` is how far driven metal has to
+stay from anything else.  `dc_setback` is where that shows: it is `w_g/2 + w_rf + g_rf`,
+and the builder refuses a technology whose file says otherwise rather than drawing
+something the technology does not describe.
+
+**A site's span carries `n_dc_pairs` pads; the rail between two sites carries what fits.**
+The pads nearest each site are anchored at that site's end of the span, and any slack goes
+to the middle of the rail rather than to the trapping positions -- so the count under a
+site is the technology's `n_dc_pairs` and not a remainder.  When the span holds no more
+than `2 * n_dc_pairs` pads there is no middle to put slack in and the run is simply
+centred, which is what every segment of the ETH preset does.
+
+**A pad is beside a site, not on it.**  A pad centred ON a node would straddle two
+segment cells, and this builder's cell-per-segment decomposition would then draw it as two
+polygons on two different nets -- two electrodes abutting at 0 nm, which the DRC would
+report as a short.  So `n_dc_pairs` pads sit symmetrically about each site rather than
+centred on it, `qccd/phys/drc.py:dc_pairs_per_site` counts what a site actually got, and
+moving a trapping position onto a pad centre would need the tiling to be owned by the
+nodes instead of the segments.  Polygon (triangular / wedge) corner electrodes at a
+junction are the other intended follow-up: `shapes.union_by_net` is exact for rectangles
+only and refuses anything else, so a wedge would have to wait for a gap computation that
+does not go through the rectangle union.  Junction pads are omitted where they would
+overlap instead -- see `keepout_half_width`.
 
 **What a junction becomes: the paper's own counterexample, on purpose.**  A node of degree
 three or more gets each incident axis's rail pair *extended straight through* the node.
@@ -45,6 +71,7 @@ approximated.  Physical coordinates never reach `qccd/viz/layout.py`, whose `COO
 
 from __future__ import annotations
 
+from dataclasses import replace
 from fractions import Fraction
 from typing import Mapping, Sequence
 
@@ -52,7 +79,8 @@ from ..arch.device import Device
 from .shapes import Cell, Inst, Layout, Poly, Refusal
 from .tech import Technology
 
-__all__ = ["build_layout", "rects_for_field", "NAIVE_CROSSING_SOURCE"]
+__all__ = ["build_layout", "rects_for_field", "dc_pairs_by_site",
+           "NAIVE_CROSSING_SOURCE"]
 
 #: Why a degree>=3 node is drawn the way it is.  Carried on every crossing polygon's role
 #: documentation and repeated in the layout notes, because the shape is deliberately the
@@ -175,7 +203,8 @@ def build_layout(arch, tech: Technology) -> Layout:
 
     sx, sy = tech.nm_per_unit_x.nm, tech.nm_per_unit_y.nm
     w_g, w_rf = tech.nm("w_g"), tech.nm("w_rf")
-    gap, pitch = tech.nm("gap"), tech.nm("dc_pitch")
+    gap, pitch = tech.g_dc, tech.nm("dc_pitch")
+    g_rf, n_pairs = tech.g_rf, tech.n_dc_pairs
     dc_w, setback = tech.nm("dc_width"), tech.nm("dc_setback")
     centre_w, well_gap = tech.nm("dc_centre_width"), tech.nm("well_gap")
     extension = tech.nm("rail_end_extension")
@@ -183,11 +212,11 @@ def build_layout(arch, tech: Technology) -> Layout:
 
     #: half-width of the RF rail pair, and the axial reach of a crossing rail
     reach = w_g // 2 + w_rf
-    if setback != reach + gap:
+    if setback != reach + g_rf:
         raise ValueError(
-            f"technology {tech.name!r} has dc_setback={setback} but w_g/2 + w_rf + gap = "
-            f"{reach + gap}; the control column must clear the rails by exactly one "
-            f"fabrication gap or the derivation below is drawing something else")
+            f"technology {tech.name!r} has dc_setback={setback} but w_g/2 + w_rf + g_rf = "
+            f"{reach + g_rf}; the control column must clear the rails by exactly the RF "
+            f"clearance g_rf or the derivation below is drawing something else")
 
     refused: list[Refusal] = []
     worst_residual = Fraction(0)
@@ -273,11 +302,11 @@ def build_layout(arch, tech: Technology) -> Layout:
             return _segment_polys(
                 length, ext_lo, ext_hi, inset_lo, inset_hi, keepouts, rail_cuts,
                 w_g=w_g, w_rf=w_rf, gap=gap, pitch=pitch, dc_w=dc_w, setback=setback,
-                centre_w=centre_w, rf_layer=rf_layer, dc_layer=dc_layer)
+                centre_w=centre_w, rf_layer=rf_layer, dc_layer=dc_layer, n_pairs=n_pairs)
 
         _cell(key, make)
         dropped_pads += _pads_dropped(length, inset_lo, inset_hi, keepouts, pitch, gap,
-                                      setback)
+                                      keepout_half_width(setback, dc_w, gap), n_pairs)
         insts.append(Inst(key, origin[0], origin[1], 0 if axis == "x" else 1, seg.id))
 
     # ------------------------------------------------------------ the crossings
@@ -332,20 +361,191 @@ def build_layout(arch, tech: Technology) -> Layout:
     if tech.declared():
         notes.append("technology dimensions this project chose rather than read: "
                      + ", ".join(tech.declared()))
+    if tech.waived():
+        notes.append("technology minimums this preset waives, with the reason in the "
+                     "file: " + ", ".join(tech.waived()))
     notes.append("clearance between metal derived from DIFFERENT elements is not checked "
                  "here; qccd/phys/drc.py does that over the flattened layout")
-    return Layout(tech, cells, tuple(insts), tuple(refused), (), tuple(notes),
-                  global_nets=(RF_NET,))
+    layout = Layout(tech, cells, tuple(insts), tuple(refused), (), tuple(notes),
+                    global_nets=(RF_NET,))
+
+    # what every trapping site actually got, which is the collaborator's own rule and
+    # the one number the tiling above exists to deliver
+    by_site = dc_pairs_by_site(layout, device)
+    if by_site:
+        short = sorted(n for n, k in by_site.items() if k < n_pairs)
+        worst = min(by_site.values())
+        notes.append(
+            f"control electrodes under a trapping site: {worst} to "
+            f"{max(by_site.values())} pairs against n_dc_pairs = {n_pairs}"
+            + (f"; {len(short)} of {len(by_site)} sites are short "
+               f"({', '.join(short[:6])}{', ...' if len(short) > 6 else ''}) and "
+               f"qccd/phys/drc.py reports each one" if short else
+               f", met at every one of {len(by_site)} sites"))
+        layout = replace(layout, notes=tuple(notes))
+    return layout
+
+
+# ---------------------------------------------------- what a site actually got
+
+def _pair_key(net: str) -> tuple[str, str] | None:
+    """`('north'|'south', index)` for a flattened control-pad net, or None."""
+    local = net.rsplit("/", 1)[-1]
+    parts = local.split(":")
+    if len(parts) != 3 or parts[0] != "DC":
+        return None
+    return (parts[1], parts[2])
+
+
+def dc_pairs_by_site(layout, arch) -> dict[str, int]:
+    """Per trapping site, how many PAIRS of control electrodes sit under its span.
+
+    A pair is the north and south pad at one axial position: the two electrodes that
+    squeeze the ion from both sides.  The centre column is not part of a pair -- there is
+    one of it, not two -- and a lone north pad is not a pair either, which is the case the
+    junction keep-outs actually produce.
+
+    **A site's span is one trap pitch of rail, positioned where the site's rail is.**  For
+    an interior site that is half the segment on each side; for a dead end, where there is
+    no neighbour on one side, the window is SHIFTED onto the side that exists rather than
+    shrunk, because the trap at the end of a rail is not half a trap.  Only pads owned by
+    the segments incident to the site are counted, so a perpendicular rail's electrodes
+    never count as somebody else's.
+
+    This is the count `qccd/phys/drc.py:dc_pairs_per_site` checks against
+    `Technology.n_dc_pairs`, and the one `build_layout` reports in its notes.
+    """
+    device: Device = getattr(arch, "device", arch)
+    tech = layout.tech
+    sx, sy = tech.nm_per_unit_x.nm, tech.nm_per_unit_y.nm
+    pos: dict[str, tuple[int, int]] = {}
+    for nid, node in device.nodes.items():
+        if len(node.pos) == 2:
+            pos[nid] = (_exact_nm(node.pos[0], sx)[0], _exact_nm(node.pos[1], sy)[0])
+
+    seg_axis: dict[str, str] = {}
+    for sid, seg in device.segments.items():
+        a, b = seg.ends
+        if a in pos and b in pos:
+            ax = _axis_of(device.nodes[a].pos, device.nodes[b].pos)
+            if ax:
+                seg_axis[sid] = ax
+
+    #: (segment, pad index) -> the bands drawn there, and the pad's axial centre
+    seen: dict[tuple[str, str], set[str]] = {}
+    centre: dict[tuple[str, str], int] = {}
+    for p in layout.flatten():
+        if p.role != "dc_pad" or p.owner not in seg_axis:
+            continue
+        key = _pair_key(p.net)
+        if key is None:
+            continue
+        band, idx = key
+        if band not in ("north", "south"):
+            continue
+        x0, y0, x1, y1 = p.bbox()
+        i = 0 if seg_axis[p.owner] == "x" else 1
+        seen.setdefault((p.owner, idx), set()).add(band)
+        centre[(p.owner, idx)] = ((x0 + x1) // 2, (y0 + y1) // 2)[i]
+
+    pairs_of_segment: dict[str, list[int]] = {}
+    for key, bands in seen.items():
+        if bands >= {"north", "south"}:
+            pairs_of_segment.setdefault(key[0], []).append(centre[key])
+
+    out: dict[str, int] = {}
+    for nid, node in device.nodes.items():
+        if not node.is_site or nid not in pos:
+            continue
+        best = 0
+        for axis in ("x", "y"):
+            i = 0 if axis == "x" else 1
+            here = pos[nid][i]
+            below: list[tuple[int, str]] = []   # (length, segment) on the low side
+            above: list[tuple[int, str]] = []
+            for sid in device.incidence[nid]:
+                if seg_axis.get(sid) != axis:
+                    continue
+                other = device.segments[sid].other(nid)
+                if other not in pos:
+                    continue
+                delta = pos[other][i] - here
+                (below if delta < 0 else above).append((abs(delta), sid))
+            if not below and not above:
+                continue
+            span_lo = max(l for l, _ in below) if below else 0
+            span_hi = max(l for l, _ in above) if above else 0
+            if not below:                       # a dead end: shift, do not shrink
+                lo, hi = here, here + span_hi
+            elif not above:
+                lo, hi = here - span_lo, here
+            else:
+                lo, hi = here - span_lo // 2, here + span_hi // 2
+            n = 0
+            for _l, sid in below + above:
+                n += sum(1 for c in pairs_of_segment.get(sid, ()) if lo <= c < hi)
+            best = max(best, n)
+        out[nid] = best
+    return out
 
 
 # ------------------------------------------------------------------ the geometry
 
+def keepout_half_width(setback: int, dc_w: int, gap: int) -> int:
+    """How far a pad must stay from a perpendicular rail's axis.
+
+    A crossing rail is not just its axis: its own control columns sit at `setback` to
+    `setback + dc_w` transversely from it, which in THIS segment's frame is an axial band
+    of that width on either side of the crossing.  A pad had to clear only `setback`,
+    which is the empty lane INSIDE those columns -- so a pad tiled onto the crossing rail's
+    own column was kept, and the two shorted at 0 nm.  It never fired on a shipped device
+    (their spurs are half a lattice unit long) and fires on every ring of height 4 or more,
+    which is what made those devices look unbuildable (`Codesign/findings/q06b` §3).
+    """
+    return setback + dc_w + gap
+
+
+def _tiled_starts(lo: int, hi: int, pitch: int, gap: int, n: int,
+                  n_pairs: int) -> list[int]:
+    """Where `n` pads start in `[lo, hi]`, with the ends anchored to the two sites.
+
+    A trapping site is at each end of the span (`lo` and `hi` are already inset by half a
+    `well_gap` from it), so the `n_pairs` pads nearest a site are laid from that site's end
+    and any slack is left in the MIDDLE of the rail.  That is the collaborator's rule --
+    every site gets `n_dc_pairs` electrode pairs, and the rail between two sites carries
+    whatever else fits at `dc_pitch` -- rather than a remainder landing where the ion does.
+
+    Below `2 * n_pairs` pads there is no middle to put the slack in, so the run is centred,
+    which is what every segment of `eth_junction_2201.12579` does: three pads in a span
+    that holds exactly three.  The two rules therefore agree wherever the span is an exact
+    number of pitches, and differ only where there is slack to place.
+    """
+    pad = pitch - gap
+    if n_pairs <= 0 or n <= 2 * n_pairs:
+        used = n * pitch - gap
+        start = lo + (hi - lo - used) // 2
+        return [start + k * pitch for k in range(n)]
+    lows = [lo + k * pitch for k in range(n_pairs)]
+    highs = sorted(hi - pad - k * pitch for k in range(n_pairs))
+    mid_lo = lows[-1] + pad + gap
+    mid_hi = highs[0] - gap
+    m = n - 2 * n_pairs
+    while m > 0 and m * pitch - gap > mid_hi - mid_lo:
+        m -= 1
+    used = m * pitch - gap
+    mids = [mid_lo + (mid_hi - mid_lo - used) // 2 + k * pitch for k in range(m)]
+    return lows + mids + highs
+
+
 def _pad_spans(length: int, inset_lo: int, inset_hi: int, keepouts: Sequence[int],
-               pitch: int, gap: int, setback: int) -> list[tuple[int, int]]:
+               pitch: int, gap: int, setback: int,
+               n_pairs: int = 0) -> list[tuple[int, int]]:
     """Axial extents of the control pads of one segment, in its own frame.
 
-    Tiled from the low end at `pitch`, each pad one fabrication gap shorter than the pitch,
-    inset at a site so the well shows, and dropped where a perpendicular rail crosses.
+    Tiled at `pitch`, each pad one `g_dc` shorter than the pitch, anchored at the sites
+    (`_tiled_starts`), inset at a site so the well shows, and dropped where a perpendicular
+    rail crosses.  `setback` here is the keep-out half-width, which is
+    `keepout_half_width` and not the bare `dc_setback` -- see there.
     """
     lo, hi = inset_lo, length - inset_hi
     if hi - lo < pitch - gap:
@@ -354,11 +554,8 @@ def _pad_spans(length: int, inset_lo: int, inset_hi: int, keepouts: Sequence[int
     n = (hi - lo + gap) // pitch
     if n <= 0:
         return []
-    used = n * pitch - gap
-    start = lo + (hi - lo - used) // 2
     out = []
-    for k in range(n):
-        x0 = start + k * pitch
+    for x0 in _tiled_starts(lo, hi, pitch, gap, n, n_pairs):
         x1 = x0 + pad
         if any(x0 < j + setback and x1 > j - setback for j in keepouts):
             continue
@@ -367,12 +564,13 @@ def _pad_spans(length: int, inset_lo: int, inset_hi: int, keepouts: Sequence[int
 
 
 def _pads_dropped(length: int, inset_lo: int, inset_hi: int, keepouts: Sequence[int],
-                  pitch: int, gap: int, setback: int) -> int:
+                  pitch: int, gap: int, setback: int, n_pairs: int = 0) -> int:
     """How many pads the keep-outs removed, counted over all three columns."""
     if not keepouts:
         return 0
-    full = len(_pad_spans(length, inset_lo, inset_hi, (), pitch, gap, setback))
-    kept = len(_pad_spans(length, inset_lo, inset_hi, keepouts, pitch, gap, setback))
+    full = len(_pad_spans(length, inset_lo, inset_hi, (), pitch, gap, setback, n_pairs))
+    kept = len(_pad_spans(length, inset_lo, inset_hi, keepouts, pitch, gap, setback,
+                          n_pairs))
     return 3 * (full - kept)
 
 
@@ -397,7 +595,7 @@ def _segment_polys(length: int, ext_lo: int, ext_hi: int, inset_lo: int, inset_h
                    keepouts: Sequence[int], rail_cuts: Sequence[tuple[int, int, int]],
                    *, w_g: int, w_rf: int, gap: int, pitch: int,
                    dc_w: int, setback: int, centre_w: int, rf_layer: str,
-                   dc_layer: str) -> list[Poly]:
+                   dc_layer: str, n_pairs: int = 0) -> list[Poly]:
     """One segment's metal, in a frame where it runs along +x from the origin.
 
     **A rail stops at a perpendicular trap's gap.**  `rail_cuts` carries `(side, x0, x1)`
@@ -419,7 +617,8 @@ def _segment_polys(length: int, ext_lo: int, ext_hi: int, inset_lo: int, inset_h
             if x1 > x0:
                 out.append(Poly.rect(rf_layer, x0, y0, x1, y1,
                                      role="rail", net=RF_NET, owner=""))
-    spans = _pad_spans(length, inset_lo, inset_hi, keepouts, pitch, gap, setback)
+    spans = _pad_spans(length, inset_lo, inset_hi, keepouts, pitch, gap,
+                       keepout_half_width(setback, dc_w, gap), n_pairs)
     bands = [("centre", -(centre_w // 2), centre_w // 2),
              ("north", setback, setback + dc_w),
              ("south", -(setback + dc_w), -setback)]

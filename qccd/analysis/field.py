@@ -207,11 +207,13 @@ class PhysicalAnalysis(QCCDAnalysis):
             # dc_setback is derived from the RF geometry, so an override of one without
             # the other would leave the builder drawing a trap that is not self-consistent
             w_g, w_rf = doc["dims"]["w_g"]["nm"], doc["dims"]["w_rf"]["nm"]
-            gap = doc["dims"]["gap"]["nm"]
+            # the RF clearance, which is g_rf and not the DC gap -- they were one number
+            # until the technology rules split them, and dc_setback follows the RF one
+            g_rf = doc["dims"].get("g_rf", doc["dims"]["gap"])["nm"]
             if s["dc"]["setback_nm"] is None:
                 doc["dims"]["dc_setback"] = {
-                    "nm": w_g // 2 + w_rf + gap,
-                    "source": "re-derived: w_g/2 + w_rf + gap, after an RF override"}
+                    "nm": w_g // 2 + w_rf + g_rf,
+                    "source": "re-derived: w_g/2 + w_rf + g_rf, after an RF override"}
         return Technology.from_json(doc)
 
     def _mass_kg(self) -> float:

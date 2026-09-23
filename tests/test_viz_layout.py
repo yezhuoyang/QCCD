@@ -123,8 +123,11 @@ def test_no_device_can_draw_two_ions_on_top_of_each_other(device, page):
     assert 2 * r <= gap + 1e-9, (
         f"{device}: ion radius {r:.2f} on a {gap:.2f} px nearest-neighbour gap "
         f"-- the discs overlap by {2 * r - gap:.2f} px")
-    # the page's own measurement has to agree with what we just recomputed
-    assert lay["g"] == pytest.approx(gap, rel=1e-6)
+    # the page's own measurement has to agree with what we just recomputed -- to the
+    # page's own rounding: `g` ships quantised to four decimals, so a gap that lands
+    # near a rounding boundary (the dual loop's inset end columns, 2026-09-15) differs
+    # from the exact recomputation by up to half a unit in the last place
+    assert lay["g"] == pytest.approx(gap, abs=6e-5)
 
 
 @pytest.mark.parametrize("device", DEVICES)
@@ -308,9 +311,12 @@ def test_a_bigger_trap_is_drawn_as_a_longer_well(device, page):
 
 @pytest.mark.parametrize("device", DEVICES)
 def test_a_segment_never_runs_straight_through_a_node_it_does_not_touch(device, page):
-    """The shipped ring's two corner docks sit exactly on the end caps, and the dual-loop
-    Cyclone's A-loop end caps are three units long and cross four D-loop nodes.  Drawn as
-    chords, those say the loops intersect.  They are bowed instead."""
+    """A rail drawn as a chord must not run THROUGH a node it does not touch; if the
+    drawing would, the rail is bowed instead.  Only a node that projects onto the rail's
+    interior counts: a trap beside a junction is half a step from the rail that ends at
+    that junction, and bending that rail made the ion detour around the junction
+    (2026-09-15).  Since the generators were repaired (R20/R21) no shipped device needs a
+    bow at all, so this mostly guards the criterion."""
     _, view = page(device)
     lay = view["layout"]
     pos = {n["id"]: (lay["ox"] + n["x"] * lay["sx"], lay["oy"] + n["y"] * lay["sy"])
@@ -320,10 +326,16 @@ def test_a_segment_never_runs_straight_through_a_node_it_does_not_touch(device, 
         if s["id"] in bows:
             continue
         a, b = pos[s["a"]], pos[s["b"]]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        l2 = dx * dx + dy * dy
         for n in view["arch"]["nodes"]:
             if n["id"] in (s["a"], s["b"]):
                 continue
-            d = point_to_segment(pos[n["id"]], a, b)
+            q = pos[n["id"]]
+            u = ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2 if l2 else 0.0
+            if u <= 1e-6 or u >= 1.0 - 1e-6:
+                continue            # beside an end, not in the way
+            d = point_to_segment(q, a, b)
             assert d >= 0.55 * lay["g"], (
                 f"{device}: node {n['id']} is {d:.1f} px from segment {s['id']}, "
                 f"which is not bowed")
@@ -332,11 +344,13 @@ def test_a_segment_never_runs_straight_through_a_node_it_does_not_touch(device, 
 
 
 def test_only_the_devices_that_need_a_bow_get_one(page):
-    """Seven of the nine shipped devices are drawn with straight chords throughout."""
+    """No shipped device is bowed any more.  The ring's corner docks used to sit on the
+    end caps (E143, E71) and the dual loop's caps ran through four data-loop nodes (EA35,
+    EA71); both were drawing defects the generators no longer have (R20/R21), so every
+    shipped device is drawn with straight chords throughout and an ion walks through a
+    junction rather than around it."""
     bowed = {d: sorted(page(d)[1]["layout"]["bows"]) for d in DEVICES}
-    assert bowed["ring144_24v"] == ["E143", "E71"]
-    assert bowed["cyclone_dual_loop"] == ["EA35", "EA71"]
-    assert [d for d, b in bowed.items() if b] == ["cyclone_dual_loop", "ring144_24v"]
+    assert [d for d, b in bowed.items() if b] == [], bowed
 
 
 # --------------------------------------------------------------- detail levels

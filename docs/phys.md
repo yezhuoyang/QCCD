@@ -107,6 +107,138 @@ These measure different things and they disagree. An isotropic 225 µm was tried
 shorts the north control column of every ring device against the opposite rail — the two
 rows physically do not fit.
 
+## The collaborator's technology rules
+
+A reviewer of the hardware model asked for six named variables, each with a minimum and a
+default. They are first-class fields of the technology — `qccd/phys/tech.py:TECH_RULES` —
+checked when a file loads, and a breach is a `TechnologyError` naming the field, the value
+and the minimum. Three of them are dimensions this layer already had under other names, so
+the rule *reads* the existing dimension instead of storing a second copy that could drift.
+
+| variable | min | default | unit | read from | enforced by |
+|---|---|---|---|---|---|
+| `n_dc_pairs` | 3 | 3 | pairs | `n_dc_pairs` (a `Count`, not a `Dim`) | `tech.py` at load; **DRC `dc_pairs_per_site`** |
+| `w_rf` | 30000 | 60000 | nm | `dims['w_rf']` | `tech.py` at load; drawn width by DRC `min_width` |
+| `w_dc` | 30000 | 50000 | nm | `dims['dc_width']` | `tech.py` at load; drawn width by DRC `min_width` |
+| `l_dc` | 30000 | 50000 | nm | `dims['dc_pitch'] − dims['gap']` | `tech.py` at load; drawn length by DRC `min_width` |
+| `g_dc` | 5000 | 8000 | nm | `dims['gap']` | `tech.py` at load; DRC `min_gap` between pads |
+| `g_rf` | 8000 | 10000 | nm | `dims['g_rf']` | `tech.py` at load; **DRC `rf_dc_clearance`**; `build.py`'s `dc_setback = w_g/2 + w_rf + g_rf` |
+
+Two rules are about the drawn metal rather than about a number in the file, so they are
+DRC rules and nothing else:
+
+* **`overlap`** — any two electrodes, on any layers, whose shapes share *positive area*.
+  One finding per pair of nets, with both net ids in the message. Same-net shapes are
+  skipped, because two perpendicular RF rails necessarily overlap at every degree-4 node
+  and on one net that is a merge; touching at 0 nm is a clearance finding, not an overlap.
+* **`dc_pairs_per_site`** — for every trapping site, the number of *pairs* (a north and a
+  south pad at one axial position) centred within the site's span, against `n_dc_pairs`.
+  A site's span is one trap pitch of rail positioned where the site's rail is: half a
+  segment either side for an interior site, and for a dead end the window is shifted onto
+  the side that exists rather than shrunk. Only pads owned by the segments incident to the
+  site count, so a perpendicular rail's electrodes are never somebody else's.
+
+`w_rf`, `w_dc` and `l_dc` reach the drawn metal through `min_width`, which measures against
+the *process* rule of the layer, not against the technology's design value: a technology
+that declares 50 µm electrodes and draws 5 must fail somewhere, and it fails there.
+
+**Electrodes may be shapes other than rectangles — and are not yet.** The collaborator
+asked for triangular or wedge corner electrodes around a junction so that nothing has to
+overlap. `shapes.union_by_net` is exact for rectangles only and *refuses* any other
+polygon rather than growing it to its bounding box, and every gap and overlap computation
+in `drc.py` goes through that union. A wedge would therefore need a new gap computation
+before it could be drawn, which is more than this change. Junction pads are **omitted**
+where they would overlap instead (`keepout_half_width`), the omission is counted in the
+layout notes, and polygon corner electrodes are recorded as the intended follow-up in
+`build.py`'s module docstring.
+
+### A minimum can be waived, by name, in writing
+
+`eth_junction_2201.12579` reproduces a trap its authors fabricated at a single 5 µm gap
+(`ms.tex:368`) — between control electrodes and between an RF rail and the control metal
+beside it alike. The project minimum for `g_rf` is 8 µm. Applying it here would move
+`dc_setback` from 125.25 µm to 128.25 µm and redraw every rail-to-column clearance of a
+published geometry, reporting a trap that paper never had.
+
+So the preset carries a `waivers` block naming `g_rf` and saying why, and that is the only
+way a number under a minimum loads at all. The rule is still *checked* — it was waived, not
+switched off — the waiver is listed by `Technology.waived()`, printed in the layout notes,
+and printed by the DRC as a `waived technology minimums` disclosure. A waiver for a rule
+the technology already meets is refused too: a stale waiver is a claim nobody checked.
+**The published preset's geometry is therefore byte-identical to what it was**, which is
+the property that matters for a reproduction.
+
+### The second preset: `surface_default`
+
+```bash
+python -m qccd phys ring144_24v --tech surface_default
+python -m qccd gds chain --tech surface_default -o chain.gds
+```
+
+The rules at their **defaults** rather than their minimums, with every other dimension
+derived from them and the arithmetic in each `source` string. Every number is `declared:` —
+it is this project's own reference process, not a reproduction, and `declared()` is the
+query that tells the two presets apart.
+
+| dim | nm | derivation |
+|---|---|---|
+| `w_rf` | 60000 | the default, and `1.2 · w_dc` |
+| `dc_width` (`w_dc`) | 50000 | the default |
+| `gap` (`g_dc`) | 8000 | the default |
+| `g_rf` | 10000 | the default |
+| `dc_pitch` | 58000 | `l_dc + g_dc = 50 + 8` |
+| `w_g` | 70000 | `w_dc + 2·g_rf` — the centre electrode is a DC electrode too |
+| `dc_centre_width` | 50000 | `w_g − 2·g_rf = w_dc`; every DC electrode is 50 × 50 µm |
+| `dc_setback` | 105000 | `w_g/2 + w_rf + g_rf` |
+| `min_axis_pitch` | 318000 | `2(dc_setback + w_dc) + g_dc` |
+| `well_gap` | 8000 | `= g_dc`, so the tiling runs across a site unbroken |
+| `rail_end_extension` | 58000 | one ion height, `½√(w_g(w_g+2w_rf)) = 57.663` µm |
+| `nm_per_unit_x` = `nm_per_unit_y` | 464000 | `8 · dc_pitch` |
+
+**The two scales are equal**, which the published preset cannot manage. The axial unit is
+raised to the transverse floor instead of the two disagreeing, so one lattice unit means
+one length in both directions. Two floors and one quantum fix it: parallel axes need
+`min_axis_pitch` = 318 µm; a dock spur's rail overrun needs
+`2(dc_setback + w_dc + rail_end_extension + g_rf)` = 446 µm; and the scale is a whole
+number of pitches so the tiling is uniform across every site. 8 × 58 = 464 µm is the first
+multiple above both. The cost is eight control electrodes per trap pitch where three would
+do — and the benefit is that **`ring144_24v` fits**: 44 `rf_dc_clearance` failures and 44
+`overlap` failures become 0.
+
+### Every site's span carries `n_dc_pairs` pads
+
+`_tiled_starts` lays the `n_dc_pairs` pads nearest a site from that site's end of the span
+and leaves any slack in the middle of the rail, so the count under a trap is the
+technology's number and not a remainder. Below `2·n_dc_pairs` pads there is no middle to
+put slack in and the run is simply centred — which is what every segment of the published
+preset does, three pads in a span that holds exactly three, so its metal did not move.
+
+A pad is beside a site, not centred on it: a pad centred *on* a node would straddle two
+segment cells, and `flatten` would qualify the two halves with different owners — two
+electrodes abutting at 0 nm, which the DRC would then report as a short. Moving a trapping
+position onto a pad centre needs the tiling to be owned by the nodes rather than by the
+segments, and that is a larger change than this one.
+
+### What the rule found
+
+| device | `dc_pairs_per_site` under `eth_junction` | under `surface_default` |
+|---|---|---|
+| `chain72`, `stationary_chain` | 0 | 0 |
+| `cyclone_base`, `h2_racetrack` | 8 | 0 |
+| `ladder_2x72` | 140 | 44 |
+| `ring144_24v` | 98 | 46 |
+| `grid9x9`, `deck_unit_cell` | 144 | 144 |
+| `cyclone_dual_loop` | 12 | 4 |
+
+Under the published preset a lattice unit is three control electrodes long, so a single pad
+dropped at a corner already starves the site beside it — five devices that were "clean"
+are not, and what changed is the question being asked, not the metal. Under the defaults
+most of that goes away and what is left is **architectural**: `ring144_24v`'s 24 docks hang
+half a lattice unit off the rail, inside the keep-out where a crossing rail's own control
+column sits, so they get one pair and no technology that keeps pads off that column can
+give them three. `grid9x9` and `deck_unit_cell` keep 144 each because their sites are one
+lattice unit from a junction in every direction.
+
 ## What a device becomes
 
 Each axis-aligned segment gets two RF rails flanking its axis at `w_g/2`, one segmented
