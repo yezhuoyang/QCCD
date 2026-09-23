@@ -225,6 +225,48 @@ page keeps its self-containment scan. What it does:
   report), `qccd_compare_runs` (returns the table and opens the side-by-side view in Studio),
   and `qccd_manage_branch` (drafts).
 
+### The website with the chat (`mirror.py`, `web/pageact.js`, `web/mirror.js`)
+
+- **Every qccd.academy page, through the workspace.** The service listens on a second port
+  and serves the site at `http://127.0.0.1:<web port>/web/...`. `qccd studio` prints the
+  address; `qccd web [page]` pairs the browser and opens it. Each page is fetched from the
+  site live, kept in memory for 5 minutes, then revalidated (ETag / Last-Modified). When the
+  site cannot be reached, the last copy is served, marked stale. `QCCD_SITE_URL` points it at
+  another copy of the site, which the tests do. `QCCD_WEB=0` turns the second port off.
+- **What a page gets.**
+  - The chat, the same one as in Studio, framed in the corner.
+  - A link back to the person's own Studio in the site bar.
+  - The site's own Agent button is hidden. The comment layer is switched off: it needs the
+    person's qccd.academy account, and it would call the local API.
+  - The Official leaderboard's reads are passed through.
+  - The site's Studio (`studio.html`, with the course) stays the site's. It is not the
+    workspace's design; that is `/studio`.
+- **Page context.** A message sent from a page carries the page's URL, title and kind. It
+  also carries the text the person selected (a `page` anchor with the `quote`) and anything
+  they pointed at with **+**. The delivery text tells the agent which page it is and which
+  tools read it. `qccd_get_context` lists the open pages. In the conversation, a message
+  says which page it was sent from.
+- **The agent's hands on the page.** Two MCP tools cover a fixed set of actions, all
+  implemented in `web/pageact.js`. Nothing else runs; there is no script execution.
+  - `qccd_page_read` returns the headings, the text (by section, paged), the visible
+    controls (the ones on screen first), the embedded examples with their animation step,
+    the reader's selection, and on studio pages the transport and the lessons.
+  - `qccd_page_act` does `highlight` (with a caption), `scroll`, `click`, `fill`, `press`,
+    `navigate`, `step` and `open_lesson`.
+  - Targets are refs from the last read, CSS selectors, or visible text. `frame` reaches into
+    an embedded example.
+  - `POST /api/page-actions` sends the action to the page as an event and waits for the
+    page's answer, at most 30 s. The default page is the one the current request came from,
+    else the page used last. Only an agent or the CLI can start an action, and only the
+    page's own view can answer it.
+  - The workspace's own Studio takes the same actions (its transport, panels and lessons).
+
+### Runs and failures in the chat
+
+When the agent's runtime stops without answering, the chat shows why: a failed Codex turn
+leaves its error message (a usage limit, for example) as a notice in the conversation,
+instead of the conversation going quiet.
+
 ## 3 · Grading (`evaluator.py`, `bundle.py`, `metrics.py`, `tasks.py`)
 
 `grade(release, bundle, profile) → report`. The local service, the CLI and the official
@@ -285,6 +327,20 @@ from the task's.
   recognises an open page. Pairings expire after 14 days. Bodies are parsed
   strictly (duplicate keys, NaN, depth, size). Imports cannot leave the workspace. The CSP
   allows only same-origin connections.
+- **The website mirror.** Its pages come from the internet, so they get their own origin
+  (the second port), which the workspace does not trust:
+  - The mirror serves GET pages and nothing else. It never honours the pairing cookie, even
+    though browsers send it there (cookies ignore ports).
+  - The workspace refuses the mirror's `Origin` like any other.
+  - The chat on a mirror page is a frame from the workspace's origin (`/chatframe`), and only
+    the mirror's origin may frame it (`frame-ancestors`). Only that frame holds the pairing.
+    It talks to the page by `postMessage`, checking the source window and origin both ways.
+  - Page actions cannot reach the chat: the dock, its menus, dialogs and notices. Navigation
+    and link clicks stay on the site.
+  - What a page answers is website content: data, not authority. It is labelled that way
+    for the agent.
+  - A hostile page could still hide or cover the chat frame, or answer page actions falsely.
+    It cannot read the conversation or act as the person.
 - **Agent scope.** The agent token can edit, comment, run jobs, submit locally and *prepare*
   publication. It cannot send prompts, approve publication, stop or resume sessions, mint
   pairing codes, unprotect a person's lock, or shut the service down.
@@ -399,6 +455,16 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   `10152b1`, which had not been pushed to GitHub when it was deployed. Its leaderboard is
   JSON only; qccd.academy has no page for it yet. Its data volumes are not backed up. The
   PostgreSQL code path has never been run.
+- **The website mirror needs the internet** for any page it has not cached; the Studio and
+  everything else stay offline. Pages are cached per service process, in memory only.
+- Page actions work on the DOM as it is. A site page that builds its controls from script
+  without buttons, links or ARIA roles shows fewer controls; the agent can still target
+  them by selector or text.
+- A live Codex answer on a website page has **not** been observed yet. On 2026-09-23 the
+  account's Codex usage limit was reached, and both attempts ended with Codex's
+  `usageLimitExceeded`. The full loop is tested with a real MCP client standing in for the
+  agent (`test_an_mcp_agent_answers_a_question_from_the_page`); the rerun is
+  `QCCD_LIVE_CODEX=1 python tests/workspace_live_page.py`.
 - A demonstration is delivered as data (diff, change sets, targets). Generalising it is the
   agent's job, and the service only guarantees that the result is valid and respects
   protection.
@@ -423,6 +489,8 @@ qccd agent install --client codex        # .agents/skills/qccd, .codex/config.to
 qccd agent install --client claude --channel   # .claude/skills/qccd, .mcp.json "qccd", CLAUDE.md block
 qccd studio                              # starts the service, opens Studio paired (one-time code)
 qccd studio --keep-alive                 # ...and stays, restarting the service if something kills it
+qccd web                                 # the qccd.academy website with the same chat on every page
+qccd web rules/                          # ...opened at a page
 qccd agent connect --client codex        # a NEW Codex thread bound to this workspace
 qccd agent connect --client codex --thread <id>   # ...or your existing conversation
 #   then attach your terminal to the same app server:  codex --remote ws://127.0.0.1:<port>
@@ -463,6 +531,9 @@ Linux and macOS were not exercised in this session.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
+| `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; in real Chrome every page action on a mirrored page, the Studio's own page actions, and a real MCP client answering a question asked on a page | ~40 s |
+| `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
+| `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |
 | `tests/workspace_live_codex.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a Studio prompt into a real Codex thread | ~1 min |
 | `examples/workspace_demo/demo.py` | the full demonstration (scripted or live Codex) | ~1–10 min |
 

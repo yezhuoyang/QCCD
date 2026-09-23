@@ -138,10 +138,11 @@ def code_identity() -> str:
     return h.hexdigest()[:16]
 
 
-def write_runtime(ws_id: str, root: Path, port: int, pid: int, *, code: str | None = None) -> dict:
+def write_runtime(ws_id: str, root: Path, port: int, pid: int, *, code: str | None = None,
+                  web_port: int | None = None) -> dict:
     info = {"workspace_id": ws_id, "root": str(root), "host": "127.0.0.1", "port": port, "pid": pid,
             "agent_token": secrets.token_urlsafe(32), "owner_token": secrets.token_urlsafe(32),
-            "started_at": time.time(), "code": code, "version": 1}
+            "started_at": time.time(), "code": code, "version": 1, "web_port": web_port}
     _write_private(runtime_path(ws_id), info)
     return info
 

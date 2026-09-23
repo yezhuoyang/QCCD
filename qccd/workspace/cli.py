@@ -34,7 +34,7 @@ from pathlib import Path
 
 __all__ = ["main", "COMMANDS"]
 
-COMMANDS = ("init", "studio", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
+COMMANDS = ("init", "studio", "web", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
             "publish", "import", "releases", "leaderboard")
 
 
@@ -103,6 +103,9 @@ def cmd_studio(a) -> int:
     url = f"http://127.0.0.1:{info['port']}/studio#pair={code}"
     print(f"Studio: {url}")
     print("  (the pairing code works once, for five minutes; run `qccd studio` again for another tab)")
+    if info.get("web_port"):
+        print(f"Website with your agent: http://127.0.0.1:{info['web_port']}/web/  (every qccd.academy page, "
+              "with this chat; `qccd web` opens it)")
     if not a.no_open:
         webbrowser.open(url)
     if not a.keep_alive:
@@ -121,6 +124,29 @@ def cmd_studio(a) -> int:
         keep_alive(_root(a), threading.Event(), on_event=said)
     except KeyboardInterrupt:
         pass
+    return 0
+
+
+def cmd_web(a) -> int:
+    """The website through the workspace: every qccd.academy page, with the chat and the
+    page tools.  Pairs this browser (a one-time code, as `qccd studio` does) and opens it."""
+    from .runtime import ensure_service
+    info = ensure_service(_root(a), restart_stale=True)
+    if info.get("restarted_stale"):
+        print("the running service was started from older code (QCCD was updated since); restarted it")
+    if not info.get("web_port"):
+        print("this service runs without the website (QCCD_WEB=0 when it started); `qccd stop` and try again",
+              file=sys.stderr)
+        return 1
+    path = (a.path or "").lstrip("/")
+    if path.startswith("web/"):
+        path = path[4:]
+    code = _call(info, "POST", "/api/pair-code", {})["code"]
+    url = f"http://127.0.0.1:{info['port']}/open-web#pair={code}&to=/web/{path}"
+    print(f"Website with your agent: http://127.0.0.1:{info['web_port']}/web/{path}")
+    print(f"  (this link pairs the browser first: {url})")
+    if not a.no_open:
+        webbrowser.open(url)
     return 0
 
 
@@ -341,7 +367,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--task", required=True, help="<task>@<release>, e.g. ghz4@1")
     p.add_argument("--name", default="design")
     p.add_argument("--empty", action="store_true", help="start from a blank canvas, not the release's starter")
-    for name, fn in (("studio", None), ("serve", None), ("status", None), ("stop", None), ("validate", None),
+    for name, fn in (("studio", None), ("web", None), ("serve", None), ("status", None), ("stop", None), ("validate", None),
                      ("compile", None), ("submit", None), ("publish", None), ("import", None), ("leaderboard", None)):
         q = sub.add_parser(name)
         q.add_argument("--root", default=None)
@@ -351,6 +377,9 @@ def build_parser() -> argparse.ArgumentParser:
                            help="stay in the foreground and restart the service if something kills it")
         if name == "serve":
             q.add_argument("--port", type=int, default=None)
+        if name == "web":
+            q.add_argument("path", nargs="?", default="", help="a page of the site, e.g. rules/ or learn/")
+            q.add_argument("--no-open", action="store_true")
         if name in ("status", "validate", "submit"):
             q.add_argument("--json", action="store_true")
         if name == "compile":
@@ -401,7 +430,8 @@ def main(argv=None) -> int:
         from ..__main__ import main as legacy
         return legacy(argv)
     a = build_parser().parse_args(argv)
-    fn = {"init": cmd_init, "serve": cmd_serve, "studio": cmd_studio, "status": cmd_status, "stop": cmd_stop,
+    fn = {"init": cmd_init, "serve": cmd_serve, "studio": cmd_studio, "web": cmd_web, "status": cmd_status,
+          "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard}[a.cmd]

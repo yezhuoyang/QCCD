@@ -64,6 +64,7 @@ class ServiceState:
         self.page_lock = threading.Lock()
         self.stop = threading.Event()
         self.bridges: dict = {}              # session_id -> adapter bridge (Codex)
+        self.page_waits: dict = {}           # page action id -> {event, view, result}
         self.started = time.time()
 
     def new_pair_code(self, ttl: float = 300.0) -> str:
@@ -105,7 +106,7 @@ def create_app(state: ServiceState) -> FastAPI:
         resp.headers["Cache-Control"] = "no-store"
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "no-referrer"
-        if "x-frame-options" not in resp.headers:
+        if "x-frame-options" not in resp.headers and not getattr(request.state, "frameable", False):
             resp.headers["X-Frame-Options"] = "DENY"
         return resp
 
@@ -238,6 +239,29 @@ def create_app(state: ServiceState) -> FastAPI:
     async def index():
         return Response(status_code=307, headers={"Location": "/studio"})
 
+    web_origin = f"http://127.0.0.1:{state.info['web_port']}" if state.info.get("web_port") else None
+
+    @app.get("/chatframe")
+    async def chatframe(request: Request):
+        """The chat, alone, for a page of the website mirror to frame.  Only the mirror's
+        origin may frame it (CSP frame-ancestors); the page it sits in is untrusted and
+        reaches it only by postMessage."""
+        request.state.frameable = True
+        page = request.query_params.get("page") or "/web/"
+        if not page.startswith("/web"):
+            page = "/web/"
+        html = _chat_page(state, web_origin, page[:400])
+        anc = f"frame-ancestors {web_origin}" if web_origin else "frame-ancestors 'none'"
+        return HTMLResponse(html, headers={"Content-Security-Policy": _CSP.replace("frame-ancestors 'none'", anc)})
+
+    @app.get("/open-web")
+    async def open_web(request: Request):
+        """Pair this browser (a `#pair=` code from `qccd web`), then open the website."""
+        if not web_origin:
+            return JSONResponse({"error": {"code": "no_web", "message": "this service runs without the website"}},
+                                status_code=404)
+        return HTMLResponse(_open_web_page(web_origin), headers={"Content-Security-Policy": _CSP})
+
     # ------------------------------------------------------------------ identity
 
     @route("GET", "/api/whoami", write=False)
@@ -327,6 +351,70 @@ def create_app(state: ServiceState) -> FastAPI:
         from .agents.codex import find_codex
         return {"codex_available": find_codex() is not None}
 
+    # ------------------------------------------------------------------ pages (the agent's hands on the UI)
+
+    @route("GET", "/api/web", write=False)
+    def web_info(request, actor, _):
+        from .mirror import site_url
+        return {"url": f"{web_origin}/web/" if web_origin else None, "site": site_url()}
+
+    @route("GET", "/api/pages", write=False)
+    def pages(request, actor, _):
+        return {"pages": ws.pages()}
+
+    @route("POST", "/api/page-actions")
+    def page_action(request, actor, b):
+        if actor["kind"] == "human" and actor["id"] != "cli":
+            raise WorkspaceError("forbidden", "page actions are the agent's; a person uses the page itself",
+                                 status=403)
+        action = str(b.get("action", ""))
+        if action not in PAGE_ACTIONS:
+            raise WorkspaceError("bad_request", f"action must be one of {PAGE_ACTIONS}", status=422)
+        args = b.get("args") or {}
+        if not isinstance(args, dict):
+            raise WorkspaceError("bad_request", "args must be an object", status=422)
+        from .jsonsafe import check_value
+        try:
+            check_value(args, Limits(max_bytes=64 * 1024, max_depth=8, max_items=2000, max_string=20000))
+        except JSONRejected as exc:
+            raise WorkspaceError(exc.code, str(exc), status=422) from None
+        view = ws.page_view(actor, b.get("view_id"))
+        wait = max(1.0, min(float(b.get("wait_s") or 15), 30.0))
+        aid = "pa_" + secrets.token_hex(8)
+        waiter = {"event": threading.Event(), "view": view["id"], "result": None}
+        state.page_waits[aid] = waiter
+        try:
+            ws.emit("page.action", {"action_id": aid, "view_id": view["id"], "action": action, "args": args,
+                                    "expires_at": time.time() + wait,
+                                    "actor": {k: actor.get(k) for k in ("kind", "id", "label")}})
+            answered = waiter["event"].wait(wait)
+        finally:
+            state.page_waits.pop(aid, None)
+        page = view["state"].get("page") or {}
+        if not answered:
+            raise WorkspaceError("page_timeout", f"the page {page.get('url')!r} did not answer within {wait:g} s "
+                                 "(closed, reloading, or asleep in a background tab)", status=504)
+        r = waiter["result"]
+        out = {"view_id": view["id"], "page": {"url": page.get("url"), "title": page.get("title")},
+               "action": action, "ok": r["ok"]}
+        if r["ok"]:
+            out["result"] = r.get("result")
+        else:
+            out["error"] = r.get("error") or "the page refused the action"
+        return out
+
+    @route("POST", "/api/page-actions/{aid}/result", human_only=True)
+    def page_result(request, actor, b):
+        w = state.page_waits.get(request.path_params["aid"])
+        if w is None:
+            raise WorkspaceError("unknown_action", "no such page action is waiting (it timed out)", status=404)
+        if actor.get("view") != w["view"]:
+            raise WorkspaceError("forbidden", "only the page the action was sent to answers it", status=403)
+        w["result"] = {"ok": bool(b.get("ok")), "result": b.get("result"),
+                       "error": str(b.get("error"))[:2000] if b.get("error") else None}
+        w["event"].set()
+        return {"ok": True}
+
     @app.get("/runview/{run_id}")
     async def run_view(run_id: str, request: Request):
         try:
@@ -377,7 +465,8 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("POST", "/api/views", human_only=True)
     def new_view(request, actor, b):
-        return ws.register_view(actor, branch=b.get("branch", "main"), label=str(b.get("label", "")))
+        return ws.register_view(actor, branch=b.get("branch", "main"), label=str(b.get("label", "")),
+                                page=b.get("page"))
 
     @route("PATCH", "/api/views/{view_id}", human_only=True)
     def patch_view(request, actor, b):
@@ -728,9 +817,11 @@ def _studio_page(state: ServiceState, snapshot_id: str | None) -> str:
             page = _render(ws, snapshot_id)
             state.page_cache[key] = page
     cfg = {"workspace_id": ws.id, "task": ws.release.id, "mode": "run" if snapshot_id else "design",
-           "snapshot_id": snapshot_id, "contract": "1"}
+           "snapshot_id": snapshot_id, "contract": "1",
+           "web_url": f"http://127.0.0.1:{state.info['web_port']}/web/" if state.info.get("web_port") else None}
     inject = (_css() + '<script id="qccd-live-config" type="application/json">'
-              + json.dumps(cfg).replace("</", "<\\/") + "</script>\n<script>\n" + _js() + "\n</script>\n")
+              + json.dumps(cfg).replace("</", "<\\/") + "</script>\n<script>\n" + _pageact() + "\n</script>\n"
+              + "<script>\n" + _js() + "\n</script>\n")
     at = page.rfind("</body>")
     return page[:at] + inject + page[at:]
 
@@ -773,6 +864,46 @@ def _js() -> str:
     return (_WEB / "cowork.js").read_text(encoding="utf-8")
 
 
+def _pageact() -> str:
+    return (_WEB / "pageact.js").read_text(encoding="utf-8")
+
+
+#: what an agent may do on a page (web/pageact.js implements each; nothing else runs)
+PAGE_ACTIONS = ("read", "scroll", "highlight", "click", "fill", "press", "navigate", "step", "open_lesson")
+
+
+def _chat_page(state: ServiceState, web_origin: str | None, page: str) -> str:
+    """The chat alone, for a website page: the same cowork.js in page mode."""
+    from .mirror import site_url
+    ws = state.ws
+    cfg = {"workspace_id": ws.id, "task": ws.release.id, "mode": "page", "framed": True,
+           "parent_origin": web_origin, "page": page, "site": site_url(), "contract": "1",
+           "web_url": f"{web_origin}/web/" if web_origin else None}
+    return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>QCCD chat</title>"
+            + _css() + "<style>html,body{margin:0;height:100%;background:#fff;overflow:hidden}</style></head>"
+            "<body class=\"qcl-framed\">"
+            + '<script id="qccd-live-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
+            + "</script>\n<script>\n" + _js() + "\n</script>\n</body></html>")
+
+
+def _open_web_page(web_origin: str) -> str:
+    """Pair with the `#pair=` code, then go to the website (`#pair=CODE&to=/web/rules/`)."""
+    js = ("(function(){var h=location.hash||'',m=/[#&]pair=([A-Za-z0-9_-]+)/.exec(h),t=/[#&]to=([^&]+)/.exec(h);"
+          "var to=t?decodeURIComponent(t[1]):'/web/';if(to.indexOf('/web')!==0)to='/web/';"
+          "var go=function(){location.replace(" + json.dumps(web_origin) + "+to);};"
+          "history.replaceState(null,'',location.pathname);"
+          "if(!m){go();return;}"
+          "fetch('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',"
+          "body:JSON.stringify({code:m[1]})}).then(function(r){if(r.ok)go();else r.json().then(function(d){"
+          "document.getElementById('msg').textContent='Pairing failed: '+((d&&d.error&&d.error.message)||r.status)+"
+          "'. Run qccd web again.';});});})();")
+    return ("<!doctype html><html><head><meta charset=\"utf-8\"><title>QCCD: opening the website</title>"
+            "<style>body{font:15px/1.5 system-ui,sans-serif;margin:48px auto;max-width:640px;color:#1d1d1b}</style>"
+            "</head><body><p id=\"msg\">Opening the website with your agent&hellip;</p><script>" + js
+            + "</script></body></html>")
+
+
 def _css() -> str:
     return "<style>\n" + (_WEB / "cowork.css").read_text(encoding="utf-8") + "\n</style>\n"
 
@@ -805,6 +936,18 @@ def _page_failed(state: ServiceState, exc: Exception) -> HTMLResponse:
             "code{background:#f5f4f1;padding:1px 4px;border-radius:4px}</style></head>"
             f"<body>{body}</body></html>")
     return HTMLResponse(page, status_code=500, headers={"Content-Security-Policy": _CSP})
+
+
+def _by_port(main, web, web_port: int):
+    """One process, two listeners: requests that arrived on the website's socket go to the
+    mirror app, everything else to the workspace app (by the socket, not the Host header)."""
+    async def app(scope, receive, send):
+        server = scope.get("server") or (None, None)
+        if scope.get("type") in ("http", "websocket") and server[1] == web_port:
+            await web(scope, receive, send)
+        else:
+            await main(scope, receive, send)
+    return app
 
 
 def _single_instance(root: Path):
@@ -851,12 +994,20 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
         print(f"a service for {ws.id} is already running on port {existing['port']} (pid {existing['pid']})")
         return 1
     # the port this workspace's service had last time, when it is free: open pages reconnect
-    sock = bind_listener(port, fallback=False) if port else bind_listener(read_sticky(ws.id).get("port"))
+    sticky = read_sticky(ws.id)
+    sock = bind_listener(port, fallback=False) if port else bind_listener(sticky.get("port"))
     port = sock.getsockname()[1]
-    write_sticky(ws.id, port=port)
-    info = write_runtime(ws.id, ws.root, port, os.getpid(), code=code)
+    # the website mirror listens on a port of its own: its pages are a different origin,
+    # which the workspace API does not trust (mirror.py)
+    wsock = bind_listener(sticky.get("web_port")) if os.environ.get("QCCD_WEB", "1") != "0" else None
+    web_port = wsock.getsockname()[1] if wsock else None
+    write_sticky(ws.id, port=port, web_port=web_port)
+    info = write_runtime(ws.id, ws.root, port, os.getpid(), code=code, web_port=web_port)
     state = ServiceState(ws, info, sticky=True)
     app = create_app(state)
+    if wsock is not None:
+        from .mirror import create_mirror_app
+        app = _by_port(app, create_mirror_app(state), web_port)
     worker = DeliveryWorker(state)
     state.worker = worker
     worker.start()
@@ -879,9 +1030,10 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
         state.stop.wait()
         server.should_exit = True
     threading.Thread(target=watch_stop, daemon=True).start()
-    print(f"QCCD workspace service {ws.id} on http://127.0.0.1:{port} (pid {os.getpid()})", flush=True)
+    print(f"QCCD workspace service {ws.id} on http://127.0.0.1:{port} (pid {os.getpid()})"
+          + (f"; website on http://127.0.0.1:{web_port}/web/" if web_port else ""), flush=True)
     try:
-        server.run(sockets=[sock])
+        server.run(sockets=[sock] + ([wsock] if wsock is not None else []))
     finally:
         state.stop.set()
         worker.stop()

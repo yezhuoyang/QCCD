@@ -119,3 +119,13 @@
 .qcl-mi{border:0;background:none;text-align:left;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink,#182230)}
 .qcl-mi:hover{background:var(--soft,#eef2f6)}
 .qcl-sep{height:1px;background:var(--line,#d0d5dd);margin:4px 0}
+/* the chat as a frame inside a website page (mirror.py): it IS the frame */
+.qcl-framed #qcl-dock,.qcl-framed #qcl-dock.qcl-chat{position:static;width:100%;height:100vh;max-height:none;border:0;border-radius:0;box-shadow:none}
+.qcl-framed #qcl-dock.qcl-chat.qcl-min{height:100vh}
+.qcl-framed #qcl-dock.qcl-chat.qcl-min .qcl-head{height:100vh;box-sizing:border-box}
+.qcl-framed #qcl-notice{top:auto;bottom:70px;left:8px;right:8px;transform:none}
+.qcl-framed #qcl-notice .qcl-toast{max-width:none}
+.qcl-framed #qcl-unpaired{inset:auto 8px 8px 8px}
+/* the agent's runtime stopped without answering (a failed turn, a usage limit): say why */
+.qcl-event.qcl-warn{color:#8a4b00;background:#fff6e6;border:1px solid #f3d6a4;border-radius:8px;padding:6px 9px}
+.qcl-event.qcl-warn .qcl-evtxt{white-space:normal}
