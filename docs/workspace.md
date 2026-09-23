@@ -169,16 +169,61 @@ page keeps its self-containment scan. What it does:
   `_ref`, `data-id`, `data-hint` fields, a panel fallback), lasso, point, the current frame,
   and demonstrations. Sketches: freehand, arrow and lasso, stored in lattice units with the
   view box. A screenshot is not the authoritative representation and is not captured.
-- **Dock and markers.** Pins on the stage for open prompts, threads with delivery and work
-  state and linked change sets/jobs/results, the agent session panel (Stop, Resume, target
-  per tab, Follow agent), attributed history with "Undo this change", jobs, and the local
-  leaderboard labelled "Local results - not published". There is a publication review dialog.
+- **The chat (the default).** The dock is one conversation with the agent: the person's
+  messages, the agent's own messages (for Codex, what it writes in the turn is stored as the
+  thread's replies), a typing indicator while it works, and one box with Send, which becomes
+  Stop while it works. The current selection goes with the message as a chip that can be
+  removed. **+** holds lasso, point, arrow, freehand, "show an edit" (a demonstration) and
+  lock or unlock parts. What the agent did appears as small cards: a change with Show and
+  Undo, a run with its round time and "Watch it run", and a comparison with "Open side by
+  side". If no agent is connected and Codex is installed, sending starts a Codex conversation
+  (approval policy `never`, read-only shell; it changes the design only through the QCCD
+  tools). `QCCD_CODEX=none` turns that off. The header also carries the draft picker.
+- **The debug view.** Under **⋯**: the old tabs. They hold threads with delivery and work
+  state and their links, the agent session panel (Stop, Resume, target per tab, Follow
+  agent), attributed history with "Undo this change", jobs, and the local leaderboard
+  labelled "Local results - not published". There is a publication review dialog.
 - **Presentation.** With Follow on, the view widens to show the target (`reveal`) and flashes
   it. With Follow off, a notification with a Show button appears instead. Either way the page
   reports `displayed` / `notified`.
 - **Run view.** `/run/<snapshot>` renders an immutable snapshot's device and final program,
   view-only, for comments anchored on generated instructions (`#instr=<id>` focuses one).
 - All text from people or agents is set with `textContent`.
+
+### Runs, drafts and comparison (`runs.py`, `perf.py`, `compare_page.py`)
+
+- **A run** compiles a program onto a design and tells where the time goes. It is a job of
+  kind `run` and an experiment, never a submission. The program is a catalogue name, from
+  the tracked `Compiler/examples/*.qasm` ("bb", "bb code" and "gross" mean `bb144_esm`, the
+  BB [[144,12,12]] syndrome round), or the agent's own OpenQASM. The design is `main` or any
+  draft. The job:
+  1. exports the design;
+  2. compiles with `qccdc_cli rotate` when the device has closed loops, falling back to
+     `compile`, and otherwise uses `compile`;
+  3. inserts cooling, and replays with the rules checked under the release's cost model and
+     under the transport table.
+
+  A design too small for the program, or one the compiler cannot route, fails with the
+  reason. Measured on this machine: BB144 on a 2×72 ring with 24 docks takes about 12 s end
+  to end and gives 522 ms per round.
+- **The performance report** (`perf.performance`) is read off that replay:
+  - the round time, and time by category (transport, cooling, gates, measurement, reset)
+    with shares;
+  - transport time by move class, and the five longest steps;
+  - junction transits with their imbalance, the busiest ions, and ions per trap at gates;
+  - peak heating, and failed rules;
+  - bottleneck sentences computed from those numbers.
+- **Drafts** are the workspace's candidate branches (`cand/<name>`); every door accepts the
+  short name. Studio saves, switches and edits them from the chat header, and agents list,
+  create and run them.
+- **Side by side**: `/compare?runs=A,B` shows the comparison table (B minus A), a verdict,
+  each run's bottlenecks, and both runs' own pages (`/runview/<id>`, view-only) in frames.
+  One slider and Play drive both by modelled time: every step's start time is kept with
+  the run. The faster design finishes first, visibly. Only `/runview` may be framed, and
+  only by the same origin.
+- **MCP**: `qccd_list_programs`, `qccd_run_program` (it waits up to 50 s and returns the
+  report), `qccd_compare_runs` (returns the table and opens the side-by-side view in Studio),
+  and `qccd_manage_branch` (drafts).
 
 ## 3 · Grading (`evaluator.py`, `bundle.py`, `metrics.py`, `tasks.py`)
 
@@ -346,6 +391,10 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   unrebaseable. It is refused, and the page shows the current design.
 - `render_html` is called once per service for the design view. The page's other embedded
   data (templates, schema) is fixed at that render.
+- A run's page footer (the in-browser engine's estimate) can disagree with the evaluator's
+  replay: 569 ms against 522 ms for BB144 on the 24-dock ring. That is the Studio engine's
+  parity gap (`tests/parity.mjs`), not the run's. The comparison page says which number is
+  the evaluator's.
 - The official service is live at `https://qccd.academy/official/`, built from commit
   `10152b1`, which had not been pushed to GitHub when it was deployed. Its leaderboard is
   JSON only; qccd.academy has no page for it yet. Its data volumes are not backed up. The

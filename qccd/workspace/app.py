@@ -1,15 +1,16 @@
-"""`Workspace` = the design core + collaboration + results, as one application object."""
+"""`Workspace` = the design core + collaboration + results + runs, as one application object."""
 
 from __future__ import annotations
 
 from .collab import CollabMixin
 from .core import WorkspaceCore, WorkspaceError, new_id
 from .results import ResultsMixin
+from .runs import RunsMixin
 
 __all__ = ["Workspace", "WorkspaceError", "new_id"]
 
 
-class Workspace(CollabMixin, ResultsMixin, WorkspaceCore):
+class Workspace(CollabMixin, ResultsMixin, RunsMixin, WorkspaceCore):
     """The application layer every door (Studio, MCP, CLI, file import) calls."""
 
     def _after_init(self) -> None:

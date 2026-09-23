@@ -22,6 +22,9 @@
 //  * TRUTH.  "committed", "rendered", "presented", "queued", "accepted", "uncertain" are
 //    different words on this page because they are different facts.
 //
+//  * CHAT.  By default the dock is one conversation with the agent (buildChat); the tabs
+//    with sessions, threads, activity and results are the debug view.
+//
 // All text that came from anyone (labels, prompts, agent replies) is set with
 // textContent, never innerHTML.
 
@@ -37,7 +40,11 @@ var S = {
   draftTimer: null, mode: localGet('qccd.live.mode') || 'propose', steer: false,
   protected: Object.create(null), lastTouched: [], highlight: [], agentMsgs: [], history: [],
   jobs: [], subs: [], board: null, lastViewPatch: 0, viewDirty: true, openPrompt: null,
-  paired: false, lastError: null, compile: null
+  paired: false, lastError: null, compile: null,
+  // the chat view (default) vs the debug view (tabs)
+  debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
+  conv: [], working: [], pending: null, codex: null, connecting: false, branches: [], convTimer: null,
+  lastSel: '', selOff: false, convScrolled: false
 };
 var NS = 'http://www.w3.org/2000/svg';
 
@@ -260,7 +267,7 @@ function openEvents() {
     if (S.rev !== null && e.revision !== S.rev + 1) S.needRefresh = true;
     refreshHead().then(function () {
       if (S.follow) { reveal(S.lastTouched); flash(S.lastTouched); }
-      else notice(who + ' committed r' + e.revision + ': ' + (p.summary || p.diff_summary || ''), null,
+      else if (S.debug) notice(who + ' committed r' + e.revision + ': ' + (p.summary || p.diff_summary || ''), null,
                   { label: 'Show', run: function () { flash(S.lastTouched); } });
     });
     loadHistory();
@@ -268,7 +275,8 @@ function openEvents() {
   ['prompt.sent', 'comment.posted', 'reply.posted', 'work.updated', 'delivery.updated', 'prompt.linked'].forEach(function (t) {
     on(t, function (e) {
       var p = e.payload || {};
-      if (t === 'reply.posted' && (p.author || {}).kind === 'agent') {
+      if (!S.debug) loadConvSoon();
+      if (t === 'reply.posted' && (p.author || {}).kind === 'agent' && S.debug) {
         notice('Agent replied on ' + p.prompt_id + ': ' + String(p.text || '').slice(0, 120), null,
                { label: 'Open', run: function () { openThread(p.prompt_id); } });
       }
@@ -286,10 +294,11 @@ function openEvents() {
   });
   ['job.updated', 'submission.updated', 'snapshot.created'].forEach(function (t) { on(t, function (e) {
     var p = e.payload || {};
+    if (!S.debug) loadConvSoon();
     if (t === 'job.updated' && p.kind === 'compile' && p.status === 'succeeded') S.compile = p.job_id;
     loadResults();
   }); });
-  on('branch.created', function () { renderBody(); });
+  on('branch.created', function () { if (S.debug) renderBody(); else loadBranches(); });
   on('present', function (e) { present(e.payload || {}, e.branch); });
 }
 
@@ -577,7 +586,7 @@ function send(opts) {
   opts = opts || {};
   if (opts.text !== undefined) S.textCache = opts.text;
   var ta = document.getElementById('qcl-text');
-  if (ta && opts.text !== undefined) ta.value = opts.text;
+  if (ta && opts.text !== undefined && S.debug) ta.value = opts.text;
   if (opts.mode) S.mode = opts.mode;
   if (opts.anchors) S.anchors = opts.anchors.slice();
   if (opts.sketches) S.sketches = opts.sketches.slice();
@@ -600,7 +609,7 @@ function send(opts) {
       S.draftId = null; S.anchors = []; S.sketches = []; S.demo = null; S.textCache = ''; S.steer = false;
       if (ta) ta.value = '';
       var how = d.delivery ? 'queued for ' + sessionLabel(d.delivery.session_id) : (d.status === 'posted' ? 'posted as a comment' : 'saved; no agent is connected');
-      notice('Prompt ' + d.prompt_id + ' v' + d.version + ' sent at r' + d.design_revision + ' - ' + how + '.');
+      if (S.debug) notice('Prompt ' + d.prompt_id + ' v' + d.version + ' sent at r' + d.design_revision + ' - ' + how + '.');
       S.mode = localGet('qccd.live.mode') || 'propose';
       paintOverlay(); loadPrompts(); renderBody();
       return d;
@@ -623,7 +632,7 @@ function editPrompt(p) {
 // ------------------------------------------------------------------ presentation
 function present(p, branch) {
   if (p.view_id && p.view_id !== S.view) return;
-  if (!p.view_id && branch && branch !== S.branch) return;
+  if (!p.view_id && branch && branch !== S.branch && p.action !== 'compare' && p.action !== 'open_run') return;
   var t = p.target || {};
   function doit() {
     if (p.action === 'highlight' || p.action === 'select') {
@@ -633,6 +642,13 @@ function present(p, branch) {
       flash(t.keys || []);
     } else if (p.action === 'open_prompt') openThread(t.prompt_id);
     else if (p.action === 'select_frame' && typeof seek === 'function') seek(+t.frame || 0, {});
+    else if (!S.debug && (p.action === 'compare' || p.action === 'open_run')) {
+      var url = p.action === 'compare' ? '/compare?runs=' + (t.runs || []).map(encodeURIComponent).join(',')
+                                       : '/runview/' + encodeURIComponent(t.run_id || '');
+      loadConvSoon();
+      notice(p.action === 'compare' ? 'The agent put two runs side by side.' : 'The agent has a run for you to watch.', null,
+             { label: 'Open', run: function () { window.open(url, '_blank', 'noopener'); } });
+    }
     else if (p.action === 'open_result' || p.action === 'compare') { S.tab = 'results'; renderTabs(); loadResults(); }
     else if (p.action === 'reveal_diagnostic') { S.tab = 'results'; renderTabs(); loadResults(); flash(t.keys || []); }
     else if (p.action === 'open_branch') { S.tab = 'activity'; renderTabs(); renderBody(); }
@@ -690,6 +706,7 @@ function capabilityText(s) {
 
 // ------------------------------------------------------------------ the dock
 function buildDock() {
+  if (!S.debug) return buildChat();
   var dock = h('div', { id: 'qcl-dock', cls: localGet('qccd.live.min') === '1' ? 'qcl-min' : '' }, [
     h('div', { cls: 'qcl-head' }, [
       h('span', { id: 'qcl-live', cls: 'qcl-dot' }),
@@ -697,6 +714,7 @@ function buildDock() {
       h('span', { id: 'qcl-rev', cls: 'qcl-chip', text: '...' }),
       h('span', { id: 'qcl-agent', cls: 'qcl-chip', text: 'no agent' }),
       h('span', { cls: 'qcl-sp' }),
+      h('button', { cls: 'qcl-btn', text: 'Chat', title: 'back to the conversation', on: { click: function () { setDebug(false); } } }),
       h('button', { cls: 'qcl-btn', text: '–', title: 'minimise', on: { click: function () {
         dock.classList.toggle('qcl-min'); localSet('qccd.live.min', dock.classList.contains('qcl-min') ? '1' : '0'); } } })
     ]),
@@ -718,6 +736,7 @@ function renderTabs() {
   });
 }
 function renderStatus() {
+  if (!S.debug) { renderChatHead(); return; }
   var d = document.getElementById('qcl-live');
   if (d) d.className = 'qcl-dot ' + (S.connected ? 'on' : 'off');
   var r = document.getElementById('qcl-rev');
@@ -734,6 +753,7 @@ function renderStatus() {
   }
 }
 function renderBody() {
+  if (!S.debug) { renderChips(); return; }
   var b = document.getElementById('qcl-body');
   if (!b) return;
   while (b.firstChild) b.removeChild(b.firstChild);
@@ -1088,6 +1108,447 @@ function review(sub) {
   });
 }
 
+// ------------------------------------------------------------------ chat (the default view)
+//
+// One conversation, like talking to a colleague: the person's messages, the agent's own
+// messages, a typing indicator while it works, and small cards for what it DID (a change
+// with Undo, a run with its time, a side-by-side comparison).  One box to write in; the
+// current selection goes with the message; "+" points at things (lasso, point, arrow,
+// sketch, show an edit) or locks parts.  Sessions, deliveries, threads, activity and
+// results are the debug view (the "..." menu).  If no agent is connected, sending starts
+// a Codex conversation when Codex is installed.
+function agentSession() {
+  return S.sessions.filter(function (x) { return x.id === S.target; })[0] || null;
+}
+function shortName(n) {
+  n = String(n || 'Agent');
+  if (/^agent:/.test(n)) return 'Agent';                 // an agent without a named session
+  if (/codex/i.test(n)) return 'Codex';
+  if (/claude/i.test(n)) return 'Claude';
+  return n;
+}
+function isWorking() { return S.working.some(function (w) { return w.state === 'working'; }); }
+function draftName(n) { return n === 'main' ? 'Main design' : 'Draft: ' + String(n).replace(/^cand\//, ''); }
+
+function buildChat() {
+  var min = localGet('qccd.live.min') === '1';
+  var ta = h('textarea', { id: 'qcl-text', cls: 'qcl-input', rows: '1', placeholder: 'Message the agent…',
+                           'aria-label': 'message the agent' });
+  ta.value = S.textCache || '';
+  ta.addEventListener('input', function () { S.textCache = ta.value; grow(ta); renderSendButton(); });
+  ta.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); }
+  });
+  var dock = h('div', { id: 'qcl-dock', cls: 'qcl-chat' + (min ? ' qcl-min' : '') }, [
+    h('div', { cls: 'qcl-head' }, [
+      h('span', { id: 'qcl-live', cls: 'qcl-dot' }),
+      h('b', { id: 'qcl-who', text: 'Agent' }),
+      h('span', { id: 'qcl-sub', cls: 'qcl-sub' }),
+      h('span', { cls: 'qcl-sp' }),
+      h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
+                    'aria-label': 'design', on: { change: onDraftPick } }),
+      h('button', { id: 'qcl-more', cls: 'qcl-btn qcl-icon', text: '⋯', title: 'more',
+                    on: { click: function (e) { e.stopPropagation(); toggleMenu('more'); } } }),
+      h('button', { cls: 'qcl-btn qcl-icon', text: '–', title: 'minimise', on: { click: function () {
+        dock.classList.toggle('qcl-min'); localSet('qccd.live.min', dock.classList.contains('qcl-min') ? '1' : '0'); } } })
+    ]),
+    h('div', { id: 'qcl-conv', cls: 'qcl-conv', 'aria-live': 'polite' }),
+    h('div', { cls: 'qcl-composer' }, [
+      h('div', { id: 'qcl-chips', cls: 'qcl-chips' }),
+      ta,
+      h('div', { cls: 'qcl-cbar' }, [
+        h('button', { id: 'qcl-plus', cls: 'qcl-btn qcl-icon', text: '+',
+                      title: 'point at something (lasso, point, arrow, sketch), show an edit, or lock parts',
+                      on: { click: function (e) { e.stopPropagation(); toggleMenu('plus'); } } }),
+        h('span', { id: 'qcl-tip', cls: 'qcl-note' }),
+        h('span', { cls: 'qcl-sp' }),
+        h('button', { id: 'qcl-send', cls: 'qcl-btn pri qcl-send', text: 'Send', on: { click: function () {
+          if (isWorking() && !ta.value.trim()) chatStop(); else chatSend(); } } })
+      ])
+    ])
+  ]);
+  document.body.appendChild(dock);
+  renderConv(); renderChips(); renderChatHead(); renderDrafts();
+}
+document.addEventListener('click', function () { closeMenu(); });
+function grow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; }
+function tip(t) { var e = document.getElementById('qcl-tip'); if (e) e.textContent = t || ''; }
+
+function closeMenu() { var m = document.getElementById('qcl-menu'); if (m) m.remove(); }
+function toggleMenu(which) {
+  var had = document.getElementById('qcl-menu');
+  closeMenu();
+  if (had && had.getAttribute('data-which') === which) return;
+  var s = agentSession();
+  var items = which === 'plus' ? [
+      ['Lasso a region', function () { setTool('lasso'); }],
+      ['Point at a place', function () { setTool('point'); }],
+      ['Draw an arrow', function () { setTool('arrow'); }],
+      ['Sketch freehand', function () { setTool('stroke'); }],
+      [!S.demo ? 'Show an edit (make it by hand, then ask)' : (S.demo.after === undefined ? 'Done showing the edit'
+                                                                                          : 'Forget the shown edit'), demoToggle],
+      null,
+      ['Lock the selected parts (nobody may change them)', function () { protect(selectionKeys()); }],
+      ['Unlock the selected parts', function () { unprotect(selectionKeys()); }]
+    ] : [
+      [(S.follow ? '✓ ' : '') + 'Follow the agent (move the view when it shows something)', function () {
+        QCCD_LIVE.setFollow(!S.follow); }],
+      ['New conversation with Codex', function () { connectCodex(); }],
+      s ? ['Stop the agent', chatStop] : null,
+      null,
+      ['Debug view (sessions, threads, activity, results)', function () { setDebug(true); }]
+    ];
+  var m = h('div', { id: 'qcl-menu', cls: 'qcl-menu ' + (which === 'plus' ? 'up' : 'down'), 'data-which': which,
+                     on: { click: function (e) { e.stopPropagation(); } } });
+  items.forEach(function (it) {
+    if (it === null) { m.appendChild(h('div', { cls: 'qcl-sep' })); return; }
+    if (!it) return;
+    m.appendChild(h('button', { cls: 'qcl-mi', text: it[0], on: { click: function () { closeMenu(); it[1](); } } }));
+  });
+  document.getElementById('qcl-dock').appendChild(m);
+}
+function demoToggle() {
+  if (!S.demo) { S.demo = { before: S.rev }; tip('Make the edit by hand now, then choose "Done showing the edit" under +.'); }
+  else if (S.demo.after === undefined) { S.demo.after = S.rev; S.demo.targets = selectionKeys(); tip(''); }
+  else { S.demo = null; tip(''); }
+  renderChips();
+}
+
+// what goes with the next message
+function renderChips() {
+  var box = document.getElementById('qcl-chips');
+  if (!box) return;
+  while (box.firstChild) box.removeChild(box.firstChild);
+  var sel = selectionKeys();
+  S.lastSel = sel.join(',');
+  if (sel.length && !S.selOff) {
+    box.appendChild(chipX(sel.length === 1 ? sel[0].replace(/^[a-z]+:/, '') + ' (selected)' : sel.length + ' selected parts',
+                          function () { S.selOff = true; renderChips(); }, 'the current selection goes with your message'));
+  }
+  S.anchors.forEach(function (a, i) {
+    box.appendChild(chipX(anchorText(a), function () { S.anchors.splice(i, 1); paintOverlay(); renderChips(); }));
+  });
+  S.sketches.forEach(function (sk, i) {
+    box.appendChild(chipX(sk.kind === 'stroke' ? 'sketch' : sk.kind, function () { S.sketches.splice(i, 1); paintOverlay(); renderChips(); }));
+  });
+  if (S.demo) {
+    box.appendChild(chipX(S.demo.after === undefined ? 'showing an edit: make it now' : 'edit shown: r' + S.demo.before + ' → r' + S.demo.after,
+                          function () { S.demo = null; renderChips(); }));
+  }
+  if (S.tool) tip({ lasso: 'Draw around a region on the canvas. Esc cancels.', point: 'Click a place on the canvas.',
+                    arrow: 'Drag an arrow on the canvas.', stroke: 'Sketch on the canvas.', pick: 'Click anything.' }[S.tool] || '');
+  else if (!S.demo || S.demo.after !== undefined) tip('');
+  box.style.display = box.children.length ? '' : 'none';
+}
+function chipX(text, onX, title) {
+  return h('span', { cls: 'qcl-chip', title: title || '' }, [text,
+    h('button', { cls: 'qcl-x', text: '×', title: 'remove', on: { click: onX } })]);
+}
+
+// sending, starting an agent, stopping it
+function chatSend(textArg) {
+  var ta = document.getElementById('qcl-text');
+  var text = String(textArg !== undefined ? textArg : (ta ? ta.value : '')).trim();
+  if (!text) return Promise.resolve(null);
+  var sel = selectionKeys(), anchors = S.anchors.slice();
+  if (sel.length && !S.selOff) anchors.unshift(sel.length === 1 ? { kind: 'entity', key: sel[0] } : { kind: 'entity_group', keys: sel });
+  var wasWorking = isWorking();
+  S.pending = text;
+  if (ta) { ta.value = ''; grow(ta); }
+  S.textCache = '';
+  renderConv(); renderSendButton();
+  return ensureAgent().then(function () {
+    var s = agentSession();
+    if (s && s.write_fence) return api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/resume', {}).then(loadSessions);
+  }).then(function () {
+    var s = agentSession();
+    S.steer = !!(wasWorking && s && s.mode === 'appserver');
+    return send({ text: text, mode: 'apply', anchors: anchors });
+  }).then(function (d) {
+    if (!d) { S.pending = null; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
+    S.selOff = false; renderChips();
+    return loadConv().then(function () { return d; });
+  });
+}
+function ensureAgent() {
+  var s = agentSession();
+  if (s && (s.status === 'connected' || s.mode === 'pull' || s.mode === 'channel')) return Promise.resolve(s);
+  var live = S.sessions.filter(function (x) { return x.status === 'connected'; })[0];
+  if (live) {
+    return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions);
+  }
+  return (S.codex === null ? api('GET', '/api/agents').then(function (r) { S.codex = !!(r.ok && r.data.codex_available); })
+                           : Promise.resolve())
+    .then(function () { return S.codex ? connectCodex() : null; });
+}
+function connectCodex() {
+  S.connecting = true; renderChatHead(); renderConv();
+  // nobody can answer an approval prompt from Studio: Codex never asks, its shell is read-only,
+  // and it changes the design through the QCCD tools (approved for this thread)
+  return api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
+                                                      sandbox: 'read-only' }).then(function (r) {
+    S.connecting = false;
+    if (!r.ok) { notice('Could not start Codex: ' + ((r.error || {}).message || 'error'), 'bad'); renderChatHead(); return null; }
+    return loadSessions();
+  });
+}
+function chatStop() {
+  var s = agentSession();
+  if (!s) return;
+  var w = S.working.filter(function (x) { return x.state === 'working'; })[0];
+  stopAgent(s.id, w && w.prompt_id);
+}
+function renderSendButton() {
+  var b = document.getElementById('qcl-send'), ta = document.getElementById('qcl-text');
+  if (!b || !ta) return;
+  var stop = isWorking() && !ta.value.trim();
+  b.textContent = stop ? 'Stop' : 'Send';
+  b.className = 'qcl-btn qcl-send ' + (stop ? 'stop' : 'pri');
+}
+function renderChatHead() {
+  var s = agentSession(), who = document.getElementById('qcl-who'), sub = document.getElementById('qcl-sub'),
+      dot = document.getElementById('qcl-live');
+  if (!who) return;
+  who.textContent = s ? shortName(s.label || s.client) : 'Agent';
+  var t, cls;
+  if (!S.connected) { t = 'offline: reconnecting'; cls = 'off'; }
+  else if (S.connecting) { t = 'starting Codex…'; cls = 'busy'; }
+  else if (!s) { t = S.codex ? 'Codex starts when you send' : 'no agent connected'; cls = ''; }
+  else if (isWorking()) { t = 'working…'; cls = 'busy'; }
+  else if (s.write_fence) { t = 'stopped'; cls = 'off'; }
+  else if (s.mode === 'pull') { t = 'checks when you ask it'; cls = 'on'; }
+  else if (s.status === 'connected') { t = 'ready'; cls = 'on'; }
+  else { t = s.status; cls = 'off'; }
+  sub.textContent = t;
+  dot.className = 'qcl-dot ' + cls;
+  renderSendButton();
+}
+
+// drafts: the workspace's branches
+function loadBranches() {
+  return api('GET', '/api/branches').then(function (r) {
+    if (!r.ok) return;
+    S.branches = (r.data.branches || []).filter(function (b) { return b.name === 'main' || (b.status || 'open') === 'open'; });
+    renderDrafts();
+  });
+}
+function renderDrafts() {
+  var sel = document.getElementById('qcl-draft');
+  if (!sel) return;
+  while (sel.firstChild) sel.removeChild(sel.firstChild);
+  var names = S.branches.map(function (b) { return b.name; });
+  if (names.indexOf('main') < 0) names.unshift('main');
+  if (names.indexOf(S.branch) < 0) names.push(S.branch);
+  names.forEach(function (n) { sel.appendChild(h('option', { value: n, text: draftName(n) })); });
+  sel.appendChild(h('option', { value: '__save', text: 'Save as a new draft…' }));
+  sel.value = S.branch;
+}
+function onDraftPick(e) {
+  var v = e.target.value;
+  if (v === '__save') { e.target.value = S.branch; saveAsDraft(); return; }
+  switchDraft(v);
+}
+function saveAsDraft(name) {
+  name = name || window.prompt('Name this draft (letters, digits, - and _):', '');
+  if (!name || !String(name).trim()) return Promise.resolve(null);
+  name = String(name).trim();
+  return api('POST', '/api/branches', { name: name, source: S.branch }).then(function (r) {
+    if (!r.ok) { notice('Not saved: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
+    notice('Saved as draft "' + name + '". You are still on the ' + draftName(S.branch).toLowerCase() + '.');
+    return loadBranches().then(function () { return r.data; });
+  });
+}
+function switchDraft(name) {
+  if (!name || name === S.branch) return Promise.resolve(true);
+  var t0 = Date.now();
+  return new Promise(function (resolve) {
+    (function waitSync() {                              // finish saving the page's edits to the old draft first
+      if (S.inflight && Date.now() - t0 < 5000) { setTimeout(waitSync, 100); return; }
+      sync();
+      S.branch = name; S.rev = null; S.synced = null;
+      api('PATCH', '/api/views/' + encodeURIComponent(S.view), { branch: name }).then(function () {
+        return loadHead();
+      }).then(function () { loadHistory(); renderDrafts(); renderChatHead(); resolve(true); });
+    })();
+  });
+}
+
+// the conversation
+function loadConvSoon() {
+  if (S.convTimer) clearTimeout(S.convTimer);
+  S.convTimer = setTimeout(loadConv, 200);
+}
+function loadConv() {
+  return api('GET', '/api/conversation?limit=40').then(function (r) {
+    if (!r.ok) return;
+    S.conv = r.data.items || [];
+    S.working = r.data.working || [];
+    S.pending = null;
+    renderConv(); renderChatHead();
+  });
+}
+function renderConv() {
+  var box = document.getElementById('qcl-conv');
+  if (!box) return;
+  var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  while (box.firstChild) box.removeChild(box.firstChild);
+  if (!S.conv.length && !S.pending && !S.connecting) { box.appendChild(emptyState()); return; }
+  var lastWho = null, runs = {};
+  S.conv.forEach(function (it) { if (it.type === 'run') runs[it.run_id] = true; });
+  S.conv.forEach(function (it) {
+    if (it.type === 'run_view' && runs[it.run_id]) return;
+    var n = convItem(it, lastWho);
+    if (n) box.appendChild(n);
+    if (it.type === 'agent') lastWho = shortName(it.author);
+    else if (it.type === 'user' || it.type === 'person') lastWho = 'you';
+  });
+  if (S.pending) box.appendChild(h('div', { cls: 'qcl-msg you pending' }, [h('div', { cls: 'qcl-bubble' }, [txt(S.pending)])]));
+  if (isWorking() || S.pending || S.connecting) {
+    box.appendChild(h('div', { cls: 'qcl-typing' }, [h('i'), h('i'), h('i'), h('em', { text: ' ' + workingText() })]));
+  }
+  if (atBottom || !S.convScrolled) box.scrollTop = box.scrollHeight;
+  S.convScrolled = true;
+}
+function workingText() {
+  var run = S.conv.filter(function (i) { return i.type === 'run' && (i.status === 'running' || i.status === 'queued'); }).pop();
+  var s = agentSession();
+  if (S.connecting) return 'starting Codex';
+  if (run) return run.progress || ('running ' + (run.program || 'a program'));
+  if (!s) return isWorking() ? 'the agent is working' : (S.codex ? 'starting Codex' : 'waiting for an agent to connect');
+  if (s.mode === 'pull') return 'waiting until you ask ' + shortName(s.label || s.client) + ' to check';
+  return shortName(s.label || s.client) + ' is working';
+}
+function emptyState() {
+  var ex = ['Compile and run the BB code on this design, and tell me the bottleneck',
+            'Save this design as a draft called A',
+            'Run the BB code on the main design and on draft A, and show them side by side'];
+  return h('div', { cls: 'qcl-empty' }, [
+    h('div', { cls: 'qcl-empty-t', text: 'Ask the agent about this design.' }),
+    h('div', { cls: 'qcl-note', text: 'Select parts on the canvas and they go with your message. The agent can change the ' +
+                                      'design, compile and run programs on it, and compare drafts.' })
+  ].concat(ex.map(function (t) {
+    return h('button', { cls: 'qcl-ex', text: t, on: { click: function () {
+      var ta = document.getElementById('qcl-text'); ta.value = t; S.textCache = t; grow(ta); ta.focus(); renderSendButton(); } } });
+  })));
+}
+function convItem(it, lastWho) {
+  if (it.type === 'user' || it.type === 'person') {
+    var extra = [it.context ? 'with ' + it.context : '', it.branch && it.branch !== 'main' ? 'on ' + draftName(it.branch).toLowerCase() : '']
+      .filter(Boolean).join(' · ');
+    return h('div', { cls: 'qcl-msg you' }, [h('div', { cls: 'qcl-bubble' }, [txt(it.text)]),
+                                            extra ? h('div', { cls: 'qcl-ctx', text: extra }) : null]);
+  }
+  if (it.type === 'agent') {
+    var name = shortName(it.author);
+    return h('div', { cls: 'qcl-msg agent' }, [lastWho === name ? null : h('div', { cls: 'qcl-who', text: name }),
+                                              h('div', { cls: 'qcl-bubble' }, md(it.text))]);
+  }
+  if (it.type === 'change') {
+    var undone = it.status === 'undone';
+    return h('div', { cls: 'qcl-event' }, [
+      h('span', { cls: 'qcl-evtxt', text: (undone ? 'Undone: ' : 'Changed the design') +
+        (it.revision !== undefined && it.revision !== null ? ' (r' + it.revision + ')' : '') +
+        (it.branch && it.branch !== 'main' ? ' on ' + draftName(it.branch).toLowerCase() : '') + (it.summary ? ': ' + it.summary : '') }),
+      btn('Show', function () { showChange(it.change_set_id); }, 'qcl-link'),
+      !undone ? btn('Undo', function () { undoChange(it.change_set_id); }, 'qcl-link') : null]);
+  }
+  if (it.type === 'run') {
+    var ok = it.status === 'succeeded', busy = it.status === 'running' || it.status === 'queued';
+    return h('div', { cls: 'qcl-card' }, [
+      h('div', { cls: 'qcl-card-t', text: (it.program || 'program') + (it.draft ? ' on ' + (it.draft === 'main' ? 'the main design' : 'draft ' + it.draft) : '') }),
+      h('div', { cls: 'qcl-card-s', text: busy ? ((it.progress || 'running') + '…')
+                                             : (ok ? (it.total_ms !== null && it.total_ms !== undefined ? it.total_ms + ' ms per round' : 'done')
+                                                   : 'did not run: ' + (it.summary || it.status)) }),
+      ok && it.view ? btn('Watch it run', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link') : null]);
+  }
+  if (it.type === 'compare') {
+    return h('div', { cls: 'qcl-card cmp' }, [h('div', { cls: 'qcl-card-t', text: 'Side by side' }),
+      it.verdict ? h('div', { cls: 'qcl-card-s', text: it.verdict }) : null,
+      btn('Open side by side', function () { window.open(it.view, '_blank', 'noopener'); }, 'pri')]);
+  }
+  if (it.type === 'run_view') {
+    return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: 'A run to watch' }),
+      btn('Open', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link')]);
+  }
+  if (it.type === 'job') {
+    return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: (it.kind === 'compile' ? 'Compiled' : it.kind) + ': ' + (it.summary || it.status) })]);
+  }
+  return null;
+}
+function showChange(csid) {
+  api('GET', '/api/change-sets/' + encodeURIComponent(csid)).then(function (c) {
+    if (c.ok) { reveal(c.data.touched || []); flash(c.data.touched || []); }
+  });
+}
+function undoChange(csid) {
+  api('POST', '/api/change-sets/' + encodeURIComponent(csid) + '/undo', { request_id: rid('undo') }).then(function (r) {
+    if (!r.ok) notice('Cannot undo: ' + ((r.error || {}).message || 'error'), 'bad');
+    loadConv();
+  });
+}
+// agent text: a little markdown (bold, code, links, lists, headings, tables), always as
+// DOM nodes built from text -- never innerHTML
+function md(text) {
+  var out = [], list = null, table = null;
+  String(text || '').split('\n').forEach(function (ln) {
+    if (/^\s*\|.*\|\s*$/.test(ln)) {
+      var cells = ln.trim().slice(1, -1).split('|').map(function (c) { return c.trim(); });
+      list = null;
+      if (cells.every(function (c) { return /^:?-{2,}:?$/.test(c); })) {       // the header rule
+        if (table) table.setAttribute('data-head', '1');
+        return;
+      }
+      if (!table) { table = h('table', { cls: 'qcl-mdt' }); out.push(table); }
+      var head = !table.firstChild;
+      table.appendChild(h('tr', {}, cells.map(function (c) { return h(head ? 'th' : 'td', {}, inline(c)); })));
+      return;
+    }
+    table = null;
+    var ul = /^\s*[-*•]\s+(.*)$/.exec(ln), ol = /^\s*\d+[.)]\s+(.*)$/.exec(ln);
+    if (ul || ol) {
+      if (!list || list.tagName.toLowerCase() !== (ul ? 'ul' : 'ol')) { list = h(ul ? 'ul' : 'ol', {}); out.push(list); }
+      list.appendChild(h('li', {}, inline((ul || ol)[1])));
+      return;
+    }
+    list = null;
+    if (!ln.trim()) { out.push(h('div', { cls: 'qcl-gap' })); return; }
+    var hd = /^#{1,4}\s+(.*)$/.exec(ln);
+    out.push(h('div', { cls: hd ? 'qcl-h' : '' }, inline(hd ? hd[1] : ln)));
+  });
+  return out;
+}
+function inline(s) {
+  var parts = [], re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g, last = 0, m;
+  while ((m = re.exec(s))) {
+    if (m.index > last) parts.push(document.createTextNode(s.slice(last, m.index)));
+    var t = m[0];
+    if (t[0] === '[') {
+      var lk = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(t);
+      // only this site's own paths or web links become links
+      parts.push(/^(\/[^\/]|https?:\/\/)/.test(lk[2])
+        ? h('a', { href: lk[2], target: '_blank', rel: 'noopener', text: lk[1] }) : document.createTextNode(lk[1]));
+    } else parts.push(t[0] === '`' ? h('code', { text: t.slice(1, -1) }) : h('b', { text: t.slice(2, -2) }));
+    last = m.index + t.length;
+  }
+  if (last < s.length) parts.push(document.createTextNode(s.slice(last)));
+  return parts;
+}
+function txt(s) {
+  var d = h('div', {});
+  String(s || '').split('\n').forEach(function (l, i) { if (i) d.appendChild(h('br')); d.appendChild(document.createTextNode(l)); });
+  return d;
+}
+function setDebug(on) {
+  S.debug = !!on;
+  localSet('qccd.live.debug', S.debug ? '1' : '0');
+  closeMenu();
+  var d = document.getElementById('qcl-dock');
+  if (d) d.remove();
+  buildDock();
+  refreshAll();
+  if (!S.debug) { loadConv(); loadBranches(); }
+}
+
 // ------------------------------------------------------------------ view state reporting
 function reportView() {
   if (!S.view || !S.paired) return;
@@ -1150,12 +1611,20 @@ function boot() {
       });
     }).then(function () {
       return api('GET', '/api/whoami').then(function (w) {
-        if (w.ok) api('GET', '/api/context').then(function (c) { if (c.ok) S.cursor = c.data.cursor || 0; openEvents(); refreshAll(); });
+        if (w.ok) api('GET', '/api/context').then(function (c) {
+          if (c.ok) S.cursor = c.data.cursor || 0;
+          openEvents(); refreshAll();
+          if (!S.debug) { loadConv(); loadBranches();
+            api('GET', '/api/agents').then(function (r) { S.codex = !!(r.ok && r.data.codex_available); renderChatHead(); renderConv(); }); }
+        });
       });
     });
   });
   setInterval(function () {
-    try { sync(); reportView(); if (!document.getElementById('qcl-ov')) paintOverlay(); } catch (e) { console.error('qccd live tick', e); }
+    try {
+      sync(); reportView(); if (!document.getElementById('qcl-ov')) paintOverlay();
+      if (!S.debug && selectionKeys().join(',') !== S.lastSel) { S.selOff = false; renderChips(); }
+    } catch (e) { console.error('qccd live tick', e); }
   }, 400);
   window.addEventListener('pagehide', function () {
     if (S.view && S.csrf) {
@@ -1180,7 +1649,12 @@ window.QCCD_LIVE = {
   demoStart: function () { S.demo = { before: S.rev }; }, demoEnd: function (targets) {
     S.demo.after = S.rev; S.demo.targets = targets || selectionKeys(); },
   setFollow: function (on) { S.follow = !!on; return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { follow_agent: S.follow }); },
-  setMode: function (m) { S.mode = m; }, openThread: openThread, stop: stopAgent
+  setMode: function (m) { S.mode = m; }, openThread: openThread, stop: stopAgent,
+  // the chat
+  chat: function () { return { debug: S.debug, items: S.conv.slice(), working: S.working.slice(), pending: S.pending,
+                               branch: S.branch, branches: S.branches.map(function (b) { return b.name; }),
+                               agent: (agentSession() || {}).id || null, codex: S.codex }; },
+  chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft
 };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

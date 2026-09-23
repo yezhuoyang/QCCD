@@ -1,6 +1,6 @@
 ---
 name: qccd
-description: Co-design a trapped-ion QCCD device and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the task circuit, compiling, grading, local submissions, or prompts the user sent from Studio (they arrive as <channel source="qccd"> messages or as unread_prompts).
+description: Co-design a trapped-ion QCCD device and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the task circuit, compiling, running programs such as the BB code on a design, performance and bottlenecks, drafts, side-by-side comparisons, grading, local submissions, or messages the user sent from Studio (they arrive as Studio chat turns, <channel source="qccd"> messages, or unread_prompts).
 ---
 
 # QCCD co-design
@@ -29,8 +29,34 @@ so neither of you can silently overwrite the other.
 5. **On 409 conflict**: the user or another agent changed the design. Re-read the context,
    reconsider, and redo the change against the new revision. Never just bump the number.
    On 403 `protected`: that entity is locked by the user; do not work around it.
-6. **Reply in the thread**: `qccd_manage_comment(action="reply", prompt_id=..., text=...,
+6. **Answer**: when the message says "This is a chat", your own messages ARE the answer the
+   user reads in Studio -- write plainly, like a colleague, and do not also post a reply.
+   Otherwise answer with `qccd_manage_comment(action="reply", prompt_id=..., text=...,
    work_state="ready_for_review")`. Use `qccd_present` to show the user what you changed.
+
+## Programs, performance, drafts
+
+- **Run a program on a design**: `qccd_run_program(program="bb", draft="main")` compiles it
+  with the real compiler, inserts cooling, replays it and returns a performance report.
+  `qccd_list_programs` shows the catalogue ("bb", "bb code" and "gross" mean the
+  BB [[144,12,12]] syndrome round `bb144_esm`, 168 qubits); you may also pass your own
+  OpenQASM 2.0 as `{name, qasm}`. "The current design" is the draft the user's Studio shows
+  (`qccd_get_context` -> view.branch).
+- **Explain it from the report, never from memory**: the round time, `breakdown` (transport,
+  cooling, gates, measurement, reset, with shares), `transport_by_class_ms`, `longest`,
+  `hotspots` (junctions and their imbalance, busiest ions), `heating`, failed `rules`, and the
+  `bottleneck` sentences. Say it is a performance run: compiled and replayed with the rules
+  checked, not Lean-checked, not a submission.
+- **When it cannot run** (the design holds too few ions, or the compiler cannot route), the
+  run says why. Tell the user, and offer a design that fits: `construct` a ring with
+  `{"width": 72, "height": 2, "verticals": 24}` holds the BB code.
+- **Drafts** are the user's saved designs: `qccd_manage_branch(action="list")` (names
+  `cand/<name>`; say just the name), `create(name, source=<the current draft>)` to save one.
+  Every tool that takes a draft accepts `A` or `cand/A`.
+- **Compare designs**: run the SAME program on each draft, then
+  `qccd_compare_runs(run_ids=[a, b])`. It returns the table and a verdict and opens the
+  side-by-side view in Studio (both designs animate on one clock). Summarise the verdict and
+  the biggest difference in your answer.
 
 ## Results
 

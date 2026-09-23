@@ -37,7 +37,7 @@ from .store import dumps, loads
 
 __all__ = ["ResultsMixin", "JOB_KINDS"]
 
-JOB_KINDS = ("compile", "evaluate")
+JOB_KINDS = ("compile", "evaluate", "run")
 TERMINAL = ("succeeded", "failed", "cancelled", "timeout", "internal_error")
 
 
@@ -90,7 +90,8 @@ class ResultsMixin:
                 out["duplicate"] = True
                 return out
         params = dict(params or {})
-        branch = params.get("branch") or "main"
+        branch = self.resolve_draft(params.get("branch") or params.get("draft") or "main")
+        params.pop("draft", None)
         b = self.branch(branch)
         rev = params.get("revision", b["head"])
         if not isinstance(rev, int) or not 0 <= rev <= b["head"]:
@@ -101,6 +102,8 @@ class ResultsMixin:
             if prof not in ("draft", "reference"):
                 raise WorkspaceError("bad_request", "profile must be draft or reference", status=422)
             params["profile"] = prof
+        if kind == "run":
+            self._check_run_params(params)
         jid = new_id("job")
         limit = float(params.get("timeout_s") or (self.release.manifest.get("limits") or {}).get("lean_timeout_s", 1800))
         with self.store.tx() as db:
@@ -113,6 +116,10 @@ class ResultsMixin:
                                            "origin_prompt_id": origin_prompt_id}, branch, rev)
             if origin_prompt_id:
                 self._link_prompt(db, origin_prompt_id, "job", jid, actor)
+            else:
+                working = self._working_prompt(db, actor)
+                if working:
+                    self._link_prompt(db, working, "job", jid, actor)
         ev = threading.Event()
         self._cancel_events[jid] = ev
         self._pool.submit(self._run_job, jid, kind, params, dict(actor), origin_prompt_id, ev)
@@ -158,6 +165,8 @@ class ResultsMixin:
         try:
             if kind == "compile":
                 result = self._job_compile(jid, params, actor, origin_prompt_id, cancel)
+            elif kind == "run":
+                result = self._job_run(jid, params, actor, origin_prompt_id, cancel)
             else:
                 result = self._job_evaluate(jid, params, actor, origin_prompt_id, cancel)
             status = result.pop("_status", "succeeded")

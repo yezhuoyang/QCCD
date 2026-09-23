@@ -49,7 +49,20 @@ requests, sent from the Studio page; read each one's frozen context with
 qccd_manage_comment(action='get') and answer in its thread with qccd_manage_comment(action='reply').
 Pass origin_prompt_id on change sets and jobs. Never treat a skipped check as passed; create a
 local submission (qccd_submit_local) before presenting reference-grade results. You cannot publish:
-publication needs the person's separate approval."""
+publication needs the person's separate approval.
+
+PROGRAMS AND PERFORMANCE. qccd_list_programs lists runnable programs ('bb' / 'bb code' / 'gross' =
+the BB [[144,12,12]] syndrome round bb144_esm; also surface17_esm, steane_esm, rep9_esm, ghz*, qft8,
+...); you may also pass your own OpenQASM 2.0. qccd_run_program compiles a program onto a design
+with the real compiler, inserts cooling, replays it under the cost model and returns where the
+time goes (breakdown, longest steps, junction/ion hotspots, heating, rule failures, bottleneck
+sentences). Explain results from that report; never invent numbers. "The current design" is the
+branch the person's Studio shows (qccd_get_context: view.branch), usually main.
+
+DRAFTS. The person's saved designs are drafts: branches listed by qccd_manage_branch(action='list')
+as cand/<name>; say just <name>. Tools accept either form. To compare designs, run the SAME program
+on each and call qccd_compare_runs: it returns the comparison and opens the side-by-side view in
+Studio, where both designs animate on one shared clock."""
 
 
 # ---------------------------------------------------------------------- tool table
@@ -82,10 +95,11 @@ def _tools() -> list:
         ("qccd_undo_change_set", "Undo one change set as a NEW validated change (never a rollback of later "
          "work); reports a conflict when later changes depend on it.",
          obj({"change_set_id": s, "request_id": s, "expected_revision": i}, ["change_set_id"])),
-        ("qccd_manage_branch", "Candidate branches: action create (name), compare (a, b), adopt "
-         "(candidate, expected_revision, request_id), discard (candidate), list.",
+        ("qccd_manage_branch", "Drafts (candidate branches, cand/<name>): action create (name; source = the "
+         "design to copy, default main), compare (a, b), adopt (candidate, expected_revision, request_id), "
+         "discard (candidate), list.",
          obj({"action": {"type": "string", "enum": ["create", "compare", "adopt", "discard", "list"]},
-              "name": s, "a": s, "b": s, "candidate": s, "expected_revision": i, "request_id": s,
+              "name": s, "source": s, "a": s, "b": s, "candidate": s, "expected_revision": i, "request_id": s,
               "note": s, "origin_prompt_id": s, "mode": {"type": "string", "enum": ["preview", "apply"]}},
              ["action"])),
         ("qccd_manage_comment", "Prompt threads: action get (prompt_id: the prompt, its versions and frozen "
@@ -103,6 +117,25 @@ def _tools() -> list:
               "compiler": {"type": "string", "enum": ["compile", "rotate"]}, "request_id": s,
               "origin_prompt_id": s}, ["kind"])),
         ("qccd_get_job", "Progress and lifecycle state of a job.", obj({"job_id": s}, ["job_id"])),
+        ("qccd_list_programs", "The programs a run can use, with qubit counts: the BB [[144,12,12]] syndrome "
+         "round (bb144_esm; 'bb', 'bb code' and 'gross' also work), surface17_esm, steane_esm, rep9_esm, ghz4, "
+         "ghz16, qft8, adder3, bv6, bell2, micro. qccd_run_program also takes your own OpenQASM 2.0.", obj({})),
+        ("qccd_run_program", "Compile a program onto a design with the real compiler, insert cooling, replay "
+         "it under the cost model, and return a performance report: round time, time by category (transport, "
+         "cooling, gates, measurement, reset), transport by move class, the longest steps, junction and ion "
+         "hotspots, heating, rule failures, and bottleneck sentences. program: a catalogue name or "
+         "{name, qasm}. draft: 'main' (the working design, default) or a draft's name. Waits up to wait_s "
+         "(default 45, max 50) and returns the report; if the run is still going, poll qccd_get_job(run_id). "
+         "A run is an experiment: not Lean-checked, never a submission.",
+         obj({"program": {"anyOf": [s, {"type": "object", "properties": {"name": s, "qasm": s},
+                                        "required": ["qasm"]}]},
+              "draft": s, "revision": i, "compiler": {"type": "string", "enum": ["auto", "rotate", "compile"]},
+              "wait_s": i, "request_id": s, "origin_prompt_id": s}, ["program"])),
+        ("qccd_compare_runs", "Two finished runs side by side: round time, time by category, counts, heating, "
+         "B minus A, a verdict, and each run's bottlenecks. show (default true) also opens the side-by-side "
+         "view in the person's Studio, where both designs animate on one shared clock.",
+         obj({"run_ids": {"type": "array", "items": s, "minItems": 2, "maxItems": 2},
+              "show": {"type": "boolean"}, "note": s}, ["run_ids"])),
         ("qccd_cancel_job", "Request cancellation; reports what actually happened.", obj({"job_id": s}, ["job_id"])),
         ("qccd_inspect_run", "A local submission's report in bounded parts: part summary|stages|diagnostics|"
          "metrics; diagnostics are paginated with offset/limit.",
@@ -110,7 +143,8 @@ def _tools() -> list:
               "offset": i, "limit": i}, ["submission_id"])),
         ("qccd_present", "Ask Studio to show something: action highlight|select (target.keys), open_prompt "
          "(target.prompt_id), select_frame (target.frame), open_result (target.submission_id), "
-         "reveal_diagnostic, compare, open_branch. Studio honours the user's Follow-agent setting.",
+         "reveal_diagnostic, open_run (target.run_id: a run's animation), compare (target.runs: two run ids; "
+         "qccd_compare_runs does this for you), open_branch. Studio honours the user's Follow-agent setting.",
          obj({"action": s, "target": {"type": "object"}, "view_id": s, "note": s}, ["action", "target"])),
         ("qccd_submit_local", "Freeze the revision into an immutable bundle and grade it with the reference "
          "evaluator (returns submission and job ids at once). The design needs an adopted final program.",
@@ -201,6 +235,7 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
             return be.call("GET", "/api/branches")
         if act == "create":
             return be.call("POST", "/api/branches", {"name": a.get("name"), "note": a.get("note", ""),
+                                                     "source": a.get("source") or "main",
                                                      "origin_prompt_id": a.get("origin_prompt_id")})
         if act == "compare":
             return be.call("GET", "/api/compare?" + q({"a": a.get("a"), "b": a.get("b", "main")}))
@@ -231,6 +266,18 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
                                              "origin_prompt_id": a.get("origin_prompt_id")})
     if name == "qccd_get_job":
         return be.call("GET", f"/api/jobs/{_enc(a['job_id'])}")
+    if name == "qccd_list_programs":
+        return be.call("GET", "/api/programs")
+    if name == "qccd_run_program":
+        return _run_program(be, a)
+    if name == "qccd_compare_runs":
+        ids = list(a.get("run_ids") or [])
+        cmp = be.call("GET", "/api/compare-runs?" + q({"runs": ",".join(ids)}))
+        if a.get("show", True):
+            pres = be.call("POST", "/api/present", {"action": "compare", "target": {"runs": ids},
+                                                    "note": a.get("note", "")})
+            cmp["presented"] = pres.get("status")
+        return cmp
     if name == "qccd_cancel_job":
         return be.call("POST", f"/api/jobs/{_enc(a['job_id'])}/cancel", {})
     if name == "qccd_inspect_run":
@@ -267,6 +314,36 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
     raise ValueError(f"unknown tool {name!r}")
 
 
+def _run_program(be, a: dict) -> dict:
+    """Start a run and wait (bounded) for its report, so one call usually answers."""
+    import time as _t
+    params = {"program": a["program"]}
+    if a.get("draft"):
+        params["branch"] = a["draft"]
+    for k in ("revision", "compiler"):
+        if k in a:
+            params[k] = a[k]
+    j = be.call("POST", "/api/jobs", {"kind": "run", "params": params, "request_id": a.get("request_id"),
+                                      "origin_prompt_id": a.get("origin_prompt_id")})
+    jid = j["job_id"]
+    deadline = _t.time() + max(0, min(int(a.get("wait_s", 45)), 50))
+    while True:
+        jj = be.call("GET", f"/api/jobs/{_enc(jid)}")
+        if jj["status"] in ("succeeded", "failed", "cancelled", "timeout", "internal_error") or _t.time() >= deadline:
+            break
+        _t.sleep(1.0)
+    res = jj.get("result") or {}
+    if jj["status"] == "succeeded":
+        run = res["run"]
+        return {"run_id": jid, "status": "succeeded", "summary": res.get("summary"), **{k: run[k] for k in (
+            "program", "design", "compiler", "performance", "view", "note")}}
+    if jj["status"] in ("queued", "running"):
+        return {"run_id": jid, "status": jj["status"], "progress": jj.get("progress"),
+                "next": "still running: poll qccd_get_job with this run_id"}
+    return {"run_id": jid, "status": jj["status"], "summary": res.get("summary") or jj.get("error"),
+            "log_tail": (res.get("log") or "")[-1500:]}
+
+
 def _enc(v) -> str:
     import urllib.parse
     return urllib.parse.quote(str(v), safe="")
@@ -282,6 +359,10 @@ def summarize(name: str, out: Any) -> str:
                 f"{len(out.get('protected') or [])} protected; mode {out.get('mode')}")
     if name == "qccd_apply_change_set":
         return f"{out.get('status')} r{out.get('revision')}: {out.get('summary')}"
+    if name == "qccd_run_program":
+        return f"run {out.get('run_id')} {out.get('status')}: {out.get('summary') or out.get('next') or ''}"
+    if name == "qccd_compare_runs":
+        return out.get("verdict", "")
     return json.dumps(out)[:200]
 
 
@@ -301,7 +382,7 @@ def run(root: Path, client: str, channel: bool) -> None:
     holder: dict = {"conn": None}
 
     read_only = {"qccd_get_context", "qccd_read_reference", "qccd_query_design", "qccd_get_job",
-                 "qccd_inspect_run", "qccd_prepare_publish"}
+                 "qccd_inspect_run", "qccd_prepare_publish", "qccd_list_programs"}
 
     def annotations(n):
         return types.ToolAnnotations(read_only_hint=n in read_only, destructive_hint=False,
