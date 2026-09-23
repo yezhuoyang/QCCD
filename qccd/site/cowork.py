@@ -83,6 +83,15 @@ on this design and summarize the bottleneck"</em> or <em>"Run the BB code on dra
 by side"</em>. The draft menu at the top of the chat saves and switches designs. Claude Code
 works too: run <code>qccd agent install --client claude</code>, start <code>claude</code> in the workspace, and
 ask it to handle the requests waiting in Studio.</p>
+<h3>Ask about any page</h3>
+<p>Your workspace also serves this whole website with the same chat on every page. In the workspace
+folder, run:</p>
+<pre>qccd web</pre>
+<p>Ask about the page you are reading: a rule, a lesson, a leaderboard entry. Select a sentence
+and it goes with your question. The agent reads the page and points at the answer on it. It
+can also step the embedded examples, open lessons and take you to other pages. The
+pages come from this site; the chat and the agent stay on your computer, and this public
+site still does not connect to it.</p>
 <h3>Bring this design</h3>
 <p><button class="qa-save" type="button">Save this design as a file</button><span class="qa-saved"></span></p>
 <p>Put the file in your workspace folder, then run:</p>
