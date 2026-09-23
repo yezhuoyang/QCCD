@@ -34,7 +34,7 @@ from .store import dumps, loads
 __all__ = ["CollabMixin", "ANCHOR_KINDS", "INTENTS", "PROMPT_MODES", "delivery_text"]
 
 ANCHOR_KINDS = ("entity", "entity_group", "region", "point", "instruction", "circuit_op",
-                "field", "metric", "diagnostic", "event", "panel", "workspace")
+                "field", "metric", "diagnostic", "event", "panel", "workspace", "page")
 #: `comment` is a remark or preference and is never delivered; the others are requests
 INTENTS = ("comment", "question", "propose_change", "apply_change", "constraint")
 PROMPT_MODES = ("ask", "propose", "apply")
@@ -63,7 +63,8 @@ class CollabMixin:
 
     # ------------------------------------------------------------------ views (Studio tabs)
 
-    def register_view(self, actor: Mapping, *, branch: str = "main", label: str = "") -> dict:
+    def register_view(self, actor: Mapping, *, branch: str = "main", label: str = "",
+                      page: Mapping | None = None) -> dict:
         from .core import WorkspaceError, new_id
         if actor.get("kind") != "human":
             raise WorkspaceError("forbidden", "only a Studio page registers a view", status=403)
@@ -71,7 +72,7 @@ class CollabMixin:
         vid = new_id("v")
         now = _now()
         state = {"rendered_revision": None, "selection": [], "viewport": None,
-                 "displayed_run": None, "frame": None}
+                 "displayed_run": None, "frame": None, "page": _page_info(page)}
         with self.store.tx() as db:
             db.execute("INSERT INTO views(id, branch, label, follow_agent, target_session, state, "
                        "created_at, last_seen) VALUES(?,?,?,?,?,?,?,?)",
@@ -104,6 +105,8 @@ class CollabMixin:
         for k in ("rendered_revision", "selection", "viewport", "displayed_run", "frame"):
             if k in patch:
                 state[k] = patch[k]
+        if "page" in patch:
+            state["page"] = _page_info(patch["page"])
         sets, args = ["state=?", "last_seen=?"], [dumps(state), _now()]
         if "follow_agent" in patch:
             sets.append("follow_agent=?")
@@ -118,17 +121,55 @@ class CollabMixin:
             self.branch(patch["branch"])
             sets.append("branch=?")
             args.append(patch["branch"])
-        if patch.get("closed"):
-            sets.append("closed=1")
+        if "closed" in patch:                         # a page that navigates closes, then reopens, its view
+            sets.append("closed=?")
+            args.append(1 if patch["closed"] else 0)
         with self.store.tx() as db:
             db.execute(f"UPDATE views SET {', '.join(sets)} WHERE id=?", (*args, view_id))
             if "rendered_revision" in patch or "target_session" in patch or "follow_agent" in patch \
-                    or patch.get("closed"):
+                    or patch.get("closed") or "page" in patch:
                 self._emit(db, "view.updated", {"view_id": view_id,
                                                 "rendered_revision": state.get("rendered_revision"),
                                                 "target_session": patch.get("target_session", v["target_session"]),
                                                 "closed": bool(patch.get("closed"))}, v["branch"])
         return self.view(view_id)
+
+    def page_view(self, actor: Mapping, view_id: str | None = None) -> dict:
+        """The page an agent's page action goes to: the one named, else the page the request
+        it is working on was sent from, else the page the person used last."""
+        from .core import WorkspaceError
+        if view_id:
+            v = self.view(view_id)
+            if not v["connected"] or not (v["state"].get("page") or {}).get("url"):
+                raise WorkspaceError("page_closed", f"view {view_id} is not an open page", status=409)
+            return v
+        with self.store.lock:
+            working = self._working_prompt(self.store.db, actor)
+        if working:
+            p = self.prompt(working)
+            vid = ((p.get("latest_sent") or {}).get("body") or {}).get("view_id")
+            if vid:
+                try:
+                    v = self.view(vid)
+                    if v["connected"] and (v["state"].get("page") or {}).get("url"):
+                        return v
+                except WorkspaceError:
+                    pass
+        for v in self.views():
+            if v["connected"] and (v["state"].get("page") or {}).get("url"):
+                return v
+        raise WorkspaceError("no_page", "no page is open: the person has no Studio or website page with "
+                             "the chat open right now", status=409)
+
+    def pages(self) -> list:
+        """The open pages (Studio and website), newest first, for an agent to choose from."""
+        out = []
+        for v in self.views():
+            pg = v["state"].get("page") or {}
+            if v["connected"] and pg.get("url"):
+                out.append({"view_id": v["id"], "url": pg.get("url"), "title": pg.get("title"),
+                            "kind": pg.get("kind"), "site": pg.get("site")})
+        return out
 
     def touch_view(self, view_id: str) -> None:
         with self.store.lock:
@@ -391,6 +432,8 @@ class CollabMixin:
             b["branch"] = branch
             b["view_id"] = view_id
             b["target_session"] = target
+            if (ctx.get("page") or {}).get("site"):
+                b["page_title"] = ctx["page"].get("title") or ctx["page"].get("url")
             status = "posted" if b["intent"] == "comment" else "sent"
             db.execute("UPDATE notes SET status=?, body=?, updated_at=? WHERE id=? AND version=?",
                        (status, dumps(b), now, prompt_id, cur["version"]))
@@ -476,6 +519,7 @@ class CollabMixin:
             "displayed_run": ctx.get("displayed_run") or ((view or {}).get("state") or {}).get("displayed_run"),
             "frame": ctx.get("frame") if ctx.get("frame") is not None else ((view or {}).get("state") or {}).get("frame"),
             "panel": ctx.get("panel"),
+            "page": _page_info(ctx.get("page")) or ((view or {}).get("state") or {}).get("page"),
             "anchors": resolved,
             "sketches": list(body.get("sketches") or []),
             "demonstration": demo_out,
@@ -525,7 +569,7 @@ class CollabMixin:
             b = sent["body"]
             items.append({"type": "user", "prompt_id": p["prompt_id"], "text": b.get("text", ""),
                           "at": sent["created_at"], "branch": b.get("branch"), "context": _context_brief(b),
-                          "comment": p["kind"] == "comment"})
+                          "comment": p["kind"] == "comment", "page": b.get("page_title")})
             for x in p["replies"]:
                 a = x["author"]
                 items.append({"type": "agent" if a.get("kind") == "agent" else "person", "prompt_id": p["prompt_id"],
@@ -539,6 +583,11 @@ class CollabMixin:
             st = (p["work"] or {}).get("state")
             if st in ("pending", "working"):
                 working.append({"prompt_id": p["prompt_id"], "state": st})
+            elif st == "waiting_input" and (p["work"] or {}).get("note"):
+                # the agent's runtime stopped without an answer (a failed turn, a usage limit):
+                # the person sees why, instead of a conversation that just goes quiet
+                items.append({"type": "notice", "prompt_id": p["prompt_id"], "text": p["work"]["note"],
+                              "at": p["work"]["updated_at"]})
         items.sort(key=lambda i: i["at"])
         return {"items": items, "working": working}
 
@@ -886,7 +935,8 @@ class CollabMixin:
                                "design_revision": b.get("design_revision"),
                                "anchors": [_anchor_brief(a) for a in b.get("anchors", [])][:20],
                                "sketches": len(b.get("sketches") or []),
-                               "demonstration": bool(b.get("demonstration"))})
+                               "demonstration": bool(b.get("demonstration")),
+                               "page": b.get("page_title")})
         if unread and actor.get("kind") == "agent":
             self.acknowledge(actor, [u["prompt_id"] for u in unread])
         latest = self.latest_result(branch)
@@ -910,7 +960,9 @@ class CollabMixin:
                 "view_id": view["id"], "connected": view["connected"], "follow_agent": view["follow_agent"],
                 "rendered_revision": view["state"].get("rendered_revision"),
                 "selection": view["state"].get("selection", [])[:50],
-                "displayed_run": view["state"].get("displayed_run"), "frame": view["state"].get("frame")},
+                "displayed_run": view["state"].get("displayed_run"), "frame": view["state"].get("frame"),
+                "page": view["state"].get("page")},
+            "pages": self.pages()[:10],
             "session": None if sess is None else {
                 "session_id": sess["id"], "client": sess["client"], "mode": sess["mode"],
                 "capabilities": sess["capabilities"], "write_fence": sess["write_fence"],
@@ -953,7 +1005,7 @@ def entity_summary_for(doc: Mapping, limit: int) -> list:
 def _anchor_brief(a: Mapping) -> dict:
     out = {"kind": a.get("kind")}
     for k in ("key", "keys", "bbox", "pos", "instr_id", "op_index", "field", "name", "rule", "panel",
-              "entities_inside", "frame"):
+              "entities_inside", "frame", "url", "quote", "element"):
         if k in a:
             v = a[k]
             out[k] = v[:20] if isinstance(v, list) else v
@@ -1012,6 +1064,16 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
              f"v{version['version']} (workspace {ws.id}, branch {ctx['branch']}, design revision "
              f"{ctx['design_revision']}, intent {b['intent']}, mode {b['mode']}).",
              "User's words (verbatim):", _quote(b.get("text", ""))]
+    pg = ctx.get("page") or {}
+    if pg.get("url") and pg.get("site"):
+        lines.append(f"The person is reading the website page \"{pg.get('title') or pg['url']}\" ({pg['url']}, "
+                     f"a {pg.get('kind') or 'page'} page of {pg['site']}, served through the workspace). A question "
+                     "is most likely about that page: read it with qccd_page_read (by section for long pages) and "
+                     "answer from what it says; show things on it with qccd_page_act (scroll, highlight with a "
+                     "note, click, fill, navigate, step an animation, open_lesson).")
+    elif pg.get("url"):
+        lines.append("The person is in Studio. qccd_page_read and qccd_page_act reach its controls too "
+                     "(the transport, the panels, the lessons).")
     if b.get("anchors"):
         lines.append("Anchored to: " + "; ".join(_describe_anchor(a) for a in b["anchors"][:8]))
     if b.get("sketches"):
@@ -1054,6 +1116,11 @@ def _context_brief(b: Mapping) -> str:
                if a.get("kind") in ("entity", "entity_group"))
     if ents:
         parts.append(f"{ents} part{'s' if ents != 1 else ''}")
+    for a in anchors:
+        if a.get("kind") == "page" and a.get("quote"):
+            parts.append("a quote")
+        elif a.get("kind") == "page" and a.get("element"):
+            parts.append("something on the page")
     if any(a.get("kind") == "region" for a in anchors):
         parts.append("a lasso")
     if any(a.get("kind") == "point" for a in anchors):
@@ -1093,4 +1160,22 @@ def _describe_anchor(a: Mapping) -> str:
         return f"diagnostic {a.get('rule')}"
     if k == "event":
         return f"simulation frame {a.get('frame')}"
+    if k == "page":
+        if a.get("quote"):
+            return f"this text on the page: \"{str(a['quote'])[:600]}\""
+        el = a.get("element") or {}
+        return (f"the element {el.get('ref')} on the page ({el.get('tag')}: \"{str(el.get('text') or '')[:200]}\""
+                + (f", in section \"{el.get('section')}\"" if el.get("section") else "") + ")")
     return k or "?"
+
+
+def _page_info(page) -> dict | None:
+    """What a view or a message says about its page, trimmed to plain short strings."""
+    if not isinstance(page, Mapping):
+        return None
+    out = {}
+    for k, n in (("url", 400), ("title", 200), ("kind", 60), ("site", 120), ("selection", 1200), ("in_view", 200)):
+        v = page.get(k)
+        if isinstance(v, str) and v:
+            out[k] = v[:n]
+    return out or None

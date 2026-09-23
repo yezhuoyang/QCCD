@@ -24,6 +24,12 @@
 //
 //  * CHAT.  By default the dock is one conversation with the agent (buildChat); the tabs
 //    with sessions, threads, activity and results are the debug view.
+//  * PAGES.  The agent may operate the page it is talking about, through a fixed set of
+//    actions (pageact.js: read, scroll, highlight, click, fill, press, navigate, step,
+//    open_lesson), never by running script.  In Studio they run here; on a website page
+//    (mode `page`: this chat is a frame from the workspace inside the mirrored page, see
+//    mirror.py) the frame passes them to the page by postMessage, and whatever the page
+//    answers is data, not authority.
 //
 // All text that came from anyone (labels, prompts, agent replies) is set with
 // textContent, never innerHTML.
@@ -31,7 +37,8 @@
 (function () {
 'use strict';
 var CFG = JSON.parse(document.getElementById('qccd-live-config').textContent);
-var ED = globalThis.EDITOR;
+var ED = globalThis.EDITOR || null;
+var PAGE = CFG.mode === 'page';
 var S = {
   csrf: null, view: null, branch: 'main', rev: null, synced: null, inflight: false,
   restoring: false, needRefresh: false, mine: Object.create(null), cursor: 0, es: null,
@@ -44,7 +51,9 @@ var S = {
   // the chat view (default) vs the debug view (tabs)
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
   conv: [], working: [], pending: null, codex: null, connecting: false, branches: [], convTimer: null,
-  lastSel: '', selOff: false, convScrolled: false
+  lastSel: '', selOff: false, convScrolled: false,
+  // the page this chat is about (a website page, or Studio itself)
+  page: PAGE ? { url: CFG.page || '/web/', site: CFG.site } : null, pageDoing: null
 };
 var NS = 'http://www.w3.org/2000/svg';
 
@@ -300,6 +309,7 @@ function openEvents() {
   }); });
   on('branch.created', function () { if (S.debug) renderBody(); else loadBranches(); });
   on('present', function (e) { present(e.payload || {}, e.branch); });
+  on('page.action', function (e) { pageAction(e.payload || {}); });
 }
 
 // ------------------------------------------------------------------ overlay (pins, flashes, sketches)
@@ -315,7 +325,7 @@ function overlay() {
   }
   return g;
 }
-function L() { return ED.layout(); }
+function L() { return ED && ED.layout ? ED.layout() : null; }
 function toUser(x, y) { var l = L(); return { x: l.ox + x * l.sx, y: l.oy + y * l.sy }; }
 function toLattice(ux, uy) { var l = L(); return { x: (ux - l.ox) / l.sx, y: (uy - l.oy) / l.sy }; }
 function nodePos(id) {
@@ -438,6 +448,7 @@ function reveal(keys) {
 
 // ------------------------------------------------------------------ capture (pick / lasso / point / sketch)
 function selectionKeys() {
+  if (!ED || !ED.selection) return [];
   return (ED.selection() || []).map(function (s) {
     return (s.kind === 'site' || s.kind === 'junction' || s.kind === 'node' ? 'node:' : s.kind + ':') + s.id;
   });
@@ -599,7 +610,7 @@ function send(opts) {
   var ctx = { design_revision: CFG.mode === 'design' ? S.rev : undefined, selection: sel, viewport: viewport(),
               frame: (typeof frame === 'number') ? frame : null,
               displayed_run: CFG.snapshot_id || null, target_session: S.target || undefined,
-              panel: S.tab };
+              panel: S.tab, page: pageInfo() };
   var req = rid('send');
   return api('POST', '/api/prompts/send', { prompt_id: S.draftId || undefined, body: b, view_id: S.view,
                                             context: ctx, request_id: req })
@@ -635,6 +646,7 @@ function present(p, branch) {
   if (!p.view_id && branch && branch !== S.branch && p.action !== 'compare' && p.action !== 'open_run') return;
   var t = p.target || {};
   function doit() {
+    if (!ED && (p.action === 'highlight' || p.action === 'select' || p.action === 'select_frame')) return;
     if (p.action === 'highlight' || p.action === 'select') {
       if (p.action === 'select') ED.select((t.keys || []).map(function (k) {
         var i = k.indexOf(':'), kind = k.slice(0, i); return { kind: kind === 'node' ? 'site' : kind, id: k.slice(i + 1) }; }));
@@ -1145,12 +1157,13 @@ function buildChat() {
       h('b', { id: 'qcl-who', text: 'Agent' }),
       h('span', { id: 'qcl-sub', cls: 'qcl-sub' }),
       h('span', { cls: 'qcl-sp' }),
-      h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
-                    'aria-label': 'design', on: { change: onDraftPick } }),
+      PAGE ? null : h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
+                                  'aria-label': 'design', on: { change: onDraftPick } }),
       h('button', { id: 'qcl-more', cls: 'qcl-btn qcl-icon', text: '⋯', title: 'more',
                     on: { click: function (e) { e.stopPropagation(); toggleMenu('more'); } } }),
       h('button', { cls: 'qcl-btn qcl-icon', text: '–', title: 'minimise', on: { click: function () {
-        dock.classList.toggle('qcl-min'); localSet('qccd.live.min', dock.classList.contains('qcl-min') ? '1' : '0'); } } })
+        dock.classList.toggle('qcl-min'); localSet('qccd.live.min', dock.classList.contains('qcl-min') ? '1' : '0');
+        if (CFG.framed) toParent({ qccd: 'size', min: dock.classList.contains('qcl-min') }); } } })
     ]),
     h('div', { id: 'qcl-conv', cls: 'qcl-conv', 'aria-live': 'polite' }),
     h('div', { cls: 'qcl-composer' }, [
@@ -1158,7 +1171,8 @@ function buildChat() {
       ta,
       h('div', { cls: 'qcl-cbar' }, [
         h('button', { id: 'qcl-plus', cls: 'qcl-btn qcl-icon', text: '+',
-                      title: 'point at something (lasso, point, arrow, sketch), show an edit, or lock parts',
+                      title: PAGE ? 'point at something on the page' :
+                             'point at something (lasso, point, arrow, sketch), show an edit, or lock parts',
                       on: { click: function (e) { e.stopPropagation(); toggleMenu('plus'); } } }),
         h('span', { id: 'qcl-tip', cls: 'qcl-note' }),
         h('span', { cls: 'qcl-sp' }),
@@ -1167,6 +1181,7 @@ function buildChat() {
       ])
     ])
   ]);
+  if (min && CFG.framed) toParent({ qccd: 'size', min: true });
   document.body.appendChild(dock);
   renderConv(); renderChips(); renderChatHead(); renderDrafts();
 }
@@ -1180,7 +1195,17 @@ function toggleMenu(which) {
   closeMenu();
   if (had && had.getAttribute('data-which') === which) return;
   var s = agentSession();
-  var items = which === 'plus' ? [
+  var items = PAGE ? (which === 'plus' ? [
+      ['Point at something on the page', pickOnPage],
+      [S.selOff ? 'Send the text you selected on the page with the message' : 'Do not send the selected text',
+       function () { S.selOff = !S.selOff; renderChips(); }]
+    ] : [
+      ['New conversation with Codex', function () { connectCodex(); }],
+      s ? ['Stop the agent', chatStop] : null,
+      null,
+      ['Open your Studio (the design you work on)', function () { window.open('/studio', '_blank', 'noopener'); }],
+      ['Debug view (sessions, threads, activity, results)', function () { setDebug(true); }]
+    ]) : which === 'plus' ? [
       ['Lasso a region', function () { setTool('lasso'); }],
       ['Point at a place', function () { setTool('point'); }],
       ['Draw an arrow', function () { setTool('arrow'); }],
@@ -1196,6 +1221,7 @@ function toggleMenu(which) {
       ['New conversation with Codex', function () { connectCodex(); }],
       s ? ['Stop the agent', chatStop] : null,
       null,
+      CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
       ['Debug view (sessions, threads, activity, results)', function () { setDebug(true); }]
     ];
   var m = h('div', { id: 'qcl-menu', cls: 'qcl-menu ' + (which === 'plus' ? 'up' : 'down'), 'data-which': which,
@@ -1221,6 +1247,11 @@ function renderChips() {
   while (box.firstChild) box.removeChild(box.firstChild);
   var sel = selectionKeys();
   S.lastSel = sel.join(',');
+  var quote = PAGE && S.page && S.page.selection;
+  if (quote && !S.selOff) {
+    box.appendChild(chipX('“' + (quote.length > 60 ? quote.slice(0, 58) + '…' : quote) + '”',
+                          function () { S.selOff = true; renderChips(); }, 'the text you selected on the page goes with your message'));
+  }
   if (sel.length && !S.selOff) {
     box.appendChild(chipX(sel.length === 1 ? sel[0].replace(/^[a-z]+:/, '') + ' (selected)' : sel.length + ' selected parts',
                           function () { S.selOff = true; renderChips(); }, 'the current selection goes with your message'));
@@ -1252,12 +1283,13 @@ function chatSend(textArg) {
   if (!text) return Promise.resolve(null);
   var sel = selectionKeys(), anchors = S.anchors.slice();
   if (sel.length && !S.selOff) anchors.unshift(sel.length === 1 ? { kind: 'entity', key: sel[0] } : { kind: 'entity_group', keys: sel });
+  if (PAGE && S.page && S.page.selection && !S.selOff) anchors.unshift({ kind: 'page', url: S.page.url, quote: S.page.selection });
   var wasWorking = isWorking();
   S.pending = text;
   if (ta) { ta.value = ''; grow(ta); }
   S.textCache = '';
   renderConv(); renderSendButton();
-  return ensureAgent().then(function () {
+  return (PAGE ? refreshPage() : Promise.resolve()).then(ensureAgent).then(function () {
     var s = agentSession();
     if (s && s.write_fence) return api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/resume', {}).then(loadSessions);
   }).then(function () {
@@ -1413,12 +1445,14 @@ function workingText() {
   var run = S.conv.filter(function (i) { return i.type === 'run' && (i.status === 'running' || i.status === 'queued'); }).pop();
   var s = agentSession();
   if (S.connecting) return 'starting Codex';
+  if (S.pageDoing && Date.now() - S.pageDoing.at < 4000) return S.pageDoing.text;
   if (run) return run.progress || ('running ' + (run.program || 'a program'));
   if (!s) return isWorking() ? 'the agent is working' : (S.codex ? 'starting Codex' : 'waiting for an agent to connect');
   if (s.mode === 'pull') return 'waiting until you ask ' + shortName(s.label || s.client) + ' to check';
   return shortName(s.label || s.client) + ' is working';
 }
 function emptyState() {
+  if (PAGE) return pageEmptyState();
   var ex = ['Compile and run the BB code on this design, and tell me the bottleneck',
             'Save this design as a draft called A',
             'Run the BB code on the main design and on draft A, and show them side by side'];
@@ -1435,6 +1469,7 @@ function convItem(it, lastWho) {
   if (it.type === 'user' || it.type === 'person') {
     var extra = [it.context ? 'with ' + it.context : '', it.branch && it.branch !== 'main' ? 'on ' + draftName(it.branch).toLowerCase() : '']
       .filter(Boolean).join(' · ');
+    if (it.page && (!PAGE || it.page !== (S.page || {}).title)) extra = [extra, 'on ' + it.page].filter(Boolean).join(' · ');
     return h('div', { cls: 'qcl-msg you' }, [h('div', { cls: 'qcl-bubble' }, [txt(it.text)]),
                                             extra ? h('div', { cls: 'qcl-ctx', text: extra }) : null]);
   }
@@ -1469,6 +1504,9 @@ function convItem(it, lastWho) {
   if (it.type === 'run_view') {
     return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: 'A run to watch' }),
       btn('Open', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link')]);
+  }
+  if (it.type === 'notice') {
+    return h('div', { cls: 'qcl-event qcl-warn' }, [h('span', { cls: 'qcl-evtxt', text: it.text })]);
   }
   if (it.type === 'job') {
     return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: (it.kind === 'compile' ? 'Compiled' : it.kind) + ': ' + (it.summary || it.status) })]);
@@ -1524,8 +1562,10 @@ function inline(s) {
     var t = m[0];
     if (t[0] === '[') {
       var lk = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(t);
-      // only this site's own paths or web links become links
-      parts.push(/^(\/[^\/]|https?:\/\/)/.test(lk[2])
+      // only this site's own paths or web links become links; a website path opens in the
+      // page this chat sits in
+      if (CFG.framed && CFG.parent_origin && /^\/web(\/|$)/.test(lk[2])) parts.push(h('a', { href: CFG.parent_origin + lk[2], target: '_top', text: lk[1] }));
+      else parts.push(/^(\/[^\/]|https?:\/\/)/.test(lk[2])
         ? h('a', { href: lk[2], target: '_blank', rel: 'noopener', text: lk[1] }) : document.createTextNode(lk[1]));
     } else parts.push(t[0] === '`' ? h('code', { text: t.slice(1, -1) }) : h('b', { text: t.slice(2, -2) }));
     last = m.index + t.length;
@@ -1549,6 +1589,92 @@ function setDebug(on) {
   if (!S.debug) { loadConv(); loadBranches(); }
 }
 
+// ------------------------------------------------------------------ pages: the agent's hands on the UI
+//
+// Studio runs the agent's page actions itself (window.QCCD_PAGE from pageact.js).  A website
+// page's chat is a frame: it asks the page, which is another origin, by postMessage, and
+// only its own parent window at the configured origin can answer.
+var parentCalls = Object.create(null);
+function toParent(msg) { if (CFG.framed && CFG.parent_origin && window.parent !== window) window.parent.postMessage(msg, CFG.parent_origin); }
+function askParent(kind, extra, ms) {
+  if (!CFG.framed || !CFG.parent_origin) return Promise.resolve({ ok: false, error: 'no page around this chat' });
+  var id = rid('m');
+  return new Promise(function (resolve) {
+    var t = setTimeout(function () { delete parentCalls[id]; resolve({ ok: false, error: 'the page did not answer' }); }, ms || 15000);
+    parentCalls[id] = function (m) { clearTimeout(t); resolve(m); };
+    var msg = { qccd: kind, id: id };
+    for (var k in (extra || {})) msg[k] = extra[k];
+    toParent(msg);
+  });
+}
+function listenToPage() {
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent || e.origin !== CFG.parent_origin) return;
+    var m = e.data || {};
+    if (m.qccd === 'result' && parentCalls[m.id]) { var f = parentCalls[m.id]; delete parentCalls[m.id]; f(m); }
+    else if (m.qccd === 'page' && m.context) { setPage(m.context); }
+  });
+}
+function setPage(ctx) {
+  var before = J(S.page || {});
+  S.page = { url: ctx.url || (S.page || {}).url, title: ctx.title, kind: ctx.kind, selection: ctx.selection,
+             in_view: ctx.in_view, site: CFG.site };
+  if (J(S.page) !== before) { if (!ctx.selection) S.selOff = false; S.viewDirty = true; renderChips(); }
+}
+function refreshPage() {
+  return askParent('context', null, 1500).then(function (m) { if (m && m.ok && m.result) setPage(m.result); });
+}
+function pageInfo() {
+  if (PAGE) return S.page;
+  if (CFG.mode !== 'design') return null;
+  return { url: location.pathname, title: document.title, kind: 'studio' };
+}
+function pickOnPage() {
+  tip('Click something on the page. Esc cancels.');
+  askParent('pick', null, 120000).then(function (m) {
+    tip('');
+    if (!m || !m.ok || !m.result) return;
+    var el = m.result;
+    addAnchor({ kind: 'page', url: (S.page || {}).url, element: { ref: el.ref, tag: el.tag, text: el.text, section: el.section } });
+  });
+}
+var PAGE_VERBS = { read: 'reading the page', scroll: 'scrolling the page', highlight: 'pointing at something',
+                   click: 'pressing a control', fill: 'filling in a field', press: 'pressing a key',
+                   navigate: 'opening another page', step: 'stepping the animation', open_lesson: 'opening a lesson' };
+function pageAction(p) {
+  if (!p.action_id || p.view_id !== S.view) return;
+  if (p.expires_at && Date.now() / 1000 > p.expires_at) return;
+  S.pageDoing = { text: PAGE_VERBS[p.action] || p.action, at: Date.now() };
+  if (!S.debug) renderConv();
+  var done = function (r) {
+    r = r || { ok: false, error: 'no answer' };
+    api('POST', '/api/page-actions/' + encodeURIComponent(p.action_id) + '/result',
+        { ok: !!r.ok, result: r.ok ? r.result : undefined, error: r.ok ? undefined : (r.error || 'refused') });
+  };
+  if (CFG.framed) { askParent('act', { action: p.action, args: p.args || {} }, 14000).then(done); return; }
+  if (!window.QCCD_PAGE) { done({ ok: false, error: 'this page has no page actions' }); return; }
+  var r;
+  try { r = window.QCCD_PAGE.act(p.action, p.args || {}); } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
+  done(r);
+}
+function pageEmptyState() {
+  var k = (S.page || {}).kind || 'page', ex;
+  if (/studio/.test(k)) ex = ['What does this lesson teach? Step me through it', 'Explain what happens at the current step'];
+  else if (k === 'rules') ex = ['Explain rule R7, and show me its failing example', 'Which rules limit how fast ions can move?'];
+  else if (/leaderboard/.test(k)) ex = ['Which design is fastest here, and why?', 'Compare the top two designs on this board'];
+  else if (k === 'course index') ex = ['Which lesson should I start with?', 'Open the first lesson on junctions'];
+  else ex = ['Summarize this page', 'What should I read next?'];
+  return h('div', { cls: 'qcl-empty' }, [
+    h('div', { cls: 'qcl-empty-t', text: 'Ask about this page.' }),
+    h('div', { cls: 'qcl-note', text: 'The agent reads the page you are on and can point at things, scroll, step ' +
+                                      'animations and open other pages. Select text and it goes with your message. ' +
+                                      'It can also work on your own design, in your Studio.' })
+  ].concat(ex.map(function (t) {
+    return h('button', { cls: 'qcl-ex', text: t, on: { click: function () {
+      var ta = document.getElementById('qcl-text'); ta.value = t; S.textCache = t; grow(ta); ta.focus(); renderSendButton(); } } });
+  })));
+}
+
 // ------------------------------------------------------------------ view state reporting
 function reportView() {
   if (!S.view || !S.paired) return;
@@ -1559,7 +1685,7 @@ function reportView() {
   api('PATCH', '/api/views/' + encodeURIComponent(S.view), {
     rendered_revision: CFG.mode === 'design' ? S.rev : null, selection: selectionKeys().slice(0, 100),
     viewport: viewport(), frame: (typeof frame === 'number') ? frame : null,
-    displayed_run: CFG.snapshot_id || null });
+    displayed_run: CFG.snapshot_id || null, page: pageInfo() });
 }
 
 // ------------------------------------------------------------------ boot
@@ -1572,7 +1698,9 @@ function pair() {
     return api('GET', '/api/whoami');
   }).then(function (w) {
     if (!w.ok || !w.data.csrf) {
-      document.body.appendChild(h('div', { id: 'qcl-unpaired' }, [
+      document.body.appendChild(h('div', { id: 'qcl-unpaired' }, PAGE ? [
+        h('b', { text: 'This browser is not paired with your workspace yet.' }),
+        h('div', { text: 'Run `qccd web` in the workspace folder: it pairs this browser and opens the website with the chat.' })] : [
         h('b', { text: 'This Studio page is not paired with the workspace.' }),
         h('div', { text: 'Run `qccd studio` in the workspace and open the link it prints. Edits here are not saved to the workspace.' })]));
       return false;
@@ -1585,25 +1713,28 @@ function registerView() {
   var key = 'qccd.view.' + CFG.workspace_id;
   var vid = sessGet(key);
   var go = function () {
-    return api('POST', '/api/views', { branch: S.branch, label: CFG.mode === 'run' ? 'run ' + CFG.snapshot_id : 'Studio' }).then(function (r) {
+    return api('POST', '/api/views', { branch: S.branch, page: pageInfo(),
+                                       label: CFG.mode === 'run' ? 'run ' + CFG.snapshot_id : (PAGE ? 'Website' : 'Studio') }).then(function (r) {
       if (r.ok) { S.view = r.data.id; sessSet(key, S.view); S.target = r.data.target_session; S.follow = r.data.follow_agent; }
     });
   };
   if (!vid) return go();
   S.view = vid;
-  return api('PATCH', '/api/views/' + encodeURIComponent(vid), { branch: S.branch }).then(function (r) {
+  return api('PATCH', '/api/views/' + encodeURIComponent(vid), { branch: S.branch, closed: false, page: pageInfo() }).then(function (r) {
     if (!r.ok) return go();
     S.target = r.data.target_session; S.follow = r.data.follow_agent;
   });
 }
 function boot() {
+  if (PAGE) listenToPage();
   buildDock();
   pair().then(function (ok) {
     if (!ok) return;
     return registerView().then(function () {
       return api('GET', '/api/whoami').then(function () {
         if (CFG.mode === 'design') return loadHead();
-        if (ED.setViewOnly) ED.setViewOnly(true);
+        if (PAGE) return refreshPage();
+        if (ED && ED.setViewOnly) ED.setViewOnly(true);
         var m = /[#&]instr=(\d+)/.exec(location.hash || '');
         if (m && typeof seek === 'function' && P && P.frames) {
           for (var i = 0; i < P.frames.length; i++) if (P.frames[i].id === +m[1]) { seek(i, {}); break; }
@@ -1654,7 +1785,8 @@ window.QCCD_LIVE = {
   chat: function () { return { debug: S.debug, items: S.conv.slice(), working: S.working.slice(), pending: S.pending,
                                branch: S.branch, branches: S.branches.map(function (b) { return b.name; }),
                                agent: (agentSession() || {}).id || null, codex: S.codex }; },
-  chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft
+  chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft,
+  page: function () { return S.page; }, refreshPage: refreshPage
 };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

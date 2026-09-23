@@ -1,0 +1,598 @@
+"""The website through the workspace: the mirror, the chat frame, and the agent's page tools.
+
+A small local copy of a site stands in for qccd.academy (QCCD_SITE_URL), so nothing here
+needs the network.  Covered: what the mirror serves and refuses, that its origin gets no
+authority over the workspace, the page-action round trip and who may take part in it, what
+a message sent from a page carries to the agent, and -- in real Chrome -- the chat frame on
+a mirrored page doing each page action for real.
+"""
+
+from __future__ import annotations
+
+import http.server
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("fastapi")
+from starlette.testclient import TestClient  # noqa: E402
+
+from qccd.workspace import mirror as mirror_mod  # noqa: E402
+from qccd.workspace.app import Workspace  # noqa: E402
+from qccd.workspace.collab import delivery_text  # noqa: E402
+from qccd.workspace.mirror import MirrorError, SiteMirror, clean_path, create_mirror_app, inject  # noqa: E402
+from qccd.workspace.service import ServiceState, create_app  # noqa: E402
+
+REPO = Path(__file__).resolve().parents[1]
+PORT, WEB_PORT = 8765, 8766
+BASE, WEB = f"http://127.0.0.1:{PORT}", f"http://127.0.0.1:{WEB_PORT}"
+AGENT = {"Authorization": "Bearer agent-tok"}
+OWNER = {"Authorization": "Bearer owner-tok"}
+HUMAN = {"kind": "human", "id": "view:t", "label": "Studio"}
+
+PAGES = {
+    "index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Home - Test site</title></head><body>
+<nav id="sitenav"><a href="rules/">Rules</a> <a href="learn/">Learn</a> <button id="qa-btn">Agent</button></nav>
+<main><h1>Welcome</h1><p>This is the home page.</p></main>
+<script>(function(){ var API = '/api'; window.__comments = 'on'; })();</script>
+</body></html>""",
+    "rules/index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Rules - Test site</title></head><body>
+<nav id="sitenav"><a href="../">Home</a></nav>
+<main>
+<h1>The rules</h1>
+<h2 id="r1">R1 capacity</h2><p>No site holds more ions than its capacity.</p>
+<h2 id="r7">R7 cooling</h2><p id="r7p">A two-qubit gate needs cold ions.</p>
+<button id="reveal" onclick="document.getElementById('ans').textContent='Revealed'">Show answer</button>
+<p id="ans">hidden</p>
+<label for="q">Search</label><input id="q" type="search">
+<select id="sel"><option value="a">Alpha</option><option value="b">Beta</option></select>
+<a id="ext" href="https://example.com/">Elsewhere</a>
+<figure><iframe src="ex/a.html#embed&amp;step=1" width="400" height="200"></iframe><figcaption>Example A</figcaption></figure>
+</main></body></html>""",
+    "rules/ex/a.html": """<!doctype html><html><head><meta charset="utf-8"><title>Example A</title></head><body>
+<input type="range" id="slider" min="0" max="9" value="1"><button id="play">Play</button>
+<script>function seek(i){ document.getElementById('slider').value = i; }</script></body></html>""",
+    "learn/index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Learn - Test site</title></head>
+<body><main><h1>Learn</h1></main></body></html>""",
+    "official/v1/tasks": """{"tasks": []}""",
+    "official/v1/leaderboard/ghz4@1": """{"rows": []}""",
+}
+
+
+class _Site:
+    """A static site on a free port, recording what it was asked and how it answered."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        for rel, text in PAGES.items():
+            p = root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+        self.log: list = []
+        site = self
+
+        class H(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *a, **k):
+                super().__init__(*a, directory=str(root), **k)
+
+            def log_request(self, code="-", size="-"):
+                site.log.append((self.path, int(code) if str(code).isdigit() else code))
+
+            def log_message(self, *a):
+                pass
+
+        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+@pytest.fixture
+def site(tmp_path):
+    s = _Site(tmp_path / "site")
+    yield s
+    try:
+        s.stop()
+    except Exception:
+        pass
+
+
+@pytest.fixture
+def svc(tmp_path, site, monkeypatch):
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    ws = Workspace.init(tmp_path / "ws", "ghz4@1")
+    info = {"port": PORT, "web_port": WEB_PORT, "agent_token": "agent-tok", "owner_token": "owner-tok",
+            "pid": os.getpid()}
+    state = ServiceState(ws, info)
+    yield ws, state, TestClient(create_app(state), base_url=BASE), TestClient(
+        create_mirror_app(state, SiteMirror(site.url)), base_url=WEB)
+    ws.close()
+
+
+def _paired(state, client):
+    code = state.new_pair_code()
+    r = client.post("/api/pair", json={"code": code})
+    assert r.status_code == 200
+    return r.json()["csrf"]
+
+
+# ---------------------------------------------------------------------- the mirror itself
+
+def test_paths_are_plain_site_paths():
+    assert clean_path("/rules/") == "rules/"
+    assert clean_path("board/bb144/01_x.html") == "board/bb144/01_x.html"
+    for bad in ("../secret", "rules/../../x", "%2e%2e/x", "a/%2E/b", "a\\b", "x?y", "<script>", "a" * 500):
+        with pytest.raises(MirrorError):
+            clean_path(bad)
+
+
+def test_the_mirror_caches_revalidates_and_serves_stale(site, monkeypatch):
+    m = SiteMirror(site.url)
+    a = m.get("rules/")
+    assert a.status == 200 and a.ctype == "text/html" and b"R7 cooling" in a.body
+    n = len(site.log)
+    m.get("rules/")
+    assert len(site.log) == n                                          # fresh: from the cache
+    monkeypatch.setattr(mirror_mod, "_FRESH_S", 0.0)
+    b = m.get("rules/")
+    assert site.log[-1] == ("/rules/", 304) and b.body == a.body       # revalidated, not refetched
+    r = m.get("learn")
+    assert r.status in (301, 302, 307, 308) and r.location == "/web/learn/"
+    assert m.get("nope.html").status == 404
+    site.stop()
+    s = m.get("rules/")
+    assert s.stale and s.body == a.body                                # the site is down: last copy
+    with pytest.raises(MirrorError) as e:
+        m.get("index.html")                                            # never fetched: nothing to show
+    assert e.value.status == 502
+
+
+def test_inject_switches_off_comments_and_adds_the_chat():
+    page = PAGES["index.html"]
+    out = inject(page, {"chat_origin": BASE, "web_origin": WEB, "studio_url": BASE + "/studio"})
+    head = out.index("<head>") + len("<head>")
+    assert out[head:].startswith("<script>window.QCCD_MIRROR=1;</script>")   # before any site script
+    assert "if (window.QCCD_MIRROR) return; var API = '/api';" in out
+    assert "#qa-btn,#qa-panel{display:none!important}" in out
+    assert out.index('id="qccd-mirror-config"') < out.rindex("</body>")
+    assert "window.QCCD_PAGE" in out and "/chatframe?page=" in out
+
+
+def test_the_mirror_serves_pages_and_nothing_else(svc):
+    ws, state, c, w = svc
+    r = w.get("/web/rules/")
+    assert r.status_code == 200 and "R7 cooling" in r.text and "qccd-mirror-config" in r.text
+    csp = r.headers["content-security-policy"]
+    assert f"frame-src 'self' {BASE}" in csp and "frame-ancestors 'self'" in csp and "form-action 'none'" in csp
+    assert r.headers["x-frame-options"] == "SAMEORIGIN" and "set-cookie" not in r.headers
+    assert w.get("/web/learn", follow_redirects=False).headers["location"] == "/web/learn/"
+    assert w.get("/", follow_redirects=False).headers["location"] == "/web/"
+    assert w.get("/web/missing.html").status_code == 404
+    assert w.get("/web/rules/../x").status_code in (400, 404)
+    assert w.get("/official/v1/tasks").json() == {"tasks": []}
+    assert w.get("/official/v1/leaderboard/ghz4%401").json() == {"rows": []}      # a task id has an @
+    # read-only, loopback host only; localhost goes to 127.0.0.1, where the chat's pairing is
+    assert w.post("/web/rules/", json={}).status_code == 405
+    assert w.get("/web/", headers={"Host": "evil.example:8766"}).status_code == 421
+    r = w.get("/web/rules/", headers={"Host": f"localhost:{WEB_PORT}"}, follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == f"{WEB}/web/rules/"
+
+
+def test_the_mirror_origin_has_no_authority(svc):
+    ws, state, c, w = svc
+    csrf = _paired(state, c)
+    # the pairing cookie reaches the mirror's port too (cookies ignore ports): it means nothing there
+    for k, v in dict(c.cookies).items():
+        w.cookies.set(k, v)
+    for path in ("/api/whoami", "/api/context", "/api/events", "/studio", "/chatframe"):
+        assert w.get(path).status_code == 404
+    # and the workspace refuses the mirror's origin, even with the cookie and the right CSRF token
+    r = c.post("/api/prompts/send", json={"body": {"text": "hi", "intent": "question"}},
+               headers={"X-QCCD-CSRF": csrf, "Origin": WEB})
+    assert r.status_code == 403 and r.json()["error"]["code"] == "bad_origin"
+
+
+def test_the_chat_frame_may_be_framed_only_by_the_mirror(svc):
+    ws, state, c, w = svc
+    r = c.get("/chatframe?page=/web/rules/")
+    assert r.status_code == 200 and "x-frame-options" not in {k.lower() for k in r.headers}
+    csp = r.headers["content-security-policy"]
+    assert f"frame-ancestors {WEB}" in csp and "connect-src 'self'" in csp
+    cfg = json.loads(r.text.split('id="qccd-live-config" type="application/json">')[1].split("</script>")[0])
+    assert cfg["mode"] == "page" and cfg["framed"] and cfg["parent_origin"] == WEB and cfg["page"] == "/web/rules/"
+    assert json.loads(c.get("/chatframe?page=https://evil.example/").text.split(
+        'type="application/json">')[1].split("</script>")[0])["page"] == "/web/"
+    assert c.get("/studio").headers.get("x-frame-options") == "DENY"
+    assert WEB in c.get("/open-web").text
+
+
+# ---------------------------------------------------------------------- page actions
+
+def _page_view(c, csrf, url="/web/rules/", title="Rules - Test site"):
+    r = c.post("/api/views", json={"page": {"url": url, "title": title, "kind": "rules", "site": "test"}},
+               headers={"X-QCCD-CSRF": csrf})
+    assert r.status_code == 200
+    return r.json()["id"]
+
+
+def test_a_page_action_goes_to_the_page_and_back(svc):
+    ws, state, c, w = svc
+    human = TestClient(c.app, base_url=BASE)
+    agent2 = TestClient(c.app, base_url=BASE)
+    csrf = _paired(state, human)
+    assert c.post("/api/page-actions", json={"action": "read"}, headers=AGENT).json()["error"]["code"] == "no_page"
+    vid = _page_view(human, csrf)
+    other = _page_view(human, csrf, "/web/", "Home")
+    assert [p["url"] for p in c.get("/api/pages", headers=AGENT).json()["pages"]] == ["/web/", "/web/rules/"]
+    cursor = ws.last_event_seq()
+    seen = {}
+
+    def page():                                   # the page: take the action off the stream, answer it
+        for _ in range(100):
+            evs = [e for e in ws.events_since(cursor)["events"] if e["type"] == "page.action"]
+            if evs:
+                p = evs[0]["payload"]
+                seen.update(p)
+                h = {"X-QCCD-CSRF": csrf}
+                seen["agent"] = agent2.post(f"/api/page-actions/{p['action_id']}/result", json={"ok": True},
+                                            headers=AGENT).status_code
+                seen["wrong_view"] = human.post(f"/api/page-actions/{p['action_id']}/result", json={"ok": True},
+                                                headers={**h, "X-QCCD-View": other}).status_code
+                seen["page"] = human.post(f"/api/page-actions/{p['action_id']}/result",
+                                          json={"ok": True, "result": {"title": "Rules - Test site"}},
+                                          headers={**h, "X-QCCD-View": vid}).status_code
+                return
+            time.sleep(0.05)
+    t = threading.Thread(target=page)
+    t.start()
+    r = c.post("/api/page-actions", json={"action": "highlight", "args": {"target": {"text": "R7"}, "note": "here"},
+                                          "view_id": vid}, headers=AGENT)
+    t.join()
+    assert r.status_code == 200, r.text
+    assert r.json() == {"view_id": vid, "page": {"url": "/web/rules/", "title": "Rules - Test site"},
+                        "action": "highlight", "ok": True, "result": {"title": "Rules - Test site"}}
+    assert seen["view_id"] == vid and seen["args"]["note"] == "here" and seen["actor"]["kind"] == "agent"
+    assert (seen["agent"], seen["wrong_view"], seen["page"]) == (403, 403, 200)
+    assert not state.page_waits
+
+
+def test_page_actions_are_the_agents_and_bounded(svc):
+    ws, state, c, w = svc
+    csrf = _paired(state, c)
+    vid = _page_view(c, csrf)
+    assert c.post("/api/page-actions", json={"action": "read"}, headers={"X-QCCD-CSRF": csrf}).status_code == 403
+    assert c.post("/api/page-actions", json={"action": "eval", "args": {"js": "1"}}, headers=AGENT).status_code == 422
+    assert c.post("/api/page-actions", json={"action": "read", "args": {"x": "y" * 70000}},
+                  headers=AGENT).status_code == 422
+    r = c.post("/api/page-actions", json={"action": "read", "wait_s": 1}, headers=AGENT)
+    assert r.status_code == 504 and r.json()["error"]["code"] == "page_timeout"
+    assert c.post("/api/page-actions/pa_nope/result", json={"ok": True},
+                  headers={"X-QCCD-CSRF": csrf, "X-QCCD-View": vid}).status_code == 404
+    # a closed page is not a target; a page that comes back (navigation) is again
+    c.patch(f"/api/views/{vid}", json={"closed": True}, headers={"X-QCCD-CSRF": csrf})
+    assert c.get("/api/pages", headers=AGENT).json()["pages"] == []
+    c.patch(f"/api/views/{vid}", json={"closed": False, "page": {"url": "/web/", "title": "Home", "site": "t"}},
+            headers={"X-QCCD-CSRF": csrf})
+    assert c.get("/api/pages", headers=AGENT).json()["pages"][0]["url"] == "/web/"
+
+
+def test_a_message_from_a_page_carries_the_page(svc):
+    ws, state, c, w = svc
+    s = ws.register_session({"kind": "human", "id": "cli"}, client="generic", mode="pull", label="test agent")
+    page = {"url": "/web/rules/", "title": "Rules - Test site", "kind": "rules", "site": "https://qccd.academy",
+            "selection": "A two-qubit gate needs cold ions."}
+    v = ws.register_view(HUMAN, page=page)
+    ws.update_view(v["id"], {"target_session": s["id"]}, HUMAN)
+    r = ws.send_prompt(HUMAN, body={"text": "What does this mean?", "intent": "question", "mode": "ask",
+                                    "anchors": [{"kind": "page", "url": "/web/rules/", "quote": page["selection"]}]},
+                       view_id=v["id"], context={"page": page})
+    sent = ws.prompt(r["prompt_id"])["latest_sent"]
+    ctx = ws.context_snapshot(sent["body"]["context_snapshot_id"])
+    assert ctx["page"]["url"] == "/web/rules/" and ctx["page"]["selection"] == page["selection"]
+    text = delivery_text(ws, r["prompt_id"], sent, ctx, r["delivery"]["id"])
+    assert 'website page "Rules - Test site" (/web/rules/' in text and "qccd_page_read" in text
+    assert 'this text on the page: "A two-qubit gate needs cold ions."' in text
+    item = [i for i in ws.conversation()["items"] if i["type"] == "user"][0]
+    assert item["page"] == "Rules - Test site" and item["context"] == "a quote"
+    ctx_agent = ws.context({"kind": "agent", "id": "agent:mcp"})
+    assert ctx_agent["pages"][0]["url"] == "/web/rules/"
+
+
+def test_the_mcp_page_tools_are_page_actions():
+    from qccd.workspace.mcp_server import _tools, dispatch
+    names = [t[0] for t in _tools()]
+    assert "qccd_page_read" in names and "qccd_page_act" in names
+
+    class Be:
+        calls = []
+
+        def call(self, method, path, body=None, *, timeout=60.0):
+            self.calls.append((method, path, body))
+            return {"ok": True}
+    be = Be()
+    dispatch(be, "qccd_page_read", {"section": "R7", "view_id": "v1"})
+    dispatch(be, "qccd_page_act", {"action": "step", "target": {"frame": "f1"}, "delta": 2})
+    assert be.calls == [("POST", "/api/page-actions", {"action": "read", "args": {"section": "R7"}, "view_id": "v1"}),
+                        ("POST", "/api/page-actions", {"action": "step", "args": {"target": {"frame": "f1"}, "delta": 2},
+                                                       "view_id": None})]
+
+
+# ---------------------------------------------------------------------- real Chrome
+
+CHROME = os.environ.get("CHROME") or "C:/Program Files/Google/Chrome/Application/chrome.exe"
+needs_chrome = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists()), reason="needs node and Chrome")
+
+
+@needs_chrome
+def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        code = own("POST", "/api/pair-code", {})["code"]
+        hdr = {"Authorization": f"Bearer {info['owner_token']}", "Content-Type": "application/json"}
+
+        def act(action, **args):
+            return {"http": {"method": "POST", "url": base + "/api/page-actions", "headers": hdr,
+                             "body": {"action": action, "args": args}}}
+        frame_ready = ("window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                       "!!QCCD_LIVE.state().view && (QCCD_LIVE.page() || {}).title === '%s'")
+        steps = [
+            {"wait": f"location.origin === '{web}' && !!document.getElementById('qccd-chat')", "timeout": 30000,
+             "stopOnFail": True},                                                                          # 0
+            {"frame": "/chatframe", "wait": frame_ready % "Rules - Test site", "timeout": 30000, "stopOnFail": True},  # 1
+            act("read"),                                                                                   # 2
+            act("read", section="R7", controls=False),                                                     # 3
+            act("click", target={"text": "Show answer"}),                                                  # 4
+            {"eval": "document.getElementById('ans').textContent"},                                        # 5
+            act("fill", target={"selector": "#q"}, value="junction"),                                      # 6
+            act("fill", target={"text": "Search"}, value="junction"),                                      # 7
+            act("fill", target={"selector": "#sel"}, value="Beta"),                                        # 8
+            {"eval": "document.getElementById('q').value + '|' + document.getElementById('sel').value"},   # 9
+            act("step", target={"frame": "f1"}, delta=3),                                                  # 10
+            {"eval": "document.querySelector('iframe').contentDocument.getElementById('slider').value"},   # 11
+            act("click", target={"selector": "#qccd-chat"}),                                               # 12
+            act("click", target={"selector": "#ext"}),                                                     # 13
+            act("highlight", target={"selector": "#r7p"}, note="cold ions only"),                          # 14
+            {"eval": "Array.prototype.some.call(document.querySelectorAll('[data-qccd-private]'), "
+                     "function(e){ return e.textContent === 'cold ions only'; })"},                        # 15
+            {"eval": "window.__comments === undefined && getComputedStyle(document.body).display !== 'none'"},  # 16
+            # this origin cannot use the workspace: its API is another origin that sends no CORS
+            {"eval": f"fetch('{base}/api/whoami', {{credentials: 'include'}}).then(function(){{ return 'read'; }}, "
+                     "function(){ return 'blocked'; })"},                                                  # 17
+            {"eval": "fetch('/api/whoami').then(function(r){ return r.status; })"},                        # 18
+            # the person selects text and asks: the quote and the page go with the message
+            {"eval": "(function(){ var r = document.createRange(); r.selectNodeContents(document.getElementById('r7p')); "
+                     "var s = getSelection(); s.removeAllRanges(); s.addRange(r); return String(s); })()"},  # 19
+            {"frame": "/chatframe", "wait": "(QCCD_LIVE.page() || {}).selection === 'A two-qubit gate needs cold ions.'",
+             "timeout": 10000},                                                                            # 20
+            {"frame": "/chatframe", "eval": "QCCD_LIVE.chatSend('What does this mean?').then(function(d){ "
+                                            "return d && d.prompt_id; })"},                                # 21
+            # a highlight inside an embedded example sits on that element, in page coordinates
+            act("highlight", target={"frame": "f1", "selector": "#slider"}, note="inside"),                # 22
+            {"eval": "(function(){ var f = document.querySelector('iframe').getBoundingClientRect(), "
+                     "s = document.querySelector('iframe').contentDocument.getElementById('slider').getBoundingClientRect(), "
+                     "b = Array.prototype.filter.call(document.querySelectorAll('[data-qccd-private]'), function(e){ "
+                     "return e.style.border; })[0].getBoundingClientRect(); "
+                     "return Math.abs(b.left + 4 - (f.left + s.left)) < 2 && Math.abs(b.top + 4 - (f.top + s.top)) < 2; })()"},  # 23
+            act("navigate", path="../"),                                                                   # 24
+            {"wait": f"location.href === '{web}/web/'", "timeout": 15000},                                 # 25
+            {"frame": "/chatframe", "wait": frame_ready % "Home - Test site", "timeout": 30000},            # 26
+            {"sleep": 800},
+            {"http": {"method": "GET", "url": base + "/api/pages", "headers": hdr}},                       # 28
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={code}&to=/web/rules/"}, "steps": steps}),
+                        encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps), diag
+        body = lambda i: json.loads(st[i]["body"])
+        assert st[0]["ok"] and st[1]["ok"], diag
+        rd = body(2)
+        assert rd["ok"] and rd["result"]["title"] == "Rules - Test site", diag
+        heads = [h["text"] for h in rd["result"]["headings"]]
+        assert heads == ["The rules", "R1 capacity", "R7 cooling"], diag
+        labels = {c["label"]: c for c in rd["result"]["controls"]}
+        assert labels["Show answer"]["kind"] == "button" and labels["Search"]["kind"] == "input", diag
+        assert labels["Elsewhere"]["href"] == "https://example.com/", diag
+        assert rd["result"]["embedded"][0]["ref"] == "f1" and rd["result"]["embedded"][0]["caption"] == "Example A", diag
+        assert rd["result"]["embedded"][0]["transport"]["step"] == 1, diag
+        assert not any("Message the agent" in c["label"] for c in rd["result"]["controls"]), diag   # not the chat
+        sec = body(3)["result"]
+        assert sec["section"]["text"] == "R7 cooling" and "cold ions" in sec["text"] and "capacity" not in sec["text"], diag
+        assert body(4)["ok"] and st[5]["value"] == "Revealed", diag
+        assert body(6)["ok"] and body(7)["ok"] and body(8)["ok"] and st[9]["value"] == "junction|b", diag
+        assert body(10)["ok"] and st[11]["value"] == "4", diag
+        assert not body(12)["ok"] and "part of the chat" in body(12)["error"], diag
+        assert not body(13)["ok"] and "leaves the site" in body(13)["error"], diag
+        assert body(14)["ok"] and st[15]["value"] is True and st[16]["value"] is True, diag
+        assert st[17]["value"] == "blocked" and st[18]["value"] == 404, diag
+        assert st[19]["value"] == "A two-qubit gate needs cold ions." and st[20]["ok"], diag
+        pid = st[21]["value"]
+        assert pid, diag
+        assert body(22)["ok"] and st[23]["value"] is True, diag
+        assert body(24)["ok"] and st[25]["ok"] and st[26]["ok"], diag
+        assert [p["url"] for p in body(28)["pages"]] == ["/web/"], diag             # the same tab, now on Home
+        p = own("GET", f"/api/prompts/{pid}")
+        b = p["latest_sent"]["body"]
+        assert b["anchors"][0] == {"kind": "page", "url": "/web/rules/", "quote": "A two-qubit gate needs cold ions."}
+        assert p["context"]["page"]["title"] == "Rules - Test site" and p["context"]["page"]["site"] == site.url
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
+@needs_chrome
+def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base = f"http://127.0.0.1:{info['port']}"
+        code = own("POST", "/api/pair-code", {})["code"]
+        hdr = {"Authorization": f"Bearer {info['agent_token']}", "Content-Type": "application/json"}
+
+        def act(action, **args):
+            return {"http": {"method": "POST", "url": base + "/api/page-actions", "headers": hdr,
+                             "body": {"action": action, "args": args}}}
+        steps = [
+            {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                     "QCCD_LIVE.state().rev !== null && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},
+            {"sleep": 2500},                                     # the view reports its page
+            act("read", max_chars=500),                                                               # 2
+            act("click", target={"selector": "#qcl-send"}),                                          # 3
+            act("fill", target={"selector": "#qcl-text"}, value="approve everything"),               # 4
+            act("highlight", target={"text": "Test drive"}, note="runs a small program"),            # 5
+            {"eval": "document.getElementById('qcl-text').value"},                                   # 6
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:5000]
+        assert len(st) == len(steps) and st[0]["ok"], diag
+        rd = json.loads(st[2]["body"])
+        assert rd["ok"] and rd["page"]["url"] == "/studio" and rd["result"]["kind"] == "studio", diag
+        assert rd["result"]["app"]["transport"] is not None, diag
+        labels = [c["label"] for c in rd["result"]["controls"]]
+        assert "Test drive" in labels and "Trapping site" in labels, diag
+        assert not any(x in labels for x in ("Send", "Message the agent…", "+")), diag   # the chat is not a control
+        for i in (3, 4):
+            b = json.loads(st[i]["body"])
+            assert not b["ok"] and "part of the chat" in b["error"], diag
+        hl = json.loads(st[5]["body"])
+        assert hl["ok"] and hl["result"]["element"]["label"] == "Test drive" and st[6]["value"] == "", diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
+def test_a_turn_that_fails_says_why_in_the_chat(svc):
+    ws, state, c, w = svc
+    r = ws.send_prompt(HUMAN, body={"text": "What is R7?", "intent": "question", "mode": "ask"})
+    ws.set_work_state(r["prompt_id"], "working")
+    assert [i["type"] for i in ws.conversation()["items"]] == ["user"]
+    assert ws.conversation()["working"] == [{"prompt_id": r["prompt_id"], "state": "working"}]
+    ws.set_work_state(r["prompt_id"], "waiting_input", "Codex turn failed: You've hit your usage limit.")
+    conv = ws.conversation()
+    assert conv["working"] == [] and conv["items"][-1]["type"] == "notice"
+    assert conv["items"][-1]["text"] == "Codex turn failed: You've hit your usage limit."
+
+
+def _mcp_python():
+    import importlib.util
+    if importlib.util.find_spec("mcp") is not None:
+        return sys.executable
+    for cand in (REPO / ".venv" / "Scripts" / "python.exe", REPO / ".venv" / "bin" / "python"):
+        if cand.exists():
+            return str(cand)
+    return None
+
+
+@needs_chrome
+@pytest.mark.skipif(_mcp_python() is None, reason="the MCP SDK is not installed (requirements-agent.txt)")
+def test_an_mcp_agent_answers_a_question_from_the_page(tmp_path, site, monkeypatch):
+    """The whole loop with a real MCP client standing in for Claude Code (pull mode): the
+    person selects text on a mirrored page and asks; the agent reads the prompt, reads the
+    page, highlights the answer on it, and replies; the person sees both."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    py = _mcp_python()
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    root = tmp_path / "ws"
+    Workspace.init(root, "ghz4@1").close()
+    info = ensure_service(root, python=py)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        script = [
+            {"sleep": 14},                                                               # the person asks meanwhile
+            {"tool": "qccd_get_context", "args": {}},                                    # 1
+            {"tool": "qccd_page_read", "args": {"section": "R7", "controls": False}},    # 2
+            {"tool": "qccd_page_act", "args": {"action": "highlight", "target": {"selector": "#r7p"},
+                                               "note": "R7: both ions must be cold"}},   # 3
+            {"tool": "qccd_manage_comment", "args": {"action": "reply", "prompt_id": "$prev.1.unread_prompts.0.prompt_id",
+                                                     "text": "R7 says a two-qubit gate needs cold ions; I highlighted it.",
+                                                     "work_state": "ready_for_review"}},  # 4
+        ]
+        sp = tmp_path / "mcp.json"
+        sp.write_text(json.dumps(script), encoding="utf-8")
+        agent = subprocess.Popen([py, str(REPO / "tests" / "workspace_mcp_client.py"), str(root), str(sp),
+                                  "--client", "claude"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 env=dict(os.environ))
+        t0 = time.time()
+        while time.time() - t0 < 30 and not any(s["mode"] == "pull" for s in own("GET", "/api/sessions")["sessions"]):
+            time.sleep(0.3)
+        code = own("POST", "/api/pair-code", {})["code"]
+        steps = [
+            {"wait": f"location.origin === '{web}' && !!document.getElementById('qccd-chat')", "timeout": 30000,
+             "stopOnFail": True},
+            {"frame": "/chatframe", "wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected "
+             "&& !!QCCD_LIVE.state().view && (QCCD_LIVE.page() || {}).title === 'Rules - Test site'", "timeout": 30000,
+             "stopOnFail": True},
+            {"eval": "(function(){ var r = document.createRange(); r.selectNodeContents(document.getElementById('r7p')); "
+                     "getSelection().removeAllRanges(); getSelection().addRange(r); return 1; })()"},
+            {"frame": "/chatframe", "wait": "!!(QCCD_LIVE.page() || {}).selection", "timeout": 10000},
+            {"frame": "/chatframe", "eval": "QCCD_LIVE.chatSend('What does this rule mean?').then(function(d){ "
+                                            "return d && d.delivery && d.delivery.session_id; })"},          # 4
+            {"wait": "Array.prototype.some.call(document.querySelectorAll('[data-qccd-private]'), function(e){ "
+                     "return e.textContent === 'R7: both ions must be cold'; })", "timeout": 60000},           # 5
+            {"frame": "/chatframe", "wait": "QCCD_LIVE.chat().items.some(function(i){ return i.type === 'agent' && "
+             "/cold ions/.test(i.text); })", "timeout": 30000},                                                # 6
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={code}&to=/web/rules/"}, "steps": steps}),
+                        encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out, err = agent.communicate(timeout=180)
+        drive = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = drive.get("steps", [])
+        res = json.loads(out)
+        diag = json.dumps({"steps": st, "logs": drive.get("logs"), "mcp": res, "err": err.decode()[-2000:]})[:8000]
+        assert "qccd_page_read" in res["tools"] and "qccd_page_act" in res["tools"], diag
+        assert len(st) == len(steps) and st[4]["value"], diag                     # delivered to the MCP session
+        ctx = res["results"][0]["structured"]            # printed results leave out the sleep
+        u = ctx["unread_prompts"][0]
+        assert u["text"] == "What does this rule mean?" and u["page"] == "Rules - Test site", diag
+        assert u["anchors"][0] == {"kind": "page", "url": "/web/rules/", "quote": "A two-qubit gate needs cold ions."}, diag
+        assert ctx["pages"][0]["url"] == "/web/rules/", diag
+        read = res["results"][1]["structured"]
+        assert read["ok"] and read["page"]["url"] == "/web/rules/" and "cold ions" in read["result"]["text"], diag
+        assert res["results"][2]["structured"]["ok"] and not res["results"][3]["is_error"], diag
+        assert st[5]["ok"] and st[6]["ok"], diag                                  # the person saw both
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass

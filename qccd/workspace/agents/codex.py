@@ -530,15 +530,21 @@ def _on_codex_event(state, sid: str, method: str, params: dict) -> None:
                 row = ws.store.one("SELECT id FROM deliveries WHERE session_id=? AND external_ref=?",
                                    (sid, str(t["id"])))
                 did = row["id"] if row else None
+            err = t.get("error")
+            if t.get("status") not in (None, "completed"):
+                # say WHY in the log: a failed turn is otherwise just "failed"
+                log.warning("Codex turn %s %s: %s", t.get("id"), t.get("status"), json.dumps(err)[:2000])
             ws.emit("agent.turn", {"session_id": sid, "turn_id": t.get("id"), "status": t.get("status"),
-                                   "delivery_id": did})
+                                   "delivery_id": did, "error": err if isinstance(err, (dict, str)) else None})
             if did:
                 d = ws.store.one("SELECT prompt_id FROM deliveries WHERE id=?", (did,))
                 if d:
                     w = ws.store.one("SELECT state FROM work WHERE prompt_id=?", (d["prompt_id"],))
                     if w and w["state"] in ("pending", "working"):
+                        why = (err.get("message") if isinstance(err, dict) else err) or ""
                         ws.set_work_state(d["prompt_id"], "ready_for_review" if t.get("status") == "completed"
-                                          else "waiting_input", f"Codex turn {t.get('status')}")
+                                          else "waiting_input", f"Codex turn {t.get('status')}"
+                                          + (f": {why}" if why and t.get("status") != "completed" else ""))
             if state.worker:
                 state.worker.kick()
         elif method == "agent/message":
