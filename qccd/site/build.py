@@ -765,7 +765,7 @@ def board_index(ts: list[dict]) -> str:
     Each row also carries its QEC clock cycle -- the round it ranks with the classical
     feedback loop composed onto it -- and the boards are compared that way in one section
     at the end (`qec_cycle`)."""
-    from . import qec_cycle
+    from . import cowork, qec_cycle
     rows_html, cycles = [], []
     for t in ts:
         rows = t["rows"]
@@ -823,8 +823,8 @@ def board_index(ts: list[dict]) -> str:
             "A round is only half of a QEC cycle, so every board also carries "
             "<a href=\"#cycle\">the classical loop</a> around it.</p>" + legend + "".join(rows_html) +
             qec_cycle.board_section(cycles) +
-            "<p class=\"note\">Contributing a design from the studio (Verify &rarr; Contribute) arrives in phase 3 of "
-            f"<a href=\"{REPO}/blob/main/docs/WEBSITE_PLAN.md\">the plan</a>; until then the boards carry the study's seed entries.</p>")
+            # the official leaderboard, read live from /official (qccd/site/cowork.py)
+            cowork.board_section())
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE,
                        extra_css=qec_cycle.CSS, body=body)
 
@@ -1812,11 +1812,12 @@ def build(out: Path) -> int:
     from ..__main__ import main as qccd_main
     studio = out / "studio.html"
     qccd_main(["studio", "-o", str(studio)])
-    from . import qec_cycle
+    from . import cowork, qec_cycle
     # the QEC-cycle panel rides in with the hash router: the studio itself is untouched,
-    # and the panel reads the page's own priced round (qccd/site/qec_cycle.py)
+    # and the panel reads the page's own priced round (qccd/site/qec_cycle.py); the Agent
+    # button is the way from this page to a local co-design workspace (qccd/site/cowork.py)
     put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True,
-        extra=HASH_JS + qec_cycle.studio_block())
+        extra=HASH_JS + qec_cycle.studio_block() + cowork.studio_block())
 
     # the compiled companion Part D steps through.  A lesson with `page:` set runs on a
     # COMPILED page, and says so; it links to this one by bare file name, beside the
