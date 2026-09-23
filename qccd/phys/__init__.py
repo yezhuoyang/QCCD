@@ -53,13 +53,25 @@ from .shapes import (
 from .build import (
     NAIVE_CROSSING_SOURCE,
     build_layout,
+    dc_pairs_by_site,
     rects_for_field,
     unconnected_crossings,
 )
 from .drc import DRCReport, Disclosure, check, checked
 from .gds import GdsBoundary, GdsLibrary, read_gds, write_gds
 from .svg import svg_text, write_svg
-from .tech import PURPOSES, Dim, Layer, Technology, load_technology, preset_names
+from .tech import (
+    PURPOSES,
+    TECH_RULES,
+    Count,
+    Dim,
+    Layer,
+    Rule,
+    Technology,
+    TechnologyError,
+    load_technology,
+    preset_names,
+)
 
 __all__ = [
     # field
@@ -71,9 +83,11 @@ __all__ = [
     "Cell", "Inst", "Layout", "Poly", "Refusal", "Violation", "min_gap_violations",
     "min_width_violations", "union_rects",
     # tech
-    "PURPOSES", "Dim", "Layer", "Technology", "load_technology", "preset_names",
+    "PURPOSES", "TECH_RULES", "Count", "Dim", "Layer", "Rule", "Technology",
+    "TechnologyError", "load_technology", "preset_names",
     # build
-    "NAIVE_CROSSING_SOURCE", "build_layout", "rects_for_field", "unconnected_crossings",
+    "NAIVE_CROSSING_SOURCE", "build_layout", "dc_pairs_by_site", "rects_for_field",
+    "unconnected_crossings",
     # drc
     "DRCReport", "Disclosure", "check", "checked",
     # renderers

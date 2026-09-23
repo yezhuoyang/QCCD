@@ -450,9 +450,24 @@ def test_loading_an_unknown_technology_names_the_presets():
 
 # ----------------------------------------------------- the preset, number by number
 
-def test_exactly_one_preset_ships():
-    """One preset whose every number is a published input, per `d_one_honest_preset`."""
-    assert preset_names() == (PRESET,)
+def test_exactly_one_preset_is_read_out_of_a_paper():
+    """Two presets ship, and only one of them is a reproduction.
+
+    `d_one_honest_preset` was about not shipping a drawer of half-cited processes, and it
+    still holds: `eth_junction_2201.12579` is the one whose every number is a published
+    INPUT of a fabricated trap, and `test_no_dimension_in_the_preset_was_chosen_rather_
+    than_read` below is what keeps it that way.  `surface_default` is the opposite kind of
+    file on purpose -- every dimension of it is `declared:`, because it is this project's
+    own reference process for the technology rules a collaborator asked for (minimums and
+    defaults for n_dc_pairs, w_rf, w_dc, l_dc, g_dc and g_rf).  It is honest about being
+    authored, which is the property that mattered; what it must not do is pretend to be
+    read, and `declared()` is the query that tells them apart.
+    """
+    assert preset_names() == (PRESET, "surface_default")
+    published, authored = load_technology(PRESET), load_technology("surface_default")
+    assert published.declared() == ()
+    assert len(authored.declared()) == len(authored.dims) + 3, (
+        "every dimension of the authored preset, plus both scales and the pair count")
 
 
 def test_every_dimension_and_every_layer_of_the_preset_carries_a_source(tech):

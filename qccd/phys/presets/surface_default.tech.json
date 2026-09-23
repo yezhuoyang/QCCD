@@ -1,0 +1,101 @@
+{
+  "name": "surface_default",
+  "description": "The collaborator's default surface-electrode technology: the six technology rules at their DEFAULT values rather than their minimums, and every other dimension derived from them by an arithmetic this file shows. Nothing here is read out of a paper -- it is a project-chosen process, which is why every source below begins with 'declared:'. It exists so that the rules have a reference technology that satisfies all of them, and so that a device can be checked against a clearance-first process instead of against the reproduction of one published trap.",
+  "source": "declared: this project, from the technology rules a collaborator asked for in review -- n_dc_pairs >= 3 (default 3), w_rf >= 30 um (default 60 um = 1.2 * w_dc), w_dc and l_dc >= 30 um (default 50 um), g_dc >= 5 um (default 8 um), g_rf >= 8 um (default 10 um). See qccd/phys/tech.py:TECH_RULES and docs/phys.md.",
+  "nm_per_unit_x": {
+    "nm": 464000,
+    "source": "declared: 8 * dc_pitch = 8 * 58 um. Two floors and one quantum fix it. (1) Two parallel trap axes need min_axis_pitch = 318 um between them. (2) A dock spur's rail overruns its end node by rail_end_extension, so a spur hanging off a rail needs 2 * (dc_setback + dc_width + rail_end_extension + g_rf) = 2 * 223 um = 446 um of transverse room -- the threshold tests/test_build.py measures for ring144_24v, below which that device's metal collides. (3) The scale is a whole number of dc_pitch so the control tiling is UNIFORM across every trapping site (well_gap = g_dc), which makes 8 pads per lattice unit. 8 * 58 = 464 um is the first multiple of the pitch above both floors."
+  },
+  "nm_per_unit_y": {
+    "nm": 464000,
+    "source": "declared: equal to nm_per_unit_x -- this technology is ISOTROPIC, and that is the point of it. eth_junction_2201.12579 cannot be: its axial unit is three 75 um control electrodes (225 um) while its transverse unit is one electrode stack (355 um), and the two disagree. Here the axial unit was raised to the transverse floor instead, so one lattice unit means the same length in both directions and a device drawn on the lattice is drawn to scale. The cost is 8 control electrodes per trap pitch where three would do."
+  },
+  "n_dc_pairs": {
+    "n": 3,
+    "source": "declared: the collaborator's default and their minimum are both three pairs of DC electrodes beneath every trapping site -- one pair each side of the well plus the pair under it, the smallest set that can both confine and shuttle. qccd/phys/drc.py:dc_pairs_per_site counts what each site actually got."
+  },
+  "dims": {
+    "w_rf": {
+      "nm": 60000,
+      "source": "declared: the collaborator's default RF rail width, and their own relation w_rf = 1.2 * w_dc = 1.2 * 50 um. Minimum 30 um."
+    },
+    "w_g": {
+      "nm": 70000,
+      "source": "declared: w_dc + 2 * g_rf = 50 + 2 * 10 um. The centre control electrode is a DC electrode like any other, so it is w_dc wide, and it clears the rail on each side of it by g_rf. That fixes the RF gap rather than leaving it free, and it puts the ion at h = 1/2 sqrt(w_g (w_g + 2 w_rf)) = 57.66 um."
+    },
+    "gap": {
+      "nm": 8000,
+      "source": "declared: g_dc, the gap between two DC electrodes. The collaborator's default is 8 um against a 5 um minimum. This is the DC-to-DC number only; RF metal is kept clear by g_rf, which is larger."
+    },
+    "g_rf": {
+      "nm": 10000,
+      "source": "declared: the collaborator's default clearance from RF metal to anything else, 10 um against an 8 um minimum. It is bigger than g_dc because the rail is driven: a gap that merely resolves in the process is not automatically a gap that holds off the RF drive."
+    },
+    "dc_pitch": {
+      "nm": 58000,
+      "source": "declared: l_dc + g_dc = 50 + 8 um. A control electrode is l_dc long along the rail and one g_dc separates it from the next, so the pitch is not a free parameter -- it is what those two make."
+    },
+    "dc_width": {
+      "nm": 50000,
+      "source": "declared: w_dc, the collaborator's default DC electrode width, 50 um against a 30 um minimum."
+    },
+    "dc_centre_width": {
+      "nm": 50000,
+      "source": "declared: w_g - 2 * g_rf = 70 - 20 um = w_dc. The middle control electrode fills the space between the rails less one g_rf on each side, and w_g was chosen above so that what is left is exactly one w_dc. Every DC electrode this technology draws is therefore 50 um x 50 um."
+    },
+    "dc_setback": {
+      "nm": 105000,
+      "source": "declared: w_g/2 + w_rf + g_rf = 35 + 60 + 10 um. The first control electrode outboard of a rail sits one RF clearance beyond the rail's outer edge. qccd/phys/build.py refuses this technology if the three numbers stop agreeing."
+    },
+    "min_axis_pitch": {
+      "nm": 318000,
+      "source": "declared: 2 * (dc_setback + dc_width) + g_dc = 2 * 155 + 8 um. The closest two PARALLEL trap axes can be drawn: each needs its rails plus a control column out to dc_setback + dc_width on the side facing the other, and the two stacks clear each other by one DC gap."
+    },
+    "well_gap": {
+      "nm": 8000,
+      "source": "declared: equal to g_dc, so the control tiling runs across a trapping site unbroken -- a well is made by voltages, not by geometry. The builder implements a wider break, so an architecture whose sites ARE geometrically marked can raise this and see it; at the value above the break is exactly one DC gap and the tiling is continuous."
+    },
+    "rail_end_extension": {
+      "nm": 58000,
+      "source": "declared: one nominal ion height, h = 1/2 sqrt(w_g (w_g + 2 w_rf)) = 1/2 sqrt(70 * 190) = 57.663 um, rounded to 58 um. RF rails run this far past the last node so that a device boundary is not also a field discontinuity at the last trap."
+    }
+  },
+  "layers": [
+    {
+      "name": "RF",
+      "gds_layer": 1,
+      "gds_datatype": 0,
+      "purpose": "rf",
+      "z_nm": 0,
+      "thickness_nm": 1000,
+      "material": "Au",
+      "min_width_nm": 5000,
+      "min_gap_nm": 5000,
+      "source": "declared: a 5 um line-and-space process rule, the same class of limit 2201.12579 fabricated at (ms.tex:368). It is the PROCESS floor and not this technology's design values: g_dc draws 8 um and g_rf draws 10 um, both above it, and a mask rule that read back the design value could never catch the design. Thickness and material are typical and are used by nothing -- the field kernel solves an infinitely thin plane."
+    },
+    {
+      "name": "DC",
+      "gds_layer": 2,
+      "gds_datatype": 0,
+      "purpose": "dc",
+      "z_nm": 0,
+      "thickness_nm": 1000,
+      "material": "Au",
+      "min_width_nm": 5000,
+      "min_gap_nm": 5000,
+      "source": "declared: same plane, same 5 um process rule. The collaborator's 30 um minimum on w_dc and l_dc is a TECHNOLOGY rule, not a mask rule: qccd/phys/tech.py enforces it when this file loads, and min_width here stays the process limit so that an electrode thinner than the process can be told from one thinner than the technology intended."
+    },
+    {
+      "name": "OUTLINE",
+      "gds_layer": 63,
+      "gds_datatype": 0,
+      "purpose": "outline",
+      "z_nm": 0,
+      "thickness_nm": 0,
+      "material": "none",
+      "min_width_nm": 1,
+      "min_gap_nm": 1,
+      "source": "declared: a drawn die boundary for the fab tool and for the eye. Never metal, never in a field sum, never design-rule checked against anything real -- the two rules are 1 nm so that the checker has a value rather than a special case."
+    }
+  ]
+}

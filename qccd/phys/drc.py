@@ -23,8 +23,19 @@ prints the axial trap pitch each implies, and stops.  Turning that into a pass/f
 be inventing a fact out of two conventions.
 
 What *is* a verdict: metal narrower than the process allows, two nets closer than it
-allows, and RF welded to a control electrode.  Those are failures of the drawn geometry
-against a declared limit, and they are reported as violations.
+allows, RF welded to a control electrode, two electrodes drawn on top of each other, and a
+trapping site with fewer control electrodes under it than the technology says every site
+gets.  Those are failures of the drawn geometry against a declared limit, and they are
+reported as violations.
+
+**The last two are the collaborator's rules, checked where they can be measured.**
+`qccd/phys/tech.py` enforces the minimums of `n_dc_pairs`, `w_rf`, `w_dc`, `l_dc`, `g_dc`
+and `g_rf` when a technology file loads -- that is a statement about the technology.  Here
+the same rules are checked against the metal a device actually got: `overlap` is the hard
+one (two electrodes sharing area are one electrode, whatever the netlist says), and
+`dc_pairs_per_site` names each site that came up short rather than reporting an average.
+`rf_dc_clearance` now measures against `g_rf` rather than the DC gap, which is the whole
+reason those were split into two numbers.
 """
 
 from __future__ import annotations
@@ -32,14 +43,19 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Mapping, Sequence
 
-from .build import unconnected_crossings
+from .build import dc_pairs_by_site, unconnected_crossings
 from .shapes import Layout, Violation, min_width_violations
 from .tech import Technology
 
 __all__ = ["Disclosure", "DRCReport", "check", "checked", "RULES"]
 
 #: Every rule this module can report.  Closed, so a report can be read without the code.
-RULES: tuple[str, ...] = ("min_width", "min_gap", "rf_dc_clearance")
+RULES: tuple[str, ...] = ("min_width", "min_gap", "rf_dc_clearance", "overlap",
+                          "dc_pairs_per_site")
+
+#: Rules whose numbers are counts rather than nanometres, so a report does not print
+#: "1 nm against 3 nm" for three electrode pairs.
+COUNT_RULES: frozenset[str] = frozenset({"dc_pairs_per_site"})
 
 
 @dataclass(frozen=True)
@@ -94,15 +110,31 @@ class DRCReport:
             if shown >= limit:
                 lines.append(f"  ... and {len(self.violations) - shown} more")
                 break
-            lines.append(f"    {v.rule} on {v.layer}: {v.measured_nm} nm against "
-                         f"{v.required_nm} nm, between {' and '.join(v.owners)} "
-                         f"near ({v.where[0]}, {v.where[1]})")
+            lines.append("    " + _violation_line(v))
             shown += 1
         for d in self.disclosures:
             lines.append(f"  [disclosure] {d.topic}")
             for line in d.statement.splitlines():
                 lines.append(f"      {line}")
         return "\n".join(lines)
+
+
+def _violation_line(v: Violation) -> str:
+    """One finding, in the units it is actually in.
+
+    A count rule reported in nanometres reads "1 nm against 3 nm" for one electrode pair
+    against three, which is the kind of line that makes a reader distrust the whole report.
+    """
+    where = f"near ({v.where[0]}, {v.where[1]})"
+    if v.rule in COUNT_RULES:
+        pair = "pair" if v.measured_nm == 1 else "pairs"
+        return (f"{v.rule} at {' and '.join(v.owners)}: {v.measured_nm} DC {pair} "
+                f"against {v.required_nm} required, {where}")
+    if v.rule == "overlap":
+        return (f"{v.rule} on {v.layer}: {v.measured_nm} nm of metal SHARED by "
+                f"{' and '.join(v.owners)} {where}")
+    return (f"{v.rule} on {v.layer}: {v.measured_nm} nm against {v.required_nm} nm, "
+            f"between {' and '.join(v.owners)} {where}")
 
 
 # ------------------------------------------------------------------- the geometry
@@ -143,7 +175,8 @@ def _gap_pairs(groups: Mapping[str, Sequence[tuple[int, int, int, int]]], limit:
     return _one_per_net_pair(out), compared
 
 
-def _one_per_net_pair(found: Sequence[Violation]) -> list[Violation]:
+def _one_per_net_pair(found: Sequence[Violation], *,
+                      worst=min) -> list[Violation]:
     """Collapse to one finding per pair of nets, keeping the worst approach.
 
     Unioning by net stops a rail drawn as many rectangles from reporting its neighbour
@@ -156,7 +189,7 @@ def _one_per_net_pair(found: Sequence[Violation]) -> list[Violation]:
     for v in found:
         key = (v.rule, v.layer, "\x00".join(sorted(v.owners)))
         prev = best.get(key)
-        if prev is None or v.measured_nm < prev.measured_nm:
+        if prev is None or worst(v.measured_nm, prev.measured_nm) == v.measured_nm:
             best[key] = v
     return list(best.values())
 
@@ -179,12 +212,18 @@ def _rf_to_dc(layout: Layout, tech: Technology) -> tuple[list[Violation], int]:
 
     They are different masks, so `min_gap` never compares them -- and this is the failure
     that matters most, because RF touching a control electrode is not a marginal spacing
-    complaint, it is a short.  The limit is the stricter of the two layers' own rules.
+    complaint, it is a short.
+
+    The limit is `g_rf`, the technology's own clearance from driven metal to anything else,
+    floored by the two layers' process rules: both have to hold, and which one binds is a
+    property of the technology rather than something to choose here.  Before `g_rf` existed
+    this was the layer rules alone, which measured the mask and not the design -- a
+    technology could declare a 10 um RF clearance, draw 5, and pass.
     """
     if not (tech.has_purpose("rf") and tech.has_purpose("dc")):
         return [], 0
     rf, dc = tech.layer("rf"), tech.layer("dc")
-    limit = max(rf.min_gap_nm, dc.min_gap_nm)
+    limit = max(tech.g_rf, rf.min_gap_nm, dc.min_gap_nm)
     left = layout.union_by_net(rf.name)
     right = layout.union_by_net(dc.name)
     return _cross_pairs(left, right, limit, "rf_dc_clearance", f"{rf.name}/{dc.name}")
@@ -223,6 +262,74 @@ def _cross_pairs(left: Mapping[str, Sequence[tuple[int, int, int, int]]],
                 out.append(Violation(rule, layer, (an, bn), measured, limit,
                                      (max(ax0, bx0), max(ay0, by0))))
     return _one_per_net_pair(out), compared
+
+
+def _overlaps(layout: Layout, tech: Technology) -> tuple[list[Violation], int]:
+    """Any two electrodes, on any layers, that share area.  One finding per pair.
+
+    The hard one.  A spacing violation is a fabrication risk; an overlap is two electrodes
+    that are one piece of metal, and no netlist, voltage plan or field solve downstream
+    means anything after it.  So the predicate is positive area -- `dx > 0 and dy > 0` --
+    and it deliberately does NOT fire on metal that merely touches, which `min_gap` and
+    `rf_dc_clearance` already report at 0 nm.
+
+    Same net is skipped on purpose and for the usual reason: two perpendicular RF rails
+    necessarily overlap at every degree-4 node, and on one net that is a merge.  Shapes are
+    unioned by net first so that one rail drawn in fifty pieces reports its neighbour once.
+    Layers are crossed as well as walked, because an RF rail over a control pad is the same
+    short whether or not the two are on one mask.
+    """
+    #: layer order comes from the technology, so that one pair of nets gets one label --
+    #: keying a finding on "RF/DC" and "DC/RF" separately reported every cross-layer
+    #: overlap twice, once for each order the sweep happened to meet the two shapes in
+    rank = {lay.name: i for i, lay in enumerate(tech.layers)}
+    flat: list[tuple[int, int, int, int, str, str]] = []
+    for lay in tech.layers:
+        for net, boxes in layout.union_by_net(lay.name).items():
+            for x0, y0, x1, y1 in boxes:
+                flat.append((x0, y0, x1, y1, net, lay.name))
+    flat.sort()
+    out: list[Violation] = []
+    compared = 0
+    for i, (ax0, ay0, ax1, ay1, an, al) in enumerate(flat):
+        for j in range(i + 1, len(flat)):
+            bx0, by0, bx1, by1, bn, bl = flat[j]
+            if bx0 >= ax1:
+                break                       # sorted by x0: nothing later can overlap
+            if an == bn:
+                continue                    # one electrode drawn in several pieces
+            compared += 1
+            ix = min(ax1, bx1) - max(ax0, bx0)
+            iy = min(ay1, by1) - max(ay0, by0)
+            if ix > 0 and iy > 0:
+                lo_l, hi_l = sorted((al, bl), key=lambda n: rank[n])
+                layer = al if al == bl else f"{lo_l}/{hi_l}"
+                out.append(Violation("overlap", layer, (an, bn), min(ix, iy), 0,
+                                     (max(ax0, bx0), max(ay0, by0))))
+    return _one_per_net_pair(out, worst=max), compared
+
+
+def _dc_pairs_per_site(layout: Layout, arch) -> list[Violation]:
+    """Every trapping site with fewer than `n_dc_pairs` control electrode pairs under it.
+
+    One finding per site, naming the site and its count, because an average would hide
+    exactly the case this is for: a device where most traps are fully controlled and the
+    ones beside a junction have nothing.  `build.dc_pairs_by_site` defines the span and
+    what counts as a pair; the number required is the technology's, not this module's.
+    """
+    device = getattr(arch, "device", arch)
+    tech = layout.tech
+    want = tech.n_dc_pairs
+    sx, sy = tech.nm_per_unit_x.nm, tech.nm_per_unit_y.nm
+    layer = tech.layer("dc").name if tech.has_purpose("dc") else ""
+    out: list[Violation] = []
+    for site, n in sorted(dc_pairs_by_site(layout, arch).items()):
+        if n >= want:
+            continue
+        pos = device.nodes[site].pos
+        where = (int(round(pos[0] * sx)), int(round(pos[1] * sy)))
+        out.append(Violation("dc_pairs_per_site", layer, (site,), n, want, where))
+    return out
 
 
 # ---------------------------------------------------------------- the disclosures
@@ -301,6 +408,11 @@ def check(layout: Layout, arch=None) -> DRCReport:
     shorts, n = _rf_to_dc(layout, tech)
     violations.extend(shorts)
     compared += n
+    welded, n = _overlaps(layout, tech)
+    violations.extend(welded)
+    compared += n
+    if arch is not None:
+        violations.extend(_dc_pairs_per_site(layout, arch))
 
     disclosures: list[Disclosure] = []
     if arch is not None:
@@ -318,6 +430,16 @@ def check(layout: Layout, arch=None) -> DRCReport:
             "everywhere. The device is not merely hard to control; as drawn it has "
             "nothing to control it with.",
             counted=0))
+    if tech.waived():
+        disclosures.append(Disclosure(
+            "waived technology minimums",
+            "this technology is under one or more of the project's own minimums, with the "
+            "reason written in its file:\n"
+            + "\n".join(f"{name}: {tech.waivers[name]}" for name in tech.waived())
+            + "\nThe rule was still checked -- it was waived, not absent -- so a reader "
+              "who does not accept the reason can read the number off the file and the "
+              "minimum off qccd/phys/tech.py:TECH_RULES.",
+            counted=len(tech.waived())))
     if tech.declared():
         disclosures.append(Disclosure(
             "authored dimensions",

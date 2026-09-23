@@ -28,6 +28,8 @@ from qccd.__main__ import build_parser, main  # noqa: E402
 BEFORE = {"devices", "show", "arch", "source", "run", "listing", "disasm", "verify",
           "demo", "regen", "reach", "analyses", "sweep", "studio", "open"}
 ADDED = {"phys", "gds"}
+#: Verbs other features added since: the website build and the course.
+LATER = {"site", "tutorial"}
 
 
 def _verbs() -> set[str]:
@@ -39,7 +41,7 @@ def _verbs() -> set[str]:
 
 def test_the_two_verbs_are_additive_and_nothing_else_moved():
     """The blast radius of this whole feature on the front end, as one assertion."""
-    assert _verbs() == BEFORE | ADDED
+    assert _verbs() == BEFORE | ADDED | LATER
 
 
 def test_every_verb_still_dispatches_to_something():
@@ -64,9 +66,14 @@ def test_phys_prints_the_derived_metal_and_the_drc(capsys):
 def test_phys_reports_a_device_that_fails_its_design_rules(capsys):
     assert main(["phys", "ring144_24v", "--limit", "2"]) == 0
     out = capsys.readouterr().out
-    assert "rf_dc_clearance    66" in out
-    assert "and 64 more" in out
-    assert "no overpass" in out, "the crossing disclosure must reach the report"
+    assert "rf_dc_clearance    44" in out
+    assert "overlap            44" in out, "and every one of them is metal really shared"
+    assert "dc_pairs_per_site  98" in out
+    assert "and 184 more" in out
+    # the ring no longer crosses itself (its corner docks run outward since R21), so the
+    # crossing disclosure is rightly absent; the technology's own disclosures remain
+    assert "no overpass" not in out
+    assert "waived technology minimums" in out, "the technology's disclosures must reach the report"
 
 
 def test_phys_writes_an_svg_when_asked(tmp_path, capsys):
@@ -91,7 +98,8 @@ def test_gds_writes_a_file_and_reads_it_back_before_saying_so(tmp_path, capsys):
     target = tmp_path / "ring.gds"
     assert main(["gds", "ring144_24v", "-o", str(target)]) == 0
     out = capsys.readouterr().out
-    assert "1372 polygons" in out and "database unit 1e-09 m" in out
+    # 1230: two more junction squares, one per corner dock now drawn beside its rail
+    assert "1230 polygons" in out and "database unit 1e-09 m" in out
     raw = target.read_bytes()
     assert struct.unpack_from(">HBB", raw, 0)[1] == 0x00, "starts with HEADER"
     assert len(raw) == target.stat().st_size > 1000
@@ -110,8 +118,25 @@ def test_an_unknown_technology_names_the_presets(capsys):
         main(["phys", "chain", "--tech", "nope"])
 
 
-def test_both_verbs_default_to_the_one_shipped_preset():
+def test_both_verbs_default_to_the_published_preset():
     parser = build_parser()
     for verb in ("phys", "gds"):
         args = parser.parse_args([verb, "chain"])
         assert args.tech == "eth_junction_2201.12579"
+
+
+def test_the_other_preset_is_reachable_by_name_and_reports_a_different_device(capsys):
+    """`--tech surface_default` is the whole interface to the collaborator's defaults.
+
+    The same document, a different technology, and a different verdict: `ring144_24v`
+    collides in the published trap's geometry and does not in this one, which is the
+    comparison the second preset exists to make possible.
+    """
+    assert main(["phys", "ring144_24v", "--tech", "surface_default", "--limit", "2"]) == 0
+    out = capsys.readouterr().out
+    assert "ring144_24v  [surface_default]" in out
+    assert "isotropic" in out, "one lattice unit means one length in both directions"
+    assert "rf_dc_clearance    0" in out and "overlap            0" in out
+    assert "dc_pairs_per_site  46" in out, (
+        "the 24 docks and the 22 junction sites, which no technology can fix")
+    assert "control electrodes under a trapping site" in out

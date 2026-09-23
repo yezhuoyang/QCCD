@@ -37,12 +37,14 @@ from qccd.arch import load  # noqa: E402
 from qccd.arch.device import Device, Node, Segment  # noqa: E402
 from qccd.phys.build import (  # noqa: E402
     NAIVE_CROSSING_SOURCE,
+    _tiled_starts,
     build_layout,
+    dc_pairs_by_site,
     rects_for_field,
     unconnected_crossings,
 )
 from qccd.phys.field import rf_null, strip_null_height  # noqa: E402
-from qccd.phys.tech import load_technology  # noqa: E402
+from qccd.phys.tech import Technology, load_technology  # noqa: E402
 
 ARCH = ROOT / "arch"
 DEVICES = sorted(p.stem.replace(".arch", "") for p in ARCH.glob("*.arch.json"))
@@ -164,7 +166,7 @@ def test_every_control_electrode_is_its_own_net(tech):
     `DC:north:0`.  If `flatten` did not qualify them by the placing instance, all 336 of
     them would be one net -- which would merge them in the union, silently skip every
     spacing check between neighbours, and make the DRC report five findings where there
-    are 66.  That is exactly what happened before this was fixed.
+    are 44.  That is exactly what happened before this was fixed.
 
     RF is the exception and has to be: one drive, one net, everywhere.
     """
@@ -172,7 +174,7 @@ def test_every_control_electrode_is_its_own_net(tech):
     polys = lay.flatten()
     dc_nets = {p.net for p in polys if p.role == "dc_pad"}
     dc_polys = [p for p in polys if p.role == "dc_pad"]
-    assert len(dc_nets) == len(dc_polys) == 990, "one net per drawn control electrode"
+    assert len(dc_nets) == len(dc_polys) == 846, "one net per drawn control electrode"
     assert all("/" in n for n in dc_nets), "each is qualified by its segment"
     rf_nets = {p.net for p in polys if p.layer == tech.layer("rf").name}
     assert rf_nets == {"RF"}, "the RF drive is one net over the whole device"
@@ -242,7 +244,7 @@ def test_a_site_break_is_a_knob_and_the_shipped_value_leaves_the_tiling_uniform(
 
 
 @pytest.mark.parametrize("name,junctions,squares", [
-    ("ring144_24v", 24, 46), ("grid9x9", 77, 252), ("deck_unit_cell", 77, 252),
+    ("ring144_24v", 24, 48), ("grid9x9", 77, 252), ("deck_unit_cell", 77, 252),
     ("ladder_2x72", 46, 136), ("chain72", 0, 0), ("cyclone_base", 0, 0),
     ("h2_racetrack", 0, 0),
 ])
@@ -251,9 +253,11 @@ def test_every_degree_three_node_gets_the_papers_counterexample(
     """One corner square per (x-arm, y-arm) pair -- so a T gets two and an X gets four.
 
     The totals are also derived from the graph rather than only pinned, because the
-    pinned numbers are not the obvious ones: `ring144_24v` has 24 degree-3 nodes and 46
-    squares rather than 48, since its two end-cap docks sit at ring corners where there is
-    no second x-arm.  `grid9x9` is 28 tees and 49 crosses, 28*2 + 49*4 = 252 exactly.
+    pinned numbers are not the obvious ones: `ring144_24v` has 24 degree-3 nodes and 48
+    squares, two per T -- it was 46 while its two corner docks were drawn along the end-cap
+    rail (no second arm to pair with); since 2026-09 a corner's spur runs outward (R20,
+    R21), so every T has an x-arm and a y-arm.  `grid9x9` is 28 tees and 49 crosses,
+    28*2 + 49*4 = 252 exactly.
     """
     dev = device(name)
     lay = layouts[BY_NAME[name]]
@@ -315,6 +319,146 @@ def test_a_rail_runs_past_a_dead_end_so_the_last_trap_is_not_a_field_edge(tech):
     dev = load(ARCH / "chain.arch.json").device
     span = (len(dev.segments)) * tech.nm_per_unit_x.nm
     assert box[2] - box[0] == span + 2 * tech.nm("rail_end_extension")
+
+
+# ------------------------------------- the collaborator's rules, in the geometry
+
+SURFACE = "surface_default"
+
+
+@pytest.fixture(scope="module")
+def surface():
+    return load_technology(SURFACE)
+
+
+def test_the_second_preset_derives_its_numbers_from_the_collaborators_defaults(surface):
+    """A preset can drift against itself; this makes that a failure, not a surprise.
+
+    Every line below is the arithmetic the file's own `source` strings claim, so the two
+    cannot come apart without a test going red.
+    """
+    g_rf, g_dc, w_dc = surface.g_rf, surface.g_dc, surface.w_dc
+    assert (g_rf, g_dc, w_dc, surface.w_rf, surface.l_dc) == (10000, 8000, 50000,
+                                                              60000, 50000)
+    assert surface.w_rf == 6 * w_dc // 5, "w_rf = 1.2 * w_dc"
+    assert surface.nm("dc_pitch") == surface.l_dc + g_dc
+    assert surface.nm("w_g") == w_dc + 2 * g_rf, "the centre electrode is a DC electrode"
+    assert surface.nm("dc_centre_width") == surface.nm("w_g") - 2 * g_rf == w_dc
+    assert surface.nm("dc_setback") == surface.nm("w_g") // 2 + surface.w_rf + g_rf
+    assert surface.nm("min_axis_pitch") == 2 * (surface.nm("dc_setback") + w_dc) + g_dc
+    assert surface.nm("well_gap") == g_dc, "so the tiling runs across a site unbroken"
+
+    h_nm = strip_null_height(surface.nm("w_g"), surface.w_rf)
+    assert h_nm == pytest.approx(57662.8, abs=0.1)
+    assert abs(surface.nm("rail_end_extension") - h_nm) / h_nm < 0.01
+
+    # and the scale: isotropic, a whole number of pitches, above both floors
+    scale = surface.nm_per_unit_x.nm
+    assert surface.is_isotropic and scale == 8 * surface.nm("dc_pitch") == 464000
+    dock = 2 * (surface.nm("dc_setback") + w_dc + surface.nm("rail_end_extension") + g_rf)
+    assert (surface.nm("min_axis_pitch"), dock) == (318000, 446000)
+    assert scale >= dock and scale - surface.nm("dc_pitch") < dock, "the FIRST above both"
+
+
+def test_the_isotropic_preset_is_a_technology_the_ring_actually_fits(surface):
+    """`ring144_24v` collides in the published technology and does not in this one.
+
+    `tests/test_drc.py` says the same thing with the rules; this says it with the metal,
+    which is the half that does not depend on the checker being right.
+    """
+    arch = load(ARCH / "ring144_24v.arch.json")
+    n, closest = _rf_dc_overlaps(build_layout(arch, surface), surface)
+    assert n == 0, f"{n} RF-to-DC collisions under the collaborator's defaults"
+    assert math.isqrt(closest) == surface.g_rf, "and the closest approach is exactly g_rf"
+
+
+def test_a_setback_that_clears_the_rails_by_the_dc_gap_is_no_longer_enough(surface):
+    """`dc_setback` is derived from `g_rf` now, and `g_rf` is not `g_dc` any more.
+
+    Before they were split, a technology could declare a 10 um clearance from driven metal
+    and have its control columns drawn 8 um away, because the builder read the one `gap`
+    for both.  The file that would have produced is refused by name.
+    """
+    doc = surface.to_json()
+    reach = surface.nm("w_g") // 2 + surface.w_rf
+    doc["dims"]["dc_setback"] = {"nm": reach + surface.g_dc,
+                                 "source": "test: one DC gap outboard of the rail"}
+    with pytest.raises(ValueError, match="must clear the rails"):
+        build_layout(load(ARCH / "chain.arch.json"), Technology.from_json(doc))
+
+
+def test_the_published_presets_tiling_is_untouched_by_the_site_anchoring(tech):
+    """The new rule and the old one agree wherever a span is an exact run of pads.
+
+    `_tiled_starts` lays `n_dc_pairs` pads from each site's end of the span and leaves any
+    slack in the middle of the rail.  Every segment of `eth_junction_2201.12579` holds
+    exactly three pads in exactly three pitches, so there is no slack to move and the
+    positions are the ones the centred rule gave -- which is why the ETH polygon counts in
+    this file did not move when the collaborator's rule arrived.
+    """
+    pitch, gap = tech.nm("dc_pitch"), tech.g_dc
+    lo = tech.nm("well_gap") // 2
+    hi = tech.nm_per_unit_x.nm - lo
+    n = (hi - lo + gap) // pitch
+    assert n == 3 == tech.n_dc_pairs
+    assert _tiled_starts(lo, hi, pitch, gap, n, tech.n_dc_pairs) == \
+        _tiled_starts(lo, hi, pitch, gap, n, 0)
+
+
+def test_a_span_with_slack_puts_the_pads_at_the_sites_and_the_slack_in_the_middle():
+    """The mechanism itself, on a span that does have room to choose.
+
+    Seven pads at a pitch of 100 in a span of 800: three are laid from each end, against
+    the two sites, and the seventh floats in the middle.  The centred rule would have put
+    the same seven in one run and left 90 of slack beside each site -- under a trap rather
+    than under the rail between two of them.
+    """
+    lo, hi, pitch, gap = 0, 800, 100, 10
+    got = _tiled_starts(lo, hi, pitch, gap, 7, 3)
+    assert got[:3] == [0, 100, 200], "three pads anchored at the low site"
+    assert got[-3:] == [510, 610, 710], "three anchored at the high site, 90 in hand"
+    assert len(got) == 7 and got[3] == 355, "and the slack is in the middle of the rail"
+    assert all(b - (a + pitch - gap) >= gap for a, b in zip(got, got[1:])), (
+        "every neighbouring pair still clears one g_dc")
+    assert _tiled_starts(lo, hi, pitch, gap, 7, 0) == [55 + 100 * k for k in range(7)]
+
+
+@pytest.mark.parametrize("preset,pairs", [(PRESET, 3), (SURFACE, 8)])
+def test_every_site_of_a_chain_gets_its_electrode_pairs_under_both_presets(preset,
+                                                                          pairs):
+    """The count the collaborator asked about, measured on the simplest device there is."""
+    tech = load_technology(preset)
+    arch = load(ARCH / "chain.arch.json")
+    by_site = dc_pairs_by_site(build_layout(arch, tech), arch)
+    assert len(by_site) == 72
+    assert set(by_site.values()) == {pairs}, sorted(set(by_site.values()))
+    assert pairs >= tech.n_dc_pairs
+
+
+def test_a_dead_end_site_is_counted_over_the_rail_it_has_not_the_one_it_has_not_got(tech):
+    """The end of a chain, which is the case that decides what a site's span means.
+
+    An interior site owns half a segment on each side; the first and last own half a
+    segment and a rail extension with no pads on it.  Counting them over half a window
+    would report two pairs for a tiling that is uniform through them, so the window is
+    SHIFTED onto the side that exists rather than shrunk -- and the answer is the same
+    three pairs every other site gets.
+    """
+    arch = load(ARCH / "chain.arch.json")
+    by_site = dc_pairs_by_site(build_layout(arch, tech), arch)
+    ends = [n.id for n in arch.device.nodes.values() if arch.device.degree(n.id) == 1]
+    assert len(ends) == 2
+    assert all(by_site[e] == 3 for e in ends), {e: by_site[e] for e in ends}
+
+
+def test_the_builder_reports_what_the_sites_got_in_its_own_notes(tech, surface):
+    """The count reaches the layout, so `qccd phys` prints it without the DRC."""
+    arch = load(ARCH / "ring144_24v.arch.json")
+    note = next(n for n in build_layout(arch, tech).notes if "trapping site" in n)
+    assert "98 of 168 sites are short" in note and "n_dc_pairs = 3" in note
+    ok = next(n for n in build_layout(load(ARCH / "chain.arch.json"), surface).notes
+              if "trapping site" in n)
+    assert "met at every one of 72 sites" in ok
 
 
 # ------------------------------------------------------------------- what is refused
@@ -442,21 +586,27 @@ def test_the_lattice_scale_at_which_the_ring_becomes_fabricable_is_sharp(tech):
     collides.  So the threshold is measured, and it is exact, and it is two different
     constraints in the two directions -- each derivable from the technology alone.
 
-    **Along the rail**: the 24 dock spurs interleave -- `V6` rises from `(6, 0)` while
-    `V138` descends from `(5, 1)` -- so two perpendicular trap axes end up one axial unit
-    apart.  One spur's rail must clear the other's whole electrode stack, by a gap:
-
-        x_min = (w_g/2 + w_rf) + (dc_setback + dc_width) + gap
-              = 120250 + 175000 + 5000 = 300250 nm
-
-    **Across it**: the dock sits at the half-unit, and its spur's rail overruns the dock by
-    `rail_end_extension`, so half a unit must hold a stack plus that overrun plus a gap:
+    **Across the rails**: the dock sits at the half-unit, and its spur's rail overruns the
+    dock by `rail_end_extension`, so half a unit must hold a stack plus that overrun plus a
+    gap:
 
         y_min = 2 * (dc_setback + dc_width + rail_end_extension + gap)
               = 2 * 230000 = 460000 nm
 
-    One nanometre under either and the violations come back -- 22 for the axial threshold,
-    44 for the transverse one.
+    One nanometre under it and the collisions return (33 of them at that scale -- the count
+    depends on how many pads the pitch tiles into a run, so it is not monotone; what the
+    threshold asserts is that the device is clean at it and dirty below it).
+
+    **Along the rail there is no longer a threshold, and that is a correction.**  The 24
+    spurs interleave -- `V6` rises from `(6, 0)` while `V138` descends from `(5, 1)` -- so
+    two perpendicular trap axes end up one axial unit apart, and this test used to measure
+    an axial threshold of `x_min = 300250 nm` with 22 violations one nanometre under it.
+    Those 22 were a builder artefact: the pads they involved sit directly on a crossing
+    spur's own control column and should never have been drawn.  `keepout_half_width`
+    drops them (`Codesign/findings/q06g`), the axial collisions go with them, and the
+    device's failure is now purely transverse.  The axial scale is still the tighter
+    constraint on the *field* -- two trap axes one unit apart is 225 um where the electrode
+    stack alone is 350 um wide -- but it is not a DRC finding.
 
     The bite: the axial trap pitch derived from the control electrodes is 225 um -- three
     75 um segments per well, which is where `nm_per_unit_x` comes from -- and `x_min` is
@@ -473,13 +623,18 @@ def test_the_lattice_scale_at_which_the_ring_becomes_fabricable_is_sharp(tech):
     y_min = 2 * (stack + tech.nm("rail_end_extension") + gap)
     assert (x_min, y_min) == (300250, 460000)
 
-    assert _ring_shorts(tech, x_min, y_min) == 0, "the derived thresholds are sufficient"
-    assert _ring_shorts(tech, x_min - 1, y_min) == 22, "and the axial one is necessary"
-    assert _ring_shorts(tech, x_min, y_min - 1) == 44, "as is the transverse one"
+    assert _ring_shorts(tech, x_min, y_min) == 0, "the derived threshold is sufficient"
+    # 33 rather than the 44 at the shipped scale: the count is not monotone in the scale,
+    # because a different pitch tiles a different number of pads into the same run.  What
+    # the threshold claims is that one nanometre under it the collisions return at all.
+    assert _ring_shorts(tech, x_min, y_min - 1) == 33, "and the transverse one is necessary"
+    # the axial threshold no longer binds: the pads that collided there were the ones a
+    # crossing spur's own control column sits on, and they are not drawn any more
+    assert _ring_shorts(tech, x_min - 1, y_min) == 0, "the axial collisions were the artefact"
 
     # the shipped scale is under both, which is the finding
     assert tech.nm_per_unit_x.nm < x_min and tech.nm_per_unit_y.nm < y_min
-    assert _ring_shorts(tech, tech.nm_per_unit_x.nm, tech.nm_per_unit_y.nm) == 66
+    assert _ring_shorts(tech, tech.nm_per_unit_x.nm, tech.nm_per_unit_y.nm) == 44
 
 
 def test_an_isotropic_lattice_does_not_fit_two_rails_and_the_preset_says_so(tech):
@@ -504,26 +659,19 @@ def test_an_isotropic_lattice_does_not_fit_two_rails_and_the_preset_says_so(tech
 # ------------------------------------------------- the device defect this layer found
 
 @pytest.mark.parametrize("name,pairs", [
-    ("cyclone_dual_loop", 4), ("ring144_24v", 2), ("grid9x9", 0), ("chain72", 0),
+    ("cyclone_dual_loop", 0), ("ring144_24v", 0), ("grid9x9", 0), ("chain72", 0),
     ("ladder_2x72", 0), ("h2_racetrack", 0), ("cyclone_base", 0),
 ])
 def test_segments_running_through_nodes_they_do_not_touch_are_reported(name, pairs):
     """A planar trap has no overpass, so the graph and the plane must agree.  Twice they
-    do not, and the crossed node's degree says which kind of disagreement it is.
-
-    `ring144_24v`'s two are its end-cap docks, at degree 1 -- `docs/adl.md` already records
-    that the ancilla for `S0 = (0,0)` sits at `(0, 0.5)`, on the segment from `S0` to
-    `S143`.  A dock drawn ON a rail rather than beside it.
-
-    `cyclone_dual_loop`'s four are degree **2**, which is the serious case: `EA35` runs
-    from `(35,0)` to `(35,3)` straight through `DT35` and `DB35`, two nodes of the data
-    loop.  The graph says the ancilla link and the data loop never meet; the plane says
-    they share metal at two places.  If the crossing is real those nodes are degree 4, not
-    2 -- they are junctions, they are not being charged as junctions, and the router is
-    free to send two ions through the same electrode at once.
-
-    Reported and not repaired: `arch/` is not this feature's to edit, and the two possible
-    repairs say different things about the machine.
+    did not, and the crossed node's degree said which kind of disagreement it was:
+    `ring144_24v`'s two end-cap docks were drawn ON the rail (degree 1), and
+    `cyclone_dual_loop`'s `EA35` ran from `(35,0)` to `(35,3)` straight through `DT35`
+    and `DB35` (degree 2, the serious case: the plane said those were junctions and the
+    graph did not charge them).  Both were repaired in the generators in 2026-09, when the
+    same facts became verifier rules (R20, R21): a corner's spur runs outward, and the
+    inner loop's end columns are inset.  Every shipped device is now crossing-free, and
+    the report is exercised on hand-drawn devices below.
     """
     dev = device(name)
     got = unconnected_crossings(dev)
@@ -557,10 +705,16 @@ def test_a_node_sitting_on_a_segments_endpoint_is_not_a_crossing():
     assert [n for _, n in unconnected_crossings(vertical)] == ["D"]
 
 
-def test_the_crossing_report_reaches_the_layout_notes(layouts):
-    lay = layouts[BY_NAME["cyclone_dual_loop"]]
+def test_the_crossing_report_reaches_the_layout_notes(tech):
+    """No shipped device draws a rail through a foreign node any more (R21), so the
+    note is exercised on a device drawn to do exactly that: `ab` runs through `M`."""
+    dev = _hand_device(
+        [Node("A", (0.0, 0.0)), Node("B", (2.0, 0.0)), Node("M", (1.0, 0.0)),
+         Node("N", (1.0, 1.0)), Node("P", (1.0, -1.0))],
+        [Segment("ab", ("A", "B")), Segment("mn", ("M", "N")), Segment("mp", ("M", "P"))])
+    lay = build_layout(dev, tech)
     note = next(n for n in lay.notes if "not incident to" in n)
-    assert "EA35" in note and "deg 2" in note and "no overpass" in note
+    assert "ab" in note and "deg 2" in note and "no overpass" in note
 
 
 # ---------------------------------------------------------------------- discipline

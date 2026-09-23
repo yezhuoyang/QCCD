@@ -183,13 +183,13 @@ def test_ring_slot_order_matches_the_visualizer():
 
 
 def test_corner_detection_survives_a_spur_collinear_with_the_rail():
-    """S0's spur points the same way as the rail segment to S143.
-
-    A purely geometric "did the direction change here" test over all incident segments
-    would misclassify that; corners are found by walking the loop instead.
+    """S0's spur used to point the same way as the rail segment to S143 (it now runs
+    outward, so that R20/R21 hold: a dock is not drawn on the end-cap rail), but corners
+    are still found by walking the loop, not by a geometric "did the direction change
+    here" test over all incident segments, which a spur of any direction could confuse.
     """
     dev = ring(72, 2, 24)
-    assert dev.nodes["A0"].pos == (0.0, 0.5)  # on the segment S0 -> S143
+    assert dev.nodes["A0"].pos == (0.0, -0.5)  # outward, off the segment S0 -> S143
     assert dev.degree("S0") == 3
     assert "S0" in dev.corners("L0")
     assert "S6" not in dev.corners("L0")  # a T-junction that does not turn
@@ -258,6 +258,78 @@ def test_grid_degrees_come_from_the_lattice():
     # the 4 lattice corners are degree-2 bends and are found geometrically, with no loop
     assert dev.loops == {}
     assert dev.all_corners == {"J0_0", "J0_8", "J8_0", "J8_8"}
+
+
+def test_grid_spacing_two_is_the_same_graph_moved_apart():
+    """`spacing` must relocate a lattice, never redraw it.
+
+    The point of the parameter is that a programme compiled against the as-drawn lattice
+    replays unchanged on the stretched one, so the stretch can be priced without
+    recompiling.  That holds only if every node id, segment id and incidence survives --
+    which is the whole assertion here.  A midpoint trap is 0.5 lattice units from each of
+    the junctions flanking it and sits inside both of their control keep-outs, so the
+    as-drawn lattice builds with zero electrodes per trap (`Codesign/findings/q06i`).
+    """
+    a, b = grid(11, 11), grid(11, 11, spacing=2)
+    assert set(a.nodes) == set(b.nodes)
+    assert set(a.segments) == set(b.segments)
+    assert all(set(a.segments[k].ends) == set(b.segments[k].ends) for k in a.segments)
+    assert all(a.degree(n) == b.degree(n) for n in a.nodes)
+    # only the metric changes: the junctions move to two units, the trap to one
+    assert a.nodes["J1_0"].pos == (1.0, 0.0) and b.nodes["J1_0"].pos == (2.0, 0.0)
+    assert a.nodes["T0_0h"].pos == (0.5, 0.0) and b.nodes["T0_0h"].pos == (1.0, 0.0)
+    assert b.params["spacing"] == 2
+
+
+def test_grid_spacing_above_two_adds_traps_per_wire():
+    dev = grid(11, 11, spacing=3)
+    # every junction-to-junction wire now carries `spacing - 1` traps at unit offsets
+    assert dev.summary()["n_sites"] == 2 * (2 * 11 * 11 - 11 - 11) == 440
+    assert len([n for n in dev.nodes.values() if n.kind == "junction"]) == 121
+    assert dev.nodes["T0_0h_0"].pos == (1.0, 0.0)
+    assert dev.nodes["T0_0h_1"].pos == (2.0, 0.0)
+    with pytest.raises(ExpansionError, match="spacing"):
+        grid(3, 3, spacing=0)
+
+
+def test_grid_periodic_closes_both_directions():
+    """`periodic=True` is the torus the BB code lives on: every junction degree 4, every
+    row and column a closed loop, and exactly `2ab` traps (one per wire, wrap wires
+    included) against the planar `2ab - a - b`.  Node and segment ids of the interior
+    are unchanged, so a placement written for the torus names the same wires on the
+    planar grid wherever they exist (`Codesign/findings/q06j`)."""
+    t, g = grid(12, 12, periodic=True), grid(12, 12)
+    assert t.summary()["n_sites"] == 2 * 12 * 12 == 288
+    assert g.summary()["n_sites"] == 2 * 12 * 12 - 12 - 12 == 264
+    assert t.summary()["degree_histogram"] == {2: 288, 4: 144}
+    assert set(g.nodes) <= set(t.nodes)
+    assert set(g.segments) <= set(t.segments)
+    # the wrap wire from the last column returns to the first
+    assert t.segments["T11_0h.b"].ends == ("T11_0h", "J0_0")
+    assert t.params["periodic"] is True and g.params["periodic"] is False
+
+
+def test_cylinder_is_the_torus_drawn_as_a_chip():
+    """Concentric rings with spokes: `C_a x P_b`, planar, no crossings.  With the wrap
+    spokes it is `C_a x C_b` at exactly `a*(b-2)` crossings, the known minimum, every
+    crossing a degree-4 node on a ring wire of the inner rings (`Codesign/findings/q06k`)."""
+    from qccd.arch.generators import cylinder
+    c = cylinder(12, 12)
+    s = c.summary()
+    assert s["n_sites"] == 12 * 12 + 12 * 11 == 276
+    assert s["degree_histogram"] == {2: 276, 3: 24, 4: 120}
+    assert c.loops == {}                          # rings are not declared by default
+    assert all(sg.loop is None for sg in c.segments.values())
+    t = cylinder(12, 12, wrap_spokes=True)
+    assert t.summary()["n_sites"] == 288
+    assert sum(1 for n in t.nodes.values() if "crossing" in n.labels) == 12 * 10
+    assert t.summary()["degree_histogram"] == {2: 288, 4: 144 + 120}
+    # the wrap spoke runs outer -> trap -> crossings on rings 10..1 -> inner
+    assert t.segments["T0_11v.0"].ends == ("J0_11", "T0_11v")
+    assert t.segments["T0_11v.1"].ends == ("T0_11v", "X0_10")
+    assert t.segments["T0_11v.11"].ends == ("X0_1", "J0_0")
+    r = cylinder(4, 3, declare_loops=True)
+    assert set(r.loops) == {"R0", "R1", "R2"} and all(lp.closed for lp in r.loops.values())
 
 
 def test_chain_of_one_is_the_stationary_baseline():

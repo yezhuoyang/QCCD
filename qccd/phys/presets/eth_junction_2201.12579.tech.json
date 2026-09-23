@@ -23,6 +23,10 @@
       "nm": 5000,
       "source": "2201.12579 ms.tex:368 -- the inter-electrode gap imposed by the fabrication process. DECLARED FOR DRC ONLY: the gapless-plane field kernel does not see it, and 2201.12579's own 5% position / 20% pseudopotential error against FEM (ms.tex:200-208) is what ignoring it costs."
     },
+    "g_rf": {
+      "nm": 5000,
+      "source": "2201.12579 ms.tex:368 -- the one inter-electrode gap the process imposes, which is what this trap puts between an RF rail and the control metal beside it: the fabricated dc_setback and the 31.5 um middle electrode both follow from it (ms.tex:370, ms.tex:685). It is 5 um and the project minimum for a NEW design is 8 um, so this technology waives g_rf and says why."
+    },
     "dc_pitch": {
       "nm": 75000,
       "source": "2201.12579 ms.tex:682, ms.tex:693 -- the middle control electrodes are divided into 75 um segments in the linear regions (40 um for the four adjacent to the junction centre, and a 30 um square at the centre itself, which this preset does not model). NOTE the paper states this segmentation for the MIDDLE electrodes; applying the same axial pitch to the outer columns is an extrapolation, and it is the one a segmented trap requires, since a well is formed by the electrodes on both sides of the axis acting together."
@@ -51,6 +55,13 @@
       "nm": 50000,
       "source": "derived: one nominal ion height (h = 1/2 sqrt(w_g (w_g + 2 w_rf)) = 49.95 um, rounded to 50 um, which is 2201.12579's own design target). RF rails are run this far past the last node so that a device boundary is not also a field discontinuity at the last trap."
     }
+  },
+  "n_dc_pairs": {
+    "n": 3,
+    "source": "2305.03828 states the conveyor-belt tie pattern {a,b,c,a,b,c,...} supports '20 wells on each side (one for every three electrodes)', and 2201.12579 ms.tex:682 divides the middle control electrodes into 75 um segments in the linear regions. Three segments per well is also what nm_per_unit_x is derived from, so this count and that scale are the same claim read twice."
+  },
+  "waivers": {
+    "g_rf": "This preset REPRODUCES a published trap, and 2201.12579 fabricated it at the single 5 um gap its process imposed (ms.tex:368) -- between control electrodes and between an RF rail and the control metal beside it alike. The project minimum of 8 um is a rule for a new design; applying it here would move dc_setback from 125.25 um to 128.25 um, redraw every rail-to-column clearance, and report a geometry that paper never had. The waiver is therefore about which trap is being drawn, not about what is safe to fabricate: a new technology gets the minimum, and surface_default.tech.json is what it looks like."
   },
   "layers": [
     {

@@ -59,17 +59,30 @@ def ring(
     verticals: int = 0,
     *,
     site_zone: str = "data",
-    ancilla_zone: str = "ancilla",
+    # A DOCK SPUR ENDS IN A TRAP, and `trap` is what the zone is called: gate, measure and
+    # cool, capacity 2.  The default used to be `ancilla`, a zone whose flags were `trap`'s
+    # exactly under a name borrowed from error correction -- a role a code assigns, not a
+    # capability of the metal.  The keyword keeps its name because architecture documents
+    # in the wild store it as `ancilla_zone`; only what it defaults to changed, in step
+    # with `engine.js::ring`, whose differential test would fail on any divergence.
+    ancilla_zone: str = "trap",
     segment_capacity: int = 1,
     loop_id: str = "L0",
+    dock_offset: int = 0,
 ) -> Device:
     """A rectangular transport loop of `2W + 2H - 4` slots with `V` dock spurs.
 
-    Each vertical is a spur from an evenly spaced perimeter slot inward to an ancilla
+    Each vertical is a spur from an evenly spaced perimeter slot inward to a trap
     site on the mid-line.  Attaching it makes that perimeter slot degree 3, so R18 turns
     it into a junction on the rotation path -- the single most expensive structural
     decision in the shipped design (PLAN §0.5).  `verticals=0` gives the base Cyclone
     shape: a loop whose only non-straight nodes are degree-2 bends.
+
+    `dock_offset` shifts every dock by that many slots around the loop.  The default
+    puts the first dock at slot 0, which is a corner, and on a loop of height >= 3 a
+    corner dock's spur lies along the side rail and fails DRC (`Codesign/findings/q06`);
+    an offset that keeps every dock on a top or bottom straight costs nothing in the
+    transport model and makes the device buildable.
     """
     slots = _ring_slots(width, height)
     capacity = len(slots)
@@ -81,7 +94,11 @@ def ring(
             f"the deck spaces docks uniformly around the loop"
         )
     spacing = capacity // verticals if verticals else 0
-    dock_slots = {i * spacing for i in range(verticals)}
+    if dock_offset < 0 or (spacing and dock_offset >= spacing):
+        raise ExpansionError(
+            f"dock_offset must be in [0, {spacing}) -- one dock spacing -- got {dock_offset}"
+        )
+    dock_slots = {(dock_offset + i * spacing) % capacity for i in range(verticals)}
 
     mid_x = (width - 1) / 2.0
     mid_y = (height - 1) / 2.0
@@ -114,14 +131,25 @@ def ring(
     for s in sorted(dock_slots):
         side, x, y = slots[s]
         # the spur runs inward, perpendicular to the side the dock sits on, to the
-        # mid-line -- which is where the deck draws its ancillas
-        ax, ay = (x, mid_y) if side in ("top", "bottom") else (mid_x, y)
+        # mid-line -- which is where the deck draws its dock traps.  At a CORNER slot
+        # the inward direction runs along the end-cap rail (the dock would sit on the
+        # rail, at 0 degrees to it: R20, R21), so a corner's spur runs outward instead,
+        # perpendicular to its row, over the same length
+        corner = x in (0.0, float(width - 1)) and y in (0.0, float(height - 1))
+        if corner:
+            ax, ay = (x, -mid_y) if side == "top" else (x, float(height - 1) + mid_y)
+        else:
+            ax, ay = (x, mid_y) if side in ("top", "bottom") else (mid_x, y)
         nodes[f"A{s}"] = Node(
             id=f"A{s}",
             pos=(ax, ay),
             kind="site",
             zone_type=ancilla_zone,
-            labels=("ancilla",),
+            # NOT "dock": the RAIL slot carries that label (line ~110), and
+            # `device.labelled("dock")` / `pipeline.py` read it to recover the dock slot
+            # indices from the `S{n}` ids -- labelling the spur-end trap "dock" too
+            # doubled that list and the deck artifact stopped matching the architecture.
+            labels=("spur_trap",),
         )
         segments[f"V{s}"] = Segment(
             id=f"V{s}",
@@ -154,6 +182,7 @@ def ring(
             "ancilla_zone": ancilla_zone,
             "segment_capacity": segment_capacity,
             "loop_id": loop_id,
+            "dock_offset": dock_offset,
         },
     )
 
@@ -167,19 +196,42 @@ def grid(
     *,
     site_zone: str = "trap",
     segment_capacity: int = 1,
+    spacing: int = 1,
+    periodic: bool = False,
 ) -> Device:
-    """An `a x b` lattice of junctions with one trap in the middle of every wire.
+    """An `a x b` lattice of junctions, with `spacing` lattice units between neighbours.
+
+    `periodic=True` closes both directions: the last column's east wire returns to the
+    first column and the top row's north wire to the bottom, so every junction is degree
+    4 and every row and column is a closed loop.  That is the torus the BB code lives on
+    (`Codesign/findings/q06j`), drawn as a graph -- the wrap wires are placed beyond the
+    last column/row, and a physical die would fold them; the design rules are not asked
+    about it here.
 
     This is the baseline grid QCCD of arXiv:2004.04706 and the README's description
     ("ion traps put in the middle of the wire of a grid").  Interior lattice points are
     degree-4 X-junctions, boundary points degree-3 T-junctions and the four lattice
     corners degree-2 bends, all of which fall straight out of the incidence count.
 
-    Trap count is `2ab - a - b`; `grid(9, 9)` gives exactly 144, one per data qubit of
-    BB [[144,12,12]].
+    At the default `spacing = 1` the junctions sit one lattice unit apart and the single
+    trap on each wire is at the midpoint.  Trap count is `2ab - a - b`; `grid(9, 9)` gives
+    exactly 144, one per data qubit of BB [[144,12,12]].
+
+    **That default is not fabricable, and `spacing` is why the parameter exists.**  A
+    crossing rail forbids control metal within `keepout_half_width` of its axis -- 180 um
+    in the shipped technology -- while one lattice unit is 225 um, so a midpoint trap sits
+    112.5 um from each of the two junctions that flank it and is swallowed by BOTH
+    keep-outs.  Every `grid(a, b)` therefore builds with zero control electrodes per trap
+    at every `a` and `b`, which `qccd.phys.drc` discloses as "no control electrodes
+    survived" (`Codesign/findings/q06i`).  Raising `spacing` moves the traps off the
+    junctions: at `spacing = s` the wire from one junction to the next carries `s - 1`
+    traps at unit offsets, so a trap is at least one full unit from a junction and the
+    outermost is `s - 1` units away.
     """
     if a < 2 or b < 2:
         raise ExpansionError("grid needs a >= 2 and b >= 2")
+    if spacing < 1:
+        raise ExpansionError("grid needs spacing >= 1")
     nodes: dict[str, Node] = {}
     segments: dict[str, Segment] = {}
 
@@ -187,29 +239,58 @@ def grid(
         for j in range(b):
             nodes[f"J{i}_{j}"] = Node(
                 id=f"J{i}_{j}",
-                pos=(float(i), float(j)),
+                pos=(float(i * spacing), float(j * spacing)),
                 kind="junction",
                 capacity=0,
                 labels=("lattice",),
             )
 
-    def add_trap(tid: str, pos: tuple[float, float], u: str, v: str) -> None:
+    def add_node(tid: str, pos: tuple[float, float]) -> None:
         nodes[tid] = Node(
             id=tid, pos=pos, kind="site", zone_type=site_zone, labels=("trap",)
         )
-        segments[f"{tid}.a"] = Segment(
-            id=f"{tid}.a", ends=(u, tid), length=0.5, capacity=segment_capacity
-        )
-        segments[f"{tid}.b"] = Segment(
-            id=f"{tid}.b", ends=(tid, v), length=0.5, capacity=segment_capacity
+
+    def link(sid: str, u: str, v: str, length: float) -> None:
+        segments[sid] = Segment(
+            id=sid, ends=(u, v), length=length, capacity=segment_capacity
         )
 
-    for i in range(a - 1):
+    def add_wire(tag: str, u: str, v: str, at) -> None:
+        """The traps on one junction-to-junction wire, in order, then the chain of hops.
+
+        At `spacing = 1` that is the single midpoint trap the baseline draws.  Above it,
+        the wire carries `spacing - 1` traps at unit offsets, so the run reads
+        junction, trap, trap, ..., junction and every hop is one lattice unit.
+        """
+        offs = [0.5] if spacing == 1 else [float(k) for k in range(1, spacing)]
+        ids = []
+        for k, off in enumerate(offs):
+            # a wire carrying ONE trap keeps the baseline's bare name, so spacing 1 and
+            # spacing 2 agree on every node id as well as every segment id
+            tid = f"T{tag}" if len(offs) == 1 else f"T{tag}_{k}"
+            add_node(tid, at(off))
+            ids.append(tid)
+        run = [u, *ids, v]
+        step = 0.5 if spacing == 1 else 1.0
+        # the baseline's own segment ids, unchanged wherever the wire still has two of
+        # them -- which covers `spacing = 1` AND `spacing = 2`.  Those two are the SAME
+        # GRAPH (one trap per wire, a segment either side); spacing 2 only pulls the
+        # junctions apart so the trap clears their keep-outs.  Keeping the names means a
+        # programme compiled against the unbuildable baseline replays unchanged on the
+        # buildable stretch, which is how q06i prices the lattice honestly.
+        names = (("a", "b") if len(run) == 3
+                 else tuple(str(k) for k in range(len(run) - 1)))
+        for k in range(len(run) - 1):
+            link(f"T{tag}.{names[k]}", run[k], run[k + 1], step)
+
+    for i in range(a if periodic else a - 1):
         for j in range(b):
-            add_trap(f"T{i}_{j}h", (i + 0.5, float(j)), f"J{i}_{j}", f"J{i + 1}_{j}")
+            add_wire(f"{i}_{j}h", f"J{i}_{j}", f"J{(i + 1) % a}_{j}",
+                     lambda o, i=i, j=j: (i * spacing + o, float(j * spacing)))
     for i in range(a):
-        for j in range(b - 1):
-            add_trap(f"T{i}_{j}v", (float(i), j + 0.5), f"J{i}_{j}", f"J{i}_{j + 1}")
+        for j in range(b if periodic else b - 1):
+            add_wire(f"{i}_{j}v", f"J{i}_{j}", f"J{i}_{(j + 1) % b}",
+                     lambda o, i=i, j=j: (float(i * spacing), j * spacing + o))
 
     return Device(
         nodes=nodes,
@@ -221,6 +302,8 @@ def grid(
             "b": b,
             "site_zone": site_zone,
             "segment_capacity": segment_capacity,
+            "spacing": spacing,
+            "periodic": periodic,
         },
     )
 
@@ -424,12 +507,14 @@ def dual_loop(
     couplings: Sequence[int] | int | None = None,
     *,
     data_zone: str = "data",
-    ancilla_zone: str = "ancilla",
+    # `trap`, for the same reason as `ring`'s dock zone above, and mirrored in
+    # `engine.js::dualLoop`.
+    ancilla_zone: str = "trap",
     segment_capacity: int = 1,
 ) -> Device:
-    """Two concentric loops: an inner data loop and an outer ancilla loop (deck p.12).
+    """Two concentric loops: an inner storage loop and an outer trap loop (deck p.12).
 
-    "The data loop stays still while the ancilla loop rotates past it"; one rotation
+    "The data loop stays still while the outer loop rotates past it"; one rotation
     finishes one syndrome type, two complete the ESM, and Data : Ancilla = 1 : 1 at one
     ion per trap.
 
@@ -453,17 +538,31 @@ def dual_loop(
     loops: dict[str, Loop] = {}
 
     plan = (("D", data_zone, 1.0, 2.0, "data", "inner"),
-            ("A", ancilla_zone, 0.0, 3.0, "ancilla", "outer"))
+            ("A", ancilla_zone, 0.0, 3.0, "outer_ring", "outer"))
+    # The outer loop's end caps run vertically at x = 0 and x = width - 1, exactly
+    # where the inner loop's end nodes sit: drawn straight, the cap passed THROUGH DT0
+    # and DB0 (R21).  The inner racetrack is the shorter one, so its two end columns are
+    # inset by half a slot; the ids, the loop order and every coupling in between are
+    # untouched, and a coupling at an end column now runs a half-slot diagonal.
+    def inner_x(tag: str, x: int) -> float:
+        if tag != "D":
+            return float(x)
+        if x == 0:
+            return 0.5
+        if x == width - 1:
+            return float(width - 1) - 0.5
+        return float(x)
+
     for tag, zone, y_top, y_bot, label, side in plan:
         order: list[str] = []
         for x in range(width):
             nid = f"{tag}T{x}"
-            nodes[nid] = Node(id=nid, pos=(float(x), y_top), kind="site",
+            nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_top), kind="site",
                               zone_type=zone, labels=(label, side, "top"))
             order.append(nid)
         for x in range(width - 1, -1, -1):
             nid = f"{tag}B{x}"
-            nodes[nid] = Node(id=nid, pos=(float(x), y_bot), kind="site",
+            nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_bot), kind="site",
                               zone_type=zone, labels=(label, side, "bottom"))
             order.append(nid)
         for i in range(len(order)):
@@ -487,7 +586,118 @@ def dual_loop(
 
 # --------------------------------------------------------------------------- dispatch
 
+def cylinder(
+    a: int,
+    b: int,
+    *,
+    wrap_spokes: bool = False,
+    declare_loops: bool = False,
+    site_zone: str = "trap",
+    segment_capacity: int = 1,
+    r0: float = 2.0,
+    pitch: float = 1.0,
+) -> Device:
+    """The torus grid drawn as a chip: `b` concentric closed loops joined by `a` spokes.
+
+    A periodic lattice is not planar, so `grid(..., periodic=True)` cannot be fabricated
+    as it is drawn -- its wrap wires cross the whole die.  This is the drawing with the
+    fewest crossings there is.  Each row `j` of the torus is a closed loop of `a` traps at
+    radius `r0 + j*pitch`; each column `i` is a radial spoke, one trap per ring gap; so the
+    x-direction wraps for free and nothing crosses.  That is a CYLINDER, `C_a x P_b`, and
+    it is planar (`Codesign/findings/q06k`).
+
+    `wrap_spokes=True` adds the y-wrap too: a spoke from the outer ring back to the inner
+    one at every column, run between the regular spokes so it crosses the `b - 2`
+    intermediate rings on their wires.  Every crossing is a degree-4 node inserted into
+    the ring wire between its junction and its trap, which is what a crossing IS in a
+    surface trap, and what the cost model charges as a junction (R18).  That makes the
+    drawing a torus at `a*(b-2)` crossings -- the known minimum for `C_a x C_b` -- and it
+    puts one crossing on every ring wire of the inner `b - 2` rings, so the price of the
+    y-wrap is paid on the x-hops.  Whether that is worth it is a measurement, not a rule.
+
+    Node ids follow `grid`: `J{i}_{j}`, ring wires `T{i}_{j}h` (from `J{i}_{j}` towards
+    `J{i+1}_{j}`), spoke wires `T{i}_{j}v` (from ring `j` out to ring `j+1`); the wrap
+    spoke's trap is `T{i}_{b-1}v` and its crossings `X{i}_{r}`.
+    """
+    import math
+
+    if a < 3 or b < 2:
+        raise ExpansionError("cylinder needs a >= 3 and b >= 2")
+    nodes: dict[str, Node] = {}
+    segments: dict[str, Segment] = {}
+    loops: dict[str, Loop] = {}
+
+    def at(i: float, j: float) -> tuple[float, float]:
+        r = r0 + j * pitch
+        th = 2 * math.pi * i / a
+        return (round(r * math.cos(th), 6), round(r * math.sin(th), 6))
+
+    def site(tid: str, pos) -> None:
+        nodes[tid] = Node(id=tid, pos=pos, kind="site", zone_type=site_zone, labels=("trap",))
+
+    def link(sid: str, u: str, v: str, length: float = 0.5, loop: str | None = None) -> None:
+        segments[sid] = Segment(id=sid, ends=(u, v), length=length,
+                                capacity=segment_capacity, loop=loop)
+
+    for i in range(a):
+        for j in range(b):
+            nodes[f"J{i}_{j}"] = Node(id=f"J{i}_{j}", pos=at(i, j), kind="junction",
+                                      capacity=0, labels=("lattice",))
+    # the rings: closed loops, one trap per wire
+    for j in range(b):
+        lid = f"R{j}"
+        tag = lid if declare_loops else None
+        order: list[str] = []
+        for i in range(a):
+            tid = f"T{i}_{j}h"
+            site(tid, at(i + 0.5, j))
+            link(f"{tid}.a", f"J{i}_{j}", tid, loop=tag)
+            link(f"{tid}.b", tid, f"J{(i + 1) % a}_{j}", loop=tag)
+            order += [f"J{i}_{j}", tid]
+        if declare_loops:
+            loops[lid] = Loop(id=lid, nodes=tuple(order), closed=True, kind="ring")
+    # the spokes: open, one trap per ring gap
+    for i in range(a):
+        for j in range(b - 1):
+            tid = f"T{i}_{j}v"
+            site(tid, at(i, j + 0.5))
+            link(f"{tid}.a", f"J{i}_{j}", tid)
+            link(f"{tid}.b", tid, f"J{i}_{j + 1}")
+    if wrap_spokes:
+        # outer ring back to inner, between spokes i and i+1, crossing rings 1..b-2 on
+        # the wire T{i}_{r}h -- inserted between the wire's junction and its trap
+        for i in range(a):
+            tid = f"T{i}_{b - 1}v"
+            site(tid, at(i + 0.5, b - 0.5))
+            chain = [f"J{i}_{b - 1}", tid]
+            for r in range(b - 2, 0, -1):
+                x = f"X{i}_{r}"
+                nodes[x] = Node(id=x, pos=at(i + 0.5, r + 0.02), kind="junction",
+                                capacity=0, labels=("crossing",))
+                # split the ring wire's first segment J -> T into J -> X -> T
+                w = f"T{i}_{r}h"
+                old = segments.pop(f"{w}.a")
+                link(f"{w}.a", f"J{i}_{r}", x, loop=old.loop)
+                link(f"{w}.x", x, w, loop=old.loop)
+                if f"R{r}" in loops:
+                    lp = loops[f"R{r}"]
+                    nl = list(lp.nodes)
+                    nl.insert(nl.index(w), x)
+                    loops[f"R{r}"] = Loop(id=lp.id, nodes=tuple(nl), closed=True, kind="ring")
+                chain.append(x)
+            chain.append(f"J{i}_0")
+            for k in range(len(chain) - 1):
+                link(f"{tid}.{k}", chain[k], chain[k + 1])
+    return Device(
+        nodes=nodes, segments=segments, loops=loops, generator="cylinder",
+        params={"a": a, "b": b, "wrap_spokes": wrap_spokes, "declare_loops": declare_loops,
+                "site_zone": site_zone,
+                "segment_capacity": segment_capacity, "r0": r0, "pitch": pitch},
+    )
+
+
 GENERATORS = {
+    "cylinder": cylinder,
     "ring": ring,
     "grid": grid,
     "chain": chain,
