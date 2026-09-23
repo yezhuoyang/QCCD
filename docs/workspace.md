@@ -271,8 +271,8 @@ from the task's.
 | D · Codex adapter: deliver, observe, steer, interrupt, reconcile, re-attach | deliver/observe/reconcile **live**; steer/interrupt implemented against the verified schema, **not exercised live** | |
 | D · Claude channel | **contract-tested** only | `test_claude_channel_pushes_studio_prompts_and_reading_acknowledges` |
 | D · generic pull fallback | **done**, labelled reduced | |
-| E · official API, auth, queue, worker, isolated grader, reports, leaderboard, parity | **done** on SQLite + inline grader; Compose/PostgreSQL **written, not run** | `test_official.py`; `deploy/official/` |
-| E · production deployment | **not done** (needs authorisation and credentials) | |
+| E · official API, auth, queue, worker, isolated grader, reports, leaderboard, parity | **done**: SQLite, both inline and containerised; the PostgreSQL path has not run | `test_official.py`; `deploy/official/` |
+| E · production deployment | **live** since 2026-09-22 at `https://qccd.academy/official/` (JSON API); authorised by the user | `deploy/official/README.md`; a private smoke submission graded eligible there, with exact parity |
 | F · WebMCP / Playwright | **not done** (optional); a CDP driver (`tests/workspace_browser.mjs`) serves testing | |
 | demonstration script | **done**; live Codex run: see below | `examples/workspace_demo/demo.py` |
 
@@ -346,7 +346,10 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   unrebaseable. It is refused, and the page shows the current design.
 - `render_html` is called once per service for the design view. The page's other embedded
   data (templates, schema) is fixed at that render.
-- The Compose deployment, the Dockerfile and the PostgreSQL code path were not executed here.
+- The official service is live at `https://qccd.academy/official/`, built from commit
+  `10152b1`, which had not been pushed to GitHub when it was deployed. Its leaderboard is
+  JSON only; qccd.academy has no page for it yet. Its data volumes are not backed up. The
+  PostgreSQL code path has never been run.
 - A demonstration is delivered as data (diff, change sets, targets). Generalising it is the
   agent's job, and the service only guarantees that the result is valid and respects
   protection.
@@ -380,7 +383,7 @@ qccd validate --json                     # a draft grade of the head revision
 qccd submit --local --wait               # freeze + reference grade -> "Local result - not published"
 qccd leaderboard
 qccd publish --submission <sub_id>       # review + approve at an interactive terminal
-QCCD_UPLOAD_TOKEN=... qccd publish --approval <ap_id> --server http://127.0.0.1:8300
+qccd publish --approval <ap_id> --server https://qccd.academy/official   # token: ~/.qccd/credentials.json
 qccd status | qccd stop
 ```
 
