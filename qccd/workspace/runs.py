@@ -144,8 +144,9 @@ class RunsMixin:
 
         tc = Toolchain.discover()
         if tc.qccdc is None:
-            raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not built: see "
-                                 "deploy/official/Dockerfile for the build commands", status=424)
+            raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not installed: run "
+                                 "`qccd toolchain install` in a terminal (it fetches the prebuilt one), "
+                                 "or build Compiler/ocaml", status=424)
         branch, rev = params["branch"], params["revision"]
         name, qasm, source = resolve_program(params["program"])
         r = self.replayed(branch, rev)

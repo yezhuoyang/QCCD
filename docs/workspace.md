@@ -436,6 +436,10 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   CLI next needs it. A page on its own cannot start one, and shows *disconnected* until then. Two earlier bugs from
   this investigation are fixed: `_pid_alive` treated *access denied* as dead, and a service
   spawned inside an agent's job object could die with it (it now spawns with job breakaway).
+- **No prebuilt compiler for macOS**, and none of the Lean checker for any platform. On a
+  Mac, build `Compiler/ocaml` from source. Local reference grades stay `unsupported` at the
+  certificate stage until `qcheck` is built. `tests/test_workspace_toolchain.py` fails when
+  `Compiler/ocaml` changes without a new release (`deploy/toolchain/README.md`).
 - The `qccd` console script needs the repository layout. The toolchain reads repo-relative
   files (`arch/` templates, `Compiler/` binaries), so install with `pip install -e .[agent]`
   from a clone. A standalone wheel is not complete.
@@ -476,9 +480,17 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
 ```bash
 python -m venv --system-site-packages .venv
 .venv/Scripts/pip install -e .[agent]            # or: pip install -r requirements-agent.txt
-# the reference checks need the built OCaml compiler and the Lean checker (see Compiler/README.md);
-# without them, a reference grade reports those stages `unsupported`, which is never eligible
+qccd toolchain install                           # the prebuilt compiler, for runs and compiles
+# the reference checks also need the Lean checker (see Compiler/README.md); without it, a
+# reference grade reports that stage `unsupported`, which is never eligible
 ```
+
+`qccd toolchain install` fetches `qccdc_cli` for Windows or Linux on x86-64 from
+qccd.academy. It refuses the download unless its size and SHA-256 match
+`qccd/workspace/toolchain.json`, installs it under `~/.qccd/toolchain/`, and runs it once on a
+test circuit. `qccd toolchain status` says which compiler is in use: `QCCD_QCCDC` first, then
+one built in the checkout, then the installed one. How a release is built and published:
+`deploy/toolchain/README.md`.
 
 **One workspace, end to end:**
 
@@ -531,6 +543,7 @@ Linux and macOS were not exercised in this session.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
+| `tests/test_workspace_toolchain.py` | the prebuilt compiler: the manifest matches the committed source, a download is refused unless its size and hash match, an install runs once, and which compiler is used | ~3 s |
 | `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; in real Chrome every page action on a mirrored page, the Studio's own page actions, and a real MCP client answering a question asked on a page | ~40 s |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
 | `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |

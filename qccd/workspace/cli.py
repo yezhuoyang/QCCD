@@ -34,7 +34,7 @@ from pathlib import Path
 
 __all__ = ["main", "COMMANDS"]
 
-COMMANDS = ("init", "studio", "web", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
+COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
             "publish", "import", "releases", "leaderboard")
 
 
@@ -147,6 +147,35 @@ def cmd_web(a) -> int:
     print(f"  (this link pairs the browser first: {url})")
     if not a.no_open:
         webbrowser.open(url)
+    return 0
+
+
+def cmd_toolchain(a) -> int:
+    """The prebuilt compiler (toolchain.py): `install` fetches the one for this computer,
+    checked against the SHA-256 pinned in the repository; `status` says what is in use."""
+    from .toolchain import ToolchainError, install, status
+    if a.action == "status":
+        s = status()
+        if a.json:
+            print(json.dumps(s, indent=1))
+            return 0
+        print(f"platform  {s['platform']}  (prebuilt compiler {'available' if s['prebuilt_available'] else 'NOT available'})")
+        print(f"version   {s['version']}  (Compiler/ocaml tree {s['source']['tree'][:12]} at {s['source']['commit'][:10]})")
+        i = s["installed"]
+        print("installed " + (f"{i['path']}" + ("" if i["matches_manifest"] else "  -- DOES NOT MATCH toolchain.json")
+                              if i else "no"))
+        u = s["in_use"]
+        print("in use    " + (f"{u['path']}  ({u['from']})" if u else "none: run `qccd toolchain install`"))
+        return 0
+    try:
+        r = install(force=a.force)
+    except ToolchainError as exc:
+        print(f"qccd toolchain install: {exc}", file=sys.stderr)
+        return 1
+    if r["status"] == "already_installed":
+        print(f"the compiler is already installed: {r['path']}")
+    else:
+        print(f"installed the compiler (checked: sha256 {r['sha256'][:16]}..., and it parsed a test circuit): {r['path']}")
     return 0
 
 
@@ -397,6 +426,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             q.add_argument("path")
             q.add_argument("--preview", action="store_true")
+    p = sub.add_parser("toolchain", help="the prebuilt compiler: install it, or see which one is in use")
+    p.add_argument("action", choices=["install", "status"])
+    p.add_argument("--force", action="store_true", help="download and check it again")
+    p.add_argument("--json", action="store_true")
     p = sub.add_parser("agent")
     p.add_argument("action", choices=["install", "uninstall", "status", "connect"])
     p.add_argument("--client", required=True, choices=["codex", "claude"])
@@ -430,7 +463,8 @@ def main(argv=None) -> int:
         from ..__main__ import main as legacy
         return legacy(argv)
     a = build_parser().parse_args(argv)
-    fn = {"init": cmd_init, "serve": cmd_serve, "studio": cmd_studio, "web": cmd_web, "status": cmd_status,
+    fn = {"init": cmd_init, "serve": cmd_serve, "studio": cmd_studio, "web": cmd_web, "toolchain": cmd_toolchain,
+          "status": cmd_status,
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
