@@ -1,0 +1,14 @@
+# The Linux x86-64 compiler binary that `qccd toolchain install` fetches.
+# Build context: a `git archive` of the commit, so the binary holds exactly committed source.
+#   docker build -f deploy/toolchain/Dockerfile.linux -o type=local,dest=out <archive dir>
+# The same OCaml stage as deploy/official/Dockerfile.  It links only libc and libm (glibc
+# 2.35+: checked on Debian 12, Ubuntu 22.04 and 24.04).
+FROM ocaml/opam:debian-12-ocaml-5.3 AS ocaml
+RUN opam install -y dune yojson.2.2.2
+WORKDIR /src
+COPY --chown=opam Compiler/ocaml/ ./
+RUN rm -rf _build && opam exec -- dune build bin/qccdc_cli.exe \
+ && opam list --installed --columns=name,version yojson dune ocaml
+
+FROM scratch
+COPY --from=ocaml /src/_build/default/bin/qccdc_cli.exe /qccdc_cli

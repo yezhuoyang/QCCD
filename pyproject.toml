@@ -31,5 +31,5 @@ qccd = "qccd.workspace.cli:main"
 include = ["qccd*"]
 
 [tool.setuptools.package-data]
-"qccd.workspace" = ["web/*", "skill/**/*", "releases/**/*", "releases/.gitattributes"]
+"qccd.workspace" = ["web/*", "skill/**/*", "releases/**/*", "releases/.gitattributes", "toolchain.json"]
 "qccd.viz" = ["*.js", "js/*.js"]

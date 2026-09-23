@@ -104,8 +104,12 @@ class Toolchain:
             return None
         ob = REPO / "Compiler" / "ocaml" / "_build" / "default" / "bin"
         lb = REPO / "Compiler" / "lean" / ".lake" / "build" / "bin"
-        return cls(qccdc=pick("QCCD_QCCDC", ob / "qccdc_cli.exe", ob / "qccdc_cli"),
-                   qcheck=pick("QCCD_QCHECK", lb / "qcheck.exe", lb / "qcheck"),
+        qccdc = pick("QCCD_QCCDC", ob / "qccdc_cli.exe", ob / "qccdc_cli")
+        if qccdc is None and not os.environ.get("QCCD_QCCDC"):
+            # a fresh clone has no build: the prebuilt one `qccd toolchain install` fetched
+            from .toolchain import installed
+            qccdc = installed()
+        return cls(qccdc=qccdc, qcheck=pick("QCCD_QCHECK", lb / "qcheck.exe", lb / "qcheck"),
                    python=sys.executable, bridge=BRIDGE)
 
     def identity(self) -> dict:
@@ -458,7 +462,7 @@ def _binding_stage(st: _Stage, release: TaskRelease, tc: Toolchain, cw: Path, ce
                    certified, limits: Mapping, cancel) -> None:
     if tc.qccdc is None:
         st.diag("TOOLCHAIN.QCCDC_MISSING", "the compiler (qccdc_cli) is not installed, so the task "
-                "circuit cannot be parsed to bind the certificate")
+                "circuit cannot be parsed to bind the certificate: run `qccd toolchain install`")
         st.done("unsupported", "needs qccdc_cli parse")
         return
     r = run_limited([tc.qccdc, "parse", cw / "circuit.qasm", "-o", cw / "circuit.parsed.json"],

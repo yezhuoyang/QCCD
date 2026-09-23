@@ -211,7 +211,8 @@ class ResultsMixin:
         from .procs import run_limited
         tc = Toolchain.discover()
         if tc.qccdc is None:
-            raise WorkspaceError("toolchain_missing", "qccdc_cli is not built (see docs/workspace.md)", status=424)
+            raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not installed: run "
+                                 "`qccd toolchain install`, or build Compiler/ocaml", status=424)
         branch, rev = params["branch"], params["revision"]
         r = self.replayed(branch, rev)
         if not r.ok:
