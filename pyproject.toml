@@ -15,6 +15,9 @@ dependencies = []
 agent = [
   "fastapi==0.135.3", "starlette==1.0.0", "uvicorn==0.43.0", "pydantic==2.13.5", "anyio==4.13.0",
   "websockets==16.0", "mcp==2.2.0", "mcp-types==2.2.0",
+  # a LOCAL grade's semantics stage (Compiler/bridge/check_cert.py) simulates the circuit;
+  # without these, `qccd submit --local` can never be eligible.  The official image pins the same.
+  "stim==1.15.0", "qiskit==2.3.1", "numpy==2.4.4",
 ]
 official = ["fastapi==0.135.3", "uvicorn==0.43.0", "psycopg[binary]>=3.2,<3.3"]
 

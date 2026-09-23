@@ -9,5 +9,9 @@ anyio==4.13.0
 websockets==16.0          # Codex app-server bridge (qccd/workspace/agents/codex.py)
 mcp==2.2.0                # official Python MCP SDK (stdio adapter)
 mcp-types==2.2.0
+# A local grade's semantics stage (Compiler/bridge/check_cert.py) simulates the circuit.
+stim==1.15.0
+qiskit==2.3.1
+numpy==2.4.4
 # Official service in a deployment (qccd/official/db.py): PostgreSQL driver.
 # psycopg[binary]==3.2.*  -- installed by deploy/official/Dockerfile; not needed for SQLite/dev
