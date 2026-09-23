@@ -61,13 +61,17 @@ cd QCCD
 python -m venv .venv
 .venv\\Scripts\\activate
 pip install -e ".[agent]"
+qccd toolchain install
 cd ..</pre>
 <p class="qa-small">On macOS or Linux, activate with <code>source .venv/bin/activate</code>. If PowerShell
 refuses to run the activate script, run
 <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once. The virtual
 environment keeps QCCD's libraries apart from the rest of your Python, so installing it cannot
 change a version another package of yours needs. Activate it again in each new terminal.
-Compiling and grading on your machine also need the OCaml compiler and the Lean checker built:
+<code>qccd toolchain install</code> downloads the compiler that runs your programs (Windows and
+Linux on x86-64). It checks the file against a hash pinned in the repository before using it.
+On a Mac, build it from source. A reference grade on your own machine also needs the Lean
+checker built:
 <a href="https://github.com/yezhuoyang/QCCD/blob/compiler/deploy/official/Dockerfile">deploy/official/Dockerfile</a>
 has the exact commands.</p>
 <h3>Start a workspace</h3>
