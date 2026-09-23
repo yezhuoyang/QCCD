@@ -1,0 +1,79 @@
+# PRODUCTION deployment of the official submission service on the qccd.academy droplet.
+#
+# Lives in /opt/qccd-official on the server next to VERSION (the commit it was built from).
+# The image is built elsewhere (see README.md) and loaded with `docker load`, so nothing is
+# compiled on the server.  Public traffic reaches the api only through the host's nginx
+# (snippets/qccd-official.conf: https://qccd.academy/official/ -> 127.0.0.1:8300).
+#
+#   QCCD_OFFICIAL_TAG=<commit> docker compose -f docker-compose.prod.yml up -d
+#   QCCD_OFFICIAL_TAG=<commit> docker compose -f docker-compose.prod.yml run --rm api \
+#       python -m qccd.official.service add-uploader <name>      # prints an upload token ONCE
+#
+# The droplet also serves other sites, so every container has a hard memory cap: the api and
+# worker are small, and the grader -- the only one running the toolchain on uploaded
+# bundles -- gets one CPU and 1 GB of real memory, one job at a time.  Storage is SQLite on a
+# volume (the tested path); there is no development token.
+
+name: qccd-official
+
+x-image: &image "qccd-official:${QCCD_OFFICIAL_TAG:?set QCCD_OFFICIAL_TAG to the image tag}"
+
+services:
+  api:
+    image: *image
+    command: ["python", "-m", "qccd.official.service", "serve", "--host", "0.0.0.0", "--port", "8300"]
+    environment:
+      QCCD_OFFICIAL_DB: sqlite:////data/official.db
+      QCCD_OFFICIAL_ARTIFACTS: /artifacts
+    volumes: [data:/data, artifacts:/artifacts]
+    ports: ["127.0.0.1:8300:8300"]
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # database <-> spool; it never runs the toolchain and needs no network
+  worker:
+    image: *image
+    command: ["python", "-m", "qccd.official.worker", "worker"]
+    environment:
+      QCCD_OFFICIAL_DB: sqlite:////data/official.db
+      QCCD_OFFICIAL_ARTIFACTS: /artifacts
+      QCCD_OFFICIAL_SPOOL: /spool
+    volumes: [data:/data, artifacts:/artifacts:ro, spool:/spool]
+    network_mode: none
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # spool -> reports: no network, no credentials, read-only root, the spool as its only
+  # writable mount.  QCCD_GRADER_MEM_MB is each job's ADDRESS-SPACE limit (RLIMIT_AS), set
+  # above the container's real-memory cap because the Lean and numpy runtimes reserve more
+  # address space than they touch; mem_limit is what protects the rest of the server.
+  grader:
+    image: *image
+    command: ["python", "-m", "qccd.official.worker", "grader", "--spool", "/spool"]
+    environment:
+      QCCD_GRADER_MEM_MB: "4096"
+      HOME: /tmp
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    volumes: [spool:/spool]
+    tmpfs: ["/tmp:size=512m"]
+    network_mode: none
+    read_only: true
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+volumes:
+  data: {}
+  artifacts: {}
+  spool: {}

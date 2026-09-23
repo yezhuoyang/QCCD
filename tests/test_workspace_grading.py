@@ -234,3 +234,32 @@ def test_unsafe_archives_are_refused_before_extraction(tmp_path, entries, code):
 def test_archives_are_deterministic(frozen):
     b = read_bundle(frozen)
     assert archive_bundle(b) == archive_bundle(b)
+
+
+NESTED_LIMIT = """
+import resource, sys
+sys.path.insert(0, sys.argv[1])
+outer = 2048 * 1024 * 1024
+resource.setrlimit(resource.RLIMIT_AS, (outer, outer))
+from qccd.workspace.procs import run_limited
+probe = "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[1])"
+r = run_limited([sys.executable, "-c", probe], timeout=60, mem_mb=12288)
+print(r.status, r.stdout.strip(), outer)
+"""
+
+
+@pytest.mark.skipif(os.name == "nt", reason="RLIMIT_AS is POSIX; Windows uses job objects")
+def test_a_stage_under_an_inherited_memory_limit_still_starts(tmp_path):
+    """The official grader runs each job under an address-space limit, and the Lean stage
+    then asks for a larger one.  A limit can only be lowered, so the stage must start
+    clamped to the inherited limit rather than fail in preexec_fn (found in the first
+    container run)."""
+    import subprocess
+    import sys
+    script = tmp_path / "nested.py"
+    script.write_text(NESTED_LIMIT, encoding="utf-8")
+    r = subprocess.run([sys.executable, str(script), str(Path(__file__).resolve().parents[1])],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    status, child_limit, outer = r.stdout.split()
+    assert status == "ok" and int(child_limit) == int(outer)

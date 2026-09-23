@@ -54,10 +54,11 @@ def run_limited(args: Sequence, *, cwd: Path | None = None, timeout: float = 600
     else:
         kw["start_new_session"] = True
         if mem_mb:
+            limit = _posix_as_limit(int(mem_mb))
+
             def _limit():  # pragma: no cover - runs in the child
                 import resource
-                b = int(mem_mb) * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (b, b))
+                resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
             kw["preexec_fn"] = _limit
     try:
         proc = subprocess.Popen(argv, **kw)
@@ -114,6 +115,17 @@ def _drain(stream, sink: list) -> None:
                 del sink[: len(sink) // 2]
     except Exception:
         pass
+
+
+def _posix_as_limit(mem_mb: int) -> int:
+    """The address-space limit, in bytes, for a child asked to stay under `mem_mb`.  A limit
+    inherited from an outer sandbox (the official grader runs each job under one) can only
+    be lowered, never raised, so a larger request is clamped to it: asking for more would
+    make the child fail to start at all."""
+    import resource
+    want = int(mem_mb) * 1024 * 1024
+    _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    return want if hard == resource.RLIM_INFINITY else min(want, hard)
 
 
 def _kill(proc, job) -> None:
