@@ -105,7 +105,8 @@ def create_app(state: ServiceState) -> FastAPI:
         resp.headers["Cache-Control"] = "no-store"
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "no-referrer"
-        resp.headers["X-Frame-Options"] = "DENY"
+        if "x-frame-options" not in resp.headers:
+            resp.headers["X-Frame-Options"] = "DENY"
         return resp
 
     def err(e: WorkspaceError) -> JSONResponse:
@@ -298,6 +299,55 @@ def create_app(state: ServiceState) -> FastAPI:
     @route("GET", "/api/compare", write=False)
     def compare(request, actor, _):
         return ws.compare(q(request, "a"), q(request, "b", "main"))
+
+    # ------------------------------------------------------------------ programs, runs, comparison
+
+    @route("GET", "/api/conversation", write=False)
+    def conversation(request, actor, _):
+        return ws.conversation(limit=q(request, "limit", 40, int))
+
+    @route("GET", "/api/programs", write=False)
+    def programs(request, actor, _):
+        return {"programs": ws.programs()}
+
+    @route("GET", "/api/runs", write=False)
+    def list_runs(request, actor, _):
+        return {"runs": ws.runs(q(request, "limit", 30, int))}
+
+    @route("GET", "/api/compare-runs", write=False)
+    def compare_runs(request, actor, _):
+        return ws.compare_runs([x for x in (q(request, "runs", "") or "").split(",") if x])
+
+    @route("GET", "/api/runs/{run_id}", write=False)
+    def get_run(request, actor, _):
+        return ws.run(request.path_params["run_id"])
+
+    @route("GET", "/api/agents", write=False)
+    def agents(request, actor, _):
+        from .agents.codex import find_codex
+        return {"codex_available": find_codex() is not None}
+
+    @app.get("/runview/{run_id}")
+    async def run_view(run_id: str, request: Request):
+        try:
+            principal(request, write=False)
+            html = await asyncio.to_thread(_run_page, state, run_id)
+        except WorkspaceError as e:
+            return err(e)
+        except Exception as e:
+            return _page_failed(state, e)
+        return HTMLResponse(html, headers={"Content-Security-Policy": _CSP_FRAMEABLE,
+                                           "X-Frame-Options": "SAMEORIGIN"})
+
+    @app.get("/compare")
+    async def compare_view(request: Request):
+        try:
+            principal(request, write=False)
+            ids = [x for x in (request.query_params.get("runs") or "").split(",") if x]
+            html = await asyncio.to_thread(_compare_page, state, ids)
+        except WorkspaceError as e:
+            return err(e)
+        return HTMLResponse(html, headers={"Content-Security-Policy": _CSP_COMPARE})
 
     @route("POST", "/api/branches/adopt")
     def adopt(request, actor, b):
@@ -598,6 +648,62 @@ def _sse(event: str, data: Any, seq: int | None) -> str:
 #: the studio page is self-contained; the live layer adds same-origin fetch/EventSource
 _CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; "
         "font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+
+
+#: the run view may be framed by this origin (the side-by-side page); nothing else may
+_CSP_FRAMEABLE = _CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+#: the side-by-side page frames the two run views
+_CSP_COMPARE = _CSP + "; frame-src 'self'"
+
+
+def _run_page(state: ServiceState, run_id: str) -> str:
+    """A run's own Studio page: its device and its compiled program, view-only, cached."""
+    from .compare_page import RUNVIEW_BLOCK
+    key = ("runview", run_id)
+    with state.page_lock:
+        page = state.page_cache.get(key)
+    if page is None:
+        page = _render_run(state.ws, run_id)
+        at = page.rfind("</body>")
+        page = page[:at] + RUNVIEW_BLOCK + page[at:]
+        with state.page_lock:
+            state.page_cache[key] = page
+    return page
+
+
+def _render_run(ws: Workspace, run_id: str) -> str:
+    import tempfile
+    from ..arch.device import Architecture
+    from ..cost.models import corrected_model
+    from ..ir.tsir import TSIR
+    from ..phys.tech import load_technology
+    from ..verify import verify
+    from ..viz.render import render_html
+    from ..viz.scale import DEFAULT_TECH
+    from .jsonsafe import strict_loads as _sl
+
+    run = ws.run(run_id)
+    arch = Architecture.from_json(_sl(ws.get_artifact(run["artifacts"]["device"])))
+    prog = TSIR.from_json(_sl(ws.get_artifact(run["artifacts"]["program"])))
+    model = corrected_model(run["performance"]["table"])
+    report = verify(prog, arch, model)
+    d = run["design"]
+    headline = (f"{run['program']['name']} on {d['name']} ({d['draft'].removeprefix('cand/')} r{d['revision']}): "
+                f"{run['performance']['total']['ms']:g} ms")
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "page.html"
+        render_html(arch, prog, report.result, model, out, tech=load_technology(DEFAULT_TECH),
+                    kicker="QCCD RUN", headline=headline, lede=None, template_stems="*")
+        return out.read_text(encoding="utf-8")
+
+
+def _compare_page(state: ServiceState, run_ids: list) -> str:
+    from .compare_page import compare_html
+    from .jsonsafe import strict_loads as _sl
+    ws = state.ws
+    cmp = ws.compare_runs(run_ids)
+    times = [_sl(ws.get_artifact(ws.run(r)["artifacts"]["times"]))["times_us"] for r in run_ids]
+    return compare_html(cmp, times)
 
 
 def _kick(state: ServiceState) -> None:

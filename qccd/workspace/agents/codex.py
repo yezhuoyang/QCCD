@@ -50,8 +50,11 @@ CAPABILITIES = {
 
 
 def find_codex() -> str | None:
-    """The codex executable: $QCCD_CODEX, PATH, or the desktop app's bundled CLI."""
+    """The codex executable: $QCCD_CODEX, PATH, or the desktop app's bundled CLI.
+    `QCCD_CODEX=none` means there is none (Studio then never starts one by itself)."""
     env = os.environ.get("QCCD_CODEX")
+    if env and env.strip().lower() == "none":
+        return None
     if env and Path(env).is_file():
         return env
     w = shutil.which("codex")
@@ -539,14 +542,35 @@ def _on_codex_event(state, sid: str, method: str, params: dict) -> None:
             if state.worker:
                 state.worker.kick()
         elif method == "agent/message":
-            ws.emit("agent.message", {"session_id": sid, "turn_id": params.get("turnId"),
-                                      "text": str(params.get("text", ""))[:4000]})
+            text = str(params.get("text", ""))[:4000]
+            ws.emit("agent.message", {"session_id": sid, "turn_id": params.get("turnId"), "text": text})
+            _store_message(state, sid, params.get("turnId"), text)
         elif method == "bridge/closed":
             ws.session_status(sid, "disconnected", detail=str(params.get("error") or "connection closed"))
         elif method == "codex/server_request":
             ws.emit("agent.approval_requested", {"session_id": sid, **params})
     except Exception:
         log.exception("handling Codex event %s failed", method)
+
+
+def _store_message(state, sid: str, turn_id, text: str) -> None:
+    """Keep what Codex said in a Studio-started turn as part of that request's conversation."""
+    ws = state.ws
+    if not text.strip() or not turn_id:
+        return
+    br = state.bridges.get(sid)
+    did = br.turn_deliveries.get(turn_id) if br else None
+    row = (ws.store.one("SELECT prompt_id FROM deliveries WHERE id=?", (did,)) if did else
+           ws.store.one("SELECT prompt_id FROM deliveries WHERE session_id=? AND external_ref=? "
+                        "ORDER BY created_at LIMIT 1", (sid, str(turn_id))))
+    if not row:
+        return                                   # a turn the person started in Codex itself
+    s = ws.session(sid)
+    actor = {"kind": "agent", "id": f"agent:{sid}", "session": sid, "label": s.get("label") or s["client"]}
+    try:
+        ws.reply(actor, row["prompt_id"], text, via="session")
+    except Exception:
+        log.exception("keeping a Codex message in the conversation failed")
 
 
 def _brief(p: Any) -> Any:

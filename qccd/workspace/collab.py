@@ -510,6 +510,76 @@ class CollabMixin:
                 "work": dict(work) if work else None, "deliveries": dels, "replies": replies,
                 "links": links}
 
+    def conversation(self, *, limit: int = 40) -> dict:
+        """Studio's chat, as one chronological stream: the person's messages, the agent's
+        messages, and what the agent DID for each (a change with its revision, a run with its
+        time, a side-by-side comparison), plus which requests are still being worked on."""
+        rows = self.store.all("SELECT id FROM notes WHERE kind IN ('prompt','comment') AND version=1 "
+                              "ORDER BY created_at DESC LIMIT ?", (max(1, min(int(limit), 200)),))
+        items, working = [], []
+        for r in reversed(rows):
+            p = self.prompt(r["id"])
+            sent = p["latest_sent"]
+            if not sent:
+                continue                                  # a draft is not part of the conversation
+            b = sent["body"]
+            items.append({"type": "user", "prompt_id": p["prompt_id"], "text": b.get("text", ""),
+                          "at": sent["created_at"], "branch": b.get("branch"), "context": _context_brief(b),
+                          "comment": p["kind"] == "comment"})
+            for x in p["replies"]:
+                a = x["author"]
+                items.append({"type": "agent" if a.get("kind") == "agent" else "person", "prompt_id": p["prompt_id"],
+                              "text": x["body"].get("text", ""), "author": a.get("label") or a.get("id"),
+                              "at": x["created_at"]})
+            for link in p["links"]:
+                it = self._link_item(link)
+                if it:
+                    it["prompt_id"] = p["prompt_id"]
+                    items.append(it)
+            st = (p["work"] or {}).get("state")
+            if st in ("pending", "working"):
+                working.append({"prompt_id": p["prompt_id"], "state": st})
+        items.sort(key=lambda i: i["at"])
+        return {"items": items, "working": working}
+
+    def _link_item(self, link: Mapping) -> dict | None:
+        kind, ref, at = link["kind"], link["ref"], link["created_at"]
+        try:
+            if kind == "change_set":
+                c = self.change_set(ref)
+                return {"type": "change", "change_set_id": ref, "revision": c.get("revision"),
+                        "branch": c.get("branch"), "summary": c.get("summary") or c.get("diff_summary"),
+                        "status": c.get("status"), "at": at}
+            if kind == "job":
+                j = self.job(ref)
+                res = j.get("result") or {}
+                if j["kind"] == "run":
+                    run = res.get("run") or {}
+                    return {"type": "run", "run_id": ref, "status": j["status"], "summary": res.get("summary"),
+                            "program": (run.get("program") or {}).get("name"),
+                            "draft": ((run.get("design") or {}).get("draft") or "").removeprefix("cand/") or None,
+                            "total_ms": ((run.get("performance") or {}).get("total") or {}).get("ms"),
+                            "view": run.get("view"), "at": at,
+                            "progress": (j.get("progress") or {}).get("message")
+                            if j["status"] in ("queued", "running") else None}
+                return {"type": "job", "job_id": ref, "kind": j["kind"], "status": j["status"],
+                        "summary": res.get("summary"), "at": at}
+            if kind == "compare":
+                runs = ref.split(",")
+                verdict = None
+                try:
+                    verdict = self.compare_runs(runs)["verdict"]
+                except Exception:
+                    pass
+                return {"type": "compare", "runs": runs, "verdict": verdict, "view": f"/compare?runs={ref}", "at": at}
+            if kind == "open_run":
+                return {"type": "run_view", "run_id": ref, "view": f"/runview/{ref}", "at": at}
+            if kind == "submission":
+                return {"type": "submission", "submission_id": ref, "at": at}
+        except Exception:
+            return None
+        return None
+
     def context_snapshot(self, ctx_id: str) -> dict:
         from .core import WorkspaceError
         r = self.store.one("SELECT payload FROM context_snapshots WHERE id=?", (ctx_id,))
@@ -534,7 +604,7 @@ class CollabMixin:
         return out
 
     def reply(self, actor: Mapping, prompt_id: str, text: str, *, work_state: str | None = None,
-              links: Mapping | None = None, request_id: str | None = None) -> dict:
+              links: Mapping | None = None, request_id: str | None = None, via: str | None = None) -> dict:
         """A reply in the prompt's thread.  From an agent it is a reply ONLY: it never
         queues a delivery, so replies cannot trigger turns."""
         from .core import WorkspaceError, new_id
@@ -554,6 +624,8 @@ class CollabMixin:
         rid = new_id("r")
         now = _now()
         body = {"text": text, "links": dict(links or {}), "work_state": work_state}
+        if via:
+            body["via"] = via
         check_value(body, _SMALL)
         branch = ((p["latest_sent"] or p["latest"])["body"]).get("branch") or "main"
         with self.store.tx() as db:
@@ -595,6 +667,18 @@ class CollabMixin:
                            (prompt_id,))
             self._emit(db, "work.updated", {"prompt_id": prompt_id, "state": state, "by": dict(actor)}, branch)
         return self.prompt(prompt_id)
+
+    def _working_prompt(self, db, actor: Mapping) -> str | None:
+        """The request this agent session is working on now.  Used ONLY to put what the
+        agent did (a change, a run, a comparison) into that request's conversation when it
+        did not name the request; it never grants or restricts anything."""
+        sid = actor.get("session")
+        if actor.get("kind") != "agent" or not sid:
+            return None
+        r = db.execute("SELECT d.prompt_id FROM deliveries d JOIN work w ON w.prompt_id=d.prompt_id "
+                       "WHERE d.session_id=? AND w.state IN ('working','pending') "
+                       "ORDER BY d.updated_at DESC LIMIT 1", (sid,)).fetchone()
+        return r["prompt_id"] if r else None
 
     def _link_prompt(self, db, prompt_id: str, what: str, ref: str, actor: Mapping) -> None:
         exists = db.execute("SELECT 1 FROM notes WHERE id=?", (prompt_id,)).fetchone()
@@ -707,7 +791,7 @@ class CollabMixin:
         reports back what it did."""
         from .core import WorkspaceError, new_id
         actions = ("highlight", "select", "open_prompt", "reveal_diagnostic", "select_frame",
-                   "open_result", "compare", "open_branch")
+                   "open_result", "compare", "open_branch", "open_run")
         if action not in actions:
             raise WorkspaceError("bad_request", f"action must be one of {actions}", status=422)
         check_value(dict(target), _SMALL)
@@ -724,15 +808,29 @@ class CollabMixin:
             self.prompt(target.get("prompt_id", ""))
         if action == "open_result":
             self.submission(target.get("submission_id", ""))
+        if action == "open_run":
+            self.run(target.get("run_id", ""))
+        if action == "compare":
+            runs = target.get("runs")
+            if not isinstance(runs, list) or len(runs) != 2:
+                raise WorkspaceError("bad_request", "compare needs target.runs = [run_id, run_id]", status=422)
+            for r in runs:
+                self.run(r)
         if view_id:
             v = self.view(view_id)
             if v["closed"]:
                 raise WorkspaceError("view_closed", f"view {view_id} is closed", status=409)
-        views = [view_id] if view_id else [v["id"] for v in self.views() if v["branch"] == branch]
+        everywhere = action in ("open_run", "compare")          # not tied to one draft's tabs
+        views = [view_id] if view_id else [v["id"] for v in self.views() if everywhere or v["branch"] == branch]
         pid = new_id("pr")
         with self.store.tx() as db:
             self._emit(db, "present", {"presentation_id": pid, "action": action, "target": dict(target),
                                        "view_id": view_id, "note": note[:300], "actor": dict(actor)}, branch)
+            if action in ("compare", "open_run"):
+                working = self._working_prompt(db, actor)
+                if working:
+                    self._link_prompt(db, working, action,
+                                      ",".join(target["runs"]) if action == "compare" else target["run_id"], actor)
         connected = [v for v in views if self.view(v)["connected"]]
         return {"presentation_id": pid, "requested_views": views, "connected_views": connected,
                 "status": "requested" if connected else "no_connected_view",
@@ -930,14 +1028,41 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
                  f"qccd_manage_comment(action='get', prompt_id='{prompt_id}') before acting "
                  f"(the design may have changed since revision {ctx['design_revision']}).")
     if b["mode"] == "ask":
-        lines.append("Mode ask: answer in the thread; do not change the design.")
+        lines.append("Mode ask: answer; do not change the design.")
     elif b["mode"] == "propose":
-        lines.append("Mode propose: put changes on a candidate branch or preview them; do not commit to main.")
+        lines.append("Mode propose: put changes on a draft or preview them; do not commit to main.")
     else:
-        lines.append("Mode apply: you may commit validated changes to main.")
-    lines.append(f"Reply with qccd_manage_comment(action='reply', prompt_id='{prompt_id}', ...) and pass "
-                 f"origin_prompt_id='{prompt_id}' on change sets and jobs. (delivery {delivery_id})")
+        lines.append(f"Mode apply: you may commit validated changes to {ctx['branch']}.")
+    d = ws.store.one("SELECT s.mode FROM deliveries d JOIN sessions s ON s.id=d.session_id WHERE d.id=?",
+                     (delivery_id,))
+    if d and d["mode"] == "appserver":
+        lines.append("This is a chat: your messages in this turn are shown to the person in Studio as the "
+                     "conversation. Answer there directly and plainly, like a colleague; do not also post "
+                     f"qccd_manage_comment replies for it. Pass origin_prompt_id='{prompt_id}' on change sets, "
+                     f"jobs and runs. (delivery {delivery_id})")
+    else:
+        lines.append(f"Reply with qccd_manage_comment(action='reply', prompt_id='{prompt_id}', ...) and pass "
+                     f"origin_prompt_id='{prompt_id}' on change sets, jobs and runs. (delivery {delivery_id})")
     return "\n".join(lines)
+
+
+def _context_brief(b: Mapping) -> str:
+    """What the person attached to a message, in a few words ("2 parts, a lasso")."""
+    parts = []
+    anchors = [a for a in (b.get("anchors") or []) if a.get("kind") != "workspace"]
+    ents = sum(len(a.get("keys") or []) or (1 if a.get("key") else 0) for a in anchors
+               if a.get("kind") in ("entity", "entity_group"))
+    if ents:
+        parts.append(f"{ents} part{'s' if ents != 1 else ''}")
+    if any(a.get("kind") == "region" for a in anchors):
+        parts.append("a lasso")
+    if any(a.get("kind") == "point" for a in anchors):
+        parts.append("a point")
+    if b.get("sketches"):
+        parts.append(f"{len(b['sketches'])} sketch{'es' if len(b['sketches']) != 1 else ''}")
+    if b.get("demonstration"):
+        parts.append("a demonstration")
+    return ", ".join(parts)
 
 
 def _quote(text: str) -> str:

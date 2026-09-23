@@ -223,6 +223,16 @@ class WorkspaceCore:
             raise WorkspaceError("unknown_branch", f"no branch {name!r}", status=404)
         return dict(r)
 
+    def resolve_draft(self, name: str | None) -> str:
+        """A branch by the name a person uses: `main`, a full name (`cand/A`), or a draft's
+        short name (`A`).  Unknown names are refused with the drafts that do exist."""
+        name = (name or "main").strip()
+        for cand in (name, f"cand/{name}"):
+            if self.store.one("SELECT 1 FROM branches WHERE name=?", (cand,)):
+                return cand
+        have = [b["name"].removeprefix("cand/") for b in self.branches() if b.get("status", "open") == "open"]
+        raise WorkspaceError("unknown_branch", f"no draft {name!r}; there are: {', '.join(have)}", status=404)
+
     def branches(self) -> list:
         return [dict(r) for r in self.store.all("SELECT * FROM branches ORDER BY created_at")]
 
@@ -427,6 +437,10 @@ class WorkspaceCore:
                 branch, rev)
             if req.get("origin_prompt_id"):
                 self._link_prompt(db, req["origin_prompt_id"], "change_set", cs_id, actor)
+            else:
+                working = self._working_prompt(db, actor)
+                if working:
+                    self._link_prompt(db, working, "change_set", cs_id, actor)
         self._replays[(branch, rev)] = new_r
         if branch == "main":
             self.write_mirror("main")
@@ -879,6 +893,9 @@ class WorkspaceCore:
 
     def _link_prompt(self, db, prompt_id: str, what: str, ref: str, actor: Mapping) -> None:
         pass
+
+    def _working_prompt(self, db, actor: Mapping) -> str | None:
+        return None
 
 
 # ---------------------------------------------------------------------- helpers

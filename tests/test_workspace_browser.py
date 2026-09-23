@@ -33,6 +33,7 @@ pytestmark = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exist
 @pytest.fixture
 def live(tmp_path, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")          # the chat must not start a real Codex here
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     yield tmp_path / "ws", info
@@ -225,6 +226,85 @@ def test_a_page_survives_a_service_restart(live, tmp_path):
     assert s[6]["value"] == 7                                    # the same page, never reloaded
     commits = [e["payload"] for e in _events(root) if e["type"] == "design.committed"]
     assert [c["actor"]["kind"] for c in commits][-2:] == ["agent", "human"]
+
+
+def test_the_chat_is_one_conversation(live, tmp_path):
+    """The default dock is a chat: the person's message (with the selection attached), the
+    agent's reply as formatted text, a change card whose Undo undoes it, a run card with its
+    time, drafts saved and switched to, and the tabs only in the debug view.  The "agent" is
+    HTTP with the agent token -- the MCP adapter's door."""
+    from qccd.workspace.evaluator import Toolchain
+    root, info = live
+    base = f"http://127.0.0.1:{info['port']}"
+    code = service_request(info, "POST", "/api/pair-code", {}, token="owner")["code"]
+    tok = info["agent_token"]
+    agent = ("(function(method, path, body){ return fetch(path, {method: method, headers: {'Content-Type': "
+             "'application/json', 'Authorization': 'Bearer " + tok + "'}, body: body ? JSON.stringify(body) : undefined})"
+             ".then(function(r){ return r.json().then(function(d){ return {status: r.status, data: d}; }); }); })")
+    ready = ("window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && QCCD_LIVE.state().rev === 0 "
+             "&& document.querySelector('#qcl-dock.qcl-chat')")
+    has = "QCCD_LIVE.chat().items.some(function(i){ return %s; })"
+    run_ok = Toolchain.discover().qccdc is not None
+    steps = [
+        {"wait": ready, "timeout": 40000, "stopOnFail": True},                                                  # 0
+        {"eval": "JSON.stringify({empty: !!document.querySelector('.qcl-empty'), tabs: !!document.getElementById('qcl-tabs'), "
+                 "who: document.getElementById('qcl-who').textContent, sub: document.getElementById('qcl-sub').textContent, "
+                 "drafts: [].map.call(document.querySelectorAll('#qcl-draft option'), function(o){ return o.textContent; })})"},
+        {"eval": "EDITOR.select([{kind: 'site', id: 'C0'}]); 'selected'"},                                      # 2
+        {"wait": "document.getElementById('qcl-chips').textContent.indexOf('C0') >= 0", "timeout": 5000},       # 3
+        {"eval": "QCCD_LIVE.chatSend('Make C0 a bit wider').then(function(d){ window.__p = d.prompt_id; return d.prompt_id; })"},
+        {"wait": has % "i.type === 'user' && i.context === '1 part'", "timeout": 10000},                        # 5
+        {"eval": agent + "('POST', '/api/prompts/' + window.__p + '/reply', {text: 'Done:\\n- widened **C0**\\n- kept `C1` as it was\\n\\n| metric | A |\\n|---|---:|\\n| time | 1 ms |\\n\\n[Watch it](/runview/x) or [no](javascript:alert(1))'})"
+                 ".then(function(r){ return r.status; })"},                                                     # 6
+        {"wait": has % "i.type === 'agent'", "timeout": 10000},                                                 # 7
+        {"eval": agent + "('POST', '/api/change-sets', {expected_revision: QCCD_LIVE.state().rev, request_id: 'c1', "
+                 "mode: 'apply', origin_prompt_id: window.__p, operations: [{type: 'add_site', id: 'TX', pos: [1.5, -1], "
+                 "zone: 'trap'}]}).then(function(r){ return r.status; })"},                                     # 8
+        {"wait": has % "i.type === 'change'" + " && !!EDITOR.state().device.nodes['TX']", "timeout": 10000},   # 9
+        {"eval": "JSON.stringify({you: document.querySelectorAll('.qcl-msg.you').length, "
+                 "agent: document.querySelectorAll('.qcl-msg.agent').length, "
+                 "bold: (document.querySelector('.qcl-msg.agent b') || {}).textContent, "
+                 "items: document.querySelectorAll('.qcl-msg.agent li').length, "
+                 "code: (document.querySelector('.qcl-msg.agent code') || {}).textContent, "
+                 "undo: [].some.call(document.querySelectorAll('.qcl-event button'), function(b){ return b.textContent === 'Undo'; }), "
+                 "rows: document.querySelectorAll('.qcl-msg.agent table.qcl-mdt tr').length, "
+                 "th: (document.querySelector('.qcl-msg.agent table.qcl-mdt th') || {}).textContent, "
+                 "links: [].map.call(document.querySelectorAll('.qcl-msg.agent a'), function(a){ return a.getAttribute('href'); })})"},
+        {"shot": str(tmp_path / "chat.png")},                                                                   # 11
+        {"eval": "[].filter.call(document.querySelectorAll('.qcl-event button'), function(b){ return b.textContent === 'Undo'; })[0].click(); 'undo'"},
+        {"wait": has % "i.type === 'change' && i.status === 'undone'" + " && !EDITOR.state().device.nodes['TX']",
+         "timeout": 10000},                                                                                     # 13
+        {"eval": agent + "('POST', '/api/jobs', {kind: 'run', params: {program: 'ghz4'}, origin_prompt_id: window.__p})"
+                 ".then(function(r){ return r.status; })"} if run_ok else {"sleep": 10},                        # 14
+        {"wait": has % "i.type === 'run' && i.status === 'succeeded' && i.total_ms > 0", "timeout": 120000}
+        if run_ok else {"sleep": 10},                                                                           # 15
+        {"eval": "QCCD_LIVE.saveAsDraft('A').then(function(){ return JSON.stringify(QCCD_LIVE.chat().branches); })"},
+        {"eval": "QCCD_LIVE.switchDraft('cand/A').then(function(){ return QCCD_LIVE.chat().branch; })"},       # 17
+        {"wait": "QCCD_LIVE.state().rev !== null && document.getElementById('qcl-draft').value === 'cand/A'", "timeout": 10000},
+        {"eval": "JSON.stringify(EDITOR.addSite(2.5, 1, null, {zone: 'trap'}))"},                               # 19
+        {"wait": "!QCCD_LIVE.state().inflight && QCCD_LIVE.state().rev === 1", "timeout": 10000},               # 20
+        {"eval": "fetch('/api/design?branch=main').then(function(r){ return r.json(); }).then(function(d){ "
+                 "return JSON.stringify({main_rev: (d.qccd_workspace || {}).revision}); })"},                                          # 21
+        {"eval": "QCCD_LIVE.setDebug(true); !!document.getElementById('qcl-tabs')"},                             # 22
+        {"eval": "QCCD_LIVE.setDebug(false); !!document.querySelector('#qcl-dock.qcl-chat') && !document.getElementById('qcl-tabs')"},
+    ]
+    out = _drive({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": steps}, tmp_path / "chat.json")
+    s = out["steps"]
+    for i, st in enumerate(s):
+        assert not st.get("error"), (i, st)
+        if "ok" in st:
+            assert st["ok"], (i, st)
+    first = json.loads(s[1]["value"])
+    assert first["empty"] and not first["tabs"] and first["who"] == "Agent" and first["sub"] == "no agent connected"
+    assert first["drafts"][0] == "Main design" and first["drafts"][-1].startswith("Save as a new draft")
+    assert s[6]["value"] == 200 and s[8]["value"] == 200
+    dom = json.loads(s[10]["value"])
+    assert dom == {"you": 1, "agent": 1, "bold": "C0", "items": 2, "code": "C1", "undo": True,
+                   "rows": 2, "th": "metric", "links": ["/runview/x"]}      # a javascript: link stays text
+    assert "cand/A" in json.loads(s[16]["value"]) and s[17]["value"] == "cand/A"
+    assert json.loads(s[21]["value"])["main_rev"] == 2            # the draft's edit left main alone (r1 add, r2 undo)
+    assert s[22]["value"] is True and s[23]["value"] is True
+    assert not any(out.get("logs", {}).get("a", []))                  # no console errors
 
 
 def _events(root: Path) -> list:
