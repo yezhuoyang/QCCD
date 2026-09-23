@@ -1,47 +1,108 @@
-# Official submission service: development deployment
+# Official submission service: deployment
 
-What this is: the API, the database-backed queue worker, PostgreSQL, and a grader with no
-network, run together on one machine with Docker Compose. It is **not** a production
-deployment, and nothing here touches the live qccd.academy site or its leaderboard.
+The API, a queue worker and a grader with no network, as one image run in three roles.
+
+| file | what it is |
+|---|---|
+| `Dockerfile` | the image: the OCaml compiler, the Lean checker built without Mathlib, the Python runtime |
+| `docker-compose.prod.yml` | **production** on the qccd.academy droplet (SQLite, memory caps) |
+| `docker-compose.yml` | a local development stack with PostgreSQL (the PostgreSQL path has never run) |
+| `nginx-qccd-official.conf` | the nginx snippet that serves `/official/` on qccd.academy |
+| `smoke_test.py` | operator check: one private submission, graded by the server, compared with a local grade |
+
+## Production: https://qccd.academy/official/
+
+It lives in `/opt/qccd-official/` on the droplet (165.232.55.161). That directory holds
+`docker-compose.prod.yml`, `.env` (`QCCD_OFFICIAL_TAG=<commit>`) and `VERSION` (the commit,
+the image id and the date). nginx serves `https://qccd.academy/official/v1/…` through
+`/etc/nginx/snippets/qccd-official.conf`, which the site's HTTPS block includes. The api
+listens on 127.0.0.1:8300 only. It is JSON only:
+
+| endpoint | who |
+|---|---|
+| `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` | anyone |
+| `GET /official/v1/submissions/<id>` and `/report` | anyone for public submissions; the uploader for private ones |
+| `POST /official/v1/submissions` | an uploader token (`add-uploader`); fails closed without one |
+
+From a workspace, a person publishes an approved local submission with:
 
 ```bash
-docker compose -f deploy/official/docker-compose.yml up --build
-docker compose -f deploy/official/docker-compose.yml run --rm api \
-    python -m qccd.official.service add-uploader dev         # prints an upload token ONCE
-curl http://127.0.0.1:8300/v1/tasks
+qccd publish --submission <sub_id>          # review + approve at a terminal (types the digest)
+qccd publish --approval <ap_id> --server https://qccd.academy/official
 ```
 
-From a workspace, publishing an approved local submission to it:
+The upload token comes from `QCCD_UPLOAD_TOKEN` or from `~/.qccd/credentials.json`
+(`{"https://qccd.academy/official": "<token>"}`).
+
+**Updating it.** Nothing is compiled on the server. It has 2 vCPUs and about 4 GB of memory,
+and it also serves other sites.
 
 ```bash
-qccd publish --submission <sub_id>                 # review + approve at a terminal (types the digest)
-QCCD_UPLOAD_TOKEN=<token> qccd publish --approval <ap_id> --server http://127.0.0.1:8300
+git archive <commit> -- qccd arch Compiler/bridge Compiler/ocaml Compiler/lean/QCCDC/Cert \
+    Compiler/lean/Main.lean Compiler/lean/lean-toolchain deploy/official | tar -x -C build/
+docker build -f build/deploy/official/Dockerfile -t qccd-official:<commit> build/
+docker save qccd-official:<commit> | gzip -1 | ssh root@165.232.55.161 'gunzip | docker load'
+ssh root@165.232.55.161 'cd /opt/qccd-official && sed -i "s/^QCCD_OFFICIAL_TAG=.*/QCCD_OFFICIAL_TAG=<commit>/" .env \
+    && docker compose -f docker-compose.prod.yml up -d'
+python deploy/official/smoke_test.py https://qccd.academy/official --token-file <file>
 ```
 
-## Roles
+A first build takes about 15 minutes, most of it compiling stim, which has no Linux wheel
+for CPython 3.14. After that only the `COPY qccd/` layer changes. Rehearse locally first:
+`docker compose -p rehearsal -f deploy/official/docker-compose.prod.yml up -d`, then run
+`smoke_test.py` against `http://127.0.0.1:8300`.
 
-| service | what it may do | what it may not do |
-|---|---|---|
-| `api` | accept authenticated uploads, return ids at once, serve status, reports, leaderboards | run the toolchain; accept client verdicts, scores or profiles |
-| `worker` | claim queued jobs, stage bundles into the spool, record reports | run the toolchain |
-| `grader` | grade spooled bundles with the reference evaluator | reach any network, see any credential or database |
-| `db` | PostgreSQL 16 | |
+**Operating it** (on the droplet, in `/opt/qccd-official`):
 
-The grader container has `network_mode: none`, a read-only root file system, a 2 GB tmpfs,
-all capabilities dropped, `no-new-privileges`, a process limit, and memory and CPU caps. The
-evaluator also runs each external tool as a subprocess with its own timeout and memory limit
-(`qccd/workspace/procs.py`). Containers reduce the attack surface; they are not a proof of
-isolation. Kernel escapes, resource exhaustion inside the limits, and bugs in the checkers
-themselves are residual risks.
+```bash
+docker compose -f docker-compose.prod.yml ps | logs --tail 50 grader
+docker compose -f docker-compose.prod.yml run --rm -T api python -m qccd.official.service add-uploader <name> [--quota N]
+docker compose -f docker-compose.prod.yml run --rm -T api python -m qccd.official.service regrade ghz4@1
+```
+
+`add-uploader` prints the new token once. Deliver it privately.
+
+**Rolling back.** Set `.env` to the previous tag and `up -d`. To take the service down
+completely: `docker compose -f docker-compose.prod.yml down` (volumes survive), then remove
+the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reload nginx`.
+The site file as it was before the include was added is
+`/root/qccd.academy.nginx.bak-20260923-000848`.
+
+**Deployed** 2026-09-23 00:08 UTC (2026-09-22 17:08 PDT), from commit `10152b1`. `VERSION`
+on the server records it. The first uploader is `yezhuoyang` (50 uploads a day), whose token
+is in that person's `~/.qccd/credentials.json`. An operator uploader `deploy-smoke`, limited
+to one upload a day, holds the one private smoke submission `os_d47f8b8542b1b207`; its
+token was deleted after use.
+
+**Data** lives in Docker volumes: `qccd-official_data` (the SQLite database),
+`qccd-official_artifacts` (uploaded archives, by digest) and `qccd-official_spool` (jobs in
+flight). They are not backed up yet.
+
+## Roles and limits
+
+| service | may | may not | limits in production |
+|---|---|---|---|
+| `api` | accept authenticated uploads, serve status, reports, leaderboards | run the toolchain; accept client verdicts, scores or profiles | 256 MB, 0.5 CPU, loopback port |
+| `worker` | claim queued jobs, stage bundles into the spool, record reports | run the toolchain; reach any network | 256 MB, 0.5 CPU, no network |
+| `grader` | grade spooled bundles with the reference evaluator | reach any network; see any credential or the database | 1 GB, 1 CPU, no network, read-only root, 128 pids |
+
+All three drop every capability and run with `no-new-privileges` as an unprivileged user.
+Inside the grader, the evaluator runs each external tool as a subprocess with its own
+timeout and address-space limit (`qccd/workspace/procs.py`). Containers reduce the attack
+surface; they are not a proof of isolation. Kernel escapes, resource exhaustion inside the
+limits, and bugs in the checkers themselves remain risks.
 
 ## What was tested, and what was not
 
-- Tested on the development machine (Windows 11, 2026-09-22): the same code paths with SQLite
-  and the inline grader (`tests/test_official.py`). That covers authenticated upload,
-  fail-closed auth, a loopback-only development token, wrong-task and tampered archives,
-  idempotent resubmission, private visibility, regrades that keep history, the HTTP API, and
-  local-vs-server report parity on the same bundle.
-- **Not run here**: this Compose file and the Dockerfile. The Docker daemon was not running,
-  and building the image fetches the OCaml and Lean toolchains. The PostgreSQL code path
-  (`qccd/official/db.py`, `FOR UPDATE SKIP LOCKED`) has not been executed against a server.
-  Build and exercise it before relying on it.
+- **The development code paths** (Windows 11): SQLite with the inline grader,
+  `tests/test_official.py`. This covers authenticated upload, fail-closed auth, the
+  loopback-only development token, wrong-task and tampered archives, idempotent resubmission,
+  private visibility, regrades that keep history, the HTTP API, and local-versus-server
+  parity.
+- **The image and the production compose file** (Docker 27.5, 2026-09-22). A local rehearsal
+  ran `smoke_test.py`: the server graded a private upload eligible, all ten stages passed,
+  and it agreed with the local report with no stage or metric differences. Peak memory was
+  87 MB for the grader, 36 MB for the worker and 43 MB for the api. The first container run
+  found a bug and fixed it: a Lean stage under the grader's inherited address-space limit
+  could not start.
+- **Not run:** the PostgreSQL path (`docker-compose.yml`, `FOR UPDATE SKIP LOCKED`).
