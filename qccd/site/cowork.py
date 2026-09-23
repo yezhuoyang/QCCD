@@ -58,18 +58,27 @@ connect to. Nothing leaves your machine unless you publish it.</p>
 <h3>Set up once</h3>
 <pre>__CLONE__
 cd QCCD
-pip install -e ".[agent]"</pre>
-<p class="qa-small">Compiling and grading on your machine also need the OCaml compiler and the Lean
-checker built. <a href="https://github.com/yezhuoyang/QCCD/blob/compiler/deploy/official/Dockerfile">deploy/official/Dockerfile</a>
+python -m venv .venv
+.venv\\Scripts\\activate
+pip install -e ".[agent]"
+cd ..</pre>
+<p class="qa-small">On macOS or Linux, activate with <code>source .venv/bin/activate</code>. If PowerShell
+refuses to run the activate script, run
+<code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once. The virtual
+environment keeps QCCD's libraries apart from the rest of your Python, so installing it cannot
+change a version another package of yours needs. Activate it again in each new terminal.
+Compiling and grading on your machine also need the OCaml compiler and the Lean checker built:
+<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/deploy/official/Dockerfile">deploy/official/Dockerfile</a>
 has the exact commands.</p>
 <h3>Start a workspace</h3>
+<p class="qa-small">Run these from the folder that holds QCCD, not inside it.</p>
 <pre>qccd init my-design --task ghz4@1
 cd my-design
 qccd agent install --client codex
 qccd studio --keep-alive</pre>
-<p>That opens the live Studio. In a second terminal, <code>qccd agent connect --client codex</code>
-starts a Codex conversation bound to this workspace, and prompts you send from the Studio reach
-it by themselves. Claude Code works too, though this path is experimental: install with
+<p>That opens the live Studio. In a second terminal, with the environment activated,
+<code>qccd agent connect --client codex</code> starts a Codex conversation bound to this workspace,
+and prompts you send from the Studio reach it by themselves. Claude Code works too, though this path is experimental: install with
 <code>--client claude --channel</code>, then run
 <code>claude --dangerously-load-development-channels server:qccd</code>.</p>
 <h3>Bring this design</h3>
