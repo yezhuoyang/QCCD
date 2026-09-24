@@ -75,8 +75,12 @@ PAGES. The person may be talking to you from a page of the qccd.academy website 
 workspace, with this same chat) or from Studio; the request says which page. Before your first work on
 the site, read qccd_read_reference section='site' (its pages, the course, and how to do the common
 things visibly) and, for a Studio, section='site:studio' (every control in the Studio's own words; a
-page read gives each Studio control its hint key). Take page paths from that map or from the page's
-own links; never guess one. The person's Design page is their own live Studio: from a website page,
+page read gives each Studio control its hint key). ONLY WHAT IS DECLARED: your page tools operate
+declared controls only (a read marks the others undeclared), navigate only to places (the site map,
+the page's own links, /studio), and call only the Studio verbs declared for agents (studio verb
+'verbs' lists them with what each does; section 'interface' has all of it). A refusal names what is
+declared instead: use that, or tell the person what you could not do. Never guess a path or a
+control. The person's Design page is their own live Studio: from a website page,
 qccd_page_act navigate path='/studio' opens it (so does the site's studio.html). A question asked on a
 page is usually about that page: read it with qccd_page_read (headings, text by section, controls,
 embedded examples, the text the person selected, the studio transport and lessons) and answer from
@@ -109,7 +113,8 @@ def _tools() -> list:
          "(an event cursor from a previous call) adds what changed since.",
          obj({"since": i, "detail": {"type": "string", "enum": ["summary", "full"]}, "branch": s})),
         ("qccd_read_reference", "Version-matched reference for THIS workspace's task release and evaluator: "
-         "sections index, site (the website's pages, the course, how to do things on it), site:studio (every "
+         "sections index, interface (everything you may do on a page: places, controls, Studio verbs; nothing "
+         "else is allowed), site (the website's pages, the course, how to do things on it), site:studio (every "
          "Studio control in its own words), task, operations, rules, evaluator, program, anchors, workflow, "
          "docs:adl, docs:rules, docs:tsir, docs:phys. Optional `query` returns the window around a match "
          "(for site: the matching pages and controls).",
@@ -178,18 +183,20 @@ def _tools() -> list:
          obj({"section": s, "offset": i, "max_chars": i, "controls": {"type": "boolean"}, "view_id": s})),
         ("qccd_page_act", "Operate the person's page, visibly (a cursor with your name moves there first): action "
          "highlight (target, note: a short caption shown beside it), scroll (target, to: top|bottom, or by: pixels "
-         "or 'page'/'-page'), wait (ms up to 10000, optional note), studio (verb + args: one verb of the page's Studio "
-         "API, e.g. addSite [x, y, id, {zone}], addSegment [a, b], emit [{method, args, kwargs}], lessonLoad, "
-         "lessonCheck, lessonHint, lessonSolution, testDrive; verb 'verbs' lists them; frame for an embedded "
-         "example), comments (the site's comment threads on this page, as the signed-in person sees them), "
-         "comment (target, text: a new thread pinned there, posted AS THE PERSON and signed 'via <you>'), reply "
-         "(thread, text), resolve (thread, resolved), click (target), fill (target, value), press "
-         "(key: Enter|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Tab|Space|Home|End|PageUp|PageDown, "
-         "optional target), navigate (path: a page of the same site, e.g. ../rules/ or /web/rules/), step (an "
-         "animation: step=N to seek, delta=+1/-1, play=true, pause=true; target {frame: 'fN'} for an embedded "
-         "example), open_lesson (lesson id, on the Studio page). target = {ref} from qccd_page_read, "
-         "{selector}, or {text}; add frame to reach into an embedded example. The chat is out of reach, and "
-         "links that leave the site are refused (give the person the link instead).",
+         "or 'page'/'-page'), wait (ms up to 10000, optional note), studio (verb + args: one verb the page's Studio "
+         "declares for agents, e.g. addSite [x, y], addSegment [a, b], lessonLoad, lessonCheck, lessonHint, "
+         "lessonSolution, testDrive; verb 'verbs' lists the declared ones with what each does; frame for an "
+         "embedded example), comments (the site's comment threads on this page, as the signed-in person sees "
+         "them), comment (target, text: a new thread pinned there, posted AS THE PERSON and signed 'via <you>'), "
+         "reply (thread, text), resolve (thread, resolved), click (target), fill (target, value), press "
+         "(key: Enter|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Tab|Space|Home|End|PageUp|PageDown; a key "
+         "that acts needs a target), navigate (path: a place -- the site map, a link on the page, or /studio), "
+         "step (an animation: step=N to seek, delta=+1/-1, play=true, pause=true; target {frame: 'fN'} for an "
+         "embedded example), open_lesson (lesson id, on the Studio page). target = {ref} from qccd_page_read, "
+         "{selector}, or {text}; add frame to reach into an embedded example. ONLY DECLARED: click, fill and "
+         "press operate declared controls (a read marks the others undeclared), navigate goes only to places; "
+         "a refusal lists what is declared instead. The chat is out of reach, and links that leave the site "
+         "are refused (give the person the link instead).",
          obj({"action": {"type": "string", "enum": ["highlight", "scroll", "click", "fill", "press", "navigate",
                                                     "step", "open_lesson", "studio", "wait", "comments", "comment", "reply",
                                                     "resolve"]},

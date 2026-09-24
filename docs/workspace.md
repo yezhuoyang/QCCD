@@ -306,6 +306,22 @@ watch it happen.
   "What does rule R7 say? Show me its failing example", Claude read the section,
   highlighted the failing example with a caption, and answered with the page's numbers.
 
+### Only what is declared
+
+An agent may do on a page only what the code declares (`qccd/workspace/interface.py`; the
+developer's rule is `docs/agent-interface.md`):
+
+- **controls:** a `data-hint` key the page describes, links and fold-outs, fields of a
+  generated form, and a short out-of-line list that may only shrink;
+- **places:** the site's index, the page's own links, and `/studio`;
+- **Studio functions:** those declared for agents in `qccd/viz/js/editor_api.json` (148 of 239).
+
+Anything else is refused with what is declared instead, and the refusal lands in the trace.
+The declarations are read when a page is served, so a rebuild updates what agents know.
+`tests/test_agent_interface.py` fails a change that adds UI or an API function without its
+declaration. The opt-in `tests/workspace_live_interface.py` checks every place on the live
+site.
+
 ### Nothing out of sight
 
 What the agent does to the person's design or with their programs happens where they are
@@ -653,6 +669,8 @@ Linux and macOS were not exercised in this session.
 | `tests/workspace_live_comments.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the agent comments on real qccd.academy pages as a signed-in person, against a PRIVATE copy of the comment service | ~20 s |
 | `tests/test_workspace_toolchain.py` | the prebuilt compiler: the manifest matches the committed source, a download is refused unless its size and hash match, an install runs once, and which compiler is used | ~3 s |
 | `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; the trace of MCP calls and page actions (and `qccd trace`); the site guide from the site's index and the Studio's hints; in real Chrome every page action on a mirrored page, the Studio's own page actions, the agent's design and runs shown in the person's Studio, and a real MCP client answering a question asked on a page | ~60 s |
+| `tests/test_agent_interface.py` | **the gate**: every Studio API function declared (`editor_api.json`), the page actions agree across the service, pageact.js, the MCP tool and the skill, agent-facing text names only agent verbs, the out-of-line list only shrinks; in Chrome every Studio control declared and every `data-hint` described (and a planted undeclared button is caught) | ~10 s |
+| `tests/workspace_live_interface.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): every place of the live site through the mirror; fails on an undeclared control not in its known-debt list | ~10 min |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
 | `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |
 | `tests/workspace_live_codex.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a Studio prompt into a real Codex thread | ~1 min |

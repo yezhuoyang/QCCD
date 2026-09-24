@@ -250,7 +250,7 @@ _HIDE_SITE_AGENT = ("<style>#qa-btn,#qa-panel{display:none!important}"
                     "@media print{#qccd-chat{display:none}}</style>")
 
 
-def inject(page: str, cfg: dict) -> str:
+def inject(page: str, cfg: dict, contract: dict | None = None) -> str:
     """A site page with the mirror's layer: a marker before any site script runs, the
     comment layer switched off, the site's own Agent button hidden (this IS the agent), and
     the chat + page actions before `</body>`."""
@@ -272,6 +272,8 @@ def inject(page: str, cfg: dict) -> str:
     tail = (_HIDE_SITE_AGENT
             + '<script id="qccd-mirror-config" type="application/json">'
             + json.dumps(cfg).replace("</", "<\\/") + "</script>\n"
+            + ("<script>window.QCCD_INTERFACE=" + json.dumps(contract).replace("</", "<\\/") + ";</script>\n"
+               if contract else "")
             + "<script>\n" + (_WEB / "pageact.js").read_text(encoding="utf-8") + "\n</script>\n"
             + "<script>\n" + (_WEB / "mirror.js").read_text(encoding="utf-8") + "\n</script>\n")
     at = page.lower().rfind("</body>")
@@ -285,7 +287,8 @@ def mirror_csp(chat_origin: str) -> str:
             "object-src 'none'")
 
 
-def _failed(message: str, status: int, studio_url: str, cfg: dict | None = None) -> tuple[int, str]:
+def _failed(message: str, status: int, studio_url: str, cfg: dict | None = None,
+            contract: dict | None = None) -> tuple[int, str]:
     """A page that could not be shown.  With `cfg` it keeps the chat and the page tools, so
     neither the person nor an agent that followed a wrong link is stranded on it."""
     why = ("<p>The website pages come from qccd.academy, so they need an internet connection. "
@@ -296,7 +299,7 @@ def _failed(message: str, status: int, studio_url: str, cfg: dict | None = None)
     page = ("<!doctype html><html><head><meta charset=\"utf-8\"><title>QCCD website: not available</title>"
             "<style>body{font:15px/1.5 system-ui,sans-serif;max-width:720px;margin:48px auto;padding:0 16px;color:#1d1d1b}"
             "</style></head><body>" + body + "</body></html>")
-    return status, (inject(page, cfg) if cfg else page)
+    return status, (inject(page, cfg, contract) if cfg else page)
 
 
 def create_mirror_app(state, mirror: SiteMirror | None = None):
@@ -338,14 +341,25 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return resp
 
+    def contract() -> dict:
+        # the places are the site's own index (cached with the pages); offline, the page's links
+        from .interface import page_contract
+        from .site_guide import _index
+        try:
+            idx = _index(mirror)
+        except Exception:
+            idx = None
+        # the Design page's other names are places the mirror itself declares
+        return page_contract(site_index=idx, aliases=[f"/web/{a}{s}" for a in DESIGN_ALIASES for s in ("", "/")])
+
     def serve(page: Page, path: str) -> Response:
         if page.status in (301, 302, 307, 308):
             if not page.location:
-                return HTMLResponse(_failed("that page redirects off the site", 404, studio_url, cfg)[1], status_code=404,
+                return HTMLResponse(_failed("that page redirects off the site", 404, studio_url, cfg, contract())[1], status_code=404,
                                     headers={"Content-Security-Policy": csp})
             return Response(status_code=307, headers={"Location": page.location})
         if page.status == 404:
-            code, body = _failed(f"qccd.academy has no page /{path}", 404, studio_url, cfg)
+            code, body = _failed(f"qccd.academy has no page /{path}", 404, studio_url, cfg, contract())
             return HTMLResponse(body, status_code=code, headers={"Content-Security-Policy": csp})
         headers = {"Content-Security-Policy": csp,
                    "Cache-Control": "no-store" if page.ctype == "text/html" else "max-age=300"}
@@ -354,7 +368,7 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         if page.ctype == "text/html":
             text = page.body.decode("utf-8", errors="replace")
             here = dict(cfg, design_redirect=True) if path.strip("/") == "studio.html" else cfg
-            return HTMLResponse(inject(text, here), headers=headers)
+            return HTMLResponse(inject(text, here, contract()), headers=headers)
         return Response(page.body, media_type=page.ctype, headers=headers)
 
     @app.get("/")
@@ -378,7 +392,7 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         try:
             page = await asyncio.to_thread(mirror.get, path)
         except MirrorError as e:
-            code, body = _failed(str(e), e.status, studio_url, cfg)
+            code, body = _failed(str(e), e.status, studio_url, cfg, contract())
             return HTMLResponse(body, status_code=code, headers={"Content-Security-Policy": csp})
         return serve(page, path)
 

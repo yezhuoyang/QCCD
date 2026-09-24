@@ -24,6 +24,10 @@
 //   reply       answer in a thread;  resolve  mark a thread addressed (or reopen it)
 // Every action is VISIBLE: a cursor with the agent's name glides to the target and says what
 // it is about to do, then does it; typing appears letter by letter.
+// ONLY WHAT IS DECLARED (qccd/workspace/interface.py, docs/agent-interface.md): click, fill and
+// press operate declared controls only; navigate goes to places (the site's index, the links
+// on the page, the workspace's pages); studio calls the verbs editor_api.json declares for
+// agents.  Anything else is refused with what IS declared -- never guessed at.
 // A target is {ref} (from the last read), {selector} (CSS), or {text} (visible text), plus
 // {frame: 'fN'} to reach into an embedded example.  The chat, its menus and its dialogs are
 // out of reach: an agent must not press the person's own Send, Approve or Undo.
@@ -35,7 +39,8 @@ if (window.QCCD_PAGE) return;
 // the chat, and the site's own comment controls (Sign in is the person's; the agent comments
 // through the `comment` action, which signs what it writes)
 var PRIVATE = '#qcl-dock, #qcl-menu, .qcl-modal, #qcl-notice, #qcl-unpaired, #qccd-chat, [data-qccd-private], ' +
-              '#qcnav, #qc-layer, #qc-menu, [id^="qc-"]';
+              '#qcnav, #qc-layer, #qc-menu, [id^="qc-"], ' +
+              '#qa-btn, #qa-panel';      // the site's own "connect an agent" panel (hidden here: this IS the agent)
 var COMMENT_UI = '#qcnav, #qc-layer, #qc-menu, [id^="qc-"]';
 var NOT_SIGNED = 'the person is not signed in to qccd.academy on this page: ask them to press "Sign in" in the ' +
                  'site bar (their own account; the agent never signs in for them)';
@@ -201,11 +206,11 @@ function controls(doc, heads) {
     if (c.kind === 'checkbox' || c.kind === 'radio') c.checked = !!el.checked;
     if (el.disabled) c.disabled = true;
     // what the control IS, in the Studio's own words (its explain layer: the hover card's sentence)
-    var hk = el.getAttribute('data-hint');
-    if (hk) {
-      c.hint = hk;
-      try { var hw = doc.defaultView.EDITOR && doc.defaultView.EDITOR.hintFor && doc.defaultView.EDITOR.hintFor(hk);
-            if (hw && hw.d) c.what = clip(hw.d, 140); } catch (e) { /* a page without the explain layer */ }
+    var dc = declared(el);
+    if (!dc) c.undeclared = true;                      // read it, point at it; do not operate it
+    else {
+      if (dc.hint) c.hint = dc.hint;
+      if (dc.what && c.kind !== 'link') c.what = clip(dc.what, 140);
     }
     var sec = sectionOf(el, heads);
     if (sec) c.section = sec;
@@ -439,14 +444,79 @@ function stageOf(doc) {
 }
 
 // ------------------------------------------------------------------ actions
+// ------------------------------------------------------------------ the contract (interface.py)
+function iface() { return window.QCCD_INTERFACE || {}; }
+function hintOf(key, win) {
+  win = win || window;
+  try { var E = win.EDITOR; if (E && typeof E.hintFor === 'function') { var h = E.hintFor(key); if (h) return h; } } catch (e) { /* none */ }
+  var t = win.QCCD_HINTS;
+  return (t && t[key]) || null;
+}
+// how a control is declared, or null: inline (data-hint the page describes), by construction
+// (a link, a fold-out), by the generated form it is in, or out of line (interface.py)
+function declared(el) {
+  var win = el.ownerDocument.defaultView, key = el.getAttribute('data-hint'), I = iface(), s;
+  if (key) { var h = hintOf(key, win); if (h) return { how: 'inline', hint: key, what: h.d || h.t || '' }; }
+  // one choice of a described control group (Hardware / Gates / Both): the group's hint declares its options;
+  // a screen region's hint (region:...) describes the region, not the controls in it
+  var grp = el.parentElement && el.parentElement.closest('[data-hint]');
+  if (grp && (el.tagName === 'BUTTON' || /^(tab|option|radio)$/.test(el.getAttribute('role') || ''))) {
+    var gk = grp.getAttribute('data-hint'), gh = /^region:/.test(gk) ? null : hintOf(gk, win);
+    if (gh) return { how: 'group', hint: gk, what: gh.d || gh.t || '' };
+  }
+  if (el.tagName === 'A' && el.hasAttribute('href')) return { how: 'link' };
+  if (el.tagName === 'SUMMARY') return { how: 'fold-out' };
+  for (s in (I.controls || {})) { try { if (el.matches(s)) return { how: 'declared', what: I.controls[s].does }; } catch (e) { /* bad selector */ } }
+  for (s in (I.forms || {})) { try { if (el.closest(s)) return { how: 'form', what: I.forms[s] }; } catch (e) { /* bad selector */ } }
+  return null;
+}
+function undeclaredError(el, doc) {
+  var near = [];
+  doc.querySelectorAll(CONTROL).forEach(function (c) {
+    if (near.length < 10 && !isPrivate(c) && vis(c) && c.tagName !== 'A' && declared(c)) near.push('"' + label(c) + '"' + (c.getAttribute('data-hint') ? ' [data-hint=' + c.getAttribute('data-hint') + ']' : ''));
+  });
+  return new Error('"' + label(el) + '" is not a declared control, so an agent may not operate it (only declared ' +
+                   'controls are: docs/agent-interface.md). Declared controls on this page include: ' +
+                   (near.join(', ') || 'none besides links') + '. Say to the person what you wanted to do instead.');
+}
+function mustBeDeclared(el, doc) { if (!declared(el)) throw undeclaredError(el, doc || el.ownerDocument); }
+// is a URL a PLACE?  The site's index, a link that is on this page, the workspace's pages
+var WS_PLACE = /^\/(studio|trace|runview\/[\w-]+|compare|run\/[\w-]+)\/?$/;
+function isPlace(u) {
+  var p = u.pathname;
+  if (!window.QCCD_MIRROR) return WS_PLACE.test(p);
+  if (p === '/studio' || p === '/web/' || p === '/web' || (iface().aliases || []).indexOf(p) >= 0) return true;
+  var P = iface().places, bare = p.replace(/index\.html$/, '');
+  if (P && (P.indexOf(p) >= 0 || P.indexOf(bare) >= 0)) return true;
+  var links = document.querySelectorAll('a[href]');
+  for (var i = 0; i < links.length; i++) {
+    try { var l = new URL(links[i].getAttribute('href'), location.href); if (l.origin === u.origin && l.pathname === p) return true; } catch (e) { /* none */ }
+  }
+  return false;
+}
+function nearestPlaces(p) {
+  var P = (iface().places || []).slice(), words = p.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  document.querySelectorAll('a[href]').forEach(function (a) {
+    try { var l = new URL(a.getAttribute('href'), location.href); if (l.origin === location.origin && P.indexOf(l.pathname) < 0) P.push(l.pathname); } catch (e) { /* none */ }
+  });
+  if (window.QCCD_MIRROR) P.push('/studio');
+  var scored = P.map(function (q) {
+    var ql = q.toLowerCase(), sc = 0;
+    words.forEach(function (w) { if (ql.indexOf(w) >= 0) sc += 2 + w.length / 10; });
+    for (var k = 0; k < Math.min(ql.length, p.length) && ql[k] === p.toLowerCase()[k]; k++) sc += 0.05;
+    return [sc, q];
+  }).filter(function (x) { return x[0] > 0.2; });
+  scored.sort(function (a, b) { return b[0] - a[0]; });
+  return scored.slice(0, 4).map(function (x) { return x[1]; });
+}
+
 var KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Tab: 9, ' ': 32, Space: 32,
              Home: 36, End: 35, PageUp: 33, PageDown: 34 };
 // the Studio's own API is the agent's hands on the canvas (the course solves its exercises with
-// the same verbs); these would touch the person's files or storage, or restart the page
-var STUDIO_DENY = { saveProject: 1, hasFileHandle: 1, autosave: 1, autoload: 1, autosaveSoon: 1, boot: 1 };
-// on the WORKSPACE's own Studio an edit through the page would be recorded as the person's; there
-// the agent changes the design through its own tools, and may only read and drive the view here
-var STUDIO_READ = /^(state|geom|seed|post|edits|program|programSource|programErrors|programBreaks|problems|lintProblems|lints|rules|ruleCoverage|validate|why|notes|selection|selectionNodes|nodes|segments|exportJson|exportPython|exportEdits|metricRows|evaluateWrite|parseErrors|palette|components|componentSpec|componentParams|elementDocs|hintFor|lessonList|lessonState|lessonCheck|lessonHint|lessonSolution|courseProgress|seekTo|fit|select|setSelection|explainToggle|setTrueScale|trueScale|layout|snapshot|refit|redraw|hover|showHud|hideHud|keyHelp|helpToggle)$/;
+// the same verbs) -- the verbs qccd/viz/js/editor_api.json declares for agents, no other.  On the
+// WORKSPACE's own Studio an edit through the page would be recorded as the person's, so there
+// only the verbs that read or change the view: the agent changes the design with its own tools.
+function designPage() { return !!(window.QCCD_DESIGN_PAGE || iface().design_page); }
 function sitePath(href) {
   // the one place navigation may go: this site, on this origin, under the mirror's /web/
   // (or the Studio's own pages when this IS the Studio)
@@ -536,6 +606,7 @@ function act(action, args, who) {
       });
     case 'click':
       r = resolve(args.target); el = r.el;
+      mustBeDeclared(el, r.doc);
       var nav = null;
       if (el.tagName === 'A') {
         var href = el.getAttribute('href') || '';
@@ -554,6 +625,7 @@ function act(action, args, who) {
       });
     case 'fill':
       r = resolve(args.target); el = r.el;
+      mustBeDeclared(el, r.doc);
       var value = String(args.value === undefined ? '' : args.value);
       if (el.tagName === 'SELECT') {
         var opt = null;
@@ -574,7 +646,12 @@ function act(action, args, who) {
       var key = String(args.key || '');
       if (!KEYS[key]) throw new Error('press takes one of: ' + Object.keys(KEYS).join(', '));
       if (key === 'Space') key = ' ';
-      el = args.target ? resolve(args.target).el : (document.activeElement && !isPrivate(document.activeElement) ? document.activeElement : document.body);
+      if (args.target) { el = resolve(args.target).el; mustBeDeclared(el); }
+      else {
+        // a key to the page itself only moves around it; one that acts (Enter, arrows) needs a declared target
+        if (!/^(Escape|Tab|Home|End|PageUp|PageDown|Space| )$/.test(key)) throw new Error('press ' + key + ' needs a target: a declared control');
+        el = document.activeElement && !isPrivate(document.activeElement) && declared(document.activeElement) ? document.activeElement : document.body;
+      }
       return pointAt(el, null, who, 'pressing ' + (key === ' ' ? 'Space' : key)).then(function () {
         ['keydown', 'keyup'].forEach(function (t) {
           el.dispatchEvent(new KeyboardEvent(t, { key: key, code: key === ' ' ? 'Space' : key, keyCode: KEYS[key], which: KEYS[key], bubbles: true, cancelable: true }));
@@ -584,6 +661,12 @@ function act(action, args, who) {
     case 'navigate':
       var p = sitePath(String(args.path || ''));
       if (!p) throw new Error('navigate stays on this site: give a path like ../rules/ or /web/rules/');
+      if (!isPlace(p)) {
+        var near = nearestPlaces(p.pathname);
+        throw new Error('there is no page ' + p.pathname + ' (a path is taken from the site map or a link, never guessed)' +
+                        (near.length ? '; the nearest places: ' + near.join(', ') : '') +
+                        (window.QCCD_MIRROR ? '; the person\'s Design page is /studio' : ''));
+      }
       return glideTo(window.innerWidth / 2, 60, who, 'opening ' + p.pathname.replace(/^\/web/, '')).then(function () {
         setTimeout(function () { location.assign(p.href); }, 50);
         return { ok: true, navigating: p.pathname + p.search + p.hash };
@@ -619,10 +702,20 @@ function act(action, args, who) {
       if (args.frame) { r = resolve({ frame: args.frame }); sw = r.win; sd = r.doc; sf = r.frame; }
       var E = sw.EDITOR, verb = String(args.verb || '');
       if (!E) throw new Error('this page has no Studio (an EDITOR); open studio.html, a lesson, or an example');
-      if (verb === 'verbs') return { ok: true, verbs: Object.keys(E).filter(function (k) { return typeof E[k] === 'function' && !STUDIO_DENY[k]; }).sort() };
-      if (typeof E[verb] !== 'function') throw new Error('the Studio has no verb ' + JSON.stringify(verb) + ' (studio verb "verbs" lists them)');
-      if (STUDIO_DENY[verb]) throw new Error(verb + ' touches your files or restarts the page; the agent does not use it');
-      if (window.QCCD_DESIGN_PAGE && !STUDIO_READ.test(verb))
+      var V = iface().verbs || {}, NA = iface().not_for_agents || {}, dp = designPage() && !sf;
+      var usable = function (k) { return V[k] && typeof E[k] === 'function' && (!dp || V[k].kind === 'read' || V[k].kind === 'view'); };
+      if (verb === 'verbs') {
+        var list = {};
+        Object.keys(V).sort().forEach(function (k) { if (usable(k)) list[k] = V[k]; });
+        return { ok: true, verbs: Object.keys(list), declared: list,
+                 note: dp ? 'the person\'s own design: read and view verbs only; change it with qccd_apply_change_set' : undefined };
+      }
+      if (NA[verb] === 'never') throw new Error(verb + ' touches your files or storage, or restarts the page; the agent does not use it');
+      if (!V[verb]) throw new Error('the Studio has no agent verb ' + JSON.stringify(verb) +
+                                    (NA[verb] ? ' (it exists, for tests and the pointer, not for agents)' : '') +
+                                    '; studio verb "verbs" lists the declared ones with what each does');
+      if (typeof E[verb] !== 'function') throw new Error('this page\'s Studio has no ' + verb);
+      if (dp && !usable(verb))
         throw new Error('this is the workspace\'s own design: change it with qccd_apply_change_set, so the change is recorded as the agent\'s');
       var a = Array.isArray(args.args) ? args.args : (args.args === undefined ? [] : [args.args]);
       return pointAt(stageOf(sd), sf, who, verb + (a.length ? ' ' + clip(JSON.stringify(a), 60) : '')).then(function () {
@@ -740,6 +833,17 @@ function pick() {
 }
 
 window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick,
+                     // the gate (tests/test_agent_interface.py): every control on the page, declared or listed here
+                     undeclared: function () {
+                       var out = [];
+                       document.querySelectorAll(CONTROL).forEach(function (c) {
+                         if (isPrivate(c) || (c.tagName === 'INPUT' && c.type === 'hidden') || declared(c)) return;
+                         var p = c.parentElement && c.parentElement.closest('[id]');
+                         out.push({ label: label(c), tag: c.tagName.toLowerCase(), id: c.id || null, in: p ? p.id : null });
+                       });
+                       return out;
+                     },
+                     declared: function (el) { return declared(el); },
                      highlight: function (t, note) { return safe('highlight', { target: t, note: note }); },
                      // the chat layer shows work that did not come through a page action (a change set)
                      point: function (x, y, who, caption) { return glideTo(x, y, who, caption); } };
