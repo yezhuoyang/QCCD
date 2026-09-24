@@ -875,7 +875,7 @@ def _live_layer(state: ServiceState, mode: str, **extra) -> str:
            "web_url": f"http://127.0.0.1:{state.info['web_port']}/web/" if state.info.get("web_port") else None,
            **extra}
     return (_css() + '<script id="qccd-live-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
-            + "</script>\n<script>\n" + _pageact() + "\n</script>\n<script>\n" + _js() + "\n</script>\n")
+            + "</script>\n" + _contract() + "<script>\n" + _pageact() + "\n</script>\n<script>\n" + _js() + "\n</script>\n")
 
 
 def _compare_page(state: ServiceState, run_ids: list) -> str:
@@ -914,7 +914,8 @@ def _studio_page(state: ServiceState, snapshot_id: str | None) -> str:
            "snapshot_id": snapshot_id, "contract": "1",
            "web_url": f"http://127.0.0.1:{state.info['web_port']}/web/" if state.info.get("web_port") else None}
     inject = (_css() + '<script id="qccd-live-config" type="application/json">'
-              + json.dumps(cfg).replace("</", "<\\/") + "</script>\n<script>\n" + _pageact() + "\n</script>\n"
+              + json.dumps(cfg).replace("</", "<\\/") + "</script>\n" + _contract(design_page=not snapshot_id)
+              + "<script>\n" + _pageact() + "\n</script>\n"
               + "<script>\n" + _js() + "\n</script>\n")
     at = page.rfind("</body>")
     return page[:at] + inject + page[at:]
@@ -956,6 +957,13 @@ def _render(ws: Workspace, snapshot_id: str | None) -> str:
 
 def _js() -> str:
     return (_WEB / "cowork.js").read_text(encoding="utf-8")
+
+
+def _contract(**kw) -> str:
+    """What the page's tools may do (interface.py), as window.QCCD_INTERFACE."""
+    from .interface import page_contract
+    return ("<script>window.QCCD_INTERFACE=" + json.dumps(page_contract(**kw)).replace("</", "<\\/")
+            + ";</script>\n")
 
 
 def _pageact() -> str:

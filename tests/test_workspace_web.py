@@ -40,7 +40,7 @@ HUMAN = {"kind": "human", "id": "view:t", "label": "Studio"}
 PAGES = {
     "index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Home - Test site</title></head><body>
 <nav id="sitenav"><a href="rules/">Rules</a> <a href="learn/">Learn</a> <button id="qa-btn">Agent</button></nav>
-<main><h1>Welcome</h1><p>This is the home page.</p></main>
+<main><h1>Welcome</h1><p>This is the home page.</p><button id="odd" onclick="window.__odd=1">Odd</button></main>
 <script>(function(){ var API = '/api';
   var PAGE = location.pathname.replace(/index\\.html$/, '');
   var ME = null, THREADS = [];
@@ -53,10 +53,12 @@ PAGES = {
 <h1>The rules</h1>
 <h2 id="r1">R1 capacity</h2><p>No site holds more ions than its capacity.</p>
 <h2 id="r7">R7 cooling</h2><p id="r7p">A two-qubit gate needs cold ions.</p>
-<button id="reveal" onclick="document.getElementById('ans').textContent='Revealed'">Show answer</button>
+<button id="reveal" data-hint="t:reveal" onclick="document.getElementById('ans').textContent='Revealed'">Show answer</button>
 <p id="ans">hidden</p>
-<label for="q">Search</label><input id="q" type="search">
-<select id="sel"><option value="a">Alpha</option><option value="b">Beta</option></select>
+<label for="q">Search</label><input id="q" type="search" data-hint="t:search">
+<select id="sel" data-hint="t:letter"><option value="a">Alpha</option><option value="b">Beta</option></select>
+<script>window.QCCD_HINTS = {'t:reveal': {t: 'Show answer', d: 'reveal the answer'},
+  't:search': {t: 'Search', d: 'search the rules'}, 't:letter': {t: 'Letter', d: 'pick a letter'}};</script>
 <a id="ext" href="https://example.com/">Elsewhere</a>
 <figure><iframe src="ex/a.html#embed&amp;step=1" width="400" height="200"></iframe><figcaption>Example A</figcaption></figure>
 </main></body></html>""",
@@ -472,6 +474,13 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
             {"frame": "/chatframe", "wait": frame_ready % "Home - Test site", "timeout": 30000},            # 26
             {"sleep": 800},
             {"http": {"method": "GET", "url": base + "/api/pages", "headers": hdr}},                       # 28
+            # ONLY WHAT IS DECLARED: an undeclared control is read but not operated, a guessed path is
+            # refused with the nearest places, and a real place is fine
+            act("read"),                                                                                   # 29
+            act("click", target={"selector": "#odd"}),                                                     # 30
+            {"eval": "window.__odd === undefined"},                                                        # 31
+            act("navigate", path="/web/rulez/"),                                                           # 32
+            act("navigate", path="/web/rules/"),                                                           # 33
         ]
         spec = tmp_path / "spec.json"
         spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={code}&to=/web/rules/"}, "steps": steps}),
@@ -490,6 +499,8 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
         assert heads == ["The rules", "R1 capacity", "R7 cooling"], diag
         labels = {c["label"]: c for c in rd["result"]["controls"]}
         assert labels["Show answer"]["kind"] == "button" and labels["Search"]["kind"] == "input", diag
+        assert labels["Show answer"]["hint"] == "t:reveal" and labels["Show answer"]["what"] == "reveal the answer", diag
+        assert not any(c.get("undeclared") for c in rd["result"]["controls"]), diag
         assert labels["Elsewhere"]["href"] == "https://example.com/", diag
         assert rd["result"]["embedded"][0]["ref"] == "f1" and rd["result"]["embedded"][0]["caption"] == "Example A", diag
         assert rd["result"]["embedded"][0]["transport"]["step"] == 1, diag
@@ -509,6 +520,12 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
         assert body(22)["ok"] and st[23]["value"] is True, diag
         assert body(24)["ok"] and st[25]["ok"] and st[26]["ok"], diag
         assert [p["url"] for p in body(28)["pages"]] == ["/web/"], diag             # the same tab, now on Home
+        odd = [c for c in body(29)["result"]["controls"] if c["label"] == "Odd"]
+        assert odd and odd[0].get("undeclared") is True, diag
+        assert not body(30)["ok"] and "not a declared control" in body(30)["error"] and st[31]["value"] is True, diag
+        assert not body(32)["ok"] and "there is no page /web/rulez/" in body(32)["error"], diag
+        assert "/web/rules/" in body(32)["error"] and "/studio" in body(32)["error"], diag      # the nearest places
+        assert body(33)["ok"], diag
         p = own("GET", f"/api/prompts/{pid}")
         b = p["latest_sent"]["body"]
         assert b["anchors"][0] == {"kind": "page", "url": "/web/rules/", "quote": "A two-qubit gate needs cold ions."}
@@ -721,9 +738,10 @@ def test_the_mirror_leads_to_the_studio(svc):
 @needs_chrome
 def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkeypatch):
     """The reported case: asked to "go to the design page", an agent navigated to /web/studio/,
-    which the site does not have, and was stranded on an error page without the chat.  Now a
-    missing page keeps the chat (the agent reads it and goes on), and the names of the Design
-    page lead to the person's own Studio, where the page tools go on working."""
+    which the site did not have, and was stranded on an error page without the chat.  Now a
+    guessed path is refused before the page is left, with the nearest places; a missing page
+    the PERSON reaches keeps the chat, so the agent reads it and goes on; and the names of the
+    Design page lead to the person's own Studio, where the page tools go on working."""
     from qccd.workspace.runtime import ensure_service, service_request
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
@@ -745,16 +763,17 @@ def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkey
              "stopOnFail": True},                                                                          # 0
             {"frame": "/chatframe", "wait": ready + "'Rules - Test site'", "timeout": 30000, "stopOnFail": True},  # 1
             act("navigate", path="/web/no-such-page/"),                                                    # 2
+            {"eval": "location.assign('/web/no-such-page/'), 1"},       # the person follows a broken link
             {"wait": "location.pathname === '/web/no-such-page/' && !!document.getElementById('qccd-chat')",
-             "timeout": 20000, "stopOnFail": True},                                                        # 3
+             "timeout": 20000, "stopOnFail": True},                                                        # 4
             {"frame": "/chatframe", "wait": ready + "'QCCD website: not available'", "timeout": 30000,
-             "stopOnFail": True},                                                                          # 4
-            act("read"),                                                                                   # 5
-            act("navigate", path="/web/studio/"),                                                          # 6
+             "stopOnFail": True},                                                                          # 5
+            act("read"),                                                                                   # 6
+            act("navigate", path="/web/studio/"),                                                          # 7
             {"wait": f"location.origin === '{base}' && location.pathname === '/studio' && !!window.QCCD_LIVE && "
-                     "QCCD_LIVE.state().connected && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},  # 7
-            {"sleep": 1500},                                                                               # 8
-            act("read", controls=False),                                                                   # 9
+                     "QCCD_LIVE.state().connected && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},  # 8
+            {"sleep": 1500},                                                                               # 9
+            act("read", controls=False),                                                                   # 10
         ]
         spec = tmp_path / "spec.json"
         spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={own('POST', '/api/pair-code', {})['code']}"
@@ -766,12 +785,13 @@ def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkey
         diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
         assert len(st) == len(steps), diag
         body = lambda i: json.loads(st[i]["body"])
-        assert st[2]["status"] == 200 and body(2)["ok"], diag
-        missing = body(5)
+        guess = body(2)                                                    # refused before leaving the page
+        assert not guess["ok"] and "there is no page /web/no-such-page/" in guess["error"] and "/studio" in guess["error"], diag
+        missing = body(6)
         assert missing["ok"] and missing["result"]["title"] == "QCCD website: not available", diag
         assert "has no page /no-such-page/" in missing["result"]["text"], diag           # it can see what happened
-        assert st[6]["status"] == 200 and body(6)["ok"], diag
-        there = body(9)
+        assert st[7]["status"] == 200 and body(7)["ok"], diag
+        there = body(10)
         assert there["ok"] and there["page"]["url"] == "/studio" and there["result"]["kind"] == "studio", diag
     finally:
         try:

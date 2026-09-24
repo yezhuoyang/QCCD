@@ -30,7 +30,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function json(u) { const r = await fetch(u); return r.json(); }
 async function target() {
-  for (let i = 0; i < 100; i++) {
+  // up to 30 s: on a loaded machine a headless Chrome can take well over 10 s to open its port
+  for (let i = 0; i < 300; i++) {
     try { await json(`http://127.0.0.1:${port}/json/version`); return; } catch (e) { await sleep(100); }
   }
   throw new Error('chrome did not start');

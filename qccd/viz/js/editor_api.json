@@ -1,0 +1,1178 @@
+{
+ "about": "The Studio's API (window.EDITOR, qccd/viz/js/editor.js), declared: every function, what it does, and who may call it. use: agent (an agent's `studio` page action may call it), harness (tests and the pointer adapters only), never (the person's files, storage, or a restart). kind (agent verbs): read, view (changes only what is shown), design (changes the device), program, course (changes the canvas to a lesson's). A function added to the API without an entry here, or an entry naming none, fails tests/test_agent_interface.py.",
+ "verbs": {
+  "mode": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the page's interaction mode"
+  },
+  "setMode": {
+   "use": "harness",
+   "does": "the old mode switch; finishes any gesture in flight (tests call it)"
+  },
+  "edits": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the edit log: every change made to the device since it was loaded"
+  },
+  "problems": {
+   "use": "agent",
+   "kind": "read",
+   "does": "what is wrong with the device now (geometry rules, structure, refusals)"
+  },
+  "lints": {
+   "use": "agent",
+   "kind": "read",
+   "does": "every lint finding, problems and notes together"
+  },
+  "state": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the whole current state: the device (nodes, segments, loops, zones) and its builder"
+  },
+  "ready": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether the page finished loading its device and programme"
+  },
+  "why": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why the page is not ready, when it is not"
+  },
+  "hit": {
+   "use": "harness",
+   "does": "what is under a pixel; the pointer adapter's hit test"
+  },
+  "begin": {
+   "use": "harness",
+   "does": "start a drag at a pixel"
+  },
+  "move": {
+   "use": "harness",
+   "does": "continue a drag"
+  },
+  "drop": {
+   "use": "harness",
+   "does": "finish a drag"
+  },
+  "cancel": {
+   "use": "harness",
+   "does": "abandon a drag"
+  },
+  "claim": {
+   "use": "harness",
+   "does": "the gesture arbiter: which gesture owns a press"
+  },
+  "claimEvent": {
+   "use": "harness",
+   "does": "the arbiter, from a DOM event"
+  },
+  "hover": {
+   "use": "harness",
+   "does": "the hover feedback at a pixel"
+  },
+  "cursor": {
+   "use": "harness",
+   "does": "the CSS cursor the pointer shows"
+  },
+  "panning": {
+   "use": "harness",
+   "does": "whether a pan is in progress"
+  },
+  "outline": {
+   "use": "harness",
+   "does": "the outline drawn around a part"
+  },
+  "hitRadii": {
+   "use": "harness",
+   "does": "hit-test radii, in pixels"
+  },
+  "slop": {
+   "use": "harness",
+   "does": "the drag threshold, in pixels"
+  },
+  "marqueeBegin": {
+   "use": "harness",
+   "does": "start a rubber-band selection"
+  },
+  "marqueeMove": {
+   "use": "harness",
+   "does": "continue it"
+  },
+  "marqueeDrop": {
+   "use": "harness",
+   "does": "finish it"
+  },
+  "bandBegin": {
+   "use": "harness",
+   "does": "start a band gesture"
+  },
+  "bandMove": {
+   "use": "harness",
+   "does": "continue it"
+  },
+  "bandDrop": {
+   "use": "harness",
+   "does": "finish it"
+  },
+  "bandCancel": {
+   "use": "harness",
+   "does": "abandon it"
+  },
+  "cancelGesture": {
+   "use": "harness",
+   "does": "Escape: abandon whatever gesture is live"
+  },
+  "measureToggle": {
+   "use": "agent",
+   "kind": "view",
+   "does": "turn the ruler on or off",
+   "args": "on?: boolean"
+  },
+  "measureClick": {
+   "use": "agent",
+   "kind": "view",
+   "does": "add a ruler point at a pixel of the canvas (two points: a distance; three: an angle)",
+   "args": "x, y: pixels"
+  },
+  "measureClear": {
+   "use": "agent",
+   "kind": "view",
+   "does": "clear the ruler's points"
+  },
+  "measure": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the ruler's reading: distance in micrometres and lattice units, angle in degrees"
+  },
+  "measureOn": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether the ruler is on"
+  },
+  "setTrueScale": {
+   "use": "agent",
+   "kind": "view",
+   "does": "True scale on (one pixel is the same length across and down) or off",
+   "args": "on: boolean"
+  },
+  "trueScale": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether True scale is on"
+  },
+  "rescale": {
+   "use": "harness",
+   "does": "recompute the layout and redraw"
+  },
+  "refit": {
+   "use": "agent",
+   "kind": "view",
+   "does": "fit the whole device to the canvas afresh"
+  },
+  "refitNext": {
+   "use": "harness",
+   "does": "make the next rebuild fit the device afresh"
+  },
+  "toUm": {
+   "use": "harness",
+   "does": "pixels to micrometres"
+  },
+  "physVec": {
+   "use": "harness",
+   "does": "a pixel displacement in nanometres, per axis"
+  },
+  "railAngle": {
+   "use": "harness",
+   "does": "the angle between two vectors, in degrees"
+  },
+  "redraw": {
+   "use": "harness",
+   "does": "redraw the static scene from the current layout"
+  },
+  "dragging": {
+   "use": "harness",
+   "does": "whether a drag is live"
+  },
+  "showHud": {
+   "use": "harness",
+   "does": "show the pointer's head-up display"
+  },
+  "hideHud": {
+   "use": "harness",
+   "does": "hide it"
+  },
+  "toasts": {
+   "use": "harness",
+   "does": "the toast strip's messages"
+  },
+  "lengthNote": {
+   "use": "harness",
+   "does": "the note about drawn vs declared segment lengths"
+  },
+  "groupCheck": {
+   "use": "harness",
+   "does": "whether a group of marks can move by an offset without overlapping"
+  },
+  "keyGesture": {
+   "use": "harness",
+   "does": "the verb a key means (the keyboard adapter)"
+  },
+  "keyHelp": {
+   "use": "agent",
+   "kind": "read",
+   "does": "every key and gesture the Studio understands, as the guide lists them"
+  },
+  "helpToggle": {
+   "use": "agent",
+   "kind": "view",
+   "does": "open or close the guide overlay (?)",
+   "args": "on?: boolean"
+  },
+  "helpOn": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether the guide overlay is open"
+  },
+  "nudge": {
+   "use": "agent",
+   "kind": "design",
+   "does": "move the selection by one step with an arrow key",
+   "args": "key: 'ArrowLeft'|'ArrowRight'|'ArrowUp'|'ArrowDown', mult?: number"
+  },
+  "reconcileLast": {
+   "use": "harness",
+   "does": "set the last moved node's segment lengths to what the drawing shows (the L key)"
+  },
+  "toast": {
+   "use": "harness",
+   "does": "show a transient message on the page"
+  },
+  "subjectOf": {
+   "use": "harness",
+   "does": "what a press on a part selects (the whole component, or the part)"
+  },
+  "selectionNodes": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the nodes the selection would move"
+  },
+  "emit": {
+   "use": "harness",
+   "does": "the one low-level applier every lane writes through; an agent uses the named design verbs"
+  },
+  "validate": {
+   "use": "agent",
+   "kind": "read",
+   "does": "check one edit op without applying it: the problems it would cause",
+   "args": "op: an edit record"
+  },
+  "undo": {
+   "use": "agent",
+   "kind": "design",
+   "does": "take back the last edit"
+  },
+  "redo": {
+   "use": "agent",
+   "kind": "design",
+   "does": "put back what undo took"
+  },
+  "addSite": {
+   "use": "agent",
+   "kind": "design",
+   "does": "add a trapping site at a position (model units)",
+   "args": "x, y, near?: node id, opts?: {kind, zone}"
+  },
+  "addSegment": {
+   "use": "agent",
+   "kind": "design",
+   "does": "join two nodes with a rail",
+   "args": "a, b: node ids, opts?"
+  },
+  "removeSelected": {
+   "use": "agent",
+   "kind": "design",
+   "does": "delete the selection (a site takes its rails with it)"
+  },
+  "reconcileLengths": {
+   "use": "harness",
+   "does": "append segment-length records for a moved node"
+  },
+  "select": {
+   "use": "agent",
+   "kind": "view",
+   "does": "select parts",
+   "args": "list of {kind, id}"
+  },
+  "selection": {
+   "use": "agent",
+   "kind": "read",
+   "does": "what is selected"
+  },
+  "stampComponent": {
+   "use": "agent",
+   "kind": "design",
+   "does": "place a whole component with its top-left at (x, y)",
+   "args": "name, x, y, quarter?"
+  },
+  "components": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the components available here, with their parameters"
+  },
+  "instanceMembers": {
+   "use": "agent",
+   "kind": "read",
+   "does": "every node and segment a placed component owns",
+   "args": "instance id"
+  },
+  "instanceAt": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the placed component a node belongs to",
+   "args": "node id"
+  },
+  "joinPin": {
+   "use": "agent",
+   "kind": "design",
+   "does": "join a component's pin to a node",
+   "args": "instance, pin, target node, opts?"
+  },
+  "pinNode": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the node behind a component's pin",
+   "args": "instance, pin"
+  },
+  "attachComponent": {
+   "use": "agent",
+   "kind": "design",
+   "does": "place a component and join one of its pins to a node, as one undoable act",
+   "args": "name, x, y, quarter, pin, target, opts?"
+  },
+  "componentSpec": {
+   "use": "agent",
+   "kind": "read",
+   "does": "a component's specification (parameters, pins, records)",
+   "args": "name"
+  },
+  "componentParams": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the parameters currently chosen for a component",
+   "args": "name"
+  },
+  "variantOf": {
+   "use": "agent",
+   "kind": "read",
+   "does": "which variant a placed component is",
+   "args": "instance id"
+  },
+  "setComponentParam": {
+   "use": "agent",
+   "kind": "design",
+   "does": "set a component parameter before placing it",
+   "args": "name, param, value"
+  },
+  "cmpCoerce": {
+   "use": "harness",
+   "does": "coerce a typed component parameter"
+  },
+  "arm": {
+   "use": "agent",
+   "kind": "view",
+   "does": "arm an element tile so the next canvas click places one",
+   "args": "type"
+  },
+  "armed": {
+   "use": "agent",
+   "kind": "read",
+   "does": "which element is armed"
+  },
+  "palettes": {
+   "use": "harness",
+   "does": "render the element palettes"
+  },
+  "avatar": {
+   "use": "harness",
+   "does": "an element's icon"
+  },
+  "avatarMarkup": {
+   "use": "harness",
+   "does": "an element's icon as markup"
+  },
+  "elementAvatar": {
+   "use": "harness",
+   "does": "a placed element's icon"
+  },
+  "avatarScenes": {
+   "use": "harness",
+   "does": "the icon scenes"
+  },
+  "stageMark": {
+   "use": "harness",
+   "does": "a node's mark on the canvas"
+  },
+  "stageMarkup": {
+   "use": "harness",
+   "does": "a node's mark as markup"
+  },
+  "nodeRec": {
+   "use": "harness",
+   "does": "what the drawing recorded about one node (length, slots, angle)"
+  },
+  "markup": {
+   "use": "harness",
+   "does": "serialise an element to markup"
+  },
+  "openForm": {
+   "use": "agent",
+   "kind": "view",
+   "does": "open one of the Selection panel's forms (a named zone, a row, a block)",
+   "args": "type, opts?"
+  },
+  "form": {
+   "use": "agent",
+   "kind": "read",
+   "does": "which form is open"
+  },
+  "menuOpen": {
+   "use": "agent",
+   "kind": "view",
+   "does": "open the element menu for the part at a pixel (what right-click does)",
+   "args": "x, y: pixels, opts?"
+  },
+  "menuItems": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the open element menu's actions, each with whether it can run here and why not"
+  },
+  "menuInvoke": {
+   "use": "agent",
+   "kind": "design",
+   "does": "run one action of the open element menu",
+   "args": "item id"
+  },
+  "menuClose": {
+   "use": "agent",
+   "kind": "view",
+   "does": "close the element menu"
+  },
+  "menuState": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the element menu's state"
+  },
+  "modifyOpen": {
+   "use": "agent",
+   "kind": "view",
+   "does": "open the Modify panel for the menu's part",
+   "args": "opts?"
+  },
+  "modifyFields": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the Modify panel's fields"
+  },
+  "modifyApply": {
+   "use": "agent",
+   "kind": "design",
+   "does": "apply the Modify panel (field name -> value)",
+   "args": "vals?: object"
+  },
+  "modifyClose": {
+   "use": "agent",
+   "kind": "view",
+   "does": "close the Modify panel"
+  },
+  "modifyExplode": {
+   "use": "harness",
+   "does": "the irreversible explode, behind the person's confirmation"
+  },
+  "insertSiteOn": {
+   "use": "agent",
+   "kind": "design",
+   "does": "split a rail and put a trapping site into it at a pixel",
+   "args": "segment id, x, y"
+  },
+  "rewriteBuilder": {
+   "use": "agent",
+   "kind": "design",
+   "does": "rewrite one builder record (d.site / d.segment / d.loop) by id",
+   "args": "method, id, changes, label?"
+  },
+  "notes": {
+   "use": "agent",
+   "kind": "read",
+   "does": "observations about what is not there yet (not problems)"
+  },
+  "lintProblems": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the lint findings that are problems"
+  },
+  "ghostBegin": {
+   "use": "harness",
+   "does": "start a placement preview"
+  },
+  "ghostMove": {
+   "use": "harness",
+   "does": "move it"
+  },
+  "ghostDrop": {
+   "use": "harness",
+   "does": "place it"
+  },
+  "ghostCancel": {
+   "use": "harness",
+   "does": "abandon it"
+  },
+  "placeStamp": {
+   "use": "harness",
+   "does": "place the armed stamp at a pixel"
+  },
+  "clickStage": {
+   "use": "harness",
+   "does": "a click on the canvas (the pointer adapter)"
+  },
+  "dblclickStage": {
+   "use": "harness",
+   "does": "a double-click on the canvas"
+  },
+  "isStampType": {
+   "use": "harness",
+   "does": "whether a type places as a stamp"
+  },
+  "setViewOnly": {
+   "use": "harness",
+   "does": "lock the page to viewing (embedded examples)"
+  },
+  "viewOnly": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether the page is view-only"
+  },
+  "leaveStage": {
+   "use": "harness",
+   "does": "the pointer left the canvas"
+  },
+  "sealZones": {
+   "use": "harness",
+   "does": "the zones the device's seal declares"
+  },
+  "canvasHistory": {
+   "use": "agent",
+   "kind": "read",
+   "does": "how many canvas-level undo and redo steps there are"
+  },
+  "pressStartCard": {
+   "use": "agent",
+   "kind": "design",
+   "does": "press a card of the Start panel (a generator, a template or a blank canvas)",
+   "args": "card"
+  },
+  "setName": {
+   "use": "agent",
+   "kind": "design",
+   "does": "type the new device's name (what the Start panel's name box does)",
+   "args": "text"
+  },
+  "zone": {
+   "use": "agent",
+   "kind": "view",
+   "does": "the zone the next placed site gets; with an argument, choose it",
+   "args": "zone?: name"
+  },
+  "closeLoopFromSelection": {
+   "use": "agent",
+   "kind": "design",
+   "does": "declare the selected sites, in selection order, as a loop",
+   "args": "opts?"
+  },
+  "elementDocs": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the schema's own description of every element"
+  },
+  "toModel": {
+   "use": "harness",
+   "does": "pixels to model units"
+  },
+  "snapTo": {
+   "use": "harness",
+   "does": "snap a point to the lattice"
+  },
+  "rebuild": {
+   "use": "harness",
+   "does": "replay the edits and redraw"
+  },
+  "setSnap": {
+   "use": "agent",
+   "kind": "view",
+   "does": "Snap on (parts land on the lattice) or off",
+   "args": "on: boolean"
+  },
+  "snap": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether Snap is on"
+  },
+  "designMode": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the design mode: sketch or parts"
+  },
+  "setDesignMode": {
+   "use": "agent",
+   "kind": "view",
+   "does": "switch between Sketch and Parts",
+   "args": "'sketch'|'parts'"
+  },
+  "sketchTool": {
+   "use": "agent",
+   "kind": "view",
+   "does": "arm a sketch shape",
+   "args": "'rect'|'ellipse'|'line'|'poly'|null"
+  },
+  "sketchOn": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the armed sketch shape"
+  },
+  "sketchTools": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the sketch shapes"
+  },
+  "sketchPlan": {
+   "use": "agent",
+   "kind": "read",
+   "does": "what a sketch would make (sites, corners, refusal) without making it",
+   "args": "tool, a, b: model points, mod?"
+  },
+  "sketchReadout": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the live sketch preview's numbers and any refusal"
+  },
+  "sketchCommit": {
+   "use": "agent",
+   "kind": "design",
+   "does": "make the device parts a sketch plan describes",
+   "args": "plan"
+  },
+  "sketchDown": {
+   "use": "harness",
+   "does": "sketch drag start"
+  },
+  "sketchMove": {
+   "use": "harness",
+   "does": "sketch drag move"
+  },
+  "sketchUp": {
+   "use": "harness",
+   "does": "sketch drag end"
+  },
+  "sketchClick": {
+   "use": "harness",
+   "does": "a polyline click at a pixel"
+  },
+  "sketchFinish": {
+   "use": "agent",
+   "kind": "design",
+   "does": "finish the polyline sketch, open or closed",
+   "args": "closed?: boolean"
+  },
+  "sketchClear": {
+   "use": "agent",
+   "kind": "view",
+   "does": "clear the sketch in progress"
+  },
+  "sketchDraw": {
+   "use": "agent",
+   "kind": "design",
+   "does": "draw a shape from one model point to another and make it",
+   "args": "tool, from, to, mod?"
+  },
+  "sketchPoints": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the polyline's points so far"
+  },
+  "boundary": {
+   "use": "harness",
+   "does": "the frozen mark sizes of the no-overlap boundary"
+  },
+  "nodeBox": {
+   "use": "harness",
+   "does": "a node's box at a position"
+  },
+  "dragState": {
+   "use": "harness",
+   "does": "the live drag's state"
+  },
+  "contactAt": {
+   "use": "harness",
+   "does": "the first mark a set of members would touch at an offset"
+  },
+  "price": {
+   "use": "agent",
+   "kind": "read",
+   "does": "what the programme costs on this device (cost, steps, time, DACs) or why it cannot be priced"
+  },
+  "hardware": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the hardware totals (DACs, junctions, electrodes, ...)"
+  },
+  "programBreaks": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why the programme no longer fits the device ([] when it fits)"
+  },
+  "hardware0": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the hardware totals of the device as loaded"
+  },
+  "repriceNow": {
+   "use": "harness",
+   "does": "recompute the price"
+  },
+  "layout": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the drawing's layout (scale and offset)"
+  },
+  "digest": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device's nodes and segments, sorted (a structural summary)"
+  },
+  "source": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device as its builder program (the Device panel's source)"
+  },
+  "applySource": {
+   "use": "agent",
+   "kind": "design",
+   "does": "replace the device's builder program with edited text",
+   "args": "src"
+  },
+  "exportPython": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device as a Python listing"
+  },
+  "schemaErrors": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why the current state could not be written as an .arch.json ([] when it can)"
+  },
+  "exportJson": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device as .arch.json text"
+  },
+  "exportEdits": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the edit log as JSON"
+  },
+  "transaction": {
+   "use": "agent",
+   "kind": "design",
+   "does": "apply several edit ops as one undoable step",
+   "args": "ops, label?"
+  },
+  "undoGroup": {
+   "use": "agent",
+   "kind": "design",
+   "does": "undo one whole gesture"
+  },
+  "redoGroup": {
+   "use": "agent",
+   "kind": "design",
+   "does": "redo one whole gesture"
+  },
+  "newCanvas": {
+   "use": "agent",
+   "kind": "design",
+   "does": "start a new blank canvas",
+   "args": "opts?"
+  },
+  "newFromGenerator": {
+   "use": "agent",
+   "kind": "design",
+   "does": "start a new device from a generator (chain, ring, grid, ...)",
+   "args": "gen, params, opts?"
+  },
+  "newFromTemplate": {
+   "use": "agent",
+   "kind": "design",
+   "does": "open a shipped device as itself",
+   "args": "stem, opts?"
+  },
+  "addNodeAt": {
+   "use": "agent",
+   "kind": "design",
+   "does": "add a site or junction at model coordinates",
+   "args": "x, y, opts?: {kind, id, zone}"
+  },
+  "joinNodes": {
+   "use": "agent",
+   "kind": "design",
+   "does": "add a segment between two nodes",
+   "args": "a, b, opts?"
+  },
+  "closeLoop": {
+   "use": "agent",
+   "kind": "design",
+   "does": "declare a loop over existing nodes",
+   "args": "id, walk: node ids, closed, kind?"
+  },
+  "nameZone": {
+   "use": "agent",
+   "kind": "design",
+   "does": "declare or change a zone type",
+   "args": "zone, fields"
+  },
+  "zoneFields": {
+   "use": "agent",
+   "kind": "read",
+   "does": "a zone type's fields, as the form prefills them",
+   "args": "zone, fields?"
+  },
+  "postSeedZones": {
+   "use": "harness",
+   "does": "zones declared after the device's seal"
+  },
+  "curveAddPoint": {
+   "use": "agent",
+   "kind": "design",
+   "does": "add a point to a physics curve",
+   "args": "name, point"
+  },
+  "curveRemovePoint": {
+   "use": "agent",
+   "kind": "design",
+   "does": "remove a point from a physics curve",
+   "args": "name, index"
+  },
+  "applyBlock": {
+   "use": "agent",
+   "kind": "design",
+   "does": "change machine settings of one block (primitives, heating, control, ...)",
+   "args": "type, changes"
+  },
+  "curveRows": {
+   "use": "agent",
+   "kind": "read",
+   "does": "a physics curve's points",
+   "args": "name"
+  },
+  "explodeToExplicit": {
+   "use": "harness",
+   "does": "irreversible: the person confirms it in the Modify panel"
+  },
+  "geom": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device's geometry records"
+  },
+  "seed": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device's seed record"
+  },
+  "post": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the records after the seed"
+  },
+  "program": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the hardware programme, one record per instruction"
+  },
+  "setProgram": {
+   "use": "agent",
+   "kind": "program",
+   "does": "replace the programme with records",
+   "args": "records"
+  },
+  "emitProgram": {
+   "use": "agent",
+   "kind": "program",
+   "does": "append one instruction record to the programme",
+   "args": "record"
+  },
+  "programSource": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the programme as source text (the Write panel's language)"
+  },
+  "applyProgramSource": {
+   "use": "agent",
+   "kind": "program",
+   "does": "replace the programme with source text",
+   "args": "src"
+  },
+  "programErrors": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why statements of the programme could not be lowered"
+  },
+  "authored": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether the programme was written on this page"
+  },
+  "parseErrors": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why the Write panel's text could not be parsed"
+  },
+  "evaluateWrite": {
+   "use": "agent",
+   "kind": "program",
+   "does": "price, check and play a test programme (what Evaluate does)",
+   "args": "text?"
+  },
+  "problemLine": {
+   "use": "harness",
+   "does": "one line describing a problem, for the strip"
+  },
+  "metricRows": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the figures the head and the Report show (cost, steps, runtime, n-bar, DACs, ...)"
+  },
+  "refusedLine": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the sentence under the picture when a statement was refused ('' when none)"
+  },
+  "testDrivePlan": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the smallest programme that exercises this device"
+  },
+  "testDrive": {
+   "use": "agent",
+   "kind": "program",
+   "does": "write that programme and play it (Test drive)"
+  },
+  "pressTestDrive": {
+   "use": "harness",
+   "does": "the Test drive button: the verb plus its toast"
+  },
+  "programToTsir": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the programme as a TSIR document"
+  },
+  "exportPair": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the device and programme files together"
+  },
+  "rules": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the hardware rules' verdicts for this programme on this device"
+  },
+  "ruleCoverage": {
+   "use": "agent",
+   "kind": "read",
+   "does": "each of the 27 rules: checked here, not checkable here, and why"
+  },
+  "palette": {
+   "use": "agent",
+   "kind": "read",
+   "does": "every element the palette offers, generated from the schema"
+  },
+  "hintFor": {
+   "use": "agent",
+   "kind": "read",
+   "does": "what a control or part is, in the explain layer's words",
+   "args": "data-hint key"
+  },
+  "hintFrom": {
+   "use": "harness",
+   "does": "the hint for a DOM element"
+  },
+  "hintHide": {
+   "use": "harness",
+   "does": "hide the hover card"
+  },
+  "stageHint": {
+   "use": "harness",
+   "does": "the on-canvas line naming what is under the pointer"
+  },
+  "explainToggle": {
+   "use": "agent",
+   "kind": "view",
+   "does": "label the regions of the screen (Explain)",
+   "args": "on?: boolean"
+  },
+  "explain": {
+   "use": "agent",
+   "kind": "read",
+   "does": "whether Explain is on"
+  },
+  "setFold": {
+   "use": "agent",
+   "kind": "view",
+   "does": "open or close a rail section (row, block, component)",
+   "args": "kind, open"
+  },
+  "folds": {
+   "use": "agent",
+   "kind": "read",
+   "does": "which rail sections are open"
+  },
+  "lessonsReady": {
+   "use": "harness",
+   "does": "the course data arrived (tutorial.js calls it)"
+  },
+  "lessonList": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the lessons, by part"
+  },
+  "lessonState": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the open lesson: its stage, whether it passed, the feedback"
+  },
+  "lessonLoad": {
+   "use": "agent",
+   "kind": "course",
+   "does": "open a lesson: its device and programme on the canvas",
+   "args": "lesson id"
+  },
+  "lessonCheck": {
+   "use": "agent",
+   "kind": "read",
+   "does": "check the lesson's exercise against what the page measures"
+  },
+  "lessonHint": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the lesson's next hint"
+  },
+  "lessonSolution": {
+   "use": "agent",
+   "kind": "course",
+   "does": "show the course's own solution, applied to the canvas",
+   "args": "opts?"
+  },
+  "lessonNext": {
+   "use": "agent",
+   "kind": "course",
+   "does": "open the next lesson"
+  },
+  "lessonAnswer": {
+   "use": "agent",
+   "kind": "course",
+   "does": "answer a lesson's question and check it",
+   "args": "choice"
+  },
+  "setAnswer": {
+   "use": "agent",
+   "kind": "course",
+   "does": "choose an answer without checking it",
+   "args": "choice"
+  },
+  "courseProgress": {
+   "use": "agent",
+   "kind": "read",
+   "does": "which lessons have been passed"
+  },
+  "evalCheck": {
+   "use": "agent",
+   "kind": "read",
+   "does": "evaluate a lesson check specification",
+   "args": "spec"
+  },
+  "loadCase": {
+   "use": "agent",
+   "kind": "course",
+   "does": "load a lesson case's programme (as given, or fixed)",
+   "args": "id, which?"
+  },
+  "shippedVerdict": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the verdict Python computed for a lesson case when the page was built",
+   "args": "id, which?"
+  },
+  "courseBlob": {
+   "use": "harness",
+   "does": "the course's shipped data"
+  },
+  "setSelection": {
+   "use": "agent",
+   "kind": "view",
+   "does": "select parts",
+   "args": "list of {kind, id}"
+  },
+  "seekTo": {
+   "use": "agent",
+   "kind": "view",
+   "does": "move the animation to a named point of the programme",
+   "args": "which"
+  },
+  "fit": {
+   "use": "agent",
+   "kind": "view",
+   "does": "fit the device to the canvas"
+  },
+  "snapshot": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the whole document as a snapshot"
+  },
+  "restore": {
+   "use": "never",
+   "does": "replaces the whole document from a snapshot; the person's to do"
+  },
+  "autosave": {
+   "use": "never",
+   "does": "writes the person's browser storage"
+  },
+  "autoload": {
+   "use": "never",
+   "does": "reads the person's browser storage"
+  },
+  "autosaveSoon": {
+   "use": "never",
+   "does": "schedules a write to the person's browser storage"
+  },
+  "importText": {
+   "use": "never",
+   "does": "replaces the whole document from a file's text; the person's to do"
+  },
+  "snapshotOf": {
+   "use": "agent",
+   "kind": "read",
+   "does": "parse a snapshot, .arch.json or edit list without applying it",
+   "args": "text"
+  },
+  "saveProject": {
+   "use": "never",
+   "does": "writes the person's file"
+  },
+  "hasFileHandle": {
+   "use": "never",
+   "does": "the person's file handle"
+  },
+  "boot": {
+   "use": "never",
+   "does": "restarts the page"
+  }
+ }
+}

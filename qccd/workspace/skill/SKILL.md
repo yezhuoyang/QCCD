@@ -81,6 +81,14 @@ context; `qccd_get_context` lists the open `pages`).
 
 ## Working on the website like a person at the screen
 
+**Only what is declared.** Your page tools operate only what the code declares
+(`qccd_read_reference` section `interface`; docs/agent-interface.md): controls with a declared
+`data-hint`, links and fold-outs, fields of generated forms, and a short out-of-line list;
+places from the site map, the page's own links and `/studio`; Studio verbs declared for agents
+(`studio` verb `verbs` lists them with what each does). A page read marks every other control
+`undeclared`. A refusal says what is declared instead; use that, or tell the person what you
+could not do. Never guess a path, a control or a verb.
+
 **The Design page is the person's own Studio.** From a website page, `qccd_page_act`
 `navigate` with `path: '/studio'` opens it (the site's `studio.html` does too; a lesson,
 `studio.html#learn=A1`, stays on the site's Studio). Take every other path from the site map
@@ -107,8 +115,8 @@ included ("scroll back and forth ten times" is `scroll by: 'page'` / `'-page'` i
 - **Walking the course.** `qccd_page_act(action="studio", verb="lessonList")` lists the
   lessons; a lesson with a `page` runs on that page (Part D: `micro_grid9x9.html`), so
   navigate there first. `open_lesson`, read the Learn pane (`qccd_page_read`), then do the
-  exercise yourself with Studio verbs (`addSite`, `addSegment`, `emit`, ...; verb `verbs`
-  lists them), `lessonCheck` to see whether it passed, `lessonHint` when stuck. To show the
+  exercise yourself with Studio verbs (`addSite`, `addSegment`, `addNodeAt`, `joinNodes`,
+  `closeLoop`, `transaction` for several edits as one; verb `verbs` lists them with what each does), `lessonCheck` to see whether it passed, `lessonHint` when stuck. To show the
   course's own answer for one stage, `lessonSolution` with args `[{"one": true}]`. Explain
   each step in the chat as you go.
 - **Reviewing a page for mistakes.** Read it section by section. For each claim, check it
