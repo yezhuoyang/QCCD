@@ -16,6 +16,14 @@
 //   navigate    go to another page of the same site (never off it)
 //   step        a studio animation: seek a step, step forward or back, play, pause
 //   open_lesson open a lesson of the course (a studio page)
+//   studio      one verb of the page's Studio API (EDITOR): design on the canvas, write the
+//               program, check a lesson -- the same verbs the course solves its exercises with
+//   wait        pause, so a demonstration can be followed
+//   comments    the comment threads on this page (the site's own, as the signed-in person sees them)
+//   comment     pin a new thread on an element, as the signed-in person, signed "via <agent>";
+//   reply       answer in a thread;  resolve  mark a thread addressed (or reopen it)
+// Every action is VISIBLE: a cursor with the agent's name glides to the target and says what
+// it is about to do, then does it; typing appears letter by letter.
 // A target is {ref} (from the last read), {selector} (CSS), or {text} (visible text), plus
 // {frame: 'fN'} to reach into an embedded example.  The chat, its menus and its dialogs are
 // out of reach: an agent must not press the person's own Send, Approve or Undo.
@@ -24,7 +32,19 @@
 'use strict';
 if (window.QCCD_PAGE) return;
 
-var PRIVATE = '#qcl-dock, #qcl-menu, .qcl-modal, #qcl-notice, #qcl-unpaired, #qccd-chat, [data-qccd-private]';
+// the chat, and the site's own comment controls (Sign in is the person's; the agent comments
+// through the `comment` action, which signs what it writes)
+var PRIVATE = '#qcl-dock, #qcl-menu, .qcl-modal, #qcl-notice, #qcl-unpaired, #qccd-chat, [data-qccd-private], ' +
+              '#qcnav, #qc-layer, #qc-menu, [id^="qc-"]';
+var COMMENT_UI = '#qcnav, #qc-layer, #qc-menu, [id^="qc-"]';
+var NOT_SIGNED = 'the person is not signed in to qccd.academy on this page: ask them to press "Sign in" in the ' +
+                 'site bar (their own account; the agent never signs in for them)';
+function hookOf() {
+  var f = window.QCCD_COMMENTS_HOOK;
+  if (typeof f !== 'function') throw new Error('this page has no comments (they work on the website pages your workspace serves)');
+  return f();
+}
+function signed(text, who) { return text + '\n\n\u2014 via ' + (who || 'an agent'); }
 var CONTROL = 'a[href], button, input, select, textarea, summary, [role="button"], [role="tab"], [role="link"], ' +
               '[role="checkbox"], [role="menuitem"], [role="option"], [onclick]';
 var MAX_TEXT = 6000, MAX_CONTROLS = 160;
@@ -270,6 +290,9 @@ function resolve(t) {
     el = best;
   } else throw new Error('a target needs ref, selector or text');
   if (!el) throw new Error('nothing on the page matches ' + JSON.stringify(t));
+  if (el.closest && el.closest(COMMENT_UI))
+    throw new Error('that is the site\'s sign-in and comment controls, which are the person\'s: read comments with ' +
+                    'the comments action and write with comment, reply, resolve');
   if (isPrivate(el)) throw new Error('that is part of the chat; the agent cannot operate it');
   return { el: el, doc: doc, win: win, frame: f };
 }
@@ -299,6 +322,7 @@ function highlight(el, note, frameEl) {
   }
   var box = document.createElement('div');
   box.setAttribute('data-qccd-private', '');
+  box.className = 'qccd-hl';
   box.style.cssText = 'position:fixed;z-index:2147483000;pointer-events:none;border:3px solid #e8890c;border-radius:6px;' +
                       'box-shadow:0 0 0 4000px rgba(20,18,30,.10),0 0 14px rgba(232,137,12,.7);transition:all .25s';
   HL = [box];
@@ -306,6 +330,7 @@ function highlight(el, note, frameEl) {
   if (note) {
     var tip = document.createElement('div');
     tip.setAttribute('data-qccd-private', '');
+    tip.className = 'qccd-hl-note';
     tip.textContent = String(note).slice(0, 400);
     tip.style.cssText = 'position:fixed;z-index:2147483001;max-width:320px;background:#1d1d1b;color:#fff;padding:8px 11px;' +
                         'border-radius:8px;font:13px/1.45 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none';
@@ -317,9 +342,104 @@ function highlight(el, note, frameEl) {
   setTimeout(function () { if (HL && HL[0] === box) unhighlight(); }, 9000);
 }
 
+// ------------------------------------------------------------------ the agent, visibly
+//
+// Like a person at the keyboard: before the agent acts on something, a cursor with its name
+// glides there and says what it is about to do; typing appears letter by letter.  The person
+// always sees where the agent is working.  The cursor rests (dimmed) where it last acted.
+var CUR = null, CURXY = null, CURFADE = null;
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function cursor(who) {
+  if (!CUR) {
+    CUR = document.createElement('div');
+    CUR.id = 'qccd-agent-cursor';
+    CUR.setAttribute('data-qccd-private', '');
+    CUR.setAttribute('aria-hidden', 'true');
+    CUR.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483600;pointer-events:none;will-change:transform;' +
+                        'transition:transform .5s cubic-bezier(.22,.8,.26,1),opacity .4s;opacity:1';
+    CUR.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" style="display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))">' +
+      '<path d="M4 2.5 L4 19.5 L8.6 15.2 L11.8 22 L14.6 20.7 L11.4 14 L17.6 14 Z" fill="#7c3aed" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+      '<span style="position:absolute;left:20px;top:18px;background:#7c3aed;color:#fff;font:600 12px/1.3 system-ui,sans-serif;' +
+      'padding:4px 9px;border-radius:11px;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis;' +
+      'box-shadow:0 3px 10px rgba(76,29,149,.35)"></span>';
+    document.body.appendChild(CUR);
+    CURXY = { x: window.innerWidth - 120, y: window.innerHeight - 140 };     // it comes from the chat
+    CUR.style.transition = 'none';
+    CUR.style.transform = 'translate(' + CURXY.x + 'px,' + CURXY.y + 'px)';
+    void CUR.offsetWidth;
+    CUR.style.transition = 'transform .5s cubic-bezier(.22,.8,.26,1),opacity .4s';
+  }
+  return CUR;
+}
+function say(who, caption) {
+  var c = cursor(who);
+  c.style.opacity = '1';
+  c.querySelector('span').textContent = (who || 'Agent') + (caption ? ': ' + caption : '');
+  if (CURFADE) clearTimeout(CURFADE);
+  CURFADE = setTimeout(function () { if (CUR) CUR.style.opacity = '.45'; }, 6000);
+}
+function glideTo(x, y, who, caption) {
+  say(who, caption);
+  var d = Math.hypot(x - CURXY.x, y - CURXY.y);
+  var ms = Math.max(180, Math.min(650, d * 0.9));
+  CUR.style.transition = 'transform ' + ms + 'ms cubic-bezier(.22,.8,.26,1),opacity .4s';
+  CUR.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  CURXY = { x: x, y: y };
+  return sleep(ms + 60);
+}
+function inView(r) { return r.bottom > 40 && r.top < window.innerHeight - 20 && r.right > 0 && r.left < window.innerWidth; }
+// bring an element (maybe inside an embedded example) on screen, then glide to it
+function pointAt(el, frameEl, who, caption) {
+  var outer = frameEl || el, wait = Promise.resolve();
+  if (!inView(outer.getBoundingClientRect())) {
+    outer.scrollIntoView({ block: 'center', behavior: frameEl ? 'instant' : 'smooth' });
+    wait = sleep(frameEl ? 60 : 480);
+  }
+  return wait.then(function () {
+    var r = el.getBoundingClientRect(), off = frameEl && el !== frameEl ? frameEl.getBoundingClientRect() : { left: 0, top: 0 };
+    var x = off.left + r.left + Math.min(r.width / 2, 60), y = off.top + r.top + Math.min(r.height / 2, 18);
+    yieldChat({ left: off.left + r.left, top: off.top + r.top, right: off.left + r.right, bottom: off.top + r.bottom });
+    return glideTo(x, y, who, caption);
+  }).then(function () { ring(el, frameEl); });
+}
+// the chat sits over the page's corner: when the agent works under it, it turns see-through
+// for a while (hovering it brings it back at once)
+var YIELD = null;
+function yieldChat(r) {
+  var c = document.getElementById('qccd-chat');
+  if (!c) return;
+  var q = c.getBoundingClientRect();
+  if (r.right < q.left || r.left > q.right || r.bottom < q.top || r.top > q.bottom) return;
+  c.classList.add('qccd-yield');
+  if (YIELD) clearTimeout(YIELD);
+  YIELD = setTimeout(function () { c.classList.remove('qccd-yield'); }, 9000);
+}
+function ring(el, frameEl) {
+  // a brief outline on what the agent touches
+  var r = el.getBoundingClientRect(), off = frameEl && el !== frameEl ? frameEl.getBoundingClientRect() : { left: 0, top: 0 };
+  var b = document.createElement('div');
+  b.setAttribute('data-qccd-private', '');
+  b.className = 'qccd-ring';
+  b.style.cssText = 'position:fixed;z-index:2147483500;pointer-events:none;border:2px solid #7c3aed;border-radius:5px;' +
+                    'transition:opacity .6s;opacity:1;left:' + (off.left + r.left - 3) + 'px;top:' + (off.top + r.top - 3) +
+                    'px;width:' + (r.width + 6) + 'px;height:' + (r.height + 6) + 'px';
+  document.body.appendChild(b);
+  setTimeout(function () { b.style.opacity = '0'; }, 700);
+  setTimeout(function () { b.remove(); }, 1400);
+}
+function stageOf(doc) {
+  return doc.getElementById('svg') || doc.getElementById('canvas') || doc.querySelector('main') || doc.body;
+}
+
 // ------------------------------------------------------------------ actions
 var KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Tab: 9, ' ': 32, Space: 32,
              Home: 36, End: 35, PageUp: 33, PageDown: 34 };
+// the Studio's own API is the agent's hands on the canvas (the course solves its exercises with
+// the same verbs); these would touch the person's files or storage, or restart the page
+var STUDIO_DENY = { saveProject: 1, hasFileHandle: 1, autosave: 1, autoload: 1, autosaveSoon: 1, boot: 1 };
+// on the WORKSPACE's own Studio an edit through the page would be recorded as the person's; there
+// the agent changes the design through its own tools, and may only read and drive the view here
+var STUDIO_READ = /^(state|geom|seed|post|edits|program|programSource|programErrors|programBreaks|problems|lintProblems|lints|rules|ruleCoverage|validate|why|notes|selection|selectionNodes|nodes|segments|exportJson|exportPython|exportEdits|metricRows|evaluateWrite|parseErrors|palette|components|componentSpec|componentParams|elementDocs|hintFor|lessonList|lessonState|lessonCheck|lessonHint|lessonSolution|courseProgress|seekTo|fit|select|setSelection|explainToggle|setTrueScale|trueScale|layout|snapshot|refit|redraw|hover|showHud|hideHud|keyHelp|helpToggle)$/;
 function sitePath(href) {
   // the one place navigation may go: this site, on this origin, under the mirror's /web/
   // (or the Studio's own pages when this IS the Studio)
@@ -329,108 +449,245 @@ function sitePath(href) {
   if (window.QCCD_MIRROR && u.pathname.indexOf('/web/') !== 0 && u.pathname !== '/web') return null;
   return u;
 }
-function setValue(el, v) {
+function setValue(el, v, quiet) {
   var proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : (el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype);
   var d = Object.getOwnPropertyDescriptor(proto, 'value');
   if (d && d.set) d.set.call(el, v); else el.value = v;
   el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
+  if (!quiet) el.dispatchEvent(new Event('change', { bubbles: true }));
 }
-function act(action, args) {
+function typeInto(el, text) {
+  // letter by letter, at most ~1.5 s however long the text
+  var n = text.length, steps = Math.min(n, 45), i = 0;
+  if (!n) { setValue(el, ''); return Promise.resolve(); }
+  return new Promise(function (done) {
+    (function tick() {
+      i++;
+      var upto = Math.round(n * i / steps);
+      setValue(el, text.slice(0, upto), i < steps);
+      if (i < steps) setTimeout(tick, Math.max(12, Math.min(40, 1500 / steps))); else done();
+    })();
+  });
+}
+function jsonable(x, budget) {
+  // a Studio verb's answer, as plain data: no DOM, no functions, bounded
+  var seen = [];
+  var s = JSON.stringify(x === undefined ? null : x, function (k, v) {
+    if (typeof v === 'function') return undefined;
+    if (v && typeof v === 'object') {
+      if (v.nodeType || v === window) return undefined;
+      if (seen.indexOf(v) >= 0) return '[repeated]';
+      seen.push(v);
+    }
+    return v;
+  });
+  if (s && s.length > (budget || 60000)) return { truncated: true, bytes: s.length, head: s.slice(0, 4000) };
+  return s ? JSON.parse(s) : null;
+}
+function studioBrief(ed) {
+  var out = {};
+  try { var st = ed.state(), d = st && st.device; if (d) out.device = { nodes: Object.keys(d.nodes || {}).length, segments: Object.keys(d.segments || {}).length }; } catch (e) { /* none */ }
+  try { out.problems = (ed.problems() || []).slice(0, 8).map(function (p) { return p.message || p.code || p; }); } catch (e) { /* none */ }
+  try { out.program_rows = (ed.program() || []).length; } catch (e) { /* none */ }
+  try { if (ed.lessonState) { var ls = ed.lessonState(); if (ls && ls.id) out.lesson = { id: ls.id, stage: ls.stage, passed: ls.passed, feedback: ls.feedback }; } } catch (e) { /* none */ }
+  return out;
+}
+function act(action, args, who) {
   args = args || {};
   var r, el;
   switch (action) {
-    case 'read': return read(args);
+    case 'read':
+      var h1 = document.querySelector('main h1, h1') || document.body;
+      pointAt(h1, null, who, 'reading this page');                        // shown; the answer does not wait
+      return read(args);
+    case 'wait':
+      var ms = Math.max(0, Math.min(10000, +args.ms || 1000));
+      say(who, args.note ? String(args.note).slice(0, 120) : 'waiting');
+      return sleep(ms).then(function () { return { ok: true, waited_ms: ms }; });
     case 'scroll':
-      if (args.to === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return { ok: true }; }
-      if (args.to === 'bottom') { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); return { ok: true }; }
+      var before = window.scrollY, top;
+      if (args.to === 'top') top = 0;
+      else if (args.to === 'bottom') top = document.documentElement.scrollHeight;
+      else if (args.by !== undefined) {
+        var by = args.by === 'page' ? window.innerHeight * 0.85 : (args.by === '-page' ? -window.innerHeight * 0.85 : +args.by);
+        top = before + (isFinite(by) ? by : 0);
+      }
+      if (top !== undefined) {
+        return glideTo(window.innerWidth * 0.55, window.innerHeight * 0.45, who, top < before ? 'scrolling up' : 'scrolling down')
+          .then(function () { window.scrollTo({ top: top, behavior: 'smooth' }); return sleep(650); })
+          .then(function () { return { ok: true, from: Math.round(before), to: Math.round(window.scrollY) }; });
+      }
       r = resolve(args.target);
-      (r.frame || r.el).scrollIntoView({ block: 'center', behavior: 'smooth' });
-      return { ok: true, element: describe(r.el) };
+      return pointAt(r.el, r.frame && r.el !== r.frame ? r.frame : null, who, 'looking at "' + label(r.el) + '"')
+        .then(function () { return { ok: true, element: describe(r.el), to: Math.round(window.scrollY) }; });
     case 'highlight':
       r = resolve(args.target);
-      highlight(r.el, args.note, r.frame && r.el !== r.frame ? r.frame : null);
-      return { ok: true, element: describe(r.el), note: args.note ? 'shown beside it for 9 s' : undefined };
+      return pointAt(r.el, r.frame && r.el !== r.frame ? r.frame : null, who, args.note ? 'look here' : 'here').then(function () {
+        highlight(r.el, args.note, r.frame && r.el !== r.frame ? r.frame : null);
+        return { ok: true, element: describe(r.el), note: args.note ? 'shown beside it for 9 s' : undefined };
+      });
     case 'click':
       r = resolve(args.target); el = r.el;
+      var nav = null;
       if (el.tagName === 'A') {
         var href = el.getAttribute('href') || '';
         if (href && href[0] !== '#' && !/^javascript:/i.test(href)) {
-          var u = sitePath(el.href);
-          if (!u) throw new Error('that link leaves the site (' + clip(href, 100) + '); give the person the link instead');
-          if (el.target === '_blank') { location.assign(u.href); return { ok: true, navigating: u.pathname + u.search + u.hash }; }
+          nav = sitePath(el.href);
+          if (!nav) throw new Error('that link leaves the site (' + clip(href, 100) + '); give the person the link instead');
         }
       }
       if (el.tagName === 'INPUT' && el.type === 'file') throw new Error('file inputs are the person\'s to use');
       if (el.disabled) throw new Error('that control is disabled right now');
-      (r.frame || el).scrollIntoView({ block: 'center', behavior: 'instant' });
-      if (typeof el.click === 'function') el.click();
-      else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: r.win }));
-      return { ok: true, element: describe(el) };
+      return pointAt(el, r.frame && el !== r.frame ? r.frame : null, who, 'clicking "' + label(el) + '"').then(function () {
+        if (nav && el.target === '_blank') { location.assign(nav.href); return { ok: true, navigating: nav.pathname + nav.search + nav.hash }; }
+        if (typeof el.click === 'function') el.click();
+        else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: r.win }));
+        return { ok: true, element: describe(el), navigating: nav ? nav.pathname + nav.search + nav.hash : undefined };
+      });
     case 'fill':
       r = resolve(args.target); el = r.el;
+      var value = String(args.value === undefined ? '' : args.value);
       if (el.tagName === 'SELECT') {
-        var want = String(args.value), opt = null;
-        Array.prototype.forEach.call(el.options, function (o) { if (!opt && (o.value === want || o.textContent.trim() === want)) opt = o; });
-        if (!opt) throw new Error('no option ' + JSON.stringify(want) + ' (options: ' + Array.prototype.map.call(el.options, function (o) { return o.textContent.trim(); }).slice(0, 20).join(', ') + ')');
-        setValue(el, opt.value);
-        return { ok: true, element: describe(el), value: el.value };
+        var opt = null;
+        Array.prototype.forEach.call(el.options, function (o) { if (!opt && (o.value === value || o.textContent.trim() === value)) opt = o; });
+        if (!opt) throw new Error('no option ' + JSON.stringify(value) + ' (options: ' + Array.prototype.map.call(el.options, function (o) { return o.textContent.trim(); }).slice(0, 20).join(', ') + ')');
+        return pointAt(el, r.frame && el !== r.frame ? r.frame : null, who, 'choosing "' + opt.textContent.trim() + '"').then(function () {
+          setValue(el, opt.value);
+          return { ok: true, element: describe(el), value: el.value };
+        });
       }
       if (el.tagName !== 'TEXTAREA' && !(el.tagName === 'INPUT' && !/^(password|file|hidden|checkbox|radio|button|submit|image|reset)$/.test(el.type)))
         throw new Error('fill works on text fields, sliders and selects; this is a ' + el.tagName.toLowerCase());
-      el.focus();
-      setValue(el, String(args.value === undefined ? '' : args.value));
-      return { ok: true, element: describe(el), value: el.value };
+      return pointAt(el, r.frame && el !== r.frame ? r.frame : null, who, 'typing').then(function () {
+        el.focus();
+        return el.type === 'range' ? (setValue(el, value), null) : typeInto(el, value);
+      }).then(function () { return { ok: true, element: describe(el), value: el.value }; });
     case 'press':
       var key = String(args.key || '');
       if (!KEYS[key]) throw new Error('press takes one of: ' + Object.keys(KEYS).join(', '));
       if (key === 'Space') key = ' ';
       el = args.target ? resolve(args.target).el : (document.activeElement && !isPrivate(document.activeElement) ? document.activeElement : document.body);
-      ['keydown', 'keyup'].forEach(function (t) {
-        el.dispatchEvent(new KeyboardEvent(t, { key: key, code: key === ' ' ? 'Space' : key, keyCode: KEYS[key], which: KEYS[key], bubbles: true, cancelable: true }));
+      return pointAt(el, null, who, 'pressing ' + (key === ' ' ? 'Space' : key)).then(function () {
+        ['keydown', 'keyup'].forEach(function (t) {
+          el.dispatchEvent(new KeyboardEvent(t, { key: key, code: key === ' ' ? 'Space' : key, keyCode: KEYS[key], which: KEYS[key], bubbles: true, cancelable: true }));
+        });
+        return { ok: true, key: key, element: describe(el) };
       });
-      return { ok: true, key: key, element: describe(el) };
     case 'navigate':
       var p = sitePath(String(args.path || ''));
       if (!p) throw new Error('navigate stays on this site: give a path like ../rules/ or /web/rules/');
-      setTimeout(function () { location.assign(p.href); }, 50);
-      return { ok: true, navigating: p.pathname + p.search + p.hash };
+      return glideTo(window.innerWidth / 2, 60, who, 'opening ' + p.pathname.replace(/^\/web/, '')).then(function () {
+        setTimeout(function () { location.assign(p.href); }, 50);
+        return { ok: true, navigating: p.pathname + p.search + p.hash };
+      });
     case 'step':
-      var win = window, doc = document;
-      if (args.target || args.frame) { r = resolve(args.target || { frame: args.frame }); win = r.win; doc = r.doc;
-        if (r.frame) r.frame.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+      var win = window, doc = document, fr = null;
+      if (args.target || args.frame) { r = resolve(args.target || { frame: args.frame }); win = r.win; doc = r.doc; fr = r.frame; }
       if (typeof win.seek !== 'function') throw new Error('this page has no animation to step');
       var sl = doc.getElementById('slider'), play = doc.getElementById('play');
       var cur = sl ? +sl.value : 0, last = sl ? +sl.max : 0;
-      if (args.play) { if (play && !/pause/i.test(play.textContent)) play.click(); }
-      else if (args.pause) { if (play && /pause/i.test(play.textContent)) play.click(); }
-      else if (args.frame_index !== undefined || args.step !== undefined) win.seek(Math.max(0, Math.min(last, +(args.step !== undefined ? args.step : args.frame_index))), {});
-      else win.seek(Math.max(0, Math.min(last, cur + (args.delta === undefined ? 1 : +args.delta))), {});
-      return { ok: true, transport: transport(win, doc) };
+      var what = args.play ? 'playing' : args.pause ? 'pausing' : (args.step !== undefined ? 'going to step ' + args.step : 'stepping');
+      return pointAt(play || sl || stageOf(doc), fr, who, what).then(function () {
+        if (args.play) { if (play && !/pause/i.test(play.textContent)) play.click(); }
+        else if (args.pause) { if (play && /pause/i.test(play.textContent)) play.click(); }
+        else if (args.frame_index !== undefined || args.step !== undefined) win.seek(Math.max(0, Math.min(last, +(args.step !== undefined ? args.step : args.frame_index))), {});
+        else win.seek(Math.max(0, Math.min(last, cur + (args.delta === undefined ? 1 : +args.delta))), {});
+        return { ok: true, transport: transport(win, doc) };
+      });
     case 'open_lesson':
       var ed = window.EDITOR;
       if (!ed || !ed.lessonLoad) throw new Error('lessons open on the Studio page (studio.html); navigate there first');
       var id = String(args.lesson || args.id || '');
       var known = (ed.lessonList ? ed.lessonList() : []).map(function (l) { return l.id; });
       if (known.length && known.indexOf(id) < 0) throw new Error('no lesson ' + id + '; the lessons are ' + known.join(', '));
-      ed.lessonLoad(id);
-      try { var dk = document.getElementById('dock'); if (dk && typeof window.foldPanel === 'function') window.foldPanel(dk, false);
-            if (typeof window.setPane === 'function') window.setPane('L'); } catch (e) { /* the page lays out itself */ }
-      return { ok: true, lesson: ed.lessonState ? ed.lessonState() : { id: id } };
+      return glideTo(window.innerWidth * 0.75, 150, who, 'opening lesson ' + id).then(function () {
+        ed.lessonLoad(id);
+        try { var dk = document.getElementById('dock'); if (dk && typeof window.foldPanel === 'function') window.foldPanel(dk, false);
+              if (typeof window.setPane === 'function') window.setPane('L'); } catch (e) { /* the page lays out itself */ }
+        return { ok: true, lesson: ed.lessonState ? ed.lessonState() : { id: id } };
+      });
+    case 'studio':
+      var sw = window, sd = document, sf = null;
+      if (args.frame) { r = resolve({ frame: args.frame }); sw = r.win; sd = r.doc; sf = r.frame; }
+      var E = sw.EDITOR, verb = String(args.verb || '');
+      if (!E) throw new Error('this page has no Studio (an EDITOR); open studio.html, a lesson, or an example');
+      if (verb === 'verbs') return { ok: true, verbs: Object.keys(E).filter(function (k) { return typeof E[k] === 'function' && !STUDIO_DENY[k]; }).sort() };
+      if (typeof E[verb] !== 'function') throw new Error('the Studio has no verb ' + JSON.stringify(verb) + ' (studio verb "verbs" lists them)');
+      if (STUDIO_DENY[verb]) throw new Error(verb + ' touches your files or restarts the page; the agent does not use it');
+      if (window.QCCD_DESIGN_PAGE && !STUDIO_READ.test(verb))
+        throw new Error('this is the workspace\'s own design: change it with qccd_apply_change_set, so the change is recorded as the agent\'s');
+      var a = Array.isArray(args.args) ? args.args : (args.args === undefined ? [] : [args.args]);
+      return pointAt(stageOf(sd), sf, who, verb + (a.length ? ' ' + clip(JSON.stringify(a), 60) : '')).then(function () {
+        var res = E[verb].apply(null, a);
+        return Promise.resolve(res).then(function (v) {
+          return { ok: !(v && v.ok === false), verb: verb, result: jsonable(v), studio: studioBrief(E) };
+        });
+      });
+    case 'comments':
+      var hk = hookOf(), me0 = hk.me();
+      if (!me0) return { ok: true, signed_in: false, note: NOT_SIGNED };
+      return hk.api('GET', '/threads?page=' + encodeURIComponent(hk.page())).then(function (d) {
+        return { ok: true, signed_in: true, me: me0.name, page: hk.page(), threads: (d.threads || []).map(function (t) {
+          var e = null;
+          try { e = hk.resolveAnchor(t.anchor); } catch (x) { e = null; }
+          return { id: t.id, resolved: !!t.resolved, author: (t.user || {}).name, at: (t.anchor || {}).text,
+                   element: e ? describe(e) : null,
+                   comments: (t.comments || []).map(function (c) { return { author: (c.user || {}).name, text: c.text, when: c.created }; }) };
+        }) };
+      });
+    case 'comment':
+      var hc = hookOf();
+      if (!hc.me()) throw new Error(NOT_SIGNED);
+      var ctext = String(args.text || '').trim();
+      if (!ctext) throw new Error('comment needs text');
+      if (ctext.length > 3800) throw new Error('keep a comment under 3800 characters');
+      r = resolve(args.target);
+      if (r.frame && r.el !== r.frame) throw new Error('a comment goes on this page, not inside an embedded example: target the example itself ({frame: ...})');
+      el = r.el;
+      var cbody = signed(ctext, who);
+      return pointAt(el, null, who, 'commenting here').then(function () {
+        var R = el.getBoundingClientRect();
+        var anchor = hc.describe(el, R.left + Math.min(R.width / 2, 40), R.top + Math.min(R.height / 2, 12));
+        return hc.api('POST', '/threads', { page: hc.page(), anchor: anchor, text: cbody });
+      }).then(function (d) {
+        hc.reload();
+        return { ok: true, thread: (d.thread || {}).id, page: hc.page(), text: cbody, as: hc.me().name, element: describe(el) };
+      });
+    case 'reply':
+    case 'resolve':
+      var hr = hookOf();
+      if (!hr.me()) throw new Error(NOT_SIGNED);
+      var tid = parseInt(args.thread, 10);
+      if (!(tid > 0)) throw new Error(action + ' needs thread: a thread id from the comments action');
+      var th = (hr.threads() || []).filter(function (t) { return t.id === tid; })[0];
+      var node = document.querySelector('#qc-layer [data-id="' + tid + '"]');
+      var there = th ? (hr.resolveAnchor(th.anchor) || node) : node;
+      var go = there ? pointAt(there, null, who, action === 'reply' ? 'replying' : 'marking it addressed') : Promise.resolve();
+      if (action === 'reply') {
+        var rtext = String(args.text || '').trim();
+        if (!rtext) throw new Error('reply needs text');
+        var rbody = signed(rtext, who);
+        return go.then(function () { return hr.api('POST', '/threads/' + tid + '/comments', { text: rbody }); })
+          .then(function () { hr.reload(); return { ok: true, thread: tid, page: hr.page(), text: rbody, as: hr.me().name }; });
+      }
+      return go.then(function () { return hr.api('POST', '/threads/' + tid + '/resolve', { resolved: args.resolved !== false }); })
+        .then(function () { hr.reload(); return { ok: true, thread: tid, resolved: args.resolved !== false }; });
     default:
-      throw new Error('unknown action ' + JSON.stringify(action) + ': read, scroll, highlight, click, fill, press, navigate, step, open_lesson');
+      throw new Error('unknown action ' + JSON.stringify(action) + ': read, scroll, highlight, click, fill, press, navigate, step, open_lesson, studio, wait, comments, comment, reply, resolve');
   }
 }
-function safe(action, args) {
-  try {
-    var out = act(action, args);
+function safe(action, args, who) {
+  var p;
+  try { p = Promise.resolve(act(action, args, who)); } catch (e) { p = Promise.reject(e); }
+  return p.then(function (out) {
     if (out && out.error) return { ok: false, error: out.error, detail: out };
     var s = JSON.stringify(out);
-    if (s.length > 120000) return { ok: true, result: { truncated: true, note: 'the answer was too large; read a section or use offset' } };
+    if (s && s.length > 120000) return { ok: true, result: { truncated: true, note: 'the answer was too large; read a section or use offset' } };
     return { ok: true, result: out };
-  } catch (e) {
+  }, function (e) {
+    if (who) say(who, 'could not: ' + String(e && e.message || e).slice(0, 80));
     return { ok: false, error: String(e && e.message || e) };
-  }
+  });
 }
 
 // ------------------------------------------------------------------ what goes with a message

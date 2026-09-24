@@ -34,6 +34,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     os.environ["QCCD_RUNTIME_DIR"] = str(out / "runtime")
     os.environ["QCCD_CODEX"] = "none"
+    os.environ["QCCD_CLAUDE"] = "none"
     from qccd.workspace.app import Workspace
     from qccd.workspace.runtime import ensure_service, service_request
 

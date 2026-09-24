@@ -34,6 +34,7 @@ pytestmark = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exist
 def live(tmp_path, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")          # the chat must not start a real Codex here
+    monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     yield tmp_path / "ws", info

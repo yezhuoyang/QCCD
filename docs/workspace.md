@@ -267,6 +267,45 @@ page keeps its self-containment scan. What it does:
     page's own view can answer it.
   - The workspace's own Studio takes the same actions (its transport, panels and lessons).
 
+### The agent as a person at the screen
+
+The design goal: a person can ask their agent for anything they could do on the site
+themselves ("open the tutorial and show me how to finish each lesson", "review the rules
+for mistakes and comment under my name", even "scroll back and forth ten times"), and
+watch it happen.
+
+- **Visible.** Every page action first glides a purple cursor, labelled with the agent's
+  name ("Codex: clicking "Show answer""), to its target, then acts. Typing appears letter
+  by letter. The cursor rests, dimmed, where the agent last worked. When the target is
+  under the chat, the chat turns see-through for a while (hovering it restores it).
+  `scroll` takes `by` (pixels, `'page'`, `'-page'`), and `wait` paces a walkthrough.
+- **The Studio.** `studio` runs one verb of the page's Studio API (`EDITOR`): design on the
+  canvas, write the program, and the course's own `lessonLoad` / `lessonCheck` /
+  `lessonHint` / `lessonSolution`. The course solves its exercises with the same verbs.
+  Verbs that touch files or storage are refused. On the workspace's own Studio only
+  reading and view verbs work: an edit through the page would be recorded as the
+  person's, so the agent changes the design with change sets there. Checked on the live
+  site: all 31 lessons' own solutions pass their checks through these tools (Part D on
+  its compiled companion page).
+- **Comments, as the person.** In the local website the site's comment layer works. Its
+  `/api/` requests are relayed to qccd.academy, and the person signs in once with their
+  own account. The session is kept in the mirror's own cookie (`qccd_site`, path
+  `/api/`), and writes are relayed only from the mirror's origin. Threads are keyed by the
+  site's path, so a comment made locally is in the same place on the public site. The
+  agent has `comments`, `comment`, `reply` and `resolve`, which call the comment layer's
+  own functions. Each comment it writes ends with "— via <agent>" and appears in the chat
+  as a card. It cannot sign in, press the comment layer's buttons, or delete anything.
+  Checked against the live pages with a private copy of the comment service
+  (`tests/workspace_live_comments.py`).
+- **Claude Code, like Codex** (`agents/claude.py`). Each chat message runs `claude -p`
+  headless, resuming ONE conversation by id (`--session-id` first, `--resume` after). It
+  gets the QCCD tools and read-only file tools, `--permission-mode dontAsk`, and no shell.
+  Its messages stream into the chat, and a failed run says why. The chat starts whichever
+  agent is installed, or the one last chosen under ⋯ ("New conversation with Codex" /
+  "…with Claude"). `QCCD_CLAUDE=none` turns it off. Live-checked: asked on the Rules page
+  "What does rule R7 say? Show me its failing example", Claude read the section,
+  highlighted the failing example with a caption, and answered with the page's numbers.
+
 ### Runs and failures in the chat
 
 When the agent's runtime stops without answering, the chat shows why: a failed Codex turn
@@ -549,6 +588,8 @@ Linux and macOS were not exercised in this session.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
+| `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat | ~5 s |
+| `tests/workspace_live_comments.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the agent comments on real qccd.academy pages as a signed-in person, against a PRIVATE copy of the comment service | ~20 s |
 | `tests/test_workspace_toolchain.py` | the prebuilt compiler: the manifest matches the committed source, a download is refused unless its size and hash match, an install runs once, and which compiler is used | ~3 s |
 | `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; in real Chrome every page action on a mirrored page, the Studio's own page actions, and a real MCP client answering a question asked on a page | ~40 s |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |

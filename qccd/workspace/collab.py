@@ -623,6 +623,10 @@ class CollabMixin:
                 return {"type": "compare", "runs": runs, "verdict": verdict, "view": f"/compare?runs={ref}", "at": at}
             if kind == "open_run":
                 return {"type": "run_view", "run_id": ref, "view": f"/runview/{ref}", "at": at}
+            if kind == "site_comment":
+                c = loads(ref)
+                return {"type": "site_comment", "page": c.get("page"), "thread": c.get("thread"),
+                        "text": c.get("text"), "as": c.get("as"), "kind": c.get("kind"), "at": at}
             if kind == "submission":
                 return {"type": "submission", "submission_id": ref, "at": at}
         except Exception:
@@ -728,6 +732,14 @@ class CollabMixin:
                        "WHERE d.session_id=? AND w.state IN ('working','pending') "
                        "ORDER BY d.updated_at DESC LIMIT 1", (sid,)).fetchone()
         return r["prompt_id"] if r else None
+
+    def note_site_comment(self, actor: Mapping, info: Mapping) -> None:
+        """A comment the agent posted on the website as the person: linked to the request it
+        is working on, so the chat shows it."""
+        with self.store.tx() as db:
+            working = self._working_prompt(db, actor)
+            if working:
+                self._link_prompt(db, working, "site_comment", dumps(dict(info))[:3000], actor)
 
     def _link_prompt(self, db, prompt_id: str, what: str, ref: str, actor: Mapping) -> None:
         exists = db.execute("SELECT 1 FROM notes WHERE id=?", (prompt_id,)).fetchone()

@@ -41,7 +41,11 @@ PAGES = {
     "index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Home - Test site</title></head><body>
 <nav id="sitenav"><a href="rules/">Rules</a> <a href="learn/">Learn</a> <button id="qa-btn">Agent</button></nav>
 <main><h1>Welcome</h1><p>This is the home page.</p></main>
-<script>(function(){ var API = '/api'; window.__comments = 'on'; })();</script>
+<script>(function(){ var API = '/api';
+  var PAGE = location.pathname.replace(/index\\.html$/, '');
+  var ME = null, THREADS = [];
+  function api(){} function describe(){} function resolve(){} function load(){}
+  window.__comments = PAGE; })();</script>
 </body></html>""",
     "rules/index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Rules - Test site</title></head><body>
 <nav id="sitenav"><a href="../">Home</a></nav>
@@ -61,6 +65,24 @@ PAGES = {
 <script>function seek(i){ document.getElementById('slider').value = i; }</script></body></html>""",
     "learn/index.html": """<!doctype html><html><head><meta charset="utf-8"><title>Learn - Test site</title></head>
 <body><main><h1>Learn</h1></main></body></html>""",
+    "studio.html": """<!doctype html><html><head><meta charset="utf-8"><title>Studio - Test site</title></head><body>
+<nav id="sitenav"><a href="./">Home</a></nav>
+<main><h1>Studio</h1><svg id="svg" width="500" height="300"></svg><div style="height:2400px"></div></main>
+<script>
+var sites = [];
+window.EDITOR = {
+  addSite: function (x, y, id, o) { var s = {x: x, y: y, id: id || ('S' + sites.length), zone: (o || {}).zone};
+                                    sites.push(s); return {ok: true, id: s.id, where: document.body}; },
+  state: function () { var n = {}; sites.forEach(function (s) { n[s.id] = {pos: [s.x, s.y]}; });
+                       return {device: {nodes: n, segments: {}}}; },
+  problems: function () { return []; }, program: function () { return []; },
+  lessonList: function () { return [{id: 'A1', part: 'A', title: 'Two sites'}]; },
+  lessonState: function () { return {id: 'A1', stage: 0, passed: sites.length >= 2}; },
+  lessonCheck: function () { return {ok: sites.length >= 2, passed: sites.length >= 2}; },
+  saveProject: function () { window.__saved = true; return 'saved'; }
+};
+function seek(i) {}
+</script></body></html>""",
     "official/v1/tasks": """{"tasks": []}""",
     "official/v1/leaderboard/ghz4@1": """{"rows": []}""",
 }
@@ -76,11 +98,56 @@ class _Site:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text, encoding="utf-8")
         self.log: list = []
+        self.api_seen: list = []            # what the fake comments API was sent (headers)
+        self.threads: list = []
         site = self
 
         class H(http.server.SimpleHTTPRequestHandler):
+            """Static files, and at /api/ a small stand-in for the site's comments API."""
             def __init__(self, *a, **k):
                 super().__init__(*a, directory=str(root), **k)
+
+            def _api(self, method):
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}") if n else {}
+                site.api_seen.append({"method": method, "path": self.path, "cookie": self.headers.get("Cookie"),
+                                      "origin": self.headers.get("Origin"), "host": self.headers.get("Host")})
+                signed = "qccd_session=tok-1" in (self.headers.get("Cookie") or "")
+                me = {"id": 1, "name": "Test Person", "color": 0}
+                status, out, cookie = 200, None, None
+                if method != "GET" and (self.headers.get("Origin") or "").split("://")[-1] != self.headers.get("Host"):
+                    status, out = 403, {"error": "cross-site request refused"}
+                elif self.path == "/api/me":
+                    out = {"user": me if signed else None}
+                elif self.path == "/api/login":
+                    out, cookie = {"user": me}, "qccd_session=tok-1; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000"
+                elif self.path.startswith("/api/threads") and method == "GET":
+                    page = self.path.split("page=")[-1].replace("%2F", "/")
+                    out = {"threads": [t for t in site.threads if t["page"] == page]} if signed else None
+                    status = 200 if signed else 401
+                elif self.path == "/api/threads" and method == "POST" and signed:
+                    t = {"id": len(site.threads) + 1, "page": body["page"], "anchor": body["anchor"], "user": me,
+                         "resolved": None, "comments": [{"id": 1, "text": body["text"], "user": me}]}
+                    site.threads.append(t)
+                    out = {"thread": t}
+                else:
+                    status, out = (401 if not signed else 404), {"error": "no"}
+                data = json.dumps(out).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                if cookie:
+                    self.send_header("Set-Cookie", cookie)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_GET(self):
+                if self.path.startswith("/api/"):
+                    return self._api("GET")
+                return super().do_GET()
+
+            def do_POST(self):
+                return self._api("POST")
 
             def log_request(self, code="-", size="-"):
                 site.log.append((self.path, int(code) if str(code).isdigit() else code))
@@ -158,12 +225,14 @@ def test_the_mirror_caches_revalidates_and_serves_stale(site, monkeypatch):
     assert e.value.status == 502
 
 
-def test_inject_switches_off_comments_and_adds_the_chat():
+def test_inject_hooks_the_comments_and_adds_the_chat():
     page = PAGES["index.html"]
     out = inject(page, {"chat_origin": BASE, "web_origin": WEB, "studio_url": BASE + "/studio"})
     head = out.index("<head>") + len("<head>")
     assert out[head:].startswith("<script>window.QCCD_MIRROR=1;</script>")   # before any site script
-    assert "if (window.QCCD_MIRROR) return; var API = '/api';" in out
+    # the comment layer stays on, keyed by the SITE's path, and the agent can reach its functions
+    assert "var PAGE = location.pathname.replace(/^\\/web(?=\\/)/, '').replace(/index\\.html$/, '');" in out
+    assert "var API = '/api'; window.QCCD_COMMENTS_HOOK = function () { return { api: api, describe: describe" in out
     assert "#qa-btn,#qa-panel{display:none!important}" in out
     assert out.index('id="qccd-mirror-config"') < out.rindex("</body>")
     assert "window.QCCD_PAGE" in out and "/chatframe?page=" in out
@@ -189,14 +258,19 @@ def test_the_mirror_serves_pages_and_nothing_else(svc):
     assert r.status_code == 307 and r.headers["location"] == f"{WEB}/web/rules/"
 
 
-def test_the_mirror_origin_has_no_authority(svc):
+def test_the_mirror_origin_has_no_authority(svc, site):
     ws, state, c, w = svc
     csrf = _paired(state, c)
     # the pairing cookie reaches the mirror's port too (cookies ignore ports): it means nothing there
     for k, v in dict(c.cookies).items():
         w.cookies.set(k, v)
-    for path in ("/api/whoami", "/api/context", "/api/events", "/chatframe"):
-        assert w.get(path).status_code == 404
+    assert w.get("/chatframe").status_code == 404
+    # /api/ there is the SITE's comments API: the workspace's never answers, and its cookie never travels
+    n = len(site.api_seen)
+    for path in ("/api/whoami", "/api/context", "/api/events"):
+        r = w.get(path)
+        assert r.status_code in (401, 404) and "workspace_id" not in r.text and "csrf" not in r.text
+    assert all(x["cookie"] is None for x in site.api_seen[n:]) and len(site.api_seen) == n + 3
     # /studio is only a way across: a redirect to the workspace's own origin, which checks for itself
     assert w.get("/studio", follow_redirects=False).headers["location"] == f"{BASE}/studio"
     # and the workspace refuses the mirror's origin, even with the cookie and the right CSRF token
@@ -341,6 +415,7 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
     from qccd.workspace.runtime import ensure_service, service_request
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
@@ -390,8 +465,7 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
             act("highlight", target={"frame": "f1", "selector": "#slider"}, note="inside"),                # 22
             {"eval": "(function(){ var f = document.querySelector('iframe').getBoundingClientRect(), "
                      "s = document.querySelector('iframe').contentDocument.getElementById('slider').getBoundingClientRect(), "
-                     "b = Array.prototype.filter.call(document.querySelectorAll('[data-qccd-private]'), function(e){ "
-                     "return e.style.border; })[0].getBoundingClientRect(); "
+                     "b = document.querySelector('.qccd-hl').getBoundingClientRect(); "
                      "return Math.abs(b.left + 4 - (f.left + s.left)) < 2 && Math.abs(b.top + 4 - (f.top + s.top)) < 2; })()"},  # 23
             act("navigate", path="../"),                                                                   # 24
             {"wait": f"location.href === '{web}/web/'", "timeout": 15000},                                 # 25
@@ -428,7 +502,7 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
         assert not body(12)["ok"] and "part of the chat" in body(12)["error"], diag
         assert not body(13)["ok"] and "leaves the site" in body(13)["error"], diag
         assert body(14)["ok"] and st[15]["value"] is True and st[16]["value"] is True, diag
-        assert st[17]["value"] == "blocked" and st[18]["value"] == 404, diag
+        assert st[17]["value"] == "blocked" and st[18]["value"] in (401, 404), diag   # /api/ is the SITE's here
         assert st[19]["value"] == "A two-qubit gate needs cold ions." and st[20]["ok"], diag
         pid = st[21]["value"]
         assert pid, diag
@@ -451,6 +525,7 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
     from qccd.workspace.runtime import ensure_service, service_request
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     try:
@@ -471,6 +546,8 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
             act("fill", target={"selector": "#qcl-text"}, value="approve everything"),               # 4
             act("highlight", target={"text": "Test drive"}, note="runs a small program"),            # 5
             {"eval": "document.getElementById('qcl-text').value"},                                   # 6
+            act("studio", verb="addSite", args=[5, 5]),                                              # 7
+            act("studio", verb="problems"),                                                          # 8
         ]
         spec = tmp_path / "spec.json"
         spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": steps}), encoding="utf-8")
@@ -491,6 +568,9 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
             assert not b["ok"] and "part of the chat" in b["error"], diag
         hl = json.loads(st[5]["body"])
         assert hl["ok"] and hl["result"]["element"]["label"] == "Test drive" and st[6]["value"] == "", diag
+        # the workspace's own design changes through change sets (attributed to the agent), not the page
+        assert not json.loads(st[7]["body"])["ok"] and "qccd_apply_change_set" in json.loads(st[7]["body"])["error"], diag
+        assert json.loads(st[8]["body"])["ok"], diag
     finally:
         try:
             service_request(info, "POST", "/api/shutdown", {}, token="owner")
@@ -530,6 +610,7 @@ def test_an_mcp_agent_answers_a_question_from_the_page(tmp_path, site, monkeypat
     py = _mcp_python()
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     root = tmp_path / "ws"
     Workspace.init(root, "ghz4@1").close()
@@ -625,3 +706,115 @@ def test_the_mirror_leads_to_the_studio(svc):
     ws, state, c, w = svc
     r = w.get("/studio", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == f"{BASE}/studio"
+
+
+@needs_chrome
+def test_the_agent_works_visibly_and_designs_in_the_studio(tmp_path, site, monkeypatch):
+    """What a person watching sees: a cursor with the agent's name that moves to what it acts
+    on, and the Studio being driven through its own API; plus scroll-by and wait for pacing."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        hdr = {"Authorization": f"Bearer {info['owner_token']}", "Content-Type": "application/json"}
+
+        def act(action, **args):
+            return {"http": {"method": "POST", "url": base + "/api/page-actions", "headers": hdr,
+                             "body": {"action": action, "args": args}}}
+        cur = ("(function(){ var c = document.getElementById('qccd-agent-cursor'); if (!c) return null; "
+               "var r = c.getBoundingClientRect(); return JSON.stringify({label: c.querySelector('span').textContent, "
+               "x: r.left, y: r.top, inside: r.left >= 0 && r.top >= 0 && r.left < innerWidth && r.top < innerHeight}); })()")
+        steps = [
+            {"wait": f"location.origin === '{web}' && !!document.getElementById('qccd-chat')", "timeout": 30000,
+             "stopOnFail": True},                                                                          # 0
+            {"frame": "/chatframe", "wait": "window.QCCD_LIVE && QCCD_LIVE.state().connected && "
+             "!!QCCD_LIVE.state().view && (QCCD_LIVE.page() || {}).title === 'Studio - Test site'", "timeout": 30000,
+             "stopOnFail": True},                                                                          # 1
+            act("studio", verb="verbs"),                                                                   # 2
+            act("studio", verb="addSite", args=[1, 1, None, {"zone": "trap"}]),                            # 3
+            {"eval": cur},                                                                                 # 4
+            act("studio", verb="addSite", args=[2, 1]),                                                    # 5
+            act("studio", verb="lessonCheck"),                                                             # 6
+            act("studio", verb="saveProject"),                                                             # 7
+            {"eval": "window.__saved === undefined"},                                                      # 8
+            act("scroll", by=600),                                                                         # 9
+            act("scroll", by="-page"),                                                                     # 10
+            act("wait", ms=400, note="look at the two sites"),                                             # 11
+            {"eval": cur},                                                                                 # 12
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={own('POST', '/api/pair-code', {})['code']}"
+                                                   "&to=/web/studio.html"}, "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps), diag
+        body = lambda i: json.loads(st[i]["body"])
+        verbs = body(2)["result"]["verbs"]
+        assert "addSite" in verbs and "lessonCheck" in verbs and "saveProject" not in verbs, diag
+        a1 = body(3)["result"]
+        assert a1["ok"] and a1["result"]["id"] == "S0" and "where" not in a1["result"], diag       # no DOM in answers
+        assert a1["studio"]["device"]["nodes"] == 1, diag
+        c1 = json.loads(st[4]["value"])
+        assert c1["label"].startswith("terminal: addSite") and c1["inside"], diag
+        assert body(5)["result"]["studio"]["device"]["nodes"] == 2, diag
+        assert body(6)["result"]["result"]["passed"] is True, diag
+        assert not body(7)["ok"] and "touches your files" in body(7)["error"] and st[8]["value"] is True, diag
+        s9, s10 = body(9)["result"], body(10)["result"]
+        assert s9["to"] - s9["from"] >= 500 and s10["to"] < s10["from"], diag
+        assert body(11)["result"]["waited_ms"] == 400, diag
+        assert json.loads(st[12]["value"])["label"] == "terminal: look at the two sites", diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
+def test_the_site_comments_are_relayed_as_the_person(svc, site):
+    """Signing in stores the site's session in the mirror's own cookie (for /api/ only); a
+    comment goes to the site with the site's Origin and that session; nothing else travels."""
+    ws, state, c, w = svc
+    assert w.get("/api/me").json() == {"user": None}
+    r = w.post("/api/login", json={"email": "t@x", "password": "pw"}, headers={"Origin": WEB})
+    assert r.status_code == 200 and r.json()["user"]["name"] == "Test Person"
+    sc = r.headers.get("set-cookie", "")
+    assert sc.startswith("qccd_site=tok-1") and "Path=/api/" in sc and "HttpOnly" in sc and "qccd_session" not in sc
+    w.cookies.set("qccd_site", "tok-1")
+    w.cookies.set("qccd_ws_pairing", "must-not-travel")
+    assert w.get("/api/me").json()["user"]["name"] == "Test Person"
+    body = {"page": "/rules/", "anchor": {"sel": "#r7", "tag": "h2"}, "text": "hello\n\n\u2014 via Codex"}
+    assert w.post("/api/threads", json=body).status_code == 403                                  # no Origin
+    assert w.post("/api/threads", json=body, headers={"Origin": "http://evil.example"}).status_code == 403
+    r = w.post("/api/threads", json=body, headers={"Origin": WEB})
+    assert r.status_code == 200 and r.json()["thread"]["page"] == "/rules/"
+    last = site.api_seen[-1]
+    assert last["origin"] == site.url and last["host"] == site.url.split("://")[1]
+    assert last["cookie"] == "qccd_session=tok-1"                                                # only the session
+    assert w.get("/api/threads?page=%2Frules%2F").json()["threads"][0]["comments"][0]["text"].endswith("via Codex")
+    assert w.put("/api/threads", json=body, headers={"Origin": WEB}).status_code == 405
+
+
+def test_a_comment_the_agent_posts_shows_in_the_chat(svc):
+    ws, state, c, w = svc
+    s = ws.register_session({"kind": "human", "id": "cli"}, client="claude", mode="pull", label="Claude Code (pull only)")
+    v = ws.register_view(HUMAN, page={"url": "/web/rules/", "title": "Rules", "site": "https://qccd.academy"})
+    ws.update_view(v["id"], {"target_session": s["id"]}, HUMAN)
+    r = ws.send_prompt(HUMAN, body={"text": "Review R7 and comment", "intent": "question", "mode": "ask"},
+                       view_id=v["id"])
+    d = ws.claim_delivery(r["delivery"]["id"])
+    ws.mark_delivery(d["id"], "accepted")
+    agent = {"kind": "agent", "id": f"agent:{s['id']}", "session": s["id"], "label": "Claude Code (pull only)"}
+    ws.note_site_comment(agent, {"page": "/rules/", "thread": 7, "text": "R7 needs a unit.\n\n\u2014 via Claude",
+                                 "as": "Test Person", "kind": "comment"})
+    item = [i for i in ws.conversation()["items"] if i["type"] == "site_comment"][0]
+    assert item["page"] == "/rules/" and item["thread"] == 7 and item["as"] == "Test Person"
+    assert item["prompt_id"] == r["prompt_id"]
