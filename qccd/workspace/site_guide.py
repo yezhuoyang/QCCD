@@ -25,8 +25,10 @@ _lock = threading.Lock()
 
 #: how to do the common things on the site so the person sees them happen
 HOW_TO = [
-    {"task": "find a page", "how": "navigate to its url (below) or search: qccd_page_act navigate path='/web/<url>'. "
-                                   "Every page carries the same search index (this list)."},
+    {"task": "find a page", "how": "navigate to its url from this map (qccd_page_act navigate path=<url>); never "
+                                   "guess a path. query=<words> searches every page."},
+    {"task": "go to the Design page", "how": "navigate path='/studio': the person's own live Studio, where your "
+                                            "change sets appear as you commit them."},
     {"task": "walk someone through a lesson",
      "how": "navigate to /web/studio.html, then open_lesson lesson='A1'. qccd_page_read shows the lesson "
             "(app.lesson, and the Learn panel's text). Do the exercise the way the lesson asks -- click the "
@@ -141,6 +143,11 @@ def site_guide(mirror, section: str = "site", query: str | None = None) -> dict:
         kinds[e.get("k")] = kinds.get(e.get("k"), 0) + 1
     main = [{"title": e["t"], "about": e.get("d"), "url": web(e["u"])} for e in idx
             if e.get("k") == "part" or (e.get("k") == "page" and "#" not in e["u"])]
+    for m in main:
+        if m["url"].startswith("/web/studio.html"):
+            # through the workspace the Design page is the person's own live Studio
+            m.update(url="/studio", about="the person's own live Studio: their design, where your change sets "
+                                          "appear (navigate path='/studio'; the site's studio.html opens it too)")
     # pages the index knows only by their entries (rules/#R7, language/#init, docs/adl/#...)
     roots: dict = {}
     for e in idx:

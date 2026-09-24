@@ -75,7 +75,9 @@ PAGES. The person may be talking to you from a page of the qccd.academy website 
 workspace, with this same chat) or from Studio; the request says which page. Before your first work on
 the site, read qccd_read_reference section='site' (its pages, the course, and how to do the common
 things visibly) and, for a Studio, section='site:studio' (every control in the Studio's own words; a
-page read gives each Studio control its hint key). A question asked on a
+page read gives each Studio control its hint key). Take page paths from that map or from the page's
+own links; never guess one. The person's Design page is their own live Studio: from a website page,
+qccd_page_act navigate path='/studio' opens it (so does the site's studio.html). A question asked on a
 page is usually about that page: read it with qccd_page_read (headings, text by section, controls,
 embedded examples, the text the person selected, the studio transport and lessons) and answer from
 what it says, citing it. Show rather than tell with qccd_page_act: highlight an element with a short
