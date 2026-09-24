@@ -228,8 +228,14 @@ page keeps its self-containment scan. What it does:
 ### The website with the chat (`mirror.py`, `web/pageact.js`, `web/mirror.js`)
 
 - **Every qccd.academy page, through the workspace.** The service listens on a second port
-  and serves the site at `http://127.0.0.1:<web port>/web/...`. `qccd studio` prints the
-  address; `qccd web [page]` pairs the browser and opens it. Each page is fetched from the
+  and serves the site at `http://127.0.0.1:47100/web/...`. `qccd studio` prints the
+  address; `qccd web [page]` pairs the browser and opens it. 47100 is a well-known port
+  (`mirror.WEB_PORT`, `QCCD_WEB_PORT` changes it): every page of qccd.academy has an
+  **Agent** button whose "Open this page with my agent" is a plain link to
+  `http://127.0.0.1:47100/web/<that page>`, and "Open my Studio" to
+  `http://127.0.0.1:47100/studio`, which redirects to the workspace's own Studio. When
+  another workspace holds 47100, the service uses the port it had last time or any free
+  one, and `qccd web` prints where. Each page is fetched from the
   site live, kept in memory for 5 minutes, then revalidated (ETag / Last-Modified). When the
   site cannot be reached, the last copy is served, marked stale. `QCCD_SITE_URL` points it at
   another copy of the site, which the tests do. `QCCD_WEB=0` turns the second port off.

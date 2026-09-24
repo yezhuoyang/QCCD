@@ -46,6 +46,18 @@ _TYPES = ("text/html", "text/css", "text/plain", "application/javascript", "text
           "image/", "font/", "application/font", "application/pdf", "video/", "audio/")
 
 
+#: the website's well-known local port: qccd.academy's Agent button links to
+#: http://127.0.0.1:47100/web/<page> (qccd/site/nav.html carries the same number)
+WEB_PORT = 47100
+
+
+def web_port_default() -> int:
+    try:
+        return int(os.environ.get("QCCD_WEB_PORT") or WEB_PORT)
+    except ValueError:
+        return WEB_PORT
+
+
 def site_url() -> str:
     return (os.environ.get("QCCD_SITE_URL") or "https://qccd.academy").rstrip("/")
 
@@ -293,6 +305,11 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
     @app.get("/web")
     async def web_root():
         return Response(status_code=307, headers={"Location": "/web/"})
+
+    @app.get("/studio")
+    async def studio():
+        # the site's "Open my Studio" button knows only this well-known port
+        return Response(status_code=307, headers={"Location": studio_url})
 
     @app.get("/web/{path:path}")
     async def web(path: str):
