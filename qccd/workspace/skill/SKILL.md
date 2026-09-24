@@ -81,6 +81,11 @@ context; `qccd_get_context` lists the open `pages`).
 
 ## Working on the website like a person at the screen
 
+**The Design page is the person's own Studio.** From a website page, `qccd_page_act`
+`navigate` with `path: '/studio'` opens it (the site's `studio.html` does too; a lesson,
+`studio.html#learn=A1`, stays on the site's Studio). Take every other path from the site map
+below or from the page's own links; never guess one.
+
 **Know the site first.** `qccd_read_reference` section `site` is the map of the deployed site
 (its pages, the lessons, the leaderboards) and a short how-to for the common things (walk through
 a lesson, play an animation, try a program, check a page for mistakes, comment); section

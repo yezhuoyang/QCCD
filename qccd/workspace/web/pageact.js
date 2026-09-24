@@ -453,7 +453,8 @@ function sitePath(href) {
   var u;
   try { u = new URL(href, location.href); } catch (e) { return null; }
   if (u.origin !== location.origin) return null;
-  if (window.QCCD_MIRROR && u.pathname.indexOf('/web/') !== 0 && u.pathname !== '/web') return null;
+  // (/studio on the website's port leads to the person's own Studio, their Design page)
+  if (window.QCCD_MIRROR && u.pathname.indexOf('/web/') !== 0 && u.pathname !== '/web' && u.pathname !== '/studio') return null;
   return u;
 }
 function setValue(el, v, quiet) {

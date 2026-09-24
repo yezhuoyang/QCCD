@@ -706,6 +706,78 @@ def test_the_mirror_leads_to_the_studio(svc):
     ws, state, c, w = svc
     r = w.get("/studio", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == f"{BASE}/studio"
+    # what a person or an agent calls the Design page, though the site has no such path (an agent
+    # once navigated to /web/studio/ and was stranded on "qccd.academy has no page /studio/")
+    for alias in ("/web/studio", "/web/studio/", "/web/design", "/web/Design/"):
+        r = w.get(alias, follow_redirects=False)
+        assert r.status_code == 307 and r.headers["location"] == f"{BASE}/studio", alias
+    # a page that is not there keeps the chat and the page tools, says why, and offers the way on
+    r = w.get("/web/no-such-page/")
+    assert r.status_code == 404 and "has no page /no-such-page/" in r.text
+    assert 'id="qccd-mirror-config"' in r.text and "window.QCCD_PAGE" in r.text
+    assert "internet connection" not in r.text and 'href="/web/"' in r.text and f'href="{BASE}/studio"' in r.text
+
+
+@needs_chrome
+def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkeypatch):
+    """The reported case: asked to "go to the design page", an agent navigated to /web/studio/,
+    which the site does not have, and was stranded on an error page without the chat.  Now a
+    missing page keeps the chat (the agent reads it and goes on), and the names of the Design
+    page lead to the person's own Studio, where the page tools go on working."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        hdr = {"Authorization": f"Bearer {info['owner_token']}", "Content-Type": "application/json"}
+
+        def act(action, **args):
+            return {"http": {"method": "POST", "url": base + "/api/page-actions", "headers": hdr,
+                             "body": {"action": action, "args": args, "wait_s": 20}}}
+        ready = "window.QCCD_LIVE && QCCD_LIVE.state().connected && (QCCD_LIVE.page() || {}).title === "
+        steps = [
+            {"wait": f"location.origin === '{web}' && !!document.getElementById('qccd-chat')", "timeout": 30000,
+             "stopOnFail": True},                                                                          # 0
+            {"frame": "/chatframe", "wait": ready + "'Rules - Test site'", "timeout": 30000, "stopOnFail": True},  # 1
+            act("navigate", path="/web/no-such-page/"),                                                    # 2
+            {"wait": "location.pathname === '/web/no-such-page/' && !!document.getElementById('qccd-chat')",
+             "timeout": 20000, "stopOnFail": True},                                                        # 3
+            {"frame": "/chatframe", "wait": ready + "'QCCD website: not available'", "timeout": 30000,
+             "stopOnFail": True},                                                                          # 4
+            act("read"),                                                                                   # 5
+            act("navigate", path="/web/studio/"),                                                          # 6
+            {"wait": f"location.origin === '{base}' && location.pathname === '/studio' && !!window.QCCD_LIVE && "
+                     "QCCD_LIVE.state().connected && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},  # 7
+            {"sleep": 1500},                                                                               # 8
+            act("read", controls=False),                                                                   # 9
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={own('POST', '/api/pair-code', {})['code']}"
+                                                   "&to=/web/rules/"}, "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps), diag
+        body = lambda i: json.loads(st[i]["body"])
+        assert st[2]["status"] == 200 and body(2)["ok"], diag
+        missing = body(5)
+        assert missing["ok"] and missing["result"]["title"] == "QCCD website: not available", diag
+        assert "has no page /no-such-page/" in missing["result"]["text"], diag           # it can see what happened
+        assert st[6]["status"] == 200 and body(6)["ok"], diag
+        there = body(9)
+        assert there["ok"] and there["page"]["url"] == "/studio" and there["result"]["kind"] == "studio", diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
 
 
 @needs_chrome
@@ -881,7 +953,8 @@ def test_the_site_guide_is_the_live_sites_map_and_the_studios_own_words(svc, sit
     site_guide._cache.pop("index", None)
     g = c.get("/api/reference?section=site", headers=AGENT).json()
     assert g["error"] is None
-    assert [p["url"] for p in g["main_pages"]] == ["/web/learn/", "/web/studio.html#design", "/web/rules/"]
+    assert [p["url"] for p in g["main_pages"]] == ["/web/learn/", "/studio", "/web/rules/"]      # Design: their Studio
+    assert any(h["task"] == "go to the Design page" and "'/studio'" in h["how"] for h in g["how_to"])
     assert g["lessons"] == [{"id": "A1", "title": "Lesson A1 · Two sites", "url": "/web/studio.html#learn=A1"}]
     assert any(h["task"] == "walk someone through a lesson" for h in g["how_to"])
     q = c.get("/api/reference?section=site&query=cold", headers=AGENT).json()

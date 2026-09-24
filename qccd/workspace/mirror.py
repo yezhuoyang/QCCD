@@ -58,6 +58,10 @@ _TYPES = ("text/html", "text/css", "text/plain", "application/javascript", "text
           "image/", "font/", "application/font", "application/pdf", "video/", "audio/")
 
 
+#: paths under /web/ that mean "the Design page" but are not site pages (the site's Design page
+#: is studio.html, which opens the person's Studio too, unless a lesson is named in its #hash)
+DESIGN_ALIASES = ("studio", "design", "my-studio", "your-studio")
+
 #: the website's well-known local port: qccd.academy's Agent button links to
 #: http://127.0.0.1:47100/web/<page> (qccd/site/nav.html carries the same number)
 WEB_PORT = 47100
@@ -281,14 +285,18 @@ def mirror_csp(chat_origin: str) -> str:
             "object-src 'none'")
 
 
-def _failed(message: str, status: int, studio_url: str) -> tuple[int, str]:
-    body = (f"<h1>This page could not be shown</h1><p>{_html.escape(message)}</p>"
-            "<p>The website pages come from qccd.academy, so they need an internet connection. "
-            f"Your own Studio works without one: <a href=\"{_html.escape(studio_url)}\">open your Studio</a>.</p>")
+def _failed(message: str, status: int, studio_url: str, cfg: dict | None = None) -> tuple[int, str]:
+    """A page that could not be shown.  With `cfg` it keeps the chat and the page tools, so
+    neither the person nor an agent that followed a wrong link is stranded on it."""
+    why = ("<p>The website pages come from qccd.academy, so they need an internet connection. "
+           "Your own Studio works without one.</p>" if status >= 500 else "")
+    body = (f"<main><h1>This page could not be shown</h1><p>{_html.escape(message)}</p>{why}"
+            "<p><a href=\"/web/\">Go to the website's home page</a> &middot; "
+            f"<a href=\"{_html.escape(studio_url)}\">open your Studio</a> (your own design)</p></main>")
     page = ("<!doctype html><html><head><meta charset=\"utf-8\"><title>QCCD website: not available</title>"
             "<style>body{font:15px/1.5 system-ui,sans-serif;max-width:720px;margin:48px auto;padding:0 16px;color:#1d1d1b}"
             "</style></head><body>" + body + "</body></html>")
-    return status, page
+    return status, (inject(page, cfg) if cfg else page)
 
 
 def create_mirror_app(state, mirror: SiteMirror | None = None):
@@ -333,11 +341,11 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
     def serve(page: Page, path: str) -> Response:
         if page.status in (301, 302, 307, 308):
             if not page.location:
-                return HTMLResponse(_failed("that page redirects off the site", 404, studio_url)[1], status_code=404,
+                return HTMLResponse(_failed("that page redirects off the site", 404, studio_url, cfg)[1], status_code=404,
                                     headers={"Content-Security-Policy": csp})
             return Response(status_code=307, headers={"Location": page.location})
         if page.status == 404:
-            code, body = _failed(f"qccd.academy has no page /{path}", 404, studio_url)
+            code, body = _failed(f"qccd.academy has no page /{path}", 404, studio_url, cfg)
             return HTMLResponse(body, status_code=code, headers={"Content-Security-Policy": csp})
         headers = {"Content-Security-Policy": csp,
                    "Cache-Control": "no-store" if page.ctype == "text/html" else "max-age=300"}
@@ -345,7 +353,7 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
             headers["X-QCCD-Mirror"] = "stale: the site could not be reached; this is the last copy"
         if page.ctype == "text/html":
             text = page.body.decode("utf-8", errors="replace")
-            here = dict(cfg, design_redirect=True) if path.strip("/") in ("studio.html", "design", "design/") else cfg
+            here = dict(cfg, design_redirect=True) if path.strip("/") == "studio.html" else cfg
             return HTMLResponse(inject(text, here), headers=headers)
         return Response(page.body, media_type=page.ctype, headers=headers)
 
@@ -364,10 +372,13 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
 
     @app.get("/web/{path:path}")
     async def web(path: str):
+        if path.strip("/").lower() in DESIGN_ALIASES:
+            # the names a person or an agent gives the Design page: it is the person's own Studio
+            return Response(status_code=307, headers={"Location": studio_url})
         try:
             page = await asyncio.to_thread(mirror.get, path)
         except MirrorError as e:
-            code, body = _failed(str(e), e.status, studio_url)
+            code, body = _failed(str(e), e.status, studio_url, cfg)
             return HTMLResponse(body, status_code=code, headers={"Content-Security-Policy": csp})
         return serve(page, path)
 
