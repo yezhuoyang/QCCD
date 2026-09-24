@@ -50,8 +50,9 @@ window.addEventListener('message', function (e) {
   if (e.origin !== CHAT || e.source !== frame.contentWindow) return;
   var m = e.data || {};
   if (m.qccd === 'act') {
-    var out = window.QCCD_PAGE.act(String(m.action || ''), m.args || {});
-    reply({ qccd: 'result', id: m.id, ok: out.ok, result: out.result, error: out.error });
+    window.QCCD_PAGE.act(String(m.action || ''), m.args || {}, m.who ? String(m.who).slice(0, 40) : 'Agent').then(function (out) {
+      reply({ qccd: 'result', id: m.id, ok: out.ok, result: out.result, error: out.error });
+    });
   } else if (m.qccd === 'context') {
     reply({ qccd: 'result', id: m.id, ok: true, result: window.QCCD_PAGE.context() });
   } else if (m.qccd === 'pick') {

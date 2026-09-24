@@ -15,8 +15,13 @@ workspace's origin (`/chatframe`); only that frame holds the pairing, and it pas
 agent's page actions to the page by `postMessage`.  What a page answers is data from the
 website, like the page itself: never authority.
 
-The site's comment layer is switched off here (its API lives on qccd.academy and needs
-the person's account there); its read-only Official leaderboard is passed through.
+The site's comments work here as on the site: the comment layer's requests (`/api/...`)
+are passed to qccd.academy, and the person signs in once with their own account.  Its session
+is kept in a cookie of this origin (`qccd_site`, path /api/), never in the workspace; writes
+are passed only from this origin's own pages.  A thread is keyed by the page's path on the
+SITE (/rules/, not /web/rules/), so a comment made here is where it belongs there.  The
+agent comments through the comment layer's own functions (`QCCD_COMMENTS_HOOK`), which the
+page-action layer signs "via <agent>".  The read-only Official leaderboard is passed through.
 `QCCD_SITE_URL` points the mirror at another copy of the site (tests use a local one).
 """
 
@@ -34,6 +39,13 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    # at module level: with postponed annotations FastAPI resolves `request: Request` here,
+    # and a Request imported inside create_mirror_app would read as a missing query field (422)
+    from fastapi import Request
+except ImportError:                      # the mirror is served only by the workspace service
+    Request = None
 
 __all__ = ["SiteMirror", "create_mirror_app", "site_url", "inject"]
 
@@ -183,6 +195,24 @@ class SiteMirror:
                 k = next(iter(self._cache))            # oldest insertion first
                 self._bytes -= len(self._cache.pop(k).body)
 
+    def site_api(self, method: str, path: str, query: str, body: bytes, session: str | None) -> tuple:
+        """One request of the site's comments API, as the person's browser would make it on
+        the site: their session (if any) as the site's cookie, and the site's own Origin."""
+        path = clean_path(path)
+        url = f"{self.base}/api/{_q(path)}" + (f"?{query}" if query else "")
+        req = urllib.request.Request(url, data=body if method != "GET" else None, method=method, headers={
+            "User-Agent": "qccd-workspace-mirror/1", "Accept": "application/json", "Origin": self.base,
+            "Content-Type": "application/json"})
+        if session:
+            req.add_header("Cookie", f"qccd_session={session}")
+        try:
+            with self._opener.open(req, timeout=_UPSTREAM_TIMEOUT) as r:
+                return r.status, r.headers, r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers, e.read()
+        except (OSError, urllib.error.URLError) as exc:
+            raise MirrorError(502, f"the site's comments could not be reached ({exc})") from None
+
     def official(self, path: str) -> Page:
         """The site's read-only Official leaderboard API, passed through uncached."""
         path = clean_path(path)
@@ -201,11 +231,15 @@ class SiteMirror:
 # ---------------------------------------------------------------------- the page, with the chat
 
 _COMMENTS_API = "var API = '/api';"
+_COMMENTS_PAGE = r"var PAGE = location.pathname.replace(/index\.html$/, '');"
+_SITE_COOKIE = "qccd_site"
+_API_BODY_LIMIT = 64 * 1024
 _HIDE_SITE_AGENT = ("<style>#qa-btn,#qa-panel{display:none!important}"
                     "#qccd-chat{position:fixed;right:14px;bottom:14px;z-index:2147482000;width:min(420px,calc(100vw - 28px));"
                     "height:min(600px,calc(100vh - 70px));border-radius:14px;overflow:hidden;"
                     "box-shadow:0 14px 40px rgba(18,16,28,.22),0 0 0 1px rgba(18,16,28,.08);background:#fff}"
                     "#qccd-chat.min{height:44px;width:260px}"
+                    "#qccd-chat{transition:opacity .35s}#qccd-chat.qccd-yield{opacity:.14}#qccd-chat.qccd-yield:hover{opacity:1}"
                     "#qccd-chat iframe{display:block;width:100%;height:100%;border:0;background:#fff}"
                     "#qccd-mirror-studio{margin-left:10px;font-size:13px;padding:3px 10px;border:1px solid #bcd4f2;"
                     "border-radius:99px;background:#eef4fc;color:#1d4f91;text-decoration:none;white-space:nowrap}"
@@ -219,7 +253,13 @@ def inject(page: str, cfg: dict) -> str:
     marker = "<script>window.QCCD_MIRROR=1;</script>"
     m = re.search(r"<head[^>]*>", page, re.I)
     page = (page[:m.end()] + marker + page[m.end():]) if m else marker + page
-    page = page.replace(_COMMENTS_API, "if (window.QCCD_MIRROR) return; " + _COMMENTS_API)
+    # the comment layer, keyed by the SITE's path, and reachable by the agent's page actions
+    page = page.replace(_COMMENTS_PAGE, r"var PAGE = location.pathname.replace(/^\/web(?=\/)/, '')"
+                                        r".replace(/index\.html$/, '');")
+    page = page.replace(_COMMENTS_API, _COMMENTS_API + " window.QCCD_COMMENTS_HOOK = function () { return { "
+                        "api: api, describe: describe, resolveAnchor: resolve, reload: load, "
+                        "me: function () { return ME; }, page: function () { return PAGE; }, "
+                        "threads: function () { return THREADS; } }; };")
     tail = (_HIDE_SITE_AGENT
             + '<script id="qccd-mirror-config" type="application/json">'
             + json.dumps(cfg).replace("</", "<\\/") + "</script>\n"
@@ -249,7 +289,7 @@ def _failed(message: str, status: int, studio_url: str) -> tuple[int, str]:
 def create_mirror_app(state, mirror: SiteMirror | None = None):
     """The mirror's own web app: GET pages under /web/, the Official leaderboard's reads,
     and nothing else.  It knows no cookie and no token."""
-    from fastapi import FastAPI, Request
+    from fastapi import FastAPI
     from fastapi.responses import HTMLResponse, JSONResponse, Response
     import asyncio
 
@@ -272,8 +312,12 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         if host != f"127.0.0.1:{web_port}":
             return JSONResponse({"error": {"code": "bad_host", "message": "unexpected Host header"}}, status_code=421)
         if request.method not in ("GET", "HEAD"):
-            return JSONResponse({"error": {"code": "read_only", "message": "the website mirror only serves pages"}},
-                                status_code=405)
+            # only the site's comments API takes writes, and only from this origin's own pages
+            if not request.url.path.startswith("/api/") or request.method not in ("POST", "DELETE"):
+                return JSONResponse({"error": {"code": "read_only", "message": "the website mirror only serves pages"}},
+                                    status_code=405)
+            if request.headers.get("origin") != origin:
+                return JSONResponse({"error": "cross-site request refused"}, status_code=403)
         resp = await call_next(request)
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "same-origin"
@@ -327,6 +371,34 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         except MirrorError:
             return Response(status_code=404)
         return Response(page.body, media_type=page.ctype, status_code=page.status if page.status == 200 else 404)
+
+    @app.api_route("/api/{path:path}", methods=["GET", "POST", "DELETE"])
+    async def site_api(path: str, request: Request):
+        body = await request.body()
+        if len(body) > _API_BODY_LIMIT:
+            return JSONResponse({"error": "too large"}, status_code=413)
+        try:
+            status, headers, data = await asyncio.to_thread(
+                mirror.site_api, request.method, path, request.url.query, body, request.cookies.get(_SITE_COOKIE))
+        except MirrorError as e:
+            return JSONResponse({"error": str(e)}, status_code=e.status)
+        resp = Response(data, status_code=status, media_type="application/json",
+                        headers={"Cache-Control": "no-store"})
+        # the site's session cookie becomes this origin's, kept for /api/ only
+        for sc in headers.get_all("Set-Cookie") or []:
+            name, _, rest = sc.partition("=")
+            if name.strip() != "qccd_session":
+                continue
+            value = rest.split(";", 1)[0].strip()
+            attrs = {k.strip().lower(): v.strip() for k, _, v in
+                     (a.partition("=") for a in rest.split(";")[1:])}
+            max_age = attrs.get("max-age")
+            if not value or max_age == "0":
+                resp.delete_cookie(_SITE_COOKIE, path="/api/")
+            else:
+                resp.set_cookie(_SITE_COOKIE, value, path="/api/", httponly=True, samesite="strict",
+                                max_age=int(max_age) if max_age and max_age.isdigit() else None)
+        return resp
 
     @app.get("/official/v1/{path:path}")
     async def official(path: str):

@@ -50,7 +50,7 @@ var S = {
   paired: false, lastError: null, compile: null,
   // the chat view (default) vs the debug view (tabs)
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
-  conv: [], working: [], pending: null, codex: null, connecting: false, branches: [], convTimer: null,
+  conv: [], working: [], pending: null, codex: null, claude: null, connecting: false, branches: [], convTimer: null,
   lastSel: '', selOff: false, convScrolled: false,
   // the page this chat is about (a website page, or Studio itself)
   page: PAGE ? { url: CFG.page || '/web/', site: CFG.site } : null, pageDoing: null
@@ -710,6 +710,7 @@ function sessionLabel(sid) {
   return s ? (s.label || s.client) : 'no agent';
 }
 function capabilityText(s) {
+  if (s.mode === 'appserver' && s.client === 'claude') return 'automatic: each message runs Claude Code in one conversation; stop supported';
   if (s.mode === 'appserver') return 'automatic: starts a turn in the Codex thread; steer and stop supported';
   if (s.mode === 'channel') return 'automatic push to Claude Code (unacknowledged until the agent reads it); no steer or stop';
   if (s.mode === 'pull') return 'reduced: the agent sees prompts only when it next reads its context';
@@ -1200,7 +1201,8 @@ function toggleMenu(which) {
       [S.selOff ? 'Send the text you selected on the page with the message' : 'Do not send the selected text',
        function () { S.selOff = !S.selOff; renderChips(); }]
     ] : [
-      ['New conversation with Codex', function () { connectCodex(); }],
+      S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
+      S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       ['Open your Studio (the design you work on)', function () { window.open('/studio', '_blank', 'noopener'); }],
@@ -1218,7 +1220,8 @@ function toggleMenu(which) {
     ] : [
       [(S.follow ? '✓ ' : '') + 'Follow the agent (move the view when it shows something)', function () {
         QCCD_LIVE.setFollow(!S.follow); }],
-      ['New conversation with Codex', function () { connectCodex(); }],
+      S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
+      S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
@@ -1294,7 +1297,7 @@ function chatSend(textArg) {
     if (s && s.write_fence) return api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/resume', {}).then(loadSessions);
   }).then(function () {
     var s = agentSession();
-    S.steer = !!(wasWorking && s && s.mode === 'appserver');
+    S.steer = !!(wasWorking && s && s.mode === 'appserver' && s.client === 'codex');   // a Claude run takes the next message after it
     return send({ text: text, mode: 'apply', anchors: anchors });
   }).then(function (d) {
     if (!d) { S.pending = null; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
@@ -1309,19 +1312,35 @@ function ensureAgent() {
   if (live) {
     return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions);
   }
-  return (S.codex === null ? api('GET', '/api/agents').then(function (r) { S.codex = !!(r.ok && r.data.codex_available); })
-                           : Promise.resolve())
-    .then(function () { return S.codex ? connectCodex() : null; });
+  return (S.codex === null ? loadAgents() : Promise.resolve())
+    .then(function () { var k = agentChoice(); return k ? connectAgent(k) : null; });
 }
-function connectCodex() {
-  S.connecting = true; renderChatHead(); renderConv();
-  // nobody can answer an approval prompt from Studio: Codex never asks, its shell is read-only,
-  // and it changes the design through the QCCD tools (approved for this thread)
-  return api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
-                                                      sandbox: 'read-only' }).then(function (r) {
+function loadAgents() {
+  return api('GET', '/api/agents').then(function (r) {
+    S.codex = !!(r.ok && r.data.codex_available); S.claude = !!(r.ok && r.data.claude_available);
+  });
+}
+// which agent the chat starts: the one the person last chose, else whichever is installed
+function agentChoice() {
+  var pref = localGet('qccd.agent');
+  if (pref === 'claude' && S.claude) return 'claude';
+  if (pref === 'codex' && S.codex) return 'codex';
+  return S.codex ? 'codex' : (S.claude ? 'claude' : null);
+}
+function agentTitle(k) { return k === 'claude' ? 'Claude' : 'Codex'; }
+function connectCodex() { return connectAgent('codex'); }
+function connectAgent(kind) {
+  S.connecting = kind; renderChatHead(); renderConv();
+  // nobody can answer an approval prompt from Studio: neither agent is ever asked -- Codex runs
+  // with approval `never` and a read-only shell, Claude with `dontAsk` and no shell -- and each
+  // changes the design only through the QCCD tools
+  var req = kind === 'claude' ? api('POST', '/api/sessions/claude/connect', { label: 'Claude' })
+    : api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
+                                                   sandbox: 'read-only' });
+  return req.then(function (r) {
     S.connecting = false;
-    if (!r.ok) { notice('Could not start Codex: ' + ((r.error || {}).message || 'error'), 'bad'); renderChatHead(); return null; }
-    return loadSessions();
+    if (!r.ok) { notice('Could not start ' + agentTitle(kind) + ': ' + ((r.error || {}).message || 'error'), 'bad'); renderChatHead(); return null; }
+    return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: r.data.session.id }).then(loadSessions);
   });
 }
 function chatStop() {
@@ -1344,8 +1363,8 @@ function renderChatHead() {
   who.textContent = s ? shortName(s.label || s.client) : 'Agent';
   var t, cls;
   if (!S.connected) { t = 'offline: reconnecting'; cls = 'off'; }
-  else if (S.connecting) { t = 'starting Codex…'; cls = 'busy'; }
-  else if (!s) { t = S.codex ? 'Codex starts when you send' : 'no agent connected'; cls = ''; }
+  else if (S.connecting) { t = 'starting ' + agentTitle(S.connecting) + '…'; cls = 'busy'; }
+  else if (!s) { t = agentChoice() ? agentTitle(agentChoice()) + ' starts when you send' : 'no agent connected'; cls = ''; }
   else if (isWorking()) { t = 'working…'; cls = 'busy'; }
   else if (s.write_fence) { t = 'stopped'; cls = 'off'; }
   else if (s.mode === 'pull') { t = 'checks when you ask it'; cls = 'on'; }
@@ -1444,10 +1463,10 @@ function renderConv() {
 function workingText() {
   var run = S.conv.filter(function (i) { return i.type === 'run' && (i.status === 'running' || i.status === 'queued'); }).pop();
   var s = agentSession();
-  if (S.connecting) return 'starting Codex';
+  if (S.connecting) return 'starting ' + agentTitle(S.connecting);
   if (S.pageDoing && Date.now() - S.pageDoing.at < 4000) return S.pageDoing.text;
   if (run) return run.progress || ('running ' + (run.program || 'a program'));
-  if (!s) return isWorking() ? 'the agent is working' : (S.codex ? 'starting Codex' : 'waiting for an agent to connect');
+  if (!s) return isWorking() ? 'the agent is working' : (agentChoice() ? 'starting ' + agentTitle(agentChoice()) : 'waiting for an agent to connect');
   if (s.mode === 'pull') return 'waiting until you ask ' + shortName(s.label || s.client) + ' to check';
   return shortName(s.label || s.client) + ' is working';
 }
@@ -1505,6 +1524,15 @@ function convItem(it, lastWho) {
     return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: 'A run to watch' }),
       btn('Open', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link')]);
   }
+  if (it.type === 'site_comment') {
+    // on the site, as the person: open the page at that thread (the comment layer scrolls to ?c=)
+    var where = String(it.page || '/'), url = (CFG.framed && CFG.parent_origin ? CFG.parent_origin + '/web' :
+                (CFG.web_url ? CFG.web_url.replace(/\/web\/$/, '/web') : '/web')) + where + '?c=' + encodeURIComponent(it.thread);
+    return h('div', { cls: 'qcl-card' }, [
+      h('div', { cls: 'qcl-card-t', text: (it.kind === 'reply' ? 'Replied' : 'Commented') + ' as ' + (it.as || 'you') + ' on ' + where }),
+      h('div', { cls: 'qcl-card-s', text: String(it.text || '').replace(/\n\n\u2014 via .*$/, '').slice(0, 220) }),
+      h('a', { cls: 'qcl-btn qcl-link', href: url, target: CFG.framed ? '_top' : '_blank', rel: 'noopener', text: 'Show on the page' })]);
+  }
   if (it.type === 'notice') {
     return h('div', { cls: 'qcl-event qcl-warn' }, [h('span', { cls: 'qcl-evtxt', text: it.text })]);
   }
@@ -1527,8 +1555,16 @@ function undoChange(csid) {
 // agent text: a little markdown (bold, code, links, lists, headings, tables), always as
 // DOM nodes built from text -- never innerHTML
 function md(text) {
-  var out = [], list = null, table = null;
+  var out = [], list = null, table = null, code = null;
   String(text || '').split('\n').forEach(function (ln) {
+    if (/^\s*```/.test(ln)) {                       // a fenced code block, verbatim
+      if (code) { code = null; return; }
+      code = h('code', {}); out.push(h('pre', { cls: 'qcl-code' }, [code])); list = null; table = null;
+      return;
+    }
+    if (code) { code.appendChild(document.createTextNode((code.firstChild ? '\n' : '') + ln)); return; }
+    var quote = /^\s*>\s?(.*)$/.exec(ln);
+    if (quote) { list = null; table = null; out.push(h('div', { cls: 'qcl-quote' }, inline(quote[1]))); return; }
     if (/^\s*\|.*\|\s*$/.test(ln)) {
       var cells = ln.trim().slice(1, -1).split('|').map(function (c) { return c.trim(); });
       list = null;
@@ -1556,7 +1592,7 @@ function md(text) {
   return out;
 }
 function inline(s) {
-  var parts = [], re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g, last = 0, m;
+  var parts = [], re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*[^*\s][^*]*\*)/g, last = 0, m;
   while ((m = re.exec(s))) {
     if (m.index > last) parts.push(document.createTextNode(s.slice(last, m.index)));
     var t = m[0];
@@ -1567,7 +1603,9 @@ function inline(s) {
       if (CFG.framed && CFG.parent_origin && /^\/web(\/|$)/.test(lk[2])) parts.push(h('a', { href: CFG.parent_origin + lk[2], target: '_top', text: lk[1] }));
       else parts.push(/^(\/[^\/]|https?:\/\/)/.test(lk[2])
         ? h('a', { href: lk[2], target: '_blank', rel: 'noopener', text: lk[1] }) : document.createTextNode(lk[1]));
-    } else parts.push(t[0] === '`' ? h('code', { text: t.slice(1, -1) }) : h('b', { text: t.slice(2, -2) }));
+    } else if (t[0] === '`') parts.push(h('code', { text: t.slice(1, -1) }));
+    else if (t.slice(0, 2) === '**') parts.push(h('b', { text: t.slice(2, -2) }));
+    else parts.push(h('i', { text: t.slice(1, -1) }));
     last = m.index + t.length;
   }
   if (last < s.length) parts.push(document.createTextNode(s.slice(last)));
@@ -1639,8 +1677,10 @@ function pickOnPage() {
   });
 }
 var PAGE_VERBS = { read: 'reading the page', scroll: 'scrolling the page', highlight: 'pointing at something',
-                   click: 'pressing a control', fill: 'filling in a field', press: 'pressing a key',
-                   navigate: 'opening another page', step: 'stepping the animation', open_lesson: 'opening a lesson' };
+                   click: 'pressing a control', fill: 'typing', press: 'pressing a key',
+                   navigate: 'opening another page', step: 'stepping the animation', open_lesson: 'opening a lesson',
+                   studio: 'working in the Studio', wait: 'pausing', comments: 'reading the comments',
+                   comment: 'writing a comment', reply: 'replying to a comment', resolve: 'marking a comment addressed' };
 function pageAction(p) {
   if (!p.action_id || p.view_id !== S.view) return;
   if (p.expires_at && Date.now() / 1000 > p.expires_at) return;
@@ -1651,11 +1691,11 @@ function pageAction(p) {
     api('POST', '/api/page-actions/' + encodeURIComponent(p.action_id) + '/result',
         { ok: !!r.ok, result: r.ok ? r.result : undefined, error: r.ok ? undefined : (r.error || 'refused') });
   };
-  if (CFG.framed) { askParent('act', { action: p.action, args: p.args || {} }, 14000).then(done); return; }
+  var who = shortName((p.actor || {}).label || (p.actor || {}).id);
+  if (CFG.framed) { askParent('act', { action: p.action, args: p.args || {}, who: who }, 28000).then(done); return; }
   if (!window.QCCD_PAGE) { done({ ok: false, error: 'this page has no page actions' }); return; }
-  var r;
-  try { r = window.QCCD_PAGE.act(p.action, p.args || {}); } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
-  done(r);
+  window.QCCD_DESIGN_PAGE = CFG.mode === 'design';        // the workspace's design: its edits go through change sets
+  window.QCCD_PAGE.act(p.action, p.args || {}, who).then(done, function (e) { done({ ok: false, error: String(e && e.message || e) }); });
 }
 function pageEmptyState() {
   var k = (S.page || {}).kind || 'page', ex;
@@ -1746,7 +1786,7 @@ function boot() {
           if (c.ok) S.cursor = c.data.cursor || 0;
           openEvents(); refreshAll();
           if (!S.debug) { loadConv(); loadBranches();
-            api('GET', '/api/agents').then(function (r) { S.codex = !!(r.ok && r.data.codex_available); renderChatHead(); renderConv(); }); }
+            loadAgents().then(function () { renderChatHead(); renderConv(); }); }
         });
       });
     });
@@ -1784,7 +1824,7 @@ window.QCCD_LIVE = {
   // the chat
   chat: function () { return { debug: S.debug, items: S.conv.slice(), working: S.working.slice(), pending: S.pending,
                                branch: S.branch, branches: S.branches.map(function (b) { return b.name; }),
-                               agent: (agentSession() || {}).id || null, codex: S.codex }; },
+                               agent: (agentSession() || {}).id || null, codex: S.codex, claude: S.claude }; },
   chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft,
   page: function () { return S.page; }, refreshPage: refreshPage
 };

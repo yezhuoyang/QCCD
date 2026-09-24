@@ -116,7 +116,7 @@ class DeliveryWorker:
                     ws.store.db.execute("UPDATE deliveries SET attempts=attempts-1 WHERE id=?", (claimed["id"],))
                 continue
             ws.mark_delivery(claimed["id"], "accepted", external_ref=out.get("turn_id"),
-                             detail=f"{out.get('how')} accepted by Codex")
+                             detail=f"{out.get('how')} accepted by {s.get('label') or s['client']}")
             n += 1
         return n
 
@@ -129,6 +129,6 @@ class DeliveryWorker:
             if s["mode"] == "appserver":
                 br = self.state.bridges.get(s["id"])
                 if br is None or not br.connected:
-                    ws.session_status(s["id"], "disconnected", detail="the Codex bridge is not connected")
+                    ws.session_status(s["id"], "disconnected", detail=f"the {s['client']} bridge is not connected")
             elif now - s["last_seen"] > 90:
                 ws.session_status(s["id"], "disconnected", detail="no heartbeat for 90 s")

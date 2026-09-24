@@ -348,8 +348,9 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/agents", write=False)
     def agents(request, actor, _):
+        from .agents.claude import find_claude
         from .agents.codex import find_codex
-        return {"codex_available": find_codex() is not None}
+        return {"codex_available": find_codex() is not None, "claude_available": find_claude() is not None}
 
     # ------------------------------------------------------------------ pages (the agent's hands on the UI)
 
@@ -379,7 +380,9 @@ def create_app(state: ServiceState) -> FastAPI:
         except JSONRejected as exc:
             raise WorkspaceError(exc.code, str(exc), status=422) from None
         view = ws.page_view(actor, b.get("view_id"))
-        wait = max(1.0, min(float(b.get("wait_s") or 15), 30.0))
+        # every action is animated for the person (a cursor glides there first); a `wait` lasts what it says
+        floor = (min(float(args.get("ms") or 0), 10000.0) / 1000.0 + 10.0) if action == "wait" else 0.0
+        wait = max(1.0, floor, min(float(b.get("wait_s") or 25), 60.0))
         aid = "pa_" + secrets.token_hex(8)
         waiter = {"event": threading.Event(), "view": view["id"], "result": None}
         state.page_waits[aid] = waiter
@@ -399,6 +402,12 @@ def create_app(state: ServiceState) -> FastAPI:
                "action": action, "ok": r["ok"]}
         if r["ok"]:
             out["result"] = r.get("result")
+            res = r.get("result") or {}
+            if action in ("comment", "reply") and isinstance(res, dict) and res.get("thread"):
+                # what the agent wrote on the site as the person goes into the conversation too
+                ws.note_site_comment(actor, {"page": res.get("page"), "thread": res.get("thread"),
+                                             "text": str(res.get("text") or "")[:600], "as": res.get("as"),
+                                             "kind": action})
         else:
             out["error"] = r.get("error") or "the page refused the action"
         return out
@@ -523,6 +532,11 @@ def create_app(state: ServiceState) -> FastAPI:
     def codex_connect(request, actor, b):
         from .agents.codex import connect_codex
         return connect_codex(state, b)
+
+    @route("POST", "/api/sessions/claude/connect", human_only=True)
+    def claude_connect(request, actor, b):
+        from .agents.claude import connect_claude
+        return connect_claude(state, b)
 
     # ------------------------------------------------------------------ prompts
 
@@ -869,7 +883,8 @@ def _pageact() -> str:
 
 
 #: what an agent may do on a page (web/pageact.js implements each; nothing else runs)
-PAGE_ACTIONS = ("read", "scroll", "highlight", "click", "fill", "press", "navigate", "step", "open_lesson")
+PAGE_ACTIONS = ("read", "scroll", "highlight", "click", "fill", "press", "navigate", "step", "open_lesson",
+                "studio", "wait", "comments", "comment", "reply", "resolve")
 
 
 def _chat_page(state: ServiceState, web_origin: str | None, page: str) -> str:
@@ -1030,6 +1045,9 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
             from .agents.codex import reattach_codex_sessions
             for r in reattach_codex_sessions(state):
                 logging.getLogger("qccd.service").info("codex session %s", r)
+            from .agents.claude import reattach_claude_sessions
+            for r in reattach_claude_sessions(state):
+                logging.getLogger("qccd.service").info("claude session %s", r)
         except Exception:
             logging.getLogger("qccd.service").exception("re-attaching Codex sessions failed")
     threading.Thread(target=reattach, name="qccd-reattach", daemon=True).start()

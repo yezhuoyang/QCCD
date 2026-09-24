@@ -78,6 +78,9 @@
 .qcl-bubble code{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:rgba(0,0,0,.06);padding:0 3px;border-radius:3px}
 .qcl-bubble .qcl-h{font-weight:600;margin-top:2px}
 .qcl-gap{height:6px}
+.qcl-bubble .qcl-code{margin:4px 0;padding:6px 8px;background:#f5f4f1;border-radius:6px;overflow-x:auto;
+  font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;white-space:pre}
+.qcl-bubble .qcl-quote{border-left:3px solid var(--line,#d0d5dd);padding-left:8px;margin:3px 0;color:var(--muted,#52514e)}
 .qcl-mdt{border-collapse:collapse;margin:4px 0;font-size:12px;background:var(--panel,#fff);border-radius:6px}
 .qcl-mdt th,.qcl-mdt td{border:1px solid var(--line,#d0d5dd);padding:2px 6px;text-align:left;white-space:nowrap}
 .qcl-mdt th{background:var(--soft,#eef2f6);font-weight:600}

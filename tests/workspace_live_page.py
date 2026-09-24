@@ -1,6 +1,6 @@
 """LIVE, opt-in: a real Codex answers a question asked on a page of the website.
 
-    QCCD_LIVE_CODEX=1 python tests/workspace_live_page.py [out_dir] [page] [question]
+    QCCD_LIVE_CODEX=1 python tests/workspace_live_page.py [out_dir] [page] [question] [codex|claude]
 
 A fresh workspace starts its service; real Chrome is paired through /open-web and opens a
 page of qccd.academy through the workspace's website mirror (default: rules/).  The chat on
@@ -38,6 +38,9 @@ def main() -> int:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(tempfile.mkdtemp(prefix="qccd-live-page-"))
     page = sys.argv[2] if len(sys.argv) > 2 else "rules/"
     question = sys.argv[3] if len(sys.argv) > 3 else QUESTION
+    agent = sys.argv[4] if len(sys.argv) > 4 else "codex"
+    if agent == "claude":
+        os.environ["QCCD_CODEX"] = "none"          # the chat then starts Claude Code
     out.mkdir(parents=True, exist_ok=True)
     os.environ["QCCD_RUNTIME_DIR"] = str(out / "runtime")
     from qccd.workspace.app import Workspace
@@ -57,6 +60,9 @@ def main() -> int:
         {"frame": "/chatframe", "wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
          "!!QCCD_LIVE.state().view && QCCD_LIVE.chat().codex !== null && !!(QCCD_LIVE.page() || {}).title",
          "timeout": 90000, "stopOnFail": True},
+        {"frame": "/chatframe", "eval": f"localStorage.setItem('qccd.agent', {json.dumps(agent)}); 1"},
+        {"frame": "/chatframe", "wait": "true",
+         "timeout": 90000, "stopOnFail": True},
         {"sleep": 3000},
         {"frame": "/chatframe", "eval": f"QCCD_LIVE.chatSend({json.dumps(question)}).then(function(d){{ return d && d.prompt_id; }})"},
         {"frame": "/chatframe", "wait": idle, "timeout": 900000, "stopOnFail": True},
@@ -75,13 +81,13 @@ def main() -> int:
                        timeout=2400, cwd=REPO)
     drive = json.loads(r.stdout.decode("utf-8") or "{}")
     st = drive.get("steps", [])
-    report = {"seconds": round(time.time() - t0), "question": question, "page": page,
+    report = {"seconds": round(time.time() - t0), "question": question, "page": page, "agent": agent,
               "steps": [{k: v for k, v in s.items() if k not in ("value", "step")} for s in st],
               "console": drive.get("logs"), "fatal": drive.get("fatal")}
-    if len(st) > 7 and st[7].get("value"):
-        report["page_after"] = json.loads(st[7]["value"])
-    if len(st) > 8 and st[8].get("value"):
-        chat = json.loads(st[8]["value"])
+    if len(st) > 9 and st[9].get("value"):
+        report["page_after"] = json.loads(st[9]["value"])
+    if len(st) > 10 and st[10].get("value"):
+        chat = json.loads(st[10]["value"])
         report["conversation"] = [{k: i.get(k) for k in ("type", "text", "author", "context", "page") if i.get(k)}
                                   for i in chat.get("items", [])]
     # tidy: archive the Codex thread this test created, then stop the service
