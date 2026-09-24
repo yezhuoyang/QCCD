@@ -119,6 +119,28 @@ class RunsMixin:
     def programs(self) -> list:
         return program_catalog()
 
+    def run_program_source(self, run_id: str) -> dict:
+        """What a run compiles, as the person's page shows it while the run is going: the
+        program's name, its OpenQASM and the design it goes onto."""
+        from .core import WorkspaceError
+        j = self.job(run_id)
+        if j["kind"] != "run":
+            raise WorkspaceError("unknown_run", f"{run_id} is not a run", status=404)
+        res = j.get("result") or {}
+        params, run = res.get("params") or {}, res.get("run") or {}
+        spec = params.get("program") if params else (run.get("program") or {}).get("name")
+        circuit = (run.get("artifacts") or {}).get("circuit")
+        try:
+            name, qasm, source = resolve_program(spec)
+        except WorkspaceError:
+            name, qasm, source = str((run.get("program") or {}).get("name") or spec or "program"), "", ""
+        if circuit:                                   # a finished run: exactly what was compiled
+            qasm = self.get_artifact(circuit).decode("utf-8", errors="replace")
+        draft = params.get("branch") or (run.get("design") or {}).get("draft") or "main"
+        return {"run_id": run_id, "name": name, "qasm": qasm[:200_000], "source": source,
+                "draft": str(draft).removeprefix("cand/"), "status": j["status"],
+                "progress": (j.get("progress") or {}).get("message"), "agent": (j.get("actor") or {}).get("label")}
+
     # ------------------------------------------------------------------ the job
 
     def _check_run_params(self, params: dict) -> None:
@@ -212,12 +234,18 @@ class RunsMixin:
                                    "application/json", f"run {jid}: program (cooled)")
         d_times = self.put_artifact(canonical_bytes({"times_us": _step_times(prog, res)}), "application/json",
                                     f"run {jid}: step start times")
+        # the circuit and the compiler's certificate: the run's page draws the circuit beside the
+        # compiled program from them (qccd.ir.source_map), as the site's compiled pages do
+        d_cert = self.put_artifact(canonical_bytes(strict_loads((work / "prog.qcert.json").read_bytes())),
+                                   "application/json", f"run {jid}: compiler certificate")
+        d_qasm = self.put_artifact(qasm.encode("utf-8"), "text/plain", f"run {jid}: circuit")
         headline = perf["bottleneck"][0] if perf["bottleneck"] else ""
         return {"summary": f"{name} on {branch} (r{rev}, {r.arch.name}): {perf['total']['ms']:g} ms per round. "
                            + headline,
                 "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
                         "design": design, "compiler": used, "performance": perf,
-                        "artifacts": {"device": d_dev, "program": d_prog, "times": d_times},
+                        "artifacts": {"device": d_dev, "program": d_prog, "times": d_times,
+                                      "certificate": d_cert, "circuit": d_qasm},
                         "view": f"/runview/{jid}",
                         "note": "a performance run: compiled and replayed with the rules checked; not "
                                 "checked by the Lean checker and not a submission"},

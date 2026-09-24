@@ -19,8 +19,8 @@ __all__ = ["read_reference", "SECTIONS"]
 _REPO = Path(__file__).resolve().parents[2]
 _SKILL = Path(__file__).resolve().parent / "skill"
 _DOCS = {"adl": "docs/adl.md", "rules": "docs/rules.md", "tsir": "docs/tsir.md", "phys": "docs/phys.md"}
-SECTIONS = ("index", "task", "operations", "rules", "evaluator", "program", "anchors", "workflow",
-            "docs:adl", "docs:rules", "docs:tsir", "docs:phys")
+SECTIONS = ("index", "site", "site:studio", "task", "operations", "rules", "evaluator", "program", "anchors",
+            "workflow", "docs:adl", "docs:rules", "docs:tsir", "docs:phys")
 _WINDOW = 12000
 
 
@@ -30,7 +30,12 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
             "evaluator": {k: v for k, v in evaluator_identity().items()}, "section": section}
     if section == "index":
         return {**head, "sections": list(SECTIONS),
-                "hint": "read `workflow` first; `operations` before editing; `evaluator` before citing results"}
+                "hint": "read `workflow` first; `site` before working on the website's pages; `operations` "
+                        "before editing; `evaluator` before citing results"}
+    if section in ("site", "site:studio"):
+        from .mirror import SiteMirror
+        from .site_guide import site_guide
+        return {**head, **site_guide(getattr(ws, "site_mirror", None) or SiteMirror(), section, query)}
     if section == "task":
         return {**head, "release": ws.release.summary(), "circuit_qasm": ws.release.circuit_text()[:_WINDOW]}
     if section == "operations":

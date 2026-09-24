@@ -59,13 +59,23 @@ time goes (breakdown, longest steps, junction/ion hotspots, heating, rule failur
 sentences). Explain results from that report; never invent numbers. "The current design" is the
 branch the person's Studio shows (qccd_get_context: view.branch), usually main.
 
+SHOW YOUR WORK. The person watches their Studio while you work, as if you sat at their screen. Their
+Design page IS the workspace's live Studio: every change set you commit appears there at once, with
+your cursor and your summary. Build in small, meaningful steps (one idea per change set, a line in the
+chat for each) rather than one opaque batch. Every run you start shows its program in their Studio
+while it compiles, then their tab opens the run's page: press Play there and let them watch before
+you report the numbers (the run's result says how).
+
 DRAFTS. The person's saved designs are drafts: branches listed by qccd_manage_branch(action='list')
 as cand/<name>; say just <name>. Tools accept either form. To compare designs, run the SAME program
 on each and call qccd_compare_runs: it returns the comparison and opens the side-by-side view in
 Studio, where both designs animate on one shared clock.
 
 PAGES. The person may be talking to you from a page of the qccd.academy website (served through the
-workspace, with this same chat) or from Studio; the request says which page. A question asked on a
+workspace, with this same chat) or from Studio; the request says which page. Before your first work on
+the site, read qccd_read_reference section='site' (its pages, the course, and how to do the common
+things visibly) and, for a Studio, section='site:studio' (every control in the Studio's own words; a
+page read gives each Studio control its hint key). A question asked on a
 page is usually about that page: read it with qccd_page_read (headings, text by section, controls,
 embedded examples, the text the person selected, the studio transport and lessons) and answer from
 what it says, citing it. Show rather than tell with qccd_page_act: highlight an element with a short
@@ -97,8 +107,10 @@ def _tools() -> list:
          "(an event cursor from a previous call) adds what changed since.",
          obj({"since": i, "detail": {"type": "string", "enum": ["summary", "full"]}, "branch": s})),
         ("qccd_read_reference", "Version-matched reference for THIS workspace's task release and evaluator: "
-         "sections index, task, operations, rules, evaluator, program, anchors, workflow, docs:adl, docs:rules, "
-         "docs:tsir, docs:phys. Optional `query` returns the window around a match.",
+         "sections index, site (the website's pages, the course, how to do things on it), site:studio (every "
+         "Studio control in its own words), task, operations, rules, evaluator, program, anchors, workflow, "
+         "docs:adl, docs:rules, docs:tsir, docs:phys. Optional `query` returns the window around a match "
+         "(for site: the matching pages and controls).",
          obj({"section": s, "query": s}, ["section"])),
         ("qccd_query_design", "Inspect entities (node:<id>, segment:<id>, loop:<id>, zone:<name>, block:<name>) "
          "at the head revision; `kind` filters; include_operations lists the operation signatures.",
@@ -395,12 +407,15 @@ def _run_program(be, a: dict) -> dict:
     if jj["status"] == "succeeded":
         run = res["run"]
         return {"run_id": jid, "status": "succeeded", "summary": res.get("summary"), **{k: run[k] for k in (
-            "program", "design", "compiler", "performance", "view", "note")}}
+            "program", "design", "compiler", "performance", "view", "note")}, "show": SHOW_RUN}
     if jj["status"] in ("queued", "running"):
         return {"run_id": jid, "status": jj["status"], "progress": jj.get("progress"),
                 "next": "still running: poll qccd_get_job with this run_id"}
     return {"run_id": jid, "status": jj["status"], "summary": res.get("summary") or jj.get("error"),
             "log_tail": (res.get("log") or "")[-1500:]}
+
+
+SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation). Before you report, show it: qccd_page_read until the page's kind is 'run', then qccd_page_act(action='step', play=true), wait a few seconds while it plays (qccd_page_act action='wait'), and say what they are seeing."
 
 
 def _enc(v) -> str:
@@ -456,17 +471,31 @@ def run(root: Path, client: str, channel: bool) -> None:
         holder["conn"] = holder["conn"] or getattr(ctx.session, "_connection", None)
         name = params.name
         args = dict(params.arguments or {})
+        t0 = time.time()
+
+        async def traced(result, error=None):
+            # the service keeps the step in this session's trace; a trace never fails a tool call
+            data = {"args": args, "result": result, "error": error}
+            try:
+                await anyio.to_thread.run_sync(lambda: be.call("POST", "/api/trace", {
+                    "name": name, "kind": "tool_call", "ms": round((time.time() - t0) * 1000, 1), "data": data},
+                    timeout=10))
+            except Exception as exc:
+                log.debug("trace step not kept: %s", exc)
         try:
             out = await anyio.to_thread.run_sync(dispatch, be, name, args)
             text = summarize(name, out) + "\n" + json.dumps(out, indent=1)[:60000]
+            await traced(out)
             return types.CallToolResult(content=[types.TextContent(type="text", text=text)],
                                         structured_content=out if isinstance(out, dict) else {"result": out})
         except ServiceError as exc:
             detail = exc.detail
             text = f"refused ({exc.status} {detail.get('code')}): {detail.get('message')}\n" + json.dumps(detail, indent=1)[:20000]
+            await traced(None, {"status": exc.status, **detail})
             return types.CallToolResult(content=[types.TextContent(type="text", text=text)],
                                         structured_content={"error": detail, "status": exc.status}, is_error=True)
         except Exception as exc:
+            await traced(None, f"{type(exc).__name__}: {exc}")
             return types.CallToolResult(content=[types.TextContent(type="text", text=f"{type(exc).__name__}: {exc}")],
                                         is_error=True)
 

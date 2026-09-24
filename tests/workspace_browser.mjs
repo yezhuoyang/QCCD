@@ -12,6 +12,7 @@
 //   {"page": "a", "shot": "<png path>"}
 //   {"sleep": 500}
 //   {"http": {"method": "POST", "url": "...", "headers": {}, "body": {}}}   a raw request
+//   {"page": "a", "mouse": [["down", x, y], ["move", x, y], ["up", x, y]]}  a real pointer drag
 // Every page is its own tab (its own view), so multi-tab behaviour is testable.
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -98,6 +99,20 @@ try {
       else if (step.shot) {
         const r = await tab.send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(step.shot, Buffer.from(r.result.data, 'base64')); rec.ok = true;
+      }
+      else if (step.mouse) {
+        // a real pointer: [["down"|"move"|"up", x, y], ...] in the tab's CSS pixels, left button
+        const T = { down: 'mousePressed', move: 'mouseMoved', up: 'mouseReleased' };
+        // a string is a page expression returning that list (for coordinates read off the page)
+        const path = typeof step.mouse === 'string' ? (await tab.eval(step.mouse)).value : step.mouse;
+        if (!Array.isArray(path)) throw new Error('mouse: no path (' + JSON.stringify(path) + ')');
+        rec.path = path;
+        for (const [kind, x, y] of path) {
+          await tab.send('Input.dispatchMouseEvent', { type: T[kind], x, y, button: 'left', buttons: kind === 'up' ? 0 : 1,
+                                                       clickCount: kind === 'move' ? 0 : 1 });
+          await sleep(step.gap || 16);
+        }
+        rec.ok = true;
       }
       else if (step.http) {
         const h = step.http; const r = await fetch(h.url, { method: h.method || 'GET', headers: h.headers || {},

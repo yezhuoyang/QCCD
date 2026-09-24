@@ -100,6 +100,8 @@ class CodexBridge:
         self.turn_overrides: dict = {}
         #: an app server this workspace started earlier and re-attached to after a restart
         self.owned_pid: int | None = None
+        #: (session id, Traces): the turn's items go into the session's trace (trace.py)
+        self.tracer: tuple | None = None
 
     # ------------------------------------------------------------------ transport
 
@@ -196,6 +198,7 @@ class CodexBridge:
         tid = p.get("threadId") or (p.get("thread") or {}).get("id")
         if self.thread_id and tid and tid != self.thread_id:
             return
+        self._trace(method, p)
         if method == "turn/started":
             self.active_turn = (p.get("turn") or {}).get("id")
             self.thread_status = "active"
@@ -222,6 +225,31 @@ class CodexBridge:
             else:
                 return
         self.on_event(method, p)
+
+    _TOOLISH = ("mcpToolCall", "commandExecution", "webSearch", "fileChange", "dynamicToolCall", "collabAgentToolCall")
+
+    def _trace(self, method: str, p: dict) -> None:
+        if self.tracer is None:
+            return
+        sid, tr = self.tracer
+        turn = p.get("turnId") or (p.get("turn") or {}).get("id")
+        try:
+            if method == "turn/started":
+                tr.turn_started(sid, turn)
+            elif method == "turn/completed":
+                t = p.get("turn") or {}
+                tr.record(sid, "agent", "turn", t.get("status"), {"status": t.get("status"), "error": t.get("error")},
+                          turn=turn)
+            elif method in ("item/started", "item/completed"):
+                item = p.get("item") or {}
+                typ = item.get("type")
+                if typ == "userMessage" or (method == "item/started" and typ not in self._TOOLISH):
+                    return
+                kind = {"agentMessage": "message", "reasoning": "thinking"}.get(typ, "item")
+                ms = item.get("durationMs") if isinstance(item.get("durationMs"), (int, float)) else None
+                tr.record(sid, "agent", kind, typ, dict(item, phase=method.split("/")[1]), turn=turn, ms=ms)
+        except Exception:
+            log.exception("tracing a Codex event failed")
 
     # ------------------------------------------------------------------ the contract
 
@@ -265,6 +293,8 @@ class CodexBridge:
                 return {"state": "busy", "active_turn": self.active_turn}
             expected = self.active_turn
             try:
+                if self.tracer is not None:
+                    self.tracer[1].delivered(self.tracer[0], delivery_id, text, how="turn/steer", steer=True)
                 r = self.request("turn/steer", {"threadId": self.thread_id, "expectedTurnId": expected,
                                                 "input": inp, "clientUserMessageId": delivery_id})
                 tid = (r or {}).get("turnId") or expected
@@ -277,6 +307,9 @@ class CodexBridge:
                 if self.active_turn == expected:
                     raise
                 how = "turn/start (the turn to steer had finished)"
+        if self.tracer is not None:
+            self.tracer[1].delivered(self.tracer[0], delivery_id, text, how="turn/start",
+                                     steer=False)
         r = self.request("turn/start", {"threadId": self.thread_id, "input": inp,
                                         "clientUserMessageId": delivery_id, **self.turn_overrides})
         turn = (r or {}).get("turn") or {}
@@ -398,6 +431,7 @@ def connect_codex(state, body: dict) -> dict:
         raise WorkspaceError("codex_bind_failed", f"could not bind the thread: {exc}", status=502) from None
     caps = dict(CAPABILITIES)
     caps["new_thread"] = bool(bound["started"])
+    caps["settings"] = {"model": br.turn_overrides.get("model") or "", "effort": br.turn_overrides.get("effort") or ""}
     # enough to re-attach after a service restart: the same thread, the same tools
     caps["reattach"] = {"url": url, "thread_id": bound["thread_id"], "owned": proc is not None,
                         "app_server_pid": proc.pid if proc is not None else None,
@@ -408,6 +442,8 @@ def connect_codex(state, body: dict) -> dict:
                             runtime_ref=bound["thread_id"], capabilities=caps,
                             session_id=sid)
     holder["sid"] = s["id"]
+    if getattr(state, "traces", None) is not None:
+        br.tracer = (s["id"], state.traces)
     old = state.bridges.pop(s["id"], None)
     if old:
         old.close()
@@ -468,6 +504,8 @@ def reattach_codex_sessions(state) -> list:
         if proc is None and ra.get("owned"):
             br.owned_pid = ra.get("app_server_pid")
         br.turn_overrides = dict(ra.get("turn_overrides") or {})
+        if getattr(state, "traces", None) is not None:
+            br.tracer = (s["id"], state.traces)
         try:
             br.bind(thread_id=ra["thread_id"], cwd=str(ws.root), start=False, config=ra.get("config"),
                     sandbox=ra.get("sandbox"), approval_policy=ra.get("approval_policy"))

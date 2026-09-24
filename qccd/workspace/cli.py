@@ -15,6 +15,8 @@
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
     qccd releases                            the installed task releases
+    qccd trace [--session S] [--prompt P] [--full | --json | --open]
+                                             what an agent did for a request, step by step
 
 Entry points: `python -m qccd.workspace <command>`, or the `qccd` console script from
 `pyproject.toml`, which falls through to the existing `python -m qccd` commands for
@@ -35,7 +37,7 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "leaderboard")
+            "publish", "import", "releases", "leaderboard", "trace")
 
 
 def _root(args) -> Path:
@@ -147,6 +149,51 @@ def cmd_web(a) -> int:
     print(f"  (this link pairs the browser first: {url})")
     if not a.no_open:
         webbrowser.open(url)
+    return 0
+
+
+def cmd_trace(a) -> int:
+    """The agent traces of this workspace (trace.py), read from .qccd/traces without the service.
+    No session: the list.  A session: its latest request (or --prompt), as a transcript."""
+    from .trace import Traces, render_text
+    root = _root(a)
+    tr = Traces(root)
+    if a.open:
+        from .runtime import ensure_service
+        info = ensure_service(root, restart_stale=True)
+        code = _call(info, "POST", "/api/pair-code", {})["code"]
+        q = "&".join(f"{k}={v}" for k, v in (("session", a.session), ("prompt", a.prompt)) if v)
+        page = f"http://127.0.0.1:{info['port']}/trace" + (f"?{q}" if q else "")
+        print(f"Traces: {page}")
+        webbrowser.open(f"{page}#pair={code}")
+        return 0
+    idx = tr.index()
+    if not a.session:
+        if a.json:
+            print(json.dumps(idx, indent=1))
+            return 0
+        if not idx:
+            print("no traces yet: a request sent to an agent from Studio or a website page is traced")
+            return 0
+        for t in idx:
+            print(f"{t['session']}  {len(t['prompts'])} request(s), {t['steps']} steps, last "
+                  f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(t['last']))}")
+            for p in t["prompts"][-8:]:
+                print(f"    {p['prompt'] or '(outside a request)':<22} {p['steps']:>4} steps {p['tools']:>3} calls  "
+                      f"{(p['text'] or '')[:70]}")
+        print("\nqccd trace --session <id> [--prompt <id>]   for one request, step by step")
+        return 0
+    one = next((t for t in idx if t["session"] == a.session), None)
+    if one is None:
+        print(f"qccd trace: no trace for session {a.session!r}", file=sys.stderr)
+        return 1
+    pid = a.prompt or (one["prompts"][-1]["prompt"] if one["prompts"] else None)
+    steps = [s for s in tr.steps(a.session) if (s.get("prompt") or None) == (pid or None)]
+    if a.json:
+        print(json.dumps(steps, indent=1, ensure_ascii=False))
+    else:
+        print(f"session {a.session}, request {pid or '(outside a request)'}")
+        print(render_text(steps, full=a.full))
     return 0
 
 
@@ -445,6 +492,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--channel", action="store_true")
     p.add_argument("--root", default=None)
     sub.add_parser("releases")
+    p = sub.add_parser("trace", help="what an agent did for a request: calls, results, page actions")
+    p.add_argument("--session")
+    p.add_argument("--prompt")
+    p.add_argument("--full", action="store_true", help="everything, uncut (the full text the agent received too)")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--open", action="store_true", help="open the trace viewer in the browser")
+    p.add_argument("--root", default=None)
     return ap
 
 
@@ -468,7 +522,7 @@ def main(argv=None) -> int:
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
-          "leaderboard": cmd_leaderboard}[a.cmd]
+          "leaderboard": cmd_leaderboard, "trace": cmd_trace}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
     try:

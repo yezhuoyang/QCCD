@@ -37,6 +37,7 @@
 (function () {
 'use strict';
 var CFG = JSON.parse(document.getElementById('qccd-live-config').textContent);
+if ((CFG.mode === 'run' || CFG.mode === 'compare') && window.self !== window.top) return;   // a frame of the side-by-side view
 var ED = globalThis.EDITOR || null;
 var PAGE = CFG.mode === 'page';
 var S = {
@@ -276,6 +277,8 @@ function openEvents() {
     if (S.rev !== null && e.revision !== S.rev + 1) S.needRefresh = true;
     refreshHead().then(function () {
       if (S.follow) { reveal(S.lastTouched); flash(S.lastTouched); }
+      if ((p.actor || {}).kind === 'agent') showAgentWork(S.lastTouched, shortName((p.actor || {}).label || (p.actor || {}).id),
+                                                          'r' + e.revision + ' ' + (p.summary || p.diff_summary || 'changed the design'));
       else if (S.debug) notice(who + ' committed r' + e.revision + ': ' + (p.summary || p.diff_summary || ''), null,
                   { label: 'Show', run: function () { flash(S.lastTouched); } });
     });
@@ -305,6 +308,7 @@ function openEvents() {
     var p = e.payload || {};
     if (!S.debug) loadConvSoon();
     if (t === 'job.updated' && p.kind === 'compile' && p.status === 'succeeded') S.compile = p.job_id;
+    if (t === 'job.updated' && p.job_id) trackRun(p);
     loadResults();
   }); });
   on('branch.created', function () { if (S.debug) renderBody(); else loadBranches(); });
@@ -658,8 +662,10 @@ function present(p, branch) {
       var url = p.action === 'compare' ? '/compare?runs=' + (t.runs || []).map(encodeURIComponent).join(',')
                                        : '/runview/' + encodeURIComponent(t.run_id || '');
       loadConvSoon();
-      notice(p.action === 'compare' ? 'The agent put two runs side by side.' : 'The agent has a run for you to watch.', null,
-             { label: 'Open', run: function () { window.open(url, '_blank', 'noopener'); } });
+      // like a person showing you: the tab you are looking at opens it
+      if (document.visibilityState === 'visible') goTo(url);
+      else notice(p.action === 'compare' ? 'The agent put two runs side by side.' : 'The agent has a run for you to watch.', null,
+                  { label: 'Open', run: function () { goTo(url); } });
     }
     else if (p.action === 'open_result' || p.action === 'compare') { S.tab = 'results'; renderTabs(); loadResults(); }
     else if (p.action === 'reveal_diagnostic') { S.tab = 'results'; renderTabs(); loadResults(); flash(t.keys || []); }
@@ -1156,6 +1162,8 @@ function buildChat() {
     h('div', { cls: 'qcl-head' }, [
       h('span', { id: 'qcl-live', cls: 'qcl-dot' }),
       h('b', { id: 'qcl-who', text: 'Agent' }),
+      h('button', { id: 'qcl-model', cls: 'qcl-btn qcl-modelbtn', title: 'the model and how hard it thinks',
+                    on: { click: function (e) { e.stopPropagation(); toggleMenu('model'); } } }),
       h('span', { id: 'qcl-sub', cls: 'qcl-sub' }),
       h('span', { cls: 'qcl-sp' }),
       PAGE ? null : h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
@@ -1183,8 +1191,55 @@ function buildChat() {
     ])
   ]);
   if (min && CFG.framed) toParent({ qccd: 'size', min: true });
+  dock.appendChild(h('div', { cls: 'qcl-grip', title: 'drag to resize' }));
   document.body.appendChild(dock);
+  movable(dock);
   renderConv(); renderChips(); renderChatHead(); renderDrafts();
+}
+// the chat moves out of the way: drag its header; resize it from the corner.  In a website page
+// the chat is a frame, and the page moves the frame (mirror.js).
+function movable(dock) {
+  var head = dock.querySelector('.qcl-head'), grip = dock.querySelector('.qcl-grip');
+  if (!CFG.framed) {
+    try { var r = JSON.parse(localGet('qccd.dock.rect') || 'null');
+          if (r && r.x >= 0 && r.y >= 0 && r.x < innerWidth - 80 && r.y < innerHeight - 40) place(r); } catch (e) { /* none */ }
+  }
+  function place(r) {
+    dock.style.left = r.x + 'px'; dock.style.top = r.y + 'px'; dock.style.right = 'auto'; dock.style.bottom = 'auto';
+    if (r.w) dock.style.width = r.w + 'px';
+    if (r.h) { dock.style.height = r.h + 'px'; dock.style.maxHeight = 'none'; }
+  }
+  function drag(el, onDelta) {
+    el.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || (e.target.closest && e.target.closest('button, select, input, textarea, a'))) return;
+      e.preventDefault();
+      var x0 = e.screenX, y0 = e.screenY;
+      el.setPointerCapture(e.pointerId);
+      function mv(ev) { onDelta(ev.screenX - x0, ev.screenY - y0); x0 = ev.screenX; y0 = ev.screenY; }
+      function up() { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up);
+                      el.removeEventListener('pointercancel', up); if (CFG.framed) toParent({ qccd: 'moved' }); else save(); }
+      el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    });
+  }
+  function save() {
+    var r = dock.getBoundingClientRect();
+    localSet('qccd.dock.rect', J({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }));
+  }
+  drag(head, function (dx, dy) {
+    if (CFG.framed) { toParent({ qccd: 'move', dx: dx, dy: dy }); return; }
+    var r = dock.getBoundingClientRect();
+    place({ x: Math.max(0, Math.min(innerWidth - 80, r.left + dx)), y: Math.max(0, Math.min(innerHeight - 40, r.top + dy)) });
+  });
+  drag(grip, function (dx, dy) {
+    if (CFG.framed) { toParent({ qccd: 'resize', dw: dx, dh: dy }); return; }
+    var r = dock.getBoundingClientRect();
+    place({ x: r.left, y: r.top, w: Math.max(300, r.width + dx), h: Math.max(220, r.height + dy) });
+  });
+  head.addEventListener('dblclick', function (e) {
+    if (e.target.closest && e.target.closest('button, select')) return;
+    if (CFG.framed) { toParent({ qccd: 'home' }); return; }
+    localSet('qccd.dock.rect', ''); dock.style.cssText = '';
+  });
 }
 document.addEventListener('click', function () { closeMenu(); });
 function grow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; }
@@ -1196,6 +1251,7 @@ function toggleMenu(which) {
   closeMenu();
   if (had && had.getAttribute('data-which') === which) return;
   var s = agentSession();
+  if (which === 'model') return modelMenu();
   var items = PAGE ? (which === 'plus' ? [
       ['Point at something on the page', pickOnPage],
       [S.selOff ? 'Send the text you selected on the page with the message' : 'Do not send the selected text',
@@ -1205,7 +1261,8 @@ function toggleMenu(which) {
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
-      ['Open your Studio (the design you work on)', function () { window.open('/studio', '_blank', 'noopener'); }],
+      ['Open your Studio (the design you work on)', function () { goTo('/studio'); }],
+      ['Trace: what the agent did, step by step', openTrace],
       ['Debug view (sessions, threads, activity, results)', function () { setDebug(true); }]
     ]) : which === 'plus' ? [
       ['Lasso a region', function () { setTool('lasso'); }],
@@ -1225,6 +1282,8 @@ function toggleMenu(which) {
       s ? ['Stop the agent', chatStop] : null,
       null,
       CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
+      CFG.mode === 'run' || CFG.mode === 'compare' ? ['Back to your Studio (the design)', function () { goTo('/studio'); }] : null,
+      ['Trace: what the agent did, step by step', openTrace],
       ['Debug view (sessions, threads, activity, results)', function () { setDebug(true); }]
     ];
   var m = h('div', { id: 'qcl-menu', cls: 'qcl-menu ' + (which === 'plus' ? 'up' : 'down'), 'data-which': which,
@@ -1328,15 +1387,75 @@ function agentChoice() {
   return S.codex ? 'codex' : (S.claude ? 'claude' : null);
 }
 function agentTitle(k) { return k === 'claude' ? 'Claude' : 'Codex'; }
+// which agent the chat is about: the connected one, else the one it will start
+function agentKind() { var s = agentSession(); return s ? (s.client === 'claude' ? 'claude' : 'codex') : agentChoice(); }
+// the trace viewer (trace.js), at this conversation's latest request
+function openTrace() {
+  var s = agentSession();
+  window.open(location.origin + '/trace' + (s ? '?session=' + encodeURIComponent(s.id) : ''), '_blank', 'noopener');
+}
+function modelPref(kind) { try { return JSON.parse(localGet('qccd.model.' + kind) || '{}') || {}; } catch (e) { return {}; } }
+function modelOf(kind) {
+  var s = agentSession();
+  var set = s && s.client === kind ? ((s.capabilities || {}).settings || {}) : {};
+  var p = modelPref(kind);
+  return { model: set.model !== undefined ? set.model : (p.model || ''), effort: set.effort !== undefined ? set.effort : (p.effort || '') };
+}
+function modelLabel(kind) {
+  var m = modelOf(kind), cat = (S.models || {})[kind] || {}, name = '';
+  (cat.models || []).forEach(function (x) { if (x.id === m.model) name = x.label; });
+  return (name || (m.model ? m.model : 'default model')) + (m.effort ? ' · ' + m.effort : '');
+}
+function setModel(kind, change) {
+  var cur = modelOf(kind), next = { model: change.model !== undefined ? change.model : cur.model,
+                                    effort: change.effort !== undefined ? change.effort : cur.effort };
+  localSet('qccd.model.' + kind, J(next));
+  var s = agentSession();
+  var done = s && s.client === kind
+    ? api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/settings', next).then(function (r) {
+        if (!r.ok) notice('Not changed: ' + ((r.error || {}).message || 'error'), 'bad'); return loadSessions(); })
+    : Promise.resolve();
+  return done.then(renderChatHead);
+}
+function modelMenu() {
+  var kind = agentKind();
+  if (!kind) { notice('No agent is installed: install Codex or Claude Code first.'); return; }
+  var go = function () {
+    var cat = (S.models || {})[kind] || {}, cur = modelOf(kind);
+    var m = h('div', { id: 'qcl-menu', cls: 'qcl-menu down', 'data-which': 'model', on: { click: function (e) { e.stopPropagation(); } } });
+    m.appendChild(h('div', { cls: 'qcl-mh', text: agentTitle(kind) + ': model' }));
+    (cat.models || []).forEach(function (x) {
+      m.appendChild(h('button', { cls: 'qcl-mi', text: (x.id === cur.model ? '✓ ' : '') + x.label + (x.note ? ' — ' + x.note : ''),
+                                  on: { click: function () { closeMenu(); setModel(kind, { model: x.id }); } } }));
+    });
+    var efforts = cat.efforts || [];
+    (cat.models || []).forEach(function (x) { if (x.id === cur.model && x.efforts) efforts = x.efforts; });
+    if (efforts.length) {
+      m.appendChild(h('div', { cls: 'qcl-sep' }));
+      m.appendChild(h('div', { cls: 'qcl-mh', text: 'Thinking' }));
+      [''].concat(efforts).forEach(function (e) {
+        m.appendChild(h('button', { cls: 'qcl-mi', text: (e === cur.effort ? '✓ ' : '') + (e || 'the model\'s default'),
+                                    on: { click: function () { closeMenu(); setModel(kind, { effort: e }); } } }));
+      });
+    }
+    m.appendChild(h('div', { cls: 'qcl-note', text: 'Applies from your next message.' }));
+    document.getElementById('qcl-dock').appendChild(m);
+  };
+  if (S.models && S.models[kind]) go();
+  else api('GET', '/api/agents/models').then(function (r) { if (r.ok) S.models = r.data; go(); });
+}
 function connectCodex() { return connectAgent('codex'); }
 function connectAgent(kind) {
   S.connecting = kind; renderChatHead(); renderConv();
   // nobody can answer an approval prompt from Studio: neither agent is ever asked -- Codex runs
   // with approval `never` and a read-only shell, Claude with `dontAsk` and no shell -- and each
   // changes the design only through the QCCD tools
-  var req = kind === 'claude' ? api('POST', '/api/sessions/claude/connect', { label: 'Claude' })
+  var pick = modelPref(kind);
+  var req = kind === 'claude' ? api('POST', '/api/sessions/claude/connect', { label: 'Claude', model: pick.model || undefined,
+                                                                             effort: pick.effort || undefined })
     : api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
-                                                   sandbox: 'read-only' });
+                                                   sandbox: 'read-only',
+                                                   turn_overrides: { model: pick.model || undefined, effort: pick.effort || undefined } });
   return req.then(function (r) {
     S.connecting = false;
     if (!r.ok) { notice('Could not start ' + agentTitle(kind) + ': ' + ((r.error || {}).message || 'error'), 'bad'); renderChatHead(); return null; }
@@ -1361,6 +1480,13 @@ function renderChatHead() {
       dot = document.getElementById('qcl-live');
   if (!who) return;
   who.textContent = s ? shortName(s.label || s.client) : 'Agent';
+  var mb = document.getElementById('qcl-model'), kind = agentKind();
+  if (mb) { mb.textContent = kind ? modelLabel(kind) + ' ▾' : ''; mb.style.display = kind ? '' : 'none'; }
+  // a chosen model is named as its agent names it (the list comes once, on demand)
+  if (kind && modelOf(kind).model && !(S.models && S.models[kind]) && !S.modelsAsked) {
+    S.modelsAsked = true;
+    api('GET', '/api/agents/models').then(function (r) { if (r.ok) { S.models = r.data; renderChatHead(); } });
+  }
   var t, cls;
   if (!S.connected) { t = 'offline: reconnecting'; cls = 'off'; }
   else if (S.connecting) { t = 'starting ' + agentTitle(S.connecting) + '…'; cls = 'busy'; }
@@ -1664,8 +1790,83 @@ function refreshPage() {
 }
 function pageInfo() {
   if (PAGE) return S.page;
+  if (CFG.mode === 'run' && CFG.run_id) return { url: location.pathname, title: document.title, kind: 'run' };
+  if (CFG.mode === 'compare') return { url: location.pathname + location.search, title: document.title, kind: 'comparison' };
   if (CFG.mode !== 'design') return null;
   return { url: location.pathname, title: document.title, kind: 'studio' };
+}
+// go to one of the workspace's own pages in the tab the person is looking at; from a website
+// page (this chat is a frame) the page itself goes, when asked by this frame
+function goTo(path) {
+  if (CFG.framed) toParent({ qccd: 'navigate', url: location.origin + path });
+  else location.assign(path);
+}
+
+// ------------------------------------------------------------------ the agent's work, shown where it happens
+// a design change: the cursor at the changed parts, saying what changed
+function showAgentWork(keys, who, caption) {
+  if (!window.QCCD_PAGE || !window.QCCD_PAGE.point) return;
+  var svg = document.getElementById('svg'), xs = [], ys = [];
+  if (!svg || !svg.getScreenCTM) return;
+  (keys || []).slice(0, 200).forEach(function (k) {
+    var q = keyPos(k); if (!q) return;
+    var u = toUser(q.x, q.y), pt = svg.createSVGPoint(); pt.x = u.x; pt.y = u.y;
+    var s = pt.matrixTransform(svg.getScreenCTM()); xs.push(s.x); ys.push(s.y);
+  });
+  var r = svg.getBoundingClientRect();
+  var x = xs.length ? xs.reduce(function (a, b) { return a + b; }) / xs.length : r.left + r.width / 2;
+  var y = ys.length ? ys.reduce(function (a, b) { return a + b; }) / ys.length : r.top + r.height / 2;
+  window.QCCD_PAGE.point(x, y, who, String(caption || '').slice(0, 90));
+}
+// a run: the program appears while it compiles, then the run's own page opens
+var RUNS = Object.create(null);
+function trackRun(p) {
+  var jid = p.job_id, known = RUNS[jid];
+  if (known === 'other') return;
+  if (!known) {
+    RUNS[jid] = 'asking';
+    api('GET', '/api/runs/' + encodeURIComponent(jid) + '/program').then(function (r) {
+      if (!r.ok) { RUNS[jid] = 'other'; return; }
+      RUNS[jid] = r.data;
+      runPanel(jid, p);
+    });
+    return;
+  }
+  if (known !== 'asking') runPanel(jid, p);
+}
+function runPanel(jid, p) {
+  var info = RUNS[jid];
+  if (CFG.framed || CFG.mode === 'run' || CFG.mode === 'compare') {
+    // the chat's run card shows the progress here; a finished run still opens in this tab
+    if (p.status === 'succeeded' && S.follow && document.visibilityState === 'visible')
+      setTimeout(function () { goTo('/runview/' + encodeURIComponent(jid)); }, 1500);
+    return;
+  }
+  var box = document.getElementById('qcl-runpanel');
+  if (!box || box.getAttribute('data-run') !== jid) {
+    if (box) box.remove();
+    var qasm = String(info.qasm || '').split('\n');
+    box = h('div', { id: 'qcl-runpanel', 'data-run': jid, 'data-qccd-private': '' }, [
+      h('div', { cls: 'qcl-rp-t', text: (info.agent ? shortName(info.agent) + ' is running ' : 'Running ') + info.name +
+                                         ' on ' + (info.draft === 'main' ? 'the main design' : 'draft ' + info.draft) }),
+      h('div', { id: 'qcl-rp-s', cls: 'qcl-rp-s', text: 'loading the program' }),
+      h('div', { cls: 'qcl-rp-l', text: 'the program (' + qasm.length + ' lines of OpenQASM)' }),
+      h('pre', { cls: 'qcl-rp-q', text: qasm.slice(0, 80).join('\n') + (qasm.length > 80 ? '\n…' : '') }),
+      h('div', { cls: 'qcl-row' }, [btn('Hide', function () { box.remove(); }, 'qcl-link')])
+    ]);
+    document.body.appendChild(box);
+  }
+  var st = document.getElementById('qcl-rp-s');
+  if (p.status === 'running' || p.status === 'queued') { if (p.message) st.textContent = p.message + '…'; return; }
+  if (p.status === 'succeeded') {
+    st.textContent = 'compiled and replayed: opening the run so you can watch it';
+    box.classList.add('done');
+    if (S.follow && document.visibilityState === 'visible') setTimeout(function () { goTo('/runview/' + encodeURIComponent(jid)); }, 1500);
+    else box.appendChild(btn('Watch it run', function () { goTo('/runview/' + encodeURIComponent(jid)); }, 'pri'));
+    return;
+  }
+  if (p.status) { st.textContent = 'the run ' + p.status + ' (the chat says why)'; box.classList.add('bad');
+                  setTimeout(function () { if (box.parentNode) box.remove(); }, 20000); }
 }
 function pickOnPage() {
   tip('Click something on the page. Esc cancels.');

@@ -306,11 +306,70 @@ watch it happen.
   "What does rule R7 say? Show me its failing example", Claude read the section,
   highlighted the failing example with a caption, and answered with the page's numbers.
 
-### Runs and failures in the chat
+### Nothing out of sight
 
-When the agent's runtime stops without answering, the chat shows why: a failed Codex turn
-leaves its error message (a usage limit, for example) as a notice in the conversation,
-instead of the conversation going quiet.
+What the agent does to the person's design or with their programs happens where they are
+looking.
+
+- **The Design page is the live Studio.** On the local website, `studio.html` (and `#design`)
+  opens the workspace's own Studio (`/studio`). Lesson links (`#learn=…`) stay on the site's
+  Studio. Every change set an agent commits appears there at once, with the agent's cursor
+  at the changed parts and the change set's summary as its caption.
+- **A run is shown before it is reported.** While `qccd_run_program` compiles, the Studio
+  shows the run's program (the first lines of its OpenQASM) and its progress. When it
+  succeeds, the person's tab opens the run's own page (`/runview/<run>`, the circuit
+  beside the compiled program). Follow off, or a background tab, gets a "Watch it run"
+  button instead. The tool's result tells the agent to press Play there and let it play
+  before reporting numbers. A comparison opens side by side the same way.
+- **Failures say why.** When the agent's runtime stops without answering, the chat shows
+  why: a failed Codex turn or Claude run leaves its error message (a usage limit, for
+  example) as a notice in the conversation, instead of the conversation going quiet.
+
+### The chat: where it sits, which model, and what the agent did
+
+- **It moves.** Drag the chat by its header, resize it from the bottom-right corner, and
+  double-click the header to put it back. On a website page the chat is a frame, and the
+  page moves the frame when the chat asks it to. The browser remembers the place, once
+  for the Studio and once for the website.
+- **Model and thinking.** The button beside the agent's name picks the model and how hard
+  it thinks, as in Claude or Codex. Claude offers Default, Fable, Opus, Sonnet and Haiku
+  (`claude --model <alias>`) and the levels low, medium, high, xhigh and max (`--effort`).
+  Codex's list is its app server's own (`model/list`), each model with the levels it
+  supports, passed as `model` and `effort` on every `turn/start`. A choice applies from
+  the next message. It is kept on the session (`capabilities.settings`, and in what a
+  restarted service re-attaches with). Before a conversation exists it is remembered in
+  the browser and used when one starts. `GET /api/agents/models` and
+  `POST /api/sessions/{id}/settings` (a person only) are behind it. Checked: each Claude
+  alias answers with `--effort low`, and Codex's list came from its app server.
+- **The trace** (`trace.py`, `web/trace.js`). Everything an agent does for a request is
+  recorded in order, in `.qccd/traces/<session>.jsonl`:
+  - the full text it was handed, and the person's own words;
+  - what it started with: model, tools, MCP servers, skills;
+  - its thinking;
+  - every tool, MCP and Skill call with its input and result;
+  - every page action and what the page answered;
+  - how the turn ended: time, model turns, cost, error.
+
+  The steps come from three places: Claude's stream-json, Codex's item events, and the
+  QCCD MCP server (which records every call it serves, so agents started in a terminal
+  are traced too), plus the service for page actions. Long values keep their head, keys
+  that name credentials are blanked, and nothing leaves the computer.
+
+  To read a trace, use `/trace` in the browser (⋯ → "Trace: what the agent did, step by
+  step"). It lists each conversation's requests and shows one step by step. Replay shows
+  the steps again at their recorded pace (real time, 4×, 16×, or one a second), and JSON
+  exports them. From a terminal, `qccd trace` lists the conversations and
+  `qccd trace --session <id> [--prompt <id>] [--full | --json | --open]` prints one
+  request. `GET /api/traces[/<session>?prompt=]` serves the same data.
+- **The agent knows the site.** `qccd_read_reference` section `site` is read from the live
+  site's own search index. It holds:
+  - the main pages, the lessons and the leaderboards;
+  - a short how-to: walk someone through a lesson, show an animation, test a program on
+    the design, try one on a site Studio page, check a page for mistakes, comment.
+
+  Section `site:studio` lists every Studio control in the Studio's own words (the explain
+  layer's HINTS table, the sentences on its hover cards). In a page read, each Studio
+  control carries its `hint` key and that sentence. `query` searches both sections.
 
 ## 3 · Grading (`evaluator.py`, `bundle.py`, `metrics.py`, `tasks.py`)
 
@@ -558,6 +617,8 @@ qccd submit --local --wait               # freeze + reference grade -> "Local re
 qccd leaderboard
 qccd publish --submission <sub_id>       # review + approve at an interactive terminal
 qccd publish --approval <ap_id> --server https://qccd.academy/official   # token: ~/.qccd/credentials.json
+qccd trace                               # what the agents did: every request, step by step
+qccd trace --session <id> --open         # ...one conversation in the browser, with Replay
 qccd status | qccd stop
 ```
 
@@ -588,10 +649,10 @@ Linux and macOS were not exercised in this session.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
-| `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat | ~5 s |
+| `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat; the model and thinking level the person picks reach the command line; a turn's trace step by step (thinking, Skill and MCP calls with results, cost); a Codex turn traced from its item events | ~8 s |
 | `tests/workspace_live_comments.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the agent comments on real qccd.academy pages as a signed-in person, against a PRIVATE copy of the comment service | ~20 s |
 | `tests/test_workspace_toolchain.py` | the prebuilt compiler: the manifest matches the committed source, a download is refused unless its size and hash match, an install runs once, and which compiler is used | ~3 s |
-| `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; in real Chrome every page action on a mirrored page, the Studio's own page actions, and a real MCP client answering a question asked on a page | ~40 s |
+| `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; the trace of MCP calls and page actions (and `qccd trace`); the site guide from the site's index and the Studio's hints; in real Chrome every page action on a mirrored page, the Studio's own page actions, the agent's design and runs shown in the person's Studio, and a real MCP client answering a question asked on a page | ~60 s |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
 | `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |
 | `tests/workspace_live_codex.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a Studio prompt into a real Codex thread | ~1 min |

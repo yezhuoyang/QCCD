@@ -251,6 +251,11 @@ def inject(page: str, cfg: dict) -> str:
     comment layer switched off, the site's own Agent button hidden (this IS the agent), and
     the chat + page actions before `</body>`."""
     marker = "<script>window.QCCD_MIRROR=1;</script>"
+    if cfg.get("design_redirect"):
+        # the Design page IS the person's live workspace: what the agent does to the design shows
+        # there as it happens (lessons, #learn..., stay on the site's own Studio)
+        marker += ("<script>(function(){var h=location.hash||'';if(!h||h==='#design')location.replace("
+                   + json.dumps(cfg["studio_url"]) + ");})();</script>")
     m = re.search(r"<head[^>]*>", page, re.I)
     page = (page[:m.end()] + marker + page[m.end():]) if m else marker + page
     # the comment layer, keyed by the SITE's path, and reachable by the agent's page actions
@@ -294,6 +299,7 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
     import asyncio
 
     mirror = mirror or SiteMirror()
+    state.ws.site_mirror = mirror                 # the site guide reads the same cache (site_guide.py)
     web_port = state.info["web_port"]
     chat_origin = f"http://127.0.0.1:{state.info['port']}"
     origin = f"http://127.0.0.1:{web_port}"
@@ -339,7 +345,8 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
             headers["X-QCCD-Mirror"] = "stale: the site could not be reached; this is the last copy"
         if page.ctype == "text/html":
             text = page.body.decode("utf-8", errors="replace")
-            return HTMLResponse(inject(text, cfg), headers=headers)
+            here = dict(cfg, design_redirect=True) if path.strip("/") in ("studio.html", "design", "design/") else cfg
+            return HTMLResponse(inject(text, here), headers=headers)
         return Response(page.body, media_type=page.ctype, headers=headers)
 
     @app.get("/")
