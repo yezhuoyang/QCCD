@@ -44,6 +44,11 @@ STUDIO_CSS = """
 #qa-panel .qa-save{font:inherit;font-size:13.5px;padding:6px 12px;border:1px solid #2a78d6;border-radius:6px;background:#2a78d6;color:#fff;cursor:pointer}
 #qa-panel .qa-save:hover{background:#1f66bd}
 #qa-panel .qa-saved{font-size:12.5px;color:#0b7a4b;margin-left:8px}
+#qa-panel .qa-go{display:inline-block;margin:6px 8px 4px 0;padding:8px 14px;border-radius:7px;background:#2a78d6;color:#fff;
+ font-weight:600;text-decoration:none;border:1px solid #2a78d6}
+#qa-panel .qa-go:hover{background:#1f66bd}
+#qa-panel .qa-go.alt{background:#fff;color:#1d4f91;border-color:#bcd4f2}
+#qa-panel .qa-go.alt:hover{background:#eef4fc}
 """
 
 PANEL_HTML = """
@@ -53,8 +58,11 @@ PANEL_HTML = """
 lasso a region, sketch an arrow, or show an edit once, and ask. The agent gets exactly what you
 pointed at and edits the same design through checked changes. You watch each change arrive in
 the Studio. Parts you lock stay locked, and any change can be undone.</p>
+<p><a class="qa-go" data-go="studio" target="_blank" rel="noopener">Open my Studio</a><a class="qa-go alt"
+data-go="page" target="_blank" rel="noopener">Open this page with my agent</a></p>
 <p class="qa-note">This runs on your own computer, in a local workspace that this page does not
-connect to. Nothing leaves your machine unless you publish it.</p>
+connect to: the buttons are links to 127.0.0.1, and work while your workspace is running.
+Nothing leaves your machine unless you publish it.</p>
 <h3>Set up once</h3>
 <pre>__CLONE__
 cd QCCD
@@ -126,6 +134,11 @@ STUDIO_JS = r"""
   panel.id = 'qa-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Design with an AI agent');
   panel.setAttribute('data-open', '0');
   panel.innerHTML = __PANEL__;
+  // the workspace's website listens on 47100 (qccd/workspace/mirror.py WEB_PORT); its /studio
+  // leads on to the person's own Studio.  Plain links: this page connects to nothing.
+  var LOCAL = 'http://127.0.0.1:47100';
+  panel.querySelector('[data-go="studio"]').href = LOCAL + '/studio';
+  panel.querySelector('[data-go="page"]').href = LOCAL + '/web/studio.html' + location.hash;
   document.body.appendChild(panel);
   function open(v){ panel.setAttribute('data-open', v ? '1' : '0'); btn.setAttribute('aria-expanded', v ? 'true' : 'false'); }
   btn.addEventListener('click', function(){ open(panel.getAttribute('data-open') !== '1'); });
