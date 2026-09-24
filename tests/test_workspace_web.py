@@ -195,8 +195,10 @@ def test_the_mirror_origin_has_no_authority(svc):
     # the pairing cookie reaches the mirror's port too (cookies ignore ports): it means nothing there
     for k, v in dict(c.cookies).items():
         w.cookies.set(k, v)
-    for path in ("/api/whoami", "/api/context", "/api/events", "/studio", "/chatframe"):
+    for path in ("/api/whoami", "/api/context", "/api/events", "/chatframe"):
         assert w.get(path).status_code == 404
+    # /studio is only a way across: a redirect to the workspace's own origin, which checks for itself
+    assert w.get("/studio", follow_redirects=False).headers["location"] == f"{BASE}/studio"
     # and the workspace refuses the mirror's origin, even with the cookie and the right CSRF token
     r = c.post("/api/prompts/send", json={"body": {"text": "hi", "intent": "question"}},
                headers={"X-QCCD-CSRF": csrf, "Origin": WEB})
@@ -596,3 +598,30 @@ def test_an_mcp_agent_answers_a_question_from_the_page(tmp_path, site, monkeypat
             service_request(info, "POST", "/api/shutdown", {}, token="owner")
         except Exception:
             pass
+
+
+def test_the_website_listens_on_its_well_known_port(monkeypatch):
+    """qccd.academy's Agent button links to http://127.0.0.1:47100/web/<page>: the mirror takes
+    that port when it is free, and any free port when another workspace holds it."""
+    from qccd.workspace.mirror import WEB_PORT
+    from qccd.workspace.runtime import free_port
+    from qccd.workspace.service import _bind_web
+    assert WEB_PORT == 47100
+    p = free_port()
+    monkeypatch.setenv("QCCD_WEB_PORT", str(p))
+    s = _bind_web(None)
+    try:
+        assert s.getsockname()[1] == p
+        s2 = _bind_web(p)                       # taken, and its last port is the same one
+        try:
+            assert s2.getsockname()[1] not in (p, 0)
+        finally:
+            s2.close()
+    finally:
+        s.close()
+
+
+def test_the_mirror_leads_to_the_studio(svc):
+    ws, state, c, w = svc
+    r = w.get("/studio", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == f"{BASE}/studio"

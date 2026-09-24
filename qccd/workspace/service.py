@@ -938,6 +938,19 @@ def _page_failed(state: ServiceState, exc: Exception) -> HTMLResponse:
     return HTMLResponse(page, status_code=500, headers={"Content-Security-Policy": _CSP})
 
 
+def _bind_web(sticky_port: int | None):
+    """The website's listener: the well-known port first (`mirror.WEB_PORT`, or
+    QCCD_WEB_PORT), so the Agent button on qccd.academy can link to this computer without
+    knowing anything about it; then the port it had last time; then any free port."""
+    from .mirror import web_port_default
+    from .runtime import bind_listener
+    want = web_port_default()
+    try:
+        return bind_listener(want, fallback=False)
+    except OSError:
+        return bind_listener(sticky_port if sticky_port and sticky_port != want else None)
+
+
 def _by_port(main, web, web_port: int):
     """One process, two listeners: requests that arrived on the website's socket go to the
     mirror app, everything else to the workspace app (by the socket, not the Host header)."""
@@ -999,7 +1012,7 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
     port = sock.getsockname()[1]
     # the website mirror listens on a port of its own: its pages are a different origin,
     # which the workspace API does not trust (mirror.py)
-    wsock = bind_listener(sticky.get("web_port")) if os.environ.get("QCCD_WEB", "1") != "0" else None
+    wsock = _bind_web(sticky.get("web_port")) if os.environ.get("QCCD_WEB", "1") != "0" else None
     web_port = wsock.getsockname()[1] if wsock else None
     write_sticky(ws.id, port=port, web_port=web_port)
     info = write_runtime(ws.id, ws.root, port, os.getpid(), code=code, web_port=web_port)
