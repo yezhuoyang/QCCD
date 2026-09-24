@@ -438,10 +438,14 @@ def create_app(state: ServiceState) -> FastAPI:
         finally:
             state.page_waits.pop(aid, None)
         page = view["state"].get("page") or {}
+        arrived = None
+        if answered and action == "navigate" and (waiter["result"] or {}).get("ok"):
+            # the answer came as the page LEFT; the agent's next step belongs on the page it arrives at
+            arrived = _arrival(ws, view, t0, ((waiter["result"] or {}).get("result") or {}).get("navigating"))
         state.traces.record(actor.get("session"), "page", "page_action", action,
                             {"args": args, "page": page.get("url"), "answered": answered,
                              "ok": (waiter["result"] or {}).get("ok"), "result": (waiter["result"] or {}).get("result"),
-                             "error": (waiter["result"] or {}).get("error")},
+                             "error": (waiter["result"] or {}).get("error"), "arrived": arrived},
                             ms=(time.time() - t0) * 1000)
         if not answered:
             raise WorkspaceError("page_timeout", f"the page {page.get('url')!r} did not answer within {wait:g} s "
@@ -451,6 +455,9 @@ def create_app(state: ServiceState) -> FastAPI:
                "action": action, "ok": r["ok"]}
         if r["ok"]:
             out["result"] = r.get("result")
+            if action == "navigate":
+                out["arrived"] = arrived or {"arrived": False, "note": "the new page has not reported itself yet "
+                                             "(still loading); read the page again before acting on it"}
             res = r.get("result") or {}
             if action in ("comment", "reply") and isinstance(res, dict) and res.get("thread"):
                 # what the agent wrote on the site as the person goes into the conversation too
@@ -957,6 +964,25 @@ def _render(ws: Workspace, snapshot_id: str | None) -> str:
 
 def _js() -> str:
     return (_WEB / "cowork.js").read_text(encoding="utf-8")
+
+
+def _arrival(ws: Workspace, old: dict, since: float, target: str | None, timeout: float = 15.0) -> dict | None:
+    """After `navigate`: the page the tab arrived at, once it has reported itself -- the same view
+    at a new address, or a view opened since the navigation began.  None when it has not (yet)."""
+    from urllib.parse import urlsplit
+    old_url = (old["state"].get("page") or {}).get("url") or ""
+    if target and urlsplit(target).path == urlsplit(old_url).path:
+        return None                                   # a move within the page: nothing to wait for
+    end = time.time() + timeout
+    while time.time() < end:
+        for v in ws.views():
+            pg = v["state"].get("page") or {}
+            if not v["connected"] or not pg.get("url"):
+                continue
+            if (v["id"] == old["id"] and pg["url"] != old_url) or (v["id"] != old["id"] and (v.get("created_at") or 0) >= since):
+                return {"view_id": v["id"], "url": pg["url"], "title": pg.get("title"), "kind": pg.get("kind")}
+        time.sleep(0.25)
+    return None
 
 
 def _contract(**kw) -> str:

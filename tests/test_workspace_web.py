@@ -519,6 +519,7 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
         assert pid, diag
         assert body(22)["ok"] and st[23]["value"] is True, diag
         assert body(24)["ok"] and st[25]["ok"] and st[26]["ok"], diag
+        assert body(24)["arrived"]["url"] == "/web/", diag              # navigate answers once Home is up
         assert [p["url"] for p in body(28)["pages"]] == ["/web/"], diag             # the same tab, now on Home
         odd = [c for c in body(29)["result"]["controls"] if c["label"] == "Odd"]
         assert odd and odd[0].get("undeclared") is True, diag
@@ -791,6 +792,7 @@ def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkey
         assert missing["ok"] and missing["result"]["title"] == "QCCD website: not available", diag
         assert "has no page /no-such-page/" in missing["result"]["text"], diag           # it can see what happened
         assert st[7]["status"] == 200 and body(7)["ok"], diag
+        assert body(7)["arrived"]["url"] == "/studio" and body(7)["arrived"]["kind"] == "studio", diag   # no race
         there = body(10)
         assert there["ok"] and there["page"]["url"] == "/studio" and there["result"]["kind"] == "studio", diag
     finally:
