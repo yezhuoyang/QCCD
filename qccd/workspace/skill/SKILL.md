@@ -81,6 +81,18 @@ context; `qccd_get_context` lists the open `pages`).
 
 ## Working on the website like a person at the screen
 
+**Know the site first.** `qccd_read_reference` section `site` is the map of the deployed site
+(its pages, the lessons, the leaderboards) and a short how-to for the common things (walk through
+a lesson, play an animation, try a program, check a page for mistakes, comment); section
+`site:studio` is every Studio control in the Studio's own words, keyed by the `hint` a page read
+gives each control (target it with `[data-hint="<key>"]`). `query` searches both.
+
+**Nothing the person should see happens out of sight.** Their Design page is the live workspace
+Studio: your change sets appear there as you commit them, so change the design in small steps
+and say what each one does. A run (`qccd_run_program`) shows its program in their Studio while it
+compiles, then their tab opens the run's page; press Play there (`qccd_page_act` step,
+`play=true`), let it play, then report. A comparison opens side by side the same way.
+
 The person watches you work: every page action moves a cursor with your name to its target
 and says what you are doing. Act like a colleague demonstrating at their screen: go to the
 thing, then act; pace a walkthrough with `wait` (a second or two) and say in the chat what

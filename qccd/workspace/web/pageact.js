@@ -200,6 +200,13 @@ function controls(doc, heads) {
     if (c.kind === 'select') { c.value = el.value; c.options = Array.prototype.slice.call(el.options, 0, 20).map(function (o) { return clip(o.textContent, 40); }); }
     if (c.kind === 'checkbox' || c.kind === 'radio') c.checked = !!el.checked;
     if (el.disabled) c.disabled = true;
+    // what the control IS, in the Studio's own words (its explain layer: the hover card's sentence)
+    var hk = el.getAttribute('data-hint');
+    if (hk) {
+      c.hint = hk;
+      try { var hw = doc.defaultView.EDITOR && doc.defaultView.EDITOR.hintFor && doc.defaultView.EDITOR.hintFor(hk);
+            if (hw && hw.d) c.what = clip(hw.d, 140); } catch (e) { /* a page without the explain layer */ }
+    }
     var sec = sectionOf(el, heads);
     if (sec) c.section = sec;
     out.push(c);
@@ -731,5 +738,8 @@ function pick() {
   });
 }
 
-window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick, highlight: function (t, note) { return safe('highlight', { target: t, note: note }); } };
+window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick,
+                     highlight: function (t, note) { return safe('highlight', { target: t, note: note }); },
+                     // the chat layer shows work that did not come through a page action (a change set)
+                     point: function (x, y, who, caption) { return glideTo(x, y, who, caption); } };
 })();

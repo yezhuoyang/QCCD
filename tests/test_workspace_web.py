@@ -749,8 +749,10 @@ def test_the_agent_works_visibly_and_designs_in_the_studio(tmp_path, site, monke
             {"eval": cur},                                                                                 # 12
         ]
         spec = tmp_path / "spec.json"
+        # a lesson page is the site's own Studio (the bare Design page is the person's workspace,
+        # test_the_agents_work_happens_in_the_persons_studio)
         spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={own('POST', '/api/pair-code', {})['code']}"
-                                                   "&to=/web/studio.html"}, "steps": steps}), encoding="utf-8")
+                                                   "&to=/web/studio.html%23learn%3DA1"}, "steps": steps}), encoding="utf-8")
         r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
                            timeout=300, cwd=REPO)
         out = json.loads(r.stdout.decode("utf-8") or "{}")
@@ -818,3 +820,150 @@ def test_a_comment_the_agent_posts_shows_in_the_chat(svc):
     item = [i for i in ws.conversation()["items"] if i["type"] == "site_comment"][0]
     assert item["page"] == "/rules/" and item["thread"] == 7 and item["as"] == "Test Person"
     assert item["prompt_id"] == r["prompt_id"]
+
+
+def _qccdc_built():
+    from qccd.workspace.evaluator import Toolchain
+    return Toolchain.discover().qccdc is not None
+
+
+@needs_chrome
+@pytest.mark.skipif(not _qccdc_built(), reason="qccdc_cli is not built or installed")
+def test_the_trace_keeps_mcp_calls_and_page_actions(svc, capsys):
+    ws, state, c, w = svc
+    csrf = _paired(state, c)
+    s = ws.register_session({"kind": "human", "id": "cli"}, client="generic", mode="pull", label="terminal agent")
+    me = {**AGENT, "X-QCCD-Session": s["id"]}
+    # the MCP server reports each call it served; only an agent session may
+    r = c.post("/api/trace", json={"name": "qccd_get_context", "ms": 12.5,
+                                   "data": {"args": {"detail": "summary", "api_token": "sk-123"}, "result": {"revision": 0}}},
+               headers=me)
+    assert r.status_code == 200, r.text
+    assert c.post("/api/trace", json={"name": "x"}, headers={"X-QCCD-CSRF": csrf}).status_code == 403
+    assert c.post("/api/trace", json={"name": "x"}, headers=AGENT).status_code == 403           # no session
+    assert c.post("/api/trace", json={"kind": "thinking"}, headers=me).status_code == 422
+    # a page action is a step too, answered or not
+    vid = _page_view(c, csrf)
+    assert c.post("/api/page-actions", json={"action": "scroll", "args": {"by": 300}, "wait_s": 1, "view_id": vid},
+                  headers=me).status_code == 504
+    steps = c.get(f"/api/traces/{s['id']}", headers=OWNER).json()["steps"]
+    assert [(x["source"], x["kind"], x["name"]) for x in steps] == [("mcp", "tool_call", "qccd_get_context"),
+                                                                    ("page", "page_action", "scroll")]
+    assert steps[0]["ms"] == 12.5 and steps[0]["data"]["args"]["api_token"] == "[hidden]"
+    assert steps[1]["data"]["args"] == {"by": 300} and steps[1]["data"]["answered"] is False
+    assert steps[1]["data"]["page"] == "/web/rules/"
+    t = c.get("/api/traces", headers=OWNER).json()["traces"]
+    assert t[0]["session"] == s["id"] and t[0]["label"] == "terminal agent" and t[0]["steps"] == 2
+    # the viewer: no data in the page itself, so it serves before pairing (it pairs from #pair=)
+    page = TestClient(c.app, base_url=BASE).get("/trace")
+    assert page.status_code == 200 and "Agent traces" in page.text and "frame-ancestors 'none'" in page.headers[
+        "content-security-policy"]
+    assert TestClient(c.app, base_url=BASE).get("/api/traces").status_code == 401
+    # and in the terminal, from the files alone
+    from qccd.workspace.cli import main as cli
+    assert cli(["trace", "--root", str(ws.root)]) == 0
+    assert s["id"] in capsys.readouterr().out
+    assert cli(["trace", "--root", str(ws.root), "--session", s["id"]]) == 0
+    text = capsys.readouterr().out
+    assert "CALL qccd_get_context" in text and "PAGE scroll" in text and "sk-123" not in text
+
+
+def test_the_site_guide_is_the_live_sites_map_and_the_studios_own_words(svc, site):
+    ws, state, c, w = svc
+    idx = [{"t": "Learn", "d": "the course", "u": "learn/", "k": "part"},
+           {"t": "Design", "d": "build a device", "u": "studio.html#design", "k": "part"},
+           {"t": "R7 · cold ions", "d": "a rule, with a passing and a failing programme", "u": "rules/#R7", "k": "rule"},
+           {"t": "Lesson A1 · Two sites", "d": "the course, part A", "u": "studio.html#learn=A1", "k": "lesson"}]
+    home = PAGES["index.html"].replace("</body>", "<script>var ROOT = './', ACTIVE = '', INDEX = "
+                                       + json.dumps(idx).replace("</", "<\\/") + ";</script></body>")
+    (site.root / "index.html").write_text(home, encoding="utf-8")
+    from qccd.workspace import site_guide
+    site_guide._cache.pop("index", None)
+    g = c.get("/api/reference?section=site", headers=AGENT).json()
+    assert g["error"] is None
+    assert [p["url"] for p in g["main_pages"]] == ["/web/learn/", "/web/studio.html#design", "/web/rules/"]
+    assert g["lessons"] == [{"id": "A1", "title": "Lesson A1 · Two sites", "url": "/web/studio.html#learn=A1"}]
+    assert any(h["task"] == "walk someone through a lesson" for h in g["how_to"])
+    q = c.get("/api/reference?section=site&query=cold", headers=AGENT).json()
+    assert [p["url"] for p in q["pages"]] == ["/web/rules/#R7"]
+    st = c.get("/api/reference?section=site:studio&query=Evaluate", headers=AGENT).json()
+    assert {"hint": "evaluate", "name": "Evaluate", "what": "Price the programme, check it against the rules, and play it.",
+            "group": "panels"} in st["controls"]
+    every = c.get("/api/reference?section=site:studio", headers=AGENT).json()["controls"]
+    assert len(every) > 100 and {h["hint"] for h in every} >= {"tab:W", "learn:check", "play", "p:shuttle", "m:DACs"}
+    assert "site" in c.get("/api/reference?section=index", headers=AGENT).json()["sections"]
+
+
+def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypatch):
+    """Nothing out of sight: an agent's change set shows its cursor and summary in the Studio;
+    a run shows its program while it compiles, then the tab opens the run's page (with the
+    chat and the circuit beside the program) where the agent presses Play; and the website's
+    Design page is the live Studio itself."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        agent = {"Authorization": f"Bearer {info['agent_token']}", "Content-Type": "application/json"}
+
+        def http(path, body):
+            return {"http": {"method": "POST", "url": base + path, "headers": agent, "body": body}}
+        cur = ("(function(){ var c = document.getElementById('qccd-agent-cursor'); "
+               "return c ? c.querySelector('span').textContent : null; })()")
+        steps = [
+            {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                     "QCCD_LIVE.state().rev === 0 && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},  # 0
+            {"sleep": 1500},
+            http("/api/change-sets", {"expected_revision": 0, "request_id": "a1", "mode": "apply",
+                                      "summary": "a spare trap beside C3",
+                                      "operations": [{"type": "add_site", "id": "T9", "pos": [4, 0], "zone": "trap"},
+                                                     {"type": "add_segment", "a": "C3", "b": "T9"}]}),  # 2
+            {"wait": "QCCD_LIVE.state().rev === 1 && !!document.getElementById('qccd-agent-cursor')", "timeout": 20000},  # 3
+            {"eval": cur},                                                                                  # 4
+            http("/api/jobs", {"kind": "run", "params": {"program": "ghz4"}, "request_id": "run1"}),        # 5
+            {"wait": "!!document.getElementById('qcl-runpanel')", "timeout": 30000},                        # 6
+            {"eval": "document.querySelector('#qcl-runpanel .qcl-rp-q').textContent.indexOf('OPENQASM') >= 0 && "
+                     "document.querySelector('#qcl-runpanel .qcl-rp-t').textContent"},                     # 7
+            {"wait": "location.pathname.indexOf('/runview/') === 0 && window.QCCD_LIVE && QCCD_LIVE.state().connected "
+                     "&& !!document.getElementById('qcl-dock')", "timeout": 120000, "stopOnFail": True},  # 8
+            {"eval": "typeof SRC !== 'undefined' && !!SRC"},                                               # 9 circuit beside
+            {"sleep": 2500},
+            http("/api/page-actions", {"action": "read", "args": {"max_chars": 200, "controls": False}}),  # 11
+            http("/api/page-actions", {"action": "step", "args": {"play": True}}),                          # 12
+            {"sleep": 800},
+            {"eval": "document.getElementById('play').textContent"},                                        # 14
+            # the website's Design page is the live Studio
+            {"eval": f"location.assign('{web}/web/studio.html#design'); 1"},                                # 15
+            {"wait": f"location.href === '{base}/studio' && window.QCCD_LIVE && QCCD_LIVE.state().paired",
+             "timeout": 60000},                                                                             # 16
+            {"eval": f"location.assign('{web}/web/studio.html#learn=A1'); 1"},                              # 17
+            {"sleep": 2500},
+            {"eval": "location.origin + location.pathname + location.hash"},                                # 19 lessons stay
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={own('POST', '/api/pair-code', {})['code']}"},
+                                    "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=400, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps), diag
+        assert st[3]["ok"] and st[4]["value"].startswith("Agent: r1 a spare trap beside C3"), diag
+        assert st[6]["ok"] and st[7]["value"] and "ghz4" in st[7]["value"], diag
+        assert st[8]["ok"] and st[9]["value"] is True, diag
+        rd = json.loads(st[11]["body"])
+        assert rd["ok"] and rd["page"]["url"].startswith("/runview/"), diag
+        assert json.loads(st[12]["body"])["ok"] and st[14]["value"].lower().startswith("pause"), diag
+        assert st[16]["ok"], diag
+        assert st[19]["value"] == f"{web}/web/studio.html#learn=A1", diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass

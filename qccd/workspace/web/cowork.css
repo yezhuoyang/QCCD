@@ -122,6 +122,24 @@
 .qcl-mi{border:0;background:none;text-align:left;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink,#182230)}
 .qcl-mi:hover{background:var(--soft,#eef2f6)}
 .qcl-sep{height:1px;background:var(--line,#d0d5dd);margin:4px 0}
+/* the chat moves and resizes */
+#qcl-dock.qcl-chat .qcl-head{cursor:move;user-select:none}
+#qcl-dock .qcl-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;z-index:3;
+  background:linear-gradient(135deg,transparent 50%,var(--line,#c9c7c1) 50%,var(--line,#c9c7c1) 58%,transparent 58%,transparent 72%,var(--line,#c9c7c1) 72%,var(--line,#c9c7c1) 80%,transparent 80%)}
+#qcl-dock.qcl-min .qcl-grip{display:none}
+#qcl-dock .qcl-modelbtn{font-size:11.5px;padding:2px 7px;border-radius:99px;color:var(--muted,#52514e);max-width:180px;flex-shrink:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qcl-menu .qcl-mh{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#667085);padding:6px 10px 2px}
+/* a run while it compiles: its program, on the page the person is looking at */
+#qcl-runpanel{position:fixed;left:14px;bottom:14px;z-index:8999;width:min(420px,calc(100vw - 460px));max-height:48vh;
+  display:flex;flex-direction:column;gap:4px;background:var(--panel,#fff);border:1px solid #c9b8f5;border-radius:10px;
+  box-shadow:0 10px 30px rgba(76,29,149,.18);padding:10px 12px;font:13px/1.4 system-ui,Segoe UI,sans-serif;color:var(--ink,#182230)}
+#qcl-runpanel .qcl-rp-t{font-weight:600}
+#qcl-runpanel .qcl-rp-s{color:#7c3aed}
+#qcl-runpanel.done .qcl-rp-s{color:#0b7a4b} #qcl-runpanel.bad .qcl-rp-s{color:#b42318}
+#qcl-runpanel .qcl-rp-l{font-size:11.5px;color:var(--muted,#667085);text-transform:uppercase;letter-spacing:.04em}
+#qcl-runpanel .qcl-rp-q{margin:0;overflow:auto;background:#f7f6fb;border-radius:6px;padding:6px 8px;
+  font:11.5px/1.4 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;flex:1 1 auto;min-height:60px}
 /* the chat as a frame inside a website page (mirror.py): it IS the frame */
 .qcl-framed #qcl-dock,.qcl-framed #qcl-dock.qcl-chat{position:static;width:100%;height:100vh;max-height:none;border:0;border-radius:0;box-shadow:none}
 .qcl-framed #qcl-dock.qcl-chat.qcl-min{height:100vh}

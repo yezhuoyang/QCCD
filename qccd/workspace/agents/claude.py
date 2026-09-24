@@ -59,13 +59,15 @@ def find_claude() -> str | None:
 
 
 class ClaudeBridge:
-    def __init__(self, state, session_id: str, exe: str, conversation: str, started: bool, model: str | None = None):
+    def __init__(self, state, session_id: str, exe: str, conversation: str, started: bool, model: str | None = None,
+                 effort: str | None = None):
         self.state = state
         self.sid = session_id
         self.exe = exe
         self.conversation = conversation          # the Claude session id (a uuid)
         self.started = started                   # the conversation exists: --resume, else --session-id
-        self.model = model
+        self.model = model                       # --model (an alias such as opus), None: Claude Code's default
+        self.effort = effort                     # --effort (low ... max), None: the model's default
         self.connected = True
         self.proc: subprocess.Popen | None = None
         self.active_turn: str | None = None
@@ -94,7 +96,12 @@ class ClaudeBridge:
             args += ["--append-system-prompt", SYSTEM_NOTE]
             if self.model:
                 args += ["--model", self.model]
-            env = dict(os.environ, QCCD_SESSION_ID=self.sid)
+            if self.effort:
+                args += ["--effort", self.effort]
+            # with tool search on, `claude -p` starts before the QCCD server connects and the agent
+            # spends its first turns looking the tools up; off, it waits and has all of them at
+            # once (measured on Claude Code 2.1.199: init "pending" with 0 tools vs "connected", 20)
+            env = dict(os.environ, QCCD_SESSION_ID=self.sid, ENABLE_TOOL_SEARCH="false")
             kw: dict = {"stdin": subprocess.PIPE, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE,
                         "cwd": str(ws.root), "env": env, "text": True, "encoding": "utf-8", "errors": "replace"}
             if os.name == "nt":
@@ -103,6 +110,9 @@ class ClaudeBridge:
             self.started = True
             self._remember()
             proc = self.proc
+            tr = getattr(self.state, "traces", None)
+            if tr is not None:
+                tr.delivered(self.sid, delivery_id, text, turn=turn, how="claude -p")
         proc.stdin.write(text)
         proc.stdin.close()
         threading.Thread(target=self._read, args=(proc, turn), name=f"claude-{turn}", daemon=True).start()
@@ -131,11 +141,52 @@ class ClaudeBridge:
     def _remember(self) -> None:
         """The session keeps what a restarted service needs to go on with the same conversation."""
         caps = dict(CAPABILITIES)
-        caps["reattach"] = {"conversation": self.conversation, "started": self.started, "model": self.model}
+        caps["reattach"] = {"conversation": self.conversation, "started": self.started, "model": self.model,
+                            "effort": self.effort}
+        caps["settings"] = {"model": self.model or "", "effort": self.effort or ""}
         try:
             self.state.ws.session_status(self.sid, "connected", detail="Claude Code (headless)", capabilities=caps)
         except Exception:
             log.exception("recording the Claude conversation failed")
+
+    def _trace(self, ev: dict, turn: str) -> None:
+        """One stream-json event as trace steps: what Claude had, thought, called and got back."""
+        tr = getattr(self.state, "traces", None)
+        if tr is None:
+            return
+        rec = lambda kind, name, data, **kw: tr.record(self.sid, "agent", kind, name, data, turn=turn, **kw)
+        kind = ev.get("type")
+        try:
+            if kind == "system" and ev.get("subtype") == "init":
+                rec("session", "claude", {k: ev.get(k) for k in ("model", "permissionMode", "claude_code_version", "tools",
+                                                                 "mcp_servers", "skills", "slash_commands", "agents",
+                                                                 "output_style") if ev.get(k) is not None})
+            elif kind == "assistant":
+                for b in ((ev.get("message") or {}).get("content") or []):
+                    t = b.get("type")
+                    if t == "text":
+                        rec("message", None, {"text": b.get("text")})
+                    elif t in ("thinking", "redacted_thinking"):
+                        rec("thinking", None, {"text": b.get("thinking") or ("[redacted]" if t == "redacted_thinking" else "")})
+                    elif t == "tool_use":
+                        rec("skill" if b.get("name") == "Skill" else "tool_call", b.get("name"),
+                            {"id": b.get("id"), "input": b.get("input")})
+            elif kind == "user":
+                for b in ((ev.get("message") or {}).get("content") or []):
+                    if isinstance(b, dict) and b.get("type") == "tool_result":
+                        c = b.get("content")
+                        if isinstance(c, list):        # text parts as text; others (a tool_reference...) named
+                            c = "\n".join((str(x.get("text") or "") if x.get("type") == "text" else
+                                           f"[{x.get('type')}: {x.get('tool_name') or x.get('name') or ''}]".replace(": ]", "]"))
+                                          if isinstance(x, dict) else str(x) for x in c)
+                        rec("tool_result", None, {"id": b.get("tool_use_id"), "content": c, "is_error": bool(b.get("is_error"))})
+            elif kind == "result":
+                rec("turn", ev.get("subtype"), {k: ev.get(k) for k in ("is_error", "duration_ms", "duration_api_ms", "num_turns",
+                                                                       "total_cost_usd", "usage", "result")
+                                                if ev.get(k) is not None},
+                    ms=ev.get("duration_ms") if isinstance(ev.get("duration_ms"), (int, float)) else None)
+        except Exception:
+            log.exception("tracing a Claude event failed")
 
     def _read(self, proc: subprocess.Popen, turn: str) -> None:
         from .codex import _store_message
@@ -153,6 +204,7 @@ class ClaudeBridge:
                 except ValueError:
                     continue
                 kind = ev.get("type")
+                self._trace(ev, turn)
                 if kind == "assistant":
                     for block in ((ev.get("message") or {}).get("content") or []):
                         if block.get("type") == "text" and str(block.get("text") or "").strip():
@@ -177,6 +229,9 @@ class ClaudeBridge:
                                "delivery_id": did, "error": failure})
         if failure:
             log.warning("Claude run %s failed: %s", turn, failure[:500])
+            tr = getattr(self.state, "traces", None)
+            if tr is not None:
+                tr.record(self.sid, "agent", "error", "run failed", {"error": failure, "exit_code": rc}, turn=turn)
         if did:
             d = ws.store.one("SELECT prompt_id FROM deliveries WHERE id=?", (did,))
             if d:
@@ -199,14 +254,19 @@ def connect_claude(state, body: dict) -> dict:
     sid = body.get("session_id") or new_id("s")
     conversation = str(uuid.uuid4())
     caps = dict(CAPABILITIES)
-    caps["reattach"] = {"conversation": conversation, "started": False, "model": body.get("model")}
+    model, effort = body.get("model") or None, body.get("effort") or None
+    from .models import CLAUDE_EFFORTS
+    if effort not in (None, *CLAUDE_EFFORTS):
+        raise WorkspaceError("bad_request", f"Claude's thinking levels are {', '.join(CLAUDE_EFFORTS)}", status=422)
+    caps["reattach"] = {"conversation": conversation, "started": False, "model": model, "effort": effort}
+    caps["settings"] = {"model": model or "", "effort": effort or ""}
     s = ws.register_session({"kind": "human", "id": "cli"}, client="claude", mode="appserver",
                             label=body.get("label") or "Claude", runtime_ref=conversation, capabilities=caps,
                             session_id=sid)
     old = state.bridges.pop(s["id"], None)
     if old:
         old.close()
-    state.bridges[s["id"]] = ClaudeBridge(state, s["id"], exe, conversation, started=False, model=body.get("model"))
+    state.bridges[s["id"]] = ClaudeBridge(state, s["id"], exe, conversation, started=False, model=model, effort=effort)
     return {"session": s, "conversation": conversation, "new_thread": True,
             "attach": f"claude --resume {conversation}   (in the workspace folder, to go on in a terminal)",
             "note": "a NEW Claude Code conversation was started for this workspace"}
@@ -224,7 +284,7 @@ def reattach_claude_sessions(state) -> list:
             out.append({"session_id": s["id"], "reattached": False, "why": "no claude executable or conversation"})
             continue
         state.bridges[s["id"]] = ClaudeBridge(state, s["id"], exe, ra["conversation"], bool(ra.get("started")),
-                                              model=ra.get("model"))
+                                              model=ra.get("model"), effort=ra.get("effort"))
         state.ws.session_status(s["id"], "connected", detail="the same Claude conversation goes on")
         out.append({"session_id": s["id"], "reattached": True})
     return out

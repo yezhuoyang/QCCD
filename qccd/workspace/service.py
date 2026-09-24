@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import secrets
 import threading
@@ -66,6 +67,8 @@ class ServiceState:
         self.bridges: dict = {}              # session_id -> adapter bridge (Codex)
         self.page_waits: dict = {}           # page action id -> {event, view, result}
         self.started = time.time()
+        from .trace import Traces
+        self.traces = Traces(ws.root, ws.store, ws)   # what each agent did, step by step (trace.py)
 
     def new_pair_code(self, ttl: float = 300.0) -> str:
         code = secrets.token_urlsafe(18)
@@ -346,11 +349,51 @@ def create_app(state: ServiceState) -> FastAPI:
     def get_run(request, actor, _):
         return ws.run(request.path_params["run_id"])
 
+    @route("GET", "/api/runs/{run_id}/program", write=False)
+    def run_program(request, actor, _):
+        return ws.run_program_source(request.path_params["run_id"])
+
     @route("GET", "/api/agents", write=False)
     def agents(request, actor, _):
         from .agents.claude import find_claude
         from .agents.codex import find_codex
         return {"codex_available": find_codex() is not None, "claude_available": find_claude() is not None}
+
+    @route("GET", "/api/traces", write=False)
+    def traces(request, actor, _):
+        labels = {s["id"]: {"label": s.get("label"), "client": s["client"], "status": s["status"]} for s in ws.sessions()}
+        out = state.traces.index()
+        for t in out:
+            t.update(labels.get(t["session"]) or {})
+        return {"traces": out}
+
+    @route("GET", "/api/traces/{sid}", write=False)
+    def trace(request, actor, _):
+        sid = request.path_params["sid"]
+        return {"session": sid, "prompt": q(request, "prompt"),
+                "steps": state.traces.steps(sid, q(request, "prompt"))}
+
+    @route("POST", "/api/trace")
+    def trace_step(request, actor, b):
+        """The QCCD MCP server reports each tool call it served (agents only)."""
+        if actor["kind"] != "agent" or not actor.get("session"):
+            raise WorkspaceError("forbidden", "trace steps come from an agent session's MCP server", status=403)
+        kind = str(b.get("kind") or "tool_call")
+        if kind not in ("tool_call", "error"):
+            raise WorkspaceError("bad_request", "kind: tool_call or error", status=422)
+        state.traces.record(actor["session"], "mcp", kind, str(b.get("name") or "")[:80], b.get("data"),
+                            ms=b.get("ms") if isinstance(b.get("ms"), (int, float)) else None)
+        return {"ok": True}
+
+    @app.get("/trace")
+    async def trace_page(request: Request):
+        # the viewer holds no data (like /studio); what it loads needs the pairing cookie
+        return HTMLResponse(_trace_page(state), headers={"Content-Security-Policy": _CSP})
+
+    @route("GET", "/api/agents/models", write=False)
+    def agent_models(request, actor, _):
+        from .agents.models import catalogue
+        return catalogue(state)
 
     # ------------------------------------------------------------------ pages (the agent's hands on the UI)
 
@@ -380,6 +423,7 @@ def create_app(state: ServiceState) -> FastAPI:
         except JSONRejected as exc:
             raise WorkspaceError(exc.code, str(exc), status=422) from None
         view = ws.page_view(actor, b.get("view_id"))
+        t0 = time.time()
         # every action is animated for the person (a cursor glides there first); a `wait` lasts what it says
         floor = (min(float(args.get("ms") or 0), 10000.0) / 1000.0 + 10.0) if action == "wait" else 0.0
         wait = max(1.0, floor, min(float(b.get("wait_s") or 25), 60.0))
@@ -394,6 +438,11 @@ def create_app(state: ServiceState) -> FastAPI:
         finally:
             state.page_waits.pop(aid, None)
         page = view["state"].get("page") or {}
+        state.traces.record(actor.get("session"), "page", "page_action", action,
+                            {"args": args, "page": page.get("url"), "answered": answered,
+                             "ok": (waiter["result"] or {}).get("ok"), "result": (waiter["result"] or {}).get("result"),
+                             "error": (waiter["result"] or {}).get("error")},
+                            ms=(time.time() - t0) * 1000)
         if not answered:
             raise WorkspaceError("page_timeout", f"the page {page.get('url')!r} did not answer within {wait:g} s "
                                  "(closed, reloading, or asleep in a background tab)", status=504)
@@ -523,6 +572,11 @@ def create_app(state: ServiceState) -> FastAPI:
                                                "message": "this runtime offers no interrupt; its writes are "
                                                           "fenced until you resume it"}
         return {"session": s, "interrupt": interrupt}
+
+    @route("POST", "/api/sessions/{sid}/settings", human_only=True)
+    def session_settings(request, actor, b):
+        from .agents.models import apply_settings
+        return apply_settings(state, request.path_params["sid"], b)
 
     @route("POST", "/api/sessions/{sid}/resume", human_only=True)
     def resume(request, actor, b):
@@ -768,7 +822,9 @@ def _run_page(state: ServiceState, run_id: str) -> str:
     if page is None:
         page = _render_run(state.ws, run_id)
         at = page.rfind("</body>")
-        page = page[:at] + RUNVIEW_BLOCK + page[at:]
+        # the chat and the page actions: in a tab of its own the run page is where the agent
+        # presses Play for the person (cowork.js stays out of the side-by-side frames)
+        page = page[:at] + RUNVIEW_BLOCK + _live_layer(state, "run", run_id=run_id) + page[at:]
         with state.page_lock:
             state.page_cache[key] = page
     return page
@@ -794,10 +850,32 @@ def _render_run(ws: Workspace, run_id: str) -> str:
     headline = (f"{run['program']['name']} on {d['name']} ({d['draft'].removeprefix('cand/')} r{d['revision']}): "
                 f"{run['performance']['total']['ms']:g} ms")
     with tempfile.TemporaryDirectory() as td:
+        # the circuit beside the compiled program, when the run kept both (runs since 2026-09-24)
+        source = None
+        arts = run.get("artifacts") or {}
+        if arts.get("certificate") and arts.get("circuit"):
+            try:
+                from ..ir.source_map import build as build_source
+                qasm = Path(td) / "circuit.qasm"
+                qasm.write_bytes(ws.get_artifact(arts["circuit"]))
+                source = build_source(prog, _sl(ws.get_artifact(arts["certificate"])), qasm)
+            except Exception:
+                logging.getLogger("qccd.service").exception("the circuit pane of run %s could not be built", run_id)
+                source = None
         out = Path(td) / "page.html"
         render_html(arch, prog, report.result, model, out, tech=load_technology(DEFAULT_TECH),
-                    kicker="QCCD RUN", headline=headline, lede=None, template_stems="*")
+                    kicker="QCCD RUN", headline=headline, lede=None, template_stems="*", source=source)
         return out.read_text(encoding="utf-8")
+
+
+def _live_layer(state: ServiceState, mode: str, **extra) -> str:
+    """The chat and the page actions, for a page the workspace serves in a tab of its own."""
+    ws = state.ws
+    cfg = {"workspace_id": ws.id, "task": ws.release.id, "mode": mode, "contract": "1",
+           "web_url": f"http://127.0.0.1:{state.info['web_port']}/web/" if state.info.get("web_port") else None,
+           **extra}
+    return (_css() + '<script id="qccd-live-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
+            + "</script>\n<script>\n" + _pageact() + "\n</script>\n<script>\n" + _js() + "\n</script>\n")
 
 
 def _compare_page(state: ServiceState, run_ids: list) -> str:
@@ -806,7 +884,9 @@ def _compare_page(state: ServiceState, run_ids: list) -> str:
     ws = state.ws
     cmp = ws.compare_runs(run_ids)
     times = [_sl(ws.get_artifact(ws.run(r)["artifacts"]["times"]))["times_us"] for r in run_ids]
-    return compare_html(cmp, times)
+    page = compare_html(cmp, times)
+    at = page.rfind("</body>")
+    return page[:at] + _live_layer(state, "compare", runs=list(run_ids)) + page[at:]
 
 
 def _kick(state: ServiceState) -> None:
@@ -917,6 +997,15 @@ def _open_web_page(web_origin: str) -> str:
             "<style>body{font:15px/1.5 system-ui,sans-serif;margin:48px auto;max-width:640px;color:#1d1d1b}</style>"
             "</head><body><p id=\"msg\">Opening the website with your agent&hellip;</p><script>" + js
             + "</script></body></html>")
+
+
+def _trace_page(state: ServiceState) -> str:
+    cfg = {"workspace_id": state.ws.id, "task": state.ws.release.id}
+    return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>QCCD: agent traces</title>"
+            "<style>\n" + (_WEB / "trace.css").read_text(encoding="utf-8") + "\n</style></head><body>"
+            + '<script id="qccd-trace-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
+            + "</script>\n<script>\n" + (_WEB / "trace.js").read_text(encoding="utf-8") + "\n</script>\n</body></html>")
 
 
 def _css() -> str:
