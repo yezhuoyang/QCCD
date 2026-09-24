@@ -899,7 +899,10 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
     a run shows its program while it compiles, then the tab opens the run's page (with the
     chat and the circuit beside the program) where the agent presses Play; and the website's
     Design page is the live Studio itself."""
+    from qccd.workspace.evaluator import Toolchain
     from qccd.workspace.runtime import ensure_service, service_request
+    if Toolchain.discover().qccdc is None:          # a run compiles for real
+        pytest.skip("no compiler: `qccd toolchain install`, or build Compiler/ocaml")
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")
