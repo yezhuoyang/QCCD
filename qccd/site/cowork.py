@@ -88,13 +88,11 @@ has the exact commands.</p>
 cd my-design
 qccd agent install --client codex
 qccd studio --keep-alive</pre>
-<p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. If Codex is
-installed, it starts by itself; otherwise run <code>qccd agent connect --client codex</code>. Ask it to
+<p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. Codex or
+Claude Code, whichever you have, starts by itself when you send (switch under &hellip; in the chat). Ask it to
 change the design, or to run a program and explain it, for example <em>"Compile and run the BB code
 on this design and summarize the bottleneck"</em> or <em>"Run the BB code on draft A and draft B side
-by side"</em>. The draft menu at the top of the chat saves and switches designs. Claude Code
-works too: run <code>qccd agent install --client claude</code>, start <code>claude</code> in the workspace, and
-ask it to handle the requests waiting in Studio.</p>
+by side"</em>. The draft menu at the top of the chat saves and switches designs.</p>
 <h3>Ask about any page</h3>
 <p>Your workspace also serves this whole website with the same chat on every page. In the workspace
 folder, run:</p>

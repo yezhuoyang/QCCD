@@ -138,9 +138,11 @@
   var PORT = 47100;                                        // qccd/workspace/mirror.py WEB_PORT
   var PANEL = '<button class="qa-x" type="button" aria-label="close">&times;</button>'
     + '<h2>Ask your own agent about this page</h2>'
-    + '<p>An AI agent on your computer (Codex or Claude Code) can read this page with you. Ask about '
-    + 'it, and the agent points at the answer on the page, steps the examples, opens lessons and takes '
-    + 'you to other pages. It can also change your own design and run programs on it.</p>'
+    + '<p>An AI agent on your computer (Codex or Claude Code) works on this site the way you do, while '
+    + 'you watch its cursor. Ask about the page, and it points at the answer, steps the examples and '
+    + 'takes you to other pages. It can walk you through the lessons, review a page for mistakes and, '
+    + 'if you ask, comment under your name, marked as your agent\'s. It can also change your own '
+    + 'design and run programs on it.</p>'
     + '<p><a class="qa-go" data-go="page" target="_blank" rel="noopener">Open this page with my agent</a>'
     + '<a class="qa-go alt" data-go="studio" target="_blank" rel="noopener">Open my Studio</a></p>'
     + '<p class="qa-small">This opens the same page from your own computer (127.0.0.1), with a chat to '
@@ -153,8 +155,8 @@
     + '.venv\\Scripts\\activate\npip install -e ".[agent]"\nqccd toolchain install\ncd ..\n'
     + 'qccd init my-design --task ghz4@1\ncd my-design\nqccd agent install --client codex\nqccd web</pre>'
     + '<p class="qa-small">On macOS or Linux, activate with <code>source .venv/bin/activate</code>. Codex '
-    + 'starts by itself when you send your first message. For Claude Code, run <code>qccd agent install '
-    + '--client claude</code> instead. After an update (<code>git pull</code>), run <code>qccd stop</code>, '
+    + 'or Claude Code, whichever you have, starts by itself when you send your first message (switch '
+    + 'under &hellip; in the chat). After an update (<code>git pull</code>), run <code>qccd stop</code>, '
     + 'then <code>qccd web</code> again. '
     + '<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/docs/workspace.md">How it works</a></p>';
   function start(){
