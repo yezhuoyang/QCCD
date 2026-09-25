@@ -45,12 +45,17 @@ docker save qccd-official:<commit> | gzip -1 | ssh root@165.232.55.161 'gunzip |
 ssh root@165.232.55.161 'cd /opt/qccd-official && sed -i "s/^QCCD_OFFICIAL_TAG=.*/QCCD_OFFICIAL_TAG=<commit>/" .env \
     && docker compose -f docker-compose.prod.yml up -d'
 python deploy/official/smoke_test.py https://qccd.academy/official --token-file <file>
+# a heavy board too: upload an existing graded local submission, privately
+python deploy/official/smoke_test.py https://qccd.academy/official --token-file <file> \
+    --workspace <workspace> --submission <sub_id> --timeout 3000
 ```
 
 A first build takes about 15 minutes, most of it compiling stim, which has no Linux wheel
 for CPython 3.14. After that only the `COPY qccd/` layer changes. Rehearse locally first:
 `docker compose -p rehearsal -f deploy/official/docker-compose.prod.yml up -d`, then run
-`smoke_test.py` against `http://127.0.0.1:8300`.
+`smoke_test.py` against `http://127.0.0.1:8300` (and `down -v` the rehearsal afterwards).
+The server grades every release in the image's `qccd/workspace/releases/`; a new board is a
+new release there and a new image, nothing else.
 
 **Operating it** (on the droplet, in `/opt/qccd-official`):
 
@@ -68,11 +73,24 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-09-23 00:08 UTC (2026-09-22 17:08 PDT), from commit `10152b1`. `VERSION`
-on the server records it. The first uploader is `yezhuoyang` (50 uploads a day), whose token
-is in that person's `~/.qccd/credentials.json`. An operator uploader `deploy-smoke`, limited
-to one upload a day, holds the one private smoke submission `os_d47f8b8542b1b207`; its
-token was deleted after use.
+**Deployed** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
+adds the website's five boards to the GHZ starter: `bb144@1`, `rep9@1`, `five_qubit@1`,
+`steane@1`, `surface17@1`. `VERSION` on the server records it; the previous deployment
+(`10152b1`, 2026-09-23) is in `.env.bak-10152b1` for a rollback. The GHZ release is
+byte-identical, so its digest and every earlier submission stand.
+
+Checked before and after the switch, all as PRIVATE uploads (never on a leaderboard): the
+GHZ smoke test in a local rehearsal and on the server, and a BB [[144,12,12]] design (a
+drawn two-triangle device, 503.8 ms per round) in both. On the server the BB grade took
+about 8.5 minutes end to end with the grader at 115 MiB peak (161 MiB in the rehearsal;
+153 MB over the whole process tree on Windows), all ten stages passing and identical to the
+local grade. No limit had to change.
+
+The first uploader is `yezhuoyang` (50 uploads a day), whose token is in that person's
+`~/.qccd/credentials.json`. Operator uploaders `deploy-smoke` (the 2026-09-23 GHZ check,
+`os_d47f8b8542b1b207`) and `deploy-smoke-259aba6` (quota 2: `os_283ef695dd1e8f21` GHZ,
+`os_eb92e18f75331375` BB) hold the private smoke submissions; their tokens were deleted
+after use.
 
 **Data** lives in Docker volumes: `qccd-official_data` (the SQLite database),
 `qccd-official_artifacts` (uploaded archives, by digest) and `qccd-official_spool` (jobs in

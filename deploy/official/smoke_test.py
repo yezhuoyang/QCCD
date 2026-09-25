@@ -1,6 +1,10 @@
 """Operator check for a deployed official service: one PRIVATE submission, end to end.
 
     python deploy/official/smoke_test.py https://qccd.academy/official --token-file PATH
+    python deploy/official/smoke_test.py URL --token-file PATH --workspace WS --submission SUB
+
+The second form uploads an existing graded local submission instead (any board: its bundle
+names the board), e.g. to prove a board's heavy grade runs within the server's limits.
 
 Builds and grades a local submission of the starter task with this machine's toolchain,
 uploads it as PRIVATE (it never appears on the leaderboard), waits for the server's own
@@ -66,22 +70,39 @@ def local_submission(tmp: Path) -> dict:
         ws.close()
 
 
+def existing_submission(root: Path, sid: str) -> dict:
+    ws = Workspace(root)
+    try:
+        sub = ws.submission(sid)
+        b = read_bundle(ws.root / sub["snapshot"]["dir"] / "bundle")
+        return {"archive": archive_bundle(b), "report": sub["report"], "digest": b.digest,
+                "eligible": sub["report"]["eligibility"]["eligible"], "task": b.manifest["task"]["id"]}
+    finally:
+        ws.close()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("server")
     ap.add_argument("--token-file", required=True)
     ap.add_argument("--timeout", type=float, default=900)
+    ap.add_argument("--workspace", help="upload a graded local submission of this workspace instead")
+    ap.add_argument("--submission", help="its id (with --workspace)")
     a = ap.parse_args()
     server = a.server.rstrip("/")
     token = Path(a.token_file).read_text(encoding="utf-8").strip()
     out: dict = {"server": server}
     st, h = _req("GET", f"{server}/v1/health")
     out["health"] = {"status": st, **(h if isinstance(h, dict) else {})}
-    with tempfile.TemporaryDirectory(prefix="qccd-smoke-") as t:
-        loc = local_submission(Path(t))
-    out["local"] = {"digest": loc["digest"], "eligible": loc["eligible"]}
+    if a.workspace:
+        loc = existing_submission(Path(a.workspace), a.submission)
+    else:
+        with tempfile.TemporaryDirectory(prefix="qccd-smoke-") as t:
+            loc = local_submission(Path(t))
+    task = loc.get("task", "ghz4@1")
+    out["local"] = {"task": task, "digest": loc["digest"], "eligible": loc["eligible"]}
     st, sub = _req("POST", f"{server}/v1/submissions", token, loc["archive"],
-                   {"Content-Type": "application/zip", "X-QCCD-Task": "ghz4@1", "X-QCCD-Visibility": "private",
+                   {"Content-Type": "application/zip", "X-QCCD-Task": task, "X-QCCD-Visibility": "private",
                     "X-QCCD-Display-Name": "deploy smoke test"})
     out["upload"] = {"http": st, **{k: sub.get(k) for k in ("submission_id", "status", "visibility", "error")}}
     sid = sub.get("submission_id")
@@ -102,7 +123,7 @@ def main() -> int:
             out["parity"] = compare_reports(loc["report"], server_report)
         else:
             out["report_error"] = {"status": st, **rep}
-        st, board = _req("GET", f"{server}/v1/leaderboard/ghz4@1")
+        st, board = _req("GET", f"{server}/v1/leaderboard/{task}")
         listed = json.dumps(board).find(sid) >= 0
         out["leaderboard"] = {"status": st, "lists_private_submission": listed}
         par = out.get("parity") or {}
