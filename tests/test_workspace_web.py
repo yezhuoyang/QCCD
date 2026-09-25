@@ -672,6 +672,16 @@ def test_the_agent_draws_a_shape_on_the_persons_studio(tmp_path, monkeypatch):
             service_request(info, "POST", "/api/shutdown", {}, token="owner")
         except Exception:
             pass
+    # a new canvas keeps the machine's physics: the drawn design can still be an entry on a board
+    # (it used to get the blank canvas's own curves, and failed the physics lock after passing Lean)
+    from qccd.workspace.tasks import find_board, physics_mismatch
+    time.sleep(2)
+    ws = Workspace(tmp_path / "ws")
+    try:
+        doc = ws.replayed("main").arch_doc or {}
+        assert physics_mismatch(doc, ws.release) == [] and physics_mismatch(doc, find_board("bb")) == []
+    finally:
+        ws.close()
 
 
 def test_a_turn_that_fails_says_why_in_the_chat(svc):
