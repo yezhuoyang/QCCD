@@ -8,8 +8,9 @@ they watch, in their Studio, one visible step at a time, with a line in the chat
 ## 0. Start a new design, named as they would name it
 
 Create a new design (`qccd_manage_branch(action="create", title="Two triangles")`) and put it
-in front of them in their Studio. Call it by that name from then on. Never overwrite another
-design unless they ask.
+in front of them in their Studio: `qccd_present(action="open_branch", target={"branch": <its
+name>})` switches their Studio to it, so the verbs below draw on it where they watch. Call it
+by that name from then on. Never overwrite another design unless they ask.
 
 In their Studio, clear the canvas with `newCanvas` (`qccd_page_act` action `studio`). The
 canvas keeps the physics every board shares.
@@ -21,7 +22,7 @@ a closed loop tries the conveyor first, then the router.
 
 | board | mechanism | what the device must have | known to work (measured) |
 |---|---|---|---|
-| BB [[144,12,12]] | conveyor (rotate) | ONE closed loop that carries the data qubits, plus docks: gate sites one rail off the loop | `ring` width 72, height 2, 24 docks: 522 ms per round, every check eligible. Drawn: a triangle loop of 144 sites with 24 docks inside it (below): 505.8 ms, every rule passing |
+| BB [[144,12,12]] | conveyor (rotate) | ONE closed loop that carries the data qubits, plus docks: gate sites one rail off the loop | `ring` width 72, height 2, 24 docks: 522 ms per round, eligible. Drawn: a triangle loop of 144 sites with 24 docks inside it (below): 505.8 ms, eligible |
 | Repetition code, Steane, Surface code | conveyor | the same, smaller | `ring` width 8, height 2, 8 docks: 9.45, 11.48 and 14.1 ms, all eligible |
 | Five-qubit code | router (compile) | gate-capable traps that hold 2 ions, sites that can measure, room for all 9 qubits | `grid` 3 × 3: 8.89 ms, eligible |
 | GHZ (starter) | router | 4 qubits' room | `chain` of 4 |
@@ -70,8 +71,10 @@ query=<title>)` gives its circuit and what is ranked.
     from the first corner you gave; `state` has every site's position. A dock goes one unit
     from its loop site, perpendicular to that side, towards the inside.
   - Measured (2026-09-24): a triangle of side 50 with its corners cut by 2 is a loop of 144
-    sites; 8 docks per side, one unit in, make 24. BB ran at 505.8 ms per round with every
-    rule passing, against 522 ms for the ring.
+    sites: `[[2, 43.30127], [48, 43.30127], [49, 41.56922], [26, 1.73205], [24, 1.73205],
+    [1, 41.56922]]` (apex up; y grows downward). 8 docks per long side, spread evenly and one
+    unit in, make 24. BB ran at 505.8 ms per round with every rule passing, against 522 ms for
+    the ring, and its reference grade was eligible (every stage, Lean included; 6 to 8 minutes).
 - **Enough of everything.**
   - Loop sites at least equal the riders.
   - Docks at least equal the docked qubits, as far as the conveyor needs; the known-good rings
