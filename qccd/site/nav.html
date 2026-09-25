@@ -40,7 +40,7 @@
   <a href="__ROOT__publications/" data-part="publications">Publications</a>
   <span class="sn-sp"></span>
   <span class="sn-sq"><input id="siteq" type="search" placeholder="search the site" autocomplete="off"
-    aria-label="search the site"><div id="sitehits" data-open="0"></div></span>
+    aria-label="search the site" data-hint="site:search"><div id="sitehits" data-open="0"></div></span>
 </nav>
 <script>
 (function(){
@@ -95,6 +95,9 @@
   if(!document.getElementById('search')){
     document.addEventListener('keydown', function(ev){ if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k'){ ev.preventDefault(); q.focus(); q.select(); } });
   }
+  // what an agent may operate in this bar, in the page's hint table (docs/agent-interface.md)
+  window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'site:search': { t: 'Search the site',
+    d: 'type words; the matching pages are listed under the box, and Enter opens the first' } });
   window.SITENAV = { search: function(s){ q.value = s; search(); return HITS.slice(); }, index: INDEX };
 })();
 </script>
