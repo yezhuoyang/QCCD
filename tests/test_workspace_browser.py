@@ -184,7 +184,7 @@ def test_the_agent_brings_its_new_design_onto_the_screen(live, tmp_path):
         {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
                  "QCCD_LIVE.state().rev !== null", "timeout": 40000, "stopOnFail": True},            # 0
         {"eval": f"{call}('/api/branches', {{title: 'Two triangles'}}).then(d => (window.__d = d.name))"},  # 1
-        {"eval": f"{call}('/api/present', {{action: 'open_branch', target: {{branch: window.__d}}, "
+        {"eval": f"{call}('/api/present', {{action: 'open_branch', target: {{branch: 'two triangles'}}, "
                  "note: 'the new design'}).then(d => d.status)"},                                     # 2
         {"wait": "QCCD_LIVE.chat().branch === window.__d && QCCD_LIVE.state().rev !== null && "
                  "document.getElementById('qcl-draft').selectedOptions[0].textContent === 'Two triangles'",
