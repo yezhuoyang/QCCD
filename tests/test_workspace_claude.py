@@ -1,4 +1,5 @@
-"""Claude Code as a chat agent (agents/claude.py), with a stand-in `claude` executable.
+"""Claude Code as a chat agent (agents/claude.py), with a stand-in `claude` executable (and one
+Codex reattach check that shares the renamed-folder promise).
 
 The stand-in reads the delivery on stdin, records its command line, and answers in Claude
 Code's stream-json.  Covered: the chat's message reaches it and its answer comes back as the
@@ -259,5 +260,23 @@ def test_a_renamed_workspace_folder_starts_a_new_conversation_instead_of_failing
         assert a2[a2.index("--resume") + 1] == "22222222-2222-2222-2222-222222222222"   # same folder: goes on
         said = [e["payload"]["text"] for e in ws.events_since(0, limit=100, types=["agent.message"])["events"]]
         assert any("renamed or moved" in t for t in said), said
+    finally:
+        ws.close()
+
+
+def test_a_codex_thread_reattached_after_a_rename_gets_tools_for_the_folder_it_is_in_now(tmp_path):
+    """The Codex side of the same promise: a saved thread config names the old folder in its QCCD
+    tool server; reattaching points it at the workspace's folder now and keeps everything else."""
+    from qccd.workspace.agents.codex import _here
+    from qccd.workspace.installers import mcp_server_config
+    ws = Workspace.init(tmp_path / "New name")
+    try:
+        old = {"mcp_servers": {"qccd": dict(mcp_server_config(tmp_path / "Old name", "codex", session_id="s1"),
+                                            default_tools_approval_mode="approve"),
+                               "other": {"command": "x"}}, "model": "m"}
+        q = _here(old, ws, "s1")["mcp_servers"]["qccd"]
+        assert Path(q["args"][q["args"].index("--root") + 1]) == ws.root
+        assert q["default_tools_approval_mode"] == "approve"
+        assert _here(old, ws, "s1")["mcp_servers"]["other"] == {"command": "x"} and _here(None, ws, "s1") is None
     finally:
         ws.close()

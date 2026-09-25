@@ -454,6 +454,19 @@ def connect_codex(state, body: dict) -> dict:
                      "prompts from Studio start turns in the existing conversation " + str(bound["thread_id"]))}
 
 
+def _here(cfg, ws, sid):
+    """A saved thread config with its QCCD tool server pointed at where the workspace is NOW: the
+    person may rename or move the folder (2026-09-25), and the saved entry names the old one."""
+    if not cfg or "qccd" not in (cfg.get("mcp_servers") or {}):
+        return cfg
+    from ..installers import mcp_server_config
+    old = cfg["mcp_servers"]["qccd"]
+    entry = mcp_server_config(ws.root, "codex", session_id=sid)
+    if "default_tools_approval_mode" in old:
+        entry["default_tools_approval_mode"] = old["default_tools_approval_mode"]
+    return {**cfg, "mcp_servers": {**cfg["mcp_servers"], "qccd": entry}}
+
+
 def reattach_codex_sessions(state) -> list:
     """After a service (re)start: bind every Codex session that was connected before
     to its SAME thread again -- through its app server if that still runs, otherwise
@@ -507,7 +520,7 @@ def reattach_codex_sessions(state) -> list:
         if getattr(state, "traces", None) is not None:
             br.tracer = (s["id"], state.traces)
         try:
-            br.bind(thread_id=ra["thread_id"], cwd=str(ws.root), start=False, config=ra.get("config"),
+            br.bind(thread_id=ra["thread_id"], cwd=str(ws.root), start=False, config=_here(ra.get("config"), ws, s["id"]),
                     sandbox=ra.get("sandbox"), approval_policy=ra.get("approval_policy"))
         except RpcError as exc:
             br.close()
