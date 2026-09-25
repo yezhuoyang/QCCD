@@ -33,11 +33,18 @@ log = logging.getLogger("qccd.claude")
 __all__ = ["find_claude", "connect_claude", "reattach_claude_sessions", "ClaudeBridge"]
 
 ALLOWED = "mcp__qccd Read Grep Glob"
-DENIED = "Bash Edit Write NotebookEdit"
+#: a run is one `claude -p` process that exits when the turn ends, so nothing it schedules outlives the
+#: turn: a live agent told the person it had "set a check every 4 minutes" to report a grade -- a
+#: session-only cron that died with the process (2026-09-24).  Waiting tools that cannot work here go too.
+DENIED = ("Bash Edit Write NotebookEdit CronCreate CronDelete CronList ScheduleWakeup Monitor RemoteTrigger "
+          "PushNotification Agent Task")
 #: every text Claude writes in a run is shown in the person's chat as it comes
 SYSTEM_NOTE = ("You are chatting with the person in QCCD Studio, on their computer. Everything you write appears "
                "in their chat as you write it: address them directly (you, not 'the user'), keep in-between "
-               "notes to a short line, and end with the answer itself.")
+               "notes to a short line, and end with the answer itself. Your turn ends when you stop, and "
+               "nothing outlives it: follow a job to its end with qccd_get_job(job_id, wait_s=50), and if you "
+               "stop before it finishes, say where its result will appear (the Studio's Results) -- never "
+               "promise to report back later.")
 CAPABILITIES = {"deliver": "claude -p, one run per message, resuming one conversation",
                 "steer": None, "interrupt": "stops the running message",
                 "observe": "stream-json events of each run", "acknowledgement": "the run starting"}

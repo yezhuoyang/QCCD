@@ -271,7 +271,9 @@ function applyHead(doc, full) {
   renderStatus();
 }
 function refreshHead(full) {
-  if (S.inflight) { S.needRefresh = true; return; }
+  // always a promise: an agent's commit that lands while the page's own edit is being saved used to
+  // throw on `.then` here and skip the history and the agent's highlight (a live run, 2026-09-24)
+  if (S.inflight) { S.needRefresh = true; return Promise.resolve(); }
   S.needRefresh = false;
   return api('GET', '/api/design?branch=' + encodeURIComponent(S.branch)).then(function (r) {
     if (r.ok) applyHead(r.data, !!full);

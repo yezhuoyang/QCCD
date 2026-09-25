@@ -116,7 +116,10 @@ def test_claude_answers_in_one_conversation_and_says_why_it_stopped(svc):
     assert a1[a1.index("--permission-mode") + 1] == "dontAsk"                         # nobody is asked anything
     assert a1[a1.index("--allowedTools") + 1] == "mcp__qccd Read Grep Glob"
     assert "Bash" in a1[a1.index("--disallowedTools") + 1] and "--strict-mcp-config" in a1
+    # nothing a run schedules outlives it (a live agent promised a cron check that died with it)
+    assert {"CronCreate", "ScheduleWakeup", "Monitor", "Agent"} <= set(a1[a1.index("--disallowedTools") + 1].split())
     assert "address them directly" in a1[a1.index("--append-system-prompt") + 1]
+    assert "never promise to report back later" in a1[a1.index("--append-system-prompt") + 1]
     assert "qccd_" in calls[0]["stdin"] and "This is a chat" in calls[0]["stdin"]      # the delivery, on stdin
     assert calls[0]["tool_search"] == "false"             # all QCCD tools from the first turn, no lookups
     p3 = ask("FAIL-PLEASE")
