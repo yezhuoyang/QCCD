@@ -692,7 +692,7 @@
   "sketchDraw": {
    "use": "agent",
    "kind": "design",
-   "does": "draw a shape and make it: the release lays trapping sites one lattice unit apart along what you drew, declares the orbit (a loop) when the shape is closed, and adds a junction where the new rail meets an existing one; a refusal says which rule (e.g. R20, too sharp a corner) and why",
+   "does": "draw a shape and make it: the release lays trapping sites one lattice unit apart along what you drew, declares the orbit (a loop) when the shape is closed, and adds a junction where the new rail meets an existing one; a refusal says which rule (e.g. R20, too sharp a corner) and why; a line declares an open path, so a dock spur is addNodeAt + joinNodes, not a line",
    "args": "tool: 'rect'|'ellipse'|'line'|'poly'; for rect/ellipse/line: from [x, y], to [x, y] (model units); for poly: from = the corner points [[x, y], ...] and to = null; mod: {closed: true} closes a polyline into a loop (a triangle is poly with three corners, closed), {shift: true} makes an ellipse a circle"
   },
   "sketchPoints": {

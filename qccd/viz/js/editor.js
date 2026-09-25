@@ -3427,7 +3427,18 @@ function sketchTool(t) {
 // ONE LATTICE UNIT is what every generator spaces its sites by, and `L.ux` / `L.uy` is what
 // the layout measured it to be.  On an empty canvas there is nothing to measure, so it is
 // 0 and the fallback is 1 -- exactly `snapTo`'s rule, not a second one.
-function skUnit() { return { x: L.ux || 1, y: L.uy || L.ux || 1 }; }
+//
+// A PITCH SMALLER THAN THE TWO CLOSEST SITES IS NOT A PITCH.  `ux` / `uy` are the smallest
+// gap between distinct coordinates, which is the pitch on an axis-aligned lattice and
+// rounding noise on a slanted one: a triangle's two sloped sides put sites at heights a
+// thousandth apart, and every shape drawn after it laid its sites 0.001 units apart and was
+// refused (2026-09-24, a dock spur off a triangle).  No two sites are closer than `L.gd`,
+// so neither is the unit.
+function skUnit() {
+  var ux = L.ux || 1, uy = L.uy || L.ux || 1, gd = L.gd || 0;
+  if (gd > 0) { if (ux < gd) ux = gd; if (uy < gd) uy = gd; }
+  return { x: ux, y: uy };
+}
 function skToU(mx, my) { return { x: (mx - L.ox) / (L.sx || 1), y: (my - L.oy) / (L.sy || 1) }; }
 function skToPx(x, y) { return { x: L.ox + x * (L.sx || 1), y: L.oy + y * (L.sy || 1) }; }
 function sk3(v) { var x = Math.round(v * 1000) / 1000; return x === 0 ? 0 : x; }
