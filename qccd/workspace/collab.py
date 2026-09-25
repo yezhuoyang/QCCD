@@ -857,7 +857,9 @@ class CollabMixin:
         if action not in actions:
             raise WorkspaceError("bad_request", f"action must be one of {actions}", status=422)
         check_value(dict(target), _SMALL)
-        branch = target.get("branch") or "main"
+        # a design by the name its person gave it, as every other door takes it
+        branch = self.resolve_draft(target.get("branch") or "main")
+        target = {**dict(target), "branch": branch} if target.get("branch") else target
         self.branch(branch)
         if action in ("highlight", "select"):
             keys = target.get("keys") or []

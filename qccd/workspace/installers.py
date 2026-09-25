@@ -34,7 +34,7 @@ from .jsonsafe import strict_loads
 __all__ = ["install", "uninstall", "status", "build_skill", "SKILL_VERSION"]
 
 SKILL_SRC = Path(__file__).resolve().parent / "skill"
-SKILL_VERSION = "1.7.0"
+SKILL_VERSION = "1.7.1"
 MD_BEGIN = "<!-- qccd:begin (managed by `qccd agent install`; edit outside this block) -->"
 MD_END = "<!-- qccd:end -->"
 TOML_BEGIN = "# qccd:begin (managed by `qccd agent install`; edit outside this block)"
