@@ -176,7 +176,9 @@ def _tools() -> list:
               "profile": {"type": "string", "enum": ["draft", "reference"]},
               "compiler": {"type": "string", "enum": ["auto", "compile", "rotate"]}, "request_id": s,
               "origin_prompt_id": s}, ["kind"])),
-        ("qccd_get_job", "Progress and lifecycle state of a job.", obj({"job_id": s}, ["job_id"])),
+        ("qccd_get_job", "Progress and lifecycle state of a job. wait_s (up to 50) waits that long for it to "
+         "finish before answering: follow a long job (a reference grade takes minutes) with a few waiting calls, "
+         "not many quick ones.", obj({"job_id": s, "wait_s": i}, ["job_id"])),
         ("qccd_list_programs", "The programs a run can use, with qubit counts: the BB [[144,12,12]] syndrome "
          "round (bb144_esm; 'bb', 'bb code' and 'gross' also work), surface17_esm, steane_esm, rep9_esm, ghz4, "
          "ghz16, qft8, adder3, bv6, bell2, micro. qccd_run_program also takes your own OpenQASM 2.0.", obj({})),
@@ -367,7 +369,14 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         return be.call("POST", "/api/jobs", {"kind": a["kind"], "params": params, "request_id": a.get("request_id"),
                                              "origin_prompt_id": a.get("origin_prompt_id")})
     if name == "qccd_get_job":
-        return be.call("GET", f"/api/jobs/{_enc(a['job_id'])}")
+        # a live agent polled a 7-minute grade every 3 s, one model turn per poll (2026-09-24)
+        import time as _t
+        deadline = _t.time() + max(0, min(int(a.get("wait_s") or 0), 50))
+        while True:
+            j = be.call("GET", f"/api/jobs/{_enc(a['job_id'])}")
+            if j.get("status") not in ("queued", "running") or _t.time() >= deadline:
+                return j
+            _t.sleep(2.0)
     if name == "qccd_list_programs":
         return be.call("GET", "/api/programs")
     if name == "qccd_run_program":
