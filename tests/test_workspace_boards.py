@@ -149,3 +149,22 @@ def test_the_cli_submits_by_board_title(tmp_path):
         assert r.returncode == 0 and "task" not in r.stdout
     finally:
         run("stop", cwd=d)
+
+
+def test_an_agent_follows_a_long_grade_in_a_few_waiting_calls():
+    """A live agent polled a 7-minute BB grade every 3 s, one model turn each, then tried to
+    sleep with tools it does not have.  qccd_get_job(wait_s) waits while the job runs."""
+    from qccd.workspace.mcp_server import dispatch
+
+    class Fake:
+        def __init__(self, states):
+            self.states, self.calls = list(states), 0
+
+        def call(self, method, path, body=None, **kw):
+            self.calls += 1
+            return {"id": "j", "status": self.states.pop(0) if len(self.states) > 1 else self.states[0]}
+
+    be = Fake(["running", "running", "succeeded"])
+    assert dispatch(be, "qccd_get_job", {"job_id": "j", "wait_s": 30})["status"] == "succeeded" and be.calls == 3
+    be = Fake(["running", "succeeded"])
+    assert dispatch(be, "qccd_get_job", {"job_id": "j"})["status"] == "running" and be.calls == 1   # no wait asked
