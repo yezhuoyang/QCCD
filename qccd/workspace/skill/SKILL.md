@@ -1,6 +1,6 @@
 ---
 name: qccd
-description: Co-design a trapped-ion QCCD device and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the task circuit, compiling, running programs such as the BB code on a design, performance and bottlenecks, drafts, side-by-side comparisons, grading, local submissions, questions about a page of the qccd.academy website (rules, lessons, the language, physics, the leaderboard), or messages the user sent from Studio or a website page (they arrive as chat turns, <channel source="qccd"> messages, or unread_prompts).
+description: Co-design a trapped-ion QCCD device and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the leaderboards (boards), compiling, running programs such as the BB code on a design, performance and bottlenecks, designs, side-by-side comparisons, grading, submitting a design to a leaderboard, questions about a page of the qccd.academy website (rules, lessons, the language, physics, the leaderboard), or messages the user sent from Studio or a website page (they arrive as chat turns, <channel source="qccd"> messages, or unread_prompts).
 ---
 
 # QCCD co-design
@@ -12,7 +12,8 @@ so neither of you can silently overwrite the other.
 ## Every turn
 
 1. **Bootstrap**: call `qccd_get_context` (pass `since` = the `cursor` from your previous call).
-   It returns the task release, the design revision, protected entities, the user's Studio
+   It returns the user's designs (by the names they gave them), the leaderboards ("boards", by
+   title) any design can be submitted to, the revision, protected entities, the user's Studio
    selection and view, unread Studio prompts, jobs, and the latest local result.
 2. **Read the prompt's frozen context**: for each unread prompt call
    `qccd_manage_comment(action="get", prompt_id=...)`. Its `context` says what "this",
@@ -50,9 +51,10 @@ so neither of you can silently overwrite the other.
 - **When it cannot run** (the design holds too few ions, or the compiler cannot route), the
   run says why. Tell the user, and offer a design that fits: `construct` a ring with
   `{"width": 72, "height": 2, "verticals": 24}` holds the BB code.
-- **Drafts** are the user's saved designs: `qccd_manage_branch(action="list")` (names
-  `cand/<name>`; say just the name), `create(name, source=<the current draft>)` to save one.
-  Every tool that takes a draft accepts `A` or `cand/A`.
+- **Designs** have the names the user gave them: `qccd_manage_branch(action="list")`,
+  `create(title=<a name>, source=<the design to copy>)` for a new one, `rename(design, title)`.
+  A new design is a NEW design: never overwrite an existing one unless the user asks. Every tool
+  takes a design by its name. Never show the user internal ids, task codes or digests.
 - **Compare designs**: run the SAME program on each draft, then
   `qccd_compare_runs(run_ids=[a, b])`. It returns the table and a verdict and opens the
   side-by-side view in Studio (both designs animate on one clock). Summarise the verdict and
@@ -143,16 +145,29 @@ included ("scroll back and forth ten times" is `scroll by: 'page'` / `'-page'` i
   existing threads first (`comments`) and reply in a thread instead of repeating it. Mark a
   thread addressed (`resolve`) only when asked. Never delete anything.
 
-## Results
+## Designing to the person's shape
 
-- Compile with `qccd_start_job(kind="compile")`; adopt its `adopt_with` operation via
-  `qccd_apply_change_set` (`set_final_program`) so the design carries the program.
-- Before presenting a number as reference-grade, create a local submission
-  (`qccd_submit_local`) and read it with `qccd_inspect_run`. Label it "local, not published".
+When they describe a shape and a leaderboard, read `qccd_read_reference(section="design")`
+first. It covers which mechanism each board needs, how to turn their outline into the one loop
+the conveyor drives (cut corners under 60°; a second shape becomes docks, not a second loop), the
+known-good sizes, and the run-fix loop until every rule passes. Then submit. Work in their Studio,
+a visible step at a time.
+
+## Submitting to a leaderboard
+
+- The boards are the website's leaderboards (`qccd_read_reference(section="boards")`): BB
+  [[144,12,12]], the repetition code, the five-qubit code, Steane, the surface code, and the GHZ
+  starter. Any design can go to any board; name the board by its title.
+- `qccd_submit_local(design=<name>, board=<title>)` does it in one job: compiles the board's
+  circuit onto the design (the conveyor for a design with a closed loop, else the router),
+  adopts that program, freezes the design and grades it with the reference evaluator (the
+  rules, the Lean certificate, semantics, metrics). Follow the job; the graded submission is on
+  the local leaderboard. Label results "local, not published": publishing needs the user's
+  approval (`qccd_prepare_publish` shows what would be uploaded).
 - A stage that is `skipped`, `unsupported`, `partial`, `timeout` or `cancelled` is NOT passed.
-  Only `eligibility.eligible == true` means the task's policy accepted the entry.
+  Only `eligibility.eligible == true` means the board's policy accepted the entry.
 - Changing `primitives`, `heating`, `species` or `budget` makes the design exploratory: never
-  eligible for the task.
+  eligible on a board.
 
 ## Never
 

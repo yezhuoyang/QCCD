@@ -328,12 +328,25 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/branches", write=False)
     def branches(request, actor, _):
-        return {"branches": ws.branches()}
+        out = ws.branches()
+        for b in out:
+            b["display"] = ws.design_title(b)
+        return {"branches": out}
 
     @route("POST", "/api/branches")
     def new_branch(request, actor, b):
-        return ws.create_candidate(actor, name=b.get("name"), source=b.get("source", "main"),
+        # a new design: `title` is whatever the person calls it (the internal name is made up)
+        src = ws.resolve_draft(b.get("source") or "main")
+        return ws.create_candidate(actor, name=b.get("name"), source=src, title=b.get("title"),
                                    note=b.get("note", ""), origin_prompt_id=b.get("origin_prompt_id"))
+
+    @route("POST", "/api/branches/rename")
+    def rename_branch(request, actor, b):
+        return ws.rename_design(actor, ws.resolve_draft(b.get("design") or "main"), str(b.get("title") or ""))
+
+    @route("GET", "/api/boards", write=False)
+    def boards(request, actor, _):
+        return {"boards": ws.boards()}
 
     @route("GET", "/api/compare", write=False)
     def compare(request, actor, _):
@@ -712,6 +725,11 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("POST", "/api/submissions")
     def submit(request, actor, b):
+        if "board" in b or "design" in b:
+            # "submit this design to that board": compile for it, adopt, freeze, grade -- one job
+            return ws.submit_design(actor, design=b.get("design") or b.get("branch") or "main", board=b.get("board"),
+                                    profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
+                                    request_id=b.get("request_id"), title=str(b.get("title", "")))
         return ws.submit_local(actor, branch=b.get("branch", "main"), revision=b.get("revision"),
                                profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
                                request_id=b.get("request_id"), title=str(b.get("title", "")))
@@ -726,7 +744,7 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/leaderboard", write=False)
     def leaderboard(request, actor, _):
-        return ws.leaderboard()
+        return ws.leaderboard(q(request, "board"))
 
     @route("POST", "/api/publish/prepare")
     def prepare(request, actor, b):
@@ -867,7 +885,7 @@ def _render_run(ws: Workspace, run_id: str) -> str:
     model = corrected_model(run["performance"]["table"])
     report = verify(prog, arch, model)
     d = run["design"]
-    headline = (f"{run['program']['name']} on {d['name']} ({d['draft'].removeprefix('cand/')} r{d['revision']}): "
+    headline = (f"{run['program']['name']} on {ws._design_title_of(d['draft'])} (r{d['revision']}): "
                 f"{run['performance']['total']['ms']:g} ms")
     with tempfile.TemporaryDirectory() as td:
         # the circuit beside the compiled program, when the run kept both (runs since 2026-09-24)

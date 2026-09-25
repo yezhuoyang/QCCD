@@ -19,15 +19,15 @@ __all__ = ["read_reference", "SECTIONS"]
 _REPO = Path(__file__).resolve().parents[2]
 _SKILL = Path(__file__).resolve().parent / "skill"
 _DOCS = {"adl": "docs/adl.md", "rules": "docs/rules.md", "tsir": "docs/tsir.md", "phys": "docs/phys.md"}
-SECTIONS = ("index", "interface", "site", "site:studio", "task", "operations", "rules", "evaluator", "program", "anchors",
+SECTIONS = ("index", "design", "boards", "interface", "site", "site:studio", "task", "operations", "rules", "evaluator", "program", "anchors",
             "workflow", "docs:adl", "docs:rules", "docs:tsir", "docs:phys")
 _WINDOW = 12000
 
 
 def read_reference(ws, section: str = "index", query: str | None = None) -> dict:
     from . import evaluator_identity
-    head = {"task": ws.release.id, "task_digest": ws.release.digest,
-            "evaluator": {k: v for k, v in evaluator_identity().items()}, "section": section}
+    # no task in the header: a workspace is general, and boards are named by title (section `boards`)
+    head = {"evaluator": {k: v for k, v in evaluator_identity().items()}, "section": section}
     if section == "index":
         return {**head, "sections": list(SECTIONS),
                 "hint": "read `workflow` first; `interface` for what you may do on a page (only what it "
@@ -46,8 +46,22 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
         from .mirror import SiteMirror
         from .site_guide import site_guide
         return {**head, **site_guide(getattr(ws, "site_mirror", None) or SiteMirror(), section, query)}
-    if section == "task":
-        return {**head, "release": ws.release.summary(), "circuit_qasm": ws.release.circuit_text()[:_WINDOW]}
+    if section in ("boards", "task"):
+        # the leaderboards: any design can be submitted to any of them.  `query` = a board's title
+        # (or short name) gives that one with its circuit
+        if query or section == "task":
+            try:
+                b = ws.board(query) if query else ws.release
+            except Exception as exc:
+                return {**head, "boards": [x["title"] for x in ws.boards()], "error": str(exc)}
+            s = b.summary()
+            return {**head, "board": {"title": b.title, "about": b.manifest.get("description"),
+                                      "rank_by": s["rank_by"], "metrics": s["metrics"],
+                                      "required_checks": s["required_checks"], "suggested_start": s["starter"],
+                                      "limits": b.manifest.get("limits")},
+                    "circuit_qasm": b.circuit_text()[:_WINDOW]}
+        return {**head, "boards": ws.boards(),
+                "note": "submit any design to any board by its title: qccd_submit_local(design, board)"}
     if section == "operations":
         from .operations import describe_operations
         return {**head, "operations": describe_operations(),
@@ -92,6 +106,10 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
                 "coordinates": "sketch and region points are diagram coordinates (lattice units, the space "
                                "of node pos); viewport is the view box they were drawn in; they are intent, "
                                "never physical constraints"}
+    if section == "design":
+        # how to turn the person's shape into a device that runs a board's circuit with every rule passing
+        p = _SKILL / "references" / "design.md"
+        return {**head, "text": _window(p.read_text(encoding="utf-8") if p.exists() else "", query)}
     if section == "workflow":
         p = _SKILL / "references" / "workflow.md"
         return {**head, "text": _window(p.read_text(encoding="utf-8") if p.exists() else "", query)}

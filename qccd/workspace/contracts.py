@@ -154,14 +154,16 @@ class TaskRelease(_Open):
 
 
 class LockFile(_Strict):
+    """Version 2: a general workspace (any design, any board).  Version 1, the old pinned form,
+    also names one task release (`mode`, `task`, `numerical_policy`); it still opens."""
     kind: Literal["qccd.lock"]
-    version: Literal[1]
+    version: Literal[1, 2]
     workspace_id: str
-    mode: Literal["task", "exploratory"]
-    task: dict[str, str]
+    mode: Optional[Literal["task", "exploratory"]] = None
+    task: Optional[dict[str, str]] = None
     evaluator: dict[str, Any]
     schemas: dict[str, str]
-    numerical_policy: Optional[dict[str, Any]]
+    numerical_policy: Optional[dict[str, Any]] = None
 
 
 StageStatus = Literal["passed", "failed", "partial", "skipped", "unsupported", "timeout", "cancelled",

@@ -213,9 +213,10 @@ page keeps its self-containment scan. What it does:
   - junction transits with their imbalance, the busiest ions, and ions per trap at gates;
   - peak heating, and failed rules;
   - bottleneck sentences computed from those numbers.
-- **Drafts** are the workspace's candidate branches (`cand/<name>`); every door accepts the
-  short name. Studio saves, switches and edits them from the chat header, and agents list,
-  create and run them.
+- **Designs** have the names their person gives them, any text ("Two triangles", "Ring v2").
+  Internally each is a branch with a made-up id that is never shown; every door takes the
+  name. A name two designs share is refused rather than guessed. Studio saves, renames,
+  switches and edits them from the chat header, and agents list, create, rename and run them.
 - **Side by side**: `/compare?runs=A,B` shows the comparison table (B minus A), a verdict,
   each run's bottlenecks, and both runs' own pages (`/runview/<id>`, view-only) in frames.
   One slider and Play drive both by modelled time: every step's start time is kept with
@@ -426,12 +427,43 @@ semantic link is O2 through the certificate's qubit→ion map.
 (`SmallCode/*/manifest.json`, re-replayed) exactly when those files are present. Modelled
 time never depends on wall-clock time.
 
-**Task releases** (`qccd/workspace/releases/<task>@<release>/`) pin the circuit, the physics
-and the manifest by sha256. `.gitattributes` keeps their bytes exact. A workspace pins one
-release in `qccd.lock.json` and never follows "latest". The starter release is `ghz4@1`
-(4-qubit GHZ on a 4-site chain; a full reference grade takes about 4 s). Every metric has a
-unit and a direction. The numerical policy is `rel_tol 1e-9 / abs_tol 1e-12`. The track is
-`codesign-artifact`: hardware plus final schedule for a fixed circuit.
+**Boards.** Each leaderboard of the website is a task release
+(`qccd/workspace/releases/<task>@<release>/`), which pins the circuit, the physics and the
+manifest by sha256. `.gitattributes` keeps their bytes exact. People only ever see and type a
+board's title. Code finds a board with `find_board` (title or short name, newest edition) and
+refuses an ambiguous name.
+
+Six boards ship, the five from the website (written by `tools/make_releases.py` from each
+board's own title, description and circuit) plus the GHZ starter. Measured 2026-09-24, each on
+its suggested first device, with the full reference grade (rules, Lean certificate,
+semantics) eligible:
+
+| board | first device | per round | grade time |
+|---|---|---|---|
+| BB [[144,12,12]] | ring 72 × 2, 24 docks | 522 ms | about 6 min, mostly Lean |
+| Repetition code, distance 9 | ring 8 × 2, 8 docks | 9.45 ms | seconds |
+| Five-qubit code [[5,1,3]] | 3 × 3 grid | 8.89 ms | seconds |
+| Steane code [[7,1,3]] | ring 8 × 2, 8 docks | 11.48 ms | seconds |
+| Surface code, distance 3 (17 qubits) | ring 8 × 2, 8 docks | 14.1 ms | seconds |
+| GHZ state on four qubits (starter) | chain of 4 | — | about 4 s |
+
+Every metric has a unit and a direction. The numerical policy is `rel_tol 1e-9 / abs_tol
+1e-12`. The track is `codesign-artifact`: hardware plus final schedule for a fixed circuit.
+
+**A workspace is general.** Its lockfile (version 2) names no board, and one workspace
+submits any design to any board. The old version-1 lockfile pinned one release; it still
+opens, and that release becomes its default. `submit_design(design, board)` (the Studio's
+"Submit to this board", the agent's `qccd_submit_local(design, board)`, and `qccd submit
+--local --board <title>`) runs as one job:
+
+1. compile the board's circuit onto the design (the conveyor first for a design with a closed
+   loop, else the router);
+2. adopt the program, which records the circuit it was compiled for;
+3. freeze a snapshot, recording the board and its digest;
+4. grade it against that board.
+
+A program compiled for one board is refused for another, which compiles again instead.
+Databases from before (store schema 1) are migrated in place.
 
 Board entries whose junction curves extend to degrees 5–16 (`random16`, `tanner`) would
 fail `physics_lock` against the reference physics. That is intended: their physics differs
@@ -567,9 +599,8 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
 - The `qccd` console script needs the repository layout. The toolchain reads repo-relative
   files (`arch/` templates, `Compiler/` binaries), so install with `pip install -e .[agent]`
   from a clone. A standalone wheel is not complete.
-- Only the `ghz4@1` release ships. `build_release` can cut the five board tasks from
-  `tasks/*/task.json`, but those circuits' reference checks take minutes (BB144 needs more
-  memory than `qcheck` can use).
+- The BB board's reference check takes about 6 minutes on this machine, mostly the Lean
+  checker. The official grader's memory limit has to cover it (see the deploy notes).
 - `studio_sync` build records are hoisted before the seal, as the page does. A device whose
   seal changes form between revisions (generator ↔ explicit) makes an in-flight human edit
   unrebaseable. It is refused, and the page shows the current design.
@@ -619,8 +650,8 @@ one built in the checkout, then the installed one. How a release is built and pu
 **One workspace, end to end:**
 
 ```bash
-qccd init my-design --task ghz4@1        # lockfile, design/studio.json, .qccd/ (git-ignored)
-cd my-design
+qccd init my-designs                     # a workspace for any number of designs and every board
+cd my-designs
 qccd agent install --client codex        # .agents/skills/qccd, .codex/config.toml block, AGENTS.md block
 qccd agent install --client claude --channel   # .claude/skills/qccd, .mcp.json "qccd", CLAUDE.md block
 qccd studio                              # starts the service, opens Studio paired (one-time code)
@@ -631,10 +662,13 @@ qccd agent connect --client codex        # a NEW Codex thread bound to this work
 qccd agent connect --client codex --thread <id>   # ...or your existing conversation
 #   then attach your terminal to the same app server:  codex --remote ws://127.0.0.1:<port>
 #   Claude Code instead: claude --dangerously-load-development-channels server:qccd
-qccd compile --adopt                     # the real compiler; adopts the final program
-qccd validate --json                     # a draft grade of the head revision
-qccd submit --local --wait               # freeze + reference grade -> "Local result - not published"
-qccd leaderboard
+qccd boards                              # the leaderboards, by title
+qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
+                                         # compile for the board, adopt, freeze, reference grade
+                                         #   -> "Local result - not published"
+qccd leaderboard --board "BB [[144,12,12]]"
+qccd compile --board surface --adopt     # the steps one by one, when wanted
+qccd validate --board surface --json     # a draft grade of the head revision
 qccd publish --submission <sub_id>       # review + approve at an interactive terminal
 qccd publish --approval <ap_id> --server https://qccd.academy/official   # token: ~/.qccd/credentials.json
 qccd trace                               # what the agents did: every request, step by step

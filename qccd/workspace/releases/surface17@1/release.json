@@ -1,0 +1,111 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:4e688b1c1183f067c2e25387ba131eef767a884d2189644341320b7f8871b7b9",
+  "file": "circuit.qasm"
+ },
+ "description": "One syndrome-extraction round of the distance-3 rotated surface code: eight stabilizers on 9 data qubits.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 600,
+  "lean_timeout_s": 1800,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('qccdsim_jones')",
+   "better": "low",
+   "name": "T_jones",
+   "unit": "ms"
+  },
+  {
+   "about": "replayed round time under corrected_model('transport_excitation')",
+   "better": "low",
+   "name": "T_transport",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 5,
+ "physics": {
+  "digest": "sha256:54696edef56232694207ed45f58524479f57d43b4ca15f01df934f7b6457d0b5",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "qccdsim_jones",
+  "tables": [
+   "qccdsim_jones",
+   "transport_excitation"
+  ]
+ },
+ "rank_by": "T_jones",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics"
+ ],
+ "starter": {
+  "generator": "ring",
+  "name": "ring16",
+  "params": {
+   "height": 2,
+   "verticals": 8,
+   "width": 8
+  }
+ },
+ "task": "surface17",
+ "title": "Surface code, distance 3 (17 qubits)",
+ "track": "codesign-artifact",
+ "version": 1
+}

@@ -279,9 +279,11 @@ def test_the_chat_is_one_conversation(live, tmp_path):
                  ".then(function(r){ return r.status; })"} if run_ok else {"sleep": 10},                        # 14
         {"wait": has % "i.type === 'run' && i.status === 'succeeded' && i.total_ms > 0", "timeout": 120000}
         if run_ok else {"sleep": 10},                                                                           # 15
-        {"eval": "QCCD_LIVE.saveAsDraft('A').then(function(){ return JSON.stringify(QCCD_LIVE.chat().branches); })"},
-        {"eval": "QCCD_LIVE.switchDraft('cand/A').then(function(){ return QCCD_LIVE.chat().branch; })"},       # 17
-        {"wait": "QCCD_LIVE.state().rev !== null && document.getElementById('qcl-draft').value === 'cand/A'", "timeout": 10000},
+        {"eval": "QCCD_LIVE.saveAsDraft('A').then(function(d){ window.__dA = d.name; "
+                 "return JSON.stringify({made: d, branches: QCCD_LIVE.chat().branches}); })"},                 # 16
+        {"eval": "QCCD_LIVE.switchDraft(window.__dA).then(function(){ return QCCD_LIVE.chat().branch === window.__dA; })"},
+        {"wait": "QCCD_LIVE.state().rev !== null && document.getElementById('qcl-draft').value === window.__dA "
+                 "&& document.getElementById('qcl-draft').selectedOptions[0].textContent === 'A'", "timeout": 10000},
         {"eval": "JSON.stringify(EDITOR.addSite(2.5, 1, null, {zone: 'trap'}))"},                               # 19
         {"wait": "!QCCD_LIVE.state().inflight && QCCD_LIVE.state().rev === 1", "timeout": 10000},               # 20
         {"eval": "fetch('/api/design?branch=main').then(function(r){ return r.json(); }).then(function(d){ "
@@ -297,12 +299,13 @@ def test_the_chat_is_one_conversation(live, tmp_path):
             assert st["ok"], (i, st)
     first = json.loads(s[1]["value"])
     assert first["empty"] and not first["tabs"] and first["who"] == "Agent" and first["sub"] == "no agent connected"
-    assert first["drafts"][0] == "Main design" and first["drafts"][-1].startswith("Save as a new draft")
+    assert first["drafts"][0] == "Main design" and first["drafts"][-2].startswith("Save as a new design")
     assert s[6]["value"] == 200 and s[8]["value"] == 200
     dom = json.loads(s[10]["value"])
     assert dom == {"you": 1, "agent": 1, "bold": "C0", "items": 2, "code": "C1", "undo": True,
                    "rows": 2, "th": "metric", "links": ["/runview/x"]}      # a javascript: link stays text
-    assert "cand/A" in json.loads(s[16]["value"]) and s[17]["value"] == "cand/A"
+    made = json.loads(s[16]["value"])                                # the person's name "A"; the id is made up
+    assert made["made"]["title"] == "A" and made["made"]["name"] in made["branches"] and s[17]["value"] is True
     assert json.loads(s[21]["value"])["main_rev"] == 2            # the draft's edit left main alone (r1 add, r2 undo)
     assert s[22]["value"] is True and s[23]["value"] is True
     assert not any(out.get("logs", {}).get("a", []))                  # no console errors

@@ -268,7 +268,7 @@ def test_restart_recovery_marks_uncertain_and_failed_honestly(ws):
 
 def test_context_is_bounded_and_says_what_matters(ws):
     ctx = ws.context(AGENT)
-    for k in ("task", "revision", "protected", "unread_prompts", "jobs", "latest_result", "cursor", "next"):
+    for k in ("boards", "designs", "design_title", "revision", "protected", "unread_prompts", "jobs", "latest_result", "cursor", "next"):
         assert k in ctx
     assert "entities" not in ctx
     full = ws.context(AGENT, detail="full")

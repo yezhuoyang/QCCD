@@ -1,0 +1,111 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:25b660258b23c5600a36d5cc969f7277cc3e743b9ecd6775beaf3cddff7408c6",
+  "file": "circuit.qasm"
+ },
+ "description": "One syndrome-extraction round of the bivariate-bicycle [[144,12,12]] code: 144 weight-6 checks, 864 two-qubit contacts.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 1800,
+  "lean_timeout_s": 3600,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('qccdsim_jones')",
+   "better": "low",
+   "name": "T_jones",
+   "unit": "ms"
+  },
+  {
+   "about": "replayed round time under corrected_model('transport_excitation')",
+   "better": "low",
+   "name": "T_transport",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 1,
+ "physics": {
+  "digest": "sha256:54696edef56232694207ed45f58524479f57d43b4ca15f01df934f7b6457d0b5",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "qccdsim_jones",
+  "tables": [
+   "qccdsim_jones",
+   "transport_excitation"
+  ]
+ },
+ "rank_by": "T_jones",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics"
+ ],
+ "starter": {
+  "generator": "ring",
+  "name": "ring144",
+  "params": {
+   "height": 2,
+   "verticals": 24,
+   "width": 72
+  }
+ },
+ "task": "bb144",
+ "title": "BB [[144,12,12]]",
+ "track": "codesign-artifact",
+ "version": 1
+}

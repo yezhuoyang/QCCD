@@ -736,7 +736,12 @@ function loadHistory() {
   });
 }
 function loadResults() {
-  return Promise.all([api('GET', '/api/jobs?limit=15'), api('GET', '/api/leaderboard')]).then(function (rs) {
+  var boards = S.boards ? Promise.resolve(null) : api('GET', '/api/boards');
+  return boards.then(function (bs) {
+    if (bs && bs.ok) { S.boards = bs.data.boards || []; if (!S.pickBoard && S.boards.length) S.pickBoard = S.boards[0].title; }
+    return Promise.all([api('GET', '/api/jobs?limit=15'),
+                        api('GET', '/api/leaderboard' + (S.pickBoard ? '?board=' + encodeURIComponent(S.pickBoard) : ''))]);
+  }).then(function (rs) {
     if (rs[0].ok) S.jobs = rs[0].data.jobs || [];
     if (rs[1].ok) S.board = rs[1].data;
     if (S.tab === 'results') renderBody();
@@ -1056,15 +1061,24 @@ function renderActivity(b) {
   }
 }
 function renderResults(b) {
+  // a leaderboard, by its title: any design can be submitted to any of them
+  var pick = h('select', { cls: 'qcl-sel', title: 'the leaderboard', on: { change: function (e) { S.pickBoard = e.target.value; loadResults(); } } },
+               (S.boards || []).map(function (x) { var o = h('option', { value: x.title, text: x.title }); if (x.title === S.pickBoard) o.selected = true; return o; }));
   b.appendChild(h('div', { cls: 'qcl-row' }, [
-    btn('Compile', function () { api('POST', '/api/jobs', { kind: 'compile', params: { branch: S.branch }, request_id: rid('compile') }).then(loadResults); },
-        '', 'run the real compiler on the task circuit for this revision'),
+    h('span', { cls: 'qcl-note', text: 'Leaderboard' }), pick,
+    btn('Submit ' + draftName(S.branch) + ' to this board', function () {
+      api('POST', '/api/submissions', { design: S.branch, board: S.pickBoard, profile: 'reference', request_id: rid('sub') }).then(function (r) {
+        if (!r.ok) { notice('Not submitted: ' + (r.error || {}).message, 'bad'); return; }
+        notice('Submitting ' + r.data.design + ' to ' + r.data.board + ': compiling its circuit onto the design, then grading. ' +
+               'It appears below when graded (a local result, not published).');
+        loadResults(); }); }, 'pri',
+        'compile this board\'s circuit onto the design, adopt the program, freeze it and grade it with the reference evaluator')
+  ]));
+  b.appendChild(h('div', { cls: 'qcl-row' }, [
+    btn('Compile only', function () { api('POST', '/api/jobs', { kind: 'compile', params: { branch: S.branch, board: S.pickBoard }, request_id: rid('compile') }).then(loadResults); },
+        '', 'run the real compiler on this board\'s circuit for this revision'),
     btn('Adopt compiled program', adoptCompiled, '', 'make the last successful compile the design\'s final program'),
-    btn('Validate (draft)', function () { api('POST', '/api/jobs', { kind: 'evaluate', params: { branch: S.branch, profile: 'draft' }, request_id: rid('val') }).then(loadResults); }),
-    btn('Submit locally', function () {
-      api('POST', '/api/submissions', { branch: S.branch, profile: 'reference', request_id: rid('sub') }).then(function (r) {
-        if (!r.ok) notice('Not submitted: ' + (r.error || {}).message, 'bad'); loadResults(); }); }, 'pri',
-        'freeze this revision and grade it with the reference evaluator')
+    btn('Validate (draft)', function () { api('POST', '/api/jobs', { kind: 'evaluate', params: { branch: S.branch, profile: 'draft', board: S.pickBoard }, request_id: rid('val') }).then(loadResults); })
   ]));
   if (S.jobs.length) {
     b.appendChild(h('div', { cls: 'qcl-label', text: 'Jobs' }));
@@ -1076,11 +1090,11 @@ function renderResults(b) {
   }
   var bd = S.board;
   if (!bd) return;
-  b.appendChild(h('div', { cls: 'qcl-label' }, ['Local leaderboard · ' + bd.task + ' · ranked by ' + bd.rank_by + ' ', h('span', { cls: 'qcl-local', text: 'Local results - not published' })]));
+  b.appendChild(h('div', { cls: 'qcl-label' }, ['Local leaderboard · ' + (bd.board || '') + ' · ranked by ' + bd.rank_by + ' ', h('span', { cls: 'qcl-local', text: 'Local results - not published' })]));
   bd.rows.forEach(function (s) {
     var m = s.metrics || {};
     b.appendChild(h('div', { cls: 'qcl-item' }, [
-      h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-chip', text: s.submission_id }), h('span', { cls: 'qcl-chip', text: 'r' + s.revision }),
+      h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-chip', text: s.design || draftName(s.branch) }), h('span', { cls: 'qcl-chip', text: 'r' + s.revision }),
         h('span', { cls: 'qcl-chip ' + (s.eligible ? 'ok' : (s.status === 'grading' ? 'warn' : 'bad')), text: s.status }),
         s.stale ? h('span', { cls: 'qcl-chip warn', text: 'stale: the design changed since' }) : h('span', { cls: 'qcl-chip ok', text: 'current' })]),
       h('div', { cls: 'qcl-note', text: Object.keys(m).map(function (k) { return k + ' ' + (typeof m[k] === 'number' ? (+m[k]).toPrecision(5) : m[k]); }).join(' · ') }),
@@ -1140,8 +1154,8 @@ function review(sub) {
     var rv = r.data;
     var sel = h('select', { cls: 'qcl-sel' }, [h('option', { value: 'public', text: 'public' }), h('option', { value: 'unlisted', text: 'unlisted' }), h('option', { value: 'private', text: 'private' })]);
     var box = h('div', {}, [h('b', { text: 'Publish exactly this bundle?' }),
-      h('div', { cls: 'qcl-note', text: 'task ' + rv.task.id + ' · ' + rv.task.digest }),
-      h('div', { cls: 'qcl-mono', text: 'bundle ' + rv.bundle_digest })]);
+      h('div', { cls: 'qcl-note', text: 'to the leaderboard ' + (rv.board || '') }),
+      h('div', { cls: 'qcl-mono', text: 'bundle fingerprint ' + rv.bundle_digest })]);
     rv.files.forEach(function (f) { box.appendChild(h('div', { cls: 'qcl-mono', text: f.path + '  ' + f.bytes + ' B  ' + f.digest })); });
     box.appendChild(h('div', { cls: 'qcl-note', text: 'Excluded: ' + rv.excluded.join(', ') + '. The official server re-grades it independently.' }));
     box.appendChild(h('div', { cls: 'qcl-row' }, ['Visibility ', sel]));
@@ -1179,7 +1193,12 @@ function shortName(n) {
   return n;
 }
 function isWorking() { return S.working.some(function (w) { return w.state === 'working'; }); }
-function draftName(n) { return n === 'main' ? 'Main design' : 'Draft: ' + String(n).replace(/^cand\//, ''); }
+function draftName(n) {
+  // what the person calls the design (its title), else the main design / its short name
+  var b = (S.branches || []).filter(function (x) { return x.name === n; })[0];
+  if (b && b.display) return b.display;
+  return n === 'main' ? 'Main design' : String(n).replace(/^cand\//, '');
+}
 
 function buildChat() {
   var min = localGet('qccd.live.min') === '1';
@@ -1549,22 +1568,32 @@ function renderDrafts() {
   if (names.indexOf('main') < 0) names.unshift('main');
   if (names.indexOf(S.branch) < 0) names.push(S.branch);
   names.forEach(function (n) { sel.appendChild(h('option', { value: n, text: draftName(n) })); });
-  sel.appendChild(h('option', { value: '__save', text: 'Save as a new draft…' }));
+  sel.appendChild(h('option', { value: '__save', text: 'Save as a new design…' }));
+  sel.appendChild(h('option', { value: '__rename', text: 'Rename this design…' }));
   sel.value = S.branch;
 }
 function onDraftPick(e) {
   var v = e.target.value;
   if (v === '__save') { e.target.value = S.branch; saveAsDraft(); return; }
+  if (v === '__rename') { e.target.value = S.branch; renameDesign(); return; }
   switchDraft(v);
 }
 function saveAsDraft(name) {
-  name = name || window.prompt('Name this draft (letters, digits, - and _):', '');
+  name = name || window.prompt('Name the new design (anything you like):', '');
   if (!name || !String(name).trim()) return Promise.resolve(null);
   name = String(name).trim();
-  return api('POST', '/api/branches', { name: name, source: S.branch }).then(function (r) {
+  return api('POST', '/api/branches', { title: name, source: S.branch }).then(function (r) {
     if (!r.ok) { notice('Not saved: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
-    notice('Saved as draft "' + name + '". You are still on the ' + draftName(S.branch).toLowerCase() + '.');
+    notice('Saved as "' + name + '". You are still on ' + draftName(S.branch) + '.');
     return loadBranches().then(function () { return r.data; });
+  });
+}
+function renameDesign() {
+  var name = window.prompt('A new name for ' + draftName(S.branch) + ':', draftName(S.branch));
+  if (!name || !String(name).trim()) return Promise.resolve(null);
+  return api('POST', '/api/branches/rename', { design: S.branch, title: String(name).trim() }).then(function (r) {
+    if (!r.ok) { notice('Not renamed: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
+    return loadBranches();
   });
 }
 function switchDraft(name) {
@@ -1644,7 +1673,7 @@ function emptyState() {
 }
 function convItem(it, lastWho) {
   if (it.type === 'user' || it.type === 'person') {
-    var extra = [it.context ? 'with ' + it.context : '', it.branch && it.branch !== 'main' ? 'on ' + draftName(it.branch).toLowerCase() : '']
+    var extra = [it.context ? 'with ' + it.context : '', it.branch && it.branch !== 'main' ? 'on ' + draftName(it.branch) : '']
       .filter(Boolean).join(' · ');
     if (it.page && (!PAGE || it.page !== (S.page || {}).title)) extra = [extra, 'on ' + it.page].filter(Boolean).join(' · ');
     return h('div', { cls: 'qcl-msg you' }, [h('div', { cls: 'qcl-bubble' }, [txt(it.text)]),
@@ -1660,14 +1689,14 @@ function convItem(it, lastWho) {
     return h('div', { cls: 'qcl-event' }, [
       h('span', { cls: 'qcl-evtxt', text: (undone ? 'Undone: ' : 'Changed the design') +
         (it.revision !== undefined && it.revision !== null ? ' (r' + it.revision + ')' : '') +
-        (it.branch && it.branch !== 'main' ? ' on ' + draftName(it.branch).toLowerCase() : '') + (it.summary ? ': ' + it.summary : '') }),
+        (it.branch && it.branch !== 'main' ? ' on ' + draftName(it.branch) : '') + (it.summary ? ': ' + it.summary : '') }),
       btn('Show', function () { showChange(it.change_set_id); }, 'qcl-link'),
       !undone ? btn('Undo', function () { undoChange(it.change_set_id); }, 'qcl-link') : null]);
   }
   if (it.type === 'run') {
     var ok = it.status === 'succeeded', busy = it.status === 'running' || it.status === 'queued';
     return h('div', { cls: 'qcl-card' }, [
-      h('div', { cls: 'qcl-card-t', text: (it.program || 'program') + (it.draft ? ' on ' + (it.draft === 'main' ? 'the main design' : 'draft ' + it.draft) : '') }),
+      h('div', { cls: 'qcl-card-t', text: (it.program || 'program') + (it.design || it.draft ? ' on ' + (it.design || it.draft) : '') }),
       h('div', { cls: 'qcl-card-s', text: busy ? ((it.progress || 'running') + '…')
                                              : (ok ? (it.total_ms !== null && it.total_ms !== undefined ? it.total_ms + ' ms per round' : 'done')
                                                    : 'did not run: ' + (it.summary || it.status)) }),
@@ -1880,7 +1909,7 @@ function runPanel(jid, p) {
     var qasm = String(info.qasm || '').split('\n');
     box = h('div', { id: 'qcl-runpanel', 'data-run': jid, 'data-qccd-private': '' }, [
       h('div', { cls: 'qcl-rp-t', text: (info.agent ? shortName(info.agent) + ' is running ' : 'Running ') + info.name +
-                                         ' on ' + (info.draft === 'main' ? 'the main design' : 'draft ' + info.draft) }),
+                                         ' on ' + (info.design || info.draft) }),
       h('div', { id: 'qcl-rp-s', cls: 'qcl-rp-s', text: 'loading the program' }),
       h('div', { cls: 'qcl-rp-l', text: 'the program (' + qasm.length + ' lines of OpenQASM)' }),
       h('pre', { cls: 'qcl-rp-q', text: qasm.slice(0, 80).join('\n') + (qasm.length > 80 ? '\n…' : '') }),
