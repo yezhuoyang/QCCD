@@ -185,7 +185,7 @@ def test_the_agent_brings_its_new_design_onto_the_screen(live, tmp_path):
                  "QCCD_LIVE.state().rev !== null", "timeout": 40000, "stopOnFail": True},            # 0
         {"eval": f"{call}('/api/branches', {{title: 'Two triangles'}}).then(d => (window.__d = d.name))"},  # 1
         {"eval": f"{call}('/api/present', {{action: 'open_branch', target: {{branch: window.__d}}, "
-                 "note: 'the new design'}).then(d => d.presentation_id || JSON.stringify(d))"},      # 2
+                 "note: 'the new design'}).then(d => d.status)"},                                     # 2
         {"wait": "QCCD_LIVE.chat().branch === window.__d && QCCD_LIVE.state().rev !== null && "
                  "document.getElementById('qcl-draft').selectedOptions[0].textContent === 'Two triangles'",
          "timeout": 15000},                                                                           # 3
@@ -196,7 +196,7 @@ def test_the_agent_brings_its_new_design_onto_the_screen(live, tmp_path):
         assert not st.get("error"), (i, st)
         if "ok" in st:
             assert st["ok"], (i, st)
-    assert s[1]["value"].startswith("cand/") and s[2]["value"]
+    assert s[1]["value"].startswith("cand/") and s[2]["value"] == "requested"   # the watching tab counts
     assert "Now showing Two triangles" in s[4]["value"] and "cand/" not in s[4]["value"], s[4]["value"]
     outcomes = [e["payload"]["outcome"] for e in _events(root) if e["type"] == "presented"]
     assert outcomes == ["displayed"]

@@ -882,7 +882,9 @@ class CollabMixin:
             v = self.view(view_id)
             if v["closed"]:
                 raise WorkspaceError("view_closed", f"view {view_id} is closed", status=409)
-        everywhere = action in ("open_run", "compare")          # not tied to one draft's tabs
+        # not tied to one draft's tabs; open_branch is by definition for a tab showing another design
+        # (counting only tabs already on it answered "no_connected_view" to an agent whose person watched)
+        everywhere = action in ("open_run", "compare", "open_branch")
         views = [view_id] if view_id else [v["id"] for v in self.views() if everywhere or v["branch"] == branch]
         pid = new_id("pr")
         with self.store.tx() as db:
