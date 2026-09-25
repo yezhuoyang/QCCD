@@ -218,3 +218,46 @@ def test_a_claude_turn_is_traced_step_by_step_on_the_model_the_person_chose(svc)
     assert one["client"] == "claude" and one["prompts"][0]["prompt"] == p1
     assert one["prompts"][0]["text"] == "TOOLS-PLEASE what is the design?" and one["prompts"][0]["tools"] == 3
     assert len(one["prompts"]) == 3
+
+
+def test_a_renamed_workspace_folder_starts_a_new_conversation_instead_of_failing(tmp_path, monkeypatch):
+    """A workspace folder is the person's to name and rename (2026-09-25).  Claude Code files a
+    conversation under the folder it ran in, so `--resume` from a renamed folder would fail; the
+    bridge starts a new conversation there instead, and says so in the chat."""
+    import types
+    from qccd.workspace.agents.claude import ClaudeBridge
+    log = tmp_path / "claude-calls.jsonl"
+    fake = tmp_path / "fake_claude.py"
+    fake.write_text(FAKE.replace("__LOG__", repr(str(log))), encoding="utf-8")
+    if os.name == "nt":
+        exe = tmp_path / "claude.cmd"
+        exe.write_text(f'@"{sys.executable}" "{fake}" %*\r\n', encoding="utf-8")
+    else:
+        exe = tmp_path / "claude"
+        exe.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{fake}" "$@"\n', encoding="utf-8")
+        exe.chmod(0o755)
+    ws = Workspace.init(tmp_path / "Renamed designs")
+    try:
+        state = types.SimpleNamespace(ws=ws, traces=None, worker=None, bridges={})
+        me = {"kind": "human", "id": "cli"}
+        s1 = ws.register_session(me, client="claude", mode="appserver", label="Claude")["id"]
+        s2 = ws.register_session(me, client="claude", mode="appserver", label="Claude")["id"]
+        moved = ClaudeBridge(state, s1, str(exe), "11111111-1111-1111-1111-111111111111", True,
+                             folder=str(tmp_path / "Old name"))
+        assert moved.deliver("> hello again\n", "d1")["state"] == "accepted"
+        stay = ClaudeBridge(state, s2, str(exe), "22222222-2222-2222-2222-222222222222", True)
+        assert _until(lambda: moved.proc.poll() is not None)
+        time.sleep(1.0)                                   # its reader thread records the end of the run
+        assert stay.deliver("> and here\n", "d2")["state"] == "accepted"
+        assert _until(lambda: stay.proc.poll() is not None)
+        time.sleep(1.0)
+        assert moved.last_error is None and stay.last_error is None, (moved.last_error, stay.last_error)
+        calls = [json.loads(x)["args"] for x in log.read_text(encoding="utf-8").splitlines()]
+        a1, a2 = calls[0], calls[1]
+        assert "--resume" not in a1 and a1[a1.index("--session-id") + 1] not in ("11111111-1111-1111-1111-111111111111",)
+        assert moved.folder == str(ws.root) and moved.started                 # the new conversation lives here now
+        assert a2[a2.index("--resume") + 1] == "22222222-2222-2222-2222-222222222222"   # same folder: goes on
+        said = [e["payload"]["text"] for e in ws.events_since(0, limit=100, types=["agent.message"])["events"]]
+        assert any("renamed or moved" in t for t in said), said
+    finally:
+        ws.close()
