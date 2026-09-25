@@ -168,3 +168,31 @@ def test_an_agent_follows_a_long_grade_in_a_few_waiting_calls():
     assert dispatch(be, "qccd_get_job", {"job_id": "j", "wait_s": 30})["status"] == "succeeded" and be.calls == 3
     be = Fake(["running", "succeeded"])
     assert dispatch(be, "qccd_get_job", {"job_id": "j"})["status"] == "running" and be.calls == 1   # no wait asked
+
+
+def test_a_workspace_folder_takes_any_name_or_none_and_the_cli_says_which_words_are_yours(tmp_path):
+    """The person asked (2026-09-25) not to be forced into a folder like `my-design` or a task like
+    `ghz4@1`, and to be told plainly which names are theirs and which commands are fixed."""
+    env = dict(os.environ, QCCD_RUNTIME_DIR=str(tmp_path / "rt"), QCCD_CODEX="none", QCCD_CLAUDE="none", QCCD_WEB="0",
+               PYTHONPATH=str(REPO) + os.pathsep + os.environ.get("PYTHONPATH", ""), PYTHONIOENCODING="utf-8")
+    run = lambda *a, cwd: subprocess.run([sys.executable, "-m", "qccd.workspace", *a], capture_output=True, text=True,
+                                         encoding="utf-8", env=env, cwd=str(cwd), timeout=300)
+    here = tmp_path / "My QCCD designs"                      # spaces, capitals: whatever the person likes
+    here.mkdir()
+    r = run("init", cwd=here)                                # no name: this folder
+    assert r.returncode == 0 and (here / "qccd.lock.json").is_file(), r.stdout + r.stderr
+    assert "yours to name, anything you like" in r.stdout and "type as shown" in r.stdout
+    assert "@1" not in r.stdout and "--task" not in r.stdout
+    assert not any(ln.strip().startswith("cd ") for ln in r.stdout.splitlines())         # already here
+    r = run("init", "Triangle ideas", cwd=tmp_path)          # a new folder, any name
+    assert r.returncode == 0 and (tmp_path / "Triangle ideas" / "qccd.lock.json").is_file()
+    assert 'cd "Triangle ideas"' in r.stdout
+    r = run("init", cwd=here)                                # twice is refused, not overwritten
+    assert r.returncode != 0 and "already holds a workspace" in r.stderr
+    elsewhere = tmp_path / "not one"
+    elsewhere.mkdir()
+    for cmd in (["status"], ["studio", "--no-open"], ["stop"]):              # `boards` needs no workspace
+        r = run(*cmd, cwd=elsewhere)                         # the wrong folder: said so, with the way out
+        assert r.returncode == 2 and "not a QCCD workspace" in r.stderr and 'qccd init "My QCCD designs"' in r.stderr, \
+            (cmd, r.stdout, r.stderr)
+    assert list(elsewhere.iterdir()) == []                   # and nothing was written there
