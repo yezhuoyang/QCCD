@@ -237,7 +237,9 @@ def _tools() -> list:
         ("qccd_present", "Ask Studio to show something: action highlight|select (target.keys), open_prompt "
          "(target.prompt_id), select_frame (target.frame), open_result (target.submission_id), "
          "reveal_diagnostic, open_run (target.run_id: a run's animation), compare (target.runs: two run ids; "
-         "qccd_compare_runs does this for you), open_branch. Studio honours the user's Follow-agent setting.",
+         "qccd_compare_runs does this for you), open_branch (target.branch: a design's name or id -- the "
+         "person's Studio switches to that design, so what you draw next lands on it where they watch). Studio "
+         "honours the user's Follow-agent setting.",
          obj({"action": s, "target": {"type": "object"}, "view_id": s, "note": s}, ["action", "target"])),
         ("qccd_submit_local", "Submit a design to a leaderboard: design (its name; default the main design) and "
          "board (its title, e.g. 'BB [[144,12,12]]' or 'surface code'). In one job it compiles the board's circuit "

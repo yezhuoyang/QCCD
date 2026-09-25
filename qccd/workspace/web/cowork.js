@@ -679,7 +679,10 @@ function editPrompt(p) {
 // ------------------------------------------------------------------ presentation
 function present(p, branch) {
   if (p.view_id && p.view_id !== S.view) return;
-  if (!p.view_id && branch && branch !== S.branch && p.action !== 'compare' && p.action !== 'open_run') return;
+  // open_branch IS about another design: it used to be dropped here, so an agent could never bring the
+  // design it had just made onto the person's screen (2026-09-24)
+  if (!p.view_id && branch && branch !== S.branch && p.action !== 'compare' && p.action !== 'open_run' &&
+      p.action !== 'open_branch') return;
   var t = p.target || {};
   function doit() {
     if (!ED && (p.action === 'highlight' || p.action === 'select' || p.action === 'select_frame')) return;
@@ -701,7 +704,13 @@ function present(p, branch) {
     }
     else if (p.action === 'open_result' || p.action === 'compare') { S.tab = 'results'; renderTabs(); loadResults(); }
     else if (p.action === 'reveal_diagnostic') { S.tab = 'results'; renderTabs(); loadResults(); flash(t.keys || []); }
-    else if (p.action === 'open_branch') { S.tab = 'activity'; renderTabs(); renderBody(); }
+    else if (p.action === 'open_branch') {
+      // the Studio switches to that design, under its name, as the person would from the header
+      var to = t.branch || branch || 'main';
+      loadBranches().then(function () { return switchDraft(to); }).then(function () {
+        notice('Now showing ' + draftName(S.branch) + (p.note ? ': ' + p.note : '') + '.');
+      });
+    }
   }
   var outcome;
   if (S.follow) { doit(); outcome = 'displayed'; }

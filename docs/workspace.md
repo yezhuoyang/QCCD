@@ -441,6 +441,7 @@ semantics) eligible:
 | board | first device | per round | grade time |
 |---|---|---|---|
 | BB [[144,12,12]] | ring 72 × 2, 24 docks | 522 ms | about 6 min, mostly Lean |
+| BB [[144,12,12]], drawn in the Studio | a triangle loop of 144 sites, 24 docks inside it ("a large triangle and a smaller one") | 505.8 ms | 451 s |
 | Repetition code, distance 9 | ring 8 × 2, 8 docks | 9.45 ms | seconds |
 | Five-qubit code [[5,1,3]] | 3 × 3 grid | 8.89 ms | seconds |
 | Steane code [[7,1,3]] | ring 8 × 2, 8 docks | 11.48 ms | seconds |

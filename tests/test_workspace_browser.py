@@ -170,6 +170,38 @@ def test_presentation_follow_and_reconnect(live, tmp_path):
     assert outcomes == ["displayed", "notified"]
 
 
+def test_the_agent_brings_its_new_design_onto_the_screen(live, tmp_path):
+    """An agent that made a new design shows it with open_branch: the person's Studio switches to
+    that design, named as they named it.  The page used to drop open_branch for any design but
+    the one it showed, so the agent drew out of sight or not at all (a live run, 2026-09-24)."""
+    root, info = live
+    base = f"http://127.0.0.1:{info['port']}"
+    code = service_request(info, "POST", "/api/pair-code", {}, token="owner")["code"]
+    tok = info["agent_token"]
+    call = ("(function(path, body){ return fetch(path, {method:'POST', headers:{'Content-Type':'application/json',"
+            "'Authorization':'Bearer " + tok + "'}, body: JSON.stringify(body)}).then(r => r.json()); })")
+    out = _drive({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": [
+        {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                 "QCCD_LIVE.state().rev !== null", "timeout": 40000, "stopOnFail": True},            # 0
+        {"eval": f"{call}('/api/branches', {{title: 'Two triangles'}}).then(d => (window.__d = d.name))"},  # 1
+        {"eval": f"{call}('/api/present', {{action: 'open_branch', target: {{branch: window.__d}}, "
+                 "note: 'the new design'}).then(d => d.presentation_id || JSON.stringify(d))"},      # 2
+        {"wait": "QCCD_LIVE.chat().branch === window.__d && QCCD_LIVE.state().rev !== null && "
+                 "document.getElementById('qcl-draft').selectedOptions[0].textContent === 'Two triangles'",
+         "timeout": 15000},                                                                           # 3
+        {"eval": "(document.getElementById('qcl-notice') || {}).textContent || ''"},                  # 4
+    ]}, tmp_path / "open_branch.json")
+    s = out["steps"]
+    for i, st in enumerate(s):
+        assert not st.get("error"), (i, st)
+        if "ok" in st:
+            assert st["ok"], (i, st)
+    assert s[1]["value"].startswith("cand/") and s[2]["value"]
+    assert "Now showing Two triangles" in s[4]["value"] and "cand/" not in s[4]["value"], s[4]["value"]
+    outcomes = [e["payload"]["outcome"] for e in _events(root) if e["type"] == "presented"]
+    assert outcomes == ["displayed"]
+
+
 def test_a_page_survives_a_service_restart(live, tmp_path):
     """Kill the service with no warning while a Studio page is open.  The next caller starts
     a new one on the same port with the same pairings; the page's event stream comes back by
