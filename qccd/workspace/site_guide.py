@@ -45,9 +45,12 @@ HOW_TO = [
      "how": "open the Write panel (click the control with hint tab:W), fill its text field with the program "
             "(p.init(...), p.shuttle(...) -- section site:studio lists the verbs), click Evaluate (hint "
             "evaluate), then play."},
-    {"task": "change the person's design", "how": "qccd_apply_change_set (preview, then apply) in small steps; each "
-                                                  "commit appears in their Studio with your cursor. Page studio verbs "
-                                                  "only READ their workspace Studio."},
+    {"task": "change the person's design", "how": "draw on their Studio with its design verbs (qccd_page_act "
+                                                  "action=studio: sketchDraw for any shape, closeLoop, addNodeAt, "
+                                                  "joinNodes, stampComponent; explodeToExplicit a generated device "
+                                                  "first; newCanvas for a new design, on a new draft) -- each verb is "
+                                                  "committed as your change set where they watch -- or "
+                                                  "qccd_apply_change_set (preview, then apply), in small steps."},
     {"task": "check a page for scientific mistakes",
      "how": "read it by section; compare every claim, number and example with the rules "
             "(qccd_read_reference section=rules), the physics (docs:phys) and the page's own embedded examples "

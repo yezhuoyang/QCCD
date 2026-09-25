@@ -89,6 +89,15 @@ places from the site map, the page's own links and `/studio`; Studio verbs decla
 `undeclared`. A refusal says what is declared instead; use that, or tell the person what you
 could not do. Never guess a path, a control or a verb.
 
+**Draw on the person's design where they watch.** On their own Studio the design verbs work
+(`qccd_page_act` action `studio`): `sketchDraw` draws any shape (`["poly", [[x, y], ...], null,
+{"closed": true}]` is a closed loop through those corners; `rect`, `ellipse`, `line` take two
+points), `closeLoop`, `addNodeAt`, `joinNodes`, `stampComponent`; a device made by a generator is
+`explodeToExplicit`-ed first, and a NEW design starts with `newCanvas` on a new draft. Each verb's
+drawing is committed as your change set. A refusal names the rule: R20 means a corner under 60
+degrees (a triangle's corners are; cut them, which keeps the shape), `no_builder` means explode
+the generated device first.
+
 **The Design page is the person's own Studio.** From a website page, `qccd_page_act`
 `navigate` with `path: '/studio'` opens it (the site's `studio.html` does too; a lesson,
 `studio.html#learn=A1`, stays on the site's Studio). Take every other path from the site map

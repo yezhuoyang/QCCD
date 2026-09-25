@@ -72,8 +72,9 @@ lessons.
 - `qccd_page_read` lists controls with their declaration: `hint` and `what` for declared
   ones, `undeclared: true` for the rest.
 - `studio` verb `verbs` lists the agent verbs with what each does. On the person's own
-  workspace Studio it lists only `read` and `view` verbs: there the agent changes the design
-  with change sets, so each change is recorded as the agent's.
+  workspace Studio the design and program verbs work too, and what each draws is committed
+  as the agent's change set. The course's verbs are off there, since they would replace the
+  design. A design verb that refuses fails the action with its rule and reason.
 - A refused `navigate` names the nearest places (the site index, the page's links, `/studio`).
 - A refused `click`/`fill`/`press` names declared controls on the page. A key that acts
   (Enter, arrows) needs a declared target.

@@ -298,6 +298,18 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("POST", "/api/change-sets")
     def change_set(request, actor, b):
+        aid = b.pop("by_page_action", None)
+        if aid is not None:
+            # the Studio page syncing what an AGENT's page action just drew on it: recorded as that
+            # agent's change set (its protection limits, its name in the history), never the person's --
+            # and only while that action is running on this very page
+            w = state.page_waits.get(str(aid))
+            if (actor["kind"] != "human" or not w or w.get("view") != actor.get("view") or w.get("action") != "studio"
+                    or (w.get("actor") or {}).get("kind") != "agent"):
+                raise WorkspaceError("forbidden", "by_page_action names no agent action running on this page", status=403)
+            a = w["actor"]
+            actor = {"kind": "agent", "id": a.get("id"), "session": a.get("session"), "label": a.get("label"),
+                     "via": "page", "view": actor.get("view")}
         return ws.apply_change_set(b, actor)
 
     @route("POST", "/api/change-sets/{cs_id}/undo")
@@ -428,7 +440,8 @@ def create_app(state: ServiceState) -> FastAPI:
         floor = (min(float(args.get("ms") or 0), 10000.0) / 1000.0 + 10.0) if action == "wait" else 0.0
         wait = max(1.0, floor, min(float(b.get("wait_s") or 25), 60.0))
         aid = "pa_" + secrets.token_hex(8)
-        waiter = {"event": threading.Event(), "view": view["id"], "result": None}
+        waiter = {"event": threading.Event(), "view": view["id"], "result": None, "action": action,
+                  "actor": {k: actor.get(k) for k in ("kind", "id", "session", "label")}}
         state.page_waits[aid] = waiter
         try:
             ws.emit("page.action", {"action_id": aid, "view_id": view["id"], "action": action, "args": args,

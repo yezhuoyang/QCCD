@@ -649,7 +649,7 @@
    "use": "agent",
    "kind": "read",
    "does": "what a sketch would make (sites, corners, refusal) without making it",
-   "args": "tool, a, b: model points, mod?"
+   "args": "tool, a: {x, y}, b: {x, y} (model units), mod?"
   },
   "sketchReadout": {
    "use": "agent",
@@ -692,8 +692,8 @@
   "sketchDraw": {
    "use": "agent",
    "kind": "design",
-   "does": "draw a shape from one model point to another and make it",
-   "args": "tool, from, to, mod?"
+   "does": "draw a shape and make it: the release lays trapping sites one lattice unit apart along what you drew, declares the orbit (a loop) when the shape is closed, and adds a junction where the new rail meets an existing one; a refusal says which rule (e.g. R20, too sharp a corner) and why",
+   "args": "tool: 'rect'|'ellipse'|'line'|'poly'; for rect/ellipse/line: from [x, y], to [x, y] (model units); for poly: from = the corner points [[x, y], ...] and to = null; mod: {closed: true} closes a polyline into a loop (a triangle is poly with three corners, closed), {shift: true} makes an ellipse a circle"
   },
   "sketchPoints": {
    "use": "agent",
@@ -800,7 +800,7 @@
   "newCanvas": {
    "use": "agent",
    "kind": "design",
-   "does": "start a new blank canvas",
+   "does": "start a new blank canvas that keeps the machine's physics; shapes (sketchDraw) and parts are drawn onto it -- for a NEW design, do it on a new draft, not on main",
    "args": "opts?"
   },
   "newFromGenerator": {
@@ -874,8 +874,9 @@
    "args": "name"
   },
   "explodeToExplicit": {
-   "use": "harness",
-   "does": "irreversible: the person confirms it in the Modify panel"
+   "use": "agent",
+   "kind": "design",
+   "does": "turn a device made by a generator (ring, grid, chain, ...) into its explicit sites, rails and loops, so shapes and parts can be added to it; the device stays the same (in the workspace this is one change set, undoable like any other)"
   },
   "geom": {
    "use": "agent",

@@ -534,7 +534,9 @@ def compile_operations(base: DesignState, base_replayed: Replayed | None,
         if spec is None:
             raise OperationError("unknown_operation",
                                  f"operations[{i}]: unknown type {name!r} (have: {sorted(OPERATIONS)})", i, str(name))
-        if name in BROWSER_ONLY and actor.get("kind") != "human" and actor.get("via") != "import":
+        # Studio's records come from the person's page, from an import on the file's behalf, or from an
+        # agent drawing on the person's page through a page action (service.change_set: via "page")
+        if name in BROWSER_ONLY and actor.get("kind") != "human" and actor.get("via") not in ("import", "page"):
             raise OperationError("forbidden", f"operations[{i}]: {name} is reserved for Studio", i, name)
         try:
             spec.compile(ctx, op, f"operations[{i}] ({name})")
