@@ -30,7 +30,8 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
     head = {"evaluator": {k: v for k, v in evaluator_identity().items()}, "section": section}
     if section == "index":
         return {**head, "sections": list(SECTIONS),
-                "hint": "read `workflow` first; `interface` for what you may do on a page (only what it "
+                "hint": "read `design` before designing a device for the person or for a board; `workflow` "
+                        "for the tools; `interface` for what you may do on a page (only what it "
                         "declares); `site` before working on the website's pages; `operations` before editing; "
                         "`evaluator` before citing results"}
     if section == "interface":
@@ -49,7 +50,10 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
     if section in ("boards", "task"):
         # the leaderboards: any design can be submitted to any of them.  `query` = a board's title
         # (or short name) gives that one with its circuit
-        if query or section == "task":
+        # `task` of a workspace pinned to one release (an old lockfile) is that release; a general
+        # workspace has no task, and its default board is the GHZ starter -- reading that as "the task"
+        # misled an agent asked for a BB design (2026-09-24), so there `task` is `boards`
+        if query or (section == "task" and ws.lock_doc.get("task")):
             try:
                 b = ws.board(query) if query else ws.release
             except Exception as exc:

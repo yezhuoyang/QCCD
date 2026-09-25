@@ -1054,8 +1054,13 @@ def _event_brief(e: Mapping) -> str:
     return canonical_text(pl)[:160]
 
 
+#: where the design guide is: a live agent asked for "two triangles, submitted to BB" read four other
+#: sections, never this one, and planned the two-loop device the guide rules out (2026-09-24)
+DESIGN_HINT = ("To design a device (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.")
+
+
 def _hints(ctx: Mapping) -> list:
-    out = []
+    out = [DESIGN_HINT]
     if ctx["unread_prompts"]:
         out.append("Unread Studio prompts are listed in unread_prompts; read each one's context with "
                    "qccd_manage_comment(action='get', prompt_id=...) and answer in its thread.")
@@ -1093,6 +1098,7 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
     elif pg.get("url"):
         lines.append("The person is in Studio. qccd_page_read and qccd_page_act reach its controls too "
                      "(the transport, the panels, the lessons).")
+    lines.append(DESIGN_HINT)
     if b.get("anchors"):
         lines.append("Anchored to: " + "; ".join(_describe_anchor(a) for a in b["anchors"][:8]))
     if b.get("sketches"):
