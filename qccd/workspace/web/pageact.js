@@ -514,8 +514,10 @@ var KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, 
              Home: 36, End: 35, PageUp: 33, PageDown: 34 };
 // the Studio's own API is the agent's hands on the canvas (the course solves its exercises with
 // the same verbs) -- the verbs qccd/viz/js/editor_api.json declares for agents, no other.  On the
-// WORKSPACE's own Studio an edit through the page would be recorded as the person's, so there
-// only the verbs that read or change the view: the agent changes the design with its own tools.
+// person's OWN workspace Studio the agent draws with the same verbs (sketch a shape, close a loop,
+// place a component); the page records what a verb drew as the AGENT's change set (cowork.js,
+// by_page_action), so it is attributed, protected and undoable like any other.  Only the course's
+// verbs stay off there: they would replace the person's design with a lesson's.
 function designPage() { return !!(window.QCCD_DESIGN_PAGE || iface().design_page); }
 function sitePath(href) {
   // the one place navigation may go: this site, on this origin, under the mirror's /web/
@@ -703,12 +705,12 @@ function act(action, args, who) {
       var E = sw.EDITOR, verb = String(args.verb || '');
       if (!E) throw new Error('this page has no Studio (an EDITOR); open studio.html, a lesson, or an example');
       var V = iface().verbs || {}, NA = iface().not_for_agents || {}, dp = designPage() && !sf;
-      var usable = function (k) { return V[k] && typeof E[k] === 'function' && (!dp || V[k].kind === 'read' || V[k].kind === 'view'); };
+      var usable = function (k) { return V[k] && typeof E[k] === 'function' && (!dp || V[k].kind !== 'course'); };
       if (verb === 'verbs') {
         var list = {};
         Object.keys(V).sort().forEach(function (k) { if (usable(k)) list[k] = V[k]; });
         return { ok: true, verbs: Object.keys(list), declared: list,
-                 note: dp ? 'the person\'s own design: read and view verbs only; change it with qccd_apply_change_set' : undefined };
+                 note: dp ? 'the person\'s own design: what a design or program verb draws here is committed as your change set' : undefined };
       }
       if (NA[verb] === 'never') throw new Error(verb + ' touches your files or storage, or restarts the page; the agent does not use it');
       if (!V[verb]) throw new Error('the Studio has no agent verb ' + JSON.stringify(verb) +
@@ -716,11 +718,17 @@ function act(action, args, who) {
                                     '; studio verb "verbs" lists the declared ones with what each does');
       if (typeof E[verb] !== 'function') throw new Error('this page\'s Studio has no ' + verb);
       if (dp && !usable(verb))
-        throw new Error('this is the workspace\'s own design: change it with qccd_apply_change_set, so the change is recorded as the agent\'s');
+        throw new Error(verb + ' opens a lesson, which would replace the person\'s own design; lessons run on the site\'s Studio (studio.html#learn=...)');
       var a = Array.isArray(args.args) ? args.args : (args.args === undefined ? [] : [args.args]);
       return pointAt(stageOf(sd), sf, who, verb + (a.length ? ' ' + clip(JSON.stringify(a), 60) : '')).then(function () {
         var res = E[verb].apply(null, a);
         return Promise.resolve(res).then(function (v) {
+          // a verb that changes the design and says ok:false REFUSED: that is a failed action, with its reason
+          // (a read verb's ok:false is data -- lessonCheck's "not passed yet")
+          if (v && v.ok === false && (V[verb].kind === 'design' || V[verb].kind === 'program')) {
+            var pr = (v.problems || [])[0] || {};
+            throw new Error(verb + ' refused' + (pr.code ? ' (' + pr.code + ')' : '') + ': ' + (pr.message || v.why || 'no reason given'));
+          }
           return { ok: !(v && v.ok === false), verb: verb, result: jsonable(v), studio: studioBrief(E) };
         });
       });

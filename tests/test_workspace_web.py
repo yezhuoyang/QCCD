@@ -586,9 +586,87 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
             assert not b["ok"] and "part of the chat" in b["error"], diag
         hl = json.loads(st[5]["body"])
         assert hl["ok"] and hl["result"]["element"]["label"] == "Test drive" and st[6]["value"] == "", diag
-        # the workspace's own design changes through change sets (attributed to the agent), not the page
-        assert not json.loads(st[7]["body"])["ok"] and "qccd_apply_change_set" in json.loads(st[7]["body"])["error"], diag
+        # on the person's own design a design verb draws, and the page commits it as the AGENT's change set
+        added = json.loads(st[7]["body"])
+        assert added["ok"] and added["result"]["change_set"]["status"] == "committed", diag
+        h = own("GET", "/api/history?branch=main&limit=1")["history"][0]
+        assert h["actor"]["kind"] == "agent" and h["actor"]["via"] == "page" and "addSite" in h["summary"], h
         assert json.loads(st[8]["body"])["ok"], diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
+@needs_chrome
+def test_the_agent_draws_a_shape_on_the_persons_studio(tmp_path, monkeypatch):
+    """Asked for "a triangle", the agent draws it with the Studio's own sketch verb on the person's
+    design page, where they watch it happen; the page commits what the verb drew as the AGENT's
+    change set (by_page_action), so it is attributed, protected and undoable.  A lesson verb, which
+    would replace their design, stays refused there."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        sid = service_request(info, "POST", "/api/sessions", {"client": "generic", "mode": "pull", "label": "Drawer"})["id"]
+        base = f"http://127.0.0.1:{info['port']}"
+        hdr = {"Authorization": f"Bearer {info['agent_token']}", "X-QCCD-Session": sid, "Content-Type": "application/json"}
+
+        def act(action, **args):
+            return {"http": {"method": "POST", "url": base + "/api/page-actions", "headers": hdr,
+                             "body": {"action": action, "args": args, "wait_s": 30}}}
+        sharp = ["poly", [[0, 6], [8, 6], [4, 13]], None, {"closed": True}]            # a 59.5 degree corner
+        # the same triangle with its corners cut: every corner 120 degrees, R20 holds, it still reads as a triangle
+        h3 = 3 ** 0.5
+        triangle = ["poly", [[2, 0], [10, 0], [11, h3], [7, 5 * h3], [5, 5 * h3], [1, h3]], None, {"closed": True}]
+        steps = [
+            {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                     "QCCD_LIVE.state().rev === 0 && !!QCCD_LIVE.state().view", "timeout": 40000, "stopOnFail": True},
+            {"sleep": 2500},
+            act("studio", verb="verbs"),                                                              # 2
+            act("studio", verb="sketchDraw", args=triangle),                                          # 3 refused
+            act("studio", verb="newCanvas"),                                                          # 4 a new design
+            act("studio", verb="sketchDraw", args=sharp),                                             # 5 refused: R20
+            act("studio", verb="sketchDraw", args=triangle),                                          # 6
+            {"wait": "QCCD_LIVE.state().rev === 2 && !QCCD_LIVE.state().inflight", "timeout": 20000},  # 7
+            act("studio", verb="lessonLoad", args=["A1"]),                                            # 8
+            {"sleep": 1500},
+            {"eval": "QCCD_LIVE.state().rev"},                                                        # 10
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={own('POST', '/api/pair-code', {})['code']}"},
+                                    "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps), diag
+        body = lambda i: json.loads(st[i]["body"])
+        verbs = body(2)["result"]["verbs"]
+        assert "sketchDraw" in verbs and "closeLoop" in verbs and "lessonLoad" not in verbs, diag
+        # the starter came from a generator: a sketch cannot join it, and the agent is TOLD so (nothing committed)
+        no = body(3)
+        assert not no["ok"] and "sketchDraw refused (no_builder)" in no["error"], diag
+        assert body(4)["ok"] and body(4)["result"]["change_set"]["status"] == "committed", diag
+        r20 = body(5)                                       # the rule and the angle, so the agent can fix the shape
+        assert not r20["ok"] and "sketchDraw refused (R20)" in r20["error"] and "59.5" in r20["error"], diag
+        drew = body(6)
+        assert drew["ok"] and drew["result"]["change_set"]["status"] == "committed", diag
+        assert drew["result"]["change_set"]["revision"] == 2 and st[7]["ok"], diag
+        h = own("GET", "/api/history?branch=main&limit=1")["history"][0]
+        assert h["revision"] == 2 and h["actor"]["kind"] == "agent" and h["actor"]["session"] == sid, h
+        assert h["actor"]["via"] == "page" and "sketchDraw" in h["summary"], h
+        d = own("GET", "/api/design?branch=main")
+        rec = json.dumps(d)
+        assert '"loop"' in rec or "'loop'" in rec, "the closed triangle declared no loop"
+        refused = body(8)
+        assert not refused["ok"] and "replace the person" in refused["error"] and st[10]["value"] == 2, diag
     finally:
         try:
             service_request(info, "POST", "/api/shutdown", {}, token="owner")

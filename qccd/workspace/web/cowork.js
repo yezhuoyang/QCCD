@@ -160,6 +160,7 @@ function summarize(op) {
 // ------------------------------------------------------------------ sync (page -> service)
 function sync() {
   if (CFG.mode !== 'design' || !S.paired || S.inflight || S.restoring || S.synced === null) return;
+  if (S.agentHold) return;                 // an agent's verb is drawing: its records are the agent's (syncAs)
   if (ED.dragging && ED.dragging()) return;
   var cur = localState();
   var op = diffOps(cur, S.synced);
@@ -188,6 +189,37 @@ function sync() {
         : 'Not applied: ' + (e.message || e.code || 'the service refused the edit');
       notice(why, 'bad');
       refreshHead(true);
+    });
+}
+
+// the person's own edits first, so they stay the person's: resolves once nothing is left to sync
+function flushSync() {
+  return new Promise(function (resolve) {
+    var t0 = Date.now();
+    (function tick() {
+      if (!S.inflight && (S.synced === null || !diffOps(localState(), S.synced) || Date.now() - t0 > 6000)) { resolve(); return; }
+      if (!S.inflight) sync();
+      setTimeout(tick, 80);
+    })();
+  });
+}
+// what an agent's page action drew, committed as THAT agent's change set (service.change_set checks
+// that the action is running on this page and records the agent, with the agent's protection limits)
+function syncAs(actionId, label) {
+  var cur = localState(), op = diffOps(cur, S.synced);
+  if (!op) return Promise.resolve({ ok: true, data: { status: 'noop' } });
+  S.inflight = true;
+  return api('POST', '/api/change-sets', { branch: S.branch, expected_revision: S.rev, request_id: rid('agent'), mode: 'apply',
+                                           rebase: 'if_disjoint', summary: label, operations: [op],
+                                           by_page_action: actionId })
+    .then(function (r) {
+      S.inflight = false;
+      if (r.ok && (r.data.status === 'committed' || r.data.status === 'noop')) {
+        S.synced = cur; S.rev = r.data.revision; S.viewDirty = true; renderStatus();
+        return r;
+      }
+      refreshHead(true);                    // refused: the canvas goes back to the design as it is
+      return r;
     });
 }
 
@@ -1896,6 +1928,35 @@ function pageAction(p) {
   if (CFG.framed) { askParent('act', { action: p.action, args: p.args || {}, who: who }, 28000).then(done); return; }
   if (!window.QCCD_PAGE) { done({ ok: false, error: 'this page has no page actions' }); return; }
   window.QCCD_DESIGN_PAGE = CFG.mode === 'design';        // the workspace's design: its edits go through change sets
+  var verb = (p.args || {}).verb, V = (((window.QCCD_INTERFACE || {}).verbs) || {})[verb];
+  if (CFG.mode === 'design' && p.action === 'studio' && V && (V.kind === 'design' || V.kind === 'program')) {
+    // the agent draws on the person's design: their pending edits first, then the verb, then its records
+    // as the agent's change set -- visible on the canvas, attributed, undoable
+    var label = who + ': ' + verb + (V.does ? ' (' + V.does.slice(0, 60) + ')' : '');
+    flushSync().then(function () {
+      S.agentHold = true;
+      return window.QCCD_PAGE.act(p.action, p.args || {}, who);
+    }).then(function (r) {
+      if (!r || !r.ok || (r.result && r.result.ok === false)) {
+        S.agentHold = false; refreshHead(true);
+        done(r && r.ok ? { ok: false, error: verb + ' refused: ' + JSON.stringify((r.result || {}).result || {}).slice(0, 300) } : r);
+        return;
+      }
+      return syncAs(p.action_id, label).then(function (cs) {
+        S.agentHold = false;
+        if (cs.ok) {
+          r.result = r.result || {};
+          r.result.change_set = { status: cs.data.status, revision: cs.data.revision, change_set_id: cs.data.change_set_id,
+                                  diagnostics: cs.data.diagnostics, summary: cs.data.summary };
+          done(r);
+        } else {
+          var e = cs.error || {};
+          done({ ok: false, error: 'the Studio drew it, but it was not committed (' + (e.code || '') + '): ' + (e.message || '') });
+        }
+      });
+    }, function (e) { S.agentHold = false; refreshHead(true); done({ ok: false, error: String(e && e.message || e) }); });
+    return;
+  }
   window.QCCD_PAGE.act(p.action, p.args || {}, who).then(done, function (e) { done({ ok: false, error: String(e && e.message || e) }); });
 }
 function pageEmptyState() {

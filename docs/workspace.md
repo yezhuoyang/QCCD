@@ -282,9 +282,13 @@ watch it happen.
 - **The Studio.** `studio` runs one verb of the page's Studio API (`EDITOR`): design on the
   canvas, write the program, and the course's own `lessonLoad` / `lessonCheck` /
   `lessonHint` / `lessonSolution`. The course solves its exercises with the same verbs.
-  Verbs that touch files or storage are refused. On the workspace's own Studio only
-  reading and view verbs work: an edit through the page would be recorded as the
-  person's, so the agent changes the design with change sets there. Checked on the live
+  Verbs that touch files or storage are refused. On the person's own Studio the agent
+  draws with the same verbs (`sketchDraw` a shape, `closeLoop`, `stampComponent`, …).
+  The page first syncs the person's pending edits, then runs the verb and commits what it
+  drew as the agent's change set (`by_page_action`, checked against the running action).
+  Each drawing is therefore attributed, protected and undoable. A verb that refuses fails
+  the action with its rule, for example R20 for a corner under 60°. The course's verbs
+  stay off there, since they would replace the design. Checked on the live
   site: all 31 lessons' own solutions pass their checks through these tools (Part D on
   its compiled companion page).
 - **Comments, as the person.** In the local website the site's comment layer works. Its

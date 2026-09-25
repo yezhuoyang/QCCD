@@ -25,7 +25,9 @@ Four kinds of thing are declared:
       into every page).  This list may only shrink: the test pins its length.
 * VERBS -- the Studio's API (`window.EDITOR`), declared function by function in
   `qccd/viz/js/editor_api.json`; an agent's `studio` action calls only verbs declared for
-  agents, and on the person's own workspace Studio only the ones that read or change the view.
+  agents; on the person's own workspace Studio what a design verb draws is committed as the
+  agent's change set (the page syncs it with `by_page_action`), and only the course's verbs,
+  which would replace the design with a lesson's, stay off.
 * ACTIONS and TOOLS -- the page actions (`service.PAGE_ACTIONS`, implemented in web/pageact.js)
   and the MCP tools (`mcp_server._tools`), declared by the code that serves them.
 
