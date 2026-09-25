@@ -79,9 +79,6 @@ OUT_OF_LINE = {
     "#pwText": {"on": "studio", "name": "Write panel text",
                 "does": "a test programme in the Write language (p.init, p.shuttle, p.gate, ...); press Evaluate "
                         "to price, check and play it"},
-    # the website's bar (qccd/site/nav.html, deployed page by page)
-    "#siteq": {"on": "site", "name": "Search the site",
-               "does": "type words; the matching pages are listed under the box and Enter opens the first"},
 }
 OUT_OF_LINE_MAX = len(OUT_OF_LINE)
 
