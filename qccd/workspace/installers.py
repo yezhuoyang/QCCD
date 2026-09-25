@@ -34,7 +34,7 @@ from .jsonsafe import strict_loads
 __all__ = ["install", "uninstall", "status", "build_skill", "SKILL_VERSION"]
 
 SKILL_SRC = Path(__file__).resolve().parent / "skill"
-SKILL_VERSION = "1.6.0"
+SKILL_VERSION = "1.7.0"
 MD_BEGIN = "<!-- qccd:begin (managed by `qccd agent install`; edit outside this block) -->"
 MD_END = "<!-- qccd:end -->"
 TOML_BEGIN = "# qccd:begin (managed by `qccd agent install`; edit outside this block)"
@@ -97,19 +97,16 @@ def build_skill(dest: Path, root: Path | None = None) -> dict:
 
     put("SKILL.md", (SKILL_SRC / "SKILL.md").read_bytes())
     put("references/workflow.md", (SKILL_SRC / "references" / "workflow.md").read_bytes())
+    put("references/design.md", (SKILL_SRC / "references" / "design.md").read_bytes())
     put("references/operations.json", json.dumps(describe_operations(), indent=1).encode())
     put("references/rules.json", json.dumps([{"id": k, "statement": v} for k, v in RULE_STATEMENTS.items()],
                                             indent=1).encode())
     from . import evaluator as ev
     put("references/evaluator.json", json.dumps({"stages_doc": ev.__doc__, "statuses": list(ev.STAGE_STATUSES),
                                                  "allowed_skips": sorted(ev.ALLOWED_SKIPS)}, indent=1).encode())
-    if root is not None:
-        try:
-            from .tasks import find_release, read_lock
-            rel = find_release(read_lock(root)["task"]["id"])
-            put("references/task.json", json.dumps(rel.summary(), indent=1).encode())
-        except Exception:
-            pass
+    # the leaderboards any design can be submitted to, by title (a workspace is not tied to one)
+    from .tasks import list_boards
+    put("references/boards.json", json.dumps([b.board() for b in list_boards()], indent=1).encode())
     put("examples/change_set.json", json.dumps({
         "expected_revision": 3, "request_id": "example-1", "mode": "preview", "summary": "a two-site spur",
         "operations": [{"type": "add_chain", "prefix": "S", "count": 2, "start": [0, 2], "step": [2, 0],

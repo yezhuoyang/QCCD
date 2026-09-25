@@ -35,7 +35,7 @@ from .design import (DesignRefused, DesignState, Replayed, base_from_arch, diff_
 from .jsonsafe import canonical_text, digest
 from .operations import OperationError, compile_operations, describe_operations
 from .store import Store, dumps, loads
-from .tasks import LOCK_NAME, TaskRelease, find_release, physics_mismatch, read_lock, write_lock
+from .tasks import DEFAULT_BOARD, LOCK_NAME, TaskRelease, find_release, physics_mismatch, read_lock, write_lock
 
 __all__ = ["WorkspaceCore", "WorkspaceError", "new_id", "CONTRACT_VERSION"]
 
@@ -116,11 +116,15 @@ class WorkspaceCore:
         self.root = Path(root).resolve()
         self.lock_doc = read_lock(self.root)
         self.id = self.lock_doc["workspace_id"]
-        self.release = find_release(self.lock_doc["task"]["id"], release_dirs)
-        if self.release.digest != self.lock_doc["task"]["digest"]:
+        self.release_dirs = release_dirs
+        # `release` is the workspace's DEFAULT board, used where a board is needed without being named
+        # (its first device, the shared physics and cost tables); every submission names its own
+        pinned = self.lock_doc.get("task")
+        self.release = find_release(pinned["id"] if pinned else DEFAULT_BOARD, release_dirs)
+        if pinned and self.release.digest != pinned["digest"]:
             raise WorkspaceError(
                 "release_mismatch",
-                f"{LOCK_NAME} pins {self.lock_doc['task']['id']} at {self.lock_doc['task']['digest']}, "
+                f"{LOCK_NAME} pins {pinned['id']} at {pinned['digest']}, "
                 f"but the installed release has digest {self.release.digest}", status=409)
         self.store = Store(self.root / self.DB)
         self._replays: dict = {}
@@ -136,19 +140,23 @@ class WorkspaceCore:
     # ------------------------------------------------------------------ lifecycle
 
     @classmethod
-    def init(cls, root: Path, release_ref: str, *, name: str = "design",
+    def init(cls, root: Path, release_ref: str | None = None, *, name: str = "design",
              starter: bool = True, release_dirs: Path | None = None) -> "WorkspaceCore":
-        """Create a workspace: lockfile, `.qccd/`, the first revision, the design mirror."""
+        """Create a workspace: lockfile, `.qccd/`, the first revision, the design mirror.
+
+        A workspace is general -- any design, any board -- and needs no board to be made.
+        `release_ref` is the old pinned form (a lockfile v1): it only sets the default board."""
         from ..api import Machine
 
         root = Path(root).resolve()
         root.mkdir(parents=True, exist_ok=True)
         if (root / LOCK_NAME).exists():
             raise WorkspaceError("exists", f"{root} already holds a workspace", status=409)
-        release = find_release(release_ref, release_dirs)
+        release = find_release(release_ref or DEFAULT_BOARD, release_dirs)
         ws_id = new_id("ws")
         from . import evaluator_identity, schema_versions
-        write_lock(root, release, ws_id, evaluator=evaluator_identity(), schemas=schema_versions())
+        write_lock(root, release if release_ref else None, ws_id, evaluator=evaluator_identity(),
+                   schemas=schema_versions())
         (root / ".qccd").mkdir(exist_ok=True)
         gi = root / ".gitignore"
         lines = gi.read_text(encoding="utf-8").splitlines() if gi.exists() else []
@@ -167,6 +175,7 @@ class WorkspaceCore:
         ws.lock_doc = read_lock(root)
         ws.id = ws_id
         ws.release = release
+        ws.release_dirs = release_dirs
         ws.store = Store(root / cls.DB)
         ws._replays, ws._replay_order = {}, []
         ws._cond = threading.Condition()
@@ -183,7 +192,7 @@ class WorkspaceCore:
                        "arch_digest, created_at) VALUES('main', 0, NULL, ?, ?, ?, ?)",
                        (dumps({"design": st.to_json(), "constraints": {}}), st.input_digest(),
                         r.arch_digest(), _now()))
-            ws._emit(db, "workspace.created", {"release": release.id}, "main", 0)
+            ws._emit(db, "workspace.created", {"default_board": release.id}, "main", 0)
         ws.write_mirror("main")
         return ws
 
@@ -224,14 +233,39 @@ class WorkspaceCore:
         return dict(r)
 
     def resolve_draft(self, name: str | None) -> str:
-        """A branch by the name a person uses: `main`, a full name (`cand/A`), or a draft's
-        short name (`A`).  Unknown names are refused with the drafts that do exist."""
+        """A design by what a person calls it: its title (any text they chose), `main`, or an
+        internal name (`cand/A`, `A`).  A title two designs share is refused, naming them."""
         name = (name or "main").strip()
         for cand in (name, f"cand/{name}"):
             if self.store.one("SELECT 1 FROM branches WHERE name=?", (cand,)):
                 return cand
-        have = [b["name"].removeprefix("cand/") for b in self.branches() if b.get("status", "open") == "open"]
-        raise WorkspaceError("unknown_branch", f"no draft {name!r}; there are: {', '.join(have)}", status=404)
+        want = " ".join(name.split()).casefold()
+        hits = [b["name"] for b in self.branches() if b.get("status", "open") == "open"
+                and " ".join(self.design_title(b).split()).casefold() == want]
+        if len(hits) == 1:
+            return hits[0]
+        have = [self.design_title(b) for b in self.branches() if b.get("status", "open") == "open"]
+        if len(hits) > 1:
+            raise WorkspaceError("ambiguous_design", f"{len(hits)} designs are called {name!r}; rename one", status=409)
+        raise WorkspaceError("unknown_branch", f"no design {name!r}; there are: {', '.join(have)}", status=404)
+
+    @staticmethod
+    def design_title(b: Mapping) -> str:
+        """What a person calls a design: the title they gave it, else the main design / its name."""
+        if b.get("title"):
+            return str(b["title"])
+        return "Main design" if b["name"] == "main" else str(b["name"]).removeprefix("cand/")
+
+    def rename_design(self, actor: Mapping, branch: str, title: str) -> dict:
+        title = " ".join(str(title or "").split())
+        if not title or len(title) > 120:
+            raise WorkspaceError("bad_name", "a design's name is 1 to 120 characters", status=422)
+        b = self.branch(branch)
+        with self.store.tx() as db:
+            db.execute("UPDATE branches SET title=? WHERE name=?", (title, b["name"]))
+            self._emit(db, "branch.renamed", {"branch": b["name"], "title": title, "actor": _actor(actor)},
+                       b["name"], b["head"])
+        return self.branch(b["name"])
 
     def branches(self) -> list:
         return [dict(r) for r in self.store.all("SELECT * FROM branches ORDER BY created_at")]
@@ -621,23 +655,29 @@ class WorkspaceCore:
     # ------------------------------------------------------------------ candidates
 
     def create_candidate(self, actor: Mapping, *, name: str | None = None, source: str = "main",
-                         note: str = "", origin_prompt_id: str | None = None) -> dict:
+                         note: str = "", origin_prompt_id: str | None = None, title: str | None = None) -> dict:
+        """A new design (a draft), copied from `source`.  `title` is what the person calls it, any
+        text; its internal name is made up (`name` is the old way, kept for tools that pass one)."""
         actor = _actor(actor)
         src = self.head(source)
-        bname = f"cand/{name or secrets.token_hex(3)}"
+        if title is not None:
+            title = " ".join(str(title).split())
+            if not title or len(title) > 120:
+                raise WorkspaceError("bad_name", "a design's name is 1 to 120 characters", status=422)
+        bname = f"cand/{name or ('d' + secrets.token_hex(3))}"
         if not _branch_name_ok(bname):
             raise WorkspaceError("bad_name", f"{bname!r} is not a usable branch name")
         with self.store.tx() as db:
             if db.execute("SELECT 1 FROM branches WHERE name=?", (bname,)).fetchone():
                 raise WorkspaceError("exists", f"branch {bname!r} exists", status=409)
             db.execute("INSERT INTO branches(name, kind, head, parent, parent_revision, status, created_by, "
-                       "created_at, note) VALUES(?, 'candidate', 0, ?, ?, 'open', ?, ?, ?)",
-                       (bname, source, src.revision, dumps(actor), _now(), note[:500]))
+                       "created_at, note, title) VALUES(?, 'candidate', 0, ?, ?, 'open', ?, ?, ?, ?)",
+                       (bname, source, src.revision, dumps(actor), _now(), note[:500], title))
             db.execute("INSERT INTO revisions(branch, revision, change_set_id, state, input_digest, "
                        "arch_digest, created_at) VALUES(?, 0, NULL, ?, ?, ?, ?)",
                        (bname, dumps({"design": src.state.to_json(), "constraints": src.constraints}),
                         src.input_digest, src.arch_digest, _now()))
-            self._emit(db, "branch.created", {"branch": bname, "parent": source,
+            self._emit(db, "branch.created", {"branch": bname, "parent": source, "title": title,
                                               "parent_revision": src.revision, "actor": actor,
                                               "origin_prompt_id": origin_prompt_id}, bname, 0)
         return self.branch(bname)

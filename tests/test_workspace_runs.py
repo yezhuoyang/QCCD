@@ -83,9 +83,9 @@ def test_two_drafts_compared(ws):
     assert a["status"] == b["status"] == "succeeded"
     cmp = ws.compare_runs([a["id"], b["id"]])
     labels = [r["label"] for r in cmp["runs"]]
-    assert labels == ["main r0", "B r1"]
+    assert labels == ["Main design r0", "B r1"]
     row = next(r for r in cmp["rows"] if r["metric"] == "round time")
-    assert row["difference"] == pytest.approx(row["B r1"] - row["main r0"], abs=1e-3)
+    assert row["difference"] == pytest.approx(row["B r1"] - row["Main design r0"], abs=1e-3)
     assert cmp["verdict"] and cmp["view"] == f"/compare?runs={a['id']},{b['id']}" and "warning" not in cmp
     with pytest.raises(WorkspaceError):
         ws.compare_runs([a["id"]])

@@ -2,6 +2,7 @@
  "$id": "https://qccd.academy/schemas/workspace/v1/lock.schema.json",
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "additionalProperties": false,
+ "description": "Version 2: a general workspace (any design, any board).  Version 1, the old pinned form,\nalso names one task release (`mode`, `task`, `numerical_policy`); it still opens.",
  "properties": {
   "evaluator": {
    "additionalProperties": true,
@@ -14,12 +15,20 @@
    "type": "string"
   },
   "mode": {
-   "enum": [
-    "task",
-    "exploratory"
+   "anyOf": [
+    {
+     "enum": [
+      "task",
+      "exploratory"
+     ],
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
    ],
-   "title": "Mode",
-   "type": "string"
+   "default": null,
+   "title": "Mode"
   },
   "numerical_policy": {
    "anyOf": [
@@ -31,6 +40,7 @@
      "type": "null"
     }
    ],
+   "default": null,
    "title": "Numerical Policy"
   },
   "schemas": {
@@ -41,14 +51,25 @@
    "type": "object"
   },
   "task": {
-   "additionalProperties": {
-    "type": "string"
-   },
-   "title": "Task",
-   "type": "object"
+   "anyOf": [
+    {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Task"
   },
   "version": {
-   "const": 1,
+   "enum": [
+    1,
+    2
+   ],
    "title": "Version",
    "type": "integer"
   },
@@ -61,11 +82,8 @@
   "kind",
   "version",
   "workspace_id",
-  "mode",
-  "task",
   "evaluator",
-  "schemas",
-  "numerical_policy"
+  "schemas"
  ],
  "title": "LockFile",
  "type": "object"

@@ -406,7 +406,7 @@ def _op_set_final_program(ctx: _Ctx, op: Mapping, where: str) -> None:
         ctx.state.final_program = None
         return
     out = {}
-    for k in ("artifact", "certified", "certificate", "compiled_for"):
+    for k in ("artifact", "certified", "certificate", "compiled_for", "circuit_digest"):
         v = op.get(k)
         if v is None and k != "artifact":
             continue
@@ -417,6 +417,13 @@ def _op_set_final_program(ctx: _Ctx, op: Mapping, where: str) -> None:
         if op["compiler"] not in ("compile", "rotate", "external"):
             raise OperationError("bad_value", f"{where}: compiler must be compile, rotate or external")
         out["compiler"] = op["compiler"]
+    if op.get("board") is not None:
+        # the board whose circuit this program realises (a release id); submissions to another board
+        # compile again rather than grade a program for a different circuit
+        import re as _re
+        if not isinstance(op["board"], str) or not _re.match(r"^[a-z0-9_]{1,40}@[0-9]{1,6}$", op["board"]):
+            raise OperationError("bad_value", f"{where}: board must be a release id like bb144@1")
+        out["board"] = op["board"]
     out["label"] = str(op.get("label", ""))[:200]
     ctx.state.final_program = out
 

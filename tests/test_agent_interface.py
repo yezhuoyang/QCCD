@@ -86,6 +86,7 @@ def test_nothing_the_agent_is_told_recommends_an_undeclared_studio_function():
     watch = [k for k, v in reg.items() if v["use"] != "agent" and (re.search(r"[A-Z]", k) or k == "emit")]
     texts = {"MCP instructions": INSTRUCTIONS,
              "the skill": (REPO / "qccd" / "workspace" / "skill" / "SKILL.md").read_text(encoding="utf-8"),
+             "the design guide": (REPO / "qccd" / "workspace" / "skill" / "references" / "design.md").read_text(encoding="utf-8"),
              "the site guide's how-to": json.dumps(HOW_TO)}
     texts.update({f"tool {n}": d for n, d, _ in _tools()})
     found = [(where, k) for where, t in texts.items() for k in watch if re.search(r"\b" + k + r"\b", t)]

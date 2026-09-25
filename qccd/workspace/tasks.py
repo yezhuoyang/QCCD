@@ -9,9 +9,13 @@ evaluator identity.  It is an immutable directory
                               circuit.qasm     the circuit, byte for byte
                               physics.json     the fixed blocks' trusted values
 
-and its identity is the digest of `release.json`'s canonical form.  A workspace pins one
-release in `qccd.lock.json`; an old experiment keeps reading the release it was created
-against, never "whatever the website calls latest".
+and its identity is the digest of `release.json`'s canonical form.  Each release is one
+LEADERBOARD ("board") of the website, known to people by its title ("BB [[144,12,12]]").
+
+A workspace is general: it holds any number of designs and submits any of them to any board
+(`find_board` by title or short name; a submission records the exact release and digest it
+was graded against, so a result never silently changes meaning).  A workspace made before
+that (lockfile v1) pinned one release; it still opens, and that release is its default.
 
 What a participant MAY change is the design (geometry, zones, capacities, wiring,
 control) and the hardware program.  What they may NOT change for a leaderboard entry is
@@ -30,12 +34,16 @@ from typing import Any, Mapping
 
 from .jsonsafe import canonical_text, digest, normalize_numbers, strict_loads
 
-__all__ = ["TaskRelease", "ReleaseError", "RELEASES_DIR", "find_release", "list_releases",
-           "write_lock", "read_lock", "LOCK_NAME", "physics_mismatch", "FIXED_BLOCKS"]
+__all__ = ["TaskRelease", "ReleaseError", "RELEASES_DIR", "find_release", "list_releases", "find_board",
+           "list_boards", "DEFAULT_BOARD", "write_lock", "read_lock", "LOCK_NAME", "physics_mismatch",
+           "FIXED_BLOCKS"]
 
 RELEASES_DIR = Path(__file__).resolve().parent / "releases"
 LOCK_NAME = "qccd.lock.json"
 FIXED_BLOCKS = ("primitives", "heating", "species", "budget")
+#: the board a general workspace uses where it needs one without being told (its first device, the
+#: physics and cost tables -- the same on every board); never shown to people
+DEFAULT_BOARD = "ghz4@1"
 
 
 class ReleaseError(ValueError):
@@ -72,6 +80,16 @@ class TaskRelease:
     @property
     def required_checks(self) -> list:
         return list(self.manifest["required_checks"])
+
+    @property
+    def title(self) -> str:
+        return str(self.manifest.get("title") or self.manifest["task"])
+
+    def board(self) -> dict:
+        """What a person (or an agent speaking to one) is shown about this board: its title."""
+        m = self.manifest
+        return {"title": self.title, "about": m.get("description"), "rank_by": m.get("rank_by"),
+                "suggested_start": m.get("starter"), "id": self.id}
 
     def summary(self) -> dict:
         m = self.manifest
@@ -128,6 +146,40 @@ def find_release(ref: str, extra: Path | None = None) -> TaskRelease:
     raise ReleaseError(f"no task release {ref!r} (have: {have})")
 
 
+def _norm(s: str) -> str:
+    return "".join(c for c in str(s).lower() if c.isalnum())
+
+
+def list_boards(extra: Path | None = None) -> list:
+    """Every board, the newest release of each task, in the website's order."""
+    newest: dict = {}
+    for r in list_releases(extra):
+        t = r.manifest["task"]
+        if t not in newest or int(r.manifest["release"]) > int(newest[t].manifest["release"]):
+            newest[t] = r
+    return sorted(newest.values(), key=lambda r: (int(r.manifest.get("order", 99)), r.title))
+
+
+def find_board(ref: str | None, extra: Path | None = None) -> TaskRelease:
+    """A board by what a person calls it: its title ("BB [[144,12,12]]", "surface code"), its
+    short name ("bb144"), or an exact release id.  Unique or refused, with the boards there are."""
+    boards = list_boards(extra)
+    if not ref or not str(ref).strip():
+        raise ReleaseError("name a board: " + "; ".join(b.title for b in boards))
+    ref = str(ref).strip()
+    if "@" in ref:
+        return find_release(ref, extra)
+    want = _norm(ref)
+    for test in (lambda b: _norm(b.title) == want or _norm(b.manifest["task"]) == want,
+                 lambda b: want in _norm(b.title) or want in _norm(b.manifest["task"])):
+        hits = [b for b in boards if test(b)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            raise ReleaseError(f"{ref!r} could be: " + "; ".join(b.title for b in hits))
+    raise ReleaseError(f"no board {ref!r}; the boards are: " + "; ".join(b.title for b in boards))
+
+
 def physics_mismatch(arch_doc: Mapping, release: TaskRelease) -> list:
     """The fixed blocks whose values differ from the release's trusted physics."""
     ref = release.physics()
@@ -140,8 +192,16 @@ def physics_mismatch(arch_doc: Mapping, release: TaskRelease) -> list:
 
 # ------------------------------------------------------------------ the lockfile
 
-def write_lock(root: Path, release: TaskRelease, workspace_id: str, *,
+def write_lock(root: Path, release: TaskRelease | None, workspace_id: str, *,
                evaluator: Mapping, schemas: Mapping, mode: str = "task") -> Path:
+    """Version 2 (a general workspace, no board) unless a release is named: then version 1, the
+    old pinned form (kept for tools that still make one)."""
+    if release is None:
+        lock = {"kind": "qccd.lock", "version": 2, "workspace_id": workspace_id,
+                "evaluator": dict(evaluator), "schemas": dict(schemas)}
+        p = Path(root) / LOCK_NAME
+        p.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return p
     lock = {
         "kind": "qccd.lock", "version": 1,
         "workspace_id": workspace_id,
@@ -161,14 +221,15 @@ def write_lock(root: Path, release: TaskRelease, workspace_id: str, *,
 def read_lock(root: Path) -> dict:
     p = Path(root) / LOCK_NAME
     lock = strict_loads(p.read_bytes())
-    if lock.get("kind") != "qccd.lock" or lock.get("version") != 1:
-        raise ReleaseError(f"{p}: not a qccd.lock v1")
+    if lock.get("kind") != "qccd.lock" or lock.get("version") not in (1, 2):
+        raise ReleaseError(f"{p}: not a qccd.lock (v1 or v2)")
     return lock
 
 
 def build_release(task: str, release: str, circuit_text: str, physics: Mapping, *,
                   title: str, description: str, out_dir: Path, metrics: list,
-                  rank_by: str, starter: Mapping | None = None, stabilizers=None) -> Path:
+                  rank_by: str, starter: Mapping | None = None, stabilizers=None,
+                  limits: Mapping | None = None, order: int | None = None) -> Path:
     """Write a release directory (a maintainer tool; releases are immutable once published)."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
@@ -199,6 +260,10 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                    "compile_timeout_s": 600},
         "evaluator": {"name": "qccd-reference-evaluator", "contract": "1"},
     }
+    if limits:
+        man["limits"].update(dict(limits))
+    if order is not None:
+        man["order"] = int(order)
     if starter:
         man["starter"] = dict(starter)
     if stabilizers:

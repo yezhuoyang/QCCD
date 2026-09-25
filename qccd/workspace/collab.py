@@ -607,6 +607,7 @@ class CollabMixin:
                     return {"type": "run", "run_id": ref, "status": j["status"], "summary": res.get("summary"),
                             "program": (run.get("program") or {}).get("name"),
                             "draft": ((run.get("design") or {}).get("draft") or "").removeprefix("cand/") or None,
+                            "design": self._design_title_of((run.get("design") or {}).get("draft") or "main"),
                             "total_ms": ((run.get("performance") or {}).get("total") or {}).get("ms"),
                             "view": run.get("view"), "at": at,
                             "progress": (j.get("progress") or {}).get("message")
@@ -956,8 +957,10 @@ class CollabMixin:
         out = {
             "contract": "1",
             "workspace": {"id": self.id, "root_name": self.root.name},
-            "task": self.release.summary(),
+            # the leaderboards any design can be submitted to, by the names people use
+            "boards": [{"title": bd["title"], "about": bd["about"], "rank_by": bd["rank_by"]} for bd in self.boards()],
             "mode": diag["physics"]["mode"] if diag.get("physics") else "task",
+            "design_title": self.design_title(self.branch(branch)),
             "branch": branch, "revision": h.revision, "input_digest": h.input_digest,
             "arch_digest": h.arch_digest,
             "design": {"name": doc.get("name"), "generator": geo.get("generator"),
@@ -982,6 +985,10 @@ class CollabMixin:
             "unread_prompts": unread,
             "jobs": jobs[:10],
             "latest_result": latest,
+            # the person's designs by the names they gave them (tools take the name; `id` is internal)
+            "designs": [{"name": self.design_title(b), "id": b["name"], "head": b["head"],
+                         "copied_from": self.design_title(self.branch(b["parent"])) if b["parent"] else None}
+                        for b in self.branches() if b["status"] == "open"][:30],
             "branches": [{"name": b["name"], "head": b["head"], "status": b["status"], "parent": b["parent"]}
                          for b in self.branches() if b["status"] == "open"][:20],
             "cursor": self.last_event_seq(),

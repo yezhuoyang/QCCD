@@ -1,6 +1,6 @@
 """`qccd` workspace commands.
 
-    qccd init my-design --task ghz4@1        a workspace: lockfile, design mirror, .qccd/
+    qccd init my-designs                     a workspace for any number of designs and every board
     qccd studio [--no-open] [--keep-alive]   start (or reuse) the service; open Studio paired;
                                              --keep-alive stays and restarts a killed service
     qccd serve                               run the service in the foreground
@@ -9,12 +9,13 @@
     qccd agent connect --client codex [--thread ID | --new] [--url ws://127.0.0.1:PORT]
     qccd mcp --client codex|claude|generic [--channel]     (launched by the agent client)
     qccd validate [--json]                   draft grade of the head revision
-    qccd compile [--adopt]                   the real compiler on the task circuit
-    qccd submit --local [--profile reference] [--wait]
+    qccd compile --board TITLE [--adopt]     the real compiler on a board's circuit
+    qccd submit --local --board "BB [[144,12,12]]" [--design NAME] [--wait]
+                                             compile for the board, adopt, freeze, grade
+    qccd boards                              the leaderboards a design can be submitted to
     qccd publish --submission SUB [--visibility public]   review + approve at this terminal
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
-    qccd releases                            the installed task releases
     qccd trace [--session S] [--prompt P] [--full | --json | --open]
                                              what an agent did for a request, step by step
 
@@ -37,7 +38,7 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "leaderboard", "trace")
+            "publish", "import", "releases", "boards", "leaderboard", "trace")
 
 
 def _root(args) -> Path:
@@ -83,9 +84,10 @@ def cmd_init(a) -> int:
     from .app import Workspace
     ws = Workspace.init(Path(a.dir), a.task, name=a.name, starter=not a.empty)
     h = ws.head()
-    print(f"workspace {ws.id} in {ws.root}")
-    print(f"  task      {ws.release.id} ({ws.release.digest[:23]}...)")
-    print(f"  design    r{h.revision}: {ws.replayed().arch.name}, {len(ws.replayed().arch.device.nodes)} nodes")
+    print(f"workspace in {ws.root}")
+    print(f"  design    {ws.design_title(ws.branch('main'))} (r{h.revision}): {ws.replayed().arch.name}, "
+          f"{len(ws.replayed().arch.device.nodes)} nodes")
+    print(f"  boards    any design can be submitted to: " + "; ".join(b["title"] for b in ws.boards()))
     print("  next      cd into it; `qccd agent install --client codex|claude`; `qccd studio`")
     ws.close()
     return 0
@@ -232,8 +234,7 @@ def cmd_status(a) -> int:
     root = _root(a)
     lock = read_lock(root)
     info = read_runtime(lock["workspace_id"])
-    out = {"workspace": lock["workspace_id"], "root": str(root), "task": lock["task"]["id"],
-           "service": None}
+    out = {"workspace": lock["workspace_id"], "root": str(root), "service": None}
     if info:
         ctx = _call(info, "GET", "/api/context")
         sessions = _call(info, "GET", "/api/sessions")["sessions"]
@@ -250,11 +251,12 @@ def cmd_status(a) -> int:
 
 
 def _fmt_status(o) -> str:
-    lines = [f"workspace {o['workspace']}  task {o['task']}  ({o['root']})"]
+    lines = [f"workspace {o['root']}"]
     if not o["service"]:
         lines.append("service   not running (`qccd studio` starts it)")
         return "\n".join(lines)
-    lines.append(f"service   127.0.0.1:{o['service']['port']} pid {o['service']['pid']}  design r{o['revision']} ({o['mode']})")
+    phys = "the boards' physics" if o["mode"] == "task" else "physics changed: not eligible on a board"
+    lines.append(f"service   127.0.0.1:{o['service']['port']} pid {o['service']['pid']}  design r{o['revision']} ({phys})")
     if o["service"].get("stale"):
         lines.append("          started from older code (QCCD was updated since): `qccd studio` restarts it")
     for s in o["sessions"]:
@@ -283,7 +285,7 @@ def cmd_validate(a) -> int:
     out: dict = {"revision": ctx["revision"], "mode": ctx["mode"], "diagnostics": ctx["diagnostics"],
                  "final_program": ctx["design"]["final_program"]}
     if ctx["design"]["final_program"]:
-        j = _call(info, "POST", "/api/jobs", {"kind": "evaluate", "params": {"profile": "draft"}})
+        j = _call(info, "POST", "/api/jobs", {"kind": "evaluate", "params": {"profile": "draft", "board": a.board}})
         j = _wait_job(info, j["job_id"])
         out["draft"] = (j.get("result") or {})
         out["draft"].pop("traceback", None)
@@ -295,7 +297,7 @@ def cmd_validate(a) -> int:
 
 def cmd_compile(a) -> int:
     info = _svc(a)
-    j = _call(info, "POST", "/api/jobs", {"kind": "compile", "params": {"compiler": a.compiler}})
+    j = _call(info, "POST", "/api/jobs", {"kind": "compile", "params": {"compiler": a.compiler, "board": a.board}})
     j = _wait_job(info, j["job_id"])
     res = j.get("result") or {}
     print(f"{j['status']}: {res.get('summary')}")
@@ -316,8 +318,22 @@ def cmd_submit(a) -> int:
         print("only local submissions are made here (`--local`); publication is `qccd publish`", file=sys.stderr)
         return 2
     info = _svc(a)
-    s = _call(info, "POST", "/api/submissions", {"profile": a.profile})
-    print(f"submission {s['submission_id']} of r{s['revision']} ({s['label']}); bundle {s['bundle_digest']}")
+    if a.board:
+        # one step: compile the board's circuit onto the design, adopt it, freeze, grade
+        t = _call(info, "POST", "/api/submissions", {"profile": a.profile, "board": a.board, "design": a.design or "main"})
+        print(f"submitting {t['design']} to {t['board']} (compile, adopt, freeze, grade)")
+        j = _wait_job(info, t["job_id"])
+        res = j.get("result") or {}
+        if j["status"] != "succeeded":
+            print(f"{j['status']}: {res.get('summary') or j.get('error')}", file=sys.stderr)
+            print((res.get("log") or "")[-1500:], file=sys.stderr)
+            return 1
+        s = {"submission_id": res["submission_id"], "job_id": res["grading_job"], "revision": res["revision"],
+             "label": "Local result - not published"}
+        print(f"submission {s['submission_id']} of r{s['revision']} ({s['label']})")
+    else:
+        s = _call(info, "POST", "/api/submissions", {"profile": a.profile})
+        print(f"submission {s['submission_id']} of r{s['revision']} ({s['label']}); bundle {s['bundle_digest']}")
     if a.wait:
         j = _wait_job(info, s["job_id"])
         sub = _call(info, "GET", f"/api/submissions/{s['submission_id']}")
@@ -333,11 +349,11 @@ def cmd_submit(a) -> int:
 
 def cmd_leaderboard(a) -> int:
     info = _svc(a)
-    b = _call(info, "GET", "/api/leaderboard")
-    print(f"{b['label']}: {b['task']}, ranked by {b['rank_by']} ({b['better']} is better)")
+    b = _call(info, "GET", "/api/leaderboard" + (f"?board={_q(a.board)}" if a.board else ""))
+    print(f"{b['label']}: {b.get('board') or b['task']}, ranked by {b['rank_by']} ({b['better']} is better)")
     for r in b["rows"]:
-        print(f"  {r['submission_id']}  r{r['revision']:<4} {r['status']:10s} {'stale' if r['stale'] else 'current':8s} "
-              f"{r['metrics'].get(b['rank_by'])}")
+        print(f"  {r.get('design') or r['branch']:24s} r{r['revision']:<4} {r['status']:10s} "
+              f"{'stale' if r['stale'] else 'current':8s} {r['metrics'].get(b['rank_by'])}")
     return 0
 
 
@@ -349,10 +365,16 @@ def cmd_import(a) -> int:
 
 
 def cmd_releases(a) -> int:
-    from .tasks import list_releases
-    for r in list_releases():
-        print(f"{r.id:20s} {r.digest[:23]}...  {r.manifest.get('title')}")
+    """The leaderboards (boards) a design can be submitted to, by title."""
+    from .tasks import list_boards
+    for r in list_boards():
+        print(f"{r.title}\n    {(r.manifest.get('description') or '')[:110]}")
     return 0
+
+
+def _q(v) -> str:
+    import urllib.parse
+    return urllib.parse.quote(str(v), safe="")
 
 
 def cmd_publish(a) -> int:
@@ -440,7 +462,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("init", help="create a workspace")
     p.add_argument("dir")
-    p.add_argument("--task", required=True, help="<task>@<release>, e.g. ghz4@1")
+    p.add_argument("--task", default=None, help=argparse.SUPPRESS)       # the old pinned form; not needed
     p.add_argument("--name", default="design")
     p.add_argument("--empty", action="store_true", help="start from a blank canvas, not the release's starter")
     for name, fn in (("studio", None), ("web", None), ("serve", None), ("status", None), ("stop", None), ("validate", None),
@@ -458,9 +480,13 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--no-open", action="store_true")
         if name in ("status", "validate", "submit"):
             q.add_argument("--json", action="store_true")
+        if name in ("validate", "submit", "compile", "leaderboard"):
+            q.add_argument("--board", default=None, help="a leaderboard by its title, e.g. 'BB [[144,12,12]]'")
+        if name == "submit":
+            q.add_argument("--design", default=None, help="the design's name (default: the main design)")
         if name == "compile":
             q.add_argument("--adopt", action="store_true")
-            q.add_argument("--compiler", default="compile", choices=["compile", "rotate"])
+            q.add_argument("--compiler", default="auto", choices=["auto", "compile", "rotate"])
         if name == "submit":
             q.add_argument("--local", action="store_true")
             q.add_argument("--profile", default="reference", choices=["draft", "reference"])
@@ -492,6 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--channel", action="store_true")
     p.add_argument("--root", default=None)
     sub.add_parser("releases")
+    sub.add_parser("boards", help="the leaderboards a design can be submitted to")
     p = sub.add_parser("trace", help="what an agent did for a request: calls, results, page actions")
     p.add_argument("--session")
     p.add_argument("--prompt")
@@ -521,7 +548,7 @@ def main(argv=None) -> int:
           "status": cmd_status,
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
-          "import": cmd_import, "releases": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
+          "import": cmd_import, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard, "trace": cmd_trace}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME

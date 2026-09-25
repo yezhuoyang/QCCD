@@ -7,13 +7,14 @@ This file ships with the `qccd` skill and is served, version-matched, by
 
 | object | what it is | how you reach it |
 |---|---|---|
-| workspace | one directory with `qccd.lock.json`; pins ONE task release | `qccd_get_context().workspace/task` |
+| workspace | one directory with `qccd.lock.json`: any number of designs, any board | `qccd_get_context().workspace` |
+| board | a leaderboard of the website, by title; any design can be submitted to it | `qccd_get_context().boards` |
 | revision | an integer per branch; every committed change set makes the next one | `revision`, `expected_revision` |
 | change set | a list of semantic operations, validated whole, committed atomically | `qccd_apply_change_set` |
-| branch | `main`, or a candidate `cand/<name>` forked from main at a revision | `qccd_manage_branch` |
+| design | the main design or another one, under the name the user gave it | `qccd_manage_branch`, `designs` |
 | prompt | the user's versioned request from Studio, with a frozen context snapshot | `qccd_manage_comment` |
 | job | compile / evaluate, asynchronous, cancellable | `qccd_start_job`, `qccd_get_job` |
-| submission | an immutable bundle of one revision, graded by the reference evaluator | `qccd_submit_local`, `qccd_inspect_run` |
+| submission | a design submitted to a board: compiled, frozen, graded by the reference evaluator | `qccd_submit_local(design, board)`, `qccd_inspect_run` |
 
 Entity keys: `node:<id>`, `segment:<id>`, `loop:<id>`, `zone:<name>`, `block:<primitives|control|heating|species|budget|description>`.
 Ids are identities: a node keeps its id when its zone, capacity or position changes.
@@ -58,7 +59,7 @@ Do not overwrite the demonstrated edit itself or any later edit.
 `qccd_inspect_run(part="stages")` lists: bundle, device, physics_lock, program, rules,
 correspondence, certificate_binding, lean_certificate, semantics, metrics. Eligibility needs
 every required stage `passed` under the `reference` profile. Metrics are MODELLED execution
-time and resources under the task's physics tables -- never the evaluator's wall-clock time.
+time and resources under the board's physics tables -- never the evaluator's wall-clock time.
 A local result is comparison data; the official server grades the same bundle independently.
 
 ## Sessions and stopping

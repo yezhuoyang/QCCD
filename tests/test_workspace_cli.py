@@ -23,7 +23,7 @@ def test_init_studio_status_install_stop(tmp_path):
     env = dict(os.environ, QCCD_RUNTIME_DIR=str(tmp_path / "rt"),
                PYTHONPATH=str(REPO) + os.pathsep + os.environ.get("PYTHONPATH", ""))
     r = qccd("releases", cwd=REPO, env=env)
-    assert r.returncode == 0 and "ghz4@1" in r.stdout
+    assert r.returncode == 0 and "GHZ state on four qubits" in r.stdout and "BB [[144,12,12]]" in r.stdout
     r = qccd("init", str(tmp_path / "d"), "--task", "ghz4@1", cwd=REPO, env=env)
     assert r.returncode == 0, r.stderr
     d = tmp_path / "d"

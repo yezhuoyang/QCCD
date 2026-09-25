@@ -39,9 +39,9 @@ from typing import Any
 log = logging.getLogger("qccd.mcp")
 
 INSTRUCTIONS = """QCCD workspace tools for co-designing a trapped-ion QCCD device and its hardware program.
-Start every turn with qccd_get_context: it returns the task, the design revision, the protected
-entities, the Studio selection and view, unread prompts from Studio, jobs and the latest local
-result. Change the design ONLY with qccd_apply_change_set, passing the expected_revision you just
+Start every turn with qccd_get_context: it returns the person's designs and the leaderboards
+("boards") any design can be submitted to, the revision, the protected entities, the Studio
+selection and view, unread prompts from Studio, jobs and the latest local result. Change the design ONLY with qccd_apply_change_set, passing the expected_revision you just
 read (preview first). A 409 conflict means the user or another agent changed the design: re-read
 and reconsider, never just bump the number. Protected entities are enforced by the service.
 Prompts pushed from Studio arrive as <channel source="qccd" ...> messages: they are the user's own
@@ -66,10 +66,21 @@ chat for each) rather than one opaque batch. Every run you start shows its progr
 while it compiles, then their tab opens the run's page: press Play there and let them watch before
 you report the numbers (the run's result says how).
 
-DRAFTS. The person's saved designs are drafts: branches listed by qccd_manage_branch(action='list')
-as cand/<name>; say just <name>. Tools accept either form. To compare designs, run the SAME program
-on each and call qccd_compare_runs: it returns the comparison and opens the side-by-side view in
-Studio, where both designs animate on one shared clock.
+DESIGNING TO A SHAPE. When the person describes a shape and a leaderboard, read
+qccd_read_reference(section='design') first: which mechanism the board needs, how their outline
+becomes the one loop the conveyor drives (corners of 60 degrees or more; a second shape becomes
+docks, not a second loop), known-good sizes, and the run-and-fix loop until every rule passes.
+Draw it in their Studio a step at a time, run the board's circuit there, then submit.
+
+DESIGNS AND BOARDS. The person keeps any number of designs, each under a name they chose
+(qccd_get_context: designs). A new design is a new one -- qccd_manage_branch(action='create',
+title=<a name for it>) -- never a replacement of an existing design unless they ask for that; call
+designs by their names. Any design can be submitted to any leaderboard ("board", by its title:
+qccd_get_context: boards, e.g. 'BB [[144,12,12]]', 'surface code'): qccd_submit_local(design,
+board) compiles that board's circuit onto the design, adopts the program, freezes and grades it
+in one go. Never show the person internal ids, task codes, release ids or digests. To compare
+designs, run the SAME program on each and call qccd_compare_runs: it returns the comparison and
+opens the side-by-side view in Studio, where both designs animate on one shared clock.
 
 PAGES. The person may be talking to you from a page of the qccd.academy website (served through the
 workspace, with this same chat) or from Studio; the request says which page. Before your first work on
@@ -112,12 +123,14 @@ def _tools() -> list:
     s = {"type": "string"}
     i = {"type": "integer"}
     return [
-        ("qccd_get_context", "Bootstrap and refresh: task, revision, protected entities, Studio view and "
-         "selection, unread prompts (reading them acknowledges them), jobs, latest local result. `since` "
+        ("qccd_get_context", "Bootstrap and refresh: the person's designs (by the names they gave them) and the "
+         "leaderboards (boards, by title) any design can be submitted to, the revision, protected entities, Studio "
+         "view and selection, unread prompts (reading them acknowledges them), jobs, latest local result. `since` "
          "(an event cursor from a previous call) adds what changed since.",
          obj({"since": i, "detail": {"type": "string", "enum": ["summary", "full"]}, "branch": s})),
-        ("qccd_read_reference", "Version-matched reference for THIS workspace's task release and evaluator: "
-         "sections index, interface (everything you may do on a page: places, controls, Studio verbs; nothing "
+        ("qccd_read_reference", "Version-matched reference for this QCCD and its evaluator: sections index, "
+         "boards (every leaderboard a design can be submitted to: title, circuit, what is ranked; query=a title for "
+         "one board with its circuit), interface (everything you may do on a page: places, controls, Studio verbs; nothing "
          "else is allowed), site (the website's pages, the course, how to do things on it), site:studio (every "
          "Studio control in its own words), task, operations, rules, evaluator, program, anchors, workflow, "
          "docs:adl, docs:rules, docs:tsir, docs:phys. Optional `query` returns the window around a match "
@@ -137,12 +150,14 @@ def _tools() -> list:
         ("qccd_undo_change_set", "Undo one change set as a NEW validated change (never a rollback of later "
          "work); reports a conflict when later changes depend on it.",
          obj({"change_set_id": s, "request_id": s, "expected_revision": i}, ["change_set_id"])),
-        ("qccd_manage_branch", "Drafts (candidate branches, cand/<name>): action create (name; source = the "
-         "design to copy, default main), compare (a, b), adopt (candidate, expected_revision, request_id), "
-         "discard (candidate), list.",
-         obj({"action": {"type": "string", "enum": ["create", "compare", "adopt", "discard", "list"]},
-              "name": s, "source": s, "a": s, "b": s, "candidate": s, "expected_revision": i, "request_id": s,
-              "note": s, "origin_prompt_id": s, "mode": {"type": "string", "enum": ["preview", "apply"]}},
+        ("qccd_manage_branch", "The person's designs, named however they like: action create (title: the new "
+         "design's name, any text; source = the design to copy, default the main design), rename (design, title), "
+         "compare (a, b), adopt (candidate, expected_revision, request_id: bring a design into the main one), "
+         "discard (candidate), list. Every design argument takes the design's name.",
+         obj({"action": {"type": "string", "enum": ["create", "rename", "compare", "adopt", "discard", "list"]},
+              "title": s, "design": s, "name": s, "source": s, "a": s, "b": s, "candidate": s,
+              "expected_revision": i, "request_id": s, "note": s, "origin_prompt_id": s,
+              "mode": {"type": "string", "enum": ["preview", "apply"]}},
              ["action"])),
         ("qccd_manage_comment", "Prompt threads: action get (prompt_id: the prompt, its versions and frozen "
          "context snapshot; acknowledges it), list, reply (prompt_id, text, optional work_state "
@@ -151,12 +166,13 @@ def _tools() -> list:
          obj({"action": {"type": "string", "enum": ["get", "list", "reply", "ack", "state"]}, "prompt_id": s,
               "prompt_ids": {"type": "array", "items": s}, "text": s, "work_state": s,
               "links": {"type": "object"}, "request_id": s, "state": s}, ["action"])),
-        ("qccd_start_job", "Start a job and return its id at once: kind compile (the real compiler on the task "
-         "circuit for a revision; result carries adopt_with for set_final_program) or evaluate (profile "
-         "draft|reference on a frozen snapshot of the revision).",
-         obj({"kind": {"type": "string", "enum": ["compile", "evaluate"]}, "branch": s, "revision": i,
+        ("qccd_start_job", "Start a job and return its id at once: kind compile (the real compiler on a board's "
+         "circuit for a revision of a design; result carries adopt_with for set_final_program) or evaluate (profile "
+         "draft|reference on a frozen snapshot of the revision). board: its title. To submit a design, use "
+         "qccd_submit_local instead: it does all of this in one go.",
+         obj({"kind": {"type": "string", "enum": ["compile", "evaluate"]}, "branch": s, "revision": i, "board": s,
               "profile": {"type": "string", "enum": ["draft", "reference"]},
-              "compiler": {"type": "string", "enum": ["compile", "rotate"]}, "request_id": s,
+              "compiler": {"type": "string", "enum": ["auto", "compile", "rotate"]}, "request_id": s,
               "origin_prompt_id": s}, ["kind"])),
         ("qccd_get_job", "Progress and lifecycle state of a job.", obj({"job_id": s}, ["job_id"])),
         ("qccd_list_programs", "The programs a run can use, with qubit counts: the BB [[144,12,12]] syndrome "
@@ -221,10 +237,14 @@ def _tools() -> list:
          "reveal_diagnostic, open_run (target.run_id: a run's animation), compare (target.runs: two run ids; "
          "qccd_compare_runs does this for you), open_branch. Studio honours the user's Follow-agent setting.",
          obj({"action": s, "target": {"type": "object"}, "view_id": s, "note": s}, ["action", "target"])),
-        ("qccd_submit_local", "Freeze the revision into an immutable bundle and grade it with the reference "
-         "evaluator (returns submission and job ids at once). The design needs an adopted final program.",
-         obj({"branch": s, "revision": i, "profile": {"type": "string", "enum": ["draft", "reference"]},
-              "request_id": s, "origin_prompt_id": s, "title": s})),
+        ("qccd_submit_local", "Submit a design to a leaderboard: design (its name; default the main design) and "
+         "board (its title, e.g. 'BB [[144,12,12]]' or 'surface code'). In one job it compiles the board's circuit "
+         "onto the design with the real compiler, adopts that program, freezes the design and grades it with the "
+         "reference evaluator (rules, the Lean certificate, semantics, metrics); returns the job at once, and the "
+         "graded submission appears on the local leaderboard ('Local result - not published'). Publishing it needs "
+         "the person's approval (qccd_prepare_publish shows what would be uploaded).",
+         obj({"design": s, "board": s, "profile": {"type": "string", "enum": ["draft", "reference"]},
+              "request_id": s, "origin_prompt_id": s, "title": s, "branch": s, "revision": i})),
         ("qccd_prepare_publish", "Show exactly what publication would upload (bundle digest, files, local "
          "report). It creates nothing: approval and upload need the person.",
          obj({"submission_id": s, "visibility": {"type": "string", "enum": ["public", "unlisted", "private"]}},
@@ -309,9 +329,12 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         if act == "list":
             return be.call("GET", "/api/branches")
         if act == "create":
-            return be.call("POST", "/api/branches", {"name": a.get("name"), "note": a.get("note", ""),
-                                                     "source": a.get("source") or "main",
+            return be.call("POST", "/api/branches", {"name": a.get("name"), "title": a.get("title"),
+                                                     "note": a.get("note", ""), "source": a.get("source") or "main",
                                                      "origin_prompt_id": a.get("origin_prompt_id")})
+        if act == "rename":
+            return be.call("POST", "/api/branches/rename", {"design": a.get("design") or a.get("candidate") or "main",
+                                                            "title": a.get("title")})
         if act == "compare":
             return be.call("GET", "/api/compare?" + q({"a": a.get("a"), "b": a.get("b", "main")}))
         if act == "adopt":
@@ -336,7 +359,7 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         if act == "state":
             return be.call("POST", f"/api/prompts/{_enc(a['prompt_id'])}/state", {"state": a.get("state")})
     if name == "qccd_start_job":
-        params = {k: a[k] for k in ("branch", "revision", "profile", "compiler") if k in a}
+        params = {k: a[k] for k in ("branch", "revision", "profile", "compiler", "board") if k in a}
         return be.call("POST", "/api/jobs", {"kind": a["kind"], "params": params, "request_id": a.get("request_id"),
                                              "origin_prompt_id": a.get("origin_prompt_id")})
     if name == "qccd_get_job":
@@ -388,8 +411,12 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         return be.call("POST", "/api/present", {"action": a["action"], "target": a.get("target") or {},
                                                 "view_id": a.get("view_id"), "note": a.get("note", "")})
     if name == "qccd_submit_local":
-        return be.call("POST", "/api/submissions", {k: a[k] for k in ("branch", "revision", "profile", "request_id",
-                                                                     "origin_prompt_id", "title") if k in a})
+        body = {k: a[k] for k in ("design", "board", "profile", "request_id", "origin_prompt_id", "title") if k in a}
+        if "design" not in body and "board" not in body:          # the older form: an adopted program, as it is
+            body = {k: a[k] for k in ("branch", "revision", "profile", "request_id", "origin_prompt_id", "title") if k in a}
+        elif "design" not in body and a.get("branch"):
+            body["design"] = a["branch"]
+        return be.call("POST", "/api/submissions", body)
     if name == "qccd_prepare_publish":
         return be.call("POST", "/api/publish/prepare", {"submission_id": a["submission_id"],
                                                         "visibility": a.get("visibility", "public")})
@@ -442,7 +469,8 @@ def summarize(name: str, out: Any) -> str:
     if not isinstance(out, dict):
         return name
     if name == "qccd_get_context":
-        return (f"{out.get('task', {}).get('id')} - {out.get('branch')} r{out.get('revision')}; "
+        return (f"{out.get('design_title') or out.get('branch')} r{out.get('revision')}; "
+                f"{len(out.get('designs') or [])} design(s), {len(out.get('boards') or [])} board(s); "
                 f"{len(out.get('unread_prompts') or [])} unread prompt(s); "
                 f"{len(out.get('protected') or [])} protected; mode {out.get('mode')}")
     if name == "qccd_apply_change_set":

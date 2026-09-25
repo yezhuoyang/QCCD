@@ -88,8 +88,15 @@ def resolve_program(spec) -> tuple[str, str, str]:
         starts = [p for n, p in cat.items() if n.startswith(key)]
         hit = starts[0] if len(starts) == 1 else None
     if hit is None:
+        # a leaderboard by its title: that board's own circuit, byte for byte (what a submission compiles)
+        from .tasks import ReleaseError, find_board
+        try:
+            board = find_board(spec)
+            return board.manifest["task"], board.circuit_text(), f"the board {board.title}"
+        except ReleaseError:
+            pass
         raise WorkspaceError("unknown_program", f"no program {spec!r}; the catalogue has: "
-                             + ", ".join(sorted(cat)), status=404)
+                             + ", ".join(sorted(cat)) + "; or name a board by its title", status=404)
     path = _examples_dir() / Path(hit["source"]).name
     return hit["name"], path.read_text(encoding="utf-8"), hit["source"]
 
@@ -138,7 +145,8 @@ class RunsMixin:
             qasm = self.get_artifact(circuit).decode("utf-8", errors="replace")
         draft = params.get("branch") or (run.get("design") or {}).get("draft") or "main"
         return {"run_id": run_id, "name": name, "qasm": qasm[:200_000], "source": source,
-                "draft": str(draft).removeprefix("cand/"), "status": j["status"],
+                "draft": str(draft).removeprefix("cand/"), "design": self._design_title_of(str(draft)),
+                "status": j["status"],
                 "progress": (j.get("progress") or {}).get("message"), "agent": (j.get("actor") or {}).get("label")}
 
     # ------------------------------------------------------------------ the job
@@ -286,8 +294,8 @@ class RunsMixin:
         if not isinstance(run_ids, (list, tuple)) or len(run_ids) != 2:
             raise WorkspaceError("bad_request", "compare exactly two runs", status=422)
         a, b = (self.run(x) for x in run_ids)
-        la = f"{a['design']['draft'].removeprefix('cand/')} r{a['design']['revision']}"
-        lb = f"{b['design']['draft'].removeprefix('cand/')} r{b['design']['revision']}"
+        la = f"{self._design_title_of(a['design']['draft'])} r{a['design']['revision']}"
+        lb = f"{self._design_title_of(b['design']['draft'])} r{b['design']['revision']}"
         if la == lb:
             la, lb = f"{la} ({a['program']['name']})", f"{lb} ({b['program']['name']})"
         out = compare(a, b, (la, lb))

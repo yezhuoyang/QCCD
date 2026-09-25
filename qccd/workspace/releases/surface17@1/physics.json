@@ -1,0 +1,221 @@
+{
+ "budget": {
+  "junction_electrode_multiplier": 2,
+  "max_area_mm2": 100,
+  "max_dacs": 128,
+  "max_junctions": 200
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.05,
+  "note": "R17: ndot = S_E(w) e^2 / 4 m hbar w, accruing whether or not the ion moves. Device-specific and unmeasured for the target trap -- q_heating_rate_measurement",
+  "source": "2605.25118"
+ },
+ "primitives": {
+  "1q_gate": {
+   "fidelity": 0.999975,
+   "source": "2305.03828",
+   "us": 5
+  },
+  "cool": {
+   "broadcastable": true,
+   "note": "Doppler sheet beams cover the whole trap, so one cooling operation cools every ion: it costs schedule time but does not serialize per ion (R7c)",
+   "removes_quanta": "all",
+   "scope": "global",
+   "source": "2606.06455",
+   "us": 300
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent; R14's hidden cost of splitting off-edge",
+   "source": "2510.23519"
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "quanta": 1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 18
+    },
+    {
+     "quanta": 0.1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 20
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "2": [
+     {
+      "label": "L-junction; superseded by R18, a bend is not a junction",
+      "quanta": 0.5,
+      "source": "2511.15910",
+      "table": "cyclone",
+      "us": 10
+     }
+    ],
+    "3": [
+     {
+      "label": "t10-t11 junction entry/exit",
+      "quanta": 3,
+      "source": "2510.23519",
+      "table": "qccdsim_jones",
+      "us": 100
+     },
+     {
+      "label": "degree-3 junction crossing; quanta borrowed from Jones",
+      "quanta": 3,
+      "source": "2511.15910",
+      "table": "cyclone",
+      "us": 100
+     },
+     {
+      "label": "~200 us one-way measured: 85 round trips in ~34 ms",
+      "quanta": 3,
+      "source": "1210.3655",
+      "table": "measured",
+      "us": 200
+     }
+    ],
+    "4": [
+     {
+      "label": "X-junction crossing; quanta borrowed from Jones",
+      "quanta": 3,
+      "source": "2511.15910",
+      "table": "cyclone",
+      "us": 120
+     },
+     {
+      "label": "Jones gives no degree-4 figure; Cyclone's is carried over",
+      "quanta": 3,
+      "source": "2511.15910",
+      "table": "qccdsim_jones",
+      "us": 120
+     }
+    ]
+   }
+  },
+  "measure": {
+   "fidelity": 0.9984,
+   "source": "2305.03828",
+   "us": 120
+  },
+  "merge": {
+   "curve": [
+    {
+     "quanta": 6,
+     "source": "2510.23519",
+     "table": "qccdsim_jones",
+     "us": 80
+    },
+    {
+     "quanta": 6,
+     "source": "2511.15910",
+     "table": "cyclone",
+     "us": 80
+    },
+    {
+     "quanta": 1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 30
+    },
+    {
+     "quanta": 0.1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 40
+    }
+   ]
+  },
+  "ms_gate": {
+   "chain_note": "G1: laser-intensity instability grows with chain length as A ~ N/ln N (Murali et al., ISCA 2020). The value is the reference chain length at which fidelity_at_n0 and error_vs_quanta were measured -- 2, from a two-ion gate zone.",
+   "error_vs_chain": "murali:2",
+   "error_vs_quanta": "linear:2.0e-3",
+   "fidelity_at_n0": 0.99816,
+   "max_quanta": 1,
+   "note": "1.84e-3 two-qubit infidelity measured on H2 (2305.03828). max_quanta is R7's gate budget; PLAN §0.4 puts it at 1-2 quanta, 1.0 is the strict end",
+   "source": "2305.03828",
+   "us": 25
+  },
+  "reset": {
+   "error": 0.005,
+   "source": "2510.23519",
+   "us": 50
+  },
+  "shuttle_segment": {
+   "curve": [
+    {
+     "label": "t7 ion shuttling, one segment",
+     "quanta": 0.1,
+     "source": "2510.23519",
+     "table": "qccdsim_jones",
+     "us": 5
+    },
+    {
+     "label": "move, one shuttling zone; quanta borrowed from Jones",
+     "quanta": 0.1,
+     "source": "2511.15910",
+     "table": "cyclone",
+     "us": 10
+    },
+    {
+     "label": "single-ion transport, fast operating point",
+     "quanta": 1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 12
+    },
+    {
+     "label": "single-ion transport, slow operating point",
+     "quanta": 0.1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 14
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "label": "t8-t9 split and merge -- 60x a shuttle in heating",
+     "quanta": 6,
+     "source": "2510.23519",
+     "table": "qccdsim_jones",
+     "us": 80
+    },
+    {
+     "label": "split; quanta borrowed from Jones (Cyclone charges none)",
+     "quanta": 6,
+     "source": "2511.15910",
+     "table": "cyclone",
+     "us": 80
+    },
+    {
+     "label": "fast split, n~1",
+     "quanta": 1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 30
+    },
+    {
+     "label": "slow split, n~0.1",
+     "quanta": 0.1,
+     "source": "2605.25118",
+     "table": "transport_excitation",
+     "us": 40
+    }
+   ]
+  }
+ },
+ "species": {
+  "T_coh_s": 600,
+  "coolant": "Sr+",
+  "coolant_fraction": 0.5,
+  "qubit": "Ba+",
+  "source": "2510.23519",
+  "sympathetic": true
+ }
+}

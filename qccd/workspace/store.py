@@ -27,7 +27,14 @@ from typing import Any, Iterable
 
 __all__ = ["Store", "SCHEMA_VERSION"]
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+#: what each schema version adds to the one before (applied in order to an older database)
+_MIGRATIONS = {
+    # 2: general workspaces (2026-09-24) -- a design has a title its person chose; a snapshot and a
+    # submission record the board (release id + digest) they were made for
+    2: [("branches", "title", "TEXT"), ("snapshots", "task_release", "TEXT"), ("snapshots", "task_digest", "TEXT"),
+        ("submissions", "task_digest", "TEXT")],
+}
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -38,7 +45,8 @@ CREATE TABLE IF NOT EXISTS branches (
   head INTEGER NOT NULL,
   parent TEXT, parent_revision INTEGER,
   status TEXT NOT NULL,               -- open | adopted | discarded
-  created_by TEXT, created_at REAL NOT NULL, note TEXT
+  created_by TEXT, created_at REAL NOT NULL, note TEXT,
+  title TEXT                          -- what the person calls the design (any text)
 );
 CREATE TABLE IF NOT EXISTS revisions (
   branch TEXT NOT NULL, revision INTEGER NOT NULL,
@@ -123,12 +131,12 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE TABLE IF NOT EXISTS snapshots (
   id TEXT PRIMARY KEY, branch TEXT NOT NULL, revision INTEGER NOT NULL,
   input_digest TEXT NOT NULL, bundle_digest TEXT, dir TEXT NOT NULL,
-  created_at REAL NOT NULL
+  created_at REAL NOT NULL, task_release TEXT, task_digest TEXT
 );
 CREATE TABLE IF NOT EXISTS submissions (
   id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, job_id TEXT, profile TEXT NOT NULL,
   task_release TEXT NOT NULL, status TEXT NOT NULL, report_digest TEXT,
-  origin_prompt_id TEXT, actor TEXT NOT NULL, created_at REAL NOT NULL
+  origin_prompt_id TEXT, actor TEXT NOT NULL, created_at REAL NOT NULL, task_digest TEXT
 );
 CREATE TABLE IF NOT EXISTS approvals (
   id TEXT PRIMARY KEY, submission_id TEXT NOT NULL, bundle_digest TEXT NOT NULL,
@@ -161,9 +169,23 @@ class Store:
             cur = self.get_meta("store_schema")
             if cur is None:
                 self.set_meta("store_schema", str(SCHEMA_VERSION))
+            elif int(cur) < SCHEMA_VERSION:
+                self._migrate(int(cur))
             elif int(cur) != SCHEMA_VERSION:
                 raise RuntimeError(
-                    f"{self.path} has store schema {cur}; this build speaks {SCHEMA_VERSION}")
+                    f"{self.path} has store schema {cur}; this build speaks {SCHEMA_VERSION} (a newer QCCD made it)")
+
+    def _migrate(self, cur: int) -> None:
+        """Bring an older database up to this schema, in one transaction; a column that is already
+        there (a migration interrupted before its version was recorded) is left alone."""
+        with self.tx() as db:
+            for v in range(cur + 1, SCHEMA_VERSION + 1):
+                for table, column, kind in _MIGRATIONS.get(v, []):
+                    have = {r["name"] for r in db.execute(f"PRAGMA table_info({table})").fetchall()}
+                    if column not in have:
+                        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+            db.execute("INSERT INTO meta(key, value) VALUES('store_schema', ?) "
+                       "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(SCHEMA_VERSION),))
 
     # -- transactions ------------------------------------------------------------
 
