@@ -5841,8 +5841,17 @@ function newCanvas(opts) {
   // `qccdsim_jones` values every shipped architecture uses, carrying their `source` so the
   // panel shows where each number came from. A design tool must not price a device against
   // constants it made up; `set_curve` / `set_degree_curve` replace them.
+  //
+  // ONLY WHEN THERE IS NO TEMPLATE.  A template already carries its machine's curves, and
+  // these three records used to overwrite them anyway: every design started from a new canvas
+  // had primitives no leaderboard's physics has, so its reference grade failed the physics
+  // lock ("an exploratory design, not an entry") after passing everything else, Lean
+  // included (2026-09-24, a two-triangle design for BB).  A new canvas keeps the machine's
+  // physics, as it says.
   var post = [
-    { method: 'set_control', args: [], kwargs: { model: 'simd_classes' } },
+    { method: 'set_control', args: [], kwargs: { model: 'simd_classes' } }
+  ];
+  if (!tmpl) post = post.concat([
     { method: 'set_curve', args: ['shuttle_segment',
         [{ us: 5.0, quanta: 0.1, table: 'qccdsim_jones', source: '2510.23519',
            label: 't7 ion shuttling, one segment' }]], kwargs: {} },
@@ -5852,8 +5861,8 @@ function newCanvas(opts) {
     // a grid tile makes degree-4 nodes, and an unpriceable junction is an R11 violation
     { method: 'set_degree_curve', args: ['junction_cross', 4,
         [{ us: 100.0, quanta: 3.0, table: 'qccdsim_jones', source: '2510.23519',
-           label: 'four-way junction crossing' }]], kwargs: {} },
-  ];
+           label: 'four-way junction crossing' }]], kwargs: {} }
+  ]);
   var r = transaction([{ canvas: { geom: geom, seed: seed, post: post } }], 'new canvas');
   if (r.ok) { setProgram([]); }
   return r;
