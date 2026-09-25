@@ -22,7 +22,7 @@ The mechanism is in `qccd/workspace/interface.py`. Agents read all of it as one 
 | you add | you also add | checked by |
 |---|---|---|
 | a button, field, select or other control on a Studio page | `data-hint="<key>"` on the element and a `HINTS` entry for the key in `qccd/viz/js/editor.js`. It is the same sentence the hover card, Explain and the guide show a person. | the Studio check: every control declared, every key described |
-| a control on a website page | `data-hint="<key>"` and an entry in the page's `window.QCCD_HINTS = {key: {t: name, d: what it does}}` | the live-site audit (below) |
+| a control on a website page | `data-hint="<key>"` and an entry in the page's `window.QCCD_HINTS = {key: {t: name, d: what it does}}`, as the site bar's search box does (`qccd/site/nav.html`) | the live-site audit (below) |
 | a region the code generates controls into from a schema | its selector and one sentence in `interface.DECLARED_FORMS`; each field keeps its own label | the Studio check (the region must exist) |
 | a choice inside a control group (Hardware / Gates / Both) | nothing more: the group's own `data-hint` declares its options. A `region:` hint does not. | the Studio check |
 | a function on `window.EDITOR` | an entry in `qccd/viz/js/editor_api.json`: `use` (`agent`, `harness` for tests and the pointer, `never` for the person's files or storage), `does`, and for an agent verb its `kind` (`read`, `view`, `design`, `program` or `course`) and `args` | every API key has an entry and every entry names a key |
@@ -45,11 +45,10 @@ test fails if it grows. At the next regeneration:
 2. delete it from the list;
 3. lower `OUT_OF_LINE_PINNED`.
 
-As of 2026-09-24:
-
-- ten Studio controls: the lesson back button, the program chip, circuit Follow, the device
-  filter, the source editor and its three buttons, the Write text and Test drive;
-- the site's search box.
+As of 2026-09-24 there are ten, all in the Studio: the lesson back button, the program chip,
+circuit Follow, the device filter, the source editor and its three buttons, the Write text,
+and Test drive. The site's search box was the eleventh; it is now declared inline in
+`qccd/site/nav.html`, and the live pages were patched the same day.
 
 ## Not declared yet (agents cannot operate these; their owners declare them inline)
 

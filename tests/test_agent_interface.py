@@ -33,9 +33,10 @@ REPO = Path(__file__).resolve().parents[1]
 CHROME = os.environ.get("CHROME") or "C:/Program Files/Google/Chrome/Application/chrome.exe"
 needs_chrome = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists()), reason="needs node and Chrome")
 
-#: the out-of-line list's length when the gate was introduced (2026-09-24).  It may go DOWN -- move
-#: an entry inline (data-hint + a HINTS entry) at a site regeneration and lower this -- never up.
-OUT_OF_LINE_PINNED = 11
+#: the out-of-line list's length (11 when the gate was introduced, 2026-09-24; 10 once the site's
+#: search box was declared inline the same day).  It may go DOWN -- move an entry inline (data-hint
+#: + a HINTS entry) at a site regeneration and lower this -- never up.
+OUT_OF_LINE_PINNED = 10
 USES = {"agent", "harness", "never"}
 KINDS = {"read", "view", "design", "program", "course"}
 
