@@ -83,16 +83,24 @@ checker built:
 <a href="https://github.com/yezhuoyang/QCCD/blob/compiler/deploy/official/Dockerfile">deploy/official/Dockerfile</a>
 has the exact commands.</p>
 <h3>Start a workspace</h3>
-<p class="qa-small">Run these from the folder that holds QCCD, not inside it.</p>
-<pre>qccd init my-design --task ghz4@1
-cd my-design
+<p class="qa-small">Run these from the folder that holds QCCD, not inside it. Type them as shown,
+except the folder name, which is yours.</p>
+<pre>qccd init "My QCCD designs"
+cd "My QCCD designs"
 qccd agent install --client codex
 qccd studio --keep-alive</pre>
+<p class="qa-small"><b>Yours to name, anything you like:</b> the workspace folder ("My QCCD designs" is
+only an example; <code>qccd init</code> with no name makes the folder you are in the workspace; rename
+or move it later while <code>qccd stop</code>ped), every design (the design menu at the top of the
+chat saves, renames and switches them, or ask the agent), and the name shown if you publish. One
+workspace holds any number of designs for every leaderboard. <b>Type as shown:</b> the commands. Use
+<code>--client claude</code> if you have Claude Code rather than Codex.</p>
 <p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. Codex or
 Claude Code, whichever you have, starts by itself when you send (switch under &hellip; in the chat). Ask it to
-change the design, or to run a program and explain it, for example <em>"Compile and run the BB code
-on this design and summarize the bottleneck"</em> or <em>"Run the BB code on draft A and draft B side
-by side"</em>. The draft menu at the top of the chat saves and switches designs.</p>
+change the design, or to run a program and explain it, for example <em>"Make a new design with a
+large triangle and a smaller one, and submit it to the BB code"</em>, <em>"Compile and run the BB code
+on this design and summarize the bottleneck"</em> or <em>"Run the BB code on my two designs side by
+side"</em>.</p>
 <h3>Ask about any page</h3>
 <p>Your workspace also serves this whole website with the same chat on every page. In the workspace
 folder, run:</p>
@@ -104,13 +112,18 @@ pages come from this site; the chat and the agent stay on your computer, and thi
 site still does not connect to it.</p>
 <h3>Bring this design</h3>
 <p><button class="qa-save" type="button">Save this design as a file</button><span class="qa-saved"></span></p>
-<p>Put the file in your workspace folder, then run:</p>
-<pre class="qa-import">qccd import my-design.studio.json</pre>
+<p>Put the file in your workspace folder, then run this (with the name the file was saved under):</p>
+<pre class="qa-import">qccd import qccd-design.studio.json</pre>
 <h3>Put it on the leaderboard</h3>
-<pre>qccd submit --local --wait
+<p>In the Studio: <b>Results</b>, pick the board, press <b>Submit to this board</b>. Or ask the
+agent. In a terminal:</p>
+<pre>qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
 qccd publish --submission &lt;id&gt;</pre>
-<p>The first command grades the design on your machine with the reference checker. The second
-asks you to approve and then uploads it. Once the server has graded it too, it appears under
+<p>The first command grades one of your designs (by the name you gave it) for one board (by its
+title, or any part that is unambiguous, such as <code>BB</code> or <code>"surface code"</code>;
+<code>qccd boards</code> lists them) on your machine, with the reference checker. The second asks you
+to approve and then uploads it; <code>&lt;id&gt;</code> is the submission id the first one printed.
+Nothing leaves your machine before that. Once the server has graded it too, it appears under
 <a href="__ROOT__board/#official">Official submissions</a>. Uploading needs a token from the
 maintainers.</p>
 <p class="qa-small"><a href="https://github.com/yezhuoyang/QCCD/blob/compiler/docs/workspace.md">How it works</a>:
@@ -149,7 +162,7 @@ STUDIO_JS = r"""
     var snap = E.snapshot();
     var base = String((snap && snap.arch && snap.arch.name) || '').toLowerCase()
       .replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-    if (!base || base === 'studio' || base === 'design') base = 'my-design';   // a fresh canvas's generic name
+    if (!base || base === 'studio' || base === 'design') base = 'qccd-design';   // a fresh canvas's generic name
     var name = base + '.studio.json';
     var url = URL.createObjectURL(new Blob([JSON.stringify(snap, null, 1)], { type: 'application/json' }));
     var a = document.createElement('a');
