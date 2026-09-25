@@ -58,8 +58,11 @@ query=<title>)` gives its circuit and what is ranked.
   smaller one", make the large one the loop, and put the docks one unit inside its sides,
   spread evenly: together they draw the smaller triangle. Tell them in one sentence why it is
   not a second loop.
-  - A dock is a trap site joined to ONE loop site by ONE plain rail: `addNodeAt(x, y,
-    {"kind": "site", "zone": "trap"})`, then `joinNodes(<loop site>, <the new site>)`.
+  - A dock is a trap site joined to ONE loop site by ONE plain rail. All of them at once, as one
+    visible step: one `qccd_apply_change_set` whose operations are `{"type": "add_site", "pos":
+    [x, y], "zone": "trap", "to": ["<loop site>"]}`, one per dock (measured: 24 in one change
+    set, same result as drawing them). One at a time on the canvas: `addNodeAt(x, y, {"kind":
+    "site", "zone": "trap"})`, then `joinNodes(<loop site>, <the new site>)`.
   - Do NOT draw docks with `sketchDraw("line", ...)`. A sketched line declares an open path,
     and the verifier then reads docking from different sides as different motions: R22 (one
     waveform per cycle) fails on every dock batch.

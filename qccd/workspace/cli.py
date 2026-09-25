@@ -552,6 +552,14 @@ def main(argv=None) -> int:
           "leaderboard": cmd_leaderboard, "trace": cmd_trace}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
+    if a.cmd not in ("mcp", "serve"):
+        # a piped Windows console is cp1252, and an agent's words carry "≈" or "→": print what
+        # can be printed rather than dying mid-output (`qccd trace | more` did, 2026-09-24)
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(errors="replace")
+            except (AttributeError, ValueError):
+                pass
     try:
         return fn(a)
     except WorkspaceError as exc:

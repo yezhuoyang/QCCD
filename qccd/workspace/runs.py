@@ -184,11 +184,14 @@ class RunsMixin:
             raise WorkspaceError("design_invalid", f"the design on {branch} at r{rev} does not build", status=422)
         q = _qubits(qasm)
         cap, n_sites = _capacity(r.arch)
+        # what the person calls them: the board's title and the design's name, never an internal id
+        shown = source[len("the board "):] if source.startswith("the board ") else name
+        dname = self._design_title_of(branch)
         design = {"draft": branch, "revision": rev, "name": r.arch.name, "sites": n_sites,
                   "ion_capacity": cap, "digest": r.arch_digest()}
         if q > cap:
             return {"_status": "failed", "design": design, "program": {"name": name, "qubits": q},
-                    "summary": f"{name} uses {q} qubits, but this design holds at most {cap} ions in "
+                    "summary": f"{shown} uses {q} qubits, but {dname} holds at most {cap} ions in "
                                f"{n_sites} sites: it cannot run here"}
         work = self.root / ".qccd" / "runs" / jid
         work.mkdir(parents=True, exist_ok=True)
@@ -218,7 +221,7 @@ class RunsMixin:
                     break
         if used is None:
             return {"_status": "failed", "design": design, "program": {"name": name, "qubits": q},
-                    "summary": f"the compiler could not place {name} on this design: "
+                    "summary": f"the compiler could not place {shown} on {dname}: "
                                + _compiler_reason(log), "log": log[-6000:]}
         self._progress(jid, "cooling", "inserting cooling (R7)")
         co = run_limited([tc.python, tc.bridge / "insert_cooling.py", work / "prog.tsir.json", "--arch",
@@ -248,7 +251,7 @@ class RunsMixin:
                                    "application/json", f"run {jid}: compiler certificate")
         d_qasm = self.put_artifact(qasm.encode("utf-8"), "text/plain", f"run {jid}: circuit")
         headline = perf["bottleneck"][0] if perf["bottleneck"] else ""
-        return {"summary": f"{name} on {branch} (r{rev}, {r.arch.name}): {perf['total']['ms']:g} ms per round. "
+        return {"summary": f"{shown} on {dname} (r{rev}): {perf['total']['ms']:g} ms per round. "
                            + headline,
                 "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
                         "design": design, "compiler": used, "performance": perf,

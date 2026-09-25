@@ -129,10 +129,12 @@ def _tools() -> list:
          "(an event cursor from a previous call) adds what changed since.",
          obj({"since": i, "detail": {"type": "string", "enum": ["summary", "full"]}, "branch": s})),
         ("qccd_read_reference", "Version-matched reference for this QCCD and its evaluator: sections index, "
+         "design (READ FIRST to design a device -- any shape the person describes -- or to put one on a board: "
+         "the structure the board's circuit needs, how a shape becomes it, measured sizes, run-and-fix), "
          "boards (every leaderboard a design can be submitted to: title, circuit, what is ranked; query=a title for "
          "one board with its circuit), interface (everything you may do on a page: places, controls, Studio verbs; nothing "
          "else is allowed), site (the website's pages, the course, how to do things on it), site:studio (every "
-         "Studio control in its own words), task, operations, rules, evaluator, program, anchors, workflow, "
+         "Studio control in its own words), task (= boards), operations, rules, evaluator, program, anchors, workflow, "
          "docs:adl, docs:rules, docs:tsir, docs:phys. Optional `query` returns the window around a match "
          "(for site: the matching pages and controls).",
          obj({"section": s, "query": s}, ["section"])),
