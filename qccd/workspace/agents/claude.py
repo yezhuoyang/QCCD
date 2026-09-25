@@ -67,7 +67,7 @@ def find_claude() -> str | None:
 
 class ClaudeBridge:
     def __init__(self, state, session_id: str, exe: str, conversation: str, started: bool, model: str | None = None,
-                 effort: str | None = None):
+                 effort: str | None = None, folder: str | None = None):
         self.state = state
         self.sid = session_id
         self.exe = exe
@@ -75,6 +75,10 @@ class ClaudeBridge:
         self.started = started                   # the conversation exists: --resume, else --session-id
         self.model = model                       # --model (an alias such as opus), None: Claude Code's default
         self.effort = effort                     # --effort (low ... max), None: the model's default
+        # the folder the conversation lives in: Claude Code files conversations by the folder it ran
+        # in, so a workspace folder renamed or moved (the person may call it anything, and change
+        # their mind) cannot `--resume` the old one; it starts a new conversation there instead
+        self.folder = folder or str(state.ws.root)
         self.connected = True
         self.proc: subprocess.Popen | None = None
         self.active_turn: str | None = None
@@ -91,6 +95,11 @@ class ClaudeBridge:
             self.active_turn = turn
             self.turn_deliveries[turn] = delivery_id
             ws = self.state.ws
+            if self.started and _same_folder(self.folder, ws.root) is False:
+                self.conversation, self.started, self.folder = str(uuid.uuid4()), False, str(ws.root)
+                ws.emit("agent.message", {"session_id": self.sid, "turn_id": turn,
+                                          "text": "(This workspace folder was renamed or moved, so Claude starts a "
+                                                  "new conversation here. The earlier one stays with the old folder.)"})
             cfg = ws.root / ".qccd" / "claude-mcp.json"
             from ..installers import mcp_server_config
             cfg.parent.mkdir(parents=True, exist_ok=True)
@@ -149,7 +158,7 @@ class ClaudeBridge:
         """The session keeps what a restarted service needs to go on with the same conversation."""
         caps = dict(CAPABILITIES)
         caps["reattach"] = {"conversation": self.conversation, "started": self.started, "model": self.model,
-                            "effort": self.effort}
+                            "effort": self.effort, "folder": self.folder}
         caps["settings"] = {"model": self.model or "", "effort": self.effort or ""}
         try:
             self.state.ws.session_status(self.sid, "connected", detail="Claude Code (headless)", capabilities=caps)
@@ -279,6 +288,14 @@ def connect_claude(state, body: dict) -> dict:
             "note": "a NEW Claude Code conversation was started for this workspace"}
 
 
+def _same_folder(a, b) -> bool | None:
+    """Whether two paths name one folder (None when that cannot be told)."""
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except (OSError, TypeError, ValueError):
+        return None
+
+
 def reattach_claude_sessions(state) -> list:
     """After a service restart: the same conversations go on (each run resumes by id)."""
     out = []
@@ -291,7 +308,9 @@ def reattach_claude_sessions(state) -> list:
             out.append({"session_id": s["id"], "reattached": False, "why": "no claude executable or conversation"})
             continue
         state.bridges[s["id"]] = ClaudeBridge(state, s["id"], exe, ra["conversation"], bool(ra.get("started")),
-                                              model=ra.get("model"), effort=ra.get("effort"))
+                                              model=ra.get("model"), effort=ra.get("effort"),
+                                              # a session from before folders were recorded: assume it is here
+                                              folder=ra.get("folder") or str(state.ws.root))
         state.ws.session_status(s["id"], "connected", detail="the same Claude conversation goes on")
         out.append({"session_id": s["id"], "reattached": True})
     return out
