@@ -10,7 +10,7 @@ It runs the brief's sequence against the real system. The pieces are the workspa
 the Studio page in headless Chrome, the MCP adapter, the OCaml compiler, the Lean checker, the
 evaluator, and a development instance of the official service:
 
-1. open the `ghz4@1` starter design and connect the agent;
+1. open the starter design (the four-site chain of the GHZ starter board) and connect the agent;
 2. protect the gate zones C0 and C1, lasso the empty region right of C3, sketch an arrow,
    and send *"Use this structure here, but preserve these gate zones."*;
 3. the prompt is delivered, the agent changes the design, and the reply appears at the prompt;

@@ -1,6 +1,8 @@
 """`qccd` workspace commands.
 
-    qccd init my-designs                     a workspace for any number of designs and every board
+    qccd init [FOLDER]                       make FOLDER a workspace: any name you like, created if
+                                             missing (default: this folder); any number of designs,
+                                             every board
     qccd studio [--no-open] [--keep-alive]   start (or reuse) the service; open Studio paired;
                                              --keep-alive stays and restarts a killed service
     qccd serve                               run the service in the foreground
@@ -80,15 +82,44 @@ def _wait_job(info, job_id: str, timeout: float = 3600.0) -> dict:
 
 # ---------------------------------------------------------------------- commands
 
+#: what a person may name freely and what they type as shown -- said the same way by `qccd init`,
+#: by a command run outside a workspace, and by the website's setup panels (qccd/site)
+NAMES_ARE_YOURS = ("this folder (rename or move it while `qccd stop`ped), every design (in the Studio's "
+                   "design menu, or ask the agent), and the name shown if you publish")
+AS_SHOWN = ("the commands; a board by its title, or any part of it that is unambiguous (\"BB\", "
+            "\"surface code\"; `qccd boards` lists them)")
+
+
+def _not_a_workspace(cmd: str) -> int:
+    print(f"qccd {cmd}: this folder is not a QCCD workspace (there is no {_lock_name()} here or above).\n"
+          "  Make one here:              qccd init\n"
+          "  or a new folder, any name:  qccd init \"My QCCD designs\"   and then cd into it\n"
+          f"  then run `qccd {cmd}` again inside it.", file=sys.stderr)
+    return 2
+
+
+def _lock_name() -> str:
+    from .tasks import LOCK_NAME
+    return LOCK_NAME
+
+
 def cmd_init(a) -> int:
     from .app import Workspace
-    ws = Workspace.init(Path(a.dir), a.task, name=a.name, starter=not a.empty)
+    folder = Path(a.dir)
+    ws = Workspace.init(folder, a.task, name=a.name, starter=not a.empty)
     h = ws.head()
-    print(f"workspace in {ws.root}")
-    print(f"  design    {ws.design_title(ws.branch('main'))} (r{h.revision}): {ws.replayed().arch.name}, "
-          f"{len(ws.replayed().arch.device.nodes)} nodes")
-    print(f"  boards    any design can be submitted to: " + "; ".join(b["title"] for b in ws.boards()))
-    print("  next      cd into it; `qccd agent install --client codex|claude`; `qccd studio`")
+    here = folder.resolve() == Path.cwd().resolve()
+    print(f"workspace ready in {ws.root}")
+    print(f"  design    {ws.design_title(ws.branch('main'))} (r{h.revision}), {len(ws.replayed().arch.device.nodes)} "
+          "sites: rename it, or save more designs under any names, in the Studio")
+    print("  boards    any design can go to any of: " + "; ".join(b["title"] for b in ws.boards()))
+    print("  yours to name, anything you like:  " + NAMES_ARE_YOURS)
+    print("  type as shown:                     " + AS_SHOWN)
+    print("next:")
+    if not here:
+        print(f'  cd "{a.dir}"')
+    print("  qccd agent install --client codex     (or --client claude: the agent you have)")
+    print("  qccd studio")
     ws.close()
     return 0
 
@@ -460,8 +491,9 @@ def cmd_mcp(a) -> int:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="qccd", description="QCCD workspaces: local-first, agent-native co-design")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("init", help="create a workspace")
-    p.add_argument("dir")
+    p = sub.add_parser("init", help="make a folder a workspace (any name you like; default: this folder)")
+    p.add_argument("dir", nargs="?", default=".",
+                   help="the workspace folder: any name you like, created if missing (default: this folder)")
     p.add_argument("--task", default=None, help=argparse.SUPPRESS)       # the old pinned form; not needed
     p.add_argument("--name", default="design")
     p.add_argument("--empty", action="store_true", help="start from a blank canvas, not the release's starter")
@@ -532,11 +564,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "studio" and "--root" not in argv:
-        # outside a workspace, `qccd studio` keeps its old meaning: write the static page
+        # outside a workspace, `qccd studio -o page.html` (and its other page-writing options) keeps
+        # its old meaning: write the static page.  Bare `qccd studio` is a person following the
+        # setup steps from the wrong folder: say so, rather than quietly writing a file
         from .runtime import find_workspace_root
         try:
             find_workspace_root()
         except FileNotFoundError:
+            if all(x in ("studio", "--no-open", "--keep-alive") for x in argv):
+                return _not_a_workspace("studio")
             from ..__main__ import main as legacy
             return legacy(argv)
     if argv and argv[0] not in COMMANDS and argv[0] not in ("-h", "--help"):
@@ -562,6 +598,10 @@ def main(argv=None) -> int:
                 pass
     try:
         return fn(a)
+    except FileNotFoundError as exc:
+        if LOCK_NAME in str(exc) and a.cmd != "init":
+            return _not_a_workspace(a.cmd)
+        raise
     except WorkspaceError as exc:
         # a refusal the workspace explains itself: one line and what to do, not a traceback
         print(f"qccd {a.cmd}: {exc}", file=sys.stderr)

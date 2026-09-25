@@ -648,11 +648,17 @@ test circuit. `qccd toolchain status` says which compiler is in use: `QCCD_QCCDC
 one built in the checkout, then the installed one. How a release is built and published:
 `deploy/toolchain/README.md`.
 
-**One workspace, end to end:**
+**One workspace, end to end.** Two kinds of words below. **Yours to name, anything you
+like:** the workspace folder ("My QCCD designs" is only an example; `qccd init` with no name makes
+the folder you are in the workspace; rename or move it later while the service is stopped), every
+design (the Studio's design menu, `--design`, or ask the agent), and the name shown if you
+publish. **Type as shown:** the commands, and a board by its title or any unambiguous part of it
+(`"BB"`, `"surface code"`; `qccd boards` lists them). There is no task to choose: one workspace
+takes any number of designs to every board.
 
 ```bash
-qccd init my-designs                     # a workspace for any number of designs and every board
-cd my-designs
+qccd init "My QCCD designs"              # any folder name; or `qccd init` inside a folder you have
+cd "My QCCD designs"
 qccd agent install --client codex        # .agents/skills/qccd, .codex/config.toml block, AGENTS.md block
 qccd agent install --client claude --channel   # .claude/skills/qccd, .mcp.json "qccd", CLAUDE.md block
 qccd studio                              # starts the service, opens Studio paired (one-time code)
