@@ -190,7 +190,9 @@ BOARD_JS = r"""
   }
   function fmt(v){ return (typeof v === 'number') ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)) : '-'; }
   get('/tasks').then(function(t){
-    var tasks = (t && t.tasks) || [];
+    var tasks = ((t && t.tasks) || []).slice();
+    var rank = function(task){ var i = ORDER.indexOf(task.id); return i < 0 ? ORDER.length : i; };
+    tasks.sort(function(a, b){ return rank(a) - rank(b); });
     return Promise.all(tasks.map(function(task){
       return get('/leaderboard/' + encodeURIComponent(task.id)).then(function(b){ return { task: task, board: b }; });
     }));
@@ -199,7 +201,7 @@ BOARD_JS = r"""
     if (!all.length) { box.appendChild(el('p', 'qo-empty', 'The official server lists no tasks.')); return; }
     all.forEach(function(x){
       var sec = el('div', 'qo-task');
-      var h = el('h3', null, x.task.title || x.task.id); h.appendChild(el('small', null, x.task.id)); sec.appendChild(h);
+      var h = el('h3', null, x.task.title || x.task.id); sec.appendChild(h);
       var rows = x.board.rows || [];
       var unit = ((x.task.metrics || []).filter(function(m){ return m.name === x.board.rank_by; })[0] || {}).unit || '';
       if (!rows.length) {
@@ -238,10 +240,12 @@ grade, including the proved Lean checker. Only eligible, public submissions appe
 private one never does. This list is read live from the server.</p>
 <div id="qo-boards"><p class="qo-wait">Loading the official leaderboard...</p></div>
 <p class="note">To contribute a design: build it in the <a href="../studio.html?agent#design">Studio</a>,
-with an AI agent if you like (the Agent button there). Then, in your workspace,
-<code>qccd submit --local --wait</code> grades it on your machine, and
-<code>qccd publish --submission &lt;id&gt;</code> uploads it once you approve. The boards above
-carry the study's seed entries.</p>
+with an AI agent if you like (the Agent button there; ask it for the shape you want and the board).
+One workspace takes any number of designs to any of these boards. In the Studio, press
+"Submit to this board" under Results; in a terminal,
+<code>qccd submit --local --board "BB [[144,12,12]]" --design "My design" --wait</code>
+grades it on your machine for that board, and <code>qccd publish --submission &lt;id&gt;</code>
+uploads it once you approve. The boards above carry the study's seed entries.</p>
 </section>"""
 
 
@@ -255,8 +259,17 @@ def studio_block(root: str = "") -> str:
 
 
 def board_section() -> str:
-    """The Leaderboard's live Official submissions section (HTML with its style and script)."""
-    return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n<script>{BOARD_JS}</script>\n"
+    """The Leaderboard's live Official submissions section (HTML with its style and script).
+    The boards are listed in the website's own order, which the releases carry."""
+    import json
+    try:
+        from ..workspace.tasks import list_boards
+        order = [b.id for b in list_boards()]
+    except Exception:                      # the workspace package is optional for a site build
+        order = []
+    js = BOARD_JS.replace("var API = '/official/v1';",
+                          "var API = '/official/v1', ORDER = " + json.dumps(order) + ";")
+    return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n<script>{js}</script>\n"
 
 
 #: the note this section replaces on the board page (build.py wrote it before the official
