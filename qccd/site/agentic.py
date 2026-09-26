@@ -348,8 +348,10 @@ def _costs(meas: dict | None) -> str:
                '</thead><tbody>' + "".join(rows) + "</tbody></table>")
     sub = [r for r in runs if r.get("to_submission")]
     if sub:
-        out.append("<p><b>The design itself</b>, from the request to the submission (after it, the agent only waits for "
-                   "the reference grade, which takes minutes for this board):</p>")
+        last = runs[-1]
+        out.append("<p><b>The design itself</b>, from the request to the submission. After it the agent waits for the "
+                   "reference grade: minutes for this board until the Lean checker computed its replay once, seconds "
+                   f"since (the last run's whole turn, grade and verdict included, took {_dur(last['wall_ms'])}).</p>")
         rows = [f"<tr><td>{_e(r['label'])}</td><td class=n>{r['to_submission']['s']:.1f} s</td>"
                 f"<td class=n>{r['to_submission']['model_calls']}</td><td class=n>{_dur(r['to_submission']['model_ms'])}</td>"
                 f"<td class=n>{_dur(r['to_submission']['tool_ms'])}</td><td class=n>{_dur(r['to_submission']['page_ms'])}</td>"
@@ -357,20 +359,13 @@ def _costs(meas: dict | None) -> str:
         out.append('<table class="ag-t"><thead><tr><th>run</th><th>submitted after</th><th>model calls</th><th>model</th>'
                    '<th>tools</th><th>page</th><th>starting the agent</th></tr></thead><tbody>' + "".join(rows)
                    + "</tbody></table>")
-        if len(runs) > 1:
-            out.append("<p>What changed between the two runs, each change made because the earlier run's program "
-                       "showed its cost:</p><ul>"
-                       "<li>One model call spent 57.5 s working out 24 dock coordinates. The operation "
-                       "<code>add_docks</code> now computes them from a count in 0.3 s, and the slowest model call "
-                       "fell to 9.0 s.</li>"
-                       "<li>76 model calls polled the grade every few seconds. <code>qccd_get_job</code> now waits up to "
-                       "50 s inside one call.</li>"
-                       "<li>Every change was previewed and then applied, a model call apart. The agent is now told to "
-                       "apply directly when confident, since an applied change is validated the same way and can be "
-                       "undone.</li>"
-                       "<li>The agent tried to schedule a check-in that could not outlive its turn. Scheduling tools are "
-                       "denied, and it now follows the grade to the end, which is why the later run's wall time is "
-                       "longer: it includes the whole grade.</li></ul>")
+        rounds = [(runs[i - 1]["label"], r["label"], CHANGES[r["label"]]) for i, r in enumerate(runs)
+                  if i and r["label"] in CHANGES]
+        if rounds:
+            out.append("<p>What changed between the runs, each change made because the earlier run's program "
+                       "showed its cost:</p>")
+            for a, b, items in rounds:
+                out.append(f"<p><b>{_e(a)} → {_e(b)}</b></p><ul>" + "".join(f"<li>{x}</li>" for x in items) + "</ul>")
     out.append("<p><b>Time.</b> A model call costs seconds and a tool call milliseconds (the tool table above has the "
                "in-tool times). So a design is fast when it takes few model calls: batch operations, apply without "
                "an extra preview, wait on a job inside one call instead of polling.</p>"
@@ -383,8 +378,42 @@ def _costs(meas: dict | None) -> str:
     return "".join(out)
 
 
+#: what changed before each measured run, by the run's label: every item was found in the earlier
+#: run's program, and the numbers are that run's and this one's
+CHANGES = {
+    "after (2026-09-26)": [
+        "One model call spent 57.5 s working out 24 dock coordinates. The operation <code>add_docks</code> now "
+        "computes them from a count in 0.3 s, and the slowest model call fell to 9.0 s.",
+        "76 model calls polled the grade every few seconds. <code>qccd_get_job</code> now waits up to 50 s inside "
+        "one call.",
+        "Every change was previewed and then applied, a model call apart. The agent is now told to apply directly "
+        "when confident, since an applied change is validated the same way and can be undone.",
+        "The agent tried to schedule a check-in that could not outlive its turn. Scheduling tools are denied, and it "
+        "now follows the grade to the end, which is why this run's wall time is longer: it includes the whole "
+        "grade.",
+    ],
+    "now (2026-09-26, later)": [
+        "The grade took 11 minutes, 93% of it the Lean certificate check. The compiled checker replayed the "
+        "certificate about 3,700 times instead of once. Its decision procedure now computes the replay once; the "
+        "specification it decides and its soundness theorem are unchanged. The check went from 623 s to under a "
+        "second, and the whole grade from 667 s to 12 s.",
+        "Claude Code started again for every message, 7 to 9 s each time. It is now one process per conversation, "
+        "kept alive between messages and started before the first one: when a page with the chat opens, or when the "
+        "person starts typing. The start of the run fell from 8.8 s to 0.1 s.",
+        "The agent had all of Claude Code's own tools and bundled skills. Twice it lost about 9 s to a research "
+        "skill it had opened by accident. It now gets only Read, Grep and Glob of them, and a wait for the QCCD tools "
+        "to connect; its first model call read 13k tokens instead of 27k.",
+        "Thinking effort now defaults to medium, which halved each model call (4.2 s against 8.3 s) with the "
+        "same design.",
+        "One <code>qccd_get_job</code> call follows a submission through its compile and its grade and returns the "
+        "verdict. The chat shows the submission as a card that follows it too. A submission right after a run adopts "
+        "that run's compile instead of compiling again.",
+    ],
+}
+
+
 def _harness(meas: dict | None) -> str:
-    from ..workspace.agents.claude import ALLOWED, DENIED, SYSTEM_NOTE
+    from ..workspace.agents.claude import ALLOWED, BUILTIN_TOOLS, DEFAULT_EFFORT, DENIED, SYSTEM_NOTE
     from ..workspace.mcp_server import INSTRUCTIONS
     ex = (meas or {}).get("excerpt") or {}
     out = ["<p>An agent is told what to do in four layers. Each is text in the code, shown here as it is.</p>",
@@ -403,9 +432,14 @@ def _harness(meas: dict | None) -> str:
     if ex.get("harness"):
         out.append(f'<details class="ag-d"><summary>A request as the agent received it ({len(ex["harness"])} characters; '
                    f"internal ids replaced by names)</summary><pre>{_e(ex['harness'])}</pre></details>")
-    out.append("<p>Claude Code runs once per message, with <code>--permission-mode dontAsk</code> (nothing waits for a "
-               "person to approve a prompt), <code>--strict-mcp-config</code> (only the QCCD server), and tool search off "
-               "(so all QCCD tools are loaded from the first call). Allowed: " + _code(ALLOWED) + ". Denied: "
+    out.append("<p>Claude Code runs as one process per conversation (<code>--input-format stream-json</code>), kept "
+               "alive between messages and started before the first one: when a page with the chat opens, or when the "
+               "person starts typing. It runs with <code>--permission-mode dontAsk</code> (nothing waits for a person to "
+               "approve a prompt), <code>--strict-mcp-config</code> (only the QCCD server), and tool search off (so all "
+               "QCCD tools are loaded from the first call). Of its own tools it gets only " + _code(BUILTIN_TOOLS)
+               + " (<code>--tools</code>), with no bundled skills or slash commands. Its thinking effort is "
+               "<code>" + _e(DEFAULT_EFFORT) + "</code> unless the person picks another. Allowed: " + _code(ALLOWED)
+               + ". Denied: "
                + _code(DENIED) + ". The denied ones either change files or schedule work that cannot outlive a "
                "single run. Its standing note:</p><pre>" + _e(SYSTEM_NOTE) + "</pre>"
                "<p>Codex runs through its app server, with the QCCD tools pre-approved: the workspace authorises "

@@ -153,6 +153,83 @@
     "tool_ms": 20278,
     "page_ms": 10849
    }
+  },
+  {
+   "label": "now (2026-09-26, later)",
+   "date": 1790449914.21,
+   "request": "I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode",
+   "model": "claude-opus-4-8[1m]",
+   "wall_ms": 63765,
+   "by_machine_ms": {
+    "model": 46861,
+    "tools": 15129,
+    "page": 1711,
+    "boot": 91
+   },
+   "model_calls": 10,
+   "calls": 9,
+   "polls": 1,
+   "commits": 3,
+   "cost_usd": 0.4772685,
+   "memory_first": 13125,
+   "memory_peak": 32029,
+   "tokens_total": {
+    "in": 771,
+    "cache_read": 181469,
+    "cache_write": 32027,
+    "out": 2453
+   },
+   "start_ms": 91,
+   "think_ms": {
+    "median": 4725.5,
+    "p90": 9817,
+    "max": 9817
+   },
+   "slowest": [
+    {
+     "i": 25,
+     "op": "call",
+     "ms": 14734,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 21,
+     "op": "think",
+     "ms": 9817,
+     "what": "think"
+    },
+    {
+     "i": 7,
+     "op": "think",
+     "ms": 9476,
+     "what": "think"
+    },
+    {
+     "i": 26,
+     "op": "think",
+     "ms": 6794,
+     "what": "think"
+    },
+    {
+     "i": 18,
+     "op": "think",
+     "ms": 4791,
+     "what": "think"
+    },
+    {
+     "i": 15,
+     "op": "think",
+     "ms": 4759,
+     "what": "think"
+    }
+   ],
+   "to_submission": {
+    "s": 37.531,
+    "model_calls": 8,
+    "model_ms": 35375,
+    "tool_ms": 354,
+    "page_ms": 1711
+   }
   }
  ],
  "tools": {
@@ -197,11 +274,11 @@
    "result_tokens_est_median": 3
   },
   "qccd_apply_change_set": {
-   "n": 5,
-   "exec_ms_median": 167.9,
+   "n": 6,
+   "exec_ms_median": 155.2,
    "exec_ms_max": 1556.5,
-   "ms_median": 201,
-   "result_chars_median": 4131,
+   "ms_median": 181.0,
+   "result_chars_median": 4133.0,
    "result_tokens_est_median": 1033
   },
   "qccd_get_context": {
@@ -213,19 +290,19 @@
    "result_tokens_est_median": 2459
   },
   "qccd_get_job": {
-   "n": 89,
-   "exec_ms_median": 4.5,
+   "n": 90,
+   "exec_ms_median": 4.6,
    "exec_ms_max": 51027.0,
-   "ms_median": 26,
-   "result_chars_median": 730,
+   "ms_median": 26.5,
+   "result_chars_median": 730.0,
    "result_tokens_est_median": 182
   },
   "qccd_manage_branch": {
-   "n": 2,
-   "exec_ms_median": 20.8,
+   "n": 3,
+   "exec_ms_median": 11.1,
    "exec_ms_max": 30.5,
-   "ms_median": 64.5,
-   "result_chars_median": 288.0,
+   "ms_median": 47,
+   "result_chars_median": 288,
    "result_tokens_est_median": 72
   },
   "qccd_manage_comment": {
@@ -237,12 +314,12 @@
    "result_tokens_est_median": 893
   },
   "qccd_page_act": {
-   "n": 7,
-   "exec_ms_median": 1130.8,
+   "n": 9,
+   "exec_ms_median": 890.1,
    "exec_ms_max": 4295.8,
-   "ms_median": 1277,
-   "result_chars_median": 599,
-   "result_tokens_est_median": 150
+   "ms_median": 916,
+   "result_chars_median": 623,
+   "result_tokens_est_median": 156
   },
   "qccd_page_read": {
    "n": 1,
@@ -253,11 +330,11 @@
    "result_tokens_est_median": 2748
   },
   "qccd_present": {
-   "n": 4,
-   "exec_ms_median": 8.9,
-   "exec_ms_max": 10.7,
-   "ms_median": 43.5,
-   "result_chars_median": 238.0,
+   "n": 5,
+   "exec_ms_median": 9.8,
+   "exec_ms_max": 22.9,
+   "ms_median": 44,
+   "result_chars_median": 238,
    "result_tokens_est_median": 60
   },
   "qccd_query_design": {
@@ -269,12 +346,12 @@
    "result_tokens_est_median": 214
   },
   "qccd_read_reference": {
-   "n": 2,
+   "n": 4,
    "exec_ms_median": 25.4,
-   "exec_ms_max": 30.7,
+   "exec_ms_max": 33.5,
    "ms_median": 57.5,
-   "result_chars_median": 8058.5,
-   "result_tokens_est_median": 2015
+   "result_chars_median": 8306.0,
+   "result_tokens_est_median": 2076
   },
   "qccd_run_program": {
    "n": 2,
@@ -285,11 +362,11 @@
    "result_tokens_est_median": 725
   },
   "qccd_submit_local": {
-   "n": 2,
-   "exec_ms_median": 2095.7,
+   "n": 3,
+   "exec_ms_median": 17.8,
    "exec_ms_max": 4173.6,
-   "ms_median": 1935.5,
-   "result_chars_median": 261.0,
+   "ms_median": 41,
+   "result_chars_median": 261,
    "result_tokens_est_median": 65
   }
  },
@@ -299,12 +376,12 @@
    "ms_median": 2215.9
   },
   "studio newCanvas": {
-   "n": 2,
-   "ms_median": 788.3
+   "n": 3,
+   "ms_median": 771.8
   },
   "studio sketchDraw": {
-   "n": 2,
-   "ms_median": 830.3
+   "n": 3,
+   "ms_median": 885.3
   },
   "wait": {
    "n": 1,
@@ -312,138 +389,114 @@
   }
  },
  "excerpt": {
-  "label": "after (2026-09-26)",
+  "label": "now (2026-09-26, later)",
   "summary": {
-   "wall_ms": 723335,
+   "wall_ms": 63765,
    "by_machine_ms": {
-    "model": 110372,
-    "tools": 601770,
-    "page": 10849,
-    "boot": 8809
+    "model": 46861,
+    "tools": 15129,
+    "page": 1711,
+    "boot": 91
    },
    "other_ms": 0,
-   "model_calls": 29,
-   "calls": 28,
-   "polls": 13,
+   "model_calls": 10,
+   "calls": 9,
+   "polls": 1,
    "by_tool": {
     "qccd_get_job": {
-     "n": 13,
-     "ms": 581431,
-     "exec_ms": 581741.2,
-     "result_chars": 10120
-    },
-    "qccd_run_program": {
      "n": 1,
-     "ms": 19758,
-     "exec_ms": 19741.3,
-     "result_chars": 2902
+     "ms": 14734,
+     "exec_ms": 14772.6,
+     "result_chars": 1141
     },
     "qccd_page_act": {
-     "n": 4,
-     "ms": 10849,
-     "exec_ms": 10065.400000000001,
-     "result_chars": 2941
+     "n": 2,
+     "ms": 1711,
+     "exec_ms": 1656.1,
+     "result_chars": 2623
     },
     "qccd_apply_change_set": {
-     "n": 3,
-     "ms": 249,
-     "exec_ms": 176.70000000000002,
-     "result_chars": 4421
-    },
-    "qccd_manage_branch": {
      "n": 1,
-     "ms": 82,
-     "exec_ms": 11.1,
-     "result_chars": 288
-    },
-    "qccd_get_context": {
-     "n": 1,
-     "ms": 53,
-     "exec_ms": 12.5,
-     "result_chars": 10077
+     "ms": 161,
+     "exec_ms": 142.4,
+     "result_chars": 4135
     },
     "qccd_read_reference": {
-     "n": 1,
-     "ms": 52,
-     "exec_ms": 20.2,
-     "result_chars": 8106
+     "n": 2,
+     "ms": 125,
+     "exec_ms": 49.3,
+     "result_chars": 20530
     },
     "qccd_present": {
      "n": 1,
-     "ms": 52,
-     "exec_ms": 9.8,
+     "ms": 44,
+     "exec_ms": 22.9,
      "result_chars": 238
     },
     "qccd_submit_local": {
      "n": 1,
-     "ms": 38,
-     "exec_ms": 17.8,
-     "result_chars": 261
+     "ms": 41,
+     "exec_ms": 14.6,
+     "result_chars": 452
     },
-    "qccd_manage_comment": {
+    "qccd_manage_branch": {
      "n": 1,
-     "ms": 32,
-     "exec_ms": 5.4,
-     "result_chars": 3405
-    },
-    "WaitForMcpServers": {
-     "n": 1,
-     "ms": 23,
-     "exec_ms": 0,
-     "result_chars": 11
+     "ms": 24,
+     "exec_ms": 6.0,
+     "result_chars": 289
     }
    },
    "commits": 3,
-   "memory_peak": 59998,
-   "memory_first": 27352,
+   "memory_peak": 32029,
+   "memory_first": 13125,
    "tokens_out": null,
    "slowest": [
     {
-     "i": 65,
+     "i": 25,
      "op": "call",
-     "ms": 51060,
+     "ms": 14734,
      "what": "qccd_get_job"
     },
     {
-     "i": 63,
-     "op": "call",
-     "ms": 50960,
-     "what": "qccd_get_job"
+     "i": 21,
+     "op": "think",
+     "ms": 9817,
+     "what": "think"
     },
     {
-     "i": 67,
-     "op": "call",
-     "ms": 50419,
-     "what": "qccd_get_job"
+     "i": 7,
+     "op": "think",
+     "ms": 9476,
+     "what": "think"
     },
     {
-     "i": 57,
-     "op": "call",
-     "ms": 50406,
-     "what": "qccd_get_job"
+     "i": 26,
+     "op": "think",
+     "ms": 6794,
+     "what": "think"
     },
     {
-     "i": 59,
-     "op": "call",
-     "ms": 50336,
-     "what": "qccd_get_job"
+     "i": 18,
+     "op": "think",
+     "ms": 4791,
+     "what": "think"
     },
     {
-     "i": 61,
-     "op": "call",
-     "ms": 50278,
-     "what": "qccd_get_job"
+     "i": 15,
+     "op": "think",
+     "ms": 4759,
+     "what": "think"
     }
    ],
-   "cost_usd": 1.6651244999999992,
-   "reported_model_calls": 29,
-   "api_ms": 109432,
+   "cost_usd": 0.4772685,
+   "reported_model_calls": 10,
+   "api_ms": 48101,
    "status": "success",
    "tokens_total": {
-    "in": 3573,
-    "cache_read": 1295453,
-    "cache_write": 84970,
-    "out": 5954
+    "in": 771,
+    "cache_read": 181469,
+    "cache_write": 32027,
+    "out": 2453
    }
   },
   "instructions": [
@@ -459,19 +512,19 @@
     "i": 1,
     "op": "boot",
     "t": 0.0,
-    "ms": 8809,
+    "ms": 91,
     "machine": "-",
     "model": "claude-opus-4-8[1m]",
-    "tools": 17,
-    "qccd_tools": 0
+    "tools": 23,
+    "qccd_tools": 20
    },
    {
     "i": 2,
     "op": "think",
-    "t": 8.809,
-    "ms": 5393,
+    "t": 0.091,
+    "ms": 3055,
     "machine": "M",
-    "memory": 27352,
+    "memory": 13125,
     "blocks": {
      "thinking": 1,
      "say": 1,
@@ -481,32 +534,34 @@
    {
     "i": 3,
     "op": "say",
-    "t": 14.144,
+    "t": 2.608,
     "ms": 0,
     "machine": "-",
-    "text": "I'll start by reading the reference material and the frozen context so I build the right thing."
+    "text": "I'll start by reading the design reference to understand what the BB code board needs and how to build a triangle-shaped device."
    },
    {
     "i": 4,
     "op": "call",
-    "t": 14.202,
-    "ms": 23,
-    "machine": "-",
-    "tool": "WaitForMcpServers",
-    "args": {},
+    "t": 3.146,
+    "ms": 79,
+    "machine": "T",
+    "tool": "qccd_read_reference",
+    "args": {
+     "section": "design"
+    },
     "ok": true,
-    "result_chars": 11,
+    "exec_ms": 33.5,
+    "result_chars": 8506,
     "effects": []
    },
    {
     "i": 5,
     "op": "think",
-    "t": 14.225,
-    "ms": 2933,
+    "t": 3.225,
+    "ms": 397,
     "machine": "M",
-    "memory": 33467,
     "blocks": {
-     "thinking": 1,
+     "thinking": 0,
      "say": 0,
      "call": 1
     }
@@ -514,80 +569,26 @@
    {
     "i": 6,
     "op": "call",
-    "t": 17.158,
-    "ms": 52,
+    "t": 3.622,
+    "ms": 46,
     "machine": "T",
     "tool": "qccd_read_reference",
     "args": {
-     "section": "design"
+     "section": "boards",
+     "query": "BB [[144,12,12]]"
     },
     "ok": true,
-    "exec_ms": 20.2,
-    "result_chars": 8106,
+    "exec_ms": 15.8,
+    "result_chars": 12024,
     "effects": []
    },
    {
     "i": 7,
     "op": "think",
-    "t": 17.21,
-    "ms": 978,
+    "t": 3.668,
+    "ms": 9476,
     "machine": "M",
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 8,
-    "op": "call",
-    "t": 18.188,
-    "ms": 32,
-    "machine": "T",
-    "tool": "qccd_manage_comment",
-    "args": {
-     "action": "get",
-     "prompt_id": "<the request>"
-    },
-    "ok": true,
-    "exec_ms": 5.4,
-    "result_chars": 3405,
-    "effects": []
-   },
-   {
-    "i": 9,
-    "op": "think",
-    "t": 18.22,
-    "ms": 289,
-    "machine": "M",
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 10,
-    "op": "call",
-    "t": 18.509,
-    "ms": 53,
-    "machine": "T",
-    "tool": "qccd_get_context",
-    "args": {
-     "detail": "full"
-    },
-    "ok": true,
-    "exec_ms": 12.5,
-    "result_chars": 10077,
-    "effects": []
-   },
-   {
-    "i": 11,
-    "op": "think",
-    "t": 18.562,
-    "ms": 7441,
-    "machine": "M",
-    "memory": 44126,
+    "memory": 25550,
     "blocks": {
      "thinking": 1,
      "say": 1,
@@ -595,28 +596,29 @@
     }
    },
    {
-    "i": 12,
+    "i": 8,
     "op": "say",
-    "t": 25.018,
+    "t": 11.888,
     "ms": 0,
     "machine": "-",
-    "text": "I've got the recipe. For BBCode the conveyor needs **one closed loop** carrying the data, with **docks** (gate sites just off the loop). So I'll make the large triangle the loop and place the docks one unit inside its sides — together they trace the smaller triangle. That's why it's not two separate loops: the conveyor drives only one loop, and two uncoupled loops could never exchange qubits.\n\nLet me create the design and open it in your Studio."
+    "text": "I have what I need. The BB board wants ONE closed loop (the conveyor) plus docks. So I'll make your **large triangle the loop** and place the docks one unit inside its sides — those docks together trace out the **smaller triangle**. They can't be a second separate loop: the conveyor drives only one loop, and two uncoupled loops would never let their qubits meet.\n\nLet me create the design and open it in your Studio."
    },
    {
-    "i": 13,
+    "i": 9,
     "op": "call",
-    "t": 26.003,
-    "ms": 82,
+    "t": 13.144,
+    "ms": 24,
     "machine": "T",
     "tool": "qccd_manage_branch",
     "args": {
      "action": "create",
      "title": "Two triangles",
-     "origin_prompt_id": "<the request>"
+     "origin_prompt_id": "<the request>",
+     "request_id": "create-two-triangles-1"
     },
     "ok": true,
-    "exec_ms": 11.1,
-    "result_chars": 288,
+    "exec_ms": 6.0,
+    "result_chars": 289,
     "effects": [
      {
       "kind": "design",
@@ -626,34 +628,41 @@
     ]
    },
    {
-    "i": 14,
+    "i": 10,
     "op": "think",
-    "t": 26.085,
-    "ms": 5376,
+    "t": 13.168,
+    "ms": 2683,
     "machine": "M",
-    "memory": 44747,
+    "memory": 26220,
     "blocks": {
-     "thinking": 1,
-     "say": 0,
+     "thinking": 0,
+     "say": 1,
      "call": 1
     }
    },
    {
-    "i": 15,
+    "i": 11,
+    "op": "say",
+    "t": 15.038,
+    "ms": 0,
+    "machine": "-",
+    "text": "I'll switch your Studio to it and clear the canvas."
+   },
+   {
+    "i": 12,
     "op": "call",
-    "t": 31.461,
-    "ms": 52,
+    "t": 15.851,
+    "ms": 44,
     "machine": "T",
     "tool": "qccd_present",
     "args": {
      "action": "open_branch",
      "target": {
       "branch": "Two triangles"
-     },
-     "note": "New design: a large triangle loop with a smaller triangle of docks inside"
+     }
     },
     "ok": true,
-    "exec_ms": 9.8,
+    "exec_ms": 22.9,
     "result_chars": 238,
     "effects": [
      {
@@ -664,31 +673,22 @@
     ]
    },
    {
-    "i": 16,
+    "i": 13,
     "op": "think",
-    "t": 31.513,
-    "ms": 2087,
+    "t": 15.895,
+    "ms": 397,
     "machine": "M",
-    "memory": 45188,
     "blocks": {
      "thinking": 0,
-     "say": 1,
+     "say": 0,
      "call": 1
     }
    },
    {
-    "i": 17,
-    "op": "say",
-    "t": 33.123,
-    "ms": 0,
-    "machine": "-",
-    "text": "Now I'll clear the canvas on this design."
-   },
-   {
-    "i": 18,
+    "i": 14,
     "op": "call",
-    "t": 33.6,
-    "ms": 847,
+    "t": 16.292,
+    "ms": 795,
     "machine": "P",
     "tool": "qccd_page_act",
     "args": {
@@ -696,7 +696,7 @@
      "verb": "newCanvas"
     },
     "ok": true,
-    "exec_ms": 812.6,
+    "exec_ms": 766.0,
     "result_chars": 623,
     "effects": [
      {
@@ -708,18 +708,18 @@
     ],
     "page": {
      "action": "studio",
-     "ms": 804.8,
+     "ms": 758.5,
      "ok": true,
      "verb": "newCanvas"
     }
    },
    {
-    "i": 19,
+    "i": 15,
     "op": "think",
-    "t": 34.447,
-    "ms": 5684,
+    "t": 17.087,
+    "ms": 4759,
     "machine": "M",
-    "memory": 45703,
+    "memory": 26878,
     "blocks": {
      "thinking": 1,
      "say": 1,
@@ -727,18 +727,18 @@
     }
    },
    {
-    "i": 20,
+    "i": 16,
     "op": "say",
-    "t": 38.912,
+    "t": 20.34,
     "ms": 0,
     "machine": "-",
-    "text": "Canvas is clear. Now I'll draw the large triangle as one closed loop — using the measured side-50 outline with cut corners (so every corner is ≥120°, satisfying the min-angle rule) that lands as exactly 144 sites."
+    "text": "Canvas is clear (revision 1). Now I'll draw the large triangle as one closed loop — using the measured 144-site outline (corners cut to 120° so it passes the 60° rule)."
    },
    {
-    "i": 21,
+    "i": 17,
     "op": "call",
-    "t": 40.131,
-    "ms": 1277,
+    "t": 21.846,
+    "ms": 916,
     "machine": "P",
     "tool": "qccd_page_act",
     "args": {
@@ -779,7 +779,7 @@
      ]
     },
     "ok": true,
-    "exec_ms": 1130.8,
+    "exec_ms": 890.1,
     "result_chars": 2000,
     "effects": [
      {
@@ -791,18 +791,18 @@
     ],
     "page": {
      "action": "studio",
-     "ms": 1122.1,
+     "ms": 885.3,
      "ok": true,
      "verb": "sketchDraw"
     }
    },
    {
-    "i": 22,
+    "i": 18,
     "op": "think",
-    "t": 41.408,
-    "ms": 5277,
+    "t": 22.762,
+    "ms": 4791,
     "machine": "M",
-    "memory": 47267,
+    "memory": 28328,
     "blocks": {
      "thinking": 1,
      "say": 1,
@@ -810,122 +810,36 @@
     }
    },
    {
-    "i": 23,
+    "i": 19,
     "op": "say",
-    "t": 44.667,
+    "t": 25.363,
     "ms": 0,
     "machine": "-",
-    "text": "The large triangle is one closed loop of 144 sites, no geometry problems. Now the smaller triangle: 24 docks spread evenly one unit inside the sides."
+    "text": "The large triangle is a 144-site closed loop, no problems. Now the 24 docks, placed evenly one unit inside the sides — these trace your smaller triangle."
    },
    {
-    "i": 24,
+    "i": 20,
     "op": "call",
-    "t": 46.685,
-    "ms": 29,
+    "t": 27.553,
+    "ms": 161,
     "machine": "T",
     "tool": "qccd_apply_change_set",
     "args": {
      "expected_revision": 2,
-     "request_id": "dock-24-v1",
+     "request_id": "add-docks-24-1",
      "mode": "apply",
-     "origin_prompt_id": "<the request>",
-     "summary": "Add 24 docks inside the triangle loop (the smaller triangle)",
      "operations": [
       {
        "type": "add_docks",
        "count": 24
       }
-     ]
-    },
-    "ok": false,
-    "exec_ms": 4.8,
-    "result_chars": 144,
-    "effects": []
-   },
-   {
-    "i": 25,
-    "op": "think",
-    "t": 46.714,
-    "ms": 4638,
-    "machine": "M",
-    "memory": 47696,
-    "blocks": {
-     "thinking": 1,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 26,
-    "op": "say",
-    "t": 49.465,
-    "ms": 0,
-    "machine": "-",
-    "text": "The change set targeted main — I need to point it at the new design."
-   },
-   {
-    "i": 27,
-    "op": "call",
-    "t": 51.352,
-    "ms": 19,
-    "machine": "T",
-    "tool": "qccd_apply_change_set",
-    "args": {
-     "branch": "Two triangles",
-     "expected_revision": 2,
-     "request_id": "dock-24-v1",
-     "mode": "apply",
+     ],
      "origin_prompt_id": "<the request>",
-     "summary": "Add 24 docks inside the triangle loop (the smaller triangle)",
-     "operations": [
-      {
-       "type": "add_docks",
-       "count": 24
-      }
-     ]
-    },
-    "ok": false,
-    "exec_ms": 4.0,
-    "result_chars": 146,
-    "effects": []
-   },
-   {
-    "i": 28,
-    "op": "think",
-    "t": 51.371,
-    "ms": 3279,
-    "machine": "M",
-    "memory": 48139,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 29,
-    "op": "call",
-    "t": 54.65,
-    "ms": 201,
-    "machine": "T",
-    "tool": "qccd_apply_change_set",
-    "args": {
-     "branch": "Two triangles",
-     "expected_revision": 2,
-     "request_id": "dock-24-v1",
-     "mode": "apply",
-     "origin_prompt_id": "<the request>",
-     "summary": "Add 24 docks inside the triangle loop (the smaller triangle)",
-     "operations": [
-      {
-       "type": "add_docks",
-       "count": 24
-      }
-     ]
+     "summary": "Add 24 docks inside the triangle loop (the smaller triangle)"
     },
     "ok": true,
-    "exec_ms": 167.9,
-    "result_chars": 4131,
+    "exec_ms": 142.4,
+    "result_chars": 4135,
     "effects": [
      {
       "kind": "commit",
@@ -936,12 +850,12 @@
     ]
    },
    {
-    "i": 30,
+    "i": 21,
     "op": "think",
-    "t": 54.851,
-    "ms": 7323,
+    "t": 27.714,
+    "ms": 9817,
     "machine": "M",
-    "memory": 50510,
+    "memory": 30741,
     "blocks": {
      "thinking": 1,
      "say": 1,
@@ -949,153 +863,29 @@
     }
    },
    {
-    "i": 31,
+    "i": 22,
     "op": "say",
-    "t": 61.184,
+    "t": 36.398,
     "ms": 0,
     "machine": "-",
-    "text": "24 docks placed, one per rail off the loop, no problems. Now I'll run the BB syndrome round on this design to confirm it's sound before submitting."
+    "text": "The design is complete: a 144-site triangular loop with 24 docks tracing the inner triangle, no problems reported. This is the measured known-good BB geometry. Submitting to the BB board now."
    },
    {
-    "i": 32,
+    "i": 23,
     "op": "call",
-    "t": 62.174,
-    "ms": 19758,
-    "machine": "T",
-    "tool": "qccd_run_program",
-    "args": {
-     "program": "bb",
-     "draft": "Two triangles",
-     "origin_prompt_id": "<the request>",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 19741.3,
-    "result_chars": 2902,
-    "effects": [
-     {
-      "kind": "job",
-      "job": "job_…",
-      "tool": "qccd_run_program",
-      "status": "succeeded"
-     }
-    ]
-   },
-   {
-    "i": 33,
-    "op": "think",
-    "t": 81.932,
-    "ms": 4017,
-    "machine": "M",
-    "memory": 52301,
-    "blocks": {
-     "thinking": 1,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 34,
-    "op": "say",
-    "t": 85.491,
-    "ms": 0,
-    "machine": "-",
-    "text": "It runs clean — **496.84 ms per round, every rule passing**. Let me play the run on your screen, then submit for the reference grade."
-   },
-   {
-    "i": 35,
-    "op": "call",
-    "t": 85.949,
-    "ms": 4419,
-    "machine": "P",
-    "tool": "qccd_page_act",
-    "args": {
-     "action": "step",
-     "play": true
-    },
-    "ok": true,
-    "exec_ms": 4295.8,
-    "result_chars": 175,
-    "effects": [],
-    "page": {
-     "action": "step",
-     "ms": 2921.3,
-     "ok": true,
-     "verb": null
-    }
-   },
-   {
-    "i": 36,
-    "op": "think",
-    "t": 90.368,
-    "ms": 4485,
-    "machine": "M",
-    "memory": 52708,
-    "blocks": {
-     "thinking": 1,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 37,
-    "op": "call",
-    "t": 94.853,
-    "ms": 4306,
-    "machine": "P",
-    "tool": "qccd_page_act",
-    "args": {
-     "action": "wait",
-     "ms": 2500,
-     "note": "Playing the BB round on the two-triangle design"
-    },
-    "ok": true,
-    "exec_ms": 3826.2,
-    "result_chars": 143,
-    "effects": [],
-    "page": {
-     "action": "wait",
-     "ms": 3128.0,
-     "ok": true,
-     "verb": null
-    }
-   },
-   {
-    "i": 38,
-    "op": "think",
-    "t": 99.159,
-    "ms": 3507,
-    "machine": "M",
-    "memory": 53016,
-    "blocks": {
-     "thinking": 0,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 39,
-    "op": "say",
-    "t": 101.357,
-    "ms": 0,
-    "machine": "-",
-    "text": "The design is sound. Now I'll submit it to the **BB [[144,12,12]]** board for the full reference grade (rules, Lean certificate, semantics, metrics). This takes several minutes."
-   },
-   {
-    "i": 40,
-    "op": "call",
-    "t": 102.666,
-    "ms": 38,
+    "t": 37.531,
+    "ms": 41,
     "machine": "T",
     "tool": "qccd_submit_local",
     "args": {
      "design": "Two triangles",
      "board": "BB [[144,12,12]]",
-     "origin_prompt_id": "<the request>"
+     "origin_prompt_id": "<the request>",
+     "request_id": "submit-two-triangles-bb-1"
     },
     "ok": true,
-    "exec_ms": 17.8,
-    "result_chars": 261,
+    "exec_ms": 14.6,
+    "result_chars": 452,
     "effects": [
      {
       "kind": "job",
@@ -1106,12 +896,12 @@
     ]
    },
    {
-    "i": 41,
+    "i": 24,
     "op": "think",
-    "t": 102.704,
-    "ms": 1748,
+    "t": 37.572,
+    "ms": 4692,
     "machine": "M",
-    "memory": 53319,
+    "memory": 31396,
     "blocks": {
      "thinking": 0,
      "say": 0,
@@ -1119,10 +909,10 @@
     }
    },
    {
-    "i": 42,
+    "i": 25,
     "op": "call",
-    "t": 104.452,
-    "ms": 10437,
+    "t": 42.264,
+    "ms": 14734,
     "machine": "T",
     "tool": "qccd_get_job",
     "args": {
@@ -1130,8 +920,8 @@
      "wait_s": 50
     },
     "ok": true,
-    "exec_ms": 10143.4,
-    "result_chars": 808,
+    "exec_ms": 14772.6,
+    "result_chars": 1141,
     "effects": [
      {
       "kind": "poll",
@@ -1142,476 +932,12 @@
     ]
    },
    {
-    "i": 43,
+    "i": 26,
     "op": "think",
-    "t": 114.889,
-    "ms": 4937,
+    "t": 56.998,
+    "ms": 6794,
     "machine": "M",
-    "memory": 53795,
-    "blocks": {
-     "thinking": 1,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 44,
-    "op": "say",
-    "t": 118.026,
-    "ms": 0,
-    "machine": "-",
-    "text": "Compiled and frozen. Now the reference grading is running (job `job_…`) — this is the 6–8 minute Lean-checked pass. I'll follow it."
-   },
-   {
-    "i": 45,
-    "op": "call",
-    "t": 119.826,
-    "ms": 49042,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50353.0,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 46,
-    "op": "think",
-    "t": 168.868,
-    "ms": 1883,
-    "machine": "M",
-    "memory": 54383,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 47,
-    "op": "call",
-    "t": 170.751,
-    "ms": 50247,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50210.3,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 48,
-    "op": "think",
-    "t": 220.998,
-    "ms": 2391,
-    "machine": "M",
-    "memory": 54838,
-    "blocks": {
-     "thinking": 0,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 49,
-    "op": "say",
-    "t": 222.886,
-    "ms": 0,
-    "machine": "-",
-    "text": "Still on the Lean certificate stage. Continuing to wait."
-   },
-   {
-    "i": 50,
-    "op": "call",
-    "t": 223.389,
-    "ms": 50139,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50124.5,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 51,
-    "op": "think",
-    "t": 273.528,
-    "ms": 1910,
-    "machine": "M",
-    "memory": 55315,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 52,
-    "op": "call",
-    "t": 275.438,
-    "ms": 50161,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50104.2,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 53,
-    "op": "think",
-    "t": 325.599,
-    "ms": 2560,
-    "machine": "M",
-    "memory": 55892,
-    "blocks": {
-     "thinking": 0,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 54,
-    "op": "say",
-    "t": 327.633,
-    "ms": 0,
-    "machine": "-",
-    "text": "Lean checking is the slow stage — still running. I'll keep following it."
-   },
-   {
-    "i": 55,
-    "op": "call",
-    "t": 328.159,
-    "ms": 50242,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50194.3,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 56,
-    "op": "think",
-    "t": 378.401,
-    "ms": 1868,
-    "machine": "M",
-    "memory": 56371,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 57,
-    "op": "call",
-    "t": 380.269,
-    "ms": 50406,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50212.2,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 58,
-    "op": "think",
-    "t": 430.675,
-    "ms": 2055,
-    "machine": "M",
-    "memory": 56826,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 59,
-    "op": "call",
-    "t": 432.73,
-    "ms": 50336,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50232.1,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 60,
-    "op": "think",
-    "t": 483.066,
-    "ms": 1890,
-    "machine": "M",
-    "memory": 57281,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 61,
-    "op": "call",
-    "t": 484.956,
-    "ms": 50278,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50262.9,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 62,
-    "op": "think",
-    "t": 535.234,
-    "ms": 8604,
-    "machine": "M",
-    "memory": 57736,
-    "blocks": {
-     "thinking": 1,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 63,
-    "op": "call",
-    "t": 543.838,
-    "ms": 50960,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50802.6,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 64,
-    "op": "think",
-    "t": 594.798,
-    "ms": 2195,
-    "machine": "M",
-    "memory": 58220,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 65,
-    "op": "call",
-    "t": 596.993,
-    "ms": 51060,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 51027.0,
-    "result_chars": 729,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "lean_certificate"
-     }
-    ]
-   },
-   {
-    "i": 66,
-    "op": "think",
-    "t": 648.053,
-    "ms": 4182,
-    "machine": "M",
-    "memory": 58675,
-    "blocks": {
-     "thinking": 0,
-     "say": 0,
-     "call": 1
-    }
-   },
-   {
-    "i": 67,
-    "op": "call",
-    "t": 652.235,
-    "ms": 50419,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 50401.2,
-    "result_chars": 733,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "running",
-      "stage": "semantics"
-     }
-    ]
-   },
-   {
-    "i": 68,
-    "op": "think",
-    "t": 702.654,
-    "ms": 2400,
-    "machine": "M",
-    "memory": 59127,
-    "blocks": {
-     "thinking": 0,
-     "say": 1,
-     "call": 1
-    }
-   },
-   {
-    "i": 69,
-    "op": "say",
-    "t": 704.543,
-    "ms": 0,
-    "machine": "-",
-    "text": "Lean certificate passed — now on the semantics check (the last stage). Almost there."
-   },
-   {
-    "i": 70,
-    "op": "call",
-    "t": 705.054,
-    "ms": 17704,
-    "machine": "T",
-    "tool": "qccd_get_job",
-    "args": {
-     "job_id": "job_…",
-     "wait_s": 50
-    },
-    "ok": true,
-    "exec_ms": 17673.5,
-    "result_chars": 1289,
-    "effects": [
-     {
-      "kind": "poll",
-      "job": "job_…",
-      "status": "succeeded",
-      "stage": "metrics"
-     }
-    ]
-   },
-   {
-    "i": 71,
-    "op": "think",
-    "t": 722.758,
-    "ms": 9042,
-    "machine": "M",
-    "memory": 59998,
+    "memory": 32029,
     "blocks": {
      "thinking": 0,
      "say": 1,
@@ -1619,26 +945,26 @@
     }
    },
    {
-    "i": 72,
+    "i": 27,
     "op": "say",
-    "t": 731.8,
+    "t": 63.792,
     "ms": 0,
     "machine": "-",
-    "text": "Done — the design passed the full reference grade. 🎉\n\n## Two triangles → **ELIGIBLE** on BB [[144,12,12]]\n\n**The design**\n- **Large triangle** = one closed loop of **144 sites** (side ~50, corners cut to 120° so it clears the min-angle rule while still reading as a triangle). This loop carries the data qubits — it's the conveyor belt the BB circuit rides.\n- **Smaller triangle** = **24 docks**, spread evenly one unit inside the three sides. Each is a gate-capable trap on its own rail off the loop; together they trace the inner triangle.\n- Why not two independent triangles: the conveyor drives only one loop, so a second free-standing loop could never exchange qubits with the first. Making the inner shape the docks is what actually lets the checks run.\n\n**The grade** (reference evaluator, Lean certificate included — every stage passed):\n- **T_jones = 496.84 ms** per syndrome round (the ranked metric — beats the 522 ms reference ring)\n- Transport 397.25 ms · 46 DACs · 5066 instructions\n- Where time goes: transport ~60% (undock 134 ms, dock 85 ms, shuttle 78 ms), cooling ~31%, gates ~5%, the rest measurement/reset\n- Junction load is even across all 24 junctions, so nothing is bottlenecked on a single point\n\nThis result is **local and not published** — it shows in your Studio Results as \"Local result – not published.\" Publishing to the shared leaderboard needs your approval; just say the word and I'll show you exactly what would be uploaded (`qccd_prepare_publish`) before anything leaves your machine."
+    "text": "Done — your **\"Two triangles\"** design is built and graded **ELIGIBLE** on the BB [[144,12,12]] board (all reference checks passed, Lean included).\n\n**What I built**\n- **Large triangle** → one closed loop of 144 sites (its corners cut to 120° so it clears the 60° geometry rule while still reading as a triangle).\n- **Smaller triangle** → 24 docks placed evenly one unit inside the sides. They can't be a second separate loop, because the conveyor drives only one loop and two uncoupled loops would never let their qubits interact — so the inner triangle serves as the gate/parking docks instead.\n\n**Result (local, not published):**\n- **T_jones: 496.84 ms** per round (the ranked metric — beats the 522 ms reference ring)\n- T_transport: 397.25 ms · instructions: 5066 · dacs: 46 · ions/instruction: 1.67\n\nThe submission card in your chat shows the verdict. This result is local only — let me know if you'd like to publish it, and I'll show you exactly what would be uploaded first."
    },
    {
-    "i": 73,
+    "i": 28,
     "op": "end",
-    "t": 732.08,
+    "t": 63.814,
     "ms": 0,
     "machine": "-",
     "status": "success",
-    "duration_ms": 723335,
-    "api_ms": 109432,
-    "model_calls": 29,
-    "cost_usd": 1.6651244999999992
+    "duration_ms": 63765,
+    "api_ms": 48101,
+    "model_calls": 10,
+    "cost_usd": 0.4772685
    }
   ],
-  "harness": "[QCCD Studio] The user sent a request from Studio: prompt <the request> v1 (workspace ws_…, branch main, design revision 0, intent apply_change, mode apply).\nUser's words (verbatim):\n> I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode\nThe person is in Studio. qccd_page_read and qccd_page_act reach its controls too (the transport, the panels, the lessons).\nTo design a device (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.\nAnchored to: workspace\nContext snapshot ctx_f5ca06d551d7 froze what the user meant; read it with qccd_manage_comment(action='get', prompt_id='<the request>') before acting (the design may have changed since revision 0).\nMode apply: you may commit validated changes to main.\nThis is a chat: your messages in this turn are shown to the person in Studio as the conversation. Answer there directly and plainly, like a colleague; do not also post qccd_manage_comment replies for it. Pass origin_prompt_id='<the request>' on change sets, jobs and runs. (delivery dlv_703fd954c7ed)"
+  "harness": "[QCCD Studio] The user sent a request from Studio: prompt <the request> v1 (workspace ws_…, branch main, design revision 0, intent apply_change, mode apply).\nUser's words (verbatim):\n> I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode\nThe person is in Studio. qccd_page_read and qccd_page_act reach its controls too (the transport, the panels, the lessons).\nTo design a device (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.\nNow: the person's Studio shows the design \"Main design\" at revision 0 (the current design; a change set without a design goes to it). Their other designs: none. The boards: BB [[144,12,12]]; Repetition code, distance 9; Five-qubit code [[5,1,3]]; Steane code [[7,1,3]]; Surface code, distance 3 (17 qubits); GHZ state on four qubits (starter).\nAnchored to: workspace\nThe frozen context (snapshot ctx_d4fe92a9366f) holds nothing beyond this message: no selection, region, sketch or demonstration, so there is no need to read it. qccd_get_context has more (protected parts, jobs, diagnostics) when you need it.\nMode apply: you may commit validated changes to main.\nThis is a chat: your messages in this turn are shown to the person in Studio as the conversation. Answer there directly and plainly, like a colleague; do not also post qccd_manage_comment replies for it. Pass origin_prompt_id='<the request>' on change sets, jobs and runs. (delivery dlv_beee69616090)"
  }
 }
