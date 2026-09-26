@@ -302,9 +302,17 @@ watch it happen.
   as a card. It cannot sign in, press the comment layer's buttons, or delete anything.
   Checked against the live pages with a private copy of the comment service
   (`tests/workspace_live_comments.py`).
-- **Claude Code, like Codex** (`agents/claude.py`). Each chat message runs `claude -p`
-  headless, resuming ONE conversation by id (`--session-id` first, `--resume` after). It
-  gets the QCCD tools and read-only file tools, `--permission-mode dontAsk`, and no shell.
+- **Claude Code, like Codex** (`agents/claude.py`). One `claude -p --input-format stream-json`
+  process per conversation, kept alive between messages, so a message skips Claude Code's
+  start-up: about 9.5 s with the QCCD tools, against about 1 s for a kept-alive process. It is
+  started when the chat is connected, and again when a page whose chat talks to it opens, as
+  long as that agent is not stopped. It stops after 20 minutes idle, counted from its last turn.
+  A change of model or thinking level, or an interrupt, starts a new process that `--resume`s
+  the same conversation. Closing ends the whole process tree, so a `claude.cmd` wrapper
+  cannot leave its node behind. It gets the QCCD tools and Read, Grep and Glob (`--tools`),
+  no bundled skills or slash commands, `--permission-mode dontAsk`, and no shell. The
+  thinking level is `medium` unless the person picks another under ⋯: on the two-triangle
+  request it halved each model call (4.2 s against 8.3 s at Claude Code's default).
   Its messages stream into the chat, and a failed run says why. The chat starts whichever
   agent is installed, or the one last chosen under ⋯ ("New conversation with Codex" /
   "…with Claude"). `QCCD_CLAUDE=none` turns it off. Live-checked: asked on the Rules page
@@ -419,6 +427,33 @@ looking.
 
   `tools/agent_costs.py` turns traces into the numbers the website's Agentic Design page
   shows.
+- **A submission follows itself.** The chat shows a submission as one card: its compile, its
+  grade's stage, and then the verdict with the board's ranking metric. `qccd_get_job` on a
+  submission waits through the compile and then the grade, and returns the verdict as `grade`,
+  so one call usually brings it back. The agent follows it once; if it is still running, the
+  agent says the card will show the verdict and stops. Before the checker fix below, a BB grade
+  took 667 s, 93% of it the Lean certificate check, and an agent that followed it used 14 model
+  calls and kept the chat busy the whole time.
+- **The Lean checker replays once** (`Compiler/lean/QCCDC/Cert/Check.lean`). `MovesAreHops`,
+  `GatesLegal` and `RespectsOrder` bind their replay with a `let`. Decided through
+  `unfold; infer_instance`, that `let` landed inside the compiled per-move and per-operand
+  functions, so a BB certificate was replayed about 3,700 times. The instances now decide
+  forms that take the replay as a parameter, equal by `Iff.rfl`; the specification and
+  `check_sound` are unchanged, and the theorems' axioms are still only `propext`. The
+  two-triangle certificate: 623.4 s before, 0.8 s after. Its full reference grade: 667 s
+  before, 12.4 s after. A differential test ran both checkers on the 93 certificates of
+  `Compiler/build/matrix` and 1,091 mutants of them (the C6 mutations, plus four on
+  rotations):
+  - 1,158 cases gave identical output;
+  - 25 were BB cases where the old checker ran past 120 s;
+  - in 1 the old checker ran out of memory, and the new one rejects it with the right reason.
+
+  A movement-heavy certificate (39,940 moves, no rotations) still takes 36 s, because
+  `stateIn` scans the snapshot list for each lookup.
+- **A submission reuses its run's compile.** When a finished run compiled the board's circuit
+  (line endings aside) for the device the design has now, the submission adopts that run's
+  program, certified program and certificate instead of compiling again (29 s for BB). Any
+  other case compiles as before. The grade checks the frozen bundle either way.
 - **`add_docks`** (an operation): the conveyor's docks from a count. They are spread evenly
   around the first closed loop (or `loop`), never at a corner or beside another dock, one unit
   in (or `distance`, `side`), each one `add_site(to=[loop site])`.

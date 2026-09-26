@@ -478,7 +478,10 @@ class ResultsMixin:
         return {"job_id": job["job_id"], "design": self.design_title(self.branch(branch)), "board": rel.title,
                 "status": job["status"], "duplicate": job.get("duplicate", False),
                 "label": "Local result - not published",
-                "next": "follow the job (it compiles, adopts, freezes and grades); the submission appears when it grades"}
+                "next": "follow it ONCE with qccd_get_job(job_id, wait_s=50): it waits through the compile and "
+                        "the grade (usually under a minute) and returns the verdict as `grade`.  If it is still "
+                        "running then, tell them the card in their chat follows it to the verdict, and end your "
+                        "turn; do not keep polling."}
 
     def _job_submit(self, jid, params, actor, origin_prompt_id, cancel) -> dict:
         from .core import WorkspaceError
@@ -490,17 +493,25 @@ class ResultsMixin:
         fresh = (fp.get("artifact") and fp.get("circuit_digest") == rel.manifest["circuit"]["digest"]
                  and fp.get("compiled_for") == r.arch_digest())
         rev = head.revision
-        compiled = None
+        compiled = reused = None
         if not fresh:
-            compiled = self._job_compile(jid, {**params, "revision": head.revision}, actor, origin_prompt_id, cancel)
-            if compiled.get("_status", "succeeded") != "succeeded":
-                return compiled
-            self._progress(jid, "adopt", f"adopting the {rel.title} program as the design's final program")
+            reused = self._run_to_adopt(branch, rel, r.arch_digest(), head.revision)
+            if reused is not None:
+                adopt = reused["adopt_with"]
+                self._progress(jid, "adopt", f"adopting the program the run compiled for this design "
+                                             f"({rel.title}), instead of compiling it again")
+            else:
+                compiled = self._job_compile(jid, {**params, "revision": head.revision}, actor, origin_prompt_id,
+                                             cancel)
+                if compiled.get("_status", "succeeded") != "succeeded":
+                    return compiled
+                adopt = compiled["adopt_with"]
+                self._progress(jid, "adopt", f"adopting the {rel.title} program as the design's final program")
             cs = self.apply_change_set({"branch": branch, "expected_revision": head.revision,
                                         "request_id": f"submit-{jid}", "mode": "apply",
                                         "summary": f"the compiled program for {rel.title}",
                                         "origin_prompt_id": origin_prompt_id,
-                                        "operations": [compiled["adopt_with"]]}, actor)
+                                        "operations": [adopt]}, actor)
             if cs.get("status") != "committed":
                 raise WorkspaceError("adopt_failed", f"the compiled program was not adopted: {cs.get('status')}",
                                      status=409)
@@ -511,7 +522,38 @@ class ResultsMixin:
                                 board=rel.id)
         return {"summary": f"{out['design']} submitted to {rel.title} (r{rev}); grading as job {out['job_id']}",
                 "submission_id": out["submission_id"], "grading_job": out["job_id"], "revision": rev,
-                "compiled": bool(compiled), "board": rel.title, "design": out["design"]}
+                "compiled": bool(compiled), "from_run": (reused or {}).get("run_id"),
+                "board": rel.title, "design": out["design"]}
+
+    def _run_to_adopt(self, branch: str, rel, arch_digest: str, revision: int) -> dict | None:
+        """A finished run that compiled this board's circuit for this very device: its program, its
+        certified program and its certificate, as the change that adopts them.  Compiling again would
+        repeat the same export, compiler and cooling on the same inputs (~25 s for BB); what is
+        adopted is graded from the frozen bundle either way.  The circuit must be the board's, text for
+        text (line endings aside: a checkout may carry them either way), and the device the one the
+        design has now."""
+        want = rel.circuit_text().replace("\r\n", "\n")
+        for row in self.store.all("SELECT id FROM jobs WHERE kind='run' AND status='succeeded' "
+                                  "ORDER BY created_at DESC LIMIT 20"):
+            run = (self.job(row["id"]).get("result") or {}).get("run") or {}
+            d, arts = run.get("design") or {}, run.get("artifacts") or {}
+            if d.get("draft") != branch or d.get("digest") != arch_digest or run.get("compiler") not in ("rotate", "compile"):
+                continue
+            if not all(arts.get(k) for k in ("program", "certified", "certificate", "circuit")):
+                continue
+            try:
+                if self.get_artifact(arts["circuit"]).decode("utf-8").replace("\r\n", "\n") != want:
+                    continue
+                n_instr = len(strict_loads(self.get_artifact(arts["program"])).get("instructions", []))
+            except Exception:
+                continue
+            ref = {"artifact": arts["program"], "certified": arts["certified"], "certificate": arts["certificate"],
+                   "compiled_for": arch_digest, "compiler": run["compiler"], "board": rel.id,
+                   "circuit_digest": rel.manifest["circuit"]["digest"],
+                   "label": f"{rel.title}: qccdc {run['compiler']}, r{revision}, {n_instr} instructions "
+                            f"(compiled by a run)"}
+            return {"run_id": row["id"], "adopt_with": {"type": "set_final_program", **ref}}
+        return None
 
     def submission(self, sub_id: str) -> dict:
         from .core import WorkspaceError

@@ -602,12 +602,17 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("POST", "/api/views", human_only=True)
     def new_view(request, actor, b):
-        return ws.register_view(actor, branch=b.get("branch", "main"), label=str(b.get("label", "")),
-                                page=b.get("page"))
+        v = ws.register_view(actor, branch=b.get("branch", "main"), label=str(b.get("label", "")),
+                             page=b.get("page"))
+        _warm_for(state, v)
+        return v
 
     @route("PATCH", "/api/views/{view_id}", human_only=True)
     def patch_view(request, actor, b):
-        return ws.update_view(request.path_params["view_id"], b, actor)
+        v = ws.update_view(request.path_params["view_id"], b, actor)
+        if b.get("closed") is False or "target_session" in b:       # a page (re)opened, or it picked an agent
+            _warm_for(state, v)
+        return v
 
     @route("POST", "/api/views/{view_id}/presented", human_only=True)
     def presented(request, actor, b):
@@ -979,6 +984,23 @@ def _kick(state: ServiceState) -> None:
         w.kick()
 
 
+def _warm_for(state: ServiceState, view: dict | None) -> None:
+    """A page with a chat opened: start the process of the agent it talks to now, so the person's
+    first message does not wait for that agent's start-up (~9 s for Claude Code with the QCCD
+    tools).  Only a runtime that keeps a process (a bridge with `warm`), and not a stopped agent."""
+    sid = (view or {}).get("target_session")
+    br = state.bridges.get(sid) if sid else None
+    if br is None or not hasattr(br, "warm"):
+        return
+    try:
+        s = state.ws.session(sid)
+    except Exception:
+        return
+    if s["status"] != "connected" or s["write_fence"]:
+        return
+    threading.Thread(target=br.warm, name=f"qccd-warm-{sid}", daemon=True).start()
+
+
 # ---------------------------------------------------------------------- the pages
 
 def _studio_page(state: ServiceState, snapshot_id: str | None) -> str:
@@ -1268,6 +1290,15 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
     finally:
         state.stop.set()
         worker.stop()
+        # the kept-alive Claude processes end with the service (each would also end when its input
+        # closed, but not before the service's own exit)
+        from .agents.claude import ClaudeBridge
+        for br in list(state.bridges.values()):
+            if isinstance(br, ClaudeBridge):
+                try:
+                    br.close()
+                except Exception:
+                    pass
         remove_runtime(ws.id, os.getpid())
         ws.close()
     return 0

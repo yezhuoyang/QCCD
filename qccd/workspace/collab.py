@@ -612,6 +612,10 @@ class CollabMixin:
                             "view": run.get("view"), "at": at,
                             "progress": (j.get("progress") or {}).get("message")
                             if j["status"] in ("queued", "running") else None}
+                if j["kind"] == "submit":
+                    return self._submission_card(at, submit_job=j)
+                if j["kind"] == "evaluate" and self.store.one("SELECT id FROM submissions WHERE job_id=?", (ref,)):
+                    return None                      # the submission's card follows its grade
                 return {"type": "job", "job_id": ref, "kind": j["kind"], "status": j["status"],
                         "summary": res.get("summary"), "at": at}
             if kind == "compare":
@@ -629,10 +633,61 @@ class CollabMixin:
                 return {"type": "site_comment", "page": c.get("page"), "thread": c.get("thread"),
                         "text": c.get("text"), "as": c.get("as"), "kind": c.get("kind"), "at": at}
             if kind == "submission":
-                return {"type": "submission", "submission_id": ref, "at": at}
+                return self._submission_card(at, sub_id=ref)
         except Exception:
             return None
         return None
+
+    def _submission_card(self, at, *, submit_job: Mapping | None = None, sub_id: str | None = None) -> dict:
+        """One card that follows a submission from its compile to the grade's verdict.  The verdict
+        reaches the person on its own, so no agent has to sit polling a grade that takes minutes."""
+        card: dict = {"type": "submission", "at": at, "submission_id": sub_id, "state": "running", "progress": None,
+                      "design": None, "board": None, "label": "Local result - not published",
+                      "started": at, "finished": None}
+        if submit_job is not None:
+            res = submit_job.get("result") or {}
+            prm = res.get("params") or {}
+            card["design"] = res.get("design") or self._design_title_of(prm.get("branch") or "main")
+            card["board"] = res.get("board") or (self._board_title(prm["board"]) if prm.get("board") else None)
+            card["started"] = submit_job["created_at"]
+            sub_id = card["submission_id"] = res.get("submission_id")
+            if submit_job["status"] in ("queued", "running"):
+                card["progress"] = (submit_job.get("progress") or {}).get("message")
+                return card
+            if submit_job["status"] != "succeeded" or not sub_id:
+                why = submit_job.get("error") or res.get("summary") or submit_job["status"]
+                card.update(state="failed", why=str(why).split(": ", 1)[-1][:300], finished=submit_job.get("finished_at"))
+                return card
+        if not sub_id:
+            return card
+        r = self.store.one("SELECT * FROM submissions WHERE id=?", (sub_id,))
+        if r is None:
+            return card
+        if submit_job is None:
+            card["started"] = r["created_at"]
+            card["board"] = self._board_title(r["task_release"])
+            snap = self.store.one("SELECT branch FROM snapshots WHERE id=?", (r["snapshot_id"],))
+            card["design"] = self._design_title_of(snap["branch"]) if snap else None
+        j = self.job(r["job_id"]) if r["job_id"] else None
+        if r["status"] == "grading":
+            if j is not None and j["status"] in ("queued", "running"):
+                card["progress"] = (j.get("progress") or {}).get("message")
+            elif j is not None:                      # the grade ended without a verdict (a crash, a timeout)
+                card.update(state="failed", why=str(j.get("error") or j["status"]).split(": ", 1)[-1][:300],
+                            finished=j.get("finished_at"))
+            return card
+        card["finished"] = j.get("finished_at") if j else None
+        if r["status"] == "cancelled":
+            card["state"] = "cancelled"
+            return card
+        rep = self.report_for(sub_id) or {}
+        card["state"] = "eligible" if r["status"] == "eligible" else "ineligible"
+        card["reasons"] = ((rep.get("eligibility") or {}).get("reasons") or [])[:3]
+        rank = rep.get("rank_by")
+        m = (rep.get("metrics") or {}).get(rank) if rank else None
+        if m and m.get("value") is not None:
+            card["metric"] = {"name": rank, "value": m["value"], "unit": m.get("unit")}
+        return card
 
     def context_snapshot(self, ctx_id: str) -> dict:
         from .core import WorkspaceError

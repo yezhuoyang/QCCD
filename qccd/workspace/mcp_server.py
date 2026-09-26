@@ -85,7 +85,10 @@ title=<a name for it>) -- never a replacement of an existing design unless they 
 designs by their names. Any design can be submitted to any leaderboard ("board", by its title:
 qccd_get_context: boards, e.g. 'BB [[144,12,12]]', 'surface code'): qccd_submit_local(design,
 board) compiles that board's circuit onto the design, adopts the program, freezes and grades it
-in one go. Never show the person internal ids, task codes, release ids or digests. To compare
+in one go, usually within a minute: follow it once with qccd_get_job(job_id, wait_s=50), which
+waits through the grade and returns the verdict. If it is still running then, say the card in their
+chat will show the verdict, and stop. Never show the person internal ids, task codes, release ids
+or digests. To compare
 designs, run the SAME program on each and call qccd_compare_runs: it returns the comparison and
 opens the side-by-side view in Studio, where both designs animate on one shared clock.
 
@@ -191,8 +194,8 @@ def _tools() -> list:
               "compiler": {"type": "string", "enum": ["auto", "compile", "rotate"]}, "request_id": s,
               "origin_prompt_id": s}, ["kind"])),
         ("qccd_get_job", "Progress and lifecycle state of a job. wait_s (up to 50) waits that long for it to "
-         "finish before answering: follow a long job (a reference grade takes minutes) with a few waiting calls, "
-         "not many quick ones.", obj({"job_id": s, "wait_s": i}, ["job_id"])),
+         "finish before answering: follow a long job with a few waiting calls, not many quick ones. On a "
+         "submission's job it waits through the compile AND the grade, and returns the verdict as `grade`.", obj({"job_id": s, "wait_s": i}, ["job_id"])),
         ("qccd_list_programs", "The programs a run can use, with qubit counts: the BB [[144,12,12]] syndrome "
          "round (bb144_esm; 'bb', 'bb code' and 'gross' also work), surface17_esm, steane_esm, rep9_esm, ghz4, "
          "ghz16, qft8, adder3, bv6, bell2, micro. qccd_run_program also takes your own OpenQASM 2.0.", obj({})),
@@ -261,8 +264,11 @@ def _tools() -> list:
          "board (its title, e.g. 'BB [[144,12,12]]' or 'surface code'). In one job it compiles the board's circuit "
          "onto the design with the real compiler, adopts that program, freezes the design and grades it with the "
          "reference evaluator (rules, the Lean certificate, semantics, metrics); returns the job at once, and the "
-         "graded submission appears on the local leaderboard ('Local result - not published'). Publishing it needs "
-         "the person's approval (qccd_prepare_publish shows what would be uploaded).",
+         "graded submission appears on the local leaderboard ('Local result - not published'). It usually "
+         "finishes within a minute: follow it ONCE with qccd_get_job(job_id, wait_s=50), which waits through the "
+         "grade and returns the verdict; if it is still running then, say the card in their chat will show the "
+         "verdict, and stop. Publishing it needs the person's approval (qccd_prepare_publish shows what would be "
+         "uploaded).",
          obj({"design": s, "board": s, "profile": {"type": "string", "enum": ["draft", "reference"]},
               "request_id": s, "origin_prompt_id": s, "title": s, "branch": s, "revision": i})),
         ("qccd_prepare_publish", "Show exactly what publication would upload (bundle digest, files, local "
@@ -397,8 +403,22 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         while True:
             j = be.call("GET", f"/api/jobs/{_enc(a['job_id'])}")
             if j.get("status") not in ("queued", "running") or _t.time() >= deadline:
-                return j
-            _t.sleep(2.0)
+                break
+            _t.sleep(1.0)
+        # a submission is two jobs (compile-adopt-freeze, then the grade): one call follows both, so
+        # the verdict comes back in the same answer when it is ready in time
+        gid = (j.get("result") or {}).get("grading_job") if j.get("kind") == "submit" else None
+        if gid and j.get("status") == "succeeded":
+            while True:
+                g = be.call("GET", f"/api/jobs/{_enc(gid)}")
+                if g.get("status") not in ("queued", "running") or _t.time() >= deadline:
+                    break
+                _t.sleep(1.0)
+            res = g.get("result") or {}
+            j["grade"] = {"status": g.get("status"), "summary": res.get("summary"), "eligible": res.get("eligible"),
+                          "metrics": res.get("metrics"), "stage": (g.get("progress") or {}).get("message")
+                          if g.get("status") in ("queued", "running") else None}
+        return j
     if name == "qccd_list_programs":
         return be.call("GET", "/api/programs")
     if name == "qccd_run_program":

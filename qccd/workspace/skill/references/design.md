@@ -108,9 +108,12 @@ query=<title>)` gives its circuit and what is ranked.
 
 `qccd_submit_local(design=<name>, board=<title>)` compiles the board's circuit onto the design,
 adopts the program, freezes the design and grades it with the reference evaluator (rules, Lean
-certificate, semantics, metrics). Follow the job with `qccd_get_job(job_id, wait_s=50)`: each
-call waits up to 50 s, and BB's grade takes 6 to 8 minutes. The result is local and not
-published; say so. Publishing needs the person's approval: `qccd_prepare_publish` shows exactly
+certificate, semantics, metrics). A BB submission is compiled and graded in well under a minute
+(the grade itself took 12 s on a two-triangle design): follow it ONCE with
+`qccd_get_job(job_id, wait_s=50)`, which waits through the grade and returns the verdict as
+`grade`, and report it. If it is still running then, say the card in their chat will show the
+verdict (it follows the submission by itself), and stop. The result is local and not published;
+say so. Publishing needs the person's approval: `qccd_prepare_publish` shows exactly
 what would be uploaded.
 
 ## Be honest about what cannot be done

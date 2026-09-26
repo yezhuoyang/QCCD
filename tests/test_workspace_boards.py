@@ -127,6 +127,80 @@ def test_one_call_submits_a_design_to_a_board_and_another_board_compiles_again(t
 
 
 @needs_toolchain
+def test_the_chat_follows_a_submission_to_its_verdict_on_one_card(tmp_path):
+    """A live agent polled a BB grade 14 times over 11 minutes, one model call each, while the chat
+    stayed busy (2026-09-26).  The chat's card follows a submission from its compile to the verdict by
+    itself, one card per submission; the tool's answer tells the agent to follow it once, not to poll."""
+    ws = Workspace.init(tmp_path / "ws")
+    try:
+        d = ws.create_candidate(ME, title="Little ring")
+        ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
+                             "operations": [{"type": "construct", "generator": "ring",
+                                             "params": {"width": 8, "height": 2, "verticals": 8}}]}, ME)
+        pid = ws.send_prompt(ME, body={"text": "Submit it to the repetition code", "intent": "apply_change",
+                                       "mode": "apply", "anchors": [{"kind": "workspace"}]})["prompt_id"]
+        out = ws.submit_design(ME, design="Little ring", board="repetition code", origin_prompt_id=pid)
+        assert "ONCE" in out["next"] and "card" in out["next"] and "do not keep polling" in out["next"]
+
+        def cards():
+            return [i for i in ws.conversation()["items"] if i["type"] in ("submission", "job")]
+        now = cards()
+        assert [c["type"] for c in now] == ["submission"] and now[0]["state"] == "running", now
+        assert (now[0]["design"], now[0]["board"]) == ("Little ring", "Repetition code, distance 9")
+        j = _wait(ws, out["job_id"])
+        g = _wait(ws, j["result"]["grading_job"])
+        assert g["result"]["eligible"], g["result"]
+        done = cards()
+        # the submit job's card and the submission's own record name ONE submission (the chat shows it
+        # once); the grade's job is not a second card
+        assert {c["type"] for c in done} == {"submission"}, done
+        assert {c["submission_id"] for c in done} == {j["result"]["submission_id"]}
+        c = done[0]
+        assert c["state"] == "eligible" and c["metric"]["value"] > 0 and c["metric"]["unit"], c
+        assert c["finished"] >= c["started"] and c["label"] == "Local result - not published"
+        assert "sub_" not in json.dumps({k: v for k, v in c.items() if k != "submission_id"})   # no ids shown
+    finally:
+        ws.close()
+
+
+@needs_toolchain
+def test_a_submission_right_after_a_run_adopts_the_runs_compile_instead_of_compiling_again(tmp_path):
+    """A live agent ran BB on its design and then submitted it; the submission compiled the same
+    circuit on the same device again, 29 s (2026-09-26).  It now adopts the run's compile when the
+    run's circuit is the board's and its device is the design's now; anything else compiles again.
+    The grade checks the adopted program all the same."""
+    ws = Workspace.init(tmp_path / "ws")
+    try:
+        d = ws.create_candidate(ME, title="Little ring")
+        ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
+                             "operations": [{"type": "construct", "generator": "ring",
+                                             "params": {"width": 8, "height": 2, "verticals": 8}}]}, ME)
+        other = _wait(ws, ws.start_job(ME, "run", {"branch": d["name"], "program": "ghz4"})["job_id"])
+        run = _wait(ws, ws.start_job(ME, "run", {"branch": d["name"], "program": "rep9"})["job_id"])
+        assert run["status"] == "succeeded" and other["status"] == "succeeded"
+        j = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code")["job_id"])
+        assert j["status"] == "succeeded", j
+        assert j["result"]["from_run"] == run["id"] and not j["result"]["compiled"]   # the rep9 run, not ghz4
+        fp = ws.head(d["name"]).state.final_program
+        assert fp["artifact"] == run["result"]["run"]["artifacts"]["program"]
+        assert fp["board"] == "rep9@1" and fp["circuit_digest"] == find_board("rep9").manifest["circuit"]["digest"]
+        g = _wait(ws, j["result"]["grading_job"])
+        assert g["result"]["eligible"], g["result"]                      # graded like any other compile
+        # another board's circuit: no run of it, so it compiles
+        j2 = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="Steane")["job_id"])
+        assert j2["result"]["compiled"] and j2["result"]["from_run"] is None
+        # the device changed after the run: the run is for another device, so it compiles again
+        head = ws.branch(d["name"])["head"]
+        ws.apply_change_set({"branch": d["name"], "expected_revision": head, "request_id": "again", "mode": "apply",
+                             "operations": [{"type": "construct", "generator": "ring",
+                                             "params": {"width": 12, "height": 2, "verticals": 8}}]}, ME)
+        j3 = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code")["job_id"])
+        assert j3["result"]["compiled"] and j3["result"]["from_run"] is None, j3["result"]
+    finally:
+        ws.close()
+
+
+@needs_toolchain
 def test_the_cli_submits_by_board_title(tmp_path):
     env = dict(os.environ, QCCD_RUNTIME_DIR=str(tmp_path / "rt"), QCCD_CODEX="none", QCCD_CLAUDE="none", QCCD_WEB="0",
                PYTHONPATH=str(REPO) + os.pathsep + os.environ.get("PYTHONPATH", ""), PYTHONIOENCODING="utf-8")
@@ -168,6 +242,35 @@ def test_an_agent_follows_a_long_grade_in_a_few_waiting_calls():
     assert dispatch(be, "qccd_get_job", {"job_id": "j", "wait_s": 30})["status"] == "succeeded" and be.calls == 3
     be = Fake(["running", "succeeded"])
     assert dispatch(be, "qccd_get_job", {"job_id": "j"})["status"] == "running" and be.calls == 1   # no wait asked
+
+
+def test_one_call_on_a_submission_waits_through_its_grade_and_returns_the_verdict():
+    """A submission is two jobs, the compile and then the grade.  With the checker's replay computed
+    once, a BB grade takes seconds (12 s, 2026-09-26), so one waiting call follows both and brings
+    the verdict back; a grade still running when the wait ends says which stage it is in."""
+    from qccd.workspace.mcp_server import dispatch
+
+    class Fake:
+        def __init__(self, grade):
+            self.grade, self.calls = list(grade), []
+
+        def call(self, method, path, body=None, **kw):
+            self.calls.append(path)
+            if path.endswith("/sub1"):
+                return {"id": "sub1", "kind": "submit", "status": "succeeded", "result": {"grading_job": "g1"}}
+            st = self.grade.pop(0) if len(self.grade) > 1 else self.grade[0]
+            return {"id": "g1", "kind": "evaluate", "status": st, "progress": {"message": "running the proved Lean checker"},
+                    "result": {"summary": "reference grade: ELIGIBLE", "eligible": True, "metrics": {"T_jones": 496.84}}
+                    if st == "succeeded" else {}}
+
+    be = Fake(["running", "succeeded"])
+    j = dispatch(be, "qccd_get_job", {"job_id": "sub1", "wait_s": 30})
+    assert j["status"] == "succeeded" and j["grade"]["eligible"] is True and j["grade"]["metrics"] == {"T_jones": 496.84}
+    assert be.calls == ["/api/jobs/sub1", "/api/jobs/g1", "/api/jobs/g1"]
+    be = Fake(["running"])
+    j = dispatch(be, "qccd_get_job", {"job_id": "sub1"})               # no wait: says where the grade is
+    assert j["grade"] == {"status": "running", "summary": None, "eligible": None, "metrics": None,
+                          "stage": "running the proved Lean checker"}
 
 
 def test_a_workspace_folder_takes_any_name_or_none_and_the_cli_says_which_words_are_yours(tmp_path):
