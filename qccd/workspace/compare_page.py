@@ -29,6 +29,17 @@ body.qrun-framed .toolbar, body.qrun-framed header .actions { display: none !imp
     frames: function(){ try { return lastFrame() + 1; } catch (e) { return 0; } },
     seek: function(i){ try { seek(i); return true; } catch (e) { return false; } }
   };
+  // opened by an agent's run (#play): it plays by itself, as a person showing it would.  The
+  // agent used to press Play and wait on the page -- two page actions and three model calls,
+  // about 17 s, measured in its trace (2026-09-26)
+  if (/(^#|&)play(&|$)/.test(location.hash) && window.self === window.top) {
+    var t0 = Date.now();
+    (function start() {
+      var b = document.getElementById('play');
+      if (b && typeof lastFrame === 'function' && lastFrame() > 0) { if (!/pause/i.test(b.textContent)) b.click(); return; }
+      if (Date.now() - t0 < 15000) setTimeout(start, 200);
+    })();
+  }
 })();
 </script>
 """

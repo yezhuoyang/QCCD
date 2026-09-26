@@ -88,7 +88,9 @@ query=<title>)` gives its circuit and what is ranked.
 
 - Read `problems` (the studio verb) after each shape. Geometry rules R19 to R21 show there,
   and a sketch that would create one is undone and refused with the rule.
-- Run the board's circuit on the design (`qccd_run_program`). Show the run on their screen.
+- Run the board's circuit on the design (`qccd_run_program`). The run opens on their screen and
+  plays by itself: do not press Play or wait for it. If every rule passes, submit in the same
+  response as your one-line summary.
   Then fix what it reports, one visible change at a time:
 
   | the run says | fix |

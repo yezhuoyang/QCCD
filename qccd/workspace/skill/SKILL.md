@@ -11,11 +11,15 @@ so neither of you can silently overwrite the other.
 
 ## Every turn
 
-1. **Bootstrap**: call `qccd_get_context` (pass `since` = the `cursor` from your previous call).
-   It returns the user's designs (by the names they gave them), the leaderboards ("boards", by
-   title) any design can be submitted to, the revision, protected entities, the user's Studio
-   selection and view, unread Studio prompts, jobs, and the latest local result.
-2. **Read the prompt's frozen context**: for each unread prompt call
+1. **Bootstrap**: a request from Studio already carries the current state in its text (the design
+   the Studio shows and its revision, the other designs, the boards): act on it. Otherwise (a
+   terminal session, or when you need more) call `qccd_get_context` (pass `since` = the `cursor`
+   from your previous call). It returns the user's designs (by the names they gave them), the
+   leaderboards ("boards", by title) any design can be submitted to, the revision, protected
+   entities, the user's Studio selection and view, unread Studio prompts, jobs, and the latest
+   local result. Every model call costs seconds: do not read what you were already given.
+2. **Read the prompt's frozen context** when the request says it holds something (a selection,
+   a region, a sketch): for each unread prompt call
    `qccd_manage_comment(action="get", prompt_id=...)`. Its `context` says what "this",
    "here" and "like this" meant when the user pressed Send (anchors resolved to entities,
    sketches in diagram coordinates, a demonstration diff). The design may have moved since:
@@ -116,8 +120,9 @@ gives each control (target it with `[data-hint="<key>"]`). `query` searches both
 **Nothing the person should see happens out of sight.** Their Design page is the live workspace
 Studio: your change sets appear there as you commit them, so change the design in small steps
 and say what each one does. A run (`qccd_run_program`) shows its program in their Studio while it
-compiles, then their tab opens the run's page; press Play there (`qccd_page_act` step,
-`play=true`), let it play, then report. A comparison opens side by side the same way.
+compiles, then their tab opens the run's page, which plays by itself: say in one line what they
+are watching and go on (do not press Play or wait for it). A comparison opens side by side the
+same way.
 
 The person watches you work: every page action moves a cursor with your name to its target
 and says what you are doing. Act like a colleague demonstrating at their screen: go to the

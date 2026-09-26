@@ -1,6 +1,8 @@
 """LIVE, opt-in: a real agent designs the shape the person asks for and submits it to a board.
 
-    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex] [message]
+    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex] [message] [effort] [model]
+
+effort and model are what the chat's model menu sets (e.g. `medium`, `sonnet`); empty keeps the default.
 
 The person's own request (2026-09-24) is the default message: "I want to make a new design,
 which has a large triangle and a smaller triangle, and then submit this design to BBCode".
@@ -41,7 +43,9 @@ def main() -> int:
         return 2
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(tempfile.mkdtemp(prefix="qccd-live-design-"))
     agent = sys.argv[2] if len(sys.argv) > 2 else "claude"
-    message = sys.argv[3] if len(sys.argv) > 3 else MESSAGE
+    message = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else MESSAGE
+    effort = sys.argv[4] if len(sys.argv) > 4 else ""
+    model = sys.argv[5] if len(sys.argv) > 5 else ""
     out.mkdir(parents=True, exist_ok=True)
     os.environ["QCCD_RUNTIME_DIR"] = str(out / "runtime")
     if agent == "claude":
@@ -60,7 +64,8 @@ def main() -> int:
     steps = [
         {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
                  "QCCD_LIVE.state().rev !== null", "timeout": 90000, "stopOnFail": True},
-        {"eval": f"localStorage.setItem('qccd.agent', {json.dumps(agent)}); 1"},
+        {"eval": f"localStorage.setItem('qccd.agent', {json.dumps(agent)}); "
+                 f"localStorage.setItem('qccd.model.{agent}', {json.dumps(json.dumps({'model': model, 'effort': effort}))}); 1"},
         {"sleep": 2000},
         {"eval": f"QCCD_LIVE.chatSend({json.dumps(message)}).then(function(d){{ return d && d.prompt_id; }})"},
         {"wait": idle, "timeout": 3000000, "stopOnFail": True},
@@ -79,7 +84,7 @@ def main() -> int:
                        timeout=3600, cwd=REPO)
     drive = json.loads(r.stdout.decode("utf-8") or "{}")
     st = drive.get("steps", [])
-    report = {"seconds_agent": round(time.time() - t0), "message": message, "agent": agent,
+    report = {"seconds_agent": round(time.time() - t0), "message": message, "agent": agent, "effort": effort, "model": model,
               "steps": [{k: v for k, v in s.items() if k not in ("value", "step")} for s in st],
               "console": drive.get("logs"), "fatal": drive.get("fatal")}
     if len(st) > 7 and st[7].get("value"):

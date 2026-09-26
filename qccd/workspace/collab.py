@@ -1104,6 +1104,9 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
         lines.append("The person is in Studio. qccd_page_read and qccd_page_act reach its controls too "
                      "(the transport, the panels, the lessons).")
     lines.append(DESIGN_HINT)
+    now = _state_now(ws, ctx.get("branch") or "main")
+    if now:
+        lines.append(now)
     if b.get("anchors"):
         lines.append("Anchored to: " + "; ".join(_describe_anchor(a) for a in b["anchors"][:8]))
     if b.get("sketches"):
@@ -1116,9 +1119,18 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
                      f"{d['after_revision']} ({d['diff'].get('summary')}); generalise it to the targets.")
     if b.get("correction_of"):
         lines.append(f"This is version {version['version']}, a correction of version {b['correction_of']}.")
-    lines.append(f"Context snapshot {ctx['id']} froze what the user meant; read it with "
-                 f"qccd_manage_comment(action='get', prompt_id='{prompt_id}') before acting "
-                 f"(the design may have changed since revision {ctx['design_revision']}).")
+    pointed = ([a for a in (b.get("anchors") or []) if a.get("kind") not in ("workspace", "page")]
+               or b.get("sketches") or ctx.get("selection") or ctx.get("demonstration"))
+    if pointed:
+        lines.append(f"Context snapshot {ctx['id']} froze what the user meant; read it with "
+                     f"qccd_manage_comment(action='get', prompt_id='{prompt_id}') before acting "
+                     f"(the design may have changed since revision {ctx['design_revision']}).")
+    else:
+        # nothing was selected, drawn or pointed at: the snapshot holds nothing this message does not
+        # say, and reading it (and the context) cost a live agent two model calls, 2026-09-26
+        lines.append(f"The frozen context (snapshot {ctx['id']}) holds nothing beyond this message: no selection, "
+                     "region, sketch or demonstration, so there is no need to read it. qccd_get_context has more "
+                     "(protected parts, jobs, diagnostics) when you need it.")
     if b["mode"] == "ask":
         lines.append("Mode ask: answer; do not change the design.")
     elif b["mode"] == "propose":
@@ -1136,6 +1148,22 @@ def delivery_text(ws, prompt_id: str, version: Mapping, ctx: Mapping, delivery_i
         lines.append(f"Reply with qccd_manage_comment(action='reply', prompt_id='{prompt_id}', ...) and pass "
                      f"origin_prompt_id='{prompt_id}' on change sets, jobs and runs. (delivery {delivery_id})")
     return "\n".join(lines)
+
+
+def _state_now(ws, branch: str) -> str | None:
+    """The state a request is about, in the message itself: the design the person's Studio shows, their
+    other designs, the boards.  An agent used to spend its first model calls reading it."""
+    try:
+        cur = ws.design_title(ws.branch(branch))
+        rev = ws.head(branch).revision
+        others = [ws.design_title(x) for x in ws.branches() if x["name"] != branch and (x.get("status") or "open") == "open"]
+        boards = [bd["title"] for bd in ws.boards()]
+    except Exception:
+        return None
+    return (f"Now: the person's Studio shows the design \"{cur}\" at revision {rev} (the current design; a change "
+            f"set without a design goes to it). Their other designs: "
+            + (", ".join(f'"{t}"' for t in others[:12]) + (" and more" if len(others) > 12 else "") if others else "none")
+            + ". The boards: " + "; ".join(boards) + ".")
 
 
 def _context_brief(b: Mapping) -> str:
