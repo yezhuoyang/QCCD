@@ -40,3 +40,47 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,Seg
 .fold pre,pre.bad{margin:4px 0 0;background:#f5f4f1;border-radius:6px;padding:7px 9px;max-height:420px;overflow:auto;
   font:12px/1.4 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
 @media (max-width:760px){#tr{grid-template-columns:1fr;height:auto}#tr-side{max-height:40vh}}
+/* the Program view: the request as instructions, beside the design they built */
+.tr-tabs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#tr-bar .tr-tab{border:0;border-radius:0;background:#fff;padding:5px 14px}
+#tr-bar .tr-tab.on{background:var(--acc);color:#fff}
+.tr-sub{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tr-sub[hidden]{display:none}
+#tr-prog-view h1{font:600 19px/1.35 Georgia,serif;margin:16px 0 8px}
+.pg-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.pg-chip{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.pg-chip i{font-style:normal;color:var(--muted);margin-right:5px}
+.pg-check{font-size:13px;margin:6px 0} .pg-check.ok{color:var(--ok)}
+.pg-timebox{margin:8px 0 4px}
+.pg-time,.pg-mem{width:100%;height:52px;display:block;background:var(--card);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.pg-mem{height:44px;cursor:default}
+.pg-memline{fill:none;stroke:#7c3aed;stroke-width:2;vector-effect:non-scaling-stroke}
+.pg-head{stroke:#1d1d1b;stroke-width:2;vector-effect:non-scaling-stroke}
+.m-M{fill:#7c3aed;background:#7c3aed} .m-T{fill:#2563eb;background:#2563eb} .m-P{fill:#ea580c;background:#ea580c}
+.m-x,.m-boot{fill:#a8a29e;background:#a8a29e}
+.pg-legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;margin-top:3px}
+.pg-legend .lg::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:inherit}
+.pg-legend .lg{background:none!important} .pg-legend .lg.m-M::before{background:#7c3aed} .pg-legend .lg.m-T::before{background:#2563eb}
+.pg-legend .lg.m-P::before{background:#ea580c} .pg-legend .lg.m-x::before{background:#a8a29e}
+.pg-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;margin-top:10px}
+.pg-list{background:var(--card);border:1px solid var(--line);border-radius:8px;max-height:calc(100vh - 150px);overflow:auto;
+  font:12px/1.35 ui-monospace,Consolas,monospace}
+.pg-row{display:grid;grid-template-columns:34px 48px 88px 50px 44px 1fr;gap:6px;padding:3px 8px;border-bottom:1px solid #f1efea;cursor:pointer;
+  align-items:baseline}
+.pg-row:hover{background:#faf7ff} .pg-row.now{background:#efe7ff;box-shadow:inset 3px 0 0 var(--acc)}
+.pg-hdr{position:sticky;top:0;background:#fbfaf8;color:var(--muted);cursor:default;font-weight:600;z-index:1}
+.pg-n,.pg-t,.pg-m{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.pg-c{white-space:nowrap;font-variant-numeric:tabular-nums} .pg-bar{display:inline-block;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
+.pg-op{font-weight:600} .op-think .pg-op{color:#7c3aed} .op-call .pg-op{color:#2563eb} .op-say .pg-op{color:var(--ok)}
+.op-recv .pg-op,.op-end .pg-op{color:#0f766e} .op-boot .pg-op{color:#78716c}
+.pg-o{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-stage{position:sticky;top:52px;align-self:start}
+.pg-pic{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:120px}
+.pg-pic-h{font-size:13px;margin-bottom:4px}
+.pg-svg{width:100%;height:auto;max-height:46vh;display:block}
+.pg-rail{stroke:#8a8680} .pg-loop{stroke:#2563eb}
+.pg-node{fill:#1d1d1b} .pg-node.fresh{fill:#16a34a} .pg-node.junc{fill:#ea580c}
+.pg-detail{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:10px;max-height:40vh;overflow:auto}
+.pg-dh{font:600 12.5px ui-monospace,Consolas,monospace;margin-bottom:4px}
+.pg-eff{font:12px ui-monospace,Consolas,monospace;color:#0b7a4b;margin:2px 0}
+@media (max-width:1100px){.pg-grid{grid-template-columns:1fr}.pg-stage{position:static}}

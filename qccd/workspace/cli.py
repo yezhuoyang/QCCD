@@ -18,8 +18,9 @@
     qccd publish --submission SUB [--visibility public]   review + approve at this terminal
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
-    qccd trace [--session S] [--prompt P] [--full | --json | --open]
-                                             what an agent did for a request, step by step
+    qccd trace [--session S] [--prompt P] [--full | --json | --open | --program | --check]
+                                             what an agent did for a request, step by step; as a
+                                             program (instructions with time, memory, effects)
 
 Entry points: `python -m qccd.workspace <command>`, or the `qccd` console script from
 `pyproject.toml`, which falls through to the existing `python -m qccd` commands for
@@ -222,6 +223,29 @@ def cmd_trace(a) -> int:
         return 1
     pid = a.prompt or (one["prompts"][-1]["prompt"] if one["prompts"] else None)
     steps = [s for s in tr.steps(a.session) if (s.get("prompt") or None) == (pid or None)]
+    if a.program or a.check:
+        # the request as a program (atir.py): one instruction per line, with its time, memory and effects
+        from .atir import check, compile_trace, listing
+        prog = compile_trace(steps)
+        findings = None
+        if a.check:
+            from .app import Workspace
+            w = Workspace(root)
+            try:
+                findings = check(prog, w)
+            finally:
+                w.close()
+        if a.json:
+            print(json.dumps({**prog, **({"findings": findings} if findings is not None else {})}, indent=1,
+                             ensure_ascii=False))
+        else:
+            print(listing(prog, width=200 if a.full else 120))
+            if findings is not None:
+                print("\ncheck: " + ("well-formed, and every commit is in the workspace's log and replays"
+                                     if not findings else f"{len(findings)} finding(s)"))
+                for f in findings:
+                    print(f"  #{f['i']} {f['rule']}: {f['message']}")
+        return 1 if findings else 0
     if a.json:
         print(json.dumps(steps, indent=1, ensure_ascii=False))
     else:
@@ -557,6 +581,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--full", action="store_true", help="everything, uncut (the full text the agent received too)")
     p.add_argument("--json", action="store_true")
     p.add_argument("--open", action="store_true", help="open the trace viewer in the browser")
+    p.add_argument("--program", action="store_true",
+                   help="the request as a program: one instruction per line, with time, memory and effects")
+    p.add_argument("--check", action="store_true",
+                   help="the program, checked: well-formed, and every design commit it claims is in the log and replays")
     p.add_argument("--root", default=None)
     return ap
 

@@ -398,6 +398,52 @@ def create_app(state: ServiceState) -> FastAPI:
         return {"session": sid, "prompt": q(request, "prompt"),
                 "steps": state.traces.steps(sid, q(request, "prompt"))}
 
+    @route("GET", "/api/traces/{sid}/program", write=False)
+    def trace_program(request, actor, _):
+        """One request as a program (atir.py), with the checker's findings against this workspace."""
+        from .atir import check, compile_trace
+        sid = request.path_params["sid"]
+        prompt = q(request, "prompt")
+        steps = state.traces.steps(sid, prompt)
+        if not prompt and steps:
+            prompt = steps[-1].get("prompt")
+            steps = [s for s in steps if s.get("prompt") == prompt]
+        prog = compile_trace(steps)
+        findings = check(prog, ws)
+        # the picture needs each commit's design: when the trace did not record it (a page action's
+        # result named none before 2026-09-26), the workspace's own log does, by change set
+        titles = {}
+        for x in prog["instructions"]:
+            for e in x.get("effects") or []:
+                if e.get("kind") == "commit" and not e.get("design"):
+                    row = ws.store.one("SELECT branch FROM change_sets WHERE id=?", (e.get("change_set"),))
+                    if row:
+                        e["design"], e["design_from"] = row["branch"], "log"
+                if e.get("design") and e["design"] not in titles:
+                    try:
+                        titles[e["design"]] = ws.design_title(ws.branch(ws.resolve_draft(e["design"])))
+                    except Exception:
+                        titles[e["design"]] = e["design"]
+        return {**prog, "findings": findings, "designs": titles}
+
+    @route("GET", "/api/design-graph", write=False)
+    def design_graph(request, actor, _):
+        """A design at one revision, as the sites and rails to draw (the trace viewer's picture)."""
+        branch = ws.resolve_draft(q(request, "branch") or "main")
+        rev = q(request, "rev", None, int)
+        r = ws.replayed(branch, rev)
+        if not r.ok:
+            return {"branch": branch, "revision": rev, "ok": False}
+        dev = r.arch.device
+
+        def xy(p):
+            return [round(float(getattr(p[0], "value", p[0])), 4), round(float(getattr(p[1], "value", p[1])), 4)]
+        return {"branch": branch, "revision": rev, "ok": True, "name": r.arch.name,
+                "title": ws.design_title(ws.branch(branch)),
+                "nodes": [{"id": n.id, "xy": xy(n.pos), "kind": n.kind, "zone": getattr(n, "zone_type", None)}
+                          for n in dev.nodes.values()],
+                "segments": [{"a": sg.ends[0], "b": sg.ends[1], "loop": sg.loop} for sg in dev.segments.values()]}
+
     @route("POST", "/api/trace")
     def trace_step(request, actor, b):
         """The QCCD MCP server reports each tool call it served (agents only)."""
