@@ -59,17 +59,17 @@ query=<title>)` gives its circuit and what is ranked.
   smaller one", make the large one the loop, and put the docks one unit inside its sides,
   spread evenly: together they draw the smaller triangle. Tell them in one sentence why it is
   not a second loop.
-  - A dock is a trap site joined to ONE loop site by ONE plain rail. All of them at once, as one
-    visible step: one `qccd_apply_change_set` whose operations are `{"type": "add_site", "pos":
-    [x, y], "zone": "trap", "to": ["<loop site>"]}`, one per dock (measured: 24 in one change
-    set, same result as drawing them). One at a time on the canvas: `addNodeAt(x, y, {"kind":
-    "site", "zone": "trap"})`, then `joinNodes(<loop site>, <the new site>)`.
+  - A dock is a trap site joined to ONE loop site by ONE plain rail. Make them all with ONE
+    operation and let it compute where they go: `qccd_apply_change_set` with `mode="apply"` and
+    `[{"type": "add_docks", "count": 24}]` (inside the first closed loop, spread evenly, never at a
+    corner or beside another dock; `side`, `distance`, `zone`, `loop` optional). Measured on the
+    side-50 triangle: 0.3 s, and BB at 496.8 ms with every rule passing. Do NOT work out dock
+    coordinates yourself: a live agent spent 57 s of one model call doing that. If you need them
+    one at a time on the canvas: `addNodeAt(x, y, {"kind": "site", "zone": "trap"})`, then
+    `joinNodes(<loop site>, <the new site>)`.
   - Do NOT draw docks with `sketchDraw("line", ...)`. A sketched line declares an open path,
     and the verifier then reads docking from different sides as different motions: R22 (one
     waveform per cycle) fails on every dock batch.
-  - Finding the loop sites: `sketchDraw` returns the loop's site ids in order, one unit apart
-    from the first corner you gave; `state` has every site's position. A dock goes one unit
-    from its loop site, perpendicular to that side, towards the inside.
   - Measured (2026-09-24): a triangle of side 50 with its corners cut by 2 is a loop of 144
     sites: `[[2, 43.30127], [48, 43.30127], [49, 41.56922], [26, 1.73205], [24, 1.73205],
     [1, 41.56922]]` (apex up; y grows downward). 8 docks per long side, spread evenly and one

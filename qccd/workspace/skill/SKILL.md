@@ -24,9 +24,11 @@ so neither of you can silently overwrite the other.
    (`qccd_manage_branch(action="create")`) or preview them; `apply` = you may commit to main.
    The service enforces this.
 4. **Edit semantically**: `qccd_apply_change_set` with `expected_revision` (from step 1), a
-   fresh `request_id`, `origin_prompt_id`, and `mode="preview"` first. Operation signatures:
-   `qccd_read_reference(section="operations")`. Use the batch helpers (`add_chain`,
-   `add_grid`, `replicate`, `construct`) instead of hundreds of single edits.
+   fresh `request_id`, `origin_prompt_id`, and `mode="apply"` when you are confident (it is
+   validated exactly as a preview is and can be undone; a preview first costs a whole extra model
+   call). Operation signatures: `qccd_read_reference(section="operations")`. Use the batch
+   helpers (`add_chain`, `add_grid`, `add_docks`, `replicate`, `construct`) instead of many
+   single edits, and never compute coordinates an operation computes for you.
 5. **On 409 conflict**: the user or another agent changed the design. Re-read the context,
    reconsider, and redo the change against the new revision. Never just bump the number.
    On 403 `protected`: that entity is locked by the user; do not work around it.

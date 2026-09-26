@@ -196,3 +196,49 @@ def test_a_workspace_folder_takes_any_name_or_none_and_the_cli_says_which_words_
         assert r.returncode == 2 and "not a QCCD workspace" in r.stderr and 'qccd init "My QCCD designs"' in r.stderr, \
             (cmd, r.stdout, r.stderr)
     assert list(elsewhere.iterdir()) == []                   # and nothing was written there
+
+
+def test_add_docks_computes_where_the_docks_go_from_a_count(tmp_path):
+    """The conveyor's docks from a count alone: a live agent spent 57 s of one model call working
+    out 24 dock coordinates (2026-09-24).  On a 10 x 6 ring: evenly spread, one unit INSIDE the loop,
+    never at a corner, never beside another dock, each joined to one loop site; outside works;
+    too many is refused with how many fit."""
+    ws = Workspace.init(tmp_path / "ws")
+    try:
+        ws.apply_change_set({"expected_revision": 0, "request_id": "ring", "mode": "apply",
+                             "operations": [{"type": "construct", "generator": "ring",
+                                             "params": {"width": 10, "height": 6}}]}, ME)
+        dev0 = ws.replayed("main").arch.device
+        loop = next(iter(dev0.loops.values()))
+        on = list(loop.nodes)
+        pos = lambda d, n: tuple(float(x) for x in d.nodes[n].pos)
+        xs = [pos(dev0, n)[0] for n in on]
+        ys = [pos(dev0, n)[1] for n in on]
+        corners = {n for n in on if pos(dev0, n)[0] in (min(xs), max(xs)) and pos(dev0, n)[1] in (min(ys), max(ys))}
+        r = ws.apply_change_set({"expected_revision": 1, "request_id": "d", "mode": "apply",
+                                 "operations": [{"type": "add_docks", "count": 6}]}, ME)
+        assert r["status"] == "committed" and not r["diagnostics"].get("violations"), r["diagnostics"]
+        dev = ws.replayed("main").arch.device
+        docks = [n for n in dev.nodes if n not in set(on)]
+        assert len(docks) == 6
+        hosts = []
+        for d in docks:
+            (sid,) = dev.incidence[d]                          # one rail each ...
+            a, b = dev.segments[sid].ends
+            host = a if b == d else b
+            hosts.append(host)
+            assert host in on and host not in corners           # ... to a loop site that is not a corner
+            x, y = pos(dev, d)
+            assert min(xs) < x < max(xs) and min(ys) < y < max(ys)            # inside
+            hx, hy = pos(dev, host)
+            assert abs(((x - hx) ** 2 + (y - hy) ** 2) ** 0.5 - 1.0) < 1e-6   # one unit off
+        idx = sorted(on.index(h) for h in hosts)
+        assert all((b - a) % len(on) > 1 for a, b in zip(idx, idx[1:] + idx[:1]))   # never neighbours
+        out = ws.apply_change_set({"expected_revision": 2, "request_id": "o", "mode": "preview",
+                                   "operations": [{"type": "add_docks", "count": 4, "side": "outside"}]}, ME)
+        assert out["status"] == "previewed" and not out["diagnostics"].get("violations")
+        with pytest.raises(WorkspaceError, match="only .* of 99 docks fit"):
+            ws.apply_change_set({"expected_revision": 2, "request_id": "x", "mode": "preview",
+                                 "operations": [{"type": "add_docks", "count": 99}]}, ME)
+    finally:
+        ws.close()
