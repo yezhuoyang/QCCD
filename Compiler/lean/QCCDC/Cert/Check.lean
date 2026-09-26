@@ -253,7 +253,55 @@ def Implements (inp : Input) : Prop :=
   Grounded inp ∧
   RespectsOrder inp
 
-/-! ## Decidability -/
+/-! ## Decidability
+
+The replay is computed ONCE per check, as the header says.  `MovesAreHops`, `GatesLegal` and
+`RespectsOrder` bind their replay (or their witness join) with a `let`; decided through
+`unfold; infer_instance`, that `let` landed inside the compiled per-move and per-operand
+functions, so a BB round was replayed about 3 700 times and one check took ten minutes
+(2026-09-26).  So each of the three is also stated with what it binds as a PARAMETER
+(`...In`), the same proposition by definition (`Iff.rfl`), and the instances decide that
+form with the replay computed once and passed in.  What `check` decides is unchanged:
+`Implements` is as written above, and `check_sound` is still `of_decide_eq_true`. -/
+
+/-- A replay: the snapshots, and the end state (`replay`'s type). -/
+abbrev Replay := List (Nat × List (String × String)) × List (String × String)
+
+/-- `MovesAreHops` over a given replay. -/
+def MovesAreHopsIn (inp : Input) (R : Replay) : Prop :=
+  ∀ m ∈ inp.moves,
+    (m.src, m.dst) ∈ inp.hops ∧ look (stateIn R m.t) m.ion = some m.src
+
+/-- `GatesLegal` over a given replay. -/
+def GatesLegalIn (inp : Input) (R : Replay) : Prop :=
+  ∀ g ∈ inp.gates,
+    g.site ∈ inp.gateSites ∧
+    ∀ i ∈ g.ions, look (stateIn R g.t) i = some g.site
+
+/-- `RespectsOrder` over a given witness join. -/
+def RespectsOrderIn (W : List WQ) : Prop :=
+  ∀ a ∈ W, ∀ b ∈ W, a.idx < b.idx →
+    (a.qubits.any (fun q => b.qubits.contains q)) = true →
+      Commutes a.name a.qubits b.name b.qubits = true ∨ a.t < b.t
+
+/-- The specification with the replay and the witness join as parameters. -/
+def ImplementsIn (inp : Input) (R : Replay) (W : List WQ) : Prop :=
+  inp.unrealised = [] ∧
+  MapInjective inp ∧
+  MapTotal inp ∧
+  EventsSorted inp ∧
+  RotationsKnown inp ∧
+  MovesAreHopsIn inp R ∧
+  GatesLegalIn inp R ∧
+  Covered inp ∧
+  Grounded inp ∧
+  RespectsOrderIn W
+
+theorem movesAreHops_iff (inp : Input) : MovesAreHops inp ↔ MovesAreHopsIn inp (replay inp) := Iff.rfl
+theorem gatesLegal_iff (inp : Input) : GatesLegal inp ↔ GatesLegalIn inp (replay inp) := Iff.rfl
+theorem respectsOrder_iff (inp : Input) : RespectsOrder inp ↔ RespectsOrderIn (witnessQubits inp) := Iff.rfl
+theorem implements_iff (inp : Input) :
+    Implements inp ↔ ImplementsIn inp (replay inp) (witnessQubits inp) := Iff.rfl
 
 instance (inp : Input) : Decidable (MapInjective inp) := by
   unfold MapInjective; infer_instance
@@ -267,11 +315,20 @@ instance (inp : Input) : Decidable (EventsSorted inp) := by
 instance (inp : Input) : Decidable (RotationsKnown inp) := by
   unfold RotationsKnown; infer_instance
 
-instance (inp : Input) : Decidable (MovesAreHops inp) := by
-  unfold MovesAreHops; infer_instance
+instance (inp : Input) (R : Replay) : Decidable (MovesAreHopsIn inp R) := by
+  unfold MovesAreHopsIn; infer_instance
 
-instance (inp : Input) : Decidable (GatesLegal inp) := by
-  unfold GatesLegal; infer_instance
+instance (inp : Input) (R : Replay) : Decidable (GatesLegalIn inp R) := by
+  unfold GatesLegalIn; infer_instance
+
+instance (W : List WQ) : Decidable (RespectsOrderIn W) := by
+  unfold RespectsOrderIn; infer_instance
+
+instance (inp : Input) : Decidable (MovesAreHops inp) :=
+  decidable_of_iff _ (movesAreHops_iff inp).symm
+
+instance (inp : Input) : Decidable (GatesLegal inp) :=
+  decidable_of_iff _ (gatesLegal_iff inp).symm
 
 instance (inp : Input) : Decidable (Covered inp) := by
   unfold Covered; infer_instance
@@ -279,11 +336,15 @@ instance (inp : Input) : Decidable (Covered inp) := by
 instance (inp : Input) : Decidable (Grounded inp) := by
   unfold Grounded; infer_instance
 
-instance (inp : Input) : Decidable (RespectsOrder inp) := by
-  unfold RespectsOrder; infer_instance
+instance (inp : Input) : Decidable (RespectsOrder inp) :=
+  decidable_of_iff _ (respectsOrder_iff inp).symm
 
-instance (inp : Input) : Decidable (Implements inp) := by
-  unfold Implements; infer_instance
+instance (inp : Input) (R : Replay) (W : List WQ) : Decidable (ImplementsIn inp R W) := by
+  unfold ImplementsIn; infer_instance
+
+/-- One replay and one witness join for the whole check. -/
+instance (inp : Input) : Decidable (Implements inp) :=
+  decidable_of_iff _ (implements_iff inp).symm
 
 /-- The checker: the decision procedure for `Implements`, and nothing else. -/
 def check (inp : Input) : Bool := decide (Implements inp)
