@@ -73,7 +73,26 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
+**Deployed** 2026-09-26 19:11 UTC (12:11 PDT), from commit `67703cb` (pushed). It carries
+`3eea898`, in which the Lean checker computes a certificate's replay once instead of about
+3,700 times. The specification, the soundness theorem and its axioms are unchanged. The
+previous deployment (`259aba6`) is in `.env.bak-259aba6` and `VERSION.bak-259aba6` for a
+rollback. All checks were PRIVATE uploads, never on a leaderboard:
+
+| check | GHZ starter | BB [[144,12,12]] (the two-triangle design) |
+|---|---|---|
+| local rehearsal, end to end | 6 s | 16 s |
+| the server, end to end | 9 s | 34 s |
+
+Before this deployment, the BB grade on the server took about 8.5 minutes. Both were eligible
+on both, with no stage or metric differences from the local grade. The BB local report came
+from the old checker, so this also compares the two checker versions. The image's 13 layers
+are identical on this machine and on the droplet; the image ids differ only because the two
+image stores name images differently. The operator uploader `deploy-smoke-67703cb` (quota 2)
+holds the private smoke submissions `os_2901e4026a976ff4` (GHZ) and `os_0909b51fd3c47007` (BB);
+its token was deleted after use.
+
+**Deployed before** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
 adds the website's five boards to the GHZ starter: `bb144@1`, `rep9@1`, `five_qubit@1`,
 `steane@1`, `surface17@1`. `VERSION` on the server records it; the previous deployment
 (`10152b1`, 2026-09-23) is in `.env.bak-10152b1` for a rollback. The GHZ release is
