@@ -1216,7 +1216,10 @@ function buildChat() {
   var ta = h('textarea', { id: 'qcl-text', cls: 'qcl-input', rows: '1', placeholder: 'Message the agent…',
                            'aria-label': 'message the agent' });
   ta.value = S.textCache || '';
-  ta.addEventListener('input', function () { S.textCache = ta.value; grow(ta); renderSendButton(); });
+  ta.addEventListener('input', function () {
+    S.textCache = ta.value; grow(ta); renderSendButton();
+    if (ta.value.trim()) warmOnTyping();
+  });
   ta.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); }
   });
@@ -1429,12 +1432,21 @@ function chatSend(textArg) {
 function ensureAgent() {
   var s = agentSession();
   if (s && (s.status === 'connected' || s.mode === 'pull' || s.mode === 'channel')) return Promise.resolve(s);
+  if (S.ensuring) return S.ensuring;            // one start at a time: typing began it, the send joins it
   var live = S.sessions.filter(function (x) { return x.status === 'connected'; })[0];
-  if (live) {
-    return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions);
-  }
-  return (S.codex === null ? loadAgents() : Promise.resolve())
-    .then(function () { var k = agentChoice(); return k ? connectAgent(k) : null; });
+  var go = live ? api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions)
+    : (S.codex === null ? loadAgents() : Promise.resolve())
+        .then(function () { var k = agentChoice(); return k ? connectAgent(k) : null; });
+  var done = function (x) { S.ensuring = null; return x; };
+  S.ensuring = go.then(done, function (e) { S.ensuring = null; throw e; });
+  return S.ensuring;
+}
+// the person started typing and no agent is connected yet: start it now, so the message does not
+// wait for the agent's start-up (~9 s for Claude Code with the QCCD tools; typing takes longer)
+function warmOnTyping() {
+  if (S.warmed || agentSession() || S.connecting) return;
+  S.warmed = true;
+  ensureAgent().catch(function () { S.warmed = false; });
 }
 function loadAgents() {
   return api('GET', '/api/agents').then(function (r) {
@@ -1496,7 +1508,8 @@ function modelMenu() {
       m.appendChild(h('div', { cls: 'qcl-sep' }));
       m.appendChild(h('div', { cls: 'qcl-mh', text: 'Thinking' }));
       [''].concat(efforts).forEach(function (e) {
-        m.appendChild(h('button', { cls: 'qcl-mi', text: (e === cur.effort ? '✓ ' : '') + (e || 'the model\'s default'),
+        m.appendChild(h('button', { cls: 'qcl-mi', text: (e === cur.effort ? '✓ ' : '') +
+                                    (e || (kind === 'claude' ? 'default (medium: fastest measured)' : 'the model\'s default')),
                                     on: { click: function () { closeMenu(); setModel(kind, { effort: e }); } } }));
       });
     }
@@ -1642,10 +1655,14 @@ function renderConv() {
   var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   while (box.firstChild) box.removeChild(box.firstChild);
   if (!S.conv.length && !S.pending && !S.connecting) { box.appendChild(emptyState()); return; }
-  var lastWho = null, runs = {};
+  var lastWho = null, runs = {}, subs = {};
   S.conv.forEach(function (it) { if (it.type === 'run') runs[it.run_id] = true; });
   S.conv.forEach(function (it) {
     if (it.type === 'run_view' && runs[it.run_id]) return;
+    if (it.type === 'submission' && it.submission_id) {        // its submit job and its record: one card
+      if (subs[it.submission_id]) return;
+      subs[it.submission_id] = true;
+    }
     var n = convItem(it, lastWho);
     if (n) box.appendChild(n);
     if (it.type === 'agent') lastWho = shortName(it.author);
@@ -1713,6 +1730,7 @@ function convItem(it, lastWho) {
                                                    : 'did not run: ' + (it.summary || it.status)) }),
       ok && it.view ? btn('Watch it run', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link') : null]);
   }
+  if (it.type === 'submission') return submissionCard(it);
   if (it.type === 'compare') {
     return h('div', { cls: 'qcl-card cmp' }, [h('div', { cls: 'qcl-card-t', text: 'Side by side' }),
       it.verdict ? h('div', { cls: 'qcl-card-s', text: it.verdict }) : null,
@@ -1738,6 +1756,24 @@ function convItem(it, lastWho) {
     return h('div', { cls: 'qcl-event' }, [h('span', { cls: 'qcl-evtxt', text: (it.kind === 'compile' ? 'Compiled' : it.kind) + ': ' + (it.summary || it.status) })]);
   }
   return null;
+}
+// a submission follows itself here, from its compile to the grade's verdict: nobody has to wait on it
+function submissionCard(it) {
+  var st = it.state, line;
+  if (st === 'running') line = (it.progress || 'waiting for a worker') + '…';
+  else if (st === 'eligible') line = 'Eligible' + (it.metric ? ' · ' + it.metric.name + ' ' + it.metric.value + (it.metric.unit ? ' ' + it.metric.unit : '') : '');
+  else if (st === 'ineligible') line = 'Not eligible' + ((it.reasons || []).length ? ': ' + it.reasons.join('; ') : '');
+  else if (st === 'cancelled') line = 'Cancelled';
+  else line = 'Did not finish: ' + (it.why || 'no reason given');
+  var mins = function (s) { s = Math.max(0, Math.round(s)); return s < 90 ? s + ' s' : Math.round(s / 60) + ' min'; };
+  var when = it.finished && it.started ? 'took ' + mins(it.finished - it.started)
+           : (st === 'running' && it.started ? 'started ' + new Date(it.started * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+                                               ' · its verdict appears here' : '');
+  return h('div', { cls: 'qcl-card sub ' + (st === 'eligible' ? 'ok' : st === 'running' ? 'busy' : 'bad'), 'data-submission': it.submission_id || '' }, [
+    h('div', { cls: 'qcl-card-t', text: (it.design || 'The design') + ' submitted to ' + (it.board || 'a leaderboard') }),
+    h('div', { cls: 'qcl-card-s', text: line }),
+    h('div', { cls: 'qcl-note', text: [it.label, when].filter(Boolean).join(' · ') }),
+    st !== 'running' ? btn('Results', function () { S.tab = 'results'; renderTabs(); loadResults(); }, 'qcl-link') : null]);
 }
 function showChange(csid) {
   api('GET', '/api/change-sets/' + encodeURIComponent(csid)).then(function (c) {

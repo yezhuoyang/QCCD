@@ -250,13 +250,17 @@ class RunsMixin:
         d_cert = self.put_artifact(canonical_bytes(strict_loads((work / "prog.qcert.json").read_bytes())),
                                    "application/json", f"run {jid}: compiler certificate")
         d_qasm = self.put_artifact(qasm.encode("utf-8"), "text/plain", f"run {jid}: circuit")
+        # the certified (uncooled) program too: with it a submission of the same circuit on the same
+        # device adopts this compile instead of compiling again (the grade checks it all the same)
+        d_raw = self.put_artifact(canonical_bytes(strict_loads((work / "prog.tsir.json").read_bytes())),
+                                  "application/json", f"run {jid}: certified program")
         headline = perf["bottleneck"][0] if perf["bottleneck"] else ""
         return {"summary": f"{shown} on {dname} (r{rev}): {perf['total']['ms']:g} ms per round. "
                            + headline,
                 "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
                         "design": design, "compiler": used, "performance": perf,
                         "artifacts": {"device": d_dev, "program": d_prog, "times": d_times,
-                                      "certificate": d_cert, "circuit": d_qasm},
+                                      "certificate": d_cert, "circuit": d_qasm, "certified": d_raw},
                         "view": f"/runview/{jid}",
                         "note": "a performance run: compiled and replayed with the rules checked; not "
                                 "checked by the Lean checker and not a submission"},

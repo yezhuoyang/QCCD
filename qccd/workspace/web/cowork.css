@@ -94,6 +94,8 @@
 .qcl-card{border:1px solid var(--line,#d0d5dd);border-radius:10px;padding:8px 10px;max-width:92%;align-self:flex-start;
   background:var(--panel,#fff)}
 .qcl-card.cmp{border-color:#9dbfe9;background:#f3f7fd}
+.qcl-card.sub.ok{border-color:#9ad3ae;background:var(--ok_bg,#e7f5ec)}
+.qcl-card.sub.bad{border-color:#f0a8a2;background:var(--bad_bg,#fdeceb)}
 .qcl-card-t{font-weight:600;font-size:12.5px}
 .qcl-card-s{font-size:12.5px;margin:2px 0 4px}
 .qcl-typing{align-self:flex-start;display:flex;align-items:center;gap:3px;color:var(--muted,#667085);font-size:12px;padding:2px 6px}

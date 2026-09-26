@@ -1,10 +1,12 @@
 """Claude Code as a chat agent (agents/claude.py), with a stand-in `claude` executable (and one
 Codex reattach check that shares the renamed-folder promise).
 
-The stand-in reads the delivery on stdin, records its command line, and answers in Claude
-Code's stream-json.  Covered: the chat's message reaches it and its answer comes back as the
-conversation; the second message RESUMES the same conversation; each run gets only the QCCD
-tools and read-only file tools, with no permission prompt; a failed run says why in the chat.
+The stand-in is one long-lived process, as Claude Code is with `--input-format stream-json`: it
+reads each message as a stream-json line, records its command line and pid, and answers in
+Claude Code's stream-json.  Covered: the chat's message reaches it and its answer comes back as
+the conversation; the second message goes to the SAME process (no second start-up); a change
+of model starts a new process that RESUMES the conversation; each run gets only the QCCD tools
+and read-only file tools, with no permission prompt; a failed run says why in the chat.
 The real-Claude path is tests/workspace_live_page.py with the chat set to Claude.
 """
 
@@ -25,32 +27,39 @@ from qccd.workspace.runtime import ensure_service, service_request  # noqa: E402
 FAKE = r'''
 import json, os, sys
 args = sys.argv[1:]
-text = sys.stdin.read()
 log = __LOG__
-with open(log, "a", encoding="utf-8") as f:
-    f.write(json.dumps({"args": args, "stdin": text[:4000], "tool_search": os.environ.get("ENABLE_TOOL_SEARCH")}) + "\n")
 sid = args[args.index("--resume") + 1] if "--resume" in args else args[args.index("--session-id") + 1]
 out = lambda ev: print(json.dumps(ev), flush=True)
-out({"type": "system", "subtype": "init", "session_id": sid, "tools": ["mcp__qccd__qccd_page_read"]})
-if "FAIL-PLEASE" in text:
-    out({"type": "result", "subtype": "success", "is_error": True, "result": "Claude AI usage limit reached", "session_id": sid})
-elif "TOOLS-PLEASE" in text:
-    # one turn the way Claude Code streams it: thinking, a Skill call, an MCP tool call, the results, the answer
-    out({"type": "assistant", "message": {"content": [{"type": "thinking", "thinking": "I should read the context first."}]}})
-    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_0", "name": "ToolSearch", "input": {"query": "qccd"}}]}})
-    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_0", "content": [
-        {"type": "tool_reference", "tool_name": "mcp__qccd__qccd_get_context"}]}]}})
-    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_1", "name": "Skill", "input": {"skill": "qccd"}}]}})
-    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_1", "content": "Launching skill: qccd"}]}})
-    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_2", "name": "mcp__qccd__qccd_get_context", "input": {"detail": "summary"}}]}})
-    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_2", "content": [{"type": "text", "text": "ghz4@1 - main r0"}], "is_error": False}]}})
-    out({"type": "assistant", "message": {"content": [{"type": "text", "text": "The design is at r0."}]}})
-    out({"type": "result", "subtype": "success", "is_error": False, "result": "The design is at r0.", "session_id": sid,
-         "duration_ms": 4321, "num_turns": 3, "total_cost_usd": 0.0123})
-else:
-    first = [l for l in text.splitlines() if l.startswith("> ")][0][2:]
-    out({"type": "assistant", "message": {"content": [{"type": "text", "text": "Fake Claude heard: " + first}]}})
-    out({"type": "result", "subtype": "success", "is_error": False, "result": "Fake Claude heard: " + first, "session_id": sid})
+with open(log + ".starts", "a", encoding="utf-8") as f:     # every process start, message or not
+  f.write(json.dumps({"pid": os.getpid(), "args": args}) + "\n")
+for raw in sys.stdin:
+  raw = raw.strip()
+  if not raw:
+    continue
+  text = json.loads(raw)["message"]["content"]
+  with open(log, "a", encoding="utf-8") as f:
+    f.write(json.dumps({"args": args, "pid": os.getpid(), "stdin": text[:4000],
+                        "tool_search": os.environ.get("ENABLE_TOOL_SEARCH")}) + "\n")
+  out({"type": "system", "subtype": "init", "session_id": sid, "tools": ["mcp__qccd__qccd_page_read"]})
+  if "FAIL-PLEASE" in text:
+      out({"type": "result", "subtype": "success", "is_error": True, "result": "Claude AI usage limit reached", "session_id": sid})
+  elif "TOOLS-PLEASE" in text:
+      # one turn the way Claude Code streams it: thinking, a Skill call, an MCP tool call, the results, the answer
+      out({"type": "assistant", "message": {"content": [{"type": "thinking", "thinking": "I should read the context first."}]}})
+      out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_0", "name": "ToolSearch", "input": {"query": "qccd"}}]}})
+      out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_0", "content": [
+          {"type": "tool_reference", "tool_name": "mcp__qccd__qccd_get_context"}]}]}})
+      out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_1", "name": "Skill", "input": {"skill": "qccd"}}]}})
+      out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_1", "content": "Launching skill: qccd"}]}})
+      out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tu_2", "name": "mcp__qccd__qccd_get_context", "input": {"detail": "summary"}}]}})
+      out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tu_2", "content": [{"type": "text", "text": "ghz4@1 - main r0"}], "is_error": False}]}})
+      out({"type": "assistant", "message": {"content": [{"type": "text", "text": "The design is at r0."}]}})
+      out({"type": "result", "subtype": "success", "is_error": False, "result": "The design is at r0.", "session_id": sid,
+           "duration_ms": 4321, "num_turns": 3, "total_cost_usd": 0.0123})
+  else:
+      first = [l for l in text.splitlines() if l.startswith("> ")][0][2:]
+      out({"type": "assistant", "message": {"content": [{"type": "text", "text": "Fake Claude heard: " + first}]}})
+      out({"type": "result", "subtype": "success", "is_error": False, "result": "Fake Claude heard: " + first, "session_id": sid})
 '''
 
 
@@ -76,6 +85,18 @@ def svc(tmp_path, monkeypatch):
         service_request(info, "POST", "/api/shutdown", {}, token="owner")
     except Exception:
         pass
+
+
+def _alive(pid: int) -> bool:
+    if os.name == "nt":
+        import subprocess
+        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+        return f" {pid} " in out
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
 
 
 def _until(fn, timeout=40):
@@ -113,7 +134,21 @@ def test_claude_answers_in_one_conversation_and_says_why_it_stopped(svc):
     calls = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
     a1, a2 = calls[0]["args"], calls[1]["args"]
     assert a1[a1.index("--session-id") + 1] == conv and "--resume" not in a1          # one conversation...
-    assert a2[a2.index("--resume") + 1] == conv and "--session-id" not in a2          # ...resumed
+    assert calls[1]["pid"] == calls[0]["pid"] and a2 == a1                           # ...in ONE kept-alive process
+    assert a1[a1.index("--input-format") + 1] == "stream-json"
+    # only the built-in tools it needs, no bundled skills (a live agent detoured through one), and the
+    # thinking level measured fastest unless the person picks another
+    assert a1[a1.index("--tools") + 1] == "Read,Grep,Glob,WaitForMcpServers" and "--disable-slash-commands" in a1
+    assert a1[a1.index("--effort") + 1] == "medium"
+    # a new model: a new process, the same conversation resumed
+    assert _until(lambda: own("GET", "/api/conversation")["working"] == [])
+    own("POST", f"/api/sessions/{sid}/settings", {"model": "sonnet", "effort": ""})
+    p2b = ask("And R9?")
+    assert _until(lambda: agent_says(p2b))
+    calls = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
+    a3 = calls[2]["args"]
+    assert calls[2]["pid"] != calls[0]["pid"] and a3[a3.index("--resume") + 1] == conv and "--session-id" not in a3
+    assert a3[a3.index("--model") + 1] == "sonnet"
     assert a1[a1.index("--permission-mode") + 1] == "dontAsk"                         # nobody is asked anything
     assert a1[a1.index("--allowedTools") + 1] == "mcp__qccd Read Grep Glob"
     assert "Bash" in a1[a1.index("--disallowedTools") + 1] and "--strict-mcp-config" in a1
@@ -121,7 +156,7 @@ def test_claude_answers_in_one_conversation_and_says_why_it_stopped(svc):
     assert {"CronCreate", "ScheduleWakeup", "Monitor", "Agent"} <= set(a1[a1.index("--disallowedTools") + 1].split())
     assert "address them directly" in a1[a1.index("--append-system-prompt") + 1]
     assert "never promise to report back later" in a1[a1.index("--append-system-prompt") + 1]
-    assert "qccd_" in calls[0]["stdin"] and "This is a chat" in calls[0]["stdin"]      # the delivery, on stdin
+    assert "qccd_" in calls[0]["stdin"] and "This is a chat" in calls[0]["stdin"]      # the delivery, as a message
     assert calls[0]["tool_search"] == "false"             # all QCCD tools from the first turn, no lookups
     p3 = ask("FAIL-PLEASE")
     note = _until(lambda: agent_says(p3))
@@ -197,7 +232,7 @@ def test_a_claude_turn_is_traced_step_by_step_on_the_model_the_person_chose(svc)
     own("POST", f"/api/sessions/{sid}/settings", {"model": "", "effort": ""})           # back to the defaults
     ask("And R9?")
     a3 = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()][-1]["args"]
-    assert "--model" not in a3 and "--effort" not in a3
+    assert "--model" not in a3 and a3[a3.index("--effort") + 1] == "medium"         # the chat's default level
 
     # the trace of the first request: what Claude was handed, thought, called and got back, how it ended
     steps = own("GET", f"/api/traces/{sid}?prompt={p1}")["steps"]
@@ -247,11 +282,9 @@ def test_a_renamed_workspace_folder_starts_a_new_conversation_instead_of_failing
                              folder=str(tmp_path / "Old name"))
         assert moved.deliver("> hello again\n", "d1")["state"] == "accepted"
         stay = ClaudeBridge(state, s2, str(exe), "22222222-2222-2222-2222-222222222222", True)
-        assert _until(lambda: moved.proc.poll() is not None)
-        time.sleep(1.0)                                   # its reader thread records the end of the run
+        assert _until(lambda: moved.active_turn is None)            # the turn ended (the process stays alive)
         assert stay.deliver("> and here\n", "d2")["state"] == "accepted"
-        assert _until(lambda: stay.proc.poll() is not None)
-        time.sleep(1.0)
+        assert _until(lambda: stay.active_turn is None)
         assert moved.last_error is None and stay.last_error is None, (moved.last_error, stay.last_error)
         calls = [json.loads(x)["args"] for x in log.read_text(encoding="utf-8").splitlines()]
         a1, a2 = calls[0], calls[1]
@@ -261,7 +294,119 @@ def test_a_renamed_workspace_folder_starts_a_new_conversation_instead_of_failing
         said = [e["payload"]["text"] for e in ws.events_since(0, limit=100, types=["agent.message"])["events"]]
         assert any("renamed or moved" in t for t in said), said
     finally:
+        for br in [b for b in locals().values() if isinstance(b, ClaudeBridge)]:
+            br.close()
         ws.close()
+
+
+def test_a_page_that_opens_starts_its_agent_and_an_idle_one_stops_counted_from_its_last_turn(tmp_path, monkeypatch):
+    """Claude Code takes ~9 s to start with the QCCD tools (measured 2026-09-26).  A page with a chat
+    that opens starts the process of the agent it talks to, before any message; a stopped agent is
+    not started.  An idle process stops IDLE_S after its LAST turn, not after an earlier one."""
+    import types
+    from qccd.workspace.agents import claude
+    from qccd.workspace.agents.claude import ClaudeBridge
+    from qccd.workspace.service import _warm_for
+    log = tmp_path / "claude-calls.jsonl"
+    fake = tmp_path / "fake_claude.py"
+    fake.write_text(FAKE.replace("__LOG__", repr(str(log))), encoding="utf-8")
+    if os.name == "nt":
+        exe = tmp_path / "claude.cmd"
+        exe.write_text(f'@"{sys.executable}" "{fake}" %*\r\n', encoding="utf-8")
+    else:
+        exe = tmp_path / "claude"
+        exe.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{fake}" "$@"\n', encoding="utf-8")
+        exe.chmod(0o755)
+    monkeypatch.setattr(claude, "IDLE_S", 3.0)
+    ws = Workspace.init(tmp_path / "Any name")
+    try:
+        state = types.SimpleNamespace(ws=ws, traces=None, worker=None, bridges={})
+        me = {"kind": "human", "id": "cli"}
+        on = ws.register_session(me, client="claude", mode="appserver", label="Claude")["id"]
+        off = ws.register_session(me, client="claude", mode="appserver", label="Claude")["id"]
+        ws.stop_session(off, {"kind": "human", "id": "someone"})
+        state.bridges[on] = br = ClaudeBridge(state, on, str(exe), "33333333-3333-3333-3333-333333333333", False)
+        state.bridges[off] = stopped = ClaudeBridge(state, off, str(exe), "44444444-4444-4444-4444-444444444444", False)
+        t0 = time.monotonic()
+        _warm_for(state, {"target_session": on})
+        _warm_for(state, {"target_session": off})
+        _warm_for(state, {"target_session": None})                      # a page with no agent: nothing
+        assert _until(lambda: br.proc is not None and br.proc.poll() is None, timeout=10)
+        proc = br.proc
+        assert not log.exists()                                          # started, and nothing sent to it
+        time.sleep(0.5)
+        assert stopped.proc is None                                      # a stopped agent is not started
+        time.sleep(max(0.0, t0 + 1.0 - time.monotonic()))
+        assert br.deliver("> first\n", "d1")["state"] == "accepted"
+        assert _until(lambda: br.active_turn is None, timeout=10)
+        assert br.proc is proc                                          # the warmed process took the message
+        time.sleep(max(0.0, t0 + 3.6 - time.monotonic()))
+        assert br.proc is proc and proc.poll() is None                   # the warm-up's timer did not stop it
+        assert _until(lambda: proc.poll() is not None, timeout=15)       # the last turn's timer did
+        assert br.proc is None
+        # closing ends the agent itself, not only a wrapper (here a .cmd, as an npm install is)
+        assert br.deliver("> again\n", "d2")["state"] == "accepted"
+        assert _until(lambda: br.active_turn is None, timeout=10)
+        pid = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()][-1]["pid"]
+        assert _alive(pid)
+        br.close()
+        assert _until(lambda: not _alive(pid), timeout=10), f"the agent's process {pid} outlived close()"
+    finally:
+        for b in list(state.bridges.values()):
+            b.close()
+        ws.close()
+
+
+def _chrome(info, steps, tmp_path, name):
+    """Open the Studio (paired) in Chrome and run `steps` after it is live; the driver's step results."""
+    import subprocess
+    from qccd.workspace.runtime import service_request
+    code = service_request(info, "POST", "/api/pair-code", {}, token="owner")["code"]
+    spec = tmp_path / f"{name}.json"
+    spec.write_text(json.dumps({"pages": {"a": f"http://127.0.0.1:{info['port']}/studio#pair={code}"}, "steps": [
+        {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                 "QCCD_LIVE.state().rev !== null", "timeout": 60000, "stopOnFail": True}] + steps}), encoding="utf-8")
+    r = subprocess.run(["node", str(Path(__file__).parent / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                       timeout=240, cwd=Path(__file__).parents[1])
+    return json.loads(r.stdout.decode("utf-8") or "{}").get("steps", [])
+
+
+TYPE = "var t = document.getElementById('qcl-text'); t.value = 'W'; t.dispatchEvent(new Event('input')); 1"
+
+
+def test_typing_starts_the_agent_so_the_message_does_not_wait_for_its_start_up(svc, tmp_path):
+    """The first message of a new chat waited for Claude Code's start-up (7 s in a live run,
+    2026-09-26).  The chat now starts the agent at the person's first keystroke: its process is
+    running before anything is sent, and the message then goes to that same process."""
+    info, log = svc
+    own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+    starts = Path(str(log) + ".starts")
+    st = _chrome(info, [{"eval": TYPE}, {"wait": "!!QCCD_LIVE.chat().agent", "timeout": 30000}], tmp_path, "type")
+    assert st and all(x.get("ok", "error" not in x) for x in st), st
+    assert _until(lambda: starts.exists() and starts.read_text(encoding="utf-8").strip(), timeout=20)
+    assert not log.exists()                                     # running, and nothing sent to it yet
+    claude = [x for x in own("GET", "/api/sessions")["sessions"] if x["client"] == "claude"]
+    assert len(claude) == 1 and claude[0]["bridge"]["process"] == "kept alive", claude
+    st = _chrome(info, [{"eval": "QCCD_LIVE.chatSend('What does rule R7 say?').then(function(d){ return !!d; })"},
+                        {"wait": "QCCD_LIVE.chat().items.some(function(i){ return i.type === 'agent' && "
+                                 "/Fake Claude heard/.test(i.text); })", "timeout": 30000}], tmp_path, "send")
+    assert st and all(x.get("ok", "error" not in x) for x in st), st
+    started = [json.loads(x) for x in starts.read_text(encoding="utf-8").splitlines()]
+    heard = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
+    assert len(started) == 1 and heard[0]["pid"] == started[0]["pid"]      # the warmed process took it
+    assert len([x for x in own("GET", "/api/sessions")["sessions"] if x["client"] == "claude"]) == 1
+
+
+def test_typing_and_sending_at_once_starts_one_agent(svc, tmp_path):
+    """The keystroke starts the agent and the send joins that start: never two conversations."""
+    info, log = svc
+    own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+    st = _chrome(info, [{"eval": TYPE + "; QCCD_LIVE.chatSend('Hello there').then(function(d){ return !!d; })"},
+                        {"wait": "QCCD_LIVE.chat().items.some(function(i){ return i.type === 'agent' && "
+                                 "/Fake Claude heard: Hello there/.test(i.text); })", "timeout": 30000}],
+                 tmp_path, "race")
+    assert st and all(x.get("ok", "error" not in x) for x in st), st
+    assert len([x for x in own("GET", "/api/sessions")["sessions"] if x["client"] == "claude"]) == 1
 
 
 def test_a_codex_thread_reattached_after_a_rename_gets_tools_for_the_folder_it_is_in_now(tmp_path):

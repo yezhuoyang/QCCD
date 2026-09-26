@@ -168,7 +168,9 @@ a visible step at a time.
 - `qccd_submit_local(design=<name>, board=<title>)` does it in one job: compiles the board's
   circuit onto the design (the conveyor for a design with a closed loop, else the router),
   adopts that program, freezes the design and grades it with the reference evaluator (the
-  rules, the Lean certificate, semantics, metrics). Follow the job; the graded submission is on
+  rules, the Lean certificate, semantics, metrics), usually within a minute. Follow it once
+  with `qccd_get_job(job_id, wait_s=50)`: it waits through the grade and returns the verdict.
+  The chat also shows it as a card that follows it to the verdict; the graded submission is on
   the local leaderboard. Label results "local, not published": publishing needs the user's
   approval (`qccd_prepare_publish` shows what would be uploaded).
 - A stage that is `skipped`, `unsupported`, `partial`, `timeout` or `cancelled` is NOT passed.

@@ -1,8 +1,9 @@
 """LIVE, opt-in: a real agent designs the shape the person asks for and submits it to a board.
 
-    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex] [message] [effort] [model]
+    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex] [message] [effort] [model] [typing_s]
 
 effort and model are what the chat's model menu sets (e.g. `medium`, `sonnet`); empty keeps the default.
+typing_s: seconds spent typing before the message is sent (default 0: sent at once).
 
 The person's own request (2026-09-24) is the default message: "I want to make a new design,
 which has a large triangle and a smaller triangle, and then submit this design to BBCode".
@@ -12,8 +13,8 @@ by itself.  The agent is expected to make a new design under a name, draw the sh
 Studio, fill in what the board's circuit needs until a run passes every rule, and submit it
 to the BB board.
 
-After the agent's turn this waits for every job to finish (the reference grade of BB takes
-about 7 minutes) and prints one JSON summary: the conversation, the designs by name, what
+After the agent's turn this waits for every job to finish (a BB reference grade took 667 s before
+the checker computed its replay once, 12 s after; the chat's submission card shows its verdict) and prints one JSON summary: the conversation, the designs by name, what
 the agent drew (page actions and change sets), the runs, the submissions with their board
 and status, and the page's console.  Screenshots land in out_dir.  It uses real agent turns
 (your Claude or Codex plan).  Not part of the pytest suite.
@@ -46,6 +47,9 @@ def main() -> int:
     message = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else MESSAGE
     effort = sys.argv[4] if len(sys.argv) > 4 else ""
     model = sys.argv[5] if len(sys.argv) > 5 else ""
+    # seconds a person spends typing the message before sending it (0: sent at once, as before
+    # 2026-09-26); the chat starts the agent at the first keystroke, so typing hides its start-up
+    typing = float(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6] else 0.0
     out.mkdir(parents=True, exist_ok=True)
     os.environ["QCCD_RUNTIME_DIR"] = str(out / "runtime")
     if agent == "claude":
@@ -67,14 +71,22 @@ def main() -> int:
         {"eval": f"localStorage.setItem('qccd.agent', {json.dumps(agent)}); "
                  f"localStorage.setItem('qccd.model.{agent}', {json.dumps(json.dumps({'model': model, 'effort': effort}))}); 1"},
         {"sleep": 2000},
+        {"eval": "var t = document.getElementById('qcl-text'); t.value = " + json.dumps(message[:1]) + "; "
+                 "t.dispatchEvent(new Event('input')); 1" if typing else "1"},
+        {"sleep": int(typing * 1000)},
         {"eval": f"QCCD_LIVE.chatSend({json.dumps(message)}).then(function(d){{ return d && d.prompt_id; }})"},
         {"wait": idle, "timeout": 3000000, "stopOnFail": True},
-        {"sleep": 3000},
         {"shot": str(out / "studio_after.png")},
         {"eval": "JSON.stringify({branch: QCCD_LIVE.chat().branch, rev: QCCD_LIVE.state().rev, "
                  "nodes: Object.keys(EDITOR.state().device.nodes).length, "
                  "loops: Object.keys(EDITOR.state().device.loops).map(function(k){ var l = EDITOR.state().device.loops[k]; "
                  "return {id: k, n: l.nodes.length, closed: !!l.closed}; }), problems: EDITOR.problems()})"},
+        {"eval": "JSON.stringify(QCCD_LIVE.chat())"},
+        # the chat's submission card follows the grade to its verdict with nobody waiting on it
+        {"wait": "!QCCD_LIVE.chat().items.some(function(i){ return i.type === 'submission' && i.state === 'running'; })",
+         "timeout": 2400000},
+        {"sleep": 1500},
+        {"shot": str(out / "studio_verdict.png")},
         {"eval": "JSON.stringify(QCCD_LIVE.chat())"},
     ]
     spec = out / "spec.json"
@@ -85,14 +97,16 @@ def main() -> int:
     drive = json.loads(r.stdout.decode("utf-8") or "{}")
     st = drive.get("steps", [])
     report = {"seconds_agent": round(time.time() - t0), "message": message, "agent": agent, "effort": effort, "model": model,
+              "typing_s": typing,
               "steps": [{k: v for k, v in s.items() if k not in ("value", "step")} for s in st],
               "console": drive.get("logs"), "fatal": drive.get("fatal")}
-    if len(st) > 7 and st[7].get("value"):
-        report["studio_after"] = json.loads(st[7]["value"])
     if len(st) > 8 and st[8].get("value"):
-        chat = json.loads(st[8]["value"])
+        report["studio_after"] = json.loads(st[8]["value"])
+    if len(st) > 13 and st[13].get("value"):
+        chat = json.loads(st[13]["value"])
         report["conversation"] = [{k: i.get(k) for k in ("type", "text", "author", "summary", "status", "program",
-                                                          "draft", "design", "total_ms", "view")
+                                                          "draft", "design", "total_ms", "view", "state", "board",
+                                                          "metric", "progress", "reasons")
                                    if i.get(k) is not None} for i in chat.get("items", [])]
     # the agent may end its turn while the grade still runs: wait for every job
     t1 = time.time()
