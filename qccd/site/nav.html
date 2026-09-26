@@ -12,8 +12,10 @@
 #sitenav a.sn-brand{color:#0b0b0b;font-weight:600;letter-spacing:.01em;padding-left:0;margin-right:8px}
 #sitenav a.sn-brand span{color:#2a78d6}
 #sitenav .sn-sp{flex:1 1 auto}
-#sitenav .sn-sq{position:relative}
-#siteq{font:inherit;font-size:13px;width:240px;max-width:38vw;padding:5px 9px;border:1px solid #cfceca;
+/* the search box gives way before the bar overflows: the menu grew to twelve places (Agentic Design,
+   2026-09-26) and a 1424-px window then scrolled sideways by 6 px */
+#sitenav .sn-sq{position:relative;flex:0 1 240px;min-width:130px}
+#siteq{font:inherit;font-size:13px;width:100%;box-sizing:border-box;max-width:38vw;padding:5px 9px;border:1px solid #cfceca;
  border-radius:6px;background:#fff;color:#0b0b0b}
 #siteq:focus{outline:2px solid #bcd4f2;border-color:#2a78d6}
 #sitehits{display:none;position:absolute;right:0;top:34px;width:min(520px,90vw);max-height:60vh;overflow:auto;
