@@ -1787,6 +1787,9 @@ def build(out: Path) -> int:
     index.append({"t": "People", "d": "who takes part in the project", "u": "people/", "k": "page"})
     index += [{"t": p["name"], "d": " \u00b7 ".join(x for x in (p.get("role"), p.get("affiliation")) if x),
                "u": f"people/#{slug(p['name'])}", "k": "person"} for p in PEOPLE]
+    # how the site is built for AI agents (qccd/site/agentic.py): generated from the workspace's own code
+    from .agentic import index_entries as agentic_index_entries
+    index += agentic_index_entries()
     index.append({"t": "Publications", "d": "the papers this website is built on, and how to cite it", "u": "publications/", "k": "page"})
     index += [{"t": p["title"], "d": (p.get("venue", "") + (" \u00b7 " if p.get("venue") else "") + (p.get("used") or ""))[:110],
                "u": f"publications/#{p['key']}", "k": "paper"} for p in PUBS]
@@ -1850,6 +1853,8 @@ def build(out: Path) -> int:
     runs = build_phys_runs(out, put)
     put("physics/index.html", physics_page(phys, runs), 1, "physics")
     put("people/index.html", people_page(), 1, "people")
+    from . import agentic
+    put("agentic/index.html", agentic.page(PAGE, STYLE), 1, "agentic")
     put("publications/index.html", publications_page(), 1, "publications")
     lang, rules = build_examples(out, put)
     put("language/index.html", language_page(lang), 1, "language")
