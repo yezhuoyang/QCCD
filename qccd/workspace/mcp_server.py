@@ -121,6 +121,11 @@ the site."""
 
 # ---------------------------------------------------------------------- tool table
 
+#: the tools that only read (the MCP read-only hint; the website's Agentic Design page lists them)
+READ_ONLY = frozenset({"qccd_get_context", "qccd_read_reference", "qccd_query_design", "qccd_get_job",
+                       "qccd_inspect_run", "qccd_prepare_publish", "qccd_list_programs"})
+
+
 def _tools() -> list:
     obj = lambda props, req=(): {"type": "object", "properties": props, "required": list(req),
                                  "additionalProperties": False}
@@ -148,7 +153,9 @@ def _tools() -> list:
               "include_operations": {"type": "boolean"}})),
         ("qccd_apply_change_set", "Preview (default) or apply one transactional change set of semantic "
          "operations (see qccd_read_reference section=operations). Requires expected_revision (from "
-         "qccd_get_context) and a unique request_id (a retry with the same id returns the same result).",
+         "qccd_get_context) and a unique request_id (a retry with the same id returns the same result). "
+         "branch = the design, by its name; it defaults to the main design, so name it whenever you work on "
+         "another one (expected_revision is that design's revision). mode='apply' when confident.",
          obj({"expected_revision": i, "request_id": s, "operations": {"type": "array", "items": {"type": "object"}},
               "mode": {"type": "string", "enum": ["preview", "apply"]}, "branch": s, "summary": s,
               "origin_prompt_id": s, "rebase": {"type": "string", "enum": ["never", "if_disjoint"]}},
@@ -514,8 +521,7 @@ def run(root: Path, client: str, channel: bool) -> None:
     tools = _tools()
     holder: dict = {"conn": None}
 
-    read_only = {"qccd_get_context", "qccd_read_reference", "qccd_query_design", "qccd_get_job",
-                 "qccd_inspect_run", "qccd_prepare_publish", "qccd_list_programs"}
+    read_only = READ_ONLY
 
     def annotations(n):
         return types.ToolAnnotations(read_only_hint=n in read_only, destructive_hint=False,

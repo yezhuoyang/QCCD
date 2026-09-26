@@ -301,6 +301,10 @@ class WorkspaceCore:
 
     def apply_change_set(self, req: Mapping, actor: Mapping) -> dict:
         actor = _actor(actor)
+        if isinstance(req, Mapping) and isinstance(req.get("branch"), str) and not _branch_name_ok(req["branch"]):
+            # a design by the name its person gave it, as every other door takes it (a live agent's
+            # branch="Two triangles" was refused here, 2026-09-26, and cost it two model calls)
+            req = {**req, "branch": self.resolve_draft(req["branch"])}
         req = _check_request(req, self.id)
         branch = req["branch"]
         b = self.branch(branch)
