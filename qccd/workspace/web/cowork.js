@@ -1986,7 +1986,8 @@ function pageAction(p) {
         S.agentHold = false;
         if (cs.ok) {
           r.result = r.result || {};
-          r.result.change_set = { status: cs.data.status, revision: cs.data.revision, change_set_id: cs.data.change_set_id,
+          r.result.change_set = { status: cs.data.status, design: cs.data.branch, revision: cs.data.revision,
+                                  change_set_id: cs.data.change_set_id,
                                   diagnostics: cs.data.diagnostics, summary: cs.data.summary };
           done(r);
         } else {

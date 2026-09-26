@@ -178,7 +178,13 @@ class ClaudeBridge:
                                                                  "mcp_servers", "skills", "slash_commands", "agents",
                                                                  "output_style") if ev.get(k) is not None})
             elif kind == "assistant":
-                for b in ((ev.get("message") or {}).get("content") or []):
+                msg = ev.get("message") or {}
+                if isinstance(msg.get("usage"), dict):
+                    # one model call's cost, per event (a call's blocks arrive as several events that
+                    # share its id): the context it read is the agent's memory at that instruction
+                    rec("model", msg.get("id"), {"usage": msg["usage"], "model": msg.get("model"),
+                                                 "stop_reason": msg.get("stop_reason")})
+                for b in (msg.get("content") or []):
                     t = b.get("type")
                     if t == "text":
                         rec("message", None, {"text": b.get("text")})
