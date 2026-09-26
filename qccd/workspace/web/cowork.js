@@ -697,7 +697,7 @@ function present(p, branch) {
     else if (p.action === 'select_frame' && typeof seek === 'function') seek(+t.frame || 0, {});
     else if (!S.debug && (p.action === 'compare' || p.action === 'open_run')) {
       var url = p.action === 'compare' ? '/compare?runs=' + (t.runs || []).map(encodeURIComponent).join(',')
-                                       : '/runview/' + encodeURIComponent(t.run_id || '');
+                                       : '/runview/' + encodeURIComponent(t.run_id || '') + '#play';   // it plays by itself
       loadConvSoon();
       // like a person showing you: the tab you are looking at opens it
       if (document.visibilityState === 'visible') goTo(url);

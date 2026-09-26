@@ -39,9 +39,12 @@ from typing import Any
 log = logging.getLogger("qccd.mcp")
 
 INSTRUCTIONS = """QCCD workspace tools for co-designing a trapped-ion QCCD device and its hardware program.
-Start every turn with qccd_get_context: it returns the person's designs and the leaderboards
+A request from Studio carries the current state in its own text (the design the Studio shows and its
+revision, the other designs, the boards) and says when its frozen context holds nothing more: act on it
+directly. qccd_get_context returns more when you need it -- the person's designs and the leaderboards
 ("boards") any design can be submitted to, the revision, the protected entities, the Studio
-selection and view, unread prompts from Studio, jobs and the latest local result. Change the design ONLY with qccd_apply_change_set, passing the expected_revision you just
+selection and view, unread prompts from Studio, jobs and the latest local result -- and after
+something may have changed. Change the design ONLY with qccd_apply_change_set, passing the expected_revision you just
 read. Pass mode='apply' for a change you are confident in: it is validated exactly as a preview is,
 returns the same diagnostics, and can be undone; a preview first costs a whole extra model call, so
 keep it for changes you are unsure of. Every model call costs seconds: prefer one batch operation
@@ -154,8 +157,8 @@ def _tools() -> list:
         ("qccd_apply_change_set", "Preview (default) or apply one transactional change set of semantic "
          "operations (see qccd_read_reference section=operations). Requires expected_revision (from "
          "qccd_get_context) and a unique request_id (a retry with the same id returns the same result). "
-         "branch = the design, by its name; it defaults to the main design, so name it whenever you work on "
-         "another one (expected_revision is that design's revision). mode='apply' when confident.",
+         "branch = the design, by its name; without one, the design the person's Studio shows (the current "
+         "design; expected_revision is that design's revision). mode='apply' when confident.",
          obj({"expected_revision": i, "request_id": s, "operations": {"type": "array", "items": {"type": "object"}},
               "mode": {"type": "string", "enum": ["preview", "apply"]}, "branch": s, "summary": s,
               "origin_prompt_id": s, "rebase": {"type": "string", "enum": ["never", "if_disjoint"]}},
@@ -337,6 +340,14 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
         body = {k: a[k] for k in ("expected_revision", "request_id", "operations", "mode", "branch", "summary",
                                   "origin_prompt_id", "rebase") if k in a}
         body.setdefault("mode", "preview")
+        if not body.get("branch"):
+            # no design named: the one the person's Studio shows, which the context calls the current
+            # design -- not main.  A live agent that had just opened its new design in the Studio sent
+            # its docks to main, and spent two model calls finding out (2026-09-26)
+            try:
+                body["branch"] = be.call("GET", "/api/context?detail=summary").get("branch") or "main"
+            except Exception:
+                body["branch"] = "main"
         return be.call("POST", "/api/change-sets", body)
     if name == "qccd_undo_change_set":
         return be.call("POST", f"/api/change-sets/{_enc(a['change_set_id'])}/undo",
@@ -480,7 +491,7 @@ def _run_program(be, a: dict) -> dict:
             "log_tail": (res.get("log") or "")[-1500:]}
 
 
-SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation). Before you report, show it: qccd_page_read until the page's kind is 'run', then qccd_page_act(action='step', play=true), wait a few seconds while it plays (qccd_page_act action='wait'), and say what they are seeing."
+SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation), which PLAYS BY ITSELF. Do not press Play or wait for it: say in one line what they are watching (from this report) and go on with the next step in the same turn -- for a design meant for a board, submit it now (qccd_submit_local), in the same response as that line."
 
 
 def _enc(v) -> str:

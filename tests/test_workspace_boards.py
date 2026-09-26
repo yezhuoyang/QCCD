@@ -259,3 +259,54 @@ def test_a_change_set_names_its_design_like_every_other_door(tmp_path):
                                  "operations": [{"type": "add_site", "id": "Q2", "pos": [8, 8], "zone": "trap"}]}, ME)
     finally:
         ws.close()
+
+
+def test_a_change_set_without_a_design_goes_to_the_one_the_studio_shows():
+    """A live agent opened its new design in the Studio, then sent its docks without naming it, and
+    they went to main (2026-09-26).  Without a design, a change set goes to the current design: the
+    one the person's Studio shows (the context's branch)."""
+    from qccd.workspace.mcp_server import dispatch
+
+    class Fake:
+        def __init__(self):
+            self.calls = []
+
+        def call(self, method, path, body=None, **kw):
+            self.calls.append((method, path, body))
+            return {"branch": "cand/dx"} if path.startswith("/api/context") else {"status": "committed", "branch": body["branch"]}
+
+    be = Fake()
+    out = dispatch(be, "qccd_apply_change_set", {"expected_revision": 2, "request_id": "r", "mode": "apply",
+                                                 "operations": [{"type": "add_docks", "count": 3}]})
+    assert out["branch"] == "cand/dx" and be.calls[0][1].startswith("/api/context")
+    be = Fake()
+    dispatch(be, "qccd_apply_change_set", {"expected_revision": 0, "request_id": "r", "operations": [{}], "branch": "Ring v2"})
+    assert len(be.calls) == 1 and be.calls[0][2]["branch"] == "Ring v2"      # a named design is never second-guessed
+
+
+def test_a_request_carries_the_state_and_says_when_there_is_nothing_more_to_read(tmp_path):
+    """An agent spent its first model calls reading the context and a frozen context that held nothing
+    the message did not say (2026-09-26).  The message now carries the state; a read is asked for
+    only when something was selected, drawn or pointed at."""
+    from qccd.workspace.collab import delivery_text
+    ws = Workspace.init(tmp_path / "ws")
+    try:
+        ws.create_candidate(ME, title="Ring v2")
+        s = ws.register_session(ME, client="claude", mode="appserver", label="Claude")
+        v = ws.register_view(ME, page=None)
+        ws.update_view(v["id"], {"target_session": s["id"]}, ME)
+
+        def sent(body):
+            r = ws.send_prompt(ME, body=body, view_id=v["id"])
+            p = ws.prompt(r["prompt_id"])["latest_sent"]
+            return delivery_text(ws, r["prompt_id"], p, ws.context_snapshot(p["body"]["context_snapshot_id"]), "d_x")
+
+        plain = sent({"text": "Make two triangles", "intent": "apply_change", "mode": "apply", "anchors": [{"kind": "workspace"}]})
+        assert 'Now: the person\'s Studio shows the design "Main design" at revision 0' in plain
+        assert '"Ring v2"' in plain and "BB [[144,12,12]]" in plain
+        assert "no need to read it" in plain and "manage_comment(action='get'" not in plain
+        drawn = sent({"text": "Like this", "intent": "apply_change", "mode": "apply",
+                      "sketches": [{"kind": "arrow", "points": [[0, 0], [3, 0]]}]})
+        assert "manage_comment(action='get'" in drawn and "no need to read it" not in drawn
+    finally:
+        ws.close()
