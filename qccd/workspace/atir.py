@@ -281,7 +281,10 @@ def compile_trace(steps: list, *, prompt: str | None = None) -> dict:
             tok["in"] += int(u.get("input_tokens") or 0)
             tok["cache_read"] += int(u.get("cache_read_input_tokens") or 0)
             tok["cache_write"] += int(u.get("cache_creation_input_tokens") or 0)
-            tok["out"] += int(u.get("output_tokens") or 0)
+            # Claude Code reports a call's usage as it STARTS: the context it read is exact, its output
+            # count is final only once the call has stopped (stop_reason set) -- otherwise unknown
+            final = ((usage_by_msg.get(mid) or {}).get("data") or {}).get("stop_reason")
+            tok["out"] = None if tok["out"] is None or not final else tok["out"] + int(u.get("output_tokens") or 0)
         x["tokens"] = tok
         x["memory"] = tok["in"] + tok["cache_read"] + tok["cache_write"]
     for x in ins:
@@ -315,7 +318,8 @@ def _summary(ins: list) -> dict:
            "by_tool": dict(sorted(calls.items(), key=lambda kv: -kv[1]["ms"])),
            "commits": sum(1 for x in ins if x["op"] == "call" for e in x.get("effects") or [] if e["kind"] == "commit"),
            "memory_peak": max(mem) if mem else None, "memory_first": mem[0] if mem else None,
-           "tokens_out": sum((x.get("tokens") or {}).get("out", 0) for x in thinks) if mem else None,
+           "tokens_out": (sum(x["tokens"]["out"] for x in thinks if x.get("tokens")) if mem and all(
+               (x.get("tokens") or {}).get("out") is not None for x in thinks if x.get("tokens")) else None),
            "slowest": [{"i": x["i"], "op": x["op"], "ms": x["ms"], "what": x.get("tool") or x["op"]}
                        for x in sorted(ins, key=lambda x: -(x["ms"] or 0))[:6]]}
     if end:

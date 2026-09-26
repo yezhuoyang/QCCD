@@ -242,3 +242,20 @@ def test_add_docks_computes_where_the_docks_go_from_a_count(tmp_path):
                                  "operations": [{"type": "add_docks", "count": 99}]}, ME)
     finally:
         ws.close()
+
+
+def test_a_change_set_names_its_design_like_every_other_door(tmp_path):
+    """A live agent passed branch="Two triangles" and was refused ("branch must be 'main' or
+    'cand/<name>'"), costing it two model calls (2026-09-26).  The name resolves, as elsewhere."""
+    ws = Workspace.init(tmp_path / "ws")
+    try:
+        d = ws.create_candidate(ME, title="Two triangles")
+        r = ws.apply_change_set({"branch": "two  TRIANGLES", "expected_revision": 0, "request_id": "n", "mode": "apply",
+                                 "operations": [{"type": "add_site", "id": "Q1", "pos": [7, 7], "zone": "trap"}]}, ME)
+        assert r["status"] == "committed" and r["branch"] == d["name"] and ws.branch(d["name"])["head"] == 1
+        assert ws.branch("main")["head"] == 0                               # main untouched
+        with pytest.raises(WorkspaceError, match="no design"):
+            ws.apply_change_set({"branch": "Nothing like it", "expected_revision": 0, "request_id": "m", "mode": "apply",
+                                 "operations": [{"type": "add_site", "id": "Q2", "pos": [8, 8], "zone": "trap"}]}, ME)
+    finally:
+        ws.close()

@@ -23,8 +23,10 @@ def _steps(t0: float, commit: dict) -> list:
     st = lambda at, source, kind, name=None, data=None, ms=None: {
         "at": t0 + at, "n": next(n), "session": "s_t", "prompt": "p_1", "turn": "ct_1", "source": source,
         "kind": kind, "name": name, "data": data or {}, **({"ms": ms} if ms is not None else {})}
-    usage = lambda i, c, o: {"usage": {"input_tokens": i, "cache_read_input_tokens": c,
-                                       "cache_creation_input_tokens": 0, "output_tokens": o}}
+    # Claude Code reports a call's usage as it starts; only an event with stop_reason set has its final output
+    usage = lambda i, c, o, stop=None: {"usage": {"input_tokens": i, "cache_read_input_tokens": c,
+                                                  "cache_creation_input_tokens": 0, "output_tokens": o},
+                                        "stop_reason": stop}
     return [
         st(0.0, "service", "delivery", "deliver", {"request": "Make a ring", "text": "[QCCD Studio] ... > Make a ring"}),
         st(2.0, "agent", "session", "claude", {"model": "claude-x", "tools": ["mcp__qccd__qccd_apply_change_set",
@@ -33,7 +35,7 @@ def _steps(t0: float, commit: dict) -> list:
         st(4.0, "agent", "model", "msg_1", usage(10, 20000, 50)),
         st(4.0, "agent", "thinking", None, {"text": ""}),
         st(4.5, "agent", "message", None, {"text": "Drawing a ring."}),
-        st(5.0, "agent", "model", "msg_1", usage(10, 20000, 180)),
+        st(5.0, "agent", "model", "msg_1", usage(10, 20000, 180, "tool_use")),
         st(5.0, "agent", "tool_call", "mcp__qccd__qccd_apply_change_set",
            {"id": "tu_1", "input": {"branch": "main", "mode": "apply", "operations": []}}),
         st(5.2, "mcp", "tool_call", "qccd_apply_change_set", {"args": {}, "result": commit}, ms=150),
@@ -44,7 +46,7 @@ def _steps(t0: float, commit: dict) -> list:
         st(9.0, "mcp", "tool_call", "qccd_get_job", {"args": {}, "result": {"id": "job_1", "status": "succeeded"}}, ms=1600),
         st(9.1, "agent", "tool_result", None, {"id": "tu_2", "content": '{"id":"job_1","status":"succeeded"}'}),
         # model call 3: answers (9.1 -> 10.1 s)
-        st(10.1, "agent", "model", "msg_3", usage(5, 21500, 90)),
+        st(10.1, "agent", "model", "msg_3", usage(5, 21500, 90, "end_turn")),
         st(10.1, "agent", "message", None, {"text": "Done."}),
         st(10.2, "agent", "turn", "success", {"duration_ms": 10200, "duration_api_ms": 6000, "num_turns": 3,
                                               "total_cost_usd": 0.05, "usage": {"output_tokens": 310}}),
@@ -58,7 +60,8 @@ def test_a_trace_compiles_to_instructions_with_costs_memory_and_effects():
     assert ops == ["recv", "boot", "think", "say", "call", "think", "call", "think", "say", "end"], ops
     th = [x for x in p["instructions"] if x["op"] == "think"]
     assert [x["ms"] for x in th] == [3000, 2000, 1000]                  # from the moment it could start
-    assert th[0]["tokens"] == {"in": 10, "cache_read": 20000, "cache_write": 0, "out": 180}   # its last event counts
+    assert th[0]["tokens"] == {"in": 10, "cache_read": 20000, "cache_write": 0, "out": 180}   # its final event counts
+    assert th[1]["tokens"]["out"] is None and th[2]["tokens"]["out"] == 90     # no final event: unknown, not guessed
     assert [x["memory"] for x in th] == [20010, 21005, 21505]           # the context each call read
     apply_, poll = [x for x in p["instructions"] if x["op"] == "call"]
     assert apply_["tool"] == "qccd_apply_change_set" and apply_["exec_ms"] == 150 and apply_["ms"] == 300
