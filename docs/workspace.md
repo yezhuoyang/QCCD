@@ -382,6 +382,46 @@ looking.
   exports them. From a terminal, `qccd trace` lists the conversations and
   `qccd trace --session <id> [--prompt <id>] [--full | --json | --open]` prints one
   request. `GET /api/traces[/<session>?prompt=]` serves the same data.
+- **A run as a program** (`atir.py`, 2026-09-26). A request's trace compiles into ATIR: one
+  instruction per line, like a compiled QCCD programme beside its animation.
+  - `recv`: the request arrives.
+  - `boot`: the agent process starts.
+  - `think`: one model call, with its latency and the context it read, which is the agent's
+    memory.
+  - `say`: text the person reads.
+  - `call`: a tool or a page action, with end-to-end and in-tool time and the size of what it
+    returned.
+  - `end`: the turn's totals.
+
+  Each call carries its effects: a design commit (change set and revision), a job started or
+  polled, a design made. `check()` verifies a program. It must be well-formed, and every commit
+  it claims must be in the change-set log at that revision and replay. The tests forge, move and
+  cut commits and results to prove the checker can fail.
+
+  `/trace` opens on the Program view:
+  - a time bar by machine (model, tools, page);
+  - the memory curve;
+  - the listing;
+  - beside it, the design as it stood at the selected instruction, drawn from
+    `GET /api/design-graph?branch=&rev=`, with a commit's new sites marked;
+  - play and step controls.
+
+  `qccd trace --program` prints the listing; `--check` also checks it against the workspace.
+  `GET /api/traces/<session>/program` serves it. Claude Code's per-call usage is recorded
+  since 2026-09-26, so memory is exact from then on. Its output counts are final only on a
+  call's last event, and a program never guesses them.
+
+  Measured on the two-triangle BB request:
+  - **Before the speed fixes:** 101 model calls and 431 s of model time, 76 of the calls
+    polling the grade; one call took 57.5 s to work out dock coordinates.
+  - **After:** 29 model calls and 110 s of model time. The design was submitted after
+    102.7 s (175.7 s before), and the slowest model call took 9.0 s.
+
+  `tools/agent_costs.py` turns traces into the numbers the website's Agentic Design page
+  shows.
+- **`add_docks`** (an operation): the conveyor's docks from a count. They are spread evenly
+  around the first closed loop (or `loop`), never at a corner or beside another dock, one unit
+  in (or `distance`, `side`), each one `add_site(to=[loop site])`.
 - **The agent knows the site.** `qccd_read_reference` section `site` is read from the live
   site's own search index. It holds:
   - the main pages, the lessons and the leaderboards;

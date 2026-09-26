@@ -87,7 +87,7 @@ OUT_OF_LINE_MAX = len(OUT_OF_LINE)
 #: the workspace's own pages (always places)
 WORKSPACE_PLACES = [
     {"url": "/studio", "title": "Your Studio", "about": "the person's own live design (their Design page)"},
-    {"url": "/trace", "title": "Agent traces", "about": "what each agent did for each request, to replay"},
+    {"url": "/trace", "title": "Agent traces", "about": "what each agent did for each request, as a program (instructions with time, memory and effects, checked against the design store) beside the design it built; and the raw steps"},
     {"url": "/runview/<run_id>", "title": "A run", "about": "a run's own page: its device, program and animation"},
     {"url": "/compare?runs=<a>,<b>", "title": "Side by side", "about": "two runs on one clock"},
 ]
