@@ -144,6 +144,11 @@ class _Ctx:
         self.state.edits.append(rec)
         self.replayed = None      # the next lookup replays
 
+    def arch(self):
+        """The device as it stands now (replayed), for operations that compute from its geometry."""
+        self.arch_doc()
+        return self.replayed.arch
+
 
 def _meta(ctx: _Ctx, label: str) -> dict:
     return {"label": label, "src": str(ctx.actor.get("kind", "agent"))}
@@ -295,6 +300,95 @@ def _op_add_chain(ctx: _Ctx, op: Mapping, where: str) -> None:
         _op_add_segment(ctx, {"id": f"{prefix}_attach", "a": _id(op["attach_to"], where), "b": ids[0]}, where)
     if op.get("close") and count > 2:
         _op_add_segment(ctx, {"id": f"{prefix}{count - 1}_0", "a": ids[-1], "b": ids[0]}, where)
+
+
+def _xy(p) -> tuple:
+    return (float(getattr(p[0], "value", p[0])), float(getattr(p[1], "value", p[1])))
+
+
+def _op_add_docks(ctx: _Ctx, op: Mapping, where: str) -> None:
+    """Batch: `count` gate sites around a closed loop, each one rail off it -- the conveyor's docks.
+
+    An agent says how many; the geometry is computed here.  (A live agent spent 57 s of one model
+    call working out 24 dock coordinates by hand, 2026-09-24.)  The loop is `loop`, or the device's
+    first closed one.  Docks go at loop sites spread evenly by arc length -- never at a corner, where
+    the spur would meet the loop's rails at under 90 degrees, and never beside another dock --
+    `distance` units off the loop, perpendicular to it, on `side` ('inside' by default: the side
+    the loop encloses, read from its orientation).  Each is one `add_site(..., to=[loop site])`.
+    """
+    import math
+    count = _need(op, "count", int, where)
+    if not 1 <= count <= 1000:
+        raise OperationError("bad_value", f"{where}: count must be 1..1000")
+    side = op.get("side", "inside")
+    if side not in ("inside", "outside"):
+        raise OperationError("bad_value", f"{where}: side must be 'inside' or 'outside'")
+    dist = float(op.get("distance", 1.0))
+    if not 0.2 <= dist <= 50:
+        raise OperationError("bad_value", f"{where}: distance must be 0.2..50 lattice units")
+    zone = op.get("zone", "trap")
+    zt = ctx.zone_types()
+    if zone not in zt:
+        raise OperationError("bad_value", f"{where}: zone {zone!r} is not declared (have: {sorted(zt)})")
+    prefix = _id(op.get("prefix", "D"), where)
+    dev = ctx.arch().device
+    want = op.get("loop")
+    loops = [(lid, lp) for lid, lp in dev.loops.items()
+             if (want is None or lid == want) and lp.closed and len(lp.nodes) >= 4]
+    if not loops:
+        raise OperationError("no_loop", f"{where}: the design has no closed loop"
+                             + (f" named {want!r}" if want else "") + " to put docks around")
+    seq = list(loops[0][1].nodes)
+    P = [_xy(dev.nodes[n].pos) for n in seq]
+    n = len(seq)
+    hyp = lambda u: math.hypot(u[0], u[1])
+    area = sum(P[i][0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * P[i][1] for i in range(n)) / 2
+    sgn = (1 if area > 0 else -1) * (1 if side == "inside" else -1)   # interior is left of travel when area > 0
+    others = [_xy(x.pos) for x in dev.nodes.values()]
+    spot: dict = {}
+    for i in range(n):
+        a, b, c = P[i - 1], P[i], P[(i + 1) % n]
+        u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        lu, lv = hyp(u), hyp(v)
+        if lu < 1e-9 or lv < 1e-9 or dev.degree(seq[i]) > 2:
+            continue
+        if abs((u[0] * v[1] - u[1] * v[0]) / (lu * lv)) > 1e-3 or (u[0] * v[0] + u[1] * v[1]) <= 0:
+            continue                                        # a corner: not straight through
+        t = (c[0] - a[0], c[1] - a[1])
+        lt = hyp(t)
+        q = (b[0] - t[1] / lt * sgn * dist, b[1] + t[0] / lt * sgn * dist)
+        if min(hyp((q[0] - o[0], q[1] - o[1])) for o in others) < 0.3:
+            continue                                        # something is already there
+        spot[i] = [round(q[0], 6), round(q[1], 6)]
+    arc = [0.0]
+    for i in range(1, n):
+        arc.append(arc[-1] + hyp((P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])))
+    L = arc[-1] + hyp((P[0][0] - P[-1][0], P[0][1] - P[-1][1]))
+    used: set = set()
+    for j in range(count):
+        target = L * (j + 0.5) / count
+        best = None
+        for i in spot:
+            if i in used or (i - 1) % n in used or (i + 1) % n in used:
+                continue
+            d = abs(arc[i] - target)
+            d = min(d, L - d)
+            if best is None or d < best[0]:
+                best = (d, i)
+        if best is None:
+            raise OperationError("no_room", f"{where}: only {len(used)} of {count} docks fit on this loop "
+                                 f"({len(spot)} straight sites with room beside them, no two docks adjacent)")
+        used.add(best[1])
+    taken = ctx.node_ids() | ctx.seg_ids()
+    k = 0
+    for i in sorted(used):
+        while f"{prefix}{k}" in taken:
+            k += 1
+        nid = f"{prefix}{k}"
+        taken.add(nid)
+        ctx.push({"topology": {"op": "add_site", "args": {
+            "id": nid, "pos": spot[i], "labels": [], "to": [seq[i]], "zone": zone,
+            "capacity": 0, "zone_types": zt}}, "meta": _meta(ctx, "add dock")})
 
 
 def _op_add_grid(ctx: _Ctx, op: Mapping, where: str) -> None:
@@ -498,6 +592,11 @@ OPERATIONS: dict = {s.name: s for s in [
            {"prefix": "string", "count": "int", "start": "[x, y]", "step": "[dx, dy]?",
             "zone": "string?", "capacity": "int?", "attach_to": "node id?", "close": "bool?"},
            _op_add_chain),
+    OpSpec("add_docks", "Batch: the conveyor's docks -- `count` gate sites spread evenly around a closed loop, "
+           "each one rail off it; the positions are computed (never at a corner or beside another dock).",
+           {"count": "int", "loop": "loop id? (default: the first closed loop)", "side": "'inside'|'outside'?",
+            "distance": "number? (lattice units, default 1)", "zone": "string? (default 'trap')", "prefix": "string?"},
+           _op_add_docks),
     OpSpec("add_grid", "Batch: a rows x cols lattice of sites.",
            {"prefix": "string", "rows": "int", "cols": "int", "origin": "[x, y]?",
             "pitch": "number?", "zone": "string?"}, _op_add_grid),

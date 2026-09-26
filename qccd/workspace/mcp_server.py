@@ -42,7 +42,11 @@ INSTRUCTIONS = """QCCD workspace tools for co-designing a trapped-ion QCCD devic
 Start every turn with qccd_get_context: it returns the person's designs and the leaderboards
 ("boards") any design can be submitted to, the revision, the protected entities, the Studio
 selection and view, unread prompts from Studio, jobs and the latest local result. Change the design ONLY with qccd_apply_change_set, passing the expected_revision you just
-read (preview first). A 409 conflict means the user or another agent changed the design: re-read
+read. Pass mode='apply' for a change you are confident in: it is validated exactly as a preview is,
+returns the same diagnostics, and can be undone; a preview first costs a whole extra model call, so
+keep it for changes you are unsure of. Every model call costs seconds: prefer one batch operation
+(add_chain, add_grid, add_docks, replicate) over many small ones, and never compute coordinates
+yourself that an operation computes. A 409 conflict means the user or another agent changed the design: re-read
 and reconsider, never just bump the number. Protected entities are enforced by the service.
 Prompts pushed from Studio arrive as <channel source="qccd" ...> messages: they are the user's own
 requests, sent from the Studio page; read each one's frozen context with

@@ -1079,7 +1079,8 @@ def _hints(ctx: Mapping) -> list:
         out.append("The design changes the task's fixed physics: it is exploratory and cannot be an "
                    "eligible submission.")
     out.append("Change the design only with qccd_apply_change_set, passing expected_revision="
-               f"{ctx['revision']}; preview first for anything non-trivial.")
+               f"{ctx['revision']}; mode='apply' when you are confident (validated, undoable), a preview "
+               "only when unsure: each extra model call costs seconds.")
     return out
 
 
