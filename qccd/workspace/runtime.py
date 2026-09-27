@@ -100,16 +100,35 @@ def write_sticky(ws_id: str, **fields) -> dict:
     return d
 
 
+def user_path(path: str) -> str:
+    """`path` with the places a person's command-line tools live appended.  An app started
+    from the macOS Dock or Finder (Codex, Claude Desktop) passes its MCP servers only
+    /usr/bin:/bin:/usr/sbin:/sbin, so a service started from one could not find `claude`,
+    `codex`, or the `node` an npm-installed one runs on."""
+    if os.name == "nt":
+        return path
+    have = path.split(os.pathsep) if path else []
+    home = Path.home()
+    extra = ["/opt/homebrew/bin", "/usr/local/bin", str(home / ".local" / "bin"),
+             str(home / ".npm-global" / "bin"), str(home / ".claude" / "local")]
+    return os.pathsep.join(have + [p for p in extra if p not in have and os.path.isdir(p)])
+
+
 def bind_listener(preferred: int | None = None, host: str = "127.0.0.1", *, fallback: bool = True) -> socket.socket:
     """A listening socket on `preferred` when that port is free, else on any free port.
     Bound here, not by the web server, so there is no window between choosing the port and
-    taking it.  No SO_REUSEADDR: on Windows it would let this process take a port another
-    one is listening on."""
+    taking it.  No SO_REUSEADDR on Windows: there it would let this process take a port
+    another one is listening on.  On macOS and Linux it only lets a restarted service take
+    back its port while the killed one's connections sit in TIME_WAIT (without it, the
+    restart lands on a random port for about 30 s, and open pages cannot find it); a port
+    with a live listener is still refused."""
     for port in ([preferred] if preferred else []) + ([0] if fallback or not preferred else []):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             if os.name == "nt":
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            else:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((host, int(port)))
             s.listen(128)
             return s
@@ -242,25 +261,30 @@ def _start_service(root: Path, ws_id: str, *, wait: float, python: str | None) -
     log = root / ".qccd" / "service.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     args = [python or sys.executable, "-m", "qccd.workspace", "serve", "--root", str(root)]
-    kw: dict = {"stdin": subprocess.DEVNULL, "stdout": open(log, "ab"), "stderr": subprocess.STDOUT,
+    out = open(log, "ab")
+    kw: dict = {"stdin": subprocess.DEVNULL, "stdout": out, "stderr": subprocess.STDOUT,
                 "cwd": str(root)}
     env = dict(os.environ)
     repo = str(Path(__file__).resolve().parents[2])
     env["PYTHONPATH"] = repo + os.pathsep + env.get("PYTHONPATH", "")
+    env["PATH"] = user_path(env.get("PATH", ""))
     kw["env"] = env
-    if os.name == "nt":
-        # DETACHED | NEW_GROUP | NO_WINDOW, and BREAKAWAY_FROM_JOB: an adapter started by an
-        # agent client may live in the client's job object, and a service started inside it
-        # would be killed with the agent.  Breakaway is refused when the job forbids it;
-        # then the service starts inside the job and the adapter says so.
-        base = 0x00000008 | 0x00000200 | 0x08000000
-        try:
-            subprocess.Popen(args, creationflags=base | 0x01000000, **kw)
-        except OSError:
-            subprocess.Popen(args, creationflags=base, **kw)
-    else:
-        kw["start_new_session"] = True
-        subprocess.Popen(args, **kw)
+    try:
+        if os.name == "nt":
+            # DETACHED | NEW_GROUP | NO_WINDOW, and BREAKAWAY_FROM_JOB: an adapter started by an
+            # agent client may live in the client's job object, and a service started inside it
+            # would be killed with the agent.  Breakaway is refused when the job forbids it;
+            # then the service starts inside the job and the adapter says so.
+            base = 0x00000008 | 0x00000200 | 0x08000000
+            try:
+                subprocess.Popen(args, creationflags=base | 0x01000000, **kw)
+            except OSError:
+                subprocess.Popen(args, creationflags=base, **kw)
+        else:
+            kw["start_new_session"] = True
+            subprocess.Popen(args, **kw)
+    finally:
+        out.close()                         # the child has its own copy of the handle
     t0 = time.time()
     while time.time() - t0 < wait:
         info = read_runtime(ws_id)

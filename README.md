@@ -26,12 +26,22 @@ rules, prices it, and derives the electrodes it would take to build.
 
 ## Install
 
-No dependencies — pure standard-library Python.
+No dependencies — pure standard-library Python 3.10 or newer. On macOS the command is
+`python3` (and the system one is 3.9: `brew install python@3.13`); on Windows, `py` or `python`.
 
 ```bash
 git clone https://github.com/yezhuoyang/QCCD.git && cd QCCD
-python -m qccd devices          # every architecture, and what it costs to wire
-python -m qccd studio           # the design tool, as one self-contained page
+python3 -m qccd devices         # every architecture, and what it costs to wire
+python3 -m qccd studio          # the design tool, as one self-contained page
+```
+
+The workspace (Studio paired with your own agent, compiling and local grading) installs into a
+virtual environment, with the prebuilt compiler — [docs/workspace.md §7](docs/workspace.md):
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate    # Windows: py -m venv .venv; .venv\Scripts\activate
+pip install -e ".[agent]"
+qccd toolchain install
 ```
 
 ---

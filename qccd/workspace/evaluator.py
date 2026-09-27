@@ -104,13 +104,17 @@ class Toolchain:
             return None
         ob = REPO / "Compiler" / "ocaml" / "_build" / "default" / "bin"
         lb = REPO / "Compiler" / "lean" / ".lake" / "build" / "bin"
+        cb = REPO / "Compiler" / "lean" / "checker" / ".lake" / "build" / "bin"   # without Mathlib
         qccdc = pick("QCCD_QCCDC", ob / "qccdc_cli.exe", ob / "qccdc_cli")
         if qccdc is None and not os.environ.get("QCCD_QCCDC"):
             # a fresh clone has no build: the prebuilt one `qccd toolchain install` fetched
             from .toolchain import installed
             qccdc = installed()
-        return cls(qccdc=qccdc, qcheck=pick("QCCD_QCHECK", lb / "qcheck.exe", lb / "qcheck"),
-                   python=sys.executable, bridge=BRIDGE)
+        qcheck = pick("QCCD_QCHECK", cb / "qcheck.exe", cb / "qcheck", lb / "qcheck.exe", lb / "qcheck")
+        if qcheck is None and not os.environ.get("QCCD_QCHECK"):
+            from .toolchain import installed_qcheck
+            qcheck = installed_qcheck()
+        return cls(qccdc=qccdc, qcheck=qcheck, python=sys.executable, bridge=BRIDGE)
 
     def identity(self) -> dict:
         return {"qccdc": _exe_digest(self.qccdc), "qcheck": _exe_digest(self.qcheck),

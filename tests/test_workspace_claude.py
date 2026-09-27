@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -112,7 +113,7 @@ def _until(fn, timeout=40):
 def test_claude_answers_in_one_conversation_and_says_why_it_stopped(svc):
     info, log = svc
     own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
-    assert own("GET", "/api/agents") == {"codex_available": False, "claude_available": True}
+    assert own("GET", "/api/agents") == {"codex_available": False, "claude_available": True, "installed": []}
     c = own("POST", "/api/sessions/claude/connect", {"label": "Claude"})
     sid, conv = c["session"]["id"], c["conversation"]
     assert c["session"]["client"] == "claude" and c["session"]["mode"] == "appserver"
@@ -357,6 +358,11 @@ def test_a_page_that_opens_starts_its_agent_and_an_idle_one_stops_counted_from_i
         ws.close()
 
 
+from chrome_path import CHROME  # noqa: E402
+
+needs_chrome = pytest.mark.skipif(not (shutil.which("node") and CHROME), reason="needs node and Chrome")
+
+
 def _chrome(info, steps, tmp_path, name):
     """Open the Studio (paired) in Chrome and run `steps` after it is live; the driver's step results."""
     import subprocess
@@ -374,6 +380,7 @@ def _chrome(info, steps, tmp_path, name):
 TYPE = "var t = document.getElementById('qcl-text'); t.value = 'W'; t.dispatchEvent(new Event('input')); 1"
 
 
+@needs_chrome
 def test_typing_starts_the_agent_so_the_message_does_not_wait_for_its_start_up(svc, tmp_path):
     """The first message of a new chat waited for Claude Code's start-up (7 s in a live run,
     2026-09-26).  The chat now starts the agent at the person's first keystroke: its process is
@@ -397,6 +404,7 @@ def test_typing_starts_the_agent_so_the_message_does_not_wait_for_its_start_up(s
     assert len([x for x in own("GET", "/api/sessions")["sessions"] if x["client"] == "claude"]) == 1
 
 
+@needs_chrome
 def test_typing_and_sending_at_once_starts_one_agent(svc, tmp_path):
     """The keystroke starts the agent and the send joins that start: never two conversations."""
     info, log = svc
@@ -425,3 +433,16 @@ def test_a_codex_thread_reattached_after_a_rename_gets_tools_for_the_folder_it_i
         assert _here(old, ws, "s1")["mcp_servers"]["other"] == {"command": "x"} and _here(None, ws, "s1") is None
     finally:
         ws.close()
+
+
+def test_the_chat_starts_the_agent_this_workspace_was_set_up_for(svc):
+    """A Mac with the ChatGPT app has a Codex (the app carries one) beside Claude Code: the chat of a
+    workspace set up with `qccd agent install --client claude` must still start Claude, not Codex."""
+    from qccd.workspace import installers
+    info, log = svc
+    own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+    root = Path(info["root"])
+    installers.install(root, "claude")
+    assert own("GET", "/api/agents")["installed"] == ["claude"]
+    js = (Path(__file__).resolve().parents[1] / "qccd" / "workspace" / "web" / "cowork.js").read_text(encoding="utf-8")
+    assert "if (inst.length === 1 && S[inst[0]]) return inst[0];" in js

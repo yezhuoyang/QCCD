@@ -20,9 +20,9 @@ cd "$(dirname "$0")"
 ROOT=..
 BUILD=build
 FIX=$BUILD/fixtures
-PY=${PYTHON:-python}
+source ./python.sh
 
-source ocaml/ocamlenv.sh
+source ./ocamlenv.sh
 
 echo "=== 1. expand every architecture ==="
 mkdir -p "$BUILD"

@@ -31,10 +31,10 @@ from pathlib import Path
 
 from .jsonsafe import strict_loads
 
-__all__ = ["install", "uninstall", "status", "build_skill", "SKILL_VERSION"]
+__all__ = ["install", "uninstall", "status", "build_skill", "refresh_skills", "SKILL_VERSION"]
 
 SKILL_SRC = Path(__file__).resolve().parent / "skill"
-SKILL_VERSION = "1.9.0"
+SKILL_VERSION = "1.10.0"
 MD_BEGIN = "<!-- qccd:begin (managed by `qccd agent install`; edit outside this block) -->"
 MD_END = "<!-- qccd:end -->"
 TOML_BEGIN = "# qccd:begin (managed by `qccd agent install`; edit outside this block)"
@@ -219,6 +219,27 @@ def install(root: Path, client: str, *, scope: str = "project", channel: bool = 
     else:
         raise ValueError("client must be codex or claude")
     return lines
+
+
+def refresh_skills(root: Path) -> list:
+    """Bring the installed skills up to this code's version, where the person has not edited
+    them: after a `git pull`, the next service start (it restarts on new code) hands every
+    agent the current guidance instead of the version installed with the workspace.  An
+    edited skill is left alone; `qccd agent status` says it is behind."""
+    out = []
+    for client, d in (("claude", ".claude"), ("codex", ".agents")):
+        dest = Path(root) / d / "skills" / "qccd"
+        m = dest / MANIFEST
+        try:
+            if not m.exists() or json.loads(m.read_text(encoding="utf-8")).get("version") == SKILL_VERSION:
+                continue
+            if _modified(dest):
+                continue
+            build_skill(dest, root)
+            out.append(client)
+        except (OSError, ValueError):
+            continue
+    return out
 
 
 def uninstall(root: Path, client: str, *, scope: str = "project") -> list:

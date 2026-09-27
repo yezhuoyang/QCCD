@@ -40,7 +40,10 @@ OCAML_ENV = {
     + os.pathsep + os.environ.get("PATH", ""),
 }
 EXE = COMPILER / "ocaml" / "_build" / "default" / "bin" / "qccdc_cli.exe"
-QCHECK = COMPILER / "lean" / ".lake" / "build" / "bin" / "qcheck.exe"
+sys.path.insert(0, str(HERE))
+from check_cert import find_qcheck  # noqa: E402
+
+QCHECK = find_qcheck(HERE.parent / "lean") or HERE.parent / "lean" / ".lake" / "build" / "bin" / "qcheck"
 
 DEVICES = ["stationary_chain", "chain", "grid9x9", "deck_unit_cell", "ladder_2x72",
            "ring144_24v", "cyclone_base", "cyclone_dual_loop", "h2_racetrack"]

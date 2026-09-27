@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +43,18 @@ from qccd.arch import Architecture  # noqa: E402
 from qccd.ir.tsir import TSIR  # noqa: E402
 
 PI = math.pi
+
+
+def find_qcheck(lean: Path) -> Path | None:
+    """The built Lean checker: `QCCD_QCHECK`, else the standalone `lean/checker` package's
+    build, else the full package's; `qcheck.exe` on Windows, `qcheck` elsewhere."""
+    if os.environ.get("QCCD_QCHECK"):
+        return Path(os.environ["QCCD_QCHECK"])
+    for d in (lean / "checker" / ".lake" / "build" / "bin", lean / ".lake" / "build" / "bin"):
+        for name in ("qcheck.exe", "qcheck"):
+            if (d / name).is_file():
+                return d / name
+    return None
 
 
 # ------------------------------------------------------------------ O1
@@ -264,8 +277,8 @@ def main(argv: list[str] | None = None) -> int:
     # by decision D3; now that it does, its verdict is what lifts the cap.
     lean_ok: bool | None = None
     if args.qcheck:
-        exe = ROOT / "Compiler" / "lean" / ".lake" / "build" / "bin" / "qcheck.exe"
-        if not exe.exists():
+        exe = find_qcheck(ROOT / "Compiler" / "lean")
+        if exe is None:
             verdict["lean"] = "qcheck not built"
         else:
             r = subprocess.run([str(exe), args.qcheck], capture_output=True, text=True)

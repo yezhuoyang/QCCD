@@ -18,9 +18,11 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { findChrome } from './chrome_path.mjs';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const CHROME = spec.chrome || process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = spec.chrome || findChrome();
+if (!CHROME) { console.error('no Chrome found; set CHROME'); process.exit(2); }
 const port = 9300 + Math.floor(Math.random() * 500);
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'qccd-cdp-'));
 const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`,

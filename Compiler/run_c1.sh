@@ -12,8 +12,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PY=${PYTHON:-python}
-source ocaml/ocamlenv.sh
+source ./python.sh
+source ./ocamlenv.sh
 
 echo "=== 1. build ==="
 (cd ocaml && dune build)

@@ -100,7 +100,7 @@ ocaml/_build/default/bin/qccdc_cli.exe compile build/bb144_esm.qasm \
 python bridge/mk_qcheck_input.py build/out/bb144_rot \
     --arch build/ring144_24v.expanded.json -o build/qc_bb144.json
 python bridge/check_cert.py build/out/bb144_rot --qasm build/bb144_esm.qasm \
-    --arch arch/ring144_24v.arch.json --qcheck build/qc_bb144.json   # ~5 min in Lean
+    --arch arch/ring144_24v.arch.json --qcheck build/qc_bb144.json   # under a second in Lean
 ```
 
 ---
@@ -182,11 +182,20 @@ distinct controls, and exhibits a state where a control/target chain does not.
 
 ## Build and run
 
-Three toolchains, all present on this machine and all pinned:
+`qccd toolchain install` fetches a prebuilt `qccdc_cli` (Windows and Linux on x86-64, macOS on
+Apple silicon) and, where one is published, `qcheck`. Only the gates below need the toolchains
+themselves; all three are pinned.
 
 ```bash
-# OCaml 5.3.0 / dune 3.19.0 / yojson 2.2.2  -- `ocaml` is NOT on PATH by default
-cd Compiler/ocaml && source ./ocamlenv.sh && dune build
+# OCaml 5.3.0 / dune 3.19+ / yojson 2.2.2.  macOS: `brew install opam`; then everywhere
+#   opam init && opam switch create 5.3.0 && opam install dune yojson.2.2.2
+# ocamlenv.sh activates the switch (on Windows, where `ocaml` is NOT on PATH by default,
+# the opam `default` one; elsewhere $QCCD_OPAM_SWITCH or opam's current one)
+cd Compiler && source ./ocamlenv.sh && (cd ocaml && dune build)   # the binary is qccdc_cli.exe on every OS
+
+# the proved checker alone, without Mathlib: about a minute on a fresh machine, most of it
+# elan fetching the pinned Lean (macOS: `brew install elan-init`)
+cd Compiler/lean/checker && lake build                     # .lake/build/bin/qcheck
 
 # the C0 gate: expand every architecture, export every fixture, round-trip them all,
 # and replay the result against the oracle
@@ -222,7 +231,9 @@ bash Compiler/run_all.sh
 
 Lean is pinned to `leanprover/lean4:v4.29.0-rc2` with Mathlib rev `3542f17d`, matching the
 **prebuilt** cache in `LeanQEC/.lake/packages` (7,676 `.olean`). Do not bump either without
-intending a multi-hour rebuild.
+intending a multi-hour rebuild. Only the pulse proofs (`QCCDC/Pulse`, the C2 gate) need
+Mathlib; `qcheck` imports Lean core alone, which is why `lean/checker` can build it without
+cloning Mathlib at all.
 
 ## Layout
 

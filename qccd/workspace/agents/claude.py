@@ -26,6 +26,7 @@ import logging
 import os
 import secrets
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -73,9 +74,22 @@ def find_claude() -> str | None:
     found = shutil.which("claude")
     if found:
         return found
-    for cand in (Path.home() / ".local" / "bin" / "claude.exe", Path.home() / ".local" / "bin" / "claude"):
+    # the native installer's and npm's places, which a service started by a desktop app (whose
+    # PATH is only the system's) does not see
+    home = Path.home()
+    for cand in (home / ".local" / "bin" / "claude.exe", home / ".local" / "bin" / "claude",
+                 home / ".claude" / "local" / "claude", Path("/opt/homebrew/bin/claude"),
+                 Path("/usr/local/bin/claude"), home / ".npm-global" / "bin" / "claude"):
         if cand.is_file():
             return str(cand)
+    # Claude Code for VS Code (and its forks) carries the same CLI: on a Mac where Claude Code was
+    # only ever installed as the extension, this is the one there is
+    exts = []
+    for editor in (".vscode", ".vscode-insiders", ".cursor", ".windsurf"):
+        exts += (home / editor / "extensions").glob("anthropic.claude-code-*/resources/native-binary/claude*")
+    exts = [p for p in exts if p.is_file() and p.name in ("claude", "claude.exe")]
+    if exts:
+        return str(max(exts, key=lambda p: p.stat().st_mtime))
     return None
 
 
@@ -181,10 +195,18 @@ class ClaudeBridge:
         # spends its first turns looking the tools up; off, it waits and has all of them at
         # once (measured on Claude Code 2.1.199: init "pending" with 0 tools vs "connected", 20)
         env = dict(os.environ, QCCD_SESSION_ID=self.sid, ENABLE_TOOL_SEARCH="false")
+        if os.name != "nt":
+            # Claude Code finds its login in the macOS keychain by user name: a service started
+            # with a stripped environment would otherwise answer "Not logged in"
+            import getpass
+            env.setdefault("USER", getpass.getuser())
+            env.setdefault("LOGNAME", env["USER"])
         kw: dict = {"stdin": subprocess.PIPE, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE,
                     "cwd": str(ws.root), "env": env, "text": True, "encoding": "utf-8", "errors": "replace"}
         if os.name == "nt":
             kw["creationflags"] = 0x08000000                      # no console window
+        else:
+            kw["start_new_session"] = True                        # its MCP servers go with it (_kill_tree)
         self.proc = subprocess.Popen(args, **kw)
         self._proc_key = self._key()
         self._spoken = False
@@ -348,6 +370,7 @@ class ClaudeBridge:
 
     def _finish(self, turn: str, failure: str | None, rc) -> None:
         """A turn ended: say so to the chat, the trace and the delivery worker."""
+        failure = explain_failure(failure)
         ws = self.state.ws
         with self._lock:
             if self.active_turn != turn:
@@ -409,6 +432,18 @@ def connect_claude(state, body: dict) -> dict:
             "note": "a NEW Claude Code conversation was started for this workspace"}
 
 
+def explain_failure(failure: str | None) -> str | None:
+    """Claude Code's own words, plus what the person does about them.  "Please run /login" means
+    Claude Code's /login, which the QCCD chat does not have."""
+    if not failure:
+        return failure
+    low = failure.lower()
+    if "not logged in" in low or "/login" in low or "invalid api key" in low or "oauth token" in low:
+        return (failure.rstrip(". ") + ". Claude Code is not signed in on this computer: in a terminal run `claude` "
+                "and sign in with /login (or sign in to Claude Code in your editor), then send your message again.")
+    return failure
+
+
 def _kill_tree(p: subprocess.Popen) -> None:
     """End a process and the ones it started: a `claude.cmd` (an npm install) is a cmd.exe whose
     node would outlive a plain kill, still holding the conversation."""
@@ -417,6 +452,11 @@ def _kill_tree(p: subprocess.Popen) -> None:
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, timeout=10,
                            creationflags=0x08000000)
         except (OSError, subprocess.SubprocessError):
+            pass
+    else:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)                     # its own session: it and its children
+        except OSError:
             pass
     if p.poll() is None:
         p.kill()

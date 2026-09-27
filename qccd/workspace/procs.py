@@ -7,7 +7,11 @@ cancellation event, and a kill that takes the whole process tree -- so a timed-o
 cancelled job does not leave a 16 GB Lean process running behind it.
 
 Windows: a Job Object with `KILL_ON_JOB_CLOSE` and a per-process memory limit.
-POSIX: a new session (`killpg`) and `RLIMIT_AS` in the child.
+Linux: a new session (`killpg`) and `RLIMIT_AS` in the child.
+macOS: a new session, and the memory ceiling as a watchdog on the process group's
+physical footprint.  Darwin does not enforce `RLIMIT_AS`, and refuses to set it below the
+address space a process has already reserved (every limit under ~1 TB), so a `preexec_fn`
+that tried would stop every tool from starting.
 """
 
 from __future__ import annotations
@@ -49,11 +53,14 @@ def run_limited(args: Sequence, *, cwd: Path | None = None, timeout: float = 600
     kw: dict = dict(cwd=str(cwd) if cwd else None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     stdin=subprocess.DEVNULL, env=env)
     job = None
+    watch_mb = None
     if os.name == "nt":
         kw["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x08000000  # CREATE_NO_WINDOW
     else:
         kw["start_new_session"] = True
-        if mem_mb:
+        if mem_mb and sys.platform == "darwin":
+            watch_mb = int(mem_mb)
+        elif mem_mb:
             limit = _posix_as_limit(int(mem_mb))
 
             def _limit():  # pragma: no cover - runs in the child
@@ -62,7 +69,7 @@ def run_limited(args: Sequence, *, cwd: Path | None = None, timeout: float = 600
             kw["preexec_fn"] = _limit
     try:
         proc = subprocess.Popen(argv, **kw)
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         return RunResult("error", None, "", f"{type(exc).__name__}: {exc}", time.time() - t0)
     if os.name == "nt":
         job = _win_job(proc.pid, mem_mb)
@@ -92,6 +99,13 @@ def run_limited(args: Sequence, *, cwd: Path | None = None, timeout: float = 600
             status = "timeout"
             _kill(proc, job)
             break
+        if watch_mb is not None:
+            used = _darwin_footprint_mb(proc.pid)
+            if used is not None and used > watch_mb:
+                _kill(proc, job)
+                err.append(f"\nstopped: the process used {used} MB, over its {watch_mb} MB "
+                           f"memory limit\n".encode())
+                break
     try:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
@@ -126,6 +140,32 @@ def _posix_as_limit(mem_mb: int) -> int:
     want = int(mem_mb) * 1024 * 1024
     _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     return want if hard == resource.RLIM_INFINITY else min(want, hard)
+
+
+_LIBPROC = None
+
+
+def _darwin_footprint_mb(pgid: int) -> int | None:
+    """The physical footprint (what Activity Monitor calls Memory) of every process in the
+    group, in MB; None when it cannot be read, which never kills anything."""
+    global _LIBPROC
+    try:
+        import ctypes
+        if _LIBPROC is None:
+            lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+            lib.proc_listpgrppids.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_int]
+            lib.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
+            _LIBPROC = lib
+        pids = (ctypes.c_int * 256)()
+        n = _LIBPROC.proc_listpgrppids(pgid, pids, ctypes.sizeof(pids))
+        total = 0
+        info = (ctypes.c_uint64 * 32)()     # rusage_info_v0; ri_phys_footprint is word 9
+        for pid in pids[:max(0, min(n, 256))] or [pgid]:
+            if pid > 0 and _LIBPROC.proc_pid_rusage(pid, 0, info) == 0:
+                total += info[9]
+        return total >> 20
+    except Exception:
+        return None
 
 
 def _kill(proc, job) -> None:

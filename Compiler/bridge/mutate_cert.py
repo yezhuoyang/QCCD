@@ -30,7 +30,10 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-QCHECK = HERE.parent / "lean" / ".lake" / "build" / "bin" / "qcheck.exe"
+sys.path.insert(0, str(HERE))
+from check_cert import find_qcheck  # noqa: E402
+
+QCHECK = find_qcheck(HERE.parent / "lean") or HERE.parent / "lean" / ".lake" / "build" / "bin" / "qcheck"
 
 
 # ------------------------------------------------------------------ mutations

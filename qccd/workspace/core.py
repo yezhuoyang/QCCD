@@ -962,8 +962,19 @@ def _pid_alive(pid: int) -> bool:
         ok = ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
         ctypes.windll.kernel32.CloseHandle(h)
         return bool(ok) and code.value == 259  # STILL_ACTIVE
+    # A service this process started and nobody waited for is a zombie once it dies, and
+    # kill(0) succeeds on a zombie: reap it here, or `--keep-alive` never sees it die.
+    try:
+        if os.waitpid(pid, os.WNOHANG)[0] == pid:
+            return False
+    except ChildProcessError:
+        pass                                    # not our child: the kernel says below
+    except OSError:
+        pass
     try:
         os.kill(pid, 0)
+    except PermissionError:
+        return True                             # EPERM: it exists, under another owner
     except OSError:
         return False
     return True

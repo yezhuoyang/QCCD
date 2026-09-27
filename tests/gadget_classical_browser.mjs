@@ -22,12 +22,10 @@ import os from "node:os";
 import path from "node:path";
 import http from "node:http";
 import { pathToFileURL } from "node:url";
+import { findChrome } from "./chrome_path.mjs";
 
 const dir = path.resolve(process.argv[2]);
-const CHROME = process.env.CHROME || [
-  "C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium",
-].find((p) => fs.existsSync(p));
+const CHROME = findChrome();
 if (!CHROME) { console.error("no Chrome found; set CHROME"); process.exit(2); }
 
 const port = 9940 + Math.floor(Math.random() * 40);

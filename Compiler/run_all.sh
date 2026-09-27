@@ -14,7 +14,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-PY=${PYTHON:-python}
+source ./python.sh
 export PYTHONIOENCODING=utf-8
 fail=0
 

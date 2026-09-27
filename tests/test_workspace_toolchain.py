@@ -23,15 +23,37 @@ from qccd.workspace.toolchain import ToolchainError
 REPO = Path(__file__).resolve().parents[1]
 BUILT = next((p for p in (REPO / "Compiler/ocaml/_build/default/bin/qccdc_cli.exe",
                           REPO / "Compiler/ocaml/_build/default/bin/qccdc_cli") if p.is_file()), None)
+BUILT_QCHECK = next((p for d in ("Compiler/lean/checker/.lake/build/bin", "Compiler/lean/.lake/build/bin")
+                     for p in (REPO / d / "qcheck.exe", REPO / d / "qcheck") if p.is_file()), None)
 
 
 def test_the_manifest_pins_every_asset_and_its_source():
     m = toolchain.manifest()["qccdc_cli"]
-    assert set(m["assets"]) == {"windows-x86_64", "linux-x86_64"}
+    assert set(m["assets"]) == {"windows-x86_64", "linux-x86_64", "macos-arm64"}
     for key, a in m["assets"].items():
         assert a["url"].startswith("https://qccd.academy/downloads/toolchain/qccdc/" + m["version"] + "/")
-        assert len(a["sha256"]) == 64 and a["bytes"] > 1_000_000
+        assert len(a["sha256"]) == 64 and a["bytes"] > 500_000
+        if a.get("encoding") == "gzip":
+            assert a["url"].endswith(".gz") and len(a["unpacked_sha256"]) == 64 and a["unpacked_bytes"] > a["bytes"]
     assert m["source"]["tree"].startswith(m["version"])
+
+
+def test_the_published_checker_is_pinned_to_the_sources_it_is_built_from():
+    """If this fails, the Lean checker's sources changed in a commit and the published `qcheck` is
+    older than them: rebuild and publish it (deploy/toolchain/README.md), then update toolchain.json."""
+    m = toolchain.manifest()["qcheck"]
+    assert set(m["source"]["paths"]) == set(toolchain.QCHECK_SOURCES)
+    assert m["version"] == toolchain.qcheck_version(m["source"]["paths"])
+    for a in m["assets"].values():
+        assert a["url"].startswith("https://qccd.academy/downloads/toolchain/qcheck/" + m["version"] + "/")
+    try:
+        ids = {p: subprocess.run(["git", "rev-parse", "--verify", "-q", f"HEAD:{p}"], cwd=REPO, capture_output=True, text=True,
+                                 timeout=30).stdout.strip() for p in toolchain.QCHECK_SOURCES}
+    except OSError:
+        pytest.skip("git is not available")
+    if not all(ids.values()):
+        pytest.skip("not a git checkout, or the checker's sources are not committed yet")
+    assert m["source"]["paths"] == ids
 
 
 def test_the_published_compiler_is_built_from_the_committed_source():
@@ -100,6 +122,26 @@ def test_install_checks_the_bytes_then_runs_it_once(served, monkeypatch):
     assert evaluator.Toolchain.discover().qccdc is None
 
 
+def test_the_checker_is_installed_beside_the_compiler_and_used(served, monkeypatch):
+    if BUILT_QCHECK is None:
+        pytest.skip("no Lean checker built in this checkout to serve")
+    man, tmp = served
+    data = BUILT_QCHECK.read_bytes()
+    (tmp / "srv" / "qcheck").write_bytes(data)
+    url = next(iter(man["qccdc_cli"]["assets"].values()))["url"].rsplit("/", 1)[0] + "/qcheck"
+    man = {**man, "qcheck": {"version": "testq1", "source": {}, "assets": {
+        toolchain.platform_key(): {"url": url, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}}}}
+    r = toolchain.install(man=man, say=lambda *_: None)
+    q = Path(r["qcheck"]["path"])
+    assert r["qcheck"]["status"] == "installed" and q.parent.name == "testq1"   # it accepted and rejected
+    assert toolchain.installed_qcheck(man) == q
+    monkeypatch.setattr(evaluator, "REPO", tmp / "no-checkout")
+    monkeypatch.setattr(toolchain, "manifest", lambda path=None: man)
+    monkeypatch.delenv("QCCD_QCHECK", raising=False)
+    assert evaluator.Toolchain.discover().qcheck == q
+    assert toolchain.status(man)["qcheck"]["in_use"]["from"] == "installed"
+
+
 def test_a_download_that_does_not_match_is_refused_and_nothing_runs(served):
     man, tmp = served
     a = next(iter(man["qccdc_cli"]["assets"].values()))
@@ -116,10 +158,31 @@ def test_a_download_that_does_not_match_is_refused_and_nothing_runs(served):
     assert toolchain.installed(man) is None
 
 
+def test_a_gzip_download_is_checked_before_and_after_unpacking(served):
+    """The macOS assets are served compressed (the checker is 106 MB, 37 MB gzipped): the download's
+    bytes are pinned, and so is what they unpack to."""
+    import gzip
+    man, tmp = served
+    a = next(iter(man["qccdc_cli"]["assets"].values()))
+    data = BUILT.read_bytes()
+    (tmp / "srv" / "qccdc.gz").write_bytes(gz := gzip.compress(data))
+    z = {**a, "url": a["url"] + ".gz", "bytes": len(gz), "sha256": hashlib.sha256(gz).hexdigest(),
+         "encoding": "gzip", "unpacked_bytes": len(data), "unpacked_sha256": hashlib.sha256(data).hexdigest()}
+    zman = {"qccdc_cli": {**man["qccdc_cli"], "assets": {toolchain.platform_key(): z}}}
+    bad = {"qccdc_cli": {**man["qccdc_cli"], "assets": {toolchain.platform_key(): {**z, "unpacked_sha256": "0" * 64}}}}
+    with pytest.raises(ToolchainError, match="unpacked file does not match"):
+        toolchain.install(man=bad, say=lambda *_: None)
+    assert toolchain.installed(bad) is None
+    r = toolchain.install(man=zman, say=lambda *_: None)
+    assert r["status"] == "installed" and Path(r["path"]).read_bytes() == data
+    assert toolchain.installed(zman) == Path(r["path"])
+    assert toolchain.install(man=zman, say=lambda *_: None)["status"] == "already_installed"
+
+
 def test_no_prebuilt_for_this_platform_says_how_to_build(monkeypatch, tmp_path):
     monkeypatch.setenv("QCCD_HOME", str(tmp_path))
-    monkeypatch.setattr(toolchain, "platform_key", lambda: "macos-arm64")
-    with pytest.raises(ToolchainError, match="no prebuilt compiler for macos-arm64.*dune build"):
+    monkeypatch.setattr(toolchain, "platform_key", lambda: "macos-x86_64")
+    with pytest.raises(ToolchainError, match="no prebuilt compiler for macos-x86_64.*dune build"):
         toolchain.install(say=lambda *_: None)
 
 

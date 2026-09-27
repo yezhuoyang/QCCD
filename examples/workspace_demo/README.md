@@ -1,9 +1,9 @@
 # The small-task co-design demonstration
 
 ```bash
-python -m venv --system-site-packages .venv && .venv/Scripts/pip install -r requirements-agent.txt   # once
-.venv/Scripts/python examples/workspace_demo/demo.py --agent scripted     # no credentials needed
-QCCD_LIVE_CODEX=1 .venv/Scripts/python examples/workspace_demo/demo.py --agent codex   # a real Codex agent
+python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[agent]"   # once; Windows: .venv\Scripts\activate
+python examples/workspace_demo/demo.py --agent scripted                            # no credentials needed
+QCCD_LIVE_CODEX=1 python examples/workspace_demo/demo.py --agent codex             # a real Codex agent
 ```
 
 It runs the brief's sequence against the real system. The pieces are the workspace service,

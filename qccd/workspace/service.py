@@ -382,7 +382,13 @@ def create_app(state: ServiceState) -> FastAPI:
     def agents(request, actor, _):
         from .agents.claude import find_claude
         from .agents.codex import find_codex
-        return {"codex_available": find_codex() is not None, "claude_available": find_claude() is not None}
+        # which agents `qccd agent install` set up here: the chat starts that one by default, so a
+        # Claude Code user whose Mac also has the ChatGPT app (it carries a Codex) gets Claude
+        root = ws.root
+        installed = [c for c, d in (("claude", ".claude"), ("codex", ".agents"))
+                     if (root / d / "skills" / "qccd").is_dir()]
+        return {"codex_available": find_codex() is not None, "claude_available": find_claude() is not None,
+                "installed": installed}
 
     @route("GET", "/api/traces", write=False)
     def traces(request, actor, _):
@@ -1239,6 +1245,9 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
         print("another service already holds this workspace's lock (.qccd/service.lock)", flush=True)
         return 1
     ws = Workspace(root, recover=True)          # this process holds the lock: it may recover
+    from .installers import refresh_skills
+    for client in refresh_skills(Path(root)):
+        print(f"updated the {client} skill in this workspace to the current version", flush=True)
     existing = read_runtime(ws.id)
     if existing:
         print(f"a service for {ws.id} is already running on port {existing['port']} (pid {existing['pid']})")

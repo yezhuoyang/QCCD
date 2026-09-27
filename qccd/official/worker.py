@@ -69,8 +69,9 @@ def _grade_subprocess(job_dir: Path, releases: Path, timeout: float) -> str:
     """Run `grade_one` in a limited child with a minimal environment (no credentials)."""
     from ..workspace.procs import run_limited
     env = {k: v for k, v in os.environ.items()
-           if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "HOME",
-                    "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS")}
+           if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
+                    "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
+                    "LANG", "LC_ALL", "LC_CTYPE")}
     r = run_limited([sys.executable, "-m", "qccd.official.worker", "one", str(job_dir), "--releases", str(releases)],
                     timeout=timeout, mem_mb=int(os.environ.get("QCCD_GRADER_MEM_MB", "16384")), env=env)
     if r.status == "ok" and (job_dir / "report.json").exists():

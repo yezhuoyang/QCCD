@@ -11,9 +11,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PY=${PYTHON:-python}
+source ./python.sh
 export PYTHONIOENCODING=utf-8
-source ocaml/ocamlenv.sh
+source ./ocamlenv.sh
 
 echo "=== 1. derive the identities numerically (untrusted search) ==="
 $PY bridge/derive_pulses.py -o build/pulses.json | tail -6

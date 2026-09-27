@@ -1,0 +1,15 @@
+# The trusted checker alone: `qcheck` and the `QCCDC.Cert` modules it imports, which need only
+# Lean core.  The parent package also builds the pulse proofs and so requires Mathlib: building
+# `qcheck` there clones Mathlib and its dependencies first, which this package never does.
+# `lake build` here takes about a minute on a fresh machine, most of it the toolchain download.
+name = "qcheck"
+defaultTargets = ["qcheck"]
+
+[[lean_lib]]
+name = "QCCDC"
+srcDir = ".."
+
+[[lean_exe]]
+name = "qcheck"
+root = "Main"
+srcDir = ".."

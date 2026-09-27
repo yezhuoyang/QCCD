@@ -7,7 +7,7 @@
       "path": "Compiler/ocaml",
       "tree": "73864a5c493db7c543f84b54924a0dbf87820404"
     },
-    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3 (deploy/toolchain/README.md)",
+    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux, 3.24 on macOS): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3, the macOS one in an opam switch made with MACOSX_DEPLOYMENT_TARGET=11.0, gzipped (deploy/toolchain/README.md)",
     "assets": {
       "windows-x86_64": {
         "url": "https://qccd.academy/downloads/toolchain/qccdc/73864a5c493d/qccdc_cli-windows-x86_64.exe",
@@ -18,6 +18,37 @@
         "url": "https://qccd.academy/downloads/toolchain/qccdc/73864a5c493d/qccdc_cli-linux-x86_64",
         "bytes": 4413760,
         "sha256": "ae79e047165f5260130eac7b2742a90634a6494dab19f0da17d146948eb81c64"
+      },
+      "macos-arm64": {
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/73864a5c493d/qccdc_cli-macos-arm64.gz",
+        "encoding": "gzip",
+        "bytes": 823020,
+        "sha256": "a86cb3db3289cdff2717ecfc3a1cce43ddc011019589ae2d296bad3846b710d3",
+        "unpacked_bytes": 2408944,
+        "unpacked_sha256": "8082f6b2eb873e10d8d956f52dc7803191134a639b0bee9aaa2ac0fe9bda1e35"
+      }
+    }
+  },
+  "qcheck": {
+    "version": "bb1c1e19bded",
+    "source": {
+      "repository": "https://github.com/yezhuoyang/QCCD",
+      "paths": {
+        "Compiler/lean/Main.lean": "68e770fb50454f279dfb8f0641f3a92a310a9ab5",
+        "Compiler/lean/QCCDC/Cert": "a0ec4039d4a2311613a75b27ff0346764adae3b5",
+        "Compiler/lean/lean-toolchain": "05f548c1590e2e3324bb0c5158d3725682df2a81",
+        "Compiler/lean/checker/lakefile.toml": "6cf4e425c1be91c1aa331d6b2679f4a3fc349b62"
+      }
+    },
+    "build": "Lean leanprover/lean4:v4.29.0-rc2: lake build in Compiler/lean/checker (no Mathlib), MACOSX_DEPLOYMENT_TARGET=11.0, strip -x, ad-hoc signed, gzipped (deploy/toolchain/README.md)",
+    "assets": {
+      "macos-arm64": {
+        "url": "https://qccd.academy/downloads/toolchain/qcheck/bb1c1e19bded/qcheck-macos-arm64.gz",
+        "encoding": "gzip",
+        "bytes": 36826241,
+        "sha256": "5b1fc39b3f0b8d4f54fd73280b3ee95e3b7c161a8ea5f551854f6dc12d653b75",
+        "unpacked_bytes": 105196544,
+        "unpacked_sha256": "6982cfc5cedef9544814d727229b06fecfd92211c67d9711164a0384857588d9"
       }
     }
   }

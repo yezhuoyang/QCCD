@@ -234,7 +234,7 @@ def _tools() -> list:
          "that acts needs a target), navigate (path: a place -- the site map, a link on the page, or /studio; "
          "it returns once the new page is up, in `arrived`), "
          "step (an animation: step=N to seek, delta=+1/-1, play=true, pause=true; target {frame: 'fN'} for an "
-         "embedded example), open_lesson (lesson id, on the Studio page). target = {ref} from qccd_page_read, "
+         "embedded example), open_lesson (lesson id, on the site's Studio: go there with navigate path='/web/studio.html#learn=<id>', which opens the lesson; never on /studio, the person's own design). target = {ref} from qccd_page_read, "
          "{selector}, or {text}; add frame to reach into an embedded example. ONLY DECLARED: click, fill and "
          "press operate declared controls (a read marks the others undeclared), navigate goes only to places; "
          "a refusal lists what is declared instead. The chat is out of reach, and links that leave the site "

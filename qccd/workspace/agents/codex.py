@@ -31,6 +31,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import logging
@@ -61,10 +62,21 @@ def find_codex() -> str | None:
     if w:
         return w
     base = Path(os.environ.get("LOCALAPPDATA", "")) / "OpenAI" / "Codex" / "bin"
-    if base.is_dir():
+    if os.name == "nt" and base.is_dir():
         cands = sorted(base.glob("*/codex.exe"), key=lambda p: p.stat().st_mtime, reverse=True)
         if cands:
             return str(cands[0])
+    # macOS and Linux: Homebrew, npm and the desktop apps' bundled CLI, none of which is on the
+    # PATH a service started by a desktop app inherits
+    home = Path.home()
+    for cand in (Path("/opt/homebrew/bin/codex"), Path("/usr/local/bin/codex"), home / ".local" / "bin" / "codex",
+                 home / ".npm-global" / "bin" / "codex",
+                 *(Path(apps) / app for apps in ("/Applications", home / "Applications") for app in (
+                     "Codex.app/Contents/Resources/codex",
+                     "Codex.app/Contents/Resources/codex-cli/bin/codex",
+                     "ChatGPT.app/Contents/Resources/codex-cli/bin/codex"))):
+        if cand.is_file() and os.access(cand, os.X_OK):
+            return str(cand)
     return None
 
 
@@ -348,11 +360,11 @@ class CodexBridge:
 
 def start_app_server(codex: str, port: int, cwd: Path, log: Path) -> subprocess.Popen:
     """A loopback app server the user's terminal can attach to with `codex --remote`."""
-    kw: dict = {"stdin": subprocess.DEVNULL, "stdout": open(log, "ab"), "stderr": subprocess.STDOUT,
-                "cwd": str(cwd)}
-    if os.name == "nt":
-        kw["creationflags"] = 0x08000000
-    return subprocess.Popen([codex, "app-server", "--listen", f"ws://127.0.0.1:{port}"], **kw)
+    with open(log, "ab") as out:               # the child keeps its own copy of the handle
+        kw: dict = {"stdin": subprocess.DEVNULL, "stdout": out, "stderr": subprocess.STDOUT, "cwd": str(cwd)}
+        if os.name == "nt":
+            kw["creationflags"] = 0x08000000
+        return subprocess.Popen([codex, "app-server", "--listen", f"ws://127.0.0.1:{port}"], **kw)
 
 
 def connect_codex(state, body: dict) -> dict:
@@ -559,11 +571,27 @@ def _is_codex_process(pid: int) -> bool:
                 image = buf.value
             finally:
                 k32.CloseHandle(h)
+        elif sys.platform == "darwin":
+            import ctypes
+            lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+            buf = ctypes.create_string_buffer(4096)                # PROC_PIDPATHINFO_MAXSIZE
+            if lib.proc_pidpath(ctypes.c_int(pid), buf, ctypes.c_uint32(len(buf))) <= 0:
+                return False
+            image = buf.value.decode("utf-8", "replace")
         else:
             image = os.readlink(f"/proc/{pid}/exe")
     except (OSError, AttributeError, ValueError):
         return False
-    return Path(image).name.lower() in ("codex", "codex.exe")
+    name = Path(image).name.lower()
+    if name == "node" and os.name != "nt":
+        # an npm install runs `node .../codex.js`, which then starts the native binary
+        try:
+            args = subprocess.run(["ps", "-o", "args=", "-p", str(pid)], capture_output=True, text=True,
+                                  timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return "codex" in args and "app-server" in args
+    return name in ("codex", "codex.exe")
 
 
 def _on_codex_event(state, sid: str, method: str, params: dict) -> None:

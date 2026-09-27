@@ -20,6 +20,7 @@ import { spawn } from 'child_process';
 // the rendered-page path probe: `PROBE` is taken under another name because this
 // file already has one, and the two ask different questions of the same page
 import { PROBE as PATH_PROBE, describe as describePaths, PLANT, UNPLANT }
+import { findChrome } from './chrome_path.mjs';
   from './_rendered_paths.mjs';
 //: The studio's pane buttons, read out of the page so a new pane is covered the day it is
 //: added.  `OPEN_PANES` from the module clicks them all at once, which is the wrong shape
@@ -36,10 +37,7 @@ const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : nu
 const SHOTS = opt('--shots'), ONLY = opt('--only'), QUIET = args.includes('--quiet');
 const LIVE = opt('--base'), RESOLVE = opt('--resolve');
 const CALIBRATE = args.includes('--calibrate');
-const CHROME = process.env.CHROME || [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome', '/usr/bin/chromium-browser', '/usr/bin/chromium',
-].find(p => fs.existsSync(p));
+const CHROME = findChrome();
 if (!CHROME) { console.error('no Chrome found; set CHROME'); process.exit(2); }
 
 // -------- a static server ------------------------------------------------------------

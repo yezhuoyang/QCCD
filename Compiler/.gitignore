@@ -3,3 +3,4 @@ build/
 ocaml/_build/
 lean/.lake/
 bench/random/
+lean/checker/.lake/

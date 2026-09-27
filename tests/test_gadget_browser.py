@@ -24,9 +24,7 @@ from qccd.gadget.programs import showcase
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "tests" / "gadget_browser.mjs"
-CHROME = os.environ.get("CHROME") or next((p for p in (
-    "C:/Program Files/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser", "/usr/bin/chromium") if Path(p).exists()), None)
+from chrome_path import CHROME  # noqa: E402
 node = shutil.which("node")
 
 pytestmark = [pytest.mark.skipif(node is None, reason="node is not on PATH"),

@@ -8619,6 +8619,26 @@ function placeStamp(type, x, y) {
   return addNodeAt(x, y, { kind: 'site', zone: z || undefined });
 }
 
+// THE API'S addSite / addSegment ARE THE PERSON'S GESTURES.  On a device with a builder (a
+// lesson's canvas, an explicit design) the click places a `d.site` and the shift-drag a
+// `d.segment`; the bare `addSite` / `addSegment` always write post-seal topology edits, which
+// the builder never sees -- so a loop closed over them afterwards named "unknown node"s, and
+// an agent following the verb list could not finish lesson A3.  A generator device keeps the
+// topology edit (it has no builder), exactly as `placeStamp` and `joinNodes` decide.
+function addSiteGesture(x, y, near, opts) {
+  opts = opts || {};
+  if (!hasBuilder()) return addSite(x, y, near, opts);
+  if (opts.kind === 'junction') return addNodeAt(x, y, { kind: 'junction', id: opts.id });
+  var proto = near ? nodeById[near] : null;
+  var zone = opts.zone !== undefined ? (opts.zone || undefined) : (proto && proto.zone) || defaultZone() || undefined;
+  if (zone && postSeedZones()[zone]) return addSite(x, y, near, opts);   // only a topology edit may use it
+  var cap = opts.capacity !== undefined ? opts.capacity : (proto && proto.zone ? undefined : (proto ? proto.cap : undefined));
+  return addNodeAt(x, y, { kind: 'site', zone: zone, capacity: cap, id: opts.id, labels: opts.labels });
+}
+function addSegmentGesture(a, b, opts) {
+  return hasBuilder() ? joinNodes(a, b, opts || {}) : addSegment(a, b, opts);
+}
+
 // WHICH ZONE TYPES THE SEAL DECLARES, read off the seed record itself.  `blank` and
 // `blank_device` carry them as `zones=` (names or a block); a `blank_device` with none
 // infers them from the builder's own sites, as Python's `_zonesOfDevice` does; a template
@@ -10034,7 +10054,7 @@ var API = {
   nudge: nudge, reconcileLast: reconcileLast, toast: toast,
   subjectOf: subjectOf, selectionNodes: selectionNodes,
   emit: emit, validate: validate, undo: undo, redo: redo,
-  addSite: addSite, addSegment: addSegment, removeSelected: removeSelected,
+  addSite: addSiteGesture, addSegment: addSegmentGesture, removeSelected: removeSelected,
   reconcileLengths: reconcileLengths,
   select: setSelection,
   selection: function () { return SELSET; },

@@ -1451,13 +1451,16 @@ function warmOnTyping() {
 function loadAgents() {
   return api('GET', '/api/agents').then(function (r) {
     S.codex = !!(r.ok && r.data.codex_available); S.claude = !!(r.ok && r.data.claude_available);
+    S.installed = (r.ok && r.data.installed) || [];
   });
 }
-// which agent the chat starts: the one the person last chose, else whichever is installed
+// which agent the chat starts: the one the person last chose, else the one `qccd agent install`
+// set up in this workspace, else whichever is on this computer
 function agentChoice() {
-  var pref = localGet('qccd.agent');
+  var pref = localGet('qccd.agent'), inst = S.installed || [];
   if (pref === 'claude' && S.claude) return 'claude';
   if (pref === 'codex' && S.codex) return 'codex';
+  if (inst.length === 1 && S[inst[0]]) return inst[0];
   return S.codex ? 'codex' : (S.claude ? 'claude' : null);
 }
 function agentTitle(k) { return k === 'claude' ? 'Claude' : 'Codex'; }
@@ -1563,7 +1566,8 @@ function renderChatHead() {
     api('GET', '/api/agents/models').then(function (r) { if (r.ok) { S.models = r.data; renderChatHead(); } });
   }
   var t, cls;
-  if (!S.connected) { t = 'offline: reconnecting'; cls = 'off'; }
+  if (S.unpaired) { t = 'not paired'; cls = 'off'; }
+  else if (!S.connected) { t = 'offline: reconnecting'; cls = 'off'; }
   else if (S.connecting) { t = 'starting ' + agentTitle(S.connecting) + '…'; cls = 'busy'; }
   else if (!s) { t = agentChoice() ? agentTitle(agentChoice()) + ' starts when you send' : 'no agent connected'; cls = ''; }
   else if (isWorking()) { t = 'working…'; cls = 'busy'; }
@@ -2077,16 +2081,41 @@ function pair() {
     return api('GET', '/api/whoami');
   }).then(function (w) {
     if (!w.ok || !w.data.csrf) {
-      document.body.appendChild(h('div', { id: 'qcl-unpaired' }, PAGE ? [
+      S.unpaired = true;
+      document.body.appendChild(h('div', { id: 'qcl-unpaired' }, (PAGE ? [
         h('b', { text: 'This browser is not paired with your workspace yet.' }),
-        h('div', { text: 'Run `qccd web` in the workspace folder: it pairs this browser and opens the website with the chat.' })] : [
+        h('div', { text: 'In the workspace folder, run `qccd web`. It opens the website paired in your default ' +
+                         'browser, and prints a pairing link: to use this browser, paste that link here.' })] : [
         h('b', { text: 'This Studio page is not paired with the workspace.' }),
-        h('div', { text: 'Run `qccd studio` in the workspace and open the link it prints. Edits here are not saved to the workspace.' })]));
+        h('div', { text: 'In the workspace folder, run `qccd studio` and paste the link it prints here (or open ' +
+                         'it in this browser). Edits here are not saved to the workspace.' })]).concat([pairForm()])));
+      renderChatHead();
       return false;
     }
     S.csrf = w.data.csrf; S.paired = true;
     return true;
   });
+}
+// pair this browser from a link or code the person pastes: the one `qccd web` / `qccd studio`
+// printed in their terminal.  The code is what a `#pair=` link carries; it works once, for five
+// minutes, so pasting it here is no more than opening that link in this browser.
+function pairForm() {
+  var input = h('input', { id: 'qcl-pair-code', type: 'text', placeholder: 'paste the link or code',
+                           autocomplete: 'off', spellcheck: 'false' });
+  var msg = h('div', { cls: 'qcl-pair-msg' });
+  var go = function () {
+    var v = String(input.value || '').trim(), m = /pair=([A-Za-z0-9_-]+)/.exec(v);
+    var code = m ? m[1] : (/^[A-Za-z0-9_-]{8,}$/.test(v) ? v : '');
+    if (!code) { msg.textContent = 'That is not a pairing link: copy the whole link with #pair= in it.'; return; }
+    msg.textContent = 'Pairing…';
+    api('POST', '/api/pair', { code: code }).then(function (r) {
+      if (r.ok) { msg.textContent = 'Paired.'; location.reload(); return; }
+      msg.textContent = ((r.error || {}).message || 'Pairing failed') + '.';
+    });
+  };
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  return h('div', { cls: 'qcl-pair' }, [h('div', { cls: 'qcl-pair-row' }, [input,
+    h('button', { type: 'button', text: 'Pair', on: { click: go } })]), msg]);
 }
 function registerView() {
   var key = 'qccd.view.' + CFG.workspace_id;

@@ -130,9 +130,12 @@ thing, then act; pace a walkthrough with `wait` (a second or two) and say in the
 each step shows. Requests can be anything a person could do on the site, playful ones
 included ("scroll back and forth ten times" is `scroll by: 'page'` / `'-page'` in a loop).
 
-- **Walking the course.** `qccd_page_act(action="studio", verb="lessonList")` lists the
-  lessons; a lesson with a `page` runs on that page (Part D: `micro_grid9x9.html`), so
-  navigate there first. `open_lesson`, read the Learn pane (`qccd_page_read`), then do the
+- **Walking the course.** Lessons run on the site's Studio, never on the person's own: navigate
+  to `/web/studio.html#learn=A1` (the lesson's own link opens it; `/studio` and a bare
+  `studio.html` are the person's design, where a lesson is refused because it would replace it).
+  There, `qccd_page_act(action="studio", verb="lessonList")` lists the lessons; a lesson with a
+  `page` runs on that page (Part D: `micro_grid9x9.html`), so navigate there first.
+  `open_lesson` switches lessons, read the Learn pane (`qccd_page_read`), then do the
   exercise yourself with Studio verbs (`addSite`, `addSegment`, `addNodeAt`, `joinNodes`,
   `closeLoop`, `transaction` for several edits as one; verb `verbs` lists them with what each does), `lessonCheck` to see whether it passed, `lessonHint` when stuck. To show the
   course's own answer for one stage, `lessonSolution` with args `[{"one": true}]`. Explain

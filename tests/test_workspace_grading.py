@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import stat
+import sys
 import time
 import zipfile
 from pathlib import Path
@@ -248,14 +249,14 @@ print(r.status, r.stdout.strip(), outer)
 """
 
 
-@pytest.mark.skipif(os.name == "nt", reason="RLIMIT_AS is POSIX; Windows uses job objects")
+@pytest.mark.skipif(not sys.platform.startswith("linux"),
+                    reason="RLIMIT_AS is Linux's; Windows uses job objects and macOS a footprint watchdog")
 def test_a_stage_under_an_inherited_memory_limit_still_starts(tmp_path):
     """The official grader runs each job under an address-space limit, and the Lean stage
     then asks for a larger one.  A limit can only be lowered, so the stage must start
     clamped to the inherited limit rather than fail in preexec_fn (found in the first
     container run)."""
     import subprocess
-    import sys
     script = tmp_path / "nested.py"
     script.write_text(NESTED_LIMIT, encoding="utf-8")
     r = subprocess.run([sys.executable, str(script), str(Path(__file__).resolve().parents[1])],
@@ -263,3 +264,17 @@ def test_a_stage_under_an_inherited_memory_limit_still_starts(tmp_path):
     assert r.returncode == 0, r.stderr
     status, child_limit, outer = r.stdout.split()
     assert status == "ok" and int(child_limit) == int(outer)
+
+
+def test_a_stage_that_outgrows_its_memory_limit_is_stopped_and_one_within_it_is_not():
+    """The ceiling holds on every platform: a job object on Windows, RLIMIT_AS on Linux, the
+    footprint watchdog on macOS -- where a preexec_fn setting RLIMIT_AS once made every
+    stage fail to start."""
+    from qccd.workspace.procs import run_limited
+    ok = run_limited([sys.executable, "-c", "print('small')"], timeout=60, mem_mb=4096)
+    assert ok.status == "ok" and ok.stdout.strip() == "small", ok.stderr
+    hog = "import time; b = b'x' * (800 << 20); time.sleep(20)"
+    t0 = time.time()
+    r = run_limited([sys.executable, "-c", hog], timeout=60, mem_mb=300)
+    assert r.status != "ok", r
+    assert time.time() - t0 < 15, "the limit was only noticed by the timeout"

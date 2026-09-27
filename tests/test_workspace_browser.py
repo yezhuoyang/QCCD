@@ -25,8 +25,8 @@ from qccd.workspace.app import Workspace  # noqa: E402
 from qccd.workspace.runtime import ensure_service, service_request  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
-CHROME = os.environ.get("CHROME") or "C:/Program Files/Google/Chrome/Application/chrome.exe"
-pytestmark = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists()),
+from chrome_path import CHROME  # noqa: E402
+pytestmark = pytest.mark.skipif(not (shutil.which("node") and CHROME and Path(CHROME).exists()),
                                 reason="needs node and Chrome")
 
 

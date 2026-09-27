@@ -179,8 +179,9 @@ def cmd_web(a) -> int:
         path = path[4:]
     code = _call(info, "POST", "/api/pair-code", {})["code"]
     url = f"http://127.0.0.1:{info['port']}/open-web#pair={code}&to=/web/{path}"
-    print(f"Website with your agent: http://127.0.0.1:{info['web_port']}/web/{path}")
-    print(f"  (this link pairs the browser first: {url})")
+    print(f"Website with your agent, opening in your default browser: http://127.0.0.1:{info['web_port']}/web/{path}")
+    print(f"To use another browser, open this link in it, or paste it into the chat there (it pairs that browser; "
+          f"once, within five minutes):\n  {url}")
     if not a.no_open:
         webbrowser.open(url)
     return 0
@@ -270,6 +271,10 @@ def cmd_toolchain(a) -> int:
                               if i else "no"))
         u = s["in_use"]
         print("in use    " + (f"{u['path']}  ({u['from']})" if u else "none: run `qccd toolchain install`"))
+        c = (s.get("qcheck") or {}).get("in_use")
+        print("checker   " + (f"{c['path']}  ({c['from']})" if c else
+                              "none: reference grades report the Lean stage `unsupported` "
+                              "(`qccd toolchain install`, or `lake build` in Compiler/lean/checker)"))
         return 0
     try:
         r = install(force=a.force)
@@ -280,6 +285,14 @@ def cmd_toolchain(a) -> int:
         print(f"the compiler is already installed: {r['path']}")
     else:
         print(f"installed the compiler (checked: sha256 {r['sha256'][:16]}..., and it parsed a test circuit): {r['path']}")
+    c = r.get("qcheck") or {}
+    if c.get("status") == "already_installed":
+        print(f"the checker is already installed: {c['path']}")
+    elif c.get("status") == "installed":
+        print(f"installed the checker (checked: sha256 {c['sha256'][:16]}..., and it accepted and rejected "
+              f"a test certificate): {c['path']}")
+    else:
+        print(f"no prebuilt checker for this platform; {c.get('hint', '')}")
     return 0
 
 
@@ -555,7 +568,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             q.add_argument("path")
             q.add_argument("--preview", action="store_true")
-    p = sub.add_parser("toolchain", help="the prebuilt compiler: install it, or see which one is in use")
+    p = sub.add_parser("toolchain", help="the prebuilt compiler and checker: install them, or see which are in use")
     p.add_argument("action", choices=["install", "status"])
     p.add_argument("--force", action="store_true", help="download and check it again")
     p.add_argument("--json", action="store_true")

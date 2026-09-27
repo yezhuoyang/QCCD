@@ -236,7 +236,9 @@ page keeps its self-containment scan. What it does:
   `http://127.0.0.1:47100/web/<that page>`, and "Open my Studio" to
   `http://127.0.0.1:47100/studio`, which redirects to the workspace's own Studio. When
   another workspace holds 47100, the service uses the port it had last time or any free
-  one, and `qccd web` prints where. Each page is fetched from the
+  one, and `qccd web` prints where. A browser that is not paired (the site's Agent link opened
+  in a browser other than the one `qccd studio` opened) says so in the chat, with a box for the
+  pairing link `qccd web` prints: pasting it there pairs that browser. Each page is fetched from the
   site live, kept in memory for 5 minutes, then revalidated (ETag / Last-Modified). When the
   site cannot be reached, the last copy is served, marked stale. `QCCD_SITE_URL` points it at
   another copy of the site, which the tests do. `QCCD_WEB=0` turns the second port off.
@@ -287,9 +289,13 @@ watch it happen.
   draws with the same verbs (`sketchDraw` a shape, `closeLoop`, `stampComponent`, …).
   The page first syncs the person's pending edits, then runs the verb and commits what it
   drew as the agent's change set (`by_page_action`, checked against the running action).
+  `addSite` / `addSegment` take the path the person's click and shift-drag take: on a device
+  with a builder (a lesson's canvas) a `d.site` / `d.segment`, so a loop closed over them can
+  name them.
   Each drawing is therefore attributed, protected and undoable. A verb that refuses fails
   the action with its rule, for example R20 for a corner under 60°. The course's verbs
-  stay off there, since they would replace the design. Checked on the live
+  and `open_lesson` stay off there, since they would replace the design; the refusal points to
+  `/web/studio.html#learn=<id>`, and the person's Studio can navigate back to any `/web/` page. Checked on the live
   site: all 31 lessons' own solutions pass their checks through these tools (Part D on
   its compiled companion page).
 - **Comments, as the person.** In the local website the site's comment layer works. Its
@@ -313,9 +319,11 @@ watch it happen.
   no bundled skills or slash commands, `--permission-mode dontAsk`, and no shell. The
   thinking level is `medium` unless the person picks another under ⋯: on the two-triangle
   request it halved each model call (4.2 s against 8.3 s at Claude Code's default).
-  Its messages stream into the chat, and a failed run says why. The chat starts whichever
-  agent is installed, or the one last chosen under ⋯ ("New conversation with Codex" /
-  "…with Claude"). `QCCD_CLAUDE=none` turns it off. Live-checked: asked on the Rules page
+  Its messages stream into the chat, and a failed run says why (a Claude Code that is not
+  signed in says how to sign it in). The chat starts the one last chosen under ⋯ ("New
+  conversation with Codex" / "…with Claude"), else the one `qccd agent install` set up in the
+  workspace, else whichever is installed: a Mac with the ChatGPT app has a Codex beside Claude
+  Code. `QCCD_CLAUDE=none` turns it off. Live-checked: asked on the Rules page
   "What does rule R7 say? Show me its failing example", Claude read the section,
   highlighted the failing example with a caption, and answered with the page's numbers.
 
@@ -668,10 +676,11 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   CLI next needs it. A page on its own cannot start one, and shows *disconnected* until then. Two earlier bugs from
   this investigation are fixed: `_pid_alive` treated *access denied* as dead, and a service
   spawned inside an agent's job object could die with it (it now spawns with job breakaway).
-- **No prebuilt compiler for macOS**, and none of the Lean checker for any platform. On a
-  Mac, build `Compiler/ocaml` from source. Local reference grades stay `unsupported` at the
-  certificate stage until `qcheck` is built. `tests/test_workspace_toolchain.py` fails when
-  `Compiler/ocaml` changes without a new release (`deploy/toolchain/README.md`).
+- **No prebuilt compiler for Intel Macs**, and a prebuilt Lean checker only for macOS on Apple
+  silicon. Elsewhere `lake build` in `Compiler/lean/checker` makes `qcheck` in about a minute;
+  until then local reference grades stay `unsupported` at the certificate stage.
+  `tests/test_workspace_toolchain.py` fails when `Compiler/ocaml`, or a source `qcheck` is built
+  from, changes without a new release (`deploy/toolchain/README.md`).
 - The `qccd` console script needs the repository layout. The toolchain reads repo-relative
   files (`arch/` templates, `Compiler/` binaries), so install with `pip install -e .[agent]`
   from a clone. A standalone wheel is not complete.
@@ -706,22 +715,34 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
 
 ## 7 · Running it
 
-**Install** (from a clone; the toolchain reads repository files):
+**Install** (from a clone; the toolchain reads repository files). Python 3.10 or newer: macOS
+ships 3.9 as `python3` and no `python`, so there install one first (`brew install python@3.13`).
 
 ```bash
-python -m venv --system-site-packages .venv
-.venv/Scripts/pip install -e .[agent]            # or: pip install -r requirements-agent.txt
-qccd toolchain install                           # the prebuilt compiler, for runs and compiles
-# the reference checks also need the Lean checker (see Compiler/README.md); without it, a
-# reference grade reports that stage `unsupported`, which is never eligible
+# macOS / Linux
+python3.13 -m venv .venv                         # any Python >= 3.10
+source .venv/bin/activate                        # then `python` and `qccd` are the venv's
+pip install -e ".[agent]"                        # quoted: zsh would expand the brackets
+
+# Windows (PowerShell or cmd)
+py -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[agent]"
+
+qccd toolchain install     # the prebuilt compiler, and on macOS the proved checker too
 ```
 
-`qccd toolchain install` fetches `qccdc_cli` for Windows or Linux on x86-64 from
-qccd.academy. It refuses the download unless its size and SHA-256 match
-`qccd/workspace/toolchain.json`, installs it under `~/.qccd/toolchain/`, and runs it once on a
-test circuit. `qccd toolchain status` says which compiler is in use: `QCCD_QCCDC` first, then
-one built in the checkout, then the installed one. How a release is built and published:
-`deploy/toolchain/README.md`.
+`qccd toolchain install` fetches `qccdc_cli` for Windows or Linux on x86-64 or macOS on Apple
+silicon, and `qcheck` (the Lean checker) where one is published -- macOS on Apple silicon so
+far -- from qccd.academy. It refuses each download unless its size and SHA-256 match
+`qccd/workspace/toolchain.json`, installs it under `~/.qccd/toolchain/`, and runs it once
+(the compiler on a test circuit, the checker on a certificate it must accept and one it must
+reject). `qccd toolchain status` says which compiler and checker are in use: `QCCD_QCCDC` /
+`QCCD_QCHECK` first, then one built in the checkout, then the installed one. Where no `qcheck`
+is published, `lake build` in `Compiler/lean/checker` builds it in about a minute without
+Mathlib (Compiler/README.md); without it a reference grade reports the Lean stage
+`unsupported`, which is never eligible. An Intel Mac builds the compiler from source. How a
+release is built and published: `deploy/toolchain/README.md`.
 
 **One workspace, end to end.** Two kinds of words below. **Yours to name, anything you
 like:** the workspace folder ("My QCCD designs" is only an example; `qccd init` with no name makes
@@ -758,6 +779,9 @@ qccd trace --session <id> --open         # ...one conversation in the browser, w
 qccd status | qccd stop
 ```
 
+A workspace's installed skill is brought up to the code's version when the service starts
+(it restarts itself on new code), unless it was edited; `qccd agent install` rewrites it.
+
 `python -m qccd.workspace <command>` is the same CLI without the console script. Outside a
 workspace, `qccd studio` still writes the static page exactly as `python -m qccd studio`
 does. `qccd agent install` is idempotent and also serves as repair; `qccd agent status`
@@ -768,9 +792,18 @@ server. The only outbound traffic is the agent's own connection to its provider,
 explicit `qccd publish`. QCCD uploads nothing by default. Whatever context you give the
 agent goes to its provider as part of that agent's normal operation.
 
-**Platforms.** Developed and tested on Windows 11 with Python 3.14.3. The code is portable
-(POSIX process groups, rlimits and `fcntl` locks in place of Job Objects and `msvcrt`), but
-Linux and macOS were not exercised in this session.
+**Platforms.** Developed on Windows 11 with Python 3.14.3, and tested on macOS 26 (Apple
+silicon) with Python 3.13: the whole suite, real Chrome included, and a local BB [[144,12,12]]
+reference grade (compile 1.9 s, grade 4.9 s, eligible), and the website's instructions followed
+from a fresh clone with real Claude Code and Codex agents: designing and submitting from the
+Studio, a rule explained on its page, a lesson walked through, a leaderboard design built,
+run and ranked, a page reviewed for mistakes. POSIX uses process groups and `fcntl`
+locks in place of Job Objects and `msvcrt`. The memory ceiling on a tool is `RLIMIT_AS` on
+Linux and, on macOS -- whose kernel neither enforces `RLIMIT_AS` nor lets a process set it
+below the address space it has already reserved -- a watchdog on the process group's physical
+footprint. A service started by a desktop app (whose PATH is only the system's) still finds
+`claude` and `codex` in Homebrew, npm and `~/.local/bin`, and in the Claude Code editor
+extension and the ChatGPT app, which carry them.
 
 **Tests.**
 

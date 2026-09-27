@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,7 @@ NODE = shutil.which("node")
 @pytest.fixture(scope="module")
 def studio_page(tmp_path_factory):
     out = tmp_path_factory.mktemp("page") / "studio.html"
-    r = subprocess.run(["python", "-m", "qccd", "studio", "-o", str(out)], cwd=REPO, capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-m", "qccd", "studio", "-o", str(out)], cwd=REPO, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     return out
 

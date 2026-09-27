@@ -43,9 +43,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ALGS = ROOT / "examples" / "gadgets" / "algorithms"
 PROBE = ROOT / "tests" / "gadget_decode_browser.mjs"
 CLASSICAL = ROOT / "tests" / "gadget_classical_browser.mjs"
-CHROME = os.environ.get("CHROME") or next((p for p in (
-    "C:/Program Files/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser", "/usr/bin/chromium") if Path(p).exists()), None)
+from chrome_path import CHROME  # noqa: E402
 NODE = shutil.which("node")
 
 BELL = """title Bell pair

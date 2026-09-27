@@ -17,8 +17,8 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-PY=${PYTHON:-python}
-source ocaml/ocamlenv.sh
+source ./python.sh
+source ./ocamlenv.sh
 (cd ocaml && dune build) || exit 1
 EXE=ocaml/_build/default/bin/qccdc_cli.exe
 

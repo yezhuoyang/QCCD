@@ -484,7 +484,10 @@ function mustBeDeclared(el, doc) { if (!declared(el)) throw undeclaredError(el, 
 var WS_PLACE = /^\/(studio|trace|runview\/[\w-]+|compare|run\/[\w-]+)\/?$/;
 function isPlace(u) {
   var p = u.pathname;
-  if (!window.QCCD_MIRROR) return WS_PLACE.test(p);
+  if (!window.QCCD_MIRROR) {
+    var wb = webBase();       // from the Studio: back to the website, where the mirror checks the page
+    return WS_PLACE.test(p) || !!(wb && u.origin === wb.origin && /^\/web(\/|$)/.test(p));
+  }
   if (p === '/studio' || p === '/web/' || p === '/web' || (iface().aliases || []).indexOf(p) >= 0) return true;
   var P = iface().places, bare = p.replace(/index\.html$/, '');
   if (P && (P.indexOf(p) >= 0 || P.indexOf(bare) >= 0)) return true;
@@ -519,11 +522,23 @@ var KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, 
 // by_page_action), so it is attributed, protected and undoable like any other.  Only the course's
 // verbs stay off there: they would replace the person's design with a lesson's.
 function designPage() { return !!(window.QCCD_DESIGN_PAGE || iface().design_page); }
+// the website's address (the mirror, on its own port), known to the workspace's own pages
+function webBase() {
+  try {
+    var c = JSON.parse((document.getElementById('qccd-live-config') || {}).textContent || '{}');
+    return c.web_url ? new URL(c.web_url) : null;
+  } catch (e) { return null; }
+}
 function sitePath(href) {
   // the one place navigation may go: this site, on this origin, under the mirror's /web/
   // (or the Studio's own pages when this IS the Studio)
-  var u;
-  try { u = new URL(href, location.href); } catch (e) { return null; }
+  var u, wb = !window.QCCD_MIRROR && webBase();
+  try {
+    // the person's Studio and run pages lead back to the website, which the service serves on its
+    // own port: without this an agent that went to /studio could not go back to any page
+    u = (wb && /^\/web(\/|$)/.test(String(href))) ? new URL(href, wb.origin) : new URL(href, location.href);
+  } catch (e) { return null; }
+  if (wb && u.origin === wb.origin && /^\/web(\/|$)/.test(u.pathname)) return u;
   if (u.origin !== location.origin) return null;
   // (/studio on the website's port leads to the person's own Studio, their Design page)
   if (window.QCCD_MIRROR && u.pathname.indexOf('/web/') !== 0 && u.pathname !== '/web' && u.pathname !== '/studio') return null;
@@ -667,7 +682,8 @@ function act(action, args, who) {
         var near = nearestPlaces(p.pathname);
         throw new Error('there is no page ' + p.pathname + ' (a path is taken from the site map or a link, never guessed)' +
                         (near.length ? '; the nearest places: ' + near.join(', ') : '') +
-                        (window.QCCD_MIRROR ? '; the person\'s Design page is /studio' : ''));
+                        (window.QCCD_MIRROR ? '; the person\'s Design page is /studio' :
+                         (webBase() ? '; the website\'s pages are /web/<path> (the site map), e.g. /web/learn/' : '')));
       }
       return glideTo(window.innerWidth / 2, 60, who, 'opening ' + p.pathname.replace(/^\/web/, '')).then(function () {
         setTimeout(function () { location.assign(p.href); }, 50);
@@ -689,8 +705,12 @@ function act(action, args, who) {
       });
     case 'open_lesson':
       var ed = window.EDITOR;
-      if (!ed || !ed.lessonLoad) throw new Error('lessons open on the Studio page (studio.html); navigate there first');
       var id = String(args.lesson || args.id || '');
+      // the person's own Studio holds their design: a lesson loaded there would replace it
+      if (designPage())
+        throw new Error('this is the person\'s own Studio: a lesson would replace their design. Lessons run on the ' +
+                        'site\'s Studio: navigate to /web/studio.html#learn=' + (id || 'A1') + ', which opens the lesson');
+      if (!ed || !ed.lessonLoad) throw new Error('lessons open on the site\'s Studio: navigate to /web/studio.html#learn=' + (id || 'A1'));
       var known = (ed.lessonList ? ed.lessonList() : []).map(function (l) { return l.id; });
       if (known.length && known.indexOf(id) < 0) throw new Error('no lesson ' + id + '; the lessons are ' + known.join(', '));
       return glideTo(window.innerWidth * 0.75, 150, who, 'opening lesson ' + id).then(function () {

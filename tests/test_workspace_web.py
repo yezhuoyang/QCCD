@@ -408,8 +408,8 @@ def test_the_mcp_page_tools_are_page_actions():
 
 # ---------------------------------------------------------------------- real Chrome
 
-CHROME = os.environ.get("CHROME") or "C:/Program Files/Google/Chrome/Application/chrome.exe"
-needs_chrome = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists()), reason="needs node and Chrome")
+from chrome_path import CHROME  # noqa: E402
+needs_chrome = pytest.mark.skipif(not (shutil.which("node") and CHROME and Path(CHROME).exists()), reason="needs node and Chrome")
 
 
 @needs_chrome
@@ -1127,9 +1127,14 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
             {"eval": f"location.assign('{web}/web/studio.html#design'); 1"},                                # 15
             {"wait": f"location.href === '{base}/studio' && window.QCCD_LIVE && QCCD_LIVE.state().paired",
              "timeout": 60000},                                                                             # 16
-            {"eval": f"location.assign('{web}/web/studio.html#learn=A1'); 1"},                              # 17
+            # a lesson is refused on the person's own Studio: it would replace their design
+            http("/api/page-actions", {"action": "open_lesson", "args": {"lesson": "A1"}}),               # 17
+            {"sleep": 1500},
+            {"eval": "QCCD_LIVE.state().rev + ' ' + location.pathname"},                                   # 19
+            # ...and from there the agent can go back to the website, where lessons run
+            http("/api/page-actions", {"action": "navigate", "args": {"path": "/web/studio.html#learn=A1"}}),  # 20
             {"sleep": 2500},
-            {"eval": "location.origin + location.pathname + location.hash"},                                # 19 lessons stay
+            {"eval": "location.origin + location.pathname + location.hash"},                                # 22 lessons stay
         ]
         spec = tmp_path / "spec.json"
         spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={own('POST', '/api/pair-code', {})['code']}"},
@@ -1147,7 +1152,12 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
         assert rd["ok"] and rd["page"]["url"].startswith("/runview/"), diag
         assert json.loads(st[12]["body"])["ok"] and st[14]["value"].lower().startswith("pause"), diag
         assert st[16]["ok"], diag
-        assert st[19]["value"] == f"{web}/web/studio.html#learn=A1", diag
+        ol = json.loads(st[17]["body"])
+        assert not ol["ok"] and "person's own Studio" in ol["error"] and "/web/studio.html#learn=A1" in ol["error"], diag
+        assert st[19]["value"] == "1 /studio", diag                                     # the design is untouched
+        nv = json.loads(st[20]["body"])
+        assert nv["ok"] and nv["arrived"]["url"] == "/web/studio.html", diag
+        assert st[22]["value"] == f"{web}/web/studio.html#learn=A1", diag
     finally:
         try:
             service_request(info, "POST", "/api/shutdown", {}, token="owner")

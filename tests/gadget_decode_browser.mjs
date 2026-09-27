@@ -24,13 +24,11 @@ import os from "node:os";
 import path from "node:path";
 import http from "node:http";
 import { pathToFileURL } from "node:url";
+import { findChrome } from "./chrome_path.mjs";
 
 const dir = path.resolve(process.argv[2]);
 const shot = process.argv[3] || null;
-const CHROME = process.env.CHROME || [
-  "C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium",
-].find((p) => fs.existsSync(p));
+const CHROME = findChrome();
 if (!CHROME) { console.error("no Chrome found; set CHROME"); process.exit(2); }
 
 const port = 9990 + Math.floor(Math.random() * 40);
@@ -144,10 +142,14 @@ try {
   if (out.decodes.length) {
     const d = out.decodes[0];
     await evaluate(`(() => { const G = window.GADGETS; G.seek(${Math.max(0, d.t0 - 40000)}); G.S.rate = 10000; G.S.playing = true; })()`);
+    // 4 s of lead-in at this rate, then DECODE_WALL_S (2.5 s) inside: sample until the playhead
+    // is past the decode, not for a fixed count that only covered it where each round trip
+    // to the page was slow
     const samples = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 80; i++) {
       await sleep(150);
       samples.push(await evaluate(`[window.GADGETS.S.t, window.GADGETS.S.slowed]`));
+      if (samples[samples.length - 1][0] > d.t1) break;
     }
     await evaluate(`window.GADGETS.S.playing = false`);
     const inside = samples.filter(([t]) => t >= d.t0 - 1e-6 && t <= d.t1 + 1e-6);

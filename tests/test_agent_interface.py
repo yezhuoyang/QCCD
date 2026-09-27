@@ -30,8 +30,8 @@ import pytest
 from qccd.workspace import interface as iface
 
 REPO = Path(__file__).resolve().parents[1]
-CHROME = os.environ.get("CHROME") or "C:/Program Files/Google/Chrome/Application/chrome.exe"
-needs_chrome = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists()), reason="needs node and Chrome")
+from chrome_path import CHROME  # noqa: E402
+needs_chrome = pytest.mark.skipif(not (shutil.which("node") and CHROME and Path(CHROME).exists()), reason="needs node and Chrome")
 
 #: the out-of-line list's length (11 when the gate was introduced, 2026-09-24; 10 once the site's
 #: search box was declared inline the same day).  It may go DOWN -- move an entry inline (data-hint

@@ -30,7 +30,9 @@ HOW_TO = [
     {"task": "go to the Design page", "how": "navigate path='/studio': the person's own live Studio, where your "
                                             "change sets appear as you commit them."},
     {"task": "walk someone through a lesson",
-     "how": "navigate to /web/studio.html, then open_lesson lesson='A1'. qccd_page_read shows the lesson "
+     "how": "navigate to /web/studio.html#learn=A1 (the lesson's own link; it opens the lesson. Never /studio or a "
+            "bare studio.html: those are the person's own design, and a lesson there is refused), then "
+            "open_lesson lesson='A2' there to switch lessons. qccd_page_read shows the lesson "
             "(app.lesson, and the Learn panel's text). Do the exercise the way the lesson asks -- click the "
             "tiles and the canvas, or studio verbs on the page's own Studio -- with wait between steps and a "
             "line in the chat for each; then click the Check button (hint learn:check) and read the verdict "

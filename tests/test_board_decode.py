@@ -36,9 +36,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / "tests" / "board_decode_browser.mjs"
 TOGGLE = ROOT / "tests" / "classical_toggle_browser.mjs"
-CHROME = os.environ.get("CHROME") or next((p for p in (
-    "C:/Program Files/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser", "/usr/bin/chromium") if Path(p).exists()), None)
+from chrome_path import CHROME  # noqa: E402
 NODE = shutil.which("node")
 SCRIPTS = ROOT / "Codesign" / "scripts"
 
