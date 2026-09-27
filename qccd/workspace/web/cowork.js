@@ -1229,7 +1229,7 @@ function buildChat() {
       h('b', { id: 'qcl-who', text: 'Agent' }),
       h('button', { id: 'qcl-model', cls: 'qcl-btn qcl-modelbtn', title: 'the model and how hard it thinks',
                     on: { click: function (e) { e.stopPropagation(); toggleMenu('model'); } } }),
-      h('span', { id: 'qcl-sub', cls: 'qcl-sub' }),
+      PAGE ? h('span', { id: 'qcl-sub', cls: 'qcl-sub' }) : null,
       h('span', { cls: 'qcl-sp' }),
       PAGE ? null : h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
                                   'aria-label': 'design', on: { change: onDraftPick } }),
@@ -1239,6 +1239,7 @@ function buildChat() {
         dock.classList.toggle('qcl-min'); localSet('qccd.live.min', dock.classList.contains('qcl-min') ? '1' : '0');
         if (CFG.framed) toParent({ qccd: 'size', min: dock.classList.contains('qcl-min') }); } } })
     ]),
+    PAGE ? null : h('div', { id: 'qcl-sub', cls: 'qcl-sub qcl-subline' }),
     h('div', { id: 'qcl-conv', cls: 'qcl-conv', 'aria-live': 'polite' }),
     h('div', { cls: 'qcl-composer' }, [
       h('div', { id: 'qcl-chips', cls: 'qcl-chips' }),
@@ -1427,6 +1428,13 @@ function chatSend(textArg) {
     if (!d) { S.pending = null; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
     S.selOff = false; renderChips();
     return loadConv().then(function () { return d; });
+  }, function (e) {
+    // the service restarting, the agent failing to start: never lose what the person typed
+    S.pending = null;
+    if (ta && !ta.value) { ta.value = text; grow(ta); }
+    renderConv(); renderSendButton();
+    notice('Not sent (' + String((e && e.message) || e).slice(0, 160) + '): your message is back in the box.', 'bad');
+    return null;
   });
 }
 function ensureAgent() {

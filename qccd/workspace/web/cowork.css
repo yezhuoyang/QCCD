@@ -59,10 +59,14 @@
 /* ---- the chat (default view): one conversation, one box ---- */
 #qcl-dock.qcl-chat{width:400px;height:min(620px,78vh);max-height:78vh;font:13.5px/1.45 system-ui,Segoe UI,sans-serif}
 #qcl-dock.qcl-chat.qcl-min{height:auto}
-#qcl-dock.qcl-chat.qcl-min .qcl-conv,#qcl-dock.qcl-chat.qcl-min .qcl-composer{display:none}
+#qcl-dock.qcl-chat.qcl-min .qcl-conv,#qcl-dock.qcl-chat.qcl-min .qcl-composer,#qcl-dock.qcl-chat.qcl-min .qcl-subline{display:none}
 .qcl-chat .qcl-head{background:var(--panel,#fff);gap:7px;padding:8px 10px}
 .qcl-chat .qcl-head b{font-size:13.5px;letter-spacing:0}
 .qcl-sub{color:var(--muted,#667085);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+/* in the Studio the design menu takes the header's room, and the status ("Claude starts when you
+   send") was cut to its first letter: there it is a line of its own, under the header */
+.qcl-chat .qcl-subline{max-width:none;padding:3px 10px 4px 27px;font-size:11.5px;border-bottom:1px solid var(--line,#d0d5dd);
+  background:var(--panel,#fff)}
 .qcl-draftsel{border:1px solid var(--line,#d0d5dd);border-radius:6px;padding:2px 4px;font:inherit;font-size:12px;
   max-width:130px;background:var(--panel,#fff);color:var(--ink,#182230)}
 .qcl-icon{padding:1px 7px;font-size:14px;line-height:1.2}
