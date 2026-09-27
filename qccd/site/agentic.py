@@ -491,9 +491,11 @@ def _build_rules() -> str:
 
 
 def _try_it() -> str:
-    return ("<pre>git clone -b compiler https://github.com/yezhuoyang/QCCD\ncd QCCD\npython -m venv .venv\n"
-            ".venv\\Scripts\\activate\npip install -e \".[agent]\"\nqccd toolchain install\ncd ..\n"
+    return ("<pre>git clone -b compiler https://github.com/yezhuoyang/QCCD\ncd QCCD\npython3.13 -m venv .venv\n"
+            "source .venv/bin/activate\npip install -e \".[agent]\"\nqccd toolchain install\ncd ..\n"
             "qccd init \"My QCCD designs\"\ncd \"My QCCD designs\"\nqccd agent install --client claude\nqccd studio</pre>"
+            "<p>Any Python 3.10 or newer (on a Mac, <code>brew install python@3.13</code> first: the one it comes "
+            "with is 3.9). On Windows: <code>py -m venv .venv</code>, then <code>.venv\\Scripts\\activate</code>.</p>"
             "<p><b>Yours to name, anything you like:</b> the workspace folder (\"My QCCD designs\" is only an example) "
             "and every design. <b>Type as shown:</b> everything else. Then ask in the Studio's chat, and open "
             "<code>qccd trace --open</code> to watch the run as a program. The full account, including what is and is "

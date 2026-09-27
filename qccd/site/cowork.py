@@ -64,24 +64,35 @@ data-go="page" target="_blank" rel="noopener">Open this page with my agent</a></
 connect to: the buttons are links to 127.0.0.1, and work while your workspace is running.
 Nothing leaves your machine unless you publish it.</p>
 <h3>Set up once</h3>
+<p class="qa-small"><b>macOS or Linux.</b> QCCD needs Python 3.10 or newer, and the
+<code>python3</code> a Mac comes with is 3.9: install a newer one first with
+<code>brew install python@3.13</code>.</p>
 <pre>__CLONE__
 cd QCCD
-python -m venv .venv
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[agent]"
+qccd toolchain install
+cd ..</pre>
+<p class="qa-small"><b>Windows.</b></p>
+<pre>__CLONE__
+cd QCCD
+py -m venv .venv
 .venv\\Scripts\\activate
 pip install -e ".[agent]"
 qccd toolchain install
 cd ..</pre>
-<p class="qa-small">On macOS or Linux, activate with <code>source .venv/bin/activate</code>. If PowerShell
-refuses to run the activate script, run
+<p class="qa-small">If PowerShell refuses to run the activate script, run
 <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once. The virtual
 environment keeps QCCD's libraries apart from the rest of your Python, so installing it cannot
 change a version another package of yours needs. Activate it again in each new terminal.
 <code>qccd toolchain install</code> downloads the compiler that runs your programs (Windows and
-Linux on x86-64). It checks the file against a hash pinned in the repository before using it.
-On a Mac, build it from source. A reference grade on your own machine also needs the Lean
-checker built:
-<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/deploy/official/Dockerfile">deploy/official/Dockerfile</a>
-has the exact commands.</p>
+Linux on x86-64, and Macs with Apple silicon) and, on a Mac, the Lean checker that a reference
+grade on your own machine needs. It checks each file against a hash pinned in the repository
+before using it. On Windows and Linux, build the checker once: install Lean with
+<a href="https://github.com/leanprover/elan">elan</a>, then run <code>lake build</code> in
+<code>QCCD/Compiler/lean/checker</code> (about a minute). An Intel Mac builds the compiler from
+source (<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/Compiler/README.md">Compiler/README.md</a>).</p>
 <h3>Start a workspace</h3>
 <p class="qa-small">Run these from the folder that holds QCCD, not inside it. Type them as shown,
 except the folder name, which is yours.</p>
