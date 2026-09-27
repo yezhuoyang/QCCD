@@ -24,7 +24,7 @@ from bisect import bisect_right
 from statistics import median
 from typing import Mapping
 
-__all__ = ["performance", "compare", "frame_at"]
+__all__ = ["performance", "compare", "frame_at", "timeline"]
 
 #: replay instruction types -> the category a person reads
 _CATEGORY = {"gate": "gates", "cool": "cooling", "measure": "measurement", "reset": "reset",
@@ -136,6 +136,41 @@ def _bottleneck(r: Mapping) -> list[str]:
         out.append("The run breaks rule(s) " + ", ".join(r["rules"]["failed"]) +
                    ": its time is not a valid result until they pass.")
     return out
+
+
+def timeline(prog, res) -> dict:
+    """The run's evaluation frame by frame, for its page to show while it plays: frame i is
+    instruction i.  Per frame: the time it adds by category (the per-cycle durations the replay
+    sums into `us_by_type`, so the running totals end exactly at the report's breakdown), the
+    modelled clock when it ends, the ions it moves, and the two-qubit gates it runs."""
+    from ..verify.replay import iter_operands, iter_pairs
+    per: dict = {}
+    for c in res.cycles or ():
+        if c.type == "init":
+            continue
+        d = per.setdefault(c.instr_id, [0.0, 0.0, 0])
+        d[0] += float(c.t1) - float(c.t0)
+        d[1] = max(d[1], float(c.t1))
+        d[2] += int(c.n_participants or 0)
+    cats: list[str] = []
+    cat, us, t, ions, g2 = [], [], [], [], []
+    clock = 0.0
+    for ins in prog.instructions:
+        d = per.get(ins.id)
+        if d is None:
+            cat.append(-1); us.append(0.0); t.append(round(clock, 3)); ions.append(0); g2.append(0)
+            continue
+        name = _CATEGORY.get(ins.type, ins.type)
+        if name not in cats:
+            cats.append(name)
+        clock = max(clock, d[1])
+        pairs = 0
+        if ins.type == "gate" and not any(len(o) == 1 for o in iter_operands(ins)):
+            pairs = len(list(iter_pairs(ins)))
+        cat.append(cats.index(name)); us.append(round(d[0], 3)); t.append(round(clock, 3))
+        ions.append(d[2] if name == "transport" else 0); g2.append(pairs)
+    return {"categories": cats, "cat": cat, "us": us, "t_us": t, "ions": ions, "gates2q": g2,
+            "total_us": round(float(res.total_us), 3)}
 
 
 def frame_at(times_us: list[float], t_us: float) -> int:

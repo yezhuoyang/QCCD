@@ -522,6 +522,81 @@ var KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, 
 // by_page_action), so it is attributed, protected and undoable like any other.  Only the course's
 // verbs stay off there: they would replace the person's design with a lesson's.
 function designPage() { return !!(window.QCCD_DESIGN_PAGE || iface().design_page); }
+// THE PERSON SEES ALL OF IT.  After an agent changes the design or its programme, the whole drawing --
+// every node, and what the page draws around the device (the decoder and the classical memory on
+// their floor, and the dashed wires to them: STAGE_EXTENT) -- is in the view, at a scale that shows
+// it, and not under the chat: the view re-fits when any of it is outside the canvas or behind the chat,
+// or when it has shrunk to a corner of the view.  An agent that drew past the edge left the person
+// watching part of what it did (2026-09-27).
+function drawingBox() {
+  var E = window.EDITOR;
+  if (!E || !E.layout || !E.state) return null;
+  var l = E.layout(), st = E.state();
+  if (!l || !st || !st.device) return null;
+  var un = function (v) { return +((window.QCCD && window.QCCD.unbox) ? window.QCCD.unbox(v) : v); };
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, n = 0, nodes = st.device.nodes || {};
+  Object.keys(nodes).forEach(function (id) {
+    var q = nodes[id].pos;
+    if (!q) return;
+    var ux = l.ox + un(q[0]) * l.sx, uy = l.oy + un(q[1]) * l.sy;
+    if (!isFinite(ux) || !isFinite(uy)) return;
+    x0 = Math.min(x0, ux); y0 = Math.min(y0, uy); x1 = Math.max(x1, ux); y1 = Math.max(y1, uy); n++;
+  });
+  if (!n) return null;
+  try {
+    var ex = window.STAGE_EXTENT && window.STAGE_EXTENT();
+    if (ex && [ex.x0, ex.y0, ex.x1, ex.y1].every(isFinite)) {
+      x0 = Math.min(x0, ex.x0); y0 = Math.min(y0, ex.y0); x1 = Math.max(x1, ex.x1); y1 = Math.max(y1, ex.y1);
+    }
+  } catch (e) { /* nothing extends the stage */ }
+  var pad = Math.max(8, (l.g || 20) * 0.5);
+  return { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad };
+}
+// the part of the canvas the person can see: the canvas, less the chat when it sits over it
+function freeArea(svg) {
+  var r = svg.getBoundingClientRect(), f = { l: r.left, t: r.top, r: r.right, b: r.bottom };
+  var dock = document.getElementById('qcl-dock') || document.getElementById('qccd-chat');
+  if (dock && !(dock.classList && dock.classList.contains('qcl-min'))) {
+    var d = dock.getBoundingClientRect();
+    if (d.width > 0 && d.left < f.r && d.right > f.l && d.top < f.b && d.bottom > f.t) {
+      if (d.left - f.l >= 0.45 * (f.r - f.l)) f.r = d.left - 10;           // the chat on the right
+      else if (d.top - f.t >= 0.45 * (f.b - f.t)) f.b = d.top - 10;        // or below
+    }
+  }
+  return { svg: r, free: f };
+}
+// after the page has redrawn: the layout, and the classical layer's floor (STAGE_EXTENT), settle on the
+// frames after a change, so a check made at once saw the old drawing and left the decoder outside
+function keepInViewSoon() {
+  setTimeout(function () { keepInView(); }, 250);
+  setTimeout(function () { keepInView(); }, 900);
+}
+function keepInView(force) {
+  try {
+    var svg = document.getElementById('svg');
+    if (typeof VB === 'undefined' || typeof applyVB !== 'function' || !svg || !svg.getScreenCTM) return false;
+    var b = drawingBox();
+    if (!b) return false;
+    var a = freeArea(svg), M = svg.getScreenCTM();
+    if (!M || !a.svg.width || !a.svg.height) return false;
+    var s0 = { x: M.a * b.x0 + M.e, y: M.d * b.y0 + M.f }, s1 = { x: M.a * b.x1 + M.e, y: M.d * b.y1 + M.f };
+    var f = a.free, sw = s1.x - s0.x, sh = s1.y - s0.y;
+    var hidden = s0.x < f.l - 1 || s0.y < f.t - 1 || s1.x > f.r + 1 || s1.y > f.b + 1;
+    var small = sw < 0.3 * (f.r - f.l) && sh < 0.3 * (f.b - f.t);
+    if (!force && !hidden && !small) return false;
+    // a fresh layout first (the page's own fit does the same), then the drawing into the free area
+    try { if (window.EDITOR && window.EDITOR.refit) window.EDITOR.refit(); } catch (e) { /* not editable */ }
+    b = drawingBox() || b;
+    var fw = Math.max(40, f.r - f.l), fh = Math.max(40, f.b - f.t), cw = b.x1 - b.x0, ch = b.y1 - b.y0;
+    var kmax = (typeof FIT_MAX_K === 'number') ? FIT_MAX_K : 1.5;
+    var k = Math.min(fw / cw, fh / ch, kmax);
+    var cx = (f.l + f.r) / 2 - a.svg.left, cy = (f.t + f.b) / 2 - a.svg.top;
+    VB.w = a.svg.width / k; VB.h = a.svg.height / k;
+    VB.x = (b.x0 + b.x1) / 2 - cx / k; VB.y = (b.y0 + b.y1) / 2 - cy / k;
+    applyVB();
+    return true;
+  } catch (e) { return false; }
+}
 // the website's address (the mirror, on its own port), known to the workspace's own pages
 function webBase() {
   try {
@@ -749,6 +824,8 @@ function act(action, args, who) {
             var pr = (v.problems || [])[0] || {};
             throw new Error(verb + ' refused' + (pr.code ? ' (' + pr.code + ')' : '') + ': ' + (pr.message || v.why || 'no reason given'));
           }
+          // what it drew, and the decoder its programme sends to, where the person can see them
+          if (!sf && (V[verb].kind === 'design' || V[verb].kind === 'program')) keepInViewSoon();
           return { ok: !(v && v.ok === false), verb: verb, result: jsonable(v), studio: studioBrief(E) };
         });
       });
@@ -860,7 +937,8 @@ function pick() {
   });
 }
 
-window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick,
+window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick, keepInView: keepInView,
+                     keepInViewSoon: keepInViewSoon,
                      // the gate (tests/test_agent_interface.py): every control on the page, declared or listed here
                      undeclared: function () {
                        var out = [];

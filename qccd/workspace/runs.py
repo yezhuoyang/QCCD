@@ -145,6 +145,7 @@ class RunsMixin:
             qasm = self.get_artifact(circuit).decode("utf-8", errors="replace")
         draft = params.get("branch") or (run.get("design") or {}).get("draft") or "main"
         return {"run_id": run_id, "name": name, "qasm": qasm[:200_000], "source": source,
+                "animate": (params or {}).get("animate", run.get("animate", True)) is not False,
                 "draft": str(draft).removeprefix("cand/"), "design": self._design_title_of(str(draft)),
                 "status": j["status"],
                 "progress": (j.get("progress") or {}).get("message"), "agent": (j.get("actor") or {}).get("label")}
@@ -158,6 +159,8 @@ class RunsMixin:
         if mode not in ("auto", "rotate", "compile"):
             raise WorkspaceError("bad_request", "compiler must be auto, rotate or compile", status=422)
         params["compiler"] = mode
+        # whether the person's tab plays the run or opens it at its result (run_eval.py)
+        params["animate"] = params.get("animate", True) is not False
 
     def _job_run(self, jid, params, actor, origin_prompt_id, cancel) -> dict:
         from ..arch.device import Architecture
@@ -259,6 +262,7 @@ class RunsMixin:
                            + headline,
                 "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
                         "design": design, "compiler": used, "performance": perf,
+                        "animate": params.get("animate", True) is not False,
                         "artifacts": {"device": d_dev, "program": d_prog, "times": d_times,
                                       "certificate": d_cert, "circuit": d_qasm, "certified": d_raw},
                         "view": f"/runview/{jid}",

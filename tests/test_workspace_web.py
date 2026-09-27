@@ -1123,18 +1123,38 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
             http("/api/page-actions", {"action": "step", "args": {"play": True}}),                          # 12
             {"sleep": 800},
             {"eval": "document.getElementById('play').textContent"},                                        # 14
+            # the run's evaluation is on its page, and the page told the service what it shows
+            {"eval": "location.hash + ' ' + document.getElementById('qe-total').textContent"},             # 15
+            {"eval": "QCCD_LIVE.api('GET', '/api/runs/' + location.pathname.split('/').pop() + '/evaluation')"
+                     ".then(function (r) { return JSON.stringify(r.data.evaluation); })"},                  # 16
+            {"eval": "document.getElementById('qe-skip').click(); new Promise(function (ok) { setTimeout(function () {"
+                     " ok(document.getElementById('qe-state').textContent + '|' + document.getElementById('qe-t').textContent"
+                     " + '|' + !document.getElementById('qe-final').hidden); }, 400); })"},                  # 17
             # the website's Design page is the live Studio
-            {"eval": f"location.assign('{web}/web/studio.html#design'); 1"},                                # 15
+            {"eval": f"location.assign('{web}/web/studio.html#design'); 1"},                                # 18
             {"wait": f"location.href === '{base}/studio' && window.QCCD_LIVE && QCCD_LIVE.state().paired",
-             "timeout": 60000},                                                                             # 16
-            # a lesson is refused on the person's own Studio: it would replace their design
-            http("/api/page-actions", {"action": "open_lesson", "args": {"lesson": "A1"}}),               # 17
+             "timeout": 60000},                                                                             # 19
+            # the agent builds far off to the side: the person's view follows, all of it in sight
+            http("/api/change-sets", {"expected_revision": 1, "request_id": "far", "mode": "apply",
+                                      "summary": "a trap far away",
+                                      "operations": [{"type": "add_site", "id": "FAR", "pos": [40, 24], "zone": "trap"}]}),  # 20
+            {"wait": "QCCD_LIVE.state().rev === 2", "timeout": 20000},                                     # 21
             {"sleep": 1500},
-            {"eval": "QCCD_LIVE.state().rev + ' ' + location.pathname"},                                   # 19
+            {"eval": "(function(){ var l = EDITOR.layout(), st = EDITOR.state(), svg = document.getElementById('svg'), "
+                     "M = svg.getScreenCTM(), r = svg.getBoundingClientRect(), d = document.getElementById('qcl-dock')"
+                     ".getBoundingClientRect(), out = []; Object.keys(st.device.nodes).forEach(function (id) { "
+                     "var q = st.device.nodes[id].pos, x = M.a * (l.ox + QCCD.unbox(q[0]) * l.sx) + M.e, "
+                     "y = M.d * (l.oy + QCCD.unbox(q[1]) * l.sy) + M.f; var seen = x >= r.left && x <= r.right && "
+                     "y >= r.top && y <= r.bottom && !(x >= d.left && x <= d.right && y >= d.top && y <= d.bottom); "
+                     "if (!seen) out.push(id); }); return JSON.stringify(out); })()"},                     # 23 hidden nodes
+            # a lesson is refused on the person's own Studio: it would replace their design
+            http("/api/page-actions", {"action": "open_lesson", "args": {"lesson": "A1"}}),               # 24
+            {"sleep": 1500},
+            {"eval": "QCCD_LIVE.state().rev + ' ' + location.pathname"},                                   # 26
             # ...and from there the agent can go back to the website, where lessons run
-            http("/api/page-actions", {"action": "navigate", "args": {"path": "/web/studio.html#learn=A1"}}),  # 20
+            http("/api/page-actions", {"action": "navigate", "args": {"path": "/web/studio.html#learn=A1"}}),  # 27
             {"sleep": 2500},
-            {"eval": "location.origin + location.pathname + location.hash"},                                # 22 lessons stay
+            {"eval": "location.origin + location.pathname + location.hash"},                                # 29 lessons stay
         ]
         spec = tmp_path / "spec.json"
         spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={own('POST', '/api/pair-code', {})['code']}"},
@@ -1151,13 +1171,22 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
         rd = json.loads(st[11]["body"])
         assert rd["ok"] and rd["page"]["url"].startswith("/runview/"), diag
         assert json.loads(st[12]["body"])["ok"] and st[14]["value"].lower().startswith("pause"), diag
-        assert st[16]["ok"], diag
-        ol = json.loads(st[17]["body"])
+        # the run opened playing, with its Evaluation panel; the page reported the round time it shows
+        hash_, total = st[15]["value"].split(" ")
+        assert hash_ == "#play" and float(total) > 0, diag
+        ev = json.loads(st[16]["value"])
+        assert ev and abs(ev["total_ms"] - float(total)) < 0.01 and ev["matches_evaluator"], diag
+        assert ev["counts"]["steps"] > 0 and ev["breakdown"], diag
+        state, clock, final = st[17]["value"].split("|")
+        assert state == "final result" and clock == total and final == "true", diag         # skipped to the result
+        assert st[19]["ok"], diag
+        assert st[21]["ok"] and json.loads(st[23]["value"]) == [], diag                     # nothing out of sight
+        ol = json.loads(st[24]["body"])
         assert not ol["ok"] and "person's own Studio" in ol["error"] and "/web/studio.html#learn=A1" in ol["error"], diag
-        assert st[19]["value"] == "1 /studio", diag                                     # the design is untouched
-        nv = json.loads(st[20]["body"])
+        assert st[26]["value"] == "2 /studio", diag                                     # the design is untouched
+        nv = json.loads(st[27]["body"])
         assert nv["ok"] and nv["arrived"]["url"] == "/web/studio.html", diag
-        assert st[22]["value"] == f"{web}/web/studio.html#learn=A1", diag
+        assert st[29]["value"] == f"{web}/web/studio.html#learn=A1", diag
     finally:
         try:
             service_request(info, "POST", "/api/shutdown", {}, token="owner")

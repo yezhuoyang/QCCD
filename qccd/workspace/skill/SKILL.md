@@ -120,9 +120,13 @@ gives each control (target it with `[data-hint="<key>"]`). `query` searches both
 **Nothing the person should see happens out of sight.** Their Design page is the live workspace
 Studio: your change sets appear there as you commit them, so change the design in small steps
 and say what each one does. A run (`qccd_run_program`) shows its program in their Studio while it
-compiles, then their tab opens the run's page, which plays by itself: say in one line what they
-are watching and go on (do not press Play or wait for it). A comparison opens side by side the
-same way.
+compiles, then their tab opens the run's page, which plays by itself, its Evaluation panel counting
+the round's time up as it plays: say in one line what they are watching and go on (do not press
+Play or wait for it). The numbers you report are the panel's, which `qccd_run_program` returns as
+`evaluation`. When the person wants designs tried as fast as possible, or you run many, pass
+`animate: false`: the run opens at its result with no animation (the person can also switch runs
+to open that way in the chat's menu, and "Skip to result" on the run page does it for one run). A
+comparison opens side by side the same way.
 
 The person watches you work: every page action moves a cursor with your name to its target
 and says what you are doing. Act like a colleague demonstrating at their screen: go to the

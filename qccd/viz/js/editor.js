@@ -4508,6 +4508,9 @@ var HINTS = {
   'el:component':  { t: 'Component', d: 'A whole part made of several sites and rails \u2014 a dock, a tile, a register \u2014 placed as one piece and moved as one piece.', k: 'press the tile, then click the canvas' },
   // the toolbar
   'play':   { t: 'Play / Pause', d: 'Run the programme as an animation: ions move along the rails one instruction at a time.', k: 'space' },
+  'run:eval': { t: 'Evaluation', d: "A run's evaluation as it plays: the modelled clock, the time spent by category (transport, cooling, gates, measurement, reset), the steps, two-qubit gates and ions moved so far, and at the last step the result -- the round time, its bottlenecks, heating and the rules. Read off the evaluator's own replay, step by step." },
+  'run:skip': { t: 'Skip to result', d: 'Jump to the end of the run and show its final evaluation, without waiting for the animation.' },
+  'run:replay': { t: 'Play from start', d: 'Play the run again from its first step, with the evaluation counting up alongside.' },
   'step':   { t: 'Step', d: 'Jump to the end of the next instruction.', k: '\u2192' },
   'glide':  { t: 'Glide', d: 'Animate just the next instruction, then stop.', k: 'enter' },
   'phase':  { t: 'Phase', d: 'Jump to the next batch of instructions that run together.' },

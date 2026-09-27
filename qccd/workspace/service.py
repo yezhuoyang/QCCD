@@ -66,6 +66,7 @@ class ServiceState:
         self.stop = threading.Event()
         self.bridges: dict = {}              # session_id -> adapter bridge (Codex)
         self.page_waits: dict = {}           # page action id -> {event, view, result}
+        self.run_evals: dict = {}            # run id -> what its page's Evaluation panel shows (run_eval.py)
         self.started = time.time()
         from .trace import Traces
         self.traces = Traces(ws.root, ws.store, ws)   # what each agent did, step by step (trace.py)
@@ -377,6 +378,22 @@ def create_app(state: ServiceState) -> FastAPI:
     @route("GET", "/api/runs/{run_id}/program", write=False)
     def run_program(request, actor, _):
         return ws.run_program_source(request.path_params["run_id"])
+
+    @route("POST", "/api/runs/{run_id}/evaluation", human_only=True)
+    def run_evaluation_shown(request, actor, b):
+        """The run's page says what its Evaluation panel shows (run_eval.py); the agent's run tool
+        reports these numbers, so what it says is what is on the person's screen."""
+        rid = request.path_params["run_id"]
+        ws.run(rid)                                   # a run, and a finished one
+        if not isinstance(b, dict):
+            raise WorkspaceError("bad_request", "an evaluation is a JSON object", status=422)
+        state.run_evals[rid] = {**b, "at": time.time()}
+        return {"ok": True}
+
+    @route("GET", "/api/runs/{run_id}/evaluation", write=False)
+    def run_evaluation(request, actor, _):
+        rid = request.path_params["run_id"]
+        return {"run_id": rid, "evaluation": state.run_evals.get(rid)}
 
     @route("GET", "/api/agents", write=False)
     def agents(request, actor, _):
@@ -915,17 +932,18 @@ def _run_page(state: ServiceState, run_id: str) -> str:
     with state.page_lock:
         page = state.page_cache.get(key)
     if page is None:
-        page = _render_run(state.ws, run_id)
+        page, panel = _render_run(state.ws, run_id)
         at = page.rfind("</body>")
         # the chat and the page actions: in a tab of its own the run page is where the agent
-        # presses Play for the person (cowork.js stays out of the side-by-side frames)
-        page = page[:at] + RUNVIEW_BLOCK + _live_layer(state, "run", run_id=run_id) + page[at:]
+        # presses Play for the person (cowork.js stays out of the side-by-side frames); the
+        # Evaluation panel shows the run's numbers growing as it plays (run_eval.py)
+        page = page[:at] + RUNVIEW_BLOCK + panel + _live_layer(state, "run", run_id=run_id) + page[at:]
         with state.page_lock:
             state.page_cache[key] = page
     return page
 
 
-def _render_run(ws: Workspace, run_id: str) -> str:
+def _render_run(ws: Workspace, run_id: str) -> tuple:
     import tempfile
     from ..arch.device import Architecture
     from ..cost.models import corrected_model
@@ -941,6 +959,12 @@ def _render_run(ws: Workspace, run_id: str) -> str:
     prog = TSIR.from_json(_sl(ws.get_artifact(run["artifacts"]["program"])))
     model = corrected_model(run["performance"]["table"])
     report = verify(prog, arch, model)
+    # the evaluator's replay step by step, for the page's Evaluation panel to play along with
+    from ..verify.replay import replay
+    from .perf import timeline
+    from .run_eval import eval_block
+    panel = eval_block(run_id, timeline(prog, replay(prog, arch, model, check_rules=False, keep_cycles=True)),
+                       run["performance"])
     d = run["design"]
     headline = (f"{run['program']['name']} on {ws._design_title_of(d['draft'])} (r{d['revision']}): "
                 f"{run['performance']['total']['ms']:g} ms")
@@ -960,7 +984,7 @@ def _render_run(ws: Workspace, run_id: str) -> str:
         out = Path(td) / "page.html"
         render_html(arch, prog, report.result, model, out, tech=load_technology(DEFAULT_TECH),
                     kicker="QCCD RUN", headline=headline, lede=None, template_stems="*", source=source)
-        return out.read_text(encoding="utf-8")
+        return out.read_text(encoding="utf-8"), panel
 
 
 def _live_layer(state: ServiceState, mode: str, **extra) -> str:

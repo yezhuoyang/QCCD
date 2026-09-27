@@ -200,16 +200,19 @@ def _tools() -> list:
          "round (bb144_esm; 'bb', 'bb code' and 'gross' also work), surface17_esm, steane_esm, rep9_esm, ghz4, "
          "ghz16, qft8, adder3, bv6, bell2, micro. qccd_run_program also takes your own OpenQASM 2.0.", obj({})),
         ("qccd_run_program", "Compile a program onto a design with the real compiler, insert cooling, replay "
-         "it under the cost model, and return a performance report: round time, time by category (transport, "
-         "cooling, gates, measurement, reset), transport by move class, the longest steps, junction and ion "
-         "hotspots, heating, rule failures, and bottleneck sentences. program: a catalogue name or "
-         "{name, qasm}. draft: 'main' (the working design, default) or a draft's name. Waits up to wait_s "
-         "(default 45, max 50) and returns the report; if the run is still going, poll qccd_get_job(run_id). "
-         "A run is an experiment: not Lean-checked, never a submission.",
+         "it under the cost model, and show it on the person's run page, whose Evaluation panel counts the "
+         "round's time up as the animation plays and ends at the result. Returns `evaluation`: the numbers that "
+         "panel shows (round time, time by category, steps, two-qubit gates, ions moved, heating, rules, "
+         "bottlenecks) -- report THOSE, they are what the person sees -- and, when no page showed the run, the "
+         "evaluator's `performance` report instead. animate (default true): the page plays the run; false opens "
+         "it at its result with no animation -- use it when the person wants designs tried as fast as possible "
+         "or runs many. program: a catalogue name or {name, qasm}. draft: 'main' (the working design, default) "
+         "or a draft's name. Waits up to wait_s (default 45, max 50); if the run is still going, poll "
+         "qccd_get_job(run_id). A run is an experiment: not Lean-checked, never a submission.",
          obj({"program": {"anyOf": [s, {"type": "object", "properties": {"name": s, "qasm": s},
                                         "required": ["qasm"]}]},
               "draft": s, "revision": i, "compiler": {"type": "string", "enum": ["auto", "rotate", "compile"]},
-              "wait_s": i, "request_id": s, "origin_prompt_id": s}, ["program"])),
+              "animate": {"type": "boolean"}, "wait_s": i, "request_id": s, "origin_prompt_id": s}, ["program"])),
         ("qccd_compare_runs", "Two finished runs side by side: round time, time by category, counts, heating, "
          "B minus A, a verdict, and each run's bottlenecks. show (default true) also opens the side-by-side "
          "view in the person's Studio, where both designs animate on one shared clock.",
@@ -405,6 +408,8 @@ def dispatch(be: Backend, name: str, a: dict) -> Any:
             if j.get("status") not in ("queued", "running") or _t.time() >= deadline:
                 break
             _t.sleep(1.0)
+        if j.get("kind") == "run" and j.get("status") == "succeeded" and "run" in (j.get("result") or {}):
+            return _run_result(be, j["id"], j["result"])
         # a submission is two jobs (compile-adopt-freeze, then the grade): one call follows both, so
         # the verdict comes back in the same answer when it is ready in time
         gid = (j.get("result") or {}).get("grading_job") if j.get("kind") == "submit" else None
@@ -487,7 +492,7 @@ def _run_program(be, a: dict) -> dict:
     params = {"program": a["program"]}
     if a.get("draft"):
         params["branch"] = a["draft"]
-    for k in ("revision", "compiler"):
+    for k in ("revision", "compiler", "animate"):
         if k in a:
             params[k] = a[k]
     j = be.call("POST", "/api/jobs", {"kind": "run", "params": params, "request_id": a.get("request_id"),
@@ -501,9 +506,7 @@ def _run_program(be, a: dict) -> dict:
         _t.sleep(1.0)
     res = jj.get("result") or {}
     if jj["status"] == "succeeded":
-        run = res["run"]
-        return {"run_id": jid, "status": "succeeded", "summary": res.get("summary"), **{k: run[k] for k in (
-            "program", "design", "compiler", "performance", "view", "note")}, "show": SHOW_RUN}
+        return _run_result(be, jid, res)
     if jj["status"] in ("queued", "running"):
         return {"run_id": jid, "status": jj["status"], "progress": jj.get("progress"),
                 "next": "still running: poll qccd_get_job with this run_id"}
@@ -511,7 +514,37 @@ def _run_program(be, a: dict) -> dict:
             "log_tail": (res.get("log") or "")[-1500:]}
 
 
-SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation), which PLAYS BY ITSELF. Do not press Play or wait for it: say in one line what they are watching (from this report) and go on with the next step in the same turn -- for a design meant for a board, submit it now (qccd_submit_local), in the same response as that line."
+SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation), which PLAYS BY ITSELF (or, with animate false, opens at its result), with its Evaluation panel counting the round's time up as it plays. Do not press Play or wait for it: say in one line what they are watching, with the numbers from `evaluation` (the panel's own), and go on with the next step in the same turn -- for a design meant for a board, submit it now (qccd_submit_local), in the same response as that line."
+
+
+def _run_result(be, jid: str, res: dict, wait_s: float = 20.0) -> dict:
+    """A finished run, with the numbers its page shows.  The person's tab opens the run's page
+    (the Studio opens it when the run finishes); the page reports what its Evaluation panel
+    shows, and that is what the agent gets, so what it says is what is on the screen.  With no
+    page open (no Studio connected), the evaluator's report, labelled as such."""
+    import time as _t
+    run = res["run"]
+    out = {"run_id": jid, "status": "succeeded", "summary": res.get("summary"),
+           **{k: run[k] for k in ("program", "design", "compiler", "view", "note")}, "show": SHOW_RUN}
+    watched = False
+    try:
+        watched = any(v.get("connected") and not v.get("closed") for v in be.call("GET", "/api/views").get("views", []))
+    except Exception:
+        pass
+    deadline = _t.time() + (wait_s if watched else 0)
+    while True:
+        ev = (be.call("GET", f"/api/runs/{_enc(jid)}/evaluation") or {}).get("evaluation")
+        if ev or _t.time() >= deadline:
+            break
+        _t.sleep(0.5)
+    if ev:
+        out["evaluation"] = {k: v for k, v in ev.items() if k != "at"}
+        out["evaluation_source"] = "the Evaluation panel of the run's page in the person's browser"
+    else:
+        out["performance"] = run["performance"]
+        out["evaluation_source"] = ("the evaluator's report: no page showed this run" +
+                                    ("" if watched else " (no Studio is open)"))
+    return out
 
 
 def _enc(v) -> str:

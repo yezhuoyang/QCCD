@@ -311,6 +311,10 @@ function openEvents() {
     if (S.rev !== null && e.revision !== S.rev + 1) S.needRefresh = true;
     refreshHead().then(function () {
       if (S.follow) { reveal(S.lastTouched); flash(S.lastTouched); }
+      // the agent's work, all of it, in view (pageact.js keepInView): a design it grew past the edge,
+      // the decoder its programme sends to
+      if (S.follow && (p.actor || {}).kind === 'agent' && window.QCCD_PAGE && window.QCCD_PAGE.keepInViewSoon)
+        window.QCCD_PAGE.keepInViewSoon();
       if ((p.actor || {}).kind === 'agent') showAgentWork(S.lastTouched, shortName((p.actor || {}).label || (p.actor || {}).id),
                                                           'r' + e.revision + ' ' + (p.summary || p.diff_summary || 'changed the design'));
       else if (S.debug) notice(who + ' committed r' + e.revision + ': ' + (p.summary || p.diff_summary || ''), null,
@@ -697,7 +701,7 @@ function present(p, branch) {
     else if (p.action === 'select_frame' && typeof seek === 'function') seek(+t.frame || 0, {});
     else if (!S.debug && (p.action === 'compare' || p.action === 'open_run')) {
       var url = p.action === 'compare' ? '/compare?runs=' + (t.runs || []).map(encodeURIComponent).join(',')
-                                       : '/runview/' + encodeURIComponent(t.run_id || '') + '#play';   // it plays by itself
+                                       : runURL(t.run_id || '', t.animate);   // it plays by itself, or opens at the result
       loadConvSoon();
       // like a person showing you: the tab you are looking at opens it
       if (document.visibilityState === 'visible') goTo(url);
@@ -710,6 +714,7 @@ function present(p, branch) {
       // the Studio switches to that design, under its name, as the person would from the header
       var to = t.branch || branch || 'main';
       loadBranches().then(function () { return switchDraft(to); }).then(function () {
+        if (window.QCCD_PAGE && window.QCCD_PAGE.keepInViewSoon) window.QCCD_PAGE.keepInViewSoon();
         notice('Now showing ' + draftName(S.branch) + (p.note ? ': ' + p.note : '') + '.');
       });
     }
@@ -1323,6 +1328,9 @@ function toggleMenu(which) {
       [S.selOff ? 'Send the text you selected on the page with the message' : 'Do not send the selected text',
        function () { S.selOff = !S.selOff; renderChips(); }]
     ] : [
+      [(animateRuns() ? '✓ ' : '') + 'Play runs as animations (off: open them at the result)', function () {
+        localSet('qccd.runs.animate', animateRuns() ? '0' : '1');
+        notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
@@ -1343,6 +1351,9 @@ function toggleMenu(which) {
     ] : [
       [(S.follow ? '✓ ' : '') + 'Follow the agent (move the view when it shows something)', function () {
         QCCD_LIVE.setFollow(!S.follow); }],
+      [(animateRuns() ? '✓ ' : '') + 'Play runs as animations (off: open them at the result)', function () {
+        localSet('qccd.runs.animate', animateRuns() ? '0' : '1');
+        notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
@@ -1917,6 +1928,12 @@ function pageInfo() {
 }
 // go to one of the workspace's own pages in the tab the person is looking at; from a website
 // page (this chat is a frame) the page itself goes, when asked by this frame
+// A RUN OPENS PLAYING, or at its result: the agent's `animate` (false when the person wants designs
+// tried as fast as possible) and the person's own choice in the chat menu, which wins
+function animateRuns() { return localGet('qccd.runs.animate') !== '0'; }
+function runURL(jid, animate) {
+  return '/runview/' + encodeURIComponent(jid) + (animate !== false && animateRuns() ? '#play' : '#result');
+}
 function goTo(path) {
   if (CFG.framed) toParent({ qccd: 'navigate', url: location.origin + path });
   else location.assign(path);
@@ -1959,7 +1976,7 @@ function runPanel(jid, p) {
   if (CFG.framed || CFG.mode === 'run' || CFG.mode === 'compare') {
     // the chat's run card shows the progress here; a finished run still opens in this tab
     if (p.status === 'succeeded' && S.follow && document.visibilityState === 'visible')
-      setTimeout(function () { goTo('/runview/' + encodeURIComponent(jid)); }, 1500);
+      setTimeout(function () { goTo(runURL(jid, info.animate)); }, 1500);
     return;
   }
   var box = document.getElementById('qcl-runpanel');
@@ -1979,10 +1996,12 @@ function runPanel(jid, p) {
   var st = document.getElementById('qcl-rp-s');
   if (p.status === 'running' || p.status === 'queued') { if (p.message) st.textContent = p.message + '…'; return; }
   if (p.status === 'succeeded') {
-    st.textContent = 'compiled and replayed: opening the run so you can watch it';
+    var anim = info.animate !== false && animateRuns();
+    st.textContent = anim ? 'compiled and replayed: opening the run so you can watch it'
+                          : 'compiled and replayed: opening its result';
     box.classList.add('done');
-    if (S.follow && document.visibilityState === 'visible') setTimeout(function () { goTo('/runview/' + encodeURIComponent(jid)); }, 1500);
-    else box.appendChild(btn('Watch it run', function () { goTo('/runview/' + encodeURIComponent(jid)); }, 'pri'));
+    if (S.follow && document.visibilityState === 'visible') setTimeout(function () { goTo(runURL(jid, info.animate)); }, 1500);
+    else box.appendChild(btn(anim ? 'Watch it run' : 'Open the result', function () { goTo(runURL(jid, info.animate)); }, 'pri'));
     return;
   }
   if (p.status) { st.textContent = 'the run ' + p.status + ' (the chat says why)'; box.classList.add('bad');
@@ -2189,6 +2208,7 @@ window.QCCD_LIVE = {
     prompts: S.prompts, protected: Object.keys(S.protected), highlight: S.highlight.slice(), mode: S.mode, demo: S.demo,
     synced_edits: S.synced ? S.synced.edits.length : null, cursor: S.cursor }; },
   send: send, setTool: setTool, addAnchor: addAnchor, addSketch: addSketch, addLasso: addLasso,
+  api: api, runURL: runURL,
   reveal: reveal,
   disconnect: function () { if (S.es) S.es.close(); S.es = null; S.connected = false; renderStatus(); },
   reconnect: function () { openEvents(); },

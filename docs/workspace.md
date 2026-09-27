@@ -355,9 +355,31 @@ looking.
 - **A run is shown before it is reported.** While `qccd_run_program` compiles, the Studio
   shows the run's program (the first lines of its OpenQASM) and its progress. When it
   succeeds, the person's tab opens the run's own page (`/runview/<run>`, the circuit
-  beside the compiled program). Follow off, or a background tab, gets a "Watch it run"
-  button instead. The tool's result tells the agent to press Play there and let it play
-  before reporting numbers. A comparison opens side by side the same way.
+  beside the compiled program), which plays by itself (`#play`; it used to open paused).
+  Follow off, or a background tab, gets a "Watch it run" button instead. A comparison
+  opens side by side the same way.
+- **The evaluation is on the page** (`run_eval.py`). The run page's left rail holds an
+  Evaluation panel drawn from the evaluator's own replay, step by step (`perf.timeline`):
+  the modelled clock against the round's total, time by category (transport, cooling,
+  gates, measurement, reset), steps, two-qubit gates and ions moved, all counting up as the
+  animation plays, and at the last step the result with its bottlenecks, heating and rules.
+  Its totals are the per-cycle durations the replay sums, so they end exactly at the run's
+  report (the page checks, and says so if they ever do not). The page reports what the
+  panel shows (`POST /api/runs/<run>/evaluation`), and `qccd_run_program` returns that as
+  `evaluation`: the agent reports the numbers on the person's screen. With no page open it
+  returns the evaluator's `performance`, labelled as such.
+- **A run need not be watched.** "Skip to result" on the run page jumps to the final panel;
+  the chat's ⋯ menu has "Play runs as animations" (off: every run opens at its result,
+  `#result`); and `qccd_run_program(animate=false)` opens one run that way, which the agent
+  uses when the person wants designs tried as fast as possible. A BB round plays for about
+  19 minutes at the default speed; at its result it is a second.
+- **All of it in sight.** After an agent changes the design or its programme, the view
+  re-fits when any part of the drawing -- every node, and the decoder, the classical memory
+  and the dashed wires to them (`STAGE_EXTENT`) -- is outside the canvas or under the chat,
+  or has shrunk to a corner of the view (`pageact.js` `keepInView`, on the person's Studio
+  and on the site's Studio pages alike). It fits into the part of the canvas the chat
+  leaves free, and runs after the page has redrawn: the classical layer's floor settles a
+  frame after the change, and a check made at once missed it.
 - **Failures say why.** When the agent's runtime stops without answering, the chat shows
   why: a failed Codex turn or Claude run leaves its error message (a usage limit, for
   example) as a notice in the conversation, instead of the conversation going quiet.
