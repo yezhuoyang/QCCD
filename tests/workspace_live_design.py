@@ -1,6 +1,6 @@
 """LIVE, opt-in: a real agent designs the shape the person asks for and submits it to a board.
 
-    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex] [message] [effort] [model] [typing_s]
+    QCCD_LIVE_AGENT=1 python tests/workspace_live_design.py [out_dir] [claude|codex|cursor] [message] [effort] [model] [typing_s]
 
 effort and model are what the chat's model menu sets (e.g. `medium`, `sonnet`); empty keeps the default.
 typing_s: seconds spent typing before the message is sent (default 0: sent at once).

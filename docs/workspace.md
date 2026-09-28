@@ -134,7 +134,7 @@ apply.
 | mode | deliver | acknowledgement | steer | interrupt | status |
 |---|---|---|---|---|---|
 | **Codex app-server** (`qccd agent connect --client codex`, or Studio → Agent → Connect) | `turn/start` with `clientUserMessageId` = delivery id | the turn id returned (runtime acceptance) | `turn/steer` with `expectedTurnId`; if the turn has already finished, a new turn | `turn/interrupt` | **live-tested** (§5) |
-| **Cursor CLI** (`qccd agent connect --client cursor`, or the chat) | one `cursor-agent -p --output-format stream-json --resume <chat>` run per message, the text on stdin | the run starting | not supported (queued behind the run) | kills the run; the next message resumes the chat | **contract-tested** with a stand-in `cursor-agent` whose flags, events and permission rules were read from cursor-agent 2026.09.26; not yet run against a signed-in Cursor |
+| **Cursor CLI** (`qccd agent connect --client cursor`, or the chat) | one `cursor-agent -p --output-format stream-json --resume <chat>` run per message, the text on stdin | the run starting | not supported (queued behind the run) | kills the run; the next message resumes the chat | **live-tested** (`tests/workspace_live_cursor.py`, cursor-agent 2026.09.28), and contract-tested with a stand-in `cursor-agent` |
 | **Claude Code channel** (`qccd mcp --client claude --channel`, `claude --dangerously-load-development-channels server:qccd`) | `notifications/claude/channel` `{content, meta}` | none from Claude Code, so `uncertain` until the agent reads the prompt through a tool | not supported (queued) | not supported; the write fence still applies | **contract-tested** over real MCP stdio; not run against a live Claude Code session |
 | **pull** (any MCP client) | none: prompts are listed in `qccd_get_context.unread_prompts` | reading | – | fence only | tested; labelled everywhere as reduced capability, **not** automatic delivery |
 | Claude Agent SDK managed session | – | – | – | – | **not implemented**: it needs an Anthropic API key, cannot reuse a claude.ai subscription login, and would be a different conversation from the user's terminal |
@@ -350,7 +350,12 @@ watch it happen.
   kills the run, and the next message resumes the same chat. A run that is not signed in says
   to run `cursor-agent login`. The chat's note to the agent (short in-between lines, nothing
   outlives the turn) goes with each message, because the CLI has no flag for a system
-  prompt. `QCCD_CURSOR=none` turns it off.
+  prompt. `QCCD_CURSOR=none` turns it off. Live-checked on 2026-09-28 (cursor-agent
+  2026.09.28, model Auto), twice. "What does rule R7 say?" was answered in 15 to 23 s through
+  `qccd_read_reference`. A follow-up on R8 went on in the same chat in 8 s and remembered the R7
+  question. Asked to run `ls` and to write `probe.txt`, it was refused both ("Command blocked by
+  permissions configuration", "Write permission denied") and said so. No file was written. Its
+  tool calls were recorded under the chat's own session.
 
 ### Only what is declared
 
@@ -879,6 +884,7 @@ extension and the ChatGPT app, which carry them.
 | `tests/workspace_live_interface.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): every place of the live site through the mirror; fails on an undeclared control not in its known-debt list | ~10 min |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
 | `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |
+| `tests/workspace_live_cursor.py` | **live**, opt-in (`QCCD_LIVE_CURSOR=1`): three messages to a real, signed-in Cursor: answered through the QCCD tools, the same chat, a shell command and a file write refused and nothing written, the calls attributed to the chat | ~1 min |
 | `tests/workspace_live_codex.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a Studio prompt into a real Codex thread | ~1 min |
 | `examples/workspace_demo/demo.py` | the full demonstration (scripted or live Codex) | ~1–10 min |
 

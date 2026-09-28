@@ -1,6 +1,6 @@
 """LIVE, opt-in: a real Codex answers a question asked on a page of the website.
 
-    QCCD_LIVE_CODEX=1 python tests/workspace_live_page.py [out_dir] [page] [question] [codex|claude]
+    QCCD_LIVE_CODEX=1 python tests/workspace_live_page.py [out_dir] [page] [question] [codex|claude|cursor]
 
 A fresh workspace starts its service; real Chrome is paired through /open-web and opens a
 page of qccd.academy through the workspace's website mirror (default: rules/).  The chat on
