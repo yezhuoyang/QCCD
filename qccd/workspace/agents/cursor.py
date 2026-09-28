@@ -80,6 +80,34 @@ def find_cursor() -> str | None:
     return None
 
 
+#: how to get Cursor's CLI, which Cursor the editor does not include
+INSTALL = ("curl https://cursor.com/install -fsS | bash" if os.name != "nt" else
+           "irm 'https://cursor.com/install?win32=true' | iex")
+
+
+def cli_state(root) -> dict:
+    """Whether the chat can start Cursor here: its CLI found, and signed in (`cursor-agent status`).
+    `state` is ready, missing, signed_out or unknown, and `next` the command to run when not ready."""
+    exe = find_cursor()
+    if not exe:
+        # the installer puts it in ~/.local/bin, which a terminal may not have on its PATH yet
+        login = "cursor-agent login" if os.name == "nt" else "~/.local/bin/cursor-agent login"
+        return {"state": "missing", "next": f"install Cursor's CLI: {INSTALL}   then sign it in: {login}"}
+    env = dict(os.environ, CURSOR_CONFIG_DIR=str(Path(root) / ".qccd" / "cursor"), NO_COLOR="1")
+    try:
+        r = subprocess.run([exe, "status", "--format", "json"], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30, env=env, stdin=subprocess.DEVNULL,
+                           creationflags=0x08000000 if os.name == "nt" else 0)
+        got = json.loads(r.stdout[r.stdout.index("{"):]) if "{" in r.stdout else {}
+    except (OSError, subprocess.SubprocessError, ValueError):
+        got = {}
+    if got.get("isAuthenticated") is True:
+        return {"state": "ready", "cli": exe, "account": (got.get("userInfo") or {}).get("email")}
+    if got.get("isAuthenticated") is False:
+        return {"state": "signed_out", "cli": exe, "next": f"sign Cursor's CLI in once: {exe} login"}
+    return {"state": "unknown", "cli": exe, "next": f"check that Cursor's CLI is signed in: {exe} status"}
+
+
 def config_dir(ws) -> Path:
     return Path(ws.root) / ".qccd" / "cursor"
 

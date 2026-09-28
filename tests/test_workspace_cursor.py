@@ -34,6 +34,11 @@ import json, os, sys, time
 args = sys.argv[1:]
 log = __LOG__
 out = lambda ev: print(json.dumps(ev), flush=True)
+if args[:1] == ["status"]:
+    signed = not os.environ.get("FAKE_CURSOR_SIGNED_OUT")
+    print(json.dumps({"status": "authenticated" if signed else "unauthenticated", "isAuthenticated": signed,
+                      "userInfo": {"email": "someone@example.com"} if signed else None}))
+    sys.exit(0)
 if args[:1] == ["models"]:
     print("Available models\n\nauto - Auto (current, default)\ngpt-5 - GPT-5\n"
           "sonnet-4.5-thinking - Claude 4.5 Sonnet (Thinking)\n\nTip: use --model <id> to switch.")
@@ -296,8 +301,10 @@ def test_a_renamed_workspace_folder_starts_a_new_cursor_chat(tmp_path, monkeypat
         ws.close()
 
 
-def test_installing_cursor_writes_its_skill_tools_and_rule_and_removes_only_those(tmp_path):
+def test_installing_cursor_writes_its_skill_tools_and_rule_and_removes_only_those(tmp_path, monkeypatch):
     from qccd.workspace import installers
+    exe, _ = _fake(tmp_path)
+    monkeypatch.setenv("QCCD_CURSOR", str(exe))
     ws = Workspace.init(tmp_path / "ws")
     root = ws.root
     ws.close()
@@ -306,6 +313,16 @@ def test_installing_cursor_writes_its_skill_tools_and_rule_and_removes_only_thos
     (root / ".cursor" / "mcp.json").write_text(json.dumps(mine), encoding="utf-8")
     lines = installers.install(root, "cursor")
     assert any(x.startswith("skill      .cursor/skills/qccd") for x in lines), lines
+    # the chat runs Cursor's CLI: install says it is ready, or the one command that is missing
+    assert f"cursor     ready: {exe}, signed in as someone@example.com" in "\n".join(lines), lines
+    monkeypatch.setenv("FAKE_CURSOR_SIGNED_OUT", "1")
+    assert f"next: sign Cursor's CLI in once: {exe} login" in "\n".join(installers.install(root, "cursor"))
+    monkeypatch.setenv("QCCD_CURSOR", "none")
+    missing = "\n".join(installers.install(root, "cursor"))
+    assert "next: install Cursor's CLI: " in missing and "cursor-agent login" in missing, missing
+    assert installers.status(root, "cursor")["cli"]["state"] == "missing"
+    monkeypatch.setenv("QCCD_CURSOR", str(exe))
+    monkeypatch.delenv("FAKE_CURSOR_SIGNED_OUT")
     assert (root / ".cursor" / "skills" / "qccd" / "SKILL.md").is_file()
     doc = json.loads((root / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
     assert doc["mcpServers"]["github"] == {"command": "gh-mcp"}                    # the person's server stays

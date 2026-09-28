@@ -286,8 +286,14 @@ def install(root: Path, client: str, *, scope: str = "project", channel: bool = 
         rule.parent.mkdir(parents=True, exist_ok=True)
         rule.write_text(_cursor_rule(), encoding="utf-8")
         lines.append("pointer    .cursor/rules/qccd.mdc (always applied)")
-        lines.append("delivery   automatic: the Studio chat runs Cursor's CLI (cursor-agent; sign it in once "
-                     "with `cursor-agent login`)")
+        # the chat runs Cursor's CLI, which Cursor the editor does not include: say what is missing
+        from .agents.cursor import cli_state
+        cli = cli_state(root)
+        if cli["state"] == "ready":
+            lines.append(f"cursor     ready: {cli['cli']}, signed in" + (f" as {cli['account']}" if cli.get("account") else "")
+                         + " - the Studio chat starts it when you send")
+        else:
+            lines.append(f"cursor     not ready yet, next: {cli['next']}")
     else:
         raise ValueError("client must be codex, claude or cursor")
     return lines
@@ -396,6 +402,8 @@ def status(root: Path, client: str) -> dict:
         out["pointer"] = rule.exists() and MD_BEGIN.split("(")[0].strip() in rule.read_text(encoding="utf-8")
         out["capabilities"] = {"delivery": "automatic from the Studio chat: each message is one cursor-agent run "
                                            "in the same chat; a Cursor you start yourself here is pull only"}
+        from .agents.cursor import cli_state
+        out["cli"] = cli_state(root)
     else:
         cfg = root / ".codex" / "config.toml"
         out["mcp"] = {"present": cfg.exists() and "[mcp_servers.qccd]" in cfg.read_text(encoding="utf-8"),

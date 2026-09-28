@@ -350,7 +350,9 @@ watch it happen.
   kills the run, and the next message resumes the same chat. A run that is not signed in says
   to run `cursor-agent login`. The chat's note to the agent (short in-between lines, nothing
   outlives the turn) goes with each message, because the CLI has no flag for a system
-  prompt. `QCCD_CURSOR=none` turns it off. Live-checked on 2026-09-28 (cursor-agent
+  prompt. `qccd agent install --client cursor` also says whether Cursor's CLI is installed and
+  signed in (`cursor-agent status`), and names the one command that is missing: the editor does
+  not include the CLI. `QCCD_CURSOR=none` turns it off. Live-checked on 2026-09-28 (cursor-agent
   2026.09.28, model Auto), twice. "What does rule R7 say?" was answered in 15 to 23 s through
   `qccd_read_reference`. A follow-up on R8 went on in the same chat in 8 s and remembered the R7
   question. Asked to run `ls` and to write `probe.txt`, it was refused both ("Command blocked by
