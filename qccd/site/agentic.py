@@ -54,6 +54,8 @@ SECTION_ABOUT = {
     "program": "the hardware programme's verbs",
     "anchors": "what a request can point at: selections, regions, sketches",
     "workflow": "the workspace model: designs, revisions, jobs, submissions",
+    "noise": "how a logical error rate is measured: the memory experiments, the noise model channel by channel, the check",
+    "compiler": "the Compiler leaderboard: the contract a compiler follows, the benchmark suite, the reference's results",
     "docs:adl": "the architecture description language",
     "docs:rules": "the rules in full",
     "docs:tsir": "the compiled programme format",
@@ -155,6 +157,11 @@ def _principles(n_tools: int, n_verbs: int, n_actions: int) -> str:
          f"{n_verbs} Studio verbs. Anything else is refused, and the refusal lists what is declared instead. A new "
          "control on the website without a declaration fails the build's gate, so the agent's view of the site "
          "cannot fall behind the site."),
+        ("Declared once.", "Every capability is one declaration in the workspace's code: the tool's name, what the agent "
+         "is told, its inputs, whether it only reads, the call it makes, and the terminal command that does the same. "
+         "The tool list, the skill's list of tools and the table on this page are generated from it. A route, "
+         "command or job an agent can reach without one fails the gate test, so a feature cannot ship for people "
+         "and forget the agent."),
         ("Visible work.", "An agent acting on a page moves a cursor with its name on it and says what it is doing; "
          "a change it makes appears in the person's Studio; a run it starts opens in their tab."),
         ("Nothing published without a person.", "Grading happens locally with the same reference checker the official "
@@ -465,7 +472,7 @@ def _skills() -> str:
            f"agent the person uses, by <code>qccd agent install --client codex</code>, <code>--client claude</code> or <code>--client cursor</code>. "
            f"It is a short workflow (SKILL.md) plus references the agent opens when it needs them: "
            + ", ".join(_code(r) for r in refs)
-           + ", and generated ones listing the boards, the operations, the rules and the evaluator's stages.</p>",
+           + ", and generated ones listing every tool, the boards, the operations, the rules and the evaluator's stages.</p>",
            f'<details class="ag-d"><summary>SKILL.md ({len(text)} characters)</summary><pre>{_e(text)}</pre></details>',
            "<p>Knowledge the agent can ask for at any time, version-matched with the checker, through "
            + _code("qccd_read_reference(section, query)") + ":</p>",

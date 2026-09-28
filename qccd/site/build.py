@@ -52,7 +52,7 @@ MARKER = ".qccd-site"
 
 PARTS = (("learn", "Learn", "learn/", "the course, the reference docs, and worked examples"),
          ("design", "Design", "studio.html#design", "build a device and program it, in the browser"),
-         ("board", "Leaderboard", "board/", "five tasks, every design ranked"),
+         ("board", "Leaderboard", "board/", "devices and compilers, ranked: speed and logical error rate"),
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
 
 #: The running example on the landing: one seed entry, embedded as the page it is, in
@@ -765,7 +765,7 @@ def board_index(ts: list[dict]) -> str:
     Each row also carries its QEC clock cycle -- the round it ranks with the classical
     feedback loop composed onto it -- and the boards are compared that way in one section
     at the end (`qec_cycle`)."""
-    from . import cowork, qec_cycle
+    from . import boards, cowork, qec_cycle
     rows_html, cycles = [], []
     for t in ts:
         rows = t["rows"]
@@ -815,18 +815,23 @@ def board_index(ts: list[dict]) -> str:
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
               '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
-    body = ("<h1>Leaderboard</h1><p class=\"sub\">One board per task. A task is a fixed circuit, physics package "
-            "and cost table; every design on a board ran one syndrome-extraction round of that circuit, was "
+    body = ("<h1>Leaderboard</h1>" + boards.architecture_intro() +
+            '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
+            "<p class=\"sub\">Devices, each compiled by the reference compiler. One board per task. A task is a "
+            "fixed circuit, physics package and cost table; every design on a board ran that circuit, was "
             "replayed against the 27 rules and, where it passed, checked by the proved Lean checker (R10). "
             "A design that fails any rule is disqualified and not listed. Each row shows the three fastest verified designs of its task; open a task for the full ranking of "
             "every listed design, where you can rank by anything and click a dot to step the programme in the studio. "
             "A round is only half of a QEC cycle, so every board also carries "
-            "<a href=\"#cycle\">the classical loop</a> around it.</p>" + legend + "".join(rows_html) +
+            "<a href=\"#cycle\">the classical loop</a> around it, and the <a href=\"#memory\">memory boards</a> "
+            "rank designs by the logical error rate itself.</p>" + legend + "".join(rows_html) +
+            boards.memory_section() +
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)
-            cowork.board_section())
+            cowork.board_section() + "</section>" +
+            boards.compiler_section() + cowork.board_script())
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE,
-                       extra_css=qec_cycle.CSS, body=body)
+                       extra_css=qec_cycle.CSS + boards.CSS, body=body)
 
 
 CREDIT_CSS = """
@@ -1799,6 +1804,9 @@ def build(out: Path) -> int:
             if r.get("status") == "ok" and r.get("page"):
                 index.append({"t": r.get("short") or r["key"], "d": f"{t['title']} · {r.get('family', '')}",
                               "u": f"board/{t['id']}/{r['page']}", "k": "entry"})
+    # the Leaderboard's two sections: the memory boards, the compiler benchmark, the noise model
+    from .boards import index_entries as board_index_entries
+    index += board_index_entries()
     # the logical-gadget tool (qccd/gadget/site.py, docs/GADGETS.md)
     from ..gadget.site import index_entries as gadget_index_entries
     index += gadget_index_entries()
@@ -1867,6 +1875,9 @@ def build(out: Path) -> int:
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
     put("board/index.html", board_index(ts), 1, "board")
+    from . import boards as lb
+    put("board/compiler/index.html", lb.compiler_page(PAGE, STYLE), 2, "board")
+    put("board/noise/index.html", lb.noise_page(PAGE, STYLE), 2, "board")
     from . import qec_cycle
     n_pages = 0
     for t in ts:
@@ -1876,8 +1887,9 @@ def build(out: Path) -> int:
             continue
         dst = out / "board" / t["id"]
         dst.mkdir(parents=True, exist_ok=True)
-        put(f"board/{t['id']}/index.html", (src / "index.html").read_text(encoding="utf-8"), 2, "board",
-            extra=FOOTER_BLOCK + BOARD_SKIN)
+        # the chart's controls are declared as the page is copied (qccd/site/boards.py)
+        put(f"board/{t['id']}/index.html", lb.declare_board_controls((src / "index.html").read_text(encoding="utf-8")),
+            2, "board", extra=FOOTER_BLOCK + BOARD_SKIN)
         # the published manifest carries only the listed designs; the seed directory keeps
         # the full record, disqualified rows included
         (dst / "manifest.json").write_text(json.dumps(t["rows"], indent=1, default=str) + "\n",

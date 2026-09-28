@@ -218,8 +218,13 @@ BOARD_JS = r"""
     });
   }
   function fmt(v){ return (typeof v === 'number') ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)) : '-'; }
+  var cbox = document.getElementById('qo-compiler');
+  function isCompiler(task){ return task.track === 'compiler'; }
   get('/tasks').then(function(t){
-    var tasks = ((t && t.tasks) || []).slice();
+    var all0 = ((t && t.tasks) || []).slice();
+    var suites = all0.filter(isCompiler);
+    if (cbox) compilerBoards(suites);
+    var tasks = all0.filter(function(x){ return !isCompiler(x); });
     var rank = function(task){ var i = ORDER.indexOf(task.id); return i < 0 ? ORDER.length : i; };
     tasks.sort(function(a, b){ return rank(a) - rank(b); });
     return Promise.all(tasks.map(function(task){
@@ -257,12 +262,49 @@ BOARD_JS = r"""
   }).catch(function(err){
     box.textContent = '';
     box.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + '). The boards above are unaffected.'));
+    if (cbox) { cbox.textContent = ''; cbox.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + ').')); }
   });
+  // the Compiler board: one ranking per suite, with each entry's coverage and wrong pairs from its report
+  function compilerBoards(suites){
+    if (!suites.length) { cbox.textContent = ''; cbox.appendChild(el('p', 'qo-empty', 'The official server lists no compiler suite yet.')); return; }
+    Promise.all(suites.map(function(s){
+      return get('/leaderboard/' + encodeURIComponent(s.id)).then(function(b){
+        return Promise.all((b.rows || []).map(function(r){
+          return get('/submissions/' + encodeURIComponent(r.id)).then(function(x){ r.m = (x.report || {}).metrics || {}; return r; },
+                                                                     function(){ r.m = {}; return r; });
+        })).then(function(rows){ return { suite: s, rows: rows }; });
+      });
+    })).then(function(all){
+      cbox.textContent = '';
+      all.forEach(function(x){
+        var sec = el('div', 'qo-task');
+        sec.appendChild(el('h3', null, x.suite.title || x.suite.id));
+        if (!x.rows.length) { sec.appendChild(el('p', 'qo-empty', 'No published compiler yet: the reference compiler is 1.00x by definition.')); cbox.appendChild(sec); return; }
+        var tb = el('table'), hd = el('tr');
+        ['#', 'compiler', 'speedup (x)', 'coverage', 'LER ratio', 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
+        var body = el('tbody');
+        x.rows.forEach(function(r, i){
+          var tr = el('tr');
+          tr.appendChild(el('td', 'qo-n', String(i + 1)));
+          tr.appendChild(el('td', null, r.display_name || r.id));
+          tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
+          tr.appendChild(el('td', 'qo-n', typeof r.m.coverage === 'number' ? Math.round(100 * r.m.coverage) + '%' : '-'));
+          tr.appendChild(el('td', 'qo-n', fmt(r.m.ler_ratio)));
+          tr.appendChild(el('td', null, r.created_at ? new Date(r.created_at * 1000).toISOString().slice(0, 10) : '-'));
+          var td = el('td'), a = el('a', null, 'report');
+          a.href = API + '/submissions/' + encodeURIComponent(r.id) + '/report'; td.appendChild(a); tr.appendChild(td);
+          body.appendChild(tr);
+        });
+        tb.appendChild(body); sec.appendChild(tb); cbox.appendChild(sec);
+      });
+    }, function(err){ cbox.textContent = ''; cbox.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + ').')); });
+  }
 })();
 """
 
 BOARD_HTML = """<section id="official">
-<h2>Official submissions</h2>
+<h2>Official submissions: devices</h2>
 <p class="sub">Designs that their authors submitted and published, each graded again on the
 official server with the reference checker. That checker runs the same ten checks as a local
 grade, including the proved Lean checker. Only eligible, public submissions appear here; a
@@ -288,8 +330,14 @@ def studio_block(root: str = "") -> str:
 
 
 def board_section() -> str:
-    """The Leaderboard's live Official submissions section (HTML with its style and script).
-    The boards are listed in the website's own order, which the releases carry."""
+    """The Leaderboard's live Official submissions section for devices (HTML with its style); its
+    script, which also fills the Compiler section's ranking, is `board_script()`, placed after both."""
+    return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n"
+
+
+def board_script() -> str:
+    """The script that reads the official server: the device boards in the website's own order (the
+    releases carry it), and each compiler suite's ranking into the Compiler section (#qo-compiler)."""
     import json
     try:
         from ..workspace.tasks import list_boards
@@ -298,7 +346,7 @@ def board_section() -> str:
         order = []
     js = BOARD_JS.replace("var API = '/official/v1';",
                           "var API = '/official/v1', ORDER = " + json.dumps(order) + ";")
-    return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n<script>{js}</script>\n"
+    return f"<script>{js}</script>\n"
 
 
 #: the note this section replaces on the board page (build.py wrote it before the official
