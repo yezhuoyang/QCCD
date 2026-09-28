@@ -1,0 +1,194 @@
+{
+ "$defs": {
+  "Metric": {
+   "additionalProperties": false,
+   "properties": {
+    "better": {
+     "anyOf": [
+      {
+       "enum": [
+        "low",
+        "high"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Better"
+    },
+    "ranked": {
+     "title": "Ranked",
+     "type": "boolean"
+    },
+    "unit": {
+     "title": "Unit",
+     "type": "string"
+    },
+    "value": {
+     "title": "Value"
+    }
+   },
+   "required": [
+    "value",
+    "unit",
+    "better",
+    "ranked"
+   ],
+   "title": "Metric",
+   "type": "object"
+  },
+  "PairResult": {
+   "additionalProperties": true,
+   "properties": {
+    "circuit": {
+     "title": "Circuit",
+     "type": "string"
+    },
+    "device": {
+     "title": "Device",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "reason": {
+     "title": "Reason",
+     "type": "string"
+    },
+    "seconds": {
+     "title": "Seconds",
+     "type": "number"
+    },
+    "split": {
+     "enum": [
+      "public",
+      "hidden"
+     ],
+     "title": "Split",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "valid",
+      "wrong",
+      "refused",
+      "timeout",
+      "crash",
+      "no_output",
+      "not_run",
+      "cancelled"
+     ],
+     "title": "Status",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "circuit",
+    "device",
+    "split",
+    "status",
+    "reason",
+    "seconds"
+   ],
+   "title": "PairResult",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/compiler_report.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "description": "`qccd.bench.run_suite`: a compiler graded over a suite, locally or by the official grader.",
+ "properties": {
+  "compiler": {
+   "additionalProperties": true,
+   "title": "Compiler",
+   "type": "object"
+  },
+  "eligibility": {
+   "additionalProperties": true,
+   "title": "Eligibility",
+   "type": "object"
+  },
+  "evaluator": {
+   "additionalProperties": true,
+   "title": "Evaluator",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.compiler_report",
+   "title": "Kind",
+   "type": "string"
+  },
+  "metrics": {
+   "additionalProperties": {
+    "$ref": "#/$defs/Metric"
+   },
+   "title": "Metrics",
+   "type": "object"
+  },
+  "pairs": {
+   "items": {
+    "$ref": "#/$defs/PairResult"
+   },
+   "title": "Pairs",
+   "type": "array"
+  },
+  "profile": {
+   "enum": [
+    "local",
+    "official"
+   ],
+   "title": "Profile",
+   "type": "string"
+  },
+  "rank_by": {
+   "title": "Rank By",
+   "type": "string"
+  },
+  "split": {
+   "title": "Split",
+   "type": "string"
+  },
+  "suite": {
+   "additionalProperties": true,
+   "title": "Suite",
+   "type": "object"
+  },
+  "summary": {
+   "additionalProperties": true,
+   "title": "Summary",
+   "type": "object"
+  },
+  "timing": {
+   "additionalProperties": true,
+   "title": "Timing",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "suite",
+  "compiler",
+  "evaluator",
+  "profile",
+  "split",
+  "summary",
+  "metrics",
+  "rank_by",
+  "eligibility",
+  "pairs",
+  "timing"
+ ],
+ "title": "CompilerReport",
+ "type": "object"
+}

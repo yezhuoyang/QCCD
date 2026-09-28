@@ -1,0 +1,106 @@
+{
+ "$id": "https://qccd.academy/schemas/workspace/v1/compiler_suite.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "description": "`suite.json`: an immutable benchmark suite (qccd/bench/suite.py).",
+ "properties": {
+  "circuits": {
+   "items": {
+    "additionalProperties": true,
+    "type": "object"
+   },
+   "title": "Circuits",
+   "type": "array"
+  },
+  "contract": {
+   "const": "qccd.compiler@1",
+   "title": "Contract",
+   "type": "string"
+  },
+  "devices": {
+   "items": {
+    "additionalProperties": true,
+    "type": "object"
+   },
+   "title": "Devices",
+   "type": "array"
+  },
+  "kind": {
+   "const": "qccd.compiler_suite",
+   "title": "Kind",
+   "type": "string"
+  },
+  "limits": {
+   "additionalProperties": true,
+   "title": "Limits",
+   "type": "object"
+  },
+  "metrics": {
+   "items": {
+    "additionalProperties": true,
+    "type": "object"
+   },
+   "title": "Metrics",
+   "type": "array"
+  },
+  "pairs": {
+   "items": {
+    "additionalProperties": {
+     "type": "string"
+    },
+    "type": "object"
+   },
+   "title": "Pairs",
+   "type": "array"
+  },
+  "physics": {
+   "additionalProperties": true,
+   "title": "Physics",
+   "type": "object"
+  },
+  "rank_by": {
+   "title": "Rank By",
+   "type": "string"
+  },
+  "release": {
+   "title": "Release",
+   "type": "string"
+  },
+  "suite": {
+   "title": "Suite",
+   "type": "string"
+  },
+  "title": {
+   "title": "Title",
+   "type": "string"
+  },
+  "track": {
+   "const": "compiler",
+   "title": "Track",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "suite",
+  "release",
+  "title",
+  "track",
+  "contract",
+  "physics",
+  "circuits",
+  "devices",
+  "pairs",
+  "limits",
+  "metrics",
+  "rank_by"
+ ],
+ "title": "CompilerSuite",
+ "type": "object"
+}

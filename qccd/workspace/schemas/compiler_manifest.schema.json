@@ -1,0 +1,76 @@
+{
+ "$id": "https://qccd.academy/schemas/workspace/v1/compiler_manifest.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "description": "`qccd-compiler.json`: a compiler under the `qccd.compiler@1` contract (qccd/bench/contract.py).",
+ "properties": {
+  "about": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "About"
+  },
+  "build": {
+   "anyOf": [
+    {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Build"
+  },
+  "entry": {
+   "items": {
+    "type": "string"
+   },
+   "minItems": 1,
+   "title": "Entry",
+   "type": "array"
+  },
+  "kind": {
+   "const": "qccd.compiler",
+   "title": "Kind",
+   "type": "string"
+  },
+  "name": {
+   "maxLength": 80,
+   "minLength": 1,
+   "title": "Name",
+   "type": "string"
+  },
+  "runtime": {
+   "enum": [
+    "python3",
+    "native"
+   ],
+   "title": "Runtime",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "name",
+  "runtime",
+  "entry"
+ ],
+ "title": "CompilerManifest",
+ "type": "object"
+}

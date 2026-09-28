@@ -37,10 +37,20 @@ import threading
 import time
 from pathlib import Path
 
-__all__ = ["run_worker", "run_grader", "grade_one", "STALE_S"]
+__all__ = ["run_worker", "run_grader", "grade_one", "grade_compiler", "STALE_S"]
 
 STALE_S = 900
 MAX_ATTEMPTS = 3
+#: a compiler is run on every pair of a suite (and the reference on the hidden ones): hours, not minutes
+COMPILER_TIMEOUT_S = float(os.environ.get("QCCD_GRADER_COMPILER_TIMEOUT_S", "10800"))
+
+
+def _job_timeout(job_dir: Path, default: float) -> float:
+    try:
+        kind = json.loads((job_dir / "job.json").read_text(encoding="utf-8")).get("kind")
+    except (OSError, ValueError):
+        kind = None
+    return max(default, COMPILER_TIMEOUT_S) if kind == "compiler" else default
 
 
 def _now() -> float:
@@ -49,7 +59,7 @@ def _now() -> float:
 
 # ---------------------------------------------------------------------- the grader side
 
-def grade_one(job_dir: Path, releases: Path) -> int:
+def grade_one(job_dir: Path, releases: Path, suites: Path | None = None) -> int:
     """Grade one job directory in THIS process and write report.json next to it."""
     from ..workspace.evaluator import grade
     from ..workspace.tasks import TaskRelease
@@ -57,10 +67,45 @@ def grade_one(job_dir: Path, releases: Path) -> int:
     rid = str(job["release"])
     if "/" in rid or "\\" in rid or ".." in rid:
         raise SystemExit("bad release id")
+    if job.get("kind") == "compiler":
+        return grade_compiler(job_dir, Path(suites or _suites_default()) / rid, job)
     rel = TaskRelease.load(Path(releases) / rid)
     with tempfile.TemporaryDirectory() as td:
         rep = grade(rel, job_dir / "bundle", "reference", workdir=Path(td),
                     run={"job_id": job["job"], "grader": socket.gethostname()})
+    (job_dir / "report.json").write_text(json.dumps(rep, sort_keys=True), encoding="utf-8")
+    return 0
+
+
+def _suites_default() -> str:
+    return os.environ.get("QCCD_OFFICIAL_SUITES", str(Path(__file__).resolve().parents[1] / "bench" / "suites"))
+
+
+def grade_compiler(job_dir: Path, suite_dir: Path, job: dict) -> int:
+    """A Compiler-board job: the reference compiler on the hidden pairs (in-process: it is our
+    own code), then the submitted compiler on every pair -- through the sandbox when
+    QCCD_SANDBOX_SPOOL names one, else as a limited child (a development grader, stated)."""
+    from ..bench.contract import load_compiler
+    from ..bench.harness import reference_results, run_suite
+    from ..bench.suite import Pair, Suite
+    suite = Suite.load(suite_dir)
+    spec = load_compiler(job_dir / "compiler")
+    hidden = [Pair(**p) for p in json.loads((job_dir / "hidden.json").read_text(encoding="utf-8"))] \
+        if (job_dir / "hidden.json").exists() else []
+    runner, spool = None, os.environ.get("QCCD_SANDBOX_SPOOL")
+    if spool:
+        from ..bench.sandbox import SpoolRunner
+        runner = SpoolRunner(Path(spool), str(job["job"]))
+    with tempfile.TemporaryDirectory() as td:
+        reference = {**suite.baseline(), **reference_results(suite, hidden, workdir=Path(td) / "reference")}
+        try:
+            rep = run_suite(suite, spec, workdir=Path(td) / "entry", split="public", extra_pairs=hidden,
+                            profile="official", runner=runner, reference=reference)
+        finally:
+            if runner is not None:
+                runner.close()
+    rep["run"] = {"job_id": job["job"], "grader": socket.gethostname(),
+                  "isolation": "sandbox container" if spool else "child process (development grader)"}
     (job_dir / "report.json").write_text(json.dumps(rep, sort_keys=True), encoding="utf-8")
     return 0
 
@@ -70,6 +115,7 @@ def _grade_subprocess(job_dir: Path, releases: Path, timeout: float) -> str:
     from ..workspace.procs import run_limited
     env = {k: v for k, v in os.environ.items()
            if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
+                    "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
                     "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
                     "LANG", "LC_ALL", "LC_CTYPE")}
     r = run_limited([sys.executable, "-m", "qccd.official.worker", "one", str(job_dir), "--releases", str(releases)],
@@ -94,7 +140,7 @@ def run_grader(spool: Path, releases: Path, *, once: bool = False, timeout: floa
                 os.rename(job, work)                       # atomic claim
             except OSError:
                 continue
-            status = _grade_subprocess(work, releases, timeout)
+            status = _grade_subprocess(work, releases, _job_timeout(work, timeout))
             out = spool / "outbox" / job.name
             os.rename(work, out)
             (out / "DONE").write_text(status, encoding="utf-8")
@@ -140,20 +186,36 @@ def process_one(svc, spool: Path, *, inline: bool, releases: Path, timeout: floa
     if jdir.exists():
         shutil.rmtree(jdir)
     jdir.mkdir(parents=True)
+    compiler = svc.is_suite(sub["task"])
     try:
-        extract_archive((svc.artifacts / f"{sub['archive_sha256']}.zip").read_bytes(), jdir / "bundle")
+        archive = (svc.artifacts / f"{sub['archive_sha256']}.zip").read_bytes()
+        if compiler:
+            from ..bench.contract import unpack
+            unpack(archive, jdir / "compiler")
+            # the hidden split: generated HERE, from a seed the grader never holds
+            seed = os.environ.get("QCCD_HIDDEN_SEED")
+            suite = svc.releases[sub["task"]]
+            hidden = suite.pairs("hidden", hidden_seed=seed) if seed else []
+            (jdir / "hidden.json").write_text(json.dumps([{
+                "id": p.id, "circuit": p.circuit, "device": p.device, "split": p.split, "qasm": p.qasm,
+                "device_doc": p.device_doc, "kind": p.kind, "detectors": p.detectors, "n_qubits": p.n_qubits}
+                for p in hidden]), encoding="utf-8")
+        else:
+            extract_archive(archive, jdir / "bundle")
     except Exception as exc:
         svc.db.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=?",
                        (f"bundle could not be staged: {exc}", _now(), job["id"]))
         return True
-    (jdir / "job.json").write_text(json.dumps({"job": job["id"], "release": sub["task"]}), encoding="utf-8")
+    (jdir / "job.json").write_text(json.dumps({"job": job["id"], "release": sub["task"],
+                                               "kind": "compiler" if compiler else "design"}), encoding="utf-8")
     (jdir / "READY").write_text("", encoding="utf-8")
     if inline:
         run_grader(spool, releases, once=True, timeout=timeout)
     out = Path(spool) / "outbox" / job["id"]
     t0 = _now()
+    limit = max(timeout, COMPILER_TIMEOUT_S) if compiler else timeout
     while not (out / "DONE").exists():
-        if _now() - t0 > timeout + 120:
+        if _now() - t0 > limit + 120:
             svc.db.execute("UPDATE jobs SET status='queued', error='grader timed out' WHERE id=?", (job["id"],))
             return True
         svc.db.execute("UPDATE jobs SET heartbeat=? WHERE id=?", (_now(), job["id"]))
@@ -204,12 +266,12 @@ def main(argv=None) -> int:
     p.add_argument("--releases", default=rel_default)
     a = ap.parse_args(argv)
     if a.cmd == "one":
-        return grade_one(Path(a.job_dir), Path(a.releases))
+        return grade_one(Path(a.job_dir), Path(a.releases), Path(_suites_default()))
     if a.cmd == "grader":
         run_grader(Path(a.spool), Path(a.releases))
         return 0
     from .service import OfficialService
-    svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts))
+    svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(_suites_default()))
     run_worker(svc, Path(a.spool), inline=a.inline, releases=Path(a.releases), once=a.once)
     return 0
 

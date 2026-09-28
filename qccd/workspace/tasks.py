@@ -77,6 +77,13 @@ class TaskRelease:
     def physics(self) -> dict:
         return json.loads((self.root / self.manifest["physics"]["file"]).read_text(encoding="utf-8"))
 
+    def detectors(self) -> dict | None:
+        """A memory board's detector spec (qccd.detectors), or None for a board without one."""
+        q = self.manifest.get("qec")
+        if not q:
+            return None
+        return json.loads((self.root / q["detectors"]["file"]).read_text(encoding="utf-8"))
+
     @property
     def required_checks(self) -> list:
         return list(self.manifest["required_checks"])
@@ -88,8 +95,11 @@ class TaskRelease:
     def board(self) -> dict:
         """What a person (or an agent speaking to one) is shown about this board: its title."""
         m = self.manifest
-        return {"title": self.title, "about": m.get("description"), "rank_by": m.get("rank_by"),
-                "suggested_start": m.get("starter"), "id": self.id}
+        out = {"title": self.title, "about": m.get("description"), "rank_by": m.get("rank_by"),
+               "suggested_start": m.get("starter"), "id": self.id, "track": m.get("track")}
+        if m.get("qec"):
+            out["memory_experiment"] = {k: m["qec"].get(k) for k in ("experiment", "noise", "ler")}
+        return out
 
     def summary(self) -> dict:
         m = self.manifest
@@ -100,12 +110,15 @@ class TaskRelease:
                 "evaluator": m.get("evaluator"), "numerical_policy": m.get("numerical_policy"),
                 "design_variables": m.get("design_variables"),
                 "allowed_transformations": m.get("allowed_transformations"),
-                "starter": m.get("starter")}
+                "starter": m.get("starter"), "order": m.get("order"), "description": m.get("description"),
+                "qec": ({k: m["qec"].get(k) for k in ("experiment", "noise", "ler")} if m.get("qec") else None)}
 
     def verify_files(self) -> None:
         """Every file the manifest pins must hash to its pinned digest."""
-        for key in ("circuit", "physics"):
-            ref = self.manifest[key]
+        refs = [self.manifest["circuit"], self.manifest["physics"]]
+        if self.manifest.get("qec"):
+            refs.append(self.manifest["qec"]["detectors"])
+        for ref in refs:
             p = self.root / ref["file"]
             if not p.is_file():
                 raise ReleaseError(f"{self.id}: {ref['file']} is missing")
@@ -173,6 +186,11 @@ def find_board(ref: str | None, extra: Path | None = None) -> TaskRelease:
     for test in (lambda b: _norm(b.title) == want or _norm(b.manifest["task"]) == want,
                  lambda b: want in _norm(b.title) or want in _norm(b.manifest["task"])):
         hits = [b for b in boards if test(b)]
+        if len(hits) > 1 and "memory" not in want:
+            # "surface code" is the syndrome-round board people have always meant; its memory board
+            # (ranked by the logical error rate) is named with the word "memory"
+            plain = [b for b in hits if not b.manifest.get("qec")]
+            hits = plain if len(plain) == 1 else hits
         if len(hits) == 1:
             return hits[0]
         if len(hits) > 1:
@@ -229,7 +247,8 @@ def read_lock(root: Path) -> dict:
 def build_release(task: str, release: str, circuit_text: str, physics: Mapping, *,
                   title: str, description: str, out_dir: Path, metrics: list,
                   rank_by: str, starter: Mapping | None = None, stabilizers=None,
-                  limits: Mapping | None = None, order: int | None = None) -> Path:
+                  limits: Mapping | None = None, order: int | None = None,
+                  qec: Mapping | None = None) -> Path:
     """Write a release directory (a maintainer tool; releases are immutable once published)."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
@@ -268,6 +287,14 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
         man["starter"] = dict(starter)
     if stabilizers:
         man["stabilizers"] = list(stabilizers)
+    if qec:
+        # a MEMORY board: the circuit is a QEC memory experiment, graded by its logical error rate
+        # under a named noise model (qccd.qec); `qec` = {experiment, detectors (the spec), noise, ler}
+        (d / "detectors.json").write_text(json.dumps(qec["detectors"], indent=1, sort_keys=True) + "\n",
+                                          encoding="utf-8")
+        man["qec"] = {"experiment": qec["experiment"], "noise": qec["noise"], "ler": dict(qec["ler"]),
+                      "detectors": {"file": "detectors.json", "digest": _sha256_file(d / "detectors.json")}}
+        man["required_checks"].append("ler")
     (d / "release.json").write_text(json.dumps(man, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
                                     encoding="utf-8")
     return d

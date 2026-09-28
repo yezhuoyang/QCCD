@@ -41,6 +41,9 @@ services:
       QCCD_OFFICIAL_DB: sqlite:////data/official.db
       QCCD_OFFICIAL_ARTIFACTS: /artifacts
       QCCD_OFFICIAL_SPOOL: /spool
+      # the Compiler board's hidden split: the seed lives only here (the worker never runs code)
+      # without it there is no hidden split (every report says how many hidden pairs it graded)
+      QCCD_HIDDEN_SEED: ${QCCD_HIDDEN_SEED:-}
     volumes: [data:/data, artifacts:/artifacts:ro, spool:/spool]
     network_mode: none
     restart: unless-stopped
@@ -58,10 +61,33 @@ services:
     command: ["python", "-m", "qccd.official.worker", "grader", "--spool", "/spool"]
     environment:
       QCCD_GRADER_MEM_MB: "4096"
+      QCCD_SANDBOX_SPOOL: /sandbox
       HOME: /tmp
       OPENBLAS_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
-    volumes: [spool:/spool]
+    volumes: [spool:/spool, sandbox:/sandbox]
+    tmpfs: ["/tmp:size=512m"]
+    network_mode: none
+    read_only: true
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # the Compiler board's submitted compilers run HERE, never in the grader (qccd/bench/sandbox.py):
+  # no network, no secrets, only its own spool; everything it starts is killed after each pair
+  sandbox:
+    image: *image
+    command: ["python", "-m", "qccd.bench.sandbox", "--spool", "/sandbox"]
+    environment:
+      QCCD_SANDBOX_KILL_ALL: "1"
+      HOME: /tmp
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    volumes: [sandbox:/sandbox]
     tmpfs: ["/tmp:size=512m"]
     network_mode: none
     read_only: true
@@ -77,3 +103,4 @@ volumes:
   data: {}
   artifacts: {}
   spool: {}
+  sandbox: {}

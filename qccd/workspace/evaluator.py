@@ -32,7 +32,15 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
                        tableau composed from the certified program's emitted pulses equals
                        the tableau of the TRUSTED circuit) both hold, and no op is
                        unrealised.  Outside the Clifford fragment O2 is `partial`.
-  metrics              the leaderboard numbers, from `metrics.compute_metrics`.
+  ler                  (memory boards only: a release with a `qec` block) the final program,
+                       read through the certificate's qubit->ion map as the release's memory
+                       experiment, has detectors and observables that are deterministic with
+                       the circuit's parity; its logical error rate under the release's noise
+                       model and sampling budget is measured (qccd.qec.evaluate_memory).  The
+                       LER is a Monte Carlo estimate with a fixed seed: the same machine gives
+                       the same number, another machine may differ within its interval.
+  metrics              the leaderboard numbers, from `metrics.compute_metrics` (and, on a memory
+                       board, `ler` and `ler_per_round` from the stage above).
 
 It does NOT establish physical realisability beyond the task's model: the rules and the
 physics tables are the model.  It does not compare the certificate's transport moves
@@ -195,7 +203,8 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
     required = set(release.required_checks) if profile == "reference" else set()
     stages: dict = {}
     order = ["bundle", "device", "physics_lock", "program", "rules", "correspondence",
-             "certificate_binding", "lean_certificate", "semantics", "metrics"]
+             "certificate_binding", "lean_certificate", "semantics"] + \
+        (["ler"] if release.manifest.get("qec") else []) + ["metrics"]
     for sid in order:
         stages[sid] = _Stage(sid, sid in required)
     limits = release.manifest.get("limits") or {}
@@ -350,6 +359,16 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         else:
             _semantics_stage(st, tc, cw, limits, cancel)
 
+    # ---- ler (memory boards)
+    if "ler" in stages:
+        st = stages["ler"]
+        say("ler", "measuring the logical error rate of the memory experiment")
+        try:
+            _ler_stage(st, release, b, arch, prog, ctx)
+        except Exception as exc:  # the estimator failing is an evaluator problem, not a verdict
+            st.diag("EVALUATOR.INTERNAL", f"{type(exc).__name__}: {exc}")
+            st.done("internal_error", "extract + noiseless check + sampling")
+
     # ---- metrics
     st = stages["metrics"]
     say("metrics", "computing the leaderboard metrics")
@@ -365,6 +384,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         from .metrics import METRIC_UNITS, compute_metrics
         values, breakdown = compute_metrics(phys_arch, prog, release.manifest["physics"])
         spec = {m["name"]: m for m in release.manifest.get("metrics") or []}
+        values.update(ctx.get("ler_metrics") or {})
         ctx["metrics"] = {k: {"value": v, "unit": (spec.get(k) or {}).get("unit", METRIC_UNITS.get(k, "")),
                               "better": (spec.get(k) or {}).get("better"),
                               "ranked": k == release.manifest.get("rank_by")}
@@ -586,6 +606,36 @@ def _semantics_stage(st: _Stage, tc: Toolchain, cw: Path, limits: Mapping, cance
         st.done("partial", "O1 only: the circuit is outside the checked fragment", **detail)
 
 
+def _ler_stage(st: _Stage, release: TaskRelease, b, arch, prog, ctx: dict) -> None:
+    """The memory experiment's logical error rate (docs/PLAN-boards.md, Phase 2)."""
+    q = release.manifest["qec"]
+    try:
+        from ..qec import MemoryExperiment, evaluate_memory
+        import stim  # noqa: F401  (the estimator's dependencies, checked before anything runs)
+        import pymatching  # noqa: F401
+    except ImportError as exc:
+        st.diag("TOOLCHAIN.QEC_MISSING", f"the logical-error-rate tools are not installed ({exc.name}): "
+                "pip install -e \".[agent]\"")
+        st.done("unsupported", "needs stim and pymatching")
+        return
+    exp = MemoryExperiment.from_spec(release.detectors(), release.circuit_text())
+    cert = b.docs.get("certificate")
+    rep = evaluate_memory(prog, arch, exp, noise_id=q["noise"], cert=cert,
+                          ler_budget={k: v for k, v in (q.get("ler") or {}).items() if k != "seed"},
+                          seed=(q.get("ler") or {}).get("seed"))
+    chk = rep.get("check") or {}
+    detail = {"experiment": rep.get("experiment"), "noise": rep.get("noise"), "check": chk,
+              "ler": rep.get("ler"), "budget": rep.get("budget"), "stats": rep.get("stats"), "tools": rep.get("tools")}
+    if not chk.get("ok"):
+        st.diag("QEC.CHECK_FAILED", f"the program does not run the memory experiment: {chk.get('reason') or chk}")
+        st.done("failed", "detectors deterministic with the circuit's parity", **detail)
+        return
+    est = rep["ler"]
+    ctx["ler_metrics"] = {"ler": est["ler"], "ler_per_round": est["per_round"]}
+    st.done("passed", f"{est['errors']} logical errors in {est['shots']} shots ({est['decoder']}), "
+            f"noise {q['noise']}", **detail)
+
+
 def _cancel_rest(stages: dict, order: list, finish: Callable) -> dict:
     for sid in order:
         if stages[sid].status == "skipped" and not stages[sid].coverage:
@@ -638,6 +688,9 @@ def _report(release: TaskRelease, profile: str, stages: dict, order: list, ctx: 
     return rep
 
 
+#: metrics estimated by sampling (the memory boards' logical error rate)
+STOCHASTIC_METRICS = ("ler", "ler_per_round")
+
 #: fields that legitimately differ between two gradings of the same inputs
 NONDETERMINISTIC = ("timing", "run")
 
@@ -656,6 +709,13 @@ def metrics_agree(a: Mapping, b: Mapping, policy: Mapping | None) -> list:
     rel, abs_ = float(pol.get("float_rel_tol", 0.0)), float(pol.get("float_abs_tol", 0.0))
     bad = []
     for k in sorted(set(a) | set(b)):
+        if k in STOCHASTIC_METRICS:
+            # a Monte Carlo estimate: stim's sampling is reproducible on one machine, not across
+            # machines, so two graders agree when the numbers are within a factor of the other
+            va, vb = (a.get(k) or {}).get("value"), (b.get(k) or {}).get("value")
+            if (va is None) != (vb is None) or (va and vb and max(va, vb) > 3 * min(va, vb) + 1e-6):
+                bad.append(k)
+            continue
         va, vb = (a.get(k) or {}).get("value"), (b.get(k) or {}).get("value")
         if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
             if abs(va - vb) > max(abs_, rel * max(abs(va), abs(vb))):

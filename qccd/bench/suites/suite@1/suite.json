@@ -1,0 +1,675 @@
+{
+ "baseline": {
+  "digest": "sha256:e10434a450267e51831fbaf5908ebac89cfb2bfa8560c8bd8b2a08e72ea87999",
+  "file": "baseline.json"
+ },
+ "circuits": [
+  {
+   "detectors": {
+    "digest": "sha256:46278c81f341855c908573f8cd6e79b07584450010ec669daa1ba8a1a81f6731",
+    "file": "circuits/rep3_r3_z.detectors.json"
+   },
+   "digest": "sha256:68bb8750f08763711ac24f3fec95af435852085a81457bc365c9bf4e5f23e370",
+   "file": "circuits/rep3_r3_z.qasm",
+   "kind": "memory",
+   "name": "rep3_r3_z",
+   "qubits": 5,
+   "source": "qccd.qec.experiments:rep3"
+  },
+  {
+   "detectors": {
+    "digest": "sha256:407185de401994d01171f1e7ff53efa9cc9b05bc4a0d806e803f164ab05cdca7",
+    "file": "circuits/rep5_r5_z.detectors.json"
+   },
+   "digest": "sha256:4dff0bd0ea2122455d498aabeb3f7792cc3ea3129211e37d0e9d5c021b577026",
+   "file": "circuits/rep5_r5_z.qasm",
+   "kind": "memory",
+   "name": "rep5_r5_z",
+   "qubits": 9,
+   "source": "qccd.qec.experiments:rep5"
+  },
+  {
+   "detectors": {
+    "digest": "sha256:212dcd47d3dc6cf526824ea0ba3d4e183d734b99fb9a6c76a125b718d0f83294",
+    "file": "circuits/surface3_r3_z.detectors.json"
+   },
+   "digest": "sha256:6bfce4f2d0279fd2e7e6b5ca5968bd757e2832912dca44484ae8b20b5963afa9",
+   "file": "circuits/surface3_r3_z.qasm",
+   "kind": "memory",
+   "name": "surface3_r3_z",
+   "qubits": 17,
+   "source": "qccd.qec.experiments:surface3"
+  },
+  {
+   "detectors": {
+    "digest": "sha256:94febae2aedd8e963ecfef3ff1784bbf0a6734a8fc0020acd6350d8709fb39a9",
+    "file": "circuits/steane_r3_z.detectors.json"
+   },
+   "digest": "sha256:a2eebbe515722cd55408409ec8a1ce935ee010705da4b31f9e4b2452ea904083",
+   "file": "circuits/steane_r3_z.qasm",
+   "kind": "memory",
+   "name": "steane_r3_z",
+   "qubits": 16,
+   "source": "qccd.qec.experiments:steane"
+  },
+  {
+   "digest": "sha256:2fb143875ed170f0535a9227c3f6bece9ac82278de05a5a9513aec75dc9ada33",
+   "file": "circuits/bell2.qasm",
+   "kind": "clifford",
+   "name": "bell2",
+   "qubits": 2,
+   "source": "Compiler/examples/bell2.qasm"
+  },
+  {
+   "digest": "sha256:bc397fbf1f22b4e98b80d2d970c4ced9f3da03d5a42b4b8df6cfc3e1eef1bdf0",
+   "file": "circuits/ghz8.qasm",
+   "kind": "clifford",
+   "name": "ghz8",
+   "qubits": 8,
+   "source": "Compiler/bench/ghz8.qasm"
+  },
+  {
+   "digest": "sha256:41387590c8677f9bc2fbc1ce59d573b2cfaf6bc2f3ad40611b96762fa4cd999d",
+   "file": "circuits/ghz16.qasm",
+   "kind": "clifford",
+   "name": "ghz16",
+   "qubits": 16,
+   "source": "Compiler/examples/ghz16.qasm"
+  },
+  {
+   "digest": "sha256:a0c9cbf7a323e72bf39c9ff388143993eb29949dd7985accded5b791e490bfe1",
+   "file": "circuits/ghz32.qasm",
+   "kind": "clifford",
+   "name": "ghz32",
+   "qubits": 32,
+   "source": "Compiler/bench/ghz32.qasm"
+  },
+  {
+   "digest": "sha256:096cf33da72736867935013c2b474049bf1a4be536aaa1fa31c031835da55054",
+   "file": "circuits/bv6.qasm",
+   "kind": "clifford",
+   "name": "bv6",
+   "qubits": 7,
+   "source": "Compiler/examples/bv6.qasm"
+  },
+  {
+   "digest": "sha256:d73d62daf7d3b788c94e0733cf5d0a20753be77c33a10b2b97855aa5ac2472de",
+   "file": "circuits/clifford12.qasm",
+   "kind": "clifford",
+   "name": "clifford12",
+   "qubits": 12,
+   "source": "Compiler/bench/clifford12.qasm"
+  },
+  {
+   "digest": "sha256:9397613853d7ccaee63ba6c09bb4ac6d5b00638a46bb5b6a133725643896d36a",
+   "file": "circuits/qft6.qasm",
+   "kind": "general",
+   "name": "qft6",
+   "qubits": 6,
+   "source": "Compiler/bench/qft6.qasm"
+  },
+  {
+   "digest": "sha256:677b977232d19d4908eafc9ebb9e38644484f2daacee3bec50939d953af536aa",
+   "file": "circuits/adder3.qasm",
+   "kind": "general",
+   "name": "adder3",
+   "qubits": 10,
+   "source": "Compiler/examples/adder3.qasm"
+  }
+ ],
+ "contract": "qccd.compiler@1",
+ "description": "Every pair of twelve circuits (four QEC memory experiments, six Clifford circuits, two small non-Clifford ones) and the nine reference devices. A compiler is ranked by how much faster its programs run than the reference compiler's, over the pairs both compile; a single wrong program makes an entry ineligible.",
+ "devices": [
+  {
+   "digest": "sha256:9b40e1d99de987fcaa862cef94666eb9f50a1e970381d4fc5f345f983297da92",
+   "file": "devices/chain.arch.json",
+   "name": "chain",
+   "source": "arch/chain.arch.json"
+  },
+  {
+   "digest": "sha256:3ad569591e33c557cb1bd02cd3c2fb95392a35660ac2997ca30b0e4ed279f38b",
+   "file": "devices/cyclone_base.arch.json",
+   "name": "cyclone_base",
+   "source": "arch/cyclone_base.arch.json"
+  },
+  {
+   "digest": "sha256:baf41e88de78fd0b954887e0687760f5fe5b03e0fe525cd0ea78834d84daf4d2",
+   "file": "devices/cyclone_dual_loop.arch.json",
+   "name": "cyclone_dual_loop",
+   "source": "arch/cyclone_dual_loop.arch.json"
+  },
+  {
+   "digest": "sha256:a9365538ecfe1a0a4443e369ae89d2fcb2c37ba4f617810bfb728fde6705810f",
+   "file": "devices/deck_unit_cell.arch.json",
+   "name": "deck_unit_cell",
+   "source": "arch/deck_unit_cell.arch.json"
+  },
+  {
+   "digest": "sha256:09bc0a9ab2d852d01b480c3afab7b1ecfb9e7ec06c2095b227272a877ae308be",
+   "file": "devices/grid9x9.arch.json",
+   "name": "grid9x9",
+   "source": "arch/grid9x9.arch.json"
+  },
+  {
+   "digest": "sha256:94d7122c4f1fa53049b95ae6687da95e1a1b1ded82fb8cb47ecfc4b5a73b185e",
+   "file": "devices/h2_racetrack.arch.json",
+   "name": "h2_racetrack",
+   "source": "arch/h2_racetrack.arch.json"
+  },
+  {
+   "digest": "sha256:cdd03931d8da4b5a14f3622a7af15106f089ae80e56bc2d3a73c65cafc88da9e",
+   "file": "devices/ladder_2x72.arch.json",
+   "name": "ladder_2x72",
+   "source": "arch/ladder_2x72.arch.json"
+  },
+  {
+   "digest": "sha256:bfee763a8fd671657877b139831aafa55a37e1d57ba4c841fc2a43b54809480c",
+   "file": "devices/ring144_24v.arch.json",
+   "name": "ring144_24v",
+   "source": "arch/ring144_24v.arch.json"
+  },
+  {
+   "digest": "sha256:64b6b3d112a05c204dd5fd28a69d341adffbf46e978fa68f5efbb43854a7f173",
+   "file": "devices/stationary_chain.arch.json",
+   "name": "stationary_chain",
+   "source": "arch/stationary_chain.arch.json"
+  }
+ ],
+ "hidden": {
+  "count": 8,
+  "seed": "held by the official server (QCCD_HIDDEN_SEED)"
+ },
+ "kind": "qccd.compiler_suite",
+ "ler": {
+  "decoder": "auto",
+  "max_errors": 100,
+  "max_shots": 100000,
+  "noise": "qccd-noise@1",
+  "seed": 20260928
+ },
+ "limits": {
+  "build_timeout_s": 600,
+  "max_instructions": 500000,
+  "pair_mem_mb": 4096,
+  "pair_timeout_s": 120,
+  "suite_timeout_s": 5400
+ },
+ "metrics": [
+  {
+   "about": "geometric mean over pairs both compilers compiled validly of T_jones(reference) / T_jones(yours)",
+   "better": "high",
+   "name": "speedup",
+   "unit": "x"
+  },
+  {
+   "about": "pairs compiled validly / pairs in the suite",
+   "better": "high",
+   "name": "coverage",
+   "unit": "fraction"
+  },
+  {
+   "about": "geometric mean over memory pairs both compiled of LER(yours) / LER(reference)",
+   "better": "low",
+   "name": "ler_ratio",
+   "unit": "x"
+  },
+  {
+   "about": "pairs where the program failed a rule or does not implement the circuit (any makes the entry ineligible)",
+   "better": "low",
+   "name": "wrong",
+   "unit": "count"
+  },
+  {
+   "about": "total wall time of the compiler over the suite (reported, not ranked)",
+   "better": "low",
+   "name": "compile_seconds",
+   "unit": "s"
+  }
+ ],
+ "pairs": [
+  {
+   "circuit": "rep3_r3_z",
+   "device": "chain"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "rep3_r3_z",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "chain"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "rep5_r5_z",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "chain"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "surface3_r3_z",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "chain"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "steane_r3_z",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "bell2",
+   "device": "chain"
+  },
+  {
+   "circuit": "bell2",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "bell2",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "bell2",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "bell2",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "bell2",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "bell2",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "bell2",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "bell2",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "chain"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "ghz8",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "chain"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "ghz16",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "chain"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "ghz32",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "bv6",
+   "device": "chain"
+  },
+  {
+   "circuit": "bv6",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "bv6",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "bv6",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "bv6",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "bv6",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "bv6",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "bv6",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "bv6",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "chain"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "clifford12",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "qft6",
+   "device": "chain"
+  },
+  {
+   "circuit": "qft6",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "qft6",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "qft6",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "qft6",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "qft6",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "qft6",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "qft6",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "qft6",
+   "device": "stationary_chain"
+  },
+  {
+   "circuit": "adder3",
+   "device": "chain"
+  },
+  {
+   "circuit": "adder3",
+   "device": "cyclone_base"
+  },
+  {
+   "circuit": "adder3",
+   "device": "cyclone_dual_loop"
+  },
+  {
+   "circuit": "adder3",
+   "device": "deck_unit_cell"
+  },
+  {
+   "circuit": "adder3",
+   "device": "grid9x9"
+  },
+  {
+   "circuit": "adder3",
+   "device": "h2_racetrack"
+  },
+  {
+   "circuit": "adder3",
+   "device": "ladder_2x72"
+  },
+  {
+   "circuit": "adder3",
+   "device": "ring144_24v"
+  },
+  {
+   "circuit": "adder3",
+   "device": "stationary_chain"
+  }
+ ],
+ "physics": {
+  "digest": "sha256:6c7591e64e9c90ee489ebfde93a0e569f5f1f0df95707c01c2192071b4586a0a",
+  "file": "physics.json",
+  "model": "corrected",
+  "rank_table": "qccdsim_jones"
+ },
+ "rank_by": "speedup",
+ "release": "1",
+ "suite": "suite",
+ "title": "Compiler benchmark",
+ "track": "compiler",
+ "version": 1
+}

@@ -163,6 +163,7 @@
       "certificate_binding",
       "lean_certificate",
       "semantics",
+      "ler",
       "metrics"
      ],
      "title": "Id",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
 from ..cost.models import CostModel
@@ -234,6 +234,7 @@ def verify(
     check_metrics: bool = True,
     keep_cycles: bool = True,
     rule_config: Mapping[str, object] | None = None,
+    on_cycle: Callable[[CycleView], None] | None = None,
 ) -> VerificationReport:
     """Replay, rule-check, and check the program's claims.  The one entry point.
 
@@ -242,10 +243,14 @@ def verify(
     without it here a budget sweep changes the schedule and is then judged against the
     architecture's original budget: every point but the default reads as an R7 failure,
     and the sweep reports nothing about the trade-off it exists to measure.
+
+    `on_cycle` is passed to `replay`: a consumer of the per-cycle view (the LER
+    extraction in `qccd.qec`) reads the same replay the verdict comes from, instead of
+    running a second one that could disagree with it.
     """
     res = replay(
         prog, arch, model, check_rules=True, only_rules=only_rules,
-        keep_cycles=keep_cycles, rule_config=rule_config
+        keep_cycles=keep_cycles, rule_config=rule_config, on_cycle=on_cycle
     )
     rules = res.rules
     # only rules that HAVE an implementation and were actually run may be marked

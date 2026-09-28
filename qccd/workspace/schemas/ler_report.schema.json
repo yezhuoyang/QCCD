@@ -1,0 +1,124 @@
+{
+ "$defs": {
+  "LerEstimate": {
+   "additionalProperties": true,
+   "properties": {
+    "decoder": {
+     "title": "Decoder",
+     "type": "string"
+    },
+    "errors": {
+     "title": "Errors",
+     "type": "integer"
+    },
+    "hi": {
+     "title": "Hi",
+     "type": "number"
+    },
+    "ler": {
+     "title": "Ler",
+     "type": "number"
+    },
+    "lo": {
+     "title": "Lo",
+     "type": "number"
+    },
+    "per_round": {
+     "title": "Per Round",
+     "type": "number"
+    },
+    "shots": {
+     "title": "Shots",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "ler",
+    "lo",
+    "hi",
+    "shots",
+    "errors",
+    "per_round",
+    "decoder"
+   ],
+   "title": "LerEstimate",
+   "type": "object"
+  }
+ },
+ "$id": "https://qccd.academy/schemas/workspace/v1/ler_report.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "description": "`qccd.qec.evaluate_memory`: a memory experiment's check and logical error rate on one program.",
+ "properties": {
+  "budget": {
+   "additionalProperties": true,
+   "title": "Budget",
+   "type": "object"
+  },
+  "check": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "title": "Check"
+  },
+  "experiment": {
+   "additionalProperties": true,
+   "title": "Experiment",
+   "type": "object"
+  },
+  "kind": {
+   "const": "qccd.ler_report",
+   "title": "Kind",
+   "type": "string"
+  },
+  "ler": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/LerEstimate"
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "noise": {
+   "additionalProperties": true,
+   "title": "Noise",
+   "type": "object"
+  },
+  "stats": {
+   "additionalProperties": true,
+   "title": "Stats",
+   "type": "object"
+  },
+  "tools": {
+   "additionalProperties": true,
+   "title": "Tools",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "kind",
+  "version",
+  "experiment",
+  "noise",
+  "check",
+  "ler",
+  "budget",
+  "stats",
+  "tools"
+ ],
+ "title": "LerReport",
+ "type": "object"
+}

@@ -1,0 +1,56 @@
+{
+ "basis": "Z",
+ "code": "repetition_d3",
+ "detectors": [
+  [
+   0
+  ],
+  [
+   1
+  ],
+  [
+   2,
+   0
+  ],
+  [
+   3,
+   1
+  ],
+  [
+   4,
+   2
+  ],
+  [
+   5,
+   3
+  ],
+  [
+   4,
+   6,
+   7
+  ],
+  [
+   5,
+   7,
+   8
+  ]
+ ],
+ "distance": 3,
+ "experiment": "rep3_r3_z",
+ "kind": "qccd.detectors",
+ "n_ancilla": 2,
+ "n_data": 3,
+ "observables": [
+  [
+   6
+  ]
+ ],
+ "readout": "appended",
+ "readout_bits": {
+  "0": 6,
+  "1": 7,
+  "2": 8
+ },
+ "rounds": 3,
+ "version": 1
+}

@@ -21,6 +21,9 @@ agent = [
   # a LOCAL grade's semantics stage (Compiler/bridge/check_cert.py) simulates the circuit;
   # without these, `qccd submit --local` can never be eligible
   "stim>=1.14", "qiskit>=2.0", "numpy>=1.26",
+  # the logical error rate (qccd/qec): matching for surface/repetition codes, BP-OSD for
+  # the rest
+  "pymatching>=2.2", "ldpc>=2.3",
 ]
 official = ["fastapi==0.135.3", "uvicorn==0.43.0", "psycopg[binary]>=3.2,<3.3"]
 
@@ -33,3 +36,4 @@ include = ["qccd*"]
 [tool.setuptools.package-data]
 "qccd.workspace" = ["web/*", "skill/**/*", "releases/**/*", "releases/.gitattributes", "toolchain.json"]
 "qccd.viz" = ["*.js", "js/*.js"]
+"qccd.bench" = ["suites/**/*", "suites/.gitattributes"]

@@ -20,7 +20,7 @@ _REPO = Path(__file__).resolve().parents[2]
 _SKILL = Path(__file__).resolve().parent / "skill"
 _DOCS = {"adl": "docs/adl.md", "rules": "docs/rules.md", "tsir": "docs/tsir.md", "phys": "docs/phys.md"}
 SECTIONS = ("index", "design", "boards", "interface", "site", "site:studio", "task", "operations", "rules", "evaluator", "program", "anchors",
-            "workflow", "docs:adl", "docs:rules", "docs:tsir", "docs:phys")
+            "workflow", "noise", "compiler", "docs:adl", "docs:rules", "docs:tsir", "docs:phys")
 _WINDOW = 12000
 
 
@@ -33,7 +33,8 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
                 "hint": "read `design` before designing a device for the person or for a board; `workflow` "
                         "for the tools; `interface` for what you may do on a page (only what it "
                         "declares); `site` before working on the website's pages; `operations` before editing; "
-                        "`evaluator` before citing results"}
+                        "`evaluator` before citing results; `noise` for how a logical error rate is measured; "
+                        "`compiler` for the Compiler leaderboard (the contract a compiler follows and the suite)"}
     if section == "interface":
         from .interface import manifest
         from .mirror import SiteMirror
@@ -110,6 +111,36 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
                 "coordinates": "sketch and region points are diagram coordinates (lattice units, the space "
                                "of node pos); viewport is the view box they were drawn in; they are intent, "
                                "never physical constraints"}
+    if section == "noise":
+        # how a compiled program's logical error rate is measured: the memory experiments, the noise
+        # model channel by channel (from the device's own physics), the check and the decoders
+        from ..qec import EXPERIMENTS, MODELS, describe_noise, get_experiment
+        name = query if query in MODELS else "qccd-noise@1"
+        return {**head, "noise_model": describe_noise(name), "models": list(MODELS),
+                "experiments": {k: get_experiment(k).summary() for k in EXPERIMENTS},
+                "memory_boards": [b for b in ws.boards() if b.get("memory_experiment")],
+                "how": "qccd_estimate_ler(design, experiment) compiles a memory experiment onto a design with the "
+                       "reference compiler, checks the program runs it (every detector deterministic with the "
+                       "circuit's parity), and samples its logical error rate; a memory board ranks by "
+                       "ler_per_round, measured the same way by the grader"}
+    if section == "compiler":
+        # the Compiler leaderboard: the contract a submitted compiler follows, and the suite it is run on
+        from ..bench.contract import describe
+        from ..bench.suite import find_suite
+        try:
+            suite = find_suite(query if query and "@" in query else None)
+            summ = suite.summary()
+            base = suite.baseline()
+            summ["reference"] = {"valid": sum(1 for v in base.values() if v.get("status") == "valid"),
+                                 "pairs": len(base)}
+        except Exception as exc:
+            summ = {"error": str(exc)}
+        return {**head, "contract": describe(), "suite": summ,
+                "how": "write a compiler directory (qccd bench init-compiler DIR gives a working one), grade it "
+                       "on the public pairs at the terminal with `qccd bench run --compiler DIR` (it runs the "
+                       "person's own code, so it runs in a shell, not through the service), read the result "
+                       "with qccd_get_bench; publishing needs the person at their terminal "
+                       "(qccd bench publish DIR)"}
     if section == "design":
         # how to turn the person's shape into a device that runs a board's circuit with every rule passing
         p = _SKILL / "references" / "design.md"

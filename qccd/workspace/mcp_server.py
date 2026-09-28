@@ -98,6 +98,17 @@ or digests. To compare
 designs, run the SAME program on each and call qccd_compare_runs: it returns the comparison and
 opens the side-by-side view in Studio, where both designs animate on one shared clock.
 
+LOGICAL ERROR RATE AND THE TWO LEADERBOARDS. The Leaderboard has two sections. ARCHITECTURE boards rank
+designs, each compiled by the reference compiler; the memory boards among them ("... memory") rank by the
+logical error rate per round. qccd_estimate_ler(experiment, design) measures a design's logical error rate
+the way those boards do: a QEC memory experiment compiled onto the design, checked, and sampled under the
+noise model built from the device's physics; report its interval and its dominant error channels, never a
+bare number. The COMPILER board ranks compilers, not designs: a compiler is a directory the person writes,
+graded over a suite of circuit x device pairs by `qccd bench run --compiler DIR` in a shell (it runs their
+code, so never through these tools); read results with qccd_get_bench, the contract and the suite with
+qccd_read_reference(section='compiler'), the noise model with section='noise'. qccd_get_leaderboard shows
+local rankings, or the published ones with official=true.
+
 PAGES. The person may be talking to you from a page of the qccd.academy website (served through the
 workspace, with this same chat) or from Studio; the request says which page. Before your first work on
 the site, read qccd_read_reference section='site' (its pages, the course, and how to do the common

@@ -46,7 +46,8 @@ __all__ = ["ResultsMixin", "JOB_KINDS", "JOB_RUNNERS"]
 #: Every job kind and the method that runs it.  A kind is started through a tool (features.py
 #: names the kinds each Feature starts; the gate test checks every kind here is reachable), and a
 #: kind with no entry is refused -- before this table, an unknown kind fell through to `evaluate`.
-JOB_RUNNERS = {"compile": "_job_compile", "evaluate": "_job_evaluate", "run": "_job_run", "submit": "_job_submit"}
+JOB_RUNNERS = {"compile": "_job_compile", "evaluate": "_job_evaluate", "run": "_job_run", "submit": "_job_submit",
+               "ler": "_job_ler"}
 JOB_KINDS = tuple(JOB_RUNNERS)
 TERMINAL = ("succeeded", "failed", "cancelled", "timeout", "internal_error")
 
@@ -131,6 +132,8 @@ class ResultsMixin:
             params["profile"] = prof
         if kind == "run":
             self._check_run_params(params)
+        if kind == "ler":
+            self._check_ler_params(params)
         rel = self.release
         if kind in ("compile", "evaluate", "submit"):
             rel = self.board(params.get("board"))

@@ -253,6 +253,49 @@ def _run_result(be, jid: str, res: dict, wait_s: float = 20.0) -> dict:
     return out
 
 
+def _estimate_ler(be, a: dict) -> dict:
+    """Start an `ler` job and wait (bounded) for it, so one call usually answers."""
+    params = {k: a[k] for k in ("experiment", "max_shots", "noise", "seed", "revision") if k in a}
+    if a.get("design"):
+        params["branch"] = a["design"]
+    j = be.call("POST", "/api/jobs", {"kind": "ler", "params": params, "request_id": a.get("request_id"),
+                                      "origin_prompt_id": a.get("origin_prompt_id")})
+    jid = j["job_id"]
+    deadline = _t.time() + max(0, min(int(a.get("wait_s", 45)), 50))
+    while True:
+        jj = be.call("GET", f"/api/jobs/{_enc(jid)}")
+        if jj["status"] not in ("queued", "running") or _t.time() >= deadline:
+            break
+        _t.sleep(1.0)
+    if jj["status"] in ("queued", "running"):
+        return {"job_id": jid, "status": jj["status"], "progress": jj.get("progress"),
+                "next": "still running: follow it once with qccd_get_job(job_id, wait_s=50)"}
+    res = jj.get("result") or {}
+    rep = res.get("ler_report") or {}
+    return {"job_id": jid, "status": jj["status"], "summary": res.get("summary") or jj.get("error"),
+            "ler": rep.get("ler"), "check": rep.get("check"), "noise": (rep.get("noise") or {}).get("id"),
+            "experiment": rep.get("experiment"), "dominant_channels": res.get("dominant_channels"),
+            "rules_failed": res.get("rules_failed"), "refusal": res.get("refusal")}
+
+
+def _get_leaderboard(be, a: dict):
+    board, official = a.get("board"), bool(a.get("official"))
+    if official:
+        return be.call("GET", "/api/official/leaderboard?" + _q({"board": board}))
+    if a.get("track") == "compiler":
+        return {"track": "compiler", "reports": be.call("GET", "/api/bench")["reports"],
+                "label": "Local results - not published"}
+    return be.call("GET", "/api/leaderboard?" + _q({"board": board}))
+
+
+def _get_bench(be, a: dict):
+    rid = a.get("report_id")
+    if not rid:
+        return be.call("GET", "/api/bench?" + _q({"limit": a.get("limit")}))
+    return be.call("GET", f"/api/bench/{_enc(rid)}?" + _q({"part": a.get("part"), "offset": a.get("offset"),
+                                                          "limit": a.get("limit")}))
+
+
 # ---------------------------------------------------------------------- the table
 
 FEATURES: tuple[Feature, ...] = (
@@ -495,6 +538,38 @@ FEATURES: tuple[Feature, ...] = (
         lambda be, a: be.call("POST", "/api/import", {"path": a["path"], "request_id": a.get("request_id"),
                                                       "mode": a.get("mode", "apply")}),
         ("POST /api/import",), cli=("import",)),
+    Feature(
+        "qccd_estimate_ler",
+        "The logical error rate of a design: compiles a QEC memory experiment onto the design with the reference "
+        "compiler (qccdc + cooling), checks the program runs it (every detector deterministic with the circuit's "
+        "parity), and samples its logical error rate under the noise model built from the device's physics "
+        "(heating- and chain-dependent MS error, gate, measurement, reset and idle errors). experiment: a memory "
+        "board's title, or one of rep3, rep5, rep9, surface3, surface5, steane, bb18, bb72 "
+        "(qccd_read_reference section='noise' explains each and the model). design: its name (default the "
+        "current design). Returns the LER with its 95% interval and per round, and the error channels that "
+        "dominate; waits up to wait_s (default 45, max 50), else follow it once with qccd_get_job.",
+        _obj({"experiment": _S, "design": _S, "revision": _I, "max_shots": _I, "noise": _S, "seed": _I,
+              "wait_s": _I, "request_id": _S, "origin_prompt_id": _S}, ["experiment"]),
+        _estimate_ler, ("POST /api/jobs", "GET /api/jobs/{jid}"), cli=("ler",), job_kinds=("ler",), group="boards"),
+    Feature(
+        "qccd_get_leaderboard",
+        "A leaderboard's ranking. Default: this workspace's local results on one Architecture board (board: its "
+        "title), labelled 'Local results - not published'. track='compiler': the Compiler board's local reports "
+        "(compilers graded here with `qccd bench run`). official=true: the published ranking on qccd.academy "
+        "(board: a title; without one, every official board with its section, Architecture or Compiler).",
+        _obj({"board": _S, "track": {"type": "string", "enum": ["architecture", "compiler"]},
+              "official": {"type": "boolean"}}),
+        _get_leaderboard, ("GET /api/leaderboard", "GET /api/bench", "GET /api/official/leaderboard"),
+        read_only=True, cli=("leaderboard",), group="boards"),
+    Feature(
+        "qccd_get_bench",
+        "The Compiler board's local reports: without report_id the list (compiler, coverage, speedup over the "
+        "reference compiler, LER ratio, wrong pairs); with report_id one report, part summary (default) or pairs "
+        "(each circuit x device pair: status valid|wrong|refused|timeout|crash, the reason, T_jones, speedup, "
+        "LER; paged with offset/limit). A report is made by running a compiler at the person's terminal, "
+        "`qccd bench run --compiler DIR` (it runs their code, so it runs in a shell, never through these tools).",
+        _obj({"report_id": _S, "part": {"type": "string", "enum": ["summary", "pairs"]}, "offset": _I, "limit": _I}),
+        _get_bench, ("GET /api/bench", "GET /api/bench/{rid}"), read_only=True, cli=("bench",), group="boards"),
 )
 
 BY_NAME: dict[str, Feature] = {f.name: f for f in FEATURES}
@@ -530,7 +605,6 @@ INTERNAL_ROUTES: dict[str, str] = {
     "POST /api/deliveries/{did}/mark": "the MCP adapter's channel loop marks a push",
     "GET /api/jobs": "the Studio's job list; agents follow their own jobs by id",
     "GET /api/submissions": "the Studio's submission list; agents inspect one by id",
-    "GET /api/leaderboard": "the local leaderboard page and `qccd leaderboard`",
     "POST /api/pair-code": "pairing a browser with the workspace",
     "POST /api/shutdown": "`qccd stop`",
 }
@@ -548,7 +622,6 @@ LOCAL_VERBS: dict[str, str] = {
     "agent": "installs, inspects or removes an agent client's configuration",
     "mcp": "is the MCP server itself",
     "trace": "a person reads what an agent did",
-    "leaderboard": "the local leaderboard as a table at the terminal",
 }
 
 

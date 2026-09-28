@@ -826,6 +826,20 @@ def create_app(state: ServiceState) -> FastAPI:
     def leaderboard(request, actor, _):
         return ws.leaderboard(q(request, "board"))
 
+    # ---- the Compiler board's local reports and the official boards (docs/PLAN-boards.md)
+    @route("GET", "/api/bench", write=False)
+    def bench_list(request, actor, _):
+        return {"reports": ws.bench_reports(q(request, "limit", 50, int))}
+
+    @route("GET", "/api/bench/{rid}", write=False)
+    def bench_one(request, actor, _):
+        return ws.bench_report(request.path_params["rid"], q(request, "part", "summary"),
+                               q(request, "offset", 0, int), q(request, "limit", 50, int))
+
+    @route("GET", "/api/official/leaderboard", write=False)
+    def official_leaderboard(request, actor, _):
+        return ws.official_leaderboard(q(request, "board"))
+
     @route("POST", "/api/publish/prepare")
     def prepare(request, actor, b):
         return ws.prepare_publish(actor, str(b.get("submission_id", "")), visibility=b.get("visibility", "public"),

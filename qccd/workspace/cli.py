@@ -19,6 +19,13 @@
     qccd publish --submission SUB [--visibility public]   review + approve at this terminal
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
+    qccd ler --experiment surface3 [--design NAME] [--shots N]
+                                             the logical error rate of a design (memory experiment,
+                                             reference compiler, the device's noise model)
+    qccd leaderboard [--board T] [--official] [--track compiler]   local or published rankings
+    qccd bench run --compiler DIR [--only X] [--jobs N]   grade a compiler on the suite, locally
+    qccd bench suite | reports | show REPORT | init-compiler DIR
+    qccd bench publish DIR --server URL      upload a compiler (a person confirms at this terminal)
     qccd trace [--session S] [--prompt P] [--full | --json | --open | --program | --check]
                                              what an agent did for a request, step by step; as a
                                              program (instructions with time, memory, effects)
@@ -42,7 +49,7 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "boards", "leaderboard", "trace")
+            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench")
 
 
 def _root(args) -> Path:
@@ -418,6 +425,23 @@ def cmd_submit(a) -> int:
 
 def cmd_leaderboard(a) -> int:
     info = _svc(a)
+    if a.official:
+        b = _call(info, "GET", "/api/official/leaderboard" + (f"?board={_q(a.board)}" if a.board else ""))
+        if not a.board:
+            for t in b["boards"]:
+                print(f"  {'Compiler' if t.get('track') == 'compiler' else 'Architecture':12s} {t.get('title') or t['id']}"
+                      f"  (ranked by {t.get('rank_by')})")
+            return 0
+        print(f"{b['board']} on {b['server']}, ranked by {b['rank_by']} ({b['better']} is better)")
+        for i, r in enumerate(b["rows"], 1):
+            print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')}")
+        return 0
+    if a.track == "compiler":
+        for r in _call(info, "GET", "/api/bench")["reports"]:
+            m = r["metrics"]
+            print(f"  {r['id']}  {(r['compiler'] or {}).get('name', '?'):24s} speedup={m.get('speedup')} "
+                  f"coverage={m.get('coverage')} wrong={m.get('wrong')}  ({r['label']})")
+        return 0
     b = _call(info, "GET", "/api/leaderboard" + (f"?board={_q(a.board)}" if a.board else ""))
     print(f"{b['label']}: {b.get('board') or b['task']}, ranked by {b['rank_by']} ({b['better']} is better)")
     for r in b["rows"]:
@@ -482,6 +506,122 @@ def cmd_publish(a) -> int:
         return 0
     print("name --submission (review and approve) or --approval (upload)", file=sys.stderr)
     return 2
+
+
+def cmd_ler(a) -> int:
+    """The logical error rate of a design: a memory experiment compiled by the reference compiler."""
+    info = _svc(a)
+    params = {"experiment": a.experiment, "max_shots": a.shots}
+    if a.design:
+        params["branch"] = a.design
+    j = _call(info, "POST", "/api/jobs", {"kind": "ler", "params": params})
+    j = _wait_job(info, j["job_id"])
+    res = j.get("result") or {}
+    print(res.get("summary") or j.get("error"))
+    for c in res.get("dominant_channels") or []:
+        print(f"  {c['channel']:12s} {c['sum_p']:.3e}  (summed error probability)")
+    if a.json:
+        print(json.dumps(res.get("ler_report"), indent=1))
+    return 0 if j["status"] == "succeeded" and ((res.get("ler_report") or {}).get("check") or {}).get("ok") else 1
+
+
+def cmd_bench(a) -> int:
+    """The Compiler board, at the terminal: run a compiler over the suite, read reports, publish."""
+    from ..bench import ContractError, find_suite, load_compiler, run_suite, starter
+    from ..bench.harness import reference_compiler
+    if a.action == "init-compiler":
+        d = starter(Path(a.target or "my-compiler"))
+        print(f"a working compiler (the reference one, to replace) is in {d}\n  grade it: qccd bench run --compiler {d}")
+        return 0
+    suite = find_suite(a.suite)
+    if a.action == "suite":
+        s = suite.summary()
+        print(f"{suite.title} ({suite.id}): {s['pairs']} public pairs, {s['hidden_pairs']} hidden on the server")
+        print(f"  circuits: {', '.join(s['circuits'])}\n  devices:  {', '.join(s['devices'])}")
+        base = suite.baseline()
+        print(f"  the reference compiler: {sum(1 for v in base.values() if v.get('status') == 'valid')} of "
+              f"{len(base)} pairs valid; ranked by {s['rank_by']}")
+        return 0
+    if a.action in ("reports", "show"):
+        info = _svc(a)
+        if a.action == "reports":
+            for r in _call(info, "GET", "/api/bench")["reports"]:
+                m = r["metrics"]
+                print(f"  {r['id']}  {(r['compiler'] or {}).get('name', '?'):24s} speedup={m.get('speedup')} "
+                      f"coverage={m.get('coverage')} wrong={m.get('wrong')}")
+            return 0
+        r = _call(info, "GET", f"/api/bench/{_q(a.target)}?part=pairs&limit=200")
+        for x in r["pairs"]:
+            print(f"  {x['id']:40s} {x['status']:9s} T={x.get('T_jones')} speedup={x.get('speedup')} {x.get('reason') or ''}"[:160])
+        return 0
+    if a.action == "run":
+        try:
+            spec = reference_compiler() if a.compiler == "reference" else load_compiler(a.compiler)
+        except ContractError as exc:
+            print(f"qccd bench: {exc}", file=sys.stderr)
+            return 2
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="qccd-bench-") as td:
+            rep = run_suite(suite, spec, workdir=Path(td), only=a.only.split(",") if a.only else None,
+                            jobs=a.jobs, progress=lambda i, n, pid, st: print(f"  [{i}/{n}] {pid}: {st}",
+                                                                               file=sys.stderr, flush=True))
+        s = rep["summary"]
+        print(f"{spec.name} on {suite.title}: {s['counts']['valid']}/{s['pairs']} valid, {s['wrong']} wrong, "
+              f"speedup {s['speedup'] if s['speedup'] is None else round(s['speedup'], 3)} over "
+              f"{s['compared']} pair(s), LER ratio {s['ler_ratio'] if s['ler_ratio'] is None else round(s['ler_ratio'], 3)}")
+        for reason in rep["eligibility"]["reasons"]:
+            print(f"  not rankable: {reason}")
+        try:
+            from .qecjobs import save_bench_report
+            rid = save_bench_report(_root(a), rep)
+            print(f"report {rid} (Local result - not published): qccd bench show {rid}")
+        except FileNotFoundError:
+            out = Path(a.out or "bench-report.json")
+            out.write_text(json.dumps(rep, indent=1), encoding="utf-8")
+            print(f"report written to {out} (not a workspace, so not listed by qccd_get_bench)")
+        return 0 if not s["wrong"] else 1
+    if a.action == "publish":
+        return _bench_publish(a, suite)
+    print("actions: run, suite, reports, show, init-compiler, publish", file=sys.stderr)
+    return 2
+
+
+def _bench_publish(a, suite) -> int:
+    from ..bench import load_compiler
+    from ..bench.contract import pack
+    from .publish import _check_server, credential_for
+    import urllib.error
+    import urllib.request
+    if not a.server:
+        print("--server is required (e.g. https://qccd.academy/official)", file=sys.stderr)
+        return 2
+    spec = load_compiler(a.target or ".")
+    archive, binding = pack(spec, suite)
+    print(f"compiler  {spec.name} ({spec.runtime}) {binding['compiler']['digest']}")
+    print(f"suite     {suite.id}  {suite.digest}")
+    print(f"archive   {len(archive)} bytes; the server builds and runs it on every pair, public and hidden")
+    if not sys.stdin.isatty():
+        print("publication needs a person at an interactive terminal", file=sys.stderr)
+        return 2
+    typed = input("Type the first 12 hex digits of the compiler digest to publish: ").strip()
+    if typed != binding["compiler"]["digest"].split(":", 1)[1][:12]:
+        print("not published")
+        return 1
+    server = _check_server(a.server)
+    req = urllib.request.Request(f"{server}/v1/submissions", data=archive, method="POST")
+    req.add_header("Authorization", f"Bearer {credential_for(server)}")
+    req.add_header("Content-Type", "application/zip")
+    req.add_header("X-QCCD-Task", suite.id)
+    req.add_header("X-QCCD-Visibility", a.visibility)
+    req.add_header("X-QCCD-Display-Name", a.name or spec.name)
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            print(json.dumps(json.loads(r.read().decode("utf-8")), indent=1))
+    except urllib.error.HTTPError as exc:
+        print(f"the server refused the upload ({exc.code}): {exc.read().decode('utf-8', 'replace')[:500]}",
+              file=sys.stderr)
+        return 1
+    return 0
 
 
 def cmd_agent(a) -> int:
@@ -558,6 +698,9 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--json", action="store_true")
         if name in ("validate", "submit", "compile", "leaderboard"):
             q.add_argument("--board", default=None, help="a leaderboard by its title, e.g. 'BB [[144,12,12]]'")
+        if name == "leaderboard":
+            q.add_argument("--official", action="store_true", help="the published ranking on qccd.academy")
+            q.add_argument("--track", default="architecture", choices=["architecture", "compiler"])
         if name == "submit":
             q.add_argument("--design", default=None, help="the design's name (default: the main design)")
         if name == "compile":
@@ -592,6 +735,24 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("mcp")
     p.add_argument("--client", default="generic", choices=["codex", "claude", "cursor", "generic"])
     p.add_argument("--channel", action="store_true")
+    p.add_argument("--root", default=None)
+    p = sub.add_parser("ler", help="the logical error rate of a design, on a QEC memory experiment")
+    p.add_argument("--experiment", required=True, help="a memory board's title, or rep3|rep5|surface3|steane|...")
+    p.add_argument("--design", default=None, help="the design's name (default: the current design)")
+    p.add_argument("--shots", type=int, default=100000, help="the most shots to sample")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--root", default=None)
+    p = sub.add_parser("bench", help="the Compiler board: run a compiler over the benchmark suite, locally")
+    p.add_argument("action", choices=["run", "suite", "reports", "show", "init-compiler", "publish"])
+    p.add_argument("target", nargs="?", default=None, help="a compiler directory, or a report id for show")
+    p.add_argument("--compiler", default="reference", help="a compiler directory (qccd-compiler.json), or 'reference'")
+    p.add_argument("--suite", default=None)
+    p.add_argument("--only", default=None, help="comma-separated pair ids, circuits or devices")
+    p.add_argument("--jobs", type=int, default=1)
+    p.add_argument("--out", default=None)
+    p.add_argument("--server", default=None)
+    p.add_argument("--name", default=None, help="the name shown on the board")
+    p.add_argument("--visibility", default="public", choices=["public", "unlisted", "private"])
     p.add_argument("--root", default=None)
     sub.add_parser("releases")
     sub.add_parser("boards", help="the leaderboards a design can be submitted to")
@@ -633,7 +794,7 @@ def main(argv=None) -> int:
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
-          "leaderboard": cmd_leaderboard, "trace": cmd_trace}[a.cmd]
+          "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
     if a.cmd not in ("mcp", "serve"):

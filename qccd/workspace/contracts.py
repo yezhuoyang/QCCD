@@ -184,7 +184,7 @@ class Diagnostic(_Strict):
 
 class Stage(_Strict):
     id: Literal["bundle", "device", "physics_lock", "program", "rules", "correspondence", "certificate_binding",
-                "lean_certificate", "semantics", "metrics"]
+                "lean_certificate", "semantics", "ler", "metrics"]
     required: bool
     status: StageStatus
     coverage: str
@@ -218,10 +218,94 @@ class EvaluationReport(_Strict):
     timing: dict[str, Any]
 
 
+# ---------------------------------------------------------------------- the logical error rate and
+# the Compiler board (docs/PLAN-boards.md): qccd.qec and qccd.bench write these
+
+class LerEstimate(_Open):
+    ler: float
+    lo: float
+    hi: float
+    shots: int
+    errors: int
+    per_round: float
+    decoder: str
+
+
+class LerReport(_Open):
+    """`qccd.qec.evaluate_memory`: a memory experiment's check and logical error rate on one program."""
+    kind: Literal["qccd.ler_report"]
+    version: Literal[1]
+    experiment: dict[str, Any]
+    noise: dict[str, Any]
+    check: Optional[dict[str, Any]]
+    ler: Optional[LerEstimate]
+    budget: dict[str, Any]
+    stats: dict[str, Any]
+    tools: dict[str, Any]
+
+
+class CompilerManifest(_Strict):
+    """`qccd-compiler.json`: a compiler under the `qccd.compiler@1` contract (qccd/bench/contract.py)."""
+    kind: Literal["qccd.compiler"]
+    version: Literal[1]
+    name: str = Field(min_length=1, max_length=80)
+    about: Optional[str] = None
+    runtime: Literal["python3", "native"]
+    entry: list[str] = Field(min_length=1)
+    build: Optional[list[str]] = None
+
+
+class PairResult(_Open):
+    id: str
+    circuit: str
+    device: str
+    split: Literal["public", "hidden"]
+    status: Literal["valid", "wrong", "refused", "timeout", "crash", "no_output", "not_run", "cancelled"]
+    reason: str
+    seconds: float
+
+
+class CompilerReport(_Open):
+    """`qccd.bench.run_suite`: a compiler graded over a suite, locally or by the official grader."""
+    kind: Literal["qccd.compiler_report"]
+    version: Literal[1]
+    suite: dict[str, Any]
+    compiler: dict[str, Any]
+    evaluator: dict[str, Any]
+    profile: Literal["local", "official"]
+    split: str
+    summary: dict[str, Any]
+    metrics: dict[str, Metric]
+    rank_by: str
+    eligibility: dict[str, Any]
+    pairs: list[PairResult]
+    timing: dict[str, Any]
+
+
+class CompilerSuite(_Open):
+    """`suite.json`: an immutable benchmark suite (qccd/bench/suite.py)."""
+    kind: Literal["qccd.compiler_suite"]
+    version: Literal[1]
+    suite: str
+    release: str
+    title: str
+    track: Literal["compiler"]
+    contract: Literal["qccd.compiler@1"]
+    physics: dict[str, Any]
+    circuits: list[dict[str, Any]]
+    devices: list[dict[str, Any]]
+    pairs: list[dict[str, str]]
+    limits: dict[str, Any]
+    metrics: list[dict[str, Any]]
+    rank_by: str
+
+
 SCHEMAS = {
     "change_set_request": ChangeSetRequest, "change_set_result": ChangeSetResult, "error": ErrorBody,
     "prompt_body": PromptBody, "context_snapshot": ContextSnapshot, "bundle_manifest": BundleManifest,
     "task_release": TaskRelease, "lock": LockFile, "evaluation_report": EvaluationReport,
+    "ler_report": LerReport, "compiler_manifest": CompilerManifest, "compiler_report": CompilerReport,
+    "compiler_suite": CompilerSuite,
 }
 
 

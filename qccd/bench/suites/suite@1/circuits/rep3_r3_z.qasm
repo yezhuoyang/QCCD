@@ -1,0 +1,27 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+// rep3_r3_z: repetition_d3 memory in the Z basis, 3 round(s); data q[0..2], ancillas q[3..4]; data readout c[6..8] appended by the grader
+qreg q[5];
+creg c[9];
+cx q[0],q[3];
+cx q[1],q[4];
+cx q[1],q[3];
+cx q[2],q[4];
+measure q[3] -> c[0];
+measure q[4] -> c[1];
+reset q[3];
+reset q[4];
+cx q[0],q[3];
+cx q[1],q[4];
+cx q[1],q[3];
+cx q[2],q[4];
+measure q[3] -> c[2];
+measure q[4] -> c[3];
+reset q[3];
+reset q[4];
+cx q[0],q[3];
+cx q[1],q[4];
+cx q[1],q[3];
+cx q[2],q[4];
+measure q[3] -> c[4];
+measure q[4] -> c[5];

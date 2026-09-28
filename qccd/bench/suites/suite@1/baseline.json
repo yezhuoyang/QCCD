@@ -1,0 +1,1526 @@
+{
+ "compiler": "qccdc (reference) + insert_cooling",
+ "measured": "2026-09-28",
+ "pairs": {
+  "adder3@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 6.705,
+    "T_transport": 7.517,
+    "dacs": 1728,
+    "instructions": 288,
+    "ions_per_instruction": 1.2758620689655173,
+    "transport_instructions": 116
+   },
+   "reason": "",
+   "seconds": 0.181,
+   "status": "valid"
+  },
+  "adder3@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 6.255,
+    "T_transport": 6.857,
+    "dacs": 38,
+    "instructions": 257,
+    "ions_per_instruction": 1.2674418604651163,
+    "transport_instructions": 86
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "adder3@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 7.13,
+    "T_transport": 8.957,
+    "dacs": 44,
+    "instructions": 432,
+    "ions_per_instruction": 1.0957854406130267,
+    "transport_instructions": 261
+   },
+   "reason": "",
+   "seconds": 0.612,
+   "status": "valid"
+  },
+  "adder3@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +y,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +x,+y and shuttle +x,-y); one cycle is one waveform, so unlike motions need 3 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +y,-x and shuttle -y,+x); one cycle is one waveform, so unlike motions need 3 cycles",
+   "seconds": 0.186,
+   "status": "wrong"
+  },
+  "adder3@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +y,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +x,+y and shuttle +x,-y); one cycle is one waveform, so unlike motions need 3 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +y,-x and shuttle -y,+x); one cycle is one waveform, so unlike motions need 3 cycles",
+   "seconds": 0.182,
+   "status": "wrong"
+  },
+  "adder3@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 6.65,
+    "T_transport": 7.805,
+    "dacs": 72,
+    "instructions": 336,
+    "ions_per_instruction": 1.1515151515151516,
+    "transport_instructions": 165
+   },
+   "reason": "",
+   "seconds": 0.247,
+   "status": "valid"
+  },
+  "adder3@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 10.635,
+    "T_transport": 11.349,
+    "dacs": 56,
+    "instructions": 302,
+    "ions_per_instruction": 1.2419354838709677,
+    "transport_instructions": 124
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "adder3@ring144_24v": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:+1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.239,
+   "status": "wrong"
+  },
+  "adder3@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.134,
+   "status": "refused"
+  },
+  "bell2@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 1728,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.177,
+   "status": "valid"
+  },
+  "bell2@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 38,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.184,
+   "status": "valid"
+  },
+  "bell2@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 44,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.183,
+   "status": "valid"
+  },
+  "bell2@deck_unit_cell": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.91,
+    "T_transport": 0.917,
+    "dacs": 44,
+    "instructions": 12,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.183,
+   "status": "valid"
+  },
+  "bell2@grid9x9": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.91,
+    "T_transport": 0.917,
+    "dacs": 5760,
+    "instructions": 12,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.186,
+   "status": "valid"
+  },
+  "bell2@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 72,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.181,
+   "status": "valid"
+  },
+  "bell2@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 56,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.179,
+   "status": "valid"
+  },
+  "bell2@ring144_24v": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.015,
+    "T_transport": 1.057,
+    "dacs": 46,
+    "instructions": 19,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 8
+   },
+   "reason": "",
+   "seconds": 0.175,
+   "status": "valid"
+  },
+  "bell2@stationary_chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 0.49,
+    "T_transport": 0.497,
+    "dacs": 48,
+    "instructions": 11,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 1
+   },
+   "reason": "",
+   "seconds": 0.185,
+   "status": "valid"
+  },
+  "bv6@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.04,
+    "T_transport": 1.089,
+    "dacs": 1728,
+    "instructions": 36,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.177,
+   "status": "valid"
+  },
+  "bv6@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.03,
+    "T_transport": 1.065,
+    "dacs": 38,
+    "instructions": 34,
+    "ions_per_instruction": 1.2,
+    "transport_instructions": 5
+   },
+   "reason": "",
+   "seconds": 0.174,
+   "status": "valid"
+  },
+  "bv6@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.035,
+    "T_transport": 1.077,
+    "dacs": 44,
+    "instructions": 35,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 6
+   },
+   "reason": "",
+   "seconds": 0.182,
+   "status": "valid"
+  },
+  "bv6@deck_unit_cell": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.53,
+    "T_transport": 2.565,
+    "dacs": 44,
+    "instructions": 37,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 5
+   },
+   "reason": "",
+   "seconds": 0.182,
+   "status": "valid"
+  },
+  "bv6@grid9x9": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.53,
+    "T_transport": 2.565,
+    "dacs": 5760,
+    "instructions": 37,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 5
+   },
+   "reason": "",
+   "seconds": 0.193,
+   "status": "valid"
+  },
+  "bv6@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.035,
+    "T_transport": 1.077,
+    "dacs": 72,
+    "instructions": 35,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 6
+   },
+   "reason": "",
+   "seconds": 0.181,
+   "status": "valid"
+  },
+  "bv6@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.43,
+    "T_transport": 1.465,
+    "dacs": 56,
+    "instructions": 36,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 6
+   },
+   "reason": "",
+   "seconds": 0.192,
+   "status": "valid"
+  },
+  "bv6@ring144_24v": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 3.075,
+    "T_transport": 3.313,
+    "dacs": 46,
+    "instructions": 76,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 44
+   },
+   "reason": "",
+   "seconds": 0.189,
+   "status": "valid"
+  },
+  "bv6@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.129,
+   "status": "refused"
+  },
+  "clifford12@chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.65,
+   "status": "refused"
+  },
+  "clifford12@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 20.43,
+    "T_transport": 22.502,
+    "dacs": 38,
+    "instructions": 781,
+    "ions_per_instruction": 1.162162162162162,
+    "transport_instructions": 296
+   },
+   "reason": "",
+   "seconds": 0.247,
+   "status": "valid"
+  },
+  "clifford12@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.767,
+   "status": "refused"
+  },
+  "clifford12@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+y and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+y and shuttle +y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 4 ions move in 4 different ways in one cycle (shuttle +x,+y and shuttle +y,+x); one cycle is one waveform, so unlike motions need 4 cycles",
+   "seconds": 0.434,
+   "status": "wrong"
+  },
+  "clifford12@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+y and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+y and shuttle +y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 4 ions move in 4 different ways in one cycle (shuttle +x,+y and shuttle +y,+x); one cycle is one waveform, so unlike motions need 4 cycles",
+   "seconds": 0.413,
+   "status": "wrong"
+  },
+  "clifford12@h2_racetrack": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.206,
+   "status": "refused"
+  },
+  "clifford12@ladder_2x72": {
+   "ler": null,
+   "metrics": null,
+   "reason": "timeout",
+   "seconds": 189.009,
+   "status": "timeout"
+  },
+  "clifford12@ring144_24v": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22', 'R4'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle L0:+1 and shuttle spur:outward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:+1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:+1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.335,
+   "status": "wrong"
+  },
+  "clifford12@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.125,
+   "status": "refused"
+  },
+  "ghz16@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.87,
+    "T_transport": 2.975,
+    "dacs": 1728,
+    "instructions": 109,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 15
+   },
+   "reason": "",
+   "seconds": 0.182,
+   "status": "valid"
+  },
+  "ghz16@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 4.095,
+    "T_transport": 4.655,
+    "dacs": 38,
+    "instructions": 177,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 80
+   },
+   "reason": "",
+   "seconds": 0.185,
+   "status": "valid"
+  },
+  "ghz16@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.87,
+    "T_transport": 2.975,
+    "dacs": 44,
+    "instructions": 109,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 15
+   },
+   "reason": "",
+   "seconds": 0.203,
+   "status": "valid"
+  },
+  "ghz16@deck_unit_cell": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 9.13,
+    "T_transport": 9.235,
+    "dacs": 44,
+    "instructions": 124,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 15
+   },
+   "reason": "",
+   "seconds": 0.186,
+   "status": "valid"
+  },
+  "ghz16@grid9x9": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 9.13,
+    "T_transport": 9.235,
+    "dacs": 5760,
+    "instructions": 124,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 15
+   },
+   "reason": "",
+   "seconds": 0.188,
+   "status": "valid"
+  },
+  "ghz16@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.87,
+    "T_transport": 2.975,
+    "dacs": 72,
+    "instructions": 109,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 15
+   },
+   "reason": "",
+   "seconds": 0.181,
+   "status": "valid"
+  },
+  "ghz16@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 4.07,
+    "T_transport": 4.175,
+    "dacs": 56,
+    "instructions": 115,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 18
+   },
+   "reason": "",
+   "seconds": 0.203,
+   "status": "valid"
+  },
+  "ghz16@ring144_24v": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 10.745,
+    "T_transport": 11.375,
+    "dacs": 46,
+    "instructions": 229,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 120
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "ghz16@stationary_chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.805,
+    "T_transport": 2.819,
+    "dacs": 48,
+    "instructions": 96,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 2
+   },
+   "reason": "",
+   "seconds": 0.189,
+   "status": "valid"
+  },
+  "ghz32@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 5.59,
+    "T_transport": 5.807,
+    "dacs": 1728,
+    "instructions": 221,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.207,
+   "status": "valid"
+  },
+  "ghz32@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 12.79,
+    "T_transport": 15.107,
+    "dacs": 38,
+    "instructions": 540,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 331
+   },
+   "reason": "",
+   "seconds": 0.216,
+   "status": "valid"
+  },
+  "ghz32@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 5.59,
+    "T_transport": 5.807,
+    "dacs": 44,
+    "instructions": 221,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.204,
+   "status": "valid"
+  },
+  "ghz32@deck_unit_cell": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 18.53,
+    "T_transport": 18.747,
+    "dacs": 44,
+    "instructions": 252,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "ghz32@grid9x9": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 18.53,
+    "T_transport": 18.747,
+    "dacs": 5760,
+    "instructions": 252,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "ghz32@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 5.59,
+    "T_transport": 5.807,
+    "dacs": 72,
+    "instructions": 221,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.213,
+   "status": "valid"
+  },
+  "ghz32@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 7.99,
+    "T_transport": 8.207,
+    "dacs": 56,
+    "instructions": 233,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 37
+   },
+   "reason": "",
+   "seconds": 0.216,
+   "status": "valid"
+  },
+  "ghz32@ring144_24v": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: measure acts on q1, which rides the loop; only docked ions can gate",
+   "seconds": 0.131,
+   "status": "refused"
+  },
+  "ghz32@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair: /var/folders/0l/gsxy0kyj32lcvy2_0_tfzxg00000gn/T/tmpto94_mqr/work/pairs/ghz32@stationary_chain/circuit.qasm: stationary_chain has 2 usable traps (30 ion slots) but the circuit needs 32",
+   "seconds": 0.126,
+   "status": "refused"
+  },
+  "ghz8@chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.51,
+    "T_transport": 1.559,
+    "dacs": 1728,
+    "instructions": 53,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.179,
+   "status": "valid"
+  },
+  "ghz8@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.57,
+    "T_transport": 1.703,
+    "dacs": 38,
+    "instructions": 65,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 19
+   },
+   "reason": "",
+   "seconds": 0.183,
+   "status": "valid"
+  },
+  "ghz8@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.51,
+    "T_transport": 1.559,
+    "dacs": 44,
+    "instructions": 53,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.186,
+   "status": "valid"
+  },
+  "ghz8@deck_unit_cell": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 4.41,
+    "T_transport": 4.459,
+    "dacs": 44,
+    "instructions": 60,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.179,
+   "status": "valid"
+  },
+  "ghz8@grid9x9": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 4.41,
+    "T_transport": 4.459,
+    "dacs": 5760,
+    "instructions": 60,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.186,
+   "status": "valid"
+  },
+  "ghz8@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.51,
+    "T_transport": 1.559,
+    "dacs": 72,
+    "instructions": 53,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 7
+   },
+   "reason": "",
+   "seconds": 0.176,
+   "status": "valid"
+  },
+  "ghz8@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 2.31,
+    "T_transport": 2.359,
+    "dacs": 56,
+    "instructions": 57,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 9
+   },
+   "reason": "",
+   "seconds": 0.184,
+   "status": "valid"
+  },
+  "ghz8@ring144_24v": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 5.185,
+    "T_transport": 5.479,
+    "dacs": 46,
+    "instructions": 109,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 56
+   },
+   "reason": "",
+   "seconds": 0.178,
+   "status": "valid"
+  },
+  "ghz8@stationary_chain": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 1.475,
+    "T_transport": 1.475,
+    "dacs": 48,
+    "instructions": 46,
+    "ions_per_instruction": 0.0,
+    "transport_instructions": 0
+   },
+   "reason": "",
+   "seconds": 0.182,
+   "status": "valid"
+  },
+  "qft6@chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 1.448,
+   "status": "refused"
+  },
+  "qft6@cyclone_base": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 4.395,
+    "T_transport": 4.661,
+    "dacs": 38,
+    "instructions": 232,
+    "ions_per_instruction": 1.131578947368421,
+    "transport_instructions": 38
+   },
+   "reason": "",
+   "seconds": 0.179,
+   "status": "valid"
+  },
+  "qft6@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 6.875,
+    "T_transport": 7.673,
+    "dacs": 44,
+    "instructions": 315,
+    "ions_per_instruction": 1.0964912280701755,
+    "transport_instructions": 114
+   },
+   "reason": "",
+   "seconds": 0.334,
+   "status": "valid"
+  },
+  "qft6@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle +y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-y); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 2 different ways in one cycle (shuttle +x,-y and shuttle -y,-x); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.414,
+   "status": "wrong"
+  },
+  "qft6@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle +y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-y); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 2 different ways in one cycle (shuttle +x,-y and shuttle -y,-x); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.406,
+   "status": "wrong"
+  },
+  "qft6@h2_racetrack": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 6.715,
+    "T_transport": 7.289,
+    "dacs": 72,
+    "instructions": 283,
+    "ions_per_instruction": 1.1341463414634145,
+    "transport_instructions": 82
+   },
+   "reason": "",
+   "seconds": 0.208,
+   "status": "valid"
+  },
+  "qft6@ladder_2x72": {
+   "ler": null,
+   "metrics": {
+    "T_jones": 13.1,
+    "T_transport": 13.457,
+    "dacs": 56,
+    "instructions": 292,
+    "ions_per_instruction": 1.240506329113924,
+    "transport_instructions": 79
+   },
+   "reason": "",
+   "seconds": 5.019,
+   "status": "valid"
+  },
+  "qft6@ring144_24v": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22', 'R4'] -- R22: 2 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:outward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R4: on the spurs: channel 'junction.all.0' drives 168 sites with one waveform, but they are asked to do 2 different things (spur:inward and spur:outward); that needs 2 channels",
+   "seconds": 5.311,
+   "status": "wrong"
+  },
+  "qft6@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.128,
+   "status": "refused"
+  },
+  "rep3_r3_z@chain": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.083332782207517e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.008189999999999994,
+     "reset": 0.02,
+     "total": 0.06587508333278458
+    },
+    "errors": 11,
+    "hi": 0.00019697922289584855,
+    "ler": 0.00011,
+    "lo": 6.142543880242281e-05,
+    "noise": "qccd-noise@1",
+    "per_round": 3.6668011193286e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.1,
+    "T_transport": 1.198,
+    "dacs": 1728,
+    "instructions": 51,
+    "ions_per_instruction": 1.5714285714285714,
+    "transport_instructions": 14
+   },
+   "reason": "",
+   "seconds": 0.187,
+   "status": "valid"
+  },
+  "rep3_r3_z@cyclone_base": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.145832781550119e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.007595999999999996,
+     "reset": 0.02,
+     "total": 0.06528114583278392
+    },
+    "errors": 10,
+    "hi": 0.00018408469545089215,
+    "ler": 0.0001,
+    "lo": 5.4320734509630915e-05,
+    "noise": "qccd-noise@1",
+    "per_round": 3.3334444506150085e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.115,
+    "T_transport": 1.234,
+    "dacs": 38,
+    "instructions": 54,
+    "ions_per_instruction": 1.3529411764705883,
+    "transport_instructions": 17
+   },
+   "reason": "",
+   "seconds": 0.132,
+   "status": "valid"
+  },
+  "rep3_r3_z@cyclone_dual_loop": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.041666115979115e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.008780999999999995,
+     "reset": 0.02,
+     "total": 0.06646604166611836
+    },
+    "errors": 24,
+    "hi": 0.0003571027618056714,
+    "ler": 0.00024,
+    "lo": 0.00016129191248332846,
+    "noise": "qccd-noise@1",
+    "per_round": 8.000640085348287e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.09,
+    "T_transport": 1.174,
+    "dacs": 44,
+    "instructions": 49,
+    "ions_per_instruction": 2.0,
+    "transport_instructions": 12
+   },
+   "reason": "",
+   "seconds": 0.134,
+   "status": "valid"
+  },
+  "rep3_r3_z@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 4 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.18,
+   "status": "wrong"
+  },
+  "rep3_r3_z@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 4 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 2 different ways in one cycle (shuttle +x,+x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.179,
+   "status": "wrong"
+  },
+  "rep3_r3_z@h2_racetrack": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.041666115979115e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.008780999999999995,
+     "reset": 0.02,
+     "total": 0.06646604166611836
+    },
+    "errors": 24,
+    "hi": 0.0003571027618056714,
+    "ler": 0.00024,
+    "lo": 0.00016129191248332846,
+    "noise": "qccd-noise@1",
+    "per_round": 8.000640085348287e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.09,
+    "T_transport": 1.174,
+    "dacs": 72,
+    "instructions": 49,
+    "ions_per_instruction": 2.0,
+    "transport_instructions": 12
+   },
+   "reason": "",
+   "seconds": 0.187,
+   "status": "valid"
+  },
+  "rep3_r3_z@ladder_2x72": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.041666115979115e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.008780999999999995,
+     "reset": 0.02,
+     "total": 0.06646604166611836
+    },
+    "errors": 24,
+    "hi": 0.0003571027618056714,
+    "ler": 0.00024,
+    "lo": 0.00016129191248332846,
+    "noise": "qccd-noise@1",
+    "per_round": 8.000640085348287e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.09,
+    "T_transport": 1.174,
+    "dacs": 56,
+    "instructions": 49,
+    "ions_per_instruction": 2.0,
+    "transport_instructions": 12
+   },
+   "reason": "",
+   "seconds": 0.179,
+   "status": "valid"
+  },
+  "rep3_r3_z@ring144_24v": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 6.49166423855041e-05,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.0,
+     "reset": 0.02,
+     "total": 0.057744916642387886
+    },
+    "errors": 9,
+    "hi": 0.00017105476038045442,
+    "ler": 9e-05,
+    "lo": 4.735143784232029e-05,
+    "noise": "qccd-noise@1",
+    "per_round": 3.000090004501299e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 15.46,
+    "T_transport": 14.544,
+    "dacs": 46,
+    "instructions": 115,
+    "ions_per_instruction": 1.4516129032258065,
+    "transport_instructions": 31
+   },
+   "reason": "",
+   "seconds": 0.181,
+   "status": "valid"
+  },
+  "rep3_r3_z@stationary_chain": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.0012000000000025324,
+     "idle": 5.062499449093316e-06,
+     "measure": 0.014400000000000412,
+     "ms_base": 0.022079999999999433,
+     "ms_chain": 0.0,
+     "ms_heating": 0.006386999999999997,
+     "reset": 0.02,
+     "total": 0.06407206249945147
+    },
+    "errors": 9,
+    "hi": 0.00017105476038045442,
+    "ler": 9e-05,
+    "lo": 4.735143784232029e-05,
+    "noise": "qccd-noise@1",
+    "per_round": 3.000090004501299e-05,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.095,
+    "T_transport": 1.186,
+    "dacs": 48,
+    "instructions": 50,
+    "ions_per_instruction": 1.0,
+    "transport_instructions": 13
+   },
+   "reason": "",
+   "seconds": 0.154,
+   "status": "valid"
+  },
+  "rep5_r5_z@chain": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 1.5674998208425883e-05,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.037155999999999974,
+     "reset": 0.08,
+     "total": 0.2347716749982161
+    },
+    "errors": 1,
+    "hi": 5.664709659040966e-05,
+    "ler": 1e-05,
+    "lo": 1.7652477303783126e-06,
+    "noise": "qccd-noise@1",
+    "per_round": 2.00000799999156e-06,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.97,
+    "T_transport": 2.138,
+    "dacs": 1728,
+    "instructions": 86,
+    "ions_per_instruction": 3.1666666666666665,
+    "transport_instructions": 24
+   },
+   "reason": "",
+   "seconds": 0.147,
+   "status": "valid"
+  },
+  "rep5_r5_z@cyclone_base": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 2.5237495951568878e-05,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.013151999999999994,
+     "reset": 0.08,
+     "total": 0.21077723749595925
+    },
+    "errors": 0,
+    "hi": 3.841311258303963e-05,
+    "ler": 0.0,
+    "lo": 0.0,
+    "noise": "qccd-noise@1",
+    "per_round": 0.0,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 3.245,
+    "T_transport": 3.518,
+    "dacs": 38,
+    "instructions": 105,
+    "ions_per_instruction": 2.076923076923077,
+    "transport_instructions": 39
+   },
+   "reason": "",
+   "seconds": 0.144,
+   "status": "valid"
+  },
+  "rep5_r5_z@cyclone_dual_loop": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 1.5524998210003638e-05,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.03791599999999998,
+     "reset": 0.08,
+     "total": 0.23553152499821767
+    },
+    "errors": 1,
+    "hi": 5.664709659040966e-05,
+    "ler": 1e-05,
+    "lo": 1.7652477303783126e-06,
+    "noise": "qccd-noise@1",
+    "per_round": 2.00000799999156e-06,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.95,
+    "T_transport": 2.09,
+    "dacs": 44,
+    "instructions": 82,
+    "ions_per_instruction": 4.0,
+    "transport_instructions": 20
+   },
+   "reason": "",
+   "seconds": 0.182,
+   "status": "valid"
+  },
+  "rep5_r5_z@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 4 ions move in 2 different ways in one cycle (shuttle -x,-x and shuttle -y,+x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 7 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle -x,+y); one cycle is one waveform, so unlike motions need 4 cycles | R22: 8 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle +y,+x); one cycle is one waveform, so unlike motions need 4 cycles",
+   "seconds": 0.188,
+   "status": "wrong"
+  },
+  "rep5_r5_z@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 4 ions move in 2 different ways in one cycle (shuttle -x,-x and shuttle -y,+x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 7 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle -x,+y); one cycle is one waveform, so unlike motions need 4 cycles | R22: 8 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle +y,+x); one cycle is one waveform, so unlike motions need 4 cycles",
+   "seconds": 0.187,
+   "status": "wrong"
+  },
+  "rep5_r5_z@h2_racetrack": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 1.5524998210003638e-05,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.03791599999999998,
+     "reset": 0.08,
+     "total": 0.23553152499821767
+    },
+    "errors": 1,
+    "hi": 5.664709659040966e-05,
+    "ler": 1e-05,
+    "lo": 1.7652477303783126e-06,
+    "noise": "qccd-noise@1",
+    "per_round": 2.00000799999156e-06,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 1.95,
+    "T_transport": 2.09,
+    "dacs": 72,
+    "instructions": 82,
+    "ions_per_instruction": 4.0,
+    "transport_instructions": 20
+   },
+   "reason": "",
+   "seconds": 0.188,
+   "status": "valid"
+  },
+  "rep5_r5_z@ladder_2x72": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 5.01749919592509e-05,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.0,
+     "reset": 0.08,
+     "total": 0.19765017499196696
+    },
+    "errors": 0,
+    "hi": 3.841311258303963e-05,
+    "ler": 0.0,
+    "lo": 0.0,
+    "noise": "qccd-noise@1",
+    "per_round": 0.0,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 6.57,
+    "T_transport": 6.738,
+    "dacs": 56,
+    "instructions": 114,
+    "ions_per_instruction": 2.2093023255813953,
+    "transport_instructions": 43
+   },
+   "reason": "",
+   "seconds": 0.188,
+   "status": "valid"
+  },
+  "rep5_r5_z@ring144_24v": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.004000000000008441,
+     "idle": 0.00041722476549005405,
+     "measure": 0.040000000000001146,
+     "ms_base": 0.07359999999999811,
+     "ms_chain": 0.0,
+     "ms_heating": 0.0,
+     "reset": 0.08,
+     "total": 0.19801722476549777
+    },
+    "errors": 1,
+    "hi": 5.664709659040966e-05,
+    "ler": 1e-05,
+    "lo": 1.7652477303783126e-06,
+    "noise": "qccd-noise@1",
+    "per_round": 2.00000799999156e-06,
+    "shots": 100000
+   },
+   "metrics": {
+    "T_jones": 55.51,
+    "T_transport": 49.204,
+    "dacs": 46,
+    "instructions": 381,
+    "ions_per_instruction": 1.8932038834951457,
+    "transport_instructions": 103
+   },
+   "reason": "",
+   "seconds": 0.178,
+   "status": "valid"
+  },
+  "rep5_r5_z@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.076,
+   "status": "refused"
+  },
+  "steane_r3_z@chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.81,
+   "status": "refused"
+  },
+  "steane_r3_z@cyclone_base": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.009450000000019942,
+     "idle": 0.00022546663200273542,
+     "measure": 0.05440000000000156,
+     "ms_base": 0.16559999999999575,
+     "ms_chain": 0.0,
+     "ms_heating": 0.004448499999999998,
+     "reset": 0.09,
+     "total": 0.32412396663202
+    },
+    "errors": 108,
+    "hi": 0.006514989037369452,
+    "ler": 0.0054,
+    "lo": 0.004474973029329244,
+    "noise": "qccd-noise@1",
+    "per_round": 0.001803249755131131,
+    "shots": 20000
+   },
+   "metrics": {
+    "T_jones": 16.79,
+    "T_transport": 20.892,
+    "dacs": 38,
+    "instructions": 824,
+    "ions_per_instruction": 1.4061433447098977,
+    "transport_instructions": 586
+   },
+   "reason": "",
+   "seconds": 0.49,
+   "status": "valid"
+  },
+  "steane_r3_z@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.587,
+   "status": "refused"
+  },
+  "steane_r3_z@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle -y,+x and shuttle -y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 5 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle +x,+y); one cycle is one waveform, so unlike motions need 4 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +x,+x and shuttle +y,+x); one cycle is one waveform, so unlike motions need 3 cycles",
+   "seconds": 0.942,
+   "status": "wrong"
+  },
+  "steane_r3_z@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle -y,+x and shuttle -y,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 5 ions move in 4 different ways in one cycle (shuttle +x,+x and shuttle +x,+y); one cycle is one waveform, so unlike motions need 4 cycles | R22: 3 ions move in 3 different ways in one cycle (shuttle +x,+x and shuttle +y,+x); one cycle is one waveform, so unlike motions need 3 cycles",
+   "seconds": 0.953,
+   "status": "wrong"
+  },
+  "steane_r3_z@h2_racetrack": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.182,
+   "status": "refused"
+  },
+  "steane_r3_z@ladder_2x72": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +x and shuttle -x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 3 ions move in 2 different ways in one cycle (shuttle +y and shuttle -x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +y and shuttle -x); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 11.856,
+   "status": "wrong"
+  },
+  "steane_r3_z@ring144_24v": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22', 'R4'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle L0:-1 and shuttle spur:inward); one cycle is one waveform, so unlike motions need 2 cycles | R22: 6 ions move in 2 different ways in one cycle (shuttle L0:+1 and shuttle spur:outward); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 7.483,
+   "status": "wrong"
+  },
+  "steane_r3_z@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.127,
+   "status": "refused"
+  },
+  "surface3_r3_z@chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.425,
+   "status": "refused"
+  },
+  "surface3_r3_z@cyclone_base": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.00780000000001646,
+     "idle": 0.00014343747692041608,
+     "measure": 0.05280000000000151,
+     "ms_base": 0.1324799999999966,
+     "ms_chain": 0.0,
+     "ms_heating": 0.004101499999999999,
+     "reset": 0.07999999999999999,
+     "total": 0.277324937476935
+    },
+    "errors": 100,
+    "hi": 0.0020265035296221424,
+    "ler": 0.0016666666666666668,
+    "lo": 0.0013706366178230175,
+    "noise": "qccd-noise@1",
+    "per_round": 0.0005558644836284321,
+    "shots": 60000
+   },
+   "metrics": {
+    "T_jones": 10.005,
+    "T_transport": 11.951,
+    "dacs": 38,
+    "instructions": 431,
+    "ions_per_instruction": 1.485611510791367,
+    "transport_instructions": 278
+   },
+   "reason": "",
+   "seconds": 0.205,
+   "status": "valid"
+  },
+  "surface3_r3_z@cyclone_dual_loop": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.409,
+   "status": "refused"
+  },
+  "surface3_r3_z@deck_unit_cell": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +y,-x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 5 ions move in 3 different ways in one cycle (shuttle +x,-y and shuttle +y,-x); one cycle is one waveform, so unlike motions need 3 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,-y and shuttle -x,+y); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.38,
+   "status": "wrong"
+  },
+  "surface3_r3_z@grid9x9": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +y,-x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 5 ions move in 3 different ways in one cycle (shuttle +x,-y and shuttle +y,-x); one cycle is one waveform, so unlike motions need 3 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x,-y and shuttle -x,+y); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 0.392,
+   "status": "wrong"
+  },
+  "surface3_r3_z@h2_racetrack": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.19,
+   "status": "refused"
+  },
+  "surface3_r3_z@ladder_2x72": {
+   "ler": null,
+   "metrics": null,
+   "reason": "rules: failed ['R22'] -- R22: 3 ions move in 2 different ways in one cycle (shuttle +x and shuttle -x); one cycle is one waveform, so unlike motions need 2 cycles | R22: 4 ions move in 2 different ways in one cycle (shuttle -x and shuttle -y); one cycle is one waveform, so unlike motions need 2 cycles | R22: 2 ions move in 2 different ways in one cycle (shuttle +x and shuttle -y); one cycle is one waveform, so unlike motions need 2 cycles",
+   "seconds": 9.174,
+   "status": "wrong"
+  },
+  "surface3_r3_z@ring144_24v": {
+   "ler": {
+    "budget": {
+     "gate_1q": 0.00780000000001646,
+     "idle": 0.0012132329239686324,
+     "measure": 0.05280000000000151,
+     "ms_base": 0.1324799999999966,
+     "ms_chain": 0.0,
+     "ms_heating": 0.0,
+     "reset": 0.08,
+     "total": 0.2742932329239832
+    },
+    "errors": 120,
+    "hi": 0.0047805208442260345,
+    "ler": 0.004,
+    "lo": 0.003346487130914705,
+    "noise": "qccd-noise@1",
+    "per_round": 0.001335115072294335,
+    "shots": 30000
+   },
+   "metrics": {
+    "T_jones": 85.52,
+    "T_transport": 74.798,
+    "dacs": 46,
+    "instructions": 684,
+    "ions_per_instruction": 3.727272727272727,
+    "transport_instructions": 198
+   },
+   "reason": "",
+   "seconds": 0.216,
+   "status": "valid"
+  },
+  "surface3_r3_z@stationary_chain": {
+   "ler": null,
+   "metrics": null,
+   "reason": "qccdc cannot compile this pair:   rotation does not apply either: the device has no closed loop with docks",
+   "seconds": 0.098,
+   "status": "refused"
+  }
+ }
+}

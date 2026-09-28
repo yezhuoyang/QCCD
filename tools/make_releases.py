@@ -10,6 +10,11 @@ checks, and a suggested first device known to run the board's circuit (measured 
 rotate on a ring with docks for the syndrome rounds, the router on a 3x3 grid for the
 five-qubit code; BB on ring(72,2,24) in 21 s).  A published release is immutable: change a
 board by adding `<task>@2`.
+
+MEMORY BOARDS (docs/PLAN-boards.md, Phase 2) rank by the logical error rate per round.  Their
+circuit is a QEC memory experiment from qccd.qec.experiments: the syndrome rounds, with the data
+readout appended by the grader (qccdc's rotation cannot measure an ion that rides the loop).
+Measured 2026-09-28: rep5 and surface3 compile by rotation on ring(8,2,8) and pass every rule.
 """
 
 from __future__ import annotations
@@ -37,6 +42,26 @@ BOARDS = [
 ]
 
 
+MEMORY = [
+    # task, order, experiment key, title, description
+    ("rep5_mem", 6, "rep5", "Repetition code memory, distance 5",
+     "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused "
+     "every round), then the data read out; ranked by the logical error rate per round under the noise "
+     "model built from the device's physics."),
+    ("surface3_mem", 7, "surface3", "Surface code memory, distance 3",
+     "Three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and "
+     "reused every round), then the data read out; ranked by the logical error rate per round under the "
+     "noise model built from the device's physics."),
+]
+LER_METRICS = [
+    {"name": "ler_per_round", "unit": "per round", "better": "low",
+     "about": "logical error rate per syndrome round, 1-(1-LER)^(1/rounds), under the release's noise model"},
+    {"name": "ler", "unit": "per experiment", "better": "low",
+     "about": "logical error rate of the whole memory experiment (Monte Carlo, fixed seed, 95% interval in the report)"},
+]
+LER_BUDGET = {"decoder": "pymatching", "max_shots": 200000, "max_errors": 200, "seed": 20260928}
+
+
 def main() -> int:
     base = find_release("ghz4@1")
     physics = base.physics()
@@ -50,6 +75,19 @@ def main() -> int:
         d = build_release(task, "1", text, physics, title=info["title"], description=info["description"],
                           out_dir=RELEASES_DIR, metrics=metrics, rank_by=base.manifest["rank_by"],
                           starter=start, limits=limits, order=order)
+        rel = find_release(f"{task}@1")
+        print(f"{rel.id}: {rel.title} -> {d} ({rel.digest[:23]}...)")
+    from qccd.qec import get_experiment
+    for task, order, key, title, description in MEMORY:
+        if (RELEASES_DIR / f"{task}@1").exists():
+            print(f"{task}@1 exists; left alone")
+            continue
+        exp = get_experiment(key)
+        d = build_release(task, "1", exp.qasm, physics, title=title, description=description,
+                          out_dir=RELEASES_DIR, metrics=metrics + LER_METRICS, rank_by="ler_per_round",
+                          starter=RING_SMALL, order=order,
+                          qec={"experiment": exp.name, "detectors": exp.spec(), "noise": "qccd-noise@1",
+                               "ler": LER_BUDGET})
         rel = find_release(f"{task}@1")
         print(f"{rel.id}: {rel.title} -> {d} ({rel.digest[:23]}...)")
     return 0
