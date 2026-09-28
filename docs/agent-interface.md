@@ -28,8 +28,28 @@ The mechanism is in `qccd/workspace/interface.py`. Agents read all of it as one 
 | a function on `window.EDITOR` | an entry in `qccd/viz/js/editor_api.json`: `use` (`agent`, `harness` for tests and the pointer, `never` for the person's files or storage), `does`, and for an agent verb its `kind` (`read`, `view`, `design`, `program` or `course`) and `args` | every API key has an entry and every entry names a key |
 | a page on the website | nothing more: the site build puts every page in the search index, and the index is the list of places | — |
 | a page action | the name in `service.PAGE_ACTIONS`, a `case` in `web/pageact.js act()`, the MCP tool's `action` enum, and a line in the skill | the four agree |
+| a capability (anything an agent does through the service) | ONE `Feature` in `qccd/workspace/features.py`: the tool's name, its text for the agent, its input schema, read-only or not, the call it makes, the routes it uses, the CLI verbs that do the same and the job kinds it starts | `tests/test_feature_registry.py` (below) |
+| a service route | a Feature that calls it, or an entry in `features.INTERNAL_ROUTES` saying why no agent needs it (`human_only` routes are exempt) | the registry gate |
+| a CLI verb | the Feature it matches (`cli=`), or an entry in `features.LOCAL_VERBS` saying why it is local | the registry gate |
+| a job kind | a runner in `results.JOB_RUNNERS` and a Feature that starts it (`job_kinds=`) | the registry gate |
 
 Links and native fold-outs (`<summary>`) are declared by being what they are.
+
+### One declaration per capability
+
+`features.py` is the only place a tool is written down. The MCP tool list, `READ_ONLY` and
+the dispatcher (`mcp_server`), the interface manifest, the skill's `references/tools.md` and
+`tools.json`, and the website's Agentic page table are all generated from it. The installed
+skill refreshes itself when the content it would be built from changes
+(`installers.skill_digest`), so a new tool reaches every workspace on the next service start
+without a version bump. `tests/test_feature_registry.py` fails when:
+
+- a route an agent can reach is called by no Feature and has no reason in `INTERNAL_ROUTES`;
+- a Feature names a route that does not exist, or one only a person may call;
+- a CLI verb matches no Feature and has no reason in `LOCAL_VERBS`;
+- a job kind has no runner, or no Feature starts it (an unknown kind is refused; it used to
+  run as `evaluate`);
+- the skill the installer builds is missing a tool.
 
 Text written for agents (the MCP instructions, tool descriptions, the skill, the site guide)
 may name only Studio functions declared for agents; the gate checks this too.

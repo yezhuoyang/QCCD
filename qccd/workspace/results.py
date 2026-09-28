@@ -41,9 +41,13 @@ from .bundle import BundleError, archive_bundle, read_bundle, write_bundle
 from .jsonsafe import canonical_bytes, digest, strict_loads
 from .store import dumps, loads
 
-__all__ = ["ResultsMixin", "JOB_KINDS"]
+__all__ = ["ResultsMixin", "JOB_KINDS", "JOB_RUNNERS"]
 
-JOB_KINDS = ("compile", "evaluate", "run", "submit")
+#: Every job kind and the method that runs it.  A kind is started through a tool (features.py
+#: names the kinds each Feature starts; the gate test checks every kind here is reachable), and a
+#: kind with no entry is refused -- before this table, an unknown kind fell through to `evaluate`.
+JOB_RUNNERS = {"compile": "_job_compile", "evaluate": "_job_evaluate", "run": "_job_run", "submit": "_job_submit"}
+JOB_KINDS = tuple(JOB_RUNNERS)
 TERMINAL = ("succeeded", "failed", "cancelled", "timeout", "internal_error")
 
 
@@ -192,14 +196,8 @@ class ResultsMixin:
         watcher.start()
         status, result, error = "internal_error", None, None
         try:
-            if kind == "compile":
-                result = self._job_compile(jid, params, actor, origin_prompt_id, cancel)
-            elif kind == "run":
-                result = self._job_run(jid, params, actor, origin_prompt_id, cancel)
-            elif kind == "submit":
-                result = self._job_submit(jid, params, actor, origin_prompt_id, cancel)
-            else:
-                result = self._job_evaluate(jid, params, actor, origin_prompt_id, cancel)
+            runner = getattr(self, JOB_RUNNERS[kind])          # a KeyError is an internal error, never a guess
+            result = runner(jid, params, actor, origin_prompt_id, cancel)
             status = result.pop("_status", "succeeded")
         except Exception as exc:  # recorded, never swallowed
             error = f"{type(exc).__name__}: {exc}"

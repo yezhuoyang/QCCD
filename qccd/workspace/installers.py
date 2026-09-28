@@ -31,10 +31,11 @@ from pathlib import Path
 
 from .jsonsafe import strict_loads
 
-__all__ = ["install", "uninstall", "status", "build_skill", "refresh_skills", "SKILL_VERSION"]
+__all__ = ["install", "uninstall", "status", "build_skill", "refresh_skills", "SKILL_VERSION", "skill_digest"]
 
 SKILL_SRC = Path(__file__).resolve().parent / "skill"
-SKILL_VERSION = "1.11.0"
+#: a label for people; the refresh keys on `skill_digest()`, not on this
+SKILL_VERSION = "1.12.0"
 MD_BEGIN = "<!-- qccd:begin (managed by `qccd agent install`; edit outside this block) -->"
 MD_END = "<!-- qccd:end -->"
 TOML_BEGIN = "# qccd:begin (managed by `qccd agent install`; edit outside this block)"
@@ -79,39 +80,60 @@ def mcp_server_config(root: Path, client: str, *, session_id: str | None = None,
     return {"command": exe, "args": args, "env": env}
 
 
+def _skill_files() -> dict[str, bytes]:
+    """Every file of the skill, static and generated, as it would be installed."""
+    from ..verify.rules import RULE_STATEMENTS
+    from . import evaluator as ev
+    from .features import tools_json, tools_markdown
+    from .operations import describe_operations
+    from .tasks import list_boards
+    files = {
+        "SKILL.md": (SKILL_SRC / "SKILL.md").read_bytes(),
+        "references/workflow.md": (SKILL_SRC / "references" / "workflow.md").read_bytes(),
+        "references/design.md": (SKILL_SRC / "references" / "design.md").read_bytes(),
+        # every tool of this build, from the one table that declares them (features.py)
+        "references/tools.md": tools_markdown().encode(),
+        "references/tools.json": json.dumps(tools_json(), indent=1).encode(),
+        "references/operations.json": json.dumps(describe_operations(), indent=1).encode(),
+        "references/rules.json": json.dumps([{"id": k, "statement": v} for k, v in RULE_STATEMENTS.items()],
+                                            indent=1).encode(),
+        "references/evaluator.json": json.dumps({"stages_doc": ev.__doc__, "statuses": list(ev.STAGE_STATUSES),
+                                                 "allowed_skips": sorted(ev.ALLOWED_SKIPS)}, indent=1).encode(),
+        # the leaderboards any design can be submitted to, by title (a workspace is not tied to one)
+        "references/boards.json": json.dumps([b.board() for b in list_boards()], indent=1).encode(),
+        "examples/change_set.json": json.dumps({
+            "expected_revision": 3, "request_id": "example-1", "mode": "preview", "summary": "a two-site spur",
+            "operations": [{"type": "add_chain", "prefix": "S", "count": 2, "start": [0, 2], "step": [2, 0],
+                            "zone": "trap", "attach_to": "C0"}]}, indent=1).encode(),
+    }
+    return files
+
+
+def skill_digest(files: dict[str, bytes] | None = None) -> str:
+    """One digest over the whole skill.  An installed skill is refreshed when this changes, so a
+    new tool, rule or board reaches every workspace without anyone bumping SKILL_VERSION (which
+    nothing enforced: a SKILL.md edit without a bump never left the repository)."""
+    files = _skill_files() if files is None else files
+    h = hashlib.sha256()
+    for rel in sorted(files):
+        h.update(rel.encode() + b"\0" + hashlib.sha256(files[rel]).digest())
+    return "sha256:" + h.hexdigest()
+
+
 def build_skill(dest: Path, root: Path | None = None) -> dict:
     """Write the skill for one client: static files + generated references + manifest."""
-    from ..verify.rules import RULE_STATEMENTS
-    from .operations import describe_operations
     dest = Path(dest)
     if dest.exists():
         shutil.rmtree(dest)
     (dest / "references").mkdir(parents=True)
+    data = _skill_files()
     files = {}
-
-    def put(rel: str, data: bytes):
+    for rel, b in data.items():
         p = dest / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(data)
-        files[rel] = _sha(data)
-
-    put("SKILL.md", (SKILL_SRC / "SKILL.md").read_bytes())
-    put("references/workflow.md", (SKILL_SRC / "references" / "workflow.md").read_bytes())
-    put("references/design.md", (SKILL_SRC / "references" / "design.md").read_bytes())
-    put("references/operations.json", json.dumps(describe_operations(), indent=1).encode())
-    put("references/rules.json", json.dumps([{"id": k, "statement": v} for k, v in RULE_STATEMENTS.items()],
-                                            indent=1).encode())
-    from . import evaluator as ev
-    put("references/evaluator.json", json.dumps({"stages_doc": ev.__doc__, "statuses": list(ev.STAGE_STATUSES),
-                                                 "allowed_skips": sorted(ev.ALLOWED_SKIPS)}, indent=1).encode())
-    # the leaderboards any design can be submitted to, by title (a workspace is not tied to one)
-    from .tasks import list_boards
-    put("references/boards.json", json.dumps([b.board() for b in list_boards()], indent=1).encode())
-    put("examples/change_set.json", json.dumps({
-        "expected_revision": 3, "request_id": "example-1", "mode": "preview", "summary": "a two-site spur",
-        "operations": [{"type": "add_chain", "prefix": "S", "count": 2, "start": [0, 2], "step": [2, 0],
-                        "zone": "trap", "attach_to": "C0"}]}, indent=1).encode())
-    man = {"skill": "qccd", "version": SKILL_VERSION, "files": files}
+        p.write_bytes(b)
+        files[rel] = _sha(b)
+    man = {"skill": "qccd", "version": SKILL_VERSION, "digest": skill_digest(data), "files": files}
     (dest / MANIFEST).write_text(json.dumps(man, indent=1), encoding="utf-8")
     return man
 
@@ -222,16 +244,17 @@ def install(root: Path, client: str, *, scope: str = "project", channel: bool = 
 
 
 def refresh_skills(root: Path) -> list:
-    """Bring the installed skills up to this code's version, where the person has not edited
-    them: after a `git pull`, the next service start (it restarts on new code) hands every
+    """Bring the installed skills up to this code's skill (by content digest), where the person
+    has not edited them: after a `git pull`, the next service start (it restarts on new code) hands every
     agent the current guidance instead of the version installed with the workspace.  An
     edited skill is left alone; `qccd agent status` says it is behind."""
     out = []
+    current = skill_digest()
     for client, d in (("claude", ".claude"), ("codex", ".agents")):
         dest = Path(root) / d / "skills" / "qccd"
         m = dest / MANIFEST
         try:
-            if not m.exists() or json.loads(m.read_text(encoding="utf-8")).get("version") == SKILL_VERSION:
+            if not m.exists() or json.loads(m.read_text(encoding="utf-8")).get("digest") == current:
                 continue
             if _modified(dest):
                 continue
@@ -282,7 +305,7 @@ def status(root: Path, client: str) -> dict:
     if (sk / MANIFEST).exists():
         man = json.loads((sk / MANIFEST).read_text(encoding="utf-8"))
         out["skill"] = {"path": str(sk.relative_to(root)), "version": man["version"],
-                        "current": man["version"] == SKILL_VERSION, "modified": _modified(sk)}
+                        "current": man.get("digest") == skill_digest(), "modified": _modified(sk)}
     if client == "claude":
         mcp = root / ".mcp.json"
         if mcp.exists():
