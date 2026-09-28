@@ -20,8 +20,8 @@ import { spawn } from 'child_process';
 // the rendered-page path probe: `PROBE` is taken under another name because this
 // file already has one, and the two ask different questions of the same page
 import { PROBE as PATH_PROBE, describe as describePaths, PLANT, UNPLANT }
-import { findChrome } from './chrome_path.mjs';
   from './_rendered_paths.mjs';
+import { findChrome } from './chrome_path.mjs';
 //: The studio's pane buttons, read out of the page so a new pane is covered the day it is
 //: added.  `OPEN_PANES` from the module clicks them all at once, which is the wrong shape
 //: here -- see the loop in `visit`.

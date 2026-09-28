@@ -3,7 +3,7 @@
     "version": "73864a5c493d",
     "source": {
       "repository": "https://github.com/yezhuoyang/QCCD",
-      "commit": "3df0d19eea7659b3cc3733b0c95a84e767c460b6",
+      "commit": "3ef9e910a2cea431325d4b78aa55aa7c43ca7147",
       "path": "Compiler/ocaml",
       "tree": "73864a5c493db7c543f84b54924a0dbf87820404"
     },
