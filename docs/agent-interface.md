@@ -79,7 +79,7 @@ check fails on any undeclared control not listed here.
 | where | undeclared controls | code |
 |---|---|---|
 | gadget viewer pages (`gadgets/algorithms/*`, `gadgets/demo/`, `gadgets/showcase/`) | 11–12: `bStart`, `bPlay`, `bStep`, `rate`, `bLib`, `checksBadge`, `bEdit`, `bUp`, `bFit`, `bIons`, `bClassical` | `qccd/gadget/web/` |
-| leaderboard index pages (`board/<task>/`) | the chart's `ysel`, `xsel`, `log`, `vchart`, `vtable` | the site build |
+| leaderboard index pages (`board/<task>/`) | the chart's `ysel`, `xsel`, `log`, `vchart`, `vtable`: declared by the site build since website/invitations 9bf8b7a (`qccd/site/boards.py`, as each page is copied); undeclared on the live site until its next deploy | the site build |
 | leaderboard entry pages (`board/<task>/<entry>.html`) | the Study-notes overlay (`bbpill`, `bbx`, `bbprev`, `bbnext`, `bbreopen`), the label box in `bblab`, two pane close buttons (`pHw`, `paneQ`), `qcShowOn` | the board overlay, the compiled pages' template, `qccd/site/qec_cycle.js` |
 | site Studio pages | the QEC-cycle panel's `qcShowOn` | `qccd/site/qec_cycle.js` |
 
