@@ -145,7 +145,7 @@ def _first_sentence(s: str) -> str:
 
 def _principles(n_tools: int, n_verbs: int, n_actions: int) -> str:
     items = [
-        ("The agent is the person's own.", "It runs on their computer (Claude Code or Codex), in a folder they chose, "
+        ("The agent is the person's own.", "It runs on their computer (Claude Code, Codex or Cursor), in a folder they chose, "
          "and works on their designs. This website never connects to it: the website's Agent button is only a link to "
          "the person's own machine."),
         ("One design store, two hands.", "The person edits in the Studio; the agent edits through the same workspace. "
@@ -172,7 +172,7 @@ def _architecture() -> str:
         ("ws", "The workspace service", "on the person's computer: the designs and their history, change sets, jobs "
          "(compile, run, grade), the page bridge, the trace"),
         ("ws", "The QCCD MCP server", "the agent's tools: typed calls into the workspace, each traced"),
-        ("ag", "The agent runtime", "Claude Code or Codex, started by the chat, with the QCCD skill"),
+        ("ag", "The agent runtime", "Claude Code, Codex or Cursor, started by the chat, with the QCCD skill"),
         ("ag", "The model", "reads the whole context each call, writes text, thinking and tool calls"),
     ]
     out = ['<div class="ag-arch">']
@@ -443,7 +443,13 @@ def _harness(meas: dict | None) -> str:
                + _code(DENIED) + ". The denied ones either change files or schedule work that cannot outlive a "
                "single run. Its standing note:</p><pre>" + _e(SYSTEM_NOTE) + "</pre>"
                "<p>Codex runs through its app server, with the QCCD tools pre-approved: the workspace authorises "
-               "them itself (a scoped token, protected entities, no publishing).</p>")
+               "them itself (a scoped token, protected entities, no publishing).</p>"
+               "<p>Cursor runs as one <code>cursor-agent -p</code> run per message, each resuming the same chat "
+               "(<code>--resume</code>), with the message on its input. Its settings are the workspace's own "
+               "(<code>CURSOR_CONFIG_DIR</code>), not the person's: the QCCD tools are allowed, every shell command "
+               "and file write is denied, and a run without <code>--force</code> refuses whatever else would wait "
+               "for a person's approval. Its QCCD tools come from the workspace's <code>.cursor/mcp.json</code>, "
+               "which names the chat's session, so every call is traced to it.</p>")
     return "".join(out)
 
 
@@ -456,7 +462,7 @@ def _skills() -> str:
         text = text.replace(x, y)
     refs = sorted(p.name for p in (skill / "references").glob("*.md"))
     out = [f"<p>The skill (version {_e(installers.SKILL_VERSION)}) is installed into the workspace folder for the "
-           f"agent the person uses, by <code>qccd agent install --client codex</code> or <code>--client claude</code>. "
+           f"agent the person uses, by <code>qccd agent install --client codex</code>, <code>--client claude</code> or <code>--client cursor</code>. "
            f"It is a short workflow (SKILL.md) plus references the agent opens when it needs them: "
            + ", ".join(_code(r) for r in refs)
            + ", and generated ones listing the boards, the operations, the rules and the evaluator's stages.</p>",

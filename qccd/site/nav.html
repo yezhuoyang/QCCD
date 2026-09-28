@@ -144,7 +144,7 @@
   var PORT = 47100;                                        // qccd/workspace/mirror.py WEB_PORT
   var PANEL = '<button class="qa-x" type="button" aria-label="close">&times;</button>'
     + '<h2>Ask your own agent about this page</h2>'
-    + '<p>An AI agent on your computer (Codex or Claude Code) works on this site the way you do, while '
+    + '<p>An AI agent on your computer (Codex, Claude Code or Cursor) works on this site the way you do, while '
     + 'you watch its cursor. Ask about the page, and it points at the answer, steps the examples and '
     + 'takes you to other pages. It can walk you through the lessons, review a page for mistakes and, '
     + 'if you ask, comment under your name, marked as your agent\'s. It can also change your own '
@@ -164,10 +164,16 @@
     + 'only an example; <code>qccd init</code> with no name makes the folder you are in the workspace; rename '
     + 'or move it later while <code>qccd stop</code>ped) and every design you make (in the Studio&rsquo;s '
     + 'design menu, or ask the agent). One workspace holds any number of designs for every leaderboard. '
-    + '<b>Type as shown:</b> everything else. Use <code>--client claude</code> if you have Claude Code '
-    + 'rather than Codex.</p>'
-    + '<p class="qa-small">On macOS or Linux, activate with <code>source .venv/bin/activate</code>. Codex '
-    + 'or Claude Code, whichever you have, starts by itself when you send your first message (switch '
+    + '<b>Type as shown:</b> everything else. Use <code>--client claude</code> if you have Claude Code, or '
+    + '<code>--client cursor</code> if you use Cursor.</p>'
+    + '<p class="qa-small">On macOS or Linux, make the environment with <code>python3.13 -m venv .venv</code> '
+    + '(QCCD needs Python 3.10 or newer, and a Mac&rsquo;s own <code>python3</code> is 3.9: '
+    + '<code>brew install python@3.13</code>) and activate it with <code>source .venv/bin/activate</code>. '
+    + 'With Cursor, the chat runs Cursor&rsquo;s command-line agent, which the editor does not include: install '
+    + 'it and sign in once with <code>curl https://cursor.com/install -fsS | bash</code> and '
+    + '<code>~/.local/bin/cursor-agent login</code> (on Windows: <code>irm "https://cursor.com/install?win32=true" '
+    + '| iex</code>, then <code>cursor-agent login</code>). Codex, Claude Code or Cursor, whichever you set up, '
+    + 'starts by itself when you send your first message (switch '
     + 'under &hellip; in the chat). After an update (<code>git pull</code>), run <code>qccd stop</code>, '
     + 'then <code>qccd web</code> again. '
     + '<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/docs/workspace.md">How it works</a></p>';
@@ -182,7 +188,7 @@
     var local = 'http://127.0.0.1:' + PORT;
     var btn = document.createElement('button');
     btn.id = 'qa-btn'; btn.type = 'button'; btn.setAttribute('aria-expanded', 'false');
-    btn.title = 'Ask your own AI agent (Codex or Claude Code) about this page';
+    btn.title = 'Ask your own AI agent (Codex, Claude Code or Cursor) about this page';
     btn.innerHTML = '<i></i>Agent';
     nav.insertBefore(btn, nav.querySelector('.sn-sp'));
     var panel = document.createElement('div');

@@ -54,7 +54,7 @@ STUDIO_CSS = """
 PANEL_HTML = """
 <button class="qa-x" type="button" aria-label="close">&times;</button>
 <h2>Design with an AI agent</h2>
-<p>Work on a design together with an agent: Codex or Claude Code. Select parts of the device,
+<p>Work on a design together with an agent: Codex, Claude Code or Cursor. Select parts of the device,
 lasso a region, sketch an arrow, or show an edit once, and ask. The agent gets exactly what you
 pointed at and edits the same design through checked changes. You watch each change arrive in
 the Studio. Parts you lock stay locked, and any change can be undone.</p>
@@ -94,6 +94,10 @@ before using it. On Windows and Linux, build the checker once: install Lean with
 checker's folder of your clone, which <code>qccd toolchain install</code> names when it finishes
 (about a minute). An Intel Mac builds the compiler from source, as
 <a href="https://github.com/yezhuoyang/QCCD/blob/compiler/Compiler/README.md">the compiler's README</a> describes.</p>
+<p class="qa-small"><b>Cursor.</b> The chat runs Cursor&rsquo;s command-line agent, which the Cursor editor does not include. Install it and sign in once (on Windows: <code>irm "https://cursor.com/install?win32=true" | iex</code>, then <code>cursor-agent login</code> in a new terminal):</p>
+<pre>curl https://cursor.com/install -fsS | bash
+~/.local/bin/cursor-agent login</pre>
+<p class="qa-small">Then use <code>--client cursor</code> below. <code>qccd agent install --client cursor</code> says whether Cursor is ready, or the one command still missing. Opened in the Cursor editor, the same workspace also gives its own agent the QCCD tools: approve the <code>qccd</code> server when Cursor asks.</p>
 <h3>Start a workspace</h3>
 <p class="qa-small">Run these from the folder that holds QCCD, not inside it. Type them as shown,
 except the folder name, which is yours.</p>
@@ -106,9 +110,9 @@ only an example; <code>qccd init</code> with no name makes the folder you are in
 or move it later while <code>qccd stop</code>ped), every design (the design menu at the top of the
 chat saves, renames and switches them, or ask the agent), and the name shown if you publish. One
 workspace holds any number of designs for every leaderboard. <b>Type as shown:</b> the commands. Use
-<code>--client claude</code> if you have Claude Code rather than Codex.</p>
-<p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. Codex or
-Claude Code, whichever you have, starts by itself when you send (switch under &hellip; in the chat). Ask it to
+<code>--client claude</code> if you have Claude Code, or <code>--client cursor</code> if you use Cursor.</p>
+<p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. Codex, Claude
+Code or Cursor, whichever you set up, starts by itself when you send (switch under &hellip; in the chat). Ask it to
 change the design, or to run a program and explain it, for example <em>"Make a new design with a
 large triangle and a smaller one, and submit it to the BB code"</em>, <em>"Compile and run the BB code
 on this design and summarize the bottleneck"</em> or <em>"Run the BB code on my two designs side by
@@ -150,7 +154,7 @@ STUDIO_JS = r"""
   if (!nav || document.getElementById('qa-btn')) return;
   var btn = document.createElement('button');
   btn.id = 'qa-btn'; btn.type = 'button'; btn.setAttribute('aria-expanded', 'false');
-  btn.title = 'Design with an AI agent (Codex or Claude Code)';
+  btn.title = 'Design with an AI agent (Codex, Claude Code or Cursor)';
   btn.innerHTML = '<i></i>Agent';
   nav.insertBefore(btn, nav.querySelector('.sn-sp'));
   var panel = document.createElement('div');
