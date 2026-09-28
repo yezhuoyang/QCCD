@@ -180,11 +180,11 @@ class CollabMixin:
     def register_session(self, actor: Mapping, *, client: str, mode: str, label: str = "",
                          runtime_ref: str | None = None, capabilities: Mapping | None = None,
                          branch: str = "main", session_id: str | None = None) -> dict:
-        """An agent runtime announcing itself.  `mode`: `appserver` (Codex), `channel`
-        (Claude Code channel), `pull` (any MCP client, reduced capability)."""
+        """An agent runtime announcing itself.  `mode`: `appserver` (Codex, and Claude Code or Cursor
+        run by the service), `channel` (Claude Code channel), `pull` (any MCP client, reduced capability)."""
         from .core import WorkspaceError, new_id
-        if client not in ("codex", "claude", "generic"):
-            raise WorkspaceError("bad_request", "client must be codex, claude or generic", status=422)
+        if client not in ("codex", "claude", "cursor", "generic"):
+            raise WorkspaceError("bad_request", "client must be codex, claude, cursor or generic", status=422)
         if mode not in ("appserver", "channel", "pull", "sdk"):
             raise WorkspaceError("bad_request", "mode must be appserver, channel, pull or sdk", status=422)
         caps = dict(capabilities or {})

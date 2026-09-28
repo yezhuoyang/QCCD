@@ -124,6 +124,7 @@ def test_every_control_in_the_studio_is_declared(tmp_path, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     try:

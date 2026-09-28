@@ -51,7 +51,7 @@ var S = {
   paired: false, lastError: null, compile: null,
   // the chat view (default) vs the debug view (tabs)
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
-  conv: [], working: [], pending: null, codex: null, claude: null, connecting: false, branches: [], convTimer: null,
+  conv: [], working: [], pending: null, codex: null, claude: null, cursor: null, connecting: false, branches: [], convTimer: null,
   lastSel: '', selOff: false, convScrolled: false,
   // the page this chat is about (a website page, or Studio itself)
   page: PAGE ? { url: CFG.page || '/web/', site: CFG.site } : null, pageDoing: null
@@ -770,6 +770,7 @@ function sessionLabel(sid) {
 }
 function capabilityText(s) {
   if (s.mode === 'appserver' && s.client === 'claude') return 'automatic: each message runs Claude Code in one conversation; stop supported';
+  if (s.mode === 'appserver' && s.client === 'cursor') return 'automatic: each message is one Cursor run in the same chat; stop supported';
   if (s.mode === 'appserver') return 'automatic: starts a turn in the Codex thread; steer and stop supported';
   if (s.mode === 'channel') return 'automatic push to Claude Code (unacknowledged until the agent reads it); no steer or stop';
   if (s.mode === 'pull') return 'reduced: the agent sees prompts only when it next reads its context';
@@ -1015,7 +1016,7 @@ function renderAgent(b) {
   });
   b.appendChild(h('label', { cls: 'qcl-row' }, [fl, ' Follow agent (move the view when it presents something)']));
   b.appendChild(h('div', { cls: 'qcl-label', text: 'Agent sessions for this workspace' }));
-  if (!S.sessions.length) b.appendChild(h('div', { cls: 'qcl-note', text: 'None. Run `qccd agent connect --client codex` (or start Claude Code with the QCCD channel) in this project.' }));
+  if (!S.sessions.length) b.appendChild(h('div', { cls: 'qcl-note', text: 'None. Run `qccd agent connect --client codex` or `--client cursor` (or start Claude Code with the QCCD channel) in this project.' }));
   S.sessions.forEach(function (s) {
     var isT = s.id === S.target;
     b.appendChild(h('div', { cls: 'qcl-item' }, [
@@ -1197,7 +1198,7 @@ function review(sub) {
 // current selection goes with the message; "+" points at things (lasso, point, arrow,
 // sketch, show an edit) or locks parts.  Sessions, deliveries, threads, activity and
 // results are the debug view (the "..." menu).  If no agent is connected, sending starts
-// a Codex conversation when Codex is installed.
+// a conversation with the agent the person chose, or the one installed (agentChoice).
 function agentSession() {
   return S.sessions.filter(function (x) { return x.id === S.target; })[0] || null;
 }
@@ -1206,6 +1207,7 @@ function shortName(n) {
   if (/^agent:/.test(n)) return 'Agent';                 // an agent without a named session
   if (/codex/i.test(n)) return 'Codex';
   if (/claude/i.test(n)) return 'Claude';
+  if (/cursor/i.test(n)) return 'Cursor';
   return n;
 }
 function isWorking() { return S.working.some(function (w) { return w.state === 'working'; }); }
@@ -1333,6 +1335,7 @@ function toggleMenu(which) {
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
+      S.cursor ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       ['Open your Studio (the design you work on)', function () { goTo('/studio'); }],
@@ -1356,6 +1359,7 @@ function toggleMenu(which) {
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
+      S.cursor ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
@@ -1433,7 +1437,7 @@ function chatSend(textArg) {
     if (s && s.write_fence) return api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/resume', {}).then(loadSessions);
   }).then(function () {
     var s = agentSession();
-    S.steer = !!(wasWorking && s && s.mode === 'appserver' && s.client === 'codex');   // a Claude run takes the next message after it
+    S.steer = !!(wasWorking && s && s.mode === 'appserver' && s.client === 'codex');   // a Claude or Cursor run takes the next message after it
     return send({ text: text, mode: 'apply', anchors: anchors });
   }).then(function (d) {
     if (!d) { S.pending = null; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
@@ -1470,6 +1474,7 @@ function warmOnTyping() {
 function loadAgents() {
   return api('GET', '/api/agents').then(function (r) {
     S.codex = !!(r.ok && r.data.codex_available); S.claude = !!(r.ok && r.data.claude_available);
+    S.cursor = !!(r.ok && r.data.cursor_available);
     S.installed = (r.ok && r.data.installed) || [];
   });
 }
@@ -1479,12 +1484,16 @@ function agentChoice() {
   var pref = localGet('qccd.agent'), inst = S.installed || [];
   if (pref === 'claude' && S.claude) return 'claude';
   if (pref === 'codex' && S.codex) return 'codex';
+  if (pref === 'cursor' && S.cursor) return 'cursor';
   if (inst.length === 1 && S[inst[0]]) return inst[0];
-  return S.codex ? 'codex' : (S.claude ? 'claude' : null);
+  return S.codex ? 'codex' : (S.claude ? 'claude' : (S.cursor ? 'cursor' : null));
 }
-function agentTitle(k) { return k === 'claude' ? 'Claude' : 'Codex'; }
+function agentTitle(k) { return k === 'claude' ? 'Claude' : (k === 'cursor' ? 'Cursor' : 'Codex'); }
 // which agent the chat is about: the connected one, else the one it will start
-function agentKind() { var s = agentSession(); return s ? (s.client === 'claude' ? 'claude' : 'codex') : agentChoice(); }
+function agentKind() {
+  var s = agentSession();
+  return s ? (s.client === 'claude' || s.client === 'cursor' ? s.client : 'codex') : agentChoice();
+}
 // the trace viewer (trace.js), at this conversation's latest request
 function openTrace() {
   var s = agentSession();
@@ -1515,7 +1524,7 @@ function setModel(kind, change) {
 }
 function modelMenu() {
   var kind = agentKind();
-  if (!kind) { notice('No agent is installed: install Codex or Claude Code first.'); return; }
+  if (!kind) { notice('No agent is installed: install Codex, Claude Code or Cursor first.'); return; }
   var go = function () {
     var cat = (S.models || {})[kind] || {}, cur = modelOf(kind);
     var m = h('div', { id: 'qcl-menu', cls: 'qcl-menu down', 'data-which': 'model', on: { click: function (e) { e.stopPropagation(); } } });
@@ -1524,6 +1533,8 @@ function modelMenu() {
       m.appendChild(h('button', { cls: 'qcl-mi', text: (x.id === cur.model ? '✓ ' : '') + x.label + (x.note ? ' — ' + x.note : ''),
                                   on: { click: function () { closeMenu(); setModel(kind, { model: x.id }); } } }));
     });
+    // Cursor lists its models only when signed in: say why the list is short
+    if (cat.error) m.appendChild(h('div', { cls: 'qcl-note', text: agentTitle(kind) + ' did not list its models: ' + String(cat.error).slice(0, 200) }));
     var efforts = cat.efforts || [];
     (cat.models || []).forEach(function (x) { if (x.id === cur.model && x.efforts) efforts = x.efforts; });
     if (efforts.length) {
@@ -1544,12 +1555,14 @@ function modelMenu() {
 function connectCodex() { return connectAgent('codex'); }
 function connectAgent(kind) {
   S.connecting = kind; renderChatHead(); renderConv();
-  // nobody can answer an approval prompt from Studio: neither agent is ever asked -- Codex runs
-  // with approval `never` and a read-only shell, Claude with `dontAsk` and no shell -- and each
+  // nobody can answer an approval prompt from Studio: no agent is ever asked -- Codex runs with
+  // approval `never` and a read-only shell, Claude with `dontAsk` and no shell, Cursor headless
+  // (what needs an approval is refused) with the shell and file writes denied -- and each
   // changes the design only through the QCCD tools
   var pick = modelPref(kind);
   var req = kind === 'claude' ? api('POST', '/api/sessions/claude/connect', { label: 'Claude', model: pick.model || undefined,
                                                                              effort: pick.effort || undefined })
+    : kind === 'cursor' ? api('POST', '/api/sessions/cursor/connect', { label: 'Cursor', model: pick.model || undefined })
     : api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
                                                    sandbox: 'read-only',
                                                    turn_overrides: { model: pick.model || undefined, effort: pick.effort || undefined } });
@@ -2220,7 +2233,8 @@ window.QCCD_LIVE = {
   // the chat
   chat: function () { return { debug: S.debug, items: S.conv.slice(), working: S.working.slice(), pending: S.pending,
                                branch: S.branch, branches: S.branches.map(function (b) { return b.name; }),
-                               agent: (agentSession() || {}).id || null, codex: S.codex, claude: S.claude }; },
+                               agent: (agentSession() || {}).id || null, codex: S.codex, claude: S.claude,
+                               cursor: S.cursor }; },
   chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft,
   page: function () { return S.page; }, refreshPage: refreshPage
 };

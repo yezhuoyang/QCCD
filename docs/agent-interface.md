@@ -1,6 +1,6 @@
 # The agent interface: a feature ships with its declaration, or it does not ship
 
-Agents (Claude, Codex, any MCP client) work on QCCD pages the way a person does, through the
+Agents (Claude, Codex, Cursor, any MCP client) work on QCCD pages the way a person does, through the
 page tools (`qccd_page_read`, `qccd_page_act`). They may do **only what the code declares**:
 
 - a control that is not declared is read and pointed at, never pressed or typed into;

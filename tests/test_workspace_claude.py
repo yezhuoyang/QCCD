@@ -78,6 +78,7 @@ def svc(tmp_path, monkeypatch):
         exe.chmod(0o755)
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
     monkeypatch.setenv("QCCD_CLAUDE", str(exe))
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
@@ -113,7 +114,8 @@ def _until(fn, timeout=40):
 def test_claude_answers_in_one_conversation_and_says_why_it_stopped(svc):
     info, log = svc
     own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
-    assert own("GET", "/api/agents") == {"codex_available": False, "claude_available": True, "installed": []}
+    assert own("GET", "/api/agents") == {"codex_available": False, "claude_available": True, "cursor_available": False,
+                                         "installed": []}
     c = own("POST", "/api/sessions/claude/connect", {"label": "Claude"})
     sid, conv = c["session"]["id"], c["conversation"]
     assert c["session"]["client"] == "claude" and c["session"]["mode"] == "appserver"

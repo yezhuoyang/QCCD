@@ -399,13 +399,14 @@ def create_app(state: ServiceState) -> FastAPI:
     def agents(request, actor, _):
         from .agents.claude import find_claude
         from .agents.codex import find_codex
+        from .agents.cursor import find_cursor
+        from .installers import SKILL_DIRS
         # which agents `qccd agent install` set up here: the chat starts that one by default, so a
         # Claude Code user whose Mac also has the ChatGPT app (it carries a Codex) gets Claude
         root = ws.root
-        installed = [c for c, d in (("claude", ".claude"), ("codex", ".agents"))
-                     if (root / d / "skills" / "qccd").is_dir()]
+        installed = [c for c, d in SKILL_DIRS.items() if (root / d / "skills" / "qccd").is_dir()]
         return {"codex_available": find_codex() is not None, "claude_available": find_claude() is not None,
-                "installed": installed}
+                "cursor_available": find_cursor() is not None, "installed": installed}
 
     @route("GET", "/api/traces", write=False)
     def traces(request, actor, _):
@@ -698,6 +699,11 @@ def create_app(state: ServiceState) -> FastAPI:
     def claude_connect(request, actor, b):
         from .agents.claude import connect_claude
         return connect_claude(state, b)
+
+    @route("POST", "/api/sessions/cursor/connect", human_only=True)
+    def cursor_connect(request, actor, b):
+        from .agents.cursor import connect_cursor
+        return connect_cursor(state, b)
 
     # ------------------------------------------------------------------ prompts
 
@@ -1303,8 +1309,11 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
             from .agents.claude import reattach_claude_sessions
             for r in reattach_claude_sessions(state):
                 logging.getLogger("qccd.service").info("claude session %s", r)
+            from .agents.cursor import reattach_cursor_sessions
+            for r in reattach_cursor_sessions(state):
+                logging.getLogger("qccd.service").info("cursor session %s", r)
         except Exception:
-            logging.getLogger("qccd.service").exception("re-attaching Codex sessions failed")
+            logging.getLogger("qccd.service").exception("re-attaching agent sessions failed")
     threading.Thread(target=reattach, name="qccd-reattach", daemon=True).start()
     access = os.environ.get("QCCD_ACCESS_LOG") == "1"   # request log for diagnosis only (never tokens: URLs carry none)
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info" if access else "warning",
@@ -1324,10 +1333,11 @@ def serve(root: Path, *, port: int | None = None, open_browser: bool = False) ->
         state.stop.set()
         worker.stop()
         # the kept-alive Claude processes end with the service (each would also end when its input
-        # closed, but not before the service's own exit)
+        # closed, but not before the service's own exit), and so does a Cursor run in progress
         from .agents.claude import ClaudeBridge
+        from .agents.cursor import CursorBridge
         for br in list(state.bridges.values()):
-            if isinstance(br, ClaudeBridge):
+            if isinstance(br, (ClaudeBridge, CursorBridge)):
                 try:
                     br.close()
                 except Exception:

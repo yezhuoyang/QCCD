@@ -2,7 +2,9 @@
 
 Claude Code takes `--model <alias>` and `--effort <level>` per run; Codex takes `model` and
 `effort` per turn (`turn/start`), and its app server lists the models this account can use
-(`model/list`, each with its supported reasoning efforts).  The person's choice is kept on
+(`model/list`, each with its supported reasoning efforts).  Cursor takes `--model <id>` per run
+and lists the account's models with `cursor-agent models`; how hard a model thinks is part of
+its id there (a `-thinking` model), so it has no separate level.  The person's choice is kept on
 the session (`capabilities.settings`, and in what a restarted service re-attaches with), so
 it holds for every later message until they change it.
 """
@@ -32,6 +34,11 @@ CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 _NAME = re.compile(r"^[A-Za-z0-9._:\-\[\]]{0,80}$")
 _codex_cache: dict = {}
 _codex_lock = threading.Lock()
+_cursor_cache: dict = {}
+_cursor_lock = threading.Lock()
+#: a line of `cursor-agent models`: `<id> - <name> (current, default)`
+_CURSOR_LINE = re.compile(r"^(?P<id>[A-Za-z0-9._\-\[\]]+) - (?P<name>.*?)"
+                          r"(?: \((?P<tags>(?:current|default)(?:, (?:current|default))*)\))?$")
 
 
 def _codex_list(state) -> dict:
@@ -90,10 +97,50 @@ def _codex_list(state) -> dict:
         return out
 
 
+def _cursor_list(state) -> dict:
+    """The models this Cursor account can use (`cursor-agent models`), kept for an hour once listed."""
+    import subprocess
+    from .claude import _kill_tree
+    from .cursor import _ANSI, _popen_kw, cursor_env, find_cursor
+    exe = find_cursor()
+    if not exe:
+        return {"available": False, "models": [], "efforts": []}
+    with _cursor_lock:
+        hit = _cursor_cache.get("v")
+        if hit and time.time() - hit[0] < 3600:
+            return hit[1]
+        ws = state.ws
+        try:
+            p = subprocess.Popen([exe, "models"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, **_popen_kw(ws, cursor_env(ws)))
+            try:
+                raw, _ = p.communicate(timeout=30)
+            except subprocess.TimeoutExpired:
+                _kill_tree(p)
+                raw = ""
+        except OSError as exc:
+            raw = f"{type(exc).__name__}: {exc}"
+        models = [{"id": "", "label": "Default", "note": "what Cursor picks"}]
+        for line in _ANSI.sub("", raw or "").splitlines():
+            m = _CURSOR_LINE.match(line.strip())
+            if not m:
+                continue
+            tags = (m.group("tags") or "").split(", ")
+            models.append({"id": m.group("id"), "label": m.group("name") or m.group("id"),
+                           "note": "Cursor's default" if "default" in tags else None})
+        out = {"available": True, "models": models, "efforts": []}
+        if len(models) == 1:
+            # not signed in, or no answer: say why, and ask again next time
+            out["error"] = (raw or "cursor-agent models gave no answer").strip()[-300:]
+            return out
+        _cursor_cache["v"] = (time.time(), out)
+        return out
+
+
 def catalogue(state) -> dict:
     from .claude import find_claude
     return {"claude": {"available": find_claude() is not None, "models": CLAUDE_MODELS, "efforts": CLAUDE_EFFORTS},
-            "codex": _codex_list(state)}
+            "codex": _codex_list(state), "cursor": _cursor_list(state)}
 
 
 def apply_settings(state, sid: str, body: dict) -> dict:
@@ -101,6 +148,7 @@ def apply_settings(state, sid: str, body: dict) -> dict:
     from ..app import WorkspaceError
     from .claude import ClaudeBridge
     from .codex import CodexBridge
+    from .cursor import CursorBridge
     ws = state.ws
     s = ws.session(sid)
     model = str(body.get("model") or "")
@@ -114,6 +162,12 @@ def apply_settings(state, sid: str, body: dict) -> dict:
         if effort and effort not in CLAUDE_EFFORTS:
             raise WorkspaceError("bad_request", f"Claude's thinking levels are {', '.join(CLAUDE_EFFORTS)}", status=422)
         br.model, br.effort = model or None, effort or None
+        br._remember()
+        return {"session": ws.session(sid), "applies": "from the next message"}
+    if isinstance(br, CursorBridge):
+        if effort:
+            raise WorkspaceError("bad_request", "Cursor's thinking level is part of its model: pick a model", status=422)
+        br.model = model or None
         br._remember()
         return {"session": ws.session(sid), "applies": "from the next message"}
     if isinstance(br, CodexBridge):

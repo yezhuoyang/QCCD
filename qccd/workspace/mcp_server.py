@@ -19,6 +19,9 @@ Modes (reported in the session's capabilities):
                     login).  Claude Code does not acknowledge channel events, so a pushed
                     delivery stays `uncertain` until the agent reads the prompt through a
                     tool -- which is what makes it `accepted`.
+  --client cursor   tools only.  Automatic delivery to Cursor is the service running
+                    `cursor-agent` itself (agents/cursor.py), which names its session in
+                    QCCD_SESSION_ID; a Cursor the person starts is a `pull` session.
   --client generic  (or no channel) a `pull` session: REDUCED capability.  Prompts wait
                     until the agent next calls qccd_get_context.  This is not automatic
                     delivery and is labelled as such everywhere.
@@ -182,8 +185,8 @@ class Backend:
                  "observe": None, "acknowledgement": "the agent reading the prompt through a tool"}
                 if self.channel else
                 {"deliver": None, "note": "pull only: prompts are seen on the next qccd_get_context"})
-        label = {"claude": "Claude Code", "codex": "Codex", "generic": "MCP client"}.get(self.client, self.client)
-        s = self.call("POST", "/api/sessions", {"client": self.client if self.client in ("codex", "claude") else "generic",
+        label = {"claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "generic": "MCP client"}.get(self.client, self.client)
+        s = self.call("POST", "/api/sessions", {"client": self.client if self.client in ("codex", "claude", "cursor") else "generic",
                                                 "mode": mode, "label": label + (" (channel)" if self.channel else " (pull only)"),
                                                 "capabilities": caps})
         self.session = s["id"]
@@ -324,7 +327,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="qccd mcp", description=__doc__.splitlines()[0])
     ap.add_argument("--root", default=None, help="workspace directory (default: $QCCD_WORKSPACE, "
                     "$CLAUDE_PROJECT_DIR, or the nearest qccd.lock.json above the cwd)")
-    ap.add_argument("--client", default="generic", choices=["codex", "claude", "generic"])
+    ap.add_argument("--client", default="generic", choices=["codex", "claude", "cursor", "generic"])
     ap.add_argument("--channel", action="store_true", help="declare the Claude Code channel capability")
     args = ap.parse_args(argv)
     logging.basicConfig(stream=sys.stderr, level=os.environ.get("QCCD_MCP_LOG", "INFO"),

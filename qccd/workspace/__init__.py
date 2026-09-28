@@ -8,7 +8,7 @@ Layers, from the inside out:
     evaluator, bundle     grade(task_release, bundle, profile) -> report, transport-free
     service               the local HTTP + server-sent-events API Studio and adapters use
     mcp_server            a thin stdio MCP adapter onto the service
-    agents/               session adapters (Codex app-server, Claude Code channel, pull)
+    agents/               session adapters (Codex app-server, Claude Code, Cursor, channel, pull)
     official/             the independent submission service and its workers
 
 Nothing below `service` imports FastAPI, the MCP SDK or any agent client, so the design

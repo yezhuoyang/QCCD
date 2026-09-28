@@ -418,6 +418,7 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
+    monkeypatch.setenv("QCCD_CURSOR", "none")          # nor a real Cursor
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
@@ -544,6 +545,7 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
+    monkeypatch.setenv("QCCD_CURSOR", "none")          # nor a real Cursor
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     try:
@@ -609,6 +611,7 @@ def test_the_agent_draws_a_shape_on_the_persons_studio(tmp_path, monkeypatch):
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
     try:
@@ -717,6 +720,7 @@ def test_an_mcp_agent_answers_a_question_from_the_page(tmp_path, site, monkeypat
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
+    monkeypatch.setenv("QCCD_CURSOR", "none")          # nor a real Cursor
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     root = tmp_path / "ws"
     Workspace.init(root, "ghz4@1").close()
@@ -835,6 +839,7 @@ def test_an_agent_that_goes_the_wrong_way_is_not_stranded(tmp_path, site, monkey
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
@@ -898,6 +903,7 @@ def test_the_agent_works_visibly_and_designs_in_the_studio(tmp_path, site, monke
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")          # nor a real Claude
+    monkeypatch.setenv("QCCD_CURSOR", "none")          # nor a real Cursor
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)
@@ -1089,6 +1095,7 @@ def test_the_agents_work_happens_in_the_persons_studio(tmp_path, site, monkeypat
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("QCCD_CODEX", "none")
     monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
     monkeypatch.setenv("QCCD_SITE_URL", site.url)
     Workspace.init(tmp_path / "ws", "ghz4@1").close()
     info = ensure_service(tmp_path / "ws", python=sys.executable)

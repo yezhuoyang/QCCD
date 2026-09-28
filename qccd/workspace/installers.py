@@ -11,6 +11,9 @@ evaluator's stages) so the instructions and the code ship as one release:
                 .codex/config.toml block    [mcp_servers.qccd] (Codex loads project config only for
                                             TRUSTED projects -- `status` says so)
                 AGENTS.md  managed block    a short pointer to the skill
+  Cursor        .cursor/skills/qccd/        the skill
+                .cursor/mcp.json  "qccd"    stdio MCP server (Cursor asks to approve it on first use)
+                .cursor/rules/qccd.mdc      an always-applied rule: a short pointer to the skill
 
 Existing agent instructions and other MCP servers are preserved: edits live inside
 explicit managed blocks (`qccd:begin` / `qccd:end`), a JSON server entry is marked with
@@ -31,9 +34,12 @@ from pathlib import Path
 
 from .jsonsafe import strict_loads
 
-__all__ = ["install", "uninstall", "status", "build_skill", "refresh_skills", "SKILL_VERSION", "skill_digest"]
+__all__ = ["install", "uninstall", "status", "build_skill", "refresh_skills", "write_cursor_mcp", "SKILL_VERSION",
+           "SKILL_DIRS", "skill_digest"]
 
 SKILL_SRC = Path(__file__).resolve().parent / "skill"
+#: where each client's skill goes (its presence is also how a workspace says which agent it was set up for)
+SKILL_DIRS = {"claude": ".claude", "codex": ".agents", "cursor": ".cursor"}
 #: a label for people; the refresh keys on `skill_digest()`, not on this
 SKILL_VERSION = "1.12.0"
 MD_BEGIN = "<!-- qccd:begin (managed by `qccd agent install`; edit outside this block) -->"
@@ -78,6 +84,39 @@ def mcp_server_config(root: Path, client: str, *, session_id: str | None = None,
         env["QCCD_RUNTIME_DIR"] = os.environ["QCCD_RUNTIME_DIR"]
     args = ["-m", "qccd.workspace", "mcp", "--client", client, "--root", str(root)] + (["--channel"] if channel else [])
     return {"command": exe, "args": args, "env": env}
+
+
+def cursor_mcp_entry(root: Path) -> dict:
+    """The `.cursor/mcp.json` entry.  Cursor starts an MCP server with only the environment its entry
+    names (checked on cursor-agent 2026.09.26: nothing else of its own is passed on), and fills in
+    `${env:NAME}` from its own.  So the session a Studio chat's run sets is passed through by name:
+    one entry serves every chat, and the person's own Cursor, which sets none, gets a pull session."""
+    exe, env = _python_env()
+    env = dict(env, QCCD_SESSION_ID="${env:QCCD_SESSION_ID}", QCCD_RUNTIME_DIR="${env:QCCD_RUNTIME_DIR}")
+    return {"command": exe, "args": ["-m", "qccd.workspace", "mcp", "--client", "cursor", "--root", str(root)],
+            "env": env}
+
+
+def write_cursor_mcp(root: Path) -> str:
+    """Put the QCCD server in the workspace's `.cursor/mcp.json` (Cursor reads project servers only from
+    there), pointed at where the workspace is now; the person's other servers stay as they are."""
+    p = Path(root) / ".cursor" / "mcp.json"
+    doc = strict_loads(p.read_bytes()) if p.exists() else {}
+    servers = doc.setdefault("mcpServers", {})
+    cur = servers.get("qccd")
+    if cur and (cur.get("env") or {}).get("QCCD_MANAGED") != "1":
+        raise RuntimeError(".cursor/mcp.json already has a 'qccd' server that qccd did not write; remove or rename it")
+    entry = cursor_mcp_entry(root)
+    if cur == entry:
+        return "unchanged"
+    servers["qccd"] = entry
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    return "updated" if cur else "added"
+
+
+def _cursor_rule() -> str:
+    return (f"---\ndescription: QCCD workspace\nalwaysApply: true\n---\n\n{MD_BEGIN}\n{POINTER}\n{MD_END}\n")
 
 
 def _skill_files() -> dict[str, bytes]:
@@ -238,8 +277,19 @@ def install(root: Path, client: str, *, scope: str = "project", channel: bool = 
         verb = _set_block(root / "AGENTS.md", POINTER, MD_BEGIN, MD_END)
         lines.append(f"pointer    AGENTS.md managed block {verb}")
         lines.append("delivery   run `qccd agent connect --client codex` for automatic Studio -> Codex delivery")
+    elif client == "cursor":
+        man = build_skill(root / ".cursor" / "skills" / "qccd", root)
+        lines.append(f"skill      .cursor/skills/qccd  (v{man['version']}, {len(man['files'])} files)")
+        verb = write_cursor_mcp(root)
+        lines.append(f"mcp        .cursor/mcp.json 'qccd' {verb} - Cursor asks you to approve it on first use")
+        rule = root / ".cursor" / "rules" / "qccd.mdc"
+        rule.parent.mkdir(parents=True, exist_ok=True)
+        rule.write_text(_cursor_rule(), encoding="utf-8")
+        lines.append("pointer    .cursor/rules/qccd.mdc (always applied)")
+        lines.append("delivery   automatic: the Studio chat runs Cursor's CLI (cursor-agent; sign it in once "
+                     "with `cursor-agent login`)")
     else:
-        raise ValueError("client must be codex or claude")
+        raise ValueError("client must be codex, claude or cursor")
     return lines
 
 
@@ -250,7 +300,7 @@ def refresh_skills(root: Path) -> list:
     edited skill is left alone; `qccd agent status` says it is behind."""
     out = []
     current = skill_digest()
-    for client, d in (("claude", ".claude"), ("codex", ".agents")):
+    for client, d in SKILL_DIRS.items():
         dest = Path(root) / d / "skills" / "qccd"
         m = dest / MANIFEST
         try:
@@ -268,7 +318,7 @@ def refresh_skills(root: Path) -> list:
 def uninstall(root: Path, client: str, *, scope: str = "project") -> list:
     root = Path(root)
     lines = []
-    sk = root / (".claude" if client == "claude" else ".agents") / "skills" / "qccd"
+    sk = root / SKILL_DIRS[client] / "skills" / "qccd"
     if sk.exists():
         mod = _modified(sk)
         if mod:
@@ -290,6 +340,22 @@ def uninstall(root: Path, client: str, *, scope: str = "project") -> list:
                 lines.append("removed    .mcp.json 'qccd'")
         if _drop_block(root / "CLAUDE.md", MD_BEGIN, MD_END):
             lines.append("removed    CLAUDE.md managed block")
+    elif client == "cursor":
+        mcp = root / ".cursor" / "mcp.json"
+        if mcp.exists():
+            doc = strict_loads(mcp.read_bytes())
+            cur = (doc.get("mcpServers") or {}).get("qccd")
+            if cur and (cur.get("env") or {}).get("QCCD_MANAGED") == "1":
+                del doc["mcpServers"]["qccd"]
+                if not doc["mcpServers"] and set(doc) == {"mcpServers"}:
+                    mcp.unlink()
+                else:
+                    mcp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+                lines.append("removed    .cursor/mcp.json 'qccd'")
+        rule = root / ".cursor" / "rules" / "qccd.mdc"
+        if rule.exists() and MD_BEGIN.split("(")[0].strip() in rule.read_text(encoding="utf-8"):
+            rule.unlink()
+            lines.append("removed    .cursor/rules/qccd.mdc")
     else:
         if _drop_block(root / ".codex" / "config.toml", TOML_BEGIN, TOML_END):
             lines.append("removed    .codex/config.toml managed block")
@@ -300,7 +366,7 @@ def uninstall(root: Path, client: str, *, scope: str = "project") -> list:
 
 def status(root: Path, client: str) -> dict:
     root = Path(root)
-    sk = root / (".claude" if client == "claude" else ".agents") / "skills" / "qccd"
+    sk = root / SKILL_DIRS[client] / "skills" / "qccd"
     out: dict = {"client": client, "skill": None, "mcp": None, "pointer": False, "notes": []}
     if (sk / MANIFEST).exists():
         man = json.loads((sk / MANIFEST).read_text(encoding="utf-8"))
@@ -319,6 +385,17 @@ def status(root: Path, client: str) -> dict:
         out["capabilities"] = ({"delivery": "automatic via Claude Code channel (unacknowledged; research preview)"}
                                if out["mcp"] and out["mcp"]["channel"] else
                                {"delivery": "pull only (reduced): prompts are seen on the next qccd_get_context"})
+    elif client == "cursor":
+        mcp = root / ".cursor" / "mcp.json"
+        if mcp.exists():
+            cur = (strict_loads(mcp.read_bytes()).get("mcpServers") or {}).get("qccd")
+            if cur:
+                out["mcp"] = {"command": cur.get("command"), "args": cur.get("args"),
+                              "managed": (cur.get("env") or {}).get("QCCD_MANAGED") == "1"}
+        rule = root / ".cursor" / "rules" / "qccd.mdc"
+        out["pointer"] = rule.exists() and MD_BEGIN.split("(")[0].strip() in rule.read_text(encoding="utf-8")
+        out["capabilities"] = {"delivery": "automatic from the Studio chat: each message is one cursor-agent run "
+                                           "in the same chat; a Cursor you start yourself here is pull only"}
     else:
         cfg = root / ".codex" / "config.toml"
         out["mcp"] = {"present": cfg.exists() and "[mcp_servers.qccd]" in cfg.read_text(encoding="utf-8"),

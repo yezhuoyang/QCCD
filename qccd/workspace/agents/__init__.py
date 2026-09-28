@@ -10,9 +10,13 @@ and reports which of those it really supports.  The modes shipped here:
     codex      `appserver`  Codex app-server over WebSocket: turn/start delivers, turn/steer
                             corrects the running turn, turn/interrupt stops it, notifications
                             are observed, thread/turns/list reconciles uncertain deliveries.
-    claude     `channel`    the QCCD MCP server declared as a Claude Code channel pushes
+    claude     `appserver`  one kept-alive `claude -p` process per conversation (claude.py): each
+                            message is the next turn; stop supported, no steer.
+               `channel`    the QCCD MCP server declared as a Claude Code channel pushes
                             `notifications/claude/channel`; no acknowledgement, no steer, no
                             interrupt -- deliveries stay `uncertain` until the agent reads them.
+    cursor     `appserver`  one `cursor-agent -p` run per message, all resuming one chat
+                            (cursor.py); stop supported, no steer.
     generic    `pull`       reduced capability: prompts wait until the agent next calls
                             qccd_get_context.  Not automatic delivery, and labelled as such.
 """

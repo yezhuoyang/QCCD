@@ -3,7 +3,7 @@
 Architecture and implementation status for `qccd/workspace/` and `qccd/official/`.
 Last updated 2026-09-22.
 
-A person and an agent (Codex, Claude Code, or any MCP client) work on **one versioned local
+A person and an agent (Codex, Claude Code, Cursor, or any MCP client) work on **one versioned local
 workspace**. The person edits in the existing QCCD Studio page. The agent edits through MCP
 tools. Both go through the same validated change-set API. Prompts sent from Studio carry
 frozen context: anchors, sketches, demonstrations. They reach a connected agent session
@@ -36,7 +36,7 @@ file export and re-import. The compile-to-grade path existed only as scripts on 
 ## 2 · Architecture
 
 ```
-Codex / Claude Code / any MCP client
+Codex / Claude Code / Cursor / any MCP client
       │ qccd_* tools (stdio MCP, qccd/workspace/mcp_server.py)       ▲ turn/start, turn/steer, turn/interrupt
       │                                                              │ (Codex app-server bridge, agents/codex.py)
       ▼                                                              │ notifications/claude/channel (mcp_server.py --channel)
@@ -134,6 +134,7 @@ apply.
 | mode | deliver | acknowledgement | steer | interrupt | status |
 |---|---|---|---|---|---|
 | **Codex app-server** (`qccd agent connect --client codex`, or Studio → Agent → Connect) | `turn/start` with `clientUserMessageId` = delivery id | the turn id returned (runtime acceptance) | `turn/steer` with `expectedTurnId`; if the turn has already finished, a new turn | `turn/interrupt` | **live-tested** (§5) |
+| **Cursor CLI** (`qccd agent connect --client cursor`, or the chat) | one `cursor-agent -p --output-format stream-json --resume <chat>` run per message, the text on stdin | the run starting | not supported (queued behind the run) | kills the run; the next message resumes the chat | **contract-tested** with a stand-in `cursor-agent` whose flags, events and permission rules were read from cursor-agent 2026.09.26; not yet run against a signed-in Cursor |
 | **Claude Code channel** (`qccd mcp --client claude --channel`, `claude --dangerously-load-development-channels server:qccd`) | `notifications/claude/channel` `{content, meta}` | none from Claude Code, so `uncertain` until the agent reads the prompt through a tool | not supported (queued) | not supported; the write fence still applies | **contract-tested** over real MCP stdio; not run against a live Claude Code session |
 | **pull** (any MCP client) | none: prompts are listed in `qccd_get_context.unread_prompts` | reading | – | fence only | tested; labelled everywhere as reduced capability, **not** automatic delivery |
 | Claude Agent SDK managed session | – | – | – | – | **not implemented**: it needs an Anthropic API key, cannot reuse a claude.ai subscription login, and would be a different conversation from the user's terminal |
@@ -176,9 +177,11 @@ page keeps its self-containment scan. What it does:
   removed. **+** holds lasso, point, arrow, freehand, "show an edit" (a demonstration) and
   lock or unlock parts. What the agent did appears as small cards: a change with Show and
   Undo, a run with its round time and "Watch it run", and a comparison with "Open side by
-  side". If no agent is connected and Codex is installed, sending starts a Codex conversation
-  (approval policy `never`, read-only shell; it changes the design only through the QCCD
-  tools). `QCCD_CODEX=none` turns that off. The header also carries the draft picker.
+  side". If no agent is connected, sending starts a conversation with the agent the person
+  chose, else the one installed (below): Codex with approval policy `never` and a read-only
+  shell, Claude Code or Cursor with no shell. Each changes the design only through the QCCD
+  tools. `QCCD_CODEX=none` (or `QCCD_CLAUDE`, `QCCD_CURSOR`) turns one off. The header also
+  carries the draft picker.
 - **The debug view.** Under **⋯**: the old tabs. They hold threads with delivery and work
   state and their links, the agent session panel (Stop, Resume, target per tab, Follow
   agent), attributed history with "Undo this change", jobs, and the local leaderboard
@@ -326,6 +329,28 @@ watch it happen.
   Code. `QCCD_CLAUDE=none` turns it off. Live-checked: asked on the Rules page
   "What does rule R7 say? Show me its failing example", Claude read the section,
   highlighted the failing example with a caption, and answered with the page's numbers.
+- **Cursor, like Claude Code** (`agents/cursor.py`). Cursor's CLI (`cursor-agent`) has a
+  print mode with Claude Code's kind of stream-json events, but no streamed input, so each
+  message is one `cursor-agent -p` run that `--resume`s the conversation's chat (made with
+  `cursor-agent create-chat` when the chat connects, and taken from each run's `system/init`
+  after that). The message goes on stdin, so it has no length limit and never shows in a
+  process list. What a run may do is QCCD's choice, not the person's own Cursor settings:
+  the runs read their settings from `.qccd/cursor/` (`CURSOR_CONFIG_DIR`), whose
+  `cli-config.json` allows the QCCD tools (`Mcp(*-qccd:*)`: Cursor names a project's server
+  `project-<n>-<folder>-qccd`) and denies `Shell(*)`, `Shell(**)` and `Write(**)`, with
+  `approvalMode: allowlist` and the sandbox off. A run is headless without `--force`, and
+  cursor-agent then refuses whatever would need an approval, so it has no shell and edits
+  nothing on disk. It has `--trust` (a headless run in an untrusted folder exits) and
+  `--approve-mcps`. The QCCD tools come from the workspace's `.cursor/mcp.json`. Cursor
+  gives an MCP server only the environment its entry names, so the entry passes
+  `${env:QCCD_SESSION_ID}` through, each run sets it, and a Cursor the person starts there
+  themselves gets a pull session. The chats live under `.qccd/cursor/chats/<md5 of the
+  folder>`, so a renamed folder starts a new chat and says so, as Claude does.
+  `CURSOR_CONFIG_DIR=.qccd/cursor cursor-agent --resume <chat>` goes on in a terminal. Stop
+  kills the run, and the next message resumes the same chat. A run that is not signed in says
+  to run `cursor-agent login`. The chat's note to the agent (short in-between lines, nothing
+  outlives the turn) goes with each message, because the CLI has no flag for a system
+  prompt. `QCCD_CURSOR=none` turns it off.
 
 ### Only what is declared
 
@@ -394,7 +419,9 @@ looking.
   it thinks, as in Claude or Codex. Claude offers Default, Fable, Opus, Sonnet and Haiku
   (`claude --model <alias>`) and the levels low, medium, high, xhigh and max (`--effort`).
   Codex's list is its app server's own (`model/list`), each model with the levels it
-  supports, passed as `model` and `effort` on every `turn/start`. A choice applies from
+  supports, passed as `model` and `effort` on every `turn/start`. Cursor's list is
+  `cursor-agent models` (the account's models, kept for an hour), passed as `--model`. Its
+  thinking is part of a model's id (a `-thinking` model), so it has no separate level. A choice applies from
   the next message. It is kept on the session (`capabilities.settings`, and in what a
   restarted service re-attaches with). Before a conversation exists it is remembered in
   the browser and used when one starts. `GET /api/agents/models` and
@@ -409,7 +436,7 @@ looking.
   - every page action and what the page answered;
   - how the turn ended: time, model turns, cost, error.
 
-  The steps come from three places: Claude's stream-json, Codex's item events, and the
+  The steps come from four places: Claude's and Cursor's stream-json, Codex's item events, and the
   QCCD MCP server (which records every call it serves, so agents started in a terminal
   are traced too), plus the service for page actions. Long values keep their head, keys
   that name credentials are blanked, and nothing leaves the computer.
@@ -779,6 +806,7 @@ qccd init "My QCCD designs"              # any folder name; or `qccd init` insid
 cd "My QCCD designs"
 qccd agent install --client codex        # .agents/skills/qccd, .codex/config.toml block, AGENTS.md block
 qccd agent install --client claude --channel   # .claude/skills/qccd, .mcp.json "qccd", CLAUDE.md block
+qccd agent install --client cursor       # .cursor/skills/qccd, .cursor/mcp.json "qccd", .cursor/rules/qccd.mdc
 qccd studio                              # starts the service, opens Studio paired (one-time code)
 qccd studio --keep-alive                 # ...and stays, restarting the service if something kills it
 qccd web                                 # the qccd.academy website with the same chat on every page
@@ -787,6 +815,7 @@ qccd agent connect --client codex        # a NEW Codex thread bound to this work
 qccd agent connect --client codex --thread <id>   # ...or your existing conversation
 #   then attach your terminal to the same app server:  codex --remote ws://127.0.0.1:<port>
 #   Claude Code instead: claude --dangerously-load-development-channels server:qccd
+qccd agent connect --client cursor       # a NEW Cursor chat the Studio's messages run in
 qccd boards                              # the leaderboards, by title
 qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
                                          # compile for the board, adopt, freeze, reference grade
@@ -824,7 +853,7 @@ locks in place of Job Objects and `msvcrt`. The memory ceiling on a tool is `RLI
 Linux and, on macOS -- whose kernel neither enforces `RLIMIT_AS` nor lets a process set it
 below the address space it has already reserved -- a watchdog on the process group's physical
 footprint. A service started by a desktop app (whose PATH is only the system's) still finds
-`claude` and `codex` in Homebrew, npm and `~/.local/bin`, and in the Claude Code editor
+`claude`, `codex` and `cursor-agent` in Homebrew, npm and `~/.local/bin`, and in the Claude Code editor
 extension and the ChatGPT app, which carry them.
 
 **Tests.**
@@ -841,6 +870,7 @@ extension and the ChatGPT app, which carry them.
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
 | `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat; the model and thinking level the person picks reach the command line; a turn's trace step by step (thinking, Skill and MCP calls with results, cost); a Codex turn traced from its item events | ~8 s |
+| `tests/test_workspace_cursor.py` | Cursor as a chat agent with a stand-in `cursor-agent`: one chat resumed by a run per message, the message on stdin; every run headless with the QCCD tools allowed and the shell and file writes denied, whatever the person's own Cursor allows; the session passed to the QCCD tools; the model the person picks on the command line; a run that is not signed in says how to sign in; Stop, then the same chat goes on; a turn's trace and program; a renamed folder; the installer; in real Chrome, the Studio chat offering and talking to Cursor | ~6 s |
 | `tests/workspace_live_comments.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the agent comments on real qccd.academy pages as a signed-in person, against a PRIVATE copy of the comment service | ~20 s |
 | `tests/test_workspace_toolchain.py` | the prebuilt compiler: the manifest matches the committed source, a download is refused unless its size and hash match, an install runs once, and which compiler is used | ~3 s |
 | `tests/test_workspace_web.py` | the website mirror against a local copy of a site: paths, cache, stale copies, what the mirror refuses, that its origin has no authority, the chat frame's framing, the page-action round trip and who may take part, a page's context in a message; the trace of MCP calls and page actions (and `qccd trace`); the site guide from the site's index and the Studio's hints; in real Chrome every page action on a mirrored page, the Studio's own page actions, the agent's design and runs shown in the person's Studio, and a real MCP client answering a question asked on a page | ~60 s |

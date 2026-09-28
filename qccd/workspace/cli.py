@@ -7,9 +7,10 @@
                                              --keep-alive stays and restarts a killed service
     qccd serve                               run the service in the foreground
     qccd status | stop                       the service, sessions, head revision
-    qccd agent install|uninstall|status --client codex|claude [--scope project]
+    qccd agent install|uninstall|status --client codex|claude|cursor [--scope project]
     qccd agent connect --client codex [--thread ID | --new] [--url ws://127.0.0.1:PORT]
-    qccd mcp --client codex|claude|generic [--channel]     (launched by the agent client)
+    qccd agent connect --client cursor       a NEW Cursor chat the Studio's messages run in
+    qccd mcp --client codex|claude|cursor|generic [--channel]     (launched by the agent client)
     qccd validate [--json]                   draft grade of the head revision
     qccd compile --board TITLE [--adopt]     the real compiler on a board's circuit
     qccd submit --local --board "BB [[144,12,12]]" [--design NAME] [--wait]
@@ -119,7 +120,7 @@ def cmd_init(a) -> int:
     print("next:")
     if not here:
         print(f'  cd "{a.dir}"')
-    print("  qccd agent install --client codex     (or --client claude: the agent you have)")
+    print("  qccd agent install --client codex     (or --client claude, or --client cursor: the agent you have)")
     print("  qccd studio")
     ws.close()
     return 0
@@ -498,6 +499,12 @@ def cmd_agent(a) -> int:
         print(json.dumps(installers.status(root, a.client), indent=1))
         return 0
     if a.action == "connect":
+        if a.client == "cursor":
+            r = _call(_svc(a), "POST", "/api/sessions/cursor/connect", {"label": a.label} if a.label else {}, timeout=90)
+            print(r["note"])
+            print(f"session   {r['session']['id']}")
+            print(f"attach    {r['attach']}")
+            return 0
         if a.client != "codex":
             print("Claude Code connects itself: start it in this project with the QCCD channel enabled:\n"
                   "  claude --dangerously-load-development-channels server:qccd\n"
@@ -574,7 +581,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p = sub.add_parser("agent")
     p.add_argument("action", choices=["install", "uninstall", "status", "connect"])
-    p.add_argument("--client", required=True, choices=["codex", "claude"])
+    p.add_argument("--client", required=True, choices=["codex", "claude", "cursor"])
     p.add_argument("--scope", default="project", choices=["project"])
     p.add_argument("--channel", action="store_true", help="(claude) configure the MCP server as a channel")
     p.add_argument("--thread")
@@ -583,7 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--label")
     p.add_argument("--root", default=None)
     p = sub.add_parser("mcp")
-    p.add_argument("--client", default="generic", choices=["codex", "claude", "generic"])
+    p.add_argument("--client", default="generic", choices=["codex", "claude", "cursor", "generic"])
     p.add_argument("--channel", action="store_true")
     p.add_argument("--root", default=None)
     sub.add_parser("releases")
