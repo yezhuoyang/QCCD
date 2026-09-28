@@ -202,7 +202,7 @@ def invoke(spec: CompilerSpec, circuit: Path, device: Path, expanded: Path, out:
 
 STARTER_MANIFEST = {
     "kind": "qccd.compiler", "version": 1, "name": "my-compiler",
-    "about": "starts as the reference compiler (qccdc + cooling); replace compile.py with your own",
+    "about": "starts as the reference compiler (qccdc + cooling): make it your own",
     "runtime": "python3", "entry": ["python3", "compile.py"], "build": None,
 }
 
