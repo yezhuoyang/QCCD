@@ -90,9 +90,10 @@ change a version another package of yours needs. Activate it again in each new t
 Linux on x86-64, and Macs with Apple silicon) and, on a Mac, the Lean checker that a reference
 grade on your own machine needs. It checks each file against a hash pinned in the repository
 before using it. On Windows and Linux, build the checker once: install Lean with
-<a href="https://github.com/leanprover/elan">elan</a>, then run <code>lake build</code> in
-<code>QCCD/Compiler/lean/checker</code> (about a minute). An Intel Mac builds the compiler from
-source (<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/Compiler/README.md">Compiler/README.md</a>).</p>
+<a href="https://github.com/leanprover/elan">elan</a>, then run <code>lake build</code> in the
+checker's folder of your clone, which <code>qccd toolchain install</code> names when it finishes
+(about a minute). An Intel Mac builds the compiler from source, as
+<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/Compiler/README.md">the compiler's README</a> describes.</p>
 <h3>Start a workspace</h3>
 <p class="qa-small">Run these from the folder that holds QCCD, not inside it. Type them as shown,
 except the folder name, which is yours.</p>
