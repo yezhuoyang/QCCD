@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 
 __all__ = ["memory_boards", "architecture_intro", "memory_section", "compiler_section", "compiler_page",
            "noise_page", "declare_board_controls", "index_entries", "CSS"]
@@ -57,6 +58,15 @@ CSS = """
 
 def _e(s) -> str:
     return html.escape(str(s))
+
+
+#: A compiler's refusal can name the scratch file it was handed (`C:\...\Temp\...\circuit.qasm:`,
+#: `/var/folders/.../circuit.qasm:`): the page says "the circuit" instead of the grader's path.
+_SCRATCH_PATH = re.compile(r"(?:[A-Za-z]:)?[\\/][^\s:]*[\\/]circuit\.qasm")
+
+
+def _reason(s) -> str:
+    return _SCRATCH_PATH.sub("the circuit", str(s or ""))
 
 
 def _board_block(task: str, title: str) -> str:
@@ -198,7 +208,7 @@ def compiler_page(PAGE: str, STYLE: str) -> str:
             st = r.get("status", "-")
             t = (r.get("metrics") or {}).get("T_jones")
             txt = f"{t:.2f}" if st == "valid" and isinstance(t, (int, float)) else st
-            tip = _e(r.get("reason") or "")
+            tip = _e(_reason(r.get("reason")))
             cells.append(f'<td class="{_e(st)}" title="{tip}">{_e(txt)}</td>')
         rows.append(f'<tr><th>{_e(cn)} <small>{_e(kinds[cn])}, {qubits[cn]} qubits</small></th>{"".join(cells)}</tr>')
     ex = c["exit_codes"]
