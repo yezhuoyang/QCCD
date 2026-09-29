@@ -131,17 +131,22 @@ site still does not connect to it.</p>
 <p>Put the file in your workspace folder, then run this (with the name the file was saved under):</p>
 <pre class="qa-import">qccd import qccd-design.studio.json</pre>
 <h3>Put it on the leaderboard</h3>
-<p>In the Studio: <b>Results</b>, pick the board, press <b>Submit to this board</b>. Or ask the
-agent. In a terminal:</p>
-<pre>qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
+<p>In your Studio, press <b>Submit to Leaderboard</b> at the top, pick the board, press <b>Test on this
+board</b>, and when it passes, <b>Submit</b>. The first time, it asks you to sign in with your
+qccd.academy account (on this site: your password never passes through your computer's workspace), and
+the <a href="__ROOT__board/">leaderboard</a> then shows your name with your design. Every board there also
+has <b>Try your own design</b>, which opens your Studio on that board. Or ask the agent, for example
+<em>"Test this design on the BB board and submit it"</em>: it tests the design and asks you to press
+Submit. In a terminal:</p>
+<pre>qccd login
+qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
 qccd publish --submission &lt;id&gt;</pre>
-<p>The first command grades one of your designs (by the name you gave it) for one board (by its
-title, or any part that is unambiguous, such as <code>BB</code> or <code>"surface code"</code>;
-<code>qccd boards</code> lists them) on your machine, with the reference checker. The second asks you
-to approve and then uploads it; <code>&lt;id&gt;</code> is the submission id the first one printed.
-Nothing leaves your machine before that. Once the server has graded it too, it appears under
-<a href="__ROOT__board/#official">Official submissions</a>. Uploading needs a token from the
-maintainers.</p>
+<p><b>Yours to name, anything you like:</b> the design (<code>"Two triangles"</code> is only an example)
+and the name it is shown under. <b>Type as shown:</b> the commands, and a board by its title or any
+unambiguous part of it, such as <code>BB</code> or <code>"surface code"</code> (<code>qccd boards</code>
+lists them). The second command tests the design on your machine with the reference checker; the third
+submits it once you approve (<code>&lt;id&gt;</code> is what the second printed). Nothing leaves your
+machine before that. The server grades it again, then lists it.</p>
 <p class="qa-small"><a href="https://github.com/yezhuoyang/QCCD/blob/compiler/docs/workspace.md">How it works</a>:
 the workspace, what is and is not tested, and the security model.</p>
 """
@@ -233,22 +238,31 @@ BOARD_JS = r"""
   }).then(function(all){
     box.textContent = '';
     if (!all.length) { box.appendChild(el('p', 'qo-empty', 'The official server lists no tasks.')); return; }
+    // a board with its own block above (leaderboard.py: "Try your own design" and its submissions) is
+    // listed there; this section keeps the others, so every board the server ranks is on the page once
+    var own = function(task){ return document.querySelector('.lbx-live[data-board="' + String(task.id).split('@')[0] + '"]'); };
+    all = all.filter(function(x){ return !own(x.task); });
+    if (!all.length) { box.appendChild(el('p', 'qo-empty', 'Every board the official server ranks is listed above, with its submissions.')); }
     all.forEach(function(x){
       var sec = el('div', 'qo-task');
       var h = el('h3', null, x.task.title || x.task.id); sec.appendChild(h);
+      var tr0 = document.createElement('button'); tr0.type = 'button'; tr0.className = 'lbx-try'; tr0.textContent = 'Try your own design';
+      tr0.setAttribute('data-board', String(x.task.id).split('@')[0]); tr0.setAttribute('data-title', x.task.title || x.task.id);
+      tr0.setAttribute('data-hint', 'board:try'); sec.appendChild(tr0);
       var rows = x.board.rows || [];
       var unit = ((x.task.metrics || []).filter(function(m){ return m.name === x.board.rank_by; })[0] || {}).unit || '';
       if (!rows.length) {
         sec.appendChild(el('p', 'qo-empty', 'No published submissions yet.'));
       } else {
         var tb = el('table'), hd = el('tr');
-        ['#', 'design', x.board.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        ['#', 'design', 'by', x.board.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
         var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
         var body = el('tbody');
         rows.forEach(function(r, i){
           var tr = el('tr');
           tr.appendChild(el('td', 'qo-n', String(i + 1)));
           tr.appendChild(el('td', null, r.display_name || r.id));
+          tr.appendChild(el('td', null, r.by || '-'));
           tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
           tr.appendChild(el('td', null, r.created_at ? new Date(r.created_at * 1000).toISOString().slice(0, 10) : '-'));
           var td = el('td'), a = el('a', null, 'report');
@@ -281,13 +295,14 @@ BOARD_JS = r"""
         sec.appendChild(el('h3', null, x.suite.title || x.suite.id));
         if (!x.rows.length) { sec.appendChild(el('p', 'qo-empty', 'No published compiler yet: the reference compiler is 1.00x by definition.')); cbox.appendChild(sec); return; }
         var tb = el('table'), hd = el('tr');
-        ['#', 'compiler', 'speedup (x)', 'coverage', 'LER ratio', 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        ['#', 'compiler', 'by', 'speedup (x)', 'coverage', 'LER ratio', 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
         var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
         var body = el('tbody');
         x.rows.forEach(function(r, i){
           var tr = el('tr');
           tr.appendChild(el('td', 'qo-n', String(i + 1)));
           tr.appendChild(el('td', null, r.display_name || r.id));
+          tr.appendChild(el('td', null, r.by || '-'));
           tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
           tr.appendChild(el('td', 'qo-n', typeof r.m.coverage === 'number' ? Math.round(100 * r.m.coverage) + '%' : '-'));
           tr.appendChild(el('td', 'qo-n', fmt(r.m.ler_ratio)));
@@ -304,19 +319,20 @@ BOARD_JS = r"""
 """
 
 BOARD_HTML = """<section id="official">
-<h2>Official submissions: devices</h2>
-<p class="sub">Designs that their authors submitted and published, each graded again on the
-official server with the reference checker. That checker runs the same ten checks as a local
-grade, including the proved Lean checker. Only eligible, public submissions appear here; a
-private one never does. This list is read live from the server.</p>
+<h2>Official submissions: more boards</h2>
+<p class="sub">Every board above lists its own submissions, with who submitted each. These are
+the other boards the official server ranks. A submission is graded again there with the
+reference checker, which runs the same ten checks as a local grade, including the proved Lean
+checker. Only eligible, public submissions appear; a private one never does. Read live from
+the server.</p>
 <div id="qo-boards"><p class="qo-wait">Loading the official leaderboard...</p></div>
-<p class="note">To contribute a design: build it in the <a href="../studio.html?agent#design">Studio</a>,
-with an AI agent if you like (the Agent button there; ask it for the shape you want and the board).
-One workspace takes any number of designs to any of these boards. In the Studio, press
-"Submit to this board" under Results; in a terminal,
-<code>qccd submit --local --board "BB [[144,12,12]]" --design "My design" --wait</code>
-grades it on your machine for that board, and <code>qccd publish --submission &lt;id&gt;</code>
-uploads it once you approve. The boards above carry the study's seed entries.</p>
+<p class="note">To take part: press <b>Try your own design</b> on a board. It opens your own QCCD
+workspace (on your computer, with your AI agent if you like) on that board, where you test a
+design with the same checks and press <b>Submit</b>. The first time, you sign in with your
+qccd.academy account, and the leaderboard shows your name with what you submit. In a terminal,
+<code>qccd login</code> signs in, <code>qccd submit --local --board "BB [[144,12,12]]" --wait</code>
+tests your design, and <code>qccd publish --submission &lt;id&gt;</code> submits it. The boards above
+also carry the study's own seed entries.</p>
 </section>"""
 
 

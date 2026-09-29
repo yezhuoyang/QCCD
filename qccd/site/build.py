@@ -765,7 +765,7 @@ def board_index(ts: list[dict]) -> str:
     Each row also carries its QEC clock cycle -- the round it ranks with the classical
     feedback loop composed onto it -- and the boards are compared that way in one section
     at the end (`qec_cycle`)."""
-    from . import boards, cowork, qec_cycle
+    from . import boards, cowork, leaderboard, qec_cycle
     rows_html, cycles = [], []
     for t in ts:
         rows = t["rows"]
@@ -810,7 +810,9 @@ def board_index(ts: list[dict]) -> str:
             f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p>'
             f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; the three fastest verified designs, by time on the jones table &middot; click a bar to step the programme</p></div>'
             f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div>'
-            f'{qec_cycle.board_block(_t(best) * 1000.0 if best else None)}</div></section>')
+            f'{qec_cycle.board_block(_t(best) * 1000.0 if best else None)}'
+            # take part: "Try your own design", and the people's submissions with who made them (leaderboard.py)
+            f'{leaderboard.board_block(t["id"], t["title"])}</div></section>')
     legend = ('<div class="legend">' +
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
@@ -829,9 +831,9 @@ def board_index(ts: list[dict]) -> str:
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)
             cowork.board_section() + "</section>" +
-            boards.compiler_section() + cowork.board_script())
+            boards.compiler_section() + cowork.board_script() + leaderboard.script())
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE,
-                       extra_css=qec_cycle.CSS + boards.CSS, body=body)
+                       extra_css=qec_cycle.CSS + boards.CSS + leaderboard.CSS, body=body)
 
 
 CREDIT_CSS = """
@@ -1858,6 +1860,9 @@ def build(out: Path) -> int:
         put(f"docs/{name}/index.html", doc_page(name, docs[name]), 2, "learn")
     put("discuss/index.html", discuss_page(), 1, "discuss")
     put("credit/index.html", credit_page(), 1, None)
+    from . import leaderboard
+    # where a person lets their own workspace submit to the leaderboard in their name
+    put("connect/index.html", leaderboard.connect_page(PAGE, STYLE), 1, None)
     runs = build_phys_runs(out, put)
     put("physics/index.html", physics_page(phys, runs), 1, "physics")
     put("people/index.html", people_page(), 1, "people")

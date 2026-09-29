@@ -59,6 +59,11 @@ def _e(s) -> str:
     return html.escape(str(s))
 
 
+def _board_block(task: str, title: str) -> str:
+    from .leaderboard import board_block
+    return board_block(task, title, seed_note=False)
+
+
 # ---------------------------------------------------------------------- the data, from the grading code
 
 def memory_boards() -> list:
@@ -117,8 +122,8 @@ def memory_section() -> str:
             f'<b>sampling</b><span>up to {int(q["ler"].get("max_shots", 0)):,} shots or {int(q["ler"].get("max_errors", 0))} '
             f'logical errors, decoder {_e(q["ler"].get("decoder", "auto"))}, fixed seed</span>'
             f'<b>a start that passes</b><span>{_e(start.get("generator", ""))} ({_e(sp)})</span>'
-            f'<b>submit</b><span><code>qccd submit --local --board "{_e(b.title)}" --wait</code>, or ask your agent '
-            f'to submit a design to it</span></div></div>')
+            f'<b>submit</b><span>Try your own design below, or ask your agent to submit a design to it</span></div>'
+            + _board_block(b.manifest["task"], b.title) + '</div>')
     how = ("" if not noise else
            f'<p class="lb-note">How the number is made: the board\'s memory experiment is compiled onto the design, '
            f'the compiled program is turned into a noisy stim circuit ({len(noise["channels"])} error channels, each '

@@ -52,6 +52,15 @@ it imports nothing outside the standard library and needs no install.
     POST   /api/admin/invites  {email, name, note, send}   (admin: invite, mail the link)
     DELETE /api/admin/invites/<id>                 (admin: withdraw an unused invitation)
     POST   /api/admin/users/<id>/access  {allow}   (admin: let an account in, or close it)
+    POST   /api/leaderboard/grant  {purpose, code}  (signed in: a 5-minute grant for the official leaderboard)
+
+The official leaderboard (a separate service, /official/) credits each submission to a person.
+A workspace signs in there with a code the person approves on /connect/; this service vouches
+for who approved it with a GRANT: {account id, name, purpose, code, expiry} signed with
+HMAC-SHA256 under QCCD_ACCOUNT_SECRET, which only this service and the official one hold (the
+unit reads it from EnvironmentFile=-/etc/qccd/account.env).  purpose "link" approves one
+sign-in code; "manage" lists or revokes the person's own keys.  Without the secret the route
+answers 503, and nothing else here changes.
 
 Errors are `{"error": "..."}` with the status that names them: 400 malformed, 401 not
 signed in, 403 not allowed (also a cross-site Origin, and a closed account), 404, 409 the
@@ -95,6 +104,7 @@ MIN_PASSWORD = 8
 N_COLOURS = 12
 ATTEMPTS, ATTEMPT_WINDOW = 30, 15 * 60          # sign-in, registration, invite lookups per IP
 DEFAULT_SITE = "https://qccd.academy"
+GRANT_TTL = 300                                  # seconds a leaderboard grant is good for
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 SCHEMA = """
@@ -126,6 +136,23 @@ CREATE INDEX IF NOT EXISTS comments_thread ON comments(thread_id);
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS invites_token ON invites(token_hash);
 """
+
+
+# ------------------------------------------------------------------------- leaderboard grants
+
+def _b64u(b: bytes) -> str:
+    import base64
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+
+
+def sign_grant(secret: str, user, purpose: str, code, now: float | None = None) -> str:
+    """What the official service's `verify_grant` (qccd/official/accounts.py) accepts: the payload,
+    base64url, a dot, and its HMAC-SHA256 under the shared secret."""
+    now = time.time() if now is None else now
+    payload = {"v": 1, "aud": "qccd-official", "sub": str(user["id"]), "name": user["name"], "purpose": purpose,
+               "code": code, "iat": now, "exp": now + GRANT_TTL, "jti": secrets.token_hex(8)}
+    body = _b64u(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    return body + "." + _b64u(hmac.new(secret.encode("utf-8"), body.encode("ascii"), hashlib.sha256).digest())
 
 
 # ------------------------------------------------------------------------- passwords
@@ -670,6 +697,7 @@ class App:
             ("POST", re.compile(r"^/api/admin/invites$"), self.admin_invite),
             ("DELETE", re.compile(r"^/api/admin/invites/(\d+)$"), self.admin_invite_delete),
             ("POST", re.compile(r"^/api/admin/users/(\d+)/access$"), self.admin_access),
+            ("POST", re.compile(r"^/api/leaderboard/grant$"), self.leaderboard_grant),
         ]
 
     # each handler: (req, *groups) -> (status, body dict, extra headers list)
@@ -751,6 +779,24 @@ class App:
 
     def comment_delete(self, req, cid):
         return 200, self.store.delete_comment(req.require_user(), int(cid)), []
+
+    def leaderboard_grant(self, req):
+        """The signed-in person, vouched for to the official leaderboard for five minutes: to allow one
+        workspace's sign-in code (purpose "link"), or to see and revoke their keys ("manage")."""
+        u = req.require_user()
+        b = req.json()
+        purpose, code = b.get("purpose"), b.get("code")
+        if purpose not in ("link", "manage"):
+            raise HttpError(400, "purpose must be link or manage")
+        if purpose == "link":
+            if not isinstance(code, str) or not re.fullmatch(r"[A-Z0-9]{4}-[A-Z0-9]{4}", code):
+                raise HttpError(400, "a sign-in code looks like ABCD-EFGH")
+        else:
+            code = None
+        secret = os.environ.get("QCCD_ACCOUNT_SECRET", "")
+        if len(secret) < 32:
+            raise HttpError(503, "signing in to the leaderboard is not set up on this server yet")
+        return 200, {"grant": sign_grant(secret, u, purpose, code), "user": {"name": u["name"]}}, []
 
     def admin(self, req):
         u = req.require_user()
