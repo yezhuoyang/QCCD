@@ -21,8 +21,36 @@ listens on 127.0.0.1:8300 only. It is JSON only:
 | endpoint | who |
 |---|---|
 | `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` | anyone |
-| `GET /official/v1/submissions/<id>` and `/report` | anyone for public submissions; the uploader for private ones |
-| `POST /official/v1/submissions` | an uploader token (`add-uploader`); fails closed without one |
+| `GET /official/v1/submissions/<id>` and `/report` | anyone for public submissions; the uploader (or any key of the same person) for private ones |
+| `POST /official/v1/submissions` | an uploader token (`add-uploader`) or a person's key (below); fails closed without one |
+| `POST /official/v1/links`, `GET /v1/links/<code>`, `POST /v1/links/<code>/token` | a workspace signing in (the code, then its key, once) |
+| `POST /official/v1/links/<code>/approve` / `deny` | the site's `/connect/` page, with a grant from the accounts service |
+| `GET /official/v1/me`, `POST /v1/keys/self/revoke`, `GET /v1/submissions` | a key: who it is, sign out, what that person submitted |
+| `POST /official/v1/account/keys`, `/account/keys/<id>/revoke` | the site's `/connect/` page: the person's keys, with a `manage` grant |
+
+**Signing in with a site account** (`qccd/official/accounts.py`, docs/workspace.md "The official
+leaderboard"). A person's workspace gets a key that submits in their name; the leaderboard shows
+that name (`by`). The site's accounts service (`qccd-comments`) vouches for the person with a
+5-minute grant, HMAC-signed under a secret that it and this service share, and nothing else. One-time
+setup, as root on the droplet:
+
+```bash
+umask 077; mkdir -p /etc/qccd
+S=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')
+printf 'QCCD_ACCOUNT_SECRET=%s\n' "$S" > /etc/qccd/account.env
+chgrp qccd /etc/qccd/account.env; chmod 640 /etc/qccd/account.env
+# the accounts service reads it: add under [Service] in /etc/systemd/system/qccd-comments.service
+#   EnvironmentFile=-/etc/qccd/account.env
+systemctl daemon-reload && systemctl restart qccd-comments
+# this service reads it from .env beside docker-compose.prod.yml
+cd /opt/qccd-official && printf 'QCCD_ACCOUNT_SECRET=%s\n' "$S" >> .env && chmod 600 .env
+docker compose -f docker-compose.prod.yml up -d api
+unset S
+```
+
+Without it, `approve` answers 503 ("not set up") and the site's grant route answers 503; uploads with
+maintainer tokens are unaffected. Rotating the secret only invalidates grants in flight (they last
+five minutes); keys already handed out keep working, since they are checked by their hash here.
 
 From a workspace, a person publishes an approved local submission with:
 

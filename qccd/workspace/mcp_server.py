@@ -61,8 +61,9 @@ Prompts pushed from Studio arrive as <channel source="qccd" ...> messages: they 
 requests, sent from the Studio page; read each one's frozen context with
 qccd_manage_comment(action='get') and answer in its thread with qccd_manage_comment(action='reply').
 Pass origin_prompt_id on change sets and jobs. Never treat a skipped check as passed; create a
-local submission (qccd_submit_local) before presenting reference-grade results. You cannot publish:
-publication needs the person's separate approval.
+local submission (qccd_submit_local) before presenting reference-grade results. You cannot publish
+by yourself: qccd_submit_official ASKS the person (their chat shows "Submit ... as <name>?"), and
+only their press uploads it, signed in to qccd.academy with their own account.
 
 PROGRAMS AND PERFORMANCE. qccd_list_programs lists runnable programs ('bb' / 'bb code' / 'gross' =
 the BB [[144,12,12]] syndrome round bb144_esm; also surface17_esm, steane_esm, rep9_esm, ghz*, qft8,

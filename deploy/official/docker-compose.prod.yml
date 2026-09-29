@@ -25,6 +25,11 @@ services:
     environment:
       QCCD_OFFICIAL_DB: sqlite:////data/official.db
       QCCD_OFFICIAL_ARTIFACTS: /artifacts
+      # signing in with a qccd.academy account (qccd/official/accounts.py): the secret the site's
+      # accounts service signs its grants with, in .env beside this file (never in the image or
+      # the repository).  Unset, signing in fails closed and maintainer tokens still work.
+      QCCD_ACCOUNT_SECRET: ${QCCD_ACCOUNT_SECRET:-}
+      QCCD_SITE_URL: https://qccd.academy
     volumes: [data:/data, artifacts:/artifacts]
     ports: ["127.0.0.1:8300:8300"]
     restart: unless-stopped

@@ -105,6 +105,9 @@ class CollabMixin:
         for k in ("rendered_revision", "selection", "viewport", "displayed_run", "frame"):
             if k in patch:
                 state[k] = patch[k]
+        if "board" in patch:                          # the board the Leaderboard panel shows, or none
+            b = patch["board"]
+            state["board"] = str(b)[:80] if isinstance(b, str) and b else None
         if "page" in patch:
             state["page"] = _page_info(patch["page"])
         sets, args = ["state=?", "last_seen=?"], [dumps(state), _now()]
@@ -634,6 +637,10 @@ class CollabMixin:
                         "text": c.get("text"), "as": c.get("as"), "kind": c.get("kind"), "at": at}
             if kind == "submission":
                 return self._submission_card(at, sub_id=ref)
+            if kind == "publication":
+                # the agent asked to put a design on the official leaderboard: the card the person
+                # answers (Submit as <name>), then follows it to its place on the board
+                return {"type": "publication", "at": at, **self.publication(ref)}
         except Exception:
             return None
         return None
@@ -908,10 +915,14 @@ class CollabMixin:
         reports back what it did."""
         from .core import WorkspaceError, new_id
         actions = ("highlight", "select", "open_prompt", "reveal_diagnostic", "select_frame",
-                   "open_result", "compare", "open_branch", "open_run")
+                   "open_result", "compare", "open_branch", "open_run", "open_board")
         if action not in actions:
             raise WorkspaceError("bad_request", f"action must be one of {actions}", status=422)
         check_value(dict(target), _SMALL)
+        if action == "open_board":
+            # the Leaderboard panel on one board: its ranking, the Test and the Submit (by title, as always)
+            rel = self.board(target.get("board") or None)
+            target = {**dict(target), "board": rel.id, "title": rel.title}
         # a design by the name its person gave it, as every other door takes it
         branch = self.resolve_draft(target.get("branch") or "main")
         target = {**dict(target), "branch": branch} if target.get("branch") else target
@@ -941,7 +952,7 @@ class CollabMixin:
                 raise WorkspaceError("view_closed", f"view {view_id} is closed", status=409)
         # not tied to one draft's tabs; open_branch is by definition for a tab showing another design
         # (counting only tabs already on it answered "no_connected_view" to an agent whose person watched)
-        everywhere = action in ("open_run", "compare", "open_branch")
+        everywhere = action in ("open_run", "compare", "open_branch", "open_board")
         views = [view_id] if view_id else [v["id"] for v in self.views() if everywhere or v["branch"] == branch]
         pid = new_id("pr")
         with self.store.tx() as db:
@@ -1035,7 +1046,11 @@ class CollabMixin:
                 "rendered_revision": view["state"].get("rendered_revision"),
                 "selection": view["state"].get("selection", [])[:50],
                 "displayed_run": view["state"].get("displayed_run"), "frame": view["state"].get("frame"),
-                "page": view["state"].get("page")},
+                "page": view["state"].get("page"),
+                # the board the person's Leaderboard panel is on ("Try your own design" opens it there)
+                "board": view["state"].get("board")},
+            # who a submission to the official leaderboard would be credited to; only the person signs in
+            "account": _account_brief(self),
             "pages": self.pages()[:10],
             "session": None if sess is None else {
                 "session_id": sess["id"], "client": sess["client"], "mode": sess["mode"],
@@ -1078,6 +1093,19 @@ class CollabMixin:
 def entity_summary_for(doc: Mapping, limit: int) -> list:
     from .design import entity_summary
     return entity_summary(doc, None, limit)
+
+
+def _account_brief(ws) -> dict:
+    try:
+        a = ws.account()
+    except Exception:
+        return {"signed_in": False}
+    if a.get("signed_in"):
+        return {"signed_in": True, "name": a["name"],
+                "about": f"submissions to the official leaderboard are credited to {a['name']}"}
+    return {"signed_in": False, "about": "nobody is signed in to qccd.academy on this computer: only the person can "
+            "sign in (Sign in, in the Studio's Leaderboard panel, or `qccd login`); qccd_submit_official still asks "
+            "them, and its card offers the sign-in"}
 
 
 def _anchor_brief(a: Mapping) -> dict:

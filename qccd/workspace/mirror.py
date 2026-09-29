@@ -380,9 +380,13 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
         return Response(status_code=307, headers={"Location": "/web/"})
 
     @app.get("/studio")
-    async def studio():
-        # the site's "Open my Studio" button knows only this well-known port
-        return Response(status_code=307, headers={"Location": studio_url})
+    async def studio(request: Request):
+        # the site's "Open my Studio" button knows only this well-known port; its "Try your own
+        # design" adds the board, which the Studio opens its Leaderboard panel on
+        board = request.query_params.get("board") or ""
+        board = board if re.fullmatch(r"[A-Za-z0-9_@. \[\],-]{1,80}", board) else ""
+        return Response(status_code=307, headers={"Location": studio_url + (
+            "?board=" + urllib.parse.quote(board, safe="@") if board else "")})
 
     @app.get("/web/{path:path}")
     async def web(path: str):

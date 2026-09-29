@@ -144,6 +144,15 @@ CREATE TABLE IF NOT EXISTS approvals (
   created_at REAL NOT NULL, used_at REAL, publication TEXT
 );
 
+CREATE TABLE IF NOT EXISTS publications (   -- a design on the OFFICIAL leaderboard (publications.py)
+  id TEXT PRIMARY KEY, branch TEXT NOT NULL, board TEXT NOT NULL,
+  submission_id TEXT, submit_job TEXT,  -- the graded local submission; the local test it waits for
+  display_name TEXT, visibility TEXT NOT NULL,
+  state TEXT NOT NULL,                -- testing | test_failed | awaiting_person | uploading | uploaded | declined | failed
+  requested_by TEXT NOT NULL, approved_by TEXT, approval_id TEXT,
+  server TEXT, credit TEXT, official_id TEXT, official TEXT, error TEXT,
+  origin_prompt_id TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, type TEXT NOT NULL,
   branch TEXT, revision INTEGER, payload TEXT NOT NULL

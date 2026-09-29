@@ -113,8 +113,8 @@ certificate, semantics, metrics). A BB submission is compiled and graded in well
 `qccd_get_job(job_id, wait_s=50)`, which waits through the grade and returns the verdict as
 `grade`, and report it. If it is still running then, say the card in their chat will show the
 verdict (it follows the submission by itself), and stop. The result is local and not published;
-say so. Publishing needs the person's approval: `qccd_prepare_publish` shows exactly
-what would be uploaded.
+say so. To put it on the official leaderboard, `qccd_submit_official(design, board)` asks the
+person: their chat shows a card, and only their Submit uploads it, in their name.
 
 ## Be honest about what cannot be done
 

@@ -609,6 +609,109 @@ Board entries whose junction curves extend to degrees 5–16 (`random16`, `tanne
 fail `physics_lock` against the reference physics. That is intended: their physics differs
 from the task's.
 
+### The official leaderboard: signing in, testing, submitting (`account.py`, `publications.py`)
+
+A design goes from a person's workspace to qccd.academy's leaderboard in three steps. The
+leaderboard shows who submitted each design.
+
+1. **Test.** The design is graded on the board locally with every check the server runs.
+   This is `submit_design`, as above.
+2. **Sign in.** The workspace is signed in with the person's own qccd.academy account.
+3. **Submit.** The person presses Submit. The server grades the design again, then lists it
+   under the person's name.
+
+**Where a person does it.**
+
+- **Studio.** **Submit to Leaderboard**, in the Studio's head, opens the **Leaderboard panel**
+  (`web/cowork.js`, `GET /api/board-view`). It holds:
+  - a board picker over the boards qccd.academy ranks;
+  - what the board ranks;
+  - **Test on this board**, with the verdict and where it would place;
+  - the sign-in;
+  - the name shown on the board, and public or private;
+  - **Submit as <name>**, enabled only once the design's current revision passed;
+  - the design's requests to publish, each followed to its place on the board;
+  - the official ranking, live, with a **by** column.
+- **Website.** Every board on `/board/` has **Try your own design**. On qccd.academy it offers
+  `http://127.0.0.1:47100/studio?board=<task>` and the setup steps. On the workspace's copy of
+  the site (the mirror) it goes straight there. The mirror's `/studio` forwards `?board=` to
+  the Studio, which opens with the panel on that board.
+- **Terminal.** `qccd login` (and `qccd logout`) do the same sign-in. `qccd publish
+  --submission <id>` reviews the bundle, asks for its digest to be typed, and submits it as the
+  signed-in person. `qccd leaderboard --official --board <title>` shows the board with `by`,
+  and the person's own requests.
+
+**Signing in** is a device link (`qccd/official/accounts.py`). The password is typed on the
+site only; the workspace never sees it.
+
+1. The workspace asks the official server for a code (`POST /official/v1/links`) and opens
+   `https://qccd.academy/connect/?code=XXXX-XXXX`.
+2. On that page, the person, signed in to the site, presses **Allow**.
+3. The page asks the site's accounts service for a **grant** (`POST /api/leaderboard/grant`).
+   A grant is five minutes long, and names the account and that one code. It is signed with
+   HMAC-SHA256 under `QCCD_ACCOUNT_SECRET`, which only the two services hold.
+4. The page hands the grant to the official server (`/v1/links/<code>/approve`). The two
+   services share no database and no network path, so this is how the official server learns
+   who approved.
+5. The workspace, polling with a secret only it holds, collects its key once.
+
+The key is an uploader of kind `account`. It can upload only, and in that person's name. It
+is kept per person, not per workspace, in `~/.qccd/credentials.json` (`QCCD_CREDENTIALS` moves
+it), which only that user can read. No door returns it: the Studio, MCP, the CLI and the context
+give the account's name only. `/connect/` also lists the workspaces that can submit as the
+person, with **Revoke**, and what they submitted. Signing out revokes the key on the server
+first. Without the secret configured, both services refuse the sign-in and say why; maintainer
+tokens (`add-uploader`) still work, and are credited with their own name.
+
+**Only the person submits.** A person's Submit (panel, card, or `qccd publish`) is the
+approval: `approve_publish` binds the bundle digest and the parameters, and `publish`
+re-hashes the bundle before sending it.
+
+An agent's `qccd_submit_official(design, board)` makes a request and nothing more. The request
+moves through these states:
+
+- **testing** — the design had no current passing grade on that board, so it is being tested
+  first;
+- **awaiting_person** — the chat shows a card, *Submit <design> to <board> as <name>?*, with
+  **Submit as <name>** and **Not now**;
+- **uploading**, then **uploaded** — the person pressed Submit.
+
+If nobody is signed in, the card offers the sign-in. A design that failed its test is refused,
+with the reasons. The agent reads `account` and `view.board` (the board the panel shows) in
+`qccd_get_context`. It opens the panel with `qccd_present(open_board)`. It reads its requests
+under `yours` in `qccd_get_leaderboard(board, official=true)`. The panel, its buttons and the
+card are the person's (`data-qccd-private`), so page actions cannot press them.
+
+**What is checked before anything is sent.**
+
+- The design passed: a current (not stale) reference grade of that design on that board,
+  graded eligible.
+- The workspace is signed in.
+- The server ranks that edition of the board: same release id, same digest.
+
+After upload, the request reads the server's own verdict and the design's place on the board
+(`GET /v1/submissions/<id>`, `/v1/leaderboard/<task>`). It re-reads them every few seconds while
+the server grades, then every minute. Nothing is pushed, so a closed page loses nothing.
+
+**Credit.** Every official submission records the account (`account_id`) and its name at the
+time (`credit`). Every leaderboard row, on the site and through the tools, carries it as `by`.
+A person's keys on two computers share the account's quota, 30 submissions a day
+(`QCCD_ACCOUNT_QUOTA`). They also share its private submissions (`GET /v1/submissions` with the
+key).
+
+Tests:
+
+- `tests/test_official_accounts.py`: the grant's checks; the device link; keys and revocation;
+  credit; the HTTP routes.
+- `tests/test_leaderboard_grant.py`: the real site server signs a grant that the official
+  service accepts, and refuses everything else.
+- `tests/test_workspace_official.py`: a real official server on a loopback port, and a real
+  toolchain grade, covering:
+  - sign-in, test, Submit and the credit;
+  - an agent's request that only the person can confirm;
+  - a stale test refused;
+  - sign-out revoking the key.
+
 ## 4 · Security and trust boundaries
 
 - **Local service.** Binds 127.0.0.1. Host must be `127.0.0.1:<port>` or `localhost:<port>`.
@@ -830,8 +933,11 @@ qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
 qccd leaderboard --board "BB [[144,12,12]]"
 qccd compile --board surface --adopt     # the steps one by one, when wanted
 qccd validate --board surface --json     # a draft grade of the head revision
-qccd publish --submission <sub_id>       # review + approve at an interactive terminal
-qccd publish --approval <ap_id> --server https://qccd.academy/official   # token: ~/.qccd/credentials.json
+qccd login                               # sign this computer in with YOUR qccd.academy account (once)
+qccd publish --submission <sub_id>       # review, type the digest, submit it in your name
+qccd leaderboard --official --board "BB [[144,12,12]]"   # the official ranking, with who submitted each
+qccd logout                              # sign this computer out (its key is revoked)
+qccd publish --approval <ap_id> --server https://qccd.academy/official   # a maintainer's token instead
 qccd trace                               # what the agents did: every request, step by step
 qccd trace --session <id> --open         # ...one conversation in the browser, with Replay
 qccd status | qccd stop
@@ -876,6 +982,9 @@ extension and the ChatGPT app, which carry them.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
+| `tests/test_official_accounts.py` | signing in with a site account: the grant's checks, the device link, keys and their revocation, the credit on the leaderboard, the HTTP routes | ~35 s |
+| `tests/test_leaderboard_grant.py` | the site's accounts service signs a grant the official service accepts, and refuses strangers, bad requests and other sites | ~2 s |
+| `tests/test_workspace_official.py` | the official leaderboard from a workspace, against a real official server on a loopback port: sign in, test, Submit, credit; an agent's request only the person confirms; a stale test refused; sign-out revokes the key | ~60 s |
 | `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat; the model and thinking level the person picks reach the command line; a turn's trace step by step (thinking, Skill and MCP calls with results, cost); a Codex turn traced from its item events | ~8 s |
 | `tests/test_workspace_cursor.py` | Cursor as a chat agent with a stand-in `cursor-agent`: one chat resumed by a run per message, the message on stdin; every run headless with the QCCD tools allowed and the shell and file writes denied, whatever the person's own Cursor allows; the session passed to the QCCD tools; the model the person picks on the command line; a run that is not signed in says how to sign in; Stop, then the same chat goes on; a turn's trace and program; a renamed folder; the installer; in real Chrome, the Studio chat offering and talking to Cursor | ~6 s |
 | `tests/workspace_live_comments.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the agent comments on real qccd.academy pages as a signed-in person, against a PRIVATE copy of the comment service | ~20 s |

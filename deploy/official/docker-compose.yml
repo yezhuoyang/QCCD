@@ -27,6 +27,7 @@ services:
     environment:
       QCCD_OFFICIAL_DB: postgresql://qccd:qccd-dev-only@db:5432/qccd
       QCCD_OFFICIAL_ARTIFACTS: /artifacts
+      QCCD_ACCOUNT_SECRET: ${QCCD_ACCOUNT_SECRET:-}
     volumes: [artifacts:/artifacts]
     ports: ["127.0.0.1:8300:8300"]
     depends_on: [db]

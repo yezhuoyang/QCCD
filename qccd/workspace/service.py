@@ -852,6 +852,60 @@ def create_app(state: ServiceState) -> FastAPI:
         return ws.approve_publish(actor, str(b.get("submission_id", "")), str(b.get("bundle_digest", "")),
                                   b.get("params") or {})
 
+    # ---- the official leaderboard at qccd.academy: signing in, and submitting in the person's name
+    @route("GET", "/api/account", write=False)
+    def account(request, actor, _):
+        return ws.account(verify=q(request, "verify", "0") == "1")
+
+    @route("POST", "/api/account/signin", human_only=True)
+    def account_signin(request, actor, b):
+        """Start signing this computer in: the page opens the returned verify_url (qccd.academy), where
+        the person allows it; the service collects the key by itself."""
+        from .account import OfficialHTTPError
+        try:
+            return ws._accounts().start_signin(on_done=lambda s: ws.emit("account.updated", {
+                "state": s.state, "name": s.name}))
+        except OfficialHTTPError as e:
+            raise WorkspaceError(e.code, str(e), status=502 if e.status in (0, 500, 502, 503) else e.status) from None
+
+    @route("POST", "/api/account/signin/cancel", human_only=True)
+    def account_signin_cancel(request, actor, b):
+        return ws._accounts().cancel_signin()
+
+    @route("POST", "/api/account/signout", human_only=True)
+    def account_signout(request, actor, b):
+        out = ws._accounts().sign_out()
+        ws.emit("account.updated", {"state": "signed_out"})
+        return out
+
+    @route("GET", "/api/board-view", write=False)
+    def board_view(request, actor, _):
+        return ws.board_view(q(request, "board"), q(request, "design"))
+
+    @route("POST", "/api/publications")
+    def publications_new(request, actor, b):
+        return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
+                                      submission_id=b.get("submission_id"), display_name=b.get("display_name"),
+                                      visibility=str(b.get("visibility") or "public"),
+                                      origin_prompt_id=b.get("origin_prompt_id"))
+
+    @route("GET", "/api/publications", write=False)
+    def publications_list(request, actor, _):
+        return {"publications": ws.publications(q(request, "board"), q(request, "limit", 30, int))}
+
+    @route("GET", "/api/publications/{pid}", write=False)
+    def publication_one(request, actor, _):
+        return ws.publication(request.path_params["pid"])
+
+    @route("POST", "/api/publications/{pid}/confirm", human_only=True)
+    def publication_confirm(request, actor, b):
+        return ws.confirm_publication(actor, request.path_params["pid"], display_name=b.get("display_name"),
+                                      visibility=b.get("visibility"))
+
+    @route("POST", "/api/publications/{pid}/decline", human_only=True)
+    def publication_decline(request, actor, b):
+        return ws.decline_publication(actor, request.path_params["pid"])
+
     @route("POST", "/api/present")
     def present(request, actor, b):
         return ws.present(actor, str(b.get("action", "")), b.get("target") or {}, view_id=b.get("view_id"),

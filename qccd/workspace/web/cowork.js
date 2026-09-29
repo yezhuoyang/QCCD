@@ -51,7 +51,7 @@ var S = {
   paired: false, lastError: null, compile: null,
   // the chat view (default) vs the debug view (tabs)
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
-  conv: [], working: [], pending: null, codex: null, claude: null, cursor: null, connecting: false, branches: [], convTimer: null,
+  conv: [], working: [], pending: null, codex: null, claude: null, cursorAgent: null, connecting: false, branches: [], convTimer: null,
   lastSel: '', selOff: false, convScrolled: false,
   // the page this chat is about (a website page, or Studio itself)
   page: PAGE ? { url: CFG.page || '/web/', site: CFG.site } : null, pageDoing: null
@@ -321,6 +321,7 @@ function openEvents() {
                   { label: 'Show', run: function () { flash(S.lastTouched); } });
     });
     loadHistory();
+    if (B.open) { if (B.commitTimer) clearTimeout(B.commitTimer); B.commitTimer = setTimeout(loadBoard, 600); }
   });
   ['prompt.sent', 'comment.posted', 'reply.posted', 'work.updated', 'delivery.updated', 'prompt.linked'].forEach(function (t) {
     on(t, function (e) {
@@ -346,10 +347,25 @@ function openEvents() {
     var p = e.payload || {};
     if (!S.debug) loadConvSoon();
     if (t === 'job.updated' && p.kind === 'compile' && p.status === 'succeeded') S.compile = p.job_id;
-    if (t === 'job.updated' && p.job_id) trackRun(p);
+    if (t === 'job.updated' && p.job_id && (!p.kind || p.kind === 'run')) trackRun(p);   // only a run has a program page
     loadResults();
   }); });
   on('branch.created', function () { if (S.debug) renderBody(); else loadBranches(); });
+  // the official leaderboard: a request moved on, or this computer signed in or out
+  ['publication.updated', 'account.updated'].forEach(function (t) { on(t, function (e) {
+    var p = e.payload || {};
+    if (!S.debug) loadConvSoon();
+    if (B.open) loadBoard();
+    // an agent's request that passed its test waits for the person: say so wherever they are looking
+    if (t === 'publication.updated' && p.state === 'awaiting_person' && p.publication_id && !PAGE) {
+      api('GET', '/api/publications/' + encodeURIComponent(p.publication_id)).then(function (r) {
+        if (!r.ok || r.data.state !== 'awaiting_person') return;
+        notice((r.data.requested_by === 'agent' ? 'The agent asks to submit ' : 'Ready to submit ') + r.data.design + ' to ' +
+               r.data.board + (r.data.credit ? ' as ' + r.data.credit : '') + '.', null,
+               { label: 'Review', run: function () { openBoard(r.data.board_id); } });
+      });
+    }
+  }); });
   on('present', function (e) { present(e.payload || {}, e.branch); });
   on('page.action', function (e) { pageAction(e.payload || {}); });
 }
@@ -688,7 +704,7 @@ function present(p, branch) {
   // open_branch IS about another design: it used to be dropped here, so an agent could never bring the
   // design it had just made onto the person's screen (2026-09-24)
   if (!p.view_id && branch && branch !== S.branch && p.action !== 'compare' && p.action !== 'open_run' &&
-      p.action !== 'open_branch') return;
+      p.action !== 'open_branch' && p.action !== 'open_board') return;
   var t = p.target || {};
   function doit() {
     if (!ED && (p.action === 'highlight' || p.action === 'select' || p.action === 'select_frame')) return;
@@ -710,6 +726,7 @@ function present(p, branch) {
     }
     else if (p.action === 'open_result' || p.action === 'compare') { S.tab = 'results'; renderTabs(); loadResults(); }
     else if (p.action === 'reveal_diagnostic') { S.tab = 'results'; renderTabs(); loadResults(); flash(t.keys || []); }
+    else if (p.action === 'open_board') openBoard(t.board || null);
     else if (p.action === 'open_branch') {
       // the Studio switches to that design, under its name, as the person would from the header
       var to = t.branch || branch || 'main';
@@ -1190,6 +1207,300 @@ function review(sub) {
   });
 }
 
+// ------------------------------------------------------------------ the official leaderboard (the Leaderboard panel)
+//
+// "Submit to Leaderboard", in the Studio's head, opens the Leaderboard panel: pick one of the boards
+// qccd.academy ranks, see its official ranking live (with who submitted each design), test the
+// design on the board (the full reference grade, on this computer), and submit it -- only once the
+// test passed, and only signed in to qccd.academy, whose account the leaderboard then credits.
+// `/studio?board=<task>` (the website's "Try your own design") opens the Studio focused on one board.
+// The panel is the PERSON's (data-qccd-private): the agent opens it (qccd_present open_board) and
+// asks to submit (qccd_submit_official), and the person presses Submit, in the panel or on the card.
+var B = { open: false, board: null, data: null, timer: null, loading: false, signinWin: null, name: null, vis: 'public' };
+
+function boardParam() {
+  var m = /[?&]board=([^&#]+)/.exec(location.search || '');
+  return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
+}
+function lbButton() {
+  if (PAGE || CFG.mode !== 'design' || document.getElementById('qcl-lbbtn')) return;
+  var grips = document.querySelector('.head .grips');
+  if (!grips) return;
+  var b = h('button', { id: 'qcl-lbbtn', type: 'button', 'data-qccd-private': '1', 'aria-expanded': 'false',
+                        title: 'Test this design on a leaderboard, and submit it to qccd.academy under your name',
+                        text: 'Submit to Leaderboard', on: { click: function () { B.open ? closeBoard() : openBoard(B.board); } } });
+  grips.insertBefore(b, grips.firstChild);
+}
+function openBoard(board) {
+  if (PAGE) { goTo('/studio' + (board ? '?board=' + encodeURIComponent(board) : '')); return Promise.resolve(); }
+  B.open = true;
+  if (board !== undefined && board !== null) { B.board = board; B.name = null; }
+  var btn0 = document.getElementById('qcl-lbbtn'); if (btn0) btn0.setAttribute('aria-expanded', 'true');
+  S.viewDirty = true;
+  renderBoard();
+  return loadBoard();
+}
+function closeBoard() {
+  B.open = false;
+  var p = document.getElementById('qcl-board'); if (p) p.remove();
+  var btn0 = document.getElementById('qcl-lbbtn'); if (btn0) btn0.setAttribute('aria-expanded', 'false');
+  if (B.timer) { clearTimeout(B.timer); B.timer = null; }
+  S.viewDirty = true;
+}
+function loadBoard() {
+  if (!B.open) return Promise.resolve();
+  B.loading = true;
+  var q = '/api/board-view?design=' + encodeURIComponent(S.branch) + (B.board ? '&board=' + encodeURIComponent(B.board) : '');
+  return api('GET', q).then(function (r) {
+    B.loading = false;
+    if (r.ok) {
+      B.data = r.data;
+      if (r.data.board) B.board = r.data.board.id;          // a title or short name becomes the board's id
+    } else B.data = { error: (r.error || {}).message || 'the Leaderboard could not be read' };
+    renderBoard(); scheduleBoard();
+  });
+}
+function scheduleBoard() {
+  if (B.timer) clearTimeout(B.timer);
+  if (!B.open) return;
+  var d = B.data || {}, busy = (d.test && d.test.state === 'running') ||
+    ((d.account || {}).signin) || (d.publications || []).some(function (p) {
+      var o = p.official || {};
+      return p.state === 'testing' || p.state === 'uploading' ||
+             (p.state === 'uploaded' && (['eligible', 'ineligible'].indexOf(o.status) < 0 ||
+                                        (o.status === 'eligible' && p.visibility === 'public' && !o.rank)));
+    });
+  B.timer = setTimeout(loadBoard, busy ? 2500 : 30000);
+}
+function fmtVal(v, unit) {
+  if (typeof v !== 'number') return '–';
+  var s = Math.abs(v) >= 100 ? v.toFixed(1) : (Math.abs(v) >= 1 ? v.toFixed(2) : v.toPrecision(3));
+  return s + (unit ? ' ' + unit : '');
+}
+function fmtDay(t) { try { return t ? new Date(t * 1000).toISOString().slice(0, 10) : ''; } catch (e) { return ''; } }
+function signIn() {
+  // the page on qccd.academy must open from the click itself, or a browser blocks it as a pop-up
+  var w = null;
+  try { w = window.open('about:blank', '_blank'); } catch (e) { w = null; }
+  return api('POST', '/api/account/signin', {}).then(function (r) {
+    if (!r.ok) { if (w) w.close(); notice('Could not start signing in: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
+    var url = r.data.verify_url;
+    if (w) { try { w.opener = null; w.location.href = url; } catch (e) { w = null; } }
+    if (!w) notice('Open this page to sign in: ' + url, null, { label: 'Open', run: function () { window.open(url, '_blank', 'noopener'); } });
+    B.signinWin = url;
+    loadBoard(); loadConvSoon();
+  });
+}
+function signOut() {
+  if (!window.confirm('Sign this computer out of qccd.academy? Its key is revoked; what you submitted stays on the leaderboard.')) return;
+  api('POST', '/api/account/signout', {}).then(function () { loadBoard(); loadConvSoon(); });
+}
+function testOnBoard() {
+  if (!B.board) return;
+  api('POST', '/api/submissions', { design: S.branch, board: B.board, profile: 'reference', request_id: rid('test') }).then(function (r) {
+    if (!r.ok) { notice('Not tested: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
+    loadBoard();
+  });
+}
+function submitToBoard() {
+  var d = B.data || {}, name = document.getElementById('qcl-bname');
+  api('POST', '/api/publications', { design: S.branch, board: B.board, visibility: B.vis,
+                                     display_name: name ? name.value : null }).then(function (r) {
+    if (!r.ok) { notice('Not submitted: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
+    notice('Submitting ' + ((d.design || {}).name || 'the design') + ' to ' + ((d.board || {}).title || 'the board') +
+           ' as ' + (r.data.credit || 'you') + '. The server grades it again, then it appears on the leaderboard.');
+    loadBoard(); loadConvSoon();
+  });
+}
+function confirmPublication(pid, fromCard) {
+  api('POST', '/api/publications/' + encodeURIComponent(pid) + '/confirm', {}).then(function (r) {
+    if (!r.ok) { notice('Not submitted: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
+    notice('Submitting as ' + (r.data.credit || 'you') + '.');
+    loadBoard(); loadConvSoon();
+  });
+}
+function declinePublication(pid) {
+  api('POST', '/api/publications/' + encodeURIComponent(pid) + '/decline', {}).then(function () { loadBoard(); loadConvSoon(); });
+}
+function newFromStarter() {
+  var bd = (B.data || {}).board || {}, st = bd.starter;
+  if (!st || !st.generator) return;
+  saveAsDraft().then(function (made) {
+    if (!made) return;
+    return switchDraft(made.name).then(function () {
+      return api('POST', '/api/change-sets', { branch: made.name, expected_revision: S.rev, request_id: rid('starter'), mode: 'apply',
+                                               summary: 'start from the ' + bd.title + ' board\'s starting device',
+                                               operations: [{ type: 'construct', generator: st.generator, params: st.params || {},
+                                                              name: st.name || 'design' }] });
+    }).then(function (c) {
+      if (c && !c.ok) notice('Not started: ' + ((c.error || {}).message || 'error'), 'bad');
+      refreshHead(true); loadBoard();
+    });
+  });
+}
+// one request to publish, as the panel and the chat card both say it
+function pubLine(p) {
+  var o = p.official || {};
+  if (p.state === 'testing') return 'Testing it on the board first…';
+  if (p.state === 'test_failed') return 'Did not pass the test: ' + (p.error || 'see the report');
+  if (p.state === 'awaiting_person') return p.signed_in ? 'Passed the test. Waiting for you to submit it as ' + p.credit + '.'
+                                                        : 'Passed the test. Sign in to qccd.academy to submit it under your name.';
+  if (p.state === 'uploading') return 'Uploading…';
+  if (p.state === 'declined') return 'Not submitted.';
+  if (p.state === 'failed') return 'Not submitted: ' + (p.error || 'no reason given');
+  if (o.unreachable && !o.status) return 'Uploaded; the server cannot be reached to say more right now.';
+  if (o.status === 'eligible') return p.visibility === 'private' ? 'Graded eligible by the server (private: not on the leaderboard).'
+    : (o.rank ? 'On the leaderboard: #' + o.rank + ' of ' + o.of : 'Graded eligible by the server') +
+      (typeof o.rank_value === 'number' ? ' · ' + (o.rank_by ? o.rank_by + ' ' : '') + fmtVal(o.rank_value, o.unit) : '') +
+      (o.by ? ' · by ' + o.by : '');
+  if (o.status === 'ineligible') return 'The server graded it not eligible' + ((o.reasons || []).length ? ': ' + o.reasons.join('; ') : '') + '.';
+  return 'Submitted as ' + (o.by || p.credit || 'you') + '. The server is grading it…';
+}
+function pubActions(p) {
+  if (p.state !== 'awaiting_person') return [];
+  if (!p.signed_in) return [btn('Sign in to qccd.academy', signIn, 'pri', 'your name is shown with what you submit'),
+                           btn('Not now', function () { declinePublication(p.publication_id); }, 'qcl-link')];
+  return [btn('Submit as ' + p.credit, function () { confirmPublication(p.publication_id); }, 'pri',
+              'upload exactly this graded design to qccd.academy; the server grades it again'),
+          btn('Not now', function () { declinePublication(p.publication_id); }, 'qcl-link')];
+}
+function renderBoard() {
+  var old = document.getElementById('qcl-board');
+  if (!B.open) { if (old) old.remove(); return; }
+  var d = B.data || {}, bd = d.board, acct = d.account || {};
+  var panel = h('div', { id: 'qcl-board', 'data-qccd-private': '1', role: 'dialog', 'aria-label': 'Leaderboard' });
+  panel.appendChild(h('div', { cls: 'qcl-bhead' }, [h('b', { text: 'Leaderboard' }),
+    h('span', { cls: 'qcl-note', text: bd ? 'qccd.academy, live' : 'pick a board' }), h('span', { cls: 'qcl-sp' }),
+    btn('×', closeBoard, 'qcl-x', 'close the Leaderboard panel')]));
+  var body = h('div', { cls: 'qcl-bbody' });
+  panel.appendChild(body);
+  if (d.error) body.appendChild(h('div', { cls: 'qcl-warnbox', text: d.error }));
+  var boards = d.boards || [];
+  // the board: a picker over the boards qccd.academy ranks
+  var pick = h('select', { id: 'qcl-bpick', cls: 'qcl-sel', title: 'the leaderboard (a circuit and what it ranks)',
+                           on: { change: function (e) { B.board = e.target.value || null; B.name = null; B.data = Object.assign({}, B.data, { board: null }); loadBoard(); } } },
+               [h('option', { value: '', text: 'Choose a board…' })].concat(boards.map(function (x) {
+                 var o = h('option', { value: x.id, text: x.title + (x.on_server ? '' : ' (not on qccd.academy yet)') });
+                 if (bd && x.id === bd.id) o.selected = true;
+                 return o; })));
+  body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Board' }), pick]));
+  if (!bd) {
+    if (!boards.length && B.loading) body.appendChild(h('div', { cls: 'qcl-note', text: 'Loading the boards…' }));
+    boards.forEach(function (x) {
+      body.appendChild(h('button', { cls: 'qcl-bpickrow', type: 'button', on: { click: function () { B.board = x.id; loadBoard(); } } }, [
+        h('b', { text: x.title }), h('span', { cls: 'qcl-note', text: ' ranked by ' + x.rank_by + (x.on_server ? '' : ' · not on qccd.academy yet') })]));
+    });
+    if (d.server_error) body.appendChild(h('div', { cls: 'qcl-note', text: 'qccd.academy did not answer: ' + d.server_error }));
+    swapBoard(old, panel);
+    return;
+  }
+  body.appendChild(h('div', { cls: 'qcl-bdesc', text: bd.description || '' }));
+  body.appendChild(h('div', { cls: 'qcl-note', text: 'Ranked by ' + bd.rank_by + (bd.unit ? ' (' + bd.unit + ')' : '') + ', ' +
+    (bd.better === 'high' ? 'higher' : 'lower') + ' is better.' }));
+  if (!bd.on_server) body.appendChild(h('div', { cls: 'qcl-warnbox', text: 'qccd.academy does not rank this board yet: you can test on it here, but not submit.' }));
+  else if (!bd.same_edition) body.appendChild(h('div', { cls: 'qcl-warnbox', text: 'qccd.academy ranks another edition of this board: update QCCD to submit to it.' }));
+
+  // 1. your design, tested on the board
+  var t = d.test, des = d.design || {};
+  body.appendChild(h('div', { cls: 'qcl-bsec', text: '1 · Your design' }));
+  body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Design' }),
+    h('b', { text: des.name || draftName(S.branch) }), h('span', { cls: 'qcl-note', text: 'r' + (des.revision !== undefined ? des.revision : '?') + ' · switch designs in the chat\'s design menu' })]));
+  var line, cls = '';
+  if (!t) line = 'Not tested on this board yet.';
+  else if (t.state === 'running') { line = 'Testing: ' + (t.progress || 'compiling the board\'s circuit onto the design') + '…'; cls = 'busy'; }
+  else if (t.eligible) {
+    line = 'Passed every check: ' + fmtVal(t.value, t.unit) + (t.would_rank ? ' · would place #' + t.would_rank + ' of ' + t.of + ' on the official board' : '');
+    cls = 'ok';
+  } else { line = 'Did not pass' + ((t.reasons || []).length ? ': ' + t.reasons.join('; ') : '') + '.'; cls = 'bad'; }
+  body.appendChild(h('div', { id: 'qcl-btest', cls: 'qcl-bstatus ' + cls, text: line }));
+  body.appendChild(h('div', { cls: 'qcl-row' }, [
+    btn(t && t.state !== 'running' ? 'Test again' : 'Test on this board', testOnBoard, t && t.eligible ? '' : 'pri',
+        'compile this board\'s circuit onto the design with the reference compiler, and grade it with every check the server runs (rules, the Lean certificate, semantics)'),
+    bd.starter && bd.starter.generator ? btn('New design from the board\'s starting device', newFromStarter, 'qcl-link',
+        'a new design (you name it) holding a device that passes this board: ' + bd.starter.generator) : null]));
+  if (t && t.state === 'running') body.lastChild.firstChild.disabled = true;
+
+  // 2. submit, signed in
+  body.appendChild(h('div', { cls: 'qcl-bsec', text: '2 · Submit to qccd.academy' }));
+  if (acct.signed_in) {
+    body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Signed in' }), h('b', { text: acct.name }),
+      btn('Sign out', signOut, 'qcl-link')]));
+    body.appendChild(h('div', { cls: 'qcl-note', text: 'The leaderboard shows this name with what you submit.' }));
+  } else if (acct.signin) {
+    body.appendChild(h('div', { cls: 'qcl-bstatus busy', text: 'Waiting for you to press Allow on qccd.academy (the page shows ' +
+                               acct.signin.code + ')…' }));
+    body.appendChild(h('div', { cls: 'qcl-row' }, [btn('Open the page again', function () { window.open(acct.signin.verify_url, '_blank', 'noopener'); }, 'qcl-link'),
+      btn('Cancel', function () { api('POST', '/api/account/signin/cancel', {}).then(loadBoard); }, 'qcl-link')]));
+  } else {
+    body.appendChild(h('div', { cls: 'qcl-note', text: (acct.problem ? acct.problem + '. ' : '') +
+      'Submitting needs your qccd.academy account: the leaderboard credits each design to the person who submitted it. ' +
+      'Sign in on the site; your password never passes through this computer.' + ((acct.last_signin || {}).state === 'denied' ? ' (The last sign-in was not allowed.)' : '') }));
+    body.appendChild(h('div', { cls: 'qcl-row' }, [btn('Sign in to qccd.academy', signIn, 'pri', 'opens qccd.academy: sign in there and press Allow')]));
+  }
+  var passed = !!(t && t.eligible), can = passed && acct.signed_in && bd.on_server && bd.same_edition;
+  if (B.name === null) B.name = des.name || '';
+  var nameIn = h('input', { id: 'qcl-bname', cls: 'qcl-in', type: 'text', maxlength: '80', value: B.name,
+                            title: 'the name shown on the leaderboard: anything you like (default: the design\'s own name)',
+                            on: { input: function (e) { B.name = e.target.value; } } });
+  var vis = h('select', { cls: 'qcl-sel', title: 'public: on the leaderboard with your name; private: graded, only you see it',
+                          on: { change: function (e) { B.vis = e.target.value; } } },
+              [['public', 'public, on the leaderboard'], ['private', 'private, only you']].map(function (o) {
+                var x = h('option', { value: o[0], text: o[1] }); if (o[0] === B.vis) x.selected = true; return x; }));
+  body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Shown as' }), nameIn, vis]));
+  var sent = t && t.publication;
+  var why = !passed ? 'Test the design on this board first: only a design that passes can be submitted.'
+          : sent ? (sent.state === 'awaiting_person' ? 'The agent already asked to submit it: answer below.'
+                                                     : 'Submitted. Change the design and test it again to submit a new version.')
+          : !acct.signed_in ? 'Sign in first.' : !bd.on_server || !bd.same_edition ? 'qccd.academy cannot take this board yet.' : '';
+  if (sent) can = false;
+  var sb = btn(sent && sent.state !== 'awaiting_person' ? 'Submitted' : (acct.signed_in ? 'Submit as ' + acct.name : 'Submit'), submitToBoard,
+               'pri qcl-bsubmit', why || 'upload exactly this graded design; the server grades it again, then lists it');
+  sb.id = 'qcl-bsubmit';
+  if (!can) sb.disabled = true;
+  body.appendChild(h('div', { cls: 'qcl-row' }, [sb, why ? h('span', { cls: 'qcl-note', text: why }) : null]));
+  (d.publications || []).slice(0, 6).forEach(function (p) {
+    body.appendChild(h('div', { cls: 'qcl-bpub ' + p.state, 'data-publication': p.publication_id }, [
+      h('div', {}, [h('b', { text: p.display_name || p.design }), h('span', { cls: 'qcl-note', text: ' · ' + fmtDay(p.created_at) +
+        (p.requested_by === 'agent' ? ' · asked by the agent' : '') })]),
+      h('div', { cls: 'qcl-note', text: pubLine(p) }), h('div', { cls: 'qcl-row' }, pubActions(p))]));
+  });
+
+  // 3. the official ranking, live
+  var off = d.official || {}, rows = off.rows || [];
+  var mine = {}; (d.publications || []).forEach(function (p) { if ((p.official || {}).submission_id) mine[p.official.submission_id] = true; });
+  body.appendChild(h('div', { cls: 'qcl-bsec', text: '3 · The official ranking' }));
+  if (off.error) body.appendChild(h('div', { cls: 'qcl-note', text: 'qccd.academy did not answer: ' + off.error }));
+  else if (!rows.length) body.appendChild(h('div', { cls: 'qcl-note', text: 'Nobody has submitted to this board yet: the first eligible design is #1.' }));
+  else {
+    var tb = h('table', { cls: 'qcl-btable' }, [h('tr', {}, ['#', 'design', 'by', bd.rank_by, 'date'].map(function (c) { return h('th', { text: c }); }))]);
+    rows.forEach(function (r, i) {
+      tb.appendChild(h('tr', { cls: mine[r.id] ? 'mine' : '' }, [h('td', { text: String(i + 1) }), h('td', { text: r.display_name || '–' }),
+        h('td', { text: r.by || '–' }), h('td', { cls: 'n', text: fmtVal(r.rank_value) }), h('td', { text: fmtDay(r.created_at) })]));
+    });
+    body.appendChild(tb);
+  }
+  var site = String(d.server || '').replace(/\/official\/?$/, '');
+  body.appendChild(h('div', { cls: 'qcl-note' }, [h('a', { href: site + '/board/#' + String(bd.id).split('@')[0], target: '_blank', rel: 'noopener',
+                                                          text: 'This board on qccd.academy, with the study\'s own entries ↗' })]));
+  swapBoard(old, panel);
+}
+function swapBoard(old, panel) {
+  var keep = old ? old.querySelector('.qcl-bbody') : null, top = keep ? keep.scrollTop : 0;
+  var focus = document.activeElement && document.activeElement.id === 'qcl-bname';
+  if (old) old.replaceWith(panel); else document.body.appendChild(panel);
+  var nb = panel.querySelector('.qcl-bbody'); if (nb) nb.scrollTop = top;
+  if (focus) { var i = document.getElementById('qcl-bname'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+}
+function publicationCard(it) {
+  var st = it.state, ok = st === 'uploaded' && (it.official || {}).status === 'eligible';
+  var bad = st === 'failed' || st === 'test_failed' || (it.official || {}).status === 'ineligible';
+  return h('div', { cls: 'qcl-card pub ' + (ok ? 'ok' : bad ? 'bad' : 'busy'), 'data-publication': it.publication_id }, [
+    h('div', { cls: 'qcl-card-t', text: (it.design || 'The design') + ' to the ' + (it.board || '') + ' leaderboard' +
+                                       (it.credit ? ', as ' + it.credit : '') }),
+    h('div', { cls: 'qcl-card-s', text: pubLine(it) }),
+    h('div', { cls: 'qcl-row' }, pubActions(it).concat([PAGE ? null : btn('Leaderboard', function () { openBoard(it.board_id); }, 'qcl-link')]))]);
+}
+
 // ------------------------------------------------------------------ chat (the default view)
 //
 // One conversation, like talking to a colleague: the person's messages, the agent's own
@@ -1335,7 +1646,7 @@ function toggleMenu(which) {
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
-      S.cursor ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
+      S.cursorAgent ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       ['Open your Studio (the design you work on)', function () { goTo('/studio'); }],
@@ -1359,7 +1670,7 @@ function toggleMenu(which) {
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
       S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
       S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
-      S.cursor ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
+      S.cursorAgent ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
       null,
       CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
@@ -1474,7 +1785,7 @@ function warmOnTyping() {
 function loadAgents() {
   return api('GET', '/api/agents').then(function (r) {
     S.codex = !!(r.ok && r.data.codex_available); S.claude = !!(r.ok && r.data.claude_available);
-    S.cursor = !!(r.ok && r.data.cursor_available);
+    S.cursorAgent = !!(r.ok && r.data.cursor_available);   // not S.cursor: that is the event stream's position
     S.installed = (r.ok && r.data.installed) || [];
   });
 }
@@ -1484,9 +1795,9 @@ function agentChoice() {
   var pref = localGet('qccd.agent'), inst = S.installed || [];
   if (pref === 'claude' && S.claude) return 'claude';
   if (pref === 'codex' && S.codex) return 'codex';
-  if (pref === 'cursor' && S.cursor) return 'cursor';
+  if (pref === 'cursor' && S.cursorAgent) return 'cursor';
   if (inst.length === 1 && S[inst[0]]) return inst[0];
-  return S.codex ? 'codex' : (S.claude ? 'claude' : (S.cursor ? 'cursor' : null));
+  return S.codex ? 'codex' : (S.claude ? 'claude' : (S.cursorAgent ? 'cursor' : null));
 }
 function agentTitle(k) { return k === 'claude' ? 'Claude' : (k === 'cursor' ? 'Cursor' : 'Codex'); }
 // which agent the chat is about: the connected one, else the one it will start
@@ -1666,7 +1977,7 @@ function switchDraft(name) {
       S.branch = name; S.rev = null; S.synced = null;
       api('PATCH', '/api/views/' + encodeURIComponent(S.view), { branch: name }).then(function () {
         return loadHead();
-      }).then(function () { loadHistory(); renderDrafts(); renderChatHead(); resolve(true); });
+      }).then(function () { loadHistory(); renderDrafts(); renderChatHead(); if (B.open) { B.name = null; loadBoard(); } resolve(true); });
     })();
   });
 }
@@ -1726,6 +2037,10 @@ function emptyState() {
   var ex = ['Compile and run the BB code on this design, and tell me the bottleneck',
             'Save this design as a draft called A',
             'Run the BB code on the main design and on draft A, and show them side by side'];
+  var fb = B.open && B.data && B.data.board;
+  if (fb) ex = ['Make a design that would place first on ' + fb.title + ', and test it on the board',
+                'Why is the current #1 on ' + fb.title + ' fast? Compare it with my design',
+                'Test this design on ' + fb.title + ' and submit it to the leaderboard'];
   return h('div', { cls: 'qcl-empty' }, [
     h('div', { cls: 'qcl-empty-t', text: 'Ask the agent about this design.' }),
     h('div', { cls: 'qcl-note', text: 'Select parts on the canvas and they go with your message. The agent can change the ' +
@@ -1767,6 +2082,7 @@ function convItem(it, lastWho) {
       ok && it.view ? btn('Watch it run', function () { window.open(it.view, '_blank', 'noopener'); }, 'qcl-link') : null]);
   }
   if (it.type === 'submission') return submissionCard(it);
+  if (it.type === 'publication') return publicationCard(it);
   if (it.type === 'compare') {
     return h('div', { cls: 'qcl-card cmp' }, [h('div', { cls: 'qcl-card-t', text: 'Side by side' }),
       it.verdict ? h('div', { cls: 'qcl-card-s', text: it.verdict }) : null,
@@ -2108,7 +2424,7 @@ function reportView() {
   api('PATCH', '/api/views/' + encodeURIComponent(S.view), {
     rendered_revision: CFG.mode === 'design' ? S.rev : null, selection: selectionKeys().slice(0, 100),
     viewport: viewport(), frame: (typeof frame === 'number') ? frame : null,
-    displayed_run: CFG.snapshot_id || null, page: pageInfo() });
+    displayed_run: CFG.snapshot_id || null, page: pageInfo(), board: B.open ? B.board : null });
 }
 
 // ------------------------------------------------------------------ boot
@@ -2180,7 +2496,11 @@ function boot() {
     if (!ok) return;
     return registerView().then(function () {
       return api('GET', '/api/whoami').then(function () {
-        if (CFG.mode === 'design') return loadHead();
+        if (CFG.mode === 'design') return loadHead().then(function () {
+          lbButton();
+          var fb = boardParam();                  // the website's "Try your own design": one board, in focus
+          if (fb) openBoard(fb).then(function () { if (!S.debug) renderConv(); });
+        });
         if (PAGE) return refreshPage();
         if (ED && ED.setViewOnly) ED.setViewOnly(true);
         var m = /[#&]instr=(\d+)/.exec(location.hash || '');
@@ -2234,9 +2554,13 @@ window.QCCD_LIVE = {
   chat: function () { return { debug: S.debug, items: S.conv.slice(), working: S.working.slice(), pending: S.pending,
                                branch: S.branch, branches: S.branches.map(function (b) { return b.name; }),
                                agent: (agentSession() || {}).id || null, codex: S.codex, claude: S.claude,
-                               cursor: S.cursor }; },
+                               cursor: S.cursorAgent }; },
   chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft,
-  page: function () { return S.page; }, refreshPage: refreshPage
+  page: function () { return S.page; }, refreshPage: refreshPage,
+  // the Leaderboard panel
+  board: function () { return { open: B.open, board: B.board, data: B.data }; },
+  openBoard: openBoard, closeBoard: closeBoard, loadBoard: loadBoard, testOnBoard: testOnBoard, submitToBoard: submitToBoard,
+  confirmPublication: confirmPublication, signIn: signIn
 };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

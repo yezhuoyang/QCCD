@@ -7,6 +7,10 @@ Trust boundaries, stated as code:
   hold is refused; a client cannot supply a task.
 * UPLOADS need a bearer token whose SHA-256 is in `uploaders` (and not disabled), within
   the uploader's daily quota.  With no uploader configured the upload path FAILS CLOSED.
+  An uploader is a maintainer's token (`add-uploader`) or a PERSON's key: a workspace signs in
+  with a qccd.academy account (accounts.py) and collects a key that submits in that person's
+  name, which the leaderboard shows as the submission's credit (`by`).  The site vouches for
+  the person with a grant signed by the secret both hold; without it signing in fails closed.
   A development token exists only when `QCCD_OFFICIAL_DEV=1`, it must be given explicitly
   (`QCCD_OFFICIAL_DEV_TOKEN`), and it is accepted only from loopback.
 * A BUNDLE is data: the archive is size-limited and safely extracted (no absolute paths,
@@ -35,6 +39,7 @@ import secrets
 import shutil
 import tempfile
 import time
+import urllib.parse
 from pathlib import Path
 
 from ..workspace.bundle import BundleError, extract_archive
@@ -128,8 +133,167 @@ class OfficialService:
         row = self.db.one("SELECT * FROM uploaders WHERE token_sha256=? AND disabled=0",
                           (hashlib.sha256(token.encode()).hexdigest(),))
         if row is None:
-            raise OfficialError("unauthorized", "unknown or disabled upload token", 401)
+            raise OfficialError("unauthorized", "unknown or disabled upload token (signed out, or revoked on the "
+                                "site): sign in again", 401)
+        self.db.execute("UPDATE uploaders SET last_used_at=? WHERE id=?", (_now(), row["id"]))
         return row
+
+    # ------------------------------------------------------------------ signing in with a site account
+
+    def start_link(self, label: str, ip: str | None) -> dict:
+        """A workspace asks to sign in: a code for the person to approve on the site, and the
+        secret the workspace collects its key with.  Nothing here says who the person is yet."""
+        from .accounts import LINK_TTL_S, new_code, site_url
+        label = " ".join(str(label or "").split())[:80] or "a QCCD workspace"
+        now = _now()
+        self.db.execute("UPDATE links SET status='expired' WHERE status IN ('pending','approved') AND expires_at<?",
+                        (now,))
+        if ip:
+            n = self.db.one("SELECT COUNT(*) AS n FROM links WHERE ip=? AND created_at>?", (ip, now - 3600))
+            if n and n["n"] >= 20:
+                raise OfficialError("rate_limited", "too many sign-ins from here in the last hour", 429)
+        pending = self.db.one("SELECT COUNT(*) AS n FROM links WHERE status='pending'")
+        if pending and pending["n"] >= 500:
+            raise OfficialError("rate_limited", "too many sign-ins are waiting; try again in a few minutes", 429)
+        poll = secrets.token_urlsafe(32)
+        for _ in range(8):
+            code = new_code()
+            if self.db.one("SELECT code FROM links WHERE code=?", (code,)) is None:
+                break
+        self.db.execute("INSERT INTO links(code, poll_sha256, label, status, ip, created_at, expires_at) "
+                        "VALUES(?,?,?, 'pending', ?,?,?)",
+                        (code, hashlib.sha256(poll.encode()).hexdigest(), label, ip, now, now + LINK_TTL_S))
+        return {"code": code, "poll_secret": poll, "verify_url": f"{site_url()}/connect/?code={code}",
+                "expires_in": LINK_TTL_S, "interval": 2, "label": label}
+
+    def _link(self, code: str) -> dict:
+        from .accounts import norm_code
+        row = self.db.one("SELECT * FROM links WHERE code=?", (norm_code(code),))
+        if row is None:
+            raise OfficialError("not_found", "no such sign-in code (it may have expired: sign in again from the "
+                                "workspace)", 404)
+        if row["status"] in ("pending", "approved") and row["expires_at"] < _now():
+            self.db.execute("UPDATE links SET status='expired' WHERE code=?", (row["code"],))
+            row["status"] = "expired"
+        return row
+
+    def link_info(self, code: str) -> dict:
+        """What the site's page shows before the person allows it: the workspace's own label."""
+        r = self._link(code)
+        return {"code": r["code"], "label": r["label"], "status": r["status"], "created_at": r["created_at"],
+                "expires_at": r["expires_at"]}
+
+    def approve_link(self, code: str, grant) -> dict:
+        from .accounts import GrantError, verify_grant
+        r = self._link(code)
+        try:
+            acct = verify_grant(grant, purpose="link", code=r["code"])
+        except GrantError as e:
+            raise OfficialError(e.code, str(e), e.status) from None
+        if r["status"] != "pending":
+            raise OfficialError("link_" + r["status"], f"this sign-in is {r['status']}", 409)
+        self.db.execute("UPDATE links SET status='approved', account_id=?, account_name=?, approved_at=? "
+                        "WHERE code=? AND status='pending'", (acct["id"], acct["name"], _now(), r["code"]))
+        return {"ok": True, "code": r["code"], "label": r["label"], "account": {"name": acct["name"]}}
+
+    def deny_link(self, code: str, grant) -> dict:
+        from .accounts import GrantError, verify_grant
+        r = self._link(code)
+        try:
+            verify_grant(grant, purpose="link", code=r["code"])
+        except GrantError as e:
+            raise OfficialError(e.code, str(e), e.status) from None
+        self.db.execute("UPDATE links SET status='denied' WHERE code=? AND status='pending'", (r["code"],))
+        return {"ok": True, "code": r["code"], "status": "denied"}
+
+    def collect_link(self, code: str, poll_secret) -> dict:
+        """The workspace's poll: 'pending' until the person approves, then the key, exactly once."""
+        from .accounts import ACCOUNT_QUOTA
+        r = self._link(code)
+        if not isinstance(poll_secret, str) or not secrets.compare_digest(
+                hashlib.sha256(poll_secret.encode()).hexdigest(), r["poll_sha256"]):
+            raise OfficialError("not_found", "no such sign-in code", 404)
+        if r["status"] == "pending":
+            return {"status": "pending", "expires_at": r["expires_at"]}
+        if r["status"] == "denied":
+            raise OfficialError("link_denied", "the sign-in was not allowed on the site", 403)
+        if r["status"] != "approved":
+            raise OfficialError("link_" + r["status"], f"this sign-in is {r['status']}: sign in again", 410)
+        token = "qccdk_" + secrets.token_urlsafe(32)
+        kid = "k_" + secrets.token_hex(6)
+        with self.db.tx() as db:
+            claimed = db.execute("UPDATE links SET status='delivered', key_id=?, delivered_at=? "
+                                 "WHERE code=? AND status='approved'", (kid, _now(), r["code"]))
+            if getattr(claimed, "rowcount", 1) == 0:
+                raise OfficialError("link_delivered", "this sign-in was already collected", 410)
+            db.execute("INSERT INTO uploaders(id, name, token_sha256, quota_per_day, created_at, kind, account_id, "
+                       "account_name, label) VALUES(?,?,?,?,?, 'account', ?,?,?)",
+                       (kid, r["account_name"], hashlib.sha256(token.encode()).hexdigest(), ACCOUNT_QUOTA, _now(),
+                        r["account_id"], r["account_name"], r["label"]))
+        return {"status": "approved", "token": token, "key_id": kid, "label": r["label"],
+                "account": {"id": r["account_id"], "name": r["account_name"]}}
+
+    def me(self, uploader: dict) -> dict:
+        used = self._used_today(uploader)
+        acct = ({"id": uploader["account_id"], "name": uploader["account_name"]}
+                if uploader.get("kind") == "account" else None)
+        return {"key_id": uploader["id"], "kind": uploader.get("kind") or "maintainer", "label": uploader.get("label"),
+                "name": uploader["name"], "account": acct, "quota_per_day": uploader["quota_per_day"],
+                "used_today": used}
+
+    def revoke_self(self, uploader: dict) -> dict:
+        self.db.execute("UPDATE uploaders SET disabled=1 WHERE id=?", (uploader["id"],))
+        return {"ok": True, "key_id": uploader["id"], "disabled": True}
+
+    def _account_of(self, grant) -> dict:
+        from .accounts import GrantError, verify_grant
+        try:
+            return verify_grant(grant, purpose="manage")
+        except GrantError as e:
+            raise OfficialError(e.code, str(e), e.status) from None
+
+    def account_keys(self, grant) -> dict:
+        """The site's account page: every workspace that can submit under this name, and what it did."""
+        acct = self._account_of(grant)
+        keys = self.db.all("SELECT id, label, created_at, last_used_at, disabled FROM uploaders "
+                           "WHERE kind='account' AND account_id=? ORDER BY created_at DESC", (acct["id"],))
+        subs = self.db.all("SELECT id, task, display_name, visibility, status, created_at FROM submissions "
+                           "WHERE account_id=? ORDER BY created_at DESC LIMIT 200", (acct["id"],))
+        titles = {k: getattr(v, "title", k) for k, v in self.releases.items()}
+        return {"account": {"name": acct["name"]},
+                "keys": [{"key_id": k["id"], "label": k["label"], "created_at": k["created_at"],
+                          "last_used_at": k["last_used_at"], "revoked": bool(k["disabled"])} for k in keys],
+                "submissions": [{**s, "board": titles.get(s["task"], s["task"])} for s in subs]}
+
+    def revoke_account_key(self, grant, key_id: str) -> dict:
+        acct = self._account_of(grant)
+        row = self.db.one("SELECT id FROM uploaders WHERE id=? AND kind='account' AND account_id=?",
+                          (str(key_id), acct["id"]))
+        if row is None:
+            raise OfficialError("not_found", "no such key on this account", 404)
+        self.db.execute("UPDATE uploaders SET disabled=1 WHERE id=?", (row["id"],))
+        return {"ok": True, "key_id": row["id"], "revoked": True}
+
+    def my_submissions(self, uploader: dict, task: str | None = None) -> dict:
+        """Everything this person (every key of the account) or this maintainer token submitted."""
+        if uploader.get("kind") == "account":
+            where, args = "s.account_id=?", [uploader["account_id"]]
+        else:
+            where, args = "s.uploader=?", [uploader["id"]]
+        if task:
+            where += " AND s.task=?"
+            args.append(task)
+        rows = self.db.all(f"SELECT s.* FROM submissions s WHERE {where} ORDER BY s.created_at DESC LIMIT 200", args)
+        return {"submissions": [self.submission(r["id"], uploader) for r in rows]}
+
+    def _used_today(self, uploader: dict) -> int:
+        if uploader.get("kind") == "account":
+            day = self.db.one("SELECT COUNT(*) AS n FROM submissions WHERE account_id=? AND created_at>?",
+                              (uploader["account_id"], _now() - 86400))
+        else:
+            day = self.db.one("SELECT COUNT(*) AS n FROM submissions WHERE uploader=? AND created_at>?",
+                              (uploader["id"], _now() - 86400))
+        return int(day["n"]) if day else 0
 
     # ------------------------------------------------------------------ submissions
 
@@ -142,9 +306,7 @@ class OfficialService:
         rel = self.releases.get(task)
         if rel is None:
             raise OfficialError("unknown_task", f"this server grades {sorted(self.releases)}, not {task!r}", 404)
-        day = self.db.one("SELECT COUNT(*) AS n FROM submissions WHERE uploader=? AND created_at>?",
-                          (uploader["id"], _now() - 86400))
-        if day and day["n"] >= uploader["quota_per_day"]:
+        if self._used_today(uploader) >= uploader["quota_per_day"]:
             raise OfficialError("quota", "daily submission quota reached", 429)
         with tempfile.TemporaryDirectory() as td:
             if self.is_suite(rel.id):
@@ -169,11 +331,15 @@ class OfficialService:
             tmp.write_bytes(archive)
             os.replace(tmp, path)
         sid = "os_" + secrets.token_hex(8)
+        # the credit: the person a signed-in key belongs to, else the maintainer token's name
+        acct = uploader.get("account_id") if uploader.get("kind") == "account" else None
+        credit = (uploader.get("account_name") if acct else uploader.get("name")) or ""
         with self.db.tx() as db:
             db.execute("INSERT INTO submissions(id, uploader, task, task_digest, bundle_digest, archive_sha256, "
-                       "visibility, display_name, status, created_at) VALUES(?,?,?,?,?,?,?,?, 'queued', ?)",
+                       "visibility, display_name, status, created_at, account_id, credit) "
+                       "VALUES(?,?,?,?,?,?,?,?, 'queued', ?,?,?)",
                        (sid, uploader["id"], rel.id, rel.digest, bundle_digest, arch_sha, visibility,
-                        display_name[:80], _now()))
+                        " ".join(str(display_name or "").split())[:80], _now(), acct, credit[:80]))
             db.execute("INSERT INTO jobs(id, submission, status, attempts, created_at) VALUES(?,?, 'queued', 0, ?)",
                        ("oj_" + secrets.token_hex(8), sid, _now()))
         return self._public(self.db.one("SELECT * FROM submissions WHERE id=?", (sid,)))
@@ -193,11 +359,20 @@ class OfficialService:
     def _public(self, row: dict) -> dict:
         return {"submission_id": row["id"], "task": row["task"], "bundle_digest": row["bundle_digest"],
                 "status": row["status"], "visibility": row["visibility"], "display_name": row["display_name"],
-                "created_at": row["created_at"]}
+                "by": row.get("credit") or "", "created_at": row["created_at"]}
+
+    @staticmethod
+    def _owns(uploader: dict | None, row: dict) -> bool:
+        if uploader is None:
+            return False
+        if uploader["id"] == row["uploader"]:
+            return True
+        return bool(uploader.get("kind") == "account" and row.get("account_id")
+                    and uploader.get("account_id") == row["account_id"])
 
     def submission(self, sid: str, uploader: dict | None) -> dict:
         row = self.db.one("SELECT * FROM submissions WHERE id=?", (sid,))
-        if row is None or (row["visibility"] == "private" and (uploader is None or uploader["id"] != row["uploader"])):
+        if row is None or (row["visibility"] == "private" and not self._owns(uploader, row)):
             raise OfficialError("not_found", "no such submission", 404)
         out = self._public(row)
         rep = self.db.one("SELECT * FROM reports WHERE submission=? AND superseded_by IS NULL "
@@ -244,10 +419,13 @@ class OfficialService:
             raise OfficialError("unknown_task", f"no task {task!r}", 404)
         key = rel.manifest.get("rank_by")
         better = next((m.get("better") for m in rel.manifest.get("metrics", []) if m["name"] == key), "low")
-        rows = self.db.all("SELECT s.id, s.display_name, s.bundle_digest, s.created_at, r.rank_value, r.report_digest "
+        rows = self.db.all("SELECT s.id, s.display_name, s.credit AS by_name, s.bundle_digest, s.created_at, "
+                           "r.rank_value, r.report_digest "
                            "FROM submissions s JOIN reports r ON r.submission=s.id "
                            "WHERE s.task=? AND s.visibility='public' AND r.superseded_by IS NULL AND r.eligible=1 "
                            "AND r.evaluator_policy=?", (task, self.evaluator_policy))
+        for r in rows:
+            r["by"] = r.pop("by_name") or ""          # who submitted it: the credit the leaderboard shows
         rows.sort(key=lambda r: (r["rank_value"] if better == "low" else -(r["rank_value"] or 0)))
         return {"task": task, "task_digest": rel.digest, "evaluator_policy": self.evaluator_policy,
                 "title": rel.title, "track": rel.manifest.get("track"),
@@ -301,9 +479,11 @@ def create_app(svc: OfficialService):
             if cl and cl.isdigit() and int(cl) > MAX_ARCHIVE:
                 raise OfficialError("too_large", "the archive is larger than 64 MB", 413)
             data = await request.body()
+            # a header carries latin-1 only, so a workspace percent-encodes the name (UTF-8); a plain
+            # name from an older client decodes to itself
+            name = urllib.parse.unquote(request.headers.get("x-qccd-display-name", ""), errors="replace")
             out = svc.submit(up, data, task=request.headers.get("x-qccd-task", ""),
-                             visibility=request.headers.get("x-qccd-visibility", "public"),
-                             display_name=request.headers.get("x-qccd-display-name", ""))
+                             visibility=request.headers.get("x-qccd-visibility", "public"), display_name=name)
             return JSONResponse(out, status_code=200 if out.get("duplicate") else 202)
         except OfficialError as e:
             return err(e)
@@ -326,6 +506,94 @@ def create_app(svc: OfficialService):
     async def board(task: str):
         try:
             return svc.leaderboard(task)
+        except OfficialError as e:
+            return err(e)
+
+    # ---- signing in with a qccd.academy account (accounts.py)
+    async def small_json(request: Request) -> dict:
+        raw = await request.body()
+        if len(raw) > 8192:
+            raise OfficialError("too_large", "request body too large", 413)
+        try:
+            b = json.loads(raw.decode("utf-8")) if raw else {}
+        except (ValueError, UnicodeDecodeError):
+            raise OfficialError("bad_request", "the body must be JSON", 400) from None
+        if not isinstance(b, dict):
+            raise OfficialError("bad_request", "the body must be a JSON object", 400)
+        return b
+
+    def ip_of(request: Request) -> str | None:
+        # nginx names the reader (X-Real-IP); only used to rate-limit sign-ins
+        return request.headers.get("x-real-ip") or (request.client.host if request.client else None)
+
+    @app.post("/v1/links")
+    async def link_start(request: Request):
+        try:
+            b = await small_json(request)
+            return JSONResponse(svc.start_link(str(b.get("label", "")), ip_of(request)), status_code=201)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/links/{code}")
+    async def link_show(code: str):
+        try:
+            return svc.link_info(code)
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/links/{code}/approve")
+    async def link_approve(code: str, request: Request):
+        try:
+            return svc.approve_link(code, (await small_json(request)).get("grant"))
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/links/{code}/deny")
+    async def link_deny(code: str, request: Request):
+        try:
+            return svc.deny_link(code, (await small_json(request)).get("grant"))
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/links/{code}/token")
+    async def link_token(code: str, request: Request):
+        try:
+            return svc.collect_link(code, (await small_json(request)).get("poll_secret"))
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/me")
+    async def me(request: Request):
+        try:
+            return svc.me(who(request, True))
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/keys/self/revoke")
+    async def revoke_self(request: Request):
+        try:
+            return svc.revoke_self(who(request, True))
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/account/keys")
+    async def account_keys(request: Request):
+        try:
+            return svc.account_keys((await small_json(request)).get("grant"))
+        except OfficialError as e:
+            return err(e)
+
+    @app.post("/v1/account/keys/{key_id}/revoke")
+    async def account_key_revoke(key_id: str, request: Request):
+        try:
+            return svc.revoke_account_key((await small_json(request)).get("grant"), key_id)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/submissions")
+    async def mine(request: Request):
+        try:
+            return svc.my_submissions(who(request, True), request.query_params.get("task") or None)
         except OfficialError as e:
             return err(e)
 

@@ -12,7 +12,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["Database", "SCHEMA"]
+__all__ = ["Database", "SCHEMA", "COLUMNS"]
 
 SCHEMA = [
     """CREATE TABLE IF NOT EXISTS releases (
@@ -36,6 +36,24 @@ SCHEMA = [
          evaluator_policy TEXT NOT NULL, report_digest TEXT NOT NULL, report TEXT NOT NULL,
          eligible INTEGER NOT NULL, rank_value DOUBLE PRECISION, created_at DOUBLE PRECISION NOT NULL,
          superseded_by TEXT)""",
+    # a workspace signing in with a qccd.academy account (accounts.py): the workspace holds the
+    # poll secret, the person approves the code on the site, the workspace collects its key once
+    """CREATE TABLE IF NOT EXISTS links (
+         code TEXT PRIMARY KEY, poll_sha256 TEXT NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL,
+         account_id TEXT, account_name TEXT, key_id TEXT, ip TEXT,
+         created_at DOUBLE PRECISION NOT NULL, expires_at DOUBLE PRECISION NOT NULL,
+         approved_at DOUBLE PRECISION, delivered_at DOUBLE PRECISION)""",
+]
+
+#: columns added after a table was first deployed: (table, column, type).  An existing database
+#: gains them on start; a new one is made with them.
+COLUMNS = [
+    # an uploader is a maintainer's token (kind 'maintainer') or a person's key from signing in
+    # with their site account (kind 'account'), which names the account it submits for
+    ("uploaders", "kind", "TEXT"), ("uploaders", "account_id", "TEXT"), ("uploaders", "account_name", "TEXT"),
+    ("uploaders", "label", "TEXT"), ("uploaders", "last_used_at", "DOUBLE PRECISION"),
+    # who a submission is credited to on the leaderboard
+    ("submissions", "account_id", "TEXT"), ("submissions", "credit", "TEXT"),
 ]
 
 
@@ -59,6 +77,16 @@ class Database:
             raise ValueError("database URL must be sqlite:///path or postgresql://...")
         for stmt in SCHEMA:
             self.execute(stmt)
+        for table, column, kind in COLUMNS:
+            self.ensure_column(table, column, kind)
+
+    def ensure_column(self, table: str, column: str, kind: str) -> None:
+        if self.kind == "postgres":
+            self.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {kind}")
+            return
+        have = {r["name"] for r in self.all(f"PRAGMA table_info({table})")}
+        if column not in have:
+            self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
     def _sql(self, sql: str) -> str:
         return sql.replace("?", "%s") if self.kind == "postgres" else sql

@@ -281,7 +281,11 @@ def _estimate_ler(be, a: dict) -> dict:
 def _get_leaderboard(be, a: dict):
     board, official = a.get("board"), bool(a.get("official"))
     if official:
-        return be.call("GET", "/api/official/leaderboard?" + _q({"board": board}))
+        out = be.call("GET", "/api/official/leaderboard?" + _q({"board": board}))
+        if board:
+            # this computer's requests to publish on that board, with the server's verdict and place
+            out["yours"] = be.call("GET", "/api/publications?" + _q({"board": board, "limit": 10}))["publications"]
+        return out
     if a.get("track") == "compiler":
         return {"track": "compiler", "reports": be.call("GET", "/api/bench")["reports"],
                 "label": "Local results - not published"}
@@ -501,7 +505,9 @@ FEATURES: tuple[Feature, ...] = (
         "(target.prompt_id), select_frame (target.frame), open_result (target.submission_id), "
         "reveal_diagnostic, open_run (target.run_id: a run's animation), compare (target.runs: two run ids; "
         "qccd_compare_runs does this for you), open_branch (target.branch: a design's name or id -- the "
-        "person's Studio switches to that design, so what you draw next lands on it where they watch). Studio "
+        "person's Studio switches to that design, so what you draw next lands on it where they watch), "
+        "open_board (target.board: a board's title -- the Studio's Leaderboard panel opens on it: the official "
+        "ranking with who submitted each design, Test on this board, and Submit). Studio "
         "honours the user's Follow-agent setting.",
         _obj({"action": _S, "target": {"type": "object"}, "view_id": _S, "note": _S}, ["action", "target"]),
         lambda be, a: be.call("POST", "/api/present", {"action": a["action"], "target": a.get("target") or {},
@@ -516,11 +522,28 @@ FEATURES: tuple[Feature, ...] = (
         "graded submission appears on the local leaderboard ('Local result - not published'). It usually "
         "finishes within a minute: follow it ONCE with qccd_get_job(job_id, wait_s=50), which waits through the "
         "grade and returns the verdict; if it is still running then, say the card in their chat will show the "
-        "verdict, and stop. Publishing it needs the person's approval (qccd_prepare_publish shows what would be "
-        "uploaded).",
+        "verdict, and stop. To put it on the OFFICIAL leaderboard at qccd.academy (credited to the signed-in "
+        "person), use qccd_submit_official.",
         _obj({"design": _S, "board": _S, "profile": {"type": "string", "enum": ["draft", "reference"]},
               "request_id": _S, "origin_prompt_id": _S, "title": _S, "branch": _S, "revision": _I}),
         _submit_local, ("POST /api/submissions",), cli=("submit",), job_kinds=("submit",), group="boards"),
+    Feature(
+        "qccd_submit_official",
+        "Put a design on the OFFICIAL leaderboard at qccd.academy, where it is credited to the person signed in "
+        "on this computer (qccd_get_context: account). design: its name (default the design on screen); board: its "
+        "title. You cannot publish by yourself: this makes a request, and the person's chat shows a card 'Submit "
+        "<design> to <board> as <name>?' that uploads when THEY press it (and offers the sign-in if nobody is "
+        "signed in; only the person can sign in). A design must pass the test first: if it has no current passing "
+        "local grade on that board, this starts one (qccd_submit_local's grade) and the card asks the person once "
+        "it passes; one that failed is refused with the reasons. The server then grades it again itself, and the "
+        "card follows it to its place on the board. display_name: the name shown on the leaderboard (default the "
+        "design's own name; the person may change it). Returns the request; tell the person in one line and stop.",
+        _obj({"design": _S, "board": _S, "display_name": _S, "submission_id": _S,
+              "visibility": {"type": "string", "enum": ["public", "private"]}, "origin_prompt_id": _S}, ["board"]),
+        lambda be, a: be.call("POST", "/api/publications", {k: a[k] for k in ("design", "board", "display_name",
+                                                                             "submission_id", "visibility",
+                                                                             "origin_prompt_id") if k in a}),
+        ("POST /api/publications",), job_kinds=(), group="boards"),
     Feature(
         "qccd_prepare_publish",
         "Show exactly what publication would upload (bundle digest, files, local "
@@ -555,11 +578,13 @@ FEATURES: tuple[Feature, ...] = (
         "qccd_get_leaderboard",
         "A leaderboard's ranking. Default: this workspace's local results on one Architecture board (board: its "
         "title), labelled 'Local results - not published'. track='compiler': the Compiler board's local reports "
-        "(compilers graded here with `qccd bench run`). official=true: the published ranking on qccd.academy "
-        "(board: a title; without one, every official board with its section, Architecture or Compiler).",
+        "(compilers graded here with `qccd bench run`). official=true: the published ranking on qccd.academy, each "
+        "row with `by` (who submitted it) (board: a title; without one, every official board with its section, "
+        "Architecture or Compiler); with a board it also lists `yours`, this computer's requests to publish there "
+        "(qccd_submit_official) with the server's verdict and place.",
         _obj({"board": _S, "track": {"type": "string", "enum": ["architecture", "compiler"]},
               "official": {"type": "boolean"}}),
-        _get_leaderboard, ("GET /api/leaderboard", "GET /api/bench", "GET /api/official/leaderboard"),
+        _get_leaderboard, ("GET /api/leaderboard", "GET /api/bench", "GET /api/official/leaderboard", "GET /api/publications"),
         read_only=True, cli=("leaderboard",), group="boards"),
     Feature(
         "qccd_get_bench",
@@ -607,6 +632,9 @@ INTERNAL_ROUTES: dict[str, str] = {
     "GET /api/submissions": "the Studio's submission list; agents inspect one by id",
     "POST /api/pair-code": "pairing a browser with the workspace",
     "POST /api/shutdown": "`qccd stop`",
+    "GET /api/account": "the Studio's sign-in state; agents read it in qccd_get_context (account), and only a person signs in",
+    "GET /api/board-view": "the Studio's Leaderboard panel; agents read the same through qccd_get_leaderboard and qccd_get_job",
+    "GET /api/publications/{pid}": "the chat card of a request; an agent's own request comes back from qccd_submit_official",
 }
 
 #: CLI verbs with no tool behind them, and why: they run before a service exists, manage the
@@ -622,6 +650,8 @@ LOCAL_VERBS: dict[str, str] = {
     "agent": "installs, inspects or removes an agent client's configuration",
     "mcp": "is the MCP server itself",
     "trace": "a person reads what an agent did",
+    "login": "a person signs this computer in to qccd.academy with their own account; an agent never can",
+    "logout": "a person signs this computer out of qccd.academy",
 }
 
 

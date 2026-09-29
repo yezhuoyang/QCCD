@@ -49,7 +49,7 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench")
+            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login", "logout")
 
 
 def _root(args) -> Path:
@@ -433,8 +433,13 @@ def cmd_leaderboard(a) -> int:
                       f"  (ranked by {t.get('rank_by')})")
             return 0
         print(f"{b['board']} on {b['server']}, ranked by {b['rank_by']} ({b['better']} is better)")
+        b["yours"] = _call(info, "GET", f"/api/publications?board={_q(a.board)}&limit=10")["publications"]
         for i, r in enumerate(b["rows"], 1):
-            print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')}")
+            print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')!s:>12}  by {r.get('by') or '-'}")
+        for p in b.get("yours") or []:
+            o = p.get("official") or {}
+            print(f"  yours: {p['design']} {p['state']}" + (f" -> {o.get('status')}" if o else "")
+                  + (f", #{o['rank']} of {o['of']}" if o.get("rank") else ""))
         return 0
     if a.track == "compiler":
         for r in _call(info, "GET", "/api/bench")["reports"]:
@@ -470,24 +475,88 @@ def _q(v) -> str:
     return urllib.parse.quote(str(v), safe="")
 
 
+def cmd_login(a) -> int:
+    """Sign this computer in to qccd.academy with your own account: the official leaderboard then
+    credits what you submit to you.  The password is typed on the site, never here."""
+    from .account import Accounts, OfficialHTTPError, SignIn, server_url
+    server = (a.server or server_url()).rstrip("/")
+    st = Accounts(server).status(verify=True)
+    if st["signed_in"] and not a.again:
+        print(f"Signed in to qccd.academy as {st['name']} ({st.get('label') or 'this computer'}). "
+              "`qccd logout` signs this computer out; `qccd login --again` signs in anew.")
+        return 0
+    try:
+        s = SignIn(server).start()
+    except OfficialHTTPError as e:
+        print(f"could not start signing in: {e}", file=sys.stderr)
+        return 1
+    print("Open this page, sign in to qccd.academy with your own account, and press Allow:")
+    print(f"  {s.verify_url}")
+    print(f"It shows the code {s.code} and \"{s.label}\". It works for 10 minutes.")
+    if not a.no_open:
+        try:
+            webbrowser.open(s.verify_url)
+        except Exception:
+            pass
+    try:
+        while s.poll_once() == "waiting":
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print("\nnot signed in")
+        return 130
+    if s.state == "signed_in":
+        print(f"Signed in as {s.name}. What you submit to the official leaderboard is credited to {s.name}.")
+        return 0
+    print(f"Not signed in: {s.state.replace('_', ' ')}" + (f" ({s.error})" if s.error else ""), file=sys.stderr)
+    return 1
+
+
+def cmd_logout(a) -> int:
+    from .account import Accounts, server_url
+    out = Accounts((a.server or server_url()).rstrip("/")).sign_out()
+    print("Signed out: this computer's key was revoked on the server." if out.get("revoked_on_server")
+          else "Signed out on this computer." + ("" if out.get("revoked_on_server") is None else
+                                                   " The server could not be reached to revoke its key; the site's "
+                                                   "account page (qccd.academy/connect/) can."))
+    return 0
+
+
 def cmd_publish(a) -> int:
     info = _svc(a)
     if a.submission:
         rv = _call(info, "POST", "/api/publish/prepare", {"submission_id": a.submission, "visibility": a.visibility})
-        print(f"task      {rv['task']['id']}  {rv['task']['digest']}")
+        print(f"board     {rv.get('board') or rv['task']['id']}  {rv['task']['digest']}")
         print(f"bundle    {rv['bundle_digest']}")
         for f in rv["files"]:
             print(f"  {f['path']:24s} {f['bytes']:>9} B  {f['digest']}")
         lr = rv["local_report"]
         print(f"local     eligible={lr['eligible']} metrics={lr['metrics']}")
-        print(f"params    {rv['params']}")
+        acct = _call(info, "GET", "/api/account?verify=1")
+        print(f"credit    {acct['name'] if acct.get('signed_in') else '(not signed in: run `qccd login` first)'}")
+        if not acct.get("signed_in") and not a.server:
+            print("sign in first: `qccd login` (the leaderboard shows who submitted each design)", file=sys.stderr)
+            return 2
         if not sys.stdin.isatty():
-            print("approval needs a person at an interactive terminal (or the Studio review dialog)", file=sys.stderr)
+            print("approval needs a person at an interactive terminal (or the Studio's Submit button)", file=sys.stderr)
             return 2
         typed = input("Type the first 12 hex digits of the bundle digest to approve: ").strip()
         if typed != rv["bundle_digest"].split(":", 1)[1][:12]:
             print("not approved")
             return 1
+        if acct.get("signed_in") and not a.server and a.visibility in ("public", "private"):
+            # the person's own account: the same request the Studio's Submit makes, followed to the server
+            p = _call(info, "POST", "/api/publications", {"submission_id": a.submission, "visibility": a.visibility,
+                                                          "display_name": a.name})
+            while p["state"] == "uploading":
+                time.sleep(1.0)
+                p = _call(info, "GET", f"/api/publications/{p['publication_id']}")
+            if p["state"] != "uploaded":
+                print(f"not submitted: {p.get('error') or p['state']}", file=sys.stderr)
+                return 1
+            o = p.get("official") or {}
+            print(f"submitted to {p['board']} as {p['credit']}: the server is grading it ({o.get('status')}); "
+                  f"`qccd leaderboard --official --board \"{p['board']}\"` shows the board")
+            return 0
         ap = _call(info, "POST", "/api/publish/approve", {"submission_id": a.submission, "bundle_digest": rv["bundle_digest"],
                                                           "params": {"visibility": a.visibility},
                                                           "interactive_confirmation": True})
@@ -715,6 +784,7 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--approval")
             q.add_argument("--server")
             q.add_argument("--visibility", default="public", choices=["public", "unlisted", "private"])
+            q.add_argument("--name", default=None, help="the name shown on the leaderboard (default: the design's)")
         if name == "import":
             q.add_argument("path")
             q.add_argument("--preview", action="store_true")
@@ -754,6 +824,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", default=None, help="the name shown on the board")
     p.add_argument("--visibility", default="public", choices=["public", "unlisted", "private"])
     p.add_argument("--root", default=None)
+    for name, what in (("login", "sign this computer in to qccd.academy with your own account (for the official "
+                                  "leaderboard, which credits what you submit to you)"),
+                       ("logout", "sign this computer out of qccd.academy (its key is revoked)")):
+        p = sub.add_parser(name, help=what)
+        p.add_argument("--server", default=None, help=argparse.SUPPRESS)
+        if name == "login":
+            p.add_argument("--no-open", action="store_true", help="print the page to open instead of opening it")
+            p.add_argument("--again", action="store_true", help="sign in anew even if signed in")
     sub.add_parser("releases")
     sub.add_parser("boards", help="the leaderboards a design can be submitted to")
     p = sub.add_parser("trace", help="what an agent did for a request: calls, results, page actions")
@@ -794,7 +872,8 @@ def main(argv=None) -> int:
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
-          "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench}[a.cmd]
+          "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench,
+          "login": cmd_login, "logout": cmd_logout}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
     if a.cmd not in ("mcp", "serve"):

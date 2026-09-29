@@ -24,13 +24,13 @@ def credential_for(server: str) -> str:
     tok = os.environ.get("QCCD_UPLOAD_TOKEN")
     if tok:
         return tok
-    p = Path.home() / ".qccd" / "credentials.json"
-    if p.exists():
-        creds = json.loads(p.read_text(encoding="utf-8"))
-        tok = creds.get(server.rstrip("/"))
-        if tok:
-            return tok
-    raise SystemExit(f"no upload credential for {server}: set QCCD_UPLOAD_TOKEN or add it to ~/.qccd/credentials.json")
+    # the person's key from `qccd login` (or the Studio's Sign in), else a maintainer's token
+    from .account import credential
+    c = credential(server)
+    if c:
+        return c["token"]
+    raise SystemExit(f"not signed in to {server}: run `qccd login` (or press Sign in in the Studio's Leaderboard "
+                     "panel); a maintainer may instead set QCCD_UPLOAD_TOKEN")
 
 
 def _check_server(server: str) -> str:
