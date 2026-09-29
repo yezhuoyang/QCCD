@@ -40,6 +40,15 @@ let usage () =
       compile by rotating the loop rigidly: one template moves every ion at once.
       For a conveyor device and a bipartite circuit (a syndrome-extraction round).
 
+  qccdc rotate ... --placement <layout.json>      (also honoured by `compile`'s fallback)
+      start the riders in the loop slots, and park the docked qubits at the docks, that
+      the file names: {"loop": {"<qubit>": slot}, "docks": {"<qubit>": "<dock site>"}}.
+      A code-aware placer decides the layout; this pass still certifies the program.
+
+  qccdc rotate ... --dock-all
+      dock every rider standing beside a dock in every batch, gate only the contacts:
+      what a machine whose spurs share one waveform with no per-site switch must do.
+
   qccdc pulses-selftest
       differential-test the pulse table against the unitaries it claims to implement
 
@@ -54,6 +63,18 @@ let arg_after flag argv =
     | [] -> None
   in
   go argv
+
+(* `--placement <json>`: a layout decided upstream (see `Rotate_pipeline.placement`).
+   Read here, once, so both the `rotate` command and `compile`'s rotation fallback see
+   the same file; a malformed one is a usage error, not a compile result. *)
+let placement_arg rest =
+  match arg_after "--placement" rest with
+  | None -> None
+  | Some path -> (
+    try Some (Qccdc.Rotate_pipeline.placement_of_file path) with
+    | Invalid_argument m | Sys_error m | Yojson.Json_error m ->
+      Printf.eprintf "--placement %s: %s\n" path m;
+      exit 2)
 
 let cmd_arch path =
   let a = Qccdc.Arch.load path in
@@ -187,7 +208,29 @@ let cmd_traps path =
       print_endline "  WARNING: the trap graph is disconnected");
   0
 
-let cmd_compile inp arch_path out =
+(* `--init-placement <json>`: `{"q0": "T0_0h", ...}` -- every ion the circuit names, at
+   the trap it starts in.  Read once, like `--placement`; a malformed file is a usage
+   error, not a compile result. *)
+let init_placement_arg rest =
+  match arg_after "--init-placement" rest with
+  | None -> None
+  | Some path -> (
+    try
+      match Yojson.Safe.from_file path with
+      | `Assoc kv ->
+        Some
+          (List.map
+             (fun (ion, v) ->
+               match v with
+               | `String s -> (ion, s)
+               | _ -> invalid_arg (ion ^ ": site must be a string"))
+             kv)
+      | _ -> invalid_arg "expected an object {ion: site}"
+    with Invalid_argument m | Sys_error m | Yojson.Json_error m ->
+      Printf.eprintf "--init-placement %s: %s\n" path m;
+      exit 2)
+
+let cmd_compile ?init inp arch_path out =
   let a = Qccdc.Arch.load arch_path in
   (match Qccdc.Arch.check_structure a with
   | [] -> ()
@@ -199,7 +242,7 @@ let cmd_compile inp arch_path out =
   let name = Filename.remove_extension (Filename.basename inp) in
   let c = Qccdc.Circuit.build ~name prog in
   let r =
-    Qccdc.Compile.run a c ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
+    Qccdc.Compile.run ?init a c ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
   in
   Printf.printf "%s -> %s (%s regime)
 " (Qccdc.Circuit.summary c) a.name
@@ -278,15 +321,16 @@ let cmd_route_instances inp arch_path out =
     (List.length insts) out;
   0
 
-let cmd_rotate ?(sweep = Qccdc.Rotate_pipeline.Monotone) inp arch_path out =
+let cmd_rotate ?(sweep = Qccdc.Rotate_pipeline.Monotone) ?placement ?(dock_all = false) inp
+    arch_path out =
   let a = Qccdc.Arch.load arch_path in
   let prog = Qccdc.Qasm.parse_file inp in
   let name = Filename.remove_extension (Filename.basename inp) in
   let c = Qccdc.Circuit.build ~name prog in
   let c, _ = Qccdc.Circuit.lower c in
   let p, cert, st, notes =
-    Qccdc.Rotate_pipeline.run ~sweep a c ~arch_path:("arch/" ^ a.name ^ ".arch.json")
-      ~qasm_path:inp
+    Qccdc.Rotate_pipeline.run ~sweep ?placement ~dock_all a c
+      ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
   in
   Printf.printf "%s -> %s (rigid rotation)
 " (Qccdc.Circuit.summary c) a.name;
@@ -342,7 +386,9 @@ let () =
         | Some "greedy" -> Qccdc.Rotate_pipeline.Greedy
         | _ -> Qccdc.Rotate_pipeline.Monotone
       in
-      try exit (cmd_rotate ~sweep inp ap out) with
+      let placement = placement_arg rest in
+      let dock_all = List.mem "--dock-all" rest in
+      try exit (cmd_rotate ~sweep ?placement ~dock_all inp ap out) with
       | Qccdc.Rotate_pipeline.Not_applicable m ->
         Printf.eprintf "%s: rotation does not apply: %s
 " inp m; exit 5
@@ -361,7 +407,7 @@ let () =
     match (arg_after "--arch" rest, arg_after "-o" rest) with
     | Some arch_path, Some out -> (
       try
-        let code, unrealised = cmd_compile inp arch_path out in
+        let code, unrealised = cmd_compile ?init:(init_placement_arg rest) inp arch_path out in
         (* A PARTIAL PLACEMENT IS A DECLINE TOO.  The general router signals "I cannot do
            this" in two different ways: it raises `Unroutable`, or it returns having left
            some ops unrealised.  The rotation fallback below used to hang off the
@@ -376,7 +422,7 @@ let () =
 " inp
             (List.length unrealised);
           prerr_endline "  trying rigid rotation, which does not need a free slot to move into";
-          try exit (cmd_rotate inp arch_path out) with
+          try exit (cmd_rotate ?placement:(placement_arg rest) ~dock_all:(List.mem "--dock-all" rest) inp arch_path out) with
           | Qccdc.Rotate_pipeline.Not_applicable r ->
             Printf.eprintf "  rotation does not apply either: %s
 " r;
@@ -406,7 +452,7 @@ let () =
            silently wrong number in a document whose whole point is that number. *)
         if List.mem "--no-rotate" rest then exit 4;
         prerr_endline "  trying rigid rotation, which does not need a free slot to move into";
-        try exit (cmd_rotate inp arch_path out) with
+        try exit (cmd_rotate ?placement:(placement_arg rest) ~dock_all:(List.mem "--dock-all" rest) inp arch_path out) with
         | Qccdc.Rotate_pipeline.Not_applicable r ->
           Printf.eprintf "  rotation does not apply either: %s
 " r; exit 4)

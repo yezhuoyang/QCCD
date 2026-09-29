@@ -110,14 +110,74 @@ let delta_to (x : ctx) (ion : string) (d : Conveyor.dock) : int =
    reason, not because it looks tidier. *)
 type sweep = Monotone | Greedy
 
-let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
-    ~(qasm_path : string) : Tsir.t * Cert.t * plan * string list =
+(* An externally chosen layout: which loop slot each rider starts in, and which dock each
+   docked qubit parks at.
+
+   The stride placement below is what this pass does on its own, and it knows nothing
+   about the circuit it is laying out.  A syndrome round has structure a placer can use --
+   the six members of a check should sit close together on the loop so one turn serves
+   them all -- and `qccd/compile/place.py` already finds such a layout for BB codes by
+   annealing on check windows.  Rather than teach this pass about codes, it accepts the
+   layout as data: the schedule is decided upstream, and this pass stays a compiler that
+   emits a certificate for whatever it was given.  Everything downstream -- the DAG order,
+   the readiness rule, the certificate, the proved checker -- is unchanged, so a placement
+   can only change how many batches the round takes, never whether the program is right. *)
+type placement = {
+  loop_slot : (int * int) list;     (* qubit index -> slot index in the loop's order *)
+  dock_site : (int * string) list;  (* qubit index -> the dock's gate site *)
+}
+
+let placement_of_json (j : Yojson.Safe.t) : placement =
+  let entries name f =
+    match j with
+    | `Assoc kv -> (
+      match List.assoc_opt name kv with
+      | Some (`Assoc m) ->
+        List.map
+          (fun (k, v) ->
+            let q = try int_of_string k with _ ->
+              invalid_arg (Printf.sprintf "placement.%s: key %S is not a qubit index" name k)
+            in
+            (q, f name k v))
+          m
+      | Some _ -> invalid_arg (Printf.sprintf "placement.%s must be an object" name)
+      | None -> [])
+    | _ -> invalid_arg "placement must be a JSON object"
+  in
+  let as_int name k = function
+    | `Int i -> i
+    | _ -> invalid_arg (Printf.sprintf "placement.%s[%s] must be an integer slot" name k)
+  in
+  let as_str name k = function
+    | `String s -> s
+    | _ -> invalid_arg (Printf.sprintf "placement.%s[%s] must be a dock site name" name k)
+  in
+  { loop_slot = entries "loop" as_int; dock_site = entries "docks" as_str }
+
+let placement_of_file path = placement_of_json (Yojson.Safe.from_file path)
+
+let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Circuit.t)
+    ~(arch_path : string) ~(qasm_path : string) : Tsir.t * Cert.t * plan * string list =
   let cv =
     match Conveyor.detect a with
     | Some cv -> cv
     | None -> raise (Not_applicable "the device has no closed loop with docks")
   in
-  let dock_side, loop_side = bipartition c in
+  let dock_side, loop_side =
+    let a, b = bipartition c in
+    (* The placement decides WHICH side parks, when it says so.  `bipartition` returns the
+       smaller side first and this pass parks that one, which is right for a ring with a
+       few docks and wrong for a device with a parking site per data qubit: there the
+       interesting assignment is the other one -- data parked, ancillas riding, which is
+       how Cyclone moves.  A placement that names docks for every member of the larger
+       side is asking for exactly that, and it is still one of the two sides, so nothing
+       about the bipartition is being overridden. *)
+    match placement with
+    | Some (pl : placement) when pl.dock_site <> [] ->
+      let named = List.sort compare (List.map fst pl.dock_site) in
+      if named = List.sort compare b then (b, a) else (a, b)
+    | _ -> (a, b)
+  in
   let n_docks = Array.length cv.docks in
   if List.length dock_side > n_docks then
     raise
@@ -134,12 +194,70 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
   let x =
     { cv; slot_of = Hashtbl.create 256; dock_of = Hashtbl.create 64; offset = 0 }
   in
-  List.iteri (fun k q -> Hashtbl.replace x.dock_of (ion q) cv.docks.(k)) dock_side;
-  (* Spread the loop ions evenly rather than packing them: the loop has more slots than
-     qubits on a real round, and spacing them keeps consecutive contacts from needing a
-     full turn between them. *)
   let stride = max 1 (cv.n / max 1 (List.length loop_side)) in
-  List.iteri (fun k q -> Hashtbl.replace x.slot_of (ion q) (k * stride mod cv.n)) loop_side;
+  let layout_note =
+    match placement with
+    | None ->
+      List.iteri (fun k q -> Hashtbl.replace x.dock_of (ion q) cv.docks.(k)) dock_side;
+      (* Spread the loop ions evenly rather than packing them: the loop has more slots
+         than qubits on a real round, and spacing them keeps consecutive contacts from
+         needing a full turn between them. *)
+      List.iteri
+        (fun k q -> Hashtbl.replace x.slot_of (ion q) (k * stride mod cv.n))
+        loop_side;
+      Printf.sprintf "%d qubits at docks, %d riding the loop (stride %d)"
+        (List.length dock_side) (List.length loop_side) stride
+    | Some (pl : placement) ->
+      (* The layout is checked, not believed: every docked qubit must name a dock that
+         exists, every rider a slot that exists, and no two may share either.  A layout
+         that puts a qubit on the wrong side of the bipartition is refused too -- the
+         partition is a property of the circuit, and the layout does not get to change
+         which qubits ride. *)
+      let used_dock = Hashtbl.create 64 and used_slot = Hashtbl.create 256 in
+      List.iter
+        (fun q ->
+          match List.assoc_opt q pl.dock_site with
+          | None ->
+            raise
+              (Not_applicable
+                 (Printf.sprintf "placement: q%d must be docked but names no dock" q))
+          | Some site -> (
+            match Conveyor.dock_for cv site with
+            | None ->
+              raise
+                (Not_applicable
+                   (Printf.sprintf "placement: q%d names %s, which is not a dock of %s"
+                      q site cv.loop))
+            | Some d ->
+              if Hashtbl.mem used_dock site then
+                raise
+                  (Not_applicable
+                     (Printf.sprintf "placement: dock %s is named twice" site));
+              Hashtbl.replace used_dock site ();
+              Hashtbl.replace x.dock_of (ion q) d))
+        dock_side;
+      List.iter
+        (fun q ->
+          match List.assoc_opt q pl.loop_slot with
+          | None ->
+            raise
+              (Not_applicable
+                 (Printf.sprintf "placement: q%d rides the loop but names no slot" q))
+          | Some s ->
+            if s < 0 || s >= cv.n then
+              raise
+                (Not_applicable
+                   (Printf.sprintf "placement: q%d names slot %d of a %d-slot loop" q s
+                      cv.n));
+            if Hashtbl.mem used_slot s then
+              raise
+                (Not_applicable (Printf.sprintf "placement: slot %d is named twice" s));
+            Hashtbl.replace used_slot s ();
+            Hashtbl.replace x.slot_of (ion q) s)
+        loop_side;
+      Printf.sprintf "%d qubits at docks, %d riding the loop (external placement)"
+        (List.length dock_side) (List.length loop_side)
+  in
 
   let prog = ref Tsir.{ name = c.name; arch_spec = arch_path; instructions = [];
                         metrics = []; prog_meta = []; id_seq = 0 } in
@@ -187,6 +305,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
              meta = [ ("kind", `String "state_prep") ] };
 
   let n_rot = ref 0 and n_hops = ref 0 and n_contacts = ref 0 and n_batches = ref 0 in
+  let n_extra = ref 0 in
   let notes = ref [] in
   (* The certificate expands a rotation into the individual ion movements it causes.
      Rotation is a COMPILER primitive, not a checker one: the checker replays hops and
@@ -224,25 +343,34 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
      not a controlled-NOT, and emitting one would produce a program that passes every
      hardware rule and computes the wrong circuit.  Orientation is preserved because a
      syndrome round contains both `cx anc,data` and `cx data,anc`. *)
-  let contact (pairs4 : (string * Conveyor.dock * string * int * bool) list) =
+  (* `extra` are riders that dock and undock with the batch WITHOUT a gate: the riders
+     standing beside a dock whose ancilla has no contact for them this batch.  A machine
+     whose spur electrodes share one broadcast waveform with no per-site switch cannot
+     leave them behind -- every spur acts or none does -- so `--dock-all` docks them too.
+     They cost a split and a merge of heat each, which the cool before the gate removes,
+     and no time at all: a SIMD instruction is charged at its slowest participant. *)
+  let contact ?(extra : (string * Conveyor.dock) list = [])
+      (pairs4 : (string * Conveyor.dock * string * int * bool) list) =
     if pairs4 <> [] then begin
       let batch_ops = List.map (fun (_, _, _, dag, _) -> dag) pairs4 in
+      let riders = List.map (fun (r, d, _, _, _) -> (r, d)) pairs4 @ extra in
+      n_extra := !n_extra + List.length extra;
       let dock_moves dir =
         List.map
-          (fun (rider, (d : Conveyor.dock), _, _, _) ->
+          (fun (rider, (d : Conveyor.dock)) ->
             if dir then Tsir.{ ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
             else Tsir.{ ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] })
-          pairs4
+          riders
       in
       add Tsir.{ blank with ityp = "simd"; id = fresh (); cls = Some cv.dock_cls;
                  mode = Some "inter"; participants = dock_moves true;
                  meta = [ ("kind", `String "dock") ] @ op_meta batch_ops };
       List.iter
-        (fun (rider, (d : Conveyor.dock), _, _, _) ->
+        (fun (rider, (d : Conveyor.dock)) ->
           cert_moves :=
             Cert.{ cycle = !cyc; ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
             :: !cert_moves)
-        pairs4;
+        riders;
       incr cyc;
 
       (* the CX sequence, round by round: every pair is at a different dock, so the k-th
@@ -324,11 +452,11 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
                  mode = Some "inter"; participants = dock_moves false;
                  meta = [ ("kind", `String "undock") ] @ op_meta batch_ops };
       List.iter
-        (fun (rider, (d : Conveyor.dock), _, _, _) ->
+        (fun (rider, (d : Conveyor.dock)) ->
           cert_moves :=
             Cert.{ cycle = !cyc; ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] }
             :: !cert_moves)
-        pairs4;
+        riders;
       incr cyc;
       n_contacts := !n_contacts + List.length pairs4;
       incr n_batches
@@ -394,38 +522,138 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
      exactly the kind of gap that looks harmless -- the tableau check passes, because it
      composes from the pulses that WERE emitted -- and is caught only by asking whether
      every op of the circuit has a witness.  The proved checker asks. *)
-  let emit_1q (o : Circuit.op) (i : string) =
-    let d = Gateset_composites.decompose_op ~gates:c.gates o.name o.params [ 0 ] in
-    let start = !cyc in
-    List.iter
-      (fun (p : Gateset.pulse) ->
-        match p with
-        | Gateset.Beam { theta; phi; _ } ->
-          add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "R";
-                     arity = Some 1; mode = Some "intra"; ions = [ i ];
-                     params = [ [ theta; phi ] ];
-                     meta = [ ("kind", `String "beam") ] @ op_meta [ o.index ] };
-          incr cyc
-        | Gateset.Frame { lam; _ } ->
-          add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "VZ";
-                     arity = Some 1; mode = Some "intra"; ions = [ i ];
-                     params = [ [ lam ] ];
-                     meta = [ ("kind", `String "virtual_z") ] @ op_meta [ o.index ] };
-          incr cyc
-        | Gateset.Ms _ ->
-          raise (Not_applicable "a one-qubit gate decomposed to an entangler"))
-      d.pulses;
-    (match Hashtbl.find_opt x.dock_of i with
-    | Some (dk : Conveyor.dock) ->
-      cert_gates :=
-        Cert.{ dag = o.index;
-               instr =
-                 (try Hashtbl.find last_instr o.index
-                  with Not_found -> !prog.id_seq - 1);
-               cycle = max start (!cyc - 1);
-               site = dk.site; operands = [ i ]; pulses = [] }
-        :: !cert_gates
-    | None -> raise (Not_applicable "a one-qubit gate on an ion that is not docked"))
+  (* Several one-qubit gates at once, one instruction per pulse ROUND rather than one per
+     pulse per op: the k-th pulse of every gate in the batch shares an instruction, as the
+     CX rounds in `contact` already do.  Every ion here is docked, so the gates are at
+     distinct sites and R12 is safe by construction.  Each op still gets its own witness,
+     naming the (shared) instruction that performed it. *)
+  let emit_singles (items : (Circuit.op * string) list) =
+    if items <> [] then begin
+      let seqs =
+        List.map
+          (fun ((o : Circuit.op), i) ->
+            let d = Gateset_composites.decompose_op ~gates:c.gates o.name o.params [ 0 ] in
+            let dk =
+              match Hashtbl.find_opt x.dock_of i with
+              | Some (dk : Conveyor.dock) -> dk
+              | None -> raise (Not_applicable "a one-qubit gate on an ion that is not docked")
+            in
+            (o, i, dk, d.pulses))
+          items
+      in
+      let rounds = List.fold_left (fun acc (_, _, _, ps) -> max acc (List.length ps)) 0 seqs in
+      let last_cycle : (int, int) Hashtbl.t = Hashtbl.create 32 in
+      for k = 0 to rounds - 1 do
+        let beams = ref [] and vzs = ref [] in
+        List.iter
+          (fun ((o : Circuit.op), i, _, ps) ->
+            if k < List.length ps then
+              match List.nth ps k with
+              | Gateset.Beam { theta; phi; _ } -> beams := (i, [ theta; phi ], o.index) :: !beams
+              | Gateset.Frame { lam; _ } -> vzs := (i, [ lam ], o.index) :: !vzs
+              | Gateset.Ms _ ->
+                raise (Not_applicable "a one-qubit gate decomposed to an entangler"))
+          seqs;
+        let emit gate kind its =
+          if its <> [] then begin
+            add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some gate;
+                       arity = Some 1; mode = Some "intra";
+                       ions = List.rev_map (fun (i, _, _) -> i) its;
+                       params = List.rev_map (fun (_, p, _) -> p) its;
+                       meta = [ ("kind", `String kind); ("round", `Int k) ]
+                              @ op_meta (List.rev_map (fun (_, _, g) -> g) its) };
+            List.iter (fun (_, _, g) -> Hashtbl.replace last_cycle g !cyc) its;
+            incr cyc
+          end
+        in
+        emit "R" "beam" !beams;
+        emit "VZ" "virtual_z" !vzs
+      done;
+      List.iter
+        (fun ((o : Circuit.op), i, (dk : Conveyor.dock), _) ->
+          cert_gates :=
+            Cert.{ dag = o.index;
+                   instr =
+                     (try Hashtbl.find last_instr o.index
+                      with Not_found -> !prog.id_seq - 1);
+                   cycle = (try Hashtbl.find last_cycle o.index with Not_found -> !cyc - 1);
+                   site = dk.site; operands = [ i ]; pulses = [] }
+            :: !cert_gates)
+        seqs
+    end
+  in
+
+  (* One readout (or one reset) instruction naming every ancilla that is ready for it.
+     A measurement costs one measurement time however many ions it names -- the optics
+     address them together -- so reading 144 ancillas out one instruction at a time cost
+     17 ms of a 98 ms round for no reason but emission order.  Neither needs a witness:
+     the checker's `needsWitness` excludes measure and reset. *)
+  let emit_spam kind (items : (int * string) list) =
+    if items <> [] then begin
+      add Tsir.{ blank with ityp = kind; id = fresh ();
+                 ions = List.map snd items;
+                 meta = [ ("kind", `String kind) ] @ op_meta (List.map fst items) };
+      incr cyc
+    end
+  in
+
+  (* Everything ready that costs no rotation: measure, reset and one-qubit gates on
+     docked ions.  Taken in PASSES.  A pass collects every such op that is ready at the
+     START of the pass -- two of them never share a qubit, because ops on one ancilla are
+     a chain and at most one link of a chain is ready -- and emits one instruction per
+     kind, then looks again, since finishing a measure makes the reset behind it ready.
+     Returns whether anything was emitted. *)
+  let drain () =
+    let progressed = ref false in
+    let again = ref true in
+    while !again do
+      let ready1 =
+        List.filter
+          (fun i ->
+            (not finished.(i))
+            && (not (blocked i))
+            &&
+            let (o : Circuit.op) = ops.(i) in
+            match o.qubits with
+            | [ _ ] -> true
+            | [ _; _ ] -> false
+            | _ ->
+              if o.name = "barrier" then true
+              else
+                raise
+                  (Not_applicable (Printf.sprintf "%s has an unsupported arity" o.name)))
+          (List.init n_ops (fun i -> i))
+      in
+      if ready1 = [] then again := false
+      else begin
+        progressed := true;
+        let measures = ref [] and resets = ref [] and singles = ref [] in
+        List.iter
+          (fun i ->
+            let (o : Circuit.op) = ops.(i) in
+            (match (o.name, o.qubits) with
+            | "barrier", _ -> ()
+            | "measure", [ q ] when Hashtbl.mem x.dock_of (ion q) ->
+              measures := (o.index, ion q) :: !measures
+            | "reset", [ q ] when Hashtbl.mem x.dock_of (ion q) ->
+              resets := (o.index, ion q) :: !resets
+            | _, [ q ] when Hashtbl.mem x.dock_of (ion q) -> singles := (o, ion q) :: !singles
+            | _, [ q ] ->
+              raise
+                (Not_applicable
+                   (Printf.sprintf
+                      "%s acts on q%d, which rides the loop; only docked ions can gate"
+                      o.name q))
+            | _ -> raise (Not_applicable (Printf.sprintf "%s has an unsupported arity" o.name)));
+            finished.(i) <- true;
+            decr remaining)
+          ready1;
+        emit_spam "measure" (List.rev !measures);
+        emit_spam "reset" (List.rev !resets);
+        emit_singles (List.rev !singles)
+      end
+    done;
+    !progressed
   in
 
   let contact_of (o : Circuit.op) =
@@ -451,31 +679,7 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
     if !guard > 4 * n_ops + 16 then
       raise (Not_applicable "the schedule stopped making progress");
     (* everything ready that costs no rotation, first *)
-    let progressed = ref false in
-    for i = 0 to n_ops - 1 do
-      if (not finished.(i)) && not (blocked i) then begin
-        let (o : Circuit.op) = ops.(i) in
-        match (o.name, o.qubits) with
-        | ("measure" | "reset"), [ q ] when Hashtbl.mem x.dock_of (ion q) ->
-          add Tsir.{ blank with ityp = o.name; id = fresh (); ions = [ ion q ];
-                     meta = [ ("kind", `String o.name) ] @ op_meta [ o.index ] };
-          incr cyc;
-          finished.(i) <- true; decr remaining; progressed := true
-        | "barrier", _ ->
-          finished.(i) <- true; decr remaining; progressed := true
-        | _, [ q ] when Hashtbl.mem x.dock_of (ion q) ->
-          emit_1q o (ion q);
-          finished.(i) <- true; decr remaining; progressed := true
-        | _, [ q ] ->
-          raise
-            (Not_applicable
-               (Printf.sprintf
-                  "%s acts on q%d, which rides the loop; only docked ions can gate" o.name
-                  q))
-        | _, [ _; _ ] -> ()
-        | _ -> raise (Not_applicable (Printf.sprintf "%s has an unsupported arity" o.name))
-      end
-    done;
+    let progressed = ref (drain ()) in
     (* then the best rotation: the offset that serves the most ready contacts *)
     let ready =
       List.filter_map
@@ -544,16 +748,34 @@ let run ?(sweep = Monotone) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
         (match sweep with
         | Greedy -> Conveyor.shortest cv x.offset best
         | Monotone -> ((best - x.offset) mod cv.n + cv.n) mod cv.n);
-      contact batch
+      (* after the turn: every rider now standing beside a dock that is not in the
+         batch docks anyway on a switchless machine -- see `contact` *)
+      let extra =
+        if not dock_all then []
+        else begin
+          let in_batch = List.map (fun (r, _, _, _, _) -> r) batch in
+          let at_rail = Hashtbl.create 64 in
+          Hashtbl.iter (fun ion _ -> Hashtbl.replace at_rail (site_of x ion) ion) x.slot_of;
+          Array.to_list cv.docks
+          |> List.filter_map (fun (d : Conveyor.dock) ->
+                 match Hashtbl.find_opt at_rail d.rail with
+                 | Some r when not (List.mem r in_batch) -> Some (r, d)
+                 | _ -> None)
+        end
+      in
+      contact ~extra batch
     end
   done;
 
   notes :=
     [ Conveyor.describe cv;
-      Printf.sprintf "%d qubits at docks, %d riding the loop (stride %d)"
-        (List.length dock_side) (List.length loop_side) stride;
+      layout_note;
       Printf.sprintf "%d rotations totalling %d hops, %d contacts in %d batches"
-        !n_rot !n_hops !n_contacts !n_batches ];
+        !n_rot !n_hops !n_contacts !n_batches ]
+    @ (if dock_all
+       then [ Printf.sprintf "dock-all: %d riders docked and undocked without a gate, so \
+                             every spur acts in every batch" !n_extra ]
+       else []);
   let cert =
     Cert.
       {

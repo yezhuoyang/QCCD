@@ -145,8 +145,32 @@ let nearest (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(claimed : (string, un
 
 (* ------------------------------------------------------------------ the driver *)
 
+(* `init`: a starting placement decided upstream, as (ion, site) pairs -- the general
+   router's counterpart of `qccdc rotate --placement`.  The placement pass optimises
+   interaction distance with no knowledge of the code; a BB code is translation-invariant
+   on a torus, and a layout that keeps that structure (`Codesign/scripts/bb_torus.py`)
+   is something the pass cannot find and the study needs to measure.  Every ion the
+   circuit names must be given a site that exists; nothing else is checked here, because
+   the router says loudly enough when a layout does not work. *)
+let placement_of_init (a : Arch.t) (c : Circuit.t) (init : (string * string) list) : Place.t =
+  let site = Hashtbl.create 256 in
+  List.iter
+    (fun (ion, s) ->
+      (match Arch.node a s with
+      | Some _ -> ()
+      | None -> invalid_arg (Printf.sprintf "--init-placement: %s -> unknown site %s" ion s));
+      Hashtbl.replace site ion s)
+    init;
+  let ion = Array.init c.Circuit.n_qubits Place.ion_name in
+  Array.iter
+    (fun i ->
+      if not (Hashtbl.mem site i) then
+        invalid_arg (Printf.sprintf "--init-placement: no site for %s" i))
+    ion;
+  { Place.ion; site; notes = [ Printf.sprintf "placement: %d ions placed by --init-placement" (List.length init) ] }
+
 let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option)
-    ?(variant = 0) (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
+    ?(variant = 0) ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
     ~(qasm_path : string) : result =
   (* Lower first.  The router meets a PAIR of ions in one trap; three ions in one trap is
      a different problem most shipped devices cannot host at all, so a Toffoli becomes six
@@ -157,7 +181,11 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
   let c, n_lowered = Circuit.lower c in
   let t = Traps.build a in
   let d = Traps.all_dists t in
-  let pl = Place.run ~variant a t d c in
+  let pl =
+    match init with
+    | Some init -> placement_of_init a c init
+    | None -> Place.run ~variant a t d c
+  in
   let notes = ref (List.rev pl.notes) in
   if n_lowered > 0 then
     notes :=
@@ -391,14 +419,21 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         let before = Hashtbl.copy pos in
         let plan = Route.plan_layer a t d ~pos ~targets ~horizon in
         (* record the sub-problem AND what the heuristic achieved on it, so C4 can measure
-           the gap against an optimal solver on the very same instance *)
+           the gap against an optimal solver on the very same instance.
+
+           `plan.slots`, not `List.length plan.cycles`: the oracle minimises the MAPF
+           makespan, and since R22 one slot may be emitted as several instructions (one
+           per waveform).  Reporting the emitted count would score a uniformity split as
+           an optimality gap against a solver that was never asked about uniformity. *)
         (match record with
         | None -> ()
         | Some acc ->
           acc :=
-            Route.instance_json a t ~pos:before ~targets ~horizon
-              ~heuristic:(List.length plan.cycles)
+            Route.instance_json a t ~pos:before ~targets ~horizon ~heuristic:plan.slots
             :: !acc);
+        (* one `Route.cycle` is one waveform (R22), so it is one instruction, one machine
+           cycle and one `cert_moves` cycle stamp -- the split the router did upstream
+           needs nothing here beyond emitting what it hands over *)
         List.iter
           (fun (cy : Route.cycle) ->
             List.iter
@@ -766,12 +801,14 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
    put an ion where a later layer cannot get past it.  Falling back to the runner-up costs
    one recompile and turns "not routable" back into a program -- measured: it is what keeps
    `clifford12` on `ladder_2x72` compiling after the hill-climb was added. *)
-let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) (a : Arch.t)
-    (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result =
+let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?init
+    (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result =
+  (* a placement given from outside has no runner-up: it either routes or it does not *)
+  let last_variant = if init = None then 2 else 0 in
   let rec attempt v last =
-    if v > 2 then match last with Some e -> raise e | None -> assert false
+    if v > last_variant then match last with Some e -> raise e | None -> assert false
     else
-      match run_once ~policy ?record ~variant:v a c ~arch_path ~qasm_path with
+      match run_once ~policy ?record ~variant:v ?init a c ~arch_path ~qasm_path with
       | r -> r
       | exception (Route.Unroutable _ as e) ->
         (match record with Some acc -> acc := [] | None -> ());
