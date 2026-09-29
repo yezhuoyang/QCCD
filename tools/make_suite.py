@@ -10,9 +10,12 @@ The suite is every pair of these circuits and these devices (docs/PLAN-boards.md
   devices    the nine reference architectures in arch/
 
 The reference compiler (qccdc + cooling) is run on every pair and its graded results are
-pinned as baseline.json, the denominator of every speedup.  Measured 2026-09-28 (macOS, 4 jobs,
-202 s): 68 of the 108 pairs valid, 20 wrong (R22: the router's moves on grids and rings need
-more than one waveform per cycle), 19 refused, 1 timeout -- the room a better compiler has.  A published suite is immutable: change it by adding suite@2.
+pinned as baseline.json, the denominator of every speedup.  Measured 2026-09-29 (Windows, 4 jobs,
+483 s, qccdc f52d3ba63b9a): 88 of the 108 pairs valid, 0 wrong, 20 refused -- the room a better
+compiler has.  The first measurement (2026-09-28) was made with a router that predated R22 and
+had 20 wrong pairs, so the reference could not pass its own board; suite@1 was re-pinned the
+day it was published, before any public submission.  A published suite is otherwise
+immutable: change it by adding suite@2.
 """
 
 from __future__ import annotations

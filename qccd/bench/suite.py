@@ -250,6 +250,12 @@ def hidden_pairs(seed: str, physics: Mapping, *, count: int) -> list[Pair]:
 
 # ---------------------------------------------------------------------- building a suite (maintainers)
 
+def _put(p: Path, text: str) -> None:
+    """Write `text` as UTF-8 with LF line ends on every platform.  The files are pinned by
+    digest, and `write_text` writes CRLF on Windows, so a suite built there would not match."""
+    p.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+
+
 def build_suite(name: str, release: str, *, out_dir: Path, circuits: list[dict], devices: list[dict],
                 physics: Mapping, title: str, description: str, limits: Mapping, ler: Mapping,
                 hidden_count: int, baseline: Mapping | None = None) -> Path:
@@ -261,24 +267,23 @@ def build_suite(name: str, release: str, *, out_dir: Path, circuits: list[dict],
     d.mkdir(parents=True, exist_ok=False)
     (d / "circuits").mkdir()
     (d / "devices").mkdir()
-    (d / "physics.json").write_text(json.dumps(normalize_numbers(dict(physics)), indent=1, sort_keys=True) + "\n",
-                                    encoding="utf-8")
+    _put(d / "physics.json", json.dumps(normalize_numbers(dict(physics)), indent=1, sort_keys=True) + "\n")
     cs = []
     for c in circuits:
         p = d / "circuits" / f"{c['name']}.qasm"
-        p.write_bytes(c["qasm"].encode("utf-8"))
+        _put(p, c["qasm"])
         entry: dict[str, Any] = {"name": c["name"], "file": f"circuits/{c['name']}.qasm", "digest": _sha(p.read_bytes()),
                                  "qubits": n_qubits(c["qasm"]), "kind": circuit_kind(c["qasm"], c.get("detectors")),
                                  "source": c.get("source", "")}
         if c.get("detectors"):
             dp = d / "circuits" / f"{c['name']}.detectors.json"
-            dp.write_text(json.dumps(c["detectors"], indent=1, sort_keys=True) + "\n", encoding="utf-8")
+            _put(dp, json.dumps(c["detectors"], indent=1, sort_keys=True) + "\n")
             entry["detectors"] = {"file": f"circuits/{c['name']}.detectors.json", "digest": _sha(dp.read_bytes())}
         cs.append(entry)
     ds = []
     for dv in devices:
         p = d / "devices" / f"{dv['name']}.arch.json"
-        p.write_text(json.dumps(dv["doc"], indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        _put(p, json.dumps(dv["doc"], indent=1, sort_keys=True) + "\n")
         ds.append({"name": dv["name"], "file": f"devices/{dv['name']}.arch.json", "digest": _sha(p.read_bytes()),
                    "source": dv.get("source", "")})
     man = {
@@ -305,7 +310,7 @@ def build_suite(name: str, release: str, *, out_dir: Path, circuits: list[dict],
         "rank_by": "speedup",
     }
     if baseline is not None:
-        (d / "baseline.json").write_text(json.dumps(baseline, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        _put(d / "baseline.json", json.dumps(baseline, indent=1, sort_keys=True) + "\n")
         man["baseline"] = {"file": "baseline.json", "digest": _sha((d / "baseline.json").read_bytes())}
-    (d / "suite.json").write_text(json.dumps(man, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    _put(d / "suite.json", json.dumps(man, indent=1, sort_keys=True) + "\n")
     return d
