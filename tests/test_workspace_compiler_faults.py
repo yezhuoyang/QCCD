@@ -68,8 +68,12 @@ def test_a_program_that_breaks_a_rule_is_the_compilers_fault():
 
 
 def test_the_withdrawn_list_is_the_73864a5c493d_release_as_it_was_published():
-    pinned = json.loads(subprocess.run(["git", "show", "3b1546c:qccd/workspace/toolchain.json"], cwd=REPO,
-                                       capture_output=True, text=True, check=True).stdout)["qccdc_cli"]
+    # the pin that published it, from history: a shallow clone does not have that commit
+    old = subprocess.run(["git", "show", "3b1546c:qccd/workspace/toolchain.json"], cwd=REPO,
+                         capture_output=True, text=True)
+    if old.returncode:
+        pytest.skip("needs the commit that pinned 73864a5c493d (3b1546c); this clone has no such history")
+    pinned = json.loads(old.stdout)["qccdc_cli"]
     assert pinned["version"] == "73864a5c493d"
     digests = {a.get("unpacked_sha256") or a["sha256"] for a in pinned["assets"].values()}
     assert digests == {d for d, v in toolchain.RETIRED_QCCDC.items() if v == "73864a5c493d"}
