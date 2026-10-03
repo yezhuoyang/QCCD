@@ -279,6 +279,8 @@ def cmd_toolchain(a) -> int:
                               if i else "no"))
         u = s["in_use"]
         print("in use    " + (f"{u['path']}  ({u['from']})" if u else "none: run `qccd toolchain install`"))
+        if u and u.get("withdrawn"):
+            print("          WITHDRAWN -- " + u["withdrawn"])
         c = (s.get("qcheck") or {}).get("in_use")
         print("checker   " + (f"{c['path']}  ({c['from']})" if c else
                               "none: reference grades report the Lean stage `unsupported` "

@@ -170,7 +170,7 @@ class RunsMixin:
         from ..verify.replay import replay
         from .core import WorkspaceError
         from .evaluator import Toolchain
-        from .results import _compiler_reason
+        from .results import _compiler_fault, _compiler_reason, _refuse_withdrawn_compiler
         from .metrics import replay_time
         from .perf import performance
         from .procs import run_limited
@@ -180,6 +180,7 @@ class RunsMixin:
             raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not installed: run "
                                  "`qccd toolchain install` in a terminal (it fetches the prebuilt one), "
                                  "or build Compiler/ocaml", status=424)
+        _refuse_withdrawn_compiler(tc)
         branch, rev = params["branch"], params["revision"]
         name, qasm, source = resolve_program(params["program"])
         r = self.replayed(branch, rev)
@@ -238,6 +239,10 @@ class RunsMixin:
         prog = TSIR.from_json(json.loads((work / "prog.cooled.tsir.json").read_text(encoding="utf-8")))
         table = self.release.manifest["physics"].get("rank_table", "qccdsim_jones")
         res = replay(prog, arch, corrected_model(table), check_rules=True, keep_cycles=True)
+        # an illegal program is the compiler's fault and is not shown as this design's run
+        fault = _compiler_fault(res, tc, design=dname, program=shown)
+        if fault:
+            return {**fault, "design": design, "program": {"name": name, "qubits": q}, "log": log[-2000:]}
         try:
             t_tr, _ = replay_time(arch, prog, "transport_excitation")
         except Exception:

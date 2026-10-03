@@ -34,7 +34,24 @@ import urllib.request
 from pathlib import Path
 
 __all__ = ["manifest", "platform_key", "qcheck_version", "QCHECK_SOURCES", "installed", "installed_qcheck", "installed_path", "install", "status",
-           "ToolchainError"]
+           "ToolchainError", "RETIRED_QCCDC", "retired", "upgrade_hint"]
+
+#: compiler releases withdrawn because they emit programs that break a rule: the SHA-256 of
+#: each published binary (unpacked) -> its version.  A machine that installed one keeps it
+#: under ~/.qccd/toolchain until something replaces it, and a checkout that predates the pin
+#: change still points at it -- which is how a Mac compiled a BB round on a new grid in
+#: October and animated cycles in which ions moved in different directions.  The digest is
+#: what is checked, so a copy renamed or moved is caught as well.
+RETIRED_QCCDC = {
+    "8b2a8d1d6471ae2bbc9a9248270260c9980d9e4aee7f6097bb7b776492155234": "73864a5c493d",   # windows-x86_64
+    "ae79e047165f5260130eac7b2742a90634a6494dab19f0da17d146948eb81c64": "73864a5c493d",   # linux-x86_64
+    "8082f6b2eb873e10d8d956f52dc7803191134a639b0bee9aaa2ac0fe9bda1e35": "73864a5c493d",   # macos-arm64
+}
+_RETIRED_WHY = {
+    "73864a5c493d": "it predates the router fix that keeps one waveform per cycle (R22): on a design "
+                    "that is not on a leaderboard it puts ions moving in different directions into one "
+                    "cycle, so the program it makes breaks R22",
+}
 
 MANIFEST = Path(__file__).with_name("toolchain.json")
 #: what `qcheck` is built from (Compiler/lean/checker/lakefile.toml): its version is a digest of
@@ -164,6 +181,38 @@ def _smoke(exe: Path, tool: str = "qccdc_cli") -> None:
             raise ToolchainError("the downloaded compiler ran but did not parse a Bell circuit correctly")
 
 
+_RETIRED_SEEN: dict = {}
+
+
+def retired(path) -> str | None:
+    """Why the compiler at `path` must not be used, if it is a withdrawn release; else None."""
+    if path is None:
+        return None
+    p = Path(path)
+    try:
+        st = p.stat()
+    except OSError:
+        return None
+    key = (str(p), st.st_size, st.st_mtime_ns)
+    if key not in _RETIRED_SEEN:
+        _RETIRED_SEEN[key] = RETIRED_QCCDC.get(_sha256(p))
+    version = _RETIRED_SEEN[key]
+    if version is None:
+        return None
+    return f"the compiler at {p} is release {version}, which was withdrawn: {_RETIRED_WHY[version]}"
+
+
+def upgrade_hint(man: dict | None = None) -> str:
+    """What to do about an outdated compiler on THIS computer."""
+    man = man or manifest()
+    q = man["qccdc_cli"]
+    if q["assets"].get(platform_key()):
+        return (f"run `qccd toolchain install --force` to get compiler {q['version']} (if Compiler/ocaml is "
+                "built in this checkout, rebuild it instead: `dune build bin/qccdc_cli.exe` there), then try again")
+    return (f"there is no prebuilt compiler {q['version']} for {platform_key()}, so {_source_hint()}; "
+            "then try again")
+
+
 def _unpacked(asset: dict) -> tuple[int, str]:
     """The installed file's size and SHA-256: the download's, unless it is compressed."""
     if asset.get("encoding") == "gzip":
@@ -281,6 +330,8 @@ def status(man: dict | None = None) -> dict:
             how = (env if os.environ.get(env) else
                    "installed" if installed(man, tool) and Path(used) == installed(man, tool) else "built in this checkout")
             info["in_use"] = {"path": str(used), "from": how}
+            if tool == "qccdc_cli" and retired(used):
+                info["in_use"]["withdrawn"] = retired(used) + "; " + upgrade_hint(man)
         if tool == "qccdc_cli":
             out["installed"], out["in_use"] = info["installed"], info["in_use"]
         else:

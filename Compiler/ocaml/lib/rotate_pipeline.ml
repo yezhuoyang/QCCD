@@ -312,6 +312,8 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
      should not have to know that 144 of them happened together.  It costs a large move
      list and buys a checker that needs no special case. *)
   let cyc = ref 1 in
+  (* the waveform labels R22 judges a dock batch by, shared with the router *)
+  let sctx = Route.sigctx a in
   let cert_moves = ref [] in
   let cert_rots = ref [] in
   let cert_gates = ref [] in
@@ -355,23 +357,64 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
       let batch_ops = List.map (fun (_, _, _, dag, _) -> dag) pairs4 in
       let riders = List.map (fun (r, d, _, _, _) -> (r, d)) pairs4 @ extra in
       n_extra := !n_extra + List.length extra;
-      let dock_moves dir =
-        List.map
-          (fun (rider, (d : Conveyor.dock)) ->
-            if dir then Tsir.{ ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
-            else Tsir.{ ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] })
-          riders
+      (* One dock (or undock) instruction per waveform (R22).  A generated ring's spurs
+         all read `spur:inward`, so the batch is one instruction as it always was.  A
+         dock drawn by hand can differ: a spur declared as its own open path is labelled
+         by its lab-frame axis, and a dock above the rail and one below it are then two
+         waveforms -- emitted as one instruction, that failed R22 on every such design.
+         The riders go to distinct dock traps and come back to distinct rail slots, so
+         the groups do not compete for room and their order is free; first-seen order
+         keeps the one-group case byte-identical. *)
+      let dock_groups dir =
+        let cls = if dir then cv.dock_cls else cv.undock_cls in
+        if Route.control_model a = "direct" then [ riders ]
+        else
+          List.fold_left
+            (fun acc ((rider, (d : Conveyor.dock)) as r) ->
+              let m =
+                if dir then Route.{ ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
+                else Route.{ ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] }
+              in
+              let s = Route.move_signature sctx ~cls m in
+              match List.assoc_opt s acc with
+              | Some l ->
+                l := r :: !l;
+                acc
+              | None -> acc @ [ (s, ref [ r ]) ])
+            [] riders
+          |> List.map (fun (_, l) -> List.rev !l)
       in
-      add Tsir.{ blank with ityp = "simd"; id = fresh (); cls = Some cv.dock_cls;
-                 mode = Some "inter"; participants = dock_moves true;
-                 meta = [ ("kind", `String "dock") ] @ op_meta batch_ops };
-      List.iter
-        (fun (rider, (d : Conveyor.dock)) ->
-          cert_moves :=
-            Cert.{ cycle = !cyc; ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
-            :: !cert_moves)
-        riders;
-      incr cyc;
+      let emit_docking dir =
+        List.iter
+          (fun group ->
+            add Tsir.{ blank with ityp = "simd"; id = fresh ();
+                       cls = Some (if dir then cv.dock_cls else cv.undock_cls);
+                       mode = Some "inter";
+                       participants =
+                         List.map
+                           (fun (rider, (d : Conveyor.dock)) ->
+                             if dir then
+                               Tsir.{ ion = rider; src = d.rail; dst = d.site; via = [ d.spur ] }
+                             else
+                               Tsir.{ ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] })
+                           group;
+                       meta = [ ("kind", `String (if dir then "dock" else "undock")) ]
+                              @ op_meta batch_ops };
+            List.iter
+              (fun (rider, (d : Conveyor.dock)) ->
+                cert_moves :=
+                  (if dir then
+                     Cert.{ cycle = !cyc; ion = rider; src = d.rail; dst = d.site;
+                            via = [ d.spur ] }
+                   else
+                     Cert.{ cycle = !cyc; ion = rider; src = d.site; dst = d.rail;
+                            via = [ d.spur ] })
+                  :: !cert_moves)
+              group;
+            incr cyc)
+          (dock_groups dir)
+      in
+      emit_docking true;
 
       (* the CX sequence, round by round: every pair is at a different dock, so the k-th
          pulse of each can share one cycle without breaking R12 *)
@@ -448,16 +491,7 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
             :: !cert_gates)
         seqs;
 
-      add Tsir.{ blank with ityp = "simd"; id = fresh (); cls = Some cv.undock_cls;
-                 mode = Some "inter"; participants = dock_moves false;
-                 meta = [ ("kind", `String "undock") ] @ op_meta batch_ops };
-      List.iter
-        (fun (rider, (d : Conveyor.dock)) ->
-          cert_moves :=
-            Cert.{ cycle = !cyc; ion = rider; src = d.site; dst = d.rail; via = [ d.spur ] }
-            :: !cert_moves)
-        riders;
-      incr cyc;
+      emit_docking false;
       n_contacts := !n_contacts + List.length pairs4;
       incr n_batches
     end

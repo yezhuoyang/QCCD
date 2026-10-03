@@ -246,6 +246,7 @@ class ResultsMixin:
         if tc.qccdc is None:
             raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not installed: run "
                                  "`qccd toolchain install`, or build Compiler/ocaml", status=424)
+        _refuse_withdrawn_compiler(tc)
         branch, rev = params["branch"], params["revision"]
         r = self.replayed(branch, rev)
         if not r.ok:
@@ -292,6 +293,11 @@ class ResultsMixin:
         if not (work / "prog.cooled.tsir.json").exists():
             return {"_status": "cancelled" if co.status == "cancelled" else "failed",
                     "summary": "cooling insertion failed", "log": (co.stdout + co.stderr)[-2000:]}
+        self._progress(jid, "rules", "checking the compiled program against the rules")
+        fault = _compiler_fault(_replay_for_rules(work, (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones")),
+                                tc, design=self._design_title_of(branch), program=rel.title)
+        if fault:
+            return {**fault, "log": log[-2000:]}
         raw = (work / "prog.tsir.json").read_bytes()
         cooled = (work / "prog.cooled.tsir.json").read_bytes()
         certb = (work / "prog.qcert.json").read_bytes()
@@ -540,6 +546,9 @@ class ResultsMixin:
             d, arts = run.get("design") or {}, run.get("artifacts") or {}
             if d.get("draft") != branch or d.get("digest") != arch_digest or run.get("compiler") not in ("rotate", "compile"):
                 continue
+            # a run from before the compiler-fault check could have succeeded with an illegal program
+            if ((run.get("performance") or {}).get("rules") or {}).get("failed"):
+                continue
             if not all(arts.get(k) for k in ("program", "certified", "certificate", "circuit")):
                 continue
             try:
@@ -731,6 +740,54 @@ def _compiler_reason(log: str) -> str:
     import re
     m = re.search(r"(unroutable[^\n]*|Unroutable[^\n]*|unrealised[^\n]*|too small[^\n]*|cannot[^\n]*|exception[^\n]*)", log)
     return (m.group(1) if m else log[-300:]).strip()
+
+
+def _refuse_withdrawn_compiler(tc) -> None:
+    """Stop before compiling with a compiler release that was withdrawn (toolchain.RETIRED_QCCDC):
+    what it makes breaks a rule, and the person would see the illegal program as their design's."""
+    from .core import WorkspaceError
+    from .toolchain import retired, upgrade_hint
+    why = retired(tc.qccdc)
+    if why:
+        raise WorkspaceError("toolchain_withdrawn", f"{why}. Nothing was compiled: {upgrade_hint()}", status=424)
+
+
+def _compiler_fault(res, tc, *, design: str, program: str) -> dict | None:
+    """A compiled program that breaks a rule is a fault in the COMPILER, not a result.
+
+    The compiler's contract is a legal program for the device or a refusal.  Its output used to
+    be replayed, animated and graded as it came, so an illegal program reached the person as
+    "your design is not eligible: R22", with the animation showing ions moving in different
+    directions in one cycle -- the compiler's error presented as theirs.  This is checked on the
+    program exactly as it would be shown and submitted (cooled), and every rule the replay
+    reports is a property of the program: the design's own rules (R19-R21) are not replayed.
+    Returns the failed job's result, or None when the program passes."""
+    faults = [v for v in res.rules.violations if v.severity == "error"]
+    if not faults:
+        return None
+    rules = sorted({v.rule for v in faults})
+    first = faults[0]
+    from .evaluator import _exe_digest
+    return {"_status": "failed",
+            "summary": f"the compiler made a program for {program} on {design} that breaks rule "
+                       f"{', '.join(rules)} ({len(faults)} violation(s); the first, at instruction "
+                       f"{first.instr_id}: {first.message}). That is a fault in the compiler, not in "
+                       f"{design}, so the program is not shown, adopted or graded. The compiler used: "
+                       f"{tc.qccdc}; `qccd toolchain status` says which one it is",
+            "compiler_fault": {"rules": rules, "violations": len(faults),
+                               "examples": [str(v) for v in faults[:5]],
+                               "compiler": str(tc.qccdc), "compiler_digest": _exe_digest(tc.qccdc)}}
+
+
+def _replay_for_rules(work: Path, table: str):
+    """Replay the cooled program in `work` against `work/device.arch.json` with every rule on."""
+    from ..arch.device import Architecture
+    from ..cost.models import corrected_model
+    from ..ir.tsir import TSIR
+    from ..verify.replay import replay
+    arch = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
+    prog = TSIR.from_json(json.loads((work / "prog.cooled.tsir.json").read_text(encoding="utf-8")))
+    return replay(prog, arch, corrected_model(table), check_rules=True)
 
 
 def _freeze_dir(d: Path) -> None:

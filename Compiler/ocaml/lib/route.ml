@@ -102,6 +102,9 @@ type sigctx = {
   sarch : Arch.t;
   seg_by_id : (string, Arch.segment) Hashtbl.t;
   loop_seq : (string, string array) Hashtbl.t;
+  (* the named paths that are CLOSED: only a step along one of those is labelled by its
+     loop alone (see `hop_label`) *)
+  closed_loops : (string, unit) Hashtbl.t;
   on_loop : (string, unit) Hashtbl.t;
   (* (src, dst) -> signature.  `hop_free` asks for this inside the A* inner loop, and a
      directed hop's `via` is fixed by `Traps.build` (one hop per ordered pair), so the
@@ -114,13 +117,15 @@ let sigctx (a : Arch.t) : sigctx =
   let seg_by_id = Hashtbl.create (List.length a.segments) in
   List.iter (fun (s : Arch.segment) -> Hashtbl.replace seg_by_id s.sid s) a.segments;
   let loop_seq = Hashtbl.create 8 in
+  let closed_loops = Hashtbl.create 8 in
   let on_loop = Hashtbl.create 64 in
   List.iter
     (fun (l : Arch.loop) ->
       Hashtbl.replace loop_seq l.lid (Array.of_list l.nodes);
+      if l.closed then Hashtbl.replace closed_loops l.lid ();
       List.iter (fun n -> Hashtbl.replace on_loop n ()) l.nodes)
     a.loops;
-  { sarch = a; seg_by_id; loop_seq; on_loop; hop_sig = Hashtbl.create 1024 }
+  { sarch = a; seg_by_id; loop_seq; closed_loops; on_loop; hop_sig = Hashtbl.create 1024 }
 
 (* `stationary_chain` declares `control.model = "direct"` -- every electrode is its own
    channel, so a cycle may legitimately ask two ions to do different things and R22 does
@@ -136,6 +141,27 @@ let index_in (seq : string array) (x : string) =
   Array.iteri (fun i n -> if !r = None && n = x then r := Some i) seq;
   !r
 
+(* The lab-frame axis of one hop: `+x`, `-y`, `+x+y`, or `0`. *)
+let axis_label (c : sigctx) src dst =
+  let p id =
+    match Arch.node c.sarch id with Some (n : Arch.node) -> n.pos | None -> (0.0, 0.0)
+  in
+  let ax, ay = p src and bx, by = p dst in
+  let dx = bx -. ax and dy = by -. ay in
+  let sx = if dx > sig_eps then "+x" else if dx < -.sig_eps then "-x" else "" in
+  let sy = if dy > sig_eps then "+y" else if dy < -.sig_eps then "-y" else "" in
+  if sx = "" && sy = "" then "0" else sx ^ sy
+
+(* The Python labels a step along an OPEN path by its lab-frame axis alone, and a step
+   along a closed loop by the loop.  This labels the open-path step by both, `P0:+1/+x`.
+   It must never be COARSER than the verifier's label -- two hops the verifier calls
+   different must be different here too, or the router puts them in one cycle and R22
+   fails -- and it must not change the programmes already published.  The path's own
+   step alone was coarser: on a path with a corner, as the Studio's sketch draws, `P0:+1`
+   is `+x` before the corner and `+y` after it, and the router played both in one cycle.
+   The axis alone would merge two parallel straight rails that the router has always kept
+   apart, changing every ladder programme; with both, a straight path splits exactly as
+   it did and a bent one splits where the verifier does. *)
 let hop_label (c : sigctx) (seg : Arch.segment) src dst =
   let along =
     match seg.loop with
@@ -149,7 +175,8 @@ let hop_label (c : sigctx) (seg : Arch.segment) src dst =
           let k = Array.length seq in
           let d = (((j - i) mod k) + k) mod k in
           let d = if d <= k / 2 then d else d - k in
-          Some (Printf.sprintf "%s:%+d" lid d)
+          if Hashtbl.mem c.closed_loops lid then Some (Printf.sprintf "%s:%+d" lid d)
+          else Some (Printf.sprintf "%s:%+d/%s" lid d (axis_label c src dst))
         | _ -> None))
   in
   match along with
@@ -162,17 +189,7 @@ let hop_label (c : sigctx) (seg : Arch.segment) src dst =
         if s_on = d_on then None
         else Some (if s_on then "spur:inward" else "spur:outward")
     in
-    match spur with
-    | Some l -> l
-    | None ->
-      let p id =
-        match Arch.node c.sarch id with Some (n : Arch.node) -> n.pos | None -> (0.0, 0.0)
-      in
-      let ax, ay = p src and bx, by = p dst in
-      let dx = bx -. ax and dy = by -. ay in
-      let sx = if dx > sig_eps then "+x" else if dx < -.sig_eps then "-x" else "" in
-      let sy = if dy > sig_eps then "+y" else if dy < -.sig_eps then "-y" else "" in
-      if sx = "" && sy = "" then "0" else sx ^ sy)
+    match spur with Some l -> l | None -> axis_label c src dst)
 
 (* The waveform one move needs: the instruction's class, then a label per segment the ion
    crosses, in the order it crosses them.  `via` is ordered from the source, which is how
