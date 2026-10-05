@@ -4476,7 +4476,8 @@ function hideHud() {
 // is this" and one source for "what does it cost".
 var HINTS = {
   // the three regions of the screen
-  'region:rail':  { t: '1 \u00b7 Elements', d: 'The standard parts: press a tile, then click the canvas to place it there; pick a zone type first for a site. Everything else about the device is in the tools bar above.' },
+  'region:rail':  { t: '1 \u00b7 Elements', d: 'The standard parts: press a tile, then click the canvas to place it there; a zone chip places a site in that zone the same way. Drag the right edge to make this column wider. Everything else about the device is in the tools bar above.' },
+  'rail:grip':     { t: 'Column width', d: 'Drag to make the Elements column wider or narrower (180 to 560 px); the width is remembered. Double-click to put it back.' },
   'region:tools': { t: '0 \u00b7 Tools', d: 'One button per thing that used to crowd the rail: Start a device, append a row, the machine settings, whole components. Each opens a panel under its button; Escape closes it. What you can do to one PART of the device is on the part itself — right-click it. The search box finds any feature on the page (Ctrl+K).' },
   'tools:start': { t: 'Start', d: 'A new device: a blank canvas, a generator, or one of the shipped devices opened as itself.' },
   'tools:rows': { t: 'Append a row', d: 'Add a row to the device as code: a curve point, a zone, a class, a wiring or budget setting.' },
@@ -4498,7 +4499,7 @@ var HINTS = {
   'el:loop':       { t: 'Loop', d: 'A closed ring of sites. The machine can rotate every ion on a loop by one step in a single instruction \u2014 the cheapest way to move many ions at once.', k: 'select the sites in order, then Close loop' },
   'el:zone_type':  { t: 'Zone type', d: 'A label a site carries: how many ions fit, and whether a gate, a measurement or cooling can happen there. Pick the chip you want before placing sites.', k: 'click a chip to choose it for the next site' },
   'zone:new':      { t: 'New zone type', d: 'Declare another kind of site \u2014 a different capacity, or different things allowed in it.' },
-  'el:curve_point': { t: 'Curve point', d: 'One measured data point of how fast an operation runs against how much it heats the ion. The price of every move is read off these curves.', k: 'adds a row to a named curve' },
+  'el:curve_point': { t: 'Curve point', d: 'One measured way of running an operation: its duration in microseconds and the heat it adds to the ion in quanta. Faster runs heat more, so each curve has several rows; the price of every move is read off these curves.', k: 'adds a row to a named curve' },
   'el:primitives': { t: 'Primitives', d: 'The physics of the machine: how long a shuttle, a split, a merge, a crossing or a gate takes, and how much each heats the ion. Every price on this page comes from here.', k: 'edit in place' },
   'el:control':    { t: 'Control plane', d: 'The wiring: how many voltage sources (DACs) drive how many electrodes, and how many different motions can happen in one step. This is what the DAC count measures.', k: 'edit in place' },
   'el:heating':    { t: 'Heating', d: 'How fast an ion warms up just by waiting, in quanta per millisecond. A hot ion makes a bad gate, so time itself has a price.', k: 'edit in place' },
@@ -4550,7 +4551,7 @@ var HINTS = {
   'menu:delete': { t: 'Delete', d: 'Removes the selection. A site takes its rails with it, and one Undo brings the whole thing back.', k: 'del' },
   'menu:insert': { t: 'Insert a trapping site here', d: 'Splits this rail where you clicked and drops a trap into the gap. The two halves inherit the rail\u2019s loop, labels and capacity, its declared length is split at that point, and the new site is spliced into the orbit in the right place \u2014 the only add that can safely put a node on a transport loop.' },
   'menu:component': { t: 'The whole component', d: 'This part was placed as one piece \u2014 a dock, a tile, a register. Select or delete every site and rail it owns, in one step.' },
-  'menu:close-loop': { t: 'Close loop', d: 'Declares the selected sites, in the order you selected them, as an orbit the machine can rotate by one step in a single instruction. It needs at least three.' },
+  'menu:close-loop': { t: 'Close loop', d: 'Declares the selected nodes as an orbit the machine can rotate by one step in a single instruction: in the order you selected them, or, when that order is not a walk, in the order the rails between them run. It needs at least three.' },
   'testdrive': { t: 'Test drive', d: 'Writes a small valid programme for this device \u2014 a rotation if it has a loop, otherwise a shuttle out and back \u2014 and plays it.' },
   'gripRail': { t: 'Elements', d: 'Hide or show the elements rail.', k: '[' },
   'gripDock': { t: 'Panels', d: 'Hide or show the side panels.', k: ']' },
@@ -8702,6 +8703,42 @@ function postSeedZones() {
 // that already exist.  So the menu says "select nodes, then press Close loop", and this is
 // that button.  It uses the SELECTION ORDER, because a loop is an orbit and the order is
 // the orbit.
+// THE ORBIT THE RAILS DRAW, when the selection order is not one.  A box selection lists
+// nodes in no orbit order (junctions first, then sites), so a square with a junction at
+// every corner was refused with "no segment between 'J0' and 'J1'" although its rails
+// close (reported on lesson A3, 2026-10-03).  If the selected nodes and the rails between
+// them form ONE ring (every node on two of those rails) or one open path, walk it, from
+// the first node selected; anything else keeps the selection order, and `closeLoop`
+// refuses it with the sentence that says where.
+function orbitOf(ids) {
+  var dev = STATE ? STATE.device : null, i, k;
+  if (!dev || ids.length < 3) return ids;
+  var ok = true;
+  for (i = 0; i + 1 < ids.length && ok; i++) ok = !!segmentBetween(dev, ids[i], ids[i + 1]);
+  if (ok) return ids;
+  var inSel = {}, nb = {};
+  for (i = 0; i < ids.length; i++) { inSel[ids[i]] = true; nb[ids[i]] = []; }
+  for (var sid in dev.segments) if (has(dev.segments, sid)) {
+    var sg = dev.segments[sid];
+    if (inSel[sg.a] && inSel[sg.b] && sg.a !== sg.b && nb[sg.a].indexOf(sg.b) < 0) {
+      nb[sg.a].push(sg.b); nb[sg.b].push(sg.a);
+    }
+  }
+  var ends = [];
+  for (i = 0; i < ids.length; i++) {
+    k = nb[ids[i]].length;
+    if (k === 0 || k > 2) return ids;
+    if (k === 1) ends.push(ids[i]);
+  }
+  if (ends.length !== 0 && ends.length !== 2) return ids;
+  var start = ends.length ? ends[0] : ids[0], walk = [start], prev = null, cur = start;
+  while (walk.length < ids.length) {
+    var nx = nb[cur][0] === prev ? nb[cur][1] : nb[cur][0];
+    if (nx === undefined || walk.indexOf(nx) >= 0) break;
+    walk.push(nx); prev = cur; cur = nx;
+  }
+  return walk.length === ids.length ? walk : ids;
+}
 function closeLoopFromSelection(opts) {
   opts = opts || {};
   var walk = [], i;
@@ -8709,6 +8746,7 @@ function closeLoopFromSelection(opts) {
     if (SELSET[i].kind === 'segment' || SELSET[i].kind === 'loop') continue;
     if (walk.indexOf(SELSET[i].id) < 0) walk.push(SELSET[i].id);
   }
+  walk = orbitOf(walk);
   if (walk.length < 3) {
     return { ok: false, problems: [{ code: 'short_walk',
       message: 'a loop needs at least three nodes; select them in orbit order first' }] };
@@ -8771,7 +8809,14 @@ function wireZoneChip(b) {
     }
     NEW_ZONE = (NEW_ZONE === z) ? null : z;
     AVCACHE = {};                       // the site tile previews the chosen zone
-    toast('ok', NEW_ZONE ? ('new sites will be ' + NEW_ZONE) : 'new sites take the nearest zone');
+    // PICKING A ZONE IS PICKING WHAT TO PLACE.  The chip used to choose the zone and
+    // nothing else, so "click the load chip, then click the canvas" placed nothing and
+    // the reader had to discover that Trapping site must be pressed in between (reported
+    // on lesson A2, 2026-10-02).  Now the chip arms the site tile too: the ghost follows
+    // the pointer in that zone and the next click on empty canvas drops it.
+    if (NEW_ZONE && ARMED_EL !== 'site' && paletteEntry('site')) setArmed('site');
+    toast('ok', NEW_ZONE ? ('new sites will be ' + NEW_ZONE + ': click empty canvas to place one')
+                         : 'new sites take the nearest zone');
     paint();
   });
 }
@@ -9617,13 +9662,29 @@ function curveForm(host, e) {
   sel.addEventListener('change', function () { FORM.curve = sel.value; paint(); });
   host.append(fieldRow('curve', sel));
   var rows = curveRows(which);
+  // WHAT A ROW IS, said before the rows.  Each row is one measured way of doing the
+  // operation: how long it takes and how many motional quanta it adds to the ion.  A
+  // faster run heats more, so a curve has several rows, and their ratio is the heating
+  // rate a reader expects to see (asked on lesson A4, 2026-10-03: the old label
+  // "us / quanta" read as one unit, and the values printed as [object Object]).
+  var intro = elh('div', 'mut');
+  intro.textContent = 'Each row is one measured operating point of ' + which + ': its ' +
+    'duration and the heat it adds per operation. Faster runs heat more, so a curve has ' +
+    'several; the rate is quanta per millisecond. The model prices the fastest row in ' +
+    policyTable() + '.';
+  host.append(intro);
   var list = elh('div', 'rowlist');
   for (i = 0; i < rows.length; i++) {
-    var r = rows[i];
+    var r = rows[i], us = +Q.unbox(r.us), qn = +Q.unbox(r.quanta);
     var line = elh('div', 'fieldrow');
-    var lab = elh('label'); lab.textContent = 'us / quanta'; line.append(lab);
-    line.append(textInput('cf_us_' + i, r.us));
-    line.append(textInput('cf_q_' + i, r.quanta));
+    var lab = elh('label');
+    lab.setAttribute('id', 'cfRow' + i);
+    lab.textContent = num3(us) + ' us · ' + num3(qn) + ' quanta' +
+      (us > 0 ? ' · ' + num3(1000 * qn / us) + ' quanta/ms' : '') +
+      (r.table && String(Q.unbox(r.table)) !== policyTable() ? ' · ' + Q.unbox(r.table) : '');
+    lab.setAttribute('title', [r.label, r.source].filter(Boolean).map(function (x) {
+      return String(Q.unbox(x)); }).join(' — '));
+    line.append(lab);
     var del = btn('cfDel' + i, '−');
     if (which === 'shuttle_segment' && rows.length <= 1) {
       del.setAttribute('disabled', 'disabled');
@@ -9637,11 +9698,9 @@ function curveForm(host, e) {
     list.append(line);
   }
   host.append(list);
-  var addLine = elh('div', 'fieldrow');
-  var al = elh('label'); al.textContent = '+ point'; addLine.append(al);
   var last = rows.length ? rows[rows.length - 1] : { us: 5.0, quanta: 0.1 };
-  addLine.append(textInput('cfNewUs', last.us));
-  addLine.append(textInput('cfNewQ', last.quanta));
+  host.append(fieldRow('+ point: duration (us)', textInput('cfNewUs', +Q.unbox(last.us))));
+  var addLine = fieldRow('heat added (quanta)', textInput('cfNewQ', +Q.unbox(last.quanta)));
   var add = btn('cfAdd', 'add', true);
   add.addEventListener('click', function () {
     curveAddPoint(which, { us: Number(val('cfNewUs')), quanta: Number(val('cfNewQ')),

@@ -42,7 +42,7 @@ a check.
 | R11 | checked | unidirectional per loop per cycle; every junction degree is priceable |
 | R12 | checked | ≤ 1 gate per trap per cycle |
 | R13 | checked | ≤ 15 ions in a trap at gate time |
-| R14 | checked | a split from a chain of > 2 needs an accounted `gate_swap` |
+| R14 | checked | a split from a chain of > 2 needs an accounted `gate_swap`; intra-chain order is not tracked (`init` places a set), so the check is conservative: it charges every such split, edge ion or not |
 | R15 | **partial** | quanta composed additively, which R15 says is an *upper bound* |
 | R16 | checked when the model models heating | gate error evaluated from the carried `n̄`, not a constant |
 | R17 | checked when the model models time | anomalous heating accrued per elapsed µs |

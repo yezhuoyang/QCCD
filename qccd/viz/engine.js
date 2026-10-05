@@ -447,6 +447,7 @@ function _bows(nodes, segments, pos, posOrder, g, pad, clearance, need) {
 // output quantizer; the parity test diffs BOTH modes, because quantization masked 3,539 of
 // 3,569 real divergences in the measured run and a round-only harness would have shrugged
 // at 99% of the drift.
+var TRUE_G_UNITS = 1.0;              // layout.py TRUE_G_UNITS
 function computeLayout(nodes, segments, opts) {
   segments = segments || [];
   var raw = !!(opts && opts.raw);
@@ -515,6 +516,7 @@ function computeLayout(nodes, segments, opts) {
     if (hd) { sx = hd[0]; sy = hd[1]; } else { f = _fit(dx, dy, ux, uy, pad, iso, ts); sx = f[0]; sy = f[1]; }
     g = minNearestNeighbour(_scale(sample, sx, sy));
     if (g <= _EPS) g = gd * Math.max(sx, sy);
+    g = _trueCap(g, sx, sy, ts);
     var r0 = Math.min(R_ION_MAX, Math.max(Math.min(R_ION_MIN, 0.45 * g), K_ION * g));
     var r1 = Math.min(r0, Math.max(Math.min(1.6, 0.30 * g), K_REST * g));
     var bowNeed = r0 + r1 + 3.0;
@@ -524,6 +526,7 @@ function computeLayout(nodes, segments, opts) {
   if (hd) { sx = hd[0]; sy = hd[1]; } else { f = _fit(dx, dy, ux, uy, pad, iso, ts); sx = f[0]; sy = f[1]; }
   g = minNearestNeighbour(_scale(sample, sx, sy));
   if (g <= _EPS) g = gd * Math.max(sx, sy);
+  g = _trueCap(g, sx, sy, ts);
 
   var W = Math.min(W_MAX, Math.max(W_MIN, _q(dx * sx + 2 * pad)));
   var H = Math.min(H_MAX, Math.max(H_MIN, _q(dy * sy + 2 * pad)));
@@ -580,6 +583,17 @@ function computeLayout(nodes, segments, opts) {
                 Math.max(rIon, 0.30 * g + 0.10 * g) + 2.0,
                 rIon + rRest + 3.0)
   };
+}
+
+// AT TRUE SCALE A MARK IS NEVER WIDER THAN ONE LATTICE UNIT.  Every mark is a fraction of
+// `g`, the nearest-neighbour distance on screen, so two sites placed far apart were drawn
+// several pitches long while the electrodes beside them stayed their real size (reported
+// on the studio, 2026-10-03: "the sites are really large compared to the DC electrodes").
+// `layout.py::_true_cap` is the twin.
+function _trueCap(g, sx, sy, ts) {
+  if (!ts) return g;
+  var unit = Math.min(sx, sy) * TRUE_G_UNITS;
+  return (unit > _EPS && g > unit) ? unit : g;
 }
 
 function _scale(pts, sx, sy) {

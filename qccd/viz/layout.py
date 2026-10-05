@@ -357,6 +357,20 @@ def _bows(nodes, segments, pos, g, pad, clearance=0.0, need=0.0):
 # --------------------------------------------------------------- the engine
 
 
+# At true scale a mark is never wider than one lattice unit: every mark is a fraction of
+# `g`, the nearest-neighbour distance on screen, so two sites placed far apart were drawn
+# several pitches long beside electrodes drawn at their real size (reported on the studio,
+# 2026-10-03).  `engine.js::_trueCap` is the twin.
+TRUE_G_UNITS = 1.0
+
+
+def _true_cap(g: float, sx: float, sy: float, ts) -> float:
+    if not ts:
+        return g
+    unit = min(sx, sy) * TRUE_G_UNITS
+    return unit if (unit > _EPS and g > unit) else g
+
+
 def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
                    *, raw: bool = False, true_scale: bool = False,
                    unit_nm: "Sequence[float] | None" = None,
@@ -441,6 +455,7 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
         g = min_nearest_neighbour([(p[0] * sx, p[1] * sy) for p in sample])
         if g <= _EPS:
             g = gd * max(sx, sy)
+        g = _true_cap(g, sx, sy, ts)
         r = min(R_ION_MAX, max(min(R_ION_MIN, 0.45 * g), K_ION * g))
         rr = min(r, max(min(1.6, 0.30 * g), K_REST * g))
         # A bow exists to route a segment AROUND a node it does not touch -- the shipped
@@ -456,6 +471,7 @@ def compute_layout(nodes: Sequence[Mapping], segments: Sequence[Mapping] = (),
     g = min_nearest_neighbour([(p[0] * sx, p[1] * sy) for p in sample])
     if g <= _EPS:
         g = gd * max(sx, sy)
+    g = _true_cap(g, sx, sy, ts)
 
     W = min(W_MAX, max(W_MIN, _q(dx * sx + 2 * pad)))
     H = min(H_MAX, max(H_MIN, _q(dy * sy + 2 * pad)))

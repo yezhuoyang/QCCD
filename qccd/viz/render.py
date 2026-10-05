@@ -956,6 +956,10 @@ text-transform:uppercase;margin-right:4px}
   position:relative}
 .row[data-layout="narrow"] .rail{position:fixed;left:0;top:44px;bottom:0;height:auto;
   width:224px;z-index:5;box-shadow:2px 0 10px rgba(0,0,0,.12)}
+/* THE RAIL'S RIGHT EDGE IS A GRIP: drag it wider (or back) and the width is kept. */
+.railgrip{position:fixed;width:7px;cursor:col-resize;z-index:6;background:transparent;
+  touch-action:none}
+.railgrip:hover,.railgrip.on{background:color-mix(in srgb,var(--accent) 35%,transparent)}
 /* folded is folded: the handles live in the head, so nothing of a folded panel shows */
 .rail[data-collapsed="1"]{display:none}
 .dock[data-collapsed="1"]{display:none}
@@ -3160,6 +3164,58 @@ function fit(){
   }
   applyVB();
 }
+// THE RAIL IS AS WIDE AS THE READER WANTS IT.  224 px holds the tiles, but a form opened
+// in it (a curve's rows, a zone's flags) was cramped to unreadable (asked 2026-10-03:
+// "this left toolbar should be able to be dragged to be wider").  A grip on its right
+// edge drags the width between 180 and 560 px; the width is remembered per viewer, and
+// letting go tells the page it was resized, so the stage refits like any other resize.
+(function railGrip(){
+  const rail = document.getElementById('rail');
+  if(!rail || !document.body || typeof rail.getBoundingClientRect !== 'function') return;
+  const KEY = 'qccd.studio.railw', MIN = 180, MAX = 560;
+  const grip = document.createElement('div');
+  grip.setAttribute('id', 'railEdge');
+  grip.setAttribute('data-hint', 'rail:grip');
+  grip.className = 'railgrip';
+  document.body.appendChild(grip);
+  function place(){
+    const r = rail.getBoundingClientRect(), on = r.width > 0 && r.height > 0;
+    grip.style.display = on ? '' : 'none';
+    if(on){ grip.style.left = (r.right - 4) + 'px'; grip.style.top = r.top + 'px';
+            grip.style.height = r.height + 'px'; }
+  }
+  function setW(w){
+    w = Math.max(MIN, Math.min(MAX, Math.round(+w || 224)));
+    rail.style.width = w + 'px';
+    try { localStorage.setItem(KEY, String(w)); } catch(e){ /* not kept */ }
+    place();
+    return w;
+  }
+  try { const w = +localStorage.getItem(KEY); if(w >= MIN) rail.style.width = Math.min(MAX, w) + 'px'; }
+  catch(e){ /* no store */ }
+  let drag = null;
+  grip.addEventListener('pointerdown', function(ev){
+    if(ev.button !== 0) return;
+    drag = { x: ev.clientX, w: rail.getBoundingClientRect().width };
+    grip.className = 'railgrip on';
+    try { grip.setPointerCapture(ev.pointerId); } catch(e){}
+    ev.preventDefault();
+  });
+  grip.addEventListener('pointermove', function(ev){ if(drag) setW(drag.w + ev.clientX - drag.x); });
+  function end(){
+    if(!drag) return;
+    drag = null; grip.className = 'railgrip';
+    window.dispatchEvent(new Event('resize'));
+  }
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+  grip.addEventListener('dblclick', function(){ setW(224); window.dispatchEvent(new Event('resize')); });
+  window.addEventListener('resize', place);
+  window.addEventListener('scroll', place, true);
+  if(typeof ResizeObserver === 'function') new ResizeObserver(place).observe(rail);
+  place();
+  window.RAIL_WIDTH = setW;
+})();
 function sizeStage(){
   // THE CANVAS IS FURNITURE, NOT A FRAME AROUND THE CONTENT. It used to be capped at
   // `L.W` css px, so its SHAPE followed the device: a 1600x132 chain drew a 61 px strip

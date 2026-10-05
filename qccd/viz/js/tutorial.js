@@ -94,18 +94,18 @@ var QCCD_TUTORIAL = {
         ['fit']
       ],
       stages: [
-        { exercise: 'Click the **load** chip under Zone type, then click an empty spot on the canvas to place a loading site.',
+        { exercise: 'Click the **load** chip under Zone type: it arms **Trapping site** in that zone, and a ghost of the site follows the pointer. Move onto an empty spot of the canvas and click to leave the loading site there.',
           check: ['all', ['sites', 5], ['anyNodeZone', 'load']] },
         { exercise: 'Now change the `load` zone itself. Open the **Device** tab and choose **Source**: the device as text. The `load` zone comes with the device\'s template, so no line sets its capacity yet -- add `m.set_zone("load", capacity=4)` as a new last line. The chip and your new site both shrink. Then come back to **Learn** and press **Check**.',
           check: ['zoneCapacity', 'load', 4] }
       ],
       hints: [
-        'The zone chips sit right under the Zone type tile; the pressed one is the zone the next site gets.',
+        'The zone chips sit right under the Zone type tile. Pressing one arms Trapping site with that zone; the next click on empty canvas places it.',
         'Source is under the **Device** tab. Nothing in it sets the load zone yet, so type a line of your own at the very end: `m.set_zone("load", capacity=4)`.',
         'The picture follows as you type. A `set_zone` line changes only the fields it names, so the zone keeps everything else it allows. When the load chip reads 4, go back to **Learn** and press **Check**.'
       ],
       nudges: {
-        sites: ['No new site yet -- pick the load chip and click the canvas.', 'The click has to land on empty canvas, away from the other sites.'],
+        sites: ['No new site yet -- press the load chip, then click empty canvas.', 'The click has to land on empty canvas, away from the other sites.'],
         anyNodeZone: ['A site was placed, but not in the load zone. Press the load chip first, then place another.'],
         zoneCapacity: ['The load zone still holds {have}. Open Device, choose Source, and add the line m.set_zone("load", capacity=4) at the end.'],
         'default': ['Not there yet. Try the hint.']
@@ -120,20 +120,20 @@ var QCCD_TUTORIAL = {
       teaches: ['el:site', 'el:segment', 'el:loop', 'snap', 'undo', 'fit'],
       text: [
         'Press **Trapping site**, then click the canvas: a ghost shows where it will land -- exactly where you click. Press **Snap** under the canvas and it lands on the lattice instead, which makes a tidy square easy. **Shift-drag** one site onto another to lay a rail between them. Drag a part to move it anywhere; **Undo** takes any gesture back; **Fit** frames the whole device.',
-        'A [[loop|el:loop]] is a closed ring of sites the machine can turn as one. Select the sites (shift-drag a box around them), then **right-click** any one of them: the menu that opens offers **Close loop**. Right-click is how you reach everything a part can do -- its size, its zone, deleting it.'
+        'A [[loop|el:loop]] is a closed ring of sites the machine can turn as one. Select the sites (shift-drag a box around them), then **right-click** any one of them: the menu that opens offers **Close loop**, and it follows the rails around the ring whatever order you selected in. Right-click is how you reach everything a part can do -- its size, its zone, deleting it.',
+        'On a real chip the corners of a square are usually [[junctions|el:junction]], with the trapping sites on the sides. Build it that way if you like: a junction at each corner, a site on each side, eight rails -- it is the same loop.'
       ],
       setup: [['newCanvas', { name: 'square' }], ['fit']],
-      exercise: 'Build a square: four sites one lattice step apart, four rails joining them in a ring, then select all four and press **Close loop**.',
-      check: ['all', ['sites', 4], ['segments', 4], ['loops', 1, true]],
+      exercise: 'Build a square: four sites, rails joining them in a ring (with or without a junction at each corner), then select them all and press **Close loop**.',
+      check: ['all', ['sites', 4], ['loops', 1, true]],
       hints: [
         'Place the four sites at the corners of a square: click, click, click, click.',
         'Shift-drag from a site to its neighbour to lay a rail; four times, around the square.',
-        'Shift-drag on empty canvas draws a selection box. With all four selected, right-click one of them and press **Close loop**.'
+        'Shift-drag on empty canvas draws a selection box. With the whole square selected, right-click one of its sites and press **Close loop**.'
       ],
       nudges: {
         sites: ['{have} of 4 sites so far. Keep placing.', 'You have {have} sites; the square needs exactly four.'],
-        segments: ['{have} of 4 rails. Shift-drag from a site onto its neighbour.', 'Almost: {have} rails. One more join around the square.'],
-        loops: ['Four sites, four rails -- now select them all and press Close loop.'],
+        loops: ['Four sites -- now join them in a ring, select the whole square and press Close loop.', 'If Close loop refuses, a rail is missing: every corner needs a rail to each neighbour.'],
         'default': ['Not a square yet. The hint knows which corner is missing.']
       },
       praise: 'A four-site loop. The machine can now turn every ion on it by one step with a single instruction -- the cheapest move it has.',
@@ -157,14 +157,15 @@ var QCCD_TUTORIAL = {
       teaches: ['m:cost', 'm:runtime', 'm:peak n̄', 'el:primitives', 'el:curve_point', 'tab:R'],
       text: [
         'The head keeps score three ways. [[Cost|m:cost]] counts what the machine is charged for each hop under its cost model. [[Runtime|m:runtime]] is wall-clock time. [[Peak n̄|m:peak n̄]] is how hot the hottest ion got, in motional quanta. Runtime and heat are read off the [[primitives|el:primitives]]: each operation has a curve of measured points, how long against how much it heats, and the model takes the **fastest point in its reference table** (`qccdsim_jones`).',
+        'A curve has several rows because the same move can be run fast or slowly: each row is one measured way of doing it, its **duration** in microseconds and the **heat** it adds in quanta. A quick hop heats the ion more than a slow one -- 0.2 quanta in 2 us is a rate of 100 quanta per millisecond.',
         'Open **Report** to see every number with where it came from. Nothing on this page is a guess: every price is a point on a measured curve, and the curve cites its paper.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
-      exercise: 'Open **Curve point** (under Append a row), pick the `shuttle_segment` curve, type **2** and **0.2** in the *+ point* row and press **add**. Watch the runtime chip fall -- and the peak heating rise.',
+      exercise: 'Open **Curve point** (under Append a row) and pick the `shuttle_segment` curve. Add a faster, hotter way to shuttle: duration **2** us, heat added **0.2** quanta, then press **add**. Watch the runtime chip fall -- and the peak heating rise.',
       check: ['all', ['runtimeBelow', 'setup'], ['peakAbove', 'setup']],
       hints: [
         'Append a row is a fold in the rail; Curve point is the tile in it. Its form has a curve picker at the top.',
-        'Choose shuttle_segment in the picker; the + point row at the bottom takes microseconds and quanta: 2 and 0.2.',
+        'Choose shuttle_segment in the picker; the two fields at the bottom take the duration in microseconds and the heat added in quanta: 2 and 0.2.',
         'The model always takes the fastest point of its table, so a faster point wins the moment it exists.'
       ],
       nudges: {
@@ -181,8 +182,8 @@ var QCCD_TUTORIAL = {
       story: 'A thousand electrodes, and not a thousand wires. How the chip is driven decides what it can do at once.',
       teaches: ['el:control', 'm:DACs', 'm:electrodes', 'm:switches'],
       text: [
-        'Each rail is paved with [[electrodes|m:electrodes]], and each electrode needs a voltage. A [[DAC|m:DACs]] is one voltage source. Wire every electrode to its own DAC (**direct** wiring) and the count grows with the chip. **Broadcast** the same waveform along a channel -- the electrodes tied *a, b, c, a, b, c* -- and one DAC drives any length of rail. This device declares its control plane that way: the report counts **channels**, not electrodes.',
-        'The price of broadcasting is the sentence this whole course turns on: **every site on a shared channel moves the same way in the same step.** You will meet it as a rule (R4d), in a programme (Part B), and as a design decision (Part D).'
+        'Every [[electrode|m:electrodes]] along a rail requires a voltage, typically supplied by a [[DAC|m:DACs]] (Digital-to-Analog Converter). Wiring each electrode to its own dedicated DAC quickly becomes unmanageable as chips grow. Instead, this device uses **broadcast** wiring: repeating a fixed sequence of channels (like *a, b, c, a, b, c*) so a single DAC can drive a rail of any length. As a result, the device specifies its control plane by counting total **channels** rather than individual electrodes.',
+        'The tradeoff of broadcasting is the central premise of this course: **every site on a shared channel must move in lockstep during the same step.** You will encounter this concept as a core rule in R4d, a programming exercise in Part B, and a major design decision in Part D.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
       stages: [
