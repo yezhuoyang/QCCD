@@ -77,6 +77,7 @@ RULE_SOURCES: Mapping[str, str] = {
     "R20": "collaborator review 2026-09 (Ke; Jaewon; Jack), 2201.12579",
     "R21": "collaborator review 2026-09 (Ke), quant-ph/0702175",
     "R22": "collaborator review 2026-09 (Ke), 2510.23519, 2305.12773",
+    "R23": "reader report 2026-09 (Jack), deck_v3, 2510.23519",
 }
 
 RULE_STATEMENTS: Mapping[str, str] = {
@@ -109,6 +110,8 @@ RULE_STATEMENTS: Mapping[str, str] = {
     "R20": "two rails meeting at a node subtend at least min_rail_angle_deg (60 degrees)",
     "R21": "rails are planar: a rail meets only the nodes it ends at, and rails cross only at a shared node",
     "R22": "one transport cycle is one waveform: every moving ion performs the same motion; a site may only opt out",
+    "R23": "a junction is crossed, not rested on: no ion ends a cycle where three or more rails meet "
+           "while the traps off the junctions have room, unless a rotating loop carries it there",
 }
 
 
@@ -1004,6 +1007,58 @@ def r22_uniform_motion(v: CycleView) -> list[Violation]:
         f"{len(sigs)} cycles")]
 
 
+# ---------------------------------------------------------------- R23: junctions are crossed
+#
+# R2 says how MANY ions a junction holds at an instant (one).  It does not say an ion may
+# stay, and a router that reads it as a capacity parks ions there: on a hexagon lattice
+# whose corners were declared as sites, a Steane round stopped an ion on a corner 77 times,
+# once for 17 instructions, with empty traps on every side (reported 2026-09-29).  An ion
+# standing where three rails meet blocks every route through it.
+#
+# Two things are NOT that, and the rule says so rather than failing them:
+#
+#   * a slot of a loop the programme ROTATES.  A conveyor carries every ion on it through
+#     every slot, the dock slots of a ring included; the ion is being conveyed, and it is
+#     the device's design, not a router's choice, that the slot has a spur on it.
+#   * a device with NO ROOM off its junctions.  If the traps where fewer than three rails
+#     meet cannot hold the programme's ions, some ion has to stand on a crossing.
+#
+# Room is counted the way the compiler counts it (`Arch.eff_capacity`): a trap's capacity,
+# capped at R13's chain limit.
+
+#: R13's bound on a chain that will host a gate; the compiler's `gate_chain_limit`.
+R23_CHAIN_LIMIT = 15
+
+
+def r23_junctions_crossed(v: CycleView) -> list[Violation]:
+    """R23.  Reported once per stay, at the first cycle the ion is seen resting."""
+    dev = v.arch.device
+    cache = v.config if isinstance(v.config, dict) else {}
+    facts = cache.get("_r23")
+    if facts is None or facts[0] is not dev:
+        junctions = frozenset(dev.junction_nodes)
+        room = sum(min(n.capacity, R23_CHAIN_LIMIT) for i, n in dev.nodes.items()
+                   if n.kind == "site" and i not in junctions)
+        conveyor = frozenset(n for lid in (v.config.get("rotated_loops") or ())
+                             if lid in dev.loops for n in dev.loops[lid].nodes)
+        facts = (dev, junctions - conveyor, room, set())
+        cache["_r23"] = facts
+    _, parked_on, room, resting = facts
+    if not parked_on or room < len(v.pos_after):
+        resting.clear()
+        return []
+    now = {(ion, s) for ion, s in v.pos_after.items() if s in parked_on}
+    new = sorted(now - resting)
+    resting.clear()
+    resting.update(now)
+    return [Violation(
+        "R23", v.instr.id,
+        f"ion {ion} comes to rest on junction {s} ({dev.degree(s)} rails meet there) while "
+        f"the traps off the junctions have room for all {len(v.pos_after)} ions "
+        f"({room} places); a junction is crossed in one move, not stood on")
+        for ion, s in new]
+
+
 def r12_intra_parallelism(v: CycleView) -> list[Violation]:
     if v.instr.type != "gate":
         return []
@@ -1079,6 +1134,7 @@ CYCLE_RULES: Mapping[str, Callable[[CycleView], list[Violation]]] = {
     "R13": r13_chain_length,
     "R14": r14_split_at_edge,
     "R22": r22_uniform_motion,
+    "R23": r23_junctions_crossed,
 }
 
 

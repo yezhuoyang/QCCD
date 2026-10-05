@@ -4645,7 +4645,8 @@ var RULE_HINTS = {
   R19: 'No more rails meet at one node than the device says a junction can join.',
   R20: 'Two rails leaving the same node are far enough apart in angle to be built.',
   R21: 'The drawing is flat: a rail touches only the nodes it ends at, and two rails cross only where they share a node.',
-  R22: 'Every ion that moves in one step moves the same way; a site may sit the step out, but it may not do something else.'
+  R22: 'Every ion that moves in one step moves the same way; a site may sit the step out, but it may not do something else.',
+  R23: 'A junction is crossed, not rested on: no ion ends a step where three or more rails meet while the traps off the junctions have room. A loop the programme rotates is a conveyor, and its slots do not count.'
 };
 
 // The entry a key names, resolved: `el:cmp:*` is a component, `rule:*` reads the rule

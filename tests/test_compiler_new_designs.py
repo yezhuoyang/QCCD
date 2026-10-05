@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import subprocess
 import sys
 from collections import Counter
@@ -27,6 +28,7 @@ from pathlib import Path
 import pytest
 
 from qccd.api import Machine
+from qccd.arch.builder import DeviceBuilder
 from qccd.arch.device import Architecture
 from qccd.compile.programs import closed_loops
 from qccd.cost.models import corrected_model
@@ -83,15 +85,14 @@ CASES = {
 }
 
 
-@pytest.mark.parametrize("case", list(CASES))
-def test_every_program_the_compiler_emits_passes_every_rule(case, tmp_path):
-    make, circuit = CASES[case]
-    doc = make()
+def _compile(doc, circuit, tmp_path, mode=None):
+    """Compile `circuit` on `doc` exactly as the workspace does; the cooled program (as JSON),
+    the architecture, and what the replay found."""
     (tmp_path / "device.arch.json").write_text(json.dumps(doc), encoding="utf-8")
     subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(tmp_path / "device.arch.json"), "-o",
                     str(tmp_path / "device.expanded.json")], check=True, capture_output=True)
     arch = Architecture.from_json(doc)
-    mode = "rotate" if closed_loops(arch) else "compile"
+    mode = mode or ("rotate" if closed_loops(arch) else "compile")
     cp = subprocess.run([str(QCCDC), mode, str(REPO / "Compiler" / "examples" / f"{circuit}.qasm"), "--arch",
                          str(tmp_path / "device.expanded.json"), "-o", str(tmp_path / "prog")],
                         capture_output=True, text=True, timeout=600)
@@ -100,7 +101,103 @@ def test_every_program_the_compiler_emits_passes_every_rule(case, tmp_path):
     subprocess.run([sys.executable, str(BRIDGE / "insert_cooling.py"), str(tmp_path / "prog.tsir.json"), "--arch",
                     str(tmp_path / "device.arch.json"), "-o", str(tmp_path / "prog.cooled.tsir.json")],
                    check=True, capture_output=True)
-    prog = TSIR.from_json(json.loads((tmp_path / "prog.cooled.tsir.json").read_text(encoding="utf-8")))
-    res = replay(prog, arch, corrected_model("qccdsim_jones"), check_rules=True)
-    bad = res.rules.violations
+    raw = json.loads((tmp_path / "prog.cooled.tsir.json").read_text(encoding="utf-8"))
+    res = replay(TSIR.from_json(raw), arch, corrected_model("qccdsim_jones"), check_rules=True)
+    return raw, arch, res.rules.violations
+
+
+@pytest.mark.parametrize("case", list(CASES))
+def test_every_program_the_compiler_emits_passes_every_rule(case, tmp_path):
+    make, circuit = CASES[case]
+    _, _, bad = _compile(make(), circuit, tmp_path)
     assert not bad, f"{case}: {dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+
+
+# ------------------------------------------------------------------ junctions are crossed
+#
+# Reported 2026-09-29 on a hexagon lattice a reader's agent designed: ions sat on the
+# corners, where three rails meet, with empty traps on every side.  The corners were
+# declared as SITES, and a site where three rails meet is a junction (R18) that R2 lets one
+# ion stand on, so the router used it as a trap: a Steane round stopped there 77 times, once
+# for 17 instructions.  With room for every ion elsewhere, the compiler now crosses such a
+# site in one move, as it always crossed a bare junction, and never rests on it.  R23 is the
+# rule; `_compile` replays every rule, so the programs below are judged against it.
+
+def hexagon_lattice(corner_sites):
+    """Seven flat-top hexagons: a corner where rails meet, two traps on every side, a
+    two-trap spur off every outer corner only two sides reach.  `corner_sites` declares
+    the corners as sites (what the reported design did) instead of bare junctions."""
+    a, b = 3.0, DeviceBuilder("explicit")
+    centres = [(0.0, 0.0)] + [(math.sqrt(3) * a * math.cos(math.radians(30 + 60 * k)),
+                               math.sqrt(3) * a * math.sin(math.radians(30 + 60 * k))) for k in range(6)]
+    vid, sides, n_seg = {}, {}, 0
+    for cx, cy in centres:
+        ring = []
+        for k in range(6):
+            p = (round(cx + a * math.cos(math.radians(60 * k)), 6), round(cy + a * math.sin(math.radians(60 * k)), 6))
+            if p not in vid:
+                vid[p] = f"J{len(vid)}"
+                b.site(vid[p], *p, zone="data") if corner_sites else b.junction(vid[p], *p)
+            ring.append(p)
+        for k in range(6):
+            (u, pu), (w, pw) = sorted((vid[q], q) for q in (ring[k], ring[(k + 1) % 6]))
+            if (u, w) in sides:
+                continue
+            sides[(u, w)] = chain = [u]
+            for t in (1 / 3, 2 / 3):
+                chain.append(f"S{2 * len(sides) + len(chain) - 3}")
+                b.site(chain[-1], pu[0] + t * (pw[0] - pu[0]), pu[1] + t * (pw[1] - pu[1]),
+                       zone="trap" if abs(pu[1] - pw[1]) < 1e-6 else "data")
+            chain.append(w)
+            for x, y in zip(chain, chain[1:]):
+                b.segment(f"E{n_seg}", x, y)
+                n_seg += 1
+    pos = {v: p for p, v in vid.items()}
+    for v, d in sorted(Counter(v for side in sides for v in side).items()):
+        if d == 2:
+            x, y = pos[v]
+            r, prev = math.hypot(x, y), v
+            for i in (1, 2):
+                b.site(f"D{v[1:]}_{i}", x + i * x / r, y + i * y / r, zone="trap")
+                b.segment(f"E{n_seg}", prev, f"D{v[1:]}_{i}")
+                n_seg, prev = n_seg + 1, f"D{v[1:]}_{i}"
+    return Machine.from_device(b.build(), name="hexagon").arch.to_json()
+
+
+def junction_rests(raw, arch):
+    """How many times an instruction ends with an ion on a node where three or more rails meet."""
+    dev = arch.device
+    junctions = {i for i in dev.nodes if dev.degree(i) >= 3}
+    pos, rests = {}, 0
+    for ins in raw["instructions"]:
+        if ins["type"] == "init":
+            pos = dict(ins["placement"])
+        elif ins["type"] == "simd":
+            pos.update((p["ion"], p["to"]) for p in ins["participants"])
+        rests += sum(1 for s in pos.values() if s in junctions)
+    return rests
+
+
+@pytest.mark.parametrize("corner_sites", [True, False], ids=["corners are sites", "corners are junctions"])
+@pytest.mark.parametrize("circuit", ["steane_esm", "qft8"])
+def test_no_ion_rests_on_a_junction_while_the_device_has_room_elsewhere(corner_sites, circuit, tmp_path):
+    raw, arch, bad = _compile(hexagon_lattice(corner_sites), circuit, tmp_path, mode="compile")
+    assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+    assert sum(1 for i in arch.device.nodes if arch.device.degree(i) >= 3) == 24   # the check has something to see
+    assert junction_rests(raw, arch) == 0
+
+
+def test_the_proved_checker_admits_a_move_that_crosses_a_junction_site(tmp_path):
+    """The Lean checker judges every move against hops read off the device by code the
+    compiler never runs (`mk_qcheck_input.py`).  That reader has to know that a site where
+    three rails meet may be crossed, or it rejects exactly the programs this fix produces."""
+    qcheck = REPO / "Compiler" / "lean" / ".lake" / "build" / "bin" / ("qcheck.exe" if sys.platform == "win32" else "qcheck")
+    if not qcheck.exists():
+        pytest.skip("the Lean checker is not built")
+    raw, arch, _ = _compile(hexagon_lattice(True), "steane_esm", tmp_path, mode="compile")
+    crossing = [p for ins in raw["instructions"] if ins["type"] == "simd" for p in ins["participants"] if len(p["via"]) > 1]
+    assert crossing, "no move crosses a junction site: the check has nothing to see"
+    subprocess.run([sys.executable, str(BRIDGE / "mk_qcheck_input.py"), str(tmp_path / "prog"), "--arch",
+                    str(tmp_path / "device.expanded.json"), "-o", str(tmp_path / "qin.json")], check=True, capture_output=True)
+    cp = subprocess.run([str(qcheck), str(tmp_path / "qin.json")], capture_output=True, text=True, timeout=900)
+    assert "ACCEPTED" in cp.stdout, (cp.stdout + cp.stderr)[-600:]

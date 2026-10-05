@@ -241,6 +241,11 @@ def replay(
     t = 0.0
     anomalous_per_us = model.anomalous_per_us(arch)
     rule_config = dict(rule_config or {})
+    # R23 exempts the slots of a loop the programme rotates, which is a fact about the whole
+    # programme and has to be known before its first cycle is judged.
+    rule_config.setdefault("rotated_loops", frozenset(
+        str(i.template.get("loop")) for i in prog.instructions
+        if i.template and i.template.get("kind") == "loop_shift"))
 
     def _bump(ion: str, component: str, value: float) -> None:
         if value == 0.0:

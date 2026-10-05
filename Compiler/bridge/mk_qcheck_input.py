@@ -25,7 +25,15 @@ def trap_hops(arch: dict, max_transit: int = 3) -> list[dict]:
     """Every ordered pair of traps one machine cycle apart.
 
     An ion never rests on a junction -- R2 allows at most one on a degree->=3 node at any
-    instant -- so a hop leaves a trap, crosses only non-trap nodes, and lands on a trap.
+    instant -- so a hop leaves a trap, crosses only junctions, and lands on a trap.
+
+    A junction here is what R18 says it is: a bare junction node, or a SITE where three or
+    more rails meet.  Such a site is still a place a hop may land (a device with no room
+    elsewhere rests ions there), and it is also a place a hop may cross: crossing is what
+    a junction is for, and the compiler crosses rather than rests whenever it can (a
+    hexagon lattice with sites for corners left ions parked on them, 2026-09-29).  This
+    widens the hop set by a fact read off the segment list, never by anything the
+    compiler says; whether the junction was FREE to cross is R1/R2, replayed elsewhere.
     """
     geom = arch["geometry"]
     kind = {n["id"]: n.get("kind", "site") for n in geom["nodes"]}
@@ -45,10 +53,10 @@ def trap_hops(arch: dict, max_transit: int = 3) -> list[dict]:
             for nbr, seg in adj.get(node, []):
                 if seg in used:
                     continue
-                if kind.get(nbr) == "site":
-                    if nbr != src and (nbr not in found or len(used) + 1 < found[nbr]):
-                        found[nbr] = len(used) + 1
-                else:
+                is_site = kind.get(nbr) == "site"
+                if is_site and nbr != src and (nbr not in found or len(used) + 1 < found[nbr]):
+                    found[nbr] = len(used) + 1
+                if nbr != src and (not is_site or len(adj.get(nbr, [])) >= 3):
                     walk(nbr, used + [seg], depth + 1)
 
         walk(src, [], 0)

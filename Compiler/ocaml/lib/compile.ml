@@ -143,6 +143,37 @@ let nearest (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(claimed : (string, un
       None t.sites
     |> Option.map fst
 
+(* ------------------------------------------------------------------ junctions are crossed
+
+   A SITE WHERE THREE OR MORE RAILS MEET IS A JUNCTION (R18), whatever the drawing calls
+   it, and an ion parked on one blocks every route through it.  R2 lets one ion stand
+   there, so the router used to treat it as a trap like any other: on a hexagon lattice
+   whose corners were declared as sites, ions waited on the corners with empty traps on
+   every side (reported 2026-09-29).  A bare junction never had the problem -- it is not
+   a vertex of the trap graph, so a move crosses it in one cycle.
+
+   R23 now says it: no ion ends a cycle on a junction while the traps off the junctions
+   have room for every ion.  So when they do, the junction sites are left out of the trap
+   graph (`Traps.build ~rest`), and nothing is placed on, gated on, or made to wait on
+   one.  The test is R23's own, counted the same way -- capacity capped at the chain limit
+   (`eff_capacity`) -- because a compiler that kept a wider notion of "room" than the
+   verifier would emit programs the verifier refuses.  There is no falling back: a device
+   that cannot run the circuit without standing on a junction cannot run it by the rules,
+   and saying so is the compiler's job.
+
+   A device with no room off its junctions compiles as before, and R23 does not apply to
+   it.  The answer is the predicate `Traps.build` wants, or `None` for "no restriction". *)
+let junction_rest (a : Arch.t) ~(n_qubits : int) : (string -> bool) option =
+  let is_j s = match Arch.node a s with Some n -> n.is_junction | None -> false in
+  let sites =
+    List.filter
+      (fun s -> match Arch.node a s with Some n -> n.kind = "site" | None -> false)
+      a.node_order
+  in
+  let js, others = List.partition is_j sites in
+  let room = List.fold_left (fun acc s -> acc + capacity a s) 0 others in
+  if js = [] || room < n_qubits then None else Some (fun s -> not (is_j s))
+
 (* ------------------------------------------------------------------ the driver *)
 
 (* `init`: a starting placement decided upstream, as (ion, site) pairs -- the general
@@ -170,7 +201,7 @@ let placement_of_init (a : Arch.t) (c : Circuit.t) (init : (string * string) lis
   { Place.ion; site; notes = [ Printf.sprintf "placement: %d ions placed by --init-placement" (List.length init) ] }
 
 let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option)
-    ?(variant = 0) ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
+    ?(variant = 0) ?init ?rest (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
     ~(qasm_path : string) : result =
   (* Lower first.  The router meets a PAIR of ions in one trap; three ions in one trap is
      a different problem most shipped devices cannot host at all, so a Toffoli becomes six
@@ -179,7 +210,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
      compares the emitted pulses against the ORIGINAL, so the lowering is checked rather
      than trusted. *)
   let c, n_lowered = Circuit.lower c in
-  let t = Traps.build a in
+  let t = Traps.build ?rest a in
   let d = Traps.all_dists t in
   let pl =
     match init with
@@ -187,6 +218,22 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     | None -> Place.run ~variant a t d c
   in
   let notes = ref (List.rev pl.notes) in
+  (match rest with
+  | Some rest ->
+    let n =
+      List.length
+        (List.filter
+           (fun s ->
+             (match Arch.node a s with Some n -> n.kind = "site" | None -> false)
+             && not (rest s))
+           a.node_order)
+    in
+    notes :=
+      Printf.sprintf
+        "junctions: %d site(s) where three or more rails meet are crossed, never rested on"
+        n
+      :: !notes
+  | None -> ());
   if n_lowered > 0 then
     notes :=
       Printf.sprintf "lowered %d multi-qubit gate(s) to 1- and 2-qubit gates" n_lowered
@@ -805,13 +852,28 @@ let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?in
     (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result =
   (* a placement given from outside has no runner-up: it either routes or it does not *)
   let last_variant = if init = None then 2 else 0 in
-  let rec attempt v last =
-    if v > last_variant then match last with Some e -> raise e | None -> assert false
-    else
-      match run_once ~policy ?record ~variant:v ?init a c ~arch_path ~qasm_path with
-      | r -> r
-      | exception (Route.Unroutable _ as e) ->
-        (match record with Some acc -> acc := [] | None -> ());
-        attempt (v + 1) (Some e)
+  let attempts ?rest () =
+    let rec attempt v last =
+      if v > last_variant then match last with Some e -> raise e | None -> assert false
+      else
+        match run_once ~policy ?record ~variant:v ?init ?rest a c ~arch_path ~qasm_path with
+        | r -> r
+        | exception (Route.Unroutable _ as e) ->
+          (match record with Some acc -> acc := [] | None -> ());
+          attempt (v + 1) (Some e)
+    in
+    attempt 0 None
   in
-  attempt 0 None
+  (* Junction sites are crossed, not rested on, when the device has room elsewhere
+     (`junction_rest`, R23).  A placement given from outside that already stands on one is
+     the caller's decision and is honoured; the verifier will say what it thinks of it. *)
+  let lowered, _ = Circuit.lower c in
+  let rest =
+    match junction_rest a ~n_qubits:lowered.Circuit.n_qubits with
+    | Some rest
+      when (match init with
+           | Some init -> List.for_all (fun (_, s) -> rest s) init
+           | None -> true) -> Some rest
+    | _ -> None
+  in
+  attempts ?rest ()

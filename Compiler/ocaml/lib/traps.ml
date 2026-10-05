@@ -26,10 +26,14 @@ type t = {
    Searching for those paths is a bounded BFS from each trap through non-trap nodes only:
    bounded because a chain of junctions with no trap between them is not a thing any
    shipped device has, and an unbounded search would happily walk the whole device. *)
-let build ?(max_transit = 3) (a : Arch.t) : t =
+let build ?(max_transit = 3) ?(rest = fun (_ : string) -> true) (a : Arch.t) : t =
   let adj = Arch.adjacency a in
+  (* `rest`: may an ion come to rest here?  A site the caller rules out is crossed like a
+     bare junction -- it is on no hop's end, and a hop through it lists it in `junctions`
+     so the reservation table gives it one transit per cycle (R2).  See
+     `Compile.junction_rest`. *)
   let is_site id =
-    match Arch.node a id with Some n -> n.kind = "site" | None -> false
+    match Arch.node a id with Some n -> n.kind = "site" && rest id | None -> false
   in
   let sites = List.filter is_site a.node_order in
   let hops = Hashtbl.create (List.length sites) in

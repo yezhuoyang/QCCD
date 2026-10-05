@@ -47,6 +47,9 @@ a check.
 | R16 | checked when the model models heating | gate error evaluated from the carried `n̄`, not a constant |
 | R17 | checked when the model models time | anomalous heating accrued per elapsed µs |
 | R18 | by construction | junction cost charged by the degree the expanded graph reports |
+| R23 | checked | a junction is crossed, not rested on: no ion ends a cycle on a node where three or more rails meet while the traps off the junctions have room for every ion. Not a violation: a slot of a loop the programme rotates, or a device with no such room |
+
+**R23, junctions are crossed (2026-10).** R2 bounds how many ions a junction holds at an instant; it never said an ion may not stay, and a router that read it as a capacity parked ions there. On a hexagon lattice whose corners were declared as sites, a Steane round stopped an ion on a corner 77 times, once for 17 instructions, with empty traps on every side. R23 judges where an ion RESTS: a node where three or more rails meet (R18, whatever the node was declared as) may be crossed inside one move and may not be where a cycle leaves an ion. Two cases are excluded by name. A slot of a loop the programme rotates is part of a conveyor, which carries every ion through every slot, the dock slots of a ring included. And if the traps off the junctions cannot hold the programme's ions (capacity capped at R13's chain limit, as the compiler counts it), some ion must stand on a crossing and the rule does not apply. The general router leaves junction sites out of its trap graph under exactly this test, so a compiled programme passes by construction; each stay is reported once, at the cycle it begins.
 
 **R15 in detail.** The true composition is
 `n̄_tot = n̄_hom + n̄_inhom + 2√(n̄_hom·n̄_inhom)·cos θ`, whose interference term can be
