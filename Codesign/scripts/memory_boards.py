@@ -26,6 +26,8 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -47,6 +49,21 @@ TASKS = ROOT / "tasks"
 BOARDS = {"rep5_mem": {"order": 6, "short": "rep-5 memory"},
           "surface3_mem": {"order": 7, "short": "surface-3 memory"}}
 SCALE = 1e4          # the index shows rates in units of 1e-4
+WORK_NEW = "work.new"  # where a run grades; it replaces `work` only when the run is kept
+
+
+def _keep_work(out: Path, rows: list[dict], only: str | None) -> list[dict]:
+    """Move a kept run's folders from `work.new` into `work` (one device, or all of them)
+    and point the rows at where the files now are."""
+    new, cur = out / WORK_NEW, out / "work"
+    cur.mkdir(exist_ok=True)
+    for d in sorted(p for p in new.iterdir() if p.is_dir()):
+        if (cur / d.name).exists():
+            shutil.rmtree(cur / d.name)
+        d.rename(cur / d.name)
+    shutil.rmtree(new, ignore_errors=True)
+    a, b = str(new), str(cur)
+    return json.loads(json.dumps(rows, default=str).replace(json.dumps(a)[1:-1], json.dumps(b)[1:-1]))
 
 
 def devices(release) -> list[dict]:
@@ -97,7 +114,9 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     """Compile, replay, and grade one design as the evaluator's `ler` stage does."""
     from qccd.qec import CompileFailed, compile_with_qccdc, evaluate_memory
     row = {"key": dev["key"], "device": dev["key"], "family": dev["family"], "title": dev["title"], "claim": dev["claim"]}
-    work = out / "work" / dev["key"]
+    # graded in a FRESH folder: the compile clears its previous outputs before it starts, so
+    # a run that fails in the old folder would take the last good program with it
+    work = out / WORK_NEW / dev["key"]
     work.mkdir(parents=True, exist_ok=True)
     if "doc" in dev:
         arch_p = out / f"{dev['key']}.arch.json"
@@ -405,7 +424,32 @@ def main(argv=None) -> int:
     ap.add_argument("--board", default=None)
     ap.add_argument("--device", default=None)
     ap.add_argument("--pages-only", action="store_true", help="rebuild pages from rows.json")
+    ap.add_argument("--force", action="store_true",
+                    help="write a board even if no design compiled, replacing saved results")
     a = ap.parse_args(argv)
+    if not a.pages_only:
+        # The compiler is found BEFORE anything is graded.  A bad QCCD_QCCDC used to turn every
+        # design into "refused: the compiler is not installed", and those rows replaced a
+        # board's saved results and pages: a typo in a path erased a leaderboard.
+        from qccd.qec import _toolchain
+        qccdc = _toolchain()[0]
+        if qccdc is None:
+            want = os.environ.get("QCCD_QCCDC")
+            print("memory_boards: no compiler to grade with"
+                  + (f": QCCD_QCCDC={want!r} is not a file" if want else
+                     ": set QCCD_QCCDC to the published compiler, or run `qccd toolchain install`")
+                  + ". Nothing was written.", file=sys.stderr)
+            return 2
+        try:
+            from qccd.workspace.toolchain import retired
+            why = retired(qccdc)
+        except Exception:  # noqa: BLE001 -- the workspace package is optional here
+            why = None
+        if why:
+            print(f"memory_boards: {why}. Nothing was written.", file=sys.stderr)
+            return 2
+        print(f"compiler: {qccdc}", flush=True)
+    failed = []
     for board in BOARDS:
         if a.board and board != a.board:
             continue
@@ -418,6 +462,7 @@ def main(argv=None) -> int:
             rows = json.loads(rj.read_text(encoding="utf-8"))
         else:
             rows = []
+            shutil.rmtree(out / WORK_NEW, ignore_errors=True)
             print(f"== {board}: {release.title}", flush=True)
             for dev in devices(release):
                 if a.device and dev["key"] != a.device:
@@ -431,12 +476,23 @@ def main(argv=None) -> int:
                           f"  R10 {n.get('r10')}  ({r['compile_seconds']:.0f}s, {r['compiler_mode']})", flush=True)
                 else:
                     print(f"   {dev['key']:18s} refused: {r.get('reason', '')[:110]}", flush=True)
+            ran = list(rows)
             if a.device and rj.exists():
                 rows = [r for r in json.loads(rj.read_text(encoding="utf-8")) if r["device"] != a.device] + rows
+            # A run in which NOTHING compiled is a broken run, not a result: every design
+            # cannot have become unroutable at once.  The saved results and pages stay.
+            if not any(r["status"] == "ok" for r in ran) and not a.force:
+                why = sorted({str(r.get("reason", ""))[:120] for r in ran})[:3]
+                print(f"memory_boards: no design of {board} compiled ({'; '.join(why)}). Its saved results "
+                      f"and pages were left as they are; --force writes this run anyway.", file=sys.stderr)
+                failed.append(board)
+                shutil.rmtree(out / WORK_NEW, ignore_errors=True)
+                continue
+            rows = _keep_work(out, rows, a.device)
             rj.write_text(json.dumps(rows, indent=1, default=str), encoding="utf-8")
         pages(board, release, exp, rows, out)
         write_task(board, release, exp)
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
