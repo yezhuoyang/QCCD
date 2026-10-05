@@ -96,7 +96,7 @@
    "per_round_hi": 0.0005076848337057793,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.118,
+   "seconds": 0.075,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -241,7 +241,7 @@
    "per_round_hi": 0.0005130405649128589,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.121,
+   "seconds": 3.584,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -354,7 +354,7 @@
    "per_round_hi": 0.0005201715112813643,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.201,
+   "seconds": 0.073,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -467,7 +467,7 @@
    "per_round_hi": 0.0005853301358237362,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.106,
+   "seconds": 0.101,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -580,7 +580,7 @@
    "per_round_hi": 0.0005853301358237362,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.05,
+   "seconds": 0.076,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -701,7 +701,7 @@
    "per_round_hi": 0.0005892630838789659,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.083,
+   "seconds": 0.069,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -814,7 +814,7 @@
    "per_round_hi": 0.0005974934735507587,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.074,
+   "seconds": 0.068,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -951,7 +951,7 @@
    "per_round_hi": 0.0013012365678195525,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.066,
+   "seconds": 0.024,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -1088,7 +1088,7 @@
    "per_round_hi": 0.0015332314219210774,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.043,
+   "seconds": 0.058,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -1201,7 +1201,7 @@
    "per_round_hi": 0.0005106628480637809,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.202,
+   "seconds": 0.135,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -1333,7 +1333,7 @@
    "per_round_hi": 0.0005497023078788743,
    "rounds": 3,
    "decoder": "pymatching",
-   "seconds": 0.128,
+   "seconds": 0.063,
    "seed": 20260928,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
