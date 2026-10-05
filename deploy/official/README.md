@@ -101,7 +101,33 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-09-26 19:11 UTC (12:11 PDT), from commit `67703cb` (pushed). It carries
+**Deployed** 2026-10-05 16:36 UTC, from commit `f1e6273` (pushed): compiler `f88a49f79af1`, which
+keeps one waveform per cycle (R22) on drawn designs too. Before it, the reference compiler in
+the image put 15 R22 violations into `adder3` on an L-shaped path; now none. `VERSION` on the
+server is the record of every deployment, including the two between this one and the next
+paragraph (`2bc13ae`, `e70144e`). The previous one is in `.env.bak-e70144e`,
+`VERSION.bak-e70144e` and `docker-compose.prod.yml.bak-e70144e` for a rollback.
+
+This image was DERIVED from `qccd-official:e70144e`, not built clean. `python:3.14-slim` had
+moved upstream, so a clean build would have recompiled every wheel (15 to 40 minutes) and
+changed production's Python base with it, for a change of seven files. The derived image
+replaces `qccd/`, `arch/` and `Compiler/bridge` with the `git archive` of the commit and
+`qccdc_cli` with the one the Dockerfile's own OCaml stage builds from it; the base, the wheels
+and `qcheck` are `e70144e`'s. Checked: every file under `/opt/qccd` hashed in both images
+differs only in `qccdc_cli` (now byte-identical to the published Linux `f88a49f79af1`), the
+five changed `qccd/workspace` files, and 30 stale `.pyc` files the old image carried; the 18
+layers are identical on both machines; the suite's baseline stands, because the old and the
+new published compilers give identical bytes on all 216 compiles of its public pairs. The
+local rehearsal and the production smoke test (`os_f69559da338c9c99`, private, uploader
+`deploy-smoke-f1e6273`, token deleted) were eligible with no stage or metric differences;
+production took 20 s end to end. The next clean build pays for the wheels once.
+
+Two traps this deployment met. Watch the build log for `CACHED` on the `wheels` stage and
+cancel if it is not: the base tag moves without notice. And a script piped to
+`ssh ... 'bash -s'` is cut short by the first `docker compose exec` in it, which reads the
+rest of the script as its stdin: give those commands `</dev/null`.
+
+**Deployed before** 2026-09-26 19:11 UTC (12:11 PDT), from commit `67703cb` (pushed). It carries
 `3eea898`, in which the Lean checker computes a certificate's replay once instead of about
 3,700 times. The specification, the soundness theorem and its axioms are unchanged. The
 previous deployment (`259aba6`) is in `.env.bak-259aba6` and `VERSION.bak-259aba6` for a
@@ -120,7 +146,7 @@ image stores name images differently. The operator uploader `deploy-smoke-67703c
 holds the private smoke submissions `os_2901e4026a976ff4` (GHZ) and `os_0909b51fd3c47007` (BB);
 its token was deleted after use.
 
-**Deployed before** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
+**And before that** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
 adds the website's five boards to the GHZ starter: `bb144@1`, `rep9@1`, `five_qubit@1`,
 `steane@1`, `surface17@1`. `VERSION` on the server records it; the previous deployment
 (`10152b1`, 2026-09-23) is in `.env.bak-10152b1` for a rollback. The GHZ release is
