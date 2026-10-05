@@ -65,6 +65,14 @@ class Extraction:
     stats: dict[str, Any]
     params: dict[str, Any] = field(default_factory=dict)
     qubit_map: dict[int, str] = field(default_factory=dict)
+    #: the stim text as it was written, line by line, and which lines each hardware
+    #: instruction produced: `{"id", "type", "a", "b", "dt_us", "why"}` with `lines[a:b]`
+    #: that instruction's operations and noise, and `why` the numbers each noise line was
+    #: priced from (n-bar, chain length, duration).  `id` is None for the preparation, the
+    #: appended readout and the detector declarations.  A page shows a reader exactly how
+    #: a shuttle, a gate or a wait became noise from this; nothing reads it back.
+    lines: list[str] = field(default_factory=list)
+    trace: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ------------------------------------------------------------------ inputs
@@ -229,7 +237,11 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
     disagreements: list[str] = []
 
     c = StimText()
+    trace: list[dict[str, Any]] = []
+    why: list[str] = []
     c.append("R", everyone)
+    trace.append({"id": None, "type": "prepare", "a": 0, "b": len(c.lines), "dt_us": 0.0,
+                  "why": ["every ion starts in |0>"]})
     budget = {k: 0.0 for k in CHANNEL_NAMES}
     count: dict[int, int] = defaultdict(int)
     meas_of_bit: dict[int, int] = {}
@@ -247,6 +259,8 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
         budget["ms_base"] += e.base
         budget["ms_heating"] += e.heating
         budget["ms_chain"] += e.chain
+        why.append(f"MS {a},{b}: n-bar {nbar:.3g}, chain of {n_chain} -> p = {e.total:.3g} "
+                   f"(base {e.base:.3g} + heating {e.heating:.3g} + chain {e.chain:.3g})")
         nbars.append(nbar)
         chains.append(n_chain)
         n["ms"] += 1
@@ -256,9 +270,13 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
         c.append("DEPOLARIZE1", [sq[ion]], p)
         budget["gate_1q"] += p
         n["1q"] += 1
+        if not why or not why[-1].startswith("one-qubit"):
+            why.append(f"one-qubit gate: p = {p:.3g} each (1 - fidelity)")
 
     for ins in prog.instructions:
         view = first.get(ins.id, ({}, {}, {}))
+        line0 = len(c.lines)
+        why = []
         try:
             unknown = [i for i in (list(ins.ions) + [x for p in ins.pairs for x in p])
                        if i not in sq]
@@ -303,6 +321,7 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
                 c.append("X_ERROR", targets, p)
                 c.append("M", targets)
                 budget["measure"] += p * len(targets)
+                why.append(f"readout: flip with p = {p:.3g} before each measurement (1 - fidelity)")
                 pinned = set()
                 for ion in ins.ions:
                     if ion not in qubit_of_ion:
@@ -333,6 +352,7 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
                 c.append("X_ERROR", targets, p)
                 budget["reset"] += p * len(targets)
                 n["reset"] += len(targets)
+                why.append(f"reset: left in |1> with p = {p:.3g}")
             elif ins.type == "cool":
                 n["cool"] += 1
         except NotClifford as exc:
@@ -342,6 +362,10 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
         if pz > 0:
             c.append("Z_ERROR", everyone, pz)
             budget["idle"] += pz * len(everyone)
+            why.append(f"takes {dt:.4g} us: every ion dephases with p = {pz:.3g} "
+                       f"((1 - exp(-dt/T2)) / 2)")
+        trace.append({"id": ins.id, "type": ins.type, "a": line0, "b": len(c.lines),
+                      "dt_us": float(dt), "why": why})
 
     short = [f"qubit {q}: {count[q]} of {len(b)}" for q, b in sorted(bits_of.items())
              if count[q] != len(b)]
@@ -351,6 +375,7 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
 
     # -- the appended data readout (see the module docstring)
     n_appended = 0
+    line0 = len(c.lines)
     if exp.readout == "appended":
         taken = [b for q, b in exp.readout_bits if b in meas_of_bit]
         if taken:
@@ -370,10 +395,18 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
         if pz > 0:
             c.append("Z_ERROR", everyone, pz)
             budget["idle"] += pz * len(everyone)
+    if len(c.lines) > line0:
+        trace.append({"id": None, "type": "readout", "a": line0, "b": len(c.lines), "dt_us": 0.0,
+                      "why": ["the grader reads the data out after the last instruction, in the "
+                              "memory's basis, with the readout error and one measurement's idle"]})
+    line0 = len(c.lines)
     try:
         declare(c, exp.detectors, exp.observables, meas_of_bit, n_meas)
     except KeyError as exc:
         raise ExtractionError(str(exc)) from exc
+    trace.append({"id": None, "type": "detectors", "a": line0, "b": len(c.lines), "dt_us": 0.0,
+                  "why": ["the experiment's detectors and logical observable, over the "
+                          "measurement records"]})
     circuit = c.circuit()
 
     failed = sorted(report.rules.failed())
@@ -404,4 +437,5 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
                                   else "disagrees: " + "; ".join(disagreements[:4]))),
     }
     return Extraction(circuit=circuit, budget=budget, stats=stats, params=params,
-                      qubit_map={q: ion for q, ion in qmap.items() if q < src.n_qubits})
+                      qubit_map={q: ion for q, ion in qmap.items() if q < src.n_qubits},
+                      lines=list(c.lines), trace=trace)

@@ -234,3 +234,26 @@ def test_a_non_matchable_code_is_decoded_by_bposd(compiled):
                           ler_budget={"max_shots": 5000, "max_errors": 10**9})
     assert rep["check"]["ok"] and rep["ler"]["decoder"] == "bposd"
     assert rep["experiment"]["matchable"] is False
+
+
+def test_the_trace_says_which_stim_lines_each_instruction_became(compiled):
+    """A page shows a reader how each hardware instruction became noise (the memory boards'
+    Noise panel), so the trace must BE the circuit: its blocks tile the stim text in order
+    with nothing left over, that text is the circuit that is sampled, every program
+    instruction has exactly one block, and a block that carries noise says what priced it."""
+    exp, arch, doc, cert = compiled("surface3", "ring8_2_8", "auto")
+    ex = extract(doc, arch, exp, cert=cert)
+    assert ex.trace[0]["type"] == "prepare" and ex.trace[-1]["type"] == "detectors"
+    at = 0
+    for t in ex.trace:
+        assert t["a"] == at and t["b"] >= t["a"]
+        at = t["b"]
+    assert at == len(ex.lines)
+    assert stim.Circuit("\n".join(ex.lines)) == ex.circuit
+    ids = [t["id"] for t in ex.trace if t["id"] is not None]
+    assert ids == [i["id"] for i in doc["instructions"]]
+    for t in ex.trace:
+        noisy = [ln for ln in ex.lines[t["a"]:t["b"]] if ln.split("(")[0] in NOISE_GATES]
+        assert bool(noisy) <= bool(t["why"]), t
+    ms = [w for t in ex.trace for w in t["why"] if w.startswith("MS ")]
+    assert len(ms) == ex.stats["n_ms"] and all("n-bar" in w and "chain of" in w for w in ms)
