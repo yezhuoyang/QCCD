@@ -348,6 +348,7 @@ RULES: list[dict] = [
      "pass": {"program": [rec("init", {f"d{i}": "C0" for i in range(15)}), rec("cool"), rec("gate", "CX", [["d0", "d1"]])],
               "why": "fifteen."}},
     {"id": "R14", "checks": "an ion splits out of a trap only from its edge; leaving a chain of more than two needs an accounted gate_swap.",
+     "note": "The verifier does not track the order of the ions inside a chain: <code>p.init</code> puts ions in a site as a set, with no first or last. So R14 is conservative. A split from a chain of more than two ions is refused unless the instruction carries an accounted <code>gate_swap</code> (the 3 CX that bring the ion to the edge), even when that ion may already have been at an edge; from a chain of one or two, every ion is at an edge and nothing is charged. The language has no statement that accounts a swap today (it is an IR annotation), so a hand-written programme satisfies R14 by splitting only from chains of at most two.",
      "device": RING_LOAD,
      "fail": {"program": [rec("init", {"d0": "A0", "d1": "A0", "d2": "A0"}), rec("move", "d0", "A0", "S0", cls="dock")],
               "why": "d0 splits from a chain of three with no swap accounted."},

@@ -371,6 +371,67 @@ try {
   step('the menu puts every note back on its spot',
        near(p4.l, p0.l, 4) && near(p4.t, p0.t, 4) && (await state()).threads[0].movedPin === null, { back: p4, was: p0 });
 
+  // A LONG THREAD ON A SHORT SCREEN, read on down the page.  The note's top goes above the
+  // window while the rest of it still covers the text: the header, with the controls that
+  // get it out of the way, has to stay under the site bar where a mouse can reach it.  And
+  // once the whole note has gone by it is gone -- it does not follow the reader down.
+  const tid = (await state()).threads[0].id;
+  await evaluate(`(async function(){
+    for(var i = 0; i < 8; i++) await fetch('/api/threads/${tid}/comments', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Reply ' + i + ': a longer answer, so that the thread fills its box.' }) });
+    window.QCCOMMENTS.reload(); })()`);
+  await until("document.querySelectorAll('.qc-box[data-id] .qc-msg').length === 9", 'the long thread');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 600, deviceScaleFactor: 1, mobile: false });
+  const scrollTo = async (y) => {
+    await evaluate(`window.scrollTo({ top: ${y}, behavior: 'instant' })`);
+    await new Promise(r => setTimeout(r, 250)); await evaluate('window.QCCOMMENTS.place()');
+    return evaluate('window.scrollY');
+  };
+  await scrollTo(0);
+  const FOLD = '.qc-box[data-id] [id^=qc-fold-]';
+  const navB = await evaluate("(function(){ var n = document.getElementById('sitenav'); return n ? n.getBoundingClientRect().bottom : 0; })()");
+  const lb0 = await rectOf('.qc-box[data-id]');
+  const vh = await evaluate('window.innerHeight');
+  // every control of the header: on screen, below the bar, and the thing a click there lands on
+  const reach = () => evaluate(`(function(){ var out = [], bar = ${navB};
+    document.querySelectorAll('.qc-box[data-id] .qc-head button').forEach(function(b){
+      var r = b.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      out.push({ id: b.id || b.className, t: r.top, b: r.bottom, l: r.left, r: r.right,
+                 ok: r.top >= bar - 0.5 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= document.documentElement.clientWidth && hit === b,
+                 hit: hit ? (hit.id || hit.className || hit.tagName) : null });
+    });
+    return out; })()`);
+  // half the note above the top of the window, half still over the text
+  const y1 = Math.round(lb0.t + lb0.h / 2);
+  const at1 = await scrollTo(y1);
+  const lb1 = await rectOf('.qc-box[data-id]'), ctl1 = await reach();
+  step('long note scrolled half off the top: part of it still covers the page',
+       near(at1, y1, 1) && lb0.h > 300 && lb1.b > navB + 60 && lb1.b < vh, { box0: lb0, box: lb1, bar: navB, scrolled: at1 });
+  step('long note scrolled half off the top: its header controls are still in reach',
+       ctl1.length >= 2 && ctl1.every(c => c.ok), { controls: ctl1, box: lb1, bar: navB });
+  await shot('05c_long_scrolled');
+  // a real click, and only where the control is what it would land on: under the bar the
+  // same click follows a link of the bar and takes the story off the page
+  const fr = await rectOf(FOLD), onFold = ctl1.some(c => /^qc-fold-/.test(c.id) && c.ok);
+  if (onFold) { await click(fr.l + fr.w / 2, fr.t + fr.h / 2); await new Promise(r => setTimeout(r, 150)); }
+  const folded1 = onFold && (await shown()) === false && (await state()).threads[0].folded === true;
+  step('long note scrolled half off the top: a click on the minimise control there folds it', folded1, { at: fr, clicked: onFold });
+  // open again (the pin is with its words, above the window) and read on, well past the note
+  if (folded1) await evaluate("document.querySelector('.qc-pin[data-id]').click()");
+  await until("document.querySelector('.qc-box[data-id]').getBoundingClientRect().height > 0", 'the long note open again');
+  const y2 = Math.round(lb0.b + 200);
+  const at2 = await scrollTo(y2);
+  const lb2 = await rectOf('.qc-box[data-id]'), hd2 = await rectOf('.qc-box[data-id] .qc-head');
+  step('scrolled well past the note: it went with its paragraph, it is not stuck on the screen',
+       near(at2, y2, 1) && lb2.b <= navB && hd2.b <= navB, { box: lb2, head: hd2, scrolled: at2 });
+  // back at the top it is as it was: the header on top of the box, the box beside its pin
+  await scrollTo(0);
+  const lb3 = await rectOf('.qc-box[data-id]'), hd3 = await rectOf('.qc-box[data-id] .qc-head');
+  step('back at the top the note is where it was, header on top',
+       near(lb3.t, lb0.t) && near(lb3.l, lb0.l) && near(hd3.t, lb3.t, 2), { box: lb3, head: hd3, was: lb0 });
+  await send('Emulation.clearDeviceMetricsOverride');
+  await new Promise(r => setTimeout(r, 200)); await evaluate('window.QCCOMMENTS.place()');
+
   // sign out: everything disappears
   await signOut();
   step('signed out: no pins, no boxes', !(await evaluate("document.querySelectorAll('.qc-pin, .qc-box').length")) && (await state()).me === null);

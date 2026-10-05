@@ -39,13 +39,17 @@ qccd-comments[hidden]{display:none}
 .qc-x.qc-on{background:rgba(255,255,255,.35)}
 .qc-pin{touch-action:none} .qc-pin.qc-dragging{cursor:grabbing;transform:none}
 .qc-box{position:absolute;width:290px;background:#fff;border:1px solid var(--qc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);
- pointer-events:auto;overflow:hidden;z-index:2}
+ pointer-events:auto;overflow:hidden;overflow:clip;z-index:2}
 .qc-box:hover,.qc-box:focus-within{z-index:3}
 /* folded: the note collapses into its pin, and the pin is all that is left over the words */
 .qc-box.qc-fold{display:none}
 /* the header is the handle: drag a note off the text it covers, double-click to put it back */
+/* It is sticky under the site bar (40px), so a note whose top has scrolled out of the window
+   keeps its controls in reach for as long as any of it is on the screen, and then goes with
+   its paragraph.  That needs the box to clip without becoming a scroller: overflow:clip
+   (where a browser has only `hidden`, the header simply scrolls with the box). */
 .qc-head{background:var(--qc);color:#fff;padding:6px 8px;display:flex;align-items:center;gap:7px;min-height:34px;
- cursor:grab;touch-action:none;user-select:none}
+ cursor:grab;touch-action:none;user-select:none;position:sticky;top:44px;z-index:1}
 .qc-head.qc-dragging{cursor:grabbing}
 .qc-head button{cursor:pointer}
 .qc-head .qc-av{background:rgba(255,255,255,.28)}
@@ -111,6 +115,7 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
   // addressed notes stay on the page, quietly, until a reader asks for them to go away
   var HIDEDONE = false;
   var FOLDED = {}, MOVED = {};
+  var BAR = 40;                                      // the site bar, sticky at the top of every page
   try { HIDDEN = localStorage.getItem('qc-hidden') === '1'; } catch(e){}
   try { HIDEDONE = localStorage.getItem('qc-hidedone') === '1'; } catch(e){}
   try { FOLDED = JSON.parse(localStorage.getItem('qc-fold:' + PAGE) || '{}') || {}; } catch(e){ FOLDED = {}; }
@@ -514,13 +519,17 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     var p = pointOf(node), L = LAYER.getBoundingClientRect();
     node.pin.style.display = node.box.style.display = p.hide ? 'none' : '';
     if(p.hide) return;
+    // The highest a pin or a box may sit: under the site bar at the top of the DOCUMENT.
+    // This was the top of the window, which put a note the reader had scrolled past back
+    // on the screen with its header (and every control in it) underneath the bar.
+    var doc0 = -L.top - window.scrollY, top = doc0 + BAR + 8;
     node.pin.classList.toggle('qc-approx', !!p.approx);
     // the whole note, pin and all, carried off its spot by dragging the pin -- the offset
     // is from the anchor, so it still follows that paragraph through a scroll or a reflow
     if(node.pinOff){
       var vwp = document.documentElement.clientWidth;
       p.x = Math.min(Math.max(p.x + node.pinOff[0], 8 - L.left), Math.max(8 - L.left, vwp - 38 - L.left));
-      p.y = Math.max(p.y + node.pinOff[1], 38 - L.top);
+      p.y = Math.max(p.y + node.pinOff[1], top + 30);
     }
     node.pin.style.left = p.x + 'px'; node.pin.style.top = p.y + 'px';
     if(node.box.classList.contains('qc-fold')) return;
@@ -532,8 +541,10 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     if(node.off){ bx += node.off[0]; by += node.off[1]; }
     var docH = Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight);
     bx = Math.min(Math.max(bx, 8 - L.left), Math.max(8 - L.left, vw - bw - 8 - L.left));
-    by = Math.max(by, 8 - L.top);
-    if(by + bh + 8 - L.top > docH + window.scrollY) by = Math.max(8 - L.top, docH + window.scrollY - L.top - bh - 8);
+    by = Math.max(by, top);
+    // and the lowest: the end of the document.  (This counted the scroll twice, so on a
+    // scrolled page a note near the end jumped far below it and back on alternate passes.)
+    if(by + bh + 8 > doc0 + docH) by = Math.max(top, doc0 + docH - bh - 8);
     node.box.style.left = bx + 'px'; node.box.style.top = by + 'px';
   }
   // Two handles, two offsets, both from the anchor rather than absolute, so a note that

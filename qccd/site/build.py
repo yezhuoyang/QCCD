@@ -1332,7 +1332,12 @@ def compilation_page(built: list[dict]) -> str:
                     f'<div><div class="lab">the same circuit, drawn</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}</div></div>')
     # the pipeline
     stages = [
-        ("Parse", "circuit_ops, a DAG", "the QASM becomes a list of operations with their qubits, parameters and source lines, and the per-qubit order between them; a second front end in Python agrees on 507 of 507 test circuits."),
+        ("Parse", "circuit_ops, a DAG", "the circuit is written in <b>OpenQASM 2.0</b>, the standard text format for quantum circuits "
+         "(<a href=\"https://arxiv.org/abs/1707.03429\">its specification</a>; gate names come from its standard library "
+         "<code>qelib1.inc</code>), and it becomes a list of operations with their qubits, parameters and source lines. "
+         "Between them it keeps the <b>dependency DAG</b>, a directed acyclic graph with an edge from each operation to the "
+         "next one that uses the same qubit: an operation may run only after everything with a path to it, and two operations "
+         "with no path between them may run in either order, or at once. A second front end in Python agrees on 507 of 507 test circuits."),
         ("Rewrite", "pulses per gate", "every gate is rewritten as pulses this machine can fire: a single-qubit gate becomes a turn about z and one pulse, a CNOT becomes four single-ion pulses around one two-ion pulse, and anything bigger unfolds into those."),
         ("Place", "map, init", "qubits are bound to ions (<code>map</code>) and ions to sites (<code>init</code>): the ion mapping. Candidates from a greedy and a spectral placement are scored by weighted interaction distance and the better one kept."),
         ("Route and schedule", "moves, layers", "ops are scheduled in DAG layers; every two-qubit gate's operands are carried to one gate-capable trap. The general router moves one ion at a time along hops the device admits; on rings past about half occupancy the rigid-rotation pass turns the whole loop instead. Every move is recorded."),
