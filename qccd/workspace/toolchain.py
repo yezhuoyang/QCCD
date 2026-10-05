@@ -46,11 +46,18 @@ RETIRED_QCCDC = {
     "8b2a8d1d6471ae2bbc9a9248270260c9980d9e4aee7f6097bb7b776492155234": "73864a5c493d",   # windows-x86_64
     "ae79e047165f5260130eac7b2742a90634a6494dab19f0da17d146948eb81c64": "73864a5c493d",   # linux-x86_64
     "8082f6b2eb873e10d8d956f52dc7803191134a639b0bee9aaa2ac0fe9bda1e35": "73864a5c493d",   # macos-arm64
+    "976ab330cbfe6b82e67d1d732690fec58fc519a3bbe3115dcf317699b993d719": "f88a49f79af1",   # windows-x86_64
+    "014c83bc139136dbbcd3d9905b87da7400f2c25eacc4d6b93dd4244b692fd174": "f88a49f79af1",   # linux-x86_64
+    # f88a49f79af1 for macos-arm64 is NOT listed yet: no newer Mac build exists, and a Mac with
+    # no compiler at all is worse than one whose junction-resting programs R23 then refuses.
 }
 _RETIRED_WHY = {
     "73864a5c493d": "it predates the router fix that keeps one waveform per cycle (R22): on a design "
                     "that is not on a leaderboard it puts ions moving in different directions into one "
                     "cycle, so the program it makes breaks R22",
+    "f88a49f79af1": "it predates R23: on a design with a site where three or more rails meet it leaves "
+                    "ions standing on that junction with empty traps beside it, so the program it makes "
+                    "breaks R23",
 }
 
 MANIFEST = Path(__file__).with_name("toolchain.json")
