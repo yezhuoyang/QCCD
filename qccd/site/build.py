@@ -737,7 +737,7 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
     body.append("<h2>A real design</h2><p class=\"sub\">Every leaderboard entry is a worked example: the executing "
                 "instruction is marked in the programme, the circuit statement it discharges beside it, and "
                 "<code>#step=N</code> links any step. The fastest verified round of each task:</p><ul>")
-    for t in ts:
+    for t in (t for t in ts if t.get("rank_by") != "ler_per_round"):     # the round-time boards
         best = [r for r in t["rows"] if _entry_ok(r) and _r10(r) and _t(r) is not None]
         best.sort(key=_t)
         if best:
@@ -767,7 +767,9 @@ def board_index(ts: list[dict]) -> str:
     at the end (`qec_cycle`)."""
     from . import boards, cowork, leaderboard, qec_cycle
     rows_html, cycles = [], []
-    for t in ts:
+    # a memory board ranks by the logical error rate, not by the round's time: it is shown
+    # in the memory section (boards.memory_section), with its own ranking, not as a time row
+    for t in (t for t in ts if t.get("rank_by") != "ler_per_round"):
         rows = t["rows"]
         ok = [r for r in rows if r.get("status") == "ok" and _t(r) is not None]
         ok.sort(key=_t)
@@ -827,7 +829,7 @@ def board_index(ts: list[dict]) -> str:
             "A round is only half of a QEC cycle, so every board also carries "
             "<a href=\"#cycle\">the classical loop</a> around it, and the <a href=\"#memory\">memory boards</a> "
             "rank designs by the logical error rate itself.</p>" + legend + "".join(rows_html) +
-            boards.memory_section() +
+            boards.memory_section(ts) +
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)
             cowork.board_section() + "</section>" +

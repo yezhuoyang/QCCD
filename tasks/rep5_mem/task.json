@@ -1,0 +1,40 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "rep5_mem",
+ "order": 6,
+ "title": "Repetition code memory, distance 5",
+ "short": "rep-5 memory",
+ "description": "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the device's physics.",
+ "circuit": "circuit.qasm",
+ "n_data": 5,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "qccdsim_jones",
+   "qccdsim_transport"
+  ]
+ },
+ "metrics": [
+  "ler_per_round",
+  "ler",
+  "T_jones",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable"
+ ],
+ "rank_by": "ler_per_round",
+ "release": "rep5_mem@1",
+ "qec": {
+  "experiment": "rep5_r5_z",
+  "noise": "qccd-noise@1",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 200,
+   "max_shots": 200000,
+   "seed": 20260928
+  }
+ },
+ "seed": "MemoryBoard/rep5_mem"
+}

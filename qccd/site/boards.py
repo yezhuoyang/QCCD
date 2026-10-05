@@ -47,6 +47,14 @@ CSS = """
 .lb-m td.refused,.lb-m td.timeout,.lb-m td.crash{background:#f1f0ec;color:#8a8892}
 .lb-m th.dev{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;text-transform:none;letter-spacing:0}
 .lb-note{color:#56545e;font-size:14px}
+.lb-rank{margin:12px 0 4px}.lb-rkh{color:#52514e;font-size:13px;margin:0 0 8px}
+.lb-bar{display:grid;grid-template-columns:22px minmax(110px,170px) 1fr auto;gap:10px;align-items:center;padding:5px 0;text-decoration:none;color:inherit}
+.lb-bar:hover .lb-nm{text-decoration:underline}.lb-rk{font-weight:600;color:#52514e;text-align:center}
+.lb-tr{position:relative;height:12px;background:#efeeeb;border-radius:6px}
+.lb-fl{position:absolute;left:0;top:0;bottom:0;background:#2a78d6;border-radius:6px}
+.lb-iv{position:absolute;top:5px;height:2px;background:#0b0b0b}
+.lb-v{font-variant-numeric:tabular-nums;white-space:nowrap}.lb-v small{color:#6b6a66}
+.lb-more{margin:8px 0 0;font-size:13px}
 #qo-compiler table{border-collapse:collapse}
 #qo-compiler th,#qo-compiler td{text-align:left;padding:6px 8px;border-bottom:1px solid #e6e5e1}
 #qo-compiler th{font-weight:600;color:#52514e;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
@@ -113,11 +121,46 @@ def architecture_intro() -> str:
         '<a href="noise/">The noise model</a></nav>')
 
 
-def memory_section() -> str:
-    """The memory boards: a design's logical error rate, not only its speed."""
+def _ler_bars(t: dict) -> str:
+    """One memory board's ranking, as the time boards show theirs: the three designs with the
+    lowest logical error rate per round, each bar a link to its page (the ion animation and
+    the stim program it was sampled from), and a link to the full ranking plot."""
+    rows = [r for r in t.get("rows", []) if r.get("status") == "ok" and (r.get("numbers") or {}).get("ler_per_round") is not None]
+    if not rows:
+        return ""
+    key = lambda r: (r["numbers"]["ler_per_round"], r["numbers"].get("ler_round_hi_1e4", 0.0), r["numbers"].get("T_jones", 0.0))  # noqa: E731
+    rows.sort(key=key)
+    shown = rows[:3]
+    top = max((r["ler"]["per_round_hi"] for r in shown), default=0.0) or 1.0
+    few = max(r["ler"]["errors"] for r in rows) < 20
+    bars = []
+    for i, r in enumerate(shown, 1):
+        e = r["ler"]
+        bars.append(
+            f'<a class="lb-bar" href="{_e(t["id"])}/{_e(r["page"])}" title="{_e(r.get("title", ""))}">'
+            f'<span class="lb-rk">{i}</span><span class="lb-nm">{_e(r.get("short") or r["key"])}</span>'
+            f'<span class="lb-tr"><span class="lb-fl" style="width:{max(1.0, 100 * e["per_round"] / top):.1f}%"></span>'
+            f'<span class="lb-iv" style="left:{100 * e["per_round_lo"] / top:.1f}%;width:{max(0.5, 100 * (e["per_round_hi"] - e["per_round_lo"]) / top):.1f}%"></span></span>'
+            + (f'<span class="lb-v">0 errors in {e["shots"]:,} shots<small> (below {e["per_round_hi"]:.1e})</small></span></a>'
+               if not e["errors"] else
+               f'<span class="lb-v">{e["per_round"]:.2e}<small> ({e["per_round_lo"]:.1e} to {e["per_round_hi"]:.1e})</small></span></a>'))
+    note = (" At this budget the designs give at most a few logical errors each, so their intervals overlap and the "
+            "order among them is not significant." if few else "")
+    refused = sum(1 for r in t.get("rows", []) if r.get("status") != "ok" or r.get("refusal"))
+    return (f'<div class="lb-rank"><p class="lb-rkh">The study&rsquo;s own designs, lowest logical error rate per round '
+            f'first; the thin line is the 95% interval. Click a bar to watch the ions and read the stim program that '
+            f'was sampled.{note}</p>{"".join(bars)}'
+            f'<p class="lb-more"><a href="{_e(t["id"])}/">Open the ranking plot: {len(rows)} designs ranked'
+            f'{f", {refused} more that the compiler refused" if refused else ""} &rarr;</a></p></div>')
+
+
+def memory_section(ts: list | None = None) -> str:
+    """The memory boards: a design's logical error rate, not only its speed.  `ts` are the
+    site's tasks; one whose `release` is a memory board carries that board's ranked designs."""
     boards = memory_boards()
     if not boards:
         return ""
+    built = {t.get("release"): t for t in (ts or []) if t.get("rank_by") == "ler_per_round"}
     noise = _noise()
     cards = []
     for b in boards:
@@ -133,6 +176,7 @@ def memory_section() -> str:
             f'logical errors, decoder {_e(q["ler"].get("decoder", "auto"))}, fixed seed</span>'
             f'<b>a start that passes</b><span>{_e(start.get("generator", ""))} ({_e(sp)})</span>'
             f'<b>submit</b><span>Try your own design below, or ask your agent to submit a design to it</span></div>'
+            + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
     how = ("" if not noise else
            f'<p class="lb-note">How the number is made: the board\'s memory experiment is compiled onto the design, '
