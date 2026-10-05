@@ -404,6 +404,13 @@ RULES: list[dict] = [
               "why": "d0 walks north through J0_1 while d1 walks east then north through J1_1: two motions, so two waveforms, in one cycle."},
      "pass": {"program": [rec("init", {"d0": "T0_0v", "d1": "T1_0v"}), rec("simd", "shuttle", [["d0", "T0_0v", "T0_1v", ["T0_0v.b", "T0_1v.a"]], ["d1", "T1_0v", "T1_1v", ["T1_0v.b", "T1_1v.a"]]])],
               "why": "both walk north through their own T-junction: one motion, one waveform."}},
+    {"id": "R23", "checks": "a junction is crossed, not rested on: no ion ends a cycle on a node where three or more rails meet while the traps off the junctions have room for every ion.",
+     "note": "R2 says how many ions a junction holds at an instant; R23 says none of them may stay. A site counts as a junction when three or more rails meet at it (R18), whatever it was declared as. Two cases are not a violation, and the verifier says which applies: a slot of a loop the programme rotates, because a conveyor carries its ions through every slot, and a device whose traps off the junctions cannot hold the programme's ions.",
+     "device": RING,
+     "fail": {"program": [rec("init", {"d0": "S1"}), rec("move", "d0", "S1", "S0")],
+              "why": "d0 stops on S0, where the loop and the spur to A0 meet, with five empty traps around it."},
+     "pass": {"program": [rec("init", {"d0": "S1"}), rec("simd", "shuttle", [["d0", "S1", "A0", ["E0", "V0"]]])],
+              "why": "the same ion crosses S0 in one move and comes to rest in the dock A0."}},
 ]
 
 
