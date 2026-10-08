@@ -2901,10 +2901,13 @@ function draw(){
     // A MARK SQUEEZED TO MAKE ROOM SHRINKS WHOLE, HALO AND ALL.  The white halo is a fixed
     // 0.055 g stroke, so two ions going round each other in a trap -- each drawn at half a
     // bar's thickness, which is as large as two fit side by side across it -- came out as
-    // two white rings with specks in them, and the swap still read as nothing much.  Only
-    // `room` scales it: a mark that is small because its trap is crowded keeps the halo it
-    // always had.
-    const sw = r < r0 ? L.sw_halo*r/r0 : L.sw_halo;
+    // two white rings with specks in them, and the swap still read as nothing much.
+    // AND NEVER WIDER THAN THE MARK CAN CARRY.  A mark that is small because its trap is
+    // crowded (16 ions to a QCCDSim trap: r = 0.44 of a slot pitch, 1.9 px) once kept the
+    // full halo -- a 4 px white stroke on a 2 px circle, whose inner half covered the whole
+    // fill, so every ion of the trap read as a plain white disc.  A full-size mark's halo is
+    // at most 0.44 of its radius, so capping at 0.45 r leaves every ordinary mark as it was.
+    const sw = Math.min(r < r0 ? L.sw_halo*r/r0 : L.sw_halo, 0.45*r);
     if(p.sw !== sw){ p.c.setAttribute('stroke-width', sw); p.sw = sw; }
     p.c.setAttribute('fill', ionColour(ion,f,stt));
     show(p.c);

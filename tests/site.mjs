@@ -121,6 +121,33 @@ async function shot(name) {
   fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(r.data, 'base64'));
 }
 
+// AN ION IS A COLOURED MARK, NOT A WHITE DISC.  Each ion is a circle with a white halo
+// stroke; a stroke is centred on the edge, so once it is as wide as the radius it hides
+// half the fill, and at twice the radius all of it.  A crowded trap (16 ions to a QCCDSim
+// trap) drew 2 px marks with a 4 px halo, and every ion read as plain white on every
+// reproduced QCCDSim page (2026-10-08, found by the user, not by this walk).  The probe
+// plants one too-wide halo first and must catch it, so its silence means something.
+const HALO = `(function(){
+  if (typeof IONP === 'undefined') return null;
+  function scan(){ var out = [], n = 0;
+    for (var k in IONP){ var c = IONP[k].c;
+      if (!c || c.getAttribute('display') === 'none') continue;
+      var r = +c.getAttribute('r'), w = +c.getAttribute('stroke-width');
+      if (!(r > 0)) continue; n++;
+      if (w > r) out.push(k + ': halo ' + w.toFixed(2) + ' on radius ' + r.toFixed(2)); }
+    return { n: n, bad: out }; }
+  var k0 = null;
+  for (var k in IONP){ var c = IONP[k].c;
+    if (c && c.getAttribute('display') !== 'none' && +c.getAttribute('r') > 0){ k0 = k; break; } }
+  var caught = null;
+  if (k0 !== null){ var c0 = IONP[k0].c, old = c0.getAttribute('stroke-width');
+    c0.setAttribute('stroke-width', String(3 * +c0.getAttribute('r')));
+    caught = scan().bad.some(function(s){ return s.indexOf(k0 + ':') === 0; });
+    c0.setAttribute('stroke-width', old); }
+  var a = scan();
+  return { ions: a.n, nbad: a.bad.length, bad: a.bad.slice(0, 3), planted_caught: caught };
+})()`;
+
 const PROBE = `(async function(){
   function embedStatus(){ var f = document.querySelector('.clip iframe.live'); if(!f) return null;
     try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false;
@@ -204,6 +231,11 @@ async function visit(rel, shotName) {
     if (isStudio || redirect || embeds) await new Promise(r => setTimeout(r, redirect ? 2500 : embeds ? 3000 : 800));
     if (shotName) await shot(shotName);
     probe = await evaluate(PROBE);
+    const halo = await evaluate(HALO);
+    if (halo && halo.nbad)
+      problems.push(`an ion's halo hides its colour (${halo.nbad} of ${halo.ions}): ${halo.bad.join('; ')}`);
+    if (halo && halo.ions && halo.planted_caught !== true)
+      problems.push('the halo probe did not see a planted halo: it is blind here');
     // a page with examples shown in place: the first frame must load and enter embed mode
     if (await evaluate("!!document.querySelector('.runbox iframe.live')")) {
       await evaluate("document.querySelector('.runbox iframe.live').scrollIntoView({block: 'center'})");
