@@ -40,6 +40,9 @@ table.rp th,table.rp td{border-bottom:1px solid #e6e5e1;padding:6px 8px;text-ali
 table.rp th{font-weight:600;color:#3a3936;background:#f6f5f1}
 table.rp td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rp-wide{overflow-x:auto;margin:12px 0 18px}.rp-wide table.rp{margin:0}
+table.rp-index tr.rp-row{cursor:pointer}table.rp-index tr.rp-row:hover td{background:#f4f8fd}
+table.rp-index td{vertical-align:top}table.rp-index td a{text-decoration:none}
+.rp-back{margin:0 0 6px;font-size:13.5px}.rp-more{font-size:13.5px;margin-top:14px}
 table.rp-rules td:first-child{width:190px}table.rp-rules th,table.rp-rules td{padding-left:5px;padding-right:5px}
 table.rp-rules th{font-size:12.5px}
 .rp-ok{color:#1b7f3b;font-weight:600}.rp-bad{color:#b42318;font-weight:600}.rp-skip{color:#8a8985}
@@ -573,17 +576,81 @@ def section(p: dict) -> str:
     return _paper_section(p, _results(p["key"]))
 
 
+def _papers() -> list[dict]:
+    return [p for p in catalog.PAPERS if p.get("runs") or p.get("kind") in ("design", "model")]
+
+
+def _replayed(p: dict) -> str:
+    """One cell: how the paper's own numbers came out when its code was replayed."""
+    res = _results(p["key"]) or {}
+    nn = len(catalog.NOTES.get(p["key"], []))
+    found = (f'<br><small class="rp-skip">{nn} finding{"s" if nn != 1 else ""}</small>' if nn else "")
+    if p.get("kind") == "design":
+        return "machine rebuilt; the published circuits' gate counts match" + found
+    if p["key"] == "schoenberger2024":
+        sm = res.get("summary", {})
+        rows_ = [c for c in res.get("configs", []) if c.get("paper")]
+        ex = sum(1 for c in rows_ if c["paper"]["verdict"] == "exact")
+        return (f'{sm.get("equal_to_printed", 0)}/{sm.get("replayed", 0)} runs exact'
+                f'<br><small>{ex}/{len(rows_)} paper values</small>' + found)
+    if p.get("kind") == "model":
+        ex = [r for r in res.get("runs", []) if r.get("kind") == "example"]
+        ok = sum(1 for r in ex if r.get("compare", {}).get("paper", {}).get("T_exe_us", {}).get("verdict") == "exact")
+        return f"{ok}/{len(ex)} worked examples exact<br><small>no code published</small>" + found
+    runs = [r for r in res.get("runs", []) if "missing" not in r]
+    exact = sum(1 for r in runs if r.get("compare", {}).get("tool")
+                and all(v["verdict"] == "exact" for v in r["compare"]["tool"].values()))
+    pv = [v for r in runs for v in r.get("compare", {}).get("paper", {}).values()]
+    pok = sum(1 for v in pv if v["verdict"] in ("exact", "close"))
+    return (f"{exact}/{len(runs)} runs exact"
+            + (f"<br><small>{pok}/{len(pv)} paper values</small>" if pv else "") + found)
+
+
+def _code(p: dict) -> str:
+    art = p.get("artifact") or {}
+    if p.get("kind") == "design":
+        return "circuits public, all rights reserved"
+    if not art.get("commit"):
+        return "not published"
+    return _e(art.get("license") or "no license")
+
+
 def page(PAGE: str, STYLE: str) -> str:
-    papers = [p for p in catalog.PAPERS if p.get("runs") or p.get("kind") in ("design", "model")]
+    """The index: one table, one row per paper; the details are a click away."""
+    papers = _papers()
+    rows = ['<table class="rp rp-index"><tr><th>paper</th><th>their code</th>'
+            "<th>their numbers, replayed</th><th>ours on the same machine</th><th></th></tr>"]
+    for p in papers:
+        k = _e(p["key"])
+        rows.append(f'<tr class="rp-row" data-href="{k}/"><td><a href="{k}/"><b>{_e(p["short"])}</b></a>'
+                    f'<br><small>{_e(p["venue"])}</small></td><td><small>{_code(p)}</small></td>'
+                    f"<td>{_replayed(p)}</td><td>{_ours_summary(p)}</td>"
+                    f'<td class="n"><a href="{k}/" aria-label="details">details →</a></td></tr>')
+    rows.append("</table>")
     body = [
         "<h1>Reproducing the literature</h1>",
-        '<p class="rp-lead">A design tool and a compiler are only as believable as their agreement '
-        "with other people's work. So we took the most relevant papers on QCCD architecture and "
-        "compilation, ran each paper's own published code, and replayed every operation it "
-        "produced in our checker, under that paper's own rules and with its own clock. "
-        "Where the numbers agree, the replay must equal the tool exactly; where they do not, "
-        "this page says so.</p>",
-        '<h2 id="method">How a paper is checked</h2>',
+        f'<p class="rp-lead">{len(papers)} published QCCD papers. For each one we ran its own code '
+        "and replayed every schedule in our checker, under the paper's own rules and clock, then "
+        "compiled the same circuits on the same machine with our compiler, under the same rules. "
+        "Open a paper for its machine, every run, what we found, and the animations.</p>",
+        '<div class="rp-wide">' + "".join(rows) + "</div>",
+        '<p class="rp-more"><a href="method/">How a paper is checked, and which rules each '
+        'paper\'s model has</a> · <a href="method/#considered">Papers we read and did not '
+        "reproduce</a> · every number here can be rerun with "
+        '<span class="rp-cmd">python -m qccd.repro check</span></p>',
+        "<script>document.querySelectorAll('tr.rp-row').forEach(function(r){"
+        "r.addEventListener('click',function(e){if(e.target.closest('a'))return;"
+        "location.href=r.getAttribute('data-href');});});</script>",
+    ]
+    return PAGE.format(title="Reproducing the literature — QCCD", style=STYLE,
+                       extra_css=CSS, body="\n".join(body))
+
+
+def _method_page(PAGE: str, STYLE: str) -> str:
+    papers = _papers()
+    body = [
+        '<p class="rp-back"><a href="../">← all papers</a></p>',
+        "<h1>How a paper is checked</h1>",
         '<ol class="rp-steps">'
         "<li><b>Run their code.</b> Each paper's artifact is run as its authors ran it, and every "
         "operation it schedules (each split, move, junction crossing, merge and gate, with its start "
@@ -598,31 +665,47 @@ def page(PAGE: str, STYLE: str) -> str:
         "<li><b>Compare three numbers.</b> What their code printed, what our replay measures (these "
         "must be identical), and what the paper reports.</li>"
         "<li><b>Then compile it ourselves.</b> The same circuit on the same machine, checked by the "
-        "same checker under the same rules.</li></ol>",
+        "same checker under the same rules, more strictly: an operation the paper's timing law "
+        "does not price is refused.</li></ol>",
         "<p>The rules are each paper's, not ours. Our own machine model is stricter in "
         "places (one waveform per cycle, gates and transport never in the same cycle), and under "
         "it most of these schedules would not be legal at all; that is a different question, "
         "and it is not the one asked here.</p>",
+        '<h2 id="rules">The rules each paper\'s model has</h2>',
         _rules_table(papers),
-        "<p>A note on a paper is written only when running its code shows it. Everything here can "
-        'be rerun with <span class="rp-cmd">python -m qccd.repro check</span>.</p>',
-        '<h2 id="summary">At a glance</h2>',
-        _summary(papers),
+        "<p>A note on a paper is written only when running its code shows it.</p>",
+        '<h2 id="considered">Papers we read and did not reproduce</h2>',
+        "<p>Every one of these was read in full, with its code where there is any. A paper is "
+        "reproduced only when its machine, its timing and its circuits can be pinned down well "
+        "enough that a mismatch would mean something.</p>",
+        '<table class="rp"><tr><th>paper</th><th>why it is not here</th></tr>'
+        + "".join(f'<tr><td>{_e(c["short"])}<br><small><a href="https://arxiv.org/abs/'
+                  f'{_e(c["arxiv"])}">arXiv:{_e(c["arxiv"])}</a></small></td>'
+                  f'<td>{_e(c["why"])}</td></tr>' for c in catalog.CONSIDERED) + "</table>",
     ]
-    for p in papers:
-        body.append(section(p))
-    body.append('<h2 id="considered">Papers we read and did not reproduce</h2>')
-    body.append("<p>Every one of these was read in full, with its code where there is any. A "
-                "paper is reproduced here only when its machine, its timing and its circuits can "
-                "be pinned down well enough that a mismatch would mean something.</p>")
-    body.append('<table class="rp"><tr><th>paper</th><th>why it is not here</th></tr>'
-                + "".join(f'<tr><td>{_e(c["short"])}<br><small><a href="https://arxiv.org/abs/'
-                          f'{_e(c["arxiv"])}">arXiv:{_e(c["arxiv"])}</a></small></td>'
-                          f'<td>{_e(c["why"])}</td></tr>' for c in catalog.CONSIDERED)
-                + "</table>")
-    html_ = PAGE.format(title="Reproducing the literature — QCCD", style=STYLE,
-                        extra_css=CSS, body="\n".join(body))
-    return html_
+    return PAGE.format(title="How a paper is checked — QCCD", style=STYLE, extra_css=CSS,
+                       body="\n".join(body))
+
+
+def _paper_page(p: dict, PAGE: str, STYLE: str) -> str:
+    """One paper's details, at /reproduce/<key>/: the section the index used to carry, with its
+    links made relative to the paper's own folder."""
+    key = p["key"]
+    sec = section(p)
+    sec = sec.replace(f'<h2 id="{_e(key)}">{_e(p["short"])}</h2>', f'<h1 id="{_e(key)}">{_e(p["short"])}</h1>', 1)
+    sec = sec.replace(f'href="{_e(key)}/', 'href="')
+    body = ['<p class="rp-back"><a href="../">← all papers</a></p>', sec,
+            '<p class="rp-more"><a href="../method/">How a paper is checked</a> · '
+            '<a href="../">all papers</a></p>']
+    return PAGE.format(title=f"{p['short']}: reproduction — QCCD", style=STYLE, extra_css=CSS,
+                       body="\n".join(body))
+
+
+def document_pages(PAGE: str, STYLE: str):
+    """Every page of the section besides the index and the Studio pages: (site path, page, depth)."""
+    for p in _papers():
+        yield f"reproduce/{p['key']}/index.html", _paper_page(p, PAGE, STYLE), 2
+    yield "reproduce/method/index.html", _method_page(PAGE, STYLE), 2
 
 
 def index_entries() -> list:
@@ -630,7 +713,7 @@ def index_entries() -> list:
             "d": "published QCCD papers rerun and replayed under their own rules"}]
     for p in catalog.PAPERS:
         if p.get("runs") or p.get("kind") in ("design", "model"):
-            out.append({"t": f"{p['short']}: reproduction", "u": f"reproduce/#{p['key']}",
+            out.append({"t": f"{p['short']}: reproduction", "u": f"reproduce/{p['key']}/",
                         "k": "reproduce", "d": p["title"]})
     return out
 
@@ -752,13 +835,13 @@ def _card(p: dict, run: dict, row: dict | None, failed_ours: dict) -> str:
     else:
         ours += ": they find nothing."
     lines.append(_e(ours))
-    back = f"../#{p['key']}"
+    back = "./"
     return (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
             f'<button type="button" data-hint="repro:card">hide</button>'
             f'<div class="rpk">Reproduced · {_e(p["short"])} ({_e(p["venue"])})</div>'
             f'<div class="rph">{_e(run.get("label", run["id"]))}</div>'
             '<div class="rpb">' + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="{back}">← all reproductions</a></p></div></div>'
+            + f'<p><a href="{back}">← this paper</a> · <a href="../">all papers</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
 
 
@@ -879,7 +962,7 @@ def _design_studio(p: dict, tmp: Path, model):
                                                                    .read_text(encoding="utf-8")))) else
                "Our compiler cannot yet compile the paper's circuits on it; the reproduction page "
                "lists why.</p>")
-            + f'<p><a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
+            + f'<p><a href="./">← this paper</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
     return f"reproduce/{p['key']}/design.html", out.read_text(encoding="utf-8"), card
 
@@ -936,7 +1019,7 @@ def _ours_studio(p: dict, o: dict, spec: dict, row: dict, tmp: Path, model):
             f'<div class="rph">{_e(label)}</div><div class="rpb">'
             + "".join(f"<p>{x}</p>" for x in lines)
             + f'<p><a href="{_e(o["against"])}.html">the paper\'s schedule</a> · '
-            f'<a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
+            f'<a href="./">← this paper</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
     return f"reproduce/{p['key']}/{o['id']}.html", out.read_text(encoding="utf-8"), card
 
@@ -1087,7 +1170,7 @@ def _model_studio(p: dict, run: dict, tmp: Path, model):
             f'<div class="rpk">{"Ours" if ours else "Reproduced"} · {_e(p["short"])}</div>'
             f'<div class="rph">{_e(label)}</div><div class="rpb">'
             + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
+            + f'<p><a href="./">← this paper</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
     return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), card
 
@@ -1258,6 +1341,6 @@ def _ish_studio(p: dict, run: dict, tmp: Path, model):
             f'<div class="rpk">{"Ours" if ours else "Reproduced"} · {_e(p["short"])}</div>'
             f'<div class="rph">{_e(label)}</div><div class="rpb">'
             + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
+            + f'<p><a href="./">← this paper</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
     return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), card

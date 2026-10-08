@@ -1902,6 +1902,9 @@ def build(out: Path) -> int:
     if reproduce_enabled():
         from . import reproduce
         put("reproduce/index.html", reproduce.page(PAGE, STYLE), 1, "reproduce")
+        # one page per paper, and the method, beside the index's single table
+        for rel, page_, depth in reproduce.document_pages(PAGE, STYLE):
+            put(rel, page_, depth, "reproduce")
         for rel, page_, card in reproduce.studio_pages(out / ".reproduce_tmp"):
             put(rel, page_, 2, "reproduce", app=True, extra=HASH_JS + card)
         shutil.rmtree(out / ".reproduce_tmp", ignore_errors=True)
