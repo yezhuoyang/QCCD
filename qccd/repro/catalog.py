@@ -462,6 +462,12 @@ PAPERS.append({
             "design reproduction: the machine in our language, and the circuits it published.",
     "arch": "h2.arch.json",
     "runs": [],
+    "blocker": "H2 is one loop with a single lane, and our rules let ions on a loop travel in "
+               "one direction per cycle. Ions may not rest in the conveyor's tied wells, so the 32 "
+               "qubits fill 32 of the 37 places an ion can stop, and the ions standing still block "
+               "the lane. The router moves ions one route at a time and cannot bring a qubit to a "
+               "gate zone past the others; that needs a pass that shifts the conveyor as a whole, "
+               "which the compiler does not have yet.",
 })
 
 #: Our own schedules, per paper: each compared with one of the paper's runs (``against``) on

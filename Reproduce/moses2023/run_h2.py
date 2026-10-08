@@ -176,6 +176,18 @@ MINIMAL = [
 ]
 
 
+def release_of(exe: Path, *, version_only: bool = False) -> str | None:
+    """Which published release a compiler binary is: its sha256 looked up in the toolchain
+    manifest (qccd/workspace/toolchain.json); a binary not there is an unreleased build."""
+    man = json.loads((ROOT / "qccd" / "workspace" / "toolchain.json").read_text(encoding="utf-8"))
+    q = man["qccdc_cli"]
+    digest = sha256(Path(exe))
+    for plat, a in q["assets"].items():
+        if a.get("sha256") == digest or a.get("unpacked_sha256") == digest:
+            return q["version"] if version_only else f"qccdc_cli, release {q['version']} ({plat})"
+    return None if version_only else "qccdc_cli, an unreleased build"
+
+
 def run_minimal(work: Path, arch) -> list[dict]:
     qccdc = os.environ["QCCD_QCCDC"]
     work.mkdir(parents=True, exist_ok=True)
@@ -298,7 +310,7 @@ def main(argv: list[str]) -> int:
                    "gate_zones": [n for n in arch.device.nodes if arch.can(n, "gate")],
                    "sites": len(arch.device.nodes), "capacity_qubits": arch.device.total_capacity(),
                    "design": "Reproduce/moses2023/DESIGN.md"},
-        "compiler": {"binary": "qccdc_cli.exe, release 35bf68427d9c (windows-x86_64)",
+        "compiler": {"binary": release_of(qccdc), "release": release_of(qccdc, version_only=True),
                      "sha256": sha256(qccdc), "call": "qccd.qec.compile_with_qccdc(qasm, "
                      "h2.arch.json, workdir, mode='compile')",
                      "verifier_model": "corrected_model(table='local') -- unit times"},
