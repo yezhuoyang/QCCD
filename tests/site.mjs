@@ -256,7 +256,9 @@ async function visit(rel, shotName) {
       problems.push('the halo probe did not see a planted halo: it is blind here');
     if (halo && halo.nring_bad)
       problems.push(`a trap does not show its places (${halo.nring_bad} of ${halo.sites}): ${halo.ring_bad.join('; ')}`);
-    if (halo && halo.sites && halo.ring_planted_caught !== true)
+    // null = no site on the page draws a ring (every one is past 24 places), so there was
+    // nothing to remove; the counts above still hold each site to zero rings
+    if (halo && halo.sites && halo.ring_planted_caught === false)
       problems.push('the slot-ring probe did not see a planted missing ring: it is blind here');
     // a page with examples shown in place: the first frame must load and enter embed mode
     if (await evaluate("!!document.querySelector('.runbox iframe.live')")) {
