@@ -360,13 +360,45 @@ def _design_section(p: dict) -> str:
                "circuits average 296, as the text says. The dependency floor is the larger of the "
                "circuit's two-qubit depth and a quarter of its gates; the layered count is the "
                "paper's own layering with every round of four filled.</small></p>")
-    fails = res.get("minimal_examples", [])
-    out.append('<div class="rp-ours"><b>Our compiler on this machine: not yet</b>'
-               "The published compiler refuses all 248 circuits on this machine. Each reason is "
-               "pinned by a minimal example, and each is compiler work, listed here rather than "
-               "worked around:<ul>" + "".join(f"<li>{_e(f['claim'].replace(' -- ', ': '))}</li>" for f in fails)
-               + "</ul>The machine itself loads with no rule violation.</div>")
+    out.append(_design_ours(p, res))
     return "\n".join(out)
+
+
+def _example_fixed(m: dict) -> bool:
+    """A minimal example the compiler now gets right: it ran, left nothing unrealised, and
+    every rule passed."""
+    prog = m.get("program") or {}
+    rules = m.get("rules")
+    failed = rules.get("failed") if isinstance(rules, dict) else (["?"] if rules else [])
+    return m.get("exit") == 0 and prog.get("unrealised", 1) == 0 and not failed
+
+
+def _design_ours(p: dict, res: dict) -> str:
+    """What our published compiler does with the design's circuits, from results.json."""
+    circ = res.get("circuits", [])
+    ok = [c for c in circ if not str((c.get("compile") or {}).get("verdict", "refused")).startswith("refused")]
+    release = (res.get("compiler") or {}).get("release")
+    who = f"The published compiler (release {_e(release)})" if release else "Our compiler"
+    exs = res.get("minimal_examples", [])
+    fixed = [m for m in exs if _example_fixed(m)]
+    open_ = [m for m in exs if not _example_fixed(m)]
+    head = '<div class="rp-ours"><b>Our compiler on this machine: ' + ("not yet" if not ok else "") + "</b>"
+    if ok:
+        return head + (f"{who} compiles {len(ok)} of {len(circ)} circuits with every rule passing."
+                       "</div>")
+    out = [head + f"{who} does not yet compile any of the {len(circ)} circuits on this machine."]
+    if fixed:
+        out.append(f" It fixes {len(fixed)} ways the compiler before it failed on them, each pinned by "
+                   "a minimal example that now compiles with every rule passing. What the earlier "
+                   "compiler did:<ul>"
+                   + "".join(f"<li>{_e(m['claim'].replace(' -- ', ': '))}</li>" for m in fixed) + "</ul>")
+    if open_:
+        out.append(" Still open, each pinned by a minimal example:<ul>"
+                   + "".join(f"<li>{_e(m['claim'].replace(' -- ', ': '))}</li>" for m in open_) + "</ul>")
+    if p.get("blocker"):
+        out.append(f"<p>What stops it now: {_e(p['blocker'])}</p>")
+    out.append("The machine itself loads with no rule violation.</div>")
+    return "".join(out)
 
 
 def _summary(papers: list[dict]) -> str:
@@ -427,7 +459,7 @@ def _ours_summary(p: dict) -> str:
     """One cell: how many of our checked schedules beat the paper's, on the paper's metric."""
     res = _results(p["key"]) or {}
     if p.get("kind") == "design":
-        return '<span class="rp-skip">not yet: our compiler refuses its circuits</span>'
+        return '<span class="rp-skip">not yet: our compiler does not compile its circuits yet</span>'
     if p["key"] == "schoenberger2024":
         rows = [o for o in res.get("ours", {}).get("runs", []) if o.get("ok")]
         if not rows:
