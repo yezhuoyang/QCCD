@@ -1077,7 +1077,8 @@ def test_the_palette_avatar_is_the_stage_s_own_mark(stem, tmp_path):
     # the bar length as a fraction of g: 0.30 + 0.15*cap, clamped at 0.88
     cap = p["sample"]["cap"]
     assert p["sample"]["bar_over_g"] == round(min(0.88, 0.30 + 0.15 * cap), 4)
-    assert p["sample"]["ticks"] == min(cap, 6)
+    # one ring per place an ion can sit, up to the stage's SLOT_RINGS_MAX (24)
+    assert p["sample"]["ticks"] == (cap if cap <= 24 else 0)
 
 
 @requires_node

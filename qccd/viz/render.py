@@ -2019,7 +2019,15 @@ computeRoles();
 // asked what a site looks like anywhere else -- and answering that question a second time
 // is exactly how a menu picture drifts from the thing it depicts.
 const _siteLen = (cap, L) => Math.min(L.site_max, (0.30 + 0.15*clamp(1, cap||1, 6))*L.g);
-const _slots   = cap      => clamp(1, Math.min(cap||1, 6), 6);
+// ONE RING PER PLACE AN ION CAN SIT, so the free places can be counted on the stage.
+// The count was clamped at six, so a 16-ion QCCDSim trap showed six rings under thirteen
+// ions and nothing said how many places were left (2026-10-08, the user: "you should
+// visualize how many sites are available").  Past SLOT_RINGS_MAX a ring would be under a
+// pixel at the scale a whole device is drawn, so such a site draws none and its n/cap
+// figure says it instead.
+const SLOT_RINGS_MAX = 24;
+const _slots   = cap      => { const c = Math.max(1, Math.trunc(cap||1));
+                               return c <= SLOT_RINGS_MAX ? c : 0; };
 const siteLen = cap => _siteLen(cap, L);
 const slots   = cap => _slots(cap);
 
@@ -2357,10 +2365,12 @@ function buildStatic(S){
       'stroke-opacity': (dock||n.corner)?0.95:0.55,
       'stroke-width': (dock||n.corner)?L.sw_node*1.7:L.sw_node});
     grp.append(bar);
-    const sr=Math.min(L.slot_r, 0.36*len/m);
+    const sr=m ? Math.min(L.slot_r, 0.36*len/m) : 0;
+    // the ring's line is held to its size, or a small ring is a blob, not a place
+    const srw=Math.min(Math.max(0.7, L.sw_node*0.8), 0.8*sr);
     for(let i=0;i<m;i++){
       grp.append(el('circle',{cx:x+((i+0.5)/m-0.5)*len, cy:y, r:sr, fill:'none',
-        stroke:zc, 'stroke-width':Math.max(0.7, L.sw_node*0.8), opacity:0.55}));
+        stroke:zc, 'stroke-width':srw, opacity:0.55}));
     }
     grp._nid=n.id; bar._nid=n.id;
     gNode.append(grp);
@@ -2368,12 +2378,17 @@ function buildStatic(S){
     if((n.cap||0) > 6){
       // too many slots to count: say it in figures instead, beyond the bar's own end
       const d=len/2+L.g*0.12;
+      const fs=Math.max(8, L.g*0.20);
       const t=el('text',{x:x+ax.ux*d, y:y+ax.uy*d, 'text-anchor':'start',
-        'dominant-baseline':'central', fill:zc, 'font-size':Math.max(8, L.g*0.20),
-        'font-weight':650, 'pointer-events':'none'});
+        'dominant-baseline':'central', fill:zc, 'font-size':fs,
+        'font-weight':650, 'pointer-events':'none', stroke:'#ffffff',
+        'stroke-width':fs*0.28, 'stroke-linejoin':'round', 'paint-order':'stroke'});
       gNode.append(t); CAPTXT[n.id]=t;
     }
   }
+  // ON TOP OF EVERY NODE.  A figure past the bar's end lands where the next junction is
+  // drawn, and junctions drawn later in the loop covered all of "13/16" but its first digit.
+  for (const id in CAPTXT) gNode.append(CAPTXT[id]);
 }
 
 // The stage's own scene.  `A` and `L` are MUTATED IN PLACE by the editor's `rebuild()`
@@ -2387,15 +2402,22 @@ buildStatic(STAGE);
 
 // slot offsets, in px along the trap axis, for k ions resting on one site
 function slotOffsets(n, k){
-  const m=slots(n.cap), len=siteLen(n.cap), pitch=len/m;
-  const step=Math.min(pitch, 0.86*L.g/Math.max(k,1));
+  const m=slots(n.cap), len=siteLen(n.cap);
   const out=[];
-  // CENTRED on the node, not left-packed into the bar: a lone ion in a cap-2 site was
-  // being drawn half a pitch off its own node, which is both wrong to look at and the
-  // reason an arrival appeared to shove its neighbour sideways.
-  if(k<=m){ for(let j=0;j<k;j++) out.push((j-(k-1)/2)*pitch); }
-  else { for(let j=0;j<k;j++) out.push((j-(k-1)/2)*step); }
-  return {off:out, pitch:Math.min(pitch, step)};
+  // A RESTING ION SITS IN A SLOT: the k ions take the k middle rings of the bar, so the
+  // empty rings either side are the places still free.  Centring the chain on the node
+  // put it half a pitch off the rings whenever k and the ring count differ in parity --
+  // thirteen ions straddling sixteen rings, nothing countable.  Where they agree in parity
+  // this is the centred chain exactly as before.
+  if(m>0 && k<=m){
+    const pitch=len/m, s=Math.floor((m-k)/2);
+    for(let j=0;j<k;j++) out.push((s+j-(m-1)/2)*pitch);
+    return {off:out, pitch:Math.min(pitch, 0.86*L.g/Math.max(k,1))};
+  }
+  // no rings (a site past SLOT_RINGS_MAX), or more ions than places: a centred chain
+  const pitch=len/Math.max(1, Math.trunc(n.cap||1)), step=Math.min(pitch, 0.86*L.g/Math.max(k,1));
+  for(let j=0;j<k;j++) out.push((j-(k-1)/2)*step);
+  return {off:out, pitch:step};
 }
 
 // ---------- replay in the page ----------

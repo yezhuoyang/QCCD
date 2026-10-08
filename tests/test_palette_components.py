@@ -11,8 +11,9 @@ are the builder calls the stamp replays, so the tile is drawn by running them th
 same `computeLayout` + `buildStatic` pair that draws the canvas.  The tests below count
 marks and compare against the records in Python: eight site records must produce eight
 site bars, twelve segments twelve rails, and a site of capacity 8 must show `_slots(8)`
-ion slots -- six, because that is the clamp the STAGE applies, so the menu inherits the
-stage's own rule rather than a second one.
+ion slots -- eight, one ring per place up to the stage's SLOT_RINGS_MAX (24), because that
+is the rule the STAGE applies, so the menu inherits the stage's own rule rather than a
+second one.
 
 **A pin is drawn, and drawn dashed.**  Two of the seven -- `trap_junction` and
 `gate_zone` -- are a single node whose arms are pins rather than geometry, so from the
@@ -110,7 +111,7 @@ def records_of(name: str) -> dict:
     segs = [r for r in comp.records if r["method"] == "d.segment"]
     caps = [int(r["kwargs"].get("capacity", 1)) for r in sites]
     return {"nodes": len(sites) + len(junc), "segs": len(segs), "pins": len(comp.pins),
-            "slots": sum(min(max(c, 1), 6) for c in caps)}
+            "slots": sum(c if c <= 24 else 0 for c in (max(c, 1) for c in caps))}
 
 
 def test_every_catalogued_component_has_a_tile(blank, tmp_path):

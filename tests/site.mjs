@@ -145,7 +145,25 @@ const HALO = `(function(){
     caught = scan().bad.some(function(s){ return s.indexOf(k0 + ':') === 0; });
     c0.setAttribute('stroke-width', old); }
   var a = scan();
-  return { ions: a.n, nbad: a.bad.length, bad: a.bad.slice(0, 3), planted_caught: caught };
+  // A TRAP SHOWS EVERY PLACE AN ION CAN SIT: one slot ring per unit of capacity (up to the
+  // stage's 24), so the free places can be counted.  The rings were clamped at six, and a
+  // 16-place trap showed six rings under thirteen ions (2026-10-08, the user).  Planted: a
+  // removed ring must be caught.
+  function rings(){ var out = [], n = 0;
+    if (typeof NODEEL === 'undefined' || typeof nodeById === 'undefined') return { n: 0, bad: out };
+    for (var id in NODEEL){ var e = NODEEL[id]; if (!e || e.kind !== 'site' || !e.grp) continue;
+      var cap = Math.max(1, Math.trunc((nodeById[id] || {}).cap || 1)), want = cap <= 24 ? cap : 0;
+      var got = e.grp.querySelectorAll('circle').length; n++;
+      if (got !== want) out.push(id + ': ' + got + ' rings for ' + cap + ' places'); }
+    return { n: n, bad: out }; }
+  var r0 = null, rcaught = null;
+  for (var id in (typeof NODEEL === 'undefined' ? {} : NODEEL)){
+    var e = NODEEL[id]; if (e && e.kind === 'site' && e.grp && e.grp.querySelector('circle')){ r0 = e; break; } }
+  if (r0){ var victim = r0.grp.querySelector('circle'), parent = victim.parentNode, next = victim.nextSibling;
+    parent.removeChild(victim); rcaught = rings().bad.length > 0; parent.insertBefore(victim, next); }
+  var rr = rings();
+  return { ions: a.n, nbad: a.bad.length, bad: a.bad.slice(0, 3), planted_caught: caught,
+           sites: rr.n, nring_bad: rr.bad.length, ring_bad: rr.bad.slice(0, 3), ring_planted_caught: rcaught };
 })()`;
 
 const PROBE = `(async function(){
@@ -236,6 +254,10 @@ async function visit(rel, shotName) {
       problems.push(`an ion's halo hides its colour (${halo.nbad} of ${halo.ions}): ${halo.bad.join('; ')}`);
     if (halo && halo.ions && halo.planted_caught !== true)
       problems.push('the halo probe did not see a planted halo: it is blind here');
+    if (halo && halo.nring_bad)
+      problems.push(`a trap does not show its places (${halo.nring_bad} of ${halo.sites}): ${halo.ring_bad.join('; ')}`);
+    if (halo && halo.sites && halo.ring_planted_caught !== true)
+      problems.push('the slot-ring probe did not see a planted missing ring: it is blind here');
     // a page with examples shown in place: the first frame must load and enter embed mode
     if (await evaluate("!!document.querySelector('.runbox iframe.live')")) {
       await evaluate("document.querySelector('.runbox iframe.live').scrollIntoView({block: 'center'})");
