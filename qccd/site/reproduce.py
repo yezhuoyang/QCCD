@@ -373,6 +373,70 @@ def _example_fixed(m: dict) -> bool:
     return m.get("exit") == 0 and prog.get("unrealised", 1) == 0 and not failed
 
 
+def _h2_families(res: dict) -> list[dict]:
+    """Per circuit family: how many compile with every rule passing, our rounds, the paper's,
+    the dependency floor and the transport cycles our schedules spend."""
+    import statistics as st
+    paper = {t["family"]: t for t in res.get("table", [])}
+    by: dict[str, list] = {}
+    for c in res.get("circuits", []):
+        by.setdefault(c["family"], []).append(c)
+    out = []
+    for fam, t in paper.items():
+        cs = by.get(fam, [])
+        good = [c for c in cs if (c.get("compile") or {}).get("verdict") == "compiled"
+                and not ((c["compile"].get("rules") or {}).get("failed"))
+                and not (c["compile"].get("program") or {}).get("unrealised")]
+        R = [c["compile"]["program"]["rounds"] for c in good]
+        F = [c["bounds"]["floor"] for c in good]
+        T = [c["compile"]["program"]["transport_cycles"] for c in good]
+        out.append({"family": fam, "row": t["row"], "n": len(cs), "good": len(good),
+                    "rounds": (min(R), st.median(R), max(R)) if R else None,
+                    "floor": (min(F), st.median(F), max(F)) if F else None,
+                    "at_floor": sum(1 for c in good if c["compile"]["program"]["rounds"] == c["bounds"]["floor"]),
+                    "paper": t["rounds"], "transport": st.median(T) if T else None})
+    return out
+
+
+def _span3(x) -> str:
+    lo, med, hi = x
+    f = lambda v: f"{v:g}"
+    return f(lo) if lo == hi else f"{f(lo)}–{f(hi)} (median {f(med)})"
+
+
+def _design_rounds(p: dict, res: dict, who: str, ok: list, circ: list) -> str:
+    fams = _h2_families(res)
+    good = sum(f["good"] for f in fams)
+    rows = ['<table class="rp"><tr><th>circuit</th><th>compiled, every rule passing</th>'
+            "<th>rounds: ours</th><th>the paper</th><th>dependency floor</th>"
+            "<th>transport cycles (median)</th></tr>"]
+    for f in fams:
+        if not f["rounds"]:
+            rows.append(f'<tr><td>{_e(f["row"])}</td><td class="n">0 of {f["n"]}</td>'
+                        "<td>–</td><td class=\"n\">" + str(f["paper"]) + "</td><td>–</td><td>–</td></tr>")
+            continue
+        better = f["rounds"][2] < f["paper"]
+        rows.append(f'<tr><td>{_e(f["row"])}</td><td class="n">{f["good"]} of {f["n"]}</td>'
+                    f'<td class="n"><b>{_span3(f["rounds"])}</b>'
+                    + (' <span class="rp-ok">fewer</span>' if better else "") + "</td>"
+                    f'<td class="n">{f["paper"]}</td>'
+                    f'<td class="n">{_span3(f["floor"])}<br><small>reached by {f["at_floor"]} of {f["good"]}</small></td>'
+                    f'<td class="n">{f["transport"]:,.0f}</td></tr>')
+    rows.append("</table>")
+    return (f"<p>{who} compiles {good} of {len(circ)} of the paper's circuits on this machine, "
+            "every rule passing and every certificate accepted by the proved checker. It runs H2 the "
+            "way H2 runs: the whole loop shifts as one, neighbours swap in the two-ion zones, and up "
+            "to four gates run per round, one per gate zone.</p>" + "".join(rows) +
+            "<p><b>Read the rounds with care.</b> A round count measures how well the gates are "
+            "packed, not how long the circuit takes: our model does not price transport, and our "
+            "schedules spend thousands of transport cycles between rounds (the last column), where "
+            "H2's own compiler minimises the total time, transport included. What the table shows is "
+            "that, on the paper's machine and with its circuits, our schedules reach each circuit's "
+            "dependency floor (no schedule with at most four gates a round can use fewer rounds), "
+            "except GHZ, one round above it. The compiled programmes are not published: the "
+            "circuits are not ours to redistribute.</p>")
+
+
 def _design_ours(p: dict, res: dict) -> str:
     """What our published compiler does with the design's circuits, from results.json."""
     circ = res.get("circuits", [])
@@ -382,10 +446,9 @@ def _design_ours(p: dict, res: dict) -> str:
     exs = res.get("minimal_examples", [])
     fixed = [m for m in exs if _example_fixed(m)]
     open_ = [m for m in exs if not _example_fixed(m)]
-    head = '<div class="rp-ours"><b>Our compiler on this machine: ' + ("not yet" if not ok else "") + "</b>"
+    head = '<div class="rp-ours"><b>Our compiler on this machine' + (": not yet" if not ok else "") + "</b>"
     if ok:
-        return head + (f"{who} compiles {len(ok)} of {len(circ)} circuits with every rule passing."
-                       "</div>")
+        return head + _design_rounds(p, res, who, ok, circ) + "</div>"
     out = [head + f"{who} does not yet compile any of the {len(circ)} circuits on this machine."]
     if fixed:
         out.append(f" It fixes {len(fixed)} ways the compiler before it failed on them, each pinned by "
@@ -459,7 +522,14 @@ def _ours_summary(p: dict) -> str:
     """One cell: how many of our checked schedules beat the paper's, on the paper's metric."""
     res = _results(p["key"]) or {}
     if p.get("kind") == "design":
-        return '<span class="rp-skip">not yet: our compiler does not compile its circuits yet</span>'
+        fams = _h2_families(res)
+        good = sum(f["good"] for f in fams)
+        if not good:
+            return '<span class="rp-skip">not yet: our compiler does not compile its circuits yet</span>'
+        n = sum(f["n"] for f in fams)
+        fewer = sum(1 for f in fams if f["rounds"] and f["rounds"][2] < f["paper"])
+        return (f"{good} of {n} circuits compile; fewer rounds than the paper in {fewer} of "
+                f"{len(fams)} families<br><small>rounds only: our model does not price transport</small>")
     if p["key"] == "schoenberger2024":
         rows = [o for o in res.get("ours", {}).get("runs", []) if o.get("ok")]
         if not rows:
@@ -784,9 +854,14 @@ def _design_studio(p: dict, tmp: Path, model):
             '<div class="rph">the machine, rebuilt in our language</div><div class="rpb">'
             "<p>Every number of this machine comes from the paper, with the place it was read; "
             "where the paper is silent the document says so. Its 32 qubits are loaded as the "
-            "paper's four batches of eight. Our compiler cannot yet compile the paper's circuits "
-            "on it; the reproduction page lists why.</p>"
-            f'<p><a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
+            "paper's four batches of eight. "
+            + ("Our compiler compiles the paper's circuits on it; the reproduction page gives the "
+               "rounds (the circuits themselves are not ours to publish).</p>"
+               if sum(f["good"] for f in _h2_families(json.loads((ROOT / p["key"] / "results.json")
+                                                                   .read_text(encoding="utf-8")))) else
+               "Our compiler cannot yet compile the paper's circuits on it; the reproduction page "
+               "lists why.</p>")
+            + f'<p><a href="../#{p["key"]}">← all reproductions</a></p></div></div>'
             f"<script>{CARD_JS}</script>")
     return f"reproduce/{p['key']}/design.html", out.read_text(encoding="utf-8"), card
 
