@@ -31,6 +31,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import os
 import shutil
 from pathlib import Path
 
@@ -611,10 +612,27 @@ def _r10(r: dict) -> bool:
 
 # ------------------------------------------------------------------------- the bar
 
+def reproduce_enabled() -> bool:
+    """The Reproduce section (qccd/site/reproduce.py; published 2026-10-08): built unless
+    `QCCD_SITE_REPRODUCE=0`, and only where its checker (`qccd.repro`) and its data
+    (`Reproduce/`) are present -- they live on the compiler branch, so a website-only
+    checkout builds the bar exactly as it was before the section."""
+    if os.environ.get("QCCD_SITE_REPRODUCE") == "0":
+        return False
+    import importlib.util
+    return (importlib.util.find_spec("qccd.repro") is not None
+            and (HERE.parent.parent / "Reproduce" / "README.md").exists())
+
+
 def nav_html(depth: int, active: str | None, index_json: str) -> str:
     root = "../" * depth
-    return ((HERE / "nav.html").read_text(encoding="utf-8")
-            .replace("__ROOT__", root).replace("__ACTIVE__", active or "")
+    nav = (HERE / "nav.html").read_text(encoding="utf-8")
+    if not reproduce_enabled():
+        # exactly the bar as it was before the section: no link, the old link padding
+        nav = "".join(ln for ln in nav.splitlines(keepends=True) if 'data-part="reproduce"' not in ln)
+        nav = nav.replace("text-decoration:none;padding:0 6px;height:40px;",
+                          "text-decoration:none;padding:0 9px;height:40px;")
+    return (nav.replace("__ROOT__", root).replace("__ACTIVE__", active or "")
             .replace("__INDEX__", index_json))
 
 
@@ -1804,6 +1822,10 @@ def build(out: Path) -> int:
     # how the site is built for AI agents (qccd/site/agentic.py): generated from the workspace's own code
     from .agentic import index_entries as agentic_index_entries
     index += agentic_index_entries()
+    # published papers rerun and replayed under their own rules (qccd/site/reproduce.py)
+    if reproduce_enabled():
+        from .reproduce import index_entries as reproduce_index_entries
+        index += reproduce_index_entries()
     index.append({"t": "Publications", "d": "the papers this website is built on, and how to cite it", "u": "publications/", "k": "page"})
     index += [{"t": p["title"], "d": (p.get("venue", "") + (" \u00b7 " if p.get("venue") else "") + (p.get("used") or ""))[:110],
                "u": f"publications/#{p['key']}", "k": "paper"} for p in PUBS]
@@ -1875,6 +1897,14 @@ def build(out: Path) -> int:
     put("people/index.html", people_page(), 1, "people")
     from . import agentic
     put("agentic/index.html", agentic.page(PAGE, STYLE), 1, "agentic")
+    # each paper's schedule opens in the Studio, like a leaderboard entry, with a card that
+    # says whose schedule it is and which clock and rules the Studio shows
+    if reproduce_enabled():
+        from . import reproduce
+        put("reproduce/index.html", reproduce.page(PAGE, STYLE), 1, "reproduce")
+        for rel, page_, card in reproduce.studio_pages(out / ".reproduce_tmp"):
+            put(rel, page_, 2, "reproduce", app=True, extra=HASH_JS + card)
+        shutil.rmtree(out / ".reproduce_tmp", ignore_errors=True)
     put("publications/index.html", publications_page(), 1, "publications")
     lang, rules = build_examples(out, put)
     put("language/index.html", language_page(lang), 1, "language")
