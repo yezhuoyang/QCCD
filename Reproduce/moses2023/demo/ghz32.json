@@ -1,0 +1,8 @@
+{
+ "circuit": "GHZ on 32 qubits, binary tree (depth 5, 31 CX), written from the definition",
+ "compiler": "c7c535380bfb",
+ "instructions": 674,
+ "rounds": 9,
+ "rules_failed": [],
+ "lean": "ACCEPTED"
+}
