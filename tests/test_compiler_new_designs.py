@@ -214,7 +214,11 @@ def test_the_proved_checker_admits_a_move_that_crosses_a_junction_site(tmp_path)
 #   M1  a barrier on three qubits crashed the compiler before placement;
 #   M2  five independent gates on four gate zones left the fifth unrealised;
 #   M3  a gate with an idle ion in every gate zone was left unrealised;
-#   M4  a conveyor ion was moved out alone while another on the same signals stayed (R4).
+#   M4  a conveyor ion was moved out alone while another on the same signals stayed (R4);
+#   M5  (fails on 02bceb9117e7) a gate between two qubits that both ride the loop, which has
+#       no docks: the router jammed and rotation declined.  Compiled without --no-rotate,
+#       because its subject is the race-track fallback (`Racetrack`): rigid shifts of the
+#       whole loop, swaps in the capacity-2 zones, the pair merged into one gate zone.
 
 sys.path.insert(0, str(REPO / "Reproduce" / "moses2023"))
 from run_h2 import ARCH as H2_ARCH, MINIMAL as H2_MINIMAL  # noqa: E402
@@ -228,8 +232,9 @@ def _h2_minimal(case, tmp_path):
     subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(H2_ARCH), "-o", str(exp)],
                    check=True, capture_output=True)
     (tmp_path / "c.qasm").write_text(case["qasm"], encoding="utf-8")
-    cmd = [str(QCCDC), "compile", str(tmp_path / "c.qasm"), "--arch", str(exp), "-o", str(tmp_path / "prog"),
-           "--no-rotate"]
+    cmd = [str(QCCDC), "compile", str(tmp_path / "c.qasm"), "--arch", str(exp), "-o", str(tmp_path / "prog")]
+    if not case.get("rotate"):
+        cmd += ["--no-rotate"]
     if case["init"]:
         (tmp_path / "init.json").write_text(json.dumps(case["init"]), encoding="utf-8")
         cmd += ["--init-placement", str(tmp_path / "init.json")]
@@ -277,3 +282,12 @@ def test_h2_minimal_examples_compile_pass_every_rule_and_are_certified(case, tmp
         wells = {f"C{s}{k:02d}" for s in "LR" for k in range(1, 21)}
         first = next(i for i in ins if i["type"] == "simd")
         assert {p["ion"] for p in first["participants"] if p["from"] in wells} == {"q0", "q2"}
+    elif case["id"].startswith("M5"):
+        # the whole loop shifted rigidly (the only way a conveyor ion moves), every other
+        # move one ion one site, and the gate ran in one round in a DG zone
+        shifts = [i for i in ins if i["type"] == "simd" and (i.get("template") or {}).get("kind") == "loop_shift"]
+        assert shifts and all(i["class"].startswith("batch_shift") for i in shifts)
+        steps = [i for i in ins if i["type"] == "simd" and not i.get("template")]
+        assert steps and all(len(i["participants"]) <= 4 for i in steps)
+        assert len(ms) == 1 and ms[0]["sites"][0].startswith("DG")
+        assert {"R1", "R3", "R4", "R11"} <= set(summary["passed"])

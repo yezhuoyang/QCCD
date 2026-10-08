@@ -173,6 +173,19 @@ MINIMAL = [
               "compile succeeds and the program fails R4 (drivability)",
      "qasm": 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\ncx q[0],q[1];\n',
      "init": {"q0": "CR01", "q1": "AUXD3", "q2": "CR03"}},
+    # M5 is compiled WITHOUT --no-rotate ("rotate": True): its subject is the fallback that
+    # moves the whole loop, which --no-rotate switches off
+    {"id": "M5_loop_without_docks",
+     "claim": "one gate between two qubits that both ride a closed loop with no docks, 32 "
+              "ions alone in 32 consecutive sites, twenty of them in the tied conveyor: the "
+              "general router leaves the gate unrealised (the conveyor ions can go nowhere "
+              "else, and every other place is in the way), and rigid rotation answers that "
+              "the device has no closed loop with docks",
+     "qasm": 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[32];\ncx q[0],q[31];\n',
+     "init": {f"q{i}": s for i, s in enumerate(
+         [z for k in range(4) for z in (f"AUXD{k}", f"DG0{k + 1}")] + ["AUXD4"]
+         + [f"CR{k:02d}" for k in range(1, 21)] + ["AUXU0", "UG01", "AUXU1"])},
+     "rotate": True},
 ]
 
 
@@ -198,14 +211,16 @@ def run_minimal(work: Path, arch) -> list[dict]:
     for m in MINIMAL:
         q = work / f"{m['id']}.qasm"
         q.write_text(m["qasm"], encoding="utf-8")
-        cmd = [qccdc, "compile", str(q), "--arch", str(exp), "-o", str(work / m["id"]),
-               "--no-rotate"]
+        cmd = [qccdc, "compile", str(q), "--arch", str(exp), "-o", str(work / m["id"])]
+        if not m.get("rotate"):
+            cmd += ["--no-rotate"]
         if m["init"]:
             ip = work / f"{m['id']}.init.json"
             ip.write_text(json.dumps(m["init"]), encoding="utf-8")
             cmd += ["--init-placement", str(ip)]
         cp = subprocess.run(cmd, capture_output=True, text=True)
-        rec = {**m, "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out> --no-rotate"
+        rec = {**m, "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out>"
+                              + ("" if m.get("rotate") else " --no-rotate")
                               + (" --init-placement <init>" if m["init"] else ""),
                "exit": cp.returncode,
                "said": [ln for ln in (cp.stdout + cp.stderr).splitlines()
