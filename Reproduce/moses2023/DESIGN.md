@@ -191,7 +191,17 @@ transport time rather than rounds (Sec. II.E) would do. **None of these is a tim
 are cheap and transport between them is 60% of H2's circuit time (Sec. II.E), and this
 document's primitive times are unit times, compared with nothing.
 
-## Our compiler on this machine: every circuit refused
+## Our compiler on this machine: every circuit refused (35bf68427d9c)
+
+**Status, 2026-10-08.** Everything in this section was true of compiler 35bf68427d9c. Release
+02bceb9117e7 fixed M1–M4 (a barrier is a fence; gates beyond the free gate zones wait for a
+later round; bystanders leave a gate zone a gate needs; no ion waits in a tied well), and
+release c7c535380bfb added the race-track pass that M5 asked for (rigid shifts of the whole
+loop, swaps in the capacity-2 zones, up to four gates a round). With c7c535380bfb all 248
+circuits compile, every rule passes, and the Lean checker accepts all 259 certificates (the
+248, plus 11 barrier-free variants); `results.json` holds the per-circuit rounds, and the
+website's H2 section shows them against Table I. Each of M1–M5 is a regression case in
+`tests/test_compiler_new_designs.py`.
 
 Published compiler 35bf68427d9c (windows-x86_64, sha256 `95951a42…fc0fc`, the digest
 `qccd/workspace/toolchain.json` pins), called as `compile_with_qccdc(qasm, h2.arch.json,
