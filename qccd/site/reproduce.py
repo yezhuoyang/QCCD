@@ -334,8 +334,9 @@ def _design_section(p: dict) -> str:
     zones = ", ".join(f"{k} ({v.get('capacity')})" for k, v in m.arch.zone_types.items())
     out.append(f'<figure class="rp-fig">{svg}<figcaption>H2 in our language: one closed loop of '
                f'{len(list(m.arch.device.sites()))} sites, no junction; zones with their capacity '
-               f'in qubits: {_e(zones)}. <a class="rp-watch" href="{_e(key)}/design.html">▶ open it '
-               f'in the Studio</a></figcaption></figure>')
+               f'in qubits: {_e(zones)}. <a class="rp-watch" href="{_e(key)}/design.html">▶ '
+               + ("watch a 32-qubit GHZ circuit of ours run on it" if (ROOT / key / "demo" / "ghz32.tsir.json").exists()
+                  else "open it") + ' in the Studio</a></figcaption></figure>')
     out.append("<p>The paper prints, for each circuit it ran, the number of two-qubit gates and "
                "the number of two-qubit gate rounds (at most four gates a round, one per gate "
                "zone; Table I). We took the same circuits from its published data, rewrote each "
@@ -842,19 +843,36 @@ def _design_studio(p: dict, tmp: Path, model):
     put([s for s in sites if s.startswith("UG")], 2)
     put(sorted((s for s in sites if s.startswith("CR")), key=lambda x: int(x[2:]))[:8], 1)
     put(sorted((s for s in sites if s.startswith("CL")), key=lambda x: int(x[2:]))[:8], 1)
-    prog = TSIR(name="H2, 32 qubits in four batches", arch_spec=m.arch.name)
-    prog.add(Instruction(type="init", id=prog.next_id(), placement=place,
-                         quanta={i: 0.0 for i in place}, meta={"note": "Sec. II.E batches"}))
+    # A PROGRAMME TO WATCH: a circuit of our own (the paper's are not ours to publish),
+    # compiled on this machine by the published compiler -- Reproduce/<key>/demo.py writes it.
+    demo = ROOT / p["key"] / "demo" / "ghz32.tsir.json"
+    info = json.loads((ROOT / p["key"] / "demo" / "ghz32.json").read_text(encoding="utf-8")) \
+        if demo.exists() else None
+    if demo.exists():
+        from ..qec import load_program
+        prog = load_program(demo)
+        headline = "our GHZ-32, compiled on the machine rebuilt in our language"
+    else:
+        prog = TSIR(name="H2, 32 qubits in four batches", arch_spec=m.arch.name)
+        prog.add(Instruction(type="init", id=prog.next_id(), placement=place,
+                             quanta={i: 0.0 for i in place}, meta={"note": "Sec. II.E batches"}))
+        headline = "the machine, rebuilt in our language"
     out = tmp / f"{p['key']}_design.html"
     m.render(prog, out, model=model, kicker=f"REPRODUCED · {p['short'].upper()}",
-             headline="the machine, rebuilt in our language")
+             headline=headline)
     card = (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
             '<button type="button" data-hint="repro:card">hide</button>'
             f'<div class="rpk">Reproduced · {_e(p["short"])} ({_e(p["venue"])})</div>'
-            '<div class="rph">the machine, rebuilt in our language</div><div class="rpb">'
+            f'<div class="rph">{_e(headline)}</div><div class="rpb">'
             "<p>Every number of this machine comes from the paper, with the place it was read; "
-            "where the paper is silent the document says so. Its 32 qubits are loaded as the "
-            "paper's four batches of eight. "
+            "where the paper is silent the document says so. "
+            + (f"What plays here is a circuit of our own, not one of the paper's: the GHZ state on "
+               f"32 qubits as a binary tree (31 two-qubit gates, depth 5), compiled by our compiler "
+               f"(release {_e(info['compiler'])}) into {info['instructions']:,} instructions and "
+               f"{info['rounds']} rounds of up to four gates. Every rule passes, and the proved "
+               f"checker accepts its certificate. The whole loop shifts as one; the ions swap in "
+               f"the two-ion zones and meet in the four gate zones.</p><p>"
+               if info and not info.get("rules_failed") and info.get("lean") == "ACCEPTED" else "")
             + ("Our compiler compiles the paper's circuits on it; the reproduction page gives the "
                "rounds (the circuits themselves are not ours to publish).</p>"
                if sum(f["good"] for f in _h2_families(json.loads((ROOT / p["key"] / "results.json")
