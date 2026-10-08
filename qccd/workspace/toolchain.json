@@ -1,23 +1,23 @@
 {
   "qccdc_cli": {
-    "version": "02bceb9117e7",
+    "version": "c7c535380bfb",
     "source": {
       "repository": "https://github.com/yezhuoyang/QCCD",
-      "commit": "0ef0bb07a29fd649fb83c293b7e5486ab307d36f",
+      "commit": "e86ac3fcf21a5a22adf38de315decc325cb835e3",
       "path": "Compiler/ocaml",
-      "tree": "02bceb9117e78c2f3cc899d578398b0748a9e169"
+      "tree": "c7c535380bfb6dbf14a16e9b95a3e16986e142a9"
     },
     "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3, the macOS one on a Mac in an opam switch made with MACOSX_DEPLOYMENT_TARGET=11.0 (minos 11.0), gzipped (deploy/toolchain/README.md)",
     "assets": {
       "windows-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/02bceb9117e7/qccdc_cli-windows-x86_64.exe",
-        "bytes": 5275636,
-        "sha256": "b771fdf039679f10ab2aeed8bcf9fc3488d5597b14cfe36b462a2558f2affc9d"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/c7c535380bfb/qccdc_cli-windows-x86_64.exe",
+        "bytes": 5443165,
+        "sha256": "68b1ba824008979c16d98d20bcfe893b165cc33129bac8c4b0f086bbf22842b2"
       },
       "linux-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/02bceb9117e7/qccdc_cli-linux-x86_64",
-        "bytes": 4736432,
-        "sha256": "a26ffbb5ee873e1b00787fbeaa87880f4613a31b047c875fe065a7e8883dfd21"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/c7c535380bfb/qccdc_cli-linux-x86_64",
+        "bytes": 4957384,
+        "sha256": "01c23f4f1369764fef261f7b442a54f58d4f18131b7793085dde24f23e082b7d"
       }
     }
   },
