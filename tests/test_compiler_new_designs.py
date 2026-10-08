@@ -201,3 +201,79 @@ def test_the_proved_checker_admits_a_move_that_crosses_a_junction_site(tmp_path)
                     str(tmp_path / "device.expanded.json"), "-o", str(tmp_path / "qin.json")], check=True, capture_output=True)
     cp = subprocess.run([str(qcheck), str(tmp_path / "qin.json")], capture_output=True, text=True, timeout=900)
     assert "ACCEPTED" in cp.stdout, (cp.stdout + cp.stderr)[-600:]
+
+
+# ------------------------------------------------------------------ Quantinuum H2
+#
+# The rebuilt H2 (Reproduce/moses2023/h2.arch.json: one closed loop, four gate zones, and
+# two conveyors whose forty wells three tied signals drive with no per-site switch) made
+# compiler 35bf68427d9c refuse or break all 248 of the paper's circuits.  Each cause is
+# pinned by a minimal example in `run_h2.MINIMAL`, and each must now compile with nothing
+# unrealised, pass every rule, and be ACCEPTED by the proved checker:
+#
+#   M1  a barrier on three qubits crashed the compiler before placement;
+#   M2  five independent gates on four gate zones left the fifth unrealised;
+#   M3  a gate with an idle ion in every gate zone was left unrealised;
+#   M4  a conveyor ion was moved out alone while another on the same signals stayed (R4).
+
+sys.path.insert(0, str(REPO / "Reproduce" / "moses2023"))
+from run_h2 import ARCH as H2_ARCH, MINIMAL as H2_MINIMAL  # noqa: E402
+
+
+def _h2_minimal(case, tmp_path):
+    from qccd.qec import load_arch, load_program
+    from qccd.verify import verify
+
+    exp = tmp_path / "h2.expanded.json"
+    subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(H2_ARCH), "-o", str(exp)],
+                   check=True, capture_output=True)
+    (tmp_path / "c.qasm").write_text(case["qasm"], encoding="utf-8")
+    cmd = [str(QCCDC), "compile", str(tmp_path / "c.qasm"), "--arch", str(exp), "-o", str(tmp_path / "prog"),
+           "--no-rotate"]
+    if case["init"]:
+        (tmp_path / "init.json").write_text(json.dumps(case["init"]), encoding="utf-8")
+        cmd += ["--init-placement", str(tmp_path / "init.json")]
+    cp = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    assert cp.returncode == 0, cp.stdout[-800:] + cp.stderr[-800:]
+    cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
+    assert not cert.get("unrealised"), cp.stdout[-800:]
+    subprocess.run([sys.executable, str(BRIDGE / "insert_cooling.py"), str(tmp_path / "prog.tsir.json"), "--arch",
+                    str(H2_ARCH), "-o", str(tmp_path / "prog.cooled.tsir.json")], check=True, capture_output=True)
+    arch = load_arch(H2_ARCH)
+    reports = {}
+    for which in ("prog.tsir.json", "prog.cooled.tsir.json"):
+        rep = verify(load_program(tmp_path / which), arch, corrected_model(table="local"))
+        bad = rep.rules.violations
+        assert not bad, f"{which}: {dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+        reports[which] = rep.rules.summary()
+    qcheck = REPO / "Compiler" / "lean" / ".lake" / "build" / "bin" / ("qcheck.exe" if sys.platform == "win32" else "qcheck")
+    if qcheck.exists():
+        subprocess.run([sys.executable, str(BRIDGE / "mk_qcheck_input.py"), str(tmp_path / "prog"), "--arch", str(exp),
+                        "-o", str(tmp_path / "qin.json")], check=True, capture_output=True)
+        qc = subprocess.run([str(qcheck), str(tmp_path / "qin.json")], capture_output=True, text=True, timeout=900)
+        assert "ACCEPTED" in qc.stdout, (qc.stdout + qc.stderr)[-600:]
+    raw = json.loads((tmp_path / "prog.tsir.json").read_text(encoding="utf-8"))
+    return raw, reports["prog.tsir.json"]
+
+
+@pytest.mark.parametrize("case", H2_MINIMAL, ids=[c["id"] for c in H2_MINIMAL])
+def test_h2_minimal_examples_compile_pass_every_rule_and_are_certified(case, tmp_path):
+    raw, summary = _h2_minimal(case, tmp_path)
+    ins = raw["instructions"]
+    ms = [i for i in ins if i["type"] == "gate" and i.get("pairs")]
+    if case["id"].startswith("M1"):
+        # the barrier is a fence: the program still prepares, gates and reads out
+        assert any(i["type"] == "measure" for i in ins)
+    elif case["id"].startswith("M2"):
+        # four gates in one round, the fifth in a second
+        assert sorted(len(i["pairs"]) for i in ms) == [1, 4]
+    elif case["id"].startswith("M3"):
+        # an idle ion left a gate zone so that the gate could take it
+        moved = {p["ion"] for i in ins if i["type"] == "simd" for p in i["participants"]}
+        assert moved & {"q2", "q3", "q4", "q5"} and len(ms) == 1
+    elif case["id"].startswith("M4"):
+        # R4 judged the conveyor and passed: both stored ions left it, together
+        assert "R4" in summary["passed"]
+        wells = {f"C{s}{k:02d}" for s in "LR" for k in range(1, 21)}
+        first = next(i for i in ins if i["type"] == "simd")
+        assert {p["ion"] for p in first["participants"] if p["from"] in wells} == {"q0", "q2"}

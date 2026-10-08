@@ -237,6 +237,107 @@ let eff_capacity a id =
 
 let gate_sites a = List.filter (fun id -> match node a id with Some n -> n.can_gate | None -> false) a.node_order
 
+(* {1 Tied sites: what a channel with no per-site switch drives together}
+
+   R4 (drivability, `qccd/verify/rules.py::r4_drivable`) reads `control.channels`: a
+   channel that drives several sites and has no per-site switch plays one waveform at all
+   of them, so on a named path its LOADED sites are all-or-nothing -- if one of them moves
+   along the path in a cycle, every one of them that holds an ion must move too.  H2's
+   conveyors are this: three signals drive all forty wells, and moving one stored ion out
+   while another stays was a program R4 rejects (2026-10-07).
+
+   The answer is the set of such sites, as site -> class, where a class is a union of the
+   channels' site sets that overlap (H2's three conveyor signals drive the same forty wells,
+   so they are one class).  Only sites ON a named path count: R4 judges the all-or-nothing
+   rule per path, over the path's loaded sites.  The groups are expanded exactly as
+   `qccd/arch/control.py::build_control_plane` expands them -- explicit, broadcast, row,
+   column, row_column; `direct` is one site per channel and ties nothing -- and
+   `switch_per_site` defaults to TRUE as it does there.  Every device in `arch/` has
+   switches or declares no channels, so on all of them this is empty and nothing the
+   router does changes. *)
+let tied_classes (a : t) : (string, int) Hashtbl.t =
+  let out = Hashtbl.create 16 in
+  let channels =
+    match mem "control" a.raw with Some c -> mem "channels" c | None -> None
+  in
+  (match channels with
+  | Some (`Assoc _ as ch) when not (bool_or "switch_per_site" true ch) ->
+    let sites =
+      List.filter
+        (fun id -> match node a id with Some n -> n.kind = "site" | None -> false)
+        a.node_order
+    in
+    let groups =
+      match str_or "grouping" "direct" ch with
+      | "explicit" -> List.map (strings "drives") (list_of "explicit" ch)
+      | "broadcast" -> [ sites ]
+      | ("row" | "column" | "row_column") as g ->
+        let axes = match g with "row" -> [ 1 ] | "column" -> [ 0 ] | _ -> [ 0; 1 ] in
+        List.concat_map
+          (fun axis ->
+            let buckets = Hashtbl.create 16 in
+            List.iter
+              (fun s ->
+                match node a s with
+                | Some n ->
+                  let v = if axis = 0 then fst n.pos else snd n.pos in
+                  let k = Float.round (v *. 1e6) in
+                  Hashtbl.replace buckets k
+                    (s :: (try Hashtbl.find buckets k with Not_found -> []))
+                | None -> ())
+              sites;
+            Hashtbl.fold (fun _ ms acc -> List.rev ms :: acc) buckets [])
+          axes
+      | _ -> []
+    in
+    let on_path = Hashtbl.create 64 in
+    List.iter
+      (fun (l : loop) -> List.iter (fun n -> Hashtbl.replace on_path n ()) l.nodes)
+      a.loops;
+    (* union-find over the sites of every multi-site group *)
+    let parent = Hashtbl.create 64 in
+    let rec find s =
+      match Hashtbl.find_opt parent s with
+      | Some p when p <> s ->
+        let r = find p in
+        Hashtbl.replace parent s r;
+        r
+      | _ -> s
+    in
+    List.iter
+      (fun g ->
+        let g = List.filter (fun s -> Hashtbl.mem on_path s && node a s <> None) g in
+        match g with
+        | [] | [ _ ] -> ()
+        | s0 :: rest ->
+          if not (Hashtbl.mem parent s0) then Hashtbl.replace parent s0 s0;
+          List.iter
+            (fun s ->
+              if not (Hashtbl.mem parent s) then Hashtbl.replace parent s s;
+              let ra = find s0 and rb = find s in
+              if ra <> rb then Hashtbl.replace parent rb ra)
+            rest)
+      groups;
+    (* number the classes in document order, so the answer is deterministic *)
+    let ids = Hashtbl.create 8 in
+    List.iter
+      (fun s ->
+        if Hashtbl.mem parent s then begin
+          let r = find s in
+          let k =
+            match Hashtbl.find_opt ids r with
+            | Some k -> k
+            | None ->
+              let k = Hashtbl.length ids in
+              Hashtbl.replace ids r k;
+              k
+          in
+          Hashtbl.replace out s k
+        end)
+      a.node_order
+  | _ -> ());
+  out
+
 (* Adjacency, built once.  The router asks for neighbours in its inner loop, and
    scanning 288 segments per query is the difference between a routing pass that runs
    and one that does not. *)

@@ -315,14 +315,19 @@ let to_json c : Yojson.Safe.t =
    The DAG is rebuilt from the lowered ops, which is what makes the expansion invisible
    to everything downstream.  What is NOT invisible is the semantics: R10's stabilizer
    half compares the emitted pulses against the ORIGINAL circuit, so a wrong lowering is
-   caught rather than trusted. *)
+   caught rather than trusted.
+
+   A `barrier` is not a gate and is never lowered, whatever its width: it is an ordering
+   fence over the qubits it names, and it stays one node.  Sending a 32-qubit barrier to
+   the gate lowering crashed the compiler before placement (`Unsupported "barrier on 32
+   qubits"`), which refused every H2 GHZ and MB circuit (2026-10-07). *)
 let lower (c : t) : t * int =
   let out = ref [] in
   let n = ref 0 in
   let expanded = ref 0 in
   List.iter
     (fun (o : op) ->
-      if List.length o.qubits <= 2 then begin
+      if List.length o.qubits <= 2 || o.name = "barrier" then begin
         out := { o with index = !n } :: !out;
         incr n
       end

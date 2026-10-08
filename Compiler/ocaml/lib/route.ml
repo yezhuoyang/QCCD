@@ -333,6 +333,21 @@ type resv = {
      the slot would cost cycles to satisfy a rule nobody checks *)
   uniform : bool;
   horizon : int;
+  (* R4's all-or-nothing, reserved rather than repaired (`Arch.tied_classes`).  A site
+     here is driven, with others, by a channel that has no per-site switch, so in a cycle
+     in which any of its class moves along the path, every one of them that holds an ion
+     must move.  The router keeps that by construction with two rules:
+
+       - an ion never WAITS on a tied site -- it is on one only in transit, so in every
+         cycle every ion on the class is moving, and all along one loop with one delta
+         (the `act` lock), which is the one waveform R4 asks for;
+       - a class on which an ion RESTS for the plan (a static ion, or one whose goal it
+         already is) is closed: nothing departs from or enters it, because its resting
+         ion would have to idle while its channel-mates move.
+
+     Empty on every device whose channels have switches, and then nothing below changes. *)
+  tied : (string, int) Hashtbl.t;
+  frozen : (int, unit) Hashtbl.t;
 }
 
 let bump tbl k n =
@@ -340,7 +355,28 @@ let bump tbl k n =
 
 let count tbl k = try Hashtbl.find tbl k with Not_found -> 0
 
-let fresh ~uniform horizon =
+(* `Arch.tied_classes`, memoised per document: the router asks for it once per layer and
+   per priority order, and the answer never changes. *)
+let tied_memo : (string, (string, int) Hashtbl.t) Hashtbl.t = Hashtbl.create 4
+
+let tied_of (a : Arch.t) =
+  let k = a.name ^ "\x00" ^ a.sha256 in
+  match Hashtbl.find_opt tied_memo k with
+  | Some t -> t
+  | None ->
+    let t = Arch.tied_classes a in
+    Hashtbl.replace tied_memo k t;
+    t
+
+let is_tied (r : resv) s = Hashtbl.mem r.tied s
+
+(* Is `s` on a class that nothing may leave or enter in this plan? *)
+let closed (r : resv) s =
+  match Hashtbl.find_opt r.tied s with
+  | Some k -> Hashtbl.mem r.frozen k
+  | None -> false
+
+let fresh ?(tied = Hashtbl.create 1) ~uniform horizon =
   {
     occ = Hashtbl.create 256;
     junc = Hashtbl.create 256;
@@ -350,6 +386,8 @@ let fresh ~uniform horizon =
     wave = Hashtbl.create 64;
     uniform;
     horizon;
+    tied;
+    frozen = Hashtbl.create 4;
   }
 
 (* Can `ion` sit at `site` at time `t`?  Capacity is the R1 bound. *)
@@ -359,6 +397,11 @@ let site_free (a : Arch.t) (r : resv) site t =
 (* Can `ion` take `hop` departing at time `t` (arriving at `t+1`)? *)
 let hop_free (a : Arch.t) (li : _) (c : sigctx) (r : resv) src (h : Traps.hop) t =
   site_free a r h.dst (t + 1)
+  (* R4's tied channels: never into or out of a closed class, and out of a tied site only
+     ALONG a path -- a move off the path is not one the conveyor's waveform makes *)
+  && (Hashtbl.length r.tied = 0
+     || ((not (closed r src)) && (not (closed r h.dst))
+        && ((not (is_tied r src)) || action_of li src h.dst <> None)))
   && ((not r.uniform)
      ||
      match Hashtbl.find_opt r.wave t with
@@ -431,7 +474,8 @@ let plan_one (a : Arch.t) (t : Traps.t) (d : Traps.dists) (li : _) (c : sigctx)
     ((int * Traps.hop) list * int) option =
   ignore ion;
   let h_of s = match Traps.dist d s goal with Some k -> k | None -> 1_000_000 in
-  if h_of src >= 1_000_000 then None
+  (* an ion that came to rest on a tied site would idle while its channel-mates move *)
+  if h_of src >= 1_000_000 || is_tied r goal then None
   else begin
     let dummy = { at = ""; t = 0; hop = None; parent = -1 } in
     let store = ref (Array.make 256 dummy) in
@@ -472,8 +516,11 @@ let plan_one (a : Arch.t) (t : Traps.t) (d : Traps.dists) (li : _) (c : sigctx)
       in
       if cur.at = goal && can_park () then answer := Some i
       else if cur.t < r.horizon then begin
-        (* wait *)
-        if site_free a r cur.at (cur.t + 1) && not (Hashtbl.mem seen (cur.at, cur.t + 1))
+        (* wait -- never on a tied site: an ion is on one only in transit *)
+        if
+          site_free a r cur.at (cur.t + 1)
+          && (not (Hashtbl.mem seen (cur.at, cur.t + 1)))
+          && not (is_tied r cur.at)
         then begin
           Hashtbl.replace seen (cur.at, cur.t + 1) ();
           push { at = cur.at; t = cur.t + 1; hop = None; parent = i };
@@ -553,11 +600,24 @@ let plan_with (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(pos : (string, stri
     ~(uniform : bool) ~(strict : bool) : layer_plan =
   let li = loop_index a in
   let ctx = sigctx a in
-  let r = fresh ~uniform horizon in
+  let r = fresh ~tied:(tied_of a) ~uniform horizon in
   let moving = List.map fst targets in
   Hashtbl.iter
     (fun ion site -> if not (List.mem ion moving) then reserve_static r site 0)
     pos;
+  (* a class on which an ion rests for the whole plan is closed to every mover; decided
+     before anyone is planned, or an earlier ion could cross a class a later one freezes *)
+  if Hashtbl.length r.tied > 0 then
+    Hashtbl.iter
+      (fun ion site ->
+        let resting =
+          (not (List.mem ion moving))
+          || List.exists (fun (i, g) -> i = ion && g = site) targets
+        in
+        match Hashtbl.find_opt r.tied site with
+        | Some k when resting -> Hashtbl.replace r.frozen k ()
+        | _ -> ())
+      pos;
   (* the movers occupy their start at t=0 *)
   List.iter (fun (ion, _) -> bump r.occ (Hashtbl.find pos ion, 0) 1) targets;
 
