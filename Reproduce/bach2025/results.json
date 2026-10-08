@@ -1,0 +1,182 @@
+{
+ "paper": {
+  "key": "bach2025",
+  "short": "Position Graph",
+  "title": "Efficient Compilation for Shuttling Trapped-Ion Machines via the Position Graph Architectural Abstraction",
+  "authors": [
+   "Bao Bach",
+   "Ilya Safro",
+   "Ed Younis"
+  ],
+  "venue": "arXiv 2025",
+  "year": 2025,
+  "arxiv": "2501.12470",
+  "artifact": {
+   "url": "https://arxiv.org/abs/2501.12470",
+   "commit": null,
+   "license": null,
+   "note": "No code or circuits are published (the paper says a link will follow acceptance), so this paper is reproduced at the level of its model: its device, its timing table and its baseline simulator."
+  },
+  "what": "A graph of ion positions as the compiler's view of any shuttling machine, and two compilers on it (SHAPER, SHAW), compared with QCCDSim on grid devices."
+ },
+ "runs": [
+  {
+   "id": "qft20_G2x3_c5_FM_GS_Greedy",
+   "label": "QFT-20 on G2x3, capacity 5: QCCDSim",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 47580.0,
+    "last_start_us": 47480.0,
+    "moves": 83,
+    "fidelity": 0.67701109177389,
+    "heating": 18.03
+   },
+   "counts": {
+    "gate": 380,
+    "split": 62,
+    "move": 83,
+    "merge": 62
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 47580.0,
+      "theirs": 47580.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.67701109177389,
+      "theirs": 0.67701109177389,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 47580.0,
+      "theirs": 70134.0,
+      "rel": 0.3215843955855933,
+      "verdict": "differs",
+      "where": "Table 3, QCCDSim on the paper's own transpiled QFT-20 (not published)",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py qft20_pg.qasm G2x3 5 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "qft20_pg.qasm",
+     "machine_type": "G2x3",
+     "num_ions_per_region": 5,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out_pg/qft20_G2x3_c5_FM_GS_Greedy/qft20_pg.qasm"
+   },
+   "seconds": 0.18
+  }
+ ],
+ "ratios": [],
+ "ours": [
+  {
+   "id": "qft20_G2x3_c5_ours",
+   "label": "QFT-20 on G2x3, capacity 5",
+   "against": "qft20_G2x3_c5_FM_GS_Greedy",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 27015.0,
+    "last_start_us": 26915.0,
+    "moves": 128,
+    "fidelity": 0.8720705484112741,
+    "heating": 9.280000000000003
+   },
+   "theirs": {
+    "makespan_us": 47580.0,
+    "last_start_us": 47480.0,
+    "moves": 83,
+    "fidelity": 0.67701109177389,
+    "heating": 18.03
+   },
+   "theirs_ok": true,
+   "seconds": 0.11,
+   "paper": {
+    "SHAW": 39871,
+    "SHAPER": 39966
+   }
+  }
+ ]
+}

@@ -1,0 +1,196 @@
+{
+ "paper": {
+  "key": "leblond2023",
+  "short": "TISCC",
+  "title": "TISCC: A Surface Code Compiler and Resource Estimator for Trapped-Ion Processors",
+  "authors": [
+   "Tyler LeBlond",
+   "Justin G. Lietz",
+   "Christopher M. Seck",
+   "Ryan S. Bennink"
+  ],
+  "venue": "SC-W 2023",
+  "year": 2023,
+  "arxiv": "2311.10687",
+  "artifact": {
+   "url": "https://github.com/ORNL-QCI/TISCC",
+   "commit": "1212aec",
+   "license": "UT-Battelle open source license (BSD-style)"
+  },
+  "what": "A grid of trapping zones and X-junctions, one ion per zone; surface-code patches compiled to timed native operations."
+ },
+ "runs": [
+  {
+   "id": "idle_551",
+   "label": "one d=5 error-correction round (TISCC -x 5 -z 5 -t 1 -o idle)",
+   "profile": "tiscc",
+   "checks": {
+    "segment_mutex": "skipped: the profile allows sharing",
+    "trap_serial": "skipped: the profile lets a trap overlap",
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "junction_mutex": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 9613.0,
+    "last_start_us": 9493.0,
+    "moves": 0
+   },
+   "counts": {
+    "prepare": 24,
+    "gate1": 368,
+    "hop": 320,
+    "gate": 80,
+    "measure": 24
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 9613.0,
+      "theirs": 9613.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {},
+   "seconds": 0.05
+  },
+  {
+   "id": "idle_661",
+   "label": "one d=6 round",
+   "profile": "tiscc",
+   "checks": {
+    "segment_mutex": "skipped: the profile allows sharing",
+    "trap_serial": "skipped: the profile lets a trap overlap",
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "junction_mutex": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 9613.0,
+    "last_start_us": 9493.0,
+    "moves": 0
+   },
+   "counts": {
+    "prepare": 35,
+    "gate1": 552,
+    "hop": 480,
+    "gate": 120,
+    "measure": 35
+   },
+   "compare": {},
+   "source": {},
+   "seconds": 0.16
+  }
+ ],
+ "ratios": [],
+ "ours": [
+  {
+   "id": "idle_551_ours",
+   "label": "one d=5 error-correction round",
+   "against": "idle_551",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "tiscc": {
+     "checks": {
+      "segment_mutex": "skipped: the profile allows sharing",
+      "trap_serial": "skipped: the profile lets a trap overlap",
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "junction_mutex": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 8864.5,
+    "last_start_us": 8849.25,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 9613.0,
+    "last_start_us": 9493.0,
+    "moves": 0
+   },
+   "theirs_ok": true,
+   "seconds": 0.05
+  },
+  {
+   "id": "idle_661_ours",
+   "label": "one d=6 round",
+   "against": "idle_661",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "tiscc": {
+     "checks": {
+      "segment_mutex": "skipped: the profile allows sharing",
+      "trap_serial": "skipped: the profile lets a trap overlap",
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "junction_mutex": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 8866.75,
+    "last_start_us": 8849.25,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 9613.0,
+    "last_start_us": 9493.0,
+    "moves": 0
+   },
+   "theirs_ok": true,
+   "seconds": 0.1
+  }
+ ]
+}

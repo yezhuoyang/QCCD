@@ -1,0 +1,43 @@
+diff --git a/a/dump_heuristic.py b/b/dump_heuristic.py
+index a754d7e..cd30b2d 100644
+--- a/a/dump_heuristic.py
++++ b/b/dump_heuristic.py
+@@ -138,7 +138,7 @@ def dump_heuristic(rec, path, config, command, circuit_file, arch, pz, max_times
+             "time_1qubit_gate": mg.time_1qubit_gate,
+             "time_2qubit_gate": mg.time_2qubit_gate,
+             "max_chains_in_parking": mg.max_num_parking,
+-            "compilation (Gate Selection)": True,
++            "compilation (Gate Selection)": rec.get("compilation", True),
+             "max_length (priority queue)": 10,
+             "pz_path_edges (n // 2)": gc.num_edges,
+         },
+diff --git a/a/run_heuristic.py b/b/run_heuristic.py
+index d5163d8..26ed08e 100644
+--- a/a/run_heuristic.py
++++ b/b/run_heuristic.py
+@@ -55,6 +55,7 @@ def run_simulation_for_architecture(arch, seeds, pz, max_timesteps, time_1qubit_
+         )
+         if recorders is not None:
+             recorders[-1]["printed_timestep"] = timestep
++            recorders[-1]["compilation"] = compilation
+             recorders[-1]["cpu_time"] = time.time() - start_time
+         timestep_arr.append(timestep)
+         cpu_time = time.time() - start_time
+@@ -70,6 +71,8 @@ if __name__ == "__main__":
+     # reproduction patch: seed of the random initial placement (original: seeds = [0]) and a JSON dump
+     parser.add_argument("--seed", type=int, default=0)
+     parser.add_argument("--dump", default=None)
++    # diagnostic only (not the paper configuration for FRA): run without the Gate Selection step
++    parser.add_argument("--no-gate-selection", action="store_true")
+     args = parser.parse_args()
+ 
+     with pathlib.Path(args.config_file).open("r") as f:
+@@ -84,7 +87,7 @@ if __name__ == "__main__":
+ 
+     recorders = [] if args.dump else None
+     timestep_arr, cpu_time_arr = run_simulation_for_architecture(
+-            arch, seeds, pz, max_timesteps, recorders=recorders
++            arch, seeds, pz, max_timesteps, recorders=recorders, compilation=not args.no_gate_selection
+         )
+     if args.dump:
+         import sys

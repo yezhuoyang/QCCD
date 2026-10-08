@@ -1,0 +1,1536 @@
+{
+ "paper": {
+  "key": "khan2026cyclone",
+  "short": "Cyclone",
+  "title": "Cyclone: Designing Efficient and Highly Parallel QCCD Architectural Codesigns for Fault Tolerant Quantum Memory",
+  "authors": [
+   "Sahil Khan",
+   "Abhinav Anand",
+   "Kenneth R. Brown",
+   "Jonathan M. Baker"
+  ],
+  "venue": "HPCA 2026",
+  "year": 2026,
+  "arxiv": "2511.15910",
+  "artifact": {
+   "url": "https://github.com/sahilkhan123/Cyclone",
+   "commit": "bb6b551",
+   "license": "MIT"
+  },
+  "what": "A ring of traps where every ancilla moves one trap per step past stationary data, against a QCCDSim grid, for hypergraph-product and bivariate-bicycle codes."
+ },
+ "runs": [
+  {
+   "id": "hgp225_cyclone",
+   "label": "HGP [[225,9,6]], Cyclone, as published",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "executed two-qubit gates differ from the circuit: 732 missing (e.g. [('a239', 'd14'), ('a239', 'd158'), ('a240', 'd15')]), 732 extra (e.g. [('a329', 'd134'), ('a332', 'd138'), ('a332', 'd139')])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 123140.0,
+    "last_start_us": 123040.0,
+    "moves": 23328
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 1512,
+    "split": 23328,
+    "move": 23328,
+    "merge": 23328
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 123140.0,
+      "theirs": 123140.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 123140.0,
+      "theirs": 123140.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Fig. 6, printed",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.generate_code_qldpc(h12) = HgpCode(h12,h12), build_graph(seed=22) [notebook qldpc1]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 108); cyclone_official_compiler(name='225-9-x', input_tuple, machine=m, machString='C108', numAncilla=216, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "225-9-x",
+     "n": 225,
+     "k": 9,
+     "num_xcheck": 108,
+     "num_zcheck": 108,
+     "numAncilla": 216,
+     "trap_amount (x)": 108,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C108",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.generate_code_qldpc(h12) = HgpCode(h12,h12), build_graph(seed=22) [notebook qldpc1]"
+    },
+    "config_name": "hgp225_cyclone"
+   },
+   "seconds": 1.67
+  },
+  {
+   "id": "hgp225_cyclone_zfix",
+   "label": "HGP [[225,9,6]], Cyclone with the Z checks fixed",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 124140.0,
+    "last_start_us": 124040.0,
+    "moves": 23328
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 1512,
+    "split": 23328,
+    "move": 23328,
+    "merge": 23328
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 124140.0,
+      "theirs": 124140.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.generate_code_qldpc(h12) = HgpCode(h12,h12), build_graph(seed=22) [notebook qldpc1]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 108); cyclone_official_compiler(name='225-9-x', input_tuple, machine=m, machString='C108', numAncilla=216, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "225-9-x",
+     "n": 225,
+     "k": 9,
+     "num_xcheck": 108,
+     "num_zcheck": 108,
+     "numAncilla": 216,
+     "trap_amount (x)": 108,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C108",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.generate_code_qldpc(h12) = HgpCode(h12,h12), build_graph(seed=22) [notebook qldpc1]"
+    },
+    "config_name": "hgp225_cyclone_zfix"
+   },
+   "seconds": 2.33
+  },
+  {
+   "id": "hgp375_cyclone",
+   "label": "HGP [[375,15,6]], Cyclone, as published",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "executed two-qubit gates differ from the circuit: 1236 missing (e.g. [('a399', 'd24'), ('a399', 'd264'), ('a403', 'd28')]), 1236 extra (e.g. [('a551', 'd231'), ('a554', 'd222'), ('a553', 'd222')])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 204200.0,
+    "last_start_us": 204100.0,
+    "moves": 64800
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 2520,
+    "split": 64800,
+    "move": 64800,
+    "merge": 64800
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 204200.0,
+      "theirs": 204200.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.HgpCode(h20, h12); build_graph(seed=22) [notebook qldpc3, mislabelled #[[625,25,8]] there]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 180); cyclone_official_compiler(name='375-15-x', input_tuple, machine=m, machString='C180', numAncilla=360, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "375-15-x",
+     "n": 375,
+     "k": 15,
+     "num_xcheck": 180,
+     "num_zcheck": 180,
+     "numAncilla": 360,
+     "trap_amount (x)": 180,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C180",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.HgpCode(h20, h12); build_graph(seed=22) [notebook qldpc3, mislabelled #[[625,25,8]] there]"
+    },
+    "config_name": "hgp375_cyclone"
+   },
+   "seconds": 3.94
+  },
+  {
+   "id": "hgp375_cyclone_zfix",
+   "label": "HGP [[375,15,6]], Cyclone with the Z checks fixed",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 204800.0,
+    "last_start_us": 204700.0,
+    "moves": 64800
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 2520,
+    "split": 64800,
+    "move": 64800,
+    "merge": 64800
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 204800.0,
+      "theirs": 204800.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.HgpCode(h20, h12); build_graph(seed=22) [notebook qldpc3, mislabelled #[[625,25,8]] there]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 180); cyclone_official_compiler(name='375-15-x', input_tuple, machine=m, machString='C180', numAncilla=360, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "375-15-x",
+     "n": 375,
+     "k": 15,
+     "num_xcheck": 180,
+     "num_zcheck": 180,
+     "numAncilla": 360,
+     "trap_amount (x)": 180,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C180",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.HgpCode(h20, h12); build_graph(seed=22) [notebook qldpc3, mislabelled #[[625,25,8]] there]"
+    },
+    "config_name": "hgp375_cyclone_zfix"
+   },
+   "seconds": 4.6
+  },
+  {
+   "id": "hgp625_cyclone",
+   "label": "HGP [[625,25,8]], Cyclone, as published",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "executed two-qubit gates differ from the circuit: 2076 missing (e.g. [('a649', 'd24'), ('a649', 'd424'), ('a653', 'd28')]), 2076 extra (e.g. [('a924', 'd391'), ('a921', 'd391'), ('a924', 'd382')])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 340300.0,
+    "last_start_us": 340200.0,
+    "moves": 180000
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 4200,
+    "split": 180000,
+    "move": 180000,
+    "merge": 180000
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 340300.0,
+      "theirs": 340300.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.generate_code_qldpc(h20) = HgpCode(h20,h20), build_graph(seed=22) [notebook qldpc2, mislabelled #[[375,15,6]] there]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 300); cyclone_official_compiler(name='625-25-x', input_tuple, machine=m, machString='C300', numAncilla=600, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "625-25-x",
+     "n": 625,
+     "k": 25,
+     "num_xcheck": 300,
+     "num_zcheck": 300,
+     "numAncilla": 600,
+     "trap_amount (x)": 300,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C300",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.generate_code_qldpc(h20) = HgpCode(h20,h20), build_graph(seed=22) [notebook qldpc2, mislabelled #[[375,15,6]] there]"
+    },
+    "config_name": "hgp625_cyclone"
+   },
+   "seconds": 13.09
+  },
+  {
+   "id": "hgp625_cyclone_zfix",
+   "label": "HGP [[625,25,8]], Cyclone with the Z checks fixed",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 341500.0,
+    "last_start_us": 341400.0,
+    "moves": 180000
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 4200,
+    "split": 180000,
+    "move": 180000,
+    "merge": 180000
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 341500.0,
+      "theirs": 341500.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone compiler (cyclone_compiler.cyclone_official_compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "notebook cell 5 for one code: cyclone_compiler.generate_code_qldpc(h20) = HgpCode(h20,h20), build_graph(seed=22) [notebook qldpc2, mislabelled #[[375,15,6]] there]; get_input_tuple_from_code_qldpc(code); make_circle_machine_length_n(5, mpar_model1, 300); cyclone_official_compiler(name='625-25-x', input_tuple, machine=m, machString='C300', numAncilla=600, ions=5, shuttling_times=165, ionSWAP=False)",
+    "config": {
+     "code": "625-25-x",
+     "n": 625,
+     "k": 25,
+     "num_xcheck": 300,
+     "num_zcheck": 300,
+     "numAncilla": 600,
+     "trap_amount (x)": 300,
+     "ions (C)": 5,
+     "shuttling_times": 165,
+     "ionSWAP": false,
+     "machString": "C300",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "code_construction": "cyclone_compiler.generate_code_qldpc(h20) = HgpCode(h20,h20), build_graph(seed=22) [notebook qldpc2, mislabelled #[[375,15,6]] there]"
+    },
+    "config_name": "hgp625_cyclone_zfix"
+   },
+   "seconds": 11.59
+  },
+  {
+   "id": "hgp225_baseline_Gx15_c5",
+   "label": "HGP [[225,9,6]], the baseline grid (QCCDSim, 15x15 traps, capacity 5)",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "failed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": false,
+   "violations": {
+    "capacity": 14
+   },
+   "first_violations": [
+    {
+     "check": "capacity",
+     "message": "trap T17 holds 8 ions at t=344205 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T46 holds 8 ions at t=184855 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T19 holds 8 ions at t=86340 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T30 holds 8 ions at t=17645 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T34 holds 8 ions at t=30085 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T36 holds 8 ions at t=26255 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T60 holds 8 ions at t=22620 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T80 holds 8 ions at t=63735 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T65 holds 8 ions at t=63450 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T61 holds 8 ions at t=368475 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T64 holds 8 ions at t=74425 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T47 holds 8 ions at t=94880 us; capacity 7",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 502675.0,
+    "last_start_us": 502575.0,
+    "moves": 8484,
+    "fidelity": 0.004665527731064183,
+    "heating": 682.6399999999999
+   },
+   "counts": {
+    "gate": 1512,
+    "split": 3238,
+    "move": 8484,
+    "merge": 3238
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 502675.0,
+      "theirs": 502675.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 502675.0,
+      "theirs": 502675.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Fig. 6, printed",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim fork vendored in the Cyclone artifact (run.py, EJFSchedule)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "python run.py QLDPC_Codes/QLPDC[[225,9,6]].qasm Gx15 5 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "program": "QLDPC_Codes/QLPDC[[225,9,6]].qasm",
+     "machine": "Gx15",
+     "ions_per_region (capacity at mapping)": 5,
+     "mapper": "Greedy",
+     "reorder": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "np.random.seed": 12345,
+     "capacity_after_add_comm_capacity(2) (used by scheduler and FM gate law)": 7,
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     }
+    },
+    "circuit_file": "QLPDC[[225,9,6]].qasm"
+   },
+   "seconds": 4.66
+  },
+  {
+   "id": "bb72_cyclone",
+   "label": "BB [[72,12,6]], Cyclone",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 42280.0,
+    "last_start_us": 42180.0,
+    "moves": 2592
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 432,
+    "split": 2592,
+    "move": 2592,
+    "merge": 2592
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 42280.0,
+      "theirs": 42280.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 42280.0,
+      "theirs": 42280.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the time behind Fig. 14 (the artifact's result files)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone BB compiler (BB_compilers.cyclone_BB_codes via run_cyclone_BB_Compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "BB_compilers.run_cyclone_BB_Compiler('72-12-6', 36, error_rates=[0.00125, 0.0015, 0.00175], num_shots=1000) [notebook cell 10] with generate_BBcode_numbers replaced by a no-op (no LER)",
+    "config": {
+     "code": "72-12-6",
+     "n": 72,
+     "numAncilla (len(cx_arr))": 72,
+     "trap_amount (x)": 36,
+     "ions (C) = ceil(n/x)+ceil((numAncilla/2)/x)": 3,
+     "shuttling_times": 165,
+     "k (unused)": 1,
+     "machString": "C36",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "input": "singleCycleCircQASMobj_72-12-6.pkl (IBM single-cycle circuit object; X checks then Z checks)"
+    },
+    "config_name": "bb72_cyclone"
+   },
+   "seconds": 0.26
+  },
+  {
+   "id": "bb90_cyclone",
+   "label": "BB [[90,8,10]], Cyclone",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 52450.0,
+    "last_start_us": 52350.0,
+    "moves": 4050
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 540,
+    "split": 4050,
+    "move": 4050,
+    "merge": 4050
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 52450.0,
+      "theirs": 52450.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 52450.0,
+      "theirs": 52450.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the time behind Fig. 14 (the artifact's result files)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone BB compiler (BB_compilers.cyclone_BB_codes via run_cyclone_BB_Compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "BB_compilers.run_cyclone_BB_Compiler('90-8-10', 45, error_rates=[0.00125, 0.0015, 0.00175], num_shots=1000) [notebook cell 10] with generate_BBcode_numbers replaced by a no-op (no LER)",
+    "config": {
+     "code": "90-8-10",
+     "n": 90,
+     "numAncilla (len(cx_arr))": 90,
+     "trap_amount (x)": 45,
+     "ions (C) = ceil(n/x)+ceil((numAncilla/2)/x)": 3,
+     "shuttling_times": 165,
+     "k (unused)": 1,
+     "machString": "C45",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "input": "singleCycleCircQASMobj_90-8-10.pkl (IBM single-cycle circuit object; X checks then Z checks)"
+    },
+    "config_name": "bb90_cyclone"
+   },
+   "seconds": 0.7
+  },
+  {
+   "id": "bb144_cyclone",
+   "label": "BB [[144,12,12]], Cyclone",
+   "profile": "cyclone",
+   "checks": {
+    "chain_order": "skipped: chain order is not tracked",
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 81860.0,
+    "last_start_us": 81760.0,
+    "moves": 10368
+   },
+   "counts": {
+    "gate1": 2,
+    "gate": 864,
+    "split": 10368,
+    "move": 10368,
+    "merge": 10368
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 81860.0,
+      "theirs": 81860.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 81860.0,
+      "theirs": 81860.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the time behind Fig. 14 (the artifact's result files)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "Cyclone BB compiler (BB_compilers.cyclone_BB_codes via run_cyclone_BB_Compiler)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "BB_compilers.run_cyclone_BB_Compiler('144-12-12', 72, error_rates=[0.00125, 0.0015, 0.00175], num_shots=1000) [notebook cell 10] with generate_BBcode_numbers replaced by a no-op (no LER)",
+    "config": {
+     "code": "144-12-12",
+     "n": 144,
+     "numAncilla (len(cx_arr))": 144,
+     "trap_amount (x)": 72,
+     "ions (C) = ceil(n/x)+ceil((numAncilla/2)/x)": 3,
+     "shuttling_times": 165,
+     "k (unused)": 1,
+     "machString": "C72",
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     },
+     "gcost formula": "max(100, 13.33*ions-54)",
+     "input": "singleCycleCircQASMobj_144-12-12.pkl (IBM single-cycle circuit object; X checks then Z checks)"
+    },
+    "config_name": "bb144_cyclone"
+   },
+   "seconds": 1.2
+  },
+  {
+   "id": "bb72_baseline_Gx9_c5",
+   "label": "BB [[72,12,6]], the baseline grid (9x9 traps, capacity 5)",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "failed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": false,
+   "violations": {
+    "capacity": 3
+   },
+   "first_violations": [
+    {
+     "check": "capacity",
+     "message": "trap T12 holds 8 ions at t=21770 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T19 holds 8 ions at t=8135 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T9 holds 8 ions at t=58670 us; capacity 7",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 164520.0,
+    "last_start_us": 164420.0,
+    "moves": 1393,
+    "fidelity": 0.21874197161893597,
+    "heating": 163.12999999999997
+   },
+   "counts": {
+    "gate": 432,
+    "split": 730,
+    "move": 1393,
+    "merge": 730
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 164520.0,
+      "theirs": 164520.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 164520.0,
+      "theirs": 164520.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the artifact's recorded output, plotted in Fig. 19",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim fork vendored in the Cyclone artifact (run.py, EJFSchedule)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "python run.py QLDPC_Codes/QLPDC[[72,12,6]].qasm Gx9 5 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "program": "QLDPC_Codes/QLPDC[[72,12,6]].qasm",
+     "machine": "Gx9",
+     "ions_per_region (capacity at mapping)": 5,
+     "mapper": "Greedy",
+     "reorder": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "np.random.seed": 12345,
+     "capacity_after_add_comm_capacity(2) (used by scheduler and FM gate law)": 7,
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     }
+    },
+    "circuit_file": "QLPDC[[72,12,6]].qasm"
+   },
+   "seconds": 0.51
+  },
+  {
+   "id": "bb90_baseline_Gx10_c5",
+   "label": "BB [[90,8,10]], the baseline grid (10x10 traps, capacity 5)",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "failed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": false,
+   "violations": {
+    "capacity": 3
+   },
+   "first_violations": [
+    {
+     "check": "capacity",
+     "message": "trap T13 holds 8 ions at t=177490 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T30 holds 8 ions at t=109110 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T25 holds 8 ions at t=66245 us; capacity 7",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 188595.0,
+    "last_start_us": 188495.0,
+    "moves": 1872,
+    "fidelity": 0.15372719075870966,
+    "heating": 199.71999999999997
+   },
+   "counts": {
+    "gate": 540,
+    "split": 844,
+    "move": 1872,
+    "merge": 844
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 188595.0,
+      "theirs": 188595.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 188595.0,
+      "theirs": 188595.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the artifact's recorded output, plotted in Fig. 19",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim fork vendored in the Cyclone artifact (run.py, EJFSchedule)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "python run.py QLDPC_Codes/QLPDC[[90,8,10]].qasm Gx10 5 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "program": "QLDPC_Codes/QLPDC[[90,8,10]].qasm",
+     "machine": "Gx10",
+     "ions_per_region (capacity at mapping)": 5,
+     "mapper": "Greedy",
+     "reorder": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "np.random.seed": 12345,
+     "capacity_after_add_comm_capacity(2) (used by scheduler and FM gate law)": 7,
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     }
+    },
+    "circuit_file": "QLPDC[[90,8,10]].qasm"
+   },
+   "seconds": 0.79
+  },
+  {
+   "id": "bb144_baseline_Gx12_c5",
+   "label": "BB [[144,12,12]], the baseline grid (12x12 traps, capacity 5)",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "failed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": false,
+   "violations": {
+    "capacity": 4
+   },
+   "first_violations": [
+    {
+     "check": "capacity",
+     "message": "trap T14 holds 8 ions at t=16665 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T18 holds 8 ions at t=176220 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T26 holds 8 ions at t=14005 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T37 holds 8 ions at t=219345 us; capacity 7",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 270145.0,
+    "last_start_us": 270045.0,
+    "moves": 3883,
+    "fidelity": 0.05811311771431653,
+    "heating": 342.53
+   },
+   "counts": {
+    "gate": 864,
+    "split": 1615,
+    "move": 3883,
+    "merge": 1615
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 270145.0,
+      "theirs": 270145.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 270145.0,
+      "theirs": 270145.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "the artifact's recorded output, plotted in Fig. 19",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim fork vendored in the Cyclone artifact (run.py, EJFSchedule)",
+    "repo": "https://github.com/sahilkhan123/Cyclone",
+    "commit": "bb6b5510632267e5cbb2116a8fa8fa20d867c158",
+    "command": "python run.py QLDPC_Codes/QLPDC[[144,12,12]].qasm Gx12 5 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "program": "QLDPC_Codes/QLPDC[[144,12,12]].qasm",
+     "machine": "Gx12",
+     "ions_per_region (capacity at mapping)": 5,
+     "mapper": "Greedy",
+     "reorder": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "np.random.seed": 12345,
+     "capacity_after_add_comm_capacity(2) (used by scheduler and FM gate law)": 7,
+     "mparams": {
+      "alpha": 0.003680029,
+      "beta": 39.996319971,
+      "split_merge_time": 80,
+      "shuttle_time": 5,
+      "junction2_cross_time": 5,
+      "junction3_cross_time": 100,
+      "junction4_cross_time": 120,
+      "gate_type": "FM",
+      "swap_type": "GateSwap",
+      "ion_swap_time": 42
+     }
+    },
+    "circuit_file": "QLPDC[[144,12,12]].qasm"
+   },
+   "seconds": 1.83
+  }
+ ],
+ "ratios": [],
+ "ours": [
+  {
+   "id": "hgp225_ours",
+   "label": "HGP [[225,9,6]]",
+   "against": "hgp225_cyclone_zfix",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 55570.0,
+    "last_start_us": 55470.0,
+    "moves": 10584
+   },
+   "theirs": {
+    "makespan_us": 124140.0,
+    "last_start_us": 124040.0,
+    "moves": 23328
+   },
+   "theirs_ok": true,
+   "seconds": 1.78
+  },
+  {
+   "id": "hgp375_ours",
+   "label": "HGP [[375,15,6]]",
+   "against": "hgp375_cyclone_zfix",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 83455.0,
+    "last_start_us": 83355.0,
+    "moves": 26460
+   },
+   "theirs": {
+    "makespan_us": 204800.0,
+    "last_start_us": 204700.0,
+    "moves": 64800
+   },
+   "theirs_ok": true,
+   "seconds": 4.99
+  },
+  {
+   "id": "hgp625_ours",
+   "label": "HGP [[625,25,8]]",
+   "against": "hgp625_cyclone_zfix",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 136965.0,
+    "last_start_us": 136865.0,
+    "moves": 72300
+   },
+   "theirs": {
+    "makespan_us": 341500.0,
+    "last_start_us": 341400.0,
+    "moves": 180000
+   },
+   "theirs_ok": true,
+   "seconds": 11.71
+  },
+  {
+   "id": "bb72_ours",
+   "label": "BB [[72,12,6]]",
+   "against": "bb72_cyclone",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 17150.0,
+    "last_start_us": 17050.0,
+    "moves": 1080
+   },
+   "theirs": {
+    "makespan_us": 42280.0,
+    "last_start_us": 42180.0,
+    "moves": 2592
+   },
+   "theirs_ok": true,
+   "seconds": 0.13
+  },
+  {
+   "id": "bb90_ours",
+   "label": "BB [[90,8,10]]",
+   "against": "bb90_cyclone",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 18280.0,
+    "last_start_us": 18180.0,
+    "moves": 1440
+   },
+   "theirs": {
+    "makespan_us": 52450.0,
+    "last_start_us": 52350.0,
+    "moves": 4050
+   },
+   "theirs_ok": true,
+   "seconds": 0.3
+  },
+  {
+   "id": "bb144_ours",
+   "label": "BB [[144,12,12]]",
+   "against": "bb144_cyclone",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "cyclone": {
+     "checks": {
+      "chain_order": "skipped: chain order is not tracked",
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 22800.0,
+    "last_start_us": 22700.0,
+    "moves": 2880
+   },
+   "theirs": {
+    "makespan_us": 81860.0,
+    "last_start_us": 81760.0,
+    "moves": 10368
+   },
+   "theirs_ok": true,
+   "seconds": 0.66
+  }
+ ]
+}

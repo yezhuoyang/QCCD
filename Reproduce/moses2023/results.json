@@ -1,0 +1,6449 @@
+{
+ "paper": {
+  "key": "moses2023",
+  "arxiv": "2305.03828",
+  "version_read": "v2",
+  "title": "A Race Track Trapped-Ion Quantum Processor",
+  "venue": "Phys. Rev. X 13, 041052 (2023)",
+  "artifact": {
+   "url": "https://github.com/Quantinuum/quantinuum-hardware-h2-benchmark (was CQCL/quantinuum-hardware-h2-benchmark)",
+   "commit": "d422a716977899d7d6603c9efadb44e89e495125",
+   "license": "none; README: (c) 2023 by Quantinuum. All Rights Reserved.",
+   "use": "read and run locally; no file of it is in this repository. Circuits are identified by the sha256 of their QASM text."
+  }
+ },
+ "device": {
+  "arch": "Reproduce/moses2023/h2.arch.json",
+  "sha256": "7de34f2f00291d70469bda60838be28bd58d8d95dbeb5283b4dfff35b47ab834",
+  "violations_R11_R18_R19_R20_R21": [],
+  "gate_zones": [
+   "DG01",
+   "DG02",
+   "DG03",
+   "DG04"
+  ],
+  "sites": 59,
+  "capacity_qubits": 77,
+  "design": "Reproduce/moses2023/DESIGN.md"
+ },
+ "compiler": {
+  "binary": "qccdc_cli.exe, release 35bf68427d9c (windows-x86_64)",
+  "sha256": "95951a42795a6ada42a5ccecb84d60b9c17361e16536644a83188896727fc0fc",
+  "call": "qccd.qec.compile_with_qccdc(qasm, h2.arch.json, workdir, mode='compile')",
+  "verifier_model": "corrected_model(table='local') -- unit times"
+ },
+ "rewrite": {
+  "rules": "Reproduce/moses2023/circuits.py docstring",
+  "checks": "    qv_n16_000: classical fidelity to the ideal circuit 0.9644; angles x2 0.6165, angles x1/2 0.6024, YY sign flipped 0.6168\n    qv_n16_001: classical fidelity to the ideal circuit 0.9591; angles x2 0.6156, angles x1/2 0.5864, YY sign flipped 0.6146\n    qv_n16_002: classical fidelity to the ideal circuit 0.9665; angles x2 0.6166, angles x1/2 0.5977, YY sign flipped 0.6153\n    qv_n16_003: classical fidelity to the ideal circuit 0.9698; angles x2 0.6188, angles x1/2 0.6036, YY sign flipped 0.6192\n    heavy_ideal[0] = 0.845792432 is the ideal heavy-output probability of qv_circs_nomeas[1] (0.845792432)\n    heavy_ideal[1] = 0.846175194 is the ideal heavy-output probability of qv_circs_nomeas[0] (0.846175194)\n    heavy_ideal[2] = 0.847123328 is the ideal heavy-output probability of qv_circs_nomeas[2] (0.847123328)\n    heavy_ideal[3] = 0.846869733 is the ideal heavy-output probability of qv_circs_nomeas[3] (0.846869733)\nok   50 x  worst 4.72e-16  U1q(t,f) == u3(t, f-pi/2, pi/2-f)\nok   50 x  worst 4.97e-16  RZZ rewrite == its definition\nok   50 x  worst 5.55e-16  Rxxyyzz rewrite == its definition\nok    1 x  worst 3.14e-16  ZZ rewrite == U_ZZ(pi/2) = exp(-i pi/4 ZZ)\nok   10 x  worst 0.00e+00  mb_n32 # deterministic output == surv_state (c0 last)\nok    3 x  worst 8.07e-11  rcs_# sampled-bitstring ideal probabilities (relative, bit order c0_last)\nok    4 x  worst 0.00e+00  qv executed circuit (rewritten) is the ideal one up to pytket's approximation: fidelity > 0.9 and > every alternative convention + 0.2\nok    4 x  worst 1.45e-14  qv heavy_ideal[i] equals the heavy-output probability of some ideal circuit among the ones simulated\n"
+ },
+ "rounds_definition": "one gate instruction carrying two-qubit pairs (an MS round); a scheduling proxy, not a time",
+ "table": [
+  {
+   "family": "ghz",
+   "row": "GHZ",
+   "qubits": 32,
+   "gates": 31,
+   "rounds": 14,
+   "circuits": 1,
+   "ours_gates": {
+    "n": 1,
+    "min": 31,
+    "median": 31,
+    "mean": 31.0,
+    "max": 31
+   },
+   "depth": {
+    "n": 1,
+    "min": 5,
+    "median": 5,
+    "mean": 5.0,
+    "max": 5
+   },
+   "floor": {
+    "n": 1,
+    "min": 8,
+    "median": 8,
+    "mean": 8.0,
+    "max": 8
+   },
+   "layered": {
+    "n": 1,
+    "min": 9,
+    "median": 9,
+    "mean": 9.0,
+    "max": 9
+   },
+   "compiler_verdicts": {
+    "refused (refused)": 1
+   },
+   "compiler_rounds": {}
+  },
+  {
+   "family": "mb",
+   "row": "MB, l=10",
+   "qubits": 32,
+   "gates": 320,
+   "rounds": 80,
+   "circuits": 10,
+   "ours_gates": {
+    "n": 10,
+    "min": 320,
+    "median": 320,
+    "mean": 320.0,
+    "max": 320
+   },
+   "depth": {
+    "n": 10,
+    "min": 20,
+    "median": 20,
+    "mean": 20.0,
+    "max": 20
+   },
+   "floor": {
+    "n": 10,
+    "min": 80,
+    "median": 80,
+    "mean": 80.0,
+    "max": 80
+   },
+   "layered": {
+    "n": 10,
+    "min": 80,
+    "median": 80,
+    "mean": 80.0,
+    "max": 80
+   },
+   "compiler_verdicts": {
+    "refused (refused)": 10
+   },
+   "compiler_rounds": {}
+  },
+  {
+   "family": "qv",
+   "row": "QV",
+   "qubits": 16,
+   "gates": 310,
+   "rounds": 128,
+   "note": "Table I lists one example circuit; the text gives an average of 296 two-qubit gates over the 200 circuits (Sec. IV.B)",
+   "circuits": 200,
+   "ours_gates": {
+    "n": 200,
+    "min": 273,
+    "median": 296,
+    "mean": 296.26,
+    "max": 317
+   },
+   "depth": {
+    "n": 200,
+    "min": 42,
+    "median": 46,
+    "mean": 45.77,
+    "max": 48
+   },
+   "floor": {
+    "n": 200,
+    "min": 69,
+    "median": 74,
+    "mean": 74.46,
+    "max": 80
+   },
+   "layered": {
+    "n": 200,
+    "min": 83,
+    "median": 90,
+    "mean": 89.52,
+    "max": 95
+   },
+   "compiler_verdicts": {
+    "refused (refused)": 200
+   },
+   "compiler_rounds": {},
+   "circuits_with_310_gates": [
+    "qv_n16_044",
+    "qv_n16_068",
+    "qv_n16_097",
+    "qv_n16_112",
+    "qv_n16_145",
+    "qv_n16_161",
+    "qv_n16_164",
+    "qv_n16_188"
+   ],
+   "layered_of_those": [
+    89,
+    90,
+    90,
+    91,
+    94,
+    94,
+    94,
+    95
+   ],
+   "floor_of_those": [
+    78,
+    78,
+    78,
+    78,
+    78,
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "family": "rcs",
+   "row": "RCS",
+   "qubits": 32,
+   "gates": 172,
+   "rounds": 56,
+   "circuits": 10,
+   "ours_gates": {
+    "n": 10,
+    "min": 172,
+    "median": 172,
+    "mean": 172.0,
+    "max": 172
+   },
+   "depth": {
+    "n": 10,
+    "min": 14,
+    "median": 14,
+    "mean": 14.0,
+    "max": 14
+   },
+   "floor": {
+    "n": 10,
+    "min": 43,
+    "median": 43,
+    "mean": 43.0,
+    "max": 43
+   },
+   "layered": {
+    "n": 10,
+    "min": 46,
+    "median": 46,
+    "mean": 46.0,
+    "max": 46
+   },
+   "compiler_verdicts": {
+    "refused (refused)": 10
+   },
+   "compiler_rounds": {}
+  },
+  {
+   "family": "qaoa",
+   "row": "QAOA, p=2",
+   "qubits": 32,
+   "gates": 96,
+   "rounds": 66,
+   "circuits": 27,
+   "ours_gates": {
+    "n": 27,
+    "min": 96,
+    "median": 96,
+    "mean": 96.0,
+    "max": 96
+   },
+   "depth": {
+    "n": 27,
+    "min": 27,
+    "median": 27,
+    "mean": 27.0,
+    "max": 27
+   },
+   "floor": {
+    "n": 27,
+    "min": 27,
+    "median": 27,
+    "mean": 27.0,
+    "max": 27
+   },
+   "layered": {
+    "n": 27,
+    "min": 34,
+    "median": 34,
+    "mean": 34.0,
+    "max": 34
+   },
+   "compiler_verdicts": {
+    "refused (refused)": 27
+   },
+   "compiler_rounds": {}
+  }
+ ],
+ "circuits": [
+  {
+   "family": "ghz",
+   "id": "ghz_n32",
+   "source_sha256": "f51e7c0493bfd29db3efc60a0b8fbedb6817627ff3c23aaa406e173bd8f403d5",
+   "rewritten_sha256": "026ad48c1243f6075c330225292d49a8be1513542bed7747449ad8e824075c8c",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 31,
+    "depth": 5,
+    "floor": 8,
+    "layered": 9,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 2.7
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 32 qubits, 32 clbits, 64 ops (31 two-qubit), 63 edges, Clifford -> h2_moses2023 (conveyor regime) / 51 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 12,
+     "rounds": 1,
+     "pairs": 4,
+     "pairs_per_round": {
+      "4": 1
+     },
+     "transport_cycles": 2,
+     "cool": 1,
+     "measure_instructions": 1,
+     "circuit_ops": 64,
+     "unrealised": 51,
+     "unrealised_by_gate": {
+      "cx": 27,
+      "measure": 24
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.5
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_0",
+   "source_sha256": "3edaf13b6eaeb5e84e2b25a70da5cdf75a48a502c2230ac288a4de716d05b922",
+   "rewritten_sha256": "94a499c037d8f35aa876c6a7190844f6c7f13982ef6bb214e6beb5a1da7379c9",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.4
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_1",
+   "source_sha256": "dfa48bd545381a251e06ce32d4f981d5e604ca4fdf7583b851b63c89e27bb19c",
+   "rewritten_sha256": "96f99f8d195b0f89b65937ca1baf9f50812775dd264d485341a81212e2edbca1",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 2.4
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL07 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_2",
+   "source_sha256": "d2e3b363ddff07aacd5a709835d4683dd806f4217c27460152c0f7c27b535e6a",
+   "rewritten_sha256": "1f0c93556f0c1e23976cbf6d72f14f8a5abdad851957ec6b1e96725daf0c95ec",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.6
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG04 from CR05 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.8
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_3",
+   "source_sha256": "041b37f9d64d0bca641dd57998ea53b0bfa509b1fbba895768dbb46f0f6763aa",
+   "rewritten_sha256": "2f43a70d19c05373bbdac7d0cdd1521fe6e89ffc6d3de60ff17eb669515e4680",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.1
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CR02 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_4",
+   "source_sha256": "41ea44c62d54899d3ea397340ad4d9d78b353b4b2b26cb02e0917a669028c4eb",
+   "rewritten_sha256": "9757768025941d7ab4fc47b82a5326c5aef23fb45f3d8c9293f6ce3f4bdae907",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.5
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL11 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_5",
+   "source_sha256": "3c11aaf685922d564ae319f638f1d5d35d85019dd3f2554cd345f9d769242b3b",
+   "rewritten_sha256": "bdd4e8094db971a8517f0612670b207e02a3e3dc12429c036c7fda14ebda3eeb",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.5
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG02 from CR05 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_6",
+   "source_sha256": "c3eb07ae9387085a996adfd7fde914e0bc45054f0649ffe4c462e22630b1fbf2",
+   "rewritten_sha256": "a01dd20df6d4e7d0a96a6a1e1f97ee4480e92537eb4dd8821e1f5d1cdc0c73e4",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.2
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CR04 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_7",
+   "source_sha256": "49aced7fb8792c6a0d844cef548655fa0e96335d6e5392779367934726e4d7f0",
+   "rewritten_sha256": "b8c5e08b54e7a960bbe2efff26c62464fb9bd7ee2b3ec4b3dc1c07190fea5d6d",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 2.0
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL11 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_8",
+   "source_sha256": "c794bb633bc7c1a4b5990b2e0e84bbdfad4ef46072b8b676ddce0c04e1e5aff7",
+   "rewritten_sha256": "8910124a4e1a2eb3423e8815bfb46ca892077a2ff8b52c06117b8853fd51419d",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.4
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL09 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "mb",
+   "id": "mb_n32_l10_9",
+   "source_sha256": "edb296f083e5932633eb0de29bece1ce6e868633b35bcf8c0c0e67c8e300aa1d",
+   "rewritten_sha256": "822ac20b8beff8e1689ce7e3271c8b4eda1ce9b5aa6972761d9bb59e02e20376",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 320,
+    "depth": 20,
+    "floor": 80,
+    "layered": 80,
+    "widest_layer": 16
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 32 qubits: no lowering to 1- and 2-qubit gates\")",
+    "seconds": 1.5
+   },
+   "compile_without_barriers": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CR03 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_000",
+   "source_sha256": "22b43a7d1f9f3498aa25e7f728edc4842bbfb6ef072fd6d3dc5c8f2ddd5a26af",
+   "rewritten_sha256": "7c77cb3c619fbd362ed21c40eac9fc1a6802ee89167d07df4d507b41d7d9c4cb",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 281,
+    "depth": 46,
+    "floor": 71,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_001",
+   "source_sha256": "42434284eceb1cfcd15168a7d770abc50f92839e4d2863fe6f9c333d6d900d65",
+   "rewritten_sha256": "ccc6bd85caf45484b52e5bf8aa480c3f8da242c7049311054392570fe3a51a00",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 284,
+    "depth": 45,
+    "floor": 71,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_002",
+   "source_sha256": "b017ae1e5f7308b9e822fa6d6701297577f801a3c84cc627d5443a7c02d997ec",
+   "rewritten_sha256": "28e1c8625e4fae610657635bfee289ea96a338b4f18c4fbbe2ad02bcfa63ea14",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 309,
+    "depth": 45,
+    "floor": 78,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_003",
+   "source_sha256": "e821ee1771a1670010a09977f8f2e7519bf0187d6e028eccdf8002c36f44f372",
+   "rewritten_sha256": "97adc0b75fb115924ffa36a7dd38ca1778efcabc418effa614ed476122c76bf9",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 278,
+    "depth": 46,
+    "floor": 70,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1196 ops (278 two-qubit), 1458 edges, 520 non-Clifford ops -> h2_moses2023 (conveyor regime) / 869 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 261,
+     "rounds": 12,
+     "pairs": 19,
+     "pairs_per_round": {
+      "1": 8,
+      "2": 2,
+      "3": 1,
+      "4": 1
+     },
+     "transport_cycles": 56,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1196,
+     "unrealised": 869,
+     "unrealised_by_gate": {
+      "u3": 175,
+      "rxx": 259,
+      "sdg": 163,
+      "s": 149,
+      "h": 115,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 105,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL15', 'CL16', 'CL17', 'CL18'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL15', 'CL16', 'CL17', 'CL18'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_004",
+   "source_sha256": "62ba6d92ba6be94c582a9355e9a2dae49d273257fa51845299d85728a6a9fa08",
+   "rewritten_sha256": "260ee1313af79524b01c95879a9cb66111f2471858b38f43045129370e0e9b4a",
+   "zero_angle_components_dropped": 70,
+   "bounds": {
+    "gates": 302,
+    "depth": 45,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_005",
+   "source_sha256": "099ae2f02ca8848e3561ba7dc70f4d642991e5822f3717621448625f63d2331a",
+   "rewritten_sha256": "3b276368c549b01b3ee647cf5a612bfb58fde73f804d28221388bd16b2ce6967",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 293,
+    "depth": 45,
+    "floor": 74,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_006",
+   "source_sha256": "1f6a91a794309faeac92cf7cfdfb6643504a02aff880ba3a85a1d4c6adf0cb0f",
+   "rewritten_sha256": "32dff5d285be91565dddc333f1a4cb4c6c0298c95db3f27a8360076e3caadb8c",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 311,
+    "depth": 47,
+    "floor": 78,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1339 ops (311 two-qubit), 1634 edges, 575 non-Clifford ops -> h2_moses2023 (conveyor regime) / 992 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 227,
+     "rounds": 11,
+     "pairs": 11,
+     "pairs_per_round": {
+      "1": 11
+     },
+     "transport_cycles": 13,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1339,
+     "unrealised": 992,
+     "unrealised_by_gate": {
+      "u3": 197,
+      "rxx": 300,
+      "sdg": 181,
+      "s": 163,
+      "h": 143,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 6,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL18', 'CR01', 'CR02', 'CR03'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL18', 'CR01', 'CR02', 'CR03'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_007",
+   "source_sha256": "f444adb937ac282a03f0b8828830f2d8a458b7ad3b1a238088ffff12cbed7465",
+   "rewritten_sha256": "3a204556f37fe1dcb33b85229d546162618bb64fe14c15bb00ad24c07d1209b1",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 302,
+    "depth": 47,
+    "floor": 76,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_008",
+   "source_sha256": "f5b86b3867de59200ec3298842a4e10af2c3241a1535d26ee5190581ce32a0c1",
+   "rewritten_sha256": "6eb8be0ea69d0feb8ba0c271542ff742fcae662e39500ea1312319627c826fba",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 298,
+    "depth": 45,
+    "floor": 75,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_009",
+   "source_sha256": "f4d012c5b998cf4948fabd345bb739fdb74069529395147b6e7f98b5bbc6e5ec",
+   "rewritten_sha256": "0f1f72f5776876ca3dde021b4bac7a370fbdcd364e480fd25893cb5c64b5493c",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 292,
+    "depth": 45,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_010",
+   "source_sha256": "7e6b36e688dce6125dc70248236547a6ecd77dbeacfda22212e9589d5c95beee",
+   "rewritten_sha256": "4e973955eddc30932fede52c4966eb24dace99984c898114212edef1fd78d160",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 304,
+    "depth": 46,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_011",
+   "source_sha256": "c69a9d2ac03704b82089d9dd4a558c2b511a749a488497c9a08abd8db27b7735",
+   "rewritten_sha256": "c5481835ac5a7a8f81c3fd6c37b0c20b5da483412cf5364a6f3b32d58091e585",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 290,
+    "depth": 45,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_012",
+   "source_sha256": "21f0d17a66b689392637d15019f6d607ef3526b0293af4edff30f84615c632c8",
+   "rewritten_sha256": "58872f10a4300fab094c781d9f760c2486886e490795a9f769bd7bc24b3796d5",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 305,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_013",
+   "source_sha256": "a69bcb6da34f516e1082b46766b291a175177f4dae1a9951ecff37b3395b02e7",
+   "rewritten_sha256": "17b9566cecb21b7de4a6b82bd8b04836a09c7a1b9159571042b7a2e66113584d",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 313,
+    "depth": 46,
+    "floor": 79,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_014",
+   "source_sha256": "c6098c91aec27f22974312bee5d772ebb9dee1c6819c29df21e98f86afe6007f",
+   "rewritten_sha256": "2c2671f3706bd7c363449f98e963f13037adf30801c7444f50b0b85f968c5fa0",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 295,
+    "depth": 46,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_015",
+   "source_sha256": "f84c10a050054457625b38068e2ada78a7b9d27a5dfc47bfe393f2458b7108f3",
+   "rewritten_sha256": "cca346c73f2ca48c3d0cfe87b99b7fc02662a475abbeb08e91291d699e37a40d",
+   "zero_angle_components_dropped": 51,
+   "bounds": {
+    "gates": 303,
+    "depth": 47,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_016",
+   "source_sha256": "33139a2969ba6e22b06c17799d187e393dd7c5a6c6a31e9785f411188e1f10a7",
+   "rewritten_sha256": "fd649bae1d92b2acdb79076a30417111b6d6fa28dc9e915c9e99644dc43ff661",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 294,
+    "depth": 45,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_017",
+   "source_sha256": "b9778f9bc9aada8a6b8eae758ca2d607d82314004fd8db26f235a27b4882f4a9",
+   "rewritten_sha256": "620d936d13d4311279e695ae8de9a0639ac228faf4804031a3c24fcd9a5e4904",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 295,
+    "depth": 45,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1265 ops (295 two-qubit), 1544 edges, 553 non-Clifford ops -> h2_moses2023 (conveyor regime) / 951 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 212,
+     "rounds": 13,
+     "pairs": 17,
+     "pairs_per_round": {
+      "1": 9,
+      "2": 4
+     },
+     "transport_cycles": 6,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1265,
+     "unrealised": 951,
+     "unrealised_by_gate": {
+      "u3": 187,
+      "sdg": 175,
+      "s": 162,
+      "rxx": 278,
+      "h": 141,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 3,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 8 loaded sites here are all-or-nothing; 7 would have to idle while the rest move (e.g. ['CL13', 'CL14', 'CL15', 'CL16'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 8 loaded sites here are all-or-nothing; 7 would have to idle while the rest move (e.g. ['CL13', 'CL14', 'CL15', 'CL16'])"
+       ]
+      }
+     }
+    },
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_018",
+   "source_sha256": "120bc272b4c1818f2b8848830bc06dd0e8c883bcf5b5da7d43bd14116c8ce68b",
+   "rewritten_sha256": "c497b65190a4bbce1a93ac231628ba3fb25ede8b6ec9bc42c9688bc94ddf862f",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 296,
+    "depth": 46,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_019",
+   "source_sha256": "ce7fd9e75b7eedce0d67201933fbd621218534f778f4ee1aeadde6a057c6693e",
+   "rewritten_sha256": "bd1c328bd15644a1f5c691fe1b07116363057fe98a566bdb4036a50ac4634cd5",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 305,
+    "depth": 45,
+    "floor": 77,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_020",
+   "source_sha256": "b334198603bed1b06dd4dbd9cd6fb68f4aaef14d431f2b1b40dcd3a074cabe23",
+   "rewritten_sha256": "02f1681e55c7dee6b66c35c14777deb79e06de1a269fa0e62d152623f7c1dd7c",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 288,
+    "depth": 46,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_021",
+   "source_sha256": "455cd80182a96c164164430505b7f2904140c5f7315fd294323739398dee0884",
+   "rewritten_sha256": "0f81d4c369811b2d1470838b927bdac8bd35b89f005c9457e30e463f51ec82c3",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 298,
+    "depth": 47,
+    "floor": 75,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_022",
+   "source_sha256": "513fe619df76837b6c27d18ceb5a7f5a0b2c46ca2dc13571aa31f191e92ac480",
+   "rewritten_sha256": "5ccef6a1d0e12bbe6448f494ececbd9cca2214d4b07011eb967fc1a50d48eaca",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 297,
+    "depth": 45,
+    "floor": 75,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q7 cannot reach DG04 from AUXD1 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_023",
+   "source_sha256": "4abd1e7b6367edf125e898c9b634478c00a1016d0b8722f97cbd9d9ffd36fa18",
+   "rewritten_sha256": "c7fb4a6438fd7ccbe2e5b0759cd0772cefe64b713c88cffc63fab7b27d14b682",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 287,
+    "depth": 46,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_024",
+   "source_sha256": "ff8cb185e6ad88f70b286e3e1d33b434aafce2439c238aff81ac5b440d6e62ae",
+   "rewritten_sha256": "674423ca0c6b5dead562e7c07b8ffda06ad4e544836e1d6d6d9bca43f841bff8",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 288,
+    "depth": 45,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG01 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_025",
+   "source_sha256": "886d1a4ac3493d7a0ad367baccfe4517f478b69bd889929c536f5dfff4f11d48",
+   "rewritten_sha256": "16dda30373ed08b3dadc41f4856f348cff91805ad150976fd48be48563c21a7e",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 311,
+    "depth": 48,
+    "floor": 78,
+    "layered": 94,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_026",
+   "source_sha256": "01a1f05e07f7af3527b6ed680facccf734cef1e55013d4ef39122c2bb1f30baa",
+   "rewritten_sha256": "88f02121230be3d3713cc18f156cc0631daecc51438fbdf0e3b4076e8f35409c",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 295,
+    "depth": 45,
+    "floor": 74,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_027",
+   "source_sha256": "b36127b82e198274c86786ba693e6de6ea92586254b9cd38b7eb3749e160bcbf",
+   "rewritten_sha256": "87c409316c0b556acda7a781559ebddd5c1379ec5f504d3a900d494623104f57",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 301,
+    "depth": 46,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG04 from DG01 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_028",
+   "source_sha256": "5481dcb4a5f36d664f91a521bbcb5b7c19bbff15382ac2d89e3b6e59252310d2",
+   "rewritten_sha256": "026e79a0dde710549e23116eb9b29f020da357e73c7c65fa3b5bed13dbb0a28d",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 300,
+    "depth": 45,
+    "floor": 75,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_029",
+   "source_sha256": "4c2f81cef1624dafe4c9285be1dbc3a093db356725de50185b907ff55f909bba",
+   "rewritten_sha256": "db67d58b4938fdfc7862258b31359f635400c2141085d2e3133784de0d34763d",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 287,
+    "depth": 45,
+    "floor": 72,
+    "layered": 85,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_030",
+   "source_sha256": "f8caac36f39d683ec870e419c8732e7f3ae57ee56c14868ac4c154858c05f1f7",
+   "rewritten_sha256": "2d6d17f73705289c59d56a721fbf9691a3850efefd4fc2e385ae5dcc59f082dd",
+   "zero_angle_components_dropped": 75,
+   "bounds": {
+    "gates": 291,
+    "depth": 44,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_031",
+   "source_sha256": "19c8469030bb8a7da3d1a50d823fbc84fed266ac52f8bfc157ab79037a31523d",
+   "rewritten_sha256": "265aafaf7bb0d15d59b5cf63ffbde9f219791e1ad3f2cea6fba8be92d30ce5a0",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 306,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_032",
+   "source_sha256": "72368f58227d5e5baa05d600f1d483290ad785f6642b3253e244b5f8bdd66f1c",
+   "rewritten_sha256": "435359de36ffae8b5aa530add1d3d6229e685aa71bc9c9a72f16640eb1eb6978",
+   "zero_angle_components_dropped": 54,
+   "bounds": {
+    "gates": 285,
+    "depth": 46,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_033",
+   "source_sha256": "d354167959282e72a8f48c65c1d9db15c81e4b95be4f4be39dd440871d8974f6",
+   "rewritten_sha256": "63b32ab583484021f79393fd5bd401252235a87db0dbc194d965503e595f2dbd",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 286,
+    "depth": 44,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_034",
+   "source_sha256": "8975c182453cb066bab2fd460567d4b92ea71893630d238e02564449f0658b51",
+   "rewritten_sha256": "22e6f9b14f41714cc183918eaa5e3f1d755eff015c9f8eb0a4d5aea06c7f92e6",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 303,
+    "depth": 47,
+    "floor": 76,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q5 cannot reach DG01 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_035",
+   "source_sha256": "3cf4cdb90c2755213d82eb808375dbb8644dd3acf03b973addfb17c4977f2aa6",
+   "rewritten_sha256": "2d4bb535e2a8f67e2e586d4ef7b3ade92b026db20c5f814f8167180b6843b682",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 303,
+    "depth": 47,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_036",
+   "source_sha256": "6da49d513d9e75b12fb1644c8407aead2be37a5ba14905ee6379957627fca6b3",
+   "rewritten_sha256": "7cea3ed592eb01b33e78c4b953616d4c3fee0b69480de710423e6537aee2f256",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 291,
+    "depth": 45,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_037",
+   "source_sha256": "056618af149e1cc6521142ce4cb946f89c353a47fc53a67e80515fd6d5d537fb",
+   "rewritten_sha256": "9f82fb68ef181dc74e08b69fbfe00273d18b31adfc8bd021b107a1927955f49a",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 304,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_038",
+   "source_sha256": "4e42148c0c194974e20d946208595fddda27a13e0438f082896a0426249f1c53",
+   "rewritten_sha256": "a29ca1233f0401894bba8b3c2ae2e837c09a7833e537054482b3c313c2213fbd",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 304,
+    "depth": 46,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_039",
+   "source_sha256": "8f2931cae0f1162780e881a5607ed53c4914671af304cecd5c2e679da100fa33",
+   "rewritten_sha256": "5003f3a1e6d90f3c8683a0e3b588b7df07a911140ff8299fa8b3df2950e477e4",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 289,
+    "depth": 46,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_040",
+   "source_sha256": "a481a0499ac319479699181dab76dae5501afd7995470b1716a3df9976b104d8",
+   "rewritten_sha256": "7f4686fc464bc611e3bd146ab6709eb4d5ad9cf4e871a2398922dd38e355b90a",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 294,
+    "depth": 46,
+    "floor": 74,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_041",
+   "source_sha256": "cadc029e776aa824c5232b05fbe40a4464887234029c06571d331da5a0e53e42",
+   "rewritten_sha256": "0ab8a955f2eb40b9cdb1a9d1383cee1e5657de479047e13ce36cbfe8ed1afdf1",
+   "zero_angle_components_dropped": 71,
+   "bounds": {
+    "gates": 277,
+    "depth": 45,
+    "floor": 70,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_042",
+   "source_sha256": "1481faabcac51bfbdfad77fcf5ea56f76be3151f3ca982ff1fc8f543e8072ab4",
+   "rewritten_sha256": "149a22fa652fa6f372d19d0ba67ee7b0711bfae235f8141432ce1faf7ee609d0",
+   "zero_angle_components_dropped": 52,
+   "bounds": {
+    "gates": 302,
+    "depth": 47,
+    "floor": 76,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1306 ops (302 two-qubit), 1592 edges, 554 non-Clifford ops -> h2_moses2023 (conveyor regime) / 964 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 214,
+     "rounds": 17,
+     "pairs": 19,
+     "pairs_per_round": {
+      "1": 15,
+      "2": 2
+     },
+     "transport_cycles": 3,
+     "cool": 1,
+     "measure_instructions": 4,
+     "circuit_ops": 1306,
+     "unrealised": 964,
+     "unrealised_by_gate": {
+      "u3": 185,
+      "sdg": 166,
+      "s": 147,
+      "rxx": 283,
+      "h": 175,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_043",
+   "source_sha256": "c07a1aa71f2c4881f2ed683a34afcbbaf4f79d139a73f4754412cf4bbcbdcc69",
+   "rewritten_sha256": "2966fab99f8fc20e10e6b899a4321608c1ec641799e3b1dfbd15ad7a12f18bb5",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 276,
+    "depth": 45,
+    "floor": 69,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_044",
+   "source_sha256": "b18ba2b4619189019224a5f5f07f7604908cf5fba4ab7f23a1336679d6165d0c",
+   "rewritten_sha256": "046bf4e4b091593ad487ad02bdcef4a12af4e7d81eb62cc35d6f3739d2d7d302",
+   "zero_angle_components_dropped": 50,
+   "bounds": {
+    "gates": 310,
+    "depth": 47,
+    "floor": 78,
+    "layered": 94,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_045",
+   "source_sha256": "41f6f3d24594a3a77c06c84d1aabfc8659382bc2019a4fa8d7b93ead4b378b4c",
+   "rewritten_sha256": "4652fdc35e680df261c64ac2703505f9bcd472b8ac4761bb453b6e889b356384",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 285,
+    "depth": 44,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_046",
+   "source_sha256": "dbe6e8fe64a9bba7c73b72bfc2045c90b4d0da987d78611febc2879fa98a6046",
+   "rewritten_sha256": "84d0d10805bfeedefad274b0d700b26b46181ce8175140e031cf61ef7ff83be0",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_047",
+   "source_sha256": "db064505ee168e3fac56a686d5781f28595cd24672bfd4c077d9035434f3646c",
+   "rewritten_sha256": "b352fae7ef20173fc5f22ee6690d5f76c59ca0135df0d9f0eff3c6048e44e1c8",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 306,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_048",
+   "source_sha256": "23a7de7ee1e7038a460a086854337b5677c33cc67b3a54555d6cf83356452f5b",
+   "rewritten_sha256": "19a117d52f00f2a2e067f1a6e38ce2a1f00376a3bce247a760d9ac3f885f5b48",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 301,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_049",
+   "source_sha256": "1f9f4798c84c467bd0ccb61a36be2b8ed8543aa016c33e88e15d10cf1c339f88",
+   "rewritten_sha256": "0949c53620e03f2872d6fecd8f23d0133d544c0e2fb945cc01788832dcbe83c0",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 295,
+    "depth": 46,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_050",
+   "source_sha256": "a2b4ca13298054fbb0c5560cbd425551dcdb11a692854af12325f79d6148273b",
+   "rewritten_sha256": "31bd4c1d4abca08bfea74eba79ddef62d00413f2568b331685ad33a0e7945a18",
+   "zero_angle_components_dropped": 70,
+   "bounds": {
+    "gates": 284,
+    "depth": 45,
+    "floor": 71,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_051",
+   "source_sha256": "d721eeb1a002ea48d1ce98e322eb0005e721d8e51a71c526b442eba20671a12d",
+   "rewritten_sha256": "598d1ab2a9239dab4705cdf7fea8caba42f927d325f5f841c9eccf7da728b80c",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 298,
+    "depth": 46,
+    "floor": 75,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_052",
+   "source_sha256": "128afd77f73d9a07e20caa75ba41561fee4f32fe2bfbf85b818f39a2169a268d",
+   "rewritten_sha256": "c1877efca69bc3a296251f2fd4701ba4510d43003c6494a80252ff34ad81e391",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 302,
+    "depth": 47,
+    "floor": 76,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_053",
+   "source_sha256": "484427ad055fa404da229e8d2bf7ee76dd0dbd311d1214912d18b156e8de7176",
+   "rewritten_sha256": "af66223bcb0fb3ca1c44203eb88bdbd70f0e73dbe3ed68e6c70e4789b5fe74c8",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 289,
+    "depth": 43,
+    "floor": 73,
+    "layered": 85,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_054",
+   "source_sha256": "d5ea59b6d269b32f28db075cf527ff5a09347314dcfdd6f2ed950ea2bb5f27fa",
+   "rewritten_sha256": "065a8402fbbdfdc6205f5eba2ac1da100ba72f1ba16874e363c5df69626926c2",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 4.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_055",
+   "source_sha256": "d29f6a476363eb74bf6abdfca24f6e54e7301718277706b35c29135107e1c800",
+   "rewritten_sha256": "0b01ced23d7531632c3934715250aaee41b25d141dfed4b27c139a7703220926",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 290,
+    "depth": 46,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_056",
+   "source_sha256": "ffc4fa64b06884848f05aafcf7ccc671f2e0eb5f1f3695067dd6fb7992d823f4",
+   "rewritten_sha256": "8b2effa4efc59cf4630ad813e6e91e3474492bf2c02af8275eced85f23473a61",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 305,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_057",
+   "source_sha256": "0f1d3ecf3257c9d58d62792acf7ca46c923d4039fbd528dcb71113684a19c5cd",
+   "rewritten_sha256": "0be6c1e44402422dc030fc609050002b54fd35da7ef62d8e37731601a5475192",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 301,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_058",
+   "source_sha256": "8103df4d6e7f0b3ebddc69b10b44aeb946d3a344158f126a1de44fed220f09b0",
+   "rewritten_sha256": "7b9e9cba752d48c5fd5dfdddceb69f3a7039956c78db8962d76ea2c184e6d171",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 299,
+    "depth": 47,
+    "floor": 75,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_059",
+   "source_sha256": "a5ac2c36c5d48076462c037aabe8e3287f8a068211be3df412ef63448ca34ea1",
+   "rewritten_sha256": "b47ec07b6377951ab27ebebad7f1dc87fb74a5bfccdd550ebb845fbf374511c8",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 291,
+    "depth": 44,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_060",
+   "source_sha256": "bbf5e3c664bae82d53d0fa422df8c0b1bf7af0b4141d10f74b3fad4bc9178c1d",
+   "rewritten_sha256": "001eb00f605b5dcd6df8e77281a306578a36cd2d02d33b6271d2bd0eefaad804",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 305,
+    "depth": 46,
+    "floor": 77,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_061",
+   "source_sha256": "f90c374b78357eb717cf4e6a99d02c65e43daf5b00ca9199ca8c5a1e88ce6af7",
+   "rewritten_sha256": "4ea15fd6310a042e2e99218fe6dd3e4fa284cef18f0f646c6b3424629dee5a0a",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 296,
+    "depth": 46,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_062",
+   "source_sha256": "0e02795030970466b43d866de4517822ce9f2bf824c40edd89d9fbcbd7b6a63b",
+   "rewritten_sha256": "2af891d88c470fa68b5ce2fa16a22da82b034f2d4af8cef64d48269413a6f7b5",
+   "zero_angle_components_dropped": 70,
+   "bounds": {
+    "gates": 299,
+    "depth": 45,
+    "floor": 75,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_063",
+   "source_sha256": "a8ee728a54e4334b7df9cb088ecffce639d0bb0a28f8375981bdae3cc17789e8",
+   "rewritten_sha256": "cc8b97e34874807a9325b522dd49c794431b32a4bab1ae1ac1b9762e278bcc3e",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 301,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q5 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_064",
+   "source_sha256": "f12823228aecca014906ba6c50ed1824810fa780857740a6ed697b03a10f5233",
+   "rewritten_sha256": "5d9f8c524849023391fce358deee0f33b2096dbbf0c33fbb0f7b3e2e4e7398ff",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 305,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q11 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_065",
+   "source_sha256": "4118e3974f5e2802f145d67f8a9f06a3952be3a5096b62f4d21bb9beb10c366b",
+   "rewritten_sha256": "37712597d1371eaac9b3d604251820c81cbae6c6a7f6538a7582ac565d80e564",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 277,
+    "depth": 43,
+    "floor": 70,
+    "layered": 84,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_066",
+   "source_sha256": "0753739276edbdf50c95f49de57fe32a5026b2b7a138186346a145b422af5627",
+   "rewritten_sha256": "8ef7f6c39e306797a18adba22e881bfeacfa84642b4f01d0e9f81330e7323c8e",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 293,
+    "depth": 44,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_067",
+   "source_sha256": "2d7975a4343f4e48c5701ac45a42bf3fc36280836a08b18033af3bdac32c5a83",
+   "rewritten_sha256": "e4fcc249afac57bd22fa528cab2cba17c2226da3deea8fa5c4ee4ee71a4384c8",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_068",
+   "source_sha256": "2c070f68ca500509a2cfb5422bd6e991118e67c386cb134b83ae6698c165267d",
+   "rewritten_sha256": "40ec8532b0091c11267584e3e0b018371e37ad2580f279487323587d9c9dd59e",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 310,
+    "depth": 46,
+    "floor": 78,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_069",
+   "source_sha256": "4c96cdbb058ca526fb5c1a2d8d3a64e9fb76f84af6839e94e0c8a60df5521935",
+   "rewritten_sha256": "ab17ba2e716f299186d635280c7897cf34873f87f429bbd893823e7ee5e545b8",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 298,
+    "depth": 44,
+    "floor": 75,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q6 cannot reach DG01 from AUXD2 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_070",
+   "source_sha256": "5db5a36dc3a057a43238f519a6af72861b07e3176c901e1b6aa98ef70dc20731",
+   "rewritten_sha256": "aca96472f46307f2c4150aad411b796f17d09dc022e93ae9884131360bbf72b7",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 303,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_071",
+   "source_sha256": "aaac92f4e728b6c6f0a81bedcc12136a2a755fdaa5c5e147a76d3911ac43f0a2",
+   "rewritten_sha256": "a1af21839166bb2ebd0fac4d0374662c69850d4237fd0501f9ea5244db299be2",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 295,
+    "depth": 45,
+    "floor": 74,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_072",
+   "source_sha256": "81cae1faf94a848fcb7af84458b365cd1b40547d79364c9b01afd6ea0641ec58",
+   "rewritten_sha256": "b7ea6f363567aa80c13a5b11b4c3b276b630b7eff48a586cf4bb05225d1b64f1",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 307,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q12 cannot reach DG03 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_073",
+   "source_sha256": "f7c341bf698354f816f662061adceac99055cb95397eacc1ec964a1349ac0fa8",
+   "rewritten_sha256": "0bbfa98fa4ed2f7f703b8003175299578f67a8483c5829d30952d29ec239daa3",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 302,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from AUXD2 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_074",
+   "source_sha256": "92e1e34a484ac5e333d4a759acf8add49d5d8760552131d665276236ef976c66",
+   "rewritten_sha256": "6ded386a37769a0d87256a77de3d3b2b8e4878a0f6d0d738a5c7f416436454f7",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 307,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_075",
+   "source_sha256": "ea849107fdbe350159cbf21db071946271e5ef6990e9d09c58bc45d8eaaa4582",
+   "rewritten_sha256": "025d955856d54514499b31dc50f39f2e84f68c465cf66207c175a04f54945af8",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 288,
+    "depth": 45,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_076",
+   "source_sha256": "80000a25d0c486187ea5ef30ed48b027e24943518091eef6868a5f5e3573cc14",
+   "rewritten_sha256": "f3c8a37474a9efdf8cbfc223f526d6e452a989b4fee93012c277df3a07283096",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 291,
+    "depth": 44,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_077",
+   "source_sha256": "608fdfdef4eefb7ddc165b1eb1b210a90d7af910abbaaaf9898a2aedede6a09a",
+   "rewritten_sha256": "8949c8ef678ecc3ff48dd030208e78b7faa8fb9969ed47de438bb4283509f345",
+   "zero_angle_components_dropped": 81,
+   "bounds": {
+    "gates": 282,
+    "depth": 45,
+    "floor": 71,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1200 ops (282 two-qubit), 1466 edges, 540 non-Clifford ops -> h2_moses2023 (conveyor regime) / 890 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 215,
+     "rounds": 9,
+     "pairs": 10,
+     "pairs_per_round": {
+      "1": 8,
+      "2": 1
+     },
+     "transport_cycles": 8,
+     "cool": 1,
+     "measure_instructions": 4,
+     "circuit_ops": 1200,
+     "unrealised": 890,
+     "unrealised_by_gate": {
+      "u3": 184,
+      "rxx": 272,
+      "sdg": 165,
+      "s": 156,
+      "h": 105,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_078",
+   "source_sha256": "ce42eb26a390229f253b5f684c159663b91a51694673767c9d8269e32e56c548",
+   "rewritten_sha256": "3e90545c197129126f7101a499e20fe7b603f3080bcfc02570889dea40fe20e7",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 303,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_079",
+   "source_sha256": "b07f3d7d4040835bba1af64472402b996d5e005da03c056ce4a9672eca8bdaa6",
+   "rewritten_sha256": "28ec19667c0cc7aa711c5d623be5023492616fd2b42c9afa560f1a0b12d37c9e",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 288,
+    "depth": 45,
+    "floor": 72,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_080",
+   "source_sha256": "ba2c3a84c954ccff3a89f621fc77f43c0170082167a9665363142c6904e1f28b",
+   "rewritten_sha256": "f28d0cbea25a8e7fb0f4ff4f83af299781f917c160eb7bfab88d36c62306cb94",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 312,
+    "depth": 46,
+    "floor": 78,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_081",
+   "source_sha256": "6e249f229058b3ded0af152535a9a224ead5603dbb700294ab899f1ee46b3f79",
+   "rewritten_sha256": "4c3fa467053a3928047ab4cf6fd9ba6358e1848591003c8b075ac85edddb85a3",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 297,
+    "depth": 47,
+    "floor": 75,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1281 ops (297 two-qubit), 1562 edges, 549 non-Clifford ops -> h2_moses2023 (conveyor regime) / 948 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 202,
+     "rounds": 16,
+     "pairs": 19,
+     "pairs_per_round": {
+      "1": 13,
+      "2": 3
+     },
+     "transport_cycles": 2,
+     "cool": 1,
+     "measure_instructions": 2,
+     "circuit_ops": 1281,
+     "unrealised": 948,
+     "unrealised_by_gate": {
+      "u3": 184,
+      "rxx": 278,
+      "sdg": 167,
+      "s": 156,
+      "h": 155,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_082",
+   "source_sha256": "3fb40223e225d29570c9a62ce9d5eb2a2f2cb05f3f9d28a01d2571cbc5978ea5",
+   "rewritten_sha256": "231142ca91360adca7b62b86b68cf0bab820c4033aba249969d04ee69b1c3244",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 295,
+    "depth": 46,
+    "floor": 74,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_083",
+   "source_sha256": "5ccbdb4eec06a3879cb6341d215211c686f9316a71fb778edcecd5391b30f0d5",
+   "rewritten_sha256": "a10e2a28ac46be61c81afba02eb31330849bedb2b271538039785daba01a3bd1",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 289,
+    "depth": 47,
+    "floor": 73,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_084",
+   "source_sha256": "16ec83a6451c5a58b32be205f70cd51d337c5f85e4df80a32fea2953ce2bed50",
+   "rewritten_sha256": "f9c6b6dbd5d5b59d96b75607947b58b2cd78cdda21e0443be773b30977149a4f",
+   "zero_angle_components_dropped": 74,
+   "bounds": {
+    "gates": 292,
+    "depth": 45,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_085",
+   "source_sha256": "91aabefdd6a1be599847e9335e93898fdff7054b8aef521052f2f95679956a11",
+   "rewritten_sha256": "3310facfb3d153483d5fe0a70e19e027e1c9a69211a4a4441899969899634b09",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 277,
+    "depth": 44,
+    "floor": 70,
+    "layered": 85,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1191 ops (277 two-qubit), 1452 edges, 519 non-Clifford ops -> h2_moses2023 (conveyor regime) / 871 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 211,
+     "rounds": 19,
+     "pairs": 19,
+     "pairs_per_round": {
+      "1": 19
+     },
+     "transport_cycles": 9,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1191,
+     "unrealised": 871,
+     "unrealised_by_gate": {
+      "u3": 174,
+      "sdg": 158,
+      "s": 147,
+      "h": 126,
+      "rxx": 258,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 6,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL14', 'CL15', 'CL16', 'CL17'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL14', 'CL15', 'CL16', 'CL17'])"
+       ]
+      }
+     }
+    },
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_086",
+   "source_sha256": "9a7cca4dc54ade1e83ac07255febd6ac9a01ea37cbb131137de16dfbc63561dc",
+   "rewritten_sha256": "e027f0aedb218de466ef1d88029f76d981e7e8e3fc3db49a37311e1fec338423",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 301,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_087",
+   "source_sha256": "2b091e1881f450c93d51891ed91bc540cf3e9b37dabed08cb624a37c84226b5b",
+   "rewritten_sha256": "d08c69e4ccb0cf38927317025957ac488252c18e12a37c8d2e9bc064734d33db",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 290,
+    "depth": 47,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_088",
+   "source_sha256": "d73522697c00adc8f6b9aaeb1eef4b6568bea59f35e2b4e907c51ebcfa84aca5",
+   "rewritten_sha256": "e8861e1229abdd769943bd11918ce58a43667e763407967db0598c97d2d8bcaa",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 294,
+    "depth": 47,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_089",
+   "source_sha256": "caa4fa99e2ebabd177d711234edf4c159506e54394b26760bc94631b2d0070ca",
+   "rewritten_sha256": "3e36b45d99ca9880bc20ffd2b0be162bbeef921b99a48fe99f834e62fa78344a",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 308,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_090",
+   "source_sha256": "d464aefd4232599ead9b6f6fd31949fbb8c9ab05292ad086b9e88a6cdbad0dbb",
+   "rewritten_sha256": "45c4b2b65e55d0ae07447d45c3051dc59a24e341b580189863163e38763bd3f5",
+   "zero_angle_components_dropped": 51,
+   "bounds": {
+    "gates": 300,
+    "depth": 47,
+    "floor": 75,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_091",
+   "source_sha256": "f1bfe5d4f4a42d85b7897cd89f9006268d88a1b229fd332b3dcd3a83b9b0a4b9",
+   "rewritten_sha256": "1c978239702acf68e03babddb29393a2467f5c9a923d0faee885bdd2847593b7",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 292,
+    "depth": 46,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 4.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_092",
+   "source_sha256": "352d23db4269635de842ef06e526d65d6cb447e6835dd95e578aadc6b11d0d30",
+   "rewritten_sha256": "b2534f32819f7ad9fad0302682815b1cc39f25bffa476fb87a8b55247e4474c9",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 293,
+    "depth": 45,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_093",
+   "source_sha256": "a0f8a63929af901f46b6c813de93a5b1c022a86808fc826f2e4f4469de5772b6",
+   "rewritten_sha256": "6013b862a050e9f08abff5710e257fe2a8ae23988035181c70c16c44da446398",
+   "zero_angle_components_dropped": 54,
+   "bounds": {
+    "gates": 294,
+    "depth": 46,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_094",
+   "source_sha256": "29ee57faf9c92b2de95e2c8b264dddcdbf2b76ada0327fc7d06d1013dec9b6f8",
+   "rewritten_sha256": "79ed955a9cbfd2d9cef2afff62c494c97c1312b4d3a4d9d46c3d56673f7fce87",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 297,
+    "depth": 46,
+    "floor": 75,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_095",
+   "source_sha256": "399889157d5b9a64d4ef8cecb2d9710e1f8f444ad2ddbde95ab0391139e72278",
+   "rewritten_sha256": "87b0bfcbc595ba9be5a3908a342b1c70500edaa1e90c8b9bc7b2ed62d9733767",
+   "zero_angle_components_dropped": 73,
+   "bounds": {
+    "gates": 275,
+    "depth": 44,
+    "floor": 69,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_096",
+   "source_sha256": "fd7bb591bddb72a28f648c7c872429cd642a3f254e95306ee12ceee88b039cbf",
+   "rewritten_sha256": "f4d2c6d877f4e3616db0d0ee2617908d9bf6fe031c0946ece0a7980de0bd89b4",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 297,
+    "depth": 47,
+    "floor": 75,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_097",
+   "source_sha256": "fe969e4ab6b54f198ab5d623e0b8d838f89cb720423fe34ba456225a4a9ab4f2",
+   "rewritten_sha256": "c4163c7e98967b5e7816bdaa4e2fef9f4bd68ffbcc537332609a7f22f7afa159",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 310,
+    "depth": 46,
+    "floor": 78,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_098",
+   "source_sha256": "cb9a9081b7b572276370c26ed29f966856928a45a140b64d5cbdf480677abe84",
+   "rewritten_sha256": "4300c4f183f185b51b739eeb401543914f00d5a5154671b1a6b9a3b9c06d3043",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 307,
+    "depth": 46,
+    "floor": 77,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_099",
+   "source_sha256": "c214c7a0d5b844a3edcfc4ced23914d60663ea6d3b5814870c4361973460e1e7",
+   "rewritten_sha256": "274d1e0d09905a8936a7c920933b7ac3b4ea245b3e56bc72a8a2e977b2f41643",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 287,
+    "depth": 46,
+    "floor": 72,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_100",
+   "source_sha256": "d2a4f4f0ec09d3b1f998e196424cfe6906156e59ea7bf3b8a54337deafb8e1f4",
+   "rewritten_sha256": "2c103334a43f39da5a4cf143ae293cf51644e33cdc2e88a801abc94546d4a811",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 301,
+    "depth": 47,
+    "floor": 76,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_101",
+   "source_sha256": "d5edd36dc9bd0d970bcf9ee8f8fd2d9611e96fc98e15e1168b0680fef651fbc5",
+   "rewritten_sha256": "05a29998d7ee22096cb5719eb8d7c2ead186d05a1986bc36c6a1e4d839e12ec6",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 303,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_102",
+   "source_sha256": "cca917c55f5ba6711b376c102471b569fa3c63887805497d133beb0d35745e5b",
+   "rewritten_sha256": "abbd77f4055c3dc1e9416edd5c2e1154ea520d1adea2b83e74639ebc2a11eaab",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 293,
+    "depth": 47,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_103",
+   "source_sha256": "9fbe14c0b8d6850ce4570bf1c78467f669e9437b3b031c726507f3994a26535b",
+   "rewritten_sha256": "71240ccc63e5f6f900663e7817275457f5fd493603a5dbb394133c3cb2fe7d8c",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 291,
+    "depth": 47,
+    "floor": 73,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_104",
+   "source_sha256": "67f92507166f6ab1dc21be9d94f7a3dcaf683b1a7e1978ac30f3eff98f3a92a3",
+   "rewritten_sha256": "015afe569a003462a8799742fbf122a15e47ab4cb09524e371a09914a84cf4f5",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 293,
+    "depth": 47,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1261 ops (293 two-qubit), 1538 edges, 545 non-Clifford ops -> h2_moses2023 (conveyor regime) / 922 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 234,
+     "rounds": 22,
+     "pairs": 23,
+     "pairs_per_round": {
+      "1": 21,
+      "2": 1
+     },
+     "transport_cycles": 5,
+     "cool": 1,
+     "measure_instructions": 5,
+     "circuit_ops": 1261,
+     "unrealised": 922,
+     "unrealised_by_gate": {
+      "u3": 181,
+      "rxx": 270,
+      "sdg": 170,
+      "s": 152,
+      "h": 141,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 3,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CR02', 'CR03', 'CR04', 'CR05'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CR02', 'CR03', 'CR04', 'CR05'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_105",
+   "source_sha256": "ae0c717c15b041d05c6f94799411e6e1344911064857df448340c73821fab321",
+   "rewritten_sha256": "73a768ba5604b5b23f5707124b3fc170f1ccb460315aa9f20dc2f7dc2d695e60",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 307,
+    "depth": 44,
+    "floor": 77,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_106",
+   "source_sha256": "525fc24255d2d8921242aa8ccb3b9dee9f29da916c93461c30ed3cf9e37b75c6",
+   "rewritten_sha256": "2069c9c1742d6143fd8bbac4d077d71516ce0a261761498797c03834aedc3a32",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 304,
+    "depth": 48,
+    "floor": 76,
+    "layered": 95,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG04 from DG01 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_107",
+   "source_sha256": "33176bfd95c421d95c24dc8082993950e9f069b504385c09d7662c4d788ccb1f",
+   "rewritten_sha256": "c2a8dc93420e84d95fe374f6c07e8bb843b120dfd84c610003cf2f835a220b27",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 298,
+    "depth": 45,
+    "floor": 75,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1280 ops (298 two-qubit), 1562 edges, 556 non-Clifford ops -> h2_moses2023 (conveyor regime) / 961 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 197,
+     "rounds": 13,
+     "pairs": 16,
+     "pairs_per_round": {
+      "1": 10,
+      "2": 3
+     },
+     "transport_cycles": 1,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1280,
+     "unrealised": 961,
+     "unrealised_by_gate": {
+      "u3": 192,
+      "sdg": 173,
+      "s": 161,
+      "h": 145,
+      "rxx": 282,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_108",
+   "source_sha256": "2966e647899032c22f1edc24826fd6bb64c3e9736066f955d1b877d14e1d46ec",
+   "rewritten_sha256": "380e138ea37a291599a39137e8e1563bb555c84a3b459854b9d9b58048d4dcc2",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 289,
+    "depth": 44,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_109",
+   "source_sha256": "8cf01f286a4c1d0b5b1df9b22532963b09223af9b7f13b620c94f80eff3ca41c",
+   "rewritten_sha256": "157569e932d39d2c83d75a5b0f3385bb1907f63762cea92618f6088fecabcc7b",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 294,
+    "depth": 45,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_110",
+   "source_sha256": "3da76647a90ba3544c99e9119b3748cdbab1f00ed456ef485271d24622105bfd",
+   "rewritten_sha256": "650e2dfee4235cecd9f88e08ee4d30e779efa9bf0840164b012a6dbec684e40d",
+   "zero_angle_components_dropped": 70,
+   "bounds": {
+    "gates": 305,
+    "depth": 46,
+    "floor": 77,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG03 from DG02 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_111",
+   "source_sha256": "76af0b227f623b3466997fef4c88050767e2c5d463ece1efd7d0905a45f49c2d",
+   "rewritten_sha256": "ce1a3b28da6f9f24b0d672f5053ea37e5e8e9397a5b55a6167f9ef5c2df86842",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 273,
+    "depth": 44,
+    "floor": 69,
+    "layered": 84,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_112",
+   "source_sha256": "27085986e523e9749988b9ec1a9248ff63947504f9c984b876d2b1a4ce06a779",
+   "rewritten_sha256": "d42cbcc5cb7be037d6ad75a1b3bf00e077d7f594223d687f8648e4c3c13cb5cc",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 310,
+    "depth": 46,
+    "floor": 78,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1338 ops (310 two-qubit), 1632 edges, 570 non-Clifford ops -> h2_moses2023 (conveyor regime) / 1006 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 212,
+     "rounds": 22,
+     "pairs": 23,
+     "pairs_per_round": {
+      "1": 21,
+      "2": 1
+     },
+     "transport_cycles": 3,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1338,
+     "unrealised": 1006,
+     "unrealised_by_gate": {
+      "u3": 191,
+      "rxx": 287,
+      "sdg": 178,
+      "s": 168,
+      "h": 174,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 3,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])"
+       ]
+      }
+     }
+    },
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_113",
+   "source_sha256": "c8e568441705203bd15d65463c6e7027182045353aa0c08abca60a7250a02662",
+   "rewritten_sha256": "c1427410e63812a9a03cc7ee4f49c4cdf0e7b1488e79ceae1f6fafe77f529b6c",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 300,
+    "depth": 46,
+    "floor": 75,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_114",
+   "source_sha256": "da24383da4ff48ba31fedb557d19279da92cc9313b0643b96fffa9126d2196f4",
+   "rewritten_sha256": "74dba873e63f8057a3d002f7ae75b17ce099babd4caa66553c49b4e19fc17370",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 313,
+    "depth": 47,
+    "floor": 79,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q14 cannot reach DG04 from DG02 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_115",
+   "source_sha256": "342513cfd443007d3cb0fc3068ade01c85bc988c00167996c47106b278423b7c",
+   "rewritten_sha256": "e12cbb15eca79f20f9fb4bc253c7fd1b1a44de8e224dfa7ad9fbbc51c1786100",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 292,
+    "depth": 47,
+    "floor": 73,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_116",
+   "source_sha256": "c85fe7776575684520fc9622c226f829c953f98d0fbbd81e8c7c121acef31376",
+   "rewritten_sha256": "f5415cbe6a28dfec01ec91d2585d2513ab644b9734c298a223ea04c95408e3b4",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 280,
+    "depth": 46,
+    "floor": 70,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q5 cannot reach DG02 from AUXD3 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_117",
+   "source_sha256": "be912c8d220a3a0bbb22174906aebcd97c6fd2e72b550f3025318ddd24db048a",
+   "rewritten_sha256": "fe1994ac5c0b805b69323fa5294be1ed8893aa2e4d5fcf23136a799b4b071797",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 295,
+    "depth": 45,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_118",
+   "source_sha256": "1f0fb4dff5bc5c377b665a22cee72dba0caf80aa53bca673ebc8ce7e211b6cd6",
+   "rewritten_sha256": "d72c7cba3a958e1eddbf45d576a5a47f97fc493a60077a819919e7678dac4c9b",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 297,
+    "depth": 46,
+    "floor": 75,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_119",
+   "source_sha256": "5fa5a46f554859ba04ecd88cd82894376e7ccac57653bd25cf9247740f91aa41",
+   "rewritten_sha256": "34c838ca82b851d7fee707340cab9fd42b0fdd3214914f4228370c394643e02a",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 302,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1300 ops (302 two-qubit), 1586 edges, 560 non-Clifford ops -> h2_moses2023 (conveyor regime) / 963 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 222,
+     "rounds": 24,
+     "pairs": 24,
+     "pairs_per_round": {
+      "1": 24
+     },
+     "transport_cycles": 2,
+     "cool": 1,
+     "measure_instructions": 4,
+     "circuit_ops": 1300,
+     "unrealised": 963,
+     "unrealised_by_gate": {
+      "u3": 188,
+      "rxx": 278,
+      "sdg": 172,
+      "s": 159,
+      "h": 158,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_120",
+   "source_sha256": "740691a10e1ea1c06b1afeb693038923b2125ffe4d7f1831169d7c445628fb62",
+   "rewritten_sha256": "3f9b4bf3fdcf2b375d627f1c00ebcc392d4ad436e20c1236d5a74322f9c6b8a7",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 301,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1297 ops (301 two-qubit), 1582 edges, 557 non-Clifford ops -> h2_moses2023 (conveyor regime) / 976 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 243,
+     "rounds": 3,
+     "pairs": 3,
+     "pairs_per_round": {
+      "1": 3
+     },
+     "transport_cycles": 53,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1297,
+     "unrealised": 976,
+     "unrealised_by_gate": {
+      "u3": 188,
+      "rxx": 298,
+      "sdg": 172,
+      "s": 157,
+      "h": 153,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 108,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 8 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL15', 'CL16', 'CL17', 'CL18'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 8 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL15', 'CL16', 'CL17', 'CL18'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_121",
+   "source_sha256": "dadaf0df6e6a94da74c44816f37a0ffd0a651eacde9a8d701c57c1d6e0cba443",
+   "rewritten_sha256": "9504eff75b01985f1790c1d89e1d5f39e13b7f88c18ea76f409d25649c5de0e6",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 296,
+    "depth": 45,
+    "floor": 74,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_122",
+   "source_sha256": "367f672b2242a3f972adbd63b6d0d18ecb031157ce88e17e9cbd3e1c9890f312",
+   "rewritten_sha256": "1bca13c89d095f58ee4c12fd676368df1bb29e95d717bd3a81c678f5da76c7a2",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 292,
+    "depth": 45,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_123",
+   "source_sha256": "eaa8d28177cf78221b708c7f3ee3e9b105d2fbcc2db4fede420fa867b2044663",
+   "rewritten_sha256": "d0daa6af86c7f3d830a830720e0a1bfcb44d1650e8c37d1d7be3c654b417310f",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 279,
+    "depth": 46,
+    "floor": 70,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_124",
+   "source_sha256": "c2be2f0081ceebbe2a4facf1327d3ab8090c65856a7e5a402db623dcf498791c",
+   "rewritten_sha256": "53a61053ba3fb932d110ca315aacdd55633a367091a72e637ce3920daee1ce8f",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 305,
+    "depth": 46,
+    "floor": 77,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_125",
+   "source_sha256": "b7a20779298538e00f8dd66555ebfafe46f8ee8be9e1f2ea7bee4dfbd87e0314",
+   "rewritten_sha256": "c08195b5a50427b860c6edc616207f071dab4ccc691e26b7f464e6ecaa7b286b",
+   "zero_angle_components_dropped": 72,
+   "bounds": {
+    "gates": 306,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG01 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_126",
+   "source_sha256": "042fee355b895a0f2bf6ff687ccb8f1afc149eb6e056a773d017eeb005322a92",
+   "rewritten_sha256": "698d44314c3b2c4bab4d019422f5a6dec6da35727341e7d8e66d724cf582f245",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 290,
+    "depth": 45,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_127",
+   "source_sha256": "63cf918dce87b2c961330ae2a04fef986a078bf8eb3bd637a99818d304676ac3",
+   "rewritten_sha256": "8fae252bb155c7b1013c8ff5cc6cc802aeec9ad91b283cd629b9a37f65439391",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 303,
+    "depth": 47,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_128",
+   "source_sha256": "880ae374278ab9b8bb5d7178a89ef16b3467036a7255c4a5b15e08d63034e932",
+   "rewritten_sha256": "ea06d7410c490096f32e6878248b5ad179e29b42d2906eebd38ddb749228d87f",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 300,
+    "depth": 46,
+    "floor": 75,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_129",
+   "source_sha256": "e7500dca334258e60a0c2043223e79bbd1f2d70d5f07faef4c600915c7e1c022",
+   "rewritten_sha256": "e9cc567a8c1904209924c67d4dcac14996d717a82ff4f759b7f4c5103838754a",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 290,
+    "depth": 48,
+    "floor": 73,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_130",
+   "source_sha256": "8fa805dfa7dee2fc3e398ea7c4f5bc7a09155eb3891ec3178b491b403a470cb7",
+   "rewritten_sha256": "ba0a0edfc9bed91ceb2d0d2f87680bff2d04e78c56b27051ad79b70e2a6a19e4",
+   "zero_angle_components_dropped": 54,
+   "bounds": {
+    "gates": 303,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_131",
+   "source_sha256": "daeedcb77bbe7de35cb4e05c162da463d4ecc3fbc3c156bf144d37c5b94db0b4",
+   "rewritten_sha256": "22855dde137d548bbf61d2b33869fa33fd2264e6dcaa5f8136d9efea4069d8ea",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 309,
+    "depth": 47,
+    "floor": 78,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1331 ops (309 two-qubit), 1624 edges, 571 non-Clifford ops -> h2_moses2023 (conveyor regime) / 981 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 219,
+     "rounds": 17,
+     "pairs": 23,
+     "pairs_per_round": {
+      "1": 11,
+      "2": 6
+     },
+     "transport_cycles": 2,
+     "cool": 1,
+     "measure_instructions": 4,
+     "circuit_ops": 1331,
+     "unrealised": 981,
+     "unrealised_by_gate": {
+      "u3": 194,
+      "rxx": 286,
+      "sdg": 179,
+      "s": 164,
+      "h": 150,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_132",
+   "source_sha256": "239fafc1d57989a9a2de34102d5f102525b4c80e770d4eac0d5d5d8b4613a258",
+   "rewritten_sha256": "eddae35d66cbf02ae865e71d7f250bbf70bb6a46d329c039a9a75ae331bd2f85",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 286,
+    "depth": 44,
+    "floor": 72,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_133",
+   "source_sha256": "dd212176a033435f84505c702eda0ac2e233aff38276393189765937f1a6643d",
+   "rewritten_sha256": "ea1dcf83a3d0a79922105e974dcc93580fbef08414872381b7d69a96469a2e95",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 296,
+    "depth": 47,
+    "floor": 74,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_134",
+   "source_sha256": "d3b9c4988e8ff4356dff30ea8665df7d530f3b2dd99e3bb302dabd758dfbc54b",
+   "rewritten_sha256": "f62d04236a64dec1506450705b3fd43dbbdea5112602892427f551f8bb16a0b3",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 286,
+    "depth": 45,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_135",
+   "source_sha256": "9977e486da18d85677c651d665e804851152f4b6fb6686e2da7e20b82252f3c1",
+   "rewritten_sha256": "0ff5fffa0009d0850e20c380ee1e5ee0a0d4322bdf04aa602a488f87475e46cb",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 301,
+    "depth": 45,
+    "floor": 76,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_136",
+   "source_sha256": "7f6dc63ee1501ba7db7a06663d48d150123eb839c1e5542f276b27204dd54a3c",
+   "rewritten_sha256": "29de9333c12fc8d362210a02c7f5464565135d24f3bdc53be9643aa5aea40940",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 287,
+    "depth": 45,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_137",
+   "source_sha256": "5afb744a9ee8cd4b7a4a1b72fa9687dd40cbbc8893b488abc53936ef2ced708e",
+   "rewritten_sha256": "1d384c8b5182ce9d68484d3b0ffab79dd3de18da6aeb6740985bfdb5767ce382",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 286,
+    "depth": 43,
+    "floor": 72,
+    "layered": 83,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_138",
+   "source_sha256": "695634a6a3291f24a16eab937a9237f4aaf8b023345d922fb55ccf7365b87e3e",
+   "rewritten_sha256": "b9c0cc091d4d714f22f6a8d39d244bcf3474140c6bbe3c845119db68d8aef079",
+   "zero_angle_components_dropped": 74,
+   "bounds": {
+    "gates": 289,
+    "depth": 46,
+    "floor": 73,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_139",
+   "source_sha256": "e2bfde48bde1c848069daf5a773dd5d8ca977a3f8e1167008d645a8da66e9d93",
+   "rewritten_sha256": "fd020d04fc19a2dea4c9f9e54dca6bfee254bdc14052e236dd71b18dda14e5c3",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 317,
+    "depth": 48,
+    "floor": 80,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_140",
+   "source_sha256": "de07c9426e756203827838ac8bf9c122b6600e39e4fbe5cf08691b07d0c594e5",
+   "rewritten_sha256": "31db89c1cd16f06f8adbb5c55ca9be865800a9776420068fe56b11a8ac282d87",
+   "zero_angle_components_dropped": 54,
+   "bounds": {
+    "gates": 312,
+    "depth": 47,
+    "floor": 78,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_141",
+   "source_sha256": "37abb618da5e1884cf6a7337b98859e31f79c791326bc7afa92a6b905eb42211",
+   "rewritten_sha256": "de1bc30b2a88850d5fc79f3e27c87dc24739bd54584dbb0c3e5b923b015686de",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 293,
+    "depth": 44,
+    "floor": 74,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_142",
+   "source_sha256": "c3185999539a3cf636f7c6f23911696cc669d1ce075bef6e674307c256094a6d",
+   "rewritten_sha256": "06163b74c66775ac87822216885354d3df68d7341476441bf2c2834ce5f0847d",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 293,
+    "depth": 47,
+    "floor": 74,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_143",
+   "source_sha256": "cf2b6619ae4af286e00ef231019388a95e589c270cd2f7125ffcf26c7b5c319d",
+   "rewritten_sha256": "cce7614fd3aa75526f6678031cd40777e463396c38a32ebfad8851854ec202df",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 278,
+    "depth": 46,
+    "floor": 70,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_144",
+   "source_sha256": "59893f0d249b4942e3759218081dcb5e1b626df8e3f3727e7326c2be0e0fd39c",
+   "rewritten_sha256": "d36f2775b975995bc05418d168f7ab6719c09ac7f508d1944748984f963b390f",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 302,
+    "depth": 47,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_145",
+   "source_sha256": "3ade24413bd51e00c455a7cd0cb24881afda9c0df063dad9ea3010d895501e54",
+   "rewritten_sha256": "b1d8f47ff8c984246d4e77725e885a9606461bd8d159d18ef063d260121d224f",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 310,
+    "depth": 48,
+    "floor": 78,
+    "layered": 94,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q15 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_146",
+   "source_sha256": "f511c53e4bc8502a107b4111cacc97052aefe740add4cdd5545c29b44f3d5199",
+   "rewritten_sha256": "b320d17b685397ffba2f8ea9c147055f000ef287259486180ee247b40b78959e",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 288,
+    "depth": 46,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_147",
+   "source_sha256": "9030e61959b3ad9f3a547341712c26c8debf8340b3ea5648f457944f277c1dc9",
+   "rewritten_sha256": "0a21979ed829546d7844d502d2cbd30aa167289d7d656ccf1dac5c62530ce5b6",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 307,
+    "depth": 46,
+    "floor": 77,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1325 ops (307 two-qubit), 1616 edges, 565 non-Clifford ops -> h2_moses2023 (conveyor regime) / 991 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 213,
+     "rounds": 13,
+     "pairs": 16,
+     "pairs_per_round": {
+      "1": 10,
+      "2": 3
+     },
+     "transport_cycles": 6,
+     "cool": 1,
+     "measure_instructions": 4,
+     "circuit_ops": 1325,
+     "unrealised": 991,
+     "unrealised_by_gate": {
+      "u3": 189,
+      "sdg": 176,
+      "s": 159,
+      "rxx": 291,
+      "h": 168,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 3,
+       "first": [
+        "[R4] instruction 7: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])",
+        "[R4] instruction 7: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 6 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_148",
+   "source_sha256": "0a429f26c5c90c28dca5a070db3d8ec525014dc116932bee02a2d607c677bf2f",
+   "rewritten_sha256": "b4d6c539c3a5bc9d48c1bf91000f587de2ccb10aa1864058d730eaa1c0dc0489",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 312,
+    "depth": 45,
+    "floor": 78,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_149",
+   "source_sha256": "d1a834559a1064186c814d6d15c03e0f677664f6d498ec6cf484e71dc0978e30",
+   "rewritten_sha256": "36821ed85e1f7e9bfa84d8564a6ccf67ecd9eca9b317e13b305516e253752f3e",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 297,
+    "depth": 47,
+    "floor": 75,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_150",
+   "source_sha256": "14f82b304933f7d8e754e8bae4cf7c57969e047643a5028a6b176815427d216d",
+   "rewritten_sha256": "d6c9fb6920c9d34b58942984e6f32b48b42e3dbb6d669a8caed35f6cac1d5825",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 308,
+    "depth": 46,
+    "floor": 77,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_151",
+   "source_sha256": "780aa7843bbd8f8647c49cdfe1f83df0e35ac3a1bed92febb2faecbbabe7bb65",
+   "rewritten_sha256": "16aced161c2260498df219b00b418cef35c276a771ce84522e7f9a7523273033",
+   "zero_angle_components_dropped": 73,
+   "bounds": {
+    "gates": 290,
+    "depth": 44,
+    "floor": 73,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_152",
+   "source_sha256": "9b16777a0ccfc67e6e5360990d80b8e8439ee0398cb594fad689b98c4175eb9e",
+   "rewritten_sha256": "cc507953b02ecd5acd0e3310d4c05853132e2a2d7c7052a89439160d1b8ed3a9",
+   "zero_angle_components_dropped": 52,
+   "bounds": {
+    "gates": 296,
+    "depth": 46,
+    "floor": 74,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_153",
+   "source_sha256": "e70c1bc5db8a740f23ac6c6e3b77aa86f200066573303ccb9986c501e4716db7",
+   "rewritten_sha256": "653fabf2a5f1f26dd3eb459d5854d65bb9885e053633403fca3a378038fa7ae8",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 286,
+    "depth": 44,
+    "floor": 72,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_154",
+   "source_sha256": "91d0fa4103d43cb7566233ed752d1e4c7596906850c4ca3935a78a6405161fc6",
+   "rewritten_sha256": "fb1965519ab24e7676d59901dab62a007e33409e46392c2078b625c3029e2afd",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 295,
+    "depth": 46,
+    "floor": 74,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_155",
+   "source_sha256": "c3ba83bc280d40af810c36b35eeef4fb391eae0a89b5b5f454af81c777c1fa5e",
+   "rewritten_sha256": "1d175998cdbd9e362ba157774a0b08a4484b3078a72a0c1528182b7575844439",
+   "zero_angle_components_dropped": 49,
+   "bounds": {
+    "gates": 302,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_156",
+   "source_sha256": "dca98cf2793049bd942521cf802c746bfbc521550382a88efaf6b247097e6a69",
+   "rewritten_sha256": "2b69eb98e50085383a2cb0225523674ca04062defa66c3bad5677b08c642186f",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 287,
+    "depth": 43,
+    "floor": 72,
+    "layered": 85,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_157",
+   "source_sha256": "3f867680a107873a24e78386a538c124038277f02e6994633ce7faa983577e6f",
+   "rewritten_sha256": "d320808becc83ae2cc4e82f61186bd013f50b4c606772e8d82b932aaf378d28e",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 316,
+    "depth": 47,
+    "floor": 79,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_158",
+   "source_sha256": "051d6434457854f51beb5400e9aa8e65af30fde4c4e3c9a222ad5fabfd86e442",
+   "rewritten_sha256": "7852a1a66f74f24e6eb22c6a5ec7ca8818d70fb6e3a174ad11ff34a1e6ca104e",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 302,
+    "depth": 47,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_159",
+   "source_sha256": "da834addf95c670e907ebded7548143ccd253cf61a9d1afc1dab91f806f6ce84",
+   "rewritten_sha256": "e1769795650cea23fd446523a3cf576ee20b695971a6fefa1cc285756f10f73b",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 305,
+    "depth": 46,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_160",
+   "source_sha256": "3a80978d8ef6f1bf2b6f549c652421ca616f5a17e34483ce374dd065da9627b1",
+   "rewritten_sha256": "abab786db623c27fb94041b21c10d68147d6f92c71c06dbf723011b71a39d6bb",
+   "zero_angle_components_dropped": 81,
+   "bounds": {
+    "gates": 288,
+    "depth": 44,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_161",
+   "source_sha256": "85a09c903eecde2d53f20c894f9cc13b34fa7d5fb07095cbe6730affcfa6aaa6",
+   "rewritten_sha256": "725aad530e9ab17730bd8f6b7d9da321e30c57dc340dbe34c3929aab0f4bca6a",
+   "zero_angle_components_dropped": 62,
+   "bounds": {
+    "gates": 310,
+    "depth": 48,
+    "floor": 78,
+    "layered": 94,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_162",
+   "source_sha256": "39d286867e3182ba40298ef094095ef64afd7be124b717f4c898adbf22fe9748",
+   "rewritten_sha256": "c1baaf6299c97af4062ad194ab64b99dd184cff945a8dbabc2652a04ab4d41d8",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 290,
+    "depth": 46,
+    "floor": 73,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_163",
+   "source_sha256": "11a8fd11e366ef60681fd7304d4a54d3913b8a98ca81a26dce28f0bee1b2fa3a",
+   "rewritten_sha256": "ef656c3352bd6d4a4b1c59dbe2320525042a90eda555a14e1bf4a518d8e3ce5e",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q6 cannot reach DG02 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_164",
+   "source_sha256": "dcfb54c8b725124fbc589b9e8867a6a690ce13759014c2cf0760aa2c96f5ed40",
+   "rewritten_sha256": "bf69d56892835a1aac42ebdade9e95e89f5a956bbd9dc126f5937e65c9ca10b3",
+   "zero_angle_components_dropped": 53,
+   "bounds": {
+    "gates": 310,
+    "depth": 48,
+    "floor": 78,
+    "layered": 95,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_165",
+   "source_sha256": "d4de039e65f1dc1a2999db1949843ca4534e0f6c4548c90cdee2b25305747e6f",
+   "rewritten_sha256": "37604c8b479dc258b96b75449a6a676b6fe63788c44643ebba518471f2032c6c",
+   "zero_angle_components_dropped": 66,
+   "bounds": {
+    "gates": 291,
+    "depth": 44,
+    "floor": 73,
+    "layered": 84,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q8 cannot reach DG02 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_166",
+   "source_sha256": "3cc91b82207ebbcbb03cf54f4eb05799ce64c8698e8412c9a54bc2ebc3328736",
+   "rewritten_sha256": "312ff3fc967a97f4d87c1f3f608eb051b057d1c338f54ca83ae3b583ccc56ee6",
+   "zero_angle_components_dropped": 71,
+   "bounds": {
+    "gates": 289,
+    "depth": 47,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_167",
+   "source_sha256": "9e5c824838abc6e81171fda1b7729f52b869514b1c5020f188b39df28f669abf",
+   "rewritten_sha256": "738ac856f81db823bdf8a2691ce029c73eb54e1dc6c8f0f1eb76fb53aeba6dda",
+   "zero_angle_components_dropped": 70,
+   "bounds": {
+    "gates": 290,
+    "depth": 46,
+    "floor": 73,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_168",
+   "source_sha256": "1293012da000e7a7cd8b5bfd2d56c337f14f792b4ef6515705ae1c26cd4f556e",
+   "rewritten_sha256": "8f658de4e082407b134d22e2d68b4e8d044f25e78d6c29c719a443e387e97971",
+   "zero_angle_components_dropped": 56,
+   "bounds": {
+    "gates": 295,
+    "depth": 46,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_169",
+   "source_sha256": "8b3ded126432374a8a4f8f8d19ac255d06385978a9f0d7d8980a3eaf7c1ef831",
+   "rewritten_sha256": "e0603e989eced9db1a1db59f7f8645b3e5704c6b157796fd2c8fb62257732356",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 296,
+    "depth": 46,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_170",
+   "source_sha256": "43e1a27b5e0269cbd61b797c6e432799abafbe03110747d06daf353fb7c1babc",
+   "rewritten_sha256": "fa5a025c3326e11b13b12cc15103897f99f2f4745acee16d0bd5b490929b981f",
+   "zero_angle_components_dropped": 58,
+   "bounds": {
+    "gates": 299,
+    "depth": 46,
+    "floor": 75,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_171",
+   "source_sha256": "45b5880cfe0cb3831965be21fd38bad94eebbb1385323c84e200a3628621537d",
+   "rewritten_sha256": "85dc25c7bba5ddeddef454ccf836cfb8a74ceb99af243e08085b0250ab8633d0",
+   "zero_angle_components_dropped": 74,
+   "bounds": {
+    "gates": 286,
+    "depth": 44,
+    "floor": 72,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_172",
+   "source_sha256": "811cee22f23bc4ec5f926f6a000d0cfb17bccb6098cefa07c768edd4cd1535c2",
+   "rewritten_sha256": "623e70d656b28bfa620ab9979f9b8745bc4614e8351135434a1348f302bc5758",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 288,
+    "depth": 46,
+    "floor": 72,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q0 cannot reach DG01 from CL20 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_173",
+   "source_sha256": "9b2ddc947ea85bd266ca8f4490495de36b57bddeae6cb8722ec59351021c82bc",
+   "rewritten_sha256": "38c7f74e3c669353aa584e51ecfdd90d40981fee5934d5e0d443cd87addc524f",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 309,
+    "depth": 48,
+    "floor": 78,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.9
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_174",
+   "source_sha256": "76a67314a91d5dab83a022a265c0ef267d92531cbd5d20aafe747355396bd42a",
+   "rewritten_sha256": "f11f966af752ec8cb38e5c6f4d6d55ceb2030007a18ab3f10e33e964802d621d",
+   "zero_angle_components_dropped": 67,
+   "bounds": {
+    "gates": 290,
+    "depth": 45,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_175",
+   "source_sha256": "f68000559d748d11c9bc3c0b4d4d30e4ae8cd73314cb9e9f67841702632f0413",
+   "rewritten_sha256": "85bd22d62066b22124aa6859dc6d7602590592e5093f69a119b82670b46b5a6c",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 293,
+    "depth": 44,
+    "floor": 74,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_176",
+   "source_sha256": "44fb550121d5bba3553b8e4810e863703366c2e03d2b5145f5115bc268eb6e0c",
+   "rewritten_sha256": "b4e5a5ff6acd98902fa14da34a41aec0df0c8c9f6bc322f30788e7bf8eeb9dfd",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 297,
+    "depth": 45,
+    "floor": 75,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_177",
+   "source_sha256": "71ddac7f65096cc46ef2a554df149772004639861e015c48442eb410f3ffbaa7",
+   "rewritten_sha256": "584791d5faebc33b15773e95d53c169b6b0f44c86dc414d1033011e1c719efff",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 295,
+    "depth": 47,
+    "floor": 74,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1267 ops (295 two-qubit), 1546 edges, 551 non-Clifford ops -> h2_moses2023 (conveyor regime) / 928 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 225,
+     "rounds": 21,
+     "pairs": 27,
+     "pairs_per_round": {
+      "1": 15,
+      "2": 6
+     },
+     "transport_cycles": 3,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1267,
+     "unrealised": 928,
+     "unrealised_by_gate": {
+      "u3": 187,
+      "rxx": 268,
+      "sdg": 166,
+      "s": 158,
+      "h": 141,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_178",
+   "source_sha256": "129c1758f3adb51b11aa513386aaf5b958560a12b1d04cdaa3ed6ccd16b72d83",
+   "rewritten_sha256": "1a6d29e58f032ad7eed90fa426628f7d95ee8b12f84ffdabca42ecc7159dbca5",
+   "zero_angle_components_dropped": 61,
+   "bounds": {
+    "gates": 299,
+    "depth": 46,
+    "floor": 75,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_179",
+   "source_sha256": "70f4fb43a9510fcfa1ab5c51a9860ff16260477d086e39a27963709feefe345b",
+   "rewritten_sha256": "ffaa08d18b806498a03be01650c7045bd32bc531079d4831ca35024ec21f697a",
+   "zero_angle_components_dropped": 79,
+   "bounds": {
+    "gates": 290,
+    "depth": 46,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_180",
+   "source_sha256": "973a65e51dfa691fa7ac8e385360cafd757ce47fee5f8f52aaac4bb4f5a47649",
+   "rewritten_sha256": "fd87b535cf7ddee3125e14c3ed4f48df2fa8e098de3c68b0c9696be4b59d1e9b",
+   "zero_angle_components_dropped": 69,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_181",
+   "source_sha256": "b6b3c306e10fbb2eb6216d4c394633d288c42351ebaf25d6245467391bf01a06",
+   "rewritten_sha256": "5500129e73170d27da7aa06982fdb88fb707cc3e0a487e59347dfcae5854dcb2",
+   "zero_angle_components_dropped": 74,
+   "bounds": {
+    "gates": 283,
+    "depth": 44,
+    "floor": 71,
+    "layered": 86,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1209 ops (283 two-qubit), 1476 edges, 537 non-Clifford ops -> h2_moses2023 (conveyor regime) / 897 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 200,
+     "rounds": 8,
+     "pairs": 8,
+     "pairs_per_round": {
+      "1": 8
+     },
+     "transport_cycles": 5,
+     "cool": 1,
+     "measure_instructions": 3,
+     "circuit_ops": 1209,
+     "unrealised": 897,
+     "unrealised_by_gate": {
+      "u3": 185,
+      "rxx": 275,
+      "sdg": 163,
+      "s": 149,
+      "h": 117,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [
+      "R4"
+     ],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {
+      "R4": {
+       "count": 6,
+       "first": [
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])",
+        "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 7 loaded sites here are all-or-nothing; 5 would have to idle while the rest move (e.g. ['CL16', 'CL17', 'CL18', 'CL19'])"
+       ]
+      }
+     }
+    },
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_182",
+   "source_sha256": "a50ecefb668d5eb4fccdba22b5f2624b4d3b5423be02a4a951f75600cb67aed6",
+   "rewritten_sha256": "843624bbe0c3d8c8fa70f88abd13224d2c9f4e07b5b0d84b52840efa796690a5",
+   "zero_angle_components_dropped": 55,
+   "bounds": {
+    "gates": 296,
+    "depth": 45,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_183",
+   "source_sha256": "269fc49005640733f08efda9606ccfc5358693c76557a55eb59a432bbf116551",
+   "rewritten_sha256": "069d33b343fbdec1a4656d8006fd86fe9cae1298a44f3967ff9e71dcc60817ee",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 282,
+    "depth": 45,
+    "floor": 71,
+    "layered": 87,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_184",
+   "source_sha256": "d181d54e6c1d806f74feae47064da8c6b82a492bca09f57757150580d9dc465b",
+   "rewritten_sha256": "2858e7df159711b68a7ceeb6770791559e51dbc868076f1aff8822503130abe5",
+   "zero_angle_components_dropped": 59,
+   "bounds": {
+    "gates": 298,
+    "depth": 46,
+    "floor": 75,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG01 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_185",
+   "source_sha256": "d569b48a8f6857484f570d60c76b49f837d1d78323aa5c19b96aab8ecd98355b",
+   "rewritten_sha256": "54db6cc4b86bafcd3de9f71acfff396d4867026684c8e7a729d82e8ad44ecf27",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 292,
+    "depth": 45,
+    "floor": 73,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG01 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 0.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_186",
+   "source_sha256": "e338d2399f61386ca94b271cca9d2c7dddcdda6f31b05cb6a1fc7202c17cfac0",
+   "rewritten_sha256": "c431005c147795b1babb08f858165f01c9c44735f12dd8c20ede75a875ebfcb4",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 307,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.0
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_187",
+   "source_sha256": "b5393181b50659148b134abaccc5de9638b9562b25427912810b4819a47dca57",
+   "rewritten_sha256": "17276a916c0945b3e8f67142e5f142fce787efaea5ef5355c3080811780625d4",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 299,
+    "depth": 45,
+    "floor": 75,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_188",
+   "source_sha256": "9b861283bbbb9136d6a40ef48ef2290a2db038b689c2dc82298c2eebc18da9af",
+   "rewritten_sha256": "9dcdc7949edcec70a6b540495090fc68e717c5fdd2cf651730e59d56fbeea0dd",
+   "zero_angle_components_dropped": 65,
+   "bounds": {
+    "gates": 310,
+    "depth": 46,
+    "floor": 78,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_189",
+   "source_sha256": "a573bc12ee7abba6b6ab97ee1b5b3195c1f7935f8c41d51e87d6b277ee3ab21b",
+   "rewritten_sha256": "01bedfa16e770f17b8163a48a17af11143198c90577ddf36b732b4bc2fdf5612",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 291,
+    "depth": 45,
+    "floor": 73,
+    "layered": 88,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL14 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_190",
+   "source_sha256": "9b2794b2ec3335d5625e3677c48c4eafc1eafa14e101f34f183e531bf6df214e",
+   "rewritten_sha256": "ba30a33abb823c343b1ade8a5ad2c19314dfdee85cdc13a812f0759ca2c95e06",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 306,
+    "depth": 47,
+    "floor": 77,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_191",
+   "source_sha256": "3d8cd6dabf0b78916036663c5cefff13ef76a0786e71b41e2df0898ee870e0be",
+   "rewritten_sha256": "21ed1c0e3d3f4e7dacb1414d7f631a6b75e657fdba1bafbcc4be8b46c8264431",
+   "zero_angle_components_dropped": 63,
+   "bounds": {
+    "gates": 291,
+    "depth": 46,
+    "floor": 73,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "circuit: 16 qubits, 16 clbits, 1251 ops (291 two-qubit), 1526 edges, 543 non-Clifford ops -> h2_moses2023 (conveyor regime) / 911 circuit op(s) left unrealised",
+    "partial_program": {
+     "instructions": 206,
+     "rounds": 16,
+     "pairs": 21,
+     "pairs_per_round": {
+      "1": 11,
+      "2": 5
+     },
+     "transport_cycles": 4,
+     "cool": 1,
+     "measure_instructions": 2,
+     "circuit_ops": 1251,
+     "unrealised": 911,
+     "unrealised_by_gate": {
+      "u3": 183,
+      "rxx": 270,
+      "sdg": 167,
+      "s": 155,
+      "h": 128,
+      "measure": 8
+     }
+    },
+    "partial_rules": {
+     "failed": [],
+     "passed": [
+      "R1",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19",
+      "R2",
+      "R20",
+      "R21",
+      "R22",
+      "R23",
+      "R3",
+      "R4",
+      "R4b",
+      "R4d",
+      "R5",
+      "R6",
+      "R6b",
+      "R7",
+      "R7c",
+      "R8",
+      "R9"
+     ],
+     "skipped": [
+      "R10",
+      "R7b"
+     ],
+     "partial": [
+      "R15"
+     ],
+     "violations": {}
+    },
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_192",
+   "source_sha256": "97b8c4af98f6c23f1272c68d40694a3d5c3018d1637e4d1bac08ed5a912a6946",
+   "rewritten_sha256": "eab069990528e8bc37efac3401c3b54b26d50a68a22a4d25eb69bf4709c20996",
+   "zero_angle_components_dropped": 53,
+   "bounds": {
+    "gates": 292,
+    "depth": 46,
+    "floor": 73,
+    "layered": 92,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL18 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_193",
+   "source_sha256": "59bae2ad188557af08f795b151467dcb2c84513a528999e48ef455b27d51a3fb",
+   "rewritten_sha256": "cd80141ad09f50e03e88f0402f042626cd18fc53af1bbca2fc38a656d4ef7e8e",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 303,
+    "depth": 46,
+    "floor": 76,
+    "layered": 90,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_194",
+   "source_sha256": "748b33eecd3fb787989b1a8fa83422c5a77c5ae1e32d208b19ad83b40a1e32db",
+   "rewritten_sha256": "05c83bff659e7a7f27aa6f0546350679cfc8ab3b754509c8e64a8ec7405c4d92",
+   "zero_angle_components_dropped": 60,
+   "bounds": {
+    "gates": 294,
+    "depth": 45,
+    "floor": 74,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q1 cannot reach DG02 from CL16 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_195",
+   "source_sha256": "4f3bf3d399fc2c8a02e999b22e159e84b2e58f3b1fb362404b3c4dab6e5e1f08",
+   "rewritten_sha256": "041d3dec7d828203e06b5c91eac74006856324a0f48ee11f87ef4f0985242f3b",
+   "zero_angle_components_dropped": 53,
+   "bounds": {
+    "gates": 307,
+    "depth": 46,
+    "floor": 77,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG03 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_196",
+   "source_sha256": "a1b7de9b74e570fe93e0cbe0bcc29f33ada10133a8c6d861b6fbc5fb5493fd28",
+   "rewritten_sha256": "7f1639889a69536924f9055e5d2dddcabf0e773cfb9740fdf395e58dbeb40fb4",
+   "zero_angle_components_dropped": 68,
+   "bounds": {
+    "gates": 280,
+    "depth": 45,
+    "floor": 70,
+    "layered": 89,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL19 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_197",
+   "source_sha256": "21bdc0f36d6463a26cddb40db4e994f765f6ee9502131b8b213f7a66bab291a0",
+   "rewritten_sha256": "aa86f471d28a9447e963435feba716d05fb42def0329e3e09ebc5605d4398f51",
+   "zero_angle_components_dropped": 64,
+   "bounds": {
+    "gates": 305,
+    "depth": 47,
+    "floor": 77,
+    "layered": 93,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_198",
+   "source_sha256": "adfdf91406514a2c58f9a2fd5ef9a817b7d289b43cd7e34c1b8538c65fa7792b",
+   "rewritten_sha256": "fa5dc997bff7002d46a9f10aaef0b2fd0bb842a8073a88ef25e1bd5f03b467f1",
+   "zero_angle_components_dropped": 77,
+   "bounds": {
+    "gates": 286,
+    "depth": 42,
+    "floor": 72,
+    "layered": 83,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q4 cannot reach DG04 from DG02 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "qv",
+   "id": "qv_n16_199",
+   "source_sha256": "03ef856a0000b0795f8eb731d74a3ab6fd6d281661f6878a4558325e1a868c11",
+   "rewritten_sha256": "983f44a74acea3e513ca4bfb1d7c1c4769bd5dac54bb47e06537e4a05e050397",
+   "zero_angle_components_dropped": 57,
+   "bounds": {
+    "gates": 303,
+    "depth": 46,
+    "floor": 76,
+    "layered": 91,
+    "widest_layer": 8
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG04 from CL17 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_0",
+   "source_sha256": "223a5c9ca766c8ee6ccf0daa1d7c0f1aecaf0fa2cc5cb6fde4966cecd828e6e5",
+   "rewritten_sha256": "b81537ee1dcf0f91a60e779bb3a1608f62edfbe103d575326824cd200303bee7",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.8
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_1",
+   "source_sha256": "a8f8ce233b53886360e0fc5e95850dd1a30d714c69f6035ce92d240880303007",
+   "rewritten_sha256": "272329a6e05121820bf3a1ec1bcac85dd49cf64ee288416992e07a24a0ae37f2",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_2",
+   "source_sha256": "b718ed6d1ec1244444b19d1f09c17e4c0f161e69d3fa96a24035ed1d788a59c9",
+   "rewritten_sha256": "73bfe8ebded4e90f7bad2ce313bc5558576a08967bac90e0406d0308a1fea0c3",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_3",
+   "source_sha256": "2694b89607e1a1a2322829d0ce5fbc598d727f00361c36c15b4f2ba27ac91d18",
+   "rewritten_sha256": "a3192fb34e25af35aa30868dbbf93d0a1c72368a5a18e534d4502747157209b6",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_4",
+   "source_sha256": "ff96fdada3d1500eccf33b0031febdc89bea0027ee6b237ff04c257e89d716e4",
+   "rewritten_sha256": "f16339584b55d3514ed9452bc48ae3665e97d2ff08994ad5b6b87f4e5a5d5342",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_5",
+   "source_sha256": "4bc7e2039efe133d91638bf50b3fe67d10fc1c520097863d125ab1bd99f58397",
+   "rewritten_sha256": "ddcea81b21f6b7ebd4d7eeb0e1a7fadbec6d30bd1963f749974045d3aa5ea8c3",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_6",
+   "source_sha256": "3db34413cebe68cd69627919691fef82df297d8e48ce9accd1eda6f90c06a5cf",
+   "rewritten_sha256": "f488d17489b84fcee4312ccfaecfc07d22027791dc276578348bda826ea8542d",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_7",
+   "source_sha256": "f9bd765e1e9a0c162247e8a06ab798ef9f7c89c1fcaa91b4fca879aaabffbfca",
+   "rewritten_sha256": "b87469ab74c97aa9a66cfc18bf7730b3c5c4722f5de3948bee9fb13ee2bd1dad",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_8",
+   "source_sha256": "c555aa93edd3f1ec73f6d4eef497e4874bedf4a94beb9c013c609599be759709",
+   "rewritten_sha256": "092960bd5b53bbb43efe825767a4b02ee5c0c24f44c7ab29786e3e69a29bb7de",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.1
+   }
+  },
+  {
+   "family": "rcs",
+   "id": "rcs_n32_9",
+   "source_sha256": "1dc1b15d6c1003af8c60cb921a0b135460512496b2a21c112b7f64c63ceeb3f4",
+   "rewritten_sha256": "4ec52fe9613f5e06d26f63fcbd41bc62c50bab2cf4807c52f8433ac75c9821a2",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 172,
+    "depth": 14,
+    "floor": 43,
+    "layered": 46,
+    "widest_layer": 14
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q2 cannot reach DG02 from CL13 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_00",
+   "source_sha256": "471a6863da3435e5cf19f5614cf062d2c4ac4dd87140dc6f538823890750a34b",
+   "rewritten_sha256": "4e7ac5db8c0e572ce638701347f1d938b008e3d8f3c04a86320575dc394881d7",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_01",
+   "source_sha256": "8ff3cd772dcf21d36add00ef164f4815a53a9898a7dd88a68a21e0261edabc8b",
+   "rewritten_sha256": "fa64e3e39c1cfc097a0ea8ee393a75a75e953fe5ef9090372f04351d42c4b154",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_02",
+   "source_sha256": "faa611fcae18d938bed6ae73d4d0bf906982297f9b7a14ef1fc358c7e03005df",
+   "rewritten_sha256": "fa2a898fd4e7611d20a5762f801e596a76261efc9c426797ff8b26f7b31d6e27",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_03",
+   "source_sha256": "9a32d08607c5b25dc496257399a854bac75cd38664e5c1814648d840a0520b68",
+   "rewritten_sha256": "8afe24370a612b5af64f0ae484c17b6d0a5044b48bc310bd344fd0aca21571f2",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_04",
+   "source_sha256": "da060a4c9b5a9f9035ed89945545824e9f0be67b1fdc8d059b98c7cf0ed8e17f",
+   "rewritten_sha256": "ff902380b309bca2bfd702a35f5a00e5a0a9bdb7b5386938808de92f64e416e7",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_05",
+   "source_sha256": "b47c432e7a4832d13c1a02fb036687e5e43609fdbc8ba23b5bc27df655197faa",
+   "rewritten_sha256": "d02c08f0367f34fe688cf4993adb589f857c017a8dace6d93a27d383a37aab6d",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_06",
+   "source_sha256": "51f89de05f65248564d0457cf8cb84b100393787b91599bdaa023c4c8ed3d274",
+   "rewritten_sha256": "d00027b4cdbb724d573d29bbada2fcb2307514c656f30bd5e451079a6e617750",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.9
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_07",
+   "source_sha256": "a3f0e9e71cf610a74a766c24b4da056f99d244990568d350714e828d6c0e6ed3",
+   "rewritten_sha256": "da5f22bb7acccdf48ea30b8f749a5446d31d75e29f0445ee48c8b53fa1b5b54c",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_08",
+   "source_sha256": "f430c3b5cb50f9d7bfa4942caf50f81fb8424c6bd2cf5990e7a090ebc145071e",
+   "rewritten_sha256": "fe33626e7a760ef33fff0c4f5dcb920ff7391219bc7e54b27ba7ec772751d664",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_09",
+   "source_sha256": "4e970e05e1fb2afc5170c414ad58037d46f5ed5a3dff281afb24b4ed789b54f0",
+   "rewritten_sha256": "5695822fdf377432532219a8f23214037fd7dfa19b3cab2ef5b723b74aa46321",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_10",
+   "source_sha256": "bd9bcd515b5155c9e3f2a6dc09c9d2c89dec2f3c30cf55efbadfce3d7d0f1094",
+   "rewritten_sha256": "419f39785cf71fe03d9076eb02ecf50d4f1afeb2e1c5ecd63b0a8234bafa2c75",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_11",
+   "source_sha256": "9dc493026ddb23d326d232105da1a15022e0df683737eb97300d8326840f9507",
+   "rewritten_sha256": "05efdce1a417ba40744d2f6a763f80c6ef4a51fd586e7d5a21978c5c32e087bc",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_12",
+   "source_sha256": "cd5c72124998c22b831e252893fcfd2f5a2e5b54396a2827d90624edbd40eff8",
+   "rewritten_sha256": "812dd28fe26c8e65d9627d8a53433e43a09613325dd1536687988ded16c91365",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.2
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_13",
+   "source_sha256": "6c9455086d1714d9c05b424f67af56cced5fe1a3d346c4f76c7d686a4c747f16",
+   "rewritten_sha256": "82fe8fd4287617de1c8c42c02e681d503990fae883d7af93e8a5a85aaf1bcd97",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_14",
+   "source_sha256": "8bdd107bb14e2b7d0801d289cc5ff918d1b54436c575c213fa343d264a8084ac",
+   "rewritten_sha256": "db2cdaf5ff97fd2358d8574524bd1ad5b13ea91b82bd01be82045a5daf3d8c85",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.1
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_15",
+   "source_sha256": "457bdc2b1f48135113698f592ad9abd945832fe4bf5c2e31a06af4ce908881da",
+   "rewritten_sha256": "ccad8173202dc0b0e063c560dad515f8491a0cf42f67052d53f96bd32322a82d",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.3
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_16",
+   "source_sha256": "84e6e8c1d9f75367a496f1dc714d5f897d9b0fad0231146a141698fe3b90ca21",
+   "rewritten_sha256": "32c44452d9419cdc72151acbcf86f81966a1586d37d4db6b8cf88900f4edf4d1",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.5
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_17",
+   "source_sha256": "cc1154dffdeccff2c24157b08e37e0368d65a41e6d24d0f062638bd0617504e4",
+   "rewritten_sha256": "78a34d18290160cde5ab489c4aff2d1eb120184b6ea948b07141721ac8e12a91",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.7
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_18",
+   "source_sha256": "70084fde72af4c8cd011fe38eb538dd63fbb6f7bc81543857ab9e7e727419fb8",
+   "rewritten_sha256": "ee38e2812e257488969588d430bcd0489073372edeadf93f5a4d747f8e8e1748",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.6
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_19",
+   "source_sha256": "8d999f645957fe4ad6284e5f20e799ab31eb31a234c9ad71210d3bc676f7ae68",
+   "rewritten_sha256": "001d1bade246adf7f87144da4845d2df20d443a0682cccaa8322f521d291fee3",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.0
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_20",
+   "source_sha256": "45e22d482d54044cfcd864a38201b69f6eb4eb5727ba42ee90b7522abb143362",
+   "rewritten_sha256": "b1075b8bad0d7f14e3ca797e463f5bb207bfc6feaeea2036d0f7fa0f731b0065",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_21",
+   "source_sha256": "df80502bb7988b20d0c4f2149b58c086c13601aa0c481cf8aca55ca13c888e32",
+   "rewritten_sha256": "bc5b5b858a3ce86083b6590c87ca561c846fb6b90e9b0250f97c0303106b3d0b",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.6
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_22",
+   "source_sha256": "32bbb2e003b05e261d2c0053b9ce3eb6d42f96aec8d007349ec0e903285a0ded",
+   "rewritten_sha256": "f55fae9a357b1c3a79823f0c0a3317f4c7c5b62ba6da8ac9f133821c1352728e",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.5
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_23",
+   "source_sha256": "3a5da4ecaf0022f88c63057b2f523aea4e2855f6f25fa2cbacbf205bb2363e6e",
+   "rewritten_sha256": "0a3470d7aa404117f79048c13464b132698bebeb2e4c531ca41ab4dbb34a8de2",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 3.0
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_24",
+   "source_sha256": "5248a7d3d6b09e8252f87ce955048f12524ea2238396069614b8744f9b4959a0",
+   "rewritten_sha256": "a35e0ce4587c20679a6a1e7c06b35cb8573c8f0126a07203e6981b740d4a6e19",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_25",
+   "source_sha256": "b5bde993b3312a3e55127d302654584c60e56fdad75da766fec86b0adfb72f34",
+   "rewritten_sha256": "9b74eeef86385a88808a4f5e4995c5d80b7322357357b707f9728c1e9bc4c5f5",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 1.4
+   }
+  },
+  {
+   "family": "qaoa",
+   "id": "qaoa_n32_p2_26",
+   "source_sha256": "266baebe3a21b63025805dc0a32cd288970c87d80226e17b21b35f9aa82e1b4d",
+   "rewritten_sha256": "e5e22a66e24da54a7232d26d67b75c26bd0d8773a0a7a9d22236df9281ed76f9",
+   "zero_angle_components_dropped": 0,
+   "bounds": {
+    "gates": 96,
+    "depth": 27,
+    "floor": 27,
+    "layered": 34,
+    "widest_layer": 6
+   },
+   "compile": {
+    "verdict": "refused (refused)",
+    "reason": "unroutable: q3 cannot reach DG03 from CL15 within 66 cycles / rotation does not apply either: the device has no closed loop with docks",
+    "seconds": 2.3
+   }
+  }
+ ],
+ "minimal_examples": [
+  {
+   "id": "M1_barrier",
+   "claim": "a barrier on more than two qubits crashes the compiler before placement",
+   "qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[3];\ncreg c[3];\nh q[0];\nbarrier q[0],q[1],q[2];\nmeasure q[0] -> c[0];\n",
+   "init": null,
+   "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out> --no-rotate",
+   "exit": 2,
+   "said": [
+    "Fatal error: exception Qccdc.Gateset.Unsupported(\"barrier on 3 qubits: no lowering to 1- and 2-qubit gates\")"
+   ]
+  },
+  {
+   "id": "M2_five_parallel_gates",
+   "claim": "five independent two-qubit gates on a machine with four gate zones: the fifth is left unrealised instead of running in a second round",
+   "qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[10];\ncx q[0],q[1];\ncx q[2],q[3];\ncx q[4],q[5];\ncx q[6],q[7];\ncx q[8],q[9];\n",
+   "init": {
+    "q0": "AUXD0",
+    "q1": "AUXD1",
+    "q2": "AUXD2",
+    "q3": "AUXD3",
+    "q4": "AUXD4",
+    "q5": "AUXU0",
+    "q6": "AUXU1",
+    "q7": "AUXU2",
+    "q8": "AUXU3",
+    "q9": "AUXU4"
+   },
+   "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out> --no-rotate --init-placement <init>",
+   "exit": 0,
+   "said": [
+    "  UNREALISED ops: 1 (4)"
+   ],
+   "program": {
+    "instructions": 92,
+    "rounds": 1,
+    "pairs": 4,
+    "pairs_per_round": {
+     "4": 1
+    },
+    "transport_cycles": 85,
+    "cool": 1,
+    "measure_instructions": 0,
+    "circuit_ops": 5,
+    "unrealised": 1,
+    "unrealised_by_gate": {
+     "cx": 1
+    }
+   },
+   "rules": {
+    "failed": [],
+    "passed": [
+     "R1",
+     "R11",
+     "R12",
+     "R13",
+     "R14",
+     "R15",
+     "R16",
+     "R17",
+     "R18",
+     "R19",
+     "R2",
+     "R20",
+     "R21",
+     "R22",
+     "R23",
+     "R3",
+     "R4",
+     "R4b",
+     "R4d",
+     "R5",
+     "R6",
+     "R6b",
+     "R7",
+     "R7c",
+     "R8",
+     "R9"
+    ],
+    "skipped": [
+     "R10",
+     "R7b"
+    ],
+    "partial": [
+     "R15"
+    ],
+    "violations": {}
+   }
+  },
+  {
+   "id": "M3_bystanders_in_gate_zones",
+   "claim": "one two-qubit gate, every gate zone holding one idle qubit: the gate is left unrealised; nothing is moved out of a gate zone to make room",
+   "qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[6];\ncx q[0],q[1];\n",
+   "init": {
+    "q0": "AUXD0",
+    "q1": "AUXD1",
+    "q2": "DG01",
+    "q3": "DG02",
+    "q4": "DG03",
+    "q5": "DG04"
+   },
+   "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out> --no-rotate --init-placement <init>",
+   "exit": 0,
+   "said": [
+    "  UNREALISED ops: 1 (0)"
+   ],
+   "program": {
+    "instructions": 2,
+    "rounds": 0,
+    "pairs": 0,
+    "pairs_per_round": {},
+    "transport_cycles": 0,
+    "cool": 1,
+    "measure_instructions": 0,
+    "circuit_ops": 1,
+    "unrealised": 1,
+    "unrealised_by_gate": {
+     "cx": 1
+    }
+   },
+   "rules": {
+    "failed": [],
+    "passed": [
+     "R1",
+     "R11",
+     "R12",
+     "R13",
+     "R14",
+     "R15",
+     "R16",
+     "R17",
+     "R18",
+     "R19",
+     "R2",
+     "R20",
+     "R21",
+     "R22",
+     "R23",
+     "R3",
+     "R4",
+     "R4b",
+     "R4d",
+     "R5",
+     "R6",
+     "R6b",
+     "R7",
+     "R7c",
+     "R8",
+     "R9"
+    ],
+    "skipped": [
+     "R10",
+     "R7b"
+    ],
+    "partial": [
+     "R15"
+    ],
+    "violations": {}
+   }
+  },
+  {
+   "id": "M4_conveyor_moved_one_ion",
+   "claim": "one gate whose first operand waits in a conveyor well beside an idle qubit in another well: the compiler pulls the one ion out of the broadcast conveyor while the other, on the same three tied signals, stays -- the compile succeeds and the program fails R4 (drivability)",
+   "qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[3];\ncx q[0],q[1];\n",
+   "init": {
+    "q0": "CR01",
+    "q1": "AUXD3",
+    "q2": "CR03"
+   },
+   "command": "qccdc compile <qasm> --arch <h2 expanded> -o <out> --no-rotate --init-placement <init>",
+   "exit": 0,
+   "said": [],
+   "program": {
+    "instructions": 13,
+    "rounds": 1,
+    "pairs": 1,
+    "pairs_per_round": {
+     "1": 1
+    },
+    "transport_cycles": 6,
+    "cool": 1,
+    "measure_instructions": 0,
+    "circuit_ops": 1,
+    "unrealised": 0,
+    "unrealised_by_gate": {}
+   },
+   "rules": {
+    "failed": [
+     "R4"
+    ],
+    "passed": [
+     "R1",
+     "R11",
+     "R12",
+     "R13",
+     "R14",
+     "R15",
+     "R16",
+     "R17",
+     "R18",
+     "R19",
+     "R2",
+     "R20",
+     "R21",
+     "R22",
+     "R23",
+     "R3",
+     "R4b",
+     "R4d",
+     "R5",
+     "R6",
+     "R6b",
+     "R7",
+     "R7c",
+     "R8",
+     "R9"
+    ],
+    "skipped": [
+     "R10",
+     "R7b"
+    ],
+    "partial": [
+     "R15"
+    ],
+    "violations": {
+     "R4": {
+      "count": 3,
+      "first": [
+       "[R4] instruction 2: on path 'L0': channel 'conveyor.a' has no per-site switch, so its 2 loaded sites here are all-or-nothing; 1 would have to idle while the rest move (e.g. ['CR03'])",
+       "[R4] instruction 2: on path 'L0': channel 'conveyor.b' has no per-site switch, so its 2 loaded sites here are all-or-nothing; 1 would have to idle while the rest move (e.g. ['CR03'])"
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,2090 @@
+{
+ "name": "h2_moses2023",
+ "schema_version": "0.3",
+ "description": "Quantinuum H2 as published in 2305.03828 (v2): one closed race-track RF null with no junctions; 4 DG gate zones that gate, prepare and measure, 4 UG gate zones that only sort, 5 auxiliary parking blocks per rail, two broadcast conveyor regions of 20 wells each, and a load hole in the middle of the left one. Capacities in qubits (one qubit = one 171Yb+-138Ba+ pair). Positions in units of the 750 um gate pitch. Primitive times are UNIT times: the paper states none.",
+ "provenance": {
+  "paper": "2305.03828",
+  "version_read": "v2 (16 May 2023), h2_benchmarking.tex + h2_benchmarking_figure.pdf",
+  "citation": "S. A. Moses et al., A Race Track Trapped-Ion Quantum Processor, Phys. Rev. X 13, 041052 (2023)",
+  "pitch_um": 750.0,
+  "pitch_source": "2305.03828 Sec. II.A: 'the spacing between gate zones remains the same (750 um)'",
+  "figure_scale_check": "Fig. 2d drawn at 56.0 pt per 750 um: DC extent 6.58 mm and isthmus 2.02 mm (Fig. 1 caption) agree to 1%",
+  "well_pitch_um": 154.5,
+  "well_pitch_source": "not stated: 20 wells spread evenly over the conveyor arc of Fig. 2d (the figure's storage ions sit ~149 um apart)",
+  "electrodes": "376 electrodes, 268 independent voltage sources, 1 RF drive, 280-pin CPGA (Sec. II.A); per-zone electrode counts not stated",
+  "rf": "~200 V, 42 MHz; ions 70 um from the surface (Sec. II.A, Fig. 2c)",
+  "operated_qubits": "32 (Abstract); four batches of 8 in the DG zones, the UG zones and each storage region (Sec. II.E)",
+  "two_qubit_parallelism": "up to four 2Q gates per round (Table I caption): four 2Q beam pairs for four gate zones (Sec. II.C)",
+  "measured": "2Q 1.84(5)e-3 (Abstract; Table II 18.3(5)e-4), 1Q 2.5(3)e-5, SPAM 1.6(1)e-3, transport 1Q RB 2.2(3)e-4 (Table II)",
+  "times": "none stated for any primitive; this document's times are unit times",
+  "control": "Gate and auxiliary regions have independently driven electrodes (268 sources for 376 electrodes, 2305.03828 Sec. II.A) and the paper states no one-waveform-per-cycle rule, so control.model is 'direct' (R22 off). The one broadcast constraint it does state -- the conveyor wells are tied to three signals {a,b,c} (Sec. II.A) -- is control.channels, which R4d judges: loaded conveyor wells move together, the same way.",
+  "heating": "not stated; no heating block",
+  "design_notes": "Reproduce/moses2023/DESIGN.md"
+ },
+ "zone_types": {
+  "dg": {
+   "capacity": 2,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "note": "DG gate zone. gate/spam: 'only the DG zones are used for quantum operations (gating, state preparation, and measurement)' (2305.03828 Sec. II.A). capacity 2 qubits: a 2Q gate runs on 'two YB pairs combined into a single four-ion crystal YBBY' (Sec. II.E, Fig. 2e) and a batch of 8 fills the 4 DG zones (Sec. II.E). cool: Doppler sheet beams cover the trap (Sec. II.E, Fig. 2d); the resolved sideband cooling applied here before every 2Q round is NOT expressible as a zone capability."
+  },
+  "ug": {
+   "capacity": 2,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "note": "UG gate zone: 'we use both rows for ion rearrangement (physical swaps), but only the DG zones are used for quantum operations' (2305.03828 Sec. II.A); 'used for sorting but not quantum operations' (Fig. 2d caption). capacity 2: a batch of 8 in the 4 UG zones (Sec. II.E). The PMT array could detect here (Sec. II.D) but does not, so spam is false."
+  },
+  "aux": {
+   "capacity": 2,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "note": "auxiliary region (light grey, Fig. 2d; 2305.03828 Sec. II.A). NOT stated: how many (5 per rail read from Fig. 2d) and capacity (2 assumed: Fig. 2d parks one pair of qubits per block, and 'Ions in the UG zones are transported to the nearby auxiliary zones', Sec. II.E). No gating, no SPAM."
+  },
+  "conveyor": {
+   "capacity": 1,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "note": "conveyor-belt storage well: '{a,b,c,...} ... can support 20 wells on each side (one for every three electrodes)' (2305.03828 Sec. II.A). capacity 1 qubit (one YB pair per well) is read from Fig. 2h, not stated in the text."
+  },
+  "load": {
+   "capacity": 1,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "photoionization": true,
+   "note": "load hole 'in the middle of the left-side conveyor belt region ... surrounded by electrodes with independent signals' (2305.03828 Sec. II.A); photo-ionization beams (Sec. II.B). NOT stated: its capacity (1 YB pair assumed)."
+  }
+ },
+ "primitives": {
+  "shuttle_segment": {
+   "curve": [
+    {
+     "us": 1.0,
+     "quanta": 0.0,
+     "table": "local",
+     "source": "none: unit time",
+     "label": "unit time for a linear shift (Sec. II.E); not stated by 2305.03828 (Sec. II.E); quanta not stated either"
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "us": 1.0,
+     "quanta": 0.0,
+     "table": "local",
+     "source": "none: unit time",
+     "label": "unit time for split (Sec. II.E 'split/combine'); not stated by 2305.03828 (Sec. II.E); quanta not stated either"
+    }
+   ]
+  },
+  "merge": {
+   "curve": [
+    {
+     "us": 1.0,
+     "quanta": 0.0,
+     "table": "local",
+     "source": "none: unit time",
+     "label": "unit time for combine (Sec. II.E 'split/combine'); not stated by 2305.03828 (Sec. II.E); quanta not stated either"
+    }
+   ]
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "us": 1.0,
+     "quanta": 0.0,
+     "table": "local",
+     "source": "none: unit time",
+     "label": "unit time for a physical swap (Sec. II.E); not stated by 2305.03828 (Sec. II.E); quanta not stated either"
+    }
+   ]
+  },
+  "ms_gate": {
+   "us": 1.0,
+   "time_basis": "unit",
+   "source": "none: unit time",
+   "note": "2305.03828 states no duration for this primitive (Sec. II.E gives only whole-shot times, Table I); 1 us is a unit so the replay counts operations. Times from this document are never compared.",
+   "fidelity_at_n0": 0.99816,
+   "fidelity_source": "2305.03828 Abstract: 2Q infidelity 1.84(5)e-3 (Table II: 18.3(5)e-4; Fig. 4: 1.83(5)e-3)",
+   "gate": "U_ZZ(theta) = exp(-i theta ZZ/2): an MS gate between 1Q wrapper pulses (Sec. II.C)",
+   "angle_law_not_expressible": "eps(theta) = (2.9(2) theta/pi + 0.46(6)) x 1e-3 (Fig. 3 caption)"
+  },
+  "1q_gate": {
+   "us": 1.0,
+   "time_basis": "unit",
+   "source": "none: unit time",
+   "note": "2305.03828 states no duration for this primitive (Sec. II.E gives only whole-shot times, Table I); 1 us is a unit so the replay counts operations. Times from this document are never compared.",
+   "fidelity": 0.999975,
+   "fidelity_source": "2305.03828 Abstract: 2.5(3)e-5"
+  },
+  "measure": {
+   "us": 1.0,
+   "time_basis": "unit",
+   "source": "none: unit time",
+   "note": "2305.03828 states no duration for this primitive (Sec. II.E gives only whole-shot times, Table I); 1 us is a unit so the replay counts operations. Times from this document are never compared.",
+   "fidelity": 0.9984,
+   "fidelity_source": "2305.03828 Abstract: SPAM 1.6(1)e-3 (preparation and measurement together, not measurement alone)"
+  },
+  "reset": {
+   "us": 1.0,
+   "time_basis": "unit",
+   "source": "none: unit time",
+   "note": "2305.03828 states no duration for this primitive (Sec. II.E gives only whole-shot times, Table I); 1 us is a unit so the replay counts operations. Times from this document are never compared."
+  },
+  "cool": {
+   "us": 1.0,
+   "time_basis": "unit",
+   "source": "none: unit time",
+   "note": "2305.03828 states no duration for this primitive (Sec. II.E gives only whole-shot times, Table I); 1 us is a unit so the replay counts operations. Times from this document are never compared.",
+   "scope": "global",
+   "broadcastable": true,
+   "removes_quanta": "all",
+   "physics": "Doppler 'sheet beams' cover the whole trap during transport (2305.03828 Sec. II.E, Fig. 2d). The resolved sideband cooling of the Ba+ ions in the DG zones 'before 2Q gating operations' (Sec. II.E) is a second, zone-scoped step the language cannot state."
+  }
+ },
+ "species": {
+  "qubit": "171Yb+",
+  "coolant": "138Ba+",
+  "sympathetic": true,
+  "coolant_fraction": 0.5,
+  "source": "2305.03828 Sec. II.B: '32 171Yb+-138Ba+ [YB] pairs in a deterministic orientation'; one coolant per qubit, so half the ions",
+  "unit_of_capacity": "every capacity in this document counts qubits = YB pairs",
+  "T1": "'finite T1 time of several minutes' (Sec. II.E): no number, so no T_coh_s"
+ },
+ "control": {
+  "model": "direct",
+  "classes": {
+   "extra": [
+    {
+     "id": "shuttle",
+     "type": "shift",
+     "orbit": "any",
+     "note": "linear shift of one qubit (YB pair) between neighbouring zones or wells: Sec. II.E 'linear shifts'. The id is the name our compiler emits for a single-ion move."
+    },
+    {
+     "id": "batch_shift_ccw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": 1,
+     "note": "Sec. II.E: 'batch shift, which shuttles batches of ions collectively to different regions of the trap'; one step along the loop"
+    },
+    {
+     "id": "batch_shift_cw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": -1,
+     "note": "the same, the other way round the loop"
+    }
+   ]
+  },
+  "channels": {
+   "grouping": "explicit",
+   "switch_per_site": false,
+   "explicit": [
+    {
+     "id": "conveyor.a",
+     "role": "conveyor",
+     "drives": [
+      "CR01",
+      "CR02",
+      "CR03",
+      "CR04",
+      "CR05",
+      "CR06",
+      "CR07",
+      "CR08",
+      "CR09",
+      "CR10",
+      "CR11",
+      "CR12",
+      "CR13",
+      "CR14",
+      "CR15",
+      "CR16",
+      "CR17",
+      "CR18",
+      "CR19",
+      "CR20",
+      "CL01",
+      "CL02",
+      "CL03",
+      "CL04",
+      "CL05",
+      "CL06",
+      "CL07",
+      "CL08",
+      "CL09",
+      "CL10",
+      "CL11",
+      "CL12",
+      "CL13",
+      "CL14",
+      "CL15",
+      "CL16",
+      "CL17",
+      "CL18",
+      "CL19",
+      "CL20"
+     ]
+    },
+    {
+     "id": "conveyor.b",
+     "role": "conveyor",
+     "drives": [
+      "CR01",
+      "CR02",
+      "CR03",
+      "CR04",
+      "CR05",
+      "CR06",
+      "CR07",
+      "CR08",
+      "CR09",
+      "CR10",
+      "CR11",
+      "CR12",
+      "CR13",
+      "CR14",
+      "CR15",
+      "CR16",
+      "CR17",
+      "CR18",
+      "CR19",
+      "CR20",
+      "CL01",
+      "CL02",
+      "CL03",
+      "CL04",
+      "CL05",
+      "CL06",
+      "CL07",
+      "CL08",
+      "CL09",
+      "CL10",
+      "CL11",
+      "CL12",
+      "CL13",
+      "CL14",
+      "CL15",
+      "CL16",
+      "CL17",
+      "CL18",
+      "CL19",
+      "CL20"
+     ]
+    },
+    {
+     "id": "conveyor.c",
+     "role": "conveyor",
+     "drives": [
+      "CR01",
+      "CR02",
+      "CR03",
+      "CR04",
+      "CR05",
+      "CR06",
+      "CR07",
+      "CR08",
+      "CR09",
+      "CR10",
+      "CR11",
+      "CR12",
+      "CR13",
+      "CR14",
+      "CR15",
+      "CR16",
+      "CR17",
+      "CR18",
+      "CR19",
+      "CR20",
+      "CL01",
+      "CL02",
+      "CL03",
+      "CL04",
+      "CL05",
+      "CL06",
+      "CL07",
+      "CL08",
+      "CL09",
+      "CL10",
+      "CL11",
+      "CL12",
+      "CL13",
+      "CL14",
+      "CL15",
+      "CL16",
+      "CL17",
+      "CL18",
+      "CL19",
+      "CL20"
+     ]
+    },
+    {
+     "id": "zone.AUXD0",
+     "role": "independent",
+     "drives": [
+      "AUXD0"
+     ]
+    },
+    {
+     "id": "zone.DG01",
+     "role": "independent",
+     "drives": [
+      "DG01"
+     ]
+    },
+    {
+     "id": "zone.AUXD1",
+     "role": "independent",
+     "drives": [
+      "AUXD1"
+     ]
+    },
+    {
+     "id": "zone.DG02",
+     "role": "independent",
+     "drives": [
+      "DG02"
+     ]
+    },
+    {
+     "id": "zone.AUXD2",
+     "role": "independent",
+     "drives": [
+      "AUXD2"
+     ]
+    },
+    {
+     "id": "zone.DG03",
+     "role": "independent",
+     "drives": [
+      "DG03"
+     ]
+    },
+    {
+     "id": "zone.AUXD3",
+     "role": "independent",
+     "drives": [
+      "AUXD3"
+     ]
+    },
+    {
+     "id": "zone.DG04",
+     "role": "independent",
+     "drives": [
+      "DG04"
+     ]
+    },
+    {
+     "id": "zone.AUXD4",
+     "role": "independent",
+     "drives": [
+      "AUXD4"
+     ]
+    },
+    {
+     "id": "zone.AUXU0",
+     "role": "independent",
+     "drives": [
+      "AUXU0"
+     ]
+    },
+    {
+     "id": "zone.UG01",
+     "role": "independent",
+     "drives": [
+      "UG01"
+     ]
+    },
+    {
+     "id": "zone.AUXU1",
+     "role": "independent",
+     "drives": [
+      "AUXU1"
+     ]
+    },
+    {
+     "id": "zone.UG02",
+     "role": "independent",
+     "drives": [
+      "UG02"
+     ]
+    },
+    {
+     "id": "zone.AUXU2",
+     "role": "independent",
+     "drives": [
+      "AUXU2"
+     ]
+    },
+    {
+     "id": "zone.UG03",
+     "role": "independent",
+     "drives": [
+      "UG03"
+     ]
+    },
+    {
+     "id": "zone.AUXU3",
+     "role": "independent",
+     "drives": [
+      "AUXU3"
+     ]
+    },
+    {
+     "id": "zone.UG04",
+     "role": "independent",
+     "drives": [
+      "UG04"
+     ]
+    },
+    {
+     "id": "zone.AUXU4",
+     "role": "independent",
+     "drives": [
+      "AUXU4"
+     ]
+    },
+    {
+     "id": "zone.LOAD",
+     "role": "independent",
+     "drives": [
+      "LOAD"
+     ]
+    }
+   ],
+   "note": "conveyor.a/b/c: 'equally spaced and sized electrodes tied together in a repeating fashion ({a,b,c,a,b,c,...}). This requires only three total voltage signals' (Sec. II.A); read literally as three signals for BOTH regions (the text is ambiguous). Every other site is independently driven. The channel count this map gives is NOT H2's 268 sources: the paper does not state electrodes per zone."
+  },
+  "wiring": {
+   "note": "376 electrodes, 268 independent voltage sources, 1 RF drive; 280-pin ceramic pin grid array (Sec. II.A)"
+  },
+  "optical": {
+   "addressing": "zone_beams",
+   "note": "four 2Q Raman beam pairs operate the four DG zones; 1Q gates use co-propagating beams; measurement beams per DG zone; a PMT array sees all 8 gate zones (Sec. II.C-D)"
+  }
+ },
+ "geometry": {
+  "generator": "explicit",
+  "params": {},
+  "nodes": [
+   {
+    "id": "AUXD0",
+    "pos": [
+     -0.5,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 0 of the bottom rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "DG01",
+    "pos": [
+     0.0,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "dg",
+    "labels": [
+     "DG01",
+     "gate zone (blue)",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A), bottom rail (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXD1",
+    "pos": [
+     0.5,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 1 of the bottom rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "DG02",
+    "pos": [
+     1.0,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "dg",
+    "labels": [
+     "DG02",
+     "gate zone (blue)",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A), bottom rail (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXD2",
+    "pos": [
+     1.5,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 2 of the bottom rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "DG03",
+    "pos": [
+     2.0,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "dg",
+    "labels": [
+     "DG03",
+     "gate zone (blue)",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A), bottom rail (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXD3",
+    "pos": [
+     2.5,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 3 of the bottom rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "DG04",
+    "pos": [
+     3.0,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "dg",
+    "labels": [
+     "DG04",
+     "gate zone (blue)",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A), bottom rail (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXD4",
+    "pos": [
+     3.5,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 4 of the bottom rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "CR01",
+    "pos": [
+     3.8,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 1 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR02",
+    "pos": [
+     4.0061,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 2 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR03",
+    "pos": [
+     4.2121,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 3 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR04",
+    "pos": [
+     4.4181,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 4 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR05",
+    "pos": [
+     4.6242,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 5 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR06",
+    "pos": [
+     4.8302,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 6 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR07",
+    "pos": [
+     5.0361,
+     0.0041
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 7 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR08",
+    "pos": [
+     5.2293,
+     0.0713
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 8 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR09",
+    "pos": [
+     5.3795,
+     0.2102
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 9 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR10",
+    "pos": [
+     5.4614,
+     0.3977
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 10 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR11",
+    "pos": [
+     5.4614,
+     0.6023
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 11 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR12",
+    "pos": [
+     5.3795,
+     0.7898
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 12 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR13",
+    "pos": [
+     5.2293,
+     0.9287
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 13 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR14",
+    "pos": [
+     5.0361,
+     0.9959
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 14 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR15",
+    "pos": [
+     4.8302,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 15 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR16",
+    "pos": [
+     4.6242,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 16 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR17",
+    "pos": [
+     4.4181,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 17 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR18",
+    "pos": [
+     4.2121,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 18 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR19",
+    "pos": [
+     4.0061,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 19 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CR20",
+    "pos": [
+     3.8,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "right conveyor well 20 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXU0",
+    "pos": [
+     3.5,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 0 of the top rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "UG01",
+    "pos": [
+     3.0,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "ug",
+    "labels": [
+     "UG01",
+     "gate zone (blue), sorting only",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A); top rail 1.00 pitch above (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXU1",
+    "pos": [
+     2.5,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 1 of the top rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "UG02",
+    "pos": [
+     2.0,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "ug",
+    "labels": [
+     "UG02",
+     "gate zone (blue), sorting only",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A); top rail 1.00 pitch above (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXU2",
+    "pos": [
+     1.5,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 2 of the top rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "UG03",
+    "pos": [
+     1.0,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "ug",
+    "labels": [
+     "UG03",
+     "gate zone (blue), sorting only",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A); top rail 1.00 pitch above (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXU3",
+    "pos": [
+     0.5,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 3 of the top rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "UG04",
+    "pos": [
+     0.0,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "ug",
+    "labels": [
+     "UG04",
+     "gate zone (blue), sorting only",
+     "src: 2305.03828 Sec. II.A; Fig. 2d caption",
+     "pos: x = 750 um pitch (Sec. II.A); top rail 1.00 pitch above (Fig. 2d)"
+    ]
+   },
+   {
+    "id": "AUXU4",
+    "pos": [
+     -0.5,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "aux",
+    "labels": [
+     "auxiliary block 4 of the top rail (light grey)",
+     "src: 2305.03828 Sec. II.A, Sec. II.E; Fig. 2d",
+     "not stated: count and position read from Fig. 2d (midway between zones)"
+    ]
+   },
+   {
+    "id": "CL01",
+    "pos": [
+     -0.8,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 1 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL02",
+    "pos": [
+     -1.0061,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 2 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL03",
+    "pos": [
+     -1.2121,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 3 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL04",
+    "pos": [
+     -1.4181,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 4 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL05",
+    "pos": [
+     -1.6242,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 5 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL06",
+    "pos": [
+     -1.8302,
+     1.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 6 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL07",
+    "pos": [
+     -2.0361,
+     0.9959
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 7 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL08",
+    "pos": [
+     -2.2293,
+     0.9287
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 8 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL09",
+    "pos": [
+     -2.3795,
+     0.7898
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 9 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL10",
+    "pos": [
+     -2.4614,
+     0.6023
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 10 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "LOAD",
+    "pos": [
+     -2.472,
+     0.5
+    ],
+    "kind": "site",
+    "zone_type": "load",
+    "labels": [
+     "load hole",
+     "src: 2305.03828 Sec. II.A ('in the middle of the left-side conveyor belt region'), Sec. II.B; Fig. 2d",
+     "not stated: one site, between wells 10 and 11"
+    ]
+   },
+   {
+    "id": "CL11",
+    "pos": [
+     -2.4614,
+     0.3977
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 11 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL12",
+    "pos": [
+     -2.3795,
+     0.2102
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 12 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL13",
+    "pos": [
+     -2.2293,
+     0.0713
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 13 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL14",
+    "pos": [
+     -2.0361,
+     0.0041
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 14 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL15",
+    "pos": [
+     -1.8302,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 15 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL16",
+    "pos": [
+     -1.6242,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 16 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL17",
+    "pos": [
+     -1.4181,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 17 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL18",
+    "pos": [
+     -1.2121,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 18 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL19",
+    "pos": [
+     -1.0061,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 19 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   },
+   {
+    "id": "CL20",
+    "pos": [
+     -0.8,
+     0.0
+    ],
+    "kind": "site",
+    "zone_type": "conveyor",
+    "labels": [
+     "left conveyor well 20 of 20",
+     "src: 2305.03828 Sec. II.A; Fig. 2b,d,h",
+     "not stated: well pitch (wells spread evenly over the green arc of Fig. 2d)"
+    ]
+   }
+  ],
+  "segments": [
+   {
+    "id": "e00",
+    "ends": [
+     "AUXD0",
+     "DG01"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e01",
+    "ends": [
+     "DG01",
+     "AUXD1"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e02",
+    "ends": [
+     "AUXD1",
+     "DG02"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e03",
+    "ends": [
+     "DG02",
+     "AUXD2"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e04",
+    "ends": [
+     "AUXD2",
+     "DG03"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e05",
+    "ends": [
+     "DG03",
+     "AUXD3"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e06",
+    "ends": [
+     "AUXD3",
+     "DG04"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e07",
+    "ends": [
+     "DG04",
+     "AUXD4"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e08",
+    "ends": [
+     "AUXD4",
+     "CR01"
+    ],
+    "length": 0.3,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e09",
+    "ends": [
+     "CR01",
+     "CR02"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e10",
+    "ends": [
+     "CR02",
+     "CR03"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e11",
+    "ends": [
+     "CR03",
+     "CR04"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e12",
+    "ends": [
+     "CR04",
+     "CR05"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e13",
+    "ends": [
+     "CR05",
+     "CR06"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e14",
+    "ends": [
+     "CR06",
+     "CR07"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e15",
+    "ends": [
+     "CR07",
+     "CR08"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e16",
+    "ends": [
+     "CR08",
+     "CR09"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e17",
+    "ends": [
+     "CR09",
+     "CR10"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e18",
+    "ends": [
+     "CR10",
+     "CR11"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e19",
+    "ends": [
+     "CR11",
+     "CR12"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e20",
+    "ends": [
+     "CR12",
+     "CR13"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e21",
+    "ends": [
+     "CR13",
+     "CR14"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e22",
+    "ends": [
+     "CR14",
+     "CR15"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e23",
+    "ends": [
+     "CR15",
+     "CR16"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e24",
+    "ends": [
+     "CR16",
+     "CR17"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e25",
+    "ends": [
+     "CR17",
+     "CR18"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e26",
+    "ends": [
+     "CR18",
+     "CR19"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e27",
+    "ends": [
+     "CR19",
+     "CR20"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e28",
+    "ends": [
+     "CR20",
+     "AUXU0"
+    ],
+    "length": 0.3,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e29",
+    "ends": [
+     "AUXU0",
+     "UG01"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e30",
+    "ends": [
+     "UG01",
+     "AUXU1"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e31",
+    "ends": [
+     "AUXU1",
+     "UG02"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e32",
+    "ends": [
+     "UG02",
+     "AUXU2"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e33",
+    "ends": [
+     "AUXU2",
+     "UG03"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e34",
+    "ends": [
+     "UG03",
+     "AUXU3"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e35",
+    "ends": [
+     "AUXU3",
+     "UG04"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e36",
+    "ends": [
+     "UG04",
+     "AUXU4"
+    ],
+    "length": 0.5,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e37",
+    "ends": [
+     "AUXU4",
+     "CL01"
+    ],
+    "length": 0.3,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e38",
+    "ends": [
+     "CL01",
+     "CL02"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e39",
+    "ends": [
+     "CL02",
+     "CL03"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e40",
+    "ends": [
+     "CL03",
+     "CL04"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e41",
+    "ends": [
+     "CL04",
+     "CL05"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e42",
+    "ends": [
+     "CL05",
+     "CL06"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e43",
+    "ends": [
+     "CL06",
+     "CL07"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e44",
+    "ends": [
+     "CL07",
+     "CL08"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e45",
+    "ends": [
+     "CL08",
+     "CL09"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e46",
+    "ends": [
+     "CL09",
+     "CL10"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e47",
+    "ends": [
+     "CL10",
+     "LOAD"
+    ],
+    "length": 0.103,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e48",
+    "ends": [
+     "LOAD",
+     "CL11"
+    ],
+    "length": 0.103,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e49",
+    "ends": [
+     "CL11",
+     "CL12"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e50",
+    "ends": [
+     "CL12",
+     "CL13"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e51",
+    "ends": [
+     "CL13",
+     "CL14"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e52",
+    "ends": [
+     "CL14",
+     "CL15"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e53",
+    "ends": [
+     "CL15",
+     "CL16"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e54",
+    "ends": [
+     "CL16",
+     "CL17"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e55",
+    "ends": [
+     "CL17",
+     "CL18"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e56",
+    "ends": [
+     "CL18",
+     "CL19"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e57",
+    "ends": [
+     "CL19",
+     "CL20"
+    ],
+    "length": 0.206,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   },
+   {
+    "id": "e58",
+    "ends": [
+     "CL20",
+     "AUXD0"
+    ],
+    "length": 0.3,
+    "loop": "L0",
+    "labels": [
+     "RF null of the race track (one closed loop, no junction)"
+    ]
+   }
+  ],
+  "loops": [
+   {
+    "id": "L0",
+    "kind": "ring",
+    "closed": true,
+    "nodes": [
+     "AUXD0",
+     "DG01",
+     "AUXD1",
+     "DG02",
+     "AUXD2",
+     "DG03",
+     "AUXD3",
+     "DG04",
+     "AUXD4",
+     "CR01",
+     "CR02",
+     "CR03",
+     "CR04",
+     "CR05",
+     "CR06",
+     "CR07",
+     "CR08",
+     "CR09",
+     "CR10",
+     "CR11",
+     "CR12",
+     "CR13",
+     "CR14",
+     "CR15",
+     "CR16",
+     "CR17",
+     "CR18",
+     "CR19",
+     "CR20",
+     "AUXU0",
+     "UG01",
+     "AUXU1",
+     "UG02",
+     "AUXU2",
+     "UG03",
+     "AUXU3",
+     "UG04",
+     "AUXU4",
+     "CL01",
+     "CL02",
+     "CL03",
+     "CL04",
+     "CL05",
+     "CL06",
+     "CL07",
+     "CL08",
+     "CL09",
+     "CL10",
+     "LOAD",
+     "CL11",
+     "CL12",
+     "CL13",
+     "CL14",
+     "CL15",
+     "CL16",
+     "CL17",
+     "CL18",
+     "CL19",
+     "CL20"
+    ],
+    "note": "the race track: 'a linear trap with periodic boundary conditions' (Abstract), one RF null (Sec. II.A)"
+   }
+  ]
+ }
+}

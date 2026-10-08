@@ -1,0 +1,214 @@
+diff --git a/dump_sat.py b/dump_sat.py
+new file mode 100644
+index 0000000..2983861
+--- /dev/null
++++ b/dump_sat.py
+@@ -0,0 +1,144 @@
++# Added for the reproduction run (not part of the artifact): read the satisfying Z3 model of
++# MemorySAT and write it as JSON. Read-only with respect to the solver: it only calls
++# model.evaluate() on variables MemorySAT already created, and re-uses SAT.py's own helpers
++# to report which edges the move constraint required to be empty.
++import json
++
++import networkx as nx
++from z3 import is_true
++
++from SAT import get_idc_from_idx, get_idx_from_idc, get_path_between_edges
++
++
++def _node_id(node):
++    return f"{node[0]},{node[1]}"
++
++
++def _edge_id(idx):
++    return f"e{idx}"
++
++
++def _through_nodes(graph, src, tar):
++    """Nodes an ion passes when it moves from edge src to edge tar (physical route)."""
++    if set(src) == set(tar):
++        return []
++    common = set(src) & set(tar)
++    if len(common) == 1:
++        return [next(iter(common))]
++    best = None
++    for a in src:
++        for b in tar:
++            p = nx.shortest_path(graph, a, b, lambda _u, _v, d: (d["edge_type"] != "trap") * 1e8 + 1)
++            if best is None or len(p) < len(best):
++                best = p
++    return best
++
++
++def dump_schedule(sat, path, meta):
++    g = sat.graph
++    model = sat.model
++    T = sat.timesteps
++    ions = sat.ions
++    idc = sat.idc_dict
++    n_edges = len(g.edges())
++
++    node_type = nx.get_node_attributes(g, "node_type")
++    edge_type = {get_idx_from_idc(idc, e): t for e, t in nx.get_edge_attributes(g, "edge_type").items()}
++
++    nodes = [
++        {"id": _node_id(nd), "coord": [nd[0], nd[1]], "plot_xy": [nd[1], -nd[0]], "node_type": node_type[nd]}
++        for nd in g.nodes()
++    ]
++    edges = []
++    for idx in range(n_edges):
++        e = get_idc_from_idx(idc, idx)
++        et = edge_type[idx]
++        edges.append(
++            {
++                "id": _edge_id(idx),
++                "idx": idx,
++                "nodes": [_node_id(e[0]), _node_id(e[1])],
++                "edge_type": et,
++                "capacity": 2 if et == "entry" else 1,
++            }
++        )
++
++    # positions[t][ion] = edge idx
++    positions = []
++    for t in range(T):
++        pos = {}
++        for ion in ions:
++            hits = [
++                e for e in range(n_edges) if is_true(model.evaluate(sat.states[t][e][ion], model_completion=True))
++            ]
++            assert len(hits) == 1, (t, ion, hits)
++            pos[ion] = hits[0]
++        positions.append(pos)
++
++    seq = meta["sequence"]
++    executed = []
++    for t in range(T):
++        executed.append(
++            [
++                j
++                for j in range(len(seq))
++                if is_true(model.evaluate(sat.seq_index[t][j], model_completion=True))
++            ]
++        )
++
++    steps = []
++    for t in range(T):
++        moved = [ion for ion in ions if t > 0 and positions[t][ion] != positions[t - 1][ion]]
++        moves = []
++        for ion in moved:
++            src = get_idc_from_idx(idc, positions[t - 1][ion])
++            tar = get_idc_from_idx(idc, positions[t][ion])
++            # the edges MV_CONSTR_2 required to be empty (of every ion) at state t-1, as coded
++            req = get_path_between_edges(g, src, tar)
++            req_idx = sorted({get_idx_from_idc(idc, e) for e in req})
++            thr = _through_nodes(g, src, tar)
++            moves.append(
++                {
++                    "ion": ion,
++                    "from": _edge_id(positions[t - 1][ion]),
++                    "to": _edge_id(positions[t][ion]),
++                    "through_nodes": [_node_id(nd) for nd in thr],
++                    "through_junctions": [_node_id(nd) for nd in thr if node_type[nd] == "junction_node"],
++                    "required_empty_at_prev_state": [_edge_id(i) for i in req_idx],
++                }
++            )
++        gates = []
++        for j in executed[t]:
++            el = seq[j]
++            gates.append(list(el) if isinstance(el, tuple) else [el])
++        steps.append(
++            {
++                "t": t,
++                "positions": {str(ion): _edge_id(positions[t][ion]) for ion in ions},
++                "gates": gates,
++                "gate_seq_index": executed[t],
++                "moved": moved,
++                "moves": moves,
++            }
++        )
++
++    out = dict(meta)
++    out["sequence"] = [list(el) if isinstance(el, tuple) else [el] for el in seq]
++    out["graph"] = {
++        "nodes": nodes,
++        "edges": edges,
++        "junction_nodes": [_node_id(nd) for nd in g.nodes() if node_type[nd] == "junction_node"],
++        "processing_zone_node": [_node_id(nd) for nd in g.nodes() if node_type[nd] == "processing_zone_node"],
++        "memory_edges": [e["id"] for e in edges if e["edge_type"] == "trap"],
++        "exit_edge(e_out)": _edge_id(get_idx_from_idc(idc, sat.exit)),
++        "entry_edge(e_in, gate site)": _edge_id(get_idx_from_idc(idc, sat.entry)),
++        "node_id_format": "row,col of the networkx grid (row 0 at top); plot_xy is SAT.plot_state's layout",
++    }
++    out["initial"] = {str(ion): _edge_id(positions[0][ion]) for ion in ions}
++    out["initial_layout"] = {_edge_id(positions[0][ion]): [str(ion)] for ion in ions}
++    out["qubit_to_ion"] = {str(ion): str(ion) for ion in ions}
++    out["steps"] = steps
++    out["num_states"] = T
++    out["num_transitions"] = T - 1
++    with open(path, "w", encoding="utf-8") as f:
++        json.dump(out, f, indent=1)
+diff --git a/run.py b/run.py
+index 69ce1e5..86a39c6 100644
+--- a/run.py
++++ b/run.py
+@@ -11,6 +11,9 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("config_file", help="path to json config file")
+     parser.add_argument("--plot", action="store_true", help="plot grid")
++    # reproduction patch: seeded random placement (the code's own rand=True branch) and a JSON dump
++    parser.add_argument("--seed", type=int, default=None, help="random initial placement with random.seed(SEED)")
++    parser.add_argument("--dump", default=None, help="write the satisfying (optimal) schedule as JSON")
+     args = parser.parse_args()
+ 
+     with pathlib.Path(args.config_file).open("r") as f:
+@@ -29,9 +32,9 @@ if __name__ == "__main__":
+     n_of_traps = len([trap for trap in graph.edges() if graph.get_edge_data(trap[0], trap[1])["edge_type"] == "trap"])
+ 
+     ### starting edges / ions
+-    rand = False
++    rand = args.seed is not None
+     if rand is True:
+-        random.seed(0)
++        random.seed(args.seed)
+         random_starting_traps = random.sample(range(n_of_traps), (num_ion_chains))
+         starting_traps = []
+         for trap in random_starting_traps:
+@@ -45,6 +48,7 @@ if __name__ == "__main__":
+             edges for edges in graph.edges() if graph.get_edge_data(edges[0], edges[1])["edge_type"] == "trap"
+         ][: num_ion_chains]
+     number_of_registers = len(starting_traps)
++    print(f"seed: {args.seed}, starting traps (ion i on entry i): {starting_traps}")
+ 
+     # place ions onto traps (ion0 on starting_trap0)
+     ions = []
+@@ -61,6 +65,29 @@ if __name__ == "__main__":
+ 
+         if is_satisfied:
+             print(f"{time.time() - start:.1f}s Found satisfying solution with {timesteps} time steps.")
++            if args.dump:
++                from dump_sat import dump_schedule
++
++                dump_schedule(
++                    SAT,
++                    args.dump,
++                    {
++                        "tool": "MQT IonShuttler exact SAT (SAT.py / run.py)",
++                        "repo": "https://github.com/munich-quantum-toolkit/ionshuttler",
++                        "commit": "bc71e46796a1d8f221d608991089d0ba3f0b0b56",
++                        "command": " ".join(sys.argv),
++                        "config": config,
++                        "seed": args.seed,
++                        "placement_rule": "random.seed(seed); random.sample(range(n_of_traps), num_ion_chains); ion i -> trap_edges[sample[i]] (trap_edges in networkx edge order)" if rand else "first num_ion_chains trap edges",
++                        "starting_traps": [[list(e[0]), list(e[1])] for e in starting_traps],
++                        "sequence": qu_alg,
++                        "time_units": "abstract time steps; the code's printed number is the count of states t = 0..T-1",
++                        "metrics": {
++                            "Found satisfying solution with N time steps": timesteps,
++                            "wall_s_total": round(time.time() - start, 1),
++                        },
++                    },
++                )
+             if args.plot:
+                 MemorySAT.plot(SAT, show_ions=True)
+             break

@@ -1,0 +1,1055 @@
+{
+ "paper": {
+  "key": "jones2025",
+  "short": "Surface-code QCCD",
+  "title": "Architecting Scalable Trapped Ion Quantum Computers using Surface Codes",
+  "authors": [
+   "Scott Jones",
+   "Prakash Murali"
+  ],
+  "venue": "ASPLOS 2026",
+  "year": 2026,
+  "arxiv": "2510.23519",
+  "artifact": {
+   "url": "https://github.com/scottjones03/PartIIProject",
+   "commit": "d235a22",
+   "license": null,
+   "note": "The README says MIT but the repository has no license file: we ran it locally and publish only the schedules it produced."
+  },
+  "what": "A compiler for surface-code rounds on grid, linear and switch QCCD devices, and a design-space study of trap capacity, wiring and logical error."
+ },
+ "runs": [
+  {
+   "id": "grid_rot_d2_c2",
+   "label": "rotated surface code d=2, one round, grid, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['34'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 4105.0,
+    "last_start_us": 4055.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 10,
+    "gate1": 40,
+    "split": 16,
+    "transit": 32,
+    "j_enter": 16,
+    "j_exit": 16,
+    "merge": 16,
+    "gate": 8,
+    "measure": 7
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 4055.0,
+      "theirs": 4055.0000000000014,
+      "rel": 3.364345382637218e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 4055.0,
+      "theirs": 4055.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/grid_rot_d2_c2 --name grid_rot_d2_c2 --recipe process_circuit --distance 2 --capacity 2 --topology-note grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+    "config": {
+     "name": "grid_rot_d2_c2",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 2,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 2
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.04
+  },
+  {
+   "id": "grid_rot_d3_c2",
+   "label": "rotated surface code d=3, one round, grid, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['70'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 25,
+    "gate1": 112,
+    "split": 48,
+    "transit": 96,
+    "j_enter": 48,
+    "j_exit": 48,
+    "merge": 48,
+    "gate": 24,
+    "measure": 17
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 4085.0,
+      "theirs": 4085.000000000001,
+      "rel": 2.2264252185383796e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 4085.0,
+      "theirs": 4085.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/grid_rot_d3_c2 --name grid_rot_d3_c2 --recipe process_circuit --distance 3 --capacity 2 --topology-note grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+    "config": {
+     "name": "grid_rot_d3_c2",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 3,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.04
+  },
+  {
+   "id": "grid_rot_d6_c2",
+   "label": "rotated surface code d=6, one round, grid, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['234'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 4130.0,
+    "last_start_us": 4080.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 106,
+    "gate1": 552,
+    "split": 240,
+    "transit": 480,
+    "j_enter": 240,
+    "j_exit": 240,
+    "merge": 240,
+    "gate": 120,
+    "measure": 71
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 4080.0,
+      "theirs": 4080.0000000000014,
+      "rel": 3.343730521224e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 4080.0,
+      "theirs": 4085.0,
+      "rel": 0.0012239902080783353,
+      "verdict": "differs",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/grid_rot_d6_c2 --name grid_rot_d6_c2 --recipe process_circuit --distance 6 --capacity 2 --topology-note grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+    "config": {
+     "name": "grid_rot_d6_c2",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 6,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 6
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.12
+  },
+  {
+   "id": "grid_rot_d12_c2",
+   "label": "rotated surface code d=12, one round, grid, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['859'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 430,
+    "gate1": 2400,
+    "split": 1056,
+    "transit": 2112,
+    "j_enter": 1056,
+    "j_exit": 1056,
+    "merge": 1056,
+    "gate": 528,
+    "measure": 287
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 4085.0,
+      "theirs": 4085.000000000001,
+      "rel": 2.2264252185383796e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 4085.0,
+      "theirs": 4085.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/grid_rot_d12_c2 --name grid_rot_d12_c2 --recipe process_circuit --distance 12 --capacity 2 --topology-note grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+    "config": {
+     "name": "grid_rot_d12_c2",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 12,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "grid via process_circuit (processCircuitAugmentedGrid rows=cols=int(sqrt(2d^2-1))+2, padding=1)",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 12
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "traps": null
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.55
+  },
+  {
+   "id": "linear_rep_d3_c2",
+   "label": "repetition code d=3, linear, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 1585.0,
+    "last_start_us": 1535.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 7,
+    "gate1": 16,
+    "split": 8,
+    "transit": 8,
+    "merge": 8,
+    "gate": 4,
+    "measure": 5
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 1535.0,
+      "theirs": 1535.0000000000002,
+      "rel": 1.48126172927187e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 1535.0,
+      "theirs": 1535.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/linear_rep_d3_c2 --name linear_rep_d3_c2 --recipe notebook --code repetition --distance 3 --capacity 2 --rows 1 --cols 8 --padding 0 --topology-note linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+    "config": {
+     "name": "linear_rep_d3_c2",
+     "recipe": "notebook",
+     "code": "repetition",
+     "distance": 3,
+     "capacity": 2,
+     "rows": 1,
+     "cols": 8,
+     "padding": 0,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+     "generated_args": [
+      [
+       "repetition_code:memory"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3,
+       "noise_args_all": 0.01,
+       "prepended_QUBIT_COORDS": "(i,0) for i<5"
+      }
+     ],
+     "gate_improvements": null,
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.02
+  },
+  {
+   "id": "linear_rep_d3_c3",
+   "label": "repetition code d=3, linear, capacity 3",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 1790.0,
+    "last_start_us": 1390.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 7,
+    "gate1": 16,
+    "gate": 4,
+    "split": 3,
+    "measure": 5,
+    "transit": 3,
+    "merge": 3,
+    "swap": 1
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 1390.0,
+      "theirs": 1390.0000000000002,
+      "rel": 1.6357818377210937e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 1390.0,
+      "theirs": 1390.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/linear_rep_d3_c3 --name linear_rep_d3_c3 --recipe notebook --code repetition --distance 3 --capacity 3 --rows 1 --cols 8 --padding 0 --topology-note linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+    "config": {
+     "name": "linear_rep_d3_c3",
+     "recipe": "notebook",
+     "code": "repetition",
+     "distance": 3,
+     "capacity": 3,
+     "rows": 1,
+     "cols": 8,
+     "padding": 0,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+     "generated_args": [
+      [
+       "repetition_code:memory"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3,
+       "noise_args_all": 0.01,
+       "prepended_QUBIT_COORDS": "(i,0) for i<5"
+      }
+     ],
+     "gate_improvements": null,
+     "trapCapacity_passed_to_ionRouting": 3
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.02
+  },
+  {
+   "id": "linear_rep_d3_c4",
+   "label": "repetition code d=3, linear, capacity 4",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 1905.0,
+    "last_start_us": 1505.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 7,
+    "gate1": 16,
+    "swap": 1,
+    "gate": 4,
+    "measure": 5,
+    "split": 2,
+    "transit": 2,
+    "merge": 2
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 1505.0,
+      "theirs": 1505.0000000000002,
+      "rel": 1.5107885411510434e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 1505.0,
+      "theirs": 1505.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/linear_rep_d3_c4 --name linear_rep_d3_c4 --recipe notebook --code repetition --distance 3 --capacity 4 --rows 1 --cols 8 --padding 0 --topology-note linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+    "config": {
+     "name": "linear_rep_d3_c4",
+     "recipe": "notebook",
+     "code": "repetition",
+     "distance": 3,
+     "capacity": 4,
+     "rows": 1,
+     "cols": 8,
+     "padding": 0,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "linear, surface_code_sims.ipynb cell 7/13 recipe: QUBIT_COORDS(i,0) prepended, processCircuitAugmentedGrid(rows=1, cols=8, padding=0)",
+     "generated_args": [
+      [
+       "repetition_code:memory"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3,
+       "noise_args_all": 0.01,
+       "prepended_QUBIT_COORDS": "(i,0) for i<5"
+      }
+     ],
+     "gate_improvements": null,
+     "trapCapacity_passed_to_ionRouting": 4
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.02
+  },
+  {
+   "id": "switch_rot_d3_c2",
+   "label": "rotated surface code d=3, switch, capacity 2 (current code)",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 3740.0,
+    "last_start_us": 3690.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 25,
+    "gate1": 112,
+    "split": 48,
+    "transit": 144,
+    "j_enter": 96,
+    "j_exit": 96,
+    "merge": 48,
+    "gate": 24,
+    "measure": 17
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 3690.0,
+      "theirs": 3690.000000000001,
+      "rel": 2.4647552893575286e-16,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 3690.0,
+      "theirs": 5325.0,
+      "rel": 0.30704225352112674,
+      "verdict": "differs",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80 + local patch:  M src/simulator/qccd_circuit.py ",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/switch_rot_d3_c2 --name switch_rot_d3_c2 --recipe process_circuit --distance 3 --capacity 2 --topology-note switch via process_circuit with patches/1-switch-topology.diff (processCircuitNetworkedGrid traps=2d^2-1, switch_cost=1)",
+    "config": {
+     "name": "switch_rot_d3_c2",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 3,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "switch via process_circuit with patches/1-switch-topology.diff (processCircuitNetworkedGrid traps=2d^2-1, switch_cost=1)",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.05
+  },
+  {
+   "id": "switch_rot_d3_c2_at6d4b467",
+   "label": "the same, with the code as of 2024 (junction entry and exit 100 \u00b5s each)",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 5375.0,
+    "last_start_us": 5325.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 25,
+    "gate1": 112,
+    "split": 48,
+    "transit": 144,
+    "j_enter": 96,
+    "j_exit": 96,
+    "merge": 48,
+    "gate": 24,
+    "measure": 17
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 5325.0,
+      "theirs": 5325.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "last_start_us": {
+      "ours": 5325.0,
+      "theirs": 5325.0,
+      "rel": 0.0,
+      "verdict": "exact",
+      "where": "Table 2",
+      "printed": true
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "6d4b4675465c5409473650a9292518a7f78020a6 + local patch:  M src/simulator/qccd_circuit.py ",
+    "command": ".venv/Scripts/python -I scripts/run_jones.py --repo <work> --out out/switch_rot_d3_c2_at6d4b467 --name switch_rot_d3_c2_at6d4b467 --recipe process_circuit --distance 3 --capacity 2 --topology-note switch via process_circuit at commit 6d4b467 (the commit that added data/saved_Data_switch.txt) with patches/2-switch-topology-at-6d4b467.diff",
+    "config": {
+     "name": "switch_rot_d3_c2_at6d4b467",
+     "recipe": "process_circuit",
+     "code": "rotated",
+     "distance": 3,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "switch via process_circuit at commit 6d4b467 (the commit that added data/saved_Data_switch.txt) with patches/2-switch-topology-at-6d4b467.diff",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.04
+  }
+ ],
+ "ratios": [],
+ "ours": [
+  {
+   "id": "grid_rot_d2_c2_ours",
+   "label": "rotated surface code d=2, one round, grid, capacity 2",
+   "against": "grid_rot_d2_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones": {
+     "checks": {
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 2345.0,
+    "last_start_us": 2295.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4105.0,
+    "last_start_us": 4055.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.02
+  },
+  {
+   "id": "grid_rot_d3_c2_ours",
+   "label": "rotated surface code d=3, one round, grid, capacity 2",
+   "against": "grid_rot_d3_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones": {
+     "checks": {
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 2385.0,
+    "last_start_us": 2335.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.04
+  },
+  {
+   "id": "grid_rot_d6_c2_ours",
+   "label": "rotated surface code d=6, one round, grid, capacity 2",
+   "against": "grid_rot_d6_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones": {
+     "checks": {
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 2390.0,
+    "last_start_us": 2340.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4130.0,
+    "last_start_us": 4080.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.16
+  },
+  {
+   "id": "grid_rot_d12_c2_ours",
+   "label": "rotated surface code d=12, one round, grid, capacity 2",
+   "against": "grid_rot_d12_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones": {
+     "checks": {
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 2390.0,
+    "last_start_us": 2340.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.63
+  }
+ ]
+}

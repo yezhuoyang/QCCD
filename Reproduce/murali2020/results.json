@@ -1,0 +1,1741 @@
+{
+ "paper": {
+  "key": "murali2020",
+  "short": "QCCDSim",
+  "title": "Architecting Noisy Intermediate-Scale Trapped Ion Quantum Computers",
+  "authors": [
+   "Prakash Murali",
+   "Dripto M. Debroy",
+   "Kenneth R. Brown",
+   "Margaret Martonosi"
+  ],
+  "venue": "ISCA 2020",
+  "year": 2020,
+  "arxiv": "2004.04706",
+  "artifact": {
+   "url": "https://github.com/prakashmurali/QCCDSim",
+   "commit": "b01b0b3",
+   "license": null,
+   "note": "No license file: we ran it locally and publish only the schedules it produced, never its code."
+  },
+  "what": "Two six-trap devices, a line (L6) and a two-by-three grid (G2x3), trap capacity swept from 14 to 34 ions, six NISQ benchmarks; the simulator every later paper in this list builds on."
+ },
+ "runs": [
+  {
+   "id": "bv64_L6_c14_FM_GS_Greedy",
+   "label": "BV-64 on L6, capacity 14, Greedy mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 13274.0,
+    "last_start_us": 13115.0,
+    "moves": 7,
+    "fidelity": 0.9776228034939393,
+    "heating": 1.57
+   },
+   "counts": {
+    "gate": 64,
+    "split": 7,
+    "move": 7,
+    "merge": 7
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 13274.0,
+      "theirs": 13274.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.9776228034939393,
+      "theirs": 0.9776228034939393,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 13274.0,
+      "theirs": 13270.0,
+      "rel": 0.0003014318010550113,
+      "verdict": "close",
+      "where": "Fig. 6(a), plotted (vector data in the source)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.9776228034939393,
+      "theirs": 0.9776,
+      "rel": 2.332599625535856e-05,
+      "verdict": "close",
+      "where": "Fig. 6(c), plotted",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py programs/bv64.qasm L6 14 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "programs/bv64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 14,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/bv64_L6_c14_FM_GS_Greedy/bv64.qasm"
+   },
+   "seconds": 0.04
+  },
+  {
+   "id": "bv64_L6_c20_FM_GS_Greedy",
+   "label": "BV-64 on L6, capacity 20, Greedy mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 18297.0,
+    "last_start_us": 18058.0,
+    "moves": 5,
+    "fidelity": 0.9697110954406406,
+    "heating": 1.15
+   },
+   "counts": {
+    "gate": 64,
+    "split": 5,
+    "move": 5,
+    "merge": 5
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 18297.0,
+      "theirs": 18297.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.9697110954406406,
+      "theirs": 0.9697110954406406,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 18297.0,
+      "theirs": 18300.0,
+      "rel": 0.0001639344262295082,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.9697110954406406,
+      "theirs": 0.9697,
+      "rel": 1.1442137403935328e-05,
+      "verdict": "close",
+      "where": "Fig. 6(c)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py programs/bv64.qasm L6 20 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "programs/bv64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 20,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/bv64_L6_c20_FM_GS_Greedy/bv64.qasm"
+   },
+   "seconds": 0.03
+  },
+  {
+   "id": "bv64_G2x3_c14_FM_GS_Greedy",
+   "label": "BV-64 on G2x3, capacity 14, Greedy mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 14354.0,
+    "last_start_us": 14195.0,
+    "moves": 10,
+    "fidelity": 0.977451014216761,
+    "heating": 1.6
+   },
+   "counts": {
+    "gate": 64,
+    "split": 7,
+    "move": 10,
+    "merge": 7
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 14354.0,
+      "theirs": 14354.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.977451014216761,
+      "theirs": 0.977451014216761,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 14354.0,
+      "theirs": 14350.0,
+      "rel": 0.00027874564459930314,
+      "verdict": "close",
+      "where": "Fig. 7(b)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.977451014216761,
+      "theirs": 0.9775,
+      "rel": 5.011333323691671e-05,
+      "verdict": "close",
+      "where": "Fig. 7(b)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py programs/bv64.qasm G2x3 14 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "programs/bv64.qasm",
+     "machine_type": "G2x3",
+     "num_ions_per_region": 14,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/bv64_G2x3_c14_FM_GS_Greedy/bv64.qasm"
+   },
+   "seconds": 0.02
+  },
+  {
+   "id": "qaoa6420_L6_c14_FM_GS_PO",
+   "label": "QAOA-64 (20 layers) on L6, capacity 14, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 162360.0,
+    "last_start_us": 162201.0,
+    "moves": 150,
+    "fidelity": 0.4757666878486023,
+    "heating": 16.499999999999996
+   },
+   "counts": {
+    "gate": 1260,
+    "split": 150,
+    "move": 150,
+    "merge": 150
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 162360.0,
+      "theirs": 162360.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.4757666878486023,
+      "theirs": 0.4757666878486023,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 162360.0,
+      "theirs": 162400.0,
+      "rel": 0.0002463054187192118,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.4757666878486023,
+      "theirs": 0.4758,
+      "rel": 7.001292853652739e-05,
+      "verdict": "close",
+      "where": "Fig. 6(d)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/qaoa6420.qasm L6 14 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/qaoa6420.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 14,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/qaoa6420_L6_c14_FM_GS_PO/qaoa6420.qasm"
+   },
+   "seconds": 0.2
+  },
+  {
+   "id": "qaoa6420_L6_c20_FM_GS_PO",
+   "label": "QAOA-64 (20 layers) on L6, capacity 20, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 254144.0,
+    "last_start_us": 253905.0,
+    "moves": 109,
+    "fidelity": 0.3827230686019614,
+    "heating": 11.99
+   },
+   "counts": {
+    "gate": 1260,
+    "split": 109,
+    "move": 109,
+    "merge": 109
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 254144.0,
+      "theirs": 254144.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.3827230686019614,
+      "theirs": 0.3827230686019614,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 254144.0,
+      "theirs": 254100.0,
+      "rel": 0.00017316017316017316,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.3827230686019614,
+      "theirs": 0.3827,
+      "rel": 6.027855229014925e-05,
+      "verdict": "close",
+      "where": "Fig. 6(d)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/qaoa6420.qasm L6 20 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/qaoa6420.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 20,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/qaoa6420_L6_c20_FM_GS_PO/qaoa6420.qasm"
+   },
+   "seconds": 0.24
+  },
+  {
+   "id": "qaoa6420_G2x3_c14_FM_GS_PO",
+   "label": "QAOA-64 (20 layers) on G2x3, capacity 14, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 191807.0,
+    "last_start_us": 191648.0,
+    "moves": 263,
+    "fidelity": 0.4004420050664155,
+    "heating": 19.83000000000001
+   },
+   "counts": {
+    "gate": 1260,
+    "split": 150,
+    "move": 263,
+    "merge": 150
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 191807.0,
+      "theirs": 191807.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.4004420050664155,
+      "theirs": 0.4004420050664155,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 191807.0,
+      "theirs": 191800.0,
+      "rel": 3.649635036496351e-05,
+      "verdict": "close",
+      "where": "Fig. 7(d)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.4004420050664155,
+      "theirs": 0.4004,
+      "rel": 0.00010490775828045915,
+      "verdict": "close",
+      "where": "Fig. 7(d)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/qaoa6420.qasm G2x3 14 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/qaoa6420.qasm",
+     "machine_type": "G2x3",
+     "num_ions_per_region": 14,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/qaoa6420_G2x3_c14_FM_GS_PO/qaoa6420.qasm"
+   },
+   "seconds": 0.25
+  },
+  {
+   "id": "adder_L6_c14_FM_GS_PO",
+   "label": "Adder (32-bit) on L6, capacity 14, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 90135.0,
+    "last_start_us": 89976.0,
+    "moves": 36,
+    "fidelity": 0.8029598735702381,
+    "heating": 5.960000000000001
+   },
+   "counts": {
+    "gate": 545,
+    "split": 36,
+    "move": 36,
+    "merge": 36
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 90135.0,
+      "theirs": 90135.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.8029598735702381,
+      "theirs": 0.8029598735702381,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 90135.0,
+      "theirs": 90130.0,
+      "rel": 5.547542438699656e-05,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.8029598735702381,
+      "theirs": 0.803,
+      "rel": 4.9970647275120713e-05,
+      "verdict": "close",
+      "where": "Fig. 6(c)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/adder.qasm L6 14 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/adder.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 14,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/adder_L6_c14_FM_GS_PO/adder.qasm"
+   },
+   "seconds": 0.11
+  },
+  {
+   "id": "adder_L6_c20_FM_GS_PO",
+   "label": "Adder (32-bit) on L6, capacity 20, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 126477.0,
+    "last_start_us": 126238.0,
+    "moves": 29,
+    "fidelity": 0.7648188941061526,
+    "heating": 3.99
+   },
+   "counts": {
+    "gate": 545,
+    "split": 29,
+    "move": 29,
+    "merge": 29
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 126477.0,
+      "theirs": 126477.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.7648188941061526,
+      "theirs": 0.7648188941061526,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 126477.0,
+      "theirs": 126500.0,
+      "rel": 0.0001818181818181818,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.7648188941061526,
+      "theirs": 0.7648,
+      "rel": 2.4704636705704415e-05,
+      "verdict": "close",
+      "where": "Fig. 6(c)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/adder.qasm L6 20 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/adder.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 20,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/adder_L6_c20_FM_GS_PO/adder.qasm"
+   },
+   "seconds": 0.16
+  },
+  {
+   "id": "qft64_L6_c14_FM_GS_Greedy",
+   "label": "QFT-64 on L6, capacity 14, Greedy mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 333074.0,
+    "last_start_us": 332915.0,
+    "moves": 251,
+    "fidelity": 0.0009701302634274007,
+    "heating": 64.01000000000002
+   },
+   "counts": {
+    "gate": 4032,
+    "split": 251,
+    "move": 251,
+    "merge": 251
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 333074.0,
+      "theirs": 333074.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.0009701302634274007,
+      "theirs": 0.0009701302634274007,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 333074.0,
+      "theirs": 333100.0,
+      "rel": 7.805463824677274e-05,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.0009701302634274007,
+      "theirs": 0.0009701,
+      "rel": 3.119619358901133e-05,
+      "verdict": "close",
+      "where": "Fig. 6(e)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/qft64.qasm L6 14 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/qft64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 14,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/qft64_L6_c14_FM_GS_Greedy/qft64.qasm"
+   },
+   "seconds": 0.6
+  },
+  {
+   "id": "qft64_L6_c20_FM_GS_Greedy",
+   "label": "QFT-64 on L6, capacity 20, Greedy mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 550560.0,
+    "last_start_us": 550321.0,
+    "moves": 170,
+    "fidelity": 0.0012947113267108474,
+    "heating": 45.69999999999999
+   },
+   "counts": {
+    "gate": 4032,
+    "split": 170,
+    "move": 170,
+    "merge": 170
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 550560.0,
+      "theirs": 550560.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.0012947113267108474,
+      "theirs": 0.0012947113267108474,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 550560.0,
+      "theirs": 550600.0,
+      "rel": 7.264802034144569e-05,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.0012947113267108474,
+      "theirs": 0.001295,
+      "rel": 0.00022291373679729216,
+      "verdict": "close",
+      "where": "Fig. 6(e)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/qft64.qasm L6 20 Greedy Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/qft64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 20,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/qft64_L6_c20_FM_GS_Greedy/qft64.qasm"
+   },
+   "seconds": 0.58
+  },
+  {
+   "id": "sup64_L6_c20_FM_GS_PO",
+   "label": "Supremacy-64 on L6, capacity 20, program-order mapper",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 223295.0,
+    "last_start_us": 223056.0,
+    "moves": 218,
+    "fidelity": 0.15627756410682178,
+    "heating": 55.77999999999997
+   },
+   "counts": {
+    "gate": 560,
+    "split": 218,
+    "move": 218,
+    "merge": 218
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 223295.0,
+      "theirs": 223295.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.15627756410682178,
+      "theirs": 0.15627756410682178,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 223295.0,
+      "theirs": 223300.0,
+      "rel": 2.239140170174653e-05,
+      "verdict": "close",
+      "where": "Fig. 6(a)",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.15627756410682178,
+      "theirs": 0.1563,
+      "rel": 0.0001435437823302185,
+      "verdict": "close",
+      "where": "Fig. 6(d)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py ../circuits/sup64.qasm L6 20 PO Naive 1 0 0 FM GateSwap",
+    "config": {
+     "openqasm_file_name": "../circuits/sup64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 20,
+     "mapper_choice": "PO",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/sup64_L6_c20_FM_GS_PO/sup64.qasm"
+   },
+   "seconds": 0.15
+  },
+  {
+   "id": "bv64_L6_c14_FM_IS_Greedy",
+   "label": "BV-64 on L6, capacity 14, Greedy mapper, ion swaps",
+   "profile": "qccdsim",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 21634.0,
+    "last_start_us": 21475.0,
+    "moves": 7,
+    "fidelity": 0.9812621563360364,
+    "heating": 12.178571428571429
+   },
+   "counts": {
+    "gate": 64,
+    "split": 7,
+    "move": 7,
+    "merge": 7
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 21634.0,
+      "theirs": 21634.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     },
+     "fidelity": {
+      "ours": 0.9812621563360364,
+      "theirs": 0.9812621563360364,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    },
+    "paper": {
+     "makespan_us": {
+      "ours": 21634.0,
+      "theirs": 21630.0,
+      "rel": 0.0001849283402681461,
+      "verdict": "close",
+      "where": "Fig. 8(h), ion swap",
+      "printed": false
+     },
+     "fidelity": {
+      "ours": 0.9812621563360364,
+      "theirs": 0.9813,
+      "rel": 3.856482621372941e-05,
+      "verdict": "close",
+      "where": "Fig. 8(b)",
+      "printed": false
+     }
+    }
+   },
+   "source": {
+    "tool": "QCCDSim",
+    "repo": "https://github.com/prakashmurali/QCCDSim",
+    "commit": "b01b0b33ce9a6e0ede877f978541c897c90a89ab",
+    "command": "cd repo && python run.py programs/bv64.qasm L6 14 Greedy Naive 1 0 0 FM IonSwap",
+    "config": {
+     "openqasm_file_name": "programs/bv64.qasm",
+     "machine_type": "L6",
+     "num_ions_per_region": 14,
+     "mapper_choice": "Greedy",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "IonSwap",
+     "honeywell_mode": false,
+     "np_random_seed": 12345,
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2
+    },
+    "circuit_file": "out/bv64_L6_c14_FM_IS_Greedy/bv64.qasm"
+   },
+   "seconds": 0.03
+  }
+ ],
+ "ratios": [],
+ "ours": [
+  {
+   "id": "bv64_L6_c14_ours",
+   "label": "BV-64 on L6, capacity 14",
+   "against": "bv64_L6_c14_FM_GS_Greedy",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 12287.0,
+    "last_start_us": 12128.0,
+    "moves": 7,
+    "fidelity": 0.9824336631641488,
+    "heating": 0.77
+   },
+   "theirs": {
+    "makespan_us": 13274.0,
+    "last_start_us": 13115.0,
+    "moves": 7,
+    "fidelity": 0.9776228034939393,
+    "heating": 1.57
+   },
+   "theirs_ok": true,
+   "seconds": 0.02
+  },
+  {
+   "id": "bv64_L6_c20_ours",
+   "label": "BV-64 on L6, capacity 20",
+   "against": "bv64_L6_c20_FM_GS_Greedy",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 17240.0,
+    "last_start_us": 17001.0,
+    "moves": 5,
+    "fidelity": 0.9775009179607607,
+    "heating": 0.55
+   },
+   "theirs": {
+    "makespan_us": 18297.0,
+    "last_start_us": 18058.0,
+    "moves": 5,
+    "fidelity": 0.9697110954406406,
+    "heating": 1.15
+   },
+   "theirs_ok": true,
+   "seconds": 0.02
+  },
+  {
+   "id": "adder_L6_c14_ours",
+   "label": "Adder on L6, capacity 14",
+   "against": "adder_L6_c14_FM_GS_PO",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 68480.0,
+    "last_start_us": 68321.0,
+    "moves": 10,
+    "fidelity": 0.8560254054104449,
+    "heating": 1.1
+   },
+   "theirs": {
+    "makespan_us": 90135.0,
+    "last_start_us": 89976.0,
+    "moves": 36,
+    "fidelity": 0.8029598735702381,
+    "heating": 5.960000000000001
+   },
+   "theirs_ok": true,
+   "seconds": 0.1
+  },
+  {
+   "id": "adder_L6_c20_ours",
+   "label": "Adder on L6, capacity 20",
+   "against": "adder_L6_c20_FM_GS_PO",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 102080.0,
+    "last_start_us": 101841.0,
+    "moves": 10,
+    "fidelity": 0.8194930125227003,
+    "heating": 1.1
+   },
+   "theirs": {
+    "makespan_us": 126477.0,
+    "last_start_us": 126238.0,
+    "moves": 29,
+    "fidelity": 0.7648188941061526,
+    "heating": 3.99
+   },
+   "theirs_ok": true,
+   "seconds": 0.1
+  },
+  {
+   "id": "qaoa6420_L6_c14_ours",
+   "label": "QAOA-64 on L6, capacity 14",
+   "against": "qaoa6420_L6_c14_FM_GS_PO",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 55139.0,
+    "last_start_us": 54980.0,
+    "moves": 195,
+    "fidelity": 0.45800441798291264,
+    "heating": 21.45
+   },
+   "theirs": {
+    "makespan_us": 162360.0,
+    "last_start_us": 162201.0,
+    "moves": 150,
+    "fidelity": 0.4757666878486023,
+    "heating": 16.499999999999996
+   },
+   "theirs_ok": true,
+   "seconds": 0.53
+  },
+  {
+   "id": "qaoa6420_L6_c20_ours",
+   "label": "QAOA-64 on L6, capacity 20",
+   "against": "qaoa6420_L6_c20_FM_GS_PO",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 80491.0,
+    "last_start_us": 80252.0,
+    "moves": 195,
+    "fidelity": 0.4119510394180188,
+    "heating": 21.45
+   },
+   "theirs": {
+    "makespan_us": 254144.0,
+    "last_start_us": 253905.0,
+    "moves": 109,
+    "fidelity": 0.3827230686019614,
+    "heating": 11.99
+   },
+   "theirs_ok": true,
+   "seconds": 0.36
+  },
+  {
+   "id": "sup64_L6_c20_ours",
+   "label": "Supremacy-64 on L6, capacity 20",
+   "against": "sup64_L6_c20_FM_GS_PO",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 108864.0,
+    "last_start_us": 108625.0,
+    "moves": 444,
+    "fidelity": 0.37923396834315565,
+    "heating": 48.839999999999975
+   },
+   "theirs": {
+    "makespan_us": 223295.0,
+    "last_start_us": 223056.0,
+    "moves": 218,
+    "fidelity": 0.15627756410682178,
+    "heating": 55.77999999999997
+   },
+   "theirs_ok": true,
+   "seconds": 0.36
+  },
+  {
+   "id": "qft64_L6_c14_ours",
+   "label": "QFT-64 on L6, capacity 14",
+   "against": "qft64_L6_c14_FM_GS_Greedy",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 770215.0,
+    "last_start_us": 770056.0,
+    "moves": 3128,
+    "fidelity": 1.5578540209067932e-15,
+    "heating": 344.07999999999856
+   },
+   "theirs": {
+    "makespan_us": 333074.0,
+    "last_start_us": 332915.0,
+    "moves": 251,
+    "fidelity": 0.0009701302634274007,
+    "heating": 64.01000000000002
+   },
+   "theirs_ok": true,
+   "seconds": 1.22
+  },
+  {
+   "id": "qft64_L6_c20_ours",
+   "label": "QFT-64 on L6, capacity 20",
+   "against": "qft64_L6_c20_FM_GS_Greedy",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "not compared",
+   "profiles": {
+    "qccdsim": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    },
+    "qccdsim-physical-swap": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 699806.0,
+    "last_start_us": 699567.0,
+    "moves": 645,
+    "fidelity": 0.002331060002523455,
+    "heating": 70.9499999999999
+   },
+   "theirs": {
+    "makespan_us": 550560.0,
+    "last_start_us": 550321.0,
+    "moves": 170,
+    "fidelity": 0.0012947113267108474,
+    "heating": 45.69999999999999
+   },
+   "theirs_ok": true,
+   "seconds": 0.89
+  }
+ ]
+}

@@ -1,0 +1,312 @@
+diff --git a/dump_heuristic.py b/dump_heuristic.py
+new file mode 100644
+index 0000000..a754d7e
+--- /dev/null
++++ b/dump_heuristic.py
+@@ -0,0 +1,172 @@
++# Added for the reproduction run (not part of the artifact): write the per-time-step records
++# collected by run_simulation(recorder=...) as JSON. Reads MemoryZone attributes only.
++import json
++
++import networkx as nx
++
++from graph_utils import get_idc_from_idx, get_idx_from_idc
++
++
++def _nid(nd):
++    return f"{nd[0]},{nd[1]}"
++
++
++def _eid(idx):
++    return f"e{idx}"
++
++
++def _through_nodes(graph, src, tar):
++    if set(src) == set(tar):
++        return []
++    common = set(src) & set(tar)
++    if len(common) == 1:
++        return [next(iter(common))]
++    best = None
++    for a in src:
++        for b in tar:
++            p = nx.shortest_path(graph, a, b)
++            if best is None or len(p) < len(best):
++                best = p
++    return best
++
++
++def dump_heuristic(rec, path, config, command, circuit_file, arch, pz, max_timesteps):
++    mg = rec["memorygrid"]
++    g = mg.graph
++    gc = mg.graph_creator
++    idc = mg.idc_dict
++    node_type = nx.get_node_attributes(g, "node_type")
++    pk = get_idx_from_idc(idc, gc.parking_edge)
++    junctionish = set(mg.junction_nodes) | {gc.processing_zone, gc.entry, gc.exit}
++
++    nodes = [
++        {"id": _nid(nd), "coord": [nd[0], nd[1]], "plot_xy": [nd[1], -nd[0]], "node_type": node_type[nd]}
++        for nd in g.nodes()
++    ]
++    edges = []
++    for idx in range(len(g.edges())):
++        e = get_idc_from_idx(idc, idx)
++        et = g.edges[e]["edge_type"]
++        edges.append(
++            {
++                "id": _eid(idx),
++                "idx": idx,
++                "nodes": [_nid(e[0]), _nid(e[1])],
++                "edge_type": et,
++                "capacity": mg.max_num_parking if idx == pk else 1,
++            }
++        )
++
++    init = {ion: get_idx_from_idc(idc, e) for ion, e in rec["ion_chains_initial"].items()}
++    steps = []
++    events = []
++    eid = 0
++    prev = init
++    for r in rec["records"]:
++        t = r["t"]
++        pos = r["positions"]
++        pre = r["positions_after_preprocess"]
++        moved = [ion for ion in pos if pos[ion] != prev[ion]]
++        moves = []
++        for ion in moved:
++            hops = []
++            if pre[ion] != prev[ion]:
++                hops.append(("preprocess", prev[ion], pre[ion]))
++            if pos[ion] != pre[ion]:
++                hops.append(("rotate", pre[ion], pos[ion]))
++            for phase, a, b in hops:
++                thr = _through_nodes(g, get_idc_from_idx(idc, a), get_idc_from_idx(idc, b))
++                moves.append(
++                    {
++                        "ion": ion,
++                        "phase": phase,
++                        "from": _eid(a),
++                        "to": _eid(b),
++                        "through_nodes": [_nid(nd) for nd in thr],
++                        "through_junction_like_nodes": [_nid(nd) for nd in thr if nd in junctionish],
++                    }
++                )
++                events.append({"id": eid, "kind": f"move/{phase}", "t0": t, "t1": t + 1, "ion": ion,
++                               "from": _eid(a), "to": _eid(b)})
++                eid += 1
++        gates = []
++        if r["gate_executing"]:
++            gates.append(list(r["gate_candidate"]))
++            events.append({"id": eid, "kind": "gate_step", "t0": t, "t1": t + 1, "qubits": list(r["gate_candidate"]),
++                           "op": r["gate_candidate_op"], "step_of_gate": r["time_in_pz_counter_before"] + 1,
++                           "duration": r["gate_duration"]})
++            eid += 1
++        steps.append(
++            {
++                "t": t,
++                "positions": {str(i): _eid(e) for i, e in pos.items()},
++                "gates": gates,
++                "gate_detail": (
++                    {
++                        "qubits": list(r["gate_candidate"]),
++                        "op": r["gate_candidate_op"],
++                        "step_of_gate": r["time_in_pz_counter_before"] + 1,
++                        "duration": r["gate_duration"],
++                        "completed_this_step": r["time_in_pz_counter_after"] == 0 or r["finished"],
++                    }
++                    if r["gate_executing"]
++                    else None
++                ),
++                "next_gate_waiting": None if r["gate_executing"] else list(r["gate_candidate"]),
++                "moved": moved,
++                "moves": moves,
++                "positions_after_preprocess": {str(i): _eid(e) for i, e in pre.items()},
++                "move_list": r["move_list"],
++                "rotated_circles": {str(k): [_eid(x) for x in v] for k, v in r["rotated_circles"].items()},
++                "blocked_circles": {str(k): [_eid(x) for x in v] for k, v in r["blocked_circles"].items()},
++                "rotate_entry": r["rotate_entry"],
++                "chain_to_move_out_of_pz": r["chain_to_move_out_of_pz"],
++            }
++        )
++        prev = pos
++
++    out = {
++        "tool": "MQT IonShuttler cycle heuristic (run_heuristic.py / scheduling.run_simulation)",
++        "repo": "https://github.com/munich-quantum-toolkit/ionshuttler",
++        "commit": "bc71e46796a1d8f221d608991089d0ba3f0b0b56",
++        "command": command,
++        "config": {
++            **config,
++            "seed": rec["seed"],
++            "pz": pz,
++            "max_timesteps": max_timesteps,
++            "time_1qubit_gate": mg.time_1qubit_gate,
++            "time_2qubit_gate": mg.time_2qubit_gate,
++            "max_chains_in_parking": mg.max_num_parking,
++            "compilation (Gate Selection)": True,
++            "max_length (priority queue)": 10,
++            "pz_path_edges (n // 2)": gc.num_edges,
++        },
++        "circuit_file": circuit_file,
++        "initial_sequence": [list(x) for x in rec["seq_initial"]],
++        "placement_rule": "create_starting_config: random.seed(seed); random.sample(range(n_of_traps), n_of_chains); ion i -> trap_edges[sample[i]]",
++        "time_units": "abstract time steps; step t = one iteration of run_simulation's while loop (preprocess slide, cycle rotation, then gate processing); printed number = index of the final iteration (0-based)",
++        "graph": {
++            "nodes": nodes,
++            "edges": edges,
++            "junction_nodes(MemoryZone.junction_nodes)": [_nid(nd) for nd in mg.junction_nodes],
++            "processing_zone_node": _nid(gc.processing_zone),
++            "parking_edge(gate site)": _eid(pk),
++            "memory_edges": [e["id"] for e in edges if e["edge_type"] == "trap"],
++            "path_to_pz(exit)": [_eid(i) for i in gc.path_to_pz_idxs],
++            "path_from_pz(entry)": [_eid(i) for i in gc.path_from_pz_idxs],
++            "node_id_format": "row,col of the networkx grid (row 0 at top; PZ path nodes have fractional coords)",
++        },
++        "initial": {str(i): _eid(e) for i, e in init.items()},
++        "initial_layout": {_eid(e): [str(i)] for i, e in init.items()},
++        "qubit_to_ion": {str(i): str(i) for i in init},
++        "steps": steps,
++        "events": events,
++        "metrics": {
++            "Circuit successfully executed in N time steps": rec["printed_timestep"],
++            "CPU time (s)": rec.get("cpu_time"),
++            "iterations_run": len(rec["records"]),
++        },
++    }
++    with open(path, "w", encoding="utf-8") as f:
++        json.dump(out, f, indent=1)
+diff --git a/run_heuristic.py b/run_heuristic.py
+index 9836995..d5163d8 100644
+--- a/run_heuristic.py
++++ b/run_heuristic.py
+@@ -7,7 +7,7 @@ import numpy as np
+ from Cycles import GraphCreator, MemoryZone
+ from scheduling import create_initial_sequence, create_starting_config, run_simulation
+ 
+-def run_simulation_for_architecture(arch, seeds, pz, max_timesteps, time_1qubit_gate=1, time_2qubit_gate=3, max_chains_in_parking=3, compilation=True):
++def run_simulation_for_architecture(arch, seeds, pz, max_timesteps, time_1qubit_gate=1, time_2qubit_gate=3, max_chains_in_parking=3, compilation=True, recorders=None):
+     """
+     Runs simulations for the given architecture and seeds, logs the results.
+ 
+@@ -44,9 +44,18 @@ def run_simulation_for_architecture(arch, seeds, pz, max_timesteps, time_1qubit_
+         seq, flat_seq, dag_dep, next_node_initial = create_initial_sequence(
+             memorygrid.distance_map, filename, compilation=compilation
+         )
++        _recorder = None
++        if recorders is not None:
++            _recorder = []
++            recorders.append({"seed": seed, "ion_chains_initial": dict(ion_chains), "memorygrid": memorygrid,
++                              "seq_initial": list(seq), "records": _recorder})
+         timestep = run_simulation(
+-            memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_initial, max_length=10, show_plot=False
++            memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_initial, max_length=10, show_plot=False,
++            recorder=_recorder,
+         )
++        if recorders is not None:
++            recorders[-1]["printed_timestep"] = timestep
++            recorders[-1]["cpu_time"] = time.time() - start_time
+         timestep_arr.append(timestep)
+         cpu_time = time.time() - start_time
+         cpu_time_arr.append(cpu_time)
+@@ -58,6 +67,9 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("config_file", help="path to json config file")
+     #parser.add_argument("--plot", action="store_true", help="plot grid")
++    # reproduction patch: seed of the random initial placement (original: seeds = [0]) and a JSON dump
++    parser.add_argument("--seed", type=int, default=0)
++    parser.add_argument("--dump", default=None)
+     args = parser.parse_args()
+ 
+     with pathlib.Path(args.config_file).open("r") as f:
+@@ -67,10 +79,15 @@ if __name__ == "__main__":
+     num_ion_chains = config["num_ion_chains"]
+     filename = config["qu_alg"]
+ 
+-    seeds = [0]
++    seeds = [args.seed]
+     pz = 'outer'
+ 
++    recorders = [] if args.dump else None
+     timestep_arr, cpu_time_arr = run_simulation_for_architecture(
+-            arch, seeds, pz, max_timesteps
++            arch, seeds, pz, max_timesteps, recorders=recorders
+         )
++    if args.dump:
++        import sys
++        from dump_heuristic import dump_heuristic
++        dump_heuristic(recorders[0], args.dump, config, " ".join(sys.argv), filename, arch, pz, max_timesteps)
+     print(f"CPU time: {np.mean(cpu_time_arr)} s")
+\ No newline at end of file
+diff --git a/scheduling.py b/scheduling.py
+index 33839bd..c6230a6 100644
+--- a/scheduling.py
++++ b/scheduling.py
+@@ -454,7 +454,11 @@ def check_duplicates(lst, memorygrid, parking_idc, max_number_parking):
+             raise AssertionError(message)
+ 
+ 
+-def run_simulation(memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_initial, max_length, show_plot):
++def run_simulation(memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_initial, max_length, show_plot, recorder=None):
++    # reproduction patch: if recorder is a list, append one read-only snapshot per time step
++    def _snap():
++        return {ion: get_idx_from_idc(memorygrid.idc_dict, e) for ion, e in memorygrid.ion_chains.items()}
++
+     time_in_pz_counter = 0
+     next_gate_is_two_qubit_gate = len(seq[0]) == 2
+     gate_execution_finished = True
+@@ -472,8 +476,12 @@ def run_simulation(memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_
+         state_idxs = memorygrid.get_state_idxs()
+         # assert check that each edge has only one chain (parking edge at most max parking)
+         check_duplicates(state_idxs, memorygrid, memorygrid.graph_creator.parking_edge, memorygrid.max_num_parking)
++        if recorder is not None:
++            _rec = {"t": timestep, "positions_start": _snap()}
+         # preprocess (move chains within junctions)
+         memorygrid = preprocess(memorygrid, flat_seq)
++        if recorder is not None:
++            _rec["positions_after_preprocess"] = _snap()
+         # move list
+         move_list = create_move_list(memorygrid, flat_seq, max_length)
+         # memorygrid.state_idxs are updated in create_move_list
+@@ -486,6 +494,30 @@ def run_simulation(memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_
+         free_circle_seq_idxs = find_movable_circles(memorygrid, all_circles, move_list)
+         # rotate free circles
+         rotate_free_circles(memorygrid, all_circles, free_circle_seq_idxs, rotate_entry, chain_to_move_out_of_pz)
++        if recorder is not None:
++            _rec["move_list"] = list(move_list)
++            _rec["rotated_circles"] = {
++                ch: [get_idx_from_idc(memorygrid.idc_dict, e) for e in all_circles[ch]] for ch in free_circle_seq_idxs
++            }
++            _rec["blocked_circles"] = {
++                ch: [get_idx_from_idc(memorygrid.idc_dict, e) for e in all_circles[ch]]
++                for ch in all_circles
++                if ch not in free_circle_seq_idxs
++            }
++            _rec["rotate_entry"] = rotate_entry
++            _rec["chain_to_move_out_of_pz"] = chain_to_move_out_of_pz
++            _rec["positions"] = _snap()
++            _pk = get_idx_from_idc(memorygrid.idc_dict, memorygrid.graph_creator.parking_edge)
++            _in_pk = [ion for ion, e in _rec["positions"].items() if e == _pk]
++            _rec["gate_candidate"] = list(seq[0])
++            _rec["gate_candidate_op"] = (
++                None if next_node is None else [next_node.op.name, [float(x) for x in next_node.op.params]]
++            )
++            _rec["gate_executing"] = sum((g in _in_pk) for g in seq[0]) == len(seq[0])
++            _rec["time_in_pz_counter_before"] = time_in_pz_counter
++            _rec["gate_duration"] = (
++                memorygrid.time_2qubit_gate if next_gate_is_two_qubit_gate else memorygrid.time_1qubit_gate
++            )
+         # update sequence and process gate
+         (
+             finished,
+@@ -510,6 +542,10 @@ def run_simulation(memorygrid, max_timesteps, seq, flat_seq, dag_dep, next_node_
+             next_gate_is_two_qubit_gate,
+             show_plot,
+         )
++        if recorder is not None:
++            _rec["time_in_pz_counter_after"] = time_in_pz_counter
++            _rec["finished"] = finished
++            recorder.append(_rec)
+         if finished:
+             return timestep
+         timestep += 1

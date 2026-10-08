@@ -1,0 +1,1260 @@
+{
+ "paper": {
+  "key": "khan2025moveless",
+  "short": "Moveless",
+  "title": "Moveless: Minimizing Overhead on QCCDs via Versatile Execution and Low Excess Shuttling",
+  "authors": [
+   "Sahil Khan",
+   "Suhas Vittal",
+   "Kenneth Brown",
+   "Jonathan Baker"
+  ],
+  "venue": "arXiv 2025",
+  "year": 2025,
+  "arxiv": "2508.03914",
+  "artifact": {
+   "url": "https://github.com/sahilkhan123/Moveless",
+   "commit": "36c953c",
+   "license": null,
+   "note": "No license file: we ran it locally and publish only the schedules it produced and the gate lists of its benchmark circuits."
+  },
+  "what": "Syndrome extraction on a line of small traps where data ions stay put and few ancillas visit them, against QCCDSim moving whichever ion is cheaper."
+ },
+ "runs": [
+  {
+   "id": "SC9_L8_Moveless_1m",
+   "label": "rotated surface code d=3 [[9,1,3]] on L8: Moveless, one ancilla",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 3250.0,
+    "last_start_us": 3150.0,
+    "moves": 5,
+    "fidelity": 0.8029967944758909,
+    "heating": 20.0
+   },
+   "counts": {
+    "gate": 24,
+    "split": 5,
+    "move": 5,
+    "merge": 5
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 3250.0,
+      "theirs": 3250.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/9-1-3_code1Ancilla.qasm L8 5 Moveless Naive 1 0 0 FM GateSwap ../out/SC9_L8_Moveless_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/9-1-3_code1Ancilla.qasm",
+     "machine_type": "L8",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Moveless",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC9_L8_Moveless_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      9,
+      1,
+      3
+     ]
+    },
+    "circuit_file": "out/SC9_L8_Moveless_1m/9-1-3_code1Ancilla.qasm"
+   },
+   "seconds": 0.0
+  },
+  {
+   "id": "SC9_L8_MAO_1m",
+   "label": "rotated surface code d=3 [[9,1,3]] on L8: moving the ancilla only",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 3930.0,
+    "last_start_us": 3830.0,
+    "moves": 9,
+    "fidelity": 0.7888456292860403,
+    "heating": 36.0
+   },
+   "counts": {
+    "gate": 24,
+    "split": 9,
+    "move": 9,
+    "merge": 9
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 3930.0,
+      "theirs": 3930.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/9-1-3_code1Ancilla.qasm L8 5 MAO Naive 1 0 0 FM GateSwap ../out/SC9_L8_MAO_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/9-1-3_code1Ancilla.qasm",
+     "machine_type": "L8",
+     "num_ions_per_region": 5,
+     "compiler_mode": "MAO",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC9_L8_MAO_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      9,
+      1,
+      3
+     ]
+    },
+    "circuit_file": "out/SC9_L8_MAO_1m/9-1-3_code1Ancilla.qasm"
+   },
+   "seconds": 0.0
+  },
+  {
+   "id": "SC9_L8_Baseline_maxm",
+   "label": "rotated surface code d=3 [[9,1,3]] on L8: QCCDSim, one ancilla per stabilizer",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 4590.0,
+    "last_start_us": 4490.0,
+    "moves": 13,
+    "fidelity": 0.6437537033566392,
+    "heating": 76.0
+   },
+   "counts": {
+    "gate": 24,
+    "split": 13,
+    "move": 13,
+    "merge": 13
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 4590.0,
+      "theirs": 4590.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/9-1-3_code8Ancilla.qasm L8 5 Baseline Naive 1 0 0 FM GateSwap ../out/SC9_L8_Baseline_maxm/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/9-1-3_code8Ancilla.qasm",
+     "machine_type": "L8",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Baseline",
+     "mapper_choice": "Greedy (mappers.QubitMapGreedy)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC9_L8_Baseline_maxm/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 8,
+     "ratio_string": "maxm",
+     "code_n_k_d": [
+      9,
+      1,
+      3
+     ]
+    },
+    "circuit_file": "out/SC9_L8_Baseline_maxm/9-1-3_code8Ancilla.qasm"
+   },
+   "seconds": 0.0
+  },
+  {
+   "id": "SC25_L24_Moveless_1m",
+   "label": "rotated surface code d=5 [[25,1,5]] on L24: Moveless, one ancilla",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 15640.0,
+    "last_start_us": 15540.0,
+    "moves": 22,
+    "fidelity": 0.26221919646562,
+    "heating": 140.0
+   },
+   "counts": {
+    "gate": 80,
+    "split": 22,
+    "move": 22,
+    "merge": 22
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 15640.0,
+      "theirs": 15640.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/25-1-5_code1Ancilla.qasm L24 5 Moveless Naive 1 0 0 FM GateSwap ../out/SC25_L24_Moveless_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/25-1-5_code1Ancilla.qasm",
+     "machine_type": "L24",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Moveless",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC25_L24_Moveless_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      25,
+      1,
+      5
+     ]
+    },
+    "circuit_file": "out/SC25_L24_Moveless_1m/25-1-5_code1Ancilla.qasm"
+   },
+   "seconds": 0.03
+  },
+  {
+   "id": "SC25_L24_MAO_1m",
+   "label": "rotated surface code d=5 [[25,1,5]] on L24: moving the ancilla only",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 20920.0,
+    "last_start_us": 20820.0,
+    "moves": 46,
+    "fidelity": 0.16158997316359744,
+    "heating": 252.0
+   },
+   "counts": {
+    "gate": 80,
+    "split": 46,
+    "move": 46,
+    "merge": 46
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 20920.0,
+      "theirs": 20920.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/25-1-5_code1Ancilla.qasm L24 5 MAO Naive 1 0 0 FM GateSwap ../out/SC25_L24_MAO_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/25-1-5_code1Ancilla.qasm",
+     "machine_type": "L24",
+     "num_ions_per_region": 5,
+     "compiler_mode": "MAO",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC25_L24_MAO_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      25,
+      1,
+      5
+     ]
+    },
+    "circuit_file": "out/SC25_L24_MAO_1m/25-1-5_code1Ancilla.qasm"
+   },
+   "seconds": 0.02
+  },
+  {
+   "id": "SC25_L24_Baseline_maxm",
+   "label": "rotated surface code d=5 [[25,1,5]] on L24: QCCDSim, one ancilla per stabilizer",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 24390.0,
+    "last_start_us": 24290.0,
+    "moves": 80,
+    "fidelity": 0.014355169463335482,
+    "heating": 568.0
+   },
+   "counts": {
+    "gate": 80,
+    "split": 80,
+    "move": 80,
+    "merge": 80
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 24390.0,
+      "theirs": 24390.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/25-1-5_code24Ancilla.qasm L24 5 Baseline Naive 1 0 0 FM GateSwap ../out/SC25_L24_Baseline_maxm/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/25-1-5_code24Ancilla.qasm",
+     "machine_type": "L24",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Baseline",
+     "mapper_choice": "Greedy (mappers.QubitMapGreedy)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC25_L24_Baseline_maxm/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 24,
+     "ratio_string": "maxm",
+     "code_n_k_d": [
+      25,
+      1,
+      5
+     ]
+    },
+    "circuit_file": "out/SC25_L24_Baseline_maxm/25-1-5_code24Ancilla.qasm"
+   },
+   "seconds": 0.06
+  },
+  {
+   "id": "SC49_L48_Moveless_1m",
+   "label": "rotated surface code d=7 [[49,1,7]] on L48: Moveless, one ancilla",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 65180.0,
+    "last_start_us": 65080.0,
+    "moves": 124,
+    "fidelity": 0.0003067142559151698,
+    "heating": 860.0
+   },
+   "counts": {
+    "gate": 168,
+    "split": 124,
+    "move": 124,
+    "merge": 124
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 65180.0,
+      "theirs": 65180.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/49-1-7_code1Ancilla.qasm L48 5 Moveless Naive 1 0 0 FM GateSwap ../out/SC49_L48_Moveless_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/49-1-7_code1Ancilla.qasm",
+     "machine_type": "L48",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Moveless",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC49_L48_Moveless_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      49,
+      1,
+      7
+     ]
+    },
+    "circuit_file": "out/SC49_L48_Moveless_1m/49-1-7_code1Ancilla.qasm"
+   },
+   "seconds": 0.12
+  },
+  {
+   "id": "SC49_L48_MAO_1m",
+   "label": "rotated surface code d=7 [[49,1,7]] on L48: moving the ancilla only",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 95010.0,
+    "last_start_us": 94910.0,
+    "moves": 213,
+    "fidelity": 2.0389462141346083e-07,
+    "heating": 1411.9999999999998
+   },
+   "counts": {
+    "gate": 168,
+    "split": 213,
+    "move": 213,
+    "merge": 213
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 95010.0,
+      "theirs": 95010.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/49-1-7_code1Ancilla.qasm L48 5 MAO Naive 1 0 0 FM GateSwap ../out/SC49_L48_MAO_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/49-1-7_code1Ancilla.qasm",
+     "machine_type": "L48",
+     "num_ions_per_region": 5,
+     "compiler_mode": "MAO",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC49_L48_MAO_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      49,
+      1,
+      7
+     ]
+    },
+    "circuit_file": "out/SC49_L48_MAO_1m/49-1-7_code1Ancilla.qasm"
+   },
+   "seconds": 0.13
+  },
+  {
+   "id": "SC49_L48_Baseline_maxm",
+   "label": "rotated surface code d=7 [[49,1,7]] on L48: QCCDSim, one ancilla per stabilizer",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 115800.0,
+    "last_start_us": 115700.0,
+    "moves": 352,
+    "fidelity": 5.961528788420872e-13,
+    "heating": 2624.0
+   },
+   "counts": {
+    "gate": 168,
+    "split": 352,
+    "move": 352,
+    "merge": 352
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 115800.0,
+      "theirs": 115800.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/SurfaceCodes/49-1-7_code48Ancilla.qasm L48 5 Baseline Naive 1 0 0 FM GateSwap ../out/SC49_L48_Baseline_maxm/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/SurfaceCodes/49-1-7_code48Ancilla.qasm",
+     "machine_type": "L48",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Baseline",
+     "mapper_choice": "Greedy (mappers.QubitMapGreedy)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/SC49_L48_Baseline_maxm/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 48,
+     "ratio_string": "maxm",
+     "code_n_k_d": [
+      49,
+      1,
+      7
+     ]
+    },
+    "circuit_file": "out/SC49_L48_Baseline_maxm/49-1-7_code48Ancilla.qasm"
+   },
+   "seconds": 0.22
+  },
+  {
+   "id": "CC91_L90_Moveless_1m",
+   "label": "color code d=11 [[91,1,11]] on L90: Moveless, one ancilla",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 173470.0,
+    "last_start_us": 173370.0,
+    "moves": 341,
+    "fidelity": 4.139702127795864e-13,
+    "heating": 2264.0
+   },
+   "counts": {
+    "gate": 480,
+    "split": 341,
+    "move": 341,
+    "merge": 341
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 173470.0,
+      "theirs": 173470.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/ColorCodes/91-1-11_code1Ancilla.qasm L90 5 Moveless Naive 1 0 0 FM GateSwap ../out/CC91_L90_Moveless_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/ColorCodes/91-1-11_code1Ancilla.qasm",
+     "machine_type": "L90",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Moveless",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/CC91_L90_Moveless_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      91,
+      1,
+      11
+     ]
+    },
+    "circuit_file": "out/CC91_L90_Moveless_1m/91-1-11_code1Ancilla.qasm"
+   },
+   "seconds": 0.4
+  },
+  {
+   "id": "CC91_L90_MAO_1m",
+   "label": "color code d=11 [[91,1,11]] on L90: moving the ancilla only",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": true,
+   "violations": {},
+   "first_violations": [],
+   "notes": {},
+   "measured": {
+    "makespan_us": 219430.0,
+    "last_start_us": 219330.0,
+    "moves": 479,
+    "fidelity": 2.5198026205892565e-19,
+    "heating": 3116.0
+   },
+   "counts": {
+    "gate": 480,
+    "split": 479,
+    "move": 479,
+    "merge": 479
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 219430.0,
+      "theirs": 219430.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/ColorCodes/91-1-11_code1Ancilla.qasm L90 5 MAO Naive 1 0 0 FM GateSwap ../out/CC91_L90_MAO_1m/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/ColorCodes/91-1-11_code1Ancilla.qasm",
+     "machine_type": "L90",
+     "num_ions_per_region": 5,
+     "compiler_mode": "MAO",
+     "mapper_choice": "Custom (customScheduler.get_custom_mapping)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/CC91_L90_MAO_1m/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 1,
+     "ratio_string": "1m",
+     "code_n_k_d": [
+      91,
+      1,
+      11
+     ]
+    },
+    "circuit_file": "out/CC91_L90_MAO_1m/91-1-11_code1Ancilla.qasm"
+   },
+   "seconds": 0.47
+  },
+  {
+   "id": "CC91_L90_Baseline_maxm",
+   "label": "color code d=11 [[91,1,11]] on L90: QCCDSim, one ancilla per stabilizer",
+   "profile": "qccdsim (gates as a set)",
+   "checks": {
+    "declared_locks": "skipped: the artifact states no locks",
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "failed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "durations": "passed",
+    "circuit": "passed"
+   },
+   "ok": false,
+   "violations": {
+    "capacity": 4
+   },
+   "first_violations": [
+    {
+     "check": "capacity",
+     "message": "trap T18 holds 8 ions at t=313160 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T24 holds 8 ions at t=388640 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T29 holds 8 ions at t=827500 us; capacity 7",
+     "events": []
+    },
+    {
+     "check": "capacity",
+     "message": "trap T31 holds 8 ions at t=620790 us; capacity 7",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 909680.0,
+    "last_start_us": 909580.0,
+    "moves": 2447,
+    "fidelity": 2.1926744748102153e-269,
+    "heating": 19164.0
+   },
+   "counts": {
+    "gate": 480,
+    "split": 2447,
+    "move": 2447,
+    "merge": 2447
+   },
+   "compare": {
+    "tool": {
+     "makespan_us": {
+      "ours": 909680.0,
+      "theirs": 909680.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "Moveless",
+    "repo": "https://github.com/sahilkhan123/Moveless",
+    "commit": "36c953ce28125320dfc453df4994753d9831fd91",
+    "command": "cd repo && python run.py Circuits/CodeFamilies/ColorCodes/91-1-11_code90Ancilla.qasm L90 5 Baseline Naive 1 0 0 FM GateSwap ../out/CC91_L90_Baseline_maxm/result.csv 80 True",
+    "config": {
+     "openqasm_file_name": "Circuits/CodeFamilies/ColorCodes/91-1-11_code90Ancilla.qasm",
+     "machine_type": "L90",
+     "num_ions_per_region": 5,
+     "compiler_mode": "Baseline",
+     "mapper_choice": "Greedy (mappers.QubitMapGreedy)",
+     "reorder_choice": "Naive",
+     "serial_trap_ops": 1,
+     "serial_comm": 0,
+     "serial_all": 0,
+     "gate_type": "FM",
+     "swap_type": "GateSwap",
+     "csv_string": "../out/CC91_L90_Baseline_maxm/result.csv",
+     "split_merge_time": 80,
+     "write_timings": "True",
+     "honeywell_mode": true,
+     "np_random_seed": 12345,
+     "PYTHONHASHSEED": "0",
+     "machine_model": "MPar1",
+     "comm_capacity_added": 2,
+     "num_ancilla": 90,
+     "ratio_string": "maxm",
+     "code_n_k_d": [
+      91,
+      1,
+      11
+     ]
+    },
+    "circuit_file": "out/CC91_L90_Baseline_maxm/91-1-11_code90Ancilla.qasm"
+   },
+   "seconds": 2.87
+  }
+ ],
+ "ratios": [
+  {
+   "label": "rotated surface code d=3 [[9,1,3]] on L8: QCCDSim / Moveless",
+   "num": "SC9_L8_Baseline_maxm",
+   "den": "SC9_L8_Moveless_1m",
+   "ours": 1.4123076923076923,
+   "theirs": 1.412308,
+   "rel": 2.1786487624005117e-07,
+   "verdict": "close",
+   "where": "Fig. 13, bar height (vector data in the source)"
+  },
+  {
+   "label": "rotated surface code d=5 [[25,1,5]] on L24: QCCDSim / Moveless",
+   "num": "SC25_L24_Baseline_maxm",
+   "den": "SC25_L24_Moveless_1m",
+   "ours": 1.5594629156010231,
+   "theirs": 1.559463,
+   "rel": 5.412053823551124e-08,
+   "verdict": "close",
+   "where": "Fig. 13, bar height (vector data in the source)"
+  },
+  {
+   "label": "rotated surface code d=7 [[49,1,7]] on L48: QCCDSim / Moveless",
+   "num": "SC49_L48_Baseline_maxm",
+   "den": "SC49_L48_Moveless_1m",
+   "ours": 1.776618594660939,
+   "theirs": 1.776619,
+   "rel": 2.2815193408525544e-07,
+   "verdict": "close",
+   "where": "Fig. 13, bar height (vector data in the source)"
+  },
+  {
+   "label": "color code d=11 [[91,1,11]] on L90: QCCDSim / Moveless",
+   "num": "CC91_L90_Baseline_maxm",
+   "den": "CC91_L90_Moveless_1m",
+   "ours": 5.244019138755981,
+   "theirs": 5.244019,
+   "rel": 2.6459854727335138e-08,
+   "verdict": "close",
+   "where": "Fig. 13, bar height (vector data in the source)"
+  }
+ ],
+ "ours": [
+  {
+   "id": "SC9_L8_ours",
+   "label": "surface code d=3 on L8",
+   "against": "SC9_L8_Moveless_1m",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "qccdsim (gates as a set)": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 2570.0,
+    "last_start_us": 2470.0,
+    "moves": 1,
+    "fidelity": 0.8121245737200565,
+    "heating": 4.0
+   },
+   "theirs": {
+    "makespan_us": 3250.0,
+    "last_start_us": 3150.0,
+    "moves": 5,
+    "fidelity": 0.8029967944758909,
+    "heating": 20.0
+   },
+   "theirs_ok": true,
+   "seconds": 0.01
+  },
+  {
+   "id": "SC25_L24_ours",
+   "label": "surface code d=5 on L24",
+   "against": "SC25_L24_Moveless_1m",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "qccdsim (gates as a set)": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 9580.0,
+    "last_start_us": 9480.0,
+    "moves": 11,
+    "fidelity": 0.44104102675557355,
+    "heating": 44.0
+   },
+   "theirs": {
+    "makespan_us": 15640.0,
+    "last_start_us": 15540.0,
+    "moves": 22,
+    "fidelity": 0.26221919646562,
+    "heating": 140.0
+   },
+   "theirs_ok": true,
+   "seconds": 0.02
+  },
+  {
+   "id": "SC49_L48_ours",
+   "label": "surface code d=7 on L48",
+   "against": "SC49_L48_Moveless_1m",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "qccdsim (gates as a set)": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 20260.0,
+    "last_start_us": 20160.0,
+    "moves": 41,
+    "fidelity": 0.1298425465962443,
+    "heating": 164.0
+   },
+   "theirs": {
+    "makespan_us": 65180.0,
+    "last_start_us": 65080.0,
+    "moves": 124,
+    "fidelity": 0.0003067142559151698,
+    "heating": 860.0
+   },
+   "theirs_ok": true,
+   "seconds": 0.12
+  },
+  {
+   "id": "CC91_L90_ours",
+   "label": "colour code d=11 on L90",
+   "against": "CC91_L90_Moveless_1m",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "qccdsim (gates as a set)": {
+     "checks": {
+      "declared_locks": "skipped: the artifact states no locks",
+      "broadcast": "skipped: transport is not broadcast in this model",
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 54750.0,
+    "last_start_us": 54650.0,
+    "moves": 141,
+    "fidelity": 0.0007899179993386591,
+    "heating": 564.0
+   },
+   "theirs": {
+    "makespan_us": 173470.0,
+    "last_start_us": 173370.0,
+    "moves": 341,
+    "fidelity": 4.139702127795864e-13,
+    "heating": 2264.0
+   },
+   "theirs_ok": true,
+   "seconds": 0.44
+  }
+ ]
+}
