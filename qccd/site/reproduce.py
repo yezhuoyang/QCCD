@@ -722,8 +722,8 @@ def index_entries() -> list:
 #
 # Every replayed run opens in the Studio, the way a leaderboard entry does: the paper's
 # machine as an architecture document, the paper's schedule as a program on it.  The page
-# is the ordinary Studio; a small card injected by the site build says what the reader is
-# looking at, because the Studio's clock and rule panel are THIS platform's, not the paper's.
+# is the ordinary Studio and nothing more, exactly like a leaderboard entry: what the run is,
+# the paper's clock and the checks under the paper's rules are on the paper's own page.
 
 #: what the Studio needs to price the paper's operations, per paper (the paper's values)
 STUDIO_PRICING = {
@@ -766,93 +766,14 @@ def studio_rel(p: dict, run: dict) -> str:
     return f"reproduce/{p['key']}/{run['id']}.html"
 
 
-CARD_CSS = """
-#rpcard{position:fixed;top:134px;right:14px;width:330px;max-height:62vh;overflow:auto;z-index:40;
- background:#fff;border:1px solid #d9d7d0;border-left:3px solid #2a78d6;border-radius:8px;
- box-shadow:0 6px 18px rgba(0,0,0,.10);padding:10px 12px;font:12.5px/1.45 ui-sans-serif,system-ui,sans-serif;color:#1c2333}
-#rpcard[data-open="0"] .rpb{display:none}
-#rpcard .rpk{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#2a78d6;font-weight:600}
-#rpcard .rph{font-weight:600;margin:2px 0 6px}
-#rpcard p{margin:5px 0}#rpcard .ok{color:#1b7f3b;font-weight:600}#rpcard .bad{color:#b42318;font-weight:600}
-#rpcard button{float:right;font:inherit;font-size:11.5px;border:1px solid #d9d7d0;background:#f6f5f1;border-radius:5px;padding:1px 7px;cursor:pointer}
-#rpcard a{color:#2a78d6}
-body[data-embed="1"] #rpcard{display:none}
-"""
-
-CARD_JS = """
-(function(){
-  var c = document.getElementById('rpcard'); if(!c) return;
-  var b = c.querySelector('button');
-  b.addEventListener('click', function(){ var o = c.getAttribute('data-open') !== '0';
-    c.setAttribute('data-open', o ? '0' : '1'); b.textContent = o ? 'show' : 'hide'; });
-  window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
-    'repro:card': {t: 'What this page is', d: "Hides or shows the card that says whose schedule this is, what it measured on the paper's own clock, and how the Studio judges it."}});
-})();
-"""
-
-#: why one of OUR rules flags a paper's schedule, when the reason is a difference of models
-OUR_RULE_WHY = {
-    "R14": "our language does not record where in a trap an ion stands, so R14 charges a "
-           "reorder for every split from a chain longer than two; the paper tracks the order "
-           "and pays only where one is needed",
-    "R13": "our rules cap a chain at 15 ions at gate time; the paper allows more",
-    "R6b": "our language puts a two-qubit gate's ions in one trap; the paper gates ions in "
-           "neighbouring zones",
-    "R3": "the paper's swap exchanges two neighbouring ions in place, an operation our language "
-          "does not have; the page plays it as two ions crossing one segment, which R3 (one ion "
-          "per segment) and R5 (no crossing) forbid",
-    "R5": "the same swap, seen as two ions passing each other on one segment",
-}
-
-
-def _card(p: dict, run: dict, row: dict | None, failed_ours: dict) -> str:
-    metric = _metric_of(p)
-    tool = (row or {}).get("compare", {}).get("tool", {}).get(metric)
-    paper = (row or {}).get("compare", {}).get("paper", {}).get(metric)
-    clock = {"last_start_us": "the start of the last step",
-             "moves": "the number of shuttles"}.get(metric, "the time")
-    lines = []
-    if tool:
-        lead = ("By the paper's own measure the schedule makes" if metric == "moves"
-                else f"On the paper's own clock {clock} is")
-        lines.append(f"{lead} <b>{_num(tool['ours'], metric)}</b>, exactly what its code printed"
-                     + (f"; the paper reports {_num(paper['theirs'], metric)} "
-                        f"({_e(paper.get('where', ''))})" if paper else "") + ".")
-    if row:
-        failed = [k for k, v in row.get("checks", {}).items() if v == "failed"]
-        n_ok = sum(1 for v in row.get("checks", {}).values() if v == "passed")
-        lines.append("Under the paper's rules: " + (
-            f'<span class="ok">all {n_ok} checks pass</span>.' if not failed else
-            f'<span class="bad">{_e(", ".join(failed))} fails</span>, {n_ok} others pass '
-            "(the reproduction page says why)."))
-    ours = ("This view plays the same operations one instruction at a time, so the runtime "
-            "above is this platform's lockstep clock, and the rule panel holds this platform's "
-            "own, stricter rules")
-    if failed_ours:
-        bits = [f"{r} ({n}){': ' + OUR_RULE_WHY[r] if r in OUR_RULE_WHY else ''}"
-                for r, n in sorted(failed_ours.items())]
-        ours += ": they flag " + "; ".join(bits) + "."
-    else:
-        ours += ": they find nothing."
-    lines.append(_e(ours))
-    back = "./"
-    return (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
-            f'<button type="button" data-hint="repro:card">hide</button>'
-            f'<div class="rpk">Reproduced · {_e(p["short"])} ({_e(p["venue"])})</div>'
-            f'<div class="rph">{_e(run.get("label", run["id"]))}</div>'
-            '<div class="rpb">' + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="{back}">← this paper</a> · <a href="../">all papers</a></p></div></div>'
-            f"<script>{CARD_JS}</script>")
-
-
 def studio_pages(tmp: Path, only: set[str] | None = None):
-    """Yield `(site path, page html, card html)` for every replayed run in the catalog."""
+    """Yield `(site path, page html, "")` for every replayed run in the catalog (the third
+    element is what the site build injects into the page: nothing)."""
     from ..api import Machine
     from ..arch import Architecture
     from ..cost.models import corrected_model
     from ..repro.devices import layout
     from ..repro.studio import studio_arch_doc, to_tsir
-    from ..verify import verify
 
     model = corrected_model("local")
     tmp.mkdir(parents=True, exist_ok=True)
@@ -872,7 +793,6 @@ def studio_pages(tmp: Path, only: set[str] | None = None):
                     yield _model_studio(p, run, tmp, model)
             continue
         res = _results(p["key"]) or {}
-        rows = {r["id"]: r for r in res.get("runs", []) if "missing" not in r}
         for o in catalog.OURS.get(p["key"], {}).get("runs", []):
             row = next((x for x in res.get("ours", []) if x["id"] == o["id"] and x.get("ok")), None)
             if row is None or (only and o["id"] not in only):
@@ -895,13 +815,10 @@ def studio_pages(tmp: Path, only: set[str] | None = None):
                                   note=f"{p['short']} ({p['venue']}): {p['what']}", **price)
             m = Machine(Architecture.from_json(doc))
             prog = to_tsir(s, name=run["id"], arch=name)
-            rep = verify(prog, m.arch, model, check_metrics=False)
-            failed = {r: n for r, n in rep.rules.by_rule().items() if n}
             out = tmp / f"{name}.html"
             m.render(prog, out, model=model, kicker=f"REPRODUCED · {p['short'].upper()}",
                      headline=run.get("label", run["id"]))
-            yield (studio_rel(p, run), out.read_text(encoding="utf-8"),
-                   _card(p, run, rows.get(run["id"]), failed))
+            yield studio_rel(p, run), out.read_text(encoding="utf-8"), ""
 
 
 def _design_studio(p: dict, tmp: Path, model):
@@ -943,28 +860,7 @@ def _design_studio(p: dict, tmp: Path, model):
     out = tmp / f"{p['key']}_design.html"
     m.render(prog, out, model=model, kicker=f"REPRODUCED · {p['short'].upper()}",
              headline=headline)
-    card = (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
-            '<button type="button" data-hint="repro:card">hide</button>'
-            f'<div class="rpk">Reproduced · {_e(p["short"])} ({_e(p["venue"])})</div>'
-            f'<div class="rph">{_e(headline)}</div><div class="rpb">'
-            "<p>Every number of this machine comes from the paper, with the place it was read; "
-            "where the paper is silent the document says so. "
-            + (f"What plays here is a circuit of our own, not one of the paper's: the GHZ state on "
-               f"32 qubits as a binary tree (31 two-qubit gates, depth 5), compiled by our compiler "
-               f"(release {_e(info['compiler'])}) into {info['instructions']:,} instructions and "
-               f"{info['rounds']} rounds of up to four gates. Every rule passes, and the proved "
-               f"checker accepts its certificate. The whole loop shifts as one; the ions swap in "
-               f"the two-ion zones and meet in the four gate zones.</p><p>"
-               if info and not info.get("rules_failed") and info.get("lean") == "ACCEPTED" else "")
-            + ("Our compiler compiles the paper's circuits on it; the reproduction page gives the "
-               "rounds (the circuits themselves are not ours to publish).</p>"
-               if sum(f["good"] for f in _h2_families(json.loads((ROOT / p["key"] / "results.json")
-                                                                   .read_text(encoding="utf-8")))) else
-               "Our compiler cannot yet compile the paper's circuits on it; the reproduction page "
-               "lists why.</p>")
-            + f'<p><a href="./">← this paper</a></p></div></div>'
-            f"<script>{CARD_JS}</script>")
-    return f"reproduce/{p['key']}/design.html", out.read_text(encoding="utf-8"), card
+    return f"reproduce/{p['key']}/design.html", out.read_text(encoding="utf-8"), ""
 
 
 def _ours_studio(p: dict, o: dict, spec: dict, row: dict, tmp: Path, model):
@@ -975,7 +871,6 @@ def _ours_studio(p: dict, o: dict, spec: dict, row: dict, tmp: Path, model):
     from ..repro.devices import layout
     from ..repro.studio import studio_arch_doc, to_tsir
     from ..repro.timed import TimedSchedule
-    from ..verify import verify
 
     s = TimedSchedule.load(_open(ROOT / p["key"] / o["file"]))
     fam, kw = _layout_for(p, spec)
@@ -989,39 +884,10 @@ def _ours_studio(p: dict, o: dict, spec: dict, row: dict, tmp: Path, model):
                           note=f"{p['short']} ({p['venue']}): our schedule", **price)
     m = Machine(Architecture.from_json(doc))
     prog = to_tsir(s, name=o["id"], arch=name)
-    rep = verify(prog, m.arch, model, check_metrics=False)
-    failed = {r: n for r, n in rep.rules.by_rule().items() if n}
     out = tmp / f"{name}.html"
     label = f"{o['label']}: our schedule"
     m.render(prog, out, model=model, kicker=f"OURS · {p['short'].upper()}", headline=label)
-    t, me = row["theirs"], row["measured"]
-    metric = "moves" if p["key"] == "saki2022" else "makespan_us"
-    tm = "last_start_us" if _metric_of(p) == "last_start_us" else "makespan_us"
-    what = "its last operation starts at" if tm == "last_start_us" else "it takes"
-    lines = [f"Our schedule for the circuit the paper ran, on the paper's machine. On the paper's "
-             f"own clock {what} <b>{_num(me[tm], 'makespan_us')}</b>, with "
-             f"{me['moves']:,} shuttles; the paper's code: {_num(t[tm], 'makespan_us')} "
-             f"and {t['moves']:,} ({_e(spec.get('label', ''))}).",
-             "Under the paper's rules: <span class=\"ok\">every check passes</span>, with "
-             "strict durations: an operation the paper's law does not price is refused."]
-    ours = ("This view plays the same operations one instruction at a time, so the runtime "
-            "above is this platform's lockstep clock, and the rule panel holds this platform's "
-            "own, stricter rules")
-    if failed:
-        ours += ": they flag " + "; ".join(
-            f"{r} ({n}){': ' + OUR_RULE_WHY[r] if r in OUR_RULE_WHY else ''}" for r, n in sorted(failed.items())) + "."
-    else:
-        ours += ": they find nothing."
-    lines.append(_e(ours))
-    card = (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
-            '<button type="button" data-hint="repro:card">hide</button>'
-            f'<div class="rpk">Ours · {_e(p["short"])} ({_e(p["venue"])})</div>'
-            f'<div class="rph">{_e(label)}</div><div class="rpb">'
-            + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="{_e(o["against"])}.html">the paper\'s schedule</a> · '
-            f'<a href="./">← this paper</a></p></div></div>'
-            f"<script>{CARD_JS}</script>")
-    return f"reproduce/{p['key']}/{o['id']}.html", out.read_text(encoding="utf-8"), card
+    return f"reproduce/{p['key']}/{o['id']}.html", out.read_text(encoding="utf-8"), ""
 
 
 def _model_studio_wanted(run: dict) -> bool:
@@ -1125,7 +991,6 @@ def _model_studio(p: dict, run: dict, tmp: Path, model):
     from ..repro.devices import layout
     from ..repro.studio import studio_arch_doc, to_tsir
     from ..repro.timed import TimedSchedule
-    from ..verify import verify
 
     s = TimedSchedule.load(_open(ROOT / p["key"] / run["file"]))
     pos = layout(s.device, "trapsimd")
@@ -1136,54 +1001,12 @@ def _model_studio(p: dict, run: dict, tmp: Path, model):
                           reset_us=0.0)
     m = Machine(Architecture.from_json(doc))
     prog = to_tsir(s, name=run["id"], arch=name)
-    rep = verify(prog, m.arch, model, check_metrics=False)
-    failed = {r: n for r, n in rep.rules.by_rule().items() if n}
     out = tmp / f"{name}.html"
     ours = run.get("kind") != "example"
     label = run["label"]
     m.render(prog, out, model=model, kicker=f"{'OURS' if ours else 'REPRODUCED'} · {p['short'].upper()}",
              headline=label)
-    c = run.get("compare", {}).get("paper", {}).get("T_exe_us", {})
-    me = run["measured"]["makespan_us"]
-    if ours:
-        lines = [f"Our schedule on the paper's device, timing and rules: <b>{_num(me, 'makespan_us')}</b>"
-                 + (f"; the paper's compiler reports {_num(c['theirs'], 'makespan_us')} (Table 3) for "
-                    "the circuit as it describes it" if c else "") + ". The circuit is rebuilt, so this "
-                 "is a model-level comparison."]
-    else:
-        lines = [f"The paper's worked example, event for event: <b>{_num(me, 'makespan_us')}</b>, "
-                 f"the paper's {_num(c.get('theirs', 0), 'makespan_us')}."]
-    lines.append('Under the paper\'s rules: <span class="ok">every check passes</span>, with strict '
-                 "durations and the broadcast rule (one transport class per cycle, nothing else "
-                 "moving during it).")
-    why = ("This view plays the same operations one instruction at a time, so the runtime "
-           "above is this platform's lockstep clock, and the rule panel holds this platform's "
-           "own, stricter rules")
-    if failed:
-        why += ": they flag " + "; ".join(
-            f"{r} ({n}){': ' + OUR_RULE_WHY[r] if r in OUR_RULE_WHY else ''}" for r, n in sorted(failed.items())) + "."
-    else:
-        why += ": they find nothing."
-    lines.append(_e(why))
-    card = (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
-            '<button type="button" data-hint="repro:card">hide</button>'
-            f'<div class="rpk">{"Ours" if ours else "Reproduced"} · {_e(p["short"])}</div>'
-            f'<div class="rph">{_e(label)}</div><div class="rpb">'
-            + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="./">← this paper</a></p></div></div>'
-            f"<script>{CARD_JS}</script>")
-    return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), card
-
-
-ISH_RULE_WHY = {
-    "R2": "the heuristic lets one chain enter the parking edge while another leaves it through "
-          "the processing-zone node in the same step (its code allows this on purpose); our rules "
-          "let one ion through a junction per cycle",
-    "R3": "the same moment, seen as two ions on the segment into the parking edge",
-    "R5": "the same moment, seen as two ions passing each other on that segment",
-    "R20": "the processing zone is drawn from the tool's own grid coordinates, and two of its "
-           "rails leave the lattice corner at a sharp angle; the paper's model has no geometry",
-}
+    return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), ""
 
 
 def _ish_wanted(run: dict) -> bool:
@@ -1301,7 +1124,6 @@ def _ish_studio(p: dict, run: dict, tmp: Path, model):
     from ..arch import Architecture
     from ..repro.devices import layout
     from ..repro.studio import studio_arch_doc, to_tsir
-    from ..verify import verify
 
     s = _ish_load(run)
     pos = layout(s.device, "ionshuttler")
@@ -1311,36 +1133,10 @@ def _ish_studio(p: dict, run: dict, tmp: Path, model):
                           gate_us=1.0, one_q_us=1.0, measure_us=0.0, reset_us=0.0)
     m = Machine(Architecture.from_json(doc))
     prog = to_tsir(s, name=run["id"], arch=name)
-    rep = verify(prog, m.arch, model, check_metrics=False)
-    failed = {r_: n for r_, n in rep.rules.by_rule().items() if n}
     out = tmp / f"{name}.html"
     ours = run["id"].endswith("_ours")
     label = run["label"]
     m.render(prog, out, model=model, kicker=f"{'OURS' if ours else 'REPRODUCED'} · {p['short'].upper()}",
              headline=label)
-    if ours:
-        th = next((r_["printed"]["stdout"] for r_ in (_results(p["key"]) or {}).get("runs", [])
-                   if r_["id"] == run.get("against")), None)
-        lines = [f"Our schedule in the heuristic's model, from the heuristic's own placement: "
-                 f"<b>{run['search']['best']} steps</b>, which is its lower bound"
-                 + (f"; the heuristic took {th}" if th is not None else "") + "."]
-    else:
-        lines = [f"The tool's own schedule: it printed <b>{run['printed']['stdout']}</b>, and the "
-                 "replay measures the same."]
-    lines.append('Under the paper\'s rules: <span class="ok">every check passes</span>, with strict '
-                 "durations, in time steps.")
-    why = ("This view plays the same moves one instruction at a time, in this platform's own "
-           "lockstep clock (a step shows as a microsecond), and the rule panel holds this "
-           "platform's own, stricter rules")
-    why += (": they flag " + "; ".join(f"{r_} ({n}){': ' + ISH_RULE_WHY[r_] if r_ in ISH_RULE_WHY else ''}"
-                                       for r_, n in sorted(failed.items())) + "."
-            if failed else ": they find nothing.")
-    lines.append(_e(why))
-    card = (f'<style>{CARD_CSS}</style><div id="rpcard" data-open="1">'
-            '<button type="button" data-hint="repro:card">hide</button>'
-            f'<div class="rpk">{"Ours" if ours else "Reproduced"} · {_e(p["short"])}</div>'
-            f'<div class="rph">{_e(label)}</div><div class="rpb">'
-            + "".join(f"<p>{x}</p>" for x in lines)
-            + f'<p><a href="./">← this paper</a></p></div></div>'
-            f"<script>{CARD_JS}</script>")
-    return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), card
+    return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), ""
+
