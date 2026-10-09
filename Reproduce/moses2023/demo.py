@@ -78,6 +78,9 @@ def main(argv: list[str]) -> int:
     OUT.mkdir(exist_ok=True)
     (OUT / "ghz32.qasm").write_text(qasm, encoding="utf-8", newline="\n")
     (OUT / "ghz32.tsir.json").write_text(json.dumps(doc), encoding="utf-8", newline="\n")
+    # the certificate, so the page can join each instruction to its circuit statement
+    (OUT / "ghz32.qcert.json").write_text(Path(cert_path).read_text(encoding="utf-8"),
+                                          encoding="utf-8", newline="\n")
     summary = {"circuit": "GHZ on 32 qubits, binary tree (depth 5, 31 CX), written from the definition",
                "compiler": release_of(Path(os.environ["QCCD_QCCDC"])) or "an unreleased build",
                "instructions": len(ins), "rounds": rounds, "rules_failed": failed,

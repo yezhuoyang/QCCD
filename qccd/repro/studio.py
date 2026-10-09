@@ -22,7 +22,7 @@ from ..ir.tsir import TSIR, Instruction, Participant
 from .devices import TABLES, to_arch_doc
 from .timed import Event, TimedSchedule
 
-__all__ = ["node_id", "studio_arch_doc", "to_tsir"]
+__all__ = ["node_id", "studio_arch_doc", "to_tsir", "source_payload"]
 
 
 def node_id(n: str) -> str:
@@ -207,3 +207,95 @@ def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> 
     if key:
         flush(batch, key[1])
     return prog
+
+
+def source_payload(prog: TSIR, name: str, lines: list[str], ops: list[dict], *,
+                   join_1q: bool = False) -> dict:
+    """The circuit pane's payload for a programme replayed from someone else's schedule.
+
+    `qccd.ir.source_map.build` joins a programme to its circuit through the stamps OUR compiler
+    puts on every instruction; a replayed programme has none, so the join is made here, by
+    the operations themselves.  `ops` are the circuit's statements in circuit order, each
+    ``{"name", "ions", "line"}`` (``ions`` as the programme names them, ``line`` 1-based in
+    `lines`, optional ``kind``: "gate" / "measure" / "reset", optional ``p``).
+
+    * A two-qubit gate realises the earliest statement not yet done on the same two ions; a
+      measurement or reset, the earliest of its kind on that ion.  One-qubit gates are joined
+      only with ``join_1q`` -- where the paper's schedule runs the circuit's own one-qubit
+      operations; where it decomposes them (Jones's RX/RY for an H), a join would name the
+      wrong statement, so the statement is shown and not joined.
+    * Transport is "towards" the next statement its ions still have to do, or "after" the last
+      one they did when none is left -- the same split `source_map` makes.
+    """
+    out_ops: list[dict] = []
+    by_key: dict[tuple, list[int]] = defaultdict(list)
+    per_ion: dict[str, list[int]] = defaultdict(list)
+    for i, o in enumerate(ops):
+        ions = tuple(str(x) for x in o["ions"])
+        kind = o.get("kind", "gate")
+        out_ops.append({"i": i, "name": o["name"], "q": list(o.get("q", ions)),
+                        "p": list(o.get("p", ())), "line": int(o["line"])})
+        by_key[(kind, frozenset(ions))].append(i)
+        for ion in ions:
+            per_ion[ion].append(i)
+    ptr: dict[tuple, int] = defaultdict(int)
+    done: set[int] = set()
+    last: dict[str, int] = {}
+    nxt: dict[str, int] = defaultdict(int)
+
+    def take(kind: str, ions: tuple) -> int | None:
+        key = (kind, frozenset(ions))
+        lst = by_key.get(key)
+        if not lst:
+            return None
+        while ptr[key] < len(lst) and lst[ptr[key]] in done:
+            ptr[key] += 1
+        if ptr[key] >= len(lst):
+            return None
+        i = lst[ptr[key]]
+        ptr[key] += 1
+        done.add(i)
+        for ion in ions:
+            last[ion] = i
+        return i
+
+    def pending(ion: str) -> int | None:
+        lst = per_ion.get(ion, [])
+        while nxt[ion] < len(lst) and lst[nxt[ion]] in done:
+            nxt[ion] += 1
+        return lst[nxt[ion]] if nxt[ion] < len(lst) else None
+
+    realises: dict[str, list[int]] = {}
+    toward: dict[str, list[int]] = {}
+    after: dict[str, list[int]] = {}
+    for ins in prog.instructions:
+        got: list[int] = []
+        if ins.type == "gate" and ins.gate != "SWAP":
+            if ins.pairs:
+                for a, b in ins.pairs:
+                    i = take("gate", (str(a), str(b)))
+                    if i is not None:
+                        got.append(i)
+            elif join_1q:
+                for ion in (ins.ions or ()):
+                    i = take("gate", (str(ion),))
+                    if i is not None:
+                        got.append(i)
+        elif ins.type in ("measure", "reset"):
+            for ion in (ins.ions or ()):
+                i = take(ins.type, (str(ion),))
+                if i is not None:
+                    got.append(i)
+        if got:
+            realises[str(ins.id)] = sorted(got)
+        elif ins.type == "simd" and ins.participants:
+            movers = [str(p.ion) for p in ins.participants]
+            soon = sorted({j for j in (pending(m) for m in movers) if j is not None})
+            if soon:
+                toward[str(ins.id)] = soon
+            else:
+                past = sorted({last[m] for m in movers if m in last})
+                if past:
+                    after[str(ins.id)] = past
+    return {"name": name, "lines": list(lines), "ops": out_ops,
+            "realises": realises, "toward": toward, "after": after}
