@@ -766,6 +766,74 @@ def studio_rel(p: dict, run: dict) -> str:
     return f"reproduce/{p['key']}/{run['id']}.html"
 
 
+_STIM_2Q = {"CX", "CNOT", "ZCX", "CY", "ZCY", "CZ", "ZCZ", "SWAP", "ISWAP", "XCX", "XCZ", "YCZ"}
+_STIM_MEASURE = {"M", "MZ", "MX", "MY", "MR", "MRZ", "MRX", "MRY"}
+_STIM_RESET = {"R", "RZ", "RX", "RY"}
+_STIM_SKIP = {"DETECTOR", "OBSERVABLE_INCLUDE", "TICK", "QUBIT_COORDS", "SHIFT_COORDS", "REPEAT",
+              "DEPOLARIZE1", "DEPOLARIZE2", "X_ERROR", "Z_ERROR", "Y_ERROR", "PAULI_CHANNEL_1",
+              "PAULI_CHANNEL_2", "}"}
+
+
+def _circuit_source(p: dict, spec: dict, sched, prog, relabel=None):
+    """The circuit a run implements, as the Studio's Gates view wants it: (name, lines, ops,
+    join_1q) for `studio.source_payload`, or None when the run names no circuit.  Qubits are
+    turned into the programme's ions exactly as the checker turns them (`sched.qubits`)."""
+    from ..repro.importers import _CX
+    c = spec.get("circuit")
+    if not c:
+        return None
+    f = ROOT / p["key"] / "circuits" / c["file"]
+    to_ion = lambda q: str((sched.qubits or {}).get(str(q), str(q)))
+    if c["kind"] == "qasm":
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        ops = []
+        for n, ln in enumerate(lines, 1):
+            m = _CX.match(ln)
+            if m:
+                ops.append({"name": "cx", "ions": (to_ion(m.group(2)), to_ion(m.group(4))),
+                            "q": [int(m.group(2)), int(m.group(4))], "line": n})
+        return c["file"], lines, ops, False
+    if c["kind"] == "pairs":
+        data = json.loads(f.read_text(encoding="utf-8"))
+        pairs = [tuple(x) for x in (data["pairs"] if isinstance(data, dict) else data)]
+        if relabel is not None:
+            pairs = relabel(pairs)
+        g = "zz" if ".zz." in c["file"] else "cx"
+        lines = [f"// the two-qubit gates of {c['file']}, in circuit order"] + \
+                [f"{g} {a}, {b};" for a, b in pairs]
+        ops = [{"name": g, "ions": (to_ion(a), to_ion(b)), "q": [a, b], "line": k + 2}
+               for k, (a, b) in enumerate(pairs)]
+        return c["file"], lines, ops, False
+    if c["kind"] == "stim":
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        ops = []
+        for n, ln in enumerate(lines, 1):
+            t = ln.split("#")[0].split()
+            if not t:
+                continue
+            nm = t[0].split("(")[0].upper()
+            tg = [x for x in t[1:] if x.isdigit()]
+            if nm in _STIM_SKIP:
+                continue
+            if nm in _STIM_2Q:
+                for a, b in zip(tg[::2], tg[1::2]):
+                    ops.append({"name": nm.lower(), "ions": (to_ion(a), to_ion(b)), "q": [int(a), int(b)], "line": n})
+            else:
+                kind = "measure" if nm in _STIM_MEASURE else "reset" if nm in _STIM_RESET else "gate"
+                for a in tg:
+                    ops.append({"name": nm.lower(), "ions": (to_ion(a),), "q": [int(a)], "line": n, "kind": kind})
+        return c["file"], lines, ops, False
+    return None
+
+
+def _source(prog, circ) -> dict | None:
+    from ..repro.studio import source_payload
+    if not circ:
+        return None
+    name, lines, ops, j1 = circ
+    return source_payload(prog, name, lines, ops, join_1q=j1)
+
+
 def studio_pages(tmp: Path, only: set[str] | None = None):
     """Yield `(site path, page html, "")` for every replayed run in the catalog (the third
     element is what the site build injects into the page: nothing)."""
@@ -817,7 +885,8 @@ def studio_pages(tmp: Path, only: set[str] | None = None):
             prog = to_tsir(s, name=run["id"], arch=name)
             out = tmp / f"{name}.html"
             m.render(prog, out, model=model, kicker=f"REPRODUCED · {p['short'].upper()}",
-                     headline=run.get("label", run["id"]))
+                     headline=run.get("label", run["id"]),
+                     source=_source(prog, _circuit_source(p, run, s, prog)))
             yield studio_rel(p, run), out.read_text(encoding="utf-8"), ""
 
 
@@ -858,8 +927,14 @@ def _design_studio(p: dict, tmp: Path, model):
                              quanta={i: 0.0 for i in place}, meta={"note": "Sec. II.E batches"}))
         headline = "the machine, rebuilt in our language"
     out = tmp / f"{p['key']}_design.html"
+    source = None
+    cert = ROOT / p["key"] / "demo" / "ghz32.qcert.json"
+    if demo.exists() and cert.exists():
+        from ..ir.source_map import build as build_source
+        source = build_source(prog, json.loads(cert.read_text(encoding="utf-8")),
+                              ROOT / p["key"] / "demo" / "ghz32.qasm")
     m.render(prog, out, model=model, kicker=f"REPRODUCED · {p['short'].upper()}",
-             headline=headline)
+             headline=headline, source=source)
     return f"reproduce/{p['key']}/design.html", out.read_text(encoding="utf-8"), ""
 
 
@@ -886,8 +961,36 @@ def _ours_studio(p: dict, o: dict, spec: dict, row: dict, tmp: Path, model):
     prog = to_tsir(s, name=o["id"], arch=name)
     out = tmp / f"{name}.html"
     label = f"{o['label']}: our schedule"
-    m.render(prog, out, model=model, kicker=f"OURS · {p['short'].upper()}", headline=label)
+    relabel = None
+    if o.get("circuit_relabel") == "checks":
+        from ..repro.importers import checks_as_scheduled
+        gates = [tuple(e.ions) for e in s.events if e.kind == "gate"]
+        relabel = lambda pairs: checks_as_scheduled(pairs, gates)[0]
+    m.render(prog, out, model=model, kicker=f"OURS · {p['short'].upper()}", headline=label,
+             source=_source(prog, _circuit_source(p, spec, s, prog, relabel)))
     return f"reproduce/{p['key']}/{o['id']}.html", out.read_text(encoding="utf-8"), ""
+
+
+def _model_circuit(run: dict, sched):
+    """A TrapSIMD run's circuit: the worked example's programme, or the rebuilt benchmark."""
+    from ..repro import trapsimd as ts
+    rid = run["id"]
+    if rid.startswith("fig6"):
+        prog = ts.w1_program()
+    elif rid.startswith("fig7"):
+        prog = ts.w2_program()
+    elif "3reg" in rid:
+        prog = ts.qaoa_regular(60, seed=0)
+    else:
+        prog = ts._BENCH[run["benchmark"]](run["n"])
+    to_ion = lambda q: str((sched.qubits or {}).get(str(q), str(q)))
+    lines = [f"// {run['label']}: one operation a line"] + \
+            [f"{o.name} {', '.join(prog.qname(q) for q in o.qubits)};" for o in prog.ops]
+    ops = [{"name": o.name, "ions": tuple(to_ion(prog.qname(q)) for q in o.qubits),
+            "q": [prog.qname(q) for q in o.qubits], "line": k + 2,
+            "kind": "measure" if o.name in ("measure", "m") else "gate"}
+           for k, o in enumerate(prog.ops)]
+    return "circuit", lines, ops, True
 
 
 def _model_studio_wanted(run: dict) -> bool:
@@ -1005,8 +1108,29 @@ def _model_studio(p: dict, run: dict, tmp: Path, model):
     ours = run.get("kind") != "example"
     label = run["label"]
     m.render(prog, out, model=model, kicker=f"{'OURS' if ours else 'REPRODUCED'} · {p['short'].upper()}",
-             headline=label)
+             headline=label, source=_source(prog, _model_circuit(run, s)))
     return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), ""
+
+
+def _ish_circuit(run: dict, sched):
+    """IonShuttler's sequence: the SAT tool's fixed order of chain visits, or the heuristic's
+    one-qubit gates (it chooses the order itself, so they are listed by qubit)."""
+    seq = sched.source.get("sequence")
+    if seq:
+        lines = ["// full register access: each element is one visit to the processing zone"] + \
+                [f"access {', '.join(el)};" for el in seq]
+        ops = [{"name": "access", "ions": tuple(el), "q": list(el), "line": k + 2}
+               for k, el in enumerate(seq)]
+        return "sequence", lines, ops, True
+    seen = {}
+    for e in sched.events:
+        if e.kind in ("gate", "gate1") and e.meta.get("gate") is not None:
+            seen.setdefault(e.meta["gate"], (e.meta.get("op", "gate"), list(e.meta.get("qubits", [])), tuple(e.ions)))
+    rows = sorted(seen.values(), key=lambda r: r[1])
+    lines = ["// the circuit's gates (the heuristic picks their order)"] + \
+            [f"{op} {', '.join(f'q[{q}]' for q in qs)};" for op, qs, _ in rows]
+    ops = [{"name": op, "ions": ions, "q": qs, "line": k + 2} for k, (op, qs, ions) in enumerate(rows)]
+    return "circuit", lines, ops, True
 
 
 def _ish_wanted(run: dict) -> bool:
@@ -1137,6 +1261,6 @@ def _ish_studio(p: dict, run: dict, tmp: Path, model):
     ours = run["id"].endswith("_ours")
     label = run["label"]
     m.render(prog, out, model=model, kicker=f"{'OURS' if ours else 'REPRODUCED'} · {p['short'].upper()}",
-             headline=label)
+             headline=label, source=_source(prog, _ish_circuit(run, s)))
     return f"reproduce/{p['key']}/{run['id']}.html", out.read_text(encoding="utf-8"), ""
 
