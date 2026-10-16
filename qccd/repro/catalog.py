@@ -577,6 +577,10 @@ OURS: dict[str, dict] = {
         "runs": [{"id": f"grid_rot_d{d}_c2_ours", "file": f"ours/grid_rot_d{d}_c2_ours.schedule.json.gz",
                   "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES",),
                   "label": f"rotated surface code d={d}, one round, grid, capacity 2"}
+                 for d in (2, 3, 6, 12)]
+                 + [{"id": f"grid_rot_d{d}_c2_wise", "file": f"ours/grid_rot_d{d}_c2_wise.schedule.json.gz",
+                    "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
+                    "label": f"rotated surface code d={d}, WISE broadcast control (one waveform per cycle)"}
                  for d in (2, 3, 6, 12)],
         "found": "The paper's own grid schedules fail the circuit check (each data qubit must see "
                  "its CNOTs in an order the circuit allows); ours pass it, with the same "
