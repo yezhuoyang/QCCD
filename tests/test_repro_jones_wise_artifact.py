@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from qccd.repro.importers import import_jones, stim_cx
+from qccd.repro import catalog
+from qccd.repro.__main__ import check_run
 from qccd.repro.models import JONES, jones_duration
 from qccd.repro.timed import Event, check
 
@@ -92,3 +94,12 @@ def test_global_move_excludes_every_held_trap_and_ion(tmp_path):
             assert rep.failed("declared_locks")
             assert rep.failed("trap_serial")
             assert rep.failed("ion_serial")
+
+
+@pytest.mark.parametrize("distance", [2, 3, 6])
+def test_wise_catalog_replay_has_exact_tool_comparison(distance):
+    paper = catalog.paper("jones2025")
+    run = next(r for r in paper["runs"] if r["id"] == f"wise_rot_d{distance}_c2")
+    row = check_run(paper, run)
+    assert row["compare"]["tool"]["last_start_us"]["verdict"] == "exact"
+    assert row["violations"] == {"circuit": 1}

@@ -879,6 +879,279 @@
     "circuit_file": "circuit.stim"
    },
    "seconds": 0.01
+  },
+  {
+   "id": "wise_rot_d2_c2",
+   "label": "rotated surface code d=2, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['8'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 14680.0,
+    "last_start_us": 14280.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 10,
+    "gate1": 40,
+    "reconfigure": 4,
+    "gate": 8,
+    "measure": 7
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 14280.0,
+      "theirs": 14280.000000000002,
+      "rel": 1.2738021033234288e-16,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 2 --capacity 2",
+    "config": {
+     "name": "wise_rot_d2_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 2,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 2
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 3,
+      "n": 3,
+      "k": 2
+     }
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.0
+  },
+  {
+   "id": "wise_rot_d3_c2",
+   "label": "rotated surface code d=3, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['16'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 20025.0,
+    "last_start_us": 19975.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 25,
+    "gate1": 112,
+    "reconfigure": 4,
+    "gate": 24,
+    "measure": 17
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 19975.0,
+      "theirs": 19974.999999999996,
+      "rel": 1.8212659860283924e-16,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 3 --capacity 2",
+    "config": {
+     "name": "wise_rot_d3_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 3,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 5,
+      "n": 5,
+      "k": 2
+     }
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.0
+  },
+  {
+   "id": "wise_rot_d6_c2",
+   "label": "rotated surface code d=6, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "passed",
+    "circuit": "failed"
+   },
+   "ok": false,
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "4 qubit(s) see their gates in an order the circuit does not allow (e.g. ['101', '70', '88', '98'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 30320.0,
+    "last_start_us": 30270.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 106,
+    "gate1": 552,
+    "reconfigure": 4,
+    "gate": 120,
+    "measure": 71
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 30270.0,
+      "theirs": 30270.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 6 --capacity 2",
+    "config": {
+     "name": "wise_rot_d6_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 6,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 6
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 9,
+      "n": 9,
+      "k": 2
+     }
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.01
   }
  ],
  "ratios": [],

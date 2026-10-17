@@ -238,6 +238,15 @@ PAPERS: list[dict] = [
                         "paper": {"last_start_us": [5325, "Table 2", "printed"]}},
              "label": "the same, with the code as of 2024 (junction entry and exit 100 µs each)",
              "no_studio": "the switch joins every pair of junctions by two parallel segments, an all-to-all junction network; our language describes surface traps, which cannot hold it, so it is replayed but not drawn"},
+        ] + [
+            {"id": f"wise_rot_d{d}_c2", "file": f"wise_rot_d{d}_c2.schedule.json.gz",
+             "importer": "jones", "profile": "JONES", "law": "jones",
+             "circuit": {"kind": "stim", "file": f"rotated_memory_z_d{d}_r1.stim"},
+             "expect": {"tool": {"last_start_us": [
+                 "metrics", "time for operations (us) = max(parallelOpsMap.keys())*1e6 [start of last step]"]}},
+             "label": f"rotated surface code d={d}, artifact WISE global reconfiguration, capacity 2",
+             "no_studio": "the artifact records WISE reconfiguration as one global permutation with a formula duration, without internal shuttle paths; replayed as a lumped state transition"}
+            for d in (2, 3, 6)
         ],
     },
     # -------------------------------------------------------------------- TISCC
