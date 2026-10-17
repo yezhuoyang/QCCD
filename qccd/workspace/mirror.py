@@ -242,7 +242,9 @@ _HIDE_SITE_AGENT = ("<style>#qa-btn,#qa-panel{display:none!important}"
                     "#qccd-chat{position:fixed;right:14px;bottom:14px;z-index:2147482000;width:min(420px,calc(100vw - 28px));"
                     "height:min(600px,calc(100vh - 70px));border-radius:14px;overflow:hidden;"
                     "box-shadow:0 14px 40px rgba(18,16,28,.22),0 0 0 1px rgba(18,16,28,.08);background:#fff}"
-                    "#qccd-chat.min{height:44px;width:260px}"
+                    # folded, the chat is the bar even when the person moved or sized it: their size
+                    # is inline on the box (mirror.js), and comes back when it unfolds
+                    "#qccd-chat.min{height:44px!important;width:260px!important}"
                     "#qccd-chat{transition:opacity .35s}#qccd-chat.qccd-yield{opacity:.14}#qccd-chat.qccd-yield:hover{opacity:1}"
                     "#qccd-chat iframe{display:block;width:100%;height:100%;border:0;background:#fff}"
                     "#qccd-mirror-studio{margin-left:10px;font-size:13px;padding:3px 10px;border:1px solid #bcd4f2;"

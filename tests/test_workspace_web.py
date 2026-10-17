@@ -540,6 +540,103 @@ def test_the_website_with_the_chat_in_chrome(tmp_path, site, monkeypatch):
 
 
 @needs_chrome
+def test_the_chat_folds_to_its_bar_wherever_the_person_put_it(tmp_path, site, monkeypatch):
+    """"-" folds the chat to its header bar, and "-" again gives back the size the person chose.
+    Once they had clicked or dragged its header, or sized it from the corner, that size sat inline
+    on the box and outranked the fold: "-" left a big blank box, on every page and after a reload
+    (reported on /agentic/, 2026-10-15).  The same in the Studio's own chat."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
+    monkeypatch.setenv("QCCD_SITE_URL", site.url)
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        base, web = f"http://127.0.0.1:{info['port']}", f"http://127.0.0.1:{info['web_port']}"
+        code = service_request(info, "POST", "/api/pair-code", {}, token="owner", timeout=60)["code"]
+        ready = {"frame": "/chatframe", "wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected"
+                                                " && !!document.getElementById('qcl-dock')", "timeout": 30000, "stopOnFail": True}
+        arrived = {"wait": "document.readyState === 'complete' && !!document.getElementById('qccd-chat')", "timeout": 30000}
+        reload = {"eval": "setTimeout(function(){ location.reload(); }, 10), 1"}
+        # [width, height, folded on the page, folded in the chat frame]: the frame answers in the next step
+        box = ("(function(){ var b = document.getElementById('qccd-chat'), r = b.getBoundingClientRect(); "
+               "return [Math.round(r.width), Math.round(r.height), b.classList.contains('min')]; })()")
+        inner = {"frame": "/chatframe", "eval": "document.getElementById('qcl-dock').classList.contains('qcl-min')"}
+        fold = {"frame": "/chatframe", "eval": "document.querySelector('#qcl-dock .qcl-head button[title=minimise]').click(), 1"}
+        head = ("(function(){ var r = document.getElementById('qccd-chat').getBoundingClientRect(), x = r.left + 6, y = r.top + 22; "
+                "return [['move', x, y], ['down', x, y], ['up', x, y]]; })()")
+        corner = ("(function(){ var r = document.getElementById('%s').getBoundingClientRect(), x = r.right - 7, y = r.bottom - 7, "
+                  "p = [['move', x, y], ['down', x, y]]; for (var i = 1; i <= 8; i++) p.push(['move', x - 5 * i, y - 15 * i]); "
+                  "return p.concat([['up', x - 40, y - 120]]); })()")
+        sbox = ("(function(){ var d = document.getElementById('qcl-dock'), r = d.getBoundingClientRect(); "
+                "return [Math.round(r.width), Math.round(r.height), d.classList.contains('qcl-min')]; })()")
+        sfold = {"page": "s", "eval": "document.querySelector('#qcl-dock .qcl-head button[title=minimise]').click(), 1"}
+        steps, at = [], {}
+
+        def add(*ss, name=None):                     # `name` records the group's measurement
+            if name:
+                at[name] = len(steps) + [s.get("eval") for s in ss].index(sbox if name.startswith("studio") else box)
+            steps.extend(ss)
+        add({"wait": f"location.origin === '{web}' && !!document.getElementById('qccd-chat')", "timeout": 30000,
+             "stopOnFail": True}, ready)
+        add({"eval": box}, inner, name="open")
+        # one click on the header keeps the chat's rect, and after a reload that size is inline on the box
+        add({"mouse": head}, {"sleep": 400}, reload, {"sleep": 1500}, arrived, ready)
+        add({"eval": box}, inner, name="kept")
+        add(fold, {"sleep": 400}, {"eval": box}, inner, name="folded")
+        add(reload, {"sleep": 1500}, arrived, ready, {"eval": box}, inner, name="folded, reloaded")
+        add(fold, {"sleep": 400}, {"eval": box}, inner, name="unfolded")
+        add({"mouse": corner % "qccd-chat"}, {"sleep": 400}, {"eval": box}, inner, name="sized")
+        add(fold, {"sleep": 400}, {"eval": box}, inner, name="sized, folded")
+        add({"mouse": head.replace("['up', x, y]", "['move', x - 60, y + 30], ['up', x - 60, y + 30]")}, {"sleep": 400},
+            reload, {"sleep": 1500}, arrived, ready, {"eval": box}, inner, name="bar moved, reloaded")
+        add(fold, {"sleep": 400}, {"eval": box}, inner, name="sized, unfolded")
+        # the Studio's own chat (not a frame): sized, folded, reloaded, unfolded
+        add({"open": "s", "url": base + "/studio"}, {"page": "s", "wait": "!!document.querySelector('#qcl-dock .qcl-head')",
+                                                     "timeout": 90000, "stopOnFail": True}, {"sleep": 800})
+        add({"page": "s", "mouse": corner % "qcl-dock"}, {"sleep": 400}, {"page": "s", "eval": sbox}, name="studio sized")
+        add(sfold, {"sleep": 400}, {"page": "s", "eval": sbox}, name="studio folded")
+        add({"page": "s", "eval": "setTimeout(function(){ location.reload(); }, 10), 1"}, {"sleep": 2000},
+            {"page": "s", "wait": "!!document.querySelector('#qcl-dock .qcl-head')", "timeout": 90000}, {"sleep": 800},
+            {"page": "s", "eval": sbox}, name="studio folded, reloaded")
+        add(sfold, {"sleep": 400}, {"page": "s", "eval": sbox}, name="studio unfolded")
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/open-web#pair={code}&to=/web/rules/"}, "steps": steps}),
+                        encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        page = lambda k: not k.startswith("studio")          # a website page: the frame's answer follows
+        got = {k: st[i]["value"] + ([st[i + 1].get("value")] if page(k) else [])
+               for k, i in at.items() if i + page(k) < len(st) and isinstance(st[i].get("value"), list)}
+        diag = json.dumps({"got": got, "steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:6000]
+        assert len(st) == len(steps) and len(got) == len(at), diag
+        w0, h0, f0, i0 = got["open"]
+        assert h0 > 200 and not f0 and not i0, diag
+        assert got["kept"] == [w0, h0, False, False], diag                       # the rect came back, inline
+        for k in ("folded", "folded, reloaded", "sized, folded", "bar moved, reloaded"):
+            w, h, f, i = got[k]
+            assert f and i and h < 60 and w < w0, (k, diag)                      # the bar, not a blank box
+        assert got["unfolded"] == [w0, h0, False, False], diag                   # and back to its size
+        w1, h1, f1, i1 = got["sized"]
+        assert (w1, h1) != (w0, h0) and h1 > 200 and not f1 and not i1, diag
+        assert got["sized, unfolded"] == [w1, h1, False, False], diag           # moving the bar kept the size
+        sw, sh, sf = got["studio sized"]
+        assert sh > 200 and not sf, diag
+        for k in ("studio folded", "studio folded, reloaded"):
+            assert got[k][2] and got[k][1] < 60, (k, diag)
+        assert got["studio unfolded"] == [sw, sh, False], diag
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
+@needs_chrome
 def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
     from qccd.workspace.runtime import ensure_service, service_request
     monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))

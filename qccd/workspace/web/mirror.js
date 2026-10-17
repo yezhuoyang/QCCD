@@ -38,8 +38,10 @@ try {
   var saved = JSON.parse(get(RECT_KEY) || 'null');
   if (saved && saved.x >= 0 && saved.y >= 0 && saved.x < innerWidth - 80 && saved.y < innerHeight - 40) {
     box.style.left = saved.x + 'px'; box.style.top = saved.y + 'px'; box.style.right = 'auto'; box.style.bottom = 'auto';
-    if (saved.w) box.style.width = saved.w + 'px';
-    if (saved.h && box.className !== 'min') box.style.height = saved.h + 'px';
+    // less than the corner allows (300 x 220) is the folded bar's own size, which older code saved
+    // when the bar was dragged: not a size the person chose.  Folded, the page's CSS keeps it the bar.
+    if (saved.w >= 300) box.style.width = saved.w + 'px';
+    if (saved.h >= 220) box.style.height = saved.h + 'px';
   }
 } catch (e) { /* none */ }
 document.body.appendChild(box);
@@ -83,12 +85,15 @@ window.addEventListener('message', function (e) {
       box.style.height = Math.max(220, r.height + (+m.dh || 0)) + 'px';
     }
   } else if (m.qccd === 'moved') {
-    var q = box.getBoundingClientRect();
-    set(RECT_KEY, JSON.stringify({ x: Math.round(q.left), y: Math.round(q.top), w: Math.round(q.width), h: Math.round(q.height) }));
+    // folded, the box is only the bar: keep the size the person gave the open chat, not the bar's
+    var q = box.getBoundingClientRect(), folded = box.classList.contains('min');
+    set(RECT_KEY, JSON.stringify({ x: Math.round(q.left), y: Math.round(q.top),
+                                   w: folded ? Math.round(parseFloat(box.style.width)) || 0 : Math.round(q.width),
+                                   h: folded ? Math.round(parseFloat(box.style.height)) || 0 : Math.round(q.height) }));
   } else if (m.qccd === 'home') {
     box.style.cssText = ''; set(RECT_KEY, '');
   } else if (m.qccd === 'size') {
-    box.className = m.min ? 'min' : '';
+    box.classList.toggle('min', !!m.min);
     set(MIN_KEY, m.min ? '1' : '0');
   }
 });

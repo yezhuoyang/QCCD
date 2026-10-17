@@ -58,7 +58,8 @@
 
 /* ---- the chat (default view): one conversation, one box ---- */
 #qcl-dock.qcl-chat{width:400px;height:min(620px,78vh);max-height:78vh;font:13.5px/1.45 system-ui,Segoe UI,sans-serif}
-#qcl-dock.qcl-chat.qcl-min{height:auto}
+/* folded, it is the header alone, even after the person sized it (that size is inline on the dock) */
+#qcl-dock.qcl-chat.qcl-min{height:auto!important}
 #qcl-dock.qcl-chat.qcl-min .qcl-conv,#qcl-dock.qcl-chat.qcl-min .qcl-composer,#qcl-dock.qcl-chat.qcl-min .qcl-subline{display:none}
 .qcl-chat .qcl-head{background:var(--panel,#fff);gap:7px;padding:8px 10px}
 .qcl-chat .qcl-head b{font-size:13.5px;letter-spacing:0}
@@ -148,7 +149,7 @@
   font:11.5px/1.4 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;flex:1 1 auto;min-height:60px}
 /* the chat as a frame inside a website page (mirror.py): it IS the frame */
 .qcl-framed #qcl-dock,.qcl-framed #qcl-dock.qcl-chat{position:static;width:100%;height:100vh;max-height:none;border:0;border-radius:0;box-shadow:none}
-.qcl-framed #qcl-dock.qcl-chat.qcl-min{height:100vh}
+.qcl-framed #qcl-dock.qcl-chat.qcl-min{height:100vh!important}
 .qcl-framed #qcl-dock.qcl-chat.qcl-min .qcl-head{height:100vh;box-sizing:border-box}
 .qcl-framed #qcl-notice{top:auto;bottom:70px;left:8px;right:8px;transform:none}
 .qcl-framed #qcl-notice .qcl-toast{max-width:none}

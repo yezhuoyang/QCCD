@@ -31,7 +31,18 @@ __all__ = ["CASES", "case_machine", "judge", "verdicts", "cases_for_page", "meas
 ROOT = Path(__file__).resolve().parents[2]
 ARCH_DIR = ROOT / "arch"
 MATRIX = ROOT / "Compiler" / "build" / "matrix"
+#: The same artifacts, shipped.  `Compiler/build/` is not in the repository, so a clone had
+#: no Part D table and `qccd tutorial` skipped the companion page (Yuewen, 2026-10-15).  The
+#: copies differ from the build's only in `meta.prov.root`, blanked: it was this machine's path.
+SHIPPED = ROOT / "Compiler" / "examples" / "micro"
 MICRO_QASM = ROOT / "Compiler" / "examples" / "micro.qasm"
+
+
+def matrix_file(name: str) -> Path:
+    """A compiled `micro.qasm` artifact: the compiler's build directory when it has one (a
+    fresh matrix run), else the copy the repository ships, which may not exist either."""
+    built = MATRIX / name
+    return built if built.exists() else SHIPPED / name
 
 #: The nine shipped architectures Part D compares, in the order the table shows them.
 ARCHES = ("chain", "stationary_chain", "h2_racetrack", "cyclone_base", "cyclone_dual_loop",
@@ -192,7 +203,7 @@ def measured(model: CostModel) -> dict:
                         "traps": hw.n_traps, "budget_dacs": (hw.budget or {}).get("max_dacs")}
         for kind, name in (("raw", f"micro_{stem}.tsir.json"),
                            ("cooled", f"micro_{stem}.cooled.tsir.json")):
-            tp = MATRIX / name
+            tp = matrix_file(name)
             if not tp.exists():
                 continue
             prog = TSIR.load(tp)

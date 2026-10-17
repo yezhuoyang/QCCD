@@ -1574,7 +1574,7 @@ function buildChat() {
       ])
     ])
   ]);
-  if (min && CFG.framed) toParent({ qccd: 'size', min: true });
+  if (CFG.framed) toParent({ qccd: 'size', min: min });   // the page remembers its own, which may differ
   dock.appendChild(h('div', { cls: 'qcl-grip', title: 'drag to resize' }));
   document.body.appendChild(dock);
   movable(dock);
@@ -1590,8 +1590,9 @@ function movable(dock) {
   }
   function place(r) {
     dock.style.left = r.x + 'px'; dock.style.top = r.y + 'px'; dock.style.right = 'auto'; dock.style.bottom = 'auto';
-    if (r.w) dock.style.width = r.w + 'px';
-    if (r.h) { dock.style.height = r.h + 'px'; dock.style.maxHeight = 'none'; }
+    // less than the corner allows (300 x 220) is a folded header's size, which older code saved: not the person's
+    if (r.w >= 300) dock.style.width = r.w + 'px';
+    if (r.h >= 220) { dock.style.height = r.h + 'px'; dock.style.maxHeight = 'none'; }
   }
   function drag(el, onDelta) {
     el.addEventListener('pointerdown', function (e) {
@@ -1606,8 +1607,11 @@ function movable(dock) {
     });
   }
   function save() {
-    var r = dock.getBoundingClientRect();
-    localSet('qccd.dock.rect', J({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }));
+    // folded, the dock is only its header: keep the size the person gave the open chat
+    var r = dock.getBoundingClientRect(), folded = dock.classList.contains('qcl-min');
+    localSet('qccd.dock.rect', J({ x: Math.round(r.left), y: Math.round(r.top),
+                                   w: folded ? Math.round(parseFloat(dock.style.width)) || 0 : Math.round(r.width),
+                                   h: folded ? Math.round(parseFloat(dock.style.height)) || 0 : Math.round(r.height) }));
   }
   drag(head, function (dx, dy) {
     if (CFG.framed) { toParent({ qccd: 'move', dx: dx, dy: dy }); return; }

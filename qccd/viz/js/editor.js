@@ -4501,6 +4501,8 @@ var HINTS = {
   'zone:new':      { t: 'New zone type', d: 'Declare another kind of site \u2014 a different capacity, or different things allowed in it.' },
   'el:curve_point': { t: 'Curve point', d: 'One measured way of running an operation: its duration in microseconds and the heat it adds to the ion in quanta. Faster runs heat more, so each curve has several rows; the price of every move is read off these curves.', k: 'adds a row to a named curve' },
   'el:primitives': { t: 'Primitives', d: 'The physics of the machine: how long a shuttle, a split, a merge, a crossing or a gate takes, and how much each heats the ion. Every price on this page comes from here.', k: 'edit in place' },
+  'prim:field': { t: 'Primitive field', d: 'One value this device declares for an operation, as its file writes it: a duration, a fidelity, a heat budget. Change it and press apply, and the page writes set_primitive(name, field=value) and prices again. A field nothing reads (a source, a note) is listed as plain text instead.' },
+  'prim:curve': { t: 'Edit this curve', d: 'Opens the operation’s curve: every measured way of running it (its duration and the heat it adds), which one the model prices, and a row to add another.' },
   'el:control':    { t: 'Control plane', d: 'The wiring: how many voltage sources (DACs) drive how many electrodes, and how many different motions can happen in one step. This is what the DAC count measures.', k: 'edit in place' },
   'el:heating':    { t: 'Heating', d: 'How fast an ion warms up just by waiting, in quanta per millisecond. A hot ion makes a bad gate, so time itself has a price.', k: 'edit in place' },
   'el:species':    { t: 'Species', d: 'Which ion carries the qubit, which one is used for cooling, and how long the qubit stays coherent.', k: 'edit in place' },
@@ -4649,8 +4651,9 @@ var RULE_HINTS = {
   R23: 'A junction is crossed, not rested on: no ion ends a step where three or more rails meet while the traps off the junctions have room. A loop the programme rotates is a conveyor, and its slots do not count.'
 };
 
-// The entry a key names, resolved: `el:cmp:*` is a component, `rule:*` reads the rule
-// table, and a key with no entry is no hint (never a blank card).
+// The entry a key names, resolved: `el:cmp:*` is a component, `el:zone_type:*` one zone
+// type of this device, `rule:*` reads the rule table, and a key with no entry is no hint
+// (never a blank card).
 function hintFor(key) {
   key = String(key || '');
   if (!key) return null;
@@ -4658,6 +4661,7 @@ function hintFor(key) {
     var cn = key.slice(7), spec = componentSpec(cn), base = HINTS['el:component'];
     return { t: cn.replace(/_/g, ' '), d: (spec && spec.blurb ? spec.blurb + ' ' : '') + base.d, k: base.k };
   }
+  if (key.slice(0, 13) === 'el:zone_type:') return zoneHint(key.slice(13));
   if (key.slice(0, 5) === 'rule:') {
     var r = key.slice(5);
     return RULE_HINTS[r] ? { t: 'Rule ' + r, d: RULE_HINTS[r] } : null;
@@ -4668,6 +4672,30 @@ function hintFor(key) {
     return { t: e.t, d: e.d, k: e.k, more: doc && doc.blurb && doc.blurb !== e.d ? doc.blurb : '' };
   }
   return HINTS[key] || null;
+}
+// ONE ZONE TYPE, in its own words.  Every chip in the zone strip used to carry the same
+// `el:zone_type` card, so pointing at `load` after `data` repeated what a zone type is and
+// said nothing about `load` (reader thread T35, 2026-10-15).  The card is read off the
+// device's own record -- its capacity, the three capabilities R6 checks, the
+// photoionization flag the consumer table says nothing reads, its note -- and how many
+// sites carry it right now; no sentence here is about a zone the device does not declare.
+var ZONE_CAPS = [['gate', 'gates'], ['spam', 'measurement and reset'], ['cool', 'cooling']];
+function zoneHint(z) {
+  var r = (A.zone_types || {})[z], base = HINTS['el:zone_type'], can = [], cannot = [], i;
+  if (!r) return null;
+  var cap = +Q.unbox(r.capacity) || 1, used = 0, nodes = A.nodes || [];
+  for (i = 0; i < ZONE_CAPS.length; i++) (Q.unbox(r[ZONE_CAPS[i][0]]) ? can : cannot).push(ZONE_CAPS[i][1]);
+  for (i = 0; i < nodes.length; i++) if (nodes[i].zone === z) used++;
+  var d = 'A site in this zone holds up to ' + cap + ' ion' + (cap === 1 ? '' : 's') + '. ' +
+    (can.length ? 'Allowed here: ' + can.join(', ') + '. ' : '') +
+    (cannot.length ? 'Not allowed here: ' + cannot.join(', ') + ' (rule R6 refuses them). ' : '') +
+    (Q.unbox(r.photoionization) ? 'Marked as a loading zone, where new ions are made ' +
+      '(photoionization); no rule and no price reads that flag. ' : '') +
+    (r.note ? 'Note: ' + String(Q.unbox(r.note)) + '. ' : '') +
+    (used ? used + ' site' + (used === 1 ? '' : 's') + ' on this device ' +
+            (used === 1 ? 'uses' : 'use') + ' it.' : 'No site on this device uses it yet.') +
+    (postSeedZones()[z] ? ' Declared after the machine was sealed, so a site placed now cannot use it.' : '');
+  return { t: 'Zone type · ' + z, d: d, k: base.k };
 }
 // The element a hover or a focus belongs to: the nearest ancestor carrying `data-hint`,
 // or the stage itself, which draws its own hint from the hit and must not be hidden by
@@ -8277,7 +8305,7 @@ function zoneStrip() {
     var z = names[i];
     var b = elh('button', 'zonechip');
     b.setAttribute('data-zone', z);
-    b.setAttribute('data-hint', 'el:zone_type');
+    b.setAttribute('data-hint', 'el:zone_type:' + z);       // this zone's own card
     b.setAttribute('aria-pressed', NEW_ZONE === z ? 'true' : 'false');
     if (after[z]) {
       // declared after the seal: real, exportable, and unusable by a new site
@@ -9605,6 +9633,7 @@ function renderForm(host) {
   var why = elh('div', 'mut'); why.textContent = doc.blurb; host.append(why);
   if (t === 'zone_type') return zoneForm(host, e);
   if (t === 'curve_point') return curveForm(host, e);
+  if (t === 'primitives') return primitivesForm(host, e);
   return blockForm(host, e);
 }
 
@@ -9855,6 +9884,148 @@ function blockForm(host, e) {
     ' per-instance field(s) live on the record they belong to') : '') +
     ' · export and edit the file to remove a field.';
   host.append(note);
+}
+
+// THE PRIMITIVES, one record per operation the device declares.  They used to go through
+// `blockForm`, which drew an apply button over nothing on every device (reader threads T40
+// and T41, 2026-10-15): it builds its rows from the consumer table, every `primitives.*`
+// path there names ONE INSTANCE -- `primitives.<name>.us`, `primitives.<curve>.points[].us`
+// -- and it skips those, so all 18 went and only the note counted them.  So the rows come
+// from the device itself.  `STATE.primitives` is `{curves, degree_curves, scalars}`
+// (engine.js) and one name can sit in two of them; the names are taken in the order the
+// exported file writes them.  A curve shows the operating point the page's own policy
+// picks from it (`Q.pickPoint`, the function the model prices with) and opens in the curve
+// form, which already edits it; a scalar is a field edited in place through
+// `set_primitive(name, field=value)`,
+// or a line of text when the consumer table says nothing reads it.
+function primitiveNames() {
+  var p = (STATE && STATE.primitives) || {}, out = [], g, k, m;
+  var groups = ['curves', 'degree_curves', 'scalars'];
+  for (g = 0; g < groups.length; g++) {
+    m = p[groups[g]] || {};
+    for (k in m) if (has(m, k) && out.indexOf(k) < 0) out.push(k);
+  }
+  return out;
+}
+function curveLine(points, policy) {
+  var best = null;
+  try { best = Q.pickPoint(points, policy); } catch (err) { best = null; }
+  return points.length + ' point' + (points.length === 1 ? '' : 's') +
+    (best ? ' · operating point ' + num3(best.us) + ' us, ' + num3(best.quanta) + ' quanta' : '');
+}
+function primitivesForm(host, e) {
+  var p = (STATE && STATE.primitives) || {}, names = primitiveNames(), rows = [], i, j, f;
+  var ph = (typeof PH !== 'undefined' && PH) || {};
+  var policy = ph.policy || { table: 'qccdsim_jones', objective: 'fastest' };
+  var minDeg = ph.junction_min_degree || 3;
+  // what the consumer table knows about a field, by its name under `primitives.<name>.`
+  var known = {};
+  for (i = 0; i < e.fields.length; i++) {
+    var fp = e.fields[i].name.split('.');
+    if (fp.length === 3 && fp[1] === '<name>') known[fp[2]] = e.fields[i];
+  }
+  var intro = elh('div', 'mut');
+  intro.textContent = names.length
+    ? names.length + ' primitive' + (names.length === 1 ? '' : 's') + ' declared by this ' +
+      'device. A curve is a list of measured operating points, and the policy picks the ' +
+      'one a price is read from; a field is a single value.'
+    : 'This device declares no primitives, so nothing on it can be priced. A template or ' +
+      'a shipped device from Start carries a full set.';
+  host.append(intro);
+  var list = elh('div', 'rowlist');
+  // the Selection panel is sticky at the foot of the rail, so a list taller than the rail
+  // would push its own top out of reach; it scrolls inside the panel instead
+  if (list.style) list.style.maxHeight = '50vh';
+  function line(text) { var d = elh('div', 'sub'); d.textContent = text; return d; }
+  for (i = 0; i < names.length; i++) {
+    var nm = names[i], cv = (p.curves || {})[nm], dc = (p.degree_curves || {})[nm];
+    var sc = (p.scalars || {})[nm] || {};
+    var head = elh('div', 'fieldrow');
+    head.setAttribute('data-prim', nm);
+    if (head.style) head.style.marginTop = '7px';
+    var hb = elh('b'); hb.textContent = nm; head.append(hb);
+    if (hb.style) hb.style.flex = '1 1 auto';
+    if (cv) {
+      var ed = btn('pfCurve' + i, 'edit curve');
+      ed.setAttribute('data-hint', 'prim:curve');
+      (function (name) {
+        ed.addEventListener('click', function () { openForm('curve_point', { curve: name }); });
+      })(nm);
+      head.append(ed);
+    }
+    list.append(head);
+    if (cv) list.append(line(curveLine(cv, policy)));
+    if (dc) {
+      var degs = Object.keys(dc).map(Number).sort(function (a, b) { return a - b; });
+      for (j = 0; j < degs.length; j++) {
+        var pts = dc[degs[j]] || [];
+        list.append(line('degree ' + degs[j] + ': ' + (degs[j] < minDeg
+          ? pts.length + ' point' + (pts.length === 1 ? '' : 's') + ' · not priced, the ' +
+            'model charges a junction from degree ' + minDeg
+          : curveLine(pts, policy))));
+      }
+    }
+    for (f in sc) if (has(sc, f)) {
+      var v = Q.unbox(sc[f]), meta = known[f] || null;
+      // a field nothing reads, or a list or a map, is part of the record and not a
+      // control: drawn as an input it would look like a setting that moves a number
+      if ((meta && meta.inert) || (v !== null && typeof v === 'object')) {
+        var s = (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+        var ln = line(f + ': ' + (s.length > 64 ? s.slice(0, 63) + '…' : s) +
+                      ((meta && meta.inert) ? ' · nothing reads this' : ''));
+        if (s.length > 64) ln.setAttribute('title', s);
+        list.append(ln);
+        continue;
+      }
+      var ctrl = textInput('pf_' + rows.length, v);
+      ctrl.setAttribute('data-hint', 'prim:field');
+      list.append(fieldRow(f, ctrl));
+      rows.push({ name: nm, field: f, was: v,
+                  type: meta ? meta.type : (typeof v === 'boolean' ? 'boolean'
+                                            : typeof v === 'number' ? 'number' : 'string') });
+    }
+  }
+  host.append(list);
+  var bar = elh('div', 'formbtns');
+  var save = btn('pfSave', 'apply', true);
+  save.addEventListener('click', function () { primitivesApply(rows); });
+  bar.append(save);
+  var close = btn('pfClose', 'close');
+  close.addEventListener('click', function () { FORM = null; paint(); });
+  bar.append(close);
+  host.append(bar);
+  var note = elh('div', 'mut');
+  note.textContent = 'set, never unset · a curve is edited in its own form · export and ' +
+    'edit the file to remove a field.';
+  host.append(note);
+}
+// THE FORM'S VERB, as a function (see `curveAddPoint`): one `set_primitive` per primitive
+// that has a changed field, carrying only the changed fields -- `set_primitive` merges, so
+// writing an unchanged value back would be the user asserting it.
+function primitivesApply(rows) {
+  var by = {}, order = [], n = 0, i, res = null;
+  for (i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var raw = val('pf_' + i), was = (r.was === undefined || r.was === null) ? '' : String(r.was);
+    if (raw === '' || raw === was) continue;
+    if ((r.type === 'number' || r.type === 'integer') && !isFinite(Number(raw))) {
+      toast('bad', r.name + '.' + r.field + ': ' + Q.pyRepr(raw) + ' is not a number');
+      return { ok: false, problems: [{ code: 'not_a_number',
+        message: r.name + '.' + r.field + ' is not a number' }] };
+    }
+    if (!by[r.name]) { by[r.name] = { __name__: r.name }; order.push(r.name); }
+    by[r.name][r.field] = coerce(raw, { type: r.type });
+    n++;
+  }
+  if (!n) { toast('warn', 'nothing changed'); return { ok: false, problems: [] }; }
+  for (i = 0; i < order.length; i++) {
+    res = applyBlock('primitives', by[order[i]]);
+    if (!res.ok) break;
+  }
+  toast(res.ok ? 'ok' : 'bad', res.ok ? ('set_primitive: ' + n + ' field(s)')
+                                  : ((res.problems[0] || {}).message || 'refused'));
+  paint();
+  return res;
 }
 
 // The selection inspector: every field the schema admits for the selected object, with the

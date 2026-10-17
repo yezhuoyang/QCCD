@@ -393,13 +393,17 @@ def cmd_tutorial(args) -> int:
                   qasm=None, cert=None, k="", model=args.model, table=args.table,
                   all_templates=True, max_frames=args.max_frames, open_pane="L")
     cmd_studio(argparse.Namespace(out=str(out / "studio.html"), **common))
-    tsir = ROOT / "Compiler" / "build" / "matrix" / "micro_grid9x9.cooled.tsir.json"
-    qasm = ROOT / "Compiler" / "examples" / "micro.qasm"
+    # the compiled programme ships with the repository (`Compiler/examples/micro/`); a newer
+    # one from the compiler's own build directory wins when there is one
+    from qccd.viz.course import MICRO_QASM, matrix_file
+    tsir, qasm = matrix_file("micro_grid9x9.cooled.tsir.json"), MICRO_QASM
     if tsir.exists() and qasm.exists():
         cmd_studio(argparse.Namespace(**{**common, "out": str(out / "micro_grid9x9.html"),
                                          "tsir": str(tsir), "qasm": str(qasm)}))
     else:
-        print(f"  companion page skipped: {tsir if not tsir.exists() else qasm} is missing")
+        missing = (tsir if not tsir.exists() else qasm).relative_to(ROOT).as_posix()
+        print(f"  companion page skipped: {missing} is missing from this copy of the "
+              f"repository; the same page is at https://qccd.academy/micro_grid9x9.html")
     return 0
 
 

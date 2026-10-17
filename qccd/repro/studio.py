@@ -15,14 +15,16 @@ rules -- is `qccd.repro.timed.check`; the page says both, and which is which.
 
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Any
+import dataclasses
+from collections import Counter, defaultdict
+from typing import Any, Mapping
 
 from ..ir.tsir import TSIR, Instruction, Participant
 from .devices import TABLES, to_arch_doc
 from .timed import Event, TimedSchedule
 
-__all__ = ["node_id", "studio_arch_doc", "to_tsir", "source_payload"]
+__all__ = ["node_id", "studio_arch_doc", "renamed", "named_after_qubits", "gate_label", "to_tsir",
+           "pulse_join", "source_payload"]
 
 
 def node_id(n: str) -> str:
@@ -62,6 +64,39 @@ def studio_arch_doc(sched: TimedSchedule, positions, *, name: str, table: str,
                                "note": "one ion from one trap to another, as the paper moves it"}]},
     }
     return doc
+
+
+def renamed(sched: TimedSchedule, names: Mapping[str, str]) -> TimedSchedule:
+    """`sched` with its ions renamed (`names`: old name -> new; an ion not in it keeps its
+    name) -- in its chains, its events, the partner of a folded reorder and `qubits`; an
+    event's `meta` quotes the artifact and keeps its names.  For drawing: the renaming must
+    keep the ions apart, and two ions under one name is refused."""
+    ions = {i for c in sched.chains.values() for i in c}
+    new = [names.get(i, i) for i in ions]
+    if len(set(new)) != len(new):
+        raise ValueError("renaming would give two ions one name")
+    n = lambda i: names.get(str(i), str(i))
+
+    def swap(sw):
+        if not sw or sw.get("with") is None:
+            return sw
+        return {**sw, "with": n(sw["with"])}
+
+    return dataclasses.replace(
+        sched, chains={s: [n(i) for i in c] for s, c in sched.chains.items()},
+        events=[dataclasses.replace(e, ions=tuple(n(i) for i in e.ions), swap=swap(e.swap))
+                for e in sched.events],
+        qubits={q: n(i) for q, i in sched.qubits.items()})
+
+
+def named_after_qubits(sched: TimedSchedule) -> TimedSchedule:
+    """`sched` with every ion that holds a program qubit named as the circuit names that qubit
+    (a `qubits` key that is a number: a stim or QASM index), where the artifact numbers its
+    ions otherwise -- Jones's ion 42 holds stim qubit 12 -- so that the animation, the
+    programme and the circuit pane say the same names, as a leaderboard page does.
+    Unchanged where they already agree."""
+    names = {ion: q for q, ion in (sched.qubits or {}).items() if q.isdigit() and ion != q}
+    return renamed(sched, names) if names else sched
 
 
 def _shuttles(sched: TimedSchedule) -> tuple[list[dict], list[Event]]:
@@ -109,8 +144,30 @@ def _shuttles(sched: TimedSchedule) -> tuple[list[dict], list[Event]]:
     return moves, rest
 
 
+def gate_label(sched: TimedSchedule, ops: list[dict]) -> str:
+    """What the replayed programme calls its two-qubit gates, decided from the schedule.
+
+    "CX" where the paper's tool runs each circuit CNOT as one whole gate: the circuit's
+    two-qubit statements are all CNOTs, the schedule has one two-qubit gate per statement,
+    and no one-ion pulse besides the circuit's own one-qubit gates -- nothing dresses an MS
+    into a CNOT, and the law prices the CNOT as one gate (Cyclone, the QCCDSim family,
+    TrapSIMD's model).  "MS", the trap's native entangling gate, where it schedules native
+    pulses (Jones's RY, RX around each MS; TISCC's ZZ and its rotations) or there is no CNOT.
+    Our language prices a CX as one `ms_gate`, so the name changes nothing but the name.
+    `ops` as `source_payload` takes them.
+    """
+    two = [o for o in ops if len(o["ions"]) == 2]
+    one = [o for o in ops if len(o["ions"]) == 1 and o.get("kind", "gate") == "gate"]
+    gates = sum(1 for e in sched.events if e.kind == "gate")
+    pulses = sum(1 for e in sched.events if e.kind in ("gate1", "prepare") and e.ions)
+    whole = (two and all(o["name"] in ("cx", "cnot") for o in two)
+             and gates == len(two) and pulses == len(one))
+    return "CX" if whole else "MS"
+
+
 def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> TSIR:
-    """`sched` as a Studio program, operations batched by start time (see the module doc)."""
+    """`sched` as a Studio program, operations batched by start time (see the module doc);
+    `gate` names its two-qubit gates (`gate_label`)."""
     moves, rest = _shuttles(sched)
     ops: list[tuple[float, int, str, Any]] = []
     for k, m in enumerate(moves):
@@ -209,8 +266,99 @@ def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> 
     return prog
 
 
+def pulse_join(sched: TimedSchedule, ops: list[dict],
+               native: Mapping[str, tuple]) -> dict[str, dict[str, list[int | None]]]:
+    """Which circuit statement each one-ion operation of `sched` belongs to, for an artifact
+    that turns statements into native operations (Jones's H is an RY then an RX).
+
+    `native` maps a statement name to its native operations on each of its qubits, one tuple
+    per qubit in the statement's order, in time order: ``("op", name)`` a one-ion pulse, named
+    as the schedule's ``meta["op"]`` names it; ``("gate",)`` the statement's two-qubit gate;
+    ``("measure",)``, ``("reset",)``.  `ops` as `source_payload` takes them; a statement
+    `native` does not know is a wall nothing is joined across.
+
+    The join is made only where it cannot be wrong.  Per ion, the circuit's decomposition and
+    the schedule are both cut at their anchors -- the k-th two-qubit gate with a given partner,
+    the k-th measurement, the k-th reset (and, in the schedule, any gate swap) -- and the
+    pulses in a gap are joined, in order, only when the schedule has the same gap, between
+    the same two anchors, holding the same sequence of pulses.  Where a schedule reorders an
+    ion's gates, the pulses around them are left unjoined: which statement they serve would
+    be a guess.
+
+    Returns ion -> {"gate1" | "measure" | "reset": [the statement of the k-th such operation on
+    that ion, or None]}, k counted in time order -- the order the programme plays them in.
+    """
+    want: dict[str, list[tuple]] = defaultdict(list)
+    for i, o in enumerate(ops):
+        ions = [str(x) for x in o["ions"]]
+        rule = native.get(o["name"])
+        for k, ion in enumerate(ions):
+            if rule is None or k >= len(rule):
+                want[ion].append(("?", i, i))
+                continue
+            for step in rule[k]:
+                if step[0] == "op":
+                    want[ion].append(("gate1", step[1], i))
+                elif step[0] == "gate":
+                    want[ion].append(("gate", tuple(x for x in ions if x != ion), i))
+                else:
+                    want[ion].append((step[0], None, i))
+    have: dict[str, list[tuple]] = defaultdict(list)
+    for e in sorted(sched.events, key=lambda e: (e.t0, e.id)):
+        if e.kind in ("gate1", "prepare"):
+            if e.ions:                      # `to_tsir` plays a one-ion operation on its first ion
+                have[e.ions[0]].append(("gate1", e.meta.get("op"), None))
+        elif e.kind in ("gate", "swap"):
+            for ion in e.ions:
+                have[ion].append((e.kind, tuple(x for x in e.ions if x != ion), None))
+        elif e.kind in ("measure", "reset"):
+            for ion in e.ions:
+                have[ion].append((e.kind, None, None))
+
+    def cut(seq: list[tuple]) -> tuple[dict, dict]:
+        """{(left anchor, right anchor): [positions of the pulses between]}, {anchor: position}"""
+        gaps: dict[tuple, list[int]] = {}
+        anchors: dict[tuple, int] = {}
+        left: tuple = ("start",)
+        run: list[int] = []
+        seen: Counter = Counter()
+        for n, (kind, detail, _) in enumerate(seq):
+            if kind == "gate1":
+                run.append(n)
+                continue
+            key = (kind, detail, seen[kind, detail])
+            seen[kind, detail] += 1
+            gaps[left, key] = run
+            anchors[key] = n
+            left, run = key, []
+        gaps[left, ("end",)] = run
+        return gaps, anchors
+
+    out: dict[str, dict[str, list[int | None]]] = {}
+    for ion, h in have.items():
+        w = want.get(ion, [])
+        wgaps, wanchors = cut(w)
+        hgaps, hanchors = cut(h)
+        stmt: list[int | None] = [None] * len(h)
+        for gap, pos in hgaps.items():
+            ref = wgaps.get(gap)
+            if ref is not None and [w[m][1] for m in ref] == [h[n][1] for n in pos]:
+                for n, m in zip(pos, ref):
+                    stmt[n] = w[m][2]
+        for key, n in hanchors.items():
+            if key in wanchors:
+                stmt[n] = w[wanchors[key]][2]
+        per: dict[str, list[int | None]] = {"gate1": [], "measure": [], "reset": []}
+        for (kind, _, _), s in zip(h, stmt):
+            if kind in per:
+                per[kind].append(s)
+        out[ion] = per
+    return out
+
+
 def source_payload(prog: TSIR, name: str, lines: list[str], ops: list[dict], *,
-                   join_1q: bool = False) -> dict:
+                   join_1q: bool = False,
+                   pulses: Mapping[str, Mapping[str, list[int | None]]] | None = None) -> dict:
     """The circuit pane's payload for a programme replayed from someone else's schedule.
 
     `qccd.ir.source_map.build` joins a programme to its circuit through the stamps OUR compiler
@@ -222,8 +370,12 @@ def source_payload(prog: TSIR, name: str, lines: list[str], ops: list[dict], *,
     * A two-qubit gate realises the earliest statement not yet done on the same two ions; a
       measurement or reset, the earliest of its kind on that ion.  One-qubit gates are joined
       only with ``join_1q`` -- where the paper's schedule runs the circuit's own one-qubit
-      operations; where it decomposes them (Jones's RX/RY for an H), a join would name the
-      wrong statement, so the statement is shown and not joined.
+      operations; where it decomposes them (Jones's RY, RX for an H), joining by qubit alone
+      would name the wrong statement.
+    * Where it decomposes them, ``pulses`` (`pulse_join`) says which statement each one-ion
+      operation is part of: a pulse realises its statement (the RY and RX of an H; the
+      rotations that turn an MS into a CNOT, that CNOT), an H is done once its pulses run,
+      and a reset with no reset statement left realises the measurement it ends (stim's MR).
     * Transport is "towards" the next statement its ions still have to do, or "after" the last
       one they did when none is left -- the same split `source_map` makes.
     """
@@ -265,6 +417,15 @@ def source_payload(prog: TSIR, name: str, lines: list[str], ops: list[dict], *,
             nxt[ion] += 1
         return lst[nxt[ion]] if nxt[ion] < len(lst) else None
 
+    nth: dict[tuple[str, str], int] = defaultdict(int)
+
+    def part(kind: str, ion: str) -> int | None:
+        """the statement `pulses` gives the next `kind` operation on `ion`"""
+        k = nth[kind, ion]
+        nth[kind, ion] += 1
+        lst = (pulses or {}).get(ion, {}).get(kind, ())
+        return lst[k] if k < len(lst) else None
+
     realises: dict[str, list[int]] = {}
     toward: dict[str, list[int]] = {}
     after: dict[str, list[int]] = {}
@@ -281,13 +442,24 @@ def source_payload(prog: TSIR, name: str, lines: list[str], ops: list[dict], *,
                     i = take("gate", (str(ion),))
                     if i is not None:
                         got.append(i)
+            elif pulses is not None:
+                for ion in (ins.ions or ()):
+                    i = part("gate1", str(ion))
+                    if i is not None:
+                        got.append(i)
+                        if len(ops[i]["ions"]) == 1:     # an H is done by its own pulses
+                            done.add(i)
+                            last[str(ion)] = i
         elif ins.type in ("measure", "reset"):
             for ion in (ins.ions or ()):
+                j = part(ins.type, str(ion))
                 i = take(ins.type, (str(ion),))
+                if i is None:
+                    i = j
                 if i is not None:
                     got.append(i)
         if got:
-            realises[str(ins.id)] = sorted(got)
+            realises[str(ins.id)] = sorted(set(got))
         elif ins.type == "simd" and ins.participants:
             movers = [str(p.ion) for p in ins.participants]
             soon = sorted({j for j in (pending(m) for m in movers) if j is not None})

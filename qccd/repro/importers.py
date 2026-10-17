@@ -348,6 +348,22 @@ _JONES_KIND = {"QubitReset": "reset", "Measurement": "measure", "XRotation": "ga
                "YRotation": "gate1", "TwoQubitMSGate": "gate", "GateSwap": "swap",
                "Split": "split", "Merge": "merge", "Move": "transit"}
 
+#: How the artifact turns a circuit statement into native operations
+#: (`QCCDCircuit._parseCircuitString`, after stim's `decomposed()` has split MR into M, R):
+#: on each qubit, in the statement's order, in time order -- the table `studio.pulse_join`
+#: reads.  An H is RY then RX (the comment cites Figgatt's thesis, p. 80); a CNOT is RY, RX
+#: on the control, RX on the target, the MS gate, RY on the control (PRA 99, 022330, Fig. 4).
+#: The artifact records no angles; RY(pi/2), RX(pi) is an H, and RY(pi/2), RX(-pi/2) on the
+#: control, RX(-pi/2) on the target, MS(pi/4), RY(-pi/2) on the control a CNOT.
+JONES_NATIVE = {
+    "h": ((("op", "YRotation"), ("op", "XRotation")),),
+    "cx": ((("op", "YRotation"), ("op", "XRotation"), ("gate",), ("op", "YRotation")),
+           (("op", "XRotation"), ("gate",))),
+    "r": ((("reset",),),),
+    "m": ((("measure",),),),
+    "mr": ((("measure",), ("reset",)),),
+}
+
 
 def jones_device(raw: Mapping[str, Any]) -> PortGraph:
     """Traps, junctions and the segments between them.  A trap's ions are listed low end

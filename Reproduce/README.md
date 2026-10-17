@@ -44,6 +44,9 @@ In each folder:
 - `circuits/` -- the circuit each run must implement, where its license allows us to ship it;
   otherwise a circuit we generated ourselves and checked gate for gate against theirs.
 - `ours/` -- our schedules for the paper's circuits on the paper's machine, compressed.
+- `scripts/` (only `jones2025/` so far) -- the driver that ran the artifact and wrote its
+  schedule dump; it is the `scripts/run_jones.py` named in each run's recorded command. It
+  imports the artifact and contains none of its code.
 - `results.json` -- written by `python -m qccd.repro check`; the website reads only this.
 
 Three folders are made by their own scripts, and `check` leaves their `results.json` alone:

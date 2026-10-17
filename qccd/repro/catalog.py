@@ -337,8 +337,9 @@ NOTES: dict[str, list[dict]] = {
     "jones2025": [
         {"title": "Gate order on the data qubits",
          "text": "The router keeps each ancilla's gates in circuit order but not each data qubit's. "
-                 "In the d = 3 schedule, data qubit D70 meets X-check ancilla M80 (routing pass 2) "
-                 "before Z-check ancilla M61 (pass 3); the circuit has the opposite order. Rebuilt "
+                 "In the d = 3 schedule, data qubit 17 (the artifact's ion D70) meets X-check "
+                 "ancilla 25 (M80) in routing pass 2, before Z-check ancilla 18 (M61) in pass 3; "
+                 "the circuit has the opposite order. Rebuilt "
                  "in stim with the CX gates in the router's order, the noiseless circuit has "
                  "non-deterministic Z detectors on the grid at d = 2, 3, 6 and 12, while stim's own "
                  "order, rebuilt the same way, has none; the linear and switch schedules keep the "
