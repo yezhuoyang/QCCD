@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2] / "Reproduce"
 
 PROFILES = {"QCCDSIM": models.QCCDSIM, "QCCDSIM_PHYSICAL": models.QCCDSIM_PHYSICAL,
             "QCCDSIM_GATESET": models.QCCDSIM_GATESET,
-            "TISCC": models.TISCC, "JONES": models.JONES, "CYCLONE": models.CYCLONE}
+            "TISCC": models.TISCC, "JONES": models.JONES, "JONES_WISE": models.JONES_WISE, "CYCLONE": models.CYCLONE}
 
 
 CACHE = ROOT.parent / "out" / "repro_cache"

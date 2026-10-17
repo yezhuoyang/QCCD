@@ -117,7 +117,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.0
   },
   {
    "id": "grid_rot_d3_c2",
@@ -217,7 +217,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.01
   },
   {
    "id": "grid_rot_d6_c2",
@@ -317,7 +317,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.12
+   "seconds": 0.03
   },
   {
    "id": "grid_rot_d12_c2",
@@ -417,7 +417,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.55
+   "seconds": 0.16
   },
   {
    "id": "linear_rep_d3_c2",
@@ -509,7 +509,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.02
+   "seconds": 0.0
   },
   {
    "id": "linear_rep_d3_c3",
@@ -602,7 +602,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.02
+   "seconds": 0.0
   },
   {
    "id": "linear_rep_d3_c4",
@@ -695,7 +695,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.02
+   "seconds": 0.0
   },
   {
    "id": "switch_rot_d3_c2",
@@ -786,7 +786,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.05
+   "seconds": 0.01
   },
   {
    "id": "switch_rot_d3_c2_at6d4b467",
@@ -878,7 +878,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.01
   }
  ],
  "ratios": [],
@@ -923,7 +923,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.02
+   "seconds": 0.0
   },
   {
    "id": "grid_rot_d3_c2_ours",
@@ -965,7 +965,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.04
+   "seconds": 0.01
   },
   {
    "id": "grid_rot_d6_c2_ours",
@@ -1007,7 +1007,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.16
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d12_c2_ours",
@@ -1049,7 +1049,175 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.63
+   "seconds": 0.23
+  },
+  {
+   "id": "grid_rot_d2_c2_wise",
+   "label": "rotated surface code d=2, WISE broadcast control (one waveform per cycle)",
+   "against": "grid_rot_d2_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones-wise": {
+     "checks": {
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "broadcast": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 4120.0,
+    "last_start_us": 4070.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4105.0,
+    "last_start_us": 4055.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.01
+  },
+  {
+   "id": "grid_rot_d3_c2_wise",
+   "label": "rotated surface code d=3, WISE broadcast control (one waveform per cycle)",
+   "against": "grid_rot_d3_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones-wise": {
+     "checks": {
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "broadcast": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 4120.0,
+    "last_start_us": 4070.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.01
+  },
+  {
+   "id": "grid_rot_d6_c2_wise",
+   "label": "rotated surface code d=6, WISE broadcast control (one waveform per cycle)",
+   "against": "grid_rot_d6_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones-wise": {
+     "checks": {
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "broadcast": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 4120.0,
+    "last_start_us": 4070.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4130.0,
+    "last_start_us": 4080.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.04
+  },
+  {
+   "id": "grid_rot_d12_c2_wise",
+   "label": "rotated surface code d=12, WISE broadcast control (one waveform per cycle)",
+   "against": "grid_rot_d12_c2",
+   "same_device": true,
+   "circuit_rows": "true",
+   "same_ops": "true",
+   "profiles": {
+    "jones-wise": {
+     "checks": {
+      "structure": "passed",
+      "positions": "passed",
+      "capacity": "passed",
+      "ion_serial": "passed",
+      "segment_mutex": "passed",
+      "junction_mutex": "passed",
+      "trap_serial": "passed",
+      "chain_order": "passed",
+      "declared_locks": "passed",
+      "broadcast": "passed",
+      "durations": "passed",
+      "circuit": "passed"
+     },
+     "ok": true,
+     "violations": {},
+     "first_violations": []
+    }
+   },
+   "ok": true,
+   "measured": {
+    "makespan_us": 4120.0,
+    "last_start_us": 4070.0,
+    "moves": 0
+   },
+   "theirs": {
+    "makespan_us": 4135.0,
+    "last_start_us": 4085.0,
+    "moves": 0
+   },
+   "theirs_ok": false,
+   "seconds": 0.25
   }
  ]
 }
