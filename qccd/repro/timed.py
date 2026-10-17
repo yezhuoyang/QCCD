@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 #: Events that change where an ion is.
-MOVE_KINDS = ("split", "merge", "move", "transit", "j_enter", "j_exit", "hop")
+MOVE_KINDS = ("split", "merge", "move", "transit", "j_enter", "j_exit", "hop", "reconfigure")
 #: Events that act on ions where they stand.
 PLACE_KINDS = ("gate", "gate1", "measure", "reset", "prepare", "swap", "cool")
 
@@ -430,6 +430,34 @@ def check(
                   f"{want:g}", e.id)
 
         # -- in-place events ------------------------------------------------------
+        if e.kind == "reconfigure":
+            # An observed, opaque global move. Check the full state transition
+            # and hold every ion/trap, without inventing internal shuttle paths.
+            before = e.meta.get("chains_before", {})
+            after = e.meta.get("chains_after", {})
+            old_ions = [i for ch in before.values() for i in ch]
+            new_ions = [i for ch in after.values() for i in ch]
+            if (not before or set(before) != set(after) or
+                    any(t not in dev.sites for t in before) or
+                    len(e.ions) != len(set(e.ions)) or len(old_ions) != len(set(old_ions)) or
+                    len(new_ions) != len(set(new_ions)) or
+                    set(old_ions) != set(new_ions) or set(old_ions) != set(e.ions)):
+                v("structure", f"reconfigure {e.id}: state transition must preserve its ions and traps", e.id)
+                continue
+            if any(chains[t] != list(ch) or any(loc[i] != ("site", t) for i in ch)
+                   for t, ch in before.items()):
+                v("positions", f"reconfigure {e.id}: observed input chains disagree with replay", e.id)
+                continue
+            for t in before:
+                if profile.trap_serial:
+                    trap_ops.add(t, e.t0, e.t1, e.id)
+            for i in e.ions:
+                leave(i, e.t1)
+            for t, ch in after.items():
+                chains[t] = list(ch)
+                for i in ch:
+                    arrive(i, "site", t, e.t1)
+            continue
         if e.kind in PLACE_KINDS:
             where = [loc[i] for i in e.ions]
             if e.kind == "gate" and len(e.ions) == 2:

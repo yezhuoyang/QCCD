@@ -395,6 +395,18 @@ def import_jones(path: str | Path, *, name: str | None = None) -> TimedSchedule:
         common = dict(id=int(e["id"]), t0=float(e["t0_us"]), t1=float(e["t1_us"]))
         locks = [f"{c['type']}:{c['id']}" for c in e.get("involvedComponents", ())]
         meta = {"op": kind, "locks": sorted(set(locks))}
+        if kind == "GlobalReconfigurations":
+            before = {f"T{t}": [str(i) for i in ions] for t, ions in e["chains_before"].items()}
+            after = {f"T{t}": [str(i) for i in ions] for t, ions in e["chains_after"].items()}
+            ions = tuple(str(i) for i in e["reconfigured_ions"])
+            held = locks + [f"trap:{t[1:]}" for t in set(before) | set(after)]
+            held += [f"ion:{i}" for i in ions]
+            meta.update(locks=sorted(set(held)), chains_before=before, chains_after=after,
+                        recorded_duration_us=float(e["operationTime"]) * 1e6,
+                        wise_arch=dict(e["wise_arch"]),
+                        duration_source="artifact operationTime; global reconfiguration formula")
+            events.append(Event(kind="reconfigure", ions=ions, meta=meta, **common))
+            continue
         if kind == "JunctionCrossing":
             seg, j = f"C{e['segment']}", f"J{e['junction']}"
             if e["direction"] == "segment->junction":
