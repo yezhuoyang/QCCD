@@ -317,7 +317,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.03
   },
   {
    "id": "grid_rot_d12_c2",
@@ -417,7 +417,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.2
+   "seconds": 0.16
   },
   {
    "id": "linear_rep_d3_c2",
@@ -1007,7 +1007,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.05
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d12_c2_ours",
@@ -1049,7 +1049,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.27
+   "seconds": 0.23
   },
   {
    "id": "grid_rot_d2_c2_wise",
@@ -1175,7 +1175,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.05
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d12_c2_wise",
@@ -1217,7 +1217,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.29
+   "seconds": 0.25
   }
  ]
 }
