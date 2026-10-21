@@ -53,3 +53,15 @@ def test_the_goal_1_release_pins_noise_at_two_and_its_table():
     phys = json.loads((ROOT / "qccd" / "workspace" / "physics" / "qccd-physics@2.json").read_text(encoding="utf-8"))
     assert {b: rel.physics()[b] for b in FIXED_BLOCKS} == {b: phys[b] for b in FIXED_BLOCKS}
     assert m["qec"]["experiment"] == "surface5xz_r5"
+
+
+def test_every_sampled_metric_is_compared_as_a_sample():
+    """stim's seeded sampling repeats on one machine, not across machines (Windows 2.82e-5, the
+    Linux grader 3.21e-5 for one Goal 1 entry): every rate the ler stage reports is a sample."""
+    from qccd.workspace.evaluator import STOCHASTIC_METRICS, metrics_agree
+    assert {"ler", "ler_per_round", "ler_per_round_per_logical"} <= set(STOCHASTIC_METRICS)
+    here = {k: {"value": v} for k, v in (("ler_per_round", 2.82e-5), ("ler_per_round_per_logical", 2.82e-5),
+                                          ("ler", 1.97e-4), ("T_quantinuum", 1644.3))}
+    there = {k: {"value": v} for k, v in (("ler_per_round", 3.21e-5), ("ler_per_round_per_logical", 3.21e-5),
+                                           ("ler", 2.25e-4), ("T_quantinuum", 1644.3))}
+    assert metrics_agree(here, there, {"float_rel_tol": 1e-9, "float_abs_tol": 1e-12}) == []

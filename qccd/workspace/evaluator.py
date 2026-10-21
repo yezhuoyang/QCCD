@@ -732,7 +732,7 @@ def _report(release: TaskRelease, profile: str, stages: dict, order: list, ctx: 
 
 
 #: metrics estimated by sampling (the memory boards' logical error rate)
-STOCHASTIC_METRICS = ("ler", "ler_per_round")
+STOCHASTIC_METRICS = ("ler", "ler_per_round", "ler_per_round_per_logical")
 
 #: fields that legitimately differ between two gradings of the same inputs
 NONDETERMINISTIC = ("timing", "run")
