@@ -89,7 +89,18 @@ MEMORY_2 = [
      "logical qubit under qccd-noise@2, with Helios-class physics in which every number is cited.",
      GRID_5, "ler_per_round_per_logical",
      {"decoder": "pymatching", "max_shots": 2000000, "max_errors": 400, "seed": 20261021}),
+    # 194 ions, under the cap.  Measured 2026-10-21 with qccdc c774b87b677f: grid(12, 12) compiles it
+    # in about 15 minutes (split rounds), passes every rule, 3.1e-5 per round, 1.64 s
+    ("surface7xz_mem", 10, "surface7xz", "Surface code memory, distance 7, both bases",
+     "Seven rounds of two distance-7 rotated surface-code patches in lockstep, one a Z memory and one an "
+     "X memory (194 ions: 98 data, 96 ancillas, reset and reused every round), then the data read out, "
+     "each patch in its own basis. Ranked with every Goal 1 code by the logical error rate per round per "
+     "logical qubit under qccd-noise@2, with Helios-class physics in which every number is cited.",
+     {"generator": "grid", "name": "grid12x12", "params": {"a": 12, "b": 12}}, "ler_per_round_per_logical",
+     {"decoder": "pymatching", "max_shots": 2000000, "max_errors": 400, "seed": 20261021}),
 ]
+#: what a 194-ion compile and its certificate need: about 15 minutes of split rounds
+LIMITS_2 = {"surface7xz_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600}}
 PER_LOGICAL = {"name": "ler_per_round_per_logical", "unit": "per round per logical qubit", "better": "low",
                "about": "logical error rate per round divided by the logical qubits the experiment tests "
                         "(qccd.qec.experiments.logical_qubits): what Goal 1 ranks every code by"}
@@ -141,6 +152,7 @@ def main() -> int:
         d = build_release(task, "1", exp.qasm, physics_2, title=title, description=description,
                           out_dir=RELEASES_DIR, metrics=METRICS_2 + LER_METRICS + ([PER_LOGICAL] if per_logical else []),
                           rank_by=rank_by, starter=start or GRID_9, order=order, rank_table="quantinuum",
+                          limits=LIMITS_2.get(task),
                           tables=["quantinuum"],
                           qec={"experiment": exp.name, "detectors": exp.spec(), "noise": "qccd-noise@2",
                                "ler": budget or LER_BUDGET_2,

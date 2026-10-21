@@ -54,7 +54,8 @@ TASKS = ROOT / "tasks"
 BOARDS = {"rep5_mem": {"order": 6, "short": "rep-5 memory"},
           "surface3_mem": {"order": 7, "short": "surface-3 memory"},
           "surface5xz_mem": {"order": 8, "short": "surface-5 X+Z memory"},
-          "surface3xz_mem": {"order": 9, "short": "surface-3 X+Z memory"}}
+          "surface3xz_mem": {"order": 9, "short": "surface-3 X+Z memory"},
+          "surface7xz_mem": {"order": 10, "short": "surface-7 X+Z memory"}}
 #: a release table -> the tag its time is reported under (`T_<tag>`)
 TABLE_TAGS = {"qccdsim_jones": "jones", "transport_excitation": "transport"}
 
@@ -163,7 +164,9 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     row["arch"] = str(arch_p)
     t0 = time.time()
     try:
-        cooled, cert_p = compile_with_qccdc(release.circuit_text(), arch_p, work, timeout=900,
+        # a board's own compile limit when it allows more (surface7xz_mem: a 194-ion compile)
+        timeout = max(900, int((release.manifest.get("limits") or {}).get("compile_timeout_s", 0)))
+        cooled, cert_p = compile_with_qccdc(release.circuit_text(), arch_p, work, timeout=timeout,
                                             table=release.manifest["physics"].get("rank_table", "qccdsim_jones"))
     except CompileFailed as exc:
         return {**row, "status": "refused", "reason": f"{exc}"[:300]}

@@ -462,6 +462,7 @@ EXPERIMENTS: dict[str, Callable[[], MemoryExperiment]] = {
     "surface5": lambda: rotated_surface(5),
     "surface3xz": lambda: rotated_surface_xz(3),
     "surface5xz": lambda: rotated_surface_xz(5),
+    "surface7xz": lambda: rotated_surface_xz(7),
     "steane": lambda: steane(3),
     "bb18": lambda: bb("bb18"),
     "bb72": lambda: bb("bb72", rounds=1),
