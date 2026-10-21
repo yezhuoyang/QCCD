@@ -39,7 +39,8 @@ def test_a_ranking_page_takes_the_official_entries_into_its_chart():
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_the_layer_scripts_parse(tmp_path):
     js = [leaderboard.SCRIPT.replace("__BOARDS__", "{}").replace("__LOCAL__", '""').replace("__CHARTS__", "[]"),
-          leaderboard.CHART_SCRIPT.replace("__BOARD__", "null").replace("__FILES__", "[]")]
+          leaderboard.CHART_SCRIPT.replace("__BOARD__", "null").replace("__FILES__", "[]"),
+          leaderboard.GOAL_TABLE_SCRIPT]
     for i, s in enumerate(js):
         f = tmp_path / f"s{i}.js"
         f.write_text(s, encoding="utf-8")

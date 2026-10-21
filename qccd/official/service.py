@@ -509,9 +509,16 @@ class OfficialService:
         names = [g["rank_by"]] + [n for n in names if n != g["rank_by"]]
         better = {m["name"]: m.get("better", "low") for rel in rels for m in rel.manifest.get("metrics", [])}
         better[g["rank_by"]] = g["better"]
+        def size(rel):
+            # the release's own count (manifests since 84e8c5d), else what its entries ran
+            q, ran = rel.manifest.get("qec") or {}, [r["experiment"] for r in rows if r["release"] == rel.id]
+            return {"ions": q.get("n_ions") or (ran[0]["ions"] if ran else None),
+                    "k": q.get("logical_qubits") or (ran[0]["k"] if ran else None),
+                    "entries": len(ran)}
         return {"goal": goal, "title": g["title"], "evaluator_policy": self.evaluator_policy,
                 "noise": g["noise"], "max_ions": g["max_ions"], "rank_by": g["rank_by"], "better": g["better"],
-                "releases": [{"id": r.id, "title": r.title, "task_digest": r.digest} for r in rels],
+                "releases": [{"id": r.id, "title": r.title, "task": r.manifest.get("task"), "task_digest": r.digest,
+                              **size(r)} for r in rels],
                 "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],
                 "rows": rows}
 

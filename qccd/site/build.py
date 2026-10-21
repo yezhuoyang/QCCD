@@ -859,7 +859,7 @@ def board_index(ts: list[dict]) -> str:
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
               '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
-    body = ("<h1>Leaderboard</h1>" + boards.goals_section() + boards.architecture_intro() +
+    body = ("<h1>Leaderboard</h1>" + boards.goals_section() + leaderboard.goal_table() + boards.architecture_intro() +
             '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
             "<p class=\"sub\">Devices, compiled by the reference compiler and judged by every "
             "<a href=\"../rules/#set-standard\">rule</a>. The three fastest verified designs per board; "

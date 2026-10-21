@@ -97,6 +97,11 @@ def memory_boards() -> list:
     return [b for b in list_boards() if b.manifest.get("qec")]
 
 
+def _goal1(b) -> bool:
+    """A board on Goal 1's one ranking: a curated memory on the shared noise model."""
+    return (b.manifest.get("qec") or {}).get("noise") == "qccd-noise@2"
+
+
 def _suite():
     try:
         from ..bench.suite import find_suite
@@ -186,8 +191,10 @@ def _ler_bars(t: dict) -> str:
 
 def memory_section(ts: list | None = None) -> str:
     """The memory boards: a design's logical error rate, not only its speed.  `ts` are the
-    site's tasks; one whose `release` is a memory board carries that board's ranked designs."""
-    boards = memory_boards()
+    site's tasks; one whose `release` is a memory board carries that board's ranked designs.
+    Goal 1's boards (the curated codes on qccd-noise@2) are not cards here: they are one table
+    under the goals (leaderboard.goal_table) and one chart (board/goal1/)."""
+    boards = [b for b in memory_boards() if not _goal1(b)]
     if not boards:
         return ""
     built = {t.get("release"): t for t in (ts or []) if t.get("rank_by") == "ler_per_round"}
@@ -473,6 +480,7 @@ def index_entries() -> list:
            {"t": "Compiler leaderboard", "d": "compilers ranked over every circuit and device of the suite",
             "u": "board/#compiler", "k": "page"}]
     for b in memory_boards():
-        out.append({"t": b.title, "d": "memory board · ranked by the logical error rate per round",
-                    "u": f"board/#{b.manifest['task']}", "k": "task"})
+        out.append({"t": b.title, "d": ("Goal 1 · ranked by the logical error rate per round per logical qubit"
+                                        if _goal1(b) else "memory board · ranked by the logical error rate per round"),
+                    "u": f"board/goal1/?code={b.id}" if _goal1(b) else f"board/#{b.manifest['task']}", "k": "task"})
     return out

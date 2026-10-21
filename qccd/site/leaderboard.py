@@ -28,7 +28,7 @@ import html
 import json
 import re
 
-__all__ = ["board_block", "SCRIPT", "CSS", "HINTS", "connect_page", "board_ids", "script", "with_submissions", "goal_page", "goal_info"]
+__all__ = ["board_block", "SCRIPT", "CSS", "HINTS", "connect_page", "board_ids", "script", "with_submissions", "goal_page", "goal_info", "goal_table"]
 
 LOCAL_STUDIO = "http://127.0.0.1:47100/studio"
 
@@ -67,6 +67,8 @@ HINTS = {
     "board:try": ("Try your own design", "design a device for this board in your own QCCD workspace (with your AI agent "
                   "if you like), test it there with the reference checks, and submit it under your name"),
     "board:try-close": ("Close", "close the Try your own design box"),
+    "board:code": ("Show this code", "show or hide one code's entries in Goal 1's chart and table; one code alone "
+                   "gives a link that opens the chart on it"),
     "board:rank": ("Rank by", "rank the submitted designs by another of the board's measures; the board's own "
                    "ranking (the logical error rate per round on a memory board) is the default"),
 }
@@ -237,6 +239,8 @@ CHART_CSS = """
  white-space:pre-wrap;overflow-wrap:anywhere}
 .detail .files{font-size:13px;margin:4px 0 0}.detail .files a{color:var(--accent);margin-right:4px}
 .detail .by{color:#c2185b;font-weight:600}
+.legend .code-t{font:inherit;font-size:12.5px;color:var(--ink2);background:none;border:0;padding:2px 4px;cursor:pointer;border-radius:6px}
+.legend .code-t:hover{background:#f1f0ec}.legend .code-t.off{opacity:.4;text-decoration:line-through}
 details.about{margin:-10px 0 14px;font-size:13px;color:var(--ink2)}details.about summary{cursor:pointer;color:var(--accent)}
 details.about p{max-width:80ch;margin:6px 0 0}
 """
@@ -251,7 +255,8 @@ CHART_SCRIPT = r"""
   var B = __BOARD__, API = '/official/v1', FILES = __FILES__;
   if (!B || typeof fetch !== 'function' || typeof DATA === 'undefined' || typeof draw !== 'function') return;
   var FAM = 'submitted to the official leaderboard', COLOR = '#c2185b';
-  var PALETTE = ['#c2185b', '#2a78d6', '#1baf7a', '#eb6834', '#4a3aa7', '#8a8985'];
+  var PALETTE = ['#c2185b', '#2a78d6', '#1baf7a', '#eb6834', '#4a3aa7', '#b8860b', '#00838f', '#6d4c41',
+                 '#8e24aa', '#43a047', '#d84315', '#546e7a'];
   // an official measure -> this chart's (the logical error rate is plotted in units of 1e-4)
   var SCALE = {ler_per_round: ['ler_round_1e4', 1e4], ler: ['ler_shot_1e4', 1e4],
                ler_per_round_per_logical: ['ler_logical_1e4', 1e4]};
@@ -289,7 +294,7 @@ CHART_SCRIPT = r"""
       METRICS.push(M);
     });
     DATA.forEach(function(d){ if (d.compiled && d.numbers && d.numbers.instructions == null && typeof d.instructions === 'number') d.numbers.instructions = d.instructions; });
-    var codes = [];
+    var codes = [], relOf = {};
     rows.forEach(function(r, i){
       var n = {};
       Object.keys(r.metrics || {}).forEach(function(name){ var v = r.metrics[name];
@@ -297,7 +302,7 @@ CHART_SCRIPT = r"""
       if (r.ler && typeof r.ler.per_round_lo === 'number') { n.ler_round_lo_1e4 = r.ler.per_round_lo * 1e4; n.ler_round_hi_1e4 = r.ler.per_round_hi * 1e4; }
       var name = r.display_name || r.id, code = r.release_title || r.release || '';
       var fam = B.goal ? code : FAM;
-      if (codes.indexOf(fam) < 0) { codes.push(fam); FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : COLOR; }
+      if (codes.indexOf(fam) < 0) { codes.push(fam); relOf[fam] = r.release; FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : COLOR; }
       DATA.push({key: 'c-' + r.id, sid: r.id, community: true, by: r.by || '', when: r.created_at, ler: r.ler || null,
                  place: i + 1, title: name, short: name + ' · ' + (r.by || 'unnamed'), family: fam, compiled: true,
                  code: code, exp: r.experiment || null, numbers: n, marks: [], rules_failed: [], claim: ''});
@@ -316,9 +321,27 @@ CHART_SCRIPT = r"""
       ysel.value = (Q.y && metric(Q.y)) ? Q.y : key(lb.rank_by);
       if (Q.x && metric(Q.x)) xsel.value = Q.x;
       logbox.checked = Q.log != null ? Q.log === '1' : !!(metric(ysel.value) || {}).log;
+      // every code is a toggle: the chart and the table show the codes that are on (?code=<release> opens one)
+      var ALL = DATA.slice(), HIDE = {};
+      if (Q.code) codes.forEach(function(f){ if (relOf[f] !== Q.code) HIDE[f] = true; });
+      if (codes.every(function(f){ return HIDE[f]; })) HIDE = {};
+      var showing = function(){ DATA.length = 0; ALL.forEach(function(d){ if (!HIDE[d.family]) DATA.push(d); }); };
+      showing();
       legend = function(){
         var el = $('legend'); el.innerHTML = '';
-        codes.forEach(function(f){ var s = E('span'), sw = E('i', 'sw'); sw.style.background = FAMHEX[f]; s.appendChild(sw); s.appendChild(document.createTextNode(f)); el.appendChild(s); });
+        codes.forEach(function(f){
+          var b = E('button', 'code-t' + (HIDE[f] ? ' off' : '')), sw = E('i', 'sw');
+          b.type = 'button'; b.setAttribute('data-hint', 'board:code'); b.setAttribute('aria-pressed', HIDE[f] ? 'false' : 'true');
+          sw.style.background = FAMHEX[f]; b.appendChild(sw); b.appendChild(document.createTextNode(f));
+          b.onclick = function(){ HIDE[f] = !HIDE[f]; if (codes.every(function(x){ return HIDE[x]; })) HIDE[f] = false;
+                                  showing(); draw(); if (VIEW === 'table') table(); pushState(); };
+          el.appendChild(b); });
+      };
+      var _push = pushState;
+      pushState = function(){
+        _push();
+        var on = codes.filter(function(f){ return !HIDE[f]; });
+        if (on.length === 1 && codes.length > 1) try { history.replaceState(null, '', location.search + '&code=' + encodeURIComponent(relOf[on[0]])); } catch (e) {}
       };
     } else {
       options();
@@ -480,6 +503,64 @@ def goal_page(page: str, goal: str = "goal1") -> str | None:
     block = board_block(task, title, seed_note=False, live=False, root="../../").replace(
         "The magenta dots are designs", "The dots are designs", 1)
     return _with_layer(page, {"goal": goal}, block, task)
+
+
+# ------------------------------------------- Goal 1 on the Leaderboard page: one row per code
+
+GOAL_TABLE_CSS = """
+.g1t{margin:4px 0 18px}
+.g1t table{width:100%;border-collapse:collapse;font:13.5px/1.4 var(--sans,system-ui,sans-serif)}
+.g1t th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#56545e;padding:4px 8px;
+ border-bottom:1px solid #e0e6ef}
+.g1t td{padding:6px 8px;border-bottom:1px solid #edf1f6;white-space:nowrap}
+.g1t td.n{text-align:right;font-variant-numeric:tabular-nums}
+.g1t .g1w{overflow-x:auto}
+.g1t .g1-more{font-size:13.5px;margin:6px 0 0}
+"""
+
+GOAL_TABLE_SCRIPT = r"""
+(function(){
+  // Goal 1 at a glance: one row per code (a curated release), its size and its best entry, live
+  // from the official server; each row opens Goal 1's chart on that code
+  var box = document.getElementById('g1-codes');
+  if (!box || typeof fetch !== 'function') return;
+  function el(t, c, x){ var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function fmt(v){ return typeof v === 'number' ? v.toExponential(2) : '–'; }
+  fetch('/official/v1/goals/goal1', {headers: {'Accept': 'application/json'}}).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(g){
+    var best = {};
+    (g.rows || []).forEach(function(r){ if (!best[r.release]) best[r.release] = r; });   // rows come ranked
+    var rels = (g.releases || []).slice().sort(function(a, b){
+      var x = best[a.id], y = best[b.id];
+      return x && y ? x.rank_value - y.rank_value : (x ? -1 : y ? 1 : (a.ions || 0) - (b.ions || 0)); });
+    var t = el('table'), hd = el('tr');
+    ['code', 'ions', 'logical qubits', 'entries', 'best, per round per logical qubit', 'design', 'by'].forEach(function(h){
+      hd.appendChild(el('th', null, h)); });
+    var th = el('thead'); th.appendChild(hd); t.appendChild(th);
+    var tb = el('tbody');
+    rels.forEach(function(rel){
+      var tr = el('tr'), b = best[rel.id], td = el('td'), a = el('a', null, rel.title || rel.id);
+      a.href = 'goal1/?code=' + encodeURIComponent(rel.id); td.appendChild(a); tr.appendChild(td);
+      tr.appendChild(el('td', 'n', rel.ions == null ? '–' : String(rel.ions)));
+      tr.appendChild(el('td', 'n', rel.k == null ? '–' : String(rel.k)));
+      tr.appendChild(el('td', 'n', String(rel.entries || 0)));
+      tr.appendChild(el('td', 'n', b ? fmt(b.rank_value) : '–'));
+      tr.appendChild(el('td', null, b ? (b.display_name || b.id) : 'no entry yet'));
+      tr.appendChild(el('td', null, b ? (b.by || '–') : ''));
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); box.textContent = ''; var w = el('div', 'g1w'); w.appendChild(t); box.appendChild(w);
+  }).catch(function(err){ box.textContent = ''; box.appendChild(el('p', null, 'The official server did not answer (' + err.message + ').')); });
+})();
+"""
+
+
+def goal_table() -> str:
+    """Goal 1 on the Leaderboard page: a live table, one row per code, each opening the chart on it."""
+    return ('<section class="g1t" id="goal1-codes" aria-label="Goal 1, code by code">'
+            '<div id="g1-codes"><p class="lbx-wait">Loading Goal 1&hellip;</p></div>'
+            '<p class="g1-more"><a href="goal1/">The Goal 1 chart: every entry, rank by any measure &rarr;</a></p>'
+            f'</section><style>{GOAL_TABLE_CSS}</style><script>{GOAL_TABLE_SCRIPT}</script>')
 
 
 # ---------------------------------------------------------------------- /connect/
