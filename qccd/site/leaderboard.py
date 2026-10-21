@@ -361,7 +361,9 @@ CHART_SCRIPT = r"""
       var rp = E('div', 'repro'); rp.appendChild(E('b', null, 'Reproduce it on your computer'));
       rp.appendChild(E('span', null, 'Download the bundle, then grade it with the same reference evaluator, in a terminal where QCCD is set up:'));
       rp.appendChild(E('pre', null, 'qccd grade ' + d.sid + '-bundle.zip'));
-      rp.appendChild(E('span', null, 'It prints every check and every measure, and should give these numbers. Not set up yet? '));
+      rp.appendChild(E('span', null, 'It runs every check again and prints every measure: the checks, the time, the instructions ' +
+        'and the DACs come out the same. The logical error rate is a sample, and stim repeats a seeded sample only on the ' +
+        'same kind of processor, so yours is an estimate that should fall within the 95% interval above. Not set up yet? '));
       rp.appendChild(link('The set-up steps, once', '../../studio.html?agent#design'));
       rp.appendChild(document.createTextNode('.'));
       left.appendChild(rp);

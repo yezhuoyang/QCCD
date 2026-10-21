@@ -644,7 +644,11 @@ leaderboard shows who submitted each design.
   signed-in person. `qccd leaderboard --official --board <title>` shows the board with `by`,
   and the person's own requests. `qccd grade <bundle.zip>` grades any entry's downloaded
   bundle on this computer with the reference evaluator the server runs, and prints every
-  check and measure; its metrics match the entry's official report.
+  check and measure. The checks and the computed measures (time, instructions, DACs) match
+  the entry's official report; a logical error rate is a stim sample, which repeats for a
+  seed only on the same kind of processor, so a local one is an estimate (a 98-ion entry
+  gave 4.61e-5 on Windows and 4.44e-5 on the Linux server, each within the other's 95%
+  interval).
 
 **An entry on the website.** A public entry is a dot in its board's ranking chart
 (`/board/<task>/`), credited to who submitted it, and the board can be ranked by any measure

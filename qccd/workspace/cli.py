@@ -520,6 +520,9 @@ def cmd_grade(a) -> int:
         print(f"  {k:22s} {v.get('value')} {v.get('unit') or ''}".rstrip())
     for r in el.get("reasons") or []:
         print(f"  why: {r}")
+    if "ler_per_round" in (rep.get("metrics") or {}):
+        print("  (the logical error rate is a sample: stim repeats a seeded sample only on the same kind of\n"
+              "   processor, so this one is an estimate; the official number is the server's, with its 95% interval)")
     return 0 if el.get("eligible") else 1
 
 

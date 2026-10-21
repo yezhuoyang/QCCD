@@ -167,8 +167,8 @@ def test_a_page_drawn_from_a_bundle_escapes_the_names_in_it(local, tmp_path):
 
 @needs_toolchain
 def test_qccd_grade_reproduces_a_downloaded_entry(svc, local, tmp_path, capsys):
-    """Reproduce: download an entry's bundle.zip and `qccd grade` it here; the metrics are the
-    server's."""
+    """Reproduce: download an entry's bundle.zip and `qccd grade` it here; on the same machine
+    the metrics are the server's (a logical error rate elsewhere is a sample of its own)."""
     from starlette.testclient import TestClient
     from qccd.workspace.cli import main
     up = svc.authenticate(svc.create_uploader("hana"), "10.0.0.1")
