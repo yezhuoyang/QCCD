@@ -27,7 +27,7 @@ stim = pytest.importorskip("stim")
 
 from qccd.qec import (EXPERIMENTS, MemoryExperiment, bb, get_experiment,  # noqa: E402
                       ideal_stim, noiseless_check, repetition, rotated_surface, steane)
-from qccd.qec.experiments import rotated_surface_xz  # noqa: E402
+from qccd.qec.experiments import rotated_surface_xz, steane_code  # noqa: E402
 from qccd.qec.qasm import QasmError, parse_qasm  # noqa: E402
 
 SEARCH = dict(dont_explore_detection_event_sets_with_size_above=4,
@@ -186,3 +186,25 @@ def test_logical_qubits_count_each_qubit_once_across_both_bases():
     assert logical_qubits(rotated_surface(3)) == 1 and logical_qubits(get_experiment("bb72")) == 12
     s = rotated_surface_xz(5).summary()
     assert s["logical_qubits"] == 1 and s["ions"] == 98
+
+
+@pytest.mark.parametrize("key,d", [("steanexz", 3), ("shorxz", 2), ("rep3xz", 1), ("bb18xz", 4)])
+def test_every_small_code_in_both_bases_has_its_stated_circuit_distance(key, d):
+    """Goal 1's other codes: what each schedule really protects (Shor's single flag cannot save a
+    weight-6 check, so 2; a repetition code's X memory has none, so 1)."""
+    exp = get_experiment(key)
+    assert exp.basis == "XZ" and exp.distance == d
+    assert circuit_distance(exp) == d
+
+
+def test_one_block_in_both_bases_measures_z_then_x():
+    """The sequential form (bb72, bb90 under 200 ions): phase 1 is read out in the program, every
+    ion is reset, phase 2 is appended in X; 2k observables, k logical qubits, one phase's rounds."""
+    from qccd.qec.experiments import css_memory_seq
+    exp = css_memory_seq(steane_code(), 3, "steaneseq", distance=3, flags=True)
+    assert exp.basis == "XZ" and exp.logical_qubits == 1 and len(exp.observables) == 2
+    assert exp.rounds == 3 and exp.n_data == 7
+    assert [s for _, _, s in exp.readout_plan()] == ["X"] * 7
+    assert exp.qasm.count("measure q[0]") == 1          # phase 1's data readout, in the program
+    assert noiseless_check(ideal_stim(exp, 0.0)).ok
+    assert circuit_distance(exp) == 3

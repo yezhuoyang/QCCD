@@ -69,6 +69,11 @@ __all__ = [
     "rotated_surface",
     "rotated_surface_xz",
     "logical_qubits",
+    "css_memory_xz",
+    "css_memory_seq",
+    "shor_code",
+    "repetition_code",
+    "bb_code",
     "steane",
     "steane_code",
     "css_memory",
@@ -235,8 +240,6 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
     if len(dbasis) != n_data or not set(dbasis) <= {"X", "Z"}:
         raise ValueError(f"basis must be 'X' or 'Z' (or one per data qubit), got {basis!r}")
     mixed = len(set(dbasis)) > 1
-    if mixed and flags:
-        raise ValueError("flags need one memory basis; this experiment has both")
     home: list[str] = []
     for c in checks:
         on = {dbasis[d] for d in c.support}
@@ -250,12 +253,12 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
         raise ValueError("a memory experiment needs at least one round")
     if layered and flags:
         raise ValueError("a layered schedule is hook-safe by construction; it takes no flags")
-    other = "X" if label == "Z" else "Z"
     m = len(checks)
     anc = [n_data + k for k in range(m)]
-    # a hook on a check of the OTHER type spreads the error type that flips the observable
+    # a hook on a check of the OTHER type (than its own patch's memory) spreads the error type
+    # that flips that patch's observable
     flagged = [k for k, c in enumerate(checks)
-               if flags and c.basis == other and len(c.support) >= 4]
+               if flags and c.basis != home[k] and len(c.support) >= 4]
     flag_of = {k: n_data + m + j for j, k in enumerate(flagged)}
     nf = len(flagged)
     per_round = m + nf
@@ -391,6 +394,86 @@ def rotated_surface_xz(d: int, rounds: int | None = None, *,
                    logicals, r, ["Z"] * n + ["X"] * n, layered=True, readout=readout)
 
 
+def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
+                  distance: int | None = None, flags: bool = False,
+                  readout: str = "appended") -> MemoryExperiment:
+    """Two copies of a CSS code side by side, a Z memory on data 0..n-1 and an X memory on
+    n..2n-1 (the construction of `rotated_surface_xz`, checks one after another as
+    `css_memory` measures them).  Observables: the code's k Z logicals, then its k X logicals."""
+    if distance is None:
+        declared = code.params.get("declared")
+        if not declared:
+            raise ValueError(f"{code.name}: pass `distance`; the code declares none")
+        distance = int(declared[2])
+    lx, lz = code.logical_basis
+    n = code.n
+    one = ([_Check("X", tuple(gf2.support(h))) for h in code.hx]
+           + [_Check("Z", tuple(gf2.support(h))) for h in code.hz])
+    checks = [_Check(c.basis, tuple(q + off for q in c.support)) for off in (0, n) for c in one]
+    logicals = ([list(gf2.support(row)) for row in lz]
+                + [[q + n for q in gf2.support(row)] for row in lx])
+    return _memory(name or f"{code.name}xz_r{rounds}", f"{code.name}_x2", distance, 2 * n, checks,
+                   logicals, rounds, ["Z"] * n + ["X"] * n, layered=False, flags=flags,
+                   note="flagged" if flags else "", readout=readout)
+
+
+def css_memory_seq(code: CSSCode, rounds: int, name: str | None = None, *,
+                   distance: int | None = None, flags: bool = False) -> MemoryExperiment:
+    """ONE block of a CSS code, a Z memory and then an X memory on the same ions: for a code whose
+    two copies would not fit the ions it is measured on (bb72's 144, bb90's 180, under Goal 1's
+    200).  Phase 1 reads its data out IN the program (Z); every ion is then reset and phase 2
+    prepares |+> and is read out by the grader (X).  The 2k observables are phase 1's Z logicals
+    and phase 2's X logicals, so `basis` is "XZ" and `logical_qubits` k, as for two copies; a
+    round is one phase's, so the rate per round compares with a two-copy experiment's."""
+    zm = css_memory(code, rounds, basis="Z", distance=distance, flags=flags, readout="program")
+    xm = css_memory(code, rounds, basis="X", distance=distance, flags=flags, readout="appended")
+    zl, xl = zm.qasm.splitlines(), xm.qasm.splitlines()
+    nq = zm.n_data + zm.n_ancilla
+    bz = parse_qasm(zm.qasm).n_bits
+    bx = parse_qasm(xm.qasm).n_bits
+
+    def body(lines: list) -> list:
+        return [ln for ln in lines if ln and not ln.startswith(("OPENQASM", "include", "//", "qreg", "creg"))]
+
+    import re
+    shift = [re.sub(r"c\[(\d+)\]", lambda mm: f"c[{int(mm.group(1)) + bz}]", ln) for ln in body(xl)]
+    nm = name or f"{code.name}seq_r{rounds}"
+    out = (['OPENQASM 2.0;', 'include "qelib1.inc";',
+            f"// {nm}: {code.name} memory, one block: a Z memory of {rounds} round(s) read out in the "
+            f"program, every ion reset, then an X memory of {rounds} round(s); data q[0..{zm.n_data - 1}]; "
+            f"X readout c[{bz + bx - zm.n_data}..{bz + bx - 1}] appended by the grader",
+            f"qreg q[{nq}];", f"creg c[{bz + bx}];"]
+           + body(zl) + [f"reset q[{j}];" for j in range(nq)] + shift)
+    off = lambda bits: tuple(b + bz for b in bits)  # noqa: E731
+    return MemoryExperiment(
+        name=nm, code=f"{code.name}_seq", distance=zm.distance, rounds=rounds, basis="XZ",
+        n_data=zm.n_data, n_ancilla=zm.n_ancilla, qasm="\n".join(out) + "\n",
+        detectors=zm.detectors + tuple(off(d) for d in xm.detectors),
+        observables=zm.observables + tuple(off(o) for o in xm.observables),
+        readout="appended", readout_bits=tuple((q, b + bz) for q, b in xm.readout_bits),
+        readout_basis=("X",) * len(xm.readout_bits))
+
+
+def shor_code() -> CSSCode:
+    """Shor's [[9,1,3]]: Z checks on neighbours within each block of three, X checks across blocks."""
+    rows = lambda sets: tuple(sum(1 << q for q in s) for s in sets)  # noqa: E731
+    return CSSCode(name="shor", n=9, hx=rows(((0, 1, 2, 3, 4, 5), (3, 4, 5, 6, 7, 8))),
+                   hz=rows(((0, 1), (1, 2), (3, 4), (4, 5), (6, 7), (7, 8))), family="shor",
+                   params={"declared": [9, 1, 3]})
+
+
+def repetition_code(d: int) -> CSSCode:
+    """The bit-flip repetition code as a CSS code: Z checks only.  In both bases it protects bit
+    flips to distance d and phase flips not at all (distance 1)."""
+    return CSSCode(name=f"rep{d}", n=d, hx=(), hz=tuple((1 << i) | (1 << (i + 1)) for i in range(d - 1)),
+                   family="repetition", params={"declared": [d, 1, 1]})
+
+
+def bb_code(name: str) -> CSSCode:
+    l, m, a, b, (n, k, d) = TUTORIAL_BB[name]
+    return bivariate_bicycle(name, l, m, parse_poly(a, l, m), parse_poly(b, l, m), declared=(n, k, d))
+
+
 def steane_code() -> CSSCode:
     """[[7,1,3]], with the check supports of the shipped `steane@1` board."""
     rows = tuple(sum(1 << q for q in s) for s in ((3, 4, 5, 6), (1, 2, 5, 6), (0, 2, 4, 6)))
@@ -463,6 +546,14 @@ EXPERIMENTS: dict[str, Callable[[], MemoryExperiment]] = {
     "surface3xz": lambda: rotated_surface_xz(3),
     "surface5xz": lambda: rotated_surface_xz(5),
     "surface7xz": lambda: rotated_surface_xz(7),
+    # Goal 1's other codes, both bases (two copies, or one block twice in a row)
+    "steanexz": lambda: css_memory_xz(steane_code(), 3, "steanexz_r3", distance=3, flags=True),
+    "shorxz": lambda: css_memory_xz(shor_code(), 3, "shorxz_r3", distance=2, flags=True),  # circuit distance 2
+    "rep3xz": lambda: css_memory_xz(repetition_code(3), 3, "rep3xz_r3", distance=1),
+    "rep5xz": lambda: css_memory_xz(repetition_code(5), 5, "rep5xz_r5", distance=1),
+    "bb18xz": lambda: css_memory_xz(bb_code("bb18"), 4, "bb18xz_r4", distance=4, flags=True),
+    "bb72seq": lambda: css_memory_seq(bb_code("bb72"), 3, "bb72seq_r3", distance=6),
+    "bb90seq": lambda: css_memory_seq(bb_code("bb90"), 3, "bb90seq_r3", distance=10),
     "steane": lambda: steane(3),
     "bb18": lambda: bb("bb18"),
     "bb72": lambda: bb("bb72", rounds=1),

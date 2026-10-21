@@ -99,6 +99,44 @@ MEMORY_2 = [
      {"generator": "grid", "name": "grid12x12", "params": {"a": 12, "b": 12}}, "ler_per_round_per_logical",
      {"decoder": "pymatching", "max_shots": 2000000, "max_errors": 400, "seed": 20261021}),
 ]
+NOISE = ('Ranked with every Goal 1 code by the logical error rate per round per logical qubit under '
+         'qccd-noise@2, with Helios-class physics in which every number is cited.')
+# Every other small code (the user, 2026-10-21: "You should also put BBCode, and all other small
+# codes!"), both bases.  Measured 2026-10-21 with qccdc c774b87b677f, every starter compiles and passes
+# every rule: rep3 2.7e-3, rep5 6.2e-3, Steane 2.2e-3, Shor 1.9e-3, bb18 2.4e-3 per round per logical.
+_GRID = lambda a: {"generator": "grid", "name": f"grid{a}x{a}", "params": {"a": a, "b": a}}  # noqa: E731
+_MATCH = {"decoder": "pymatching", "max_shots": 2000000, "max_errors": 400, "seed": 20261021}
+MEMORY_2 += [
+    ("steanexz_mem", 11, "steanexz", "Steane code memory, both bases",
+     "Three rounds of two flagged Steane [[7,1,3]] blocks in lockstep, one a Z memory and one an X memory "
+     "(32 ions: 14 data, 12 check and 6 flag ancillas), then the data read out, each block in its own "
+     "basis. Circuit distance 3; decoded with BP-OSD. " + NOISE,
+     _GRID(5), "ler_per_round_per_logical",
+     {"decoder": "bposd", "max_shots": 200000, "max_errors": 400, "seed": 20261021}),
+    ("shorxz_mem", 12, "shorxz", "Shor code memory, both bases",
+     "Three rounds of two flagged Shor [[9,1,3]] blocks in lockstep, one a Z memory and one an X memory "
+     "(36 ions: 18 data, 16 check and 2 flag ancillas), then the data read out, each block in its own "
+     "basis. The code has distance 3; this schedule has circuit distance 2, since one flag cannot catch "
+     "every hook of a weight-6 check. " + NOISE,
+     _GRID(5), "ler_per_round_per_logical", _MATCH),
+    ("rep3xz_mem", 13, "rep3xz", "Repetition code memory, distance 3, both bases",
+     "Three rounds of two distance-3 bit-flip repetition codes in lockstep, one a Z memory and one an X "
+     "memory (10 ions), then the data read out, each in its own basis. It corrects bit flips (distance 3) "
+     "and no phase flips (distance 1 in the X memory): what a code without phase protection gives. " + NOISE,
+     _GRID(4), "ler_per_round_per_logical", _MATCH),
+    ("rep5xz_mem", 14, "rep5xz", "Repetition code memory, distance 5, both bases",
+     "Five rounds of two distance-5 bit-flip repetition codes in lockstep, one a Z memory and one an X "
+     "memory (18 ions), then the data read out, each in its own basis. It corrects bit flips (distance 5) "
+     "and no phase flips (distance 1 in the X memory), so more qubits only add phase errors. " + NOISE,
+     _GRID(4), "ler_per_round_per_logical", _MATCH),
+    ("bb18xz_mem", 15, "bb18xz", "Bivariate bicycle code [[18,4,4]] memory, both bases",
+     "Four rounds of two flagged bivariate-bicycle [[18,4,4]] blocks in lockstep, one a Z memory and one "
+     "an X memory (90 ions: 36 data, 36 check and 18 flag ancillas; 4 logical qubits), then the data read "
+     "out, each block in its own basis. Circuit distance 4; decoded with BP-OSD, its belief propagation "
+     "capped at 30 iterations. " + NOISE,
+     _GRID(9), "ler_per_round_per_logical",
+     {"decoder": "bposd", "max_shots": 20000, "max_errors": 400, "seed": 20261021, "bp_max_iter": 30}),
+]
 #: what a 194-ion compile and its certificate need: about 15 minutes of split rounds
 LIMITS_2 = {"surface7xz_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600}}
 PER_LOGICAL = {"name": "ler_per_round_per_logical", "unit": "per round per logical qubit", "better": "low",

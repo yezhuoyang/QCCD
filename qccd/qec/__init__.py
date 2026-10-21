@@ -54,7 +54,7 @@ __all__ = [
 REPORT_KIND = "qccd.ler_report"
 
 _REPO = Path(__file__).resolve().parents[2]
-_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s")
+_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s", "bp_max_iter")
 
 
 def tool_versions() -> dict[str, str | None]:
