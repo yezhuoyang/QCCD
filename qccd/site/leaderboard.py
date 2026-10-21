@@ -26,8 +26,9 @@ from __future__ import annotations
 
 import html
 import json
+import re
 
-__all__ = ["board_block", "SCRIPT", "CSS", "HINTS", "connect_page", "board_ids", "script"]
+__all__ = ["board_block", "SCRIPT", "CSS", "HINTS", "connect_page", "board_ids", "script", "with_submissions", "goal_page", "goal_info"]
 
 LOCAL_STUDIO = "http://127.0.0.1:47100/studio"
 
@@ -46,6 +47,10 @@ CSS = """
 .lbx-live .lbx-by{font-weight:600;color:#1a2540}
 .lbx-live .lbx-empty,.lbx-live .lbx-wait{color:#6b6a66;font:13.5px/1.5 var(--sans,system-ui,sans-serif);margin:6px 0 0}
 .lbx-seedby{font:12.5px/1.4 var(--sans,system-ui,sans-serif);color:#6b6a66;margin:4px 0 0}
+.lbx-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0 0;font:13px/1.4 var(--sans,system-ui,sans-serif);color:#56545e}
+.lbx-bar select{font:inherit;padding:4px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:#1d1d1b;max-width:100%}
+.lbx-tw{overflow-x:auto}
+.lbx-live td.lbx-links a{margin-right:10px;white-space:nowrap}
 #lbx-pop{position:absolute;z-index:1200;width:min(420px,calc(100vw - 24px));background:#fff;border:1px solid #cfceca;
  border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px;font:14px/1.5 var(--sans,system-ui,sans-serif);
  color:#1d1d1b}
@@ -62,6 +67,8 @@ HINTS = {
     "board:try": ("Try your own design", "design a device for this board in your own QCCD workspace (with your AI agent "
                   "if you like), test it there with the reference checks, and submit it under your name"),
     "board:try-close": ("Close", "close the Try your own design box"),
+    "board:rank": ("Rank by", "rank the submitted designs by another of the board's measures; the board's own "
+                   "ranking (the logical error rate per round on a memory board) is the default"),
 }
 
 
@@ -74,24 +81,38 @@ def board_ids() -> dict:
         return {}
 
 
-def board_block(task: str, title: str, seed_note: bool = True) -> str:
-    """One board's "Try your own design" and its live community list (filled by SCRIPT)."""
+def board_block(task: str, title: str, seed_note: bool = True, *, live: bool = True, root: str = "../") -> str:
+    """One board's "Try your own design" and its live community list (filled by SCRIPT).  On the
+    board's own ranking page (`live=False`) the submissions are dots in its chart instead
+    (chart_block), and the block is only the button and what it does; `root` is the site's root
+    relative to the page."""
     t = html.escape(task)
     seed = ('<p class="lbx-seedby">The bars above are the QCCD study&rsquo;s own designs. Submissions from people '
             'are listed here, with who submitted each, straight from the official server.</p>' if seed_note else "")
+    body = (f'<div class="lbx-live" data-board="{t}"><p class="lbx-wait">Loading the official ranking&hellip;</p></div>'
+            if live else
+            '<p class="lbx-seedby">The magenta dots are designs people submitted to the official leaderboard, live from '
+            'the server, each credited to who submitted it and graded there with every check. Click one to watch it, '
+            'download its bundle, or grade it again on your own computer.</p>')
     return (f'<div class="lbx" data-board="{t}"><div class="lbx-top">'
             f'<button class="lbx-try" type="button" data-board="{t}" data-title="{html.escape(title)}" '
-            f'data-hint="board:try">Try your own design</button>'
-            f'<span class="lbx-t">Community submissions</span></div>'
-            f'<div class="lbx-live" data-board="{t}"><p class="lbx-wait">Loading the official ranking&hellip;</p></div>'
-            f'{seed}</div>')
+            f'data-root="{html.escape(root)}" data-hint="board:try">Try your own design</button>'
+            f'<span class="lbx-t">{"Community submissions" if live else "Submit a design"}</span></div>'
+            f'{body}{seed}</div>')
 
 
 SCRIPT = r"""
 (function(){
-  var API = '/official/v1', BOARDS = __BOARDS__, LOCAL = __LOCAL__;
+  var API = '/official/v1', BOARDS = __BOARDS__, LOCAL = __LOCAL__, CHARTS = __CHARTS__;
   function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function fmt(v){ return (typeof v === 'number') ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)) : '-'; }
+  function fmt(v){ return (typeof v !== 'number') ? '-' : (v !== 0 && Math.abs(v) < 1e-3) ? v.toExponential(2)
+    : Number.isInteger(v) ? String(v) : (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)); }
+  var NICE = {ler_per_round: 'logical error rate per round', ler: 'logical error rate per shot',
+              T_quantinuum: 'time, quantinuum table', T_jones: 'time, jones table', T_transport: 'time, transport table',
+              instructions: 'instructions', transport_instructions: 'transport instructions', dacs: 'DACs',
+              ions_per_instruction: 'ions per transport instruction'};
+  function nice(m){ return NICE[m.name] || m.name.replace(/_/g, ' '); }
+  function unitOf(m){ return (m.unit && m.unit !== 'count' && !/^per /.test(m.unit)) ? m.unit : ''; }
   function day(t){ return t ? new Date(t * 1000).toISOString().slice(0, 10) : '-'; }
   function get(path){ return fetch(API + path, { headers: { 'Accept': 'application/json' } }).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); }
@@ -111,7 +132,7 @@ SCRIPT = r"""
       'the Studio on this board: its ranking, a test with every check the server runs, and Submit, which lists your ' +
       'design here under your name once you sign in with your qccd.academy account.'));
     var go = el('a', 'lbx-go', 'Open in my workspace'); go.href = studioURL(task); go.target = '_blank'; go.rel = 'noopener';
-    var setup = el('a', 'lbx-go alt', 'Set up a workspace'); setup.href = '../studio.html?agent#design';   // /board/ is one level down
+    var setup = el('a', 'lbx-go alt', 'Set up a workspace'); setup.href = (btn.getAttribute('data-root') || '../') + 'studio.html?agent#design';
     var p = el('p'); p.appendChild(go); p.appendChild(setup); pop.appendChild(p);
     pop.appendChild(el('p', 'lbx-small', '"Open in my workspace" works while your workspace runs on this computer ' +
       '(qccd studio). Set up once: the Design page’s Agent panel lists the steps.'));
@@ -126,6 +147,53 @@ SCRIPT = r"""
     if (pop && !pop.contains(e.target)) closePop();
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePop(); });
+  // one board's submissions, ranked by the reader's choice of its measures (the board's own by
+  // default); each opens on the board's ranking page, where it is a dot with its numbers, its
+  // animation, its files and how to grade it again
+  function fill(box, task, lb){
+    box.textContent = '';
+    var rows = lb.rows || [];
+    if (!rows.length) { box.appendChild(el('p', 'lbx-empty', 'No submissions yet: the first design that passes is #1.')); return; }
+    var has = function(r, k){ return typeof (r.metrics || {})[k] === 'number'; };
+    var ms = (lb.metrics || []).filter(function(m){ return rows.some(function(r){ return has(r, m.name); }); });
+    var main = ms.filter(function(m){ return m.name === lb.rank_by; })[0] || {name: lb.rank_by, better: lb.better, unit: ''};
+    var bar = el('div', 'lbx-bar'), lab = el('label', null, 'Rank by '), sel = el('select');
+    sel.setAttribute('data-hint', 'board:rank');
+    ms.forEach(function(m){ var o = el('option', null, nice(m) + (m.name === lb.rank_by ? ' (the board’s ranking)' : ''));
+      o.value = m.name; sel.appendChild(o); });
+    sel.value = main.name; lab.appendChild(sel); bar.appendChild(lab);
+    bar.appendChild(el('span', 'lbx-n', rows.length + (rows.length === 1 ? ' design' : ' designs') + ', each graded by the official server'));
+    var wrap = el('div', 'lbx-tw'); box.appendChild(bar); box.appendChild(wrap);
+    function open(r){ return CHARTS.indexOf(task) >= 0 ? task + '/?sel=c-' + encodeURIComponent(r.id)
+                                                         : API + '/submissions/' + encodeURIComponent(r.id) + '/page'; }
+    function render(){
+      var m = ms.filter(function(x){ return x.name === sel.value; })[0] || main, k = m.name;
+      var xs = rows.filter(function(r){ return has(r, k); }).sort(function(a, b){
+        var d = a.metrics[k] - b.metrics[k]; return m.better === 'high' ? -d : d; });
+      var tb = el('table'), hd = el('tr'), cols = ['#', 'design', 'by', nice(m) + (unitOf(m) ? ' (' + unitOf(m) + ')' : '')];
+      if (k !== main.name) cols.push(nice(main));
+      cols.push('submitted', '');
+      cols.forEach(function(c){ hd.appendChild(el('th', null, c)); });
+      var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
+      var body = el('tbody');
+      xs.forEach(function(r, i){
+        var tr = el('tr'), td0 = el('td'), a0 = el('a', null, r.display_name || r.id);
+        tr.appendChild(el('td', 'n', String(i + 1)));
+        a0.href = open(r); td0.appendChild(a0); tr.appendChild(td0);
+        tr.appendChild(el('td', 'lbx-by', r.by || '-'));
+        tr.appendChild(el('td', 'n', fmt(r.metrics[k])));
+        if (k !== main.name) tr.appendChild(el('td', 'n', fmt((r.metrics || {})[main.name])));
+        tr.appendChild(el('td', null, day(r.created_at)));
+        var td = el('td', 'lbx-links'), sid = encodeURIComponent(r.id);
+        [['watch', API + '/submissions/' + sid + '/page'], ['bundle', API + '/submissions/' + sid + '/bundle.zip'],
+         ['report', API + '/submissions/' + sid + '/report']].forEach(function(x){
+          var a = el('a', null, x[0]); a.href = x[1]; td.appendChild(a); });
+        tr.appendChild(td); body.appendChild(tr);
+      });
+      tb.appendChild(body); wrap.textContent = ''; wrap.appendChild(tb);
+    }
+    sel.onchange = render; render();
+  }
   // each board's community list, live
   var boxes = document.querySelectorAll('.lbx-live[data-board]');
   if (!boxes.length || typeof fetch !== 'function') return;
@@ -134,28 +202,8 @@ SCRIPT = r"""
     [].forEach.call(boxes, function(box){
       var b = BOARDS[box.getAttribute('data-board')];
       if (!b || !have[b.id]) { box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server does not rank this board yet.')); return; }
-      var task = have[b.id], unit = ((task.metrics || []).filter(function(m){ return m.name === task.rank_by; })[0] || {}).unit || '';
-      get('/leaderboard/' + encodeURIComponent(b.id)).then(function(lb){
-        box.textContent = '';
-        var rows = lb.rows || [];
-        if (!rows.length) { box.appendChild(el('p', 'lbx-empty', 'No submissions yet: the first design that passes is #1.')); return; }
-        var tb = el('table'), hd = el('tr');
-        ['#', 'design', 'by', lb.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', ''].forEach(function(c){ hd.appendChild(el('th', null, c)); });
-        var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
-        var body = el('tbody');
-        rows.forEach(function(r, i){
-          var tr = el('tr');
-          tr.appendChild(el('td', 'n', String(i + 1)));
-          tr.appendChild(el('td', null, r.display_name || '-'));
-          tr.appendChild(el('td', 'lbx-by', r.by || '-'));
-          tr.appendChild(el('td', 'n', fmt(r.rank_value)));
-          tr.appendChild(el('td', null, day(r.created_at)));
-          var td = el('td'), a = el('a', null, 'report'); a.href = API + '/submissions/' + encodeURIComponent(r.id) + '/report';
-          td.appendChild(a); tr.appendChild(td);
-          body.appendChild(tr);
-        });
-        tb.appendChild(body); box.appendChild(tb);
-      }, function(err){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
+      get('/leaderboard/' + encodeURIComponent(b.id)).then(function(lb){ fill(box, box.getAttribute('data-board'), lb); },
+        function(err){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
     });
   }, function(err){
     [].forEach.call(boxes, function(box){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
@@ -164,11 +212,279 @@ SCRIPT = r"""
 """
 
 
-def script() -> str:
+def script(charts=()) -> str:
+    """The blocks' script; `charts` are the boards that have a ranking page (board/<task>/), where a
+    submission opens as a dot in the chart."""
     hints = {k: {"t": t, "d": d} for k, (t, d) in HINTS.items()}
-    js = SCRIPT.replace("__BOARDS__", json.dumps(board_ids())).replace("__LOCAL__", json.dumps(LOCAL_STUDIO))
+    js = (SCRIPT.replace("__BOARDS__", json.dumps(board_ids())).replace("__LOCAL__", json.dumps(LOCAL_STUDIO))
+          .replace("__CHARTS__", json.dumps(sorted(charts))))
     return ("<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, " + json.dumps(hints) + ");</script>"
             f"<script>{js}</script>")
+
+
+# ------------------------------------------------- the official entries in a board's ranking chart
+
+#: what each bundle file is, in the words an entry's detail panel uses
+BUNDLE_FILES = (("device.arch.json", "the device"), ("program.tsir.json", "the compiled program"),
+                ("certified.tsir.json", "the program the checker certified"),
+                ("certificate.qcert.json", "the certificate"), ("manifest.json", "the manifest"))
+
+CHART_CSS = """
+.dot.sub circle.mark{stroke:#fff}
+#tablewrap{overflow-x:auto}
+#tablewrap .tbl td:nth-child(-n+4),#tablewrap .tbl th:nth-child(-n+4){text-align:left}
+#tablewrap .tbl td:first-child,#tablewrap .tbl th:first-child{text-align:right}
+.detail .repro{margin:14px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fafaf8}
+.detail .repro b{display:block;margin-bottom:4px;color:var(--ink)}
+.detail .repro pre{margin:6px 0;padding:8px 10px;background:#f1f0ec;border-radius:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;
+ white-space:pre-wrap;overflow-wrap:anywhere}
+.detail .files{font-size:13px;margin:4px 0 0}.detail .files a{color:var(--accent);margin-right:4px}
+.detail .by{color:#c2185b;font-weight:600}
+"""
+
+CHART_SCRIPT = r"""
+(function(){
+  // A ranking page's chart (DATA, the chart's own script) takes the official leaderboard's entries,
+  // live: a dot each, credited to who submitted it, ranked by any measure the server scores; its
+  // detail opens the studio page the server drew, the bundle's files, and the command that grades
+  // it again on the reader's computer.  On a board's page they join the QCCD study's designs; on a
+  // goal's page (B.goal) they are the whole chart, every code's entries ranked together.
+  var B = __BOARD__, API = '/official/v1', FILES = __FILES__;
+  if (!B || typeof fetch !== 'function' || typeof DATA === 'undefined' || typeof draw !== 'function') return;
+  var FAM = 'submitted to the official leaderboard', COLOR = '#c2185b';
+  var PALETTE = ['#c2185b', '#2a78d6', '#1baf7a', '#eb6834', '#4a3aa7', '#8a8985'];
+  // an official measure -> this chart's (the logical error rate is plotted in units of 1e-4)
+  var SCALE = {ler_per_round: ['ler_round_1e4', 1e4], ler: ['ler_shot_1e4', 1e4],
+               ler_per_round_per_logical: ['ler_logical_1e4', 1e4]};
+  var NAMES = {ler_per_round_per_logical: 'Logical error rate per round per logical qubit (×10⁻⁴)',
+               ler_per_round: 'Logical error rate per round (×10⁻⁴)', ler: 'Logical error rate per shot (×10⁻⁴)',
+               instructions: 'Program — instructions', transport_instructions: 'Program — transport instructions',
+               T_quantinuum: 'Total running time — quantinuum table', T_jones: 'Total running time — jones table',
+               T_transport: 'Total running time — transport table', dacs: 'Resource — DACs',
+               ions_per_instruction: 'Parallelism — ions per transport instruction'};
+  function key(name){ return SCALE[name] ? SCALE[name][0] : name; }
+  function E(t, c, x){ var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function day(t){ return t ? new Date(t * 1000).toISOString().slice(0, 10) : '-'; }
+  function link(text, href, cls){ var a = E('a', cls || null, text); a.href = href; return a; }
+  function say(text){ var el = $('detail'); if (el) { el.className = 'detail empty'; el.textContent = text; } }
+  function options(){
+    [ysel, xsel].forEach(function(s){
+      [].slice.call(s.options).forEach(function(o){ if (o.value !== 'rank') s.removeChild(o); });
+      METRICS.forEach(function(m){ var o = E('option', null, m.name); o.value = m.k; s.appendChild(o); });
+    });
+  }
+  var path = B.goal ? '/goals/' + encodeURIComponent(B.goal) : '/leaderboard/' + encodeURIComponent(B.id);
+  fetch(API + path, {headers: {'Accept': 'application/json'}}).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(lb){
+    var rows = lb.rows || [];
+    if (!rows.length) {
+      if (B.goal) say('No entries yet. The first design submitted to one of this goal’s boards that passes every check is #1.');
+      return;
+    }
+    // every measure the server scores is one to rank by here
+    (lb.metrics || []).forEach(function(m){
+      var k = key(m.name); if (metric(k)) return;
+      var M = {k: k, name: NAMES[m.name] || m.name.replace(/_/g, ' '), better: m.better === 'high' ? 'high' : 'low',
+               unit: (SCALE[m.name] || !m.unit || m.unit === 'count') ? '' : m.unit};
+      if (SCALE[m.name]) M.nd = 3; else if (m.unit === 'count') M.nd = 0;
+      METRICS.push(M);
+    });
+    DATA.forEach(function(d){ if (d.compiled && d.numbers && d.numbers.instructions == null && typeof d.instructions === 'number') d.numbers.instructions = d.instructions; });
+    var codes = [];
+    rows.forEach(function(r, i){
+      var n = {};
+      Object.keys(r.metrics || {}).forEach(function(name){ var v = r.metrics[name];
+        if (typeof v === 'number') n[key(name)] = SCALE[name] ? v * SCALE[name][1] : v; });
+      if (r.ler && typeof r.ler.per_round_lo === 'number') { n.ler_round_lo_1e4 = r.ler.per_round_lo * 1e4; n.ler_round_hi_1e4 = r.ler.per_round_hi * 1e4; }
+      var name = r.display_name || r.id, code = r.release_title || r.release || '';
+      var fam = B.goal ? code : FAM;
+      if (codes.indexOf(fam) < 0) { codes.push(fam); FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : COLOR; }
+      DATA.push({key: 'c-' + r.id, sid: r.id, community: true, by: r.by || '', when: r.created_at, ler: r.ler || null,
+                 place: i + 1, title: name, short: name + ' · ' + (r.by || 'unnamed'), family: fam, compiled: true,
+                 code: code, exp: r.experiment || null, numbers: n, marks: [], rules_failed: [], claim: ''});
+    });
+    var tcols = [key(lb.rank_by)].concat(/^ler_per_round/.test(lb.rank_by) ? ['ler_round_lo_1e4', 'ler_round_hi_1e4'] : []);
+    (lb.metrics || []).forEach(function(m){ var k = key(m.name); if (tcols.indexOf(k) < 0) tcols.push(k); });
+    if (B.goal) {
+      // a goal's chart holds only its entries: the measures none of them has are not offered; the
+      // goal's own comes first, and an error rate (orders of magnitude apart) is drawn on a log scale
+      var main = key(lb.rank_by);
+      var keep = METRICS.filter(function(m){ return DATA.some(function(d){ return val(d, m.k) != null; }); });
+      keep.sort(function(a, b){ return (b.k === main) - (a.k === main); });
+      keep.forEach(function(m){ if (/^ler_/.test(m.k)) m.log = true; });
+      METRICS.length = 0; keep.forEach(function(m){ METRICS.push(m); });
+      options();
+      ysel.value = (Q.y && metric(Q.y)) ? Q.y : key(lb.rank_by);
+      if (Q.x && metric(Q.x)) xsel.value = Q.x;
+      logbox.checked = Q.log != null ? Q.log === '1' : !!(metric(ysel.value) || {}).log;
+      legend = function(){
+        var el = $('legend'); el.innerHTML = '';
+        codes.forEach(function(f){ var s = E('span'), sw = E('i', 'sw'); sw.style.background = FAMHEX[f]; s.appendChild(sw); s.appendChild(document.createTextNode(f)); el.appendChild(s); });
+        el.appendChild(E('span', null, 'each dot is an entry on the official leaderboard, credited to who submitted it'));
+      };
+    } else {
+      options();
+      if (Q.y && metric(Q.y)) ysel.value = Q.y;
+    }
+    // a submitted design is not assessed for the study's buildability: its dot is filled, never hollow
+    var _draw = draw;
+    draw = function(){
+      _draw();
+      [].forEach.call(document.querySelectorAll('#svg .dot'), function(g){
+        if ((g.getAttribute('data-key') || '').indexOf('c-') === 0) { g.classList.remove('hollow'); g.classList.add('sub'); } });
+      var c = $('count'); if (c && !B.goal) c.textContent += ' · ' + rows.length + ' from the official leaderboard';
+    };
+    var _detail = detail;
+    detail = function(d){
+      if (!d || !d.community) return _detail(d);
+      var el = $('detail'); el.className = 'detail'; el.innerHTML = '';
+      var left = E('div'), right = E('div'), sid = encodeURIComponent(d.sid), base = API + '/submissions/' + sid;
+      left.appendChild(E('h2', null, d.title));
+      var f = E('div', 'fam'); f.appendChild(document.createTextNode('submitted by ')); f.appendChild(E('span', 'by', d.by || 'unnamed'));
+      f.appendChild(document.createTextNode(' · ' + day(d.when) + ' · #' + d.place + ' on the official leaderboard' +
+                                            (B.goal && d.code ? ' · ' + d.code : ''))); left.appendChild(f);
+      var p = 'Graded on the official server by the reference evaluator, and every required check passed: the rules, ' +
+              'the proved Lean checker on its certificate, the program against the circuit, and the measures.';
+      if (d.ler && typeof d.ler.per_round === 'number')
+        p += ' Logical error rate per round ' + d.ler.per_round.toExponential(2) + ', 95% interval ' + d.ler.per_round_lo.toExponential(1) +
+             ' to ' + d.ler.per_round_hi.toExponential(1) + ' (' + d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() +
+             ' shots, decoder ' + d.ler.decoder + ', seed ' + d.ler.seed + ').';
+      left.appendChild(E('p', null, p));
+      var btns = E('div', 'btns');
+      btns.appendChild(link('Open in studio — step every instruction', base + '/page', 'btn primary'));
+      var z = link('Download the bundle (.zip)', base + '/bundle.zip', 'btn'); z.setAttribute('download', d.sid + '-bundle.zip'); btns.appendChild(z);
+      btns.appendChild(link('The official report', base + '/report', 'btn'));
+      left.appendChild(btns);
+      var fl = E('div', 'files'); fl.appendChild(document.createTextNode('Its files: '));
+      FILES.forEach(function(x, i){ fl.appendChild(link(x[1], base + '/files/' + x[0])); if (i < FILES.length - 1) fl.appendChild(document.createTextNode(' · ')); });
+      left.appendChild(fl);
+      var rp = E('div', 'repro'); rp.appendChild(E('b', null, 'Reproduce it on your computer'));
+      rp.appendChild(E('span', null, 'Download the bundle, then grade it with the same reference evaluator, in a terminal where QCCD is set up:'));
+      rp.appendChild(E('pre', null, 'qccd grade ' + d.sid + '-bundle.zip'));
+      rp.appendChild(E('span', null, 'It prints every check and every measure, and should give these numbers. Not set up yet? '));
+      rp.appendChild(link('The set-up steps, once', '../../studio.html?agent#design'));
+      rp.appendChild(document.createTextNode('.'));
+      left.appendChild(rp);
+      var tb = E('table');
+      if (d.exp) {
+        var cn = d.code || d.exp.code || '';
+        tb.appendChild(row('code', cn + (d.exp.distance && !/distance/.test(cn) ? ', distance ' + d.exp.distance : '')));
+        tb.appendChild(row('ions', d.exp.ions + ' (' + d.exp.n_data + ' data, ' + d.exp.n_ancilla + ' ancilla)'));
+        tb.appendChild(row('logical qubits', String(d.exp.k) + (d.exp.basis ? ', measured in ' + d.exp.basis.split('').join(' and ') : '')));
+      }
+      METRICS.forEach(function(m){ if (val(d, m.k) != null) tb.appendChild(row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m))); });
+      tb.appendChild(row('submitted by', d.by || 'unnamed'));
+      tb.appendChild(row('official grade', 'every required check passed', 'ok'));
+      right.appendChild(tb);
+      el.appendChild(left); el.appendChild(right);
+    };
+    // the table names who each design is by (and, on a goal's page, its code); the measures are the server's
+    table = function(){
+      var w = $('tablewrap'); w.innerHTML = ''; var yk = ysel.value;
+      var cols = tcols.map(metric).filter(Boolean), lead = B.goal ? ['#', 'design', 'by', 'code', 'ions'] : ['#', 'design', 'by', 'family'];
+      var t = E('table', 'tbl'), tr = E('tr');
+      lead.concat(cols.map(function(m){ return m.name.split(' — ')[1] || m.name; })).forEach(function(h, i){
+        var th = E('th', null, h), c = cols[i - lead.length];
+        if (c) { th.onclick = function(){ ysel.value = c.k; logbox.checked = !!c.log; draw(); pushState(); };
+                 th.title = 'rank by this'; if (c.k === yk) th.style.color = '#0b0b0b'; }
+        tr.appendChild(th); });
+      t.appendChild(tr);
+      var rk = ranked(yk), all = rk.concat(DATA.filter(function(d){ return d.compiled && val(d, yk) == null; }),
+                                           DATA.filter(function(d){ return !d.compiled; }));
+      all.forEach(function(d){
+        var r = E('tr'); if (SEL === d.key) r.className = 'sel'; var i = rk.indexOf(d);
+        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title : shortName(d), d.community ? d.by : 'the QCCD study'];
+        head = head.concat(B.goal ? [d.code || '', d.exp ? String(d.exp.ions) : ''] : [d.community ? 'submitted' : d.family]);
+        head.concat(cols.map(function(m){ return fmt(val(d, m.k), m); })).forEach(function(v){ r.appendChild(E('td', null, v)); });
+        r.onclick = function(){ select(d.key); }; t.appendChild(r);
+      });
+      w.appendChild(t);
+    };
+    draw();
+    if (VIEW === 'table') table();
+    var want = DATA.filter(function(d){ return d.key === Q.sel && d.community; })[0] || (B.goal ? ranked(ysel.value)[0] : null);
+    if (want) { select(want.key); if (Q.sel) { var dt = $('detail'); if (dt && dt.scrollIntoView) dt.scrollIntoView({block: 'start'}); } }
+  }).catch(function(err){
+    // the server did not answer: a board's page keeps the study's ranking; a goal's page says so
+    if (B.goal) say('The official server did not answer (' + err.message + '). Try again in a minute.');
+  });
+})();
+"""
+
+
+_DETAIL = re.compile(r'(<div class="detail empty" id="detail">[^<]*</div>)')
+
+
+def _with_layer(page: str, board: dict, block: str, task: str) -> str:
+    js = (CHART_SCRIPT.replace("__BOARD__", json.dumps(board)).replace("__FILES__", json.dumps(BUNDLE_FILES)))
+    page, n = _DETAIL.subn(lambda m: m.group(1) + block, page, count=1)
+    if not n:
+        page = page.replace("</main>", block + "</main>", 1)
+    tail = f"<style>{CSS}{CHART_CSS}</style>" + script([task]) + f"<script>{js}</script>"
+    return page.replace("</body>", tail + "</body>", 1)
+
+
+def with_submissions(page: str, task: str, title: str) -> str:
+    """A board's ranking page (board/<task>/) as the site serves it: the official entries in its
+    chart (CHART_SCRIPT), and "Try your own design" under the detail panel, before the
+    disqualified list.  Unchanged for a board the official server does not rank."""
+    b = board_ids().get(task)
+    if not b or "</body>" not in page:
+        return page
+    block = board_block(task, title, seed_note=False, live=False, root="../../")
+    return _with_layer(page, {"id": b["id"], "task": task}, block, task)
+
+
+# ------------------------------------------------------------------ a goal: one ranking across codes
+
+def goal_info(goal: str = "goal1") -> dict | None:
+    """The goal as the official service defines it (OfficialService.GOALS), and its boards: the
+    releases on the shared noise model, as (task, release id, title)."""
+    try:
+        from ..official.service import OfficialService
+        from ..workspace.tasks import list_boards
+    except Exception:                       # the workspace package is optional for a site build
+        return None
+    g = OfficialService.GOALS.get(goal)
+    if g is None:
+        return None
+    boards = [(b.manifest["task"], b.id, b.title) for b in list_boards()
+              if (b.manifest.get("qec") or {}).get("noise") == g["noise"]]
+    return {**g, "id": goal, "boards": boards}
+
+
+GOAL_SUB = (
+    "Every implementation under {max_ions} ions, on one ranking: the entries of every curated QEC memory "
+    "on the official leaderboard ({codes}), whichever code it runs and whatever machine it runs on. "
+    "Each was compiled by the reference compiler, judged by every rule, checked by the proved Lean "
+    "checker, and sampled under the same noise model ({noise}) with both bases measured. Ranked by the "
+    "logical error rate per round per logical qubit, lower is better; pick any other measure to rank by. "
+    "Each dot is an entry, credited to who submitted it: click it to watch it in the studio, download its "
+    "bundle, or grade it again on your own computer.")
+
+
+def goal_page(page: str, goal: str = "goal1") -> str | None:
+    """A goal's ranking page (board/<goal>/), made from a memory board's chart page: the same
+    chart, its data the goal's official entries only, every code together (CHART_SCRIPT with
+    B.goal).  None when the goal has no board."""
+    g = goal_info(goal)
+    if not g or not g["boards"] or "</body>" not in page:
+        return None
+    codes = ", ".join(t for _, _, t in g["boards"])
+    h1 = f"Goal 1: {g['title']} — every implementation, ranked" if goal == "goal1" else g["title"]
+    page = re.sub(r"<title>[^<]*</title>", f"<title>{html.escape(h1)}</title>", page, count=1)
+    page = re.sub(r"<h1>[^<]*</h1>", f"<h1>{html.escape(h1)}</h1>", page, count=1)
+    page = re.sub(r'(<h1>[^<]*</h1>\s*<p class="sub">)[^<]*(</p>)',
+                  lambda m: m.group(1) + html.escape(GOAL_SUB.format(max_ions=g["max_ions"], codes=codes,
+                                                                     noise=g["noise"])) + m.group(2), page, count=1)
+    page = re.sub(r"var DATA = \[.*?\];\n", "var DATA = [];\n", page, count=1, flags=re.S)
+    page = re.sub(r'<section class="dq" id="disqualified">.*?</section>', "", page, count=1, flags=re.S)
+    page = page.replace("Click a dot to see the design's numbers, its claim, and the steps to check it on.",
+                        "Loading the official entries&hellip;", 1)
+    task, _, title = g["boards"][0]
+    block = board_block(task, title, seed_note=False, live=False, root="../../").replace(
+        "The magenta dots are designs", "The dots are designs", 1)
+    return _with_layer(page, {"goal": goal}, block, task)
 
 
 # ---------------------------------------------------------------------- /connect/

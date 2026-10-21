@@ -49,7 +49,9 @@ services:
       # the Compiler board's hidden split: the seed lives only here (the worker never runs code)
       # without it there is no hidden split (every report says how many hidden pairs it graded)
       QCCD_HIDDEN_SEED: ${QCCD_HIDDEN_SEED:-}
-    volumes: [data:/data, artifacts:/artifacts:ro, spool:/spool]
+    # artifacts is writable for one thing: the page each graded entry opens (artifacts/pages/<id>.html),
+    # which the grader draws and this worker keeps; the worker never runs submitted code
+    volumes: [data:/data, artifacts:/artifacts, spool:/spool]
     network_mode: none
     restart: unless-stopped
     mem_limit: 256m

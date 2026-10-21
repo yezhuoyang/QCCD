@@ -795,6 +795,11 @@ def _refuse_repository_paths(blob: str) -> None:
             " -- emit the bare artifact name instead of its location in the tree")
 
 
+def _escape_text(s: str) -> str:
+    """Text for an HTML text node (the page's <title>): the names a device or programme file gives."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _escape_blob(blob: str) -> str:
     r"""Make the JSON data block incapable of looking like markup or a network call.
 
@@ -4860,7 +4865,8 @@ def render_html(
     if ruleset:
         # absent unless given, so every other page is byte-identical to before
         view["ruleset"] = ruleset
-    html = _TEMPLATE.replace("__TITLE__", f"{arch.name} - {prog.name}")
+    # names come from the device and programme files, which can be anyone's (a leaderboard entry)
+    html = _TEMPLATE.replace("__TITLE__", _escape_text(f"{arch.name} - {prog.name}"))
     html = html.replace("__STAMP__", page_stamp())
     html = html.replace("__CSSVARS__", css_vars())
     blob = json.dumps(view, separators=(",", ":"))

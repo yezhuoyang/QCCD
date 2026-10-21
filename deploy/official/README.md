@@ -16,12 +16,14 @@ It lives in `/opt/qccd-official/` on the droplet (qccd.academy). That directory 
 `docker-compose.prod.yml`, `.env` (`QCCD_OFFICIAL_TAG=<commit>`) and `VERSION` (the commit,
 the image id and the date). nginx serves `https://qccd.academy/official/v1/…` through
 `/etc/nginx/snippets/qccd-official.conf`, which the site's HTTPS block includes. The api
-listens on 127.0.0.1:8300 only. It is JSON only:
+listens on 127.0.0.1:8300 only. It is JSON, except an entry's studio page (HTML) and its
+bundle (zip):
 
 | endpoint | who |
 |---|---|
-| `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` | anyone |
+| `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` (each row: `by`, every metric, the LER interval) | anyone |
 | `GET /official/v1/submissions/<id>` and `/report` | anyone for public submissions; the uploader (or any key of the same person) for private ones |
+| `GET /official/v1/submissions/<id>/page`, `/files/<name>`, `/bundle.zip` | the same: the studio page the grader drew from the graded bundle (drawn on first request for an entry graded before pages existed, into `artifacts/pages/`), one bundle file, the whole archive |
 | `POST /official/v1/submissions` | an uploader token (`add-uploader`) or a person's key (below); fails closed without one |
 | `POST /official/v1/links`, `GET /v1/links/<code>`, `POST /v1/links/<code>/token` | a workspace signing in (the code, then its key, once) |
 | `POST /official/v1/links/<code>/approve` / `deny` | the site's `/connect/` page, with a grant from the accounts service |

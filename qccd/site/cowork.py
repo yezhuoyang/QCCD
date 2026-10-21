@@ -255,18 +255,22 @@ BOARD_JS = r"""
         sec.appendChild(el('p', 'qo-empty', 'No published submissions yet.'));
       } else {
         var tb = el('table'), hd = el('tr');
-        ['#', 'design', 'by', x.board.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        ['#', 'design', 'by', x.board.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', ''].forEach(function(c){ hd.appendChild(el('th', null, c)); });
         var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
         var body = el('tbody');
         rows.forEach(function(r, i){
           var tr = el('tr');
           tr.appendChild(el('td', 'qo-n', String(i + 1)));
-          tr.appendChild(el('td', null, r.display_name || r.id));
+          var td0 = el('td'), a0 = el('a', null, r.display_name || r.id);
+          a0.href = API + '/submissions/' + encodeURIComponent(r.id) + '/page'; td0.appendChild(a0); tr.appendChild(td0);
           tr.appendChild(el('td', null, r.by || '-'));
           tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
           tr.appendChild(el('td', null, r.created_at ? new Date(r.created_at * 1000).toISOString().slice(0, 10) : '-'));
-          var td = el('td'), a = el('a', null, 'report');
-          a.href = API + '/submissions/' + encodeURIComponent(r.id) + '/report'; td.appendChild(a); tr.appendChild(td);
+          var td = el('td');
+          [['watch', '/page'], ['bundle', '/bundle.zip'], ['report', '/report']].forEach(function(x){
+            var a = el('a', null, x[0]); a.href = API + '/submissions/' + encodeURIComponent(r.id) + x[1];
+            a.style.marginRight = '10px'; td.appendChild(a); });
+          tr.appendChild(td);
           body.appendChild(tr);
         });
         tb.appendChild(body); sec.appendChild(tb);

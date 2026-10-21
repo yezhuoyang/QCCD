@@ -9,8 +9,9 @@ names the board), e.g. to prove a board's heavy grade runs within the server's l
 Builds and grades a local submission of the starter task with this machine's toolchain,
 uploads it as PRIVATE (it never appears on the leaderboard), waits for the server's own
 grade, and compares the two reports.  The token is read from a file and never printed.
-Exit status 0 only when the server graded it eligible, the reports agree, and the public
-leaderboard does not list it.
+Exit status 0 only when the server graded it eligible, the reports agree, neither the public
+leaderboard nor Goal 1's lists it, and the entry opens for its owner (the page the grader drew,
+served sandboxed; a bundle file; the archive, byte for byte) and for nobody else.
 """
 
 from __future__ import annotations
@@ -46,6 +47,18 @@ def _req(method, url, token=None, data=None, headers=None):
             return resp.status, json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         return exc.code, {"error": exc.read().decode("utf-8", "replace")[:500]}
+
+
+def _raw(url, token=None):
+    """GET, keeping the bytes and the headers (a page, a file, an archive)."""
+    r = urllib.request.Request(url)
+    if token:
+        r.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(r, timeout=120) as resp:
+            return resp.status, {k.lower(): v for k, v in resp.headers.items()}, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, {k.lower(): v for k, v in exc.headers.items()}, b""
 
 
 def local_submission(tmp: Path) -> dict:
@@ -126,9 +139,26 @@ def main() -> int:
         st, board = _req("GET", f"{server}/v1/leaderboard/{task}")
         listed = json.dumps(board).find(sid) >= 0
         out["leaderboard"] = {"status": st, "lists_private_submission": listed}
+        st, gb = _req("GET", f"{server}/v1/goals/goal1")
+        listed = listed or json.dumps(gb).find(sid) >= 0
+        out["goal1"] = {"status": st, "rows": len(gb.get("rows", [])) if isinstance(gb, dict) else None,
+                        "lists_private_submission": json.dumps(gb).find(sid) >= 0}
+        # what the entry opens: the page the grader drew (sandboxed), a file, the archive -- for its
+        # owner only, since it is private
+        opens = {}
+        st, hd, body = _raw(f"{server}/v1/submissions/{sid}/page", token)
+        opens["page"] = {"status": st, "bytes": len(body), "sandboxed": hd.get("content-security-policy", "").startswith("sandbox")}
+        st, hd, body = _raw(f"{server}/v1/submissions/{sid}/bundle.zip", token)
+        opens["bundle_is_the_upload"] = st == 200 and body == loc["archive"]
+        st, hd, body = _raw(f"{server}/v1/submissions/{sid}/files/device.arch.json", token)
+        opens["device_file"] = st
+        opens["page_for_a_stranger"] = _raw(f"{server}/v1/submissions/{sid}/page", None)[0]
+        out["opens"] = opens
         par = out.get("parity") or {}
         ok = (out.get("server_eligible") is True and par.get("eligibility_agrees") is True
-              and not par.get("stage_differences") and not listed)
+              and not par.get("stage_differences") and not listed
+              and opens["page"]["status"] == 200 and opens["page"]["sandboxed"] and opens["bundle_is_the_upload"]
+              and opens["device_file"] == 200 and opens["page_for_a_stranger"] == 404)
     out["ok"] = ok
     print(json.dumps(out, indent=1, default=str))
     return 0 if ok else 1

@@ -652,6 +652,7 @@ LOCAL_VERBS: dict[str, str] = {
     "trace": "a person reads what an agent did",
     "login": "a person signs this computer in to qccd.academy with their own account; an agent never can",
     "logout": "a person signs this computer out of qccd.academy",
+    "grade": "re-grades a downloaded submission bundle with the reference evaluator; no workspace is involved",
 }
 
 

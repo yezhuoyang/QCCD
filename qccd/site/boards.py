@@ -115,11 +115,12 @@ def _noise(model: str = "qccd-noise@1") -> dict | None:
 #: and where the platform measures progress on it today.
 GOALS = (
     ("Goal 1", "The best QEC design under 200 ions",
-     "The machine of fewer than 200 ions whose logical memory has the lowest logical error rate per "
-     "round: low enough to challenge the best logical error rates demonstrated so far. Every design "
-     "is compiled by the reference compiler, judged by every rule and sampled under the same noise "
-     "model, so the ranking is a ranking of machines.",
-     "#surface5xz_mem", "Surface code memory, distance 5, both bases: 98 ions, ranked by logical error rate"),
+     "The machine of fewer than 200 ions whose logical memory, in any of the curated codes, has the "
+     "lowest logical error rate per round per logical qubit: low enough to challenge the best logical "
+     "error rates demonstrated so far. Every design is compiled by the reference compiler, judged by "
+     "every rule and sampled under the same noise model with both bases measured, so every "
+     "implementation is on one ranking.",
+     "goal1/", "Every implementation under 200 ions, ranked by logical error rate per logical qubit"),
     ("Goal 2", "A verified resource estimate for Shor's algorithm",
      "A complete fault-tolerant resource estimate for Shor's algorithm (the ions, the time and the "
      "machine it needs), in which every step is compiled and checked rather than modelled: the "
@@ -494,7 +495,10 @@ def declare_board_controls(page: str) -> str:
 
 
 def index_entries() -> list:
-    out = [{"t": "Compiler benchmark", "d": "the Compiler leaderboard's suite, pair by pair, and how to submit a compiler",
+    out = [{"t": "Goal 1: the best QEC design under 200 ions",
+            "d": "every implementation under 200 ions on one ranking, by logical error rate per logical qubit",
+            "u": "board/goal1/", "k": "page"},
+           {"t": "Compiler benchmark", "d": "the Compiler leaderboard's suite, pair by pair, and how to submit a compiler",
             "u": "board/compiler/", "k": "page"},
            {"t": "The noise model", "d": "how a compiled program becomes a logical error rate, channel by channel",
             "u": "board/noise/", "k": "page"},

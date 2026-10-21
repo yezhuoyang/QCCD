@@ -52,9 +52,9 @@ SUITES_DEFAULT = str(Path(__file__).resolve().parents[1] / "bench" / "suites")
 
 try:  # the HTTP layer is optional; the service class works without it (worker, tests)
     from fastapi import FastAPI, Request
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import FileResponse, JSONResponse, Response
 except ImportError:  # pragma: no cover
-    FastAPI = Request = JSONResponse = None
+    FastAPI = Request = JSONResponse = FileResponse = Response = None
 
 __all__ = ["OfficialService", "OfficialError", "create_app"]
 
@@ -419,17 +419,146 @@ class OfficialService:
             raise OfficialError("unknown_task", f"no task {task!r}", 404)
         key = rel.manifest.get("rank_by")
         better = next((m.get("better") for m in rel.manifest.get("metrics", []) if m["name"] == key), "low")
+        rows, units = self._ranked_rows(task)
+        rows.sort(key=lambda r: (r["rank_value"] if better == "low" else -(r["rank_value"] or 0)))
+        metrics = [{"name": m["name"], "better": m.get("better", "low"), "unit": units.get(m["name"]) or m.get("unit")}
+                   for m in rel.manifest.get("metrics", [])]
+        return {"task": task, "task_digest": rel.digest, "evaluator_policy": self.evaluator_policy,
+                "title": rel.title, "track": rel.manifest.get("track"),
+                "rank_by": key, "better": better, "metrics": metrics, "rows": rows}
+
+    def _ranked_rows(self, task: str) -> tuple[list, dict]:
+        """A release's public, eligible entries under the current policy, each with its credit,
+        every metric its report scored, and for a memory board the sample behind its logical
+        error rate and the experiment it ran; and the metrics' units."""
         rows = self.db.all("SELECT s.id, s.display_name, s.credit AS by_name, s.bundle_digest, s.created_at, "
-                           "r.rank_value, r.report_digest "
+                           "r.rank_value, r.report_digest, r.report "
                            "FROM submissions s JOIN reports r ON r.submission=s.id "
                            "WHERE s.task=? AND s.visibility='public' AND r.superseded_by IS NULL AND r.eligible=1 "
                            "AND r.evaluator_policy=?", (task, self.evaluator_policy))
+        units: dict = {}
         for r in rows:
             r["by"] = r.pop("by_name") or ""          # who submitted it: the credit the leaderboard shows
-        rows.sort(key=lambda r: (r["rank_value"] if better == "low" else -(r["rank_value"] or 0)))
-        return {"task": task, "task_digest": rel.digest, "evaluator_policy": self.evaluator_policy,
-                "title": rel.title, "track": rel.manifest.get("track"),
-                "rank_by": key, "better": better, "rows": rows}
+            # every metric the report scored, so a reader can rank by any of them, not only rank_by
+            rep = json.loads(r.pop("report") or "{}")
+            r["metrics"] = {k: v.get("value") for k, v in (rep.get("metrics") or {}).items()}
+            for k, v in (rep.get("metrics") or {}).items():
+                units.setdefault(k, v.get("unit"))
+            # a memory board's logical error rate is a sample: its 95% interval and the shots behind it
+            det = next((s.get("detail", {}) for s in rep.get("stages", []) if s.get("id") == "ler"), None) or {}
+            ler = det.get("ler")
+            if isinstance(ler, dict):
+                r["ler"] = {k: ler.get(k) for k in ("per_round", "per_round_lo", "per_round_hi", "ler", "lo", "hi",
+                                                    "errors", "shots", "rounds", "decoder", "seed")}
+            exp = det.get("experiment")
+            if isinstance(exp, dict):
+                # the experiment's own count when it states one (qccd.qec.experiments, since 84e8c5d);
+                # an older report's from its observables: a two-basis memory measures each logical
+                # qubit twice
+                obs = int(exp.get("observables") or 0)
+                k = exp.get("logical_qubits") or max(1, obs // 2 if str(exp.get("basis", "")).upper() == "XZ" else obs)
+                ions = exp.get("ions") or int(exp.get("n_data") or 0) + int(exp.get("n_ancilla") or 0)
+                r["experiment"] = {"code": exp.get("code"), "distance": exp.get("distance"), "basis": exp.get("basis"),
+                                   "rounds": exp.get("rounds"), "n_data": exp.get("n_data"),
+                                   "n_ancilla": exp.get("n_ancilla"), "ions": int(ions), "k": int(k)}
+        return rows, units
+
+    # ------------------------------------------------------------------ the goals: one ranking across codes
+
+    #: The Leaderboard's goals (qccd/site/boards.py GOALS).  Goal 1 ranks every implementation
+    #: under 200 ions together: the entries of every curated QEC-memory release under the shared
+    #: noise model, whichever code it runs, by the logical error rate per round PER LOGICAL QUBIT
+    #: (both bases measured).  The user's decisions of 2026-10-21: curated codes, each a vetted
+    #: release; that normalisation.
+    GOALS = {"goal1": {"title": "The best QEC design under 200 ions", "noise": "qccd-noise@2", "max_ions": 200,
+                       "rank_by": "ler_per_round_per_logical", "better": "low",
+                       "unit": "per round per logical qubit"}}
+
+    def goal_releases(self, goal: str) -> list:
+        g = self.GOALS[goal]
+        return [r for r in self.releases.values()
+                if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]]
+
+    def goal_board(self, goal: str) -> dict:
+        """One ranking across releases: every member release's entries, each with its release and
+        the experiment it ran (code, distance, ions, logical qubits), ranked by the goal's
+        measure.  An entry whose experiment exceeds the goal's ions is not on it."""
+        g = self.GOALS.get(goal)
+        if g is None:
+            raise OfficialError("unknown_goal", f"no goal {goal!r}", 404)
+        rels, rows, units, names = self.goal_releases(goal), [], {}, []
+        for rel in rels:
+            rr, u = self._ranked_rows(rel.id)
+            for k, v in u.items():
+                units.setdefault(k, v)
+            for m in rel.manifest.get("metrics", []):
+                if m["name"] not in names:
+                    names.append(m["name"])
+            for r in rr:
+                exp = r.get("experiment") or {}
+                if not exp or exp["ions"] > g["max_ions"]:
+                    continue
+                m = r["metrics"]
+                if not isinstance(m.get(g["rank_by"]), (int, float)) and isinstance(m.get("ler_per_round"), (int, float)):
+                    m[g["rank_by"]] = m["ler_per_round"] / exp["k"]      # graded before the measure existed
+                r.update(release=rel.id, release_title=rel.title, rank_value=m.get(g["rank_by"]))
+                rows.append(r)
+        rows = [r for r in rows if isinstance(r["rank_value"], (int, float))]
+        rows.sort(key=lambda r: r["rank_value"] if g["better"] == "low" else -r["rank_value"])
+        units.setdefault(g["rank_by"], g["unit"])
+        names = [g["rank_by"]] + [n for n in names if n != g["rank_by"]]
+        better = {m["name"]: m.get("better", "low") for rel in rels for m in rel.manifest.get("metrics", [])}
+        better[g["rank_by"]] = g["better"]
+        return {"goal": goal, "title": g["title"], "evaluator_policy": self.evaluator_policy,
+                "noise": g["noise"], "max_ions": g["max_ions"], "rank_by": g["rank_by"], "better": g["better"],
+                "releases": [{"id": r.id, "title": r.title, "task_digest": r.digest} for r in rels],
+                "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],
+                "rows": rows}
+
+    # ------------------------------------------------------------------ what a reader can open
+
+    #: the bundle's files a reader may download: the manifest and every role's file
+    READABLE = ("manifest.json", "device.arch.json", "program.tsir.json", "certified.tsir.json",
+                "certificate.qcert.json", "presentation.json")
+
+    def _readable(self, sid: str, uploader: dict | None) -> dict:
+        """A submission a reader may open: public or unlisted, or private and their own; a design
+        bundle (a compiler archive is not a design to play)."""
+        row = self.db.one("SELECT * FROM submissions WHERE id=?", (sid,))
+        if row is None or (row["visibility"] == "private" and not self._owns(uploader, row)):
+            raise OfficialError("not_found", "no such submission", 404)
+        if self.is_suite(row["task"]):
+            raise OfficialError("not_a_design", "a compiler submission has no design files", 404)
+        return row
+
+    def bundle_archive(self, sid: str, uploader: dict | None) -> bytes:
+        row = self._readable(sid, uploader)
+        return (self.artifacts / f"{row['archive_sha256']}.zip").read_bytes()
+
+    def bundle_file(self, sid: str, name: str, uploader: dict | None) -> bytes:
+        import io
+        import zipfile
+        if name not in self.READABLE:
+            raise OfficialError("not_found", f"a bundle holds {', '.join(self.READABLE)}", 404)
+        with zipfile.ZipFile(io.BytesIO(self.bundle_archive(sid, uploader))) as z:
+            members = {Path(n).name: n for n in z.namelist() if not n.endswith("/")}
+            if name not in members:
+                raise OfficialError("not_found", f"this bundle has no {name}", 404)
+            return z.read(members[name])
+
+    def entry_page(self, sid: str, uploader: dict | None) -> Path:
+        """The studio page of a graded submission (pages.py), drawn by the grader beside its
+        report.  This service never draws one (it runs in a small container, and the page is
+        made from an uploaded bundle): an entry graded before pages existed gets its page from
+        a regrade."""
+        row = self._readable(sid, uploader)
+        page = self.artifacts / "pages" / f"{sid}.html"
+        if not page.exists():
+            if row["status"] not in ("eligible", "ineligible"):
+                raise OfficialError("not_ready", "the submission has not been graded yet", 409)
+            raise OfficialError("no_page", "this entry has no page yet: it was graded before pages existed, "
+                                "and a regrade draws one; its files and bundle are here meanwhile", 404)
+        return page
 
     def tasks(self) -> list:
         return [r.summary() for r in self.releases.values()]
@@ -443,6 +572,15 @@ class OfficialService:
                             ("oj_" + secrets.token_hex(8), s["id"], _now()))
             n += 1
         return n
+
+
+#: an entry's page is drawn from an uploaded bundle: it runs sandboxed, in an opaque origin, so
+#: nothing in it can act as a page of qccd.academy (no cookies, storage or same-origin calls)
+PAGE_HEADERS = {"Content-Security-Policy": "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox "
+                                           "allow-downloads allow-modals",
+                "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
+#: a bundle file or archive is a download, never a page
+DOWNLOAD_HEADERS = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"}
 
 
 def create_app(svc: OfficialService):
@@ -506,6 +644,40 @@ def create_app(svc: OfficialService):
     async def board(task: str):
         try:
             return svc.leaderboard(task)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/goals/{goal}")
+    async def goal_board(goal: str):
+        try:
+            return svc.goal_board(goal)
+        except OfficialError as e:
+            return err(e)
+
+    # ---- what a leaderboard entry opens: its animation, its files, its whole bundle
+    @app.get("/v1/submissions/{sid}/page")
+    async def entry_page(sid: str, request: Request):
+        try:
+            return FileResponse(svc.entry_page(sid, who(request, False)), media_type="text/html; charset=utf-8",
+                                headers=PAGE_HEADERS)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/submissions/{sid}/files/{name}")
+    async def bundle_file(sid: str, name: str, request: Request):
+        try:
+            data = svc.bundle_file(sid, name, who(request, False))
+            return Response(data, media_type="application/json",
+                            headers={"Content-Disposition": f'attachment; filename="{sid}-{name}"', **DOWNLOAD_HEADERS})
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/submissions/{sid}/bundle.zip")
+    async def bundle_zip(sid: str, request: Request):
+        try:
+            data = svc.bundle_archive(sid, who(request, False))
+            return Response(data, media_type="application/zip",
+                            headers={"Content-Disposition": f'attachment; filename="{sid}-bundle.zip"', **DOWNLOAD_HEADERS})
         except OfficialError as e:
             return err(e)
 

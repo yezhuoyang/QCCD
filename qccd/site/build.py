@@ -877,7 +877,8 @@ def board_index(ts: list[dict]) -> str:
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)
             cowork.board_section() + "</section>" +
-            boards.compiler_section() + cowork.board_script() + leaderboard.script())
+            boards.compiler_section() + cowork.board_script()
+            + leaderboard.script(t["id"] for t in ts if (t["seed_dir"] / "index.html").exists()))
     return PAGE.format(title="Leaderboard - QCCD studio", style=STYLE,
                        extra_css=qec_cycle.CSS + boards.CSS + boards.GOALS_CSS + leaderboard.CSS, body=body)
 
@@ -2124,8 +2125,11 @@ def build(out: Path) -> int:
             continue
         dst = out / "board" / t["id"]
         dst.mkdir(parents=True, exist_ok=True)
-        # the chart's controls are declared as the page is copied (qccd/site/boards.py)
-        put(f"board/{t['id']}/index.html", lb.declare_board_controls((src / "index.html").read_text(encoding="utf-8")),
+        # the chart's controls are declared as the page is copied (qccd/site/boards.py), and the
+        # official leaderboard's entries join its chart, live (qccd/site/leaderboard.py)
+        put(f"board/{t['id']}/index.html",
+            lb.declare_board_controls(leaderboard.with_submissions(
+                (src / "index.html").read_text(encoding="utf-8"), t["id"], t["title"])),
             2, "board", extra=FOOTER_BLOCK + BOARD_SKIN)
         # the published manifest carries only the listed designs; the seed directory keeps
         # the full record, disqualified rows included.  Where a row names a file on the
@@ -2151,6 +2155,16 @@ def build(out: Path) -> int:
             if gif and (src.parent / gif).exists():
                 shutil.copy2(src.parent / gif, out / "board" / gif)
         print(f"  {t['id']:12s} {sum(1 for r in t['rows'] if r.get('status') == 'ok'):3d} entries from {src.relative_to(ROOT)}")
+    # Goal 1: every implementation under 200 ions on one ranking, every code's official entries
+    # together (qccd/site/leaderboard.py goal_page), drawn in a memory board's chart
+    g = leaderboard.goal_info("goal1")
+    by_task = {t["id"]: t for t in ts}
+    src = next((by_task[task]["seed_dir"] / "index.html" for task, _, _ in (g or {}).get("boards", [])
+                if task in by_task and (by_task[task]["seed_dir"] / "index.html").exists()), None)
+    goal = leaderboard.goal_page(src.read_text(encoding="utf-8"), "goal1") if src else None
+    if goal:
+        put("board/goal1/index.html", lb.declare_board_controls(goal), 2, "board", extra=FOOTER_BLOCK + BOARD_SKIN)
+        print(f"  goal1        {len(g['boards'])} board(s): {', '.join(t for t, _, _ in g['boards'])}")
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
     print(f"wrote {out}  ({n_pages} entry pages, {len(index)} search entries, {total / 1e6:.0f} MB)")
     return 0

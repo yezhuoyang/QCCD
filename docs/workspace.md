@@ -642,7 +642,19 @@ leaderboard shows who submitted each design.
 - **Terminal.** `qccd login` (and `qccd logout`) do the same sign-in. `qccd publish
   --submission <id>` reviews the bundle, asks for its digest to be typed, and submits it as the
   signed-in person. `qccd leaderboard --official --board <title>` shows the board with `by`,
-  and the person's own requests.
+  and the person's own requests. `qccd grade <bundle.zip>` grades any entry's downloaded
+  bundle on this computer with the reference evaluator the server runs, and prints every
+  check and measure; its metrics match the entry's official report.
+
+**An entry on the website.** A public entry is a dot in its board's ranking chart
+(`/board/<task>/`), credited to who submitted it, and the board can be ranked by any measure
+its server scores (the board's own ranking first: the logical error rate per round on a
+memory board). Its detail panel opens what the grader drew from the graded bundle, the studio
+page you step through instruction by instruction (`GET /official/v1/submissions/<id>/page`),
+each bundle file (`.../files/<name>`: the device, the compiled program, the certified program,
+the certificate, the manifest), the whole bundle (`.../bundle.zip`), the official report, and
+the `qccd grade` line that reproduces it. A private entry opens nothing for anyone but its
+owner.
 
 **Signing in** is a device link (`qccd/official/accounts.py`). The password is typed on the
 site only; the workspace never sees it.
@@ -945,6 +957,7 @@ qccd validate --board surface --json     # a draft grade of the head revision
 qccd login                               # sign this computer in with YOUR qccd.academy account (once)
 qccd publish --submission <sub_id>       # review, type the digest, submit it in your name
 qccd leaderboard --official --board "BB [[144,12,12]]"   # the official ranking, with who submitted each
+qccd grade sub_0123456789ab-bundle.zip   # grade an entry's downloaded bundle here, as the server did
 qccd logout                              # sign this computer out (its key is revoked)
 qccd publish --approval <ap_id> --server https://qccd.academy/official   # a maintainer's token instead
 qccd trace                               # what the agents did: every request, step by step

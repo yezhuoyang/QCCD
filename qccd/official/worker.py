@@ -45,12 +45,15 @@ MAX_ATTEMPTS = 3
 COMPILER_TIMEOUT_S = float(os.environ.get("QCCD_GRADER_COMPILER_TIMEOUT_S", "10800"))
 
 
-def _job_timeout(job_dir: Path, default: float) -> float:
+def _job_kind(job_dir: Path) -> str | None:
     try:
-        kind = json.loads((job_dir / "job.json").read_text(encoding="utf-8")).get("kind")
+        return json.loads((job_dir / "job.json").read_text(encoding="utf-8")).get("kind")
     except (OSError, ValueError):
-        kind = None
-    return max(default, COMPILER_TIMEOUT_S) if kind == "compiler" else default
+        return None
+
+
+def _job_timeout(job_dir: Path, default: float) -> float:
+    return max(default, COMPILER_TIMEOUT_S) if _job_kind(job_dir) == "compiler" else default
 
 
 def _now() -> float:
@@ -74,6 +77,24 @@ def grade_one(job_dir: Path, releases: Path, suites: Path | None = None) -> int:
         rep = grade(rel, job_dir / "bundle", "reference", workdir=Path(td),
                     run={"job_id": job["job"], "grader": socket.gethostname()})
     (job_dir / "report.json").write_text(json.dumps(rep, sort_keys=True), encoding="utf-8")
+    return 0
+
+
+#: the largest entry page the service keeps (a 98-ion memory board's is about 2.5 MB)
+MAX_PAGE_BYTES = 64 * 1024 * 1024
+PAGE_TIMEOUT_S = 600.0
+
+
+def draw_page(job_dir: Path, releases: Path) -> int:
+    """The page the leaderboard entry opens (pages.py), from the bundle just graded, into
+    page.html beside the report.  Run as its own limited child after a passing grade."""
+    from ..workspace.tasks import TaskRelease
+    from .pages import render_entry_page
+    job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+    rid = str(job["release"])
+    if "/" in rid or "\\" in rid or ".." in rid:
+        raise SystemExit("bad release id")
+    render_entry_page(job_dir / "bundle", TaskRelease.load(Path(releases) / rid), job_dir / "page.html")
     return 0
 
 
@@ -118,9 +139,17 @@ def _grade_subprocess(job_dir: Path, releases: Path, timeout: float) -> str:
                     "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
                     "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
                     "LANG", "LC_ALL", "LC_CTYPE")}
+    mem = int(os.environ.get("QCCD_GRADER_MEM_MB", "16384"))
     r = run_limited([sys.executable, "-m", "qccd.official.worker", "one", str(job_dir), "--releases", str(releases)],
-                    timeout=timeout, mem_mb=int(os.environ.get("QCCD_GRADER_MEM_MB", "16384")), env=env)
+                    timeout=timeout, mem_mb=mem, env=env)
     if r.status == "ok" and (job_dir / "report.json").exists():
+        # the entry's page, in a child of its own: a page that cannot be drawn never costs the grade
+        if _job_kind(job_dir) != "compiler":
+            p = run_limited([sys.executable, "-m", "qccd.official.worker", "page", str(job_dir), "--releases", str(releases)],
+                            timeout=PAGE_TIMEOUT_S, mem_mb=mem, env=env)
+            if p.status != "ok" or not (job_dir / "page.html").exists():
+                (job_dir / "page.err").write_text(f"{p.status}: {(p.stderr or '')[-4000:]}", encoding="utf-8")
+                (job_dir / "page.html").unlink(missing_ok=True)
         return "ok"
     (job_dir / "grader.log").write_text((r.stdout + "\n" + r.stderr)[-20000:], encoding="utf-8")
     return r.status
@@ -223,6 +252,15 @@ def process_one(svc, spool: Path, *, inline: bool, releases: Path, timeout: floa
     status = (out / "DONE").read_text(encoding="utf-8").strip()
     if status == "ok":
         report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+        page = out / "page.html"
+        if page.exists() and page.stat().st_size <= MAX_PAGE_BYTES:
+            try:
+                pages = svc.artifacts / "pages"
+                pages.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(page, pages / f".{sub['id']}.tmp")
+                os.replace(pages / f".{sub['id']}.tmp", pages / f"{sub['id']}.html")
+            except OSError as exc:       # the page is a convenience: the grade is recorded regardless
+                print(f"[worker] {sub['id']}: page not kept: {exc}", file=sys.stderr, flush=True)
         svc.record_report(sub["id"], report)
         svc.db.execute("UPDATE jobs SET status='succeeded', finished_at=?, error=NULL WHERE id=?", (_now(), job["id"]))
     else:
@@ -264,9 +302,14 @@ def main(argv=None) -> int:
     p = sub.add_parser("one")
     p.add_argument("job_dir")
     p.add_argument("--releases", default=rel_default)
+    p = sub.add_parser("page")
+    p.add_argument("job_dir")
+    p.add_argument("--releases", default=rel_default)
     a = ap.parse_args(argv)
     if a.cmd == "one":
         return grade_one(Path(a.job_dir), Path(a.releases), Path(_suites_default()))
+    if a.cmd == "page":
+        return draw_page(Path(a.job_dir), Path(a.releases))
     if a.cmd == "grader":
         run_grader(Path(a.spool), Path(a.releases))
         return 0
