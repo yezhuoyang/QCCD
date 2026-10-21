@@ -847,7 +847,7 @@ var QCCD_TUTORIAL = {
       story: 'A programme said it would cost two. The replay said three.',
       teaches: ['rule:R9', 'rule:R10', 'tab:R'],
       text: [
-        'A programme may make claims about itself: `p.claim(total_steps=4, total_cost=3)`. [[R9|rule:R9]] checks each claim against the replay. The browser does not run R9, so the [[Report|tab:R]] shows it grey, and the box below shows the checker\'s verdict.',
+        'A programme may make claims about itself: `p.claim(total_steps=5, total_cost=3)`. [[R9|rule:R9]] checks each claim against the replay. The browser does not run R9, so the [[Report|tab:R]] shows it grey, and the box below shows the checker\'s verdict.',
         '[[R10|rule:R10]] says a compiled programme does what its circuit says. It needs the circuit, and no lesson so far had one.',
         'What a badge colour means. **Green:** the check ran and passed. **Red:** it ran and failed. **Amber:** it ran, but can only give a bound. **Grey:** it did not run here, and the page says why. Nothing on this page is green for a check that did not run.'
       ],
@@ -858,7 +858,7 @@ var QCCD_TUTORIAL = {
           check: ['answer', 'notrun'] },
         { breaks: [['shipped', 'R9', 'loaded', 'R9', 'failed']],
           exercise: 'In step 1 the box showed the claim (cost 2, 3 steps) and what the replay found. In **Write**, correct the `p.claim` line to the true numbers: **COST** and **STEPS** in the top bar show them. The box below now shows the checker\'s verdict on a corrected programme.',
-          check: ['all', ['rulesPass'], ['claimIs', 'total_steps', 4], ['claimIs', 'total_cost', 3], ['shipped', 'R9', 'fixed', 'R9', 'passed']],
+          check: ['all', ['rulesPass'], ['claimIs', 'total_steps', 5], ['claimIs', 'total_cost', 3], ['shipped', 'R9', 'fixed', 'R9', 'passed']],
           verdict: { 'case': 'R9', which: 'fixed' } },
         { exercise: 'R10 has been grey on every page of this course so far. Why?',
           check: ['answer', 'nocircuit'],
@@ -885,11 +885,11 @@ var QCCD_TUTORIAL = {
     // =============================================================== C1
     { id: 'C1', part: 'C', title: 'A syndrome round of the repetition code',
       story: 'Three data ions, two check ions, four CNOTs, two measurements: the smallest error-correcting round, on a line of five sites.',
-      teaches: ['p:gate', 'p:measure', 'rule:R1', 'rule:R6b'],
+      teaches: ['p:gate', 'p:measure', 'rule:R1', 'rule:R6b', 'rule:R7'],
       text: [
         'The three-qubit repetition code keeps one logical bit in `d0 d1 d2`. Two check ions ask whether neighbours agree: `c0` checks `d0` and `d1`, and `c1` checks `d1` and `d2`.',
         'As a circuit: four CNOTs, CX(d0,c0), CX(d1,c0), CX(d1,c1), CX(d2,c1), then measure both checks.',
-        'The ions start in the order `d0 c0 d1 c1 d2`, in `S0` to `S4`. Each site holds two. So a check ion can visit a data ion, but both checks cannot be in `S2` with `d1` at once ([[R1|rule:R1]]). Each gate needs both ions in one site ([[R6b|rule:R6b]]). One `p.cool()` anywhere is enough for this little heat.'
+        'The ions start in the order `d0 c0 d1 c1 d2`, in `S0` to `S4`. Each site holds two. So a check ion can visit a data ion, but both checks cannot be in `S2` with `d1` at once ([[R1|rule:R1]]). Each gate needs both ions in one site ([[R6b|rule:R6b]]). Every move warms the ion that moves, and a gate needs it cold ([[R7|rule:R7]]): cool before each gate that follows a move.'
       ],
       setup: [
         ['newCanvas', { name: 'line5' }],
@@ -909,12 +909,12 @@ var QCCD_TUTORIAL = {
       nudges: {
         gateBetween: ['A CNOT is missing: {have}', 'Four pairs: d0-c0, d1-c0, d1-c1, d2-c1. Check the ion names in each.'],
         measured: ['Not measured yet: {have}.'],
-        rulesPass: ['A rule fails: {have}', 'Both checks and d1 cannot all be in S2. Move c0 away before c1 comes.'],
+        rulesPass: ['A rule fails: {have}', 'A gate right after a move fails R7: put p.cool() between them.', 'Both checks and d1 cannot all be in S2. Move c0 away before c1 comes.'],
         lowered: ['The text did not run: {have}'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
       praise: 'A syndrome round, by hand: {frames} instructions, {steps} steps, cost {cost}. Each CNOT of the circuit is a trip and a gate, and you scheduled all four under the rules.',
-      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.shuttle("c0", ["S1", "S0"])\np.gate("CX", [["d0", "c0"]])\np.shuttle("c0", ["S0", "S1", "S2"])\np.gate("CX", [["d1", "c0"]])\np.shuttle("c0", ["S2", "S1"])\np.shuttle("c1", ["S3", "S2"])\np.gate("CX", [["d1", "c1"]])\np.shuttle("c1", ["S2", "S3", "S4"])\np.gate("CX", [["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
+      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.shuttle("c0", ["S1", "S0"])\np.cool()\np.gate("CX", [["d0", "c0"]])\np.shuttle("c0", ["S0", "S1", "S2"])\np.cool()\np.gate("CX", [["d1", "c0"]])\np.shuttle("c0", ["S2", "S1"])\np.shuttle("c1", ["S3", "S2"])\np.cool()\np.gate("CX", [["d1", "c1"]])\np.shuttle("c1", ["S2", "S3", "S4"])\np.cool()\np.gate("CX", [["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
 
     // =============================================================== C2
     { id: 'C2', part: 'C', title: 'Parallelism under the rules',
@@ -924,7 +924,7 @@ var QCCD_TUTORIAL = {
         'Two rules allow more than your first round used. [[R12|rule:R12]] forbids two gates in one trap per step, but two gates in two different traps may share an instruction: `p.gate("CX", [["d0", "c0"], ["d1", "c1"]])`.',
         '[[R4|rule:R4]] lets one `p.simd` move many ions in one step, if they all move the same way. One step is one signal on the electrodes ([[R22|rule:R22]]), so `d0` moving right while `d2` moves left takes two steps.',
         'So choose moves that agree. The two check ions are as far apart as the data ions they visit: move them together, and every move is shared.',
-        'The C1 solution took 13 steps. **STEPS** in the top bar shows your count.'
+        'The C1 solution took 24 steps. **STEPS** in the top bar shows your count.'
       ],
       setup: [
         ['newCanvas', { name: 'line5' }],
@@ -939,8 +939,8 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'S3', 'S4', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\n']],
-      exercise: 'The same round (four CNOTs, both checks measured) in **at most 10 steps**.',
-      check: ['all', ['gateBetween', 'd0', 'c0', 'CX'], ['gateBetween', 'd1', 'c0', 'CX'], ['gateBetween', 'd1', 'c1', 'CX'], ['gateBetween', 'd2', 'c1', 'CX'], ['measured', ['c0', 'c1']], ['rulesPass'], ['stepsAtMost', 10]],
+      exercise: 'The same round (four CNOTs, both checks measured) in **at most 12 steps**.',
+      check: ['all', ['gateBetween', 'd0', 'c0', 'CX'], ['gateBetween', 'd1', 'c0', 'CX'], ['gateBetween', 'd1', 'c1', 'CX'], ['gateBetween', 'd2', 'c1', 'CX'], ['measured', ['c0', 'c1']], ['rulesPass'], ['stepsAtMost', 12]],
       nudges: {
         gateBetween: ['A CNOT is missing: {have}'],
         measured: ['Not measured yet: {have}.'],
@@ -949,8 +949,8 @@ var QCCD_TUTORIAL = {
         lowered: ['The text did not run: {have}'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: '{steps} steps for the round that took 13. Nothing was skipped: four CNOTs, two measurements, and no rule failed. The machine simply did several legal things at once.',
-      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.simd("shuttle", [["c0", "S1", "S0"], ["c1", "S3", "S2"]])\np.gate("CX", [["d0", "c0"], ["d1", "c1"]])\np.simd("shuttle", [["c0", "S0", "S1"], ["c1", "S2", "S3"]])\np.simd("shuttle", [["c0", "S1", "S2"], ["c1", "S3", "S4"]])\np.gate("CX", [["d1", "c0"], ["d2", "c1"]])\np.simd("shuttle", [["c0", "S2", "S1"], ["c1", "S4", "S3"]])\np.measure(["c0", "c1"])\n' } },
+      praise: '{steps} steps for the round that took 24. Nothing was skipped: four CNOTs, two measurements, and no rule failed. The machine simply did several legal things at once.',
+      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.simd("shuttle", [["c0", "S1", "S0"], ["c1", "S3", "S2"]])\np.cool()\np.gate("CX", [["d0", "c0"], ["d1", "c1"]])\np.simd("shuttle", [["c0", "S0", "S1"], ["c1", "S2", "S3"]])\np.simd("shuttle", [["c0", "S1", "S2"], ["c1", "S3", "S4"]])\np.cool()\np.gate("CX", [["d1", "c0"], ["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
 
     // =============================================================== C3
     { id: 'C3', part: 'C', title: 'One plaquette',
@@ -1009,8 +1009,8 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'J0', 'S3', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\n']],
-      exercise: 'Two full rounds (eight CNOTs, two measurements, a reset between them) in **under 3500 us** (3.5 ms). No rule may fail.',
-      check: ['all', ['gateCount', 'CX', 8], ['measured', ['a0']], ['hasFrame', 'reset'], ['runtimeAtMost', 3500], ['rulesPass']],
+      exercise: 'Two full rounds (eight CNOTs, two measurements, a reset between them) in **under 4500 us** (4.5 ms). No rule may fail.',
+      check: ['all', ['gateCount', 'CX', 8], ['measured', ['a0']], ['hasFrame', 'reset'], ['runtimeAtMost', 4500], ['rulesPass']],
       nudges: {
         gateCount: ['{have} CX gates so far; two rounds need eight.'],
         hasFrame: ['No reset between the rounds: add p.reset(["a0"]) after the first measurement.'],
@@ -1021,8 +1021,8 @@ var QCCD_TUTORIAL = {
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
       praise: 'Two rounds in {us} us: {gates} CNOTs, six crossings, six coolings, and a reset between. That is a syndrome extraction loop, scheduled by hand with no rule failing. Part D shows what the compiler makes of the same job.',
-      challenge: { label: 'sharp', exercise: 'Cool only where a gate needs it: after each crossing, cool just `a0` with `p.cool(["a0"])`, and nothing else. Stay under 3500 us, with no rule failing.',
-                   check: ['all', ['gateCount', 'CX', 8], ['runtimeAtMost', 3500], ['rulesPass'], ['not', ['broadcastCool']]],
+      challenge: { label: 'sharp', exercise: 'Cool only where a gate needs it: after each crossing, cool just `a0` with `p.cool(["a0"])`, and nothing else. Stay under 4500 us, with no rule failing.',
+                   check: ['all', ['gateCount', 'CX', 8], ['runtimeAtMost', 4500], ['rulesPass'], ['not', ['broadcastCool']]],
                    praise: 'Targeted cooling, and the same runtime: on this chip a cooling pulse costs the same for one ion as for all. Now you know that about the model.' },
       solution: { program: 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\np.cool()\np.gate("CX", [["d0", "a0"]])\np.shuttle("a0", ["S0", "J0", "S1"])\np.cool()\np.gate("CX", [["d1", "a0"]])\np.shuttle("a0", ["S1", "J0", "S2"])\np.cool()\np.gate("CX", [["d2", "a0"]])\np.shuttle("a0", ["S2", "J0", "S3"])\np.cool()\np.gate("CX", [["d3", "a0"]])\np.measure(["a0"])\np.reset(["a0"])\np.gate("CX", [["d3", "a0"]])\np.shuttle("a0", ["S3", "J0", "S2"])\np.cool()\np.gate("CX", [["d2", "a0"]])\np.shuttle("a0", ["S2", "J0", "S1"])\np.cool()\np.gate("CX", [["d1", "a0"]])\np.shuttle("a0", ["S1", "J0", "S0"])\np.cool()\np.gate("CX", [["d0", "a0"]])\np.measure(["a0"])\n' } },
 
