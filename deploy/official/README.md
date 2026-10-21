@@ -103,7 +103,23 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-21, from commit `d2da98d` (pushed, also on `website/invitations`):
+**Deployed** 2026-10-21 (afternoon), from commit `0b8678f` (pushed, also on `website/invitations`):
+- A leaderboard entry opens: `/submissions/<id>/page` (the studio page the grader draws after a
+  passing grade, in a child of its own; served with CSP `sandbox`), `/files/<name>`, `/bundle.zip`.
+- Rows carry `by`, every metric, the LER interval and the experiment; `GET /v1/goals/goal1` ranks
+  every curated `qccd-noise@2` memory under 200 ions together by `ler_per_round_per_logical`.
+- New releases `surface3xz_mem@1` (34 ions) and `surface7xz_mem@1` (194 ions).
+- The worker's `artifacts` mount is writable (it keeps the pages): `docker-compose.prod.yml` changed.
+
+The image is derived from `qccd-official:d2da98d` with `qccd/` from `0b8678f` (nothing outside
+`qccd/` changed); its 47 layers are identical on both machines. Rollback: `.env.bak-d2da98d`,
+`VERSION.bak-d2da98d`, `docker-compose.prod.yml.bak-d2da98d`. Rehearsed with the prod compose,
+then the production smoke (operator `deploy-smoke-0b8678f`, quota 2, token deleted) passed with no
+stage and no metric different, and every new door checked (page sandboxed, file, archive byte for
+byte, 404 for a stranger, absent from Goal 1): GHZ `os_c7641ce0f9c24fe0`, and the 194-ion
+surface-7 seed `os_3f43da41121a7780` (its 4.6 MB page drawn inside the 1 GB grader).
+
+**Before that** 2026-10-21, from commit `d2da98d` (pushed, also on `website/invitations`):
 - `qccd-noise@2` and `qccd-physics@2`: every number cited, every channel a Pauli channel for stim.
 - Goal 1's board, `surface5xz_mem@1`: a Z and an X surface-5 memory side by side, 98 ions.
 - A design entered on a board takes that board's physics (`board_device`).
