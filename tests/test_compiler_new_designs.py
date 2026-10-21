@@ -524,3 +524,33 @@ def test_a_crowded_layer_is_split_not_refused(tmp_path):
                          "--json"], capture_output=True, text=True, timeout=600)
     verdict = json.loads(cp.stdout)
     assert verdict["order"] == "ok" and verdict["o2_semantics"] == "ok" and verdict["o1_transport"] == "ok"
+
+
+def _dedicated(n: int) -> str:
+    """One ancilla per check: n data, n ancillas, each check reset-H-CX-CX-H-measure."""
+    body = "".join(f"reset q[{n + a}];\nh q[{n + a}];\ncx q[{n + a}],q[{a}];\ncx q[{n + a}],q[{(a + 1) % n}];\n"
+                   f"h q[{n + a}];\nmeasure q[{n + a}] -> c[{a}];\n" for a in range(n))
+    return f'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[{2 * n}];\ncreg c[{n}];\n' + body
+
+
+@pytest.mark.parametrize("switches", [True, False])
+def test_dedicated_ancillas_dock_without_a_placement(switches, tmp_path):
+    """A round with one ancilla per check splits its qubits evenly, and rotate parked the
+    data -- the tie went to the side holding q0 -- then refused every ancilla's reset:
+    "reset acts on q4, which rides the loop" (BB[[144,12,12]] with 144 dedicated ancillas on
+    a 144-dock ring, 2026-10-21).  It now docks the side that acts alone.  On a ring whose
+    spurs share one waveform (no per-site switch) it also docks every rider in every batch,
+    unasked: anything else breaks R4."""
+    doc = Machine.ring(8, 2, verticals=4, name="dedicated").arch.to_json()
+    doc["control"]["channels"]["switch_per_site"] = switches
+    (tmp_path / "c.qasm").write_text(_dedicated(4), encoding="utf-8")
+    raw, arch, bad = _compile(doc, None, tmp_path, mode="rotate", qasm=tmp_path / "c.qasm")
+    assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+    cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
+    on_loop = {n for lp in arch.device.loops.values() if lp.closed for n in lp.nodes}
+    ancilla_sites = {cert["init"][cert["map"][str(4 + a)]] for a in range(4)}
+    data_sites = {cert["init"][cert["map"][str(d)]] for d in range(4)}
+    assert not ancilla_sites & on_loop and data_sites <= on_loop  # the ancillas are the docked side
+    moves = Counter(m["ion"] for m in cert["moves"])
+    if not switches:                                              # dock-all: idle riders dock too
+        assert len(moves) == 4 and sum(moves.values()) > 2 * 8

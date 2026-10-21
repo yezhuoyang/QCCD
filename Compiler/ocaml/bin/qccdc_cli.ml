@@ -45,7 +45,7 @@ let usage () =
       the file names: {"loop": {"<qubit>": slot}, "docks": {"<qubit>": "<dock site>"}}.
       A code-aware placer decides the layout; this pass still certifies the program.
 
-  qccdc rotate ... --dock-all
+  qccdc rotate ... --dock-all      (implied on a device whose channels have no per-site switch)
       dock every rider standing beside a dock in every batch, gate only the contacts:
       what a machine whose spurs share one waveform with no per-site switch must do.
 

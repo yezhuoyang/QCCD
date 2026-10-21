@@ -81,6 +81,36 @@ let bipartition (c : Circuit.t) : int list * int list =
   let a = side 0 and b = side 1 in
   if List.length a <= List.length b then (a, b) else (b, a)
 
+(* The qubits that act ALONE somewhere in the circuit: a reset, a measurement, an H.
+   Only a docked ion can gate (the loop's slots cannot), so a side with such a qubit has to
+   be the docked side -- whatever its size.  A barrier is not an act. *)
+let acts_alone (c : Circuit.t) : (int, unit) Hashtbl.t =
+  let h = Hashtbl.create 64 in
+  List.iter
+    (fun (o : Circuit.op) ->
+      match (o.name, o.qubits) with
+      | "barrier", _ -> ()
+      | _, [ q ] -> Hashtbl.replace h q ()
+      | _ -> ())
+    c.ops;
+  h
+
+(* Does the device tie its dock spurs together?  A channel that drives several sites and
+   has no per-site switch plays one waveform at all of them (R4), so on such a machine a
+   spur cannot dock one rider and leave its neighbour on the rail: every rider standing
+   beside a dock docks in every batch, which is what `--dock-all` emits.  Read off
+   `control.channels` as `qccd/arch/control.py` reads it (`switch_per_site` defaults to
+   true; `direct` grouping ties nothing). *)
+let spurs_tied (a : Arch.t) : bool =
+  match Arch.mem "control" a.raw with
+  | Some ctl -> (
+    match Arch.mem "channels" ctl with
+    | Some (`Assoc _ as ch) ->
+      (not (Arch.bool_or "switch_per_site" true ch))
+      && Arch.str_or "grouping" "direct" ch <> "direct"
+    | _ -> false)
+  | None -> false
+
 (* ------------------------------------------------------------------ the pass *)
 
 type ctx = {
@@ -170,6 +200,8 @@ let placement_of_file path = placement_of_json (Yojson.Safe.from_file path)
 
 let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circuit.t)
     ~(arch_path : string) ~(qasm_path : string) : Tsir.t * Cert.t * plan * string list =
+  (* a switchless machine docks every rider, asked or not: anything else breaks R4 *)
+  let dock_all = dock_all || spurs_tied a in
   let cv =
     match Conveyor.detect a with
     | Some cv -> cv
@@ -188,7 +220,15 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
     | Some (pl : placement) when pl.dock_site <> [] ->
       let named = List.sort compare (List.map fst pl.dock_site) in
       if named = List.sort compare b then (b, a) else (a, b)
-    | _ -> (a, b)
+    | _ ->
+      (* No placement: park the smaller side -- unless only the LARGER side has qubits that
+         act alone.  Those must be docked, so parking the smaller side could only end in
+         "acts on q, which rides the loop": a BB[[144,12,12]] round with 144 dedicated
+         ancillas splits 144/144, the tie put the data at the docks, and every ancilla's
+         reset was refused (2026-10-21).  This changes only circuits that were refused. *)
+      let alone = acts_alone c in
+      let acts side = List.exists (Hashtbl.mem alone) side in
+      if acts b && not (acts a) then (b, a) else (a, b)
   in
   let n_docks = Array.length cv.docks in
   if List.length dock_side > n_docks then
