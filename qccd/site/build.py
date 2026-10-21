@@ -850,8 +850,7 @@ def board_index(ts: list[dict]) -> str:
         rows_html.append(
             f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
             f'<p class="desc">{html.escape(t.get("description", ""))}</p>'
-            f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p>'
-            f'<p class="meta">{t.get("n_data", "?")} data qubits &middot; the three fastest verified designs, by time on the leaderboard&rsquo;s clock &middot; click a bar to step the programme</p></div>'
+            f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p></div>'
             f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div>'
             f'{qec_cycle.board_block(_t(best) * 1000.0 if best else None)}'
             # take part: "Try your own design", and the people's submissions with who made them (leaderboard.py)
@@ -862,17 +861,9 @@ def board_index(ts: list[dict]) -> str:
               '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
     body = ("<h1>Leaderboard</h1>" + boards.goals_section() + boards.architecture_intro() +
             '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
-            "<p class=\"sub\">Devices, each compiled by the reference compiler. One board per task. A task is a "
-            "fixed circuit, physics package and cost table; every design on a board ran that circuit, was "
-            "replayed and judged by every rule of the <a href=\"../rules/#set-standard\">standard rule set</a> "
-            "and, where it passed, checked for R10 by the proved checker on its certificate and by the tableau "
-            "of its pulses. "
-            "A design that fails any rule, or needs more hardware than its task's budget allows, is "
-            "disqualified: it is not ranked, and its task's page lists it apart with what it breaks. Each row shows the three fastest verified designs of its task; open a task for the full ranking of "
-            "every listed design, where you can rank by anything and click a dot to step the programme in the studio. "
-            "A round is only half of a QEC cycle, so every board also carries "
-            "<a href=\"#cycle\">the classical loop</a> around it, and the <a href=\"#memory\">memory boards</a> "
-            "rank designs by the logical error rate itself.</p>" + legend + "".join(rows_html) +
+            "<p class=\"sub\">Devices, compiled by the reference compiler and judged by every "
+            "<a href=\"../rules/#set-standard\">rule</a>. The three fastest verified designs per board; "
+            "<a href=\"#memory\">memory boards</a> rank by logical error rate.</p>" + legend + "".join(rows_html) +
             boards.memory_section(ts) +
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)

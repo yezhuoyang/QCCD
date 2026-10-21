@@ -49,7 +49,7 @@ CSS = """
 .lbx-seedby{font:12.5px/1.4 var(--sans,system-ui,sans-serif);color:#6b6a66;margin:4px 0 0}
 .lbx-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0 0;font:13px/1.4 var(--sans,system-ui,sans-serif);color:#56545e}
 .lbx-bar select{font:inherit;padding:4px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:#1d1d1b;max-width:100%}
-.lbx-tw{overflow-x:auto}
+.lbx-tw{overflow-x:auto}.lbx-tw td{white-space:nowrap}
 .lbx-live td.lbx-links a{margin-right:10px;white-space:nowrap}
 #lbx-pop{position:absolute;z-index:1200;width:min(420px,calc(100vw - 24px));background:#fff;border:1px solid #cfceca;
  border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px;font:14px/1.5 var(--sans,system-ui,sans-serif);
@@ -81,19 +81,15 @@ def board_ids() -> dict:
         return {}
 
 
-def board_block(task: str, title: str, seed_note: bool = True, *, live: bool = True, root: str = "../") -> str:
+def board_block(task: str, title: str, seed_note: bool = False, *, live: bool = True, root: str = "../") -> str:
     """One board's "Try your own design" and its live community list (filled by SCRIPT).  On the
     board's own ranking page (`live=False`) the submissions are dots in its chart instead
-    (chart_block), and the block is only the button and what it does; `root` is the site's root
-    relative to the page."""
+    (chart_block), and the block is only the button; `root` is the site's root relative to the
+    page.  Short on purpose (the user, 2026-10-21: the Leaderboard had too much text)."""
     t = html.escape(task)
-    seed = ('<p class="lbx-seedby">The bars above are the QCCD study&rsquo;s own designs. Submissions from people '
-            'are listed here, with who submitted each, straight from the official server.</p>' if seed_note else "")
+    seed = '<p class="lbx-seedby">Bars: the study&rsquo;s designs. Below: submissions, credited.</p>' if seed_note else ""
     body = (f'<div class="lbx-live" data-board="{t}"><p class="lbx-wait">Loading the official ranking&hellip;</p></div>'
-            if live else
-            '<p class="lbx-seedby">The magenta dots are designs people submitted to the official leaderboard, live from '
-            'the server, each credited to who submitted it and graded there with every check. Click one to watch it, '
-            'download its bundle, or grade it again on your own computer.</p>')
+            if live else '<p class="lbx-seedby">Coloured dots are submitted designs, each credited.</p>')
     return (f'<div class="lbx" data-board="{t}"><div class="lbx-top">'
             f'<button class="lbx-try" type="button" data-board="{t}" data-title="{html.escape(title)}" '
             f'data-root="{html.escape(root)}" data-hint="board:try">Try your own design</button>'
@@ -107,7 +103,8 @@ SCRIPT = r"""
   function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function fmt(v){ return (typeof v !== 'number') ? '-' : (v !== 0 && Math.abs(v) < 1e-3) ? v.toExponential(2)
     : Number.isInteger(v) ? String(v) : (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)); }
-  var NICE = {ler_per_round: 'logical error rate per round', ler: 'logical error rate per shot',
+  var NICE = {ler_per_round_per_logical: 'logical error rate per round per logical qubit',
+              ler_per_round: 'logical error rate per round', ler: 'logical error rate per shot',
               T_quantinuum: 'time, quantinuum table', T_jones: 'time, jones table', T_transport: 'time, transport table',
               instructions: 'instructions', transport_instructions: 'transport instructions', dacs: 'DACs',
               ions_per_instruction: 'ions per transport instruction'};
@@ -153,7 +150,7 @@ SCRIPT = r"""
   function fill(box, task, lb){
     box.textContent = '';
     var rows = lb.rows || [];
-    if (!rows.length) { box.appendChild(el('p', 'lbx-empty', 'No submissions yet: the first design that passes is #1.')); return; }
+    if (!rows.length) { box.appendChild(el('p', 'lbx-empty', 'No submissions yet.')); return; }
     var has = function(r, k){ return typeof (r.metrics || {})[k] === 'number'; };
     var ms = (lb.metrics || []).filter(function(m){ return rows.some(function(r){ return has(r, m.name); }); });
     var main = ms.filter(function(m){ return m.name === lb.rank_by; })[0] || {name: lb.rank_by, better: lb.better, unit: ''};
@@ -162,7 +159,7 @@ SCRIPT = r"""
     ms.forEach(function(m){ var o = el('option', null, nice(m) + (m.name === lb.rank_by ? ' (the board’s ranking)' : ''));
       o.value = m.name; sel.appendChild(o); });
     sel.value = main.name; lab.appendChild(sel); bar.appendChild(lab);
-    bar.appendChild(el('span', 'lbx-n', rows.length + (rows.length === 1 ? ' design' : ' designs') + ', each graded by the official server'));
+    bar.appendChild(el('span', 'lbx-n', rows.length + (rows.length === 1 ? ' design' : ' designs')));
     var wrap = el('div', 'lbx-tw'); box.appendChild(bar); box.appendChild(wrap);
     function open(r){ return CHARTS.indexOf(task) >= 0 ? task + '/?sel=c-' + encodeURIComponent(r.id)
                                                          : API + '/submissions/' + encodeURIComponent(r.id) + '/page'; }
@@ -225,9 +222,9 @@ def script(charts=()) -> str:
 # ------------------------------------------------- the official entries in a board's ranking chart
 
 #: what each bundle file is, in the words an entry's detail panel uses
-BUNDLE_FILES = (("device.arch.json", "the device"), ("program.tsir.json", "the compiled program"),
-                ("certified.tsir.json", "the program the checker certified"),
-                ("certificate.qcert.json", "the certificate"), ("manifest.json", "the manifest"))
+BUNDLE_FILES = (("device.arch.json", "device"), ("program.tsir.json", "program"),
+                ("certified.tsir.json", "certified program"),
+                ("certificate.qcert.json", "certificate"), ("manifest.json", "manifest"))
 
 CHART_CSS = """
 .dot.sub circle.mark{stroke:#fff}
@@ -240,6 +237,8 @@ CHART_CSS = """
  white-space:pre-wrap;overflow-wrap:anywhere}
 .detail .files{font-size:13px;margin:4px 0 0}.detail .files a{color:var(--accent);margin-right:4px}
 .detail .by{color:#c2185b;font-weight:600}
+details.about{margin:-10px 0 14px;font-size:13px;color:var(--ink2)}details.about summary{cursor:pointer;color:var(--accent)}
+details.about p{max-width:80ch;margin:6px 0 0}
 """
 
 CHART_SCRIPT = r"""
@@ -320,7 +319,6 @@ CHART_SCRIPT = r"""
       legend = function(){
         var el = $('legend'); el.innerHTML = '';
         codes.forEach(function(f){ var s = E('span'), sw = E('i', 'sw'); sw.style.background = FAMHEX[f]; s.appendChild(sw); s.appendChild(document.createTextNode(f)); el.appendChild(s); });
-        el.appendChild(E('span', null, 'each dot is an entry on the official leaderboard, credited to who submitted it'));
       };
     } else {
       options();
@@ -340,32 +338,22 @@ CHART_SCRIPT = r"""
       var el = $('detail'); el.className = 'detail'; el.innerHTML = '';
       var left = E('div'), right = E('div'), sid = encodeURIComponent(d.sid), base = API + '/submissions/' + sid;
       left.appendChild(E('h2', null, d.title));
-      var f = E('div', 'fam'); f.appendChild(document.createTextNode('submitted by ')); f.appendChild(E('span', 'by', d.by || 'unnamed'));
-      f.appendChild(document.createTextNode(' · ' + day(d.when) + ' · #' + d.place + ' on the official leaderboard' +
-                                            (B.goal && d.code ? ' · ' + d.code : ''))); left.appendChild(f);
-      var p = 'Graded on the official server by the reference evaluator, and every required check passed: the rules, ' +
-              'the proved Lean checker on its certificate, the program against the circuit, and the measures.';
-      if (d.ler && typeof d.ler.per_round === 'number')
-        p += ' Logical error rate per round ' + d.ler.per_round.toExponential(2) + ', 95% interval ' + d.ler.per_round_lo.toExponential(1) +
-             ' to ' + d.ler.per_round_hi.toExponential(1) + ' (' + d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() +
-             ' shots, decoder ' + d.ler.decoder + ', seed ' + d.ler.seed + ').';
-      left.appendChild(E('p', null, p));
+      var f = E('div', 'fam'); f.appendChild(document.createTextNode('by ')); f.appendChild(E('span', 'by', d.by || 'unnamed'));
+      f.appendChild(document.createTextNode(' · #' + d.place + ' · ' + day(d.when) + (B.goal && d.code ? ' · ' + d.code : '')));
+      left.appendChild(f);
+      left.appendChild(E('p', 'ok', '✓ every check passed on the official server'));
       var btns = E('div', 'btns');
-      btns.appendChild(link('Open in studio — step every instruction', base + '/page', 'btn primary'));
-      var z = link('Download the bundle (.zip)', base + '/bundle.zip', 'btn'); z.setAttribute('download', d.sid + '-bundle.zip'); btns.appendChild(z);
-      btns.appendChild(link('The official report', base + '/report', 'btn'));
+      btns.appendChild(link('Open in studio', base + '/page', 'btn primary'));
+      var z = link('Download (.zip)', base + '/bundle.zip', 'btn'); z.setAttribute('download', d.sid + '-bundle.zip'); btns.appendChild(z);
+      btns.appendChild(link('Report', base + '/report', 'btn'));
       left.appendChild(btns);
-      var fl = E('div', 'files'); fl.appendChild(document.createTextNode('Its files: '));
+      var fl = E('div', 'files'); fl.appendChild(document.createTextNode('Files: '));
       FILES.forEach(function(x, i){ fl.appendChild(link(x[1], base + '/files/' + x[0])); if (i < FILES.length - 1) fl.appendChild(document.createTextNode(' · ')); });
       left.appendChild(fl);
-      var rp = E('div', 'repro'); rp.appendChild(E('b', null, 'Reproduce it on your computer'));
-      rp.appendChild(E('span', null, 'Download the bundle, then grade it with the same reference evaluator, in a terminal where QCCD is set up:'));
+      var rp = E('div', 'repro'); rp.appendChild(E('b', null, 'Reproduce'));
       rp.appendChild(E('pre', null, 'qccd grade ' + d.sid + '-bundle.zip'));
-      rp.appendChild(E('span', null, 'It runs every check again and prints every measure: the checks, the time, the instructions ' +
-        'and the DACs come out the same. The logical error rate is a sample, and stim repeats a seeded sample only on the ' +
-        'same kind of processor, so yours is an estimate that should fall within the 95% interval above. Not set up yet? '));
-      rp.appendChild(link('The set-up steps, once', '../../studio.html?agent#design'));
-      rp.appendChild(document.createTextNode('.'));
+      rp.appendChild(E('span', null, 'The logical error rate is a sample: expect yours within the 95% interval. '));
+      rp.appendChild(link('Set up once', '../../studio.html?agent#design'));
       left.appendChild(rp);
       var tb = E('table');
       if (d.exp) {
@@ -374,9 +362,8 @@ CHART_SCRIPT = r"""
         tb.appendChild(row('ions', d.exp.ions + ' (' + d.exp.n_data + ' data, ' + d.exp.n_ancilla + ' ancilla)'));
         tb.appendChild(row('logical qubits', String(d.exp.k) + (d.exp.basis ? ', measured in ' + d.exp.basis.split('').join(' and ') : '')));
       }
+      if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
       METRICS.forEach(function(m){ if (val(d, m.k) != null) tb.appendChild(row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m))); });
-      tb.appendChild(row('submitted by', d.by || 'unnamed'));
-      tb.appendChild(row('official grade', 'every required check passed', 'ok'));
       right.appendChild(tb);
       el.appendChild(left); el.appendChild(right);
     };
@@ -434,7 +421,7 @@ def with_submissions(page: str, task: str, title: str) -> str:
     if not b or "</body>" not in page:
         return page
     block = board_block(task, title, seed_note=False, live=False, root="../../")
-    return _with_layer(page, {"id": b["id"], "task": task}, block, task)
+    return _with_layer(_short(page), {"id": b["id"], "task": task}, block, task)
 
 
 # ------------------------------------------------------------------ a goal: one ranking across codes
@@ -455,14 +442,20 @@ def goal_info(goal: str = "goal1") -> dict | None:
     return {**g, "id": goal, "boards": boards}
 
 
-GOAL_SUB = (
-    "Every implementation under {max_ions} ions, on one ranking: the entries of every curated QEC memory "
-    "on the official leaderboard ({codes}), whichever code it runs and whatever machine it runs on. "
-    "Each was compiled by the reference compiler, judged by every rule, checked by the proved Lean "
-    "checker, and sampled under the same noise model ({noise}) with both bases measured. Ranked by the "
-    "logical error rate per round per logical qubit, lower is better; pick any other measure to rank by. "
-    "Each dot is an entry, credited to who submitted it: click it to watch it in the studio, download its "
-    "bundle, or grade it again on your own computer.")
+GOAL_SUB = ("Every curated QEC memory under {max_ions} ions on one ranking, by logical error rate per round "
+            "per logical qubit ({noise}).")
+
+#: a board page's one line; its long description folds away (the user: too much text)
+BOARD_SUB = "Pick a measure to rank by; click a dot to open a design."
+_SUB = re.compile(r'(<h1>[^<]*</h1>\s*)<p class="sub">(.*?)</p>', re.S)
+_DQ_SUB = re.compile(r'(<section class="dq" id="disqualified"><h2>[^<]*</h2>)<p class="sub">.*?</p>', re.S)
+
+
+def _short(page: str) -> str:
+    page = _SUB.sub(lambda m: m.group(1) + f'<p class="sub">{BOARD_SUB}</p><details class="about"><summary>About '
+                    f'this board</summary><p>{m.group(2)}</p></details>', page, count=1)
+    return _DQ_SUB.sub(lambda m: m.group(1) + '<p class="sub">Not ranked: each breaks a rule or the task&rsquo;s '
+                       'hardware budget.</p>', page, count=1)
 
 
 def goal_page(page: str, goal: str = "goal1") -> str | None:
@@ -473,7 +466,7 @@ def goal_page(page: str, goal: str = "goal1") -> str | None:
     if not g or not g["boards"] or "</body>" not in page:
         return None
     codes = ", ".join(t for _, _, t in g["boards"])
-    h1 = f"Goal 1: {g['title']} — every implementation, ranked" if goal == "goal1" else g["title"]
+    h1 = f"Goal 1: {g['title']}" if goal == "goal1" else g["title"]
     page = re.sub(r"<title>[^<]*</title>", f"<title>{html.escape(h1)}</title>", page, count=1)
     page = re.sub(r"<h1>[^<]*</h1>", f"<h1>{html.escape(h1)}</h1>", page, count=1)
     page = re.sub(r'(<h1>[^<]*</h1>\s*<p class="sub">)[^<]*(</p>)',

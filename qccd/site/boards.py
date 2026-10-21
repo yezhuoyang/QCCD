@@ -37,6 +37,10 @@ CSS = """
 .lb-card p{margin:6px 0}
 .lb-kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:14px;margin:8px 0}
 .lb-kv b{color:#56545e;font-weight:600}
+.lb-card .lb-meta{color:#6b6a66;font-size:13px;margin:2px 0 6px}
+.lb-goaltag{font:700 10.5px/1 var(--sans,system-ui,sans-serif);letter-spacing:.06em;text-transform:uppercase;vertical-align:3px;
+ margin-left:8px;padding:3px 7px;border-radius:999px;background:#eef3fb;color:#1f5bb5;text-decoration:none}
+details.lb-more-d{margin:8px 0;font-size:13.5px;color:#56545e}details.lb-more-d summary{cursor:pointer;color:#1f5bb5}
 .lb-t{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0}
 .lb-t th,.lb-t td{text-align:left;padding:5px 8px;border-bottom:1px solid #eceae3;vertical-align:top}
 .lb-t th{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:#56545e}
@@ -115,17 +119,11 @@ def _noise(model: str = "qccd-noise@1") -> dict | None:
 #: and where the platform measures progress on it today.
 GOALS = (
     ("Goal 1", "The best QEC design under 200 ions",
-     "The machine of fewer than 200 ions whose logical memory, in any of the curated codes, has the "
-     "lowest logical error rate per round per logical qubit: low enough to challenge the best logical "
-     "error rates demonstrated so far. Every design is compiled by the reference compiler, judged by "
-     "every rule and sampled under the same noise model with both bases measured, so every "
-     "implementation is on one ranking.",
-     "goal1/", "Every implementation under 200 ions, ranked by logical error rate per logical qubit"),
+     "Lowest logical error rate per round per logical qubit, any curated code.",
+     "goal1/", "The Goal 1 leaderboard"),
     ("Goal 2", "A verified resource estimate for Shor's algorithm",
-     "A complete fault-tolerant resource estimate for Shor's algorithm (the ions, the time and the "
-     "machine it needs), in which every step is compiled and checked rather than modelled: the "
-     "logical gadgets, their placement on the machine and the schedule that runs them.",
-     "../gadgets/algorithms/shor15/", "Shor's algorithm for 15, scheduled end to end on verified gadgets"),
+     "Ions, time and machine, with every step compiled and checked.",
+     "../gadgets/algorithms/shor15/", "Shor's algorithm for 15"),
 )
 
 GOALS_CSS = """
@@ -152,10 +150,6 @@ def goals_section() -> str:
 
 def architecture_intro() -> str:
     return (
-        '<p class="sub">Two leaderboards. <b>Architecture</b> ranks devices: you design the machine, and the '
-        "reference compiler compiles each board's circuit onto it. <b>Compiler</b> ranks compilers: you write "
-        "the compiler, and it is run on every circuit and device of a benchmark suite. Both are graded by the "
-        "same reference checker, locally and on the official server.</p>"
         '<nav class="lb-tabs"><a href="#architecture">Architecture</a><a href="#compiler">Compiler</a>'
         '<a href="noise/">The noise model</a></nav>')
 
@@ -183,14 +177,11 @@ def _ler_bars(t: dict) -> str:
             + (f'<span class="lb-v">0 errors in {e["shots"]:,} shots<small> (below {e["per_round_hi"]:.1e})</small></span></a>'
                if not e["errors"] else
                f'<span class="lb-v">{e["per_round"]:.2e}<small> ({e["per_round_lo"]:.1e} to {e["per_round_hi"]:.1e})</small></span></a>'))
-    note = (" At this budget the designs give at most a few logical errors each, so their intervals overlap and the "
-            "order among them is not significant." if few else "")
+    note = " (statistically tied at this budget)" if few else ""
     refused = sum(1 for r in t.get("rows", []) if r.get("status") != "ok" or r.get("refusal"))
-    return (f'<div class="lb-rank"><p class="lb-rkh">The study&rsquo;s own designs, lowest logical error rate per round '
-            f'first; the thin line is the 95% interval. Click a bar to watch the ions and read the stim program that '
-            f'was sampled.{note}</p>{"".join(bars)}'
-            f'<p class="lb-more"><a href="{_e(t["id"])}/">Open the ranking plot: {len(rows)} designs ranked'
-            f'{f", {refused} more that the compiler refused" if refused else ""} &rarr;</a></p></div>')
+    return (f'<div class="lb-rank"><p class="lb-rkh">The study&rsquo;s designs, with 95% intervals{note}</p>{"".join(bars)}'
+            f'<p class="lb-more"><a href="{_e(t["id"])}/">All {len(rows)} ranked'
+            f'{f", {refused} refused" if refused else ""} &rarr;</a></p></div>')
 
 
 def memory_section(ts: list | None = None) -> str:
@@ -204,32 +195,17 @@ def memory_section(ts: list | None = None) -> str:
     cards = []
     for b in boards:
         q = b.manifest["qec"]
-        start = b.manifest.get("starter") or {}
-        sp = ", ".join(f"{k} {v}" for k, v in (start.get("params") or {}).items())
+        goal = q["noise"] == "qccd-noise@2"
         cards.append(
-            f'<div class="lb-card" id="{_e(b.manifest["task"])}"><h3>{_e(b.title)}</h3>'
-            f'<p>{_e(b.manifest.get("description", ""))}</p><div class="lb-kv">'
-            f'<b>ranked by</b><span>logical error rate per round (lower is better), with its 95% interval</span>'
-            f'<b>noise model</b><span><a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a>, '
-            + ("with the board's cited physics, qccd-physics@2, on every design entered on it</span>"
-               if q["noise"] == "qccd-noise@2" else "built from the device's own physics</span>")
-            + f'<b>sampling</b><span>up to {int(q["ler"].get("max_shots", 0)):,} shots or {int(q["ler"].get("max_errors", 0))} '
-            f'logical errors, decoder {_e(q["ler"].get("decoder", "auto"))}, fixed seed</span>'
-            f'<b>a start that passes</b><span>{_e(start.get("generator", ""))} ({_e(sp)})</span>'
-            f'<b>submit</b><span>Try your own design below, or ask your agent to submit a design to it</span></div>'
+            f'<div class="lb-card" id="{_e(b.manifest["task"])}"><h3>{_e(b.title)}'
+            + (' <a class="lb-goaltag" href="goal1/">Goal 1</a>' if goal else "") + '</h3>'
+            f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
+            f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; up to '
+            f'{int(q["ler"].get("max_shots", 0)):,} shots</p>'
             + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
-    how = ("" if not noise else
-           f'<p class="lb-note">How the number is made: the board\'s memory experiment is compiled onto the design, '
-           f'the compiled program is turned into a noisy stim circuit ({len(noise["channels"])} error channels, each '
-           f'from a parameter of the device), checked to run the experiment (every detector deterministic with the '
-           f'circuit\'s parity), and sampled and decoded. <a href="noise/">The noise model, channel by channel '
-           f'&rarr;</a></p>')
-    return ('<h2 id="memory">Memory boards: the logical error rate</h2>'
-            "<p>A syndrome round's time is a proxy. These boards measure what it stands for: how often the "
-            "encoded qubit is lost. Heating from transport raises the two-qubit gate error, longer chains raise it "
-            "further, and idle time dephases; a design that moves less, or cools better, keeps the logical qubit "
-            "longer.</p>" + "".join(cards) + how)
+    how = "" if not noise else '<p class="lb-note"><a href="noise/">How the number is made &rarr;</a></p>'
+    return ('<h2 id="memory">Memory boards: the logical error rate</h2>' + "".join(cards) + how)
 
 
 def compiler_section() -> str:
@@ -247,25 +223,15 @@ def compiler_section() -> str:
                       f'<td>{_e(m["about"])}</td></tr>' for m in s.manifest["metrics"])
     return (
         '<section class="lb-sec" id="compiler"><h2>Compiler</h2>'
-        f'<p class="sub">Submit a compiler, not a design. It is run on every pair of {len(summ["circuits"])} circuits '
-        f'and {len(summ["devices"])} devices ({summ["pairs"]} public pairs, and {summ["hidden_pairs"]} more that only '
-        "the official server generates, so a compiler tuned to the public ones is still measured on circuits and "
-        "devices it has never seen). Each program it writes is checked without trusting it: every rule of the "
-        "device, then whether it computes the circuit (the stabilizer tableau, the exact unitary, or for a QEC "
-        "memory experiment its detectors). Then it is timed, and a memory experiment's logical error rate is "
-        "measured.</p>"
-        f'<div class="lb-card"><h3>{_e(s.title)} <small>{_e(s.id)}</small></h3><div class="lb-kv">'
-        f'<b>ranked by</b><span>speedup over the reference compiler, over the pairs both compile; one wrong '
-        f'program makes an entry ineligible</span>'
-        f'<b>the reference</b><span>qccdc with cooling: {counts.get("valid", 0)} of {len(base)} pairs valid, '
-        f'{counts.get("wrong", 0)} breaking a rule, {counts.get("refused", 0)} refused, '
-        f'{counts.get("timeout", 0)} out of time</span>'
-        f'<b>circuits</b><span>{_e(", ".join(summ["circuits"]))}</span>'
-        f'<b>devices</b><span>{_e(", ".join(summ["devices"]))}</span></div>'
-        '<p><a href="compiler/">The suite pair by pair, the contract a compiler follows, and how to submit '
-        '&rarr;</a></p></div>'
-        f'<table class="lb-t"><thead><tr><th>metric</th><th></th><th>what it measures</th></tr></thead>'
-        f'<tbody>{metrics}</tbody></table>'
+        f'<p class="sub">Submit a compiler: it runs on {summ["pairs"]} circuit&ndash;device pairs, plus '
+        f'{summ["hidden_pairs"]} hidden ones, ranked by speedup over the reference.</p>'
+        f'<div class="lb-card"><h3>{_e(s.title)} <small>{_e(s.id)}</small></h3>'
+        f'<p class="lb-meta">reference qccdc: {counts.get("valid", 0)} of {len(base)} pairs valid &middot; '
+        f'{len(summ["circuits"])} circuits &middot; {len(summ["devices"])} devices &middot; one wrong program makes an '
+        'entry ineligible</p>'
+        '<p><a href="compiler/">The suite, pair by pair, and how to submit &rarr;</a></p>'
+        f'<details class="lb-more-d"><summary>The measures</summary><table class="lb-t"><thead><tr><th>metric</th>'
+        f'<th></th><th>what it measures</th></tr></thead><tbody>{metrics}</tbody></table></details></div>'
         '<h3>Official ranking</h3><div id="qo-compiler"><p class="qo-wait">Loading the official ranking...</p></div>'
         "</section>")
 

@@ -324,19 +324,13 @@ BOARD_JS = r"""
 
 BOARD_HTML = """<section id="official">
 <h2>Official submissions: more boards</h2>
-<p class="sub">Every board above lists its own submissions, with who submitted each. These are
-the other boards the official server ranks. A submission is graded again there with the
-reference checker, which runs the same ten checks as a local grade, including the proved
-checker. Only eligible, public submissions appear; a private one never does. Read live from
-the server.</p>
+<p class="sub">The other boards the official server ranks, live.</p>
 <div id="qo-boards"><p class="qo-wait">Loading the official leaderboard...</p></div>
-<p class="note">To take part: press <b>Try your own design</b> on a board. It opens your own QCCD
-workspace (on your computer, with your AI agent if you like) on that board, where you test a
-design with the same checks and press <b>Submit</b>. The first time, you sign in with your
-qccd.academy account, and the leaderboard shows your name with what you submit. In a terminal,
-<code>qccd login</code> signs in, <code>qccd submit --local --board "BB [[144,12,12]]" --wait</code>
-tests your design, and <code>qccd publish --submission &lt;id&gt;</code> submits it. The boards above
-also carry the study's own seed entries.</p>
+<details class="lb-more-d"><summary>How to take part</summary><p>Press <b>Try your own design</b> on a
+board: your own QCCD workspace opens on it, you test a design with the same checks, and press
+<b>Submit</b> (signed in with your qccd.academy account, which the leaderboard credits). In a
+terminal: <code>qccd login</code>, <code>qccd submit --local --board "BB [[144,12,12]]" --wait</code>,
+then <code>qccd publish --submission &lt;id&gt;</code>.</p></details>
 </section>"""
 
 

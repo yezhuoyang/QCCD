@@ -60,6 +60,6 @@ def test_goal_1_is_one_chart_of_every_codes_official_entries():
     out = leaderboard.goal_page(PAGE.read_text(encoding="utf-8"), "goal1")
     assert "var DATA = [];" in out                      # the study's designs are not entries
     assert 'id="disqualified"' not in out
-    assert "<h1>Goal 1: The best QEC design under 200 ions" in out
+    assert "<h1>Goal 1: The best QEC design under 200 ions</h1>" in out
     assert '"goal": "goal1"' in out and "/goals/" in out
     assert out.index('id="detail"') < out.index('data-hint="board:try"') < out.index("</main>")

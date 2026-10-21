@@ -55,6 +55,8 @@ section.cycle thead th { color: var(--muted); font-weight: 600; font-size: 12px;
 section.cycle tr.ref td { color: var(--muted); font-style: italic; }
 section.cycle .loop { margin: 14px 0 10px; max-width: 980px; }
 section.cycle .why { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+section.cycle details.why-d { margin: 8px 0 0; font-size: 13px; }
+section.cycle details.why-d summary { cursor: pointer; color: var(--accent, #1f5bb5); }
 """
 
 
@@ -194,16 +196,13 @@ def board_section(tasks: list[dict]) -> str:
     biggest = max(have, key=lambda t: t["round_us"])
     return (
         '<section class="cycle" id="cycle"><h2>The QEC clock cycle</h2>'
-        '<p class="sub">A board ranks the quantum half of a cycle: one syndrome-extraction '
-        'round. A machine has to close the loop as well &mdash; the outcomes cross a wire to '
-        'a decoder, and what it decides either <b>stops in the classical memory</b> as a '
-        'Pauli-frame update, which no ion waits for, or <b>comes back</b> as the guard of a '
-        'classically controlled operation, which one does. Both are drawn here for the '
-        f'slowest board ({html.escape(biggest["title"])}), then tabulated for all of them.</p>'
+        '<p class="sub">A round is half a cycle: the decoder closes the loop. Drawn for the '
+        f'slowest board ({html.escape(biggest["title"])}), tabulated for all.</p>'
         + loop_svg(biggest["round_us"], decoder="lut") +
         '<table><thead><tr><th>board</th><th>a round</th><th>cycles/s</th>'
         f'{head}<th>reaction</th><th>of a cycle</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table>'
+        '<details class="why-d"><summary>What margin and reaction mean</summary>'
         '<p class="why"><b>Margin</b> is the round time divided by the decoding time: above '
         '1&times; the decoder keeps up and the undecoded backlog never grows; below it, the '
         'backlog grows every round and no amount of buffering fixes it. That is why the '
@@ -219,7 +218,7 @@ def board_section(tasks: list[dict]) -> str:
         '(G10, G11) of every algorithm under '
         '<a href="../gadgets/algorithms/">Logical Algorithm</a>.</p>'
         f'<p class="why">{html.escape(MODES["store"])} &mdash; and, in the other mode, '
-        f'{html.escape(MODES["react"])}</p></section>')
+        f'{html.escape(MODES["react"])}</p></details></section>')
 
 
 def studio_payload() -> dict:
