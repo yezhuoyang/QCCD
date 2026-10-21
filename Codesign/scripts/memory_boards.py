@@ -60,6 +60,21 @@ BOARDS = {"rep5_mem": {"order": 6, "short": "rep-5 memory"},
 TABLE_TAGS = {"qccdsim_jones": "jones", "transport_excitation": "transport"}
 
 
+def entered(doc: dict, release) -> dict:
+    """A device as this board grades it.  A design takes the board's physics unless it set its own
+    (`board_device`); the study's devices are the board's entries, so on a board with physics of
+    its own (qccd-physics@2) they carry it even where a generator wrote slightly different
+    blocks (random16's).  On a board whose physics is the template's, as before."""
+    from qccd.api import _template_doc
+    from qccd.workspace.tasks import FIXED_BLOCKS, board_device, physics_mismatch
+    out = board_device(doc, release)
+    ref = release.physics()
+    own = physics_mismatch({b: _template_doc(None).get(b) for b in FIXED_BLOCKS}, release)
+    if own and physics_mismatch(out, release):
+        out = {**out, **{b: ref[b] for b in FIXED_BLOCKS if b in ref}}
+    return out
+
+
 def board_release(board: str):
     """The release a board is built from: its task's (tasks/<board>/task.json `release`), so a
     board follows its task to a new release; a board with no task yet starts at `@1`."""
@@ -136,7 +151,19 @@ def devices(release) -> list[dict]:
     ]
     # a starter named like a shipped device (surface5xz_mem's grid9x9) is that device: one row
     seen: set = set()
-    return [d for d in out if not (d["key"] in seen or seen.add(d["key"]))]
+    out = [d for d in out if not (d["key"] in seen or seen.add(d["key"]))]
+    # a device this code cannot load (a generator that is not committed: cylinder6x4's) is no
+    # entry of a board built from it
+    from qccd.arch.device import Architecture
+    keep = []
+    for d in out:
+        try:
+            Architecture.from_json(d["doc"] if "doc" in d else json.loads(Path(d["arch"]).read_text(encoding="utf-8")))
+        except Exception as exc:  # noqa: BLE001
+            print(f"   {d['key']:18s} left out: this code cannot load it ({type(exc).__name__})", flush=True)
+            continue
+        keep.append(d)
+    return keep
 
 
 def grade_point(out: Path, release, exp, dev: dict) -> dict:
@@ -147,15 +174,14 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     # a run that fails in the old folder would take the last good program with it
     work = out / WORK_NEW / dev["key"]
     work.mkdir(parents=True, exist_ok=True)
-    from qccd.workspace.tasks import board_device
     # every design is entered on the board, so it carries the board's physics (unchanged on a
     # board whose physics is the template's, as every board before qccd-physics@2)
     if "doc" in dev:
         arch_p = out / f"{dev['key']}.arch.json"
-        arch_p.write_text(json.dumps(board_device(dev["doc"], release), indent=1), encoding="utf-8")
+        arch_p.write_text(json.dumps(entered(dev["doc"], release), indent=1), encoding="utf-8")
     else:
         src = json.loads(Path(dev["arch"]).read_text(encoding="utf-8"))
-        doc = board_device(src, release)
+        doc = entered(src, release)
         if doc == src:
             arch_p = Path(dev["arch"])
         else:

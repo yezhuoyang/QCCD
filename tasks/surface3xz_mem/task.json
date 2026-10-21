@@ -1,0 +1,39 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "surface3xz_mem",
+ "order": 9,
+ "title": "Surface code memory, distance 3, both bases",
+ "short": "surface-3 X+Z memory",
+ "description": "Three rounds of two distance-3 rotated surface-code patches in lockstep, one a Z memory and one an X memory (34 ions: 18 data, 16 ancillas, reset and reused every round), then the data read out, each patch in its own basis. Ranked with every Goal 1 code by the logical error rate per round per logical qubit under qccd-noise@2, with Helios-class physics in which every number is cited.",
+ "circuit": "circuit.qasm",
+ "n_data": 18,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "quantinuum"
+  ]
+ },
+ "metrics": [
+  "ler_per_round",
+  "ler",
+  "T_quantinuum",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable"
+ ],
+ "rank_by": "ler_per_round",
+ "release": "surface3xz_mem@1",
+ "qec": {
+  "experiment": "surface3xz_r3",
+  "noise": "qccd-noise@2",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 400,
+   "max_shots": 2000000,
+   "seed": 20261021
+  }
+ },
+ "seed": "MemoryBoard/surface3xz_mem"
+}
