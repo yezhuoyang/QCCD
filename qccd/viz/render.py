@@ -988,6 +988,11 @@ text-transform:uppercase;margin-right:4px}
 .ql.qw{background:color-mix(in srgb,var(--active) 10%,transparent)}
 .ql.qz .a{color:var(--muted)}
 .tab.off{display:none}
+/* THE COURSE IS THE TUTORIAL'S.  A design page -- a board entry, a compiled example, the
+   blank canvas -- shows no Learn tab and never opens the Learn pane: the page is busy
+   enough.  The course comes in only when the reader asks for it (#learn, a lesson, the
+   pane itself), and `data-course` on <body> says so. */
+body:not([data-course="1"]) #tabL{display:none}
 .pal{border:1px solid var(--line);border-radius:9px;padding:7px;background:var(--panel)}
 /* the Selection section stays at the foot of the rail, over whatever scrolled under it */
 #palInspect{position:sticky;bottom:0;margin-top:auto;z-index:1}
@@ -4369,8 +4374,13 @@ function placeProgram(){
     pin.innerHTML = col ? 'Into the panels &#9654;' : '&#9664; Beside the animation';
     pin.setAttribute('aria-pressed', col ? 'true' : 'false');
   }
-  // the dock cannot show a pane that is not in it: fall through to the course
-  setPane(col && PANE === 'P' ? 'L' : PANE);
+  // the dock cannot show a pane that is not in it.  In the course it falls through to the
+  // course; anywhere else it has nothing to show, so it folds -- a design page never opens
+  // on the Learn pane it did not ask for
+  if(col && PANE === 'P'){
+    if(inCourse()) setPane('L');
+    else { foldPanel(dock, true); syncMenu(); }
+  } else setPane(PANE);
   return col;
 }
 function progPinToggle(on){
@@ -4438,7 +4448,11 @@ function menuPick(k){
   setPane(k);
   return { pane: PANE, view: PROG_VIEW };
 }
+// Course mode: the tutorial's Learn tab and pane.  Asking for the pane is asking for the
+// course -- #learn, a lesson found by search, a lesson's own Check -- so it turns the mode on.
+function inCourse(){ return document.body.getAttribute('data-course') === '1'; }
 function setPane(which){
+  if(which === 'L' && !inCourse()) document.body.setAttribute('data-course', '1');
   if(which === 'Q'){ setProgView('gates'); which = 'P'; }
   // the programme beside the animation is not a dock pane: the dock keeps what it shows
   if(which === 'P' && PROG_COL){ syncQ(); sizeLists(); return; }
@@ -4817,7 +4831,9 @@ sizeLists();
   setProgView(v || (SRC ? 'both' : 'hw'));
   // the page opens on the canvas; a page built for the course opens on its Learn pane
   if(D.open_pane && document.getElementById('pane' + D.open_pane)){
-    foldPanel(document.getElementById('dock'), false);
+    // the programme in its column already shows P and Q: the dock stays folded
+    if(!(PROG_COL && (D.open_pane === 'P' || D.open_pane === 'Q')))
+      foldPanel(document.getElementById('dock'), false);
     setPane(D.open_pane);
   }
   syncMenu();

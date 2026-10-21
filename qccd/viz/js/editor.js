@@ -4946,6 +4946,9 @@ function courseFacts() {
 function lessonLoad(id) {
   var L = lessonById(id);
   if (!L) return { ok: false, problems: [{ code: 'no_lesson', message: 'no lesson ' + id }] };
+  // a lesson is the tutorial: the page enters course mode, which is what shows the Learn
+  // tab at all (a design page has none -- render.py, `inCourse`)
+  try { if (typeof document !== 'undefined' && document.body && document.body.setAttribute) document.body.setAttribute('data-course', '1'); } catch (e) { /* no DOM */ }
   if (GHOST) cancel();
   if (ARMED_EL) arm(null);
   if (FORM) openForm(null);
