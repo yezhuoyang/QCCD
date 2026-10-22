@@ -542,9 +542,14 @@ def main(argv=None) -> int:
         release = board_release(board)
         exp = MemoryExperiment.from_spec(release.detectors(), release.circuit_text())
         out = OUT / board
-        out.mkdir(parents=True, exist_ok=True)
         rj = out / "rows.json"
-        if a.pages_only and rj.exists():
+        if a.pages_only and not rj.exists():
+            # --pages-only redraws saved results; a board never run has none, and running it here
+            # (surface7xz: hours of compiles) is not what a page rebuild asked for
+            print(f"== {board}: no rows.json, so no pages to rebuild (run it without --pages-only)", flush=True)
+            continue
+        out.mkdir(parents=True, exist_ok=True)
+        if a.pages_only:
             rows = json.loads(rj.read_text(encoding="utf-8"))
         else:
             rows = []
