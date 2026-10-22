@@ -1,63 +1,49 @@
-# WISE result: source-order split passes both logical bases
+# Broadcast control on Jones's junction grid
 
-**WISE split is the valid result: last start 4070 µs at d=2, 3, 6, and 12.**
-All schedules retain their capacity-2 devices/mappings. timed.check passes
-with JONES_WISE, strict durations, the source CX circuit, zero violations,
-and broadcast enabled. Split makespan is 4120 µs.
+The split schedule and John's current Ours both preserve exact per-qubit Stim
+CNOT order, with the same device, ion mapping, native operations and Jones times.
+Both retain full searched distance in memory-Z and memory-X at d=2,3,6,12;
+all source/executed detectors are deterministic. WISE split adds broadcast
+control on Jones's junction grid, with idle zones opting out through per-site
+switches. It is not a different trapping architecture.
 
-| d | Mode | Last start (µs) | Broadcast cycles | timed.check | Memory-Z source/executed | Memory-X source/executed |
-|---|---|---:|---:|---|---|---|
-| 2 | split | **4070** | 72 | PASS | 2 / 2 | 2 / 2 |
-| 2 | shared_shape | 2870 | 48 | PASS | 2 / 2 | **2 / 1 FAIL** |
-| 3 | split | **4070** | 72 | PASS | 3 / 3 | 3 / 3 |
-| 3 | shared_shape | 2870 | 48 | PASS | 3 / 3 | **3 / 2 FAIL** |
-| 6 | split | **4070** | 72 | PASS | 6 / 6 | 6 / 6 |
-| 6 | shared_shape | 2870 | 48 | PASS | 6 / 6 | **6 / 4 FAIL** |
-| 12 | split | **4070** | 72 | PASS | 12 / 12 | 12 / 12 |
-| 12 | shared_shape | 2870 | 48 | PASS | 12 / 12 | **12 / 8 FAIL** |
+| d | John's current Ours, last start (µs) | WISE split, last start (µs) | Memory-Z source/executed, both | Memory-X source/executed, both |
+|---|---:|---:|---|---|
+| 2 | 2850 | 4070 | 2 / 2 | 2 / 2 |
+| 3 | 3010 | 4070 | 3 / 3 | 3 / 3 |
+| 6 | 3085 | 4070 | 6 / 6 | 6 / 6 |
+| 12 | 3070 | 4070 | 12 / 12 | 12 / 12 |
 
-All detector checks are deterministic. tools/order.py reports PASS for split
-in both bases and shared_shape in memory-Z, but FAIL for shared_shape in
-memory-X. The X tests reconstruct RX/MX preparation/readout around the saved
-CX order; archives remain unchanged.
+The 6% figure applied only against a return-home direct schedule, now superseded
+by John's current Ours. The shared_shape experiment was removed because it
+fails strict per-qubit CNOT order and memory-X.
 
-shared_shape remains in the code but fails memory-X: a visiting order shared
-by X and Z checks aligns one check type's hook errors with its logical.
-Here Z-check hooks shorten the memory-X logical. No repair was attempted;
-memory-Z alone was insufficient.
+WISE split has 72 broadcast cycles, 3240 µs of transport, and 4120 µs makespan
+at every distance. Transport per Stim step is 540,1080,1080,540 µs, including
+returns home; in the middle steps X checks run before Z checks. The four
+rotations and MS of each native CX take 60 µs per parallel pass. Last start,
+not makespan, matches the Reproduce page's measure.
 
-| Schedule, last start (µs) | d=2 | d=3 | d=6 | d=12 |
-|---|---:|---:|---:|---:|
-| Jones standard, paper | 4055 | 4085 | 4080 | 4085 |
-| John standard | 2295 | 2335 | 2340* | 2340 |
-| WISE split | **4070** | **4070** | **4070** | **4070** |
-| Direct wiring, Stim order | **3830** | **3830** | **3830** | **3830** |
+Distances are the bounded search in tools/order.py: “no logical error shorter
+than d found” within that search, not proofs. The tool prints
+`circuit distance <= N` and checks 500 noiseless shots.
 
-*John's d=6 executed memory-Z distance is **4 of 6**, so this timing comparison
-does not preserve distance. Paper/John times are the requested baselines.
+Assumptions: Jones Table 1 durations (50 µs junction entry and 50 µs exit),
+separate j_enter/j_exit waveform classes, no waveform switching cost, and
+per-site switches allowing idle zones to hold still. Junction exclusion R2
+still applies. The rule checks below make the broadcast/opt-out assumptions
+explicit rather than treating class metadata as geometric evidence.
 
-Direct wiring, Stim order uses JONES (no broadcast), strict durations and
-an additional exact per-qubit CX-order check. All four grids pass memory-Z
-and memory-X at their source distances 2, 3, 6, 12; makespan is 3880 µs.
-Independent routes/gates overlap inside each Stim step, with a barrier
-between steps. Raw results: [direct-wiring validation](jones_ordered_validation.json).
+Reproduce from the QCCD root:
 
-Distances are from the **bounded search in tools/order.py**, not proofs:
-**“no logical error shorter than d found”** for passing rows. Detection-event
-set size and edge degree are capped at 4; noiseless sampling uses 500 shots.
-
-Assumptions: **zone opt-out** (idle zones hold still), **no waveform switching
-cost**, **separate j_enter/j_exit classes**, and **Jones Table 1 timings with
-50 µs entry/exit**. Ancillas return home after each gate; native CX and
-exclusion rules are unchanged.
-
-The noise fix adds DEPOLARIZE1 after RX and Z_ERROR before MX/MRX. All 19
-existing Jones memory-Z archives have identical before/after output and exit
-codes. Generated X sources were checked for identical Z-source CX layers.
-
-Commands and all 16 results: [basis validation](wise_both_bases_validation.json).
-Z regressions: [before/after output](order_noise_z_regression.json).
-Earlier reports, schedules, Z sources, catalog, profiles, and timed.py remain
-unchanged. Nothing was pushed.
-
-The shared_shape experiment was removed because it fails strict per-qubit order and memory-X.
+```sh
+for d in 2 3 6 12; do
+  .venv/bin/python -m qccd.repro.sched_wise --distance "$d"
+  for kind in ours wise; do
+    for basis in z x; do
+      .venv/bin/python tools/order.py "Reproduce/jones2025/ours/grid_rot_d${d}_c2_${kind}.schedule.json.gz" "Reproduce/jones2025/circuits/rotated_memory_${basis}_d${d}_r1.stim"
+    done
+  done
+ done
+.venv/bin/python -m qccd.repro check jones2025
+```
