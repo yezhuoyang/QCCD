@@ -97,6 +97,18 @@ docker compose -f docker-compose.prod.yml run --rm -T api python -m qccd.officia
 
 `add-uploader` prints the new token once. Deliver it privately.
 
+A new studio template (a change to `qccd/viz/render.py`'s page or the JS it stamps) changes the
+page every entry opens. Draw them all again from the stored archives, without grading again (a
+regrade samples every logical error rate again, 25-45 min per BB entry), as a one-off container with
+the grader's memory:
+
+```bash
+docker run --rm -m 1g --network none -e HOME=/tmp -e QCCD_GRADER_MEM_MB=4096 \
+  -e QCCD_OFFICIAL_DB=sqlite:////data/official.db -e QCCD_OFFICIAL_ARTIFACTS=/artifacts \
+  -v qccd-official_data:/data -v qccd-official_artifacts:/artifacts \
+  qccd-official:<tag> python -m qccd.official.worker redraw [--task <release>]
+```
+
 **Rolling back.** Set `.env` to the previous tag and `up -d`. To take the service down
 completely: `docker compose -f docker-compose.prod.yml down` (volumes survive), then remove
 the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reload nginx`.

@@ -183,6 +183,23 @@ def test_qccd_grade_reproduces_a_downloaded_entry(svc, local, tmp_path, capsys):
 
 
 @needs_toolchain
+def test_a_new_template_redraws_every_entry_page_without_grading_again(svc, local, tmp_path):
+    """`worker redraw`: every graded entry's page drawn again from its stored archive, and the
+    reports untouched (a regrade would sample the logical error rate again)."""
+    from qccd.official.worker import redraw
+    up = svc.authenticate(svc.create_uploader("ivy"), "10.0.0.1")
+    sid = svc.submit(up, local["archive"], task="ghz4@1", visibility="public")["submission_id"]
+    assert process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    page = svc.artifacts / "pages" / f"{sid}.html"
+    page.write_text("an old page", encoding="utf-8")
+    reports = svc.db.all("SELECT id FROM reports WHERE submission=?", (sid,))
+    r = redraw(svc, RELEASES_DIR)
+    assert r["drawn"] == 1 and r["failed"] == []
+    assert 'name="qccd-page"' in page.read_text(encoding="utf-8")
+    assert svc.db.all("SELECT id FROM reports WHERE submission=?", (sid,)) == reports
+
+
+@needs_toolchain
 def test_wrong_task_and_tampered_archives_are_refused(svc, local):
     up = svc.authenticate(svc.create_uploader("bob"), "10.0.0.1")
     z = zipfile.ZipFile(io.BytesIO(local["archive"]))

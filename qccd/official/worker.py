@@ -131,14 +131,55 @@ def grade_compiler(job_dir: Path, suite_dir: Path, job: dict) -> int:
     return 0
 
 
+def _child_env() -> dict:
+    """The minimal environment a grading or drawing child gets (no credentials)."""
+    return {k: v for k, v in os.environ.items()
+            if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
+                     "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
+                     "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
+                     "LANG", "LC_ALL", "LC_CTYPE")}
+
+
+def redraw(svc, releases: Path, *, task: str | None = None) -> dict:
+    """Draw every graded design entry's page again from its stored archive, without grading it
+    again: the page an entry opens follows the studio's template, so a new template means new
+    pages, and a regrade would sample every logical error rate again (a BB entry is 25-45 min on
+    the droplet).  Each page is drawn the way the grader draws it (`draw_page`, a limited child)
+    and replaces artifacts/pages/<id>.html; the reports are untouched."""
+    from ..workspace.bundle import extract_archive
+    from ..workspace.procs import run_limited
+    sql = "SELECT id, task, archive_sha256 FROM submissions WHERE status IN ('eligible', 'ineligible')"
+    rows = svc.db.all(sql + (" AND task=?" if task else "") + " ORDER BY created_at", (task,) if task else ())
+    mem = int(os.environ.get("QCCD_GRADER_MEM_MB", "16384"))
+    out = {"drawn": 0, "failed": []}
+    pages = svc.artifacts / "pages"
+    pages.mkdir(parents=True, exist_ok=True)
+    for r in rows:
+        if svc.is_suite(r["task"]) or r["task"] not in svc.releases:
+            continue
+        with tempfile.TemporaryDirectory() as td:
+            jd = Path(td) / "job"
+            jd.mkdir()
+            (jd / "job.json").write_text(json.dumps({"job": "redraw", "release": r["task"]}), encoding="utf-8")
+            extract_archive((svc.artifacts / f"{r['archive_sha256']}.zip").read_bytes(), jd / "bundle")
+            p = run_limited([sys.executable, "-m", "qccd.official.worker", "page", str(jd), "--releases", str(releases)],
+                            timeout=PAGE_TIMEOUT_S, mem_mb=mem, env=_child_env())
+            page = jd / "page.html"
+            ok = p.status == "ok" and page.exists() and page.stat().st_size <= MAX_PAGE_BYTES
+            if ok:
+                shutil.copyfile(page, pages / f".{r['id']}.tmp")
+                os.replace(pages / f".{r['id']}.tmp", pages / f"{r['id']}.html")
+                out["drawn"] += 1
+            else:
+                out["failed"].append({"id": r["id"], "status": p.status, "stderr": (p.stderr or "")[-300:]})
+        print(f"[redraw] {r['id']} {r['task']}: {'drawn' if ok else 'FAILED'}", flush=True)
+    return out
+
+
 def _grade_subprocess(job_dir: Path, releases: Path, timeout: float) -> str:
     """Run `grade_one` in a limited child with a minimal environment (no credentials)."""
     from ..workspace.procs import run_limited
-    env = {k: v for k, v in os.environ.items()
-           if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
-                    "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
-                    "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
-                    "LANG", "LC_ALL", "LC_CTYPE")}
+    env = _child_env()
     mem = int(os.environ.get("QCCD_GRADER_MEM_MB", "16384"))
     r = run_limited([sys.executable, "-m", "qccd.official.worker", "one", str(job_dir), "--releases", str(releases)],
                     timeout=timeout, mem_mb=mem, env=env)
@@ -305,7 +346,21 @@ def main(argv=None) -> int:
     p = sub.add_parser("page")
     p.add_argument("job_dir")
     p.add_argument("--releases", default=rel_default)
+    p = sub.add_parser("redraw", help="draw every graded entry's page again from its archive (a new template); "
+                                      "no grade, no report changes")
+    p.add_argument("--db", default=os.environ.get("QCCD_OFFICIAL_DB", "sqlite:///official/official.db"))
+    p.add_argument("--artifacts", default=os.environ.get("QCCD_OFFICIAL_ARTIFACTS", "official/artifacts"))
+    p.add_argument("--releases", default=rel_default)
+    p.add_argument("--task", default=None)
     a = ap.parse_args(argv)
+    if a.cmd == "redraw":
+        from .service import OfficialService
+        svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(_suites_default()))
+        r = redraw(svc, Path(a.releases), task=a.task)
+        print(json.dumps({"drawn": r["drawn"], "failed": len(r["failed"])}))
+        for f in r["failed"]:
+            print(json.dumps(f), file=sys.stderr)
+        return 0 if not r["failed"] else 1
     if a.cmd == "one":
         return grade_one(Path(a.job_dir), Path(a.releases), Path(_suites_default()))
     if a.cmd == "page":
