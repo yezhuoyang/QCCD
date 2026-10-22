@@ -112,7 +112,8 @@ def test_all_transport_labels_match_coordinates(wise_archive):
 
 
 @pytest.mark.parametrize("cycle_index", range(12))
-def test_uniformly_wrong_cycle_passes_timed_but_fails_geometry(wise_archive, cycle_index):
+@pytest.mark.xfail(strict=True, reason="timed.check broadcast trusts meta['class']; it does not validate direction from geometry")
+def test_uniformly_wrong_cycle_should_fail_timed_geometry(wise_archive, cycle_index):
     """First pass: all six outbound and all six return cycles, in every archive."""
     sched, circuit = wise_archive
     transport = [e for e in sched.events if e.kind in JONES_WISE.broadcast]
@@ -132,8 +133,8 @@ def test_uniformly_wrong_cycle_passes_timed_but_fails_geometry(wise_archive, cyc
     # Only the labels changed: timings, positions, locks, circuit and class
     # uniformity are still legal, so the core checker cannot catch this fault.
     report = check(broken, JONES_WISE, duration=jones_duration, circuit=circuit, strict=True)
-    assert report.ok, report.summary()
-    assert report.checks["broadcast"] == "passed"
-    assert not report.violations
     with pytest.raises(AssertionError, match="geometric class mismatch"):
         _assert_geometric_classes(broken)
+    # Desired behavior is rejection. Until timed.check derives direction,
+    # this assertion fails and the strict xfail records the known gap.
+    assert not report.ok, "timed.check accepted a uniformly false geometric class"
