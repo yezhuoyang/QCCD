@@ -299,11 +299,7 @@ JONES_US = {"gate": 40.0, "gate1": 5.0, "measure": 400.0, "reset": 50.0, "split"
 
 
 def jones_duration(e: Event, ctx: Context) -> float | None:
-    if e.kind == "reconfigure":
-        # Replay an opaque artifact operation: its formula is not redistributed.
-        # This checks timestamps against the separately recorded operationTime,
-        # not an independent derivation of the WISE reconfiguration law.
-        return e.meta.get("recorded_duration_us")
+    # Global reconfiguration's operationTime is an observation, not a clock law.
     return JONES_US.get(e.kind)
 
 

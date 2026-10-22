@@ -404,7 +404,7 @@ def import_jones(path: str | Path, *, name: str | None = None) -> TimedSchedule:
             meta.update(locks=sorted(set(held)), chains_before=before, chains_after=after,
                         recorded_duration_us=float(e["operationTime"]) * 1e6,
                         wise_arch=dict(e["wise_arch"]),
-                        duration_source="artifact operationTime; global reconfiguration formula")
+                        duration_source="artifact operationTime: recorded, not checked")
             events.append(Event(kind="reconfigure", ions=ions, meta=meta, **common))
             continue
         if kind == "JunctionCrossing":

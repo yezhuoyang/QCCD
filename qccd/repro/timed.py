@@ -418,7 +418,9 @@ def check(
                       len(chain) if chain is not None else None)
         for obs in observers:
             obs(e, ctx)
-        if duration is not None:
+        if e.kind == "reconfigure" and (not math.isfinite(e.duration) or e.duration <= 0):
+            v("structure", f"reconfigure {e.id}: duration must be finite and positive", e.id)
+        if duration is not None and e.kind != "reconfigure":
             want = duration(e, ctx)
             if want is None and strict:
                 dur_bad += 1
@@ -672,6 +674,10 @@ def check(
     by = Counter(x.check for x in bad)
     for name in names:
         rep.checks[name] = "failed" if by.get(name) else "passed"
+    if counts["reconfigure"]:
+        if duration is not None and not by.get("durations"):
+            rep.checks["durations"] = "not checked: reconfigure durations are recorded, not checked; other events checked"
+        rep.checks["reconfigure_paths"] = "not checked: global permutations contain no internal routes"
 
     rep.metrics = {
         "makespan_us": max((e.t1 for e in sched.events), default=0.0),

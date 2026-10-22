@@ -1,7 +1,7 @@
 """Replay recorded WISE global moves, including the artifact's circuit failures.
 
 No artifact implementation or reconfiguration formula is included here.
-The dumped operationTime is the duration oracle for these opaque operations.
+The dumped operationTime is recorded, never an independent duration oracle.
 """
 from dataclasses import replace
 import gzip
@@ -44,7 +44,9 @@ def test_wise_artifact_matches_tool_without_hiding_circuit_failure(
     assert last_start == pytest.approx(raw["metrics"]["process_circuit_results"]["ElapsedTime"]["Forwarding"] * 1e6)
     assert rep.summary()["violations"] == {"circuit": 1}
     assert all(result == "passed" for name, result in rep.checks.items()
-               if name not in ("circuit", "broadcast"))
+               if name not in ("circuit", "broadcast", "durations", "reconfigure_paths"))
+    assert rep.checks["durations"].startswith("not checked:")
+    assert rep.checks["reconfigure_paths"].startswith("not checked:")
     assert rep.checks["broadcast"].startswith("skipped:")
     global_moves = [e for e in sched.events if e.kind == "reconfigure"]
     assert len(global_moves) == 4
@@ -55,7 +57,7 @@ def test_wise_artifact_matches_tool_without_hiding_circuit_failure(
         assert set(event.ions) == {i for ch in event.meta["chains_after"].values() for i in ch}
         assert {f"ion:{i}" for i in event.ions} <= set(event.meta["locks"])
         assert {f"trap:{t[1:]}" for t in event.meta["chains_after"]} <= set(event.meta["locks"])
-    # Reconfiguration alone is a faithful, physically valid state transition.
+    # Reconfiguration alone preserves the recorded state; paths/timing are not certified.
     first = global_moves[0]
     prefix = replace(sched, events=[e for e in sched.events if e.t1 <= first.t1])
     physical = check(prefix, JONES, duration=jones_duration, strict=True)
@@ -76,7 +78,9 @@ def test_recorded_global_state_and_duration_faults_are_rejected(tmp_path):
     after = {t: list(ch) for t, ch in event.meta["chains_after"].items()}
     after[next(t for t in after if after[t])].pop()
     assert report(replace(event, meta={**event.meta, "chains_after": after})).failed("structure")
-    assert report(replace(event, t1=event.t1 + 1)).failed("durations")
+    changed_time = report(replace(event, t1=event.t1 + 1))
+    assert not changed_time.failed("durations")
+    assert changed_time.checks["durations"].startswith("not checked:")
     after = {t: list(ch) for t, ch in event.meta["chains_after"].items()}
     full = [t for t, ch in after.items() if len(ch) == 2]
     after[full[0]].append(after[full[1]].pop())
@@ -103,3 +107,17 @@ def test_wise_catalog_replay_has_exact_tool_comparison(distance):
     row = check_run(paper, run)
     assert row["compare"]["tool"]["last_start_us"]["verdict"] == "exact"
     assert row["violations"] == {"circuit": 1}
+
+
+def test_zero_time_disconnected_reconfiguration_is_rejected():
+    from qccd.repro.timed import PortGraph, TimedSchedule
+    dev = PortGraph({"A": {"capacity": 1}, "B": {"capacity": 1}})
+    event = Event(0, "reconfigure", 0, 0, ("i",), meta={
+        "chains_before": {"A": ["i"], "B": []},
+        "chains_after": {"A": [], "B": ["i"]}, "recorded_duration_us": 0})
+    sched = TimedSchedule("disconnected", dev, {"A": ["i"], "B": []}, [event])
+    rep = check(sched, JONES, duration=jones_duration)
+    assert not rep.ok
+    assert "positive" in rep.failed("structure")[0].message
+    assert rep.checks["durations"].startswith("not checked:")
+    assert rep.checks["reconfigure_paths"].startswith("not checked:")
