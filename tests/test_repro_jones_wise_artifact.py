@@ -13,7 +13,7 @@ import pytest
 from qccd.repro.importers import import_jones, stim_cx
 from qccd.repro import catalog
 from qccd.repro.__main__ import check_run
-from qccd.repro.models import JONES, jones_duration
+from qccd.repro.models import JONES, JONES_WISE, JONES_WISE_ARTIFACT, QCCDSIM, jones_duration
 from qccd.repro.timed import Event, check
 
 
@@ -37,7 +37,7 @@ def test_wise_artifact_matches_tool_without_hiding_circuit_failure(
         distance, last_start, makespan, ops, reconfig_us, tmp_path):
     sched, raw = _load(distance, tmp_path)
     circuit = stim_cx(BASE / f"circuits/rotated_memory_z_d{distance}_r1.stim")
-    rep = check(sched, JONES, duration=jones_duration, circuit=circuit, strict=True)
+    rep = check(sched, JONES_WISE_ARTIFACT, duration=jones_duration, circuit=circuit, strict=True)
     assert rep.metrics["last_start_us"] == last_start
     assert rep.metrics["makespan_us"] == makespan
     assert rep.metrics["events"] == ops == raw["metrics"]["process_circuit_results"]["Operations"]["Forwarding"]
@@ -60,7 +60,7 @@ def test_wise_artifact_matches_tool_without_hiding_circuit_failure(
     # Reconfiguration alone preserves the recorded state; paths/timing are not certified.
     first = global_moves[0]
     prefix = replace(sched, events=[e for e in sched.events if e.t1 <= first.t1])
-    physical = check(prefix, JONES, duration=jones_duration, strict=True)
+    physical = check(prefix, JONES_WISE_ARTIFACT, duration=jones_duration, strict=True)
     assert physical.ok, physical.summary()
 
 
@@ -69,7 +69,7 @@ def test_recorded_global_state_and_duration_faults_are_rejected(tmp_path):
     event = next(e for e in sched.events if e.kind == "reconfigure")
 
     def report(bad):
-        return check(replace(sched, events=[bad]), JONES, duration=jones_duration, strict=True)
+        return check(replace(sched, events=[bad]), JONES_WISE_ARTIFACT, duration=jones_duration, strict=True)
 
     before = {t: list(ch) for t, ch in event.meta["chains_before"].items()}
     nonempty = [t for t in before if before[t]]
@@ -94,7 +94,7 @@ def test_global_move_excludes_every_held_trap_and_ion(tmp_path):
         for ion in ions:
             gate = Event(10000, "gate1", event.t0 + 1, event.t0 + 6, (ion,), at=trap,
                          meta={"op": "XRotation", "locks": [f"trap:{trap[1:]}", f"ion:{ion}"]})
-            rep = check(replace(sched, events=[event, gate]), JONES, duration=jones_duration, strict=True)
+            rep = check(replace(sched, events=[event, gate]), JONES_WISE_ARTIFACT, duration=jones_duration, strict=True)
             assert rep.failed("declared_locks")
             assert rep.failed("trap_serial")
             assert rep.failed("ion_serial")
@@ -116,8 +116,18 @@ def test_zero_time_disconnected_reconfiguration_is_rejected():
         "chains_before": {"A": ["i"], "B": []},
         "chains_after": {"A": [], "B": ["i"]}, "recorded_duration_us": 0})
     sched = TimedSchedule("disconnected", dev, {"A": ["i"], "B": []}, [event])
-    rep = check(sched, JONES, duration=jones_duration)
+    rep = check(sched, JONES_WISE_ARTIFACT, duration=jones_duration)
     assert not rep.ok
     assert "positive" in rep.failed("structure")[0].message
     assert rep.checks["durations"].startswith("not checked:")
     assert rep.checks["reconfigure_paths"].startswith("not checked:")
+
+
+@pytest.mark.parametrize("profile", [JONES, JONES_WISE, QCCDSIM])
+@pytest.mark.parametrize("strict", [False, True])
+def test_ordinary_profiles_reject_global_reconfiguration(profile, strict, tmp_path):
+    sched, _ = _load(2, tmp_path)
+    event = next(e for e in sched.events if e.kind == "reconfigure")
+    rep = check(replace(sched, events=[event]), profile, duration=jones_duration, strict=strict)
+    assert not rep.ok
+    assert any("does not allow reconfigure" in v.message for v in rep.failed("structure"))

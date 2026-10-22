@@ -243,7 +243,7 @@ PAPERS: list[dict] = [
              "no_studio": "the switch joins every pair of junctions by two parallel segments, an all-to-all junction network; our language describes surface traps, which cannot hold it, so it is replayed but not drawn"},
         ] + [
             {"id": f"wise_rot_d{d}_c2", "file": f"wise_rot_d{d}_c2.schedule.json.gz",
-             "importer": "jones", "profile": "JONES", "law": "jones",
+             "importer": "jones", "profile": "JONES_WISE_ARTIFACT", "law": "jones",
              "circuit": {"kind": "stim", "file": f"rotated_memory_z_d{d}_r1.stim"},
              "expect": {"tool": {"last_start_us": [
                  "metrics", "time for operations (us) = max(parallelOpsMap.keys())*1e6 [start of last step]"]}},

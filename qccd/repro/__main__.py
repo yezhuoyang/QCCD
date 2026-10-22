@@ -22,6 +22,7 @@ from .timed import TimedSchedule, check
 ROOT = Path(__file__).resolve().parents[2] / "Reproduce"
 
 PROFILES = {"QCCDSIM": models.QCCDSIM, "QCCDSIM_PHYSICAL": models.QCCDSIM_PHYSICAL,
+            "JONES_WISE_ARTIFACT": models.JONES_WISE_ARTIFACT,
             "QCCDSIM_GATESET": models.QCCDSIM_GATESET,
             "TISCC": models.TISCC, "JONES": models.JONES, "JONES_WISE": models.JONES_WISE, "CYCLONE": models.CYCLONE}
 
@@ -30,6 +31,7 @@ PROFILES = {"QCCDSIM": models.QCCDSIM, "QCCDSIM_PHYSICAL": models.QCCDSIM_PHYSIC
 #: rules.  The timed checker's profile and the rule set say the same thing; the rule set is
 #: what the pages print, rule by rule.
 RULESETS = {"QCCDSIM": "qccdsim", "QCCDSIM_PHYSICAL": "qccdsim-physical",
+            "JONES_WISE_ARTIFACT": "jones-wise-artifact",
             "QCCDSIM_GATESET": "qccdsim-gateset", "TISCC": "tiscc", "JONES": "jones", "JONES_WISE": "jones-wise",
             "CYCLONE": "cyclone"}
 

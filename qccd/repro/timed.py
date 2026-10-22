@@ -194,6 +194,8 @@ class Profile:
     declared_locks: bool = False
     op_zones: tuple[tuple[str, tuple[str, ...]], ...] = ()
     tol: float = 1e-6
+    # Opaque recorded global permutations are only part of an explicit artifact model.
+    allow_reconfigure: bool = False
 
     def to_json(self) -> dict:
         d = asdict(self)
@@ -433,6 +435,9 @@ def check(
 
         # -- in-place events ------------------------------------------------------
         if e.kind == "reconfigure":
+            if not profile.allow_reconfigure:
+                v("structure", f"reconfigure {e.id}: profile {profile.name} does not allow reconfigure", e.id)
+                continue
             # An observed, opaque global move. Check the full state transition
             # and hold every ion/trap, without inventing internal shuttle paths.
             before = e.meta.get("chains_before", {})

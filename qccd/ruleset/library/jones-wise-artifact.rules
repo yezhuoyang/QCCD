@@ -1,0 +1,6 @@
+# Opaque global reconfigurations captured from the artifact, without its formula.
+ruleset "jones-wise-artifact"
+title "Jones's recorded WISE artifact"
+about "Jones's ordinary operations, plus recorded global permutations. Global durations are recorded, not checked; internal paths are not recorded."
+include "jones"
+param allow_reconfigure = true
