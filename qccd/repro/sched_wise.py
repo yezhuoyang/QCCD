@@ -1,4 +1,4 @@
-"""Lockstep WISE schedule on the unchanged Jones device and initial mapping.
+"""Broadcast control on Jones's junction grid, with its initial ion mapping.
 
 Each pass sends one direction group out, applies the source native CX
 decomposition in parallel across traps, and returns every visitor home.
@@ -10,6 +10,7 @@ import argparse
 import gzip
 import json
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 from typing import Mapping
 
@@ -41,6 +42,12 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
     """
     if steps not in (1, 4):
         raise ValueError("steps must be 1/4")
+    # This control-only extension is explicit per trap; do not mutate the
+    # reference artifact device. Geometry, capacities, and ion mapping stay fixed.
+    dev = deepcopy(dev)
+    for site in dev.sites.values():
+        site["broadcast_switch"] = bool(zone_opt_out)
+        site["control_model"] = "broadcast"
     cx, prog, _ = stim_program(stim)
     ion = {q: str(qubits[q]) for q in prog}
     anc = {q for q, p in prog.items()

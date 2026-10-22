@@ -485,6 +485,30 @@ def _motion(ctx: Ctx, o):
     return _op(o, "motion").facts.get("motion")
 
 
+@term("displacement(o)", "a name", "Primitive and directed leg derived from device coordinates, "
+      "independently of the recorded waveform label; none if geometry is unavailable.",
+      "execution", kinds=("schedule",))
+def _displacement(ctx: Ctx, o):
+    return _op(o, "displacement").facts.get("displacement")
+
+
+@term("movement_mode(o)", "a name", "Whether a timed operation moves within a trap (intra), "
+      "between traps (inter), or does not transport ions (none).", "execution", kinds=("schedule",))
+def _movement_mode(ctx: Ctx, o):
+    return _op(o, "movement_mode").facts.get("movement_mode")
+
+
+@term("opt_out_ready(o)", "true or false", "Every trap outside the simultaneous transport's "
+      "directed legs declares its own broadcast switch, so all idle sites can hold still.",
+      "execution", kinds=("schedule",))
+def _opt_out_ready(ctx: Ctx, o):
+    idle = _op(o, "opt_out_ready").facts.get("idle_sites")
+    if idle is None:
+        return False
+    return ctx.once(("opt_out_ready", idle),
+                    lambda: idle <= ctx.hw.numbers.get("site_switches", frozenset()))
+
+
 @term("simultaneous(a, b)", "true or false", "Whether operations a and b happen at the same "
       "time.", "execution",
       programme="In the same step.",

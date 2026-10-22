@@ -47,3 +47,46 @@ for d in 2 3 6 12; do
  done
 .venv/bin/python -m qccd.repro check jones2025
 ```
+
+## Rules on grid_rot_d3_c2_wise
+
+These are the production `keeping_order(jones-wise)` verdicts: R25 replaces
+the included Jones commuting-order rule R26 for our schedules.
+
+| Rule | Verdict |
+|---|---|
+| R0 positions / well-formedness | holds |
+| R1 site capacity | holds |
+| R2 junction exclusion | holds |
+| R3 rail capacity | holds |
+| R4b programme control mode | does not apply (no programme steps) |
+| R4d programme channel/opt-out | does not apply (no programme steps) |
+| R6b gate locality | holds |
+| R8 ion exclusion | holds |
+| R14 chain end / paid swap | holds |
+| R22 one waveform | holds |
+| R24 circuit gates | holds |
+| R25 strict per-qubit order | holds |
+| R27 trap exclusion | holds |
+| R29 durations | holds |
+| R30 declared component locks | holds |
+| W1 geometry, labels and lockstep | holds |
+| W2 timed R4b counterpart | holds |
+| W3 timed R4d counterpart | holds |
+
+R4b and R4d themselves quantify programme steps and explicitly do not apply
+to timed schedules. W2 enforces their intra/inter transport separation and
+exclusion of simultaneous gates, resets, measurements and cooling. W3 checks
+every idle trap for a per-site switch; W1 supplies R4d's common-waveform part.
+R22 evaluates on schedules; its legacy `motion` still reads the label. W1
+compares a separate `displacement` fact derived from device coordinates and
+requires the label to agree, so uniformly lying labels are rejected as well.
+
+Each WISE archive now declares `broadcast_switch: true` and
+`control_model: broadcast` on every trap, including empty traps. This is an
+explicit added control assumption, not a change in trap geometry, capacity,
+mapping, initial chains, event timing or gate order. A direct-wiring schedule,
+a move delayed by 5 µs, a uniformly mislabelled cycle, a missing idle-site
+switch, a gate concurrent with transport, and double junction occupancy are
+all rejected by the rule tests. The older timed checker still trusts class
+labels; its geometry-gap tests remain strict expected failures.

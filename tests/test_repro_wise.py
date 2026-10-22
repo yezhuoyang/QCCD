@@ -154,7 +154,11 @@ def test_wise_other_grid_artifacts(distance, mode, suffix):
     assert report.ok, report.summary()
     assert report.checks["broadcast"] == "passed"
     assert not report.violations
-    assert sched.device.to_json() == dev.to_json()
+    assert sched.device.segments == dev.segments and sched.device.nodes == dev.nodes
+    assert sched.device.adjacent == dev.adjacent
+    for t, site in dev.sites.items():
+        assert "broadcast_switch" not in site  # builder must not mutate the reference
+        assert sched.device.sites[t] == {**site, "broadcast_switch": True, "control_model": "broadcast"}
     assert sched.qubits == {q: str(i) for q, i in qubits.items()}
     assert {t: ch for t, ch in sched.chains.items() if ch} == chains
     assert len([e for e in sched.events if e.kind == "gate"]) == len(cx)

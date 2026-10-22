@@ -15,9 +15,10 @@ is the timed checker's convention, so the two can never disagree about capacity.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+import math
 from typing import Any, Callable, Mapping, Sequence
 
-from .model import CircuitOpData, Execution, Hardware, Ion, Op, Rail, Site, Timeline
+from .model import CircuitOpData, Execution, Hardware, Ion, Op, Rail, Site, Timeline, TRANSPORT_KINDS
 
 __all__ = ["schedule_hardware", "schedule_execution"]
 
@@ -60,6 +61,11 @@ def schedule_hardware(dev) -> Hardware:
         ends={Rail(s): (Site(a), Site(b)) for s, (a, b) in dev.segments.items()},
         rails_at={k: tuple(v) for k, v in rails_at.items()},
         neighbours={Site(s): frozenset(Site(x) for x in v) for s, v in dev.adjacent.items()},
+        numbers={"site_switches": frozenset(Site(s) for s, d in dev.sites.items()
+                                            if d.get("broadcast_switch") is True),
+                 **({"control_model": next(iter({d["control_model"] for d in dev.sites.values()}))}
+                    if dev.sites and all("control_model" in d for d in dev.sites.values())
+                    and len({d["control_model"] for d in dev.sites.values()}) == 1 else {})},
     )
 
 
@@ -98,6 +104,36 @@ def schedule_execution(sched, *, chain_order: str | None = None,
     resid: dict[Any, list[tuple[float, float]]] = defaultdict(list)
     pos_changes: list[tuple[float, int, str, Any]] = []
     malformed_start: list[str] = []
+    directed_legs: dict[str, tuple[str, str]] = {}
+
+    def displacement(e):
+        """Physical directed leg, independently of the declared motion label."""
+        if len(e.ions) != 1:
+            return None, frozenset()
+        i = e.ions[0]
+        if e.kind in ("split", "j_exit"):
+            near = e.at if e.kind == "split" else e.via
+            segment = e.seg if e.kind == "split" else e.dst
+            ends = dev.segments.get(segment, ())
+            if near not in ends or len(ends) != 2:
+                return None, frozenset()
+            directed_legs[i] = (near, ends[1] if ends[0] == near else ends[0])
+        leg = directed_legs.get(i)
+        if leg is None:
+            return None, frozenset()
+        touched = frozenset(Site(n) for n in leg if n in dev.sites)
+        if e.kind == "merge":
+            directed_legs.pop(i)
+        try:
+            a, b = [(dev.sites if n in dev.sites else dev.nodes)[n]["pos"] for n in leg]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            zx, zy = math.isclose(dx, 0, abs_tol=1e-9), math.isclose(dy, 0, abs_tol=1e-9)
+            if zx == zy:
+                return None, touched
+            direction = ("E" if dx > 0 else "W") if zy else ("N" if dy > 0 else "S")
+            return f"{e.kind}:{direction}", touched
+        except (KeyError, TypeError, IndexError):
+            return None, touched
     for site, chain in sched.chains.items():
         if site not in dev.sites:
             malformed_start.append(f"initial chain on unknown site {site}")
@@ -132,6 +168,12 @@ def schedule_execution(sched, *, chain_order: str | None = None,
                text=f"{e.kind} {','.join(e.ions)} (event {e.id})")
         if e.meta.get("class") is not None:
             o.facts["motion"] = str(e.meta.get("class"))
+        if e.kind in ("split", "merge", "transit", "j_enter", "j_exit"):
+            o.facts["displacement"], o.facts["transport_sites"] = displacement(e)
+        if kind in TRANSPORT_KINDS:
+            o.facts["movement_mode"] = "inter"
+        elif e.kind == "swap":
+            o.facts["movement_mode"] = "intra"
         ops.append(o)
 
         def misplaced(msg: str, o=o) -> None:
@@ -315,6 +357,21 @@ def schedule_execution(sched, *, chain_order: str | None = None,
     pos_changes.sort(key=lambda x: (x[0], x[1]))
     for t, _, i, where in pos_changes:
         pos.set(ions[i], index[t], where)
+
+    # The same active/idle zone set is shared by every event of a cycle. Also
+    # handle malformed staggered cycles without assuming equal boundaries.
+    movers = [o for o in ops if o.kind in TRANSPORT_KINDS]
+    idle_by_span = {}
+    all_sites = frozenset(hw.sites)
+    for o in movers:
+        span = (o.t0, o.t1)
+        if span not in idle_by_span:
+            active = set()
+            for other in movers:
+                if o.t0 < other.t1 - tol and other.t0 < o.t1 - tol:
+                    active.update(other.facts.get("transport_sites", ()))
+            idle_by_span[span] = all_sites - active
+        o.facts["idle_sites"] = idle_by_span[span]
 
     exe = Execution(kind="schedule", hardware=hw, ions=sorted(ions.values()), ops=ops,
                     instants=instants, instant_time=[-INF] + times, occupancy=occ, position=pos,
