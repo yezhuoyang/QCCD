@@ -103,7 +103,18 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-21 (afternoon), from commit `0b8678f` (pushed, also on `website/invitations`):
+**Deployed** 2026-10-21 (evening), from commit `82f95f2` (pushed, also on `website/invitations`):
+Goal 1's other codes (`steanexz`, `shorxz`, `rep3xz`, `rep5xz`, `bb18xz` two-copy; `bb72seq` one block,
+Z then X, 144 ions; `ldpc` decodes the BB and Steane ones), `/v1/goals/goal1` with each release's
+ions, logical qubits and entries, and the studio template that shows the Learn panel only in the
+tutorial. Derived from `d2da98d` (`qccd/` from `82f95f2`; outside it only `Compiler/ocaml` changed,
+the rotate fix released as qccdc `b4a003dbb4ae`, byte-identical on the suite and the seeds, so the
+image keeps `c774b87b677f`). 47 layers identical; rollback `*.bak-0b8678f`. Rehearsal smoke passed and
+an entry page drawn there hides the Learn tab at 1600 and 1100 px. The three public boards were
+regraded on production (`regrade surface3xz_mem@1` / `surface5xz_mem@1` / `surface7xz_mem@1`, 28
+jobs) to redraw every entry page; the numbers were the same.
+
+**Before that** 2026-10-21 (afternoon), from commit `0b8678f` (pushed, also on `website/invitations`):
 - A leaderboard entry opens: `/submissions/<id>/page` (the studio page the grader draws after a
   passing grade, in a child of its own; served with CSP `sandbox`), `/files/<name>`, `/bundle.zip`.
 - Rows carry `by`, every metric, the LER interval and the experiment; `GET /v1/goals/goal1` ranks
