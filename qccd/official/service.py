@@ -474,6 +474,12 @@ class OfficialService:
                        "rank_by": "ler_per_round_per_logical", "better": "low",
                        "unit": "per round per logical qubit"}}
 
+    #: a goal's measures of size, from the experiment each entry ran: (name, better, unit)
+    GOAL_SIZE_MEASURES = (("logical_qubits", "high", "logical qubits"), ("ions", "low", "ions"),
+                          ("ions_per_logical_qubit", "low", "ions per logical qubit"))
+    #: where the project is going (the user, 2026-10-21): the leaderboard shows how far each entry is
+    FTL_TARGET = {"logical_qubits": 60, "ions": 2000}
+
     def goal_releases(self, goal: str) -> list:
         g = self.GOALS[goal]
         return [r for r in self.releases.values()
@@ -501,14 +507,22 @@ class OfficialService:
                 m = r["metrics"]
                 if not isinstance(m.get(g["rank_by"]), (int, float)) and isinstance(m.get("ler_per_round"), (int, float)):
                     m[g["rank_by"]] = m["ler_per_round"] / exp["k"]      # graded before the measure existed
+                # what the code buys: logical qubits, and what each costs in ions (FTL's target is
+                # 60 logical qubits within 2000 ions; the user, 2026-10-21)
+                m.update(logical_qubits=exp["k"], ions=exp["ions"],
+                         ions_per_logical_qubit=exp["ions"] / exp["k"] if exp["k"] else None)
                 r.update(release=rel.id, release_title=rel.title, rank_value=m.get(g["rank_by"]))
                 rows.append(r)
         rows = [r for r in rows if isinstance(r["rank_value"], (int, float))]
         rows.sort(key=lambda r: r["rank_value"] if g["better"] == "low" else -r["rank_value"])
         units.setdefault(g["rank_by"], g["unit"])
-        names = [g["rank_by"]] + [n for n in names if n != g["rank_by"]]
+        size_measures = [n for n, _, _ in self.GOAL_SIZE_MEASURES]
+        names = [g["rank_by"]] + size_measures + [n for n in names if n != g["rank_by"] and n not in size_measures]
         better = {m["name"]: m.get("better", "low") for rel in rels for m in rel.manifest.get("metrics", [])}
         better[g["rank_by"]] = g["better"]
+        for n, b, u in self.GOAL_SIZE_MEASURES:
+            better[n] = b
+            units[n] = u
         def size(rel):
             # the release's own count (manifests since 84e8c5d), else what its entries ran
             q, ran = rel.manifest.get("qec") or {}, [r["experiment"] for r in rows if r["release"] == rel.id]
@@ -517,6 +531,7 @@ class OfficialService:
                     "entries": len(ran)}
         return {"goal": goal, "title": g["title"], "evaluator_policy": self.evaluator_policy,
                 "noise": g["noise"], "max_ions": g["max_ions"], "rank_by": g["rank_by"], "better": g["better"],
+                "ftl_target": self.FTL_TARGET,
                 "releases": [{"id": r.id, "title": r.title, "task": r.manifest.get("task"), "task_digest": r.digest,
                               **size(r)} for r in rels],
                 "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],

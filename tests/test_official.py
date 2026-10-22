@@ -241,3 +241,21 @@ def test_goal_1_ranks_every_noise_2_memory_together(svc):
     with pytest.raises(OfficialError) as e:
         svc.goal_board("goal9")
     assert e.value.status == 404
+
+
+def test_goal_1_measures_what_a_code_buys_logical_qubits_and_their_ions(svc, monkeypatch):
+    """Logical qubits and ions per logical qubit are figures of merit beside the logical error
+    rate (the user, 2026-10-21: FTL's target is 60 logical qubits within 2000 ions)."""
+    def rows(task):
+        exp = ({"ions": 144, "k": 12} if task.startswith("surface5xz") else {"ions": 98, "k": 1})
+        return ([{"id": f"os_{task[:4]}", "display_name": "d", "by": "x", "created_at": 0, "rank_value": None,
+                  "metrics": {"ler_per_round": 1e-4 * exp["k"]}, "experiment": exp}], {})
+    monkeypatch.setattr(svc, "_ranked_rows", rows)
+    g = svc.goal_board("goal1")
+    names = [m["name"] for m in g["metrics"]]
+    assert names[:4] == ["ler_per_round_per_logical", "logical_qubits", "ions", "ions_per_logical_qubit"]
+    better = {m["name"]: m["better"] for m in g["metrics"]}
+    assert better["logical_qubits"] == "high" and better["ions_per_logical_qubit"] == "low"
+    big = next(r for r in g["rows"] if r["experiment"]["k"] == 12)
+    assert big["metrics"]["logical_qubits"] == 12 and big["metrics"]["ions_per_logical_qubit"] == 12.0
+    assert g["ftl_target"] == {"logical_qubits": 60, "ions": 2000}

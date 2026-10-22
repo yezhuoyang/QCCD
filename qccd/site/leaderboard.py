@@ -262,6 +262,8 @@ CHART_SCRIPT = r"""
                ler_per_round_per_logical: ['ler_logical_1e4', 1e4]};
   var NAMES = {ler_per_round_per_logical: 'Logical error rate per round per logical qubit (×10⁻⁴)',
                ler_per_round: 'Logical error rate per round (×10⁻⁴)', ler: 'Logical error rate per shot (×10⁻⁴)',
+               logical_qubits: 'Size — logical qubits', ions: 'Size — ions',
+               ions_per_logical_qubit: 'Size — ions per logical qubit',
                instructions: 'Program — instructions', transport_instructions: 'Program — transport instructions',
                T_quantinuum: 'Total running time — quantinuum table', T_jones: 'Total running time — jones table',
                T_transport: 'Total running time — transport table', dacs: 'Resource — DACs',
@@ -285,12 +287,29 @@ CHART_SCRIPT = r"""
       if (B.goal) say('No entries yet. The first design submitted to one of this goal’s boards that passes every check is #1.');
       return;
     }
+    // what a code buys (logical qubits) and what each costs (ions): FTL's target is 60 logical qubits
+    // within 2000 ions.  A server that lists them only in each entry's experiment gets them filled in.
+    var SIZE = ['logical_qubits', 'ions', 'ions_per_logical_qubit'];
+    var TARGET = lb.ftl_target || {logical_qubits: 60, ions: 2000};
+    if (B.goal) {
+      var have = (lb.metrics || []).map(function(m){ return m.name; });
+      [['logical_qubits', 'high'], ['ions', 'low'], ['ions_per_logical_qubit', 'low']].forEach(function(s, i){
+        if (have.indexOf(s[0]) < 0) (lb.metrics = lb.metrics || []).splice(1 + i, 0, {name: s[0], better: s[1], unit: ''}); });
+      rows.forEach(function(r){
+        var e = r.experiment, m = r.metrics = r.metrics || {};
+        if (!e || !e.k) return;
+        if (m.logical_qubits == null) m.logical_qubits = e.k;
+        if (m.ions == null) m.ions = e.ions;
+        if (m.ions_per_logical_qubit == null) m.ions_per_logical_qubit = e.ions / e.k;
+      });
+    }
     // every measure the server scores is one to rank by here
     (lb.metrics || []).forEach(function(m){
       var k = key(m.name); if (metric(k)) return;
       var M = {k: k, name: NAMES[m.name] || m.name.replace(/_/g, ' '), better: m.better === 'high' ? 'high' : 'low',
-               unit: (SCALE[m.name] || !m.unit || m.unit === 'count') ? '' : m.unit};
-      if (SCALE[m.name]) M.nd = 3; else if (m.unit === 'count') M.nd = 0;
+               unit: (SCALE[m.name] || SIZE.indexOf(m.name) >= 0 || !m.unit || m.unit === 'count') ? '' : m.unit};
+      if (SCALE[m.name]) M.nd = 3; else if (m.unit === 'count' || m.name === 'logical_qubits' || m.name === 'ions') M.nd = 0;
+      else if (m.name === 'ions_per_logical_qubit') M.nd = 1;
       METRICS.push(M);
     });
     DATA.forEach(function(d){ if (d.compiled && d.numbers && d.numbers.instructions == null && typeof d.instructions === 'number') d.numbers.instructions = d.instructions; });
@@ -384,9 +403,11 @@ CHART_SCRIPT = r"""
         tb.appendChild(row('code', cn + (d.exp.distance && !/distance/.test(cn) ? ', distance ' + d.exp.distance : '')));
         tb.appendChild(row('ions', d.exp.ions + ' (' + d.exp.n_data + ' data, ' + d.exp.n_ancilla + ' ancilla)'));
         tb.appendChild(row('logical qubits', String(d.exp.k) + (d.exp.basis ? ', measured in ' + d.exp.basis.split('').join(' and ') : '')));
+        if (d.exp.k) tb.appendChild(row('ions per logical qubit', (d.exp.ions / d.exp.k).toFixed(1) + ' (FTL target: ' +
+          Math.floor(TARGET.ions / TARGET.logical_qubits) + ' or fewer)', d.exp.ions / d.exp.k <= TARGET.ions / TARGET.logical_qubits ? 'ok' : ''));
       }
       if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
-      METRICS.forEach(function(m){ if (val(d, m.k) != null) tb.appendChild(row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m))); });
+      METRICS.forEach(function(m){ if (val(d, m.k) != null && !(d.exp && SIZE.indexOf(m.k) >= 0)) tb.appendChild(row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m))); });
       right.appendChild(tb);
       el.appendChild(left); el.appendChild(right);
     };
@@ -466,7 +487,8 @@ def goal_info(goal: str = "goal1") -> dict | None:
 
 
 GOAL_SUB = ("Every curated QEC memory under {max_ions} ions on one ranking, by logical error rate per round "
-            "per logical qubit ({noise}).")
+            "per logical qubit ({noise}). Rank by logical qubits or ions per logical qubit too: FTL's target is "
+            "60 logical qubits within 2000 ions.")
 
 #: a board page's one line; its long description folds away (the user: too much text)
 BOARD_SUB = "Pick a measure to rank by; click a dot to open a design."
@@ -534,7 +556,7 @@ GOAL_TABLE_SCRIPT = r"""
       var x = best[a.id], y = best[b.id];
       return x && y ? x.rank_value - y.rank_value : (x ? -1 : y ? 1 : (a.ions || 0) - (b.ions || 0)); });
     var t = el('table'), hd = el('tr');
-    ['code', 'ions', 'logical qubits', 'entries', 'best, per round per logical qubit', 'design', 'by'].forEach(function(h){
+    ['code', 'ions', 'logical qubits', 'ions per logical qubit', 'entries', 'best, per round per logical qubit', 'design', 'by'].forEach(function(h){
       hd.appendChild(el('th', null, h)); });
     var th = el('thead'); th.appendChild(hd); t.appendChild(th);
     var tb = el('tbody');
@@ -543,6 +565,7 @@ GOAL_TABLE_SCRIPT = r"""
       a.href = 'goal1/?code=' + encodeURIComponent(rel.id); td.appendChild(a); tr.appendChild(td);
       tr.appendChild(el('td', 'n', rel.ions == null ? '–' : String(rel.ions)));
       tr.appendChild(el('td', 'n', rel.k == null ? '–' : String(rel.k)));
+      tr.appendChild(el('td', 'n', rel.k && rel.ions ? (rel.ions / rel.k).toFixed(1) : '–'));
       tr.appendChild(el('td', 'n', String(rel.entries || 0)));
       tr.appendChild(el('td', 'n', b ? fmt(b.rank_value) : '–'));
       tr.appendChild(el('td', null, b ? (b.display_name || b.id) : 'no entry yet'));
@@ -559,7 +582,8 @@ def goal_table() -> str:
     """Goal 1 on the Leaderboard page: a live table, one row per code, each opening the chart on it."""
     return ('<section class="g1t" id="goal1-codes" aria-label="Goal 1, code by code">'
             '<div id="g1-codes"><p class="lbx-wait">Loading Goal 1&hellip;</p></div>'
-            '<p class="g1-more"><a href="goal1/">The Goal 1 chart: every entry, rank by any measure &rarr;</a></p>'
+            '<p class="g1-more">FTL&rsquo;s target: 60 logical qubits within 2000 ions, about 33 ions per logical qubit. '
+            '<a href="goal1/">The Goal 1 chart: every entry, rank by any measure &rarr;</a></p>'
             f'</section><style>{GOAL_TABLE_CSS}</style><script>{GOAL_TABLE_SCRIPT}</script>')
 
 
