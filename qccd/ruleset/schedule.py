@@ -360,7 +360,11 @@ def schedule_execution(sched, *, chain_order: str | None = None,
 
     # The same active/idle zone set is shared by every event of a cycle. Also
     # handle malformed staggered cycles without assuming equal boundaries.
-    movers = [o for o in ops if o.kind in TRANSPORT_KINDS]
+    # Opt-out is a broadcast-only fact. Independent paper schedules can have
+    # hundreds of thousands of distinct transport intervals; scanning them for
+    # idle broadcast zones would add quadratic work that none of their rules use.
+    movers = ([o for o in ops if o.kind in TRANSPORT_KINDS]
+              if hw.numbers.get("control_model") == "broadcast" else [])
     idle_by_span = {}
     all_sites = frozenset(hw.sites)
     for o in movers:

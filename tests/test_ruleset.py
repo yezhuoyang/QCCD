@@ -55,8 +55,10 @@ def test_jones_wise_rules_and_timed_applicability(d):
 
 
 def test_jones_wise_rejects_direct_wiring_schedule():
-    res, _ = _wise_rules(*_wise_schedule(kind="ours"))
+    res, exe = _wise_rules(*_wise_schedule(kind="ours"))
     assert res["W1"].verdict == FAILS
+    assert not any("idle_sites" in o.facts for o in exe.ops)
+    assert res["W3"].verdict == FAILS
 
 
 def test_jones_wise_rejects_five_us_delayed_move():
