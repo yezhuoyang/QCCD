@@ -4491,7 +4491,7 @@ var HINTS = {
   'el:spur': { t: 'Spur', d: 'A short rail from the loop to a side site, where an ion can be parked. A parked ion stays put while the loop turns; moving onto the spur and back off it are the dock and undock moves.' },
   'region:dock':  { t: '4 \u00b7 Panel', d: 'One panel at a time, opened from the menu in the head: the course, the device as code, the machine settings, a place to write your own test programme, or the report. Press its menu item again to close it.' },
   'region:prog':  { t: '3 \u00b7 Program', d: 'The hardware programme one instruction per row, and the circuit it was compiled from, beside the animation: the executing instruction is marked and the next ones are in view. Hardware, Gates or Both.' },
-  'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both stacked. Only a compiled page has a circuit.' },
+  'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both side by side. Only a compiled page has a circuit.' },
   'progpin': { t: 'Beside the animation', d: 'Keep the programme in its own column next to the canvas, the whole height, or put it back among the panels to give the canvas the width.' },
   'ruleset': { t: 'The paper’s rules', d: 'This schedule was written for another machine model: a paper’s. Its rule set, judged rule by rule when the page was built, comes first; hover a rule for its first counterexample or for why it does not apply. The badges after it are this website’s own rules, which the paper did not assume.' },
   // the picture, element by element

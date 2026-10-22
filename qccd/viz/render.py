@@ -937,6 +937,18 @@ text-transform:uppercase;margin-right:4px}
 #paneP[data-view="gates"] #pHw{display:none}
 #paneP[data-view="both"] .lst{min-height:80px}
 #paneP[data-view="both"] .pblock{flex:1 1 50%}
+/* BOTH IS TWO COLUMNS, the hardware programme on the left and the circuit on the right
+   under the one header (the user, 2026-10-22: "two Column, but not two row"), and the
+   column or dock holding the pane doubles so each listing keeps a listing's width.
+   Only the narrow regime still stacks them: two columns there would be under 200 px. */
+.row:not([data-layout="narrow"]) .progcol #paneP[data-view="both"],
+.row:not([data-layout="narrow"]) .dock #paneP.on[data-view="both"]{display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+  column-gap:14px;row-gap:8px}
+.row:not([data-layout="narrow"]) #paneP[data-view="both"]>header{grid-column:1/-1}
+.row:not([data-layout="narrow"]) #paneP[data-view="both"] .pblock{grid-row:2;min-width:0}
+.row:not([data-layout="narrow"]) .progcol[data-view="both"],
+.row:not([data-layout="narrow"]) .dock[data-view="both"]{width:min(760px,46vw)}
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;
   grid-column:2;grid-row:1}
 .stage[data-drop="1"] svg{outline:2px dashed var(--accent);outline-offset:-4px}
@@ -1717,14 +1729,14 @@ textarea.src.out{min-height:120px;opacity:.85}
 
         <!-- THE PROGRAM PANE: two listings, one switch.  The hardware programme and the
              source circuit it was compiled from (when the page carries one), shown one at
-             a time or stacked, in lockstep with the animation.  `#paneQ` keeps its id and
+             a time or side by side, in lockstep with the animation.  `#paneQ` keeps its id and
              its `data-off` switch: the harnesses read both. -->
         <section class="pane card on" id="paneP" data-view="hw">
           <header class="ph"><h3>Program</h3>
             <span class="seg" id="pView" data-hint="progview" style="display:none">
               <button class="on" id="pvhw" data-view="hw" title="the hardware instructions">Hardware</button>
               <button id="pvgates" data-view="gates" title="the circuit statements">Gates</button>
-              <button id="pvboth" data-view="both" title="both, stacked">Both</button>
+              <button id="pvboth" data-view="both" title="both, side by side">Both</button>
             </span>
             <span class="grow"></span>
             <button class="grip" id="pPin" data-hint="progpin" aria-pressed="false"
@@ -4381,6 +4393,7 @@ function placeProgram(){
     if(inCourse()) setPane('L');
     else { foldPanel(dock, true); syncMenu(); }
   } else setPane(PANE);
+  syncProgWidth();
   return col;
 }
 function progPinToggle(on){
@@ -4404,8 +4417,24 @@ function setProgView(v){
   const seg = document.getElementById('pView'); if(seg) seg.style.display = SRC ? '' : 'none';
   try { localStorage.setItem('qccd.studio.progview', v); } catch (e) { /* no store */ }
   syncQ();
-  sizeLists();
+  if(syncProgWidth()) sizeStage(); else sizeLists();
   return v;
+}
+// BOTH WIDENS WHAT HOLDS THE PANE: the CSS doubles the column, or the dock, that carries
+// `data-view="both"` -- the dock only while the Program pane is the one it shows, so the
+// Learn pane never opens twice as wide.  Returns whether the width changed, so the caller
+// refits the canvas beside it.
+function syncProgWidth(){
+  const both = PROG_VIEW === 'both' && !!SRC;
+  let changed = false;
+  const mark = (el, on) => {
+    if(!el) return;
+    const v = on ? 'both' : 'one';
+    if(el.getAttribute('data-view') !== v){ el.setAttribute('data-view', v); changed = true; }
+  };
+  mark(document.getElementById('progcol'), both && PROG_COL);
+  mark(document.getElementById('dock'), both && !PROG_COL && PANE === 'P');
+  return changed;
 }
 // the Circuit listing's off switch is an attribute: a pane that shows every block must
 // not show this one with nothing behind it
@@ -4462,6 +4491,7 @@ function setPane(which){
     document.getElementById('pane'+k).className = 'pane card'+(on?' on':'');
   }
   syncQ();
+  if(syncProgWidth()){ sizeStage(); return; }
   // the wide strip scrolls sideways when its panes do not all fit: bring the pane in
   const panes=document.getElementById('panes'), pe=document.getElementById('pane'+which);
   if(panes && pe && typeof pe.offsetLeft==='number' &&
