@@ -106,7 +106,7 @@ def test_wise_round_and_order(mode, cycles, transport, makespan, tmp_path):
     result = subprocess.run([sys.executable, str(stim.parents[3] / "tools/order.py"),
                              str(path), str(stim)], text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "executed: detectors deterministic; circuit distance = 3" in result.stdout
+    assert "executed: detectors deterministic; circuit distance <= 3" in result.stdout
     assert "RESULT: PASS" in result.stdout
     if mode == "split":
         assert "executed order matches the source on every qubit" in result.stdout

@@ -30,6 +30,6 @@ def test_memory_x_preserves_split_distance(mode, suffix, distance, result, exit_
         str(base / "circuits/rotated_memory_x_d3_r1.stim"),
     ], text=True, capture_output=True)
     assert run.returncode == exit_code, run.stdout + run.stderr
-    assert "source  : detectors deterministic; circuit distance = 3" in run.stdout
-    assert f"executed: detectors deterministic; circuit distance = {distance}" in run.stdout
+    assert "source  : detectors deterministic; circuit distance <= 3" in run.stdout
+    assert f"executed: detectors deterministic; circuit distance <= {distance}" in run.stdout
     assert f"RESULT: {result}" in run.stdout

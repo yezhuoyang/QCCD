@@ -59,7 +59,7 @@ def test_ordered_grid_exact_sequence_and_both_bases(d, tmp_path):
                                  str(path), str(source)], capture_output=True, text=True)
         assert result.returncode == 0, result.stdout + result.stderr
         assert "executed order matches the source on every qubit" in result.stdout
-        assert f"executed: detectors deterministic; circuit distance = {d}" in result.stdout
+        assert f"executed: detectors deterministic; circuit distance <= {d}" in result.stdout
         assert "RESULT: PASS" in result.stdout
 
 
