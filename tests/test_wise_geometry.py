@@ -49,7 +49,7 @@ def _assert_geometric_classes(sched):
     for event in sorted(sched.events, key=lambda e: (e.t0, e.id)):
         if event.kind not in JONES_WISE.broadcast:
             continue
-        # These eight return-home archives need no swaps; fail explicitly if a
+        # These four return-home archives need no swaps; fail explicitly if a
         # new transport primitive appears without a geometric interpretation.
         assert event.kind in TRANSPORT, f"unsupported transport kind {event.kind}"
         assert len(event.ions) == 1
@@ -87,7 +87,7 @@ def _assert_geometric_classes(sched):
 
 
 @pytest.fixture(scope="module", params=[(d, mode) for d in (2, 3, 6, 12)
-                                       for mode in ("split", "shared_shape")],
+                                       for mode in ("split",)],
                 ids=lambda case: f"d{case[0]}-{case[1]}")
 def wise_archive(request):
     distance, mode = request.param

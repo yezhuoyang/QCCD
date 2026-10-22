@@ -12,6 +12,7 @@ from qccd.repro.importers import jones_device
 from qccd.repro.models import JONES, JONES_WISE, jones_duration
 from qccd.repro.sched_jones import stim_program
 from qccd.repro.sched_wise import build
+from qccd.repro.__main__ import ours_profile
 from qccd.repro.timed import Event, PortGraph, TimedSchedule, check
 
 
@@ -29,7 +30,7 @@ def test_wise_profile_and_broadcast_faults():
     returns = [replace(e, id=e.id + 2, kind="merge", t0=100, t1=180,
                        meta={**e.meta, "class": "merge:R"}) for e in events]
     sched = TimedSchedule("broadcast probe", dev, {"T0": ["0"], "T1": ["1"]}, events + returns)
-    report = check(sched, JONES_WISE, duration=jones_duration, strict=True)
+    report = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, strict=True)
     assert report.ok, report.summary()
     assert report.checks["broadcast"] == "passed"
     for bad in (
@@ -54,7 +55,7 @@ def test_wise_first_step_and_planted_faults():
     dev, chains, qubits, stim = _source()
     sched = build(dev, chains, qubits, stim, steps=1)
     cx, _, _ = stim_program(stim)
-    report = check(sched, JONES_WISE, duration=jones_duration, circuit=cx[:6], strict=True)
+    report = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, circuit=cx[:6], strict=True)
     assert report.ok, report.summary()
     assert report.checks["broadcast"] == "passed"
     assert report.metrics["makespan_us"] == 660
@@ -72,13 +73,12 @@ def test_wise_first_step_and_planted_faults():
 
 @pytest.mark.parametrize("mode,cycles,transport,makespan", [
     ("split", 72, [540, 1080, 1080, 540], 4120),
-    ("shared_shape", 48, [540, 540, 540, 540], 2920),
 ])
 def test_wise_round_and_order(mode, cycles, transport, makespan, tmp_path):
     dev, chains, qubits, stim = _source()
-    sched = build(dev, chains, qubits, stim, middle_steps=mode)
+    sched = build(dev, chains, qubits, stim)
     cx, _, _ = stim_program(stim)
-    report = check(sched, JONES_WISE, duration=jones_duration, circuit=cx, strict=True)
+    report = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, circuit=cx, strict=True)
     assert report.ok, report.summary()
     assert report.checks["broadcast"] == "passed"
     assert sched.claims["broadcast_cycles"] == cycles
@@ -110,8 +110,6 @@ def test_wise_round_and_order(mode, cycles, transport, makespan, tmp_path):
     assert "RESULT: PASS" in result.stdout
     if mode == "split":
         assert "executed order matches the source on every qubit" in result.stdout
-    else:
-        assert "qubit 9" in result.stdout and "qubit 18" in result.stdout
 
 
 def test_wise_combined_junction_class_choice():
@@ -122,21 +120,37 @@ def test_wise_combined_junction_class_choice():
     assert sched.claims["broadcast_cycles"] == 12
 
 
-@pytest.mark.parametrize("mode,suffix", [("split", ""), ("shared_shape", "_shared_shape")])
+def test_builder_checks_strict_per_qubit_order(monkeypatch):
+    from qccd.repro import sched_wise
+    profiles = []
+    real_check = sched_wise.check
+
+    def observed(schedule, profile, **kwargs):
+        profiles.append(profile)
+        assert kwargs["strict"] is True
+        return real_check(schedule, profile, **kwargs)
+
+    monkeypatch.setattr(sched_wise, "check", observed)
+    build(*_source())
+    assert profiles == [ours_profile("JONES_WISE")]
+    assert profiles[0].circuit_order == "strict"
+
+
+@pytest.mark.parametrize("mode,suffix", [("split", "")])
 def test_wise_d3_output_unchanged(mode, suffix):
     dev, chains, qubits, stim = _source()
-    sched = build(dev, chains, qubits, stim, middle_steps=mode)
+    sched = build(dev, chains, qubits, stim)
     with gzip.open(stim.parents[1] / f"ours/grid_rot_d3_c2_wise{suffix}.schedule.json.gz", "rt") as f:
         assert sched.to_json() == json.load(f)
 
 
 @pytest.mark.parametrize("distance", [2, 6, 12])
-@pytest.mark.parametrize("mode,suffix", [("split", ""), ("shared_shape", "_shared_shape")])
+@pytest.mark.parametrize("mode,suffix", [("split", "")])
 def test_wise_other_grid_artifacts(distance, mode, suffix):
     dev, chains, qubits, stim = _source(distance)
-    sched = build(dev, chains, qubits, stim, middle_steps=mode)
+    sched = build(dev, chains, qubits, stim)
     cx, _, _ = stim_program(stim)
-    report = check(sched, JONES_WISE, duration=jones_duration, circuit=cx, strict=True)
+    report = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, circuit=cx, strict=True)
     assert report.ok, report.summary()
     assert report.checks["broadcast"] == "passed"
     assert not report.violations

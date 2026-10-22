@@ -20,9 +20,8 @@ def test_generated_memory_x_has_identical_source_cx_layers(distance):
 
 @pytest.mark.parametrize("mode,suffix,distance,result,exit_code", [
     ("split", "", 3, "PASS", 0),
-    ("shared_shape", "_shared_shape", 2, "FAIL", 1),
 ])
-def test_memory_x_exposes_shared_shape_hook_errors(mode, suffix, distance, result, exit_code):
+def test_memory_x_preserves_split_distance(mode, suffix, distance, result, exit_code):
     root = Path(__file__).resolve().parents[1]
     base = root / "Reproduce/jones2025"
     run = subprocess.run([

@@ -59,3 +59,5 @@ Commands and all 16 results: [basis validation](wise_both_bases_validation.json)
 Z regressions: [before/after output](order_noise_z_regression.json).
 Earlier reports, schedules, Z sources, catalog, profiles, and timed.py remain
 unchanged. Nothing was pushed.
+
+The shared_shape experiment was removed because it fails strict per-qubit order and memory-X.

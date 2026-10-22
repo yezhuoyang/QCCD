@@ -15,6 +15,7 @@ from typing import Mapping
 
 from .importers import jones_device
 from .models import JONES_US, JONES_WISE, jones_duration
+from .__main__ import ours_profile
 from .sched_jones import stim_program
 from .timed import Event, PortGraph, TimedSchedule, check
 
@@ -28,20 +29,19 @@ def _direction(a, b):
 
 def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, str],
           stim: str | Path, *, name: str = "jones_wise", verify: bool = True,
-          middle_steps: str = "split", steps: int = 4, zone_opt_out: bool = True,
+          steps: int = 4, zone_opt_out: bool = True,
           separate_junction_classes: bool = True) -> TimedSchedule:
     """Build a circuit prefix (steps=1) or full round (steps=4).
 
-    shared_shape assigns Z checks by their coordinate offsets in the X visiting
-    order (+1,+1), (-1,+1), (+1,-1), (-1,-1). split retains Stim's layers.
+    Retains Stim's layers and exact per-qubit CNOT order.
     Disabling opt-out requires every occupied zone to participate in each pass;
     this layout cannot meet that requirement and is rejected explicitly.
     With separate_junction_classes=False entry/exit share the primitive class
     'junction'; their durations and six distinct cycles remain unchanged.
     """
-    if middle_steps not in ("split", "shared_shape") or steps not in (1, 4):
-        raise ValueError("middle_steps must be split/shared_shape; steps must be 1/4")
-    cx, prog, coords = stim_program(stim)
+    if steps not in (1, 4):
+        raise ValueError("steps must be 1/4")
+    cx, prog, _ = stim_program(stim)
     ion = {q: str(qubits[q]) for q in prog}
     anc = {q for q, p in prog.items()
            if ("op", "reset") in p[p.index(("op", "measure")):]}
@@ -62,13 +62,9 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
             k += 1
     if k != len(cx) or set(source_layer.values()) != set(range(4)):
         raise ValueError("expected one round with four explicit CX layers")
-    offsets = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
     for k, (c, target) in enumerate(cx):
         a, d = (c, target) if c in anc else (target, c)
         step = source_layer[k]
-        if middle_steps == "shared_shape":
-            off = tuple(int(coords[d][j] - coords[a][j]) for j in (0, 1))
-            step = offsets.index(off)
         layers[step].append((a, d, c, target, k))
     events = []
     clock = 0.0
@@ -140,7 +136,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
 
     for step, layer in enumerate(layers[:steps], 1):
         groups = [layer]
-        if middle_steps == "split" and step in (2, 3):
+        if step in (2, 3):
             groups = [[p for p in layer if p[0] in xchecks],
                       [p for p in layer if p[0] not in xchecks]]
         spent = 0.0
@@ -189,7 +185,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
         clock = end
     sched = TimedSchedule(name, dev, {t: list(chains.get(t, [])) for t in dev.sites},
                           sorted(events, key=lambda e: (e.t0, e.id)), ion,
-                          source={"tool": "qccd.repro.sched_wise", "middle_steps": middle_steps,
+                          source={"tool": "qccd.repro.sched_wise", "middle_steps": "split",
                                   "steps": steps, "zone_opt_out": zone_opt_out,
                                   "separate_junction_classes": separate_junction_classes,
                                   "passes": passes},
@@ -199,7 +195,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
                                   "counts": dict(Counter(e.kind for e in events))})
     if verify:
         expected = cx if steps == 4 else [cx[k] for p in passes for k in p["cx_indices"]]
-        rep = check(sched, JONES_WISE, duration=jones_duration, circuit=expected, strict=True)
+        rep = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, circuit=expected, strict=True)
         if not rep.ok:
             raise ValueError(f"checker rejects WISE schedule: {rep.summary()}")
     return sched
@@ -210,7 +206,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--distance", type=int, choices=(2, 3, 6, 12), default=3,
                     help="Jones capacity-2 grid artifact and source circuit (default: 3)")
-    ap.add_argument("--middle-steps", choices=("split", "shared_shape"), default="split")
     ap.add_argument("--steps", type=int, choices=(1, 4), default=4)
     ap.add_argument("--zone-opt-out", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--separate-junction-classes", action=argparse.BooleanOptionalAction, default=True)
@@ -223,10 +218,10 @@ def main():
     chains = {f"T{t}": [str(i) for i in ch] for t, ch in raw["initial_layout"].items()}
     circuit = base / f"circuits/rotated_memory_z_d{args.distance}_r1.stim"
     sched = build(dev, chains, raw["qubit_to_ion"], circuit,
-                  middle_steps=args.middle_steps, steps=args.steps,
+                  steps=args.steps,
                   zone_opt_out=args.zone_opt_out,
                   separate_junction_classes=args.separate_junction_classes)
-    suffix = f"_{args.middle_steps}" if args.middle_steps != "split" or args.steps == 1 else ""
+    suffix = "_split" if args.steps == 1 else ""
     out = args.out or base / "ours" / (f"grid_rot_d{args.distance}_c2_wise{suffix}"
                                        + ("_step1" if args.steps == 1 else "") + ".schedule.json.gz")
     with gzip.open(out, "wt") as f:
@@ -234,7 +229,7 @@ def main():
     cx, _, _ = stim_program(circuit)
     if args.steps == 1:
         cx = [cx[k] for p in sched.source["passes"] for k in p["cx_indices"]]
-    rep = check(sched, JONES_WISE, duration=jones_duration, circuit=cx, strict=True)
+    rep = check(sched, ours_profile("JONES_WISE"), duration=jones_duration, circuit=cx, strict=True)
     print(json.dumps({"schedule": str(out), "check": rep.summary(), "claims": sched.claims}, indent=2))
 
 
