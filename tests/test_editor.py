@@ -321,7 +321,15 @@ def test_every_page_can_rebuild_its_own_architecture(page, tmp_path):
     assert r["census_base"]["overlap_frames"] == 0
 
 
+#: The deck price is the shipped schedule's, imported from a standalone visualizer HTML
+#: that is THIRD-PARTY SOURCE MATERIAL and deliberately not tracked; without it the test
+#: skips by name, as test_golden_24ancilla.py does.
+DECK_HTML = ROOT / "visualizer_24_ancillas_24_junctions_standalone.html"
+
+
 @requires_node
+@pytest.mark.skipif(not DECK_HTML.exists(),
+                    reason=f"{DECK_HTML.name} is not present; it is third-party material and untracked")
 def test_a_drag_moves_the_deck_price_and_not_the_corrected_one(tmp_path):
     """THE WORKED EXAMPLE, and the single most useful thing this editor can show.
 
