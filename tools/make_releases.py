@@ -143,7 +143,7 @@ MEMORY_2 += [
 # logical (9 errors in 300 shots); BP-OSD decodes a shot in 0.53 s, so the budget is shots, not errors,
 # in batches small enough (estimate_ler stops only between batches) that a poor design stops early.
 # The official grader allows 3600 s a grade and decodes 1.3-1.5x slower than the desktop measured here,
-# so bb72seq's 3000 shots keep its sampling under about 2400 s.
+# so bb72seq's 3000 shots and bb90seq's 1500 keep its sampling under about 2400 and 2600 s.
 _BB_SEQ = ("Two copies would need {two} ions, over Goal 1's 200, so the two bases are measured one after "
            "the other on the same ions; a round is one memory's. ")
 MEMORY_2 += [
@@ -155,11 +155,22 @@ MEMORY_2 += [
      _GRID(12), "ler_per_round_per_logical",
      {"decoder": "bposd", "max_shots": 3000, "max_errors": 100, "batch": 250, "seed": 20261021,
       "bp_max_iter": 30}),
+    # grid14x14: 38 minutes to compile, every rule passes, 1.5e-3 per round per logical (11 in 300),
+    # 1.0 s a shot to decode
+    ("bb90seq_mem", 17, "bb90seq", "Bivariate bicycle code [[90,8,10]] memory, both bases",
+     "Three rounds of one bivariate-bicycle [[90,8,10]] block as a Z memory, read out in the program; "
+     "every ion reset; then three rounds as an X memory, read out by the grader (180 ions: 90 data and 90 "
+     "check ancillas; 8 logical qubits). " + _BB_SEQ.format(two=360) + "Circuit distance 10 with bare "
+     "checks; decoded with BP-OSD, its belief propagation capped at 30 iterations. " + NOISE,
+     _GRID(14), "ler_per_round_per_logical",
+     {"decoder": "bposd", "max_shots": 1500, "max_errors": 100, "batch": 250, "seed": 20261021,
+      "bp_max_iter": 30}),
 ]
 #: what a 194-ion compile and its certificate need: about 15 minutes of split rounds.  bb72seq's took
-#: 17 minutes alone and 40 on a loaded desktop (the end-to-end run, qccdc b4a003dbb4ae)
+#: 17 minutes alone and 40 on a loaded desktop (the end-to-end run, qccdc b4a003dbb4ae); bb90seq's 38 and 47
 LIMITS_2 = {"surface7xz_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600},
-            "bb72seq_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600}}
+            "bb72seq_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600},
+            "bb90seq_mem": {"compile_timeout_s": 7200, "lean_timeout_s": 3600}}
 PER_LOGICAL = {"name": "ler_per_round_per_logical", "unit": "per round per logical qubit", "better": "low",
                "about": "logical error rate per round divided by the logical qubits the experiment tests "
                         "(qccd.qec.experiments.logical_qubits): what Goal 1 ranks every code by"}
