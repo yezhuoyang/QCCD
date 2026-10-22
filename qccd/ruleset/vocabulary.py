@@ -718,6 +718,14 @@ def _locks(ctx: Ctx, o):
 
 # ------------------------------------------------------------------- claims (programmes)
 
+@term("holds_device(o)", "true or false", "Whether operation o holds every trap, junction and "
+      "rail, independently of its recorded ion permutation. A hold is not ion occupancy.",
+      "execution", kinds=("schedule",))
+def _holds_device(ctx: Ctx, o):
+    ctx.need("schedule", "global device holds")
+    return _op(o, "holds_device").facts.get("held_device") == frozenset(ctx.hw.nodes + ctx.hw.rails)
+
+
 @term("claims", "a set of claims", "Every figure the programme states about itself: its total "
       "time, cost and steps, and per-instruction annotations.", "execution", domain=True,
       kinds=("programme",))

@@ -107,6 +107,14 @@ def test_wise_catalog_replay_has_exact_tool_comparison(distance):
     row = check_run(paper, run)
     assert row["compare"]["tool"]["last_start_us"]["verdict"] == "exact"
     assert row["violations"] == {"circuit": 1}
+    assert row["profile"] == "jones-wise-artifact"
+    assert row["checks"]["durations"].startswith("not checked:")
+    verdicts = {r["id"]: r["verdict"] for r in row["rules"]["results"]}
+    assert {key for key, value in verdicts.items() if value != "holds"} == {"R26"}
+    assert verdicts["R26"] == "fails"
+    assert verdicts["R0"] == verdicts["R6b"] == verdicts["A1"] == "holds"
+    assert verdicts["R29"] == "holds"
+    assert "recorded, not checked" in row["rules"]["recorded_checks"]["reconfigure_durations"]
 
 
 def test_zero_time_disconnected_reconfiguration_is_rejected():
@@ -160,3 +168,57 @@ def test_global_hold_excludes_junction_crossing_by_an_unaffected_ion():
     assert not rep.failed("positions")
     assert check(replace(sched, events=[e for e in sched.events if e.kind != "reconfigure"]),
                  JONES, duration=jones_duration).ok
+
+
+def test_rules_global_hold_excludes_junction_crossing():
+    from qccd.ruleset import check_schedule
+    rep = check_schedule("jones-wise-artifact", _junction_overlap_schedule(),
+                         duration=jones_duration)
+    assert rep.failed() == ["A1"]
+
+
+def test_rules_apply_global_permutation_only_at_its_end(tmp_path):
+    from qccd.ruleset import check_schedule
+    from qccd.ruleset.model import Ion, Site
+    from qccd.ruleset.schedule import schedule_execution
+    sched, _ = _load(2, tmp_path)
+    event = next(e for e in sched.events if e.kind == "reconfigure")
+    # Add an independent marker so the timeline contains a mid-event instant.
+    marker = Event(10000, "gate1", event.t0 + 1, event.t0 + 6, (), at=None)
+    prefix = replace(sched, events=[event, marker])
+    exe = schedule_execution(prefix, allow_reconfigure=True, duration=jones_duration,
+                             strict_clock=True)
+    middle, end = exe.instant_time.index(marker.t0), exe.instant_time.index(event.t1)
+    for trap, chain in event.meta["chains_before"].items():
+        for ion in chain:
+            assert exe.position.at(Ion(ion), middle) == Site(trap)
+    for trap, chain in event.meta["chains_after"].items():
+        for ion in chain:
+            assert exe.position.at(Ion(ion), end) == Site(trap)
+    global_op = next(o for o in exe.ops if o.kind == "reconfigure")
+    assert "clock" not in global_op.facts  # even strict mode never self-prices
+    assert not check_schedule("jones", prefix, duration=jones_duration).ok
+
+
+def test_rules_reject_corrupt_global_state_and_capacity(tmp_path):
+    from qccd.ruleset import check_schedule
+    sched, _ = _load(2, tmp_path)
+    event = next(e for e in sched.events if e.kind == "reconfigure")
+    after = {t: list(ch) for t, ch in event.meta["chains_after"].items()}
+    full = [t for t, ch in after.items() if len(ch) == 2]
+    after[full[0]].append(after[full[1]].pop())
+    bad = replace(event, meta={**event.meta, "chains_after": after})
+    assert "R1" in check_schedule("jones-wise-artifact", replace(sched, events=[bad])).failed()
+    after[full[0]].pop()
+    bad = replace(event, meta={**event.meta, "chains_after": after})
+    assert "R0" in check_schedule("jones-wise-artifact", replace(sched, events=[bad])).failed()
+
+
+def test_artifact_rules_still_check_ordinary_operation_durations(tmp_path):
+    from qccd.ruleset import check_schedule
+    sched, _ = _load(2, tmp_path)
+    event = next(e for e in sched.events if e.kind == "gate1")
+    bad = replace(event, t1=event.t1 + 1)
+    rep = check_schedule("jones-wise-artifact", replace(sched, events=[bad]),
+                         duration=jones_duration, strict_clock=True)
+    assert "R29" in rep.failed()

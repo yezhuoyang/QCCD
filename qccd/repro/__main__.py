@@ -64,10 +64,13 @@ def judge_by_rules(set_name: str, sched: TimedSchedule, *, law, circ, strict: bo
         rs = keeping_order(rs)
     chain = rs.params.get("chain_order")
     exe = schedule_execution(sched, chain_order=getattr(chain, "value", None), duration=law,
-                             strict_clock=strict, circuit=circ)
+                             strict_clock=strict, circuit=circ,
+                             allow_reconfigure=getattr(rs.params.get("allow_reconfigure"), "value", False))
     rep = rcheck(rs, exe)
     return {"ruleset": rs.name, "title": rs.title, "ok": rep.ok,
-            "results": [r.to_json() for r in rep.results]}
+            "results": [r.to_json() for r in rep.results],
+            **({"recorded_checks": exe.facts["recorded_checks"]}
+               if "recorded_checks" in exe.facts else {})}
 
 
 CACHE = ROOT.parent / "out" / "repro_cache"
