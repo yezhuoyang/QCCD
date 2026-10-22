@@ -115,7 +115,13 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-21 (late), from commit `6012b17` (pushed, also on `website/invitations`):
+**Deployed** 2026-10-22, from commit `751d443` (pushed, also on `website/invitations`): the Program
+pane's Both view in two columns (hardware and circuit side by side on an entry's page) and `worker
+redraw`. Same derivation (`qccd/` from `751d443`); 47 layers identical; rollback `*.bak-6012b17`;
+rehearsal smoke passed and a rehearsal redraw drew its page. On production, `worker redraw` drew all
+62 entry pages again from their archives (0 failed, no report changed).
+
+**Before that** 2026-10-21 (late), from commit `6012b17` (pushed, also on `website/invitations`):
 `bb90seq_mem@1` (one [[90,8,10]] block, Z then X, 180 ions; the tightest grade, ~2600-2700 s on the
 droplet) completes Goal 1's curated codes, and `/v1/goals/goal1` carries `logical_qubits`, `ions`
 and `ions_per_logical_qubit` for every entry and the FTL target (60 logical qubits within 2000 ions).
