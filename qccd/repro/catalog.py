@@ -611,11 +611,21 @@ OURS: dict[str, dict] = {
         "runs": [{"id": f"grid_rot_d{d}_c2_ours", "file": f"ours/grid_rot_d{d}_c2_ours.schedule.json.gz",
                   "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES",),
                   "label": f"rotated surface code d={d}, one round, grid, capacity 2"}
-                 for d in (2, 3, 6, 12)]
-                 + [{"id": f"grid_rot_d{d}_c2_wise", "file": f"ours/grid_rot_d{d}_c2_wise.schedule.json.gz",
-                    "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
-                    "label": f"rotated surface code d={d}, WISE broadcast control (one waveform per cycle)"}
                  for d in (2, 3, 6, 12)],
+        "boxes": [{
+            "id": "wise",
+            "title": "Ours, WISE control",
+            "how": "Broadcast control on Jones's junction grid: the same geometry, mapping and native "
+                   "operations, exact per-qubit Stim order, one geometric transport class per cycle. "
+                   "Every idle trap declares a per-site switch; intra/inter transport and gates do not overlap.",
+            "found": "All four split schedules retain full searched distance in both memory bases. "
+                     "Last start is 4070 µs (makespan 4120 µs); John's current Ours is faster. "
+                     "No waveform switching cost is charged. This is broadcast control on Jones's junction grid.",
+            "runs": [{"id": f"grid_rot_d{d}_c2_wise", "file": f"ours/grid_rot_d{d}_c2_wise.schedule.json.gz",
+                      "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
+                      "label": f"rotated surface code d={d}, broadcast control on Jones's junction grid"}
+                     for d in (2, 3, 6, 12)],
+        }],
         "found": "The paper's own grid schedules fail the circuit check: a data qubit meets two of its "
                  "CNOTs in an order the circuit does not allow. Ours keep every qubit's CNOTs in exactly "
                  "the circuit's order, with the same operations. In that order one kind of check ancilla "

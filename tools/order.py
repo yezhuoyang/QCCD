@@ -71,7 +71,7 @@ def check(name, head, tail, seq):
         dont_explore_detection_event_sets_with_size_above=4,
         dont_explore_edges_with_degree_above=4,
         dont_explore_edges_increasing_symptom_degree=False)
-    print(f"{name}: detectors deterministic; circuit distance = {len(err)}")
+    print(f"{name}: detectors deterministic; circuit distance <= {len(err)}")
     return len(err)
 
 def main(sched_path, src_path):

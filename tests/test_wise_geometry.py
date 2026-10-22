@@ -49,7 +49,7 @@ def _assert_geometric_classes(sched):
     for event in sorted(sched.events, key=lambda e: (e.t0, e.id)):
         if event.kind not in JONES_WISE.broadcast:
             continue
-        # These eight return-home archives need no swaps; fail explicitly if a
+        # These four return-home archives need no swaps; fail explicitly if a
         # new transport primitive appears without a geometric interpretation.
         assert event.kind in TRANSPORT, f"unsupported transport kind {event.kind}"
         assert len(event.ions) == 1
@@ -86,14 +86,11 @@ def _assert_geometric_classes(sched):
     return checked
 
 
-@pytest.fixture(scope="module", params=[(d, mode) for d in (2, 3, 6, 12)
-                                       for mode in ("split", "shared_shape")],
-                ids=lambda case: f"d{case[0]}-{case[1]}")
+@pytest.fixture(scope="module", params=(2, 3, 6, 12), ids=lambda d: f"d{d}-split")
 def wise_archive(request):
-    distance, mode = request.param
+    distance = request.param
     base = Path(__file__).resolve().parents[1] / "Reproduce/jones2025"
-    suffix = "" if mode == "split" else "_shared_shape"
-    with gzip.open(base / f"ours/grid_rot_d{distance}_c2_wise{suffix}.schedule.json.gz", "rt") as f:
+    with gzip.open(base / f"ours/grid_rot_d{distance}_c2_wise.schedule.json.gz", "rt") as f:
         sched = TimedSchedule.from_json(json.load(f))
     circuit, _, _ = stim_program(base / f"circuits/rotated_memory_z_d{distance}_r1.stim")
     return sched, circuit
@@ -112,7 +109,8 @@ def test_all_transport_labels_match_coordinates(wise_archive):
 
 
 @pytest.mark.parametrize("cycle_index", range(12))
-def test_uniformly_wrong_cycle_passes_timed_but_fails_geometry(wise_archive, cycle_index):
+@pytest.mark.xfail(strict=True, reason="timed.check broadcast trusts meta['class']; it does not validate direction from geometry")
+def test_uniformly_wrong_cycle_should_fail_timed_geometry(wise_archive, cycle_index):
     """First pass: all six outbound and all six return cycles, in every archive."""
     sched, circuit = wise_archive
     transport = [e for e in sched.events if e.kind in JONES_WISE.broadcast]
@@ -132,8 +130,8 @@ def test_uniformly_wrong_cycle_passes_timed_but_fails_geometry(wise_archive, cyc
     # Only the labels changed: timings, positions, locks, circuit and class
     # uniformity are still legal, so the core checker cannot catch this fault.
     report = check(broken, JONES_WISE, duration=jones_duration, circuit=circuit, strict=True)
-    assert report.ok, report.summary()
-    assert report.checks["broadcast"] == "passed"
-    assert not report.violations
     with pytest.raises(AssertionError, match="geometric class mismatch"):
         _assert_geometric_classes(broken)
+    # Desired behavior is rejection. Until timed.check derives direction,
+    # this assertion fails and the strict xfail records the known gap.
+    assert not report.ok, "timed.check accepted a uniformly false geometric class"

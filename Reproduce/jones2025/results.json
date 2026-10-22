@@ -200,7 +200,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.06
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d3_c2",
@@ -566,7 +566,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.11
+   "seconds": 0.12
   },
   {
    "id": "grid_rot_d12_c2",
@@ -749,7 +749,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.54
+   "seconds": 0.55
   },
   {
    "id": "linear_rep_d3_c2",
@@ -2562,7 +2562,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.12
+   "seconds": 0.13
   },
   {
    "id": "grid_rot_d12_c2_ours",
@@ -2683,515 +2683,654 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.57
-  },
+   "seconds": 0.61
+  }
+ ],
+ "ours_boxes": [
   {
-   "id": "grid_rot_d2_c2_wise",
-   "label": "rotated surface code d=2, WISE broadcast control (one waveform per cycle)",
-   "against": "grid_rot_d2_c2",
-   "same_device": true,
-   "circuit_rows": "true",
-   "same_ops": "true",
-   "profiles": {
-    "jones-wise": {
-     "checks": {
-      "structure": "passed",
-      "positions": "passed",
-      "capacity": "passed",
-      "ion_serial": "passed",
-      "segment_mutex": "passed",
-      "junction_mutex": "passed",
-      "trap_serial": "passed",
-      "chain_order": "passed",
-      "declared_locks": "passed",
-      "broadcast": "passed",
-      "durations": "passed",
-      "circuit": "passed"
+   "id": "wise",
+   "title": "Ours, WISE control",
+   "how": "Broadcast control on Jones's junction grid: the same geometry, mapping and native operations, exact per-qubit Stim order, one geometric transport class per cycle. Every idle trap declares a per-site switch; intra/inter transport and gates do not overlap.",
+   "found": "All four split schedules retain full searched distance in both memory bases. Last start is 4070 \u00b5s (makespan 4120 \u00b5s); John's current Ours is faster. No waveform switching cost is charged. This is broadcast control on Jones's junction grid.",
+   "count": 4,
+   "runs": [
+    {
+     "id": "grid_rot_d2_c2_wise",
+     "label": "rotated surface code d=2, broadcast control on Jones's junction grid",
+     "against": "grid_rot_d2_c2",
+     "same_device": true,
+     "circuit_rows": "true",
+     "same_ops": "true",
+     "profiles": {
+      "jones-wise": {
+       "checks": {
+        "structure": "passed",
+        "positions": "passed",
+        "capacity": "passed",
+        "ion_serial": "passed",
+        "segment_mutex": "passed",
+        "junction_mutex": "passed",
+        "trap_serial": "passed",
+        "chain_order": "passed",
+        "declared_locks": "passed",
+        "broadcast": "passed",
+        "durations": "passed",
+        "circuit": "passed"
+       },
+       "ok": true,
+       "rules": {
+        "ruleset": "jones-wise",
+        "title": "Broadcast control on Jones's junction grid",
+        "ok": true,
+        "results": [
+         {
+          "id": "R0",
+          "title": "Every operation finds its ions where it says they are",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R1",
+          "title": "A site holds at most its capacity",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R2",
+          "title": "A junction holds one ion at a time",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R3",
+          "title": "A rail carries at most its capacity",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R4b",
+          "title": "A step either moves ions or gates them, never both",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R4d",
+          "title": "The control channels can drive every transport step",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R6b",
+          "title": "A two-ion gate acts on two ions standing in one site",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R8",
+          "title": "An ion does one thing at a time",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R14",
+          "title": "A split takes the ion at the end of its chain, or pays to reorder",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R22",
+          "title": "A transport step is one waveform",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R24",
+          "title": "Every two-qubit gate of the circuit is performed, and no other",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R25",
+          "title": "Each qubit's operations keep the circuit's order",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R27",
+          "title": "One operation at a time in a trap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R29",
+          "title": "Every operation lasts what the clock says",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R30",
+          "title": "Operations that hold the same component never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W1",
+          "title": "Broadcast transport moves in lockstep",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W2",
+          "title": "Transport control modes and gates never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W3",
+          "title": "Idle traps have their own switches",
+          "verdict": "holds",
+          "core": false
+         }
+        ]
+       },
+       "violations": {},
+       "first_violations": []
+      }
      },
      "ok": true,
-     "rules": {
-      "ruleset": "jones-wise",
-      "title": "Surface-code QCCD's rules, under WISE broadcast control",
-      "ok": true,
-      "results": [
-       {
-        "id": "R0",
-        "title": "Every operation finds its ions where it says they are",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R1",
-        "title": "A site holds at most its capacity",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R2",
-        "title": "A junction holds one ion at a time",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R3",
-        "title": "A rail carries at most its capacity",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R6b",
-        "title": "A two-ion gate acts on two ions standing in one site",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R8",
-        "title": "An ion does one thing at a time",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R14",
-        "title": "A split takes the ion at the end of its chain, or pays to reorder",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R24",
-        "title": "Every two-qubit gate of the circuit is performed, and no other",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R25",
-        "title": "Each qubit's operations keep the circuit's order",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R27",
-        "title": "One operation at a time in a trap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R29",
-        "title": "Every operation lasts what the clock says",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R30",
-        "title": "Operations that hold the same component never overlap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "W1",
-        "title": "Broadcast transport moves in lockstep",
-        "verdict": "holds",
-        "core": false
-       }
-      ]
+     "measured": {
+      "makespan_us": 4120.0,
+      "last_start_us": 4070.0,
+      "moves": 0
      },
-     "violations": {},
-     "first_violations": []
-    }
-   },
-   "ok": true,
-   "measured": {
-    "makespan_us": 4120.0,
-    "last_start_us": 4070.0,
-    "moves": 0
-   },
-   "theirs": {
-    "makespan_us": 4105.0,
-    "last_start_us": 4055.0,
-    "moves": 0
-   },
-   "theirs_ok": false,
-   "seconds": 0.01
-  },
-  {
-   "id": "grid_rot_d3_c2_wise",
-   "label": "rotated surface code d=3, WISE broadcast control (one waveform per cycle)",
-   "against": "grid_rot_d3_c2",
-   "same_device": true,
-   "circuit_rows": "true",
-   "same_ops": "true",
-   "profiles": {
-    "jones-wise": {
-     "checks": {
-      "structure": "passed",
-      "positions": "passed",
-      "capacity": "passed",
-      "ion_serial": "passed",
-      "segment_mutex": "passed",
-      "junction_mutex": "passed",
-      "trap_serial": "passed",
-      "chain_order": "passed",
-      "declared_locks": "passed",
-      "broadcast": "passed",
-      "durations": "passed",
-      "circuit": "passed"
+     "theirs": {
+      "makespan_us": 4105.0,
+      "last_start_us": 4055.0,
+      "moves": 0
      },
-     "ok": true,
-     "rules": {
-      "ruleset": "jones-wise",
-      "title": "Surface-code QCCD's rules, under WISE broadcast control",
-      "ok": true,
-      "results": [
-       {
-        "id": "R0",
-        "title": "Every operation finds its ions where it says they are",
-        "verdict": "holds",
-        "core": true
+     "theirs_ok": false,
+     "seconds": 0.02
+    },
+    {
+     "id": "grid_rot_d3_c2_wise",
+     "label": "rotated surface code d=3, broadcast control on Jones's junction grid",
+     "against": "grid_rot_d3_c2",
+     "same_device": true,
+     "circuit_rows": "true",
+     "same_ops": "true",
+     "profiles": {
+      "jones-wise": {
+       "checks": {
+        "structure": "passed",
+        "positions": "passed",
+        "capacity": "passed",
+        "ion_serial": "passed",
+        "segment_mutex": "passed",
+        "junction_mutex": "passed",
+        "trap_serial": "passed",
+        "chain_order": "passed",
+        "declared_locks": "passed",
+        "broadcast": "passed",
+        "durations": "passed",
+        "circuit": "passed"
        },
-       {
-        "id": "R1",
-        "title": "A site holds at most its capacity",
-        "verdict": "holds",
-        "core": true
+       "ok": true,
+       "rules": {
+        "ruleset": "jones-wise",
+        "title": "Broadcast control on Jones's junction grid",
+        "ok": true,
+        "results": [
+         {
+          "id": "R0",
+          "title": "Every operation finds its ions where it says they are",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R1",
+          "title": "A site holds at most its capacity",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R2",
+          "title": "A junction holds one ion at a time",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R3",
+          "title": "A rail carries at most its capacity",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R4b",
+          "title": "A step either moves ions or gates them, never both",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R4d",
+          "title": "The control channels can drive every transport step",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R6b",
+          "title": "A two-ion gate acts on two ions standing in one site",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R8",
+          "title": "An ion does one thing at a time",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R14",
+          "title": "A split takes the ion at the end of its chain, or pays to reorder",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R22",
+          "title": "A transport step is one waveform",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R24",
+          "title": "Every two-qubit gate of the circuit is performed, and no other",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R25",
+          "title": "Each qubit's operations keep the circuit's order",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R27",
+          "title": "One operation at a time in a trap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R29",
+          "title": "Every operation lasts what the clock says",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R30",
+          "title": "Operations that hold the same component never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W1",
+          "title": "Broadcast transport moves in lockstep",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W2",
+          "title": "Transport control modes and gates never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W3",
+          "title": "Idle traps have their own switches",
+          "verdict": "holds",
+          "core": false
+         }
+        ]
        },
-       {
-        "id": "R2",
-        "title": "A junction holds one ion at a time",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R3",
-        "title": "A rail carries at most its capacity",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R6b",
-        "title": "A two-ion gate acts on two ions standing in one site",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R8",
-        "title": "An ion does one thing at a time",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R14",
-        "title": "A split takes the ion at the end of its chain, or pays to reorder",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R24",
-        "title": "Every two-qubit gate of the circuit is performed, and no other",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R25",
-        "title": "Each qubit's operations keep the circuit's order",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R27",
-        "title": "One operation at a time in a trap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R29",
-        "title": "Every operation lasts what the clock says",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R30",
-        "title": "Operations that hold the same component never overlap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "W1",
-        "title": "Broadcast transport moves in lockstep",
-        "verdict": "holds",
-        "core": false
-       }
-      ]
-     },
-     "violations": {},
-     "first_violations": []
-    }
-   },
-   "ok": true,
-   "measured": {
-    "makespan_us": 4120.0,
-    "last_start_us": 4070.0,
-    "moves": 0
-   },
-   "theirs": {
-    "makespan_us": 4135.0,
-    "last_start_us": 4085.0,
-    "moves": 0
-   },
-   "theirs_ok": false,
-   "seconds": 0.04
-  },
-  {
-   "id": "grid_rot_d6_c2_wise",
-   "label": "rotated surface code d=6, WISE broadcast control (one waveform per cycle)",
-   "against": "grid_rot_d6_c2",
-   "same_device": true,
-   "circuit_rows": "true",
-   "same_ops": "true",
-   "profiles": {
-    "jones-wise": {
-     "checks": {
-      "structure": "passed",
-      "positions": "passed",
-      "capacity": "passed",
-      "ion_serial": "passed",
-      "segment_mutex": "passed",
-      "junction_mutex": "passed",
-      "trap_serial": "passed",
-      "chain_order": "passed",
-      "declared_locks": "passed",
-      "broadcast": "passed",
-      "durations": "passed",
-      "circuit": "passed"
+       "violations": {},
+       "first_violations": []
+      }
      },
      "ok": true,
-     "rules": {
-      "ruleset": "jones-wise",
-      "title": "Surface-code QCCD's rules, under WISE broadcast control",
-      "ok": true,
-      "results": [
-       {
-        "id": "R0",
-        "title": "Every operation finds its ions where it says they are",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R1",
-        "title": "A site holds at most its capacity",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R2",
-        "title": "A junction holds one ion at a time",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R3",
-        "title": "A rail carries at most its capacity",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R6b",
-        "title": "A two-ion gate acts on two ions standing in one site",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R8",
-        "title": "An ion does one thing at a time",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R14",
-        "title": "A split takes the ion at the end of its chain, or pays to reorder",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R24",
-        "title": "Every two-qubit gate of the circuit is performed, and no other",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R25",
-        "title": "Each qubit's operations keep the circuit's order",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R27",
-        "title": "One operation at a time in a trap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R29",
-        "title": "Every operation lasts what the clock says",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R30",
-        "title": "Operations that hold the same component never overlap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "W1",
-        "title": "Broadcast transport moves in lockstep",
-        "verdict": "holds",
-        "core": false
-       }
-      ]
+     "measured": {
+      "makespan_us": 4120.0,
+      "last_start_us": 4070.0,
+      "moves": 0
      },
-     "violations": {},
-     "first_violations": []
-    }
-   },
-   "ok": true,
-   "measured": {
-    "makespan_us": 4120.0,
-    "last_start_us": 4070.0,
-    "moves": 0
-   },
-   "theirs": {
-    "makespan_us": 4130.0,
-    "last_start_us": 4080.0,
-    "moves": 0
-   },
-   "theirs_ok": false,
-   "seconds": 0.36
-  },
-  {
-   "id": "grid_rot_d12_c2_wise",
-   "label": "rotated surface code d=12, WISE broadcast control (one waveform per cycle)",
-   "against": "grid_rot_d12_c2",
-   "same_device": true,
-   "circuit_rows": "true",
-   "same_ops": "true",
-   "profiles": {
-    "jones-wise": {
-     "checks": {
-      "structure": "passed",
-      "positions": "passed",
-      "capacity": "passed",
-      "ion_serial": "passed",
-      "segment_mutex": "passed",
-      "junction_mutex": "passed",
-      "trap_serial": "passed",
-      "chain_order": "passed",
-      "declared_locks": "passed",
-      "broadcast": "passed",
-      "durations": "passed",
-      "circuit": "passed"
+     "theirs": {
+      "makespan_us": 4135.0,
+      "last_start_us": 4085.0,
+      "moves": 0
+     },
+     "theirs_ok": false,
+     "seconds": 0.06
+    },
+    {
+     "id": "grid_rot_d6_c2_wise",
+     "label": "rotated surface code d=6, broadcast control on Jones's junction grid",
+     "against": "grid_rot_d6_c2",
+     "same_device": true,
+     "circuit_rows": "true",
+     "same_ops": "true",
+     "profiles": {
+      "jones-wise": {
+       "checks": {
+        "structure": "passed",
+        "positions": "passed",
+        "capacity": "passed",
+        "ion_serial": "passed",
+        "segment_mutex": "passed",
+        "junction_mutex": "passed",
+        "trap_serial": "passed",
+        "chain_order": "passed",
+        "declared_locks": "passed",
+        "broadcast": "passed",
+        "durations": "passed",
+        "circuit": "passed"
+       },
+       "ok": true,
+       "rules": {
+        "ruleset": "jones-wise",
+        "title": "Broadcast control on Jones's junction grid",
+        "ok": true,
+        "results": [
+         {
+          "id": "R0",
+          "title": "Every operation finds its ions where it says they are",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R1",
+          "title": "A site holds at most its capacity",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R2",
+          "title": "A junction holds one ion at a time",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R3",
+          "title": "A rail carries at most its capacity",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R4b",
+          "title": "A step either moves ions or gates them, never both",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R4d",
+          "title": "The control channels can drive every transport step",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R6b",
+          "title": "A two-ion gate acts on two ions standing in one site",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R8",
+          "title": "An ion does one thing at a time",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R14",
+          "title": "A split takes the ion at the end of its chain, or pays to reorder",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R22",
+          "title": "A transport step is one waveform",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R24",
+          "title": "Every two-qubit gate of the circuit is performed, and no other",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R25",
+          "title": "Each qubit's operations keep the circuit's order",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R27",
+          "title": "One operation at a time in a trap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R29",
+          "title": "Every operation lasts what the clock says",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R30",
+          "title": "Operations that hold the same component never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W1",
+          "title": "Broadcast transport moves in lockstep",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W2",
+          "title": "Transport control modes and gates never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W3",
+          "title": "Idle traps have their own switches",
+          "verdict": "holds",
+          "core": false
+         }
+        ]
+       },
+       "violations": {},
+       "first_violations": []
+      }
      },
      "ok": true,
-     "rules": {
-      "ruleset": "jones-wise",
-      "title": "Surface-code QCCD's rules, under WISE broadcast control",
-      "ok": true,
-      "results": [
-       {
-        "id": "R0",
-        "title": "Every operation finds its ions where it says they are",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R1",
-        "title": "A site holds at most its capacity",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R2",
-        "title": "A junction holds one ion at a time",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R3",
-        "title": "A rail carries at most its capacity",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R6b",
-        "title": "A two-ion gate acts on two ions standing in one site",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R8",
-        "title": "An ion does one thing at a time",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R14",
-        "title": "A split takes the ion at the end of its chain, or pays to reorder",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R24",
-        "title": "Every two-qubit gate of the circuit is performed, and no other",
-        "verdict": "holds",
-        "core": true
-       },
-       {
-        "id": "R25",
-        "title": "Each qubit's operations keep the circuit's order",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R27",
-        "title": "One operation at a time in a trap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R29",
-        "title": "Every operation lasts what the clock says",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "R30",
-        "title": "Operations that hold the same component never overlap",
-        "verdict": "holds",
-        "core": false
-       },
-       {
-        "id": "W1",
-        "title": "Broadcast transport moves in lockstep",
-        "verdict": "holds",
-        "core": false
-       }
-      ]
+     "measured": {
+      "makespan_us": 4120.0,
+      "last_start_us": 4070.0,
+      "moves": 0
      },
-     "violations": {},
-     "first_violations": []
+     "theirs": {
+      "makespan_us": 4130.0,
+      "last_start_us": 4080.0,
+      "moves": 0
+     },
+     "theirs_ok": false,
+     "seconds": 0.74
+    },
+    {
+     "id": "grid_rot_d12_c2_wise",
+     "label": "rotated surface code d=12, broadcast control on Jones's junction grid",
+     "against": "grid_rot_d12_c2",
+     "same_device": true,
+     "circuit_rows": "true",
+     "same_ops": "true",
+     "profiles": {
+      "jones-wise": {
+       "checks": {
+        "structure": "passed",
+        "positions": "passed",
+        "capacity": "passed",
+        "ion_serial": "passed",
+        "segment_mutex": "passed",
+        "junction_mutex": "passed",
+        "trap_serial": "passed",
+        "chain_order": "passed",
+        "declared_locks": "passed",
+        "broadcast": "passed",
+        "durations": "passed",
+        "circuit": "passed"
+       },
+       "ok": true,
+       "rules": {
+        "ruleset": "jones-wise",
+        "title": "Broadcast control on Jones's junction grid",
+        "ok": true,
+        "results": [
+         {
+          "id": "R0",
+          "title": "Every operation finds its ions where it says they are",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R1",
+          "title": "A site holds at most its capacity",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R2",
+          "title": "A junction holds one ion at a time",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R3",
+          "title": "A rail carries at most its capacity",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R4b",
+          "title": "A step either moves ions or gates them, never both",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R4d",
+          "title": "The control channels can drive every transport step",
+          "verdict": "does not apply",
+          "core": false,
+          "reason": "steps exist only in a programme, and this is a timed schedule"
+         },
+         {
+          "id": "R6b",
+          "title": "A two-ion gate acts on two ions standing in one site",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R8",
+          "title": "An ion does one thing at a time",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R14",
+          "title": "A split takes the ion at the end of its chain, or pays to reorder",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R22",
+          "title": "A transport step is one waveform",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R24",
+          "title": "Every two-qubit gate of the circuit is performed, and no other",
+          "verdict": "holds",
+          "core": true
+         },
+         {
+          "id": "R25",
+          "title": "Each qubit's operations keep the circuit's order",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R27",
+          "title": "One operation at a time in a trap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R29",
+          "title": "Every operation lasts what the clock says",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "R30",
+          "title": "Operations that hold the same component never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W1",
+          "title": "Broadcast transport moves in lockstep",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W2",
+          "title": "Transport control modes and gates never overlap",
+          "verdict": "holds",
+          "core": false
+         },
+         {
+          "id": "W3",
+          "title": "Idle traps have their own switches",
+          "verdict": "holds",
+          "core": false
+         }
+        ]
+       },
+       "violations": {},
+       "first_violations": []
+      }
+     },
+     "ok": true,
+     "measured": {
+      "makespan_us": 4120.0,
+      "last_start_us": 4070.0,
+      "moves": 0
+     },
+     "theirs": {
+      "makespan_us": 4135.0,
+      "last_start_us": 4085.0,
+      "moves": 0
+     },
+     "theirs_ok": false,
+     "seconds": 11.96
     }
-   },
-   "ok": true,
-   "measured": {
-    "makespan_us": 4120.0,
-    "last_start_us": 4070.0,
-    "moves": 0
-   },
-   "theirs": {
-    "makespan_us": 4135.0,
-    "last_start_us": 4085.0,
-    "moves": 0
-   },
-   "theirs_ok": false,
-   "seconds": 5.34
+   ]
   }
  ]
 }
