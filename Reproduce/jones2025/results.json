@@ -200,7 +200,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.03
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d3_c2",
@@ -566,7 +566,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.14
+   "seconds": 0.12
   },
   {
    "id": "grid_rot_d12_c2",
@@ -749,7 +749,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.64
+   "seconds": 0.55
   },
   {
    "id": "linear_rep_d3_c2",
@@ -1434,7 +1434,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.03
   },
   {
    "id": "switch_rot_d3_c2_at6d4b467",
@@ -1602,6 +1602,567 @@
      ],
      "gate_improvements": [],
      "trapCapacity_passed_to_ionRouting": 2
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.03
+  },
+  {
+   "id": "wise_rot_d2_c2",
+   "label": "rotated surface code d=2, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones-wise-artifact",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "global_hold": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
+   },
+   "ok": false,
+   "rules": {
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
+    "ok": false,
+    "results": [
+     {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "fails",
+      "core": false,
+      "count": 1,
+      "examples": [
+       "c1 = circuit operation 5 (cx 6,7), c2 = circuit operation 6 (cx 12,6): end(last(c1)) is t = 10315 \u00b5s and start(first(c2)) is t = 3180 \u00b5s"
+      ]
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R30",
+      "title": "Operations that hold the same component never overlap",
+      "verdict": "holds",
+      "core": false
+     }
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
+   },
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['8'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 14680.0,
+    "last_start_us": 14280.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 10,
+    "gate1": 40,
+    "reconfigure": 4,
+    "gate": 8,
+    "measure": 7
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 14280.0,
+      "theirs": 14280.000000000002,
+      "rel": 1.2738021033234288e-16,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 2 --capacity 2",
+    "config": {
+     "name": "wise_rot_d2_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 2,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 2
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 3,
+      "n": 3,
+      "k": 2
+     }
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.01
+  },
+  {
+   "id": "wise_rot_d3_c2",
+   "label": "rotated surface code d=3, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones-wise-artifact",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "global_hold": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
+   },
+   "ok": false,
+   "rules": {
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
+    "ok": false,
+    "results": [
+     {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "fails",
+      "core": false,
+      "count": 1,
+      "examples": [
+       "c1 = circuit operation 13 (cx 11,5), c2 = circuit operation 23 (cx 5,13): end(last(c1)) is t = 13965 \u00b5s and start(first(c2)) is t = 4420 \u00b5s"
+      ]
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R30",
+      "title": "Operations that hold the same component never overlap",
+      "verdict": "holds",
+      "core": false
+     }
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
+   },
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "1 qubit(s) see their gates in an order the circuit does not allow (e.g. ['16'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 20025.0,
+    "last_start_us": 19975.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 25,
+    "gate1": 112,
+    "reconfigure": 4,
+    "gate": 24,
+    "measure": 17
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 19975.0,
+      "theirs": 19974.999999999996,
+      "rel": 1.8212659860283924e-16,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 3 --capacity 2",
+    "config": {
+     "name": "wise_rot_d3_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 3,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 3
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 5,
+      "n": 5,
+      "k": 2
+     }
+    },
+    "circuit_file": "circuit.stim"
+   },
+   "seconds": 0.01
+  },
+  {
+   "id": "wise_rot_d6_c2",
+   "label": "rotated surface code d=6, artifact WISE global reconfiguration, capacity 2",
+   "profile": "jones-wise-artifact",
+   "checks": {
+    "broadcast": "skipped: transport is not broadcast in this model",
+    "structure": "passed",
+    "positions": "passed",
+    "capacity": "passed",
+    "ion_serial": "passed",
+    "global_hold": "passed",
+    "segment_mutex": "passed",
+    "junction_mutex": "passed",
+    "trap_serial": "passed",
+    "chain_order": "passed",
+    "declared_locks": "passed",
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
+   },
+   "ok": false,
+   "rules": {
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
+    "ok": false,
+    "results": [
+     {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "fails",
+      "core": false,
+      "count": 4,
+      "examples": [
+       "c1 = circuit operation 72 (cx 36,24), c2 = circuit operation 118 (cx 24,38): end(last(c1)) is t = 21430 \u00b5s and start(first(c2)) is t = 13755 \u00b5s",
+       "c1 = circuit operation 73 (cx 62,50), c2 = circuit operation 119 (cx 50,64): end(last(c1)) is t = 21430 \u00b5s and start(first(c2)) is t = 13755 \u00b5s",
+       "c1 = circuit operation 77 (cx 66,67), c2 = circuit operation 92 (cx 80,66): end(last(c1)) is t = 21430 \u00b5s and start(first(c2)) is t = 6915 \u00b5s",
+       "c1 = circuit operation 82 (cx 70,71), c2 = circuit operation 98 (cx 84,70): end(last(c1)) is t = 21430 \u00b5s and start(first(c2)) is t = 13755 \u00b5s"
+      ]
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R30",
+      "title": "Operations that hold the same component never overlap",
+      "verdict": "holds",
+      "core": false
+     }
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
+   },
+   "violations": {
+    "circuit": 1
+   },
+   "first_violations": [
+    {
+     "check": "circuit",
+     "message": "4 qubit(s) see their gates in an order the circuit does not allow (e.g. ['101', '70', '88', '98'])",
+     "events": []
+    }
+   ],
+   "notes": {},
+   "measured": {
+    "makespan_us": 30320.0,
+    "last_start_us": 30270.0,
+    "moves": 0
+   },
+   "counts": {
+    "reset": 106,
+    "gate1": 552,
+    "reconfigure": 4,
+    "gate": 120,
+    "measure": 71
+   },
+   "compare": {
+    "tool": {
+     "last_start_us": {
+      "ours": 30270.0,
+      "theirs": 30270.0,
+      "rel": 0.0,
+      "verdict": "exact"
+     }
+    }
+   },
+   "source": {
+    "tool": "PartIIProject QEC compiler (Jones & Murali, arXiv 2510.23519)",
+    "repo": "https://github.com/scottjones03/PartIIProject",
+    "commit": "d235a22c4a6b18549e9c1afb3adf5141477ecf80",
+    "command": "MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 run_jones.py --recipe wise --distance 6 --capacity 2",
+    "config": {
+     "name": "wise_rot_d6_c2",
+     "recipe": "wise",
+     "code": "rotated",
+     "distance": 6,
+     "capacity": 2,
+     "rows": null,
+     "cols": null,
+     "padding": null,
+     "traps": null,
+     "rounds": 1,
+     "seed_numpy": 0,
+     "topology_note": "",
+     "generated_args": [
+      [
+       "surface_code:rotated_memory_z"
+      ],
+      {
+       "rounds": 1,
+       "distance": 6
+      }
+     ],
+     "gate_improvements": [],
+     "trapCapacity_passed_to_ionRouting": 2,
+     "wise_arch": {
+      "m": 9,
+      "n": 9,
+      "k": 2
+     }
     },
     "circuit_file": "circuit.stim"
    },
@@ -1971,7 +2532,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.15
+   "seconds": 0.13
   },
   {
    "id": "grid_rot_d12_c2_ours",
@@ -2092,7 +2653,7 @@
     "moves": 0
    },
    "theirs_ok": false,
-   "seconds": 0.71
+   "seconds": 0.61
   }
  ],
  "ours_boxes": [
@@ -2737,7 +3298,7 @@
       "moves": 0
      },
      "theirs_ok": false,
-     "seconds": 11.98
+     "seconds": 11.96
     }
    ]
   }

@@ -284,5 +284,7 @@ def check_schedule(ruleset: RuleSet | str, sched, **kw) -> Report:
         node = rs.params["chain_order"]
         from .syntax import Str as _Str, Const as _Const
         chain = node.value if isinstance(node, (_Str, _Const)) else None
-    exe = schedule_execution(sched, chain_order=kw.pop("chain_order", chain), **kw)
+    allow = getattr(rs.params.get("allow_reconfigure"), "value", False)
+    exe = schedule_execution(sched, chain_order=kw.pop("chain_order", chain),
+                             allow_reconfigure=kw.pop("allow_reconfigure", allow), **kw)
     return check(rs, exe)
