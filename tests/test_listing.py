@@ -58,6 +58,14 @@ from qccd.viz import build_view_model, render_html  # noqa: E402
 ARCH_DIR = ROOT / "arch"
 DEVICES = sorted(p.stem.replace(".arch", "") for p in ARCH_DIR.glob("*.arch.json"))
 
+#: `build(ring, "deck")` imports the shipped schedule from a standalone visualizer HTML that
+#: is THIRD-PARTY SOURCE MATERIAL and deliberately not tracked (see test_golden_24ancilla.py).
+#: A clone without it skips the tests that build the deck, by name, rather than failing.
+DECK_HTML = ROOT / "visualizer_24_ancillas_24_junctions_standalone.html"
+needs_deck = pytest.mark.skipif(
+    not DECK_HTML.exists(),
+    reason=f"{DECK_HTML.name} is not present; it is third-party material and untracked")
+
 
 @pytest.fixture(scope="module")
 def ring():
@@ -67,6 +75,8 @@ def ring():
 @pytest.fixture(scope="module")
 def deck(ring):
     """The shipped schedule, disassembled against a real replay -- built once."""
+    if not DECK_HTML.exists():
+        pytest.skip(f"{DECK_HTML.name} is not present; it is third-party material and untracked")
     prog = build(ring, "deck")
     model = corrected_model()
     res = verify(prog, ring, model, check_metrics=False).result
@@ -159,6 +169,7 @@ def test_the_page_model_is_addressable_by_instruction_id(deck):
     assert len(blob) < 400_000, f"the page model must stay small: {len(blob)}"
 
 
+@needs_deck
 def test_folding_a_program_with_inserted_cooling_does_not_shatter_it(ring):
     """An inserted `cool` carries `batch` but no `group`; a `barrier` carries neither.
 
@@ -282,6 +293,7 @@ def test_a_direct_wired_plane_summarizes_its_channels_instead_of_listing_4608():
 # ===================================================================== control
 
 
+@needs_deck
 def test_a_dock_is_never_reported_as_drivable_because_nothing_judged_it(ring):
     """Every dock in the deck program runs on a `spur` segment that belongs to no loop,
     so R4d is silent about it.  Silence is not a pass, and the record must say so with
@@ -296,6 +308,7 @@ def test_a_dock_is_never_reported_as_drivable_because_nothing_judged_it(ring):
     assert all(r.feasible is True for r in by_cls["rotate_cw"])
 
 
+@needs_deck
 def test_a_whole_program_collapses_to_a_handful_of_control_states(ring):
     """1,579 instructions, 3,861 machine cycles, ~12 distinct control states.  That is
     what makes precomputing them into the page cheap enough to be the right answer."""
@@ -311,6 +324,7 @@ def test_a_whole_program_collapses_to_a_handful_of_control_states(ring):
     assert [r.instr_id for r in trace.records] == [i.id for i in prog.instructions]
 
 
+@needs_deck
 def test_the_control_record_counts_the_serialization_broadcast_wiring_buys(ring):
     """Moving one ion engages every channel and holds 167 of 168 sites out by switch.
     Both halves of the WISE trade, on one cycle."""
@@ -659,6 +673,7 @@ def test_adding_provenance_changes_no_number(ring):
     assert numbers("calls") == numbers("off")
 
 
+@needs_deck
 def test_the_shipped_oracle_is_untouched_by_provenance(ring):
     """cost 397184 / steps 8808 under the deck's own model, with every instruction of
     the imported schedule now carrying a `call` index."""
@@ -713,6 +728,7 @@ def test_exporting_provenance_drops_the_repository_as_well_as_the_machine():
 # ======================================================================== page
 
 
+@needs_deck
 def test_the_emitted_page_has_a_listing_row_for_every_animated_frame(tmp_path, ring):
     prog = build(ring, "deck")
     model = corrected_model()
