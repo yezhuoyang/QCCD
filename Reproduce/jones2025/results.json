@@ -1610,43 +1610,40 @@
   {
    "id": "wise_rot_d2_c2",
    "label": "rotated surface code d=2, artifact WISE global reconfiguration, capacity 2",
-   "profile": "jones",
+   "profile": "jones-wise-artifact",
    "checks": {
     "broadcast": "skipped: transport is not broadcast in this model",
     "structure": "passed",
     "positions": "passed",
     "capacity": "passed",
     "ion_serial": "passed",
+    "global_hold": "passed",
     "segment_mutex": "passed",
     "junction_mutex": "passed",
     "trap_serial": "passed",
     "chain_order": "passed",
     "declared_locks": "passed",
-    "durations": "passed",
-    "circuit": "failed"
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
    },
    "ok": false,
    "rules": {
-    "ruleset": "jones",
-    "title": "Surface-code QCCD's rules",
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
     "ok": false,
     "results": [
      {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
       "id": "R0",
       "title": "Every operation finds its ions where it says they are",
-      "verdict": "fails",
-      "core": true,
-      "count": 31,
-      "examples": [
-       "o = reconfigure 1,2,4,5,7,8,10 (event 22), 125-3180 us: well_formed(o) is false",
-       "o = gate 10,2 (event 24) at T3, 3180-3220 us: found(o) is false",
-       "o = gate1 10 (event 27) at T3, 3220-3225 us: found(o) is false",
-       "o = gate1 7 (event 28) at T0, 3225-3230 us: found(o) is false",
-       "o = gate1 2 (event 29) at T3, 3225-3230 us: found(o) is false",
-       "o = gate1 10 (event 31) at T3, 3230-3235 us: found(o) is false",
-       "o = gate1 7 (event 32) at T0, 3235-3240 us: found(o) is false",
-       "o = reconfigure 1,2,4,5,7,8,10 (event 34), 3245-6300 us: well_formed(o) is false"
-      ]
+      "verdict": "holds",
+      "core": true
      },
      {
       "id": "R1",
@@ -1669,19 +1666,8 @@
      {
       "id": "R6b",
       "title": "A two-ion gate acts on two ions standing in one site",
-      "verdict": "fails",
-      "core": false,
-      "count": 11,
-      "examples": [
-       "g = gate 1,7 (event 23) at T0, 3180-3220 us, i = ion 7: position(i, start(g)) is T6 and site(g) is T0",
-       "g = gate 10,2 (event 24) at T3, 3180-3220 us, i = ion 10: position(i, start(g)) is T9 and site(g) is T3",
-       "g = gate 10,2 (event 24) at T3, 3180-3220 us, i = ion 2: position(i, start(g)) is T0 and site(g) is T3",
-       "g = gate 4,8 (event 25) at T6, 3180-3220 us, i = ion 4: position(i, start(g)) is T3 and site(g) is T6",
-       "g = gate 1,5 (event 35) at T0, 6300-6340 us, i = ion 5: position(i, start(g)) is T3 and site(g) is T0",
-       "g = gate 7,2 (event 36) at T3, 6300-6340 us, i = ion 7: position(i, start(g)) is T6 and site(g) is T3",
-       "g = gate 7,2 (event 36) at T3, 6300-6340 us, i = ion 2: position(i, start(g)) is T0 and site(g) is T3",
-       "g = gate 4,10 (event 37) at T6, 6300-6340 us, i = ion 4: position(i, start(g)) is T3 and site(g) is T6"
-      ]
+      "verdict": "holds",
+      "core": false
      },
      {
       "id": "R8",
@@ -1719,7 +1705,7 @@
      },
      {
       "id": "R29",
-      "title": "Every operation lasts what the clock says",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
       "verdict": "holds",
       "core": false
      },
@@ -1729,7 +1715,11 @@
       "verdict": "holds",
       "core": false
      }
-    ]
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
    },
    "violations": {
     "circuit": 1
@@ -1801,48 +1791,45 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.0
+   "seconds": 0.01
   },
   {
    "id": "wise_rot_d3_c2",
    "label": "rotated surface code d=3, artifact WISE global reconfiguration, capacity 2",
-   "profile": "jones",
+   "profile": "jones-wise-artifact",
    "checks": {
     "broadcast": "skipped: transport is not broadcast in this model",
     "structure": "passed",
     "positions": "passed",
     "capacity": "passed",
     "ion_serial": "passed",
+    "global_hold": "passed",
     "segment_mutex": "passed",
     "junction_mutex": "passed",
     "trap_serial": "passed",
     "chain_order": "passed",
     "declared_locks": "passed",
-    "durations": "passed",
-    "circuit": "failed"
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
    },
    "ok": false,
    "rules": {
-    "ruleset": "jones",
-    "title": "Surface-code QCCD's rules",
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
     "ok": false,
     "results": [
      {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
       "id": "R0",
       "title": "Every operation finds its ions where it says they are",
-      "verdict": "fails",
-      "core": true,
-      "count": 107,
-      "examples": [
-       "o = reconfigure 1,2,4,5,7,8,10,11,13,14,16,17,19,20,22,23,25 (event 50), 125-4420 us: well_formed(o) is false",
-       "o = gate 8,23 (event 52) at T3, 4420-4460 us: found(o) is false",
-       "o = gate 4,20 (event 53) at T6, 4420-4460 us: found(o) is false",
-       "o = gate 22,7 (event 54) at T9, 4420-4460 us: found(o) is false",
-       "o = gate 19,2 (event 55) at T12, 4420-4460 us: found(o) is false",
-       "o = gate 25,10 (event 56) at T15, 4420-4460 us: found(o) is false",
-       "o = gate 16,5 (event 57) at T18, 4420-4460 us: found(o) is false",
-       "o = gate1 8 (event 59) at T3, 4460-4465 us: found(o) is false"
-      ]
+      "verdict": "holds",
+      "core": true
      },
      {
       "id": "R1",
@@ -1865,19 +1852,8 @@
      {
       "id": "R6b",
       "title": "A two-ion gate acts on two ions standing in one site",
-      "verdict": "fails",
-      "core": false,
-      "count": 42,
-      "examples": [
-       "g = gate 1,14 (event 51) at T0, 4420-4460 us, i = ion 14: position(i, start(g)) is T12 and site(g) is T0",
-       "g = gate 8,23 (event 52) at T3, 4420-4460 us, i = ion 8: position(i, start(g)) is T6 and site(g) is T3",
-       "g = gate 8,23 (event 52) at T3, 4420-4460 us, i = ion 23: position(i, start(g)) is T21 and site(g) is T3",
-       "g = gate 4,20 (event 53) at T6, 4420-4460 us, i = ion 4: position(i, start(g)) is T3 and site(g) is T6",
-       "g = gate 4,20 (event 53) at T6, 4420-4460 us, i = ion 20: position(i, start(g)) is T18 and site(g) is T6",
-       "g = gate 22,7 (event 54) at T9, 4420-4460 us, i = ion 22: position(i, start(g)) is T21 and site(g) is T9",
-       "g = gate 22,7 (event 54) at T9, 4420-4460 us, i = ion 7: position(i, start(g)) is T6 and site(g) is T9",
-       "g = gate 19,2 (event 55) at T12, 4420-4460 us, i = ion 19: position(i, start(g)) is T18 and site(g) is T12"
-      ]
+      "verdict": "holds",
+      "core": false
      },
      {
       "id": "R8",
@@ -1915,7 +1891,7 @@
      },
      {
       "id": "R29",
-      "title": "Every operation lasts what the clock says",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
       "verdict": "holds",
       "core": false
      },
@@ -1925,7 +1901,11 @@
       "verdict": "holds",
       "core": false
      }
-    ]
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
    },
    "violations": {
     "circuit": 1
@@ -2002,43 +1982,40 @@
   {
    "id": "wise_rot_d6_c2",
    "label": "rotated surface code d=6, artifact WISE global reconfiguration, capacity 2",
-   "profile": "jones",
+   "profile": "jones-wise-artifact",
    "checks": {
     "broadcast": "skipped: transport is not broadcast in this model",
     "structure": "passed",
     "positions": "passed",
     "capacity": "passed",
     "ion_serial": "passed",
+    "global_hold": "passed",
     "segment_mutex": "passed",
     "junction_mutex": "passed",
     "trap_serial": "passed",
     "chain_order": "passed",
     "declared_locks": "passed",
-    "durations": "passed",
-    "circuit": "failed"
+    "durations": "not checked: reconfigure durations are recorded, not checked; other events checked",
+    "circuit": "failed",
+    "reconfigure_paths": "not checked: global permutations contain no internal routes"
    },
    "ok": false,
    "rules": {
-    "ruleset": "jones",
-    "title": "Surface-code QCCD's rules",
+    "ruleset": "jones-wise-artifact",
+    "title": "Jones's recorded WISE artifact",
     "ok": false,
     "results": [
      {
+      "id": "A1",
+      "title": "A global reconfiguration holds the whole device",
+      "verdict": "holds",
+      "core": false
+     },
+     {
       "id": "R0",
       "title": "Every operation finds its ions where it says they are",
-      "verdict": "fails",
-      "core": true,
-      "count": 608,
-      "examples": [
-       "o = reconfigure 1,2,4,5,7,8,10,11,13,14,16,17,19,20,22,23,25,26,28,29,31,32,34,35,37,38,40,41,43,44,46,47,49,50,52,53,55,56,58,59,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,83,85,86,88,89,91,92,94,95,97,98,100,101,103,104,106 (event 214), 140-6915 us: well_formed(o) is false",
-       "o = gate 14,73 (event 216) at T3, 6915-6955 us: found(o) is false",
-       "o = gate 32,91 (event 217) at T6, 6915-6955 us: found(o) is false",
-       "o = gate 7,65 (event 218) at T9, 6915-6955 us: found(o) is false",
-       "o = gate 25,83 (event 219) at T12, 6915-6955 us: found(o) is false",
-       "o = gate 43,101 (event 220) at T15, 6915-6955 us: found(o) is false",
-       "o = gate 2,58 (event 221) at T18, 6915-6955 us: found(o) is false",
-       "o = gate 17,76 (event 222) at T21, 6915-6955 us: found(o) is false"
-      ]
+      "verdict": "holds",
+      "core": true
      },
      {
       "id": "R1",
@@ -2061,19 +2038,8 @@
      {
       "id": "R6b",
       "title": "A two-ion gate acts on two ions standing in one site",
-      "verdict": "fails",
-      "core": false,
-      "count": 233,
-      "examples": [
-       "g = gate 1,55 (event 215) at T0, 6915-6955 us, i = ion 55: position(i, start(g)) is T54 and site(g) is T0",
-       "g = gate 14,73 (event 216) at T3, 6915-6955 us, i = ion 14: position(i, start(g)) is T12 and site(g) is T3",
-       "g = gate 14,73 (event 216) at T3, 6915-6955 us, i = ion 73: position(i, start(g)) is T72 and site(g) is T3",
-       "g = gate 32,91 (event 217) at T6, 6915-6955 us, i = ion 32: position(i, start(g)) is T30 and site(g) is T6",
-       "g = gate 32,91 (event 217) at T6, 6915-6955 us, i = ion 91: position(i, start(g)) is T90 and site(g) is T6",
-       "g = gate 7,65 (event 218) at T9, 6915-6955 us, i = ion 7: position(i, start(g)) is T6 and site(g) is T9",
-       "g = gate 7,65 (event 218) at T9, 6915-6955 us, i = ion 65: position(i, start(g)) is T63 and site(g) is T9",
-       "g = gate 25,83 (event 219) at T12, 6915-6955 us, i = ion 25: position(i, start(g)) is T24 and site(g) is T12"
-      ]
+      "verdict": "holds",
+      "core": false
      },
      {
       "id": "R8",
@@ -2114,7 +2080,7 @@
      },
      {
       "id": "R29",
-      "title": "Every operation lasts what the clock says",
+      "title": "Ordinary operations last what the clock says; global durations are recorded, not checked",
       "verdict": "holds",
       "core": false
      },
@@ -2124,7 +2090,11 @@
       "verdict": "holds",
       "core": false
      }
-    ]
+    ],
+    "recorded_checks": {
+     "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+     "reconfigure_paths": "not checked: global permutations contain no internal routes"
+    }
    },
    "violations": {
     "circuit": 1
@@ -2196,7 +2166,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.05
   }
  ],
  "ratios": [],
