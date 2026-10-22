@@ -103,7 +103,14 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-21 (evening), from commit `82f95f2` (pushed, also on `website/invitations`):
+**Deployed** 2026-10-21 (late), from commit `6012b17` (pushed, also on `website/invitations`):
+`bb90seq_mem@1` (one [[90,8,10]] block, Z then X, 180 ions; the tightest grade, ~2600-2700 s on the
+droplet) completes Goal 1's curated codes, and `/v1/goals/goal1` carries `logical_qubits`, `ions`
+and `ions_per_logical_qubit` for every entry and the FTL target (60 logical qubits within 2000 ions).
+Same derivation as below (`qccd/` from `6012b17`); 47 layers identical; rollback `*.bak-82f95f2`.
+Rehearsal smoke passed, and the queue was empty at the switch.
+
+**Before that** 2026-10-21 (evening), from commit `82f95f2` (pushed, also on `website/invitations`):
 Goal 1's other codes (`steanexz`, `shorxz`, `rep3xz`, `rep5xz`, `bb18xz` two-copy; `bb72seq` one block,
 Z then X, 144 ions; `ldpc` decodes the BB and Steane ones), `/v1/goals/goal1` with each release's
 ions, logical qubits and entries, and the studio template that shows the Learn panel only in the
