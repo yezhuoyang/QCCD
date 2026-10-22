@@ -382,8 +382,14 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     rotation puts a second ion on a degree-3 node (R2), the same rotation asks two ions to
     travel in two different lab-frame directions in one broadcast cycle (R22 -- the drawn
     ring turns a corner and its rails carry no loop name, so `hop_label` falls through to
-    the axis), and the gate happens at n-bar 3.411 against a 1.0 budget (R7).  A tool that
+    the axis), and the gate happens at n-bar 21.423 against a 1.0 budget (R7).  A tool that
     reported "all rules pass" here would be worse than one that reported nothing.
+
+    The price is 10 steps: the rotation 3, then d1's two moves 3 and 4, because a move into
+    or out of an occupied trap is a split or a merge (db3e6fc: class, conveyor dock or
+    occupancy).  d1 merges onto d0 at T1, splits off it and merges onto a0 at A0 -- three
+    of them at 1 step and 6 quanta each under qccdsim_jones, which is also why the n-bar is
+    0.4 shuttle + 3.0 junction + 18.0 split/merge + 0.02 background rather than 3.411.
     """
     script = list(_SCRATCH) + [{"do": "prog", "src": _PROGRAM}]
     r = drive(STUDIO, script, tmp_path)
@@ -394,7 +400,7 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     assert after["frames"] == 7          # the shuttle is TWO hops, so 6 statements -> 7
     assert after["blocked"] is None, after["blocked"]
     price = after["price"]
-    assert price["cost"] == 7 and price["steps"] == 7
+    assert price["cost"] == 10 and price["steps"] == 10
     # NO ORACLE: these frames were never priced by Python, so there is nothing to compare
     # them against and the page has to say so rather than reporting drift 0.
     assert price["frameChecked"] == 0
@@ -404,7 +410,7 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
         "2 ions move in 2 different ways in one cycle (rotate_cw +x and rotate_cw +y); "
         "one cycle is one waveform, so unlike motions need 2 cycles",
         "junction T1 (degree 3) holds 2 ions",
-        "ion d1 enters a 2Q gate at n-bar=3.411 > 1.0; a cooling operation must precede it",
+        "ion d1 enters a 2Q gate at n-bar=21.423 > 1.0; a cooling operation must precede it",
     ]
 
     # ---- and now Python, on the two files the page hands over -------------------------
@@ -412,8 +418,9 @@ def test_a_programme_written_here_is_priced_and_judged_and_python_agrees(tmp_pat
     arch = _load_doc(json.loads(arch_doc))
     prog = TSIR.from_json(json.loads(tsir_doc))
     rep = verify(prog, arch, corrected_model("qccdsim_jones"))
-    assert rep.result.total_cost == 7
-    assert rep.result.total_steps == 7
+    assert rep.result.total_cost == 10
+    assert rep.result.total_steps == 10
+    assert rep.result.per_ion_quanta["d1"]["split_merge"] == pytest.approx(18.0)
     assert sorted(rep.rules.failed()) == ["R2", "R22", "R7"]
     assert [v.message for v in rep.rules.violations] == after["rules"]["messages"]
 
@@ -856,7 +863,9 @@ def test_qccd_open_replays_a_browser_design_and_reports_all_27_rules(tmp_path):
                          capture_output=True, text=True, timeout=900, cwd=str(ROOT))
     text = cli.stdout
     assert "nodes 6  segments 6  loops 1" in text, text
-    assert "total_cost     7" in text and "total_steps    7" in text, text
+    # 10, not 7: d1's moves onto and off occupied traps are three split/merges (see
+    # test_a_programme_written_here_is_priced_and_judged_and_python_agrees)
+    assert "total_cost     10" in text and "total_steps    10" in text, text
     assert "rules failed   R2 R22 R7" in text, text
     # and the ones the browser could not check are named by Python, with verdicts
     assert "rules skipped  R10 R7b" in text, text
