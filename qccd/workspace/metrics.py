@@ -22,7 +22,9 @@ __all__ = ["replay_time", "broadcast_use", "compute_metrics", "METRIC_UNITS"]
 
 METRIC_UNITS = {"T_jones": "ms", "T_transport": "ms", "instructions": "count", "dacs": "count",
                 "ions_per_instruction": "ions", "transport_instructions": "count",
-                "total_cost": "model cost units", "total_steps": "machine steps"}
+                "total_cost": "model cost units", "total_steps": "machine steps",
+                "ler": "per experiment", "ler_per_round": "per round",
+                "ler_per_round_per_logical": "per round per logical qubit"}
 
 
 def _fastest_model(table: str):
@@ -71,7 +73,7 @@ def broadcast_use(arch: Architecture, prog: TSIR) -> dict:
 
 def compute_metrics(arch: Architecture, prog: TSIR, physics: Mapping) -> tuple:
     """`(metrics, breakdown)` for one design under the task's physics tables."""
-    from ..cost.hardware import hardware_report
+    from ..cost.hardware import WIRING_FLOORS, hardware_report
 
     rank_table = physics.get("rank_table", "qccdsim_jones")
     tables = list(physics.get("tables") or [rank_table])
@@ -90,6 +92,7 @@ def compute_metrics(arch: Architecture, prog: TSIR, physics: Mapping) -> tuple:
     out["ions_per_instruction"] = bc["ions_per_instruction"]
     out["transport_instructions"] = bc["transport_instructions"]
     out["instructions"] = len(prog)
-    out["dacs"] = hardware_report(arch).dacs
+    # the count the device stage judged the budget with, not the device's own claim (#15)
+    out["dacs"] = hardware_report(arch, floors=WIRING_FLOORS).dacs
     breakdown["broadcast"] = bc
     return out, breakdown

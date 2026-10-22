@@ -1,0 +1,130 @@
+{
+ "budget": {
+  "junction_electrode_multiplier": 2,
+  "max_area_mm2": 100,
+  "max_dacs": 128,
+  "max_junctions": 200
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.029,
+  "note": "R17: accrues whether or not the ion moves. 29(4) quanta/s, the axial centre-of-mass mode of a Ba-Yb crystal in Quantinuum's junction trap",
+  "source": "arXiv:2206.11888 Fig. 3 caption"
+ },
+ "primitives": {
+  "1q_gate": {
+   "fidelity": 0.999975,
+   "note": "Clifford-averaged infidelity 2.5(1)e-5 on Helios; a single-qubit pi/2 takes 5 us on H0",
+   "source": "arXiv:2511.05465 Table II; duration arXiv:2003.01293 Table III",
+   "us": 5
+  },
+  "cool": {
+   "broadcastable": true,
+   "note": "the 300 us of cooling Helios applies after a shift, before the next gates. It leaves the floor n-bar 0.05 that qccd-noise@2 adds (arXiv:2206.11888, Fig. 3's Ba-Yb experiment); the replay counts heating from 0",
+   "removes_quanta": "all",
+   "scope": "global",
+   "source": "arXiv:2511.05465 p.5",
+   "us": 300
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent: the logical identity SWAP = CX CX CX, not a measured number"
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "label": "physical swap of a two-ion crystal: 200 us, < 2 quanta per mode (the bound used as the value)",
+     "quanta": 2,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 200
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "3": [
+     {
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs. Measured on an X junction; no Y-junction figure for a Ba-Yb crystal is published",
+      "quanta": 0,
+      "source": "arXiv:2206.11888 Table II",
+      "table": "quantinuum",
+      "us": 0
+     }
+    ],
+    "4": [
+     {
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs",
+      "quanta": 0,
+      "source": "arXiv:2206.11888 Table II",
+      "table": "quantinuum",
+      "us": 0
+     }
+    ]
+   }
+  },
+  "measure": {
+   "fidelity": 0.999999,
+   "note": "Helios's SPAM error, 4.8(6)e-4, is mostly preparation (arXiv:2511.05465 p.7); the vendor's emulator splits it as p_meas 1e-6 and p_init 5e-4, which this block follows (reset.error). 120 us is H0's high-fidelity measurement",
+   "source": "arXiv:2511.05465 Table II; Quantinuum Helios-1E emulator parameters (p_meas); duration arXiv:2003.01293 Table III",
+   "us": 120
+  },
+  "merge": {
+   "curve": [
+    {
+     "label": "combine: 128 us, < 1 quantum per mode (the bound used as the value)",
+     "quanta": 1,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 128
+    }
+   ]
+  },
+  "ms_gate": {
+   "chain_note": "the chain-length term of Murali et al. (arXiv:2004.04706 Eq. 1, ISCA 2020): A ~ N/ln N, referenced to the two-qubit gate the fidelity was measured on",
+   "error_vs_chain": "murali:2",
+   "error_vs_quanta": "linear:9.5e-4",
+   "fidelity_at_n0": 0.99921,
+   "max_quanta": 1,
+   "note": "two-qubit RB infidelity 7.9(2)e-4 on Helios, gate time about 70 us. Error per quantum (derived): Bell-state fidelity 0.993(1) near the ground state and 0.974(1) at n-bar 20(2), the same MS gate (arXiv:0810.0670 Sec. 5.2), i.e. 9.5e-4 per quantum. max_quanta is R7's gate budget, a rule of the boards, not a measurement",
+   "source": "arXiv:2511.05465 Table II and p.5; arXiv:0810.0670 Sec. 5.2",
+   "us": 70
+  },
+  "reset": {
+   "error": 0.0005,
+   "note": "preparation error p_init 5e-4 of the vendor's Helios emulator, the bulk of the measured SPAM 4.8(6)e-4; H0 initialises in 10 us",
+   "source": "Quantinuum Helios-1E emulator parameters (p_init); arXiv:2511.05465 Table II; duration arXiv:2003.01293 Table III",
+   "us": 10
+  },
+  "shuttle_segment": {
+   "curve": [
+    {
+     "label": "one zone pitch, 375 um at 4 m/s (derived: 94 us), the speed at which a Ba-Yb crystal gains <= 0.03 quanta per round trip of four such legs (derived: 0.0075 per leg)",
+     "quanta": 0.0075,
+     "source": "arXiv:2206.11888 Fig. 1 and Table II",
+     "table": "quantinuum",
+     "us": 94
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "label": "split: 128 us, < 1 quantum per mode (the bound used as the value)",
+     "quanta": 1,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 128
+    }
+   ]
+  }
+ },
+ "species": {
+  "T_coh_s": 126.6,
+  "coolant": "171Yb+",
+  "coolant_fraction": 0.5,
+  "note": "Helios pairs each 137Ba+ qubit with one 171Yb+ coolant. T_coh_s (derived) is 1/r for the Helios linear memory rate r = 7.9e-3/s, so the coarse idle estimate of qccd.cost.physical agrees with qccd-noise@2's memory channel",
+  "qubit": "137Ba+",
+  "source": "arXiv:2511.05465 Sec. II B",
+  "sympathetic": true
+ }
+}

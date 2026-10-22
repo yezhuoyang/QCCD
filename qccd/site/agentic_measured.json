@@ -1,0 +1,970 @@
+{
+ "runs": [
+  {
+   "label": "before (2026-09-24)",
+   "date": 1790309948.916,
+   "request": "I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode",
+   "model": "claude-opus-4-8[1m]",
+   "wall_ms": 481500,
+   "by_machine_ms": {
+    "model": 431123,
+    "tools": 66244,
+    "page": 4096,
+    "boot": 3682
+   },
+   "model_calls": 101,
+   "calls": 102,
+   "polls": 76,
+   "commits": 3,
+   "cost_usd": 6.5502800000000025,
+   "memory_first": null,
+   "memory_peak": null,
+   "tokens_total": {
+    "in": 5441,
+    "cache_read": 8907070,
+    "cache_write": 117424,
+    "out": 22894
+   },
+   "start_ms": 3682,
+   "think_ms": {
+    "median": 2494,
+    "p90": 6992,
+    "max": 57485
+   },
+   "slowest": [
+    {
+     "i": 29,
+     "op": "think",
+     "ms": 57485,
+     "what": "think"
+    },
+    {
+     "i": 79,
+     "op": "call",
+     "ms": 20313,
+     "what": "Agent"
+    },
+    {
+     "i": 37,
+     "op": "call",
+     "ms": 17482,
+     "what": "qccd_run_program"
+    },
+    {
+     "i": 26,
+     "op": "think",
+     "ms": 15205,
+     "what": "think"
+    },
+    {
+     "i": 32,
+     "op": "think",
+     "ms": 13370,
+     "what": "think"
+    },
+    {
+     "i": 234,
+     "op": "think",
+     "ms": 11620,
+     "what": "think"
+    }
+   ],
+   "to_submission": {
+    "s": 175.718,
+    "model_calls": 17,
+    "model_ms": 145772,
+    "tool_ms": 22168,
+    "page_ms": 4096
+   }
+  },
+  {
+   "label": "after (2026-09-26)",
+   "date": 1790436173.84,
+   "request": "I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode",
+   "model": "claude-opus-4-8[1m]",
+   "wall_ms": 723335,
+   "by_machine_ms": {
+    "model": 110372,
+    "tools": 601770,
+    "page": 10849,
+    "boot": 8809
+   },
+   "model_calls": 29,
+   "calls": 28,
+   "polls": 13,
+   "commits": 3,
+   "cost_usd": 1.6651244999999992,
+   "memory_first": 27352,
+   "memory_peak": 59998,
+   "tokens_total": {
+    "in": 3573,
+    "cache_read": 1295453,
+    "cache_write": 84970,
+    "out": 5954
+   },
+   "start_ms": 8809,
+   "think_ms": {
+    "median": 3279,
+    "p90": 7441,
+    "max": 9042
+   },
+   "slowest": [
+    {
+     "i": 65,
+     "op": "call",
+     "ms": 51060,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 63,
+     "op": "call",
+     "ms": 50960,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 67,
+     "op": "call",
+     "ms": 50419,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 57,
+     "op": "call",
+     "ms": 50406,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 59,
+     "op": "call",
+     "ms": 50336,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 61,
+     "op": "call",
+     "ms": 50278,
+     "what": "qccd_get_job"
+    }
+   ],
+   "to_submission": {
+    "s": 102.666,
+    "model_calls": 15,
+    "model_ms": 62707,
+    "tool_ms": 20278,
+    "page_ms": 10849
+   }
+  },
+  {
+   "label": "now (2026-09-26, later)",
+   "date": 1790449914.21,
+   "request": "I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode",
+   "model": "claude-opus-4-8[1m]",
+   "wall_ms": 63765,
+   "by_machine_ms": {
+    "model": 46861,
+    "tools": 15129,
+    "page": 1711,
+    "boot": 91
+   },
+   "model_calls": 10,
+   "calls": 9,
+   "polls": 1,
+   "commits": 3,
+   "cost_usd": 0.4772685,
+   "memory_first": 13125,
+   "memory_peak": 32029,
+   "tokens_total": {
+    "in": 771,
+    "cache_read": 181469,
+    "cache_write": 32027,
+    "out": 2453
+   },
+   "start_ms": 91,
+   "think_ms": {
+    "median": 4725.5,
+    "p90": 9817,
+    "max": 9817
+   },
+   "slowest": [
+    {
+     "i": 25,
+     "op": "call",
+     "ms": 14734,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 21,
+     "op": "think",
+     "ms": 9817,
+     "what": "think"
+    },
+    {
+     "i": 7,
+     "op": "think",
+     "ms": 9476,
+     "what": "think"
+    },
+    {
+     "i": 26,
+     "op": "think",
+     "ms": 6794,
+     "what": "think"
+    },
+    {
+     "i": 18,
+     "op": "think",
+     "ms": 4791,
+     "what": "think"
+    },
+    {
+     "i": 15,
+     "op": "think",
+     "ms": 4759,
+     "what": "think"
+    }
+   ],
+   "to_submission": {
+    "s": 37.531,
+    "model_calls": 8,
+    "model_ms": 35375,
+    "tool_ms": 354,
+    "page_ms": 1711
+   }
+  }
+ ],
+ "tools": {
+  "Agent": {
+   "n": 2,
+   "exec_ms_median": null,
+   "exec_ms_max": null,
+   "ms_median": 13192.0,
+   "result_chars_median": 381.0,
+   "result_tokens_est_median": 95
+  },
+  "Bash": {
+   "n": 3,
+   "exec_ms_median": null,
+   "exec_ms_max": null,
+   "ms_median": 2,
+   "result_chars_median": 157,
+   "result_tokens_est_median": 39
+  },
+  "CronCreate": {
+   "n": 1,
+   "exec_ms_median": null,
+   "exec_ms_max": null,
+   "ms_median": 10,
+   "result_chars_median": 171,
+   "result_tokens_est_median": 43
+  },
+  "Monitor": {
+   "n": 2,
+   "exec_ms_median": null,
+   "exec_ms_max": null,
+   "ms_median": 5483.5,
+   "result_chars_median": 469.0,
+   "result_tokens_est_median": 117
+  },
+  "WaitForMcpServers": {
+   "n": 1,
+   "exec_ms_median": null,
+   "exec_ms_max": null,
+   "ms_median": 23,
+   "result_chars_median": 11,
+   "result_tokens_est_median": 3
+  },
+  "qccd_apply_change_set": {
+   "n": 6,
+   "exec_ms_median": 155.2,
+   "exec_ms_max": 1556.5,
+   "ms_median": 181.0,
+   "result_chars_median": 4133.0,
+   "result_tokens_est_median": 1033
+  },
+  "qccd_get_context": {
+   "n": 3,
+   "exec_ms_median": 12.0,
+   "exec_ms_max": 12.5,
+   "ms_median": 39,
+   "result_chars_median": 9836,
+   "result_tokens_est_median": 2459
+  },
+  "qccd_get_job": {
+   "n": 90,
+   "exec_ms_median": 4.6,
+   "exec_ms_max": 51027.0,
+   "ms_median": 26.5,
+   "result_chars_median": 730.0,
+   "result_tokens_est_median": 182
+  },
+  "qccd_manage_branch": {
+   "n": 3,
+   "exec_ms_median": 11.1,
+   "exec_ms_max": 30.5,
+   "ms_median": 47,
+   "result_chars_median": 288,
+   "result_tokens_est_median": 72
+  },
+  "qccd_manage_comment": {
+   "n": 2,
+   "exec_ms_median": 5.7,
+   "exec_ms_max": 6.0,
+   "ms_median": 60.5,
+   "result_chars_median": 3573.0,
+   "result_tokens_est_median": 893
+  },
+  "qccd_page_act": {
+   "n": 9,
+   "exec_ms_median": 890.1,
+   "exec_ms_max": 4295.8,
+   "ms_median": 916,
+   "result_chars_median": 623,
+   "result_tokens_est_median": 156
+  },
+  "qccd_page_read": {
+   "n": 1,
+   "exec_ms_median": 708.5,
+   "exec_ms_max": 708.5,
+   "ms_median": 1159,
+   "result_chars_median": 10990,
+   "result_tokens_est_median": 2748
+  },
+  "qccd_present": {
+   "n": 5,
+   "exec_ms_median": 9.8,
+   "exec_ms_max": 22.9,
+   "ms_median": 44,
+   "result_chars_median": 238,
+   "result_tokens_est_median": 60
+  },
+  "qccd_query_design": {
+   "n": 2,
+   "exec_ms_median": 15.7,
+   "exec_ms_max": 18.9,
+   "ms_median": 53.5,
+   "result_chars_median": 857.5,
+   "result_tokens_est_median": 214
+  },
+  "qccd_read_reference": {
+   "n": 4,
+   "exec_ms_median": 25.4,
+   "exec_ms_max": 33.5,
+   "ms_median": 57.5,
+   "result_chars_median": 8306.0,
+   "result_tokens_est_median": 2076
+  },
+  "qccd_run_program": {
+   "n": 2,
+   "exec_ms_median": 18595.6,
+   "exec_ms_max": 19741.3,
+   "ms_median": 18620.0,
+   "result_chars_median": 2900.5,
+   "result_tokens_est_median": 725
+  },
+  "qccd_submit_local": {
+   "n": 3,
+   "exec_ms_median": 17.8,
+   "exec_ms_max": 4173.6,
+   "ms_median": 41,
+   "result_chars_median": 261,
+   "result_tokens_est_median": 65
+  }
+ },
+ "page": {
+  "step": {
+   "n": 2,
+   "ms_median": 2215.9
+  },
+  "studio newCanvas": {
+   "n": 3,
+   "ms_median": 771.8
+  },
+  "studio sketchDraw": {
+   "n": 3,
+   "ms_median": 885.3
+  },
+  "wait": {
+   "n": 1,
+   "ms_median": 3128.0
+  }
+ },
+ "excerpt": {
+  "label": "now (2026-09-26, later)",
+  "summary": {
+   "wall_ms": 63765,
+   "by_machine_ms": {
+    "model": 46861,
+    "tools": 15129,
+    "page": 1711,
+    "boot": 91
+   },
+   "other_ms": 0,
+   "model_calls": 10,
+   "calls": 9,
+   "polls": 1,
+   "by_tool": {
+    "qccd_get_job": {
+     "n": 1,
+     "ms": 14734,
+     "exec_ms": 14772.6,
+     "result_chars": 1141
+    },
+    "qccd_page_act": {
+     "n": 2,
+     "ms": 1711,
+     "exec_ms": 1656.1,
+     "result_chars": 2623
+    },
+    "qccd_apply_change_set": {
+     "n": 1,
+     "ms": 161,
+     "exec_ms": 142.4,
+     "result_chars": 4135
+    },
+    "qccd_read_reference": {
+     "n": 2,
+     "ms": 125,
+     "exec_ms": 49.3,
+     "result_chars": 20530
+    },
+    "qccd_present": {
+     "n": 1,
+     "ms": 44,
+     "exec_ms": 22.9,
+     "result_chars": 238
+    },
+    "qccd_submit_local": {
+     "n": 1,
+     "ms": 41,
+     "exec_ms": 14.6,
+     "result_chars": 452
+    },
+    "qccd_manage_branch": {
+     "n": 1,
+     "ms": 24,
+     "exec_ms": 6.0,
+     "result_chars": 289
+    }
+   },
+   "commits": 3,
+   "memory_peak": 32029,
+   "memory_first": 13125,
+   "tokens_out": null,
+   "slowest": [
+    {
+     "i": 25,
+     "op": "call",
+     "ms": 14734,
+     "what": "qccd_get_job"
+    },
+    {
+     "i": 21,
+     "op": "think",
+     "ms": 9817,
+     "what": "think"
+    },
+    {
+     "i": 7,
+     "op": "think",
+     "ms": 9476,
+     "what": "think"
+    },
+    {
+     "i": 26,
+     "op": "think",
+     "ms": 6794,
+     "what": "think"
+    },
+    {
+     "i": 18,
+     "op": "think",
+     "ms": 4791,
+     "what": "think"
+    },
+    {
+     "i": 15,
+     "op": "think",
+     "ms": 4759,
+     "what": "think"
+    }
+   ],
+   "cost_usd": 0.4772685,
+   "reported_model_calls": 10,
+   "api_ms": 48101,
+   "status": "success",
+   "tokens_total": {
+    "in": 771,
+    "cache_read": 181469,
+    "cache_write": 32027,
+    "out": 2453
+   }
+  },
+  "instructions": [
+   {
+    "i": 0,
+    "op": "recv",
+    "t": 0.0,
+    "ms": 0,
+    "machine": "-",
+    "request": "I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode"
+   },
+   {
+    "i": 1,
+    "op": "boot",
+    "t": 0.0,
+    "ms": 91,
+    "machine": "-",
+    "model": "claude-opus-4-8[1m]",
+    "tools": 23,
+    "qccd_tools": 20
+   },
+   {
+    "i": 2,
+    "op": "think",
+    "t": 0.091,
+    "ms": 3055,
+    "machine": "M",
+    "memory": 13125,
+    "blocks": {
+     "thinking": 1,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 3,
+    "op": "say",
+    "t": 2.608,
+    "ms": 0,
+    "machine": "-",
+    "text": "I'll start by reading the design reference to understand what the BB code board needs and how to build a triangle-shaped device."
+   },
+   {
+    "i": 4,
+    "op": "call",
+    "t": 3.146,
+    "ms": 79,
+    "machine": "T",
+    "tool": "qccd_read_reference",
+    "args": {
+     "section": "design"
+    },
+    "ok": true,
+    "exec_ms": 33.5,
+    "result_chars": 8506,
+    "effects": []
+   },
+   {
+    "i": 5,
+    "op": "think",
+    "t": 3.225,
+    "ms": 397,
+    "machine": "M",
+    "blocks": {
+     "thinking": 0,
+     "say": 0,
+     "call": 1
+    }
+   },
+   {
+    "i": 6,
+    "op": "call",
+    "t": 3.622,
+    "ms": 46,
+    "machine": "T",
+    "tool": "qccd_read_reference",
+    "args": {
+     "section": "boards",
+     "query": "BB [[144,12,12]]"
+    },
+    "ok": true,
+    "exec_ms": 15.8,
+    "result_chars": 12024,
+    "effects": []
+   },
+   {
+    "i": 7,
+    "op": "think",
+    "t": 3.668,
+    "ms": 9476,
+    "machine": "M",
+    "memory": 25550,
+    "blocks": {
+     "thinking": 1,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 8,
+    "op": "say",
+    "t": 11.888,
+    "ms": 0,
+    "machine": "-",
+    "text": "I have what I need. The BB board wants ONE closed loop (the conveyor) plus docks. So I'll make your **large triangle the loop** and place the docks one unit inside its sides — those docks together trace out the **smaller triangle**. They can't be a second separate loop: the conveyor drives only one loop, and two uncoupled loops would never let their qubits meet.\n\nLet me create the design and open it in your Studio."
+   },
+   {
+    "i": 9,
+    "op": "call",
+    "t": 13.144,
+    "ms": 24,
+    "machine": "T",
+    "tool": "qccd_manage_branch",
+    "args": {
+     "action": "create",
+     "title": "Two triangles",
+     "origin_prompt_id": "<the request>",
+     "request_id": "create-two-triangles-1"
+    },
+    "ok": true,
+    "exec_ms": 6.0,
+    "result_chars": 289,
+    "effects": [
+     {
+      "kind": "design",
+      "design": "Two triangles",
+      "title": "Two triangles"
+     }
+    ]
+   },
+   {
+    "i": 10,
+    "op": "think",
+    "t": 13.168,
+    "ms": 2683,
+    "machine": "M",
+    "memory": 26220,
+    "blocks": {
+     "thinking": 0,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 11,
+    "op": "say",
+    "t": 15.038,
+    "ms": 0,
+    "machine": "-",
+    "text": "I'll switch your Studio to it and clear the canvas."
+   },
+   {
+    "i": 12,
+    "op": "call",
+    "t": 15.851,
+    "ms": 44,
+    "machine": "T",
+    "tool": "qccd_present",
+    "args": {
+     "action": "open_branch",
+     "target": {
+      "branch": "Two triangles"
+     }
+    },
+    "ok": true,
+    "exec_ms": 22.9,
+    "result_chars": 238,
+    "effects": [
+     {
+      "kind": "present",
+      "action": "open_branch",
+      "status": "requested"
+     }
+    ]
+   },
+   {
+    "i": 13,
+    "op": "think",
+    "t": 15.895,
+    "ms": 397,
+    "machine": "M",
+    "blocks": {
+     "thinking": 0,
+     "say": 0,
+     "call": 1
+    }
+   },
+   {
+    "i": 14,
+    "op": "call",
+    "t": 16.292,
+    "ms": 795,
+    "machine": "P",
+    "tool": "qccd_page_act",
+    "args": {
+     "action": "studio",
+     "verb": "newCanvas"
+    },
+    "ok": true,
+    "exec_ms": 766.0,
+    "result_chars": 623,
+    "effects": [
+     {
+      "kind": "commit",
+      "change_set": "cs_…",
+      "revision": 1,
+      "design": "Two triangles"
+     }
+    ],
+    "page": {
+     "action": "studio",
+     "ms": 758.5,
+     "ok": true,
+     "verb": "newCanvas"
+    }
+   },
+   {
+    "i": 15,
+    "op": "think",
+    "t": 17.087,
+    "ms": 4759,
+    "machine": "M",
+    "memory": 26878,
+    "blocks": {
+     "thinking": 1,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 16,
+    "op": "say",
+    "t": 20.34,
+    "ms": 0,
+    "machine": "-",
+    "text": "Canvas is clear (revision 1). Now I'll draw the large triangle as one closed loop — using the measured 144-site outline (corners cut to 120° so it passes the 60° rule)."
+   },
+   {
+    "i": 17,
+    "op": "call",
+    "t": 21.846,
+    "ms": 916,
+    "machine": "P",
+    "tool": "qccd_page_act",
+    "args": {
+     "action": "studio",
+     "verb": "sketchDraw",
+     "args": [
+      "poly",
+      [
+       [
+        2,
+        43.30127
+       ],
+       [
+        48,
+        43.30127
+       ],
+       [
+        49,
+        41.56922
+       ],
+       [
+        26,
+        1.73205
+       ],
+       [
+        24,
+        1.73205
+       ],
+       [
+        1,
+        41.56922
+       ]
+      ],
+      null,
+      {
+       "closed": true
+      }
+     ]
+    },
+    "ok": true,
+    "exec_ms": 890.1,
+    "result_chars": 2000,
+    "effects": [
+     {
+      "kind": "commit",
+      "change_set": "cs_…",
+      "revision": 2,
+      "design": "Two triangles"
+     }
+    ],
+    "page": {
+     "action": "studio",
+     "ms": 885.3,
+     "ok": true,
+     "verb": "sketchDraw"
+    }
+   },
+   {
+    "i": 18,
+    "op": "think",
+    "t": 22.762,
+    "ms": 4791,
+    "machine": "M",
+    "memory": 28328,
+    "blocks": {
+     "thinking": 1,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 19,
+    "op": "say",
+    "t": 25.363,
+    "ms": 0,
+    "machine": "-",
+    "text": "The large triangle is a 144-site closed loop, no problems. Now the 24 docks, placed evenly one unit inside the sides — these trace your smaller triangle."
+   },
+   {
+    "i": 20,
+    "op": "call",
+    "t": 27.553,
+    "ms": 161,
+    "machine": "T",
+    "tool": "qccd_apply_change_set",
+    "args": {
+     "expected_revision": 2,
+     "request_id": "add-docks-24-1",
+     "mode": "apply",
+     "operations": [
+      {
+       "type": "add_docks",
+       "count": 24
+      }
+     ],
+     "origin_prompt_id": "<the request>",
+     "summary": "Add 24 docks inside the triangle loop (the smaller triangle)"
+    },
+    "ok": true,
+    "exec_ms": 142.4,
+    "result_chars": 4135,
+    "effects": [
+     {
+      "kind": "commit",
+      "change_set": "cs_…",
+      "revision": 3,
+      "design": "Two triangles"
+     }
+    ]
+   },
+   {
+    "i": 21,
+    "op": "think",
+    "t": 27.714,
+    "ms": 9817,
+    "machine": "M",
+    "memory": 30741,
+    "blocks": {
+     "thinking": 1,
+     "say": 1,
+     "call": 1
+    }
+   },
+   {
+    "i": 22,
+    "op": "say",
+    "t": 36.398,
+    "ms": 0,
+    "machine": "-",
+    "text": "The design is complete: a 144-site triangular loop with 24 docks tracing the inner triangle, no problems reported. This is the measured known-good BB geometry. Submitting to the BB board now."
+   },
+   {
+    "i": 23,
+    "op": "call",
+    "t": 37.531,
+    "ms": 41,
+    "machine": "T",
+    "tool": "qccd_submit_local",
+    "args": {
+     "design": "Two triangles",
+     "board": "BB [[144,12,12]]",
+     "origin_prompt_id": "<the request>",
+     "request_id": "submit-two-triangles-bb-1"
+    },
+    "ok": true,
+    "exec_ms": 14.6,
+    "result_chars": 452,
+    "effects": [
+     {
+      "kind": "job",
+      "job": "job_…",
+      "tool": "qccd_submit_local",
+      "status": "queued"
+     }
+    ]
+   },
+   {
+    "i": 24,
+    "op": "think",
+    "t": 37.572,
+    "ms": 4692,
+    "machine": "M",
+    "memory": 31396,
+    "blocks": {
+     "thinking": 0,
+     "say": 0,
+     "call": 1
+    }
+   },
+   {
+    "i": 25,
+    "op": "call",
+    "t": 42.264,
+    "ms": 14734,
+    "machine": "T",
+    "tool": "qccd_get_job",
+    "args": {
+     "job_id": "job_…",
+     "wait_s": 50
+    },
+    "ok": true,
+    "exec_ms": 14772.6,
+    "result_chars": 1141,
+    "effects": [
+     {
+      "kind": "poll",
+      "job": "job_…",
+      "status": "succeeded",
+      "stage": "freeze"
+     }
+    ]
+   },
+   {
+    "i": 26,
+    "op": "think",
+    "t": 56.998,
+    "ms": 6794,
+    "machine": "M",
+    "memory": 32029,
+    "blocks": {
+     "thinking": 0,
+     "say": 1,
+     "call": 0
+    }
+   },
+   {
+    "i": 27,
+    "op": "say",
+    "t": 63.792,
+    "ms": 0,
+    "machine": "-",
+    "text": "Done — your **\"Two triangles\"** design is built and graded **ELIGIBLE** on the BB [[144,12,12]] board (all reference checks passed, Lean included).\n\n**What I built**\n- **Large triangle** → one closed loop of 144 sites (its corners cut to 120° so it clears the 60° geometry rule while still reading as a triangle).\n- **Smaller triangle** → 24 docks placed evenly one unit inside the sides. They can't be a second separate loop, because the conveyor drives only one loop and two uncoupled loops would never let their qubits interact — so the inner triangle serves as the gate/parking docks instead.\n\n**Result (local, not published):**\n- **T_jones: 496.84 ms** per round (the ranked metric — beats the 522 ms reference ring)\n- T_transport: 397.25 ms · instructions: 5066 · dacs: 46 · ions/instruction: 1.67\n\nThe submission card in your chat shows the verdict. This result is local only — let me know if you'd like to publish it, and I'll show you exactly what would be uploaded first."
+   },
+   {
+    "i": 28,
+    "op": "end",
+    "t": 63.814,
+    "ms": 0,
+    "machine": "-",
+    "status": "success",
+    "duration_ms": 63765,
+    "api_ms": 48101,
+    "model_calls": 10,
+    "cost_usd": 0.4772685
+   }
+  ],
+  "harness": "[QCCD Studio] The user sent a request from Studio: prompt <the request> v1 (workspace ws_…, branch main, design revision 0, intent apply_change, mode apply).\nUser's words (verbatim):\n> I want to make a new design, which has a large triangle and a smaller triangle, and then submit this design to BBCode\nThe person is in Studio. qccd_page_read and qccd_page_act reach its controls too (the transport, the panels, the lessons).\nTo design a device (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.\nNow: the person's Studio shows the design \"Main design\" at revision 0 (the current design; a change set without a design goes to it). Their other designs: none. The boards: BB [[144,12,12]]; Repetition code, distance 9; Five-qubit code [[5,1,3]]; Steane code [[7,1,3]]; Surface code, distance 3 (17 qubits); GHZ state on four qubits (starter).\nAnchored to: workspace\nThe frozen context (snapshot ctx_d4fe92a9366f) holds nothing beyond this message: no selection, region, sketch or demonstration, so there is no need to read it. qccd_get_context has more (protected parts, jobs, diagnostics) when you need it.\nMode apply: you may commit validated changes to main.\nThis is a chat: your messages in this turn are shown to the person in Studio as the conversation. Answer there directly and plainly, like a colleague; do not also post qccd_manage_comment replies for it. Pass origin_prompt_id='<the request>' on change sets, jobs and runs. (delivery dlv_beee69616090)"
+ }
+}

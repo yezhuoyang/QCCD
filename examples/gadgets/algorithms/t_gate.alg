@@ -9,9 +9,17 @@
 #
 # Every one of the four outcome branches is signed off separately, and each must implement
 # the same channel from the magic block's state to q0.
+#
+# The factory makes T-dagger|+> (msf15's own state-vector check), and gate teleportation
+# with this correction table needs T|+>: X-bar on the magic block turns one into the other
+# (X T-dagger|+> is T|+> up to a phase), and costs nothing -- it is a line in the archive.
+# Without it every branch was T-dagger or S T, never T: the flat sign-off cannot see that,
+# because it treats the injected state as a free input; checking the gate's contract does,
+# and the standard gates' `t` is this program.
 title A logical T by teleportation, with the S correction only when needed
 prep   q0 X
 inject t
+x      t           # the factory's T-dagger|+> becomes T|+>, in software
 zz     q0 t -> m
 read   t X   -> k
 decode             # both corrections read an outcome: decode them first

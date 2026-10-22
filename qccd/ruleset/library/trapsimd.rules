@@ -1,0 +1,7 @@
+# Ruan et al. 2025: TrapSIMD.
+
+ruleset "trapsimd"
+title "TrapSIMD's rules"
+about "Transport between traps is broadcast: every such move of a cycle starts and ends together and is one class of move, and cycles never overlap; one ion per position, so no chain order is tracked; a junction holds one ion at a time; the two-ion gate acts on ions in a gate zone and a neighbouring one; every operation lasts what the paper's timing table says; each qubit's gates run in the circuit's order, except that consecutive CNOTs in which it plays the same role may run in any order. The paper's replay also checks its own model's control limits (which shifts and swaps a cycle may combine), beside these."
+
+use R0, R1, R2, R8, R24, R26, R29, R31, R33

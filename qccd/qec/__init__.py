@@ -54,7 +54,7 @@ __all__ = [
 REPORT_KIND = "qccd.ler_report"
 
 _REPO = Path(__file__).resolve().parents[2]
-_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s")
+_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s", "bp_max_iter")
 
 
 def tool_versions() -> dict[str, str | None]:
@@ -171,14 +171,16 @@ def _reason(log: str) -> str:
 
 
 def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
-                       timeout: float = 600.0, mode: str = "auto") -> tuple[Path, Path]:
+                       timeout: float = 600.0, mode: str = "auto",
+                       table: str = "qccdsim_jones") -> tuple[Path, Path]:
     """Compile `qasm_text` for `arch` with qccdc, then insert cooling: (program, certificate).
 
     `arch` is a path to an `.arch.json`, its parsed document, or an `Architecture`.
     `mode` is qccdc's verb:
     "compile" (place, route; falls back to rigid rotation by itself), "rotate", or "auto",
     which is what the workspace's compile job does -- rotate first on a device with a
-    closed loop, else compile.  The program returned is the cooled one when `cool`.
+    closed loop, else compile.  The program returned is the cooled one when `cool`, cooled
+    under the heating of the operating-point `table` (the board's rank table).
     A `compile.json` beside the outputs records the mode used, the timings and the log.
     """
     work = Path(workdir)
@@ -249,7 +251,8 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
     if cool:
         cooled = work / "prog.cooled.tsir.json"
         cooled.unlink(missing_ok=True)
-        co = run([python, bridge / "insert_cooling.py", tsir, "--arch", arch_path, "-o", cooled],
+        co = run([python, bridge / "insert_cooling.py", tsir, "--arch", arch_path, "-o", cooled,
+                  "--table", table],
                  "insert_cooling")
         if co.returncode or not cooled.exists():
             raise CompileFailed("crash", "insert_cooling failed", (co.stdout + co.stderr)[-4000:])

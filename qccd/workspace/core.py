@@ -35,7 +35,8 @@ from .design import (DesignRefused, DesignState, Replayed, base_from_arch, diff_
 from .jsonsafe import canonical_text, digest
 from .operations import OperationError, compile_operations, describe_operations
 from .store import Store, dumps, loads
-from .tasks import DEFAULT_BOARD, LOCK_NAME, TaskRelease, find_release, physics_mismatch, read_lock, write_lock
+from .tasks import (DEFAULT_BOARD, LOCK_NAME, TaskRelease, board_device, find_release, physics_mismatch,
+                    read_lock, write_lock)
 
 __all__ = ["WorkspaceCore", "WorkspaceError", "new_id", "CONTRACT_VERSION"]
 
@@ -522,7 +523,7 @@ class WorkspaceCore:
                 out["program"] = {"ok": True, "instructions": len(prog)}
             except Exception as exc:
                 out["program"] = {"ok": False, "message": str(exc)}
-        mism = physics_mismatch(r.arch_doc or {}, self.release)
+        mism = physics_mismatch(board_device(r.arch_doc or {}, self.release), self.release)
         out["physics"] = {"matches_release": not mism, "changed_blocks": mism,
                           "mode": "task" if not mism else "exploratory"}
         out["warnings"] = out["warnings"][:limit]

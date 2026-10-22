@@ -10,7 +10,7 @@ Design a machine · compile a circuit for it · prove the result runs · derive 
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![dependencies](https://img.shields.io/badge/dependencies-none-lightgrey.svg)](#install)
 [![rules](https://img.shields.io/badge/hardware%20rules-23-1e2761.svg)](docs/rules.md)
-[![verified](https://img.shields.io/badge/R10-proved%20in%20Lean%204-e4572e.svg)](Compiler/)
+[![verified](https://img.shields.io/badge/R10-Lean%20checker%20%2B%20tableau-e4572e.svg)](Compiler/)
 
 </div>
 
@@ -86,7 +86,7 @@ The same circuit on the same twelve traps, wired as a loop instead of a lattice:
 | transport instructions | **5** | 22 |
 | cost | **15** | 33 |
 | runtime | **2.045 ms** | 2.615 ms |
-| R10, by the proved Lean checker | **passed** | **passed** |
+| R10, by the proved Lean checker and the tableau | **passed** | **passed** |
 
 **1.28× faster on identical hardware budget**, and the reason is one row: a lattice gates
 where the ions already are; a ring has four gate zones and must carry every pair to one.
@@ -107,7 +107,7 @@ closed form, GDSII and SVG from one shape table.
 
 | | |
 |---|---|
-| **R10 is no longer skipped** | *"the compiled program implements the input circuit"* shipped as unchecked, for a stated reason: it needs symbolic permutation and Pauli-frame tracking against a QASM DAG. It is now **decided by a checker proved in Lean 4** — 31 theorems, no `sorry` — plus a stabilizer-tableau check of the emitted pulses. [How](Compiler/README.md) |
+| **R10 is no longer skipped** | *"the compiled program implements the input circuit"* shipped as unchecked, for a stated reason: it needs symbolic permutation and Pauli-frame tracking against a QASM DAG. It is now decided in two halves: a **checker proved in Lean 4** — 23 theorems, no `sorry`, propext the only axiom — that the certificate's transport is legal and brings each gate's own ions together, once and in order; and a stabilizer-tableau check of the emitted pulses, executable and not proved, which is the only one to see which gate fires. [How](Compiler/README.md) |
 | **72 of 81 verified, 0 defects** | nine circuits × nine architectures, compiled, all rules passing, R10 passed. The nine out of reach decline loudly rather than emitting something illegal. |
 | **`BB [[144,12,12]]` compiles** | the individual-ion router stops at 46.2% loop occupancy and the round needs 53.8%. Rigid rotation moves every ion with one instruction: **776 ion-hops** against the shipped pipeline's 2,672. |
 | **The shipped artifact reproduces exactly** | 397,184 cost / 8,808 steps, all rules pass — the oracle everything else is measured against. |

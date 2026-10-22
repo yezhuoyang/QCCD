@@ -18,6 +18,7 @@ from .replay import CycleRecord, ReplayError, ReplayResult, replay
 from .rules import (
     CYCLE_RULES,
     architecture_violations,
+    geometry_violations,
     concurrency_violations,
     CycleView,
     ResolvedMove,
@@ -40,6 +41,7 @@ __all__ = [
     "Violation",
     "architecture_violations",
     "concurrency_violations",
+    "geometry_violations",
     "replay",
     "rule_statements",
     "verify",
@@ -56,7 +58,7 @@ UNCHECKABLE: Mapping[str, str] = {
 }
 
 #: Rules checked outside the per-cycle loop, so `only_rules` may legitimately name them.
-PROGRAM_RULES = ("R9", "R7c", "R18")
+PROGRAM_RULES = ("R9", "R7c", "R18", "R19", "R20", "R21")
 
 PARTIAL: Mapping[str, str] = {
     "R15": (
@@ -261,6 +263,13 @@ def verify(
         rules.skipped[unknown] = "no per-cycle check is implemented for this rule"
     if only_rules is None or "R11" in only_rules:
         rules.extend(architecture_violations(arch))
+    # The geometry rules read the document alone, so they run whenever any of them is asked.
+    # They were written (2026-09-14) and judged by the Studio and the boards, but never called
+    # from here, so the grader passed a device whose rails meet at 23.6 degrees (#21).
+    geometry = {"R19", "R20", "R21"} if only_rules is None else {"R19", "R20", "R21"} & set(only_rules)
+    if geometry:
+        rules.extend([v for v in geometry_violations(arch) if v.rule in geometry])
+        rules.checked |= geometry
     if only_rules is None or "R4" in only_rules:
         rules.extend(concurrency_violations(arch, prog))
     metrics: dict = {}

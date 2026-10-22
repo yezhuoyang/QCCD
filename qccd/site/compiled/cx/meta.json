@@ -1,0 +1,17 @@
+{
+ "id": "cx",
+ "title": "cx",
+ "note": "the entangler: carry one ion to the other, then one two-ion pulse with four single-ion pulses around it",
+ "compiler": "1 layers, 2 transport cycles, 4 beams, 1 MS, 0 virtual-Z, 9 instructions",
+ "device": "grid2x3",
+ "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",
+ "notes": [
+  "seeded q0 (weight 1) at T0_1h",
+  "candidates: greedy 1, spectral 1 -> greedy",
+  "weighted interaction distance 1 over 1 distinct pairs"
+ ],
+ "regime": "broadcast-free",
+ "n_qubits": 2,
+ "compile_seconds": 0.05,
+ "check_seconds": 1.1
+}

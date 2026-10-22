@@ -55,7 +55,8 @@ def test_every_level_of_the_hierarchy_draws(walked):
     assert by_path["r0.p0"]["crumbs"].replace(" ", "").endswith("r0›p0")
     mem = by_path["r0.p0.t0.mem"]
     assert mem["heading"].startswith("mem")
-    assert "memory leaf" in mem["what"]
+    # the beta's memory is a Logical Memory too: a block kept and cycled in place
+    assert "memory leaf" in mem["what"] or "Logical Memory" in mem["what"]
     assert mem["step"] == "" or "instruction" in mem["step"]
     for lv in seen["levels"]:
         assert lv["ms"] < 250, lv
@@ -110,7 +111,7 @@ def test_a_verified_algorithm_page_draws_every_category_its_own_way(verified):
     _, seen = verified
     assert seen["ready"] and seen["errors"] == []
     town = seen["town"]
-    assert town["distinct"] == town["categories"] == 13          # one silhouette each
+    assert town["distinct"] == town["categories"] == 14          # one silhouette each
     assert "Lattice Surgery" in town["legend"] and "Logical Preparation" in town["legend"]
     # the classical half is on the map too, and the bus is in the legend
     assert {"Decoder", "Classical Memory", "Classical Data Bus"} <= set(town["legend"])

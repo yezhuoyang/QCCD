@@ -69,57 +69,66 @@ let class_named (a : Arch.t) ~(orbit : string) ~(delta : int option)
   in
   match List.find_opt ok a.classes with Some c -> c.cid | None -> fallback
 
-(* Does this device rotate, and where are its docks? *)
+(* Does this loop rotate, and where are its docks? *)
+let of_loop (a : Arch.t) (l : Arch.loop) : t option =
+  let nodes = Array.of_list l.nodes in
+  let n = Array.length nodes in
+  let index = Hashtbl.create n in
+  Array.iteri (fun i s -> Hashtbl.replace index s i) nodes;
+  (* a dock: gate-capable, off the loop, one segment from a loop slot *)
+  let docks =
+    List.filter_map
+      (fun (sg : Arch.segment) ->
+        let pick rail other =
+          match (Hashtbl.find_opt index rail, Hashtbl.find_opt index other) with
+          | Some ri, None -> (
+            match Arch.node a other with
+            | Some nd when nd.can_gate && nd.kind = "site" ->
+              Some { site = other; rail; rail_idx = ri; spur = sg.sid }
+            | _ -> None)
+          | _ -> None
+        in
+        match pick sg.a sg.b with Some d -> Some d | None -> pick sg.b sg.a)
+      a.segments
+    |> List.sort_uniq compare
+    |> Array.of_list
+  in
+  if Array.length docks = 0 then None
+  else
+    Some
+      {
+        loop = l.lid;
+        nodes;
+        index;
+        docks;
+        n;
+        cw = class_named a ~orbit:l.lid ~delta:(Some 1) ~direction:None ~fallback:"shuttle";
+        ccw =
+          class_named a ~orbit:l.lid ~delta:(Some (-1)) ~direction:None ~fallback:"shuttle";
+        dock_cls =
+          class_named a ~orbit:"spurs" ~delta:None ~direction:(Some "inward")
+            ~fallback:"shuttle";
+        undock_cls =
+          class_named a ~orbit:"spurs" ~delta:None ~direction:(Some "outward")
+            ~fallback:"shuttle";
+        rail_segs =
+          List.filter_map
+            (fun (sg : Arch.segment) ->
+              if sg.loop = Some l.lid then Some sg.sid else None)
+            a.segments;
+      }
+
+(* Does this device rotate, and where are its docks?  The first closed loop that HAS docks,
+   in the device's canonical order (`Arch.of_json`).  It used to be the first closed loop in
+   the file, docks or not: on `dual144_c24` the docked loop `D` is listed before the bare
+   loop `A`, so rotation applied -- and the same device with its loops listed the other way
+   round had "no closed loop with docks".  Which loop rotates is a property of the device,
+   so the loops are tried in an order the file cannot choose, and one without docks is
+   passed over rather than taken as the answer. *)
 let detect (a : Arch.t) : t option =
-  match List.find_opt (fun (l : Arch.loop) -> l.closed && List.length l.nodes >= 4) a.loops with
-  | None -> None
-  | Some l ->
-    let nodes = Array.of_list l.nodes in
-    let n = Array.length nodes in
-    let index = Hashtbl.create n in
-    Array.iteri (fun i s -> Hashtbl.replace index s i) nodes;
-    (* a dock: gate-capable, off the loop, one segment from a loop slot *)
-    let docks =
-      List.filter_map
-        (fun (sg : Arch.segment) ->
-          let pick rail other =
-            match (Hashtbl.find_opt index rail, Hashtbl.find_opt index other) with
-            | Some ri, None -> (
-              match Arch.node a other with
-              | Some nd when nd.can_gate && nd.kind = "site" ->
-                Some { site = other; rail; rail_idx = ri; spur = sg.sid }
-              | _ -> None)
-            | _ -> None
-          in
-          match pick sg.a sg.b with Some d -> Some d | None -> pick sg.b sg.a)
-        a.segments
-      |> List.sort_uniq compare
-      |> Array.of_list
-    in
-    if Array.length docks = 0 then None
-    else
-      Some
-        {
-          loop = l.lid;
-          nodes;
-          index;
-          docks;
-          n;
-          cw = class_named a ~orbit:l.lid ~delta:(Some 1) ~direction:None ~fallback:"shuttle";
-          ccw =
-            class_named a ~orbit:l.lid ~delta:(Some (-1)) ~direction:None ~fallback:"shuttle";
-          dock_cls =
-            class_named a ~orbit:"spurs" ~delta:None ~direction:(Some "inward")
-              ~fallback:"shuttle";
-          undock_cls =
-            class_named a ~orbit:"spurs" ~delta:None ~direction:(Some "outward")
-              ~fallback:"shuttle";
-          rail_segs =
-            List.filter_map
-              (fun (sg : Arch.segment) ->
-                if sg.loop = Some l.lid then Some sg.sid else None)
-              a.segments;
-        }
+  List.find_map
+    (fun (l : Arch.loop) -> if l.closed && List.length l.nodes >= 4 then of_loop a l else None)
+    a.loops
 
 (* ------------------------------------------------------------------ geometry *)
 

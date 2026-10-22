@@ -1,0 +1,135 @@
+/* The book: a document page (the site's STYLE) whose code blocks are Lean the reader edits. */
+main{max-width:980px}
+.crumbs{font:13px var(--sans);color:var(--ink3);margin:0 0 6px}
+.crumbs a{color:var(--ink2);text-decoration:none}
+.sub{font:15px var(--sans);color:var(--ink2);margin-top:-6px}
+
+/* Lean's status, pinned to the top of the sheet while the reader scrolls */
+#leanbar{position:sticky;top:44px;z-index:20;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  font:13px var(--sans);color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:7px 12px;margin:10px 0 18px;box-shadow:0 1px 2px rgba(18,16,28,.05)}
+#leanbar .dot{width:9px;height:9px;border-radius:50%;background:#c9c6bd;flex:none}
+#leanbar[data-state="ready"] .dot{background:#2f8f5b}
+#leanbar[data-state="busy"] .dot{background:#d29b2a}
+#leanbar[data-state="failed"] .dot{background:#c0392b}
+#leanbar .prog{color:var(--ink3)}
+#leanbar .score{margin-left:auto;font-weight:600;color:var(--head)}
+
+/* prose */
+.prose h1{margin-top:0}
+.prose table.tbl{border-collapse:collapse;margin:10px 0 16px;font:14px var(--sans)}
+.prose table.tbl th,.prose table.tbl td{border:1px solid var(--line);padding:5px 10px;text-align:left;vertical-align:top}
+.prose table.tbl th{background:var(--card)}
+.prose pre.static{background:var(--card);border-left:3px solid var(--line);padding:10px 14px;overflow:auto;
+  font:13.5px/1.45 var(--mono);border-radius:6px}
+h4.exercise{font:600 15px var(--sans);color:var(--head);margin:26px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h4.exercise .stars{color:#c48a12;letter-spacing:1px}
+.exstate{font:600 11.5px var(--sans);text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:99px;
+  background:#efeee9;color:var(--ink3)}
+.exstate[data-s="solved"]{background:#e2f3e8;color:#1d6b40}
+.exstate[data-s="error"],.exstate[data-s="changed"],.exstate[data-s="untrusted"]{background:#fbe7e4;color:#9b2c1f}
+
+/* a Lean cell: a textarea over its own highlighted copy, so the reader edits real text */
+.cell{position:relative;margin:8px 0 14px}
+.cell[data-hidden],.cell[data-setup]{display:none}
+.cell .ed{position:relative;border:1px solid var(--line);border-left:3px solid #c9c6bd;border-radius:8px;background:#fcfcfa}
+.cell[data-ex] .ed{border-left-color:#c48a12}
+.cell.solved .ed{border-left-color:#2f8f5b}
+.cell.bad .ed{border-left-color:#c0392b}
+.cell pre.hl,.cell textarea{margin:0;padding:10px 12px;font:13.5px/1.5 var(--mono);white-space:pre;tab-size:2;
+  overflow:hidden;border:0;box-sizing:border-box;width:100%}
+.cell pre.hl{position:absolute;inset:0;pointer-events:none;color:var(--ink)}
+.cell textarea{position:relative;display:block;resize:none;background:transparent;color:transparent;
+  caret-color:var(--ink);outline:none;overflow-x:auto;min-height:2.6em}
+.cell textarea::selection{background:rgba(31,91,181,.18);color:transparent}
+.cell textarea:focus{box-shadow:0 0 0 2px var(--soft) inset}
+.cell .tools{position:absolute;top:4px;right:6px;display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.cell:hover .tools,.cell:focus-within .tools{opacity:1}
+.cell .tools button{font:12px var(--sans);border:1px solid var(--line);background:var(--paper);border-radius:6px;
+  padding:2px 8px;color:var(--ink2);cursor:pointer}
+.hl .k{color:#7b2fb5;font-weight:600}.hl .c{color:#8a8892;font-style:italic}.hl .s{color:#1d6b40}
+.hl .n{color:#a35a00}.hl .t{color:#1f5bb5}
+
+/* messages under a cell, each with its line inside the cell */
+.msgs{margin:4px 0 0;font:13px/1.45 var(--sans)}
+.msg{display:flex;gap:8px;align-items:flex-start;padding:5px 9px;border-radius:6px;margin:3px 0;background:#f4f3ef}
+.msg .ln{font:12px var(--mono);color:var(--ink3);flex:none;min-width:2.6em}
+.msg pre{margin:0;white-space:pre-wrap;font:12.5px/1.45 var(--mono);color:var(--ink);
+  background:none;border:0;padding:0;box-shadow:none;border-radius:0}
+.msg.error{background:#fbe7e4}.msg.warning{background:#fbf1dc}
+.msg.info pre{color:#2b2a33}
+
+/* goals at the cursor */
+#goals{position:fixed;right:18px;bottom:18px;width:min(420px,calc(100vw - 36px));max-height:42vh;overflow:auto;
+  background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:30}
+#goals .gh{font:600 12.5px var(--sans);color:var(--ink2);padding:8px 12px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:var(--paper)}
+#goals pre{margin:0;padding:10px 12px;font:12.5px/1.5 var(--mono);white-space:pre-wrap}
+
+/* the certificates panel */
+.certs{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px 14px;margin:10px 0 18px}
+.certs .row{display:grid;grid-template-columns:7.5em 1fr auto auto;gap:10px;align-items:center;padding:5px 0;
+  border-top:1px solid var(--line);font:13.5px var(--sans)}
+.certs .row:first-of-type{border-top:0}
+.certs .row .what{color:var(--ink2)}
+.certs .row a{font-size:12.5px;color:var(--ink2)}
+.certs .row .v{font:600 12.5px var(--sans);min-width:9em;text-align:right}
+.certs .row .v.ok{color:#1d6b40}.certs .row .v.no{color:#9b2c1f}
+.certs .act{display:flex;gap:10px;align-items:center;margin-bottom:6px;font:13px var(--sans);color:var(--ink2)}
+.certs button,.btn{font:600 13px var(--sans);border:1px solid var(--accent);background:var(--accent);color:#fff;
+  border-radius:8px;padding:5px 12px;cursor:pointer}
+.certs button[disabled],.btn[disabled]{opacity:.5;cursor:default}
+
+/* figures: a certificate as Lean replays it, on its device */
+figure.leanfig{margin:12px 0 20px;border:1px solid var(--line);border-radius:12px;background:var(--paper);
+  padding:10px 14px 12px;box-shadow:0 1px 2px rgba(18,16,28,.04)}
+figure.leanfig.stale{opacity:.55}
+figure.leanfig .figwait{font:13px var(--sans);color:var(--ink3);padding:8px 0}
+.fighead{font:13px var(--sans);color:var(--ink2);margin-bottom:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:baseline}
+.fighead b{font-family:var(--mono);color:var(--head)}
+.figverdict{font-weight:600;margin-left:auto}
+.figverdict.ok{color:#1d6b40}.figverdict.bad{color:#9b2c1f}
+.figbody{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.studiobox{flex:1 1 520px;min-width:300px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.studiobox iframe.studio{display:block;width:100%;height:430px;border:0}
+.figside{flex:0 1 300px;min-width:240px}
+.figcirc{display:block;max-width:100%;height:auto;font-family:var(--sans)}
+.studiosays p{font:12.5px/1.45 var(--sans);margin:8px 0 0;padding:6px 9px;border-radius:7px}
+.studiosays p.ok{background:#e2f3e8;color:#1d6b40}.studiosays p.bad{background:#fbe7e4;color:#9b2c1f}
+.figctl{display:flex;gap:6px;align-items:center;margin:8px 0 4px;font:13px var(--sans);color:var(--ink2)}
+.figctl button{font:13px var(--sans);border:1px solid var(--line);background:var(--card);border-radius:6px;
+  min-width:32px;padding:3px 8px;cursor:pointer;color:var(--ink)}
+.figctl input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+.figcyc{min-width:7.5em;text-align:right;font-variant-numeric:tabular-nums}
+.figchecks{margin-top:6px;border-top:1px solid var(--line);padding-top:4px}
+.figrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font:12.5px var(--sans);padding:4px 6px;border-radius:6px;cursor:pointer}
+.figrow:hover{background:var(--card)}
+.figrow.now{background:var(--soft)}
+.figrowt{color:var(--ink);margin-right:4px}
+.chip{font:600 11.5px var(--sans);padding:1px 8px;border-radius:99px}
+.chip.ok{background:#e2f3e8;color:#1d6b40}.chip.bad{background:#fbe7e4;color:#9b2c1f}
+.certs .watch{font:600 12px var(--sans);border:1px solid var(--line);background:var(--paper);color:var(--accent);
+  border-radius:6px;padding:1px 8px;cursor:pointer}
+.certs figure.casefig{margin:6px 0 10px}
+
+/* the book's index */
+.vol{margin:22px 0}
+.vol h2{margin-bottom:4px}
+ul.chapters{list-style:none;padding:0;margin:8px 0}
+ul.chapters li{padding:6px 0;border-top:1px solid var(--line);font:15px var(--sans);display:flex;gap:10px;align-items:baseline}
+ul.chapters .cn{font:13px var(--mono);color:var(--ink3);min-width:2.4em}
+.cstate{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.04em;color:var(--ink3)}
+.cstate.live{color:#1d6b40}
+.cprog{font:12px var(--sans);color:var(--ink2)}
+@media (max-width:640px){.certs .row{grid-template-columns:1fr auto}.certs .row .what,.certs .row a{display:none}
+  #goals{left:12px;right:12px;width:auto}}
+/* the foot of a lesson: the one before, the contents, the one after */
+.lessonnav{display:flex;gap:12px;align-items:baseline;justify-content:space-between;flex-wrap:wrap;
+  margin:30px 0 0;padding-top:12px;border-top:1px solid var(--line);font:14px var(--sans)}
+.lessonnav a{color:var(--accent);text-decoration:none}
+.lessonnav a:hover{text-decoration:underline}
+.lessonnav .prev,.lessonnav .next{flex:1 1 0;min-width:0}
+.lessonnav .next{text-align:right}
+.lessonnav .toc{flex:none;color:var(--ink2);font-size:13px}
+@media (max-width:640px){.lessonnav .prev,.lessonnav .next{flex-basis:100%;text-align:left}}
+.enginenote{font:12.5px/1.5 var(--sans);color:var(--ink3);margin:34px 0 0;border-top:1px solid var(--line);padding-top:10px}

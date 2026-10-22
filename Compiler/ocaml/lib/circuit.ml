@@ -216,7 +216,9 @@ let edges c : (int * int) list =
 
 (* ------------------------------------------------------------------ analysis *)
 
-let two_qubit_ops c = List.filter (fun o -> List.length o.qubits = 2) c.ops
+(* gates only: a two-qubit barrier is a fence, not a two-qubit op *)
+let two_qubit_ops c =
+  List.filter (fun (o : op) -> List.length o.qubits = 2 && o.name <> "barrier") c.ops
 
 (* Is every op in the Clifford fragment?  D1 makes this the gate: inside it, R10 is
    discharged by stabilizer simulation over the whole program; outside it, the compiler

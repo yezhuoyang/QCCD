@@ -19,8 +19,10 @@ from qccd.gadget.logic.flat import sign_off
 from qccd.gadget.place_checks import check_places
 from qccd.gadget.town import town
 
-EXAMPLES = sorted((Path(__file__).resolve().parents[1] / "examples" / "gadgets" / "algorithms")
-                  .glob("*.alg"))
+#: the examples that run on the town (one that names its own floorplan has its own tests)
+EXAMPLES = sorted(f for f in (Path(__file__).resolve().parents[1] / "examples" / "gadgets"
+                              / "algorithms").glob("*.alg")
+                  if "\nfloorplan " not in "\n" + f.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -116,3 +118,22 @@ def test_bad_programs_are_refused_with_the_line():
         with pytest.raises(AlgorithmError) as exc:
             parse_algorithm(src)
         assert why in str(exc.value)
+
+
+def test_an_algorithm_page_writes_its_leaves_without_the_build_machine(leaves, tmp_path):
+    """The algorithm pages write their own leaf files (qccd/gadget/verified.py) and these go
+    on the website as written: each program's provenance log thinned, as qccd/gadget/build.py
+    does, with no absolute `root` and no repository file or quoted source."""
+    import re
+    from qccd.gadget.verified import build_algorithm
+    build_algorithm(parse_algorithm_file(EXAMPLES[0]), out_dir=tmp_path, leaves=leaves, log=None)
+    leaks = re.compile(r"[A-Za-z]:(?:\\\\|\\|/)+Users|/home/|\"root\":|\"file\": \"qccd/|\.py\"")
+    assert leaks.search('{"root": "C:\\\\Users\\\\x", "file": "qccd/compile/cooling.py"}')
+    files = list((tmp_path / "leaf").glob("*.js"))
+    assert files
+    thinned = 0
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        assert not leaks.search(text), f"{f.name}: {leaks.search(text).group(0)}"
+        thinned += text.count('"level": "sites"')
+    assert thinned, "no provenance log was found to thin; the check would pass on anything"

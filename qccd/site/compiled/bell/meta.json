@@ -1,0 +1,17 @@
+{
+ "id": "bell",
+ "title": "A Bell pair",
+ "note": "the worked example: a Hadamard, a CNOT that needs transport, and two measurements",
+ "compiler": "3 layers, 1 transport cycles, 5 beams, 1 MS, 1 virtual-Z, 11 instructions",
+ "device": "chain4",
+ "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
+ "notes": [
+  "seeded q0 (weight 1) at C1",
+  "candidates: greedy 1, spectral 1 -> greedy",
+  "weighted interaction distance 1 over 1 distinct pairs"
+ ],
+ "regime": "conveyor",
+ "n_qubits": 2,
+ "compile_seconds": 0.03,
+ "check_seconds": 1.1
+}

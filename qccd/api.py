@@ -1044,13 +1044,14 @@ class Machine:
         }
 
     def violations(self) -> list:
-        """The architecture-level rule checks (R11/R18), as `Violation` records.
+        """The architecture-level rule checks (R11/R18, and the geometry rules R19-R21),
+        as `Violation` records.
 
         A topology edit is the only thing that can turn these from empty to non-empty
         without touching the program, so an editor calls this after every edit.
         """
-        from .verify.rules import architecture_violations
-        return architecture_violations(self.arch)
+        from .verify.rules import architecture_violations, geometry_violations
+        return architecture_violations(self.arch) + geometry_violations(self.arch)
 
     def only_zones(self, *names: str) -> "Machine":
         """Drop every zone type not named -- a template's leftovers."""

@@ -1,46 +1,62 @@
 {
   "qccdc_cli": {
-    "version": "c7c535380bfb",
+    "version": "b4a003dbb4ae",
     "source": {
       "repository": "https://github.com/yezhuoyang/QCCD",
-      "commit": "e86ac3fcf21a5a22adf38de315decc325cb835e3",
+      "commit": "f341f63186cb53f37781880426d6312c77d44016",
       "path": "Compiler/ocaml",
-      "tree": "c7c535380bfb6dbf14a16e9b95a3e16986e142a9"
+      "tree": "b4a003dbb4ae301758033249399a50f7439b4132"
     },
-    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3, the macOS one on a Mac in an opam switch made with MACOSX_DEPLOYMENT_TARGET=11.0 (minos 11.0), gzipped (deploy/toolchain/README.md)",
+    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3 (deploy/toolchain/Dockerfile.linux), the macOS one on a Mac in an opam switch made with MACOSX_DEPLOYMENT_TARGET=11.0 (minos 11.0), gzipped (deploy/toolchain/README.md)",
     "assets": {
       "windows-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/c7c535380bfb/qccdc_cli-windows-x86_64.exe",
-        "bytes": 5443165,
-        "sha256": "68b1ba824008979c16d98d20bcfe893b165cc33129bac8c4b0f086bbf22842b2"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-windows-x86_64.exe",
+        "bytes": 5501327,
+        "sha256": "25fd38b107a70eaf88837b4b097014f6d829ebb79315737789b2073980b9693f"
       },
       "linux-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/c7c535380bfb/qccdc_cli-linux-x86_64",
-        "bytes": 4957384,
-        "sha256": "01c23f4f1369764fef261f7b442a54f58d4f18131b7793085dde24f23e082b7d"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-linux-x86_64",
+        "bytes": 5036952,
+        "sha256": "da01cc037f6a0cdc7a293107b3c6fce4e9b60fbebc66683d285668be7c09f16d"
+      },
+      "macos-arm64": {
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-macos-arm64.gz",
+        "encoding": "gzip",
+        "bytes": 983698,
+        "sha256": "f201b6b137ae4cdfa09a600801ec3235300db2024aa45771fac120ab5c26e821",
+        "unpacked_bytes": 2855776,
+        "unpacked_sha256": "b2c597670256eec28a592f1c35dd6c5ca76b48d8431af97065658f183a69c9d6"
       }
     }
   },
   "qcheck": {
-    "version": "bb1c1e19bded",
+    "version": "e8acd6640fd3",
     "source": {
       "repository": "https://github.com/yezhuoyang/QCCD",
       "paths": {
-        "Compiler/lean/Main.lean": "68e770fb50454f279dfb8f0641f3a92a310a9ab5",
-        "Compiler/lean/QCCDC/Cert": "a0ec4039d4a2311613a75b27ff0346764adae3b5",
+        "Compiler/lean/Main.lean": "499cff360899246b1c7a3c3aa7d89997a1fe3b5f",
+        "Compiler/lean/QCCDC/Cert": "88ebfa5560a5c8a0f45be85290c824b36b4ab07c",
         "Compiler/lean/lean-toolchain": "05f548c1590e2e3324bb0c5158d3725682df2a81",
         "Compiler/lean/checker/lakefile.toml": "6cf4e425c1be91c1aa331d6b2679f4a3fc349b62"
       }
     },
-    "build": "Lean leanprover/lean4:v4.29.0-rc2: lake build in Compiler/lean/checker (no Mathlib), MACOSX_DEPLOYMENT_TARGET=11.0, strip -x, ad-hoc signed, gzipped (deploy/toolchain/README.md)",
+    "build": "Lean leanprover/lean4:v4.29.0-rc2: lake build in Compiler/lean/checker (no Mathlib), from git archive 1f80ea8bfd; Windows natively, Linux in deploy/toolchain/Dockerfile.qcheck-linux (debian:12-slim; runs on Debian 12 and Ubuntu 22.04); gzipped. No macOS build of this version yet: on a Mac, `qccd toolchain build-checker` (deploy/toolchain/README.md)",
     "assets": {
-      "macos-arm64": {
-        "url": "https://qccd.academy/downloads/toolchain/qcheck/bb1c1e19bded/qcheck-macos-arm64.gz",
+      "windows-x86_64": {
+        "url": "https://qccd.academy/downloads/toolchain/qcheck/e8acd6640fd3/qcheck-windows-x86_64.exe.gz",
         "encoding": "gzip",
-        "bytes": 36826241,
-        "sha256": "5b1fc39b3f0b8d4f54fd73280b3ee95e3b7c161a8ea5f551854f6dc12d653b75",
-        "unpacked_bytes": 105196544,
-        "unpacked_sha256": "6982cfc5cedef9544814d727229b06fecfd92211c67d9711164a0384857588d9"
+        "bytes": 43034370,
+        "sha256": "303b07cd036455e1ac99a6a4ec380dcef145c5a8bf44001a4778b652e3338e41",
+        "unpacked_bytes": 140663808,
+        "unpacked_sha256": "8e962ac288401298ae1302d5be3820dd7f38967c918efa35640d758ef4110d5f"
+      },
+      "linux-x86_64": {
+        "url": "https://qccd.academy/downloads/toolchain/qcheck/e8acd6640fd3/qcheck-linux-x86_64.gz",
+        "encoding": "gzip",
+        "bytes": 44253570,
+        "sha256": "8ce37e113b654d0942fbc117976b5ae30c2e53297513c6f824d65698fb80f3f5",
+        "unpacked_bytes": 147378488,
+        "unpacked_sha256": "c18484bd7b807ed63edacfe61be87143729ee188fe6cddcbede6bdcec34c050e"
       }
     }
   }

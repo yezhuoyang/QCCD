@@ -1,11 +1,17 @@
 /-
 # Soundness, and what it does and does not say
 
-`check_sound` is the theorem R10 rests on.  It is short, and that is the design: `check`
-is defined as `decide (Implements inp)`, so soundness is `of_decide_eq_true` and every
-substantive question has been moved into whether `Implements` says the right thing --
-which a reader can settle by reading `Check.lean`, rather than by auditing a pile of
-`Bool`s against a meaning asserted elsewhere.
+`check_sound` is the theorem the transport-and-order half of R10 rests on.  It is short,
+and that is the design: `check` is defined as `decide (Implements inp)`, so soundness is
+`of_decide_eq_true` and every substantive question has been moved into whether
+`Implements` says the right thing -- which a reader can settle by reading `Check.lean`,
+rather than by auditing a pile of `Bool`s against a meaning asserted elsewhere.
+
+What it does not say is that the program applies the circuit's gates.  `Implements` is
+about the certificate -- mapping, transport, co-location of each op's own ions, order -- and
+a witness names no gate.  Which gate fires is the other half of R10: `bridge/check_cert.py`
+composes the emitted pulses and compares them with the source circuit, and that comparison
+is computed, not proved here.
 
 What follows the main theorem is more useful than the main theorem: the *rejection*
 lemmas.  A checker is only worth running if a wrong certificate fails it, so each named
@@ -17,12 +23,13 @@ import QCCDC.Cert.Check
 
 namespace QCCDC.Cert
 
-/-- **The soundness theorem.**  If the checker accepts, the compiled program implements
-the circuit -- in the sense `Implements` spells out. -/
+/-- **The soundness theorem.**  If the checker accepts, `Implements` holds: the compiled
+program follows its certificate in mapping, transport, co-location of each op's own ions,
+and order.  Which gates it applies is not part of that (see the header). -/
 theorem check_sound {inp : Input} (h : check inp = true) : Implements inp :=
   of_decide_eq_true h
 
-/-- And the converse: the checker accepts everything that does implement the circuit, so
+/-- And the converse: the checker accepts every certificate that satisfies `Implements`, so
 a rejection is always a real defect and never a limitation of the check. -/
 theorem check_complete {inp : Input} (h : Implements inp) : check inp = true :=
   decide_eq_true h
@@ -46,13 +53,22 @@ theorem rejects_aliased_qubits {inp : Input} (h : ¬ MapInjective inp) :
     check inp = false :=
   decide_eq_false fun himp => h himp.2.1
 
-/-- A gate whose operands are not both in the trap the witness names is never accepted.
+/-- A witness naming an ion that is not in the trap the witness names is never accepted.
 This is the co-location obligation, O1, and it is checked against the REPLAYED positions
-rather than against anything the certificate claims about them. -/
+rather than against anything the certificate claims about them.  The ions are the ones the
+witness names; `rejects_foreign_ions` is what makes them its op's operands. -/
 theorem rejects_not_colocated {inp : Input} {g : GateW} (hg : g ∈ inp.gates)
     {i : String} (hi : i ∈ g.ions) (h : look (posAt inp g.t) i ≠ some g.site) :
     check inp = false :=
   decide_eq_false fun himp => h ((himp.2.2.2.2.2.2.1 g hg).2 i hi)
+
+/-- A witness that names other ions than the ones its op's qubits are mapped to is never
+accepted -- two other ions that happen to stand together in a gate-capable trap, one ion
+too many or too few, or the right ions with one of them twice.  Only the order is free. -/
+theorem rejects_foreign_ions {inp : Input} {g : GateW} (hg : g ∈ inp.gates)
+    {o : Op} (ho : o ∈ inp.ops) (hi : o.idx = g.dag)
+    (h : ¬ (g.ions.map some).Perm (o.qubits.map (ionOf inp))) : check inp = false :=
+  decide_eq_false fun himp => h (himp.2.2.2.2.2.2.2.1 g hg o ho hi)
 
 /-- A gate placed in a trap that cannot gate is never accepted. -/
 theorem rejects_ungateable_site {inp : Input} {g : GateW} (hg : g ∈ inp.gates)
@@ -64,7 +80,7 @@ theorem rejects_dropped_gate {inp : Input} {o : Op} (ho : o ∈ inp.ops)
     (hn : needsWitness o = true)
     (h : (inp.gates.filter (fun g => g.dag = o.idx)).length ≠ 1) :
     check inp = false :=
-  decide_eq_false fun himp => h (himp.2.2.2.2.2.2.2.1 o ho hn)
+  decide_eq_false fun himp => h (himp.2.2.2.2.2.2.2.2.1 o ho hn)
 
 /-- An ion that moves without a hop the architecture admits -- a teleport -- is never
 accepted.  Without this conjunct every later check could be satisfied by putting ions
@@ -82,10 +98,17 @@ theorem rejects_wrong_departure {inp : Input} {m : Move} (hm : m ∈ inp.moves)
 theorem rejects_invented_gate {inp : Input} {g : GateW} (hg : g ∈ inp.gates)
     (h : (inp.ops.any (fun o => o.idx = g.dag)) = false) : check inp = false :=
   decide_eq_false fun himp => by
-    have := himp.2.2.2.2.2.2.2.2.1 g hg
+    have := himp.2.2.2.2.2.2.2.2.2.1 g hg
     rw [h] at this; exact Bool.noConfusion this
 
-/-- Two ops sharing a qubit, realised out of program order, are never accepted.
+/-- Two ops sharing a qubit, realised out of program order, are never accepted -- whether
+or not they commute.
+
+Until 2026-10-19 this lemma also asked that the pair NOT commute (`Commutes ... = false`),
+because the order rule exempted two `cx` sharing a control or a target.  The rule is now
+strict (`RespectsOrder` says why), and the hypothesis is gone: swapping two commuting
+CNOTs, which leaves the unitary and so the semantic half of R10 unchanged, is refused here
+like any other reorder.
 
 Stated over `witnessQubits` -- each witness paired with the qubits of the op it realises,
 joined here from the circuit's own op list.  With `Covered` and `Grounded` that is the same
@@ -94,13 +117,9 @@ procedure can actually run: quantifying over ops AND their witnesses separately 
 nested quantifiers, which on a BB round is 10^10 pairs. -/
 theorem rejects_reordering {inp : Input} {a b : WQ}
     (ha : a ∈ witnessQubits inp) (hb : b ∈ witnessQubits inp) (hlt : a.idx < b.idx)
-    (hsh : (a.qubits.any (fun q => b.qubits.contains q)) = true)
-    (hnc : Commutes a.name a.qubits b.name b.qubits = false) (h : ¬ a.t < b.t) :
+    (hsh : (a.qubits.any (fun q => b.qubits.contains q)) = true) (h : ¬ a.t < b.t) :
     check inp = false :=
-  decide_eq_false fun himp =>
-    match himp.2.2.2.2.2.2.2.2.2 a ha b hb hlt hsh with
-    | .inl hc => by rw [hnc] at hc; exact Bool.noConfusion hc
-    | .inr hlt => h hlt
+  decide_eq_false fun himp => h (himp.2.2.2.2.2.2.2.2.2.2 a ha b hb hlt hsh)
 
 /-- A rotation of a loop the architecture does not declare is never accepted.  The loop
 inventory reaches the checker from the architecture document, so this is the conjunct that
@@ -115,7 +134,9 @@ theorem rejects_unknown_loop {inp : Input} {r : Rot} (hr : r ∈ inp.rots)
 
 #print axioms check_sound
 #print axioms check_complete
+#print axioms check_iff
 #print axioms rejects_not_colocated
+#print axioms rejects_foreign_ions
 #print axioms rejects_dropped_gate
 #print axioms rejects_teleport
 #print axioms rejects_wrong_departure

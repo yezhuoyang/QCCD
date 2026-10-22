@@ -9,6 +9,9 @@
 //   group     a selection becomes a new composite master; every channel that crossed the
 //             selection's boundary now ends on a port the new master exports
 //   ungroup   the reverse, one level
+//   floorplan a flat gadget of places as floorplan text (`qccd/gadget/floorplan.py`): places
+//             by region, junctions, roads with their routes, wires -- which
+//             `python -m qccd.gadget floorplan F` judges and `algorithm X --floorplan F` runs on
 //   export    the whole library as qccd.gadget/0.1 JSON, which
 //             `python -m qccd.gadget build PROGRAM --design FILE` synthesizes
 // Undo and redo keep whole snapshots of the edited masters; a library of dozens of masters
@@ -347,6 +350,73 @@
     say(`exported ${E.master}.gadget.json — python -m qccd.gadget build PROGRAM.lq --design ${E.master}.gadget.json`);
   }
 
+  // The floorplan language, written from the gadget being edited -- the twin of
+  // `floorplan.write`: a place at its footprint's top-left corner, a junction at its centre,
+  // a road's corners only where the default route (one corner, horizontal first) would not
+  // take them.
+  function floorplanText(m) {
+    const num = (v) => String(+(+v).toFixed(4));
+    const home = (G.D && G.D.homeRegion) || {};
+    const regions = (m.params && m.params.regions) || {};
+    const lines = [`floorplan ${m.name} "${(m.title || m.name).replace(/"/g, "'")}"`, `code ${(m.params && m.params.code) || "surface_d3"}`, ""];
+    const insts = m.instances.filter((i) => i.master !== "junc9");
+    const order = ["supply", "compute", "memory", "factory", "control"];
+    const regionOf = (i) => regions[i.name] || home[masterOf(i.master).family] || "compute";
+    for (const reg of order.concat([...new Set(insts.map(regionOf))].filter((r) => !order.includes(r)))) {
+      const mine = insts.filter((i) => regionOf(i) === reg);
+      if (!mine.length) continue;
+      lines.push(`region ${reg}`);
+      for (const i of mine) {
+        const bb = masterOf(i.master).bbox || [0, 0, 0, 0];
+        lines.push(`place ${i.name.padEnd(9)} ${i.master.padEnd(7)} at ${num(i.x + bb[0])} ${num(i.y + bb[1])}`);
+      }
+      lines.push("");
+    }
+    const js = m.instances.filter((i) => i.master === "junc9");
+    if (js.length) {
+      lines.push("# junctions: where roads meet");
+      for (const i of js) lines.push(`junction ${i.name} at ${num(i.x)} ${num(i.y)}`);
+      lines.push("");
+    }
+    const via = (ch) => {
+      const pts = ch.points || [];
+      if (pts.length < 2) return "";
+      const inner = pts.slice(1, -1);
+      const a = pts[0], b = pts[pts.length - 1];
+      const dflt = (a[0] === b[0] || a[1] === b[1]) ? [] : [[b[0], a[1]]];
+      const same = inner.length === dflt.length && inner.every((p, k) => p[0] === dflt[k][0] && p[1] === dflt[k][1]);
+      return same ? "" : " via " + inner.map((p) => `${num(p[0])} ${num(p[1])}`).join(", ");
+    };
+    const roads = m.channels.filter((c) => c.kind !== "wire");
+    if (roads.length) {
+      lines.push("# roads: conveyors between doors and junction arms");
+      for (const c of roads) lines.push(`road ${c.a} -- ${c.b}${via(c)} as ${c.name}`);
+      lines.push("");
+    }
+    const wires = m.channels.filter((c) => c.kind === "wire");
+    if (wires.length) {
+      lines.push("# wires: bits, never ions");
+      for (const c of wires) lines.push(`wire ${c.a} -> ${c.b} latency ${num(c.latency_us || 0)}${via(c)} as ${c.name}`);
+    }
+    return lines.join("\n").replace(/\s+$/, "") + "\n";
+  }
+
+  function exportFloorplan() {
+    const m = masterOf(E.master);
+    if (!m || m.kind !== "composite") { say("a floorplan places leaf places: open a composite gadget"); return; }
+    refresh(m);
+    const nested = m.instances.filter((i) => masterOf(i.master).kind !== "leaf").map((i) => i.name);
+    if (nested.length) { say(`a floorplan is flat: ungroup ${nested.join(", ")} first`); return; }
+    const blob = new Blob([floorplanText(m)], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${m.name}.floor`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    say(`exported ${m.name}.floor — python -m qccd.gadget floorplan ${m.name}.floor, then algorithm PROGRAM.alg --floorplan ${m.name}.floor`);
+  }
+
   // ------------------------------------------------------------------ drawing
 
   function draw() {
@@ -623,10 +693,11 @@
       <button id="eGroup" title="G">Group</button><button id="eUngroup">Ungroup</button><button id="eDelete" title="Del">Delete</button>
       <button id="eFit">Fit</button><span id="editStatus" style="margin-left:6px"></span>
       <span id="editMsg" style="flex:1;min-width:120px;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-      <button id="eExport" class="on" title="download the library as qccd.gadget/0.1 JSON">Export design</button><button id="eClose">Close</button>`;
+      <button id="eFloor" title="download this gadget as floorplan text (.floor): places, regions, junctions, roads, wires">Export floorplan</button><button id="eExport" class="on" title="download the library as qccd.gadget/0.1 JSON">Export design</button><button id="eClose">Close</button>`;
     $("stageWrap").appendChild(bar);
     $("eUndo").onclick = undo; $("eRedo").onclick = redoIt; $("eGroup").onclick = () => group();
     $("eUngroup").onclick = ungroup; $("eDelete").onclick = removeSelection; $("eExport").onclick = exportDesign;
+    $("eFloor").onclick = exportFloorplan;
     $("eClose").onclick = close; $("eFit").onclick = fitMaster;
   }
 
@@ -761,5 +832,7 @@
     select: (names) => { E.sel = new Set(names); E.chan = null; update(); },
     lib: () => E.lib, master: () => masterOf(E.master),
     json: () => JSON.stringify({ schema: "qccd.gadget/0.1", top: E.master, masters: E.lib.masters }),
+    // the floorplan text of the gadget being edited (or of a master, by name)
+    floorplan: (name) => floorplanText(masterOf(name || E.master)),
   };
 })();

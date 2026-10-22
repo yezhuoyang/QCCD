@@ -1,0 +1,9 @@
+{
+ "build": "relink of the runtime-62b6a22 link kit with a patched Lean/Shell.lean (lean_wasm_compile reports parse errors)",
+ "patch": {"file": "src/Lean/Shell.lean", "original_sha256": "c414b705bfc5ae16ab83379f380ff38160873e2716c815c8a073f662af1c8240", "patched_sha256": "9876ae59cd6e44e496a24a1337a9b0120c6348e758d3feedb29575e533e2a864", "what": "wasmCompile keeps each command's parse messages (Frontend.processCommand inlined)"},
+ "patched_object_sha256": "e2f27aaf5c44407de7bac8ed669e147c57a2f8aee5fa319855e3d96b936aff36",
+ "link_kit": {"release": "browser-62b6a22-compact1", "file": "linkkit-62b6a22.tar.gz", "sha256": "1d8345533bd03b8cb72fee36d4ca2c084315414e9561a1d055680af6dc1d2c90"},
+ "recipe": {"commit": "fb896a60f96a452cbf477aef31dcfbbff3c78f8b", "exports_sha256": "1049f282260f3a18e1cf8bfe9b24355a3e515c54a4321d5ab2bd698f1a57a956", "dlsym_sha256": "264f000882cad81e4ed3484a0e3c545d7b533ae9ca06e34041b730afeb699da7"},
+ "emscripten": "4.0.22 (0f3d2e62bccf8e14497ff19e05a1202c51eb0c65)",
+ "control": {"lean.js": "63aa7b004435f3d90cf19d7c3b3e3284726701ea06da8bc70b015125e1a38b24", "lean.wasm": "08d3ae8ee5dec8bae165ad5102e604eca016d74d2303e0b5748690df679a764e"}
+}

@@ -1,0 +1,39 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "surface5xz_mem",
+ "order": 8,
+ "title": "Surface code memory, distance 5, both bases",
+ "short": "surface-5 X+Z memory",
+ "description": "Five rounds of two distance-5 rotated surface-code patches in lockstep, one a Z memory and one an X memory (98 ions: 50 data, 48 ancillas, reset and reused every round), then the data read out, each patch in its own basis. Ranked by the logical error rate per round (a shot fails if either patch does) under qccd-noise@2, with Helios-class physics in which every number is cited.",
+ "circuit": "circuit.qasm",
+ "n_data": 50,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "quantinuum"
+  ]
+ },
+ "metrics": [
+  "ler_per_round",
+  "ler",
+  "T_quantinuum",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable"
+ ],
+ "rank_by": "ler_per_round",
+ "release": "surface5xz_mem@1",
+ "qec": {
+  "experiment": "surface5xz_r5",
+  "noise": "qccd-noise@2",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 400,
+   "max_shots": 2000000,
+   "seed": 20261021
+  }
+ },
+ "seed": "MemoryBoard/surface5xz_mem"
+}

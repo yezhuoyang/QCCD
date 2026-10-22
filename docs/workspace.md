@@ -544,9 +544,9 @@ worker all call it.
 | program | well-formed TSIR within limits | `validate_program` |
 | rules | replay under the task model; only R7b, R9 and R10 may be skipped, only R15 may be partial | `qccd.verify.verify` |
 | correspondence | the final program is the certified program with only allowed insertions (`cool`, fresh ids), identical otherwise except the provenance index `meta.call` | new |
-| certificate_binding | the certificate's `circuit_ops` are the **release's** circuit as the compiler's own parser reads it; gate witnesses match certified instructions | `qccdc_cli parse`, `qccd.ir.source_map` |
+| certificate_binding | the certificate's `circuit_ops` are the **release's** circuit op by op (a composite such as `ccx` as the run of ops whose product is its defining unitary), with its qubit count and a one-to-one qubit map; gate witnesses match certified instructions | `check_cert.check_binding`, `qccd.ir.source_map` |
 | lean_certificate | `QCCDC.Cert.check` (proved sound) accepts, against facts re-derived from the **submitted** device | `mk_qcheck_input.py`, `qcheck` |
-| semantics | O1 transport replay and O2 tableau of the emitted pulses equal to the trusted circuit (partial outside Clifford) | `check_cert.py` without `--qcheck` |
+| semantics | O1 transport replay, witnesses tied to the program's instructions, and O2: the emitted pulses, measurements and resets equal to the trusted circuit -- a stabilizer tableau, or outside Clifford an exact unitary up to 10 qubits (partial beyond) | `check_cert.py` without `--qcheck` |
 | metrics | `T_jones`, `T_transport` (ms, modelled), `instructions`, `dacs`, `ions_per_instruction` | `metrics.compute_metrics` |
 
 **Eligible** means every required stage `passed` under the `reference` profile. `skipped`,
@@ -557,10 +557,13 @@ diagnostics with stable ids (`RULE.R1`, `TASK.PHYSICS_MODIFIED`, `CERT.BINDING`,
 `CORR.MISMATCH`, …), metrics with units, and non-deterministic timing kept apart.
 `evaluator.comparable` / `publish.compare_reports` define parity.
 
-**What it does not establish.** Physical realisability beyond the task's model. It also does
-not compare the certificate's moves with the final program's transport instruction by
-instruction: co-location of the program's own gates is rule R6b of the replay, and the
-semantic link is O2 through the certificate's qubit→ion map.
+**What it does not establish.** Physical realisability beyond the task's model. (The
+certificate's transport *is* compared with the final program's: `check_cert.py` replays both
+and requires each ion's moves, and every rotation, to be the same and in the same order --
+`o1_transport`, part of O1 -- so a programme that moves ions the certificate does not claim,
+or claims moves it does not make, fails the semantics stage. Co-location of the program's
+own gates is rule R6b of the replay, and the semantic link is O2 through the certificate's
+qubit→ion map.)
 
 **Metrics parity.** `tests/test_workspace_metrics.py` reproduces the published board numbers
 (`SmallCode/*/manifest.json`, re-replayed) exactly when those files are present. Modelled
@@ -639,7 +642,23 @@ leaderboard shows who submitted each design.
 - **Terminal.** `qccd login` (and `qccd logout`) do the same sign-in. `qccd publish
   --submission <id>` reviews the bundle, asks for its digest to be typed, and submits it as the
   signed-in person. `qccd leaderboard --official --board <title>` shows the board with `by`,
-  and the person's own requests.
+  and the person's own requests. `qccd grade <bundle.zip>` grades any entry's downloaded
+  bundle on this computer with the reference evaluator the server runs, and prints every
+  check and measure. The checks and the computed measures (time, instructions, DACs) match
+  the entry's official report; a logical error rate is a stim sample, which repeats for a
+  seed only on the same kind of processor, so a local one is an estimate (a 98-ion entry
+  gave 4.61e-5 on Windows and 4.44e-5 on the Linux server, each within the other's 95%
+  interval).
+
+**An entry on the website.** A public entry is a dot in its board's ranking chart
+(`/board/<task>/`), credited to who submitted it, and the board can be ranked by any measure
+its server scores (the board's own ranking first: the logical error rate per round on a
+memory board). Its detail panel opens what the grader drew from the graded bundle, the studio
+page you step through instruction by instruction (`GET /official/v1/submissions/<id>/page`),
+each bundle file (`.../files/<name>`: the device, the compiled program, the certified program,
+the certificate, the manifest), the whole bundle (`.../bundle.zip`), the official report, and
+the `qccd grade` line that reproduces it. A private entry opens nothing for anyone but its
+owner.
 
 **Signing in** is a device link (`qccd/official/accounts.py`). The password is typed on the
 site only; the workspace never sees it.
@@ -835,8 +854,9 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   CLI next needs it. A page on its own cannot start one, and shows *disconnected* until then. Two earlier bugs from
   this investigation are fixed: `_pid_alive` treated *access denied* as dead, and a service
   spawned inside an agent's job object could die with it (it now spawns with job breakaway).
-- **No prebuilt compiler for Intel Macs**, and a prebuilt Lean checker only for macOS on Apple
-  silicon. Elsewhere `lake build` in `Compiler/lean/checker` makes `qcheck` in about a minute;
+- **No prebuilt compiler for Intel Macs**, and a prebuilt Lean checker for Windows and Linux
+  on x86-64 only (the Mac build of the current checker is not made yet). Elsewhere `qccd
+  toolchain build-checker` makes `qcheck` in about a minute;
   until then local reference grades stay `unsupported` at the certificate stage.
   `tests/test_workspace_toolchain.py` fails when `Compiler/ocaml`, or a source `qcheck` is built
   from, changes without a new release (`deploy/toolchain/README.md`).
@@ -888,19 +908,24 @@ py -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[agent]"
 
-qccd toolchain install     # the prebuilt compiler, and on macOS the proved checker too
+qccd toolchain install     # the prebuilt compiler, and on Windows and Linux the proved checker too
+qccd toolchain build-checker   # on a Mac: build the proved checker from source (needs Lean)
 ```
 
 `qccd toolchain install` fetches `qccdc_cli` for Windows or Linux on x86-64 or macOS on Apple
-silicon, and `qcheck` (the Lean checker) where one is published -- macOS on Apple silicon so
-far -- from qccd.academy. It refuses each download unless its size and SHA-256 match
+silicon, and `qcheck` (the Lean checker) where one is published -- Windows and Linux on x86-64
+-- from qccd.academy. It refuses each download unless its size and SHA-256 match
 `qccd/workspace/toolchain.json`, installs it under `~/.qccd/toolchain/`, and runs it once
 (the compiler on a test circuit, the checker on a certificate it must accept and one it must
 reject). `qccd toolchain status` says which compiler and checker are in use: `QCCD_QCCDC` /
 `QCCD_QCHECK` first, then one built in the checkout, then the installed one. Where no `qcheck`
-is published, `lake build` in `Compiler/lean/checker` builds it in about a minute without
-Mathlib (Compiler/README.md); without it a reference grade reports the Lean stage
-`unsupported`, which is never eligible. An Intel Mac builds the compiler from source. How a
+is published, `qccd toolchain build-checker` builds it from source in about a minute without
+Mathlib (it runs `lake build` in `Compiler/lean/checker`, so it needs Lean, installed with
+elan; the command says how if it is missing), runs it once on a certificate it must accept and
+one it must reject, and the workspace uses it from then on; without it a reference grade reports
+the Lean stage `unsupported`, which is never eligible. `qccd toolchain check
+<file>.qcheck.json` runs the checker in use on one certificate, with its own output and exit
+code (0 accepted, 1 rejected). An Intel Mac builds the compiler from source. How a
 release is built and published: `deploy/toolchain/README.md`.
 
 **One workspace, end to end.** Two kinds of words below. **Yours to name, anything you
@@ -936,6 +961,7 @@ qccd validate --board surface --json     # a draft grade of the head revision
 qccd login                               # sign this computer in with YOUR qccd.academy account (once)
 qccd publish --submission <sub_id>       # review, type the digest, submit it in your name
 qccd leaderboard --official --board "BB [[144,12,12]]"   # the official ranking, with who submitted each
+qccd grade sub_0123456789ab-bundle.zip   # grade an entry's downloaded bundle here, as the server did
 qccd logout                              # sign this computer out (its key is revoked)
 qccd publish --approval <ap_id> --server https://qccd.academy/official   # a maintainer's token instead
 qccd trace                               # what the agents did: every request, step by step

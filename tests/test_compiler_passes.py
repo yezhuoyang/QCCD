@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 from qccd import Machine  # noqa: E402
 from qccd.codes import gross_code  # noqa: E402
 from qccd.compile import CompilePolicy, compile_code  # noqa: E402
-from qccd.compile.order import bind_dynamic, bind_fixed_waves  # noqa: E402
+from qccd.compile.order import _ordered_arc, bind_dynamic, bind_fixed_waves  # noqa: E402
 from qccd.compile.place import (  # noqa: E402
     identity_seed,
     interleaved_seed,
@@ -31,6 +31,14 @@ from qccd.compile.schedule import OPTICS, TRANSPORT, resources_of  # noqa: E402
 CAP = 144
 DOCKS = list(range(0, CAP, 6))
 SHIPPED_HOPS, SHIPPED_BATCHES, SHIPPED_UTIL = 2672, 396, 2.18
+
+#: Claims the pipeline made while a check's CNOTs ran in whatever order the loop presented
+#: them.  Since 2026-10-19 (the user's decision) they run in the code's member order, the
+#: arcs widen past a revolution, and these no longer hold.  Strict, so a claim that comes
+#: back is noticed.
+MEMBER_ORDER = pytest.mark.xfail(strict=True, reason=(
+    "each check's CNOTs run in the code's member order since 2026-10-19; the claim was made "
+    "for arrival order"))
 
 
 @pytest.fixture(scope="module")
@@ -72,29 +80,41 @@ def test_interleaving_the_code_blocks_halves_the_window(code):
 
 
 def test_the_packing_bound_is_a_real_lower_bound(compiled):
-    """Every check holds a dock for its whole window; 24 docks offer 144 offsets each."""
+    """Every check holds a dock for its whole window; 24 docks offer 144 offsets each.
+
+    A bound, no longer a tight one: it uses each check's narrowest window, and in member
+    order a check's arc is usually wider (it was within 1.3x in arrival order)."""
     assert compiled.bound_revolutions > 0
     assert compiled.revolutions >= compiled.bound_revolutions
-    assert compiled.revolutions / compiled.bound_revolutions < 1.3
 
 
 # ------------------------------------------------------------------ pass 2: order
 
 
-def test_the_arc_anchor_points_the_right_way(code):
-    """A contact happens at `(dock - slot)`, so sweeping forward walks slots backward.
-
-    Anchoring on the near end of the slot arc instead of the far end makes every arc span
-    nearly a whole revolution -- a 3x error that looks like a merely mediocre schedule.
-    """
+def test_every_check_meets_its_members_in_the_codes_order(code):
+    """A check's CNOTs happen in the order the code lists its members, even where they
+    commute (2026-10-19): each member at its first arrival after the previous contact, so
+    the arc is the ordered one, which may be wider than the check's narrowest window."""
     slot_of = interleaved_seed(code)
-    b = bind_dynamic(code.checks, slot_of, DOCKS, CAP)
-    widths = [a.width for a in b.assignments]
-    wins = [window([slot_of[q] for q in c.members], CAP) for c in code.checks]
-    assert max(widths) <= max(wins), "an arc cannot be wider than its check's window"
+    for b in (bind_dynamic(code.checks, slot_of, DOCKS, CAP),
+              bind_fixed_waves(code.checks, slot_of, DOCKS, CAP)):
+        for a in b.assignments:
+            assert [q for _, q in a.contacts] == list(a.check.members)
+            offs = [o for o, _ in a.contacts]
+            assert all(x < y for x, y in zip(offs, offs[1:]))
+            _, rel = _ordered_arc([slot_of[q] for q in a.check.members], CAP)
+            assert a.width == rel[-1]
 
 
 def test_dynamic_binding_beats_the_fixed_wave_rule(code):
+    slot_of = interleaved_seed(code)
+    dyn = bind_dynamic(code.checks, slot_of, DOCKS, CAP)
+    fix = bind_fixed_waves(code.checks, slot_of, DOCKS, CAP)
+    assert dyn.sweep < fix.sweep
+
+
+@MEMBER_ORDER
+def test_dynamic_binding_beats_the_fixed_wave_rule_threefold_in_two_rotations(code):
     slot_of = interleaved_seed(code)
     dyn = bind_dynamic(code.checks, slot_of, DOCKS, CAP)
     fix = bind_fixed_waves(code.checks, slot_of, DOCKS, CAP)
@@ -160,7 +180,9 @@ def test_every_check_is_measured_once_and_its_ancilla_reset(compiled):
             reset.update(i.ions)
     assert sum(meas.values()) == 144, "one readout per check"
     assert meas == reset, "an ancilla is reset exactly when it is read"
-    assert set(meas.values()) == {6}, "each of the 24 ancillas serves six checks"
+    # in member order the arcs differ in width, so the docks share the 144 checks unevenly
+    # (5-7 each, was exactly 6); every one of the 24 still serves some
+    assert len(meas) == 24, "every ancilla serves checks"
 
 
 def test_the_compiled_contacts_are_exactly_the_codes(compiled, code):
@@ -206,6 +228,7 @@ def test_event_scheduling_hides_work_under_transport(machine, code):
 # ------------------------------------------------------------------ the whole thing
 
 
+@MEMBER_ORDER
 def test_the_compiler_beats_the_shipped_schedule_by_the_margin_it_claims(compiled):
     assert compiled.contacts == 864
     assert compiled.hops <= SHIPPED_HOPS / 8, f"{compiled.hops} vs {SHIPPED_HOPS}"
@@ -219,11 +242,12 @@ def test_solving_the_passes_beats_leaving_them_crude(machine, code):
         event_schedule=False, spam=False, refine_steps=0))
     solved = compile_code(machine.arch, code,
                           policy=CompilePolicy(insert_cooling=False))
-    assert solved.hops < crude.hops / 3
-    assert solved.batches < crude.batches
+    # fewer hops still; in member order no longer a third, nor fewer batches (it was both)
+    assert solved.hops < crude.hops
     assert crude.contacts == solved.contacts == 864
 
 
+@MEMBER_ORDER
 def test_batch_utilization_meets_plan_m7(machine, code, compiled):
     from qccd.cost import t1_metrics
 

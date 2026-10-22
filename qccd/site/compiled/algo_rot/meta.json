@@ -1,0 +1,17 @@
+{
+ "id": "algo_rot",
+ "title": "A three-qubit parity check, by rotation",
+ "note": "the ancilla q0 sits at a dock, the data ride the loop; the loop turns twice and every CNOT is a contact at the dock",
+ "compiler": "",
+ "device": "ring6d",
+ "device_about": "the six-site ring with two dock spurs",
+ "notes": [
+  "conveyor: loop L0 of 6 slots, 2 docks, classes rotate_cw/rotate_ccw + dock/undock",
+  "1 qubits at docks, 3 riding the loop (stride 2)",
+  "2 rotations totalling 4 hops, 3 contacts in 3 batches"
+ ],
+ "regime": "",
+ "n_qubits": 4,
+ "compile_seconds": 0.09,
+ "check_seconds": 2.3
+}

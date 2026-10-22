@@ -30,13 +30,16 @@ let ion_name q = Printf.sprintf "q%d" q
 (* Symmetric pair weights over the two-qubit gates.  One-qubit gates constrain nothing
    about *pairs*, so they are absent -- but they do force a visit to a gate-capable trap,
    which the router handles and the placer deliberately ignores: optimising placement for
-   one-qubit gates on a device where every trap can gate would be optimising nothing. *)
+   one-qubit gates on a device where every trap can gate would be optimising nothing.
+   Nor is a barrier a pair, whatever its width: it orders, it never brings two ions
+   together, so `barrier a,b` must not pull a and b towards each other. *)
 let interaction (c : Circuit.t) : (int * int, int) Hashtbl.t =
   let w = Hashtbl.create 64 in
   List.iter
     (fun (o : Circuit.op) ->
-      match o.qubits with
-      | [ a; b ] ->
+      match (o.name, o.qubits) with
+      | "barrier", _ -> ()
+      | _, [ a; b ] ->
         let k = if a < b then (a, b) else (b, a) in
         Hashtbl.replace w k (1 + (try Hashtbl.find w k with Not_found -> 0))
       | _ -> ())

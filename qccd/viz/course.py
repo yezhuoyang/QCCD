@@ -57,6 +57,7 @@ def _rec(method: str, *args, **kwargs) -> dict:
 #: puts spurs at S0 and S3; the loop sites are `data` (no gates), the spur ends `trap`.
 RING6D = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2},
           "name": "ring6d"}
+CHAIN3 = {"generator": "chain", "params": {"n": 3}, "name": "chain3"}
 
 CASES: Mapping[str, dict] = {
     # R4d: one channel, one waveform.  Two ions on the loop asked to hop opposite ways in
@@ -94,22 +95,24 @@ CASES: Mapping[str, dict] = {
         ],
     },
     # R9: the programme claims totals its replay does not reach; the fix is the true claim.
+    # On a line of three traps: on ring6d every gate trap sits behind a junction, and since
+    # R23 (an ion crosses a junction, never rests on one) the walk to it failed a second rule.
     "R9": {
-        "device": RING6D,
+        "device": CHAIN3,
         "focus": "R9",
         "program": [
-            _rec("init", {"d0": "S1", "d1": "A0"}),
-            _rec("shuttle", "d0", ["S1", "S0", "A0"]),
+            _rec("init", {"d0": "C0", "d1": "C2"}),
+            _rec("shuttle", "d0", ["C0", "C1", "C2"]),
             _rec("cool"),
             _rec("gate", "CX", [["d0", "d1"]]),
             _rec("claim", total_steps=3, total_cost=2),
         ],
         "fixed": [
-            _rec("init", {"d0": "S1", "d1": "A0"}),
-            _rec("shuttle", "d0", ["S1", "S0", "A0"]),
+            _rec("init", {"d0": "C0", "d1": "C2"}),
+            _rec("shuttle", "d0", ["C0", "C1", "C2"]),
             _rec("cool"),
             _rec("gate", "CX", [["d0", "d1"]]),
-            _rec("claim", total_steps=4, total_cost=3),
+            _rec("claim", total_steps=5, total_cost=3),
         ],
     },
 }

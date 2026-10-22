@@ -1,0 +1,39 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "surface17",
+ "order": 5,
+ "title": "Surface code, distance 3 (17 qubits)",
+ "short": "surface-17",
+ "description": "One syndrome-extraction round of the distance-3 rotated surface code: eight stabilizers on 9 data qubits.",
+ "circuit": "circuit.qasm",
+ "n_data": 9,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "qccdsim_jones",
+   "qccdsim_transport"
+  ]
+ },
+ "metrics": [
+  "T_jones",
+  "T_transport",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable",
+  "p_eff_vs_threshold"
+ ],
+ "rank_by": "T_jones",
+ "seed": "SmallCode/surface17",
+ "stabilizers": [
+  "IXXIXXIII",
+  "IIIXXIXXI",
+  "XXIIIIIII",
+  "IIIIIIIXX",
+  "ZZIZZIIII",
+  "IIIIZZIZZ",
+  "IIZIIZIII",
+  "IIIZIIZII"
+ ]
+}

@@ -700,9 +700,21 @@ And the commutation the scheduler relies on is a real reordering, which `Respect
 rejected outright. The fix was not to weaken the rule but to state the exemption and prove
 it: `Cert/Commute.lean` proves that two `cx` gates commute when they share a control with
 distinct targets, or share a target with distinct controls, and exhibits a state on which
-a control/target chain does *not* commute. `Commutes` in the checker admits exactly those
+a control/target chain does *not* commute. `Commutes` in the checker admitted exactly those
 two cases. `bridge/mutate_cert.py`'s `swap_dependent_gates` — which exchanges which op two
-witnesses realise, leaving co-location untouched — confirms the rule is not too generous.
+witnesses realise, leaving co-location untouched — confirmed the rule was not too generous.
+
+**Withdrawn 2026-10-19: the compiler may not reorder commuting gates either.** The order of a
+qubit's gates is the circuit author's to choose — in a syndrome round it is chosen on purpose
+— and a reorder of commuting CNOTs gives the same tableau, so the semantic check cannot see
+it. The rotation scheduler now treats a shared qubit as a dependency without exception
+(BB144 on `ring144_24v`: 824 batches, was 546); `RespectsOrder` lost the `Commutes` case
+(`Commute.lean`'s theorems stay, consulted by nothing); `check_cert.py` checks each qubit's
+order from the program itself; and `mutate_cert.py` gained `swap_commuting_gates`, which
+both must now reject for order. Two follow-ups the same day: the default sweep became greedy
+(in circuit order an ancilla has one contact ready at a time, and turning only forward laps
+the loop for each: BB144 788 batches / 4 956 hops greedy, 824 / 7 586 monotone), and the
+Python binder (`qccd/compile/order.py`) serves each check's CNOTs in the code's member order.
 
 What generality *did* buy is in the matrix below: 9 examples × 9 architectures, **72 of 81
 pairs fully verified and 0 defects**, on grids, ladders, racetracks, chains and a two-trap

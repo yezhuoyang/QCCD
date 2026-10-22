@@ -8,11 +8,13 @@ characterization checks the program's own circuit against it (`qccd.gadget.logic
     prep_d3        prep         prep.Z  prep.X       1 -> Z̄ (or X̄) exactly; every stabilizer holds
     se_d3          se           se.1  se.3           every stabilizer measured and holds; X̄, Z̄ kept
     zone_d3        zone         check_in check_out   identity on every ion
+    mem_d3         memory       store refresh        every stabilizer measured and holds; X̄, Z̄ kept
+                                 release            identity: a block corrected while it rests
     tcx_d3         operation    cx                   CNOT ion by ion (36 exact flows)
     ls_d3          surgery      zz  xx               Z̄Z̄ (X̄X̄) measured; Z̄_A, Z̄_B, X̄X̄ (…) kept
     read_d3        readout      read.Z  read.X       every data ion measured in the basis
     inj_d3         injection    inject               X -> X̄, Z -> Z̄ from the magic ion; stabilizers hold
-    msf15          factory      produce              T|+> on the output when all 14 checks pass
+    msf15          factory      produce              T†|+> on the output when all 14 checks pass
     depot9         depot        load.k  dump.9       none: fresh ions carry no promise
     junc9          road         pass.<a>.<b>         identity on every ion
 
@@ -39,8 +41,8 @@ from .common import (LeafBuild, TrackedProgram, add_port_stub, declare_port_clas
                      declare_port_zone, tidy)
 from .factory import ring_circuit, rm15_circuit
 
-__all__ = ["prep", "clinic", "zone", "workshop", "bridge", "post_office", "pharmacy",
-           "factory", "depot", "junction9", "PLACES", "D"]
+__all__ = ["prep", "clinic", "zone", "memory", "workshop", "bridge", "post_office",
+           "pharmacy", "factory", "depot", "junction9", "PLACES", "D"]
 
 D = 3
 KEEP = ("rotate_cw", "rotate_ccw", "dock", "undock", "port_in", "port_out")
@@ -324,6 +326,92 @@ def zone(*, name: str = "zone_d3") -> LeafBuild:
                    size=b.size())
 
 
+def memory(*, name: str = "mem_d3") -> LeafBuild:
+    """A logical memory: one block rests here and is corrected while it rests.
+
+    A zone keeps a block and touches nothing, so a block may rest there only as long as its
+    coherence lasts (G8).  A memory is the clinic's device -- eight resident ancillas in dock
+    traps on a 24-slot ring -- with the block kept on the ring between ops: `store` takes it
+    in and runs one syndrome round, `refresh` runs one more round on the resting block, and
+    `release` sends it out.  The scheduler refreshes a resting block as often as its budget
+    needs, inside the block's own lease, with no trip anywhere.  Every ion inside is cooled
+    by name after each round, since a block may be refreshed many times over."""
+    p, code = _surface()
+    W = 12
+    docks = [1 + 3 * i for i in range(8)]
+    b = bay(name, W, docks, {"in": "TL", "out": "TR"}, {"in": 9, "out": 9})
+    ds, ad, steps = place(p, b.N, docks)
+    data = [f"d{q}" for q in range(p.n)]
+    anc = _anc_names(p)
+    home = {anc[c]: f"A{ad[c]}" for c in anc}
+    rest = {d: f"S{ds[q]}" for q, d in enumerate(data)}
+    build = LeafBuild(master=None, machine=b.machine, home=home,
+                      roles={**{a: "ancilla" for a in home}, **{d: "data" for d in data}})
+    blk = Block(code, data, "A")
+    se_spec = (_stab_flows(p, data, measured=True, holds=True)
+               + [Flow("X̄ kept", _L(code, data, "X"), _L(code, data, "X"), "exact", role="logical"),
+                  Flow("Z̄ kept", _L(code, data, "Z"), _L(code, data, "Z"), "exact", role="logical")])
+    note = ["ancillas live in the dock traps; the ring turns and each data ion docks at the "
+            "ancilla of its check when the schedule allows (Tomita-Svore order, as a partial "
+            "order); the block stays on the ring between ops"]
+
+    def se_exp():
+        return dict(blocks_in=[blk], blocks_out=[blk], expect="ft",
+                    flows=[LogicalFlow("X̄", [("A", 0, "X")], [("A", 0, "X")]),
+                           LogicalFlow("Z̄", [("A", 0, "Z")], [("A", 0, "Z")])])
+
+    bp = BayProgram(b, f"{name}.store", {**home, **{d: "X_in" for d in data}})
+    bp.absorb("in", data, [ds[q] for q in range(p.n)], op="enter")
+    bp.restore(op="enter")
+    bp.conveyor_round(p, dict(enumerate(data)), anc, ad, round_index=0)
+    bp.restore(op="round")
+    bp.cool_inside(op="round")
+    build.programs["store"] = _cooled(bp.prog, b.machine)
+    build.titles["store"] = "a block checks in, takes one syndrome round, and rests on the ring"
+    build.expect_end["store"] = {**home, **rest}
+    build.params["store"] = {"rounds": 1, "conveyor_steps": steps}
+    build.notes["store"] = list(note)
+    build.specs["store"] = Spec("store, with one round of syndrome extraction", data, data,
+                                list(se_spec))
+    build.experiments["store"] = se_exp()
+
+    bp = BayProgram(b, f"{name}.refresh", {**home, **rest})
+    bp.conveyor_round(p, dict(enumerate(data)), anc, ad, round_index=0)
+    bp.restore(op="round")
+    bp.cool_inside(op="round")
+    build.programs["refresh"] = _cooled(bp.prog, b.machine)
+    build.titles["refresh"] = "one syndrome round on the resting block, which stays"
+    build.expect_end["refresh"] = {**home, **rest}
+    build.params["refresh"] = {"rounds": 1, "conveyor_steps": steps}
+    build.notes["refresh"] = list(note)
+    build.specs["refresh"] = Spec("one round of syndrome extraction at rest", data, data,
+                                  list(se_spec))
+    build.experiments["refresh"] = se_exp()
+
+    ident = [Flow(f"{s_}({d})", {d: s_}, {d: s_}, "exact") for d in data for s_ in ("X", "Z")]
+    bp = BayProgram(b, f"{name}.release", {**home, **rest})
+    bp.emit("out", data, cool_every=5, op="leave")
+    build.programs["release"] = _cooled(bp.prog, b.machine)
+    build.titles["release"] = "the block leaves, in the order it arrived"
+    build.expect_end["release"] = {**home, **{d: "X_out" for d in data}}
+    build.specs["release"] = Spec("release", data, data, ident)
+
+    tidy(b.machine, build.programs.values(), keep_classes=KEEP)
+    build.extra = {"patch": p, "data_slots": ds, "anc_docks": ad, "rest": rest}
+    return _master(build, name=name, category="memory", title="Logical memory (d=3)",
+                   doc="the clinic ring and its 8 resident ancillas, with one block kept on the "
+                       "ring and corrected while it rests",
+                   ports=[Port("in", "in", "data", 9, "W", 0.3, node=b.trap("in"),
+                               stub=b.stub("in"), code=code.name),
+                          Port("out", "out", "data", 9, "E", 0.3, node=b.trap("out"),
+                               stub=b.stub("out"), code=code.name)]
+                         + _classical_ports(syndrome=8),
+                   inventory={"ancilla": 8}, capacity=8 + 9,
+                   params={"code": code.summary(), "ring_slots": b.N, "docks": docks,
+                           "rest": rest},
+                   size=b.size())
+
+
 # --------------------------------------------------------------------------- depot
 
 
@@ -490,10 +578,13 @@ def workshop(*, name: str = "tcx_d3", n: int = 9) -> LeafBuild:
             shift(tp, ra, op="fill")
             shift(tp, rb, op="fill")
         tp.move("port_in", [(ctrl[j], "A0"), (targ[j], "B0")], op="fill")
-    tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in ctrl + targ], op="pair")
+    # rail A docks DOWN into the gate traps and rail B docks UP: two motions, so two cycles
+    # (R22: one cycle is one waveform), and the same on the way out
+    tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in ctrl], op="pair")
+    tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in targ], op="pair")
     tp.gate("CX", [(ctrl[j], targ[j]) for j in range(n)], op="cx")
-    tp.move("undock", [(ion, f"{'A' if ion[0] == 'd' else 'B'}{tp.pos[ion][1:]}")
-                       for ion in ctrl + targ], op="unpair")
+    tp.move("undock", [(ion, f"A{tp.pos[ion][1:]}") for ion in ctrl], op="unpair")
+    tp.move("undock", [(ion, f"B{tp.pos[ion][1:]}") for ion in targ], op="unpair")
     tp.cool(op="before_exit")
     for j in range(n):
         tp.move("port_out", [(tp.at(f"A{n - 1}")[0], "XA_out"),
@@ -873,6 +964,7 @@ def factory(*, name: str = "msf15") -> LeafBuild:
                    size=b.size())
 
 
-PLACES = {"prep_d3": prep, "se_d3": clinic, "zone_d3": zone, "tcx_d3": workshop,
+PLACES = {"prep_d3": prep, "se_d3": clinic, "zone_d3": zone, "mem_d3": memory,
+          "tcx_d3": workshop,
           "ls_d3": bridge, "read_d3": post_office, "inj_d3": pharmacy, "msf15": factory,
           "depot9": depot, "junc9": junction9}

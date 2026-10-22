@@ -193,3 +193,64 @@ def test_the_cli_reports_status(tmp_path):
     assert r.returncode == 0, r.stderr
     s = json.loads(r.stdout)
     assert s["version"] == toolchain.manifest()["qccdc_cli"]["version"] and s["installed"] is None
+
+
+# -- the checker from source: one command to build it, one to run it ----------------------------
+
+def test_without_lean_build_checker_says_how_to_get_it(monkeypatch):
+    monkeypatch.setattr(toolchain, "_lake", lambda: None)
+    with pytest.raises(ToolchainError, match="Lean is not installed: install Lean with elan"):
+        toolchain.build_checker(say=lambda *_: None)
+    # and where nothing is published, install points at the same command
+    assert "qccd toolchain build-checker" in toolchain._source_hint("qcheck")
+
+
+def test_check_runs_the_checker_in_use_and_passes_on_its_verdict(tmp_path):
+    if BUILT_QCHECK is None:
+        pytest.skip("no checker built in this checkout (`qccd toolchain build-checker`)")
+    ok, bad = tmp_path / "ok.qcheck.json", tmp_path / "bad.qcheck.json"
+    empty = '"moves": [], "gates": [], "gate_sites": ["S0"], "hops": []'
+    ok.write_text('{"circuit": "c", "arch": "none", "n_qubits": 0, "map": {}, "init": {}, "circuit_ops": [], '
+                  + empty + '}', encoding="utf-8")
+    bad.write_text('{"circuit": "c", "arch": "none", "n_qubits": 2, "map": {"0": "a", "1": "b"}, '
+                   '"init": {"a": "S0", "b": "S0"}, "circuit_ops": [{"i": 0, "name": "cx", "qubits": [0, 1]}], '
+                   + empty + '}', encoding="utf-8")
+    env = {**os.environ, "QCCD_QCHECK": str(BUILT_QCHECK)}
+
+    def check(*args):
+        return subprocess.run([sys.executable, "-m", "qccd.workspace", "toolchain", "check", *map(str, args)],
+                              cwd=REPO, capture_output=True, text=True, timeout=60, env=env)
+    a, r, gone = check(ok), check(bad), check(tmp_path / "nope.json")
+    assert a.returncode == 0 and "ACCEPTED" in a.stdout, a.stdout + a.stderr
+    assert r.returncode == 1 and "REJECTED" in r.stdout, r.stdout + r.stderr
+    assert gone.returncode == 2 and "no such file" in gone.stderr
+    # what the checker says names no source file: a reader may quote it whole
+    assert ".py" not in a.stdout and "bridge/" not in a.stdout
+
+
+def test_the_checker_refuses_a_malformed_input_by_name(tmp_path):
+    """`{}` was read as an empty programme and ACCEPTED, and a move whose t is 20.0 was dropped
+    -- a programme with one move fewer.  Both are refused now, naming what is wrong."""
+    if BUILT_QCHECK is None:
+        pytest.skip("no checker built in this checkout (`qccd toolchain build-checker`)")
+    whole = ('{"circuit": "c", "arch": "none", "n_qubits": 1, "map": {"0": "a"}, "init": {"a": "S0"}, '
+             '"circuit_ops": [], "moves": [MOVE], "gates": [], "gate_sites": ["S0", "S1"], '
+             '"hops": [{"from": "S0", "to": "S1"}]}')
+    cases = {"{}": ("{}", 'the field "circuit" is missing'),
+             "float t": (whole.replace("MOVE", '{"t": 20.0, "ion": "a", "from": "S0", "to": "S1"}'),
+                         'moves[0] is malformed: "t" is not a whole number'),
+             "qubit 0.5": (whole.replace("MOVE", "").replace('"circuit_ops": []',
+                                                             '"circuit_ops": [{"i": 0, "name": "h", "qubits": [0.5]}]'),
+                           'circuit_ops[0] is malformed: "qubits" is not a list of whole numbers'),
+             "no hops": (whole.replace("MOVE", "").replace(', "hops": [{"from": "S0", "to": "S1"}]', ""),
+                         'the field "hops" is missing')}
+    for name, (text, says) in cases.items():
+        f = tmp_path / "x.qcheck.json"
+        f.write_text(text, encoding="utf-8")
+        r = subprocess.run([str(BUILT_QCHECK), str(f)], capture_output=True, text=True, timeout=60)
+        assert r.returncode == 1 and "REJECTED -- the input is malformed" in r.stdout and says in r.stdout, \
+            (name, r.stdout, r.stderr)
+    # the same document with a whole move is read, and judged on what it says
+    f.write_text(whole.replace("MOVE", '{"t": 1, "ion": "a", "from": "S0", "to": "S1"}'), encoding="utf-8")
+    r = subprocess.run([str(BUILT_QCHECK), str(f)], capture_output=True, text=True, timeout=60)
+    assert "malformed" not in r.stdout and r.returncode in (0, 1), r.stdout

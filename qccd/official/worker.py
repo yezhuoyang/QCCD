@@ -45,12 +45,15 @@ MAX_ATTEMPTS = 3
 COMPILER_TIMEOUT_S = float(os.environ.get("QCCD_GRADER_COMPILER_TIMEOUT_S", "10800"))
 
 
-def _job_timeout(job_dir: Path, default: float) -> float:
+def _job_kind(job_dir: Path) -> str | None:
     try:
-        kind = json.loads((job_dir / "job.json").read_text(encoding="utf-8")).get("kind")
+        return json.loads((job_dir / "job.json").read_text(encoding="utf-8")).get("kind")
     except (OSError, ValueError):
-        kind = None
-    return max(default, COMPILER_TIMEOUT_S) if kind == "compiler" else default
+        return None
+
+
+def _job_timeout(job_dir: Path, default: float) -> float:
+    return max(default, COMPILER_TIMEOUT_S) if _job_kind(job_dir) == "compiler" else default
 
 
 def _now() -> float:
@@ -74,6 +77,24 @@ def grade_one(job_dir: Path, releases: Path, suites: Path | None = None) -> int:
         rep = grade(rel, job_dir / "bundle", "reference", workdir=Path(td),
                     run={"job_id": job["job"], "grader": socket.gethostname()})
     (job_dir / "report.json").write_text(json.dumps(rep, sort_keys=True), encoding="utf-8")
+    return 0
+
+
+#: the largest entry page the service keeps (a 98-ion memory board's is about 2.5 MB)
+MAX_PAGE_BYTES = 64 * 1024 * 1024
+PAGE_TIMEOUT_S = 600.0
+
+
+def draw_page(job_dir: Path, releases: Path) -> int:
+    """The page the leaderboard entry opens (pages.py), from the bundle just graded, into
+    page.html beside the report.  Run as its own limited child after a passing grade."""
+    from ..workspace.tasks import TaskRelease
+    from .pages import render_entry_page
+    job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+    rid = str(job["release"])
+    if "/" in rid or "\\" in rid or ".." in rid:
+        raise SystemExit("bad release id")
+    render_entry_page(job_dir / "bundle", TaskRelease.load(Path(releases) / rid), job_dir / "page.html")
     return 0
 
 
@@ -110,17 +131,66 @@ def grade_compiler(job_dir: Path, suite_dir: Path, job: dict) -> int:
     return 0
 
 
+def _child_env() -> dict:
+    """The minimal environment a grading or drawing child gets (no credentials)."""
+    return {k: v for k, v in os.environ.items()
+            if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
+                     "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
+                     "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
+                     "LANG", "LC_ALL", "LC_CTYPE")}
+
+
+def redraw(svc, releases: Path, *, task: str | None = None) -> dict:
+    """Draw every graded design entry's page again from its stored archive, without grading it
+    again: the page an entry opens follows the studio's template, so a new template means new
+    pages, and a regrade would sample every logical error rate again (a BB entry is 25-45 min on
+    the droplet).  Each page is drawn the way the grader draws it (`draw_page`, a limited child)
+    and replaces artifacts/pages/<id>.html; the reports are untouched."""
+    from ..workspace.bundle import extract_archive
+    from ..workspace.procs import run_limited
+    sql = "SELECT id, task, archive_sha256 FROM submissions WHERE status IN ('eligible', 'ineligible')"
+    rows = svc.db.all(sql + (" AND task=?" if task else "") + " ORDER BY created_at", (task,) if task else ())
+    mem = int(os.environ.get("QCCD_GRADER_MEM_MB", "16384"))
+    out = {"drawn": 0, "failed": []}
+    pages = svc.artifacts / "pages"
+    pages.mkdir(parents=True, exist_ok=True)
+    for r in rows:
+        if svc.is_suite(r["task"]) or r["task"] not in svc.releases:
+            continue
+        with tempfile.TemporaryDirectory() as td:
+            jd = Path(td) / "job"
+            jd.mkdir()
+            (jd / "job.json").write_text(json.dumps({"job": "redraw", "release": r["task"]}), encoding="utf-8")
+            extract_archive((svc.artifacts / f"{r['archive_sha256']}.zip").read_bytes(), jd / "bundle")
+            p = run_limited([sys.executable, "-m", "qccd.official.worker", "page", str(jd), "--releases", str(releases)],
+                            timeout=PAGE_TIMEOUT_S, mem_mb=mem, env=_child_env())
+            page = jd / "page.html"
+            ok = p.status == "ok" and page.exists() and page.stat().st_size <= MAX_PAGE_BYTES
+            if ok:
+                shutil.copyfile(page, pages / f".{r['id']}.tmp")
+                os.replace(pages / f".{r['id']}.tmp", pages / f"{r['id']}.html")
+                out["drawn"] += 1
+            else:
+                out["failed"].append({"id": r["id"], "status": p.status, "stderr": (p.stderr or "")[-300:]})
+        print(f"[redraw] {r['id']} {r['task']}: {'drawn' if ok else 'FAILED'}", flush=True)
+    return out
+
+
 def _grade_subprocess(job_dir: Path, releases: Path, timeout: float) -> str:
     """Run `grade_one` in a limited child with a minimal environment (no credentials)."""
     from ..workspace.procs import run_limited
-    env = {k: v for k, v in os.environ.items()
-           if k in ("PATH", "SYSTEMROOT", "PYTHONPATH", "QCCD_QCCDC", "QCCD_QCHECK", "TEMP", "TMP", "TMPDIR", "HOME",
-                    "QCCD_OFFICIAL_SUITES", "QCCD_SANDBOX_SPOOL",
-                    "USERPROFILE", "LOCALAPPDATA", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
-                    "LANG", "LC_ALL", "LC_CTYPE")}
+    env = _child_env()
+    mem = int(os.environ.get("QCCD_GRADER_MEM_MB", "16384"))
     r = run_limited([sys.executable, "-m", "qccd.official.worker", "one", str(job_dir), "--releases", str(releases)],
-                    timeout=timeout, mem_mb=int(os.environ.get("QCCD_GRADER_MEM_MB", "16384")), env=env)
+                    timeout=timeout, mem_mb=mem, env=env)
     if r.status == "ok" and (job_dir / "report.json").exists():
+        # the entry's page, in a child of its own: a page that cannot be drawn never costs the grade
+        if _job_kind(job_dir) != "compiler":
+            p = run_limited([sys.executable, "-m", "qccd.official.worker", "page", str(job_dir), "--releases", str(releases)],
+                            timeout=PAGE_TIMEOUT_S, mem_mb=mem, env=env)
+            if p.status != "ok" or not (job_dir / "page.html").exists():
+                (job_dir / "page.err").write_text(f"{p.status}: {(p.stderr or '')[-4000:]}", encoding="utf-8")
+                (job_dir / "page.html").unlink(missing_ok=True)
         return "ok"
     (job_dir / "grader.log").write_text((r.stdout + "\n" + r.stderr)[-20000:], encoding="utf-8")
     return r.status
@@ -223,6 +293,15 @@ def process_one(svc, spool: Path, *, inline: bool, releases: Path, timeout: floa
     status = (out / "DONE").read_text(encoding="utf-8").strip()
     if status == "ok":
         report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+        page = out / "page.html"
+        if page.exists() and page.stat().st_size <= MAX_PAGE_BYTES:
+            try:
+                pages = svc.artifacts / "pages"
+                pages.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(page, pages / f".{sub['id']}.tmp")
+                os.replace(pages / f".{sub['id']}.tmp", pages / f"{sub['id']}.html")
+            except OSError as exc:       # the page is a convenience: the grade is recorded regardless
+                print(f"[worker] {sub['id']}: page not kept: {exc}", file=sys.stderr, flush=True)
         svc.record_report(sub["id"], report)
         svc.db.execute("UPDATE jobs SET status='succeeded', finished_at=?, error=NULL WHERE id=?", (_now(), job["id"]))
     else:
@@ -264,9 +343,28 @@ def main(argv=None) -> int:
     p = sub.add_parser("one")
     p.add_argument("job_dir")
     p.add_argument("--releases", default=rel_default)
+    p = sub.add_parser("page")
+    p.add_argument("job_dir")
+    p.add_argument("--releases", default=rel_default)
+    p = sub.add_parser("redraw", help="draw every graded entry's page again from its archive (a new template); "
+                                      "no grade, no report changes")
+    p.add_argument("--db", default=os.environ.get("QCCD_OFFICIAL_DB", "sqlite:///official/official.db"))
+    p.add_argument("--artifacts", default=os.environ.get("QCCD_OFFICIAL_ARTIFACTS", "official/artifacts"))
+    p.add_argument("--releases", default=rel_default)
+    p.add_argument("--task", default=None)
     a = ap.parse_args(argv)
+    if a.cmd == "redraw":
+        from .service import OfficialService
+        svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(_suites_default()))
+        r = redraw(svc, Path(a.releases), task=a.task)
+        print(json.dumps({"drawn": r["drawn"], "failed": len(r["failed"])}))
+        for f in r["failed"]:
+            print(json.dumps(f), file=sys.stderr)
+        return 0 if not r["failed"] else 1
     if a.cmd == "one":
         return grade_one(Path(a.job_dir), Path(a.releases), Path(_suites_default()))
+    if a.cmd == "page":
+        return draw_page(Path(a.job_dir), Path(a.releases))
     if a.cmd == "grader":
         run_grader(Path(a.spool), Path(a.releases))
         return 0

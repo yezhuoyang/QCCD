@@ -3,7 +3,9 @@ rules -- and the checker still finds what we plant in them.
 
 Every verdict comes from `timed.check` with the paper's profile, its duration law (strict:
 an operation the law does not price is refused) and the circuit; each test that expects
-silence also plants a fault and expects the checker to name it.
+silence also plants a fault and expects the checker to name it.  Ours are also held to the
+circuit's order (``circuit_order="strict"``) whatever the paper's profile allows: our
+schedulers never change the order of a qubit's gates, commuting or not.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import json
 import pytest
 
 from qccd.repro import catalog, importers, models, sched_jones, sched_moveless, sched_tiscc
-from qccd.repro.__main__ import ROOT, _circuit, _open, check_ours
+from qccd.repro.__main__ import PROFILES, ROOT, _circuit, _law_and_observers, _open, check_ours
 from qccd.repro.timed import TimedSchedule, check
 
 
@@ -26,9 +28,9 @@ def _replace(s: TimedSchedule, eid: int, **kw) -> TimedSchedule:
 # ------------------------------------------------------------------------------ Moveless
 
 
-def _moveless(code: str = "SC9_L8"):
+def _moveless(code: str = "SC9_L8", kind: str = "Moveless_1m"):
     base = ROOT / "khan2025moveless"
-    run = f"{code}_Moveless_1m"
+    run = f"{code}_{kind}"
     path = _open(base / "artifact" / f"{run}.schedule.json.gz")
     raw = json.loads(path.read_text(encoding="utf-8"))
     law = importers.qccdsim_params(raw["config"], raw["device"])
@@ -37,28 +39,41 @@ def _moveless(code: str = "SC9_L8"):
     return importers.import_qccdsim(path), law, circ
 
 
-def _moveless_check(s, law, circ):
-    return check(s, models.QCCDSIM_GATESET, duration=models.qccdsim_duration(law), circuit=circ,
-                 strict=True)
+def _moveless_check(s, law, circ, order: str | None = None):
+    prof = models.QCCDSIM_GATESET
+    if order:
+        prof = dataclasses.replace(prof, circuit_order=order)
+    return check(s, prof, duration=models.qccdsim_duration(law), circuit=circ, strict=True)
 
 
-def test_moveless_one_ancilla_tours_the_line_once():
+def test_moveless_ancilla_walks_to_every_cnot_in_the_files_order():
     ref, law, circ = _moveless("SC25_L24")
     s = sched_moveless.build(circ, ref.device, law=law)
     rep = _moveless_check(s, law, circ)
     assert rep.ok, rep.summary()
-    # 80 CNOTs of 100 us in a row, the first move 170 us, three more with a gate swap (470 us)
-    assert rep.metrics["makespan_us"] == 80 * 100 + 170 + 3 * 470
+    # every CNOT exactly where the benchmark file lists it, and the strict replay agrees
+    gates = [tuple(e.ions) for e in sorted(s.events, key=lambda e: (e.t0, e.id)) if e.kind == "gate"]
+    assert gates == [tuple(g) for g in circ]
+    assert _moveless_check(s, law, circ, "strict").ok
+    # the data stay put: apart from the brigade that fills traps at the start, only the
+    # ancilla moves
+    walkers = {e.ions[0] for e in s.events if e.kind == "move" and e.meta.get("why") != "brigade"}
+    assert walkers == {"25"}
     # every trap starts at the paper's fill of 5 ions
     assert max(len(c) for c in s.chains.values()) <= 5
-    swaps = [e for e in s.events if e.kind == "split" and e.swap]
-    assert len(swaps) == 3 and {e.ions[0] for e in swaps} == {"25"}
+    # 80 CNOTs of 100 us in a row plus the ancilla's walk, which the plan's model prices exactly
+    assert rep.metrics["makespan_us"] == 80 * 100 + s.source["plan"]["walk_us"] == 16480
+    # the paper's own in-order run (it moves the ancilla only, data at its placement) also
+    # keeps the file's order, and takes longer
+    mao, mao_law, mao_circ = _moveless("SC25_L24", "MAO_1m")
+    theirs = _moveless_check(mao, mao_law, mao_circ, "strict")
+    assert theirs.ok and theirs.metrics["makespan_us"] == 20920 > rep.metrics["makespan_us"]
 
 
 def test_moveless_planted_faults_are_found():
     ref, law, circ = _moveless("SC9_L8")
     s = sched_moveless.build(circ, ref.device, law=law)
-    assert _moveless_check(s, law, circ).ok
+    assert _moveless_check(s, law, circ).ok and _moveless_check(s, law, circ, "strict").ok
     # a CNOT dropped: the set of CNOTs is no longer the benchmark's
     g = next(e for e in s.events if e.kind == "gate")
     dropped = dataclasses.replace(s, events=[e for e in s.events if e.id != g.id])
@@ -66,6 +81,15 @@ def test_moveless_planted_faults_are_found():
     # the ancilla's move made 10 us shorter than QCCDSim's law
     mv = next(e for e in s.events if e.kind == "move")
     assert _moveless_check(_replace(s, mv.id, t1=mv.t1 - 5), law, circ).failed("durations")
+    # two CNOTs in one trap run the other way round: the same set (the paper's rule passes
+    # it), but not the file's order
+    gates = sorted((e for e in s.events if e.kind == "gate"), key=lambda e: e.t0)
+    a, b = next((x, y) for x, y in zip(gates, gates[1:]) if x.at == y.at and x.ions != y.ions)
+    swapped = dataclasses.replace(s, events=[
+        dataclasses.replace(e, ions=b.ions) if e.id == a.id else
+        dataclasses.replace(e, ions=a.ions) if e.id == b.id else e for e in s.events])
+    assert _moveless_check(swapped, law, circ).ok
+    assert _moveless_check(swapped, law, circ, "strict").failed("circuit")
 
 
 # --------------------------------------------------------------------------------- Jones
@@ -78,18 +102,26 @@ def _jones(d: int = 2):
     return ref, stim, importers.stim_cx(stim)
 
 
-def _jones_check(s, circ):
-    return check(s, models.JONES, duration=models.jones_duration, circuit=circ, strict=True)
+def _jones_check(s, circ, order: str | None = None):
+    prof = models.JONES if not order else dataclasses.replace(models.JONES, circuit_order=order)
+    return check(s, prof, duration=models.jones_duration, circuit=circ, strict=True)
 
 
-def test_jones_tours_pass_the_circuit_check_the_artifact_fails():
+def test_jones_tours_keep_the_circuits_order_the_artifact_does_not():
     ref, stim, circ = _jones(3)
     theirs = check(ref, models.JONES, duration=models.jones_duration, circuit=circ)
     assert theirs.failed("circuit")                     # the artifact's own grid schedule
     s = sched_jones.build(ref.device, ref.chains, ref.qubits, stim)
     rep = _jones_check(s, circ)
     assert rep.ok, rep.summary()
-    assert rep.metrics["last_start_us"] < theirs.metrics["last_start_us"]
+    # every qubit meets its CNOT partners in exactly stim's order, commuting or not
+    assert _jones_check(s, circ, "strict").ok
+    assert rep.metrics["last_start_us"] == 3010 < theirs.metrics["last_start_us"]
+    # each ancilla tours its data in its own circuit order: the plan is the circuit's
+    cx, prog, _ = sched_jones.stim_program(stim)
+    tours = s.source["plan"]["tours"]
+    for a, ks in tours.items():
+        assert ks == [it[1] for it in prog[a] if it[0] == "cx"], a
     # the same operations as the paper's: every reset, rotation, MS and measurement
     for kind in ("reset", "gate1", "gate", "measure"):
         assert rep.metrics["counts"][kind] == theirs.metrics["counts"][kind], kind
@@ -125,6 +157,26 @@ def test_jones_planted_faults_are_found():
     # a junction entry made free
     je = next(e for e in s.events if e.kind == "j_enter")
     assert _jones_check(_replace(s, je.id, t1=je.t0), circ).failed("durations")
+
+
+def test_jones_strict_order_refuses_a_commuting_swap_the_papers_rule_allows():
+    """What the old tours did: a data qubit met its two middle CNOTs (same role, so they
+    commute) the other way round.  Played against a circuit with those two CNOTs exchanged,
+    our schedule passes the paper's rule and fails the circuit's order."""
+    ref, stim, circ = _jones(3)
+    s = sched_jones.build(ref.device, ref.chains, ref.qubits, stim)
+    for q in sorted({x for g in circ for x in g}, key=int):
+        mine = [k for k, g in enumerate(circ) if q in g]
+        roles = [circ[k][0] == q for k in mine]
+        # a data qubit (it is control for one kind of check, target for the other) whose
+        # two middle CNOTs have the same role
+        if len(mine) == 4 and len(set(roles)) == 2 and roles[1] == roles[2]:
+            k1, k2 = mine[1], mine[2]
+            break
+    swapped = list(circ)
+    swapped[k1], swapped[k2] = circ[k2], circ[k1]
+    assert _jones_check(s, swapped).ok
+    assert _jones_check(s, swapped, "strict").failed("circuit")
 
 
 # --------------------------------------------------------------------------------- TISCC
@@ -182,6 +234,28 @@ def test_tiscc_planted_faults_are_found():
 
 
 # ------------------------------------------------------------------------- on the page
+
+
+@pytest.mark.parametrize("key,mod", [("jones2025", sched_jones), ("khan2025moveless", sched_moveless)])
+def test_published_ours_rebuild_byte_for_byte_and_keep_the_circuits_order(key, mod, tmp_path):
+    """The files on the page are what the scheduler builds today (``publish`` writes them),
+    and each passes its paper's profile with the circuit's order made strict."""
+    p = catalog.paper(key)
+    published = sorted((ROOT / key / "ours").glob("*_ours.schedule.json.gz"))
+    assert len(published) == 4
+    mod.publish(tmp_path)
+    for f in published:
+        assert (tmp_path / f.name).read_bytes() == f.read_bytes(), f.name
+    for o in catalog.OURS[key]["runs"]:
+        spec = next(r for r in p["runs"] if r["id"] == o["against"])
+        sched = TimedSchedule.load(_open(ROOT / key / o["file"]))
+        circ = _circuit(ROOT / key, spec["circuit"])
+        raw = json.loads(_open(ROOT / key / "artifact" / spec["file"]).read_text(encoding="utf-8"))
+        for name in o["profiles"]:
+            prof = dataclasses.replace(PROFILES[name], circuit_order="strict")
+            law, observers, _ = _law_and_observers(spec, sched, raw)
+            rep = check(sched, prof, duration=law, circuit=circ, observers=observers, strict=True)
+            assert rep.ok, (o["id"], rep.summary())
 
 
 @pytest.mark.parametrize("key,run_id", [("khan2025moveless", "SC9_L8_ours"),

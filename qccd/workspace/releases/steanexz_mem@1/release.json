@@ -1,0 +1,138 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:272680ae2b209867abe1ab579de6b3669e0a9788633de93fb4852f04abcc5b6f",
+  "file": "circuit.qasm"
+ },
+ "description": "Three rounds of two flagged Steane [[7,1,3]] blocks in lockstep, one a Z memory and one an X memory (32 ions: 14 data, 12 check and 6 flag ancillas), then the data read out, each block in its own basis. Circuit distance 3; decoded with BP-OSD. Ranked with every Goal 1 code by the logical error rate per round per logical qubit under qccd-noise@2, with Helios-class physics in which every number is cited.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 600,
+  "lean_timeout_s": 1800,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('quantinuum')",
+   "better": "low",
+   "name": "T_quantinuum",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  },
+  {
+   "about": "logical error rate per syndrome round, 1-(1-LER)^(1/rounds), under the release's noise model",
+   "better": "low",
+   "name": "ler_per_round",
+   "unit": "per round"
+  },
+  {
+   "about": "logical error rate of the whole memory experiment (Monte Carlo, fixed seed, 95% interval in the report)",
+   "better": "low",
+   "name": "ler",
+   "unit": "per experiment"
+  },
+  {
+   "about": "logical error rate per round divided by the logical qubits the experiment tests (qccd.qec.experiments.logical_qubits): what Goal 1 ranks every code by",
+   "better": "low",
+   "name": "ler_per_round_per_logical",
+   "unit": "per round per logical qubit"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 11,
+ "physics": {
+  "digest": "sha256:8f08a9b687e5f7026b85e71270bfff1591c421dfc2da0fa08391c11a923c967c",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "quantinuum",
+  "tables": [
+   "quantinuum"
+  ]
+ },
+ "qec": {
+  "detectors": {
+   "digest": "sha256:233e4facbc791a4982f8ebc1929cb6f5fa34fb5af8591daa95c4678a7d50520b",
+   "file": "detectors.json"
+  },
+  "experiment": "steanexz_r3",
+  "ler": {
+   "decoder": "bposd",
+   "max_errors": 400,
+   "max_shots": 200000,
+   "seed": 20261021
+  },
+  "logical_qubits": 1,
+  "n_ions": 32,
+  "noise": "qccd-noise@2"
+ },
+ "rank_by": "ler_per_round_per_logical",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics",
+  "ler"
+ ],
+ "starter": {
+  "generator": "grid",
+  "name": "grid5x5",
+  "params": {
+   "a": 5,
+   "b": 5
+  }
+ },
+ "task": "steanexz_mem",
+ "title": "Steane code memory, both bases",
+ "track": "codesign-artifact",
+ "version": 1
+}

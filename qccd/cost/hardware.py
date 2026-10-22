@@ -36,7 +36,26 @@ from typing import Mapping
 
 from ..arch import Architecture
 
-__all__ = ["HardwareReport", "hardware_report", "deck_unit_cell_report"]
+__all__ = ["HardwareReport", "hardware_report", "deck_unit_cell_report", "WIRING_FLOORS"]
+
+#: What a device may not declare for itself (#15).  HOW it is wired -- direct, broadcast, a
+#: channel map -- is a design choice and stays the device's.  How many electrodes a trap needs,
+#: how many of them are compensation electrodes, how far a demultiplexer divides those, and
+#: how many waveforms it takes to move an ion out of a cell are the deck's physics (p.19-20),
+#: and they are the numbers every honest device in this repository declares.  Without a floor
+#: a device could declare one electrode per trap, or one broadcast channel, and fit any budget:
+#: the grader trusted `control.wiring` and `control` is a design variable, not a fixed block.
+#: A device that declares less is counted at these; one that declares more, at its own.  The
+#: electrodes of a junction follow from the trap's through `budget.junction_electrode_multiplier`,
+#: which IS a fixed block.
+WIRING_FLOORS: Mapping[str, int] = {
+    "electrodes_per_trap": 24,              # 12 linear + 4 junction + 8 compensation
+    # together, the least the compensation term may count: 8 shims a trap through the deck's
+    # 1:100 demultiplexer (a floor on the COUNT; see `compensation_floor`)
+    "compensation_electrodes_per_trap": 8,
+    "max_shim_per_dac": 100,
+    "channels_per_site": 32,                # (6 + 6 + 4) electrode roles, each a differential pair
+}
 
 
 @dataclass
@@ -86,8 +105,14 @@ class HardwareReport:
         }
 
 
-def hardware_report(arch: Architecture) -> HardwareReport:
-    """Electrode, switch and DAC counts for any architecture, from its expanded graph."""
+def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = None,
+                    budget: Mapping | None = None) -> HardwareReport:
+    """Electrode, switch and DAC counts for any architecture, from its expanded graph.
+
+    `floors` (the grader passes `WIRING_FLOORS`) counts every number the device declares
+    about its own wiring at no less than the physics allows, and says so in `notes`.
+    `budget` judges the device against a budget other than its own -- the task release's.
+    """
     dev = arch.device
     wiring = dict(arch.control.get("wiring", {}) or {})
     scheme = str(wiring.get("scheme", "direct"))
@@ -95,9 +120,41 @@ def hardware_report(arch: Architecture) -> HardwareReport:
     per_junction = int(wiring.get("electrodes_per_junction", 48))
     shim_per_dac = int(wiring.get("shim_per_dac", 1) or 1)
     compensation_per_cell = int(wiring.get("compensation_electrodes_per_trap", 8))
+    budget = dict(arch.budget if budget is None else budget)
+
+    notes: list[str] = []
+
+    def floor(what: str, declared: int, least: int) -> int:
+        if declared < least:
+            notes.append(f"{what}: the device declares {declared}; counted at the physics' {least}")
+            return least
+        return declared
 
     plane = arch.control_plane
+    broadcast_scheme = scheme in ("wise", "broadcast_groups")
+    # each floor is applied on the path where the number it floors is what gets counted, so
+    # a note never names a number that changed nothing
+    if floors is not None and not plane.declared and not broadcast_scheme:
+        per_trap = floor("electrodes per trap", per_trap, int(floors["electrodes_per_trap"]))
+        per_junction = floor("electrodes per junction", per_junction,
+                             int(budget.get("junction_electrode_multiplier", 2)) * per_trap)
+
     traps = [n for n in dev.nodes.values() if n.kind == "site"]
+
+    def compensation_floor(declared: int) -> int:
+        """The compensation DACs are floored as a COUNT, not factor by factor.  A device may
+        honestly trade fewer shims for no demultiplexer (`h2_racetrack`: one shim a trap,
+        driven directly, 40 DACs); flooring each factor would charge it for a combination
+        neither it nor the deck declares (8 shims, no demux: 320).  What it may not do is
+        come in under the deck's cheapest: 8 shims a trap through a 1:100 demultiplexer."""
+        least = math.ceil(len(traps) * int(floors["compensation_electrodes_per_trap"])
+                          / int(floors["max_shim_per_dac"]))
+        if declared < least:
+            notes.append(f"compensation: {declared} DAC(s) declared; counted at the physics' {least} "
+                         f"({floors['compensation_electrodes_per_trap']} shims a trap, "
+                         f"1:{floors['max_shim_per_dac']} demultiplexer)")
+            return least
+        return declared
     junction_ids = dev.junction_nodes
     deg_hist: dict[int, int] = {}
     for nid in dev.nodes:
@@ -109,22 +166,42 @@ def hardware_report(arch: Architecture) -> HardwareReport:
     electrodes = e_trap + e_junction
     switches = electrodes * 2  # every DC is wired through a two-way switch (deck p.19)
 
-    notes: list[str] = []
     if plane.declared:
         # count the channels the wiring actually has, rather than trusting a formula
         broadcast = plane.n_shared_channels
         comp_dacs = plane.n_compensation_channels
-        dacs = plane.n_channels
         electrodes = plane.n_electrodes
         switches = plane.n_switches
         notes.extend(plane.notes)
+        if floors is not None:
+            # The map is counted, but how many channels drive one site is still declared: a
+            # map of ONE broadcast channel (roles ["linear"], no differential pair) passes R4d
+            # whenever each cycle moves its ions alike.  Moving an ion takes every electrode
+            # role of its cell, so a site driven by fewer than `channels_per_site` channels is
+            # under-declared, and the map is counted as if each of its channels were that many.
+            least = int(floors["channels_per_site"])
+            driven = [len(plane.channels_of(s)) for s in (n.id for n in traps)]
+            driven = [k for k in driven if k > 0]
+            if driven and min(driven) < least:
+                scaled = math.ceil(broadcast * least / min(driven))
+                notes.append(f"channel map: a site is driven by {min(driven)} channel(s); moving an "
+                             f"ion takes {least}, so {broadcast} channel(s) count as {scaled}")
+                broadcast = scaled
+            comp_dacs = compensation_floor(comp_dacs)
+        dacs = broadcast + comp_dacs
         notes.append(
-            f"{plane.n_shared_channels} shared channel(s) + {comp_dacs} compensation = "
+            f"{broadcast} shared channel(s) + {comp_dacs} compensation = "
             f"{dacs}, counted from the channel map")
-    elif scheme in ("wise", "broadcast_groups"):
+    elif broadcast_scheme:
         broadcast = int(wiring.get("dacs_dynamic", 0))
+        if floors is not None:
+            # no map, so nothing checks that this many waveforms can drive the device
+            broadcast = floor("broadcast DACs (dacs_dynamic, no channel map)", broadcast,
+                              int(floors["channels_per_site"]))
         compensation = len(traps) * compensation_per_cell
         comp_dacs = math.ceil(compensation / shim_per_dac) if shim_per_dac else compensation
+        if floors is not None:
+            comp_dacs = compensation_floor(comp_dacs)
         dacs = broadcast + comp_dacs
         notes.append(
             f"broadcast wiring: {broadcast} DACs are constant in array size; only the "
@@ -140,7 +217,6 @@ def hardware_report(arch: Architecture) -> HardwareReport:
         dacs = electrodes
         notes.append("direct wiring: one DAC per electrode, so DAC count is O(traps)")
 
-    budget = dict(arch.budget)
     over: list[str] = []
     if "max_dacs" in budget and dacs > int(budget["max_dacs"]):
         over.append(f"dacs {dacs} > max_dacs {budget['max_dacs']}")

@@ -12,6 +12,9 @@
 the search index) and `build_section(out, put)` with its own `put`, so each page here gets
 the site's bar, search and comment layer like any other.  `python -m qccd.gadget site`
 builds this section alone, for a deploy that must not rebuild the rest of the site.
+
+`embed_page(name, dst)` writes one page as a figure for the tutorial: no bar, no file beside
+it, nothing fetched.
 """
 
 from __future__ import annotations
@@ -26,7 +29,8 @@ from .categories import CATEGORIES, ORDER
 from .logicq import parse, parse_file
 from .programs import showcase
 
-__all__ = ["index_entries", "build_section", "SECTION", "standalone"]
+__all__ = ["index_entries", "build_section", "SECTION", "standalone", "embed_page",
+           "export_place_arch"]
 
 SECTION = "gadgets"
 ROOT = Path(__file__).resolve().parents[2]
@@ -328,7 +332,7 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         ops = [op for m in leaves for op in m.ops.values()]
         n_ok = sum(1 for op in ops if op.status == "verified")
         n_logic = sum(1 for op in ops if (op.logic or {}).get("status") == "verified")
-        n_alg = sum(1 for r in algs.values() if r["signoff"].get("passed"))
+        n_alg = sum(1 for r in algs.values() if _signed(r))
         body.append(f'<div class="gstat"><div><b>{len([m for m in leaves if m.family != "road"])}</b>places</div>'
                     f'<div><b>{n_ok}/{len(ops)}</b>ops pass the hardware rules</div>'
                     f'<div><b>{n_logic}</b>ops verified as logic</div>'
@@ -494,9 +498,34 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
     return "".join(body)
 
 
+def _signed(res: dict) -> bool:
+    """Signed off end to end: flat, or -- for a program too large to flatten -- in parts."""
+    return bool(res["signoff"].get("passed")) or (
+        res["signoff"].get("passed") is None and bool((res.get("compositional") or {}).get("passed")))
+
+
 def _algo_card(stem: str, res: dict, *, prefix: str) -> str:
     alg, so, st, ck = res["algorithm"], res["signoff"], res["stats"], res["checks"]
     lines = []
+    cs = res.get("compositional") or {}
+    if so.get("passed") is None and cs.get("parts"):
+        parts = cs["parts"]
+        lines.append(f'<li class="muted">{len(alg.instructions)} instructions, '
+                     f'{sum(1 for i in alg.instructions if i.kind == "inject")} magic states: '
+                     f'signed off in parts, as a program this size must be</li>')
+        g = parts.get("gates", {})
+        if g.get("rows"):
+            names = ", ".join(r["gate"] for r in g["rows"])
+            lines.append(f'<li>{"✓" if g["passed"] else "✗"} every gate it calls is its contract in '
+                         f'every branch: {html.escape(names)}</li>')
+        c = parts.get("composition", {})
+        lines.append(f'<li>{"✓" if c.get("passed") else "✗"} the floorplan and the schedule obey '
+                     f'every machine rule ({len(c.get("held", []))})</li>')
+        d = parts.get("semantics", {}).get("distribution") or []
+        if d:
+            lines.append('<li>✓ with every call as its contract, the outcomes: ' + html.escape("; ".join(
+                " ".join(f"{k}={v}" for k, v in r["outcomes"].items()) + f" with probability {r['p']:g}"
+                for r in d[:8])) + '</li>')
     for r in so.get("relations", []):
         lines.append(f'<li>{"✓" if r["ok"] else "✗"} {html.escape(r["relation"])}</li>')
     for f in so.get("flows", []):
@@ -511,15 +540,16 @@ def _algo_card(stem: str, res: dict, *, prefix: str) -> str:
     about = " ".join(l.lstrip("# ").strip() for l in body if l.lstrip().startswith("#"))
     src = "\n".join(l for l in body if not l.lstrip().startswith("#"))
     return (f'<div class="algo"><h3><a href="{prefix}{stem}/">{html.escape(alg.title)}</a> '
-            f'{_pill(bool(so.get("passed")), "signed off", "not signed off")}</h3>'
+            f'{_pill(_signed(res), "signed off", "not signed off")}</h3>'
             + (f'<p class="muted" style="font-size:13px;margin:2px 0">{html.escape(about)}</p>'
                if about else "")
             + f'<pre>{html.escape(src)}</pre><ul>{"".join(lines)}</ul>'
             f'<div class="gstat"><div><b>{st["blocks"]}</b>blocks</div>'
             f'<div><b>{_fmt_ms(st["makespan_ms"] * 1000)}</b>machine time</div>'
             f'<div><b>{st["events"]}</b>gadget ops</div>'
-            f'<div><b class="{"ok" if not ck["failed"] else "bad"}">{len(ck["passed"])}/9</b>'
-            f'G checks</div></div></div>')
+            f'<div><b class="{"ok" if not (res.get("rules") or {}).get("failed") else "bad"}">'
+            f'{len((res.get("rules") or {}).get("passed", []))}/{len((res.get("rules") or {}).get("rules", []))}</b>'
+            f'machine rules</div></div></div>')
 
 
 def _algorithms_page(lib, algs: dict) -> str:
@@ -529,12 +559,17 @@ def _algorithms_page(lib, algs: dict) -> str:
         '<p class="sub"><a href="../">Logical gadgets</a> &rsaquo; Logical Algorithm</p>',
         "<h1>Logical Algorithm</h1>",
         '<p class="sub">A logical algorithm is a program over blocks. Each instruction names the '
-        "kind of place it needs; the scheduler takes the blocks there along the streets of a "
-        "design, runs the place's verified op, and parks any block the next instruction does not "
-        "need in a logical zone. Then the whole schedule is signed off: flattened to one circuit "
+        "kind of place it needs; the scheduler takes the blocks there along the roads of a "
+        "floorplan -- the town below, unless the program names its own -- runs the place's "
+        "verified op, and rests any block the next instruction does not need, in a logical zone or "
+        "in a memory that corrects it while it waits. Instructions run as early as their blocks "
+        "and places allow, so a factory produces while a lattice surgery runs elsewhere. Every "
+        "schedule is judged by the machine's rules, and then signed off: flattened to one circuit "
         "over every ion, simulated once symbolically, and compared with the algorithm's ideal "
-        "circuit &mdash; relations among outcomes, random bits, flows to surviving blocks, and "
-        "the fault distance of the whole schedule.</p>",
+        "circuit; or, for a program too large to flatten (Shor's algorithm), in parts -- every "
+        "place op verified, every gate it calls proved to be its contract in every branch, every "
+        "machine rule holding, and the program's outcomes computed with each call as its "
+        "contract.</p>",
         design_svg(lib),
         '<h2>The algorithms</h2><div class="cards">',
     ]
@@ -552,15 +587,27 @@ def _algorithms_page(lib, algs: dict) -> str:
         "<tr><td><code>zz a b -&gt; m</code> &middot; <code>xx a b -&gt; m</code></td><td>measure Z̄Z̄ or X̄X̄ by lattice surgery</td><td>Lattice Surgery</td></tr>"
         "<tr><td><code>read q Z -&gt; m</code></td><td>destructive readout in Z or X</td><td>Logical Readout</td></tr>"
         "<tr><td><code>inject t</code></td><td>a block holding the factory's magic state</td><td>Magic State Factory, then Injection</td></tr>"
-        "<tr><td><code>store q</code></td><td>rest the block</td><td>Logical Zone</td></tr>"
+        "<tr><td><code>s q</code> &middot; <code>sx q</code></td><td>S̄ or √X̄, by consuming a |Ȳ⟩ block "
+        "in a lattice surgery</td><td>Injection, Lattice Surgery, Readout</td></tr>"
+        "<tr><td><code>x q</code> &middot; <code>y q</code> &middot; <code>z q</code></td><td>a logical "
+        "Pauli, kept in the classical memory: no ion moves</td><td>Classical Memory</td></tr>"
+        "<tr><td><code>store q</code></td><td>rest the block</td><td>Logical Zone or Logical Memory</td></tr>"
         "<tr><td><code>decode q</code> &middot; <code>decode</code></td><td>call the decoder: the "
         "syndromes the block left (or every one waiting) go down their wires to it, and the "
         "frame it decides to the classical memory. An outcome is a result only once decoded, "
         "and a program must decode everything it measured</td><td>Decoder</td></tr>"
         "</tbody></table></div>"
-        "<p>Build one locally with <code>python -m qccd.gadget algorithm my.alg -o out/my</code>: "
-        "the tool page, the schedule, the G1&ndash;G9 checks and the sign-off report. In the "
-        "tool, <b>Edit</b> composes places into a new design.</p>")
+        "<p>Any instruction may be <b>guarded</b>, <code>if m: s q</code>, to run only when a "
+        "measured outcome says so (<code>m ^ k</code> and <code>m &amp; k</code> combine outcomes). "
+        "A program may define <b>gates</b> from these instructions and call them like instructions:"
+        "</p><pre>gate t q implements T:\n  inject m\n  x m\n  zz q m -&gt; a\n  read m X -&gt; b\n"
+        "  decode q m\n  if a: s q\n  if b: z q</pre>"
+        "<p><code>include \"standard\"</code> brings the standard ones -- <code>sdg</code>, "
+        "<code>h</code>, <code>t</code>, <code>tdg</code>, <code>cz</code>, <code>ccx</code>, "
+        "<code>cswap</code> -- each proved to be the gate it says it implements, and "
+        "<code>floorplan \"shor\"</code> names the machine a program runs on. In the design "
+        "page, <b>Edit</b> composes places into a new design and <b>Export floorplan</b> writes "
+        "it as a floorplan of your own.</p>")
     return "".join(body)
 
 
@@ -585,3 +632,94 @@ def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadge
         p.write_text(page, encoding="utf-8", newline="")
 
     return build_section(out, put, cache_dir=cache_dir, log=log)
+
+
+# -- figures ---------------------------------------------------------------------------------
+
+#: the program a bare place is shown in: the shortest example on the town, which holds every place
+PLACE_PROGRAM = "t_gate"
+_EMBED_LEAVES: dict = {}
+
+
+def _leaves(cache_dir, log):
+    from .library import LeafLibrary
+    key = str(Path(cache_dir).resolve())
+    if key not in _EMBED_LEAVES:
+        _EMBED_LEAVES[key] = LeafLibrary(cache_dir, log=log or (lambda *a, **k: None))
+    return _EMBED_LEAVES[key]
+
+
+def export_place_arch(m: str, dst: Path, *, cache_dir="out/gadgets/cache", log=None) -> Path:
+    """Write the device of place `m` -- the architecture document its ops are compiled for and
+    verified on -- to `dst`, as the studio loads any device.  Its `name` is the place's own
+    ("msf15", "ls_d3"): unique among the places, and none is the name of another device the
+    site ships."""
+    from .leaves.places import PLACES
+    if m not in PLACES:
+        raise KeyError(f"no place {m!r} with a device: {', '.join(sorted(PLACES))}")
+    leaves = _leaves(cache_dir, log)
+    leaves.place(m)
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(json.dumps(leaves.data[m]["arch"], indent=1) + "\n", encoding="utf-8")
+    return dst
+
+
+def embed_page(name: str, dst: Path, *, focus: str | None = None,
+               cache_dir="out/gadgets/cache", log=None) -> Path:
+    """Write ONE self-contained page for `name` to `dst`: every script and all its data inline,
+    nothing fetched, no navigation of the page that holds it -- a figure the tutorial frames.
+
+        "algorithms/<stem>"   the design page running that example (examples/gadgets/algorithms)
+        "<place>"             a place by its kind ("msf15", "mem_d3"): the town, that place selected
+        "<place>.<op>"        one op of a place on the studio's stage ("msf15.produce")
+
+    The design pages carry `window.GADGET = {ready(), focus(id), seek(us)}`: `focus` takes a
+    place by its path or kind, or an instruction ("i5", or its line "L13"); the same two come
+    in the address as `#f=ID&t=US`.  `focus` here is what the page shows first.
+    """
+    import shutil
+    import tempfile
+
+    from .leaves.classical import CLASSICAL
+    from .leaves.places import PLACES
+    from .verified import build_algorithm
+
+    log = log or (lambda *a, **k: None)
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    leaves = _leaves(cache_dir, log)
+
+    stem = name[len("algorithms/"):] if name.startswith("algorithms/") else None
+    if stem is None and (name in PLACES or name in CLASSICAL):
+        stem, focus = PLACE_PROGRAM, focus or name
+    if stem is not None:
+        src = ALGORITHMS / f"{stem}.alg"
+        if not src.exists():
+            raise KeyError(f"no example algorithm {stem!r}: "
+                           + ", ".join(sorted(f.stem for f in ALGORITHMS.glob("*.alg"))))
+        with tempfile.TemporaryDirectory(prefix="gadget-embed-") as tmp:
+            build_algorithm(src, out_dir=tmp, leaves=leaves, log=log, inline=True, focus=focus)
+            shutil.copyfile(Path(tmp) / "index.html", dst)
+        return dst
+
+    master, _, op = name.partition(".")
+    if master in PLACES and op:
+        from ..arch.device import Architecture
+        from ..cost.models import corrected_model
+        from ..ir.tsir import TSIR
+        from ..verify import verify
+        from ..viz import render_html
+        m = leaves.place(master)
+        data = leaves.data[master]
+        if op not in data["programs"]:
+            raise KeyError(f"{master} has no op {op!r}: " + ", ".join(sorted(data["programs"])))
+        arch = Architecture.from_json(data["arch"])
+        prog = TSIR.from_json(data["programs"][op])
+        model = corrected_model("qccdsim_jones")
+        res = verify(prog, arch, model, check_metrics=False).result
+        render_html(arch, prog, res, model, dst, kicker="logical gadget",
+                    headline=f"{master} · {op}", lede=m.ops[op].title if op in m.ops else op)
+        return dst
+    raise KeyError(f"no gadget page {name!r}: 'algorithms/<example>', a place "
+                   f"({', '.join(sorted({*PLACES, *CLASSICAL}))}), or '<place>.<op>'")

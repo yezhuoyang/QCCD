@@ -1,0 +1,6 @@
+ruleset "qccdsim-gateset"
+title "QCCDSim's rules, with the circuit's gates as a set"
+about "QCCDSim's rules for benchmark files that list a round's CNOTs with no order between stabilisers: every gate must be performed, in any order."
+
+include "qccdsim"
+drop R25

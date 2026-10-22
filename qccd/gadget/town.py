@@ -103,7 +103,20 @@ def town(leaves: LeafLibrary, *, name: str = "town_d3", rows=TOWN_ROWS,
         if spacing_ok(doors):
             break
     else:
-        raise ValueError("no row offset keeps the junctions on the shared street apart")
+        # more than two rows: shift each row on its own, top to bottom, until the street it
+        # shares with the row above keeps its junctions apart
+        shifts = [0.0] * len(rows)
+        for r in range(1, len(rows)):
+            for extra in range(0, 80):
+                shifts[r] = float(extra)
+                instances, doors = layout(shifts)
+                if spacing_ok({r: doors.get(r, [])}):
+                    break
+            else:
+                raise ValueError(f"no offset of row {r} keeps the junctions on its street apart")
+        instances, doors = layout(shifts)
+        if not spacing_ok(doors):
+            raise ValueError("no row offset keeps the junctions on the shared street apart")
 
     links: list[tuple] = []
     xs = [x for street in doors.values() for x, _, _ in street]

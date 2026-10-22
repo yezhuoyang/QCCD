@@ -47,6 +47,20 @@ header { grid-area: head; display: flex; align-items: center; gap: 12px; padding
 #clock { font-family: var(--mono); font-size: 12px; min-width: 150px; text-align: right; color: var(--ink); }
 #clock small { color: var(--muted); }
 #checksBadge { font-weight: 600; }
+.ck .grp { grid-column: 1 / span 2; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3, #6b6b6b); padding-top: 6px; cursor: default; }
+.ck .t { grid-column: 2; display: none; font-size: 11.5px; color: var(--ink2, #3f3f3f); }
+.ck .t pre { font-family: var(--mono); font-size: 10.5px; white-space: pre-wrap; margin: 4px 0; background: #f7f6f2; border: 1px solid #e7e5df; border-radius: 6px; padding: 6px 8px; }
+.ck.open .t { display: block; }
+#traffic { flex: 0 0 auto; }
+#trafficBody { padding: 2px 10px 6px; font-size: 11px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; line-height: 1.45; }
+#trafficBody .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#trafficBody .n { white-space: nowrap; }
+#trafficBody .k { color: var(--ink3, #6b6b6b); } #trafficBody .n { font-family: var(--mono); text-align: right; }
+#floorView { display: none; position: fixed; inset: 6% 8%; background: #fff; border: 1px solid #d9d6cf; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.18); z-index: 50; flex-direction: column; }
+#floorView.open { display: flex; }
+#floorView .fvHead { display: flex; gap: 12px; align-items: baseline; padding: 10px 14px; border-bottom: 1px solid #ece9e2; font-size: 13px; }
+#floorView .fvHead .muted { flex: 1; font-size: 12px; }
+#floorView pre { margin: 0; padding: 12px 16px; overflow: auto; font-family: var(--mono); font-size: 12px; line-height: 1.5; flex: 1; }
 #checksBadge.ok { background: var(--ok-soft); color: var(--ok); border-color: #abefc6; }
 #checksBadge.bad { background: var(--bad-soft); color: var(--bad); border-color: #fecdca; }
 
@@ -69,7 +83,7 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
 .tn .sub { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .tn .blk { font-family: var(--mono); font-size: 11px; color: var(--accent); }
 
-#checks { max-height: 38%; }
+#checks { max-height: 34%; }
 .ck { display: grid; grid-template-columns: 26px 1fr; gap: 4px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
 .ck:hover { background: var(--soft); }
 .ck b { font-family: var(--mono); font-size: 11px; }
@@ -174,12 +188,14 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
       </select>
       <span id="clock"></span>
       <button id="bLib" title="the gadget library (L)">Library</button>
-      <button id="checksBadge" title="hierarchy checks G1–G9"></button>
+      <button id="bFloor" title="the floorplan this program runs on, as text" hidden>Floorplan</button>
+      <button id="checksBadge" title="the machine's rules"></button>
     </div>
   </header>
   <aside id="left">
     <div class="sect" style="flex:1"><h3>Hierarchy <span id="treeCount" class="muted"></span></h3><div id="tree" class="scroll"></div></div>
-    <div class="sect" id="checks"><h3>Checks</h3><div id="checksBody" class="scroll"></div></div>
+    <div class="sect" id="checks"><h3>Checks <span id="checksCount" class="muted"></span></h3><div id="checksBody" class="scroll"></div></div>
+    <div class="sect" id="traffic" hidden><h3>Traffic</h3><div id="trafficBody"></div></div>
   </aside>
   <div id="stageWrap">
     <canvas id="stage" tabindex="0" aria-label="the current level of the design"></canvas>
@@ -195,6 +211,7 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
   <div id="split" title="drag to resize the timeline"></div>
   <div id="tlWrap"><canvas id="tl" aria-label="timeline"></canvas></div>
   <div id="library"></div>
+  <div id="floorView"><div class="fvHead"><b id="fvTitle">Floorplan</b><span class="muted">places, regions, junctions, roads and wires, as written -- the F-rules judge it before any program runs</span><a id="fvSave" download="floorplan.floor">Download</a><button id="fvClose">Close</button></div><pre id="fvText"></pre></div>
 </div>
 <div id="tip"></div>
 <script id="gdata" type="application/json">__DATA__</script>

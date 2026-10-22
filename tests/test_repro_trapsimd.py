@@ -269,25 +269,41 @@ def test_the_grid_has_the_papers_trap_counts_and_gate_zone_layouts():
 
 
 def test_the_line_networks_meet_every_pair_once_in_the_dependency_depth():
+    # QAOA's ZZ gates commute and could all meet in n rounds; kept in the circuit's order
+    # they need 2n - 3, like VQE's CX gates
     for n in (5, 12, 20):
         q = ts.all_pairs_rounds(ts.qaoa_complete(n))
         v = ts.all_pairs_rounds(ts.vqe(n))
-        assert len(q) == n and len(v) == 2 * n - 3
+        assert len(q) == len(v) == 2 * n - 3
         for rounds, prog in ((q, ts.qaoa_complete(n)), (v, ts.vqe(n))):
             ops = [a[2] for r in rounds for a in r]
             assert sorted(ops) == sorted(k for k, o in enumerate(prog.ops) if len(o.qubits) == 2)
+            # each qubit meets its partners in the circuit's order
+            for q_ in range(n):
+                mine = [k for k in ops if q_ in prog.ops[k].qubits]
+                assert mine == sorted(mine)
 
 
-def test_a_sparse_commuting_program_runs_on_the_network_with_plain_exchanges():
+def test_a_sparse_program_runs_on_the_complete_network_with_plain_exchanges():
     prog = ts.qaoa_regular(12, seed=3)
     rounds = ts.all_pairs_rounds(prog, partial=True)
-    gates = sorted(a[2] for r in rounds for a in r if a[0] == "2")
-    assert gates == sorted(k for k, o in enumerate(prog.ops) if len(o.qubits) == 2)
+    gates = [a[2] for r in rounds for a in r if a[0] == "2"]
+    assert sorted(gates) == sorted(k for k, o in enumerate(prog.ops) if len(o.qubits) == 2)
     assert any(a[0] == "x" for r in rounds for a in r)
+    for q in range(prog.n):                           # in the circuit's order, qubit by qubit
+        mine = [k for k in gates if q in prog.ops[k].qubits]
+        assert mine == sorted(mine)
     with pytest.raises(ValueError):
         ts.all_pairs_rounds(prog)                     # not every pair: refused without partial
     sched = ts.schedule_line(ts.grid_device(2, 8), prog, partial=True)
-    assert checked(sched, prog).ok
+    assert prog.order == "strict" and checked(sched, prog).ok
+    # a circuit that lists some qubit's partners out of index order is refused, not reordered
+    edges = [o for o in prog.ops if len(o.qubits) == 2]
+    shuffled = dataclasses.replace(prog, ops=[o for o in prog.ops if len(o.qubits) == 1][:prog.n]
+                                   + edges[::-1] + [o for o in prog.ops if len(o.qubits) == 1][prog.n:],
+                                   meta={})
+    with pytest.raises(ValueError):
+        ts.all_pairs_rounds(shuffled, partial=True)
 
 
 def test_the_a60_trail_needs_five_classes():
@@ -307,11 +323,75 @@ def test_our_a20_schedules_pass_every_check_and_beat_table_3(bench):
     assert rep.metrics["makespan_us"] < ts.TABLE3[(8, bench, 20)][1]
 
 
-def test_vqe_on_the_line_holds_in_strict_program_order():
-    prog = ts.vqe(20)
+def _input_order_kept(sched, prog) -> bool:
+    """Independent of the module's checkers: each qubit's operations, by start time, are
+    exactly its input sequence."""
+    want: dict[str, list[int]] = {}
+    for k, o in enumerate(prog.ops):
+        for q in o.qubits:
+            want.setdefault(prog.qname(q), []).append(k)
+    got: dict[str, list[int]] = {}
+    for e in sorted(sched.events, key=lambda e: (e.t0, e.id)):
+        if e.kind in ("gate", "gate1"):
+            for ion in e.ions:
+                got.setdefault(ion, []).append(int(e.meta["op"]))
+    return all(got.get(q) == seq for q, seq in want.items())
+
+
+@pytest.mark.parametrize("bench", ["VQE", "QAOA", "BV", "RCA", "QAOA-3reg"])
+def test_every_schedule_of_ours_keeps_each_qubits_input_order(bench):
+    """The user's rule (2026-10-19): our schedulers never change the order of the input
+    circuit, not even where gates commute (QAOA's ZZ gates, a run of CX gates sharing a
+    control)."""
+    prog = {"VQE": ts.vqe, "QAOA": ts.qaoa_complete, "BV": ts.bv, "RCA": ts.rca,
+            "QAOA-3reg": lambda n: ts.qaoa_regular(n, seed=0)}[bench](20)
+    assert prog.order == "strict"
+    sched, rep = ts.schedule_ours(ts.grid_device(2, 8), prog)
+    assert rep.ok and rep.checks["program"] == "passed", rep.summary()
+    assert _input_order_kept(sched, prog)
+
+
+def test_strict_order_refuses_a_reorder_the_papers_rule_allows():
+    # our QAOA schedule against a circuit that lists two of qubit 0's commuting ZZ gates the
+    # other way round: the paper's rule accepts it, strict order does not
+    prog = ts.qaoa_complete(20)
     sched = ts.schedule_line(ts.grid_device(2, 8), prog)
-    rep = checked(sched, dataclasses.replace(prog, order="strict"))
-    assert rep.ok, rep.summary()
+    ops = list(prog.ops)
+    i, j = (next(k for k, o in enumerate(ops) if o.qubits == pair) for pair in ((0, 1), (0, 2)))
+    ops[i], ops[j] = ops[j], ops[i]
+    other = ts.Program("qaoa20_swapped", 20, ops, "strict")
+    # the schedule's op labels follow the original list: relabel them to the new one
+    relabel = {i: j, j: i}
+    moved = dataclasses.replace(sched, events=[
+        dataclasses.replace(e, meta={**e.meta, "op": relabel.get(e.meta.get("op"), e.meta.get("op"))})
+        if e.kind in ("gate", "gate1") else e for e in sched.events])
+    strict = checked(moved, other)
+    assert strict.failed("program") and strict.failed("circuit"), strict.summary()
+    assert checked(moved, dataclasses.replace(other, order="commuting", meta={})).ok
+    # and the paper's own Fig. 7(c1) is one such reorder
+    assert checked(ts.w2_sliced(), ts.w2_program()).ok
+    assert checked(ts.w2_sliced(), dataclasses.replace(ts.w2_program(), order="strict", meta={})).failed("program")
+
+
+def test_the_writer_publishes_gzipped_strict_schedules_and_nothing_stale(tmp_path):
+    import gzip
+    import json
+
+    (tmp_path / "ours").mkdir()
+    (tmp_path / "ours" / "stale_L8.schedule.json.gz").write_bytes(gzip.compress(b"{}"))
+    res = ts.reproduce(tmp_path, sizes=(20,), lengths=(8,), log=lambda m: None)
+    files = {r["file"] for r in res["runs"]}
+    on_disk = {f"{p.parent.name}/{p.name}" for p in tmp_path.glob("*/*.schedule.json*")}
+    assert on_disk == files and all(f.endswith(".schedule.json.gz") for f in files)
+    for r in res["runs"]:
+        assert r["ok"], r["id"]
+        if r["kind"] == "example":
+            continue
+        assert r["circuit_order"] == "strict"
+        sched = ts.TimedSchedule.from_json(json.loads(gzip.decompress((tmp_path / r["file"]).read_bytes())))
+        assert _input_order_kept(sched, ts._BENCH[r["benchmark"]](r["n"])), r["id"]
+    assert {r["id"]: r["in_strict_order"]["ok"] for r in res["runs"] if r["kind"] == "example"} == {
+        "fig6_eager": True, "fig6_batched": True, "fig7_depth": True, "fig7_sliced": False}
 
 
 def test_a_planted_fault_in_our_schedule_is_caught():

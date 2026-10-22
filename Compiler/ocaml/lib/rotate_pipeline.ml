@@ -36,14 +36,19 @@ type plan = {
 
 (* Two-colour the interaction graph.  Returns (dock side, loop side) with the dock side
    the smaller, or raises if the circuit cannot be split -- which is the honest answer for
-   a circuit whose qubits all have to meet each other. *)
+   a circuit whose qubits all have to meet each other.
+
+   A barrier is not an interaction, whatever its width: two qubits a `barrier a,b` names
+   never have to meet.  The NAME is tested before the arity, here and in every match of
+   this pass, because a two-qubit barrier has the shape of a gate (2026-10-17). *)
 let bipartition (c : Circuit.t) : int list * int list =
   let colour = Array.make c.n_qubits (-1) in
   let adj = Array.make c.n_qubits [] in
   List.iter
     (fun (o : Circuit.op) ->
-      match o.qubits with
-      | [ a; b ] ->
+      match (o.name, o.qubits) with
+      | "barrier", _ -> ()
+      | _, [ a; b ] ->
         adj.(a) <- b :: adj.(a);
         adj.(b) <- a :: adj.(b)
       | _ -> ())
@@ -76,6 +81,36 @@ let bipartition (c : Circuit.t) : int list * int list =
   let a = side 0 and b = side 1 in
   if List.length a <= List.length b then (a, b) else (b, a)
 
+(* The qubits that act ALONE somewhere in the circuit: a reset, a measurement, an H.
+   Only a docked ion can gate (the loop's slots cannot), so a side with such a qubit has to
+   be the docked side -- whatever its size.  A barrier is not an act. *)
+let acts_alone (c : Circuit.t) : (int, unit) Hashtbl.t =
+  let h = Hashtbl.create 64 in
+  List.iter
+    (fun (o : Circuit.op) ->
+      match (o.name, o.qubits) with
+      | "barrier", _ -> ()
+      | _, [ q ] -> Hashtbl.replace h q ()
+      | _ -> ())
+    c.ops;
+  h
+
+(* Does the device tie its dock spurs together?  A channel that drives several sites and
+   has no per-site switch plays one waveform at all of them (R4), so on such a machine a
+   spur cannot dock one rider and leave its neighbour on the rail: every rider standing
+   beside a dock docks in every batch, which is what `--dock-all` emits.  Read off
+   `control.channels` as `qccd/arch/control.py` reads it (`switch_per_site` defaults to
+   true; `direct` grouping ties nothing). *)
+let spurs_tied (a : Arch.t) : bool =
+  match Arch.mem "control" a.raw with
+  | Some ctl -> (
+    match Arch.mem "channels" ctl with
+    | Some (`Assoc _ as ch) ->
+      (not (Arch.bool_or "switch_per_site" true ch))
+      && Arch.str_or "grouping" "direct" ch <> "direct"
+    | _ -> false)
+  | None -> false
+
 (* ------------------------------------------------------------------ the pass *)
 
 type ctx = {
@@ -104,10 +139,17 @@ let delta_to (x : ctx) (ion : string) (d : Conveyor.dock) : int =
    turns -- which is what the shipped deck schedule does, and why its hop count is 2 672
    rather than tens of thousands.
 
-   `Greedy` jumps to whichever offset serves the most contacts.  It makes bigger batches
-   and pays for them in hops, and hops are not free: every one heats the ion, and heating
-   is what degrades the next gate (`docs/PLAN.md` §0.3).  Monotone is the default for that
-   reason, not because it looks tidier. *)
+   `Greedy` jumps to whichever offset serves the most contacts, turning the shorter way.
+   It makes bigger batches and pays for them in hops, and hops are not free: every one
+   heats the ion, and heating is what degrades the next gate (`docs/PLAN.md` §0.3).
+
+   Greedy is the default since 2026-10-19, and the reason is the order rule.  Monotone was
+   the default while this pass reordered a check's commuting CNOTs: a whole check was ready
+   at once, so one forward pass found most of its contacts lined up (BB144 on ring144_24v:
+   546 batches, 776 hops).  Keeping every qubit's order, only one contact per ancilla is
+   ready at a time, and always turning forward then laps the loop for each of them: 824
+   batches and 7 586 hops, against greedy's 788 batches and 4 956 hops -- fewer turns AND
+   fewer hops, so less heat as well.  `--sweep monotone` still selects the old rule. *)
 type sweep = Monotone | Greedy
 
 (* An externally chosen layout: which loop slot each rider starts in, and which dock each
@@ -156,8 +198,10 @@ let placement_of_json (j : Yojson.Safe.t) : placement =
 
 let placement_of_file path = placement_of_json (Yojson.Safe.from_file path)
 
-let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Circuit.t)
+let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circuit.t)
     ~(arch_path : string) ~(qasm_path : string) : Tsir.t * Cert.t * plan * string list =
+  (* a switchless machine docks every rider, asked or not: anything else breaks R4 *)
+  let dock_all = dock_all || spurs_tied a in
   let cv =
     match Conveyor.detect a with
     | Some cv -> cv
@@ -176,7 +220,15 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
     | Some (pl : placement) when pl.dock_site <> [] ->
       let named = List.sort compare (List.map fst pl.dock_site) in
       if named = List.sort compare b then (b, a) else (a, b)
-    | _ -> (a, b)
+    | _ ->
+      (* No placement: park the smaller side -- unless only the LARGER side has qubits that
+         act alone.  Those must be docked, so parking the smaller side could only end in
+         "acts on q, which rides the loop": a BB[[144,12,12]] round with 144 dedicated
+         ancillas splits 144/144, the tie put the data at the docks, and every ancilla's
+         reset was refused (2026-10-21).  This changes only circuits that were refused. *)
+      let alone = acts_alone c in
+      let acts side = List.exists (Hashtbl.mem alone) side in
+      if acts b && not (acts a) then (b, a) else (a, b)
   in
   let n_docks = Array.length cv.docks in
   if List.length dock_side > n_docks then
@@ -337,6 +389,9 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
     end
   in
 
+  (* the circuit's ops by index: a contact runs the gate its op names *)
+  let op_at = Array.of_list c.ops in
+
   (* One contact batch: dock, run the CX pulse sequence, undock -- with no rotation in
      between, because a docked ion is off the loop and would not come back to the slot it
      left.
@@ -360,8 +415,10 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
       (* One dock (or undock) instruction per waveform (R22).  A generated ring's spurs
          all read `spur:inward`, so the batch is one instruction as it always was.  A
          dock drawn by hand can differ: a spur declared as its own open path is labelled
-         by its lab-frame axis, and a dock above the rail and one below it are then two
-         waveforms -- emitted as one instruction, that failed R22 on every such design.
+         by its lab-frame direction, and a dock above the rail and one below it are then
+         two waveforms -- emitted as one instruction, that failed R22 on every such
+         design.  So can a "dock" that is a chord between two loop slots: it is labelled
+         by direction too, since it is no dead end (`Route.hop_label`).
          The riders go to distinct dock traps and come back to distinct rail slots, so
          the groups do not compete for room and their order is free; first-seen order
          keeps the one-group case byte-identical. *)
@@ -417,12 +474,21 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
       emit_docking true;
 
       (* the CX sequence, round by round: every pair is at a different dock, so the k-th
-         pulse of each can share one cycle without breaking R12 *)
+         pulse of each can share one cycle without breaking R12.
+
+         The pulses are the op's OWN decomposition, operand 0 first.  A fixed "cx" here
+         compiled every two-qubit op as a CX -- a `cz` too, and a two-qubit barrier --
+         and the programme passed every hardware rule while computing something else. *)
       let seqs =
         List.map
           (fun (rider, (d : Conveyor.dock), partner, dag, ctrl_is_rider) ->
             let ctrl, tgt = if ctrl_is_rider then (rider, partner) else (partner, rider) in
-            let dc = Gateset_composites.decompose_op ~gates:c.gates "cx" [] [ 0; 1 ] in
+            let (o : Circuit.op) = op_at.(dag) in
+            let dc =
+              try Gateset_composites.decompose_op ~gates:c.gates o.name o.params [ 0; 1 ]
+              with Gateset.Unsupported m ->
+                raise (Not_applicable (Printf.sprintf "op %d (%s): %s" dag o.name m))
+            in
             let name k = if k = 0 then ctrl else tgt in
             ( d,
               dag,
@@ -506,31 +572,22 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
      structure, and the reason its batch utilisation is a number worth reporting.
 
      An op is ready when every earlier op sharing one of its qubits has been emitted, so
-     reordering never crosses a dependency. *)
+     every qubit still sees exactly its own ops in the circuit's order; only ops on
+     DIFFERENT qubits move relative to each other. *)
   let ops = Array.of_list c.ops in
   let n_ops = Array.length ops in
   let finished = Array.make n_ops false in
   let remaining = ref n_ops in
 
-  (* Do these two operations commute?
+  (* A shared qubit is always a dependency, even between ops that commute.
 
-     This is where the batching comes from.  A weight-6 check is six CX gates that all
-     share the same ancilla, and treating a shared qubit as a dependency serialises them --
-     which leaves one contact ready per ancilla, offsets scattered over the whole loop, and
-     a batch size of barely more than one.  But CX gates sharing only their CONTROL commute
-     with each other, and so do CX gates sharing only their TARGET: the six can happen in
-     any order, and once the scheduler knows that, a whole check is available at once.
-
-     `cx a,b` and `cx b,a` do NOT commute, and nothing commutes past a Hadamard on a qubit
-     it touches -- so the rule is stated narrowly rather than assumed generously. *)
-  let commutes (u : Circuit.op) (v : Circuit.op) =
-    let shared = List.exists (fun q -> List.mem q v.qubits) u.qubits in
-    if not shared then true
-    else
-      match (u.name, u.qubits, v.name, v.qubits) with
-      | "cx", [ c1; t1 ], "cx", [ c2; t2 ] -> (c1 = c2 && t1 <> t2) || (t1 = t2 && c1 <> c2)
-      | _ -> false
-  in
+     This pass used to exempt CX gates sharing only their control, or only their target:
+     a weight-6 check's six CNOTs could then happen in any order, a whole check was ready
+     at once, and the batches grew.  But the order of a qubit's gates is the circuit
+     author's, not the compiler's -- in a syndrome round it is the hook structure, chosen
+     on purpose -- and a unitary cannot tell the difference, so every check passed the
+     reordered programmes (726 adjacent pairs out of order on a BB144 round).  The batches
+     now come only from ops that are ready in the circuit's own order. *)
 
   (* per-qubit op lists, so readiness is a scan over the ops touching this one *)
   let touching = Array.make c.n_qubits [] in
@@ -544,9 +601,7 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
     let (o : Circuit.op) = ops.(i) in
     List.exists
       (fun q ->
-        List.exists
-          (fun j -> j < i && (not finished.(j)) && not (commutes ops.(j) o))
-          touching.(q))
+        List.exists (fun j -> j < i && not finished.(j)) touching.(q))
       o.qubits
   in
 
@@ -648,14 +703,18 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
             && (not (blocked i))
             &&
             let (o : Circuit.op) = ops.(i) in
-            match o.qubits with
-            | [ _ ] -> true
-            | [ _; _ ] -> false
+            (* a barrier of ANY width is a fence and costs no rotation: once ready (every
+               earlier op on its wires done) it is finished here, and whatever waits on it
+               becomes ready.  Testing the arity first sent `barrier a,b` to the contact
+               scheduler, which compiled it as a CX: 1728 contacts for a BB round's 864
+               CNOTs, and a programme that did not implement the circuit. *)
+            match (o.name, o.qubits) with
+            | "barrier", _ -> true
+            | _, [ _ ] -> true
+            | _, [ _; _ ] -> false
             | _ ->
-              if o.name = "barrier" then true
-              else
-                raise
-                  (Not_applicable (Printf.sprintf "%s has an unsupported arity" o.name)))
+              raise
+                (Not_applicable (Printf.sprintf "%s has an unsupported arity" o.name)))
           (List.init n_ops (fun i -> i))
       in
       if ready1 = [] then again := false
@@ -690,9 +749,12 @@ let run ?(sweep = Monotone) ?placement ?(dock_all = false) (a : Arch.t) (c : Cir
     !progressed
   in
 
+  (* A contact is a two-qubit GATE.  A two-qubit barrier has the same shape and is not
+     one: `drain` finishes it as a fence, and it must never be scheduled here. *)
   let contact_of (o : Circuit.op) =
-    match o.qubits with
-    | [ p; q ] ->
+    match (o.name, o.qubits) with
+    | "barrier", _ -> None
+    | _, [ p; q ] ->
       let ip = ion p and iq = ion q in
       let rider, partner = if Hashtbl.mem x.dock_of ip then (iq, ip) else (ip, iq) in
       let ctrl_is_rider = ion (List.nth o.qubits 0) = rider in

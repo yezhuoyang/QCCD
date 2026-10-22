@@ -1,0 +1,8 @@
+# LeBlond et al., SC 2023: the TISCC resource estimator.
+
+ruleset "tiscc"
+title "TISCC's rules"
+about "One ion per zone, so a zone does not serialise its own operations; a junction is crossed by one ion at a time; rotations, preparation and measurement run only in operation (O) zones; the two-ion gate acts on ions in neighbouring zones of one rail; every gate of the circuit is performed, in any order; every operation lasts what TISCC's duration law says."
+
+use R0, R1, R2, R8, R24, R29, R32, R33
+param single_ion_zones = {"O"}

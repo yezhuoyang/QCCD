@@ -19,13 +19,28 @@ import math
 import time
 from pathlib import Path
 
+from ..ir.provenance import thin
 from .checks import check
 from .designs import processor
 from .library import LeafLibrary
 from .logicq import LogicalProgram, parse, parse_file
 from .synth import synthesize
 
-__all__ = ["build", "design_for"]
+__all__ = ["build", "design_for", "published"]
+
+
+def published(obj):
+    """A leaf's data as the viewer is sent it: every program's provenance log (`meta.prov`)
+    thinned the way `qccd.viz.render` thins a studio page's -- no absolute `root`, no
+    repository file, line or quoted source, only which pass emitted each instruction.  The
+    viewer reads none of it; the full log was the build machine's paths on the website."""
+    if isinstance(obj, dict):
+        if "sites" in obj and "calls" in obj and "level" in obj:
+            return thin(obj, "sites")
+        return {k: published(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [published(v) for v in obj]
+    return obj
 
 
 def design_for(prog: LogicalProgram, rows: int | None = None,
@@ -96,7 +111,7 @@ def build(program, *, out_dir, rows: int | None = None, pairs: int | None = None
     (out / "checks.json").write_text(json.dumps(verdict, indent=1), encoding="utf-8")
     leaf_files = {}
     for name in lib.leaf_masters():
-        payload = json.dumps(leaves.data[name]).replace("</", "<\\/")
+        payload = json.dumps(published(leaves.data[name])).replace("</", "<\\/")
         (out / "leaf" / f"{name}.js").write_text(
             f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
         leaf_files[name] = f"leaf/{name}.js"

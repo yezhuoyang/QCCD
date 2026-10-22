@@ -1,0 +1,14 @@
+# Jones et al. 2025's rules under WISE broadcast control (arXiv:2305.12773).
+
+ruleset "jones-wise"
+title "Surface-code QCCD's rules, under WISE broadcast control"
+about "Jones's rules, plus WISE control: one waveform drives every transport move of a cycle, so moves that overlap in time start and end together and make the same motion (primitive and direction); a site may sit a cycle out, never do something else."
+
+include "jones"
+
+rule W1 "Broadcast transport moves in lockstep"
+  about "One waveform drives every transport move of a cycle: every move names its motion, and moves that overlap start and end together with the same motion."
+  source "arXiv:2305.12773; arXiv:2510.23519"
+  (for all a in transport: motion(a) != none)
+  and (for all a, b in transport where a != b and simultaneous(a, b):
+       start(a) = start(b) and end(a) = end(b) and motion(a) = motion(b))

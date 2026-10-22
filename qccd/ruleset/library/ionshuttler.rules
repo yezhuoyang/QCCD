@@ -1,0 +1,7 @@
+# Schoenberger et al. 2024: the MQT IonShuttler, exact (SAT) router.
+
+ruleset "ionshuttler"
+title "IonShuttler's rules (exact router)"
+about "A rail and a junction hold one ion at a time; every operation lasts one time step of the paper's model; each qubit's gates run in the circuit's order. The paper's replay also checks its own model's rules about the processing zone, beside these."
+
+use R0, R1, R2, R3, R8, R24, R25, R29

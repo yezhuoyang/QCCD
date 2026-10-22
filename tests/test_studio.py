@@ -36,7 +36,13 @@ from qccd.arch import load
 from qccd.arch.device import ExpansionError
 from qccd.ir.tsir import TSIR
 from qccd.verify import verify
+from qccd.verify.rules import rule_statements
+from qccd.viz.render import BROWSER_SET
 from qccd.cost.models import corrected_model
+
+#: How many rules the page must account for, and how many it re-derives -- read off the
+#: tables, not written down: a literal 27 went stale the day R23 made it 28.
+N_RULES = len(rule_statements())
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
@@ -95,9 +101,10 @@ def test_the_empty_canvas_loads_and_claims_nothing_it_did_not_check(tmp_path):
     assert b["status_invents_a_step"] is False, b["status"]
     assert b["says_no_programme_replayed"] is True
     assert b["says_all_pass"] is False
-    assert b["n_checked"] == 0 and b["n_unchecked"] == 27, (
+    assert b["n_checked"] == 0 and b["n_unchecked"] == N_RULES, (
         "every rule is vacuously satisfied over zero cycles; reporting them as CHECKED "
-        "would be 21 green badges for a machine nothing has ever been run on")
+        f"would be {len(BROWSER_SET)} green badges for a machine nothing has ever been "
+        f"run on")
 
     # the degenerate layout is a good default, not a survival value: one data unit at the
     # maximum pitch the tool ever uses, so the first site lands dead centre and the second
@@ -448,7 +455,7 @@ def test_the_programme_lane_refuses_a_programme_python_cannot_run(tmp_path):
     assert after["price"] is None
     assert after["n_checked"] == 0, (
         "the page reported verdicts for a programme it could not replay")
-    assert after["n_unchecked"] == 27
+    assert after["n_unchecked"] == N_RULES
 
 
 @requires_node
@@ -778,7 +785,7 @@ def test_every_page_agrees_with_the_rule_counts_python_shipped(page, tmp_path):
     oracle = b["rules"]["oracle"]
     assert oracle is not None, "the page did not run its own rule self-check"
     assert oracle["ok"] is True, oracle
-    assert oracle["n"] == 21, oracle
+    assert oracle["n"] == len(BROWSER_SET), oracle
     assert b["says_all_pass"] is False
     assert b["says_rule_count"] is True
 

@@ -313,6 +313,15 @@ def test_odd_even_sort_needs_two_batches_per_round():
     assert sr.serialization_factor == pytest.approx(2.0, abs=0.05)
 
 
+#: Claims made while the compiler served a check's CNOTs in whatever order the loop presented
+#: them.  Since 2026-10-19 (the user's decision) they run in the code's member order and these
+#: no longer hold; strict, so a claim that comes back is noticed.
+MEMBER_ORDER = pytest.mark.xfail(strict=True, reason=(
+    "each check's CNOTs run in the code's member order since 2026-10-19; the claim was made "
+    "for arrival order"))
+
+
+@MEMBER_ORDER
 def test_cyclone_needs_about_two_rotations_for_the_gross_code():
     """"2 full rotations" for BB [[144,12,12]] (arXiv:2511.15910, deck p.9). Our compiler
     reaches it from placement and dynamic binding, with no knowledge of the claim."""
@@ -342,6 +351,7 @@ def test_rigid_rotation_is_roadblock_free():
 # ===================================================================== ranking
 
 
+@MEMBER_ORDER
 def test_a_good_routing_strategy_beats_a_bad_one_by_a_wide_margin():
     a = arch("ring144_24v")
     code = gross_code()
@@ -355,6 +365,7 @@ def test_a_good_routing_strategy_beats_a_bad_one_by_a_wide_margin():
     assert good.hops < bad.hops / 3
 
 
+@MEMBER_ORDER
 def test_improving_one_pass_alone_can_make_the_schedule_worse():
     """Cyclone's confusion matrix, reproduced from our own model.
 
@@ -387,6 +398,7 @@ def test_improving_one_pass_alone_can_make_the_schedule_worse():
     assert both < neither / 2, "together they win by a wide margin"
 
 
+@MEMBER_ORDER
 def test_the_ranking_does_not_flip_between_the_two_primitive_tables():
     """The corpus's tables differ by 2-3x in time. A ranking that flips is not a result
     (PLAN §3.2)."""

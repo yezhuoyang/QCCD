@@ -47,6 +47,14 @@ from qccd.api import Machine
 from qccd.cost.hardware import hardware_report
 from qccd.cost.models import corrected_model, deck_model
 from qccd.verify import verify
+from qccd.verify.rules import rule_statements
+from qccd.viz.render import BROWSER_SET
+
+#: Every rule Python states, and the ones the browser does NOT re-derive -- read off the
+#: two tables rather than written down.  The literal 27 here went stale the day R23 landed
+#: (28 rules; R23 is not mirrored in `engine.js`, so it is the seventh grey one).
+ALL_RULES = frozenset(rule_statements())
+NOT_IN_BROWSER = ALL_RULES - frozenset(BROWSER_SET)
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
@@ -65,11 +73,27 @@ requires_node = pytest.mark.skipif(node is None, reason="node is not on PATH")
 #: build whose 200-odd pages were failing here with the generator drift of that day.
 STAGED_BUILDS = "site-"
 
+#: ...and the same kind of copy wherever it lands.  A directory name is a convention, not a
+#: fact: `out/live-0929/` (a download of the LIVE site, 193 pages with a data blob) and
+#: `out/live-studio.html` are site copies under other names, and the board pages among them
+#: failed here with "location is not defined" -- the site's nav and comment layer read
+#: `location`, which no page this repository renders does, so `tests/shim.mjs` does not
+#: provide it.  The website's build (`qccd/site`, `with_nav`) is the only writer of this
+#: bar; `render_html` never emits it, so a page carrying it was not written by `qccd demo`
+#: / `studio` / `verify` / `tutorial` (or any other renderer in this tree) and is not this
+#: build's to judge.  Skipped, never deleted: those copies are other sessions' artefacts.
+SITE_LAYER = '<nav id="sitenav"'
+
 
 def _pages():
-    return [p for p in sorted(OUT.rglob("*.html"))
-            if not any(part.startswith(STAGED_BUILDS) for part in p.relative_to(OUT).parts)
-            and '<script id="data"' in p.read_text(encoding="utf-8")]
+    out = []
+    for p in sorted(OUT.rglob("*.html")):
+        if any(part.startswith(STAGED_BUILDS) for part in p.relative_to(OUT).parts):
+            continue
+        text = p.read_text(encoding="utf-8")
+        if '<script id="data"' in text and SITE_LAYER not in text:
+            out.append(p)
+    return out
 
 
 def drive(page: Path, script, tmp_path: Path) -> dict:
@@ -631,15 +655,36 @@ def test_pricing_never_discovers_a_topology_break_the_structural_check_missed(tm
 # the ions always", which would pass every assertion above and destroy the editor.
 
 
+def _demo_page(tmp_path: Path, device: str, kind: str) -> Path:
+    """The page `python -m qccd demo` writes for `(device, kind, corrected)`, rendered into
+    `tmp_path` by the calls `cmd_demo` makes, so a test that ANCHORS A NUMBER measures this
+    tree's page and not whatever `out/` was left holding (that file is stale the moment the
+    engine changes, and `demo` itself is no way to refresh it in a shared tree: it unlinks
+    every `out/*__*.html`, other tools' pages included)."""
+    from qccd.__main__ import program_for
+    from qccd.viz.render import render_html
+    arch = load(ROOT / "arch" / f"{device}.arch.json")
+    prog = program_for(arch, kind, "")
+    model = corrected_model()
+    res = verify(prog, arch, model, check_metrics=False).result
+    out = tmp_path / f"{device}__{kind}__corrected.html"
+    render_html(arch, prog, res, model, out, max_frames=20000)
+    return out
+
+
 @requires_node
 def test_the_census_catches_ions_drawn_on_a_deleted_node(tmp_path):
     """A test that cannot fail is not a test.  Delete the guard from the emitted page and
-    confirm the census reports exactly the defect it exists to catch: 14.684 px of
-    ion-on-ion overlap between `d5` (parked on its stale destination because its source
-    node is gone) and `d14` (arriving there nine nodes early over the shortened loop)."""
-    page = OUT / "cyclone_base__rotate__corrected.html"
-    if not page.exists():
-        pytest.skip("run `python -m qccd demo`")
+    confirm the census reports exactly the defect it exists to catch: ion-on-ion overlap
+    between `d5` (parked on its stale destination because its source node is gone) and
+    `d14` (arriving there nine nodes early over the shortened loop), 72 ions drawn while
+    the programme is invalid, 18 of them phantoms.
+
+    The overlap is 9.888 px: d14's in-flight mark (r 10.464) over d5's resting one
+    (r 4.220), 4.8 px apart.  It was 14.684 px with the two centres coincident until
+    e8bb3c8 (2026-10-08) sat a resting ion in one of its trap's places instead of at the
+    trap's centre; the pair, the frame (1, phase 0.5), the 72 and the 18 did not move."""
+    page = _demo_page(tmp_path, "cyclone_base", "rotate")
     edit = [{"do": "mode", "mode": "edit"},
             {"do": "remove", "sel": [{"kind": "node", "id": "S5"}]}]
     assert census(page, tmp_path=tmp_path, frames=40, edit=edit)["ions_while_invalid"] == 0
@@ -656,9 +701,11 @@ def test_the_census_catches_ions_drawn_on_a_deleted_node(tmp_path):
         "the census passed a page animating a programme compiled against a device that "
         "no longer exists -- it would not have caught the defect it exists to catch")
     assert r["phantom_ions"] > 0, r
-    # anchored to the number measured on this build, so the guard fails loudly if the
-    # mutation stops reproducing the original defect rather than quietly proving nothing
-    assert r["worst_overlap_px"] > 10, r["worst_pair"]
+    # anchored to the number measured on this build (9.888 px; see the docstring), so the
+    # guard fails loudly if the mutation stops reproducing the original defect rather than
+    # quietly proving nothing -- the guarded page draws no ion at all once S5 is gone, and
+    # with in-flight marks at half size the mutation measures 5.7 px (d5/d21), below this
+    assert r["worst_overlap_px"] > 8, r["worst_pair"]
     assert {r["worst_pair"]["a"], r["worst_pair"]["b"]} == {"d5", "d14"}, r["worst_pair"]
 
 
@@ -955,16 +1002,18 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
     This assertion used to read "an edit strikes the verdicts out", because
     `architecture_violations` (R11 structural) was the only state-free check and every
     other rule needed a `CycleView` from a replay that only Python could do.  The browser
-    now RE-DERIVES 21 of the 27 off the same walk that prices the programme, so striking
-    all 27 through would be the dishonest answer in the other direction: it would hide
-    verdicts the page can genuinely stand behind.
+    now RE-DERIVES `BROWSER_SET` (21 of the 28 since R23) off the same walk that prices
+    the programme, so striking every rule through would be the dishonest answer in the
+    other direction: it would hide verdicts the page can genuinely stand behind.
 
     What must hold, before and after an edit, is the thing that was always the point:
 
       * the page never says "all rules pass" -- it COUNTS, and the count is the number it
         actually checked;
       * every rule it did NOT check is named, with its reason, rather than being absent;
-      * the six that need Python stay grey no matter what the user does.
+      * the grey ones are exactly the rules outside `BROWSER_SET` -- the six that need
+        Python (R4d, R7b, R9, R10, R15, R16) and R23, which `engine.js` does not mirror --
+        and they stay grey no matter what the user does.
     """
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
@@ -979,11 +1028,16 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
             f"{label}: the page claimed 'all rules pass'")
         assert snap["side_says_count"] is True, (
             f"{label}: the rules heading does not count what it checked")
-        assert snap["n_checked"] + snap["n_unchecked"] == 27, snap["coverage"]
+        assert snap["n_checked"] + snap["n_unchecked"] == len(ALL_RULES), snap["coverage"]
         # the six that genuinely need Python, named rather than absent
         grey = {c[0] for c in snap["coverage"] if c[1] in ("unchecked", "partial")}
         assert {"R4d", "R7b", "R9", "R10", "R15", "R16"} <= grey, (
             f"{label}: a rule the browser cannot check is not marked unchecked: {grey}")
+        # ...and the split is the one the tables declare, both ways: nothing outside
+        # BROWSER_SET wears a verdict, and nothing inside it is left grey
+        assert grey == NOT_IN_BROWSER, (
+            f"{label}: grey {sorted(grey)}, but the rules outside BROWSER_SET are "
+            f"{sorted(NOT_IN_BROWSER)}")
     assert edited["n_checked"] == base["n_checked"], (
         "an edit changed which rules could be checked; the mirror is state-free about that")
     assert undone["price"] == base["price"], "undo did not restore the price"

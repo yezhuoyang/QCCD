@@ -1,0 +1,9 @@
+# Jones et al. 2025: surface-code QCCD architectures.
+
+ruleset "jones"
+title "Surface-code QCCD's rules"
+about "A trap does one operation of any kind at a time; a rail and a junction hold one ion at a time; a reorder before a split is a gate swap; operations that the schedule says hold the same component never overlap; every operation lasts what the paper's duration law says; each qubit's gates run in the circuit's order, except that consecutive CNOTs in which it plays the same role may run in any order."
+
+use R0, R1, R2, R3, R6b, R8, R14, R24, R26, R27, R29, R30
+param serial_kinds = {"gate2", "gate1", "split", "merge", "swap", "measure", "reset"}
+param chain_order = "physical"

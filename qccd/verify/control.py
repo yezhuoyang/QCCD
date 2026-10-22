@@ -6,9 +6,13 @@ many of those are following it, how many are being held out by their switch, and
 the wiring can actually produce the cycle at all.
 
 The load-bearing decision is that a `ControlRecord` is derived from the *same*
-`CycleView` object `r4_drivable` judges, through the *same* `ControlPlane.drivable()`
-call, collected through `replay(on_cycle=...)` in the same replay.  The panel and the
-verifier cannot disagree, because there is only one computation.
+`CycleView` object `r4_drivable` judges, and its verdict IS `r4_drivable`'s: the record
+calls the rule and copies its messages, collected through `replay(on_cycle=...)` in the
+same replay.  The panel and the verifier cannot disagree, because there is only one
+computation.  (It used to be a second one -- `ControlPlane.drivable()` on the moving
+sites -- and when R4d learned that an EMPTY well under a broadcast waveform is not a site
+idling, the panel did not: on H2, whose conveyor channels have no per-site switch, it
+printed "NOT DRIVABLE (R4d)" on 51 loop shifts whose R4d verdict was a pass.)
 
 Three properties keep it cheap enough to ship inside a page:
 
@@ -41,7 +45,7 @@ from typing import Iterable, Mapping, Sequence
 from ..arch.device import Architecture
 from ..ir.tsir import TSIR, Instruction
 from .replay import replay
-from .rules import CycleView, action_label, path_actions
+from .rules import CycleView, action_label, path_actions, r4_drivable
 
 __all__ = [
     "ChannelBank", "ControlRecord", "ControlTrace",
@@ -132,7 +136,7 @@ class ControlRecord:
 
     # --- the verdict, and its limits --------------------------------------
     feasible: bool | None         # None = NOT JUDGED; never conflate with True
-    problems: tuple[str, ...] = ()      # verbatim ControlPlane.drivable() strings
+    problems: tuple[str, ...] = ()      # verbatim r4_drivable (R4d) messages
     undetermined: tuple[str, ...] = ()  # what this view does not claim
 
     @property
@@ -189,13 +193,17 @@ class ControlRecord:
 def _banks(engaged, verified_actions: Mapping[str, str], role_order: Sequence[str],
            with_ids: bool, skip: Iterable[str] = ()) -> tuple[ChannelBank, ...]:
     skip = set(skip)
+    # `verified_actions` maps a SITE to the label its path gave it, so the membership test
+    # is against the labels: testing the action against the site keys was always False,
+    # and every bank on every page read "(not verifiable)", path-judged rotations included
+    labels = set(verified_actions.values())
     buckets: dict[tuple, list[str]] = {}
     for e in engaged:
         if e.group.id in skip:
             continue
         action = e.actions[0] if len(e.actions) == 1 else " / ".join(e.actions)
         key = (e.group.role, len(e.group.sites), e.acting, action,
-               action in verified_actions)
+               action in labels)
         buckets.setdefault(key, []).append(e.group.id)
     order = {r: i for i, r in enumerate(role_order)}
     rows = [ChannelBank(role=k[0], n=len(ids), fanout=k[1], acting=k[2], action=k[3],
@@ -269,15 +277,16 @@ def control_record(view: CycleView, *, hop: int = 0, hops: int = 1,
             actions[m.src] = f"class:{instr.cls}"
             offpath += 1
 
-    # the verdict, per path, exactly as R4d scopes it.  `feasible` stays None unless a
-    # named path was actually judged: a dock is not "drivable: yes", it is unjudged.
-    feasible: bool | None = None
-    problems: list[str] = []
-    for loop, deltas in sorted(paths.items()):
-        labels = {s: action_label(loop, d) for s, d in deltas.items()}
-        ok, probs = plane.drivable(labels)
-        feasible = ok if feasible is None else (feasible and ok)
-        problems += [f"on path {loop!r}: {p}" for p in probs]
+    # THE VERDICT IS R4d's, not a second judgement of the same question: the rule is
+    # called on this very view and its messages are the problems, byte for byte.  A
+    # second computation (ControlPlane.drivable on the moving sites) drifted from the rule
+    # when R4d learned that, without per-site switches, only the LOADED sites of a channel
+    # are all-or-nothing -- an empty well under the waveform has nothing to move.  It then
+    # failed every H2 loop shift that left a conveyor well empty while R4d passed it.
+    # `feasible` still stays None unless a named path was judged (a dock is not
+    # "drivable: yes", it is unjudged), but any R4d violation is a NO.
+    problems = [x.message for x in r4_drivable(view)]
+    feasible: bool | None = False if problems else (True if paths else None)
 
     engaged = plane.engagement(actions)
     skip: set[str] = set()
@@ -294,7 +303,11 @@ def control_record(view: CycleView, *, hop: int = 0, hops: int = 1,
     engaged_ids = [e.group.id for e in engaged if e.group.id not in skip]
 
     acting = len(actions)
-    held = max(0, plane.covered_sites(engaged_ids) - acting)
+    # held out BY A SWITCH needs a switch: on a plane without per-site switches a site on
+    # an engaged channel that is not moving is an empty well riding the waveform (a loaded
+    # one would be an R4d failure, reported above), so none is held out.  H2's conveyors
+    # used to read "20 held out by their switch" on a machine that has none.
+    held = max(0, plane.covered_sites(engaged_ids) - acting) if plane.switch_per_site else 0
     role_order = []
     for g in plane.groups:
         if g.role not in role_order:

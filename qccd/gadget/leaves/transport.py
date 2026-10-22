@@ -96,11 +96,14 @@ def station(n: int, *, code: str, name: str | None = None) -> LeafBuild:
                 _shift(tp, rail_a, +1, op="fill")
                 _shift(tp, rail_b, +1, op="fill")
             tp.move("port_in", [(ctrl[j], "A0"), (targ[j], "B0")], op="fill")
-        tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in ctrl + targ], op="pair")
+        # rail A docks one way and rail B the other: two motions, two cycles (R22: one cycle
+        # is one waveform), and the same on the way out
+        tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in ctrl], op="pair")
+        tp.move("dock", [(ion, f"G{tp.pos[ion][1:]}") for ion in targ], op="pair")
         tp.gate("CX", [(ctrl[j], targ[j]) if a_controls else (targ[j], ctrl[j])
                        for j in range(n)], op=key)
-        tp.move("undock", [(ion, f"{'A' if ion[0] == 'c' else 'B'}{tp.pos[ion][1:]}")
-                           for ion in ctrl + targ], op="unpair")
+        tp.move("undock", [(ion, f"A{tp.pos[ion][1:]}") for ion in ctrl], op="unpair")
+        tp.move("undock", [(ion, f"B{tp.pos[ion][1:]}") for ion in targ], op="unpair")
         tp.cool(op="before_exit")
         for j in range(n):
             tp.move("port_out", [(tp.at("A0")[0], "XA"), (tp.at("B0")[0], "XB")], op="exit")

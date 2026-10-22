@@ -94,6 +94,22 @@ def _page_quanta(view: dict) -> dict:
         e = ph["junction_by_degree"].get(str(d))
         return e["quanta"] if e else 0.0
 
+    from collections import Counter
+    from types import SimpleNamespace
+
+    from qccd.verify.replay import move_entails
+    seg = {}
+    for s in arch["segments"]:
+        rail = SimpleNamespace(ends=(s["a"], s["b"]), loop=s["loop"])
+        seg[(s["a"], s["b"])] = seg[(s["b"], s["a"])] = rail
+    # the conveyors, as `rules.conveyor_nodes` reads them off the rails
+    per_loop = Counter(s["loop"] for s in arch["segments"] if s["loop"] is not None)
+    on_loop = {n for lid, nodes in loops.items() if len(nodes) > 2 and per_loop[lid] >= len(nodes) for n in nodes}
+    rails = Counter()
+    for s in arch["segments"]:
+        if (s["a"] in on_loop) != (s["b"] in on_loop):
+            rails[s["b"] if s["a"] in on_loop else s["a"]] += 1
+
     pos: dict[str, str] = {}
     q: dict[str, float] = {}
     for f in view["program"]["frames"]:
@@ -119,13 +135,18 @@ def _page_quanta(view: dict) -> dict:
                         pos[ion] = dst
                         q[ion] = q.get(ion, 0.0) + shuttle_q + junction_q(deg[dst])
             elif "moves" in f:
+                # the page asks `QCCD.moveEntails`, the twin of `replay.move_entails` (#16)
                 ent = f.get("entails") or []
-                for ion, path in f["moves"]:
+                occ = Counter(pos.values())
+                parts = [SimpleNamespace(ion=ion, src=path[0], dst=path[-1]) for ion, path in f["moves"]]
+                routes = [[seg[(u, v)] for u, v in zip(path, path[1:])] for _, path in f["moves"]]
+                per = move_entails(ent, parts, occ, routes, on_loop, rails)
+                for (ion, path), (priced, _) in zip(f["moves"], per):
                     pos[ion] = path[-1]
                     dq = sum(shuttle_q + junction_q(deg[n]) for n in path[1:])
-                    if "split" in ent:
+                    if "split" in priced:
                         dq += split_q
-                    if "merge" in ent:
+                    if "merge" in priced:
                         dq += merge_q
                     q[ion] = q.get(ion, 0.0) + dq
     return {k: round(v, 6) for k, v in q.items()}

@@ -65,3 +65,36 @@ def test_the_documents_themselves_are_untouched():
 def test_audit_sees_through_markup_and_ignores_scripts():
     assert prose.audit("<p>the checks live in <code>qccd/verify/rules.py</code></p>") == ["qccd/verify/rules.py"]
     assert prose.audit("<script>// qccd/verify/rules.py</script>") == []
+
+
+#: An absolute path from the machine that built the site, in a published record's own
+#: spelling or JSON-escaped (two backslashes): a drive letter and a Users folder, or a home.
+ABSOLUTE = r"[A-Za-z]:(?:\\\\|\\|/)+Users(?:\\\\|\\|/)|/home/[^\"/]+/"
+
+
+def test_a_board_record_is_published_without_the_paths_of_the_machine_that_built_it():
+    r"""The leaderboard publishes each task's rows as `board/<task>/manifest.json` (and
+    `rows.json`).  A row names its artifacts -- `arch`, `prefix`, `qasm` -- by where they were
+    on the disk that compiled them, `C:\Users\<name>\...`; the published copy names the file
+    and nothing above it."""
+    import json
+    import re
+    build = pytest.importorskip("qccd.site.build", reason="the site package is not in this tree")
+    row = {"key": "01_ring", "page": "01_ring.html", "numbers": {"T_jones": 1.5},
+           "arch": r"C:\Users\someone\QCCD\arch\ring144_24v.arch.json",
+           "prefix": "/home/someone/QCCD/SmallCode/steane/chain_steane",
+           "qasm": ROOT / "SmallCode" / "steane" / "steane.qasm",
+           "note": "arch/ring144_24v.arch.json is the device"}
+    got = build.public_paths([row])[0]
+    assert (got["arch"], got["prefix"], got["qasm"]) == ("ring144_24v.arch.json", "chain_steane", "steane.qasm")
+    assert {k: got[k] for k in ("key", "page", "numbers", "note")} == {k: row[k] for k in ("key", "page", "numbers", "note")}
+    # the pattern sees a planted path, so its silence below means something
+    assert re.search(ABSOLUTE, json.dumps(row, default=str))
+    # and the records the build publishes today carry none, though their seeds do
+    seen = 0
+    for t in build.tasks():
+        raw = json.dumps(t["rows"], default=str)
+        seen += bool(re.search(ABSOLUTE, raw))
+        assert not re.search(ABSOLUTE, json.dumps(build.public_paths(t["rows"]), default=str)), t["id"]
+    if not seen:
+        pytest.skip("no seed record in this tree names an absolute path; only the planted one was checked")

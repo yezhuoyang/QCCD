@@ -9,28 +9,36 @@ pass; it keeps each ancilla's CNOTs in circuit order but not each data qubit's.
 
 Ours keeps the device, the qubit-to-trap mapping, the native decomposition (H -> RY RX;
 CX(c,t) -> RY(c) RX(c) RX(t) MS RY(c); MR -> M then R) and every qubit's sequence of
-operations; the only reordering is the one the circuit allows (a qubit's CNOTs in which it
-plays the same role, between two of the other role).  Then:
+operations exactly as the circuit writes it: each qubit meets its CNOT partners in the
+circuit's order, even where two of its CNOTs commute.  That order is the circuit author's
+decision, and a compiler that changes it has compiled a different circuit; what a schedule
+may change is only when operations on different qubits happen relative to each other.  Then:
 
-* every ancilla tours its data instead of going home after each gate: it visits the data
-  around one end of its own trap, passes through its (empty) home trap, then visits those
-  around the other end, and comes home to be measured.  It always leaves a data trap through
-  the end it came in by, so no gate swap is needed anywhere;
-* the order of the tour follows what each data qubit needs: an ancilla is the first gate of
-  its (+1,+1) data, the last of its (-1,-1) data and a middle one of the other two, and every
-  gate gets a slot (1, 2 around one end of the trap; 4, 5 around the other) that both the
-  ancilla's tour and the data's own order follow, so every qubit sees its gates in an order
-  the circuit allows and no ancilla waits on a chain of others;
+* every ancilla tours its data in its own circuit order instead of going home after each
+  gate.  An ancilla's trap and each of its data qubits' traps share one junction, with up to
+  two data qubits around each end of the ancilla's trap.  The ancilla goes straight from one data
+  qubit to the next when both lie around the same end, and through its own (empty) trap
+  when the next one lies around the other end; it comes home to be measured.  It always
+  leaves a data trap through the end it came in by, so no gate swap is needed anywhere.  In
+  stim's CX order one kind of ancilla (X or Z, depending on the distance's orientation)
+  meets both data qubits of one end and then both of the other, 6 hops; the other kind
+  alternates between the ends and needs 8, and its tours are what the round's length
+  mostly comes from;
 * nothing waits for a barrier: each operation starts as soon as its ions, its trap and every
   component the model says it holds are free (split and merge hold the junction at the far
   end of their segment, as the artifact declares; an entry or exit holds the junction and the
-  segment).  Two rules keep the list scheduler out of its own way: a data qubit is measured
-  only once no visitor is left in its trap (a measurement holds the trap 400 us), and a
-  junction serves the ancilla whose slots 1-2 lie behind it before the one whose slots 4-5 do.
+  segment).  Three rules keep the list scheduler out of its own way: a visitor sets off only
+  once its data qubit has begun the gate before this one (with one slot per data trap, that
+  is what makes every data qubit see its visitors in circuit order); a data qubit is measured
+  only once no visitor is left in its trap (a measurement holds the trap 400 us); and each
+  junction passes ions in the order of the circuit's layers -- a hop toward a CNOT of layer n
+  before any toward a later one, a hop home after a layer-n CNOT counting as n + 1/2, and of
+  two hops home of one rank, the one whose ion has more trips ahead goes first.
 
 Every event carries the components it holds (``meta["locks"]``, in the artifact's naming), and
 `build` returns a schedule only after `timed.check` accepted it under the JONES profile with
-strict durations and the circuit.
+strict durations and the circuit, with each qubit's CNOTs in exactly the circuit's order
+(``circuit_order="strict"``).
 """
 
 from __future__ import annotations
@@ -38,6 +46,7 @@ from __future__ import annotations
 import heapq
 import re
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -45,7 +54,7 @@ from .models import JONES, JONES_US, jones_duration
 from .sched import _Busy
 from .timed import Event, PortGraph, TimedSchedule, check
 
-__all__ = ["stim_program", "build", "Deadlock"]
+__all__ = ["stim_program", "layers", "build", "publish", "Deadlock"]
 
 _OPNAME = {"reset": "QubitReset", "measure": "Measurement", "RX": "XRotation", "RY": "YRotation",
            "gate": "TwoQubitMSGate", "split": "Split", "merge": "Merge", "transit": "Move",
@@ -104,21 +113,6 @@ def stim_program(path: str | Path) -> tuple[list[tuple[str, str]], dict[str, lis
     return cx, dict(prog), coords
 
 
-def _runs(q: str, items: list, cx: list) -> list[list[int]]:
-    """The qubit's CNOTs grouped into maximal runs of one role (the reorderable blocks)."""
-    out, role = [], None
-    for it in items:
-        if it[0] != "cx":
-            continue
-        k = it[1]
-        r = "c" if cx[k][0] == q else "t"
-        if r != role:
-            out.append([])
-            role = r
-        out[-1].append(k)
-    return out
-
-
 def _num(x: str) -> str:
     return x[1:] if x[:1] in "TCJ" else x
 
@@ -168,11 +162,22 @@ class _Sim:
         return True
 
 
+def layers(cx: Sequence[tuple[str, str]]) -> list[int]:
+    """Each CNOT's depth in the circuit: one more than the deepest earlier CNOT on either of
+    its qubits (for stim's surface-code rounds, the CX layer it was written in)."""
+    depth: dict[str, int] = defaultdict(int)
+    out = []
+    for c, t in cx:
+        n = max(depth[c], depth[t]) + 1
+        depth[c] = depth[t] = n
+        out.append(n)
+    return out
+
+
 def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, str],
           stim: str | Path, *, name: str = "jones_ours", verify: bool = True,
-          slots: Mapping[tuple[int, int], int] | None = None,
           junction_order: bool = True) -> TimedSchedule:
-    cx, prog, coords = stim_program(stim)
+    cx, prog, _ = stim_program(stim)
     ion = {q: str(qubits[q]) for q in prog}
     # an ancilla is measured and reset (MR); a data qubit is only measured
     roles = {q: ("ancilla" if ("op", "measure") in items and
@@ -186,30 +191,17 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
             ends[a][b] = s
         elif b in dev.sites and a in dev.nodes:
             ends[b][a] = s
+    layer = layers(cx)
 
-    # -- each data qubit's CNOT order: its runs in circuit order (a run may be reordered)
-    run_of: dict[tuple[str, int], int] = {}
-    for q, items in prog.items():
-        for r, ks in enumerate(_runs(q, items, cx)):
-            for k in ks:
-                run_of[(q, k)] = r
-
-    # -- each ancilla's tour.  Its data sit at code offsets (+-1, +-1); the ancilla is the
-    # first gate of its (+1,+1) data and the last of its (-1,-1) data, and a middle one of
-    # the other two.  Each pair of data shares one end junction with the ancilla's trap.  A
-    # gate's slot: 1 for (+1,+1), 2 for the middle that shares its junction, 4 for the other
-    # middle (after a pass through home), 5 for (-1,-1).  Tours run in slot order and every
-    # data qubit takes its middle visitors in slot order, so all agree on who comes first.
-    def offset(a: str, d: str) -> tuple[int, int]:
-        return (int(round(coords[d][0] - coords[a][0])), int(round(coords[d][1] - coords[a][1])))
-
+    # -- each ancilla's tour: its CNOTs in the circuit's order, each through the one junction
+    # its trap shares with that data qubit's trap
     junc: dict[int, str] = {}
-    pairs: dict[str, list[tuple[int, str]]] = {}
+    tours: dict[str, list[tuple[str, int]]] = {}
     for a, items in prog.items():
         if roles[a] != "ancilla":
             continue
         ta = home[ion[a]]
-        pairs[a] = []
+        tours[a] = []
         for it in items:
             if it[0] != "cx":
                 continue
@@ -219,29 +211,9 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
             if len(shared) != 1:
                 raise Deadlock(f"ancilla {a} and data {d} share {len(shared)} junctions")
             junc[k] = next(iter(shared))
-            pairs[a].append((k, d))
-    near = None                   # the middle offset that shares a junction with (+1, +1)
-    for a, ps in pairs.items():
-        by_off = {offset(a, d): k for k, d in ps}
-        if (1, 1) in by_off:
-            for m in ((1, -1), (-1, 1)):
-                if m in by_off and junc[by_off[m]] == junc[by_off[(1, 1)]]:
-                    near = m
-    if near is None:
-        raise Deadlock("cannot tell which middle data shares a junction with the first")
-    slot_of_off = {(1, 1): 1, near: 2, (-near[0], -near[1]): 4, (-1, -1): 5}
-    if slots:
-        slot_of_off.update(slots)
-    tours: dict[str, list[tuple[str, int]]] = {}
-    stop_of: dict[int, float] = {}
-    for a, ps in pairs.items():
-        tour = []
-        for k, d in sorted(ps, key=lambda kd: (slot_of_off[offset(a, kd[1])], kd[0])):
-            stop_of[k] = slot_of_off[offset(a, d)]
-            tour.append((junc[k], k))
-        tours[a] = tour
+            tours[a].append((junc[k], k))
 
-    # -- per-qubit operation lists in our order
+    # -- per-qubit operation lists, in the circuit's order (nothing is reordered)
     def expand(q: str, k: int) -> tuple[list, list]:
         c, t = cx[k]
         if q == c:
@@ -251,20 +223,15 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
     scripts: dict[str, list] = {}
     for q, items in prog.items():
         i = ion[q]
-        cxs = [it[1] for it in items if it[0] == "cx"]
-        if roles[q] == "ancilla":
-            order = [k for _, k in tours[q]]
-        else:
-            order = sorted(cxs, key=lambda k: (run_of[(q, k)], stop_of.get(k, 0), k))
-        it_cx = iter(order)
         steps: list = []
         here = home[i]
         tour = {k: j for j, k in tours.get(q, [])}
+        last = tours[q][-1][1] if tours.get(q) else None
         for it in items:
             if it[0] == "op":
                 steps.append(("q", it[1]))
                 continue
-            k = next(it_cx)
+            k = it[1]
             pre, post = expand(q, k)
             steps += [("q", p[0]) for p in pre]
             if roles[q] == "ancilla":
@@ -272,7 +239,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
                 td = home[ion[d]]
                 j = tour[k]
                 if here != home[i] and j not in ends[here]:
-                    # come home first, then out through the other end
+                    # the next data qubit lies at the other end: through home and out again
                     jj = next(x for x in ends[here] if x in ends[home[i]])
                     steps.append(("hop", here, jj, home[i], None))
                     here = home[i]
@@ -280,7 +247,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
                 here = td
             steps.append(("ms", k))
             steps += [("q", p[0]) for p in post]
-            if roles[q] == "ancilla" and (q not in tours or k == tours[q][-1][1]):
+            if roles[q] == "ancilla" and k == last:
                 jj = next(x for x in ends[here] if x in ends[home[i]])
                 steps.append(("hop", here, jj, home[i], None))
                 here = home[i]
@@ -313,17 +280,26 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
         ks = [s[1] for s in scripts[i][:n] if s[0] == "ms"]
         return ks[-1] if ks else None
 
-    # each junction serves the ancilla that visits slots 1-2 through it before the one that
-    # visits slots 4-5 through it (a boundary ancilla with nothing in slots 1-2 would
-    # otherwise take the junction while its neighbour still needs it)
-    first_user: dict[str, tuple[str, int]] = {}
+    # each junction passes ions in the order of the circuit's layers.  A hop toward a CNOT of
+    # layer n has rank n, a hop home after one n + 1/2; a hop goes only once every other ion's
+    # hop through that junction of a lower rank has been scheduled.  Between two hops home of
+    # one rank, the ion with more trips still ahead goes first (it has less slack).
+    rank: dict[tuple[str, int], tuple[float, int]] = {}
+    by_junction: dict[str, list[tuple[tuple[float, int], str, int]]] = defaultdict(list)
     if junction_order:
-        for a, tour in tours.items():
-            js = {j for j, k in tour if stop_of[k] <= 2}
-            for j in js:
-                i_a = ion[a]
-                last = max(n for n, x in enumerate(scripts[i_a]) if x[0] == "hop" and x[2] == j)
-                first_user[j] = (i_a, last)
+        for i, st in scripts.items():
+            done = 0.0
+            hops = [n for n, x in enumerate(st) if x[0] == "hop"]
+            for n, x in enumerate(st):
+                if x[0] == "ms":
+                    done = layer[x[1]] + 0.5
+                elif x[0] == "hop":
+                    r = ((float(layer[x[4]]), 0) if x[4] is not None
+                         else (done, -sum(1 for m in hops if m > n)))
+                    rank[(i, n)] = r
+                    by_junction[x[2]].append((r, i, n))
+        for v in by_junction.values():
+            v.sort()
     on_pass: dict[tuple[str, int], list[str]] = defaultdict(list)
 
     def advance(x: str) -> None:
@@ -389,10 +365,18 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
             if pk is not None and pk not in ms_done:
                 on_ms[pk].append(i)
                 continue
-        fu = first_user.get(j)
-        if fu is not None and fu[0] != i and pos[fu[0]] <= fu[1]:
-            on_pass[fu].append(i)
-            continue
+        r = rank.get((i, pos[i]))
+        if r is not None:
+            ahead = None
+            for rr, x, n in by_junction[j]:
+                if rr >= r:
+                    break
+                if x != i and pos[x] <= n:
+                    ahead = (x, n)
+                    break
+            if ahead is not None:
+                on_pass[ahead].append(i)
+                continue
         s1, s2 = ends[src][j], ends[dst][j]
         side_out = dev.port(src, s1)
         ch = sim.chain[src]
@@ -465,7 +449,39 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
                       source={"tool": "qccd.repro.sched_jones",
                               "plan": {"tours": {a: [k for _, k in tr] for a, tr in tours.items()}}})
     if verify:
-        rep = check(s, JONES, duration=jones_duration, circuit=cx, strict=True)
-        if not rep.ok:
-            raise Deadlock(f"checker rejects: {rep.summary()['violations']} {rep.summary()['first'][:3]}")
+        for prof in (JONES, replace(JONES, circuit_order="strict")):
+            rep = check(s, prof, duration=jones_duration, circuit=cx, strict=True)
+            if not rep.ok:
+                raise Deadlock(f"checker rejects ({prof.circuit_order} circuit order): "
+                               f"{rep.summary()['violations']} {rep.summary()['first'][:3]}")
     return s
+
+
+def publish(out: str | Path | None = None, distances: Sequence[int] = (2, 3, 6, 12)) -> list[Path]:
+    """Write our schedule for each grid run on the reproduction page, as it is published:
+    built on the artifact's own device, placement and qubit-to-ion map, saved as
+    ``grid_rot_d<d>_c2_ours.schedule.json.gz`` in ``Reproduce/jones2025/ours`` (or ``out``),
+    gzip'd with no timestamp so that a rebuild is identical byte for byte."""
+    import gzip
+    import json
+
+    from . import importers
+    from .__main__ import ROOT, _open
+
+    base = ROOT / "jones2025"
+    out = Path(out) if out is not None else base / "ours"
+    written = []
+    for d in distances:
+        ref = importers.import_jones(_open(base / "artifact" / f"grid_rot_d{d}_c2.schedule.json.gz"))
+        s = build(ref.device, ref.chains, ref.qubits,
+                  base / "circuits" / f"rotated_memory_z_d{d}_r1.stim", name=f"grid_rot_d{d}_c2_ours")
+        p = out / f"grid_rot_d{d}_c2_ours.schedule.json.gz"
+        p.write_bytes(gzip.compress(json.dumps(s.to_json(), separators=(",", ":")).encode("utf-8"),
+                                    compresslevel=9, mtime=0))
+        written.append(p)
+    return written
+
+
+if __name__ == "__main__":
+    for p in publish():
+        print(p)

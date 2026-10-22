@@ -1,17 +1,22 @@
 // qccd/viz/js/tutorial.js -- THE COURSE, AS DATA.
 //
 // Every lesson is a record: what it teaches, the handful of editor verbs that build its
-// device, the exercise, the check that decides it, three hints of increasing depth, the
-// nudges a failure gets, the praise a pass gets, and the solution.  Nothing here runs the
-// machine: the engine in editor.js (`lessonLoad`, `lessonCheck`, ...) drives the same verbs
-// a user's pointer drives, and a check is a small expression over what the page already
-// computed -- frames, verdicts, prices.  `tests/test_tutorial.py` loads every lesson,
-// proves the check FAILS on the starting state, applies the solution, proves it passes, and
-// runs the result through `python -m qccd open`, so a lesson that lies cannot ship.
+// device, the exercise, the check that decides it, the nudges a failure gets, the praise a
+// pass gets, and the solution.  Its **Hint** button is a walk-through (the page dims and the
+// next control is ringed): a lesson whose answer is a gesture writes it as `guide`, and the
+// rest are derived from the solution.  Nothing here runs the machine: the engine in
+// editor.js (`lessonLoad`, `lessonCheck`, ...) drives the same verbs a user's pointer
+// drives, and a check is a small expression over what the page already computed --
+// frames, verdicts, prices.  `tests/test_tutorial.py` loads every lesson, proves the check
+// FAILS on the starting state, applies the solution, proves it passes, and runs the result
+// through `python -m qccd open`; `tests/guide.mjs` follows every guide with real input.
 //
-// Text carries three marks the renderer understands: **bold**, `code`, and [[term|hint-key]]
-// for a term that hovers to the same card as the rest of the page.  Facts in praise are
-// {name} slots filled from the check ({cost}, {steps}, {dacs}, {sites}, ...).
+// Story, text, exercises and choices carry three marks the renderer understands: **bold**,
+// `code`, and [[term|hint-key]] for a term that hovers to the same card as the rest of the
+// page (a single *star* is NOT a mark: it shows as a star).  Nudges, praise and milestones
+// are shown as PLAIN text, so they carry no marks; facts are {name} slots filled from the
+// check ({cost}, {steps}, {dacs}, {sites}, ...).  Write for a reader who is new to all of
+// this: short sentences, one action each, every control named as it reads on screen.
 //
 // This file is inlined into the page after editor.js and registers itself at the end.
 
@@ -22,23 +27,39 @@ var QCCD_TUTORIAL = {
     { id: 'A', title: 'What you are looking at',
       milestone: 'Part A done: you can read the map, build on it, and price a move. Part B puts ions on it and moves them.' },
     { id: 'B', title: 'Programming by hand',
-      milestone: 'Part B done: you have written a CNOT, a Bell pair and a docked rotation by hand, which most people who use these machines never do. Part R breaks every rule on purpose -- and you repair them.' },
+      milestone: 'Part B done: you have written a CNOT, a Bell pair and a docked rotation by hand. Most people who use these machines never do that. Part R breaks every rule on purpose, and you fix them.' },
     { id: 'R', title: 'The rules the machine must obey',
-      milestone: 'Part R done: every rule this machine obeys, you have broken and repaired -- or read the honest reason it cannot be checked here. Part C builds circuits under all of them.' },
+      milestone: 'Part R done: you have broken and fixed every rule this machine obeys, or read why it cannot be checked here. Part C builds circuits under all of them.' },
     { id: 'C', title: 'Circuits by hand',
       milestone: 'Part C done: a syndrome round and a plaquette, scheduled by hand under every rule, with the heat paid for. Part D lets the compiler do it and asks you to judge the machine.' },
     { id: 'D', title: 'Architecture decisions with the compiler',
-      milestone: 'The course is done. You can read the map, build a device, program it by hand, break and repair every rule, schedule a circuit under them, and judge an architecture from measured numbers. The rest is practice -- and the compiler.' }
+      milestone: 'The course is done. You can read the map, build a device, program it by hand, break and fix every rule, schedule a circuit, and judge an architecture from measured numbers. The rest is practice, and the compiler.' }
   ],
+  // The tutorial goes on past this page: Parts E onward are lessons whose code is Lean, checked
+  // in the page, on the site's Learn page (their titles are book/book.json's; tests/test_book.py
+  // keeps the two in step).  The Learn tab links to them; it never loads or scores them here.
+  continues: {
+    href: 'https://qccd.academy/learn/',
+    parts: [
+      { id: 'E', title: 'The machine as data' },
+      { id: 'F', title: 'Certificates and the proved checker' },
+      { id: 'G', title: 'Semantics: which gate the pulses make' },
+      { id: 'H', title: 'Verify the website yourself' },
+      { id: 'I', title: 'Build your own verified compiler' },
+      { id: 'J', title: 'Gadgets and fault-tolerant architecture' }
+    ]
+  },
   lessons: [
 
     // =============================================================== A1
     { id: 'A1', part: 'A', title: 'The machine in one picture',
-      story: 'A few micrometres above a chip, in vacuum, a handful of ions are held still by electric fields. This page is a map of that chip.',
+      story: 'A few micrometres above a chip, in a vacuum, a few ions are held in place by electric fields. This page is a map of that chip.',
       teaches: ['el:site', 'el:junction', 'el:segment', 'region:stage'],
       text: [
-        'Each [[trapping site|el:site]] -- a rounded bar -- is a well in the field where ions sit. The ticks inside it are how many fit. Each [[rail|el:segment]] -- a pink line -- is a track an ion can be pushed along, and a [[junction|el:junction]] -- a square -- is where rails meet: ions cross it and never stop in it.',
-        'The **elements rail** on the left lists what you can add. The **canvas** in the middle is the chip. The **panels** on the right hold the programme, the device as code, and the report. Hover anything on this page for what it is; press **Explain** in the head to label the regions; **?** opens the guide.'
+        'A [[trapping site|el:site]] is a rounded bar. Ions sit in it. The small rings inside are the places for ions: one ring, one ion.',
+        'A [[rail|el:segment]] is a pink line. Ions are pushed along it.',
+        'A [[junction|el:junction]] is a square where rails meet. Ions pass through it, but never stop in it.',
+        'On the left are the parts you can add. In the middle is the **canvas**: the chip. On the right is this panel. Hover over anything to see what it is. **Explain** (in the top bar) labels each area. **?** (under the canvas) opens the guide.'
       ],
       setup: [
         ['newCanvas', { name: 'tee' }],
@@ -54,31 +75,30 @@ var QCCD_TUTORIAL = {
         ['fit']
       ],
       stages: [
-        { exercise: 'Click the **junction** -- the square where three rails meet.',
-          check: ['selected', { kind: 'junction' }] },
-        { exercise: 'Now click the site at the end of the **spur**: the bar hanging below the junction.',
-          check: ['selected', { id: 'S3' }] }
-      ],
-      hints: [
-        'A junction is drawn as a square; sites are rounded bars.',
-        'The spur is the short rail going down from the junction; its site is at the bottom.',
-        'Click on the bar itself, not beside it -- the cursor changes to a hand over it.'
+        { exercise: 'Click the **junction**: the square where three rails meet.',
+          check: ['selected', { kind: 'junction' }],
+          guide: [['click', 'J0', ['selected', { kind: 'junction' }], 'Click the junction: the square where the rails meet.'], ['check']] },
+        { exercise: 'Now click the site at the end of the **spur**: the short rail that hangs below the junction.',
+          check: ['selected', { id: 'S3' }],
+          guide: [['click', 'S3', ['selected', { id: 'S3' }], 'Click the site below the junction.'], ['check']] }
       ],
       nudges: {
-        selected: ['Not that one -- look for the square.', 'Close: that is a site. The junction is where the three rails meet.', 'Try the square in the middle of the row.'],
-        'default': ['Nothing selected yet: click a part on the canvas.']
+        selected: ['Not that one. The junction is the square; the spur site is the bar below it.', 'Click right on the part. The pointer turns into a hand over it.', 'Press Hint: it shows you where to click.'],
+        'default': ['Nothing is selected yet. Click a part on the canvas.']
       },
-      praise: 'That is the whole vocabulary: {sites} sites, {junctions} junction, {segments} rails. Everything else on this page is about moving ions between them.',
+      praise: 'That is the whole picture: {sites} sites, {junctions} junction, {segments} rails. The rest of this page is about moving ions between them.',
       solution: { stages: [[['setSelection', [{ kind: 'junction', id: 'J0' }]]],
                            [['setSelection', [{ kind: 'site', id: 'S3' }]]]] } },
 
     // =============================================================== A2
     { id: 'A2', part: 'A', title: 'Zones: what may happen where',
-      story: 'Not every site can do everything. Some can hold a gate, some can be read out, some only take ions in from the source.',
+      story: 'Not every site can do everything. Some can hold a gate, some can measure, some only take in new ions.',
       teaches: ['el:zone_type', 'zone:new'],
       text: [
-        'A [[zone type|el:zone_type]] is a label a site carries: how many ions fit, and whether a gate, a measurement or cooling may happen there. This device knows three: `trap` (gate, measure, cool; two ions), `data` (storage; two ions) and `load` (where ions arrive; eight). The chips under **Zone type** draw each one at its real size -- `load` is visibly the longer bar.',
-        'A site takes its zone when it is placed: pick a chip, then place. And a zone is a shared thing: change its capacity and every site that carries it changes with it.'
+        'A [[zone type|el:zone_type]] is a label on a site. It says how many ions fit, and whether a gate, a measurement or cooling may happen there.',
+        'This device has three: `trap` (gate, measure, cool; 2 ions), `data` (stores ions, can cool; 2 ions) and `load` (where new ions arrive; 8 ions). Their chips are under **Zone type** on the left. Each chip shows the name and the size, for example `load · 8`.',
+        '**Pick a zone:** press a chip, then click the canvas. The new site gets that zone.',
+        '**A zone is shared:** change its capacity once, and every site with that zone changes.'
       ],
       setup: [
         ['newCanvas', { name: 'tee' }],
@@ -94,50 +114,49 @@ var QCCD_TUTORIAL = {
         ['fit']
       ],
       stages: [
-        { exercise: 'Click the **load** chip under Zone type: it arms **Trapping site** in that zone, and a ghost of the site follows the pointer. Move onto an empty spot of the canvas and click to leave the loading site there.',
-          check: ['all', ['sites', 5], ['anyNodeZone', 'load']] },
-        { exercise: 'Now change the `load` zone itself. Open the **Device** tab and choose **Source**: the device as text. The `load` zone comes with the device\'s template, so no line sets its capacity yet -- add `m.set_zone("load", capacity=4)` as a new last line. The chip and your new site both shrink. Then come back to **Learn** and press **Check**.',
-          check: ['zoneCapacity', 'load', 4] }
-      ],
-      hints: [
-        'The zone chips sit right under the Zone type tile. Pressing one arms Trapping site with that zone; the next click on empty canvas places it.',
-        'Source is under the **Device** tab. Nothing in it sets the load zone yet, so type a line of your own at the very end: `m.set_zone("load", capacity=4)`.',
-        'The picture follows as you type. A `set_zone` line changes only the fields it names, so the zone keeps everything else it allows. When the load chip reads 4, go back to **Learn** and press **Check**.'
+        { exercise: 'Press the **load** chip under **Zone type**. Then click an empty spot on the canvas. A new `load` site appears there.',
+          check: ['all', ['sites', 5], ['anyNodeZone', 'load']],
+          guide: [['site', 3, 1, { zone: 'load', chip: true }], ['check']] },
+        { exercise: 'Now change the `load` zone. Open the **Device** tab and press **Source**: the device as text. No line sets the `load` capacity yet, so type a new last line: `m.set_zone("load", capacity=4)`. The chip now reads `load · 4`, and your new site gets shorter. Go back to **Learn** and press **Check**.',
+          check: ['zoneCapacity', 'load', 4],
+          guide: [['tab', 'A'], ['view', 'src'], ['line', '#eSrc', 'm.set_zone("load", capacity=4)', 'Type this as a new last line.'],
+                  ['goal', ['zoneCapacity', 'load', 4]], ['check']] }
       ],
       nudges: {
-        sites: ['No new site yet -- press the load chip, then click empty canvas.', 'The click has to land on empty canvas, away from the other sites.'],
-        anyNodeZone: ['A site was placed, but not in the load zone. Press the load chip first, then place another.'],
-        zoneCapacity: ['The load zone still holds {have}. Open Device, choose Source, and add the line m.set_zone("load", capacity=4) at the end.'],
-        'default': ['Not there yet. Try the hint.']
+        sites: ['No new site yet. Press the load chip, then click an empty spot on the canvas.', 'The click must land on empty canvas, away from the other sites.'],
+        anyNodeZone: ['A site was placed, but not in the load zone. Press the load chip first, then place another site.'],
+        zoneCapacity: ['The load zone still holds {have}. Open Device, press Source, and type the line m.set_zone("load", capacity=4) at the end.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'A loading site that now holds {cap}. Capacity is the first rule of the machine -- R1 -- and you just set it for a whole zone at once.',
+      praise: 'A load site that now holds {cap}. Capacity is the first rule of the machine, R1, and you just set it for a whole zone at once.',
       solution: { stages: [[['addNodeAt', 3, 1, { id: 'S4', kind: 'site', zone: 'load' }]],
                            [['emit', { method: 'set_zone', args: ['load'], kwargs: { capacity: 4 } }]]] } },
 
     // =============================================================== A3
     { id: 'A3', part: 'A', title: 'Building by hand',
-      story: 'Every chip starts empty.',
+      story: 'Every chip starts empty. You will build a square loop by hand.',
       teaches: ['el:site', 'el:segment', 'el:loop', 'snap', 'undo', 'fit'],
       text: [
-        'Press **Trapping site**, then click the canvas: a ghost shows where it will land -- exactly where you click. Press **Snap** under the canvas and it lands on the lattice instead, which makes a tidy square easy. **Shift-drag** one site onto another to lay a rail between them. Drag a part to move it anywhere; **Undo** takes any gesture back; **Fit** frames the whole device.',
-        'A [[loop|el:loop]] is a closed ring of sites the machine can turn as one. Select the sites (shift-drag a box around them), then **right-click** any one of them: the menu that opens offers **Close loop**, and it follows the rails around the ring whatever order you selected in. Right-click is how you reach everything a part can do -- its size, its zone, deleting it.',
-        'On a real chip the corners of a square are usually [[junctions|el:junction]], with the trapping sites on the sides. Build it that way if you like: a junction at each corner, a site on each side, eight rails -- it is the same loop.'
+        '**Place a site:** press **Trapping site** on the left, then click the canvas. Turn on **Snap** (under the canvas) and it lands on the grid.',
+        '**Lay a rail:** hold **Shift** and drag from one site onto another.',
+        '**Make a loop:** a [[loop|el:loop]] is a ring of sites the machine can turn all at once. Hold **Shift** and drag a box around the sites to select them, then **right-click** one of them and choose **Close loop**.',
+        '**Undo** takes back any step. On a real chip the corners of a square are often [[junctions|el:junction]]; a square built that way is a loop too. Press **Hint** to be shown each step.'
       ],
       setup: [['newCanvas', { name: 'square' }], ['fit']],
-      exercise: 'Build a square: four sites, rails joining them in a ring (with or without a junction at each corner), then select them all and press **Close loop**.',
+      exercise: 'Build a square: four sites, four rails joining them in a ring, then close it into a loop.',
       check: ['all', ['sites', 4], ['loops', 1, true]],
-      hints: [
-        'Place the four sites at the corners of a square: click, click, click, click.',
-        'Shift-drag from a site to its neighbour to lay a rail; four times, around the square.',
-        'Shift-drag on empty canvas draws a selection box. With the whole square selected, right-click one of its sites and press **Close loop**.'
-      ],
+      guide: [['fresh', [[0, 0], [1, 0], [1, 1], [0, 1]]], ['snap'],
+              ['site', 0, 0], ['site', 1, 0], ['site', 1, 1], ['site', 0, 1],
+              ['rail', [0, 0], [1, 0]], ['rail', [1, 0], [1, 1]], ['rail', [1, 1], [0, 1]], ['rail', [0, 1], [0, 0]],
+              ['box', [[0, 0], [1, 0], [1, 1], [0, 1]]],
+              ['menu', [0, 0], 'close-loop', ['loops', 1, true], 'Press Close loop.'], ['check']],
       nudges: {
         sites: ['{have} of 4 sites so far. Keep placing.', 'You have {have} sites; the square needs exactly four.'],
-        loops: ['Four sites -- now join them in a ring, select the whole square and press Close loop.', 'If Close loop refuses, a rail is missing: every corner needs a rail to each neighbour.'],
-        'default': ['Not a square yet. The hint knows which corner is missing.']
+        loops: ['Four sites. Now join them in a ring, select all four, and choose Close loop.', 'If Close loop does not work, a rail is missing: each corner needs a rail to both of its neighbours.'],
+        'default': ['Not a square yet. Press Hint: it shows you the next step.']
       },
-      praise: 'A four-site loop. The machine can now turn every ion on it by one step with a single instruction -- the cheapest move it has.',
-      challenge: { label: 'sharp', exercise: 'Do it in nine gestures: four places, four joins, one close.',
+      praise: 'A four-site loop. The machine can now move every ion on it one site with a single instruction: the cheapest move it has.',
+      challenge: { label: 'sharp', exercise: 'Do it in nine gestures: four sites, four rails, one **Close loop**.',
                    check: ['editsAtMost', 9] },
       solution: { steps: [
         ['addNodeAt', 0, 0, { id: 'N0', kind: 'site', zone: 'trap' }],
@@ -153,62 +172,62 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== A4
     { id: 'A4', part: 'A', title: 'The price of motion',
-      story: 'Moving an ion is not free. Every push along a rail heats it a little, and a hot ion makes a worse gate. Pushing faster heats it more.',
+      story: 'Moving an ion is not free. Each push along a rail warms the ion a little, and a warm ion makes a worse gate. A faster push warms it more.',
       teaches: ['m:cost', 'm:runtime', 'm:peak n̄', 'el:primitives', 'el:curve_point', 'tab:R'],
       text: [
-        'The head keeps score three ways. [[Cost|m:cost]] counts what the machine is charged for each hop under its cost model. [[Runtime|m:runtime]] is wall-clock time. [[Peak n̄|m:peak n̄]] is how hot the hottest ion got, in motional quanta. Runtime and heat are read off the [[primitives|el:primitives]]: each operation has a curve of measured points, how long against how much it heats, and the model takes the **fastest point in its reference table** (`qccdsim_jones`).',
-        'A curve has several rows because the same move can be run fast or slowly: each row is one measured way of doing it, its **duration** in microseconds and the **heat** it adds in quanta. A quick hop heats the ion more than a slow one -- 0.2 quanta in 2 us is a rate of 100 quanta per millisecond.',
-        'Open **Report** to see every number with where it came from. Nothing on this page is a guess: every price is a point on a measured curve, and the curve cites its paper.'
+        'The top bar shows the price of the programme on the canvas. [[Cost|m:cost]] is what the model charges for the moves. [[Runtime|m:runtime]] is how long the programme takes.',
+        '[[Report|tab:R]] also shows the [[peak n̄|m:peak n̄]], written **peak n-bar**: the heat of the hottest ion, in quanta.',
+        'Times and heats come from the [[primitives|el:primitives]]. Each kind of move has a curve: a short table of measured rows. Each row is one way to do the move: its **duration** in microseconds (us) and the **heat** it adds in quanta.',
+        'The model always uses the fastest row in its table (`qccdsim_jones`). A fast move heats more than a slow one: 0.2 quanta in 2 us is 100 quanta per millisecond.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
-      exercise: 'Open **Curve point** (under Append a row) and pick the `shuttle_segment` curve. Add a faster, hotter way to shuttle: duration **2** us, heat added **0.2** quanta, then press **add**. Watch the runtime chip fall -- and the peak heating rise.',
+      exercise: 'Press **Append a row** in the tools bar, then **Curve point**. A form opens on the left. Pick the `shuttle_segment` curve. At the bottom, type duration **2** (us) and heat added **0.2** (quanta), then press **add**. **RUNTIME** in the top bar falls, and in **Report** the **peak n-bar** rises.',
       check: ['all', ['runtimeBelow', 'setup'], ['peakAbove', 'setup']],
-      hints: [
-        'Append a row is a fold in the rail; Curve point is the tile in it. Its form has a curve picker at the top.',
-        'Choose shuttle_segment in the picker; the two fields at the bottom take the duration in microseconds and the heat added in quanta: 2 and 0.2.',
-        'The model always takes the fastest point of its table, so a faster point wins the moment it exists.'
-      ],
+      guide: [['tool', 'row'], ['tile', 'curve_point', 'Press Curve point.'],
+              ['pick', '#cfName', 'shuttle_segment', 'Pick the shuttle_segment curve.'],
+              ['fill', '#cfNewUs', '2', 'Duration: 2 (microseconds).'], ['fill', '#cfNewQ', '0.2', 'Heat added: 0.2 (quanta).'],
+              ['press', '#cfAdd', 'Press add.'], ['goal', ['all', ['runtimeBelow', 'setup'], ['peakAbove', 'setup']]], ['check']],
       nudges: {
-        runtimeBelow: ['Runtime is still {have} us. Is the new point faster than the old one? Check its us value.', 'The fastest point still seems to be the old one -- did the add go through? The toast says how many points the curve has.'],
-        peakAbove: ['Runtime fell but heating did not rise -- give the fast point more quanta than the old one (0.2).'],
-        'default': ['The price has not moved yet.']
+        runtimeBelow: ['Runtime is still {have} us. Is the new row faster than the old ones? Check its duration.', 'The fastest row still seems to be an old one. Did add work? A short message at the bottom of the canvas says how many points the curve has.'],
+        peakAbove: ['Runtime fell, but the heat did not rise. Give the new row more heat than the old ones, for example 0.2.'],
+        'default': ['The price has not moved yet. Press Hint to be shown the next step.']
       },
-      praise: 'Runtime fell from {us0} us to {us} us, and the hottest ion went from {peak0} to {peak} quanta. Faster is hotter: that trade is the whole game, and the curves are where it is decided.',
+      praise: 'Runtime fell from {us0} us to {us} us, and the hottest ion went from {peak0} to {peak} quanta. Faster is hotter: that trade-off is the whole game, and the curves decide it.',
       solution: { steps: [
         ['curveAddPoint', 'shuttle_segment', { us: 2.0, quanta: 0.2, table: 'qccdsim_jones', source: 'exercise A4', label: 'a faster shuttle' }]] } },
 
     // =============================================================== A5
     { id: 'A5', part: 'A', title: 'The control plane and broadcasting',
-      story: 'A thousand electrodes, and not a thousand wires. How the chip is driven decides what it can do at once.',
+      story: 'A chip has thousands of electrodes, but not thousands of wires. How the electrodes are wired decides what the chip can do at once.',
       teaches: ['el:control', 'm:DACs', 'm:electrodes', 'm:switches'],
       text: [
-        'Every [[electrode|m:electrodes]] along a rail requires a voltage, typically supplied by a [[DAC|m:DACs]] (Digital-to-Analog Converter). Wiring each electrode to its own dedicated DAC quickly becomes unmanageable as chips grow. Instead, this device uses **broadcast** wiring: repeating a fixed sequence of channels (like *a, b, c, a, b, c*) so a single DAC can drive a rail of any length. As a result, the device specifies its control plane by counting total **channels** rather than individual electrodes.',
-        'The tradeoff of broadcasting is the central premise of this course: **every site on a shared channel must move in lockstep during the same step.** You will encounter this concept as a core rule in R4d, a programming exercise in Part B, and a major design decision in Part D.'
+        'Each [[electrode|m:electrodes]] along a rail needs a voltage. A [[DAC|m:DACs]] (digital-to-analog converter) makes that voltage. One DAC for every electrode does not scale to big chips.',
+        'This device uses **broadcast** wiring: many electrodes share one **channel**, and one DAC drives the whole channel. So the device counts DACs by channel, not by electrode.',
+        'The price: **every site on a shared channel must move the same way in the same step.** You will meet this again as rule R4d, in Part B, and in Part D.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
       stages: [
-        { exercise: 'Open **Control plane** (under Machine settings) and double `wiring.electrodes_per_trap` from 24 to 48, then apply. Open **Report** and read the Hardware table: electrodes double -- and DACs do not move.',
-          check: ['all', ['electrodesAbove', 'setup'], ['dacsSame', 'setup']] },
-        { exercise: 'Why did the DAC count not move?',
+        { exercise: 'Press **Machine settings** in the tools bar, then **Control plane**. A form opens on the left. Change `wiring.electrodes_per_trap` from 24 to 48. Press **apply** at the bottom of the form. Then open **Report**: **electrodes** goes up, and **DACs** stays the same.',
+          check: ['all', ['electrodesAbove', 'setup'], ['dacsSame', 'setup']],
+          guide: [['tool', 'block'], ['tile', 'control', 'Press Control plane.'],
+                  ['fill', 'label:wiring.electrodes_per_trap', '48', 'Change 24 to 48.'], ['press', '#bfSave', 'Press apply.'],
+                  ['goal', ['all', ['electrodesAbove', 'setup'], ['dacsSame', 'setup']]],
+                  ['tab', 'R'], ['look', '#report', 'Report: the electrodes went up, the DACs stayed the same.'], ['check']] },
+        { exercise: 'Why did the number of DACs not change?',
           check: ['answer', 'channels'] }
       ],
       choices: [
-        { id: 'stale', text: 'The report has not caught up yet.' },
-        { id: 'channels', text: 'Every electrode on a channel shares one waveform, so DACs count channels, not electrodes.' },
+        { id: 'stale', text: 'The report has not updated yet.' },
+        { id: 'channels', text: 'All electrodes on a channel share one signal, so DACs count channels, not electrodes.' },
         { id: 'junctions', text: 'DACs are only counted for junctions, and this ring has none.' }
       ],
-      hints: [
-        'Control plane is the second tile under Machine settings; its form lists the wiring fields by name.',
-        'Change the number next to wiring.electrodes_per_trap and press apply. The Report tab shows electrodes, switches and DACs.',
-        'One waveform, many electrodes: that is what a channel is. The DAC count is the channel count plus a few for compensation.'
-      ],
       nudges: {
-        electrodesAbove: ['Electrodes are still {have}. Change wiring.electrodes_per_trap in the Control plane form and apply.'],
-        dacsSame: ['The DAC count moved to {have} -- change only electrodes_per_trap, nothing else, and apply again.'],
-        answer: ['Look at the numbers again: electrodes doubled and DACs stayed. Which sentence explains that?', 'The report is not stale -- it re-priced the moment you applied. Think about what a channel is.'],
-        'default': ['Not there yet.']
+        electrodesAbove: ['Electrodes are still {have}. Change wiring.electrodes_per_trap in the Control plane form, then press apply.'],
+        dacsSame: ['The DAC count changed to {have}. Change only electrodes_per_trap, nothing else, and press apply again.'],
+        answer: ['Look at the numbers again: electrodes went up, DACs did not. Which answer explains that?', 'The report is not stale: it updated the moment you pressed apply. Think about what a channel is.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Electrodes went from {electrodes0} to {electrodes} and DACs stayed at {dacs}. That is broadcasting: a DAC drives a channel, and a channel drives every electrode on it -- which is exactly why every site on it must move the same way.',
+      praise: 'Electrodes rose to {electrodes}, and DACs stayed at {dacs}. That is broadcasting: one DAC drives a channel, and a channel drives every electrode on it. That is why every site on it must move the same way.',
       solution: { stages: [[['emit', { method: 'set_wiring', args: [], kwargs: { electrodes_per_trap: 48 } }]],
                            [['setAnswer', 'channels']]] } },
 
@@ -217,31 +236,34 @@ var QCCD_TUTORIAL = {
       story: 'You have a device and a programme. Now read them.',
       teaches: ['tab:P', 'tab:A', 'tab:M', 'tab:W', 'tab:R', 'follow'],
       text: [
-        '[[Program|tab:P]] lists the hardware programme one instruction per row; click a row and the animation jumps there. [[Device|tab:A]] is the device as code: the statements that build it, and a Source view you can edit. [[Machine|tab:M]] and [[Report|tab:R]] hold the totals and the 23 rules -- green passed, red failed, grey not checkable here. [[Write|tab:W]] is where you will write programmes in Part B.',
-        'The two right-hand columns of a programme row are its cost and its steps. A rotation moves every ion on the loop at once, so it costs the most -- and does the most.'
+        'The tabs at the top right open the panels. **Learn** is this course.',
+        '[[Program|tab:P]]: the hardware programme, one instruction per row. Click a row and the animation jumps there.',
+        '[[Device|tab:A]]: the device as code. Press **Source** to see it as text you can edit.',
+        '[[Machine|tab:M]]: the rules and the hardware.',
+        '[[Report|tab:R]]: the totals and the rules. Each rule is a badge: green passed, red failed, amber only partly checked, grey (dashed) not checked on this page.',
+        '[[Write|tab:W]]: where you write programmes, from Part B on.',
+        'A rotation row reads like `L0 × +1  1 hop`: the loop turns one site. Every ion on the loop pays for every hop, so the row with the most hops costs the most.'
       ],
-      setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
-      exercise: 'In **Program**, find the most expensive instruction and click its row so the animation jumps there.',
+      setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit'], ['seekTo', 0]],
+      exercise: 'Open **Program**. Find the most expensive instruction: the rotation with the most hops. Click its row, and the animation jumps there.',
       check: ['frameIs', 'maxcost'],
-      hints: [
-        'The right-hand numbers on each row are cost and steps.',
-        'Follow keeps the running instruction in view; switch it off to browse the list.',
-        'Clicking a row seeks the animation to that instruction; the status strip names it.'
-      ],
       nudges: {
-        frameIs: ['You are on instruction {have}; the dearest one is elsewhere in the list.', 'Compare the cost column: one row is bigger than the rest.'],
+        frameIs: ['You are on instruction {have}. The most expensive one is another row.', 'Compare the hops: one rotation turns the loop further than the others.'],
         'default': ['Click a row in the Program panel.']
       },
-      praise: 'Instruction {frame} costs {cost}: a rotation moves every ion at once. Part B is about writing your own.',
+      praise: 'Instruction {frame} costs {cost}: a rotation moves every ion at once. Part B is about writing your own programmes.',
       solution: { steps: [['seekTo', 'maxcost']] } },
 
     // =============================================================== B1
     { id: 'B1', part: 'B', title: 'The programme language',
-      story: 'A device does nothing until it is told to. Here is how you tell it.',
+      story: 'A device does nothing until you tell it what to do. Here is how.',
       teaches: ['p:init', 'p:shuttle', 'evaluate', 'tab:W', 'tab:P'],
       text: [
-        'A programme is a list of `p.` statements in the [[Write|tab:W]] panel, one per line, run in order. [[p.init|p:init]] puts named ions on named sites: `p.init({"d0": "S0"})`. [[p.shuttle|p:shuttle]] pushes one ion along a path of site ids, one rail per step: `p.shuttle("d0", ["S0", "S1", "S2"])`. Press **Evaluate** and the page turns the text into frames, prices them, checks every rule and plays them on the canvas.',
-        'The [[Program|tab:P]] panel lists the frames the text became. The strip under the canvas says the first thing that is wrong, if anything is. Nothing in the text is taken on trust: an ion asked to walk a rail that is not there is refused at the line that asked.'
+        'A programme is a list of `p.` lines in the [[Write|tab:W]] tab. The lines run in order, one after another.',
+        '[[p.init|p:init]] puts named ions on named sites: `p.init({"d0": "S0"})` puts ion `d0` on site `S0`.',
+        '[[p.shuttle|p:shuttle]] moves one ion along a path of sites, one rail per step: `p.shuttle("d0", ["S0", "S1", "S2"])`.',
+        'Press **Evaluate**. The page runs the lines, prices them, checks the rules, and plays the result on the canvas. The [[Program|tab:P]] tab lists the instructions it made.',
+        'Nothing is taken on trust. If a line cannot run, for example a path along a rail that does not exist, the **Write** tab says which line and why.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -251,32 +273,28 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'S0', 'S1', { id: 'E0' }],
         ['joinNodes', 'S1', 'S2', { id: 'E1' }],
         ['fit']],
-      exercise: 'Open **Write**. Put an ion `d0` on `S0` and walk it to `S2`. Press **Evaluate**, then **Check**.',
+      exercise: 'Open **Write**. Put ion `d0` on `S0` and walk it to `S2`. Press **Evaluate**, then **Check**.',
       check: ['all', ['lowered'], ['ionAt', 'd0', 'S2'], ['rulesPass']],
-      hints: [
-        'Two lines: a p.init that places d0 on S0, then a p.shuttle with the path S0, S1, S2.',
-        'Site ids go in quotes, the path in square brackets: p.shuttle("d0", ["S0", "S1", "S2"]).',
-        'Evaluate is the button under the text. The toast says how many statements and frames it made.'
-      ],
       nudges: {
-        lowered: ['No programme yet. The Write panel is waiting for two lines.', 'The text did not run: {have}', 'Check the quotes and brackets -- the strip names the line.'],
-        ionAt: ['d0 ended at {have}, not S2. The path is a list of site ids, each joined to the next by a rail.', 'Nearly: d0 is at {have}. One more site in the path.'],
-        rulesPass: ['The ion got there but a rule is red: {have}'],
-        'default': ['Not there yet. Evaluate, then Check.']
+        lowered: ['No programme yet. The Write tab is waiting for two lines.', 'The text did not run: {have}', 'Check the quotes and brackets. The Write tab names the line that failed.'],
+        ionAt: ['d0 ended at {have}, not S2. The path is a list of sites, each joined to the next by a rail.', 'Nearly: d0 is at {have}. Add one more site to the path.'],
+        rulesPass: ['The ion got there, but a rule failed: {have}. Open Report to read it.'],
+        'default': ['Not there yet. Press Evaluate, then Check.']
       },
-      praise: 'd0 walked two rails to {at} in {steps} steps at cost {cost}. Press play under the canvas and watch it go: that is your first hardware programme.',
-      boundary: { exercise: 'Walk it back: a round trip that visits S2 and ends on S0.',
+      praise: 'd0 walked two rails to {at} in {steps} steps at cost {cost}. Press Play under the canvas to watch it: your first hardware programme.',
+      boundary: { exercise: 'Now walk it back: a round trip that visits `S2` and ends on `S0`.',
                   check: ['all', ['visited', 'd0', 'S2'], ['ionAt', 'd0', 'S0'], ['rulesPass']],
-                  praise: 'There and back in {steps} steps. Every hop is a row in the Program panel -- click one and the animation jumps there.' },
+                  praise: 'There and back in {steps} steps. Every hop is a row in the Program tab: click one and the animation jumps there.' },
       solution: { program: 'p.init({"d0": "S0"})\np.shuttle("d0", ["S0", "S1", "S2"])\n' } },
 
     // =============================================================== B2
     { id: 'B2', part: 'B', title: 'One CNOT',
-      story: 'Two ions, one gate. On paper it is a line in a circuit. On the chip it is a journey, a pause, and then the gate.',
+      story: 'Two ions, one gate. On paper it is one line of a circuit. On the chip it is a trip, a pause, then the gate.',
       teaches: ['p:gate', 'p:cool', 'rule:R6b', 'rule:R7c', 'rule:R22'],
       text: [
-        'A two-qubit gate happens **in one site**: both ions must sit there ([[R6b|rule:R6b]]), and the site\'s zone must allow gates ([[R6|rule:R6]]). [[p.gate|p:gate]] names the gate and its pairs, control first: `p.gate("CX", [["d0", "d1"]])`.',
-        'So a CNOT between ions in different sites is two things: transport, then the gate. Bring `d1` down the line to `S0` with a shuttle, then fire. The ions start where the loaded programme puts them.'
+        'A two-qubit gate happens **in one site**. Both ions must be there ([[R6b|rule:R6b]]), and the zone of that site must allow gates ([[R6|rule:R6]]).',
+        '[[p.gate|p:gate]] names the gate and the pair of ions, control first: `p.gate("CX", [["d0", "d1"]])`.',
+        'So a CNOT between ions in different sites takes two things: move one ion to the other, then fire the gate. The loaded programme puts `d0` on `S0` and `d1` on `S2`.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -288,28 +306,23 @@ var QCCD_TUTORIAL = {
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\n']],
       stages: [
-        { exercise: 'Under the `p.init`, add a shuttle that walks `d1` from `S2` to `S0`, then a `CX` on `d0`, `d1`. Evaluate, then Check.',
+        { exercise: 'Open **Write**. Under the `p.init` line, add a shuttle that walks `d1` from `S2` to `S0`. Then add a `CX` on `d0`, `d1`. Press **Evaluate**, then **Check**.',
           check: ['all', ['lowered'], ['gateBetween', 'd0', 'd1', 'CX']] },
-        { exercise: 'The gate fired -- and the badge went **red**. Hover it: R7c. The shuttle heated `d1`, and the machine will not fire a gate on an ion nobody cooled. Put a [[p.cool()|p:cool]] line between the shuttle and the gate, then Evaluate again.',
+        { exercise: 'The gate fired, but a rule failed. Open **Report**: the badge **R7c** is red. The trip warmed `d1`, and the machine refuses gates when no ion is ever cooled. Add a [[p.cool()|p:cool]] line between the shuttle and the gate. Press **Evaluate** again, then **Check**.',
           check: ['all', ['gateBetween', 'd0', 'd1', 'CX'], ['rulesPass']] }
       ],
-      hints: [
-        'p.shuttle("d1", ["S2", "S1", "S0"]) brings d1 to d0. Then p.gate("CX", [["d0", "d1"]]).',
-        'The pairs argument is a list of pairs -- two levels of brackets: [["d0", "d1"]].',
-        'p.cool() with no arguments cools every ion. It goes after the transport and before the gate.'
-      ],
       nudges: {
-        lowered: ['The text did not run: {have}', 'The strip under the canvas names the line that failed.'],
-        gateBetween: ['No CX between d0 and d1 yet. p.gate takes the name, then a list of pairs.', 'The gate must name both ions -- and they must share a site when it fires.'],
-        rulesPass: ['Still red: {have}', 'Read the badge on the strip: it names the rule and the instruction. Cooling goes before the gate.'],
-        stepsAtMost: ['{have} steps, and four is the answer here. One p.simd would be three, but R22 refuses it: one waveform moves every ion the same way, and these two move towards each other.', 'p.shuttle("d0", ["S0", "S1"]) and p.shuttle("d1", ["S2", "S1"]), then p.cool(), then the gate.'],
-        ionAt: ['That ion ends at {have}. The gate fires at S1, so each ion walks one rail -- neither one walks the whole way.', 'd0 goes S0 to S1, d1 goes S2 to S1, and the CX fires where they meet.'],
-        'default': ['Not there yet. Evaluate, then Check.']
+        lowered: ['The text did not run: {have}', 'The Write tab names the line that failed.'],
+        gateBetween: ['No CX between d0 and d1 yet. p.gate takes the gate name, then a list of pairs.', 'The gate must name both ions, and they must be in the same site when it fires.'],
+        rulesPass: ['A rule still fails: {have}', 'Open Report and read the red badge. The cooling goes before the gate.'],
+        stepsAtMost: ['{have} steps; four is the goal. One p.simd would be three, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other.', 'Use p.shuttle("d0", ["S0", "S1"]) and p.shuttle("d1", ["S2", "S1"]), then p.cool(), then the gate.'],
+        ionAt: ['That ion ends at {have}. The gate fires at S1, so each ion walks one rail. Neither walks the whole way.', 'd0 goes from S0 to S1, d1 goes from S2 to S1, and the CX fires where they meet.'],
+        'default': ['Not there yet. Press Evaluate, then Check.']
       },
-      praise: 'That is a CNOT on real hardware: d1 walked to d0, was cooled, and CX fired at instruction {gateFrame}. Cost {cost}, {steps} steps, and all {rulesChecked} rules the page checks are green.',
-      challenge: { exercise: 'Meet in the middle: fire the `CX` at `S1`, with `d0` and `d1` each walking one rail to get there. You will want to put both moves in one `p.simd` -- try it, and read the rule that goes red. One set of electrodes pushes everything on a rail the same way, so no single instruction can move `d0` right while `d1` moves left ([[R22|rule:R22]]). Two shuttles, then cool and fire.',
+      praise: 'That is a CNOT on real hardware: d1 walked to d0, was cooled, and CX fired at instruction {gateFrame}. Cost {cost}, {steps} steps, and all {rulesChecked} rules the page checks passed.',
+      challenge: { exercise: 'Meet in the middle: fire the `CX` at `S1`, with `d0` and `d1` each walking one rail. You may want both moves in one `p.simd`. Try it, and see which rule fails: one set of electrodes pushes every ion on a rail the same way, so one instruction cannot move `d0` right and `d1` left ([[R22|rule:R22]]). Use two shuttles, then cool and fire.',
                    check: ['all', ['gateBetween', 'd0', 'd1', 'CX'], ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S1'], ['stepsAtMost', 4]],
-                   praise: 'The CX fired at S1 in {steps} steps, with both ions travelling. One p.simd would have been three, but R22 refuses it: one waveform moves every ion the same way, and these two move towards each other. That is why Part C rotates a whole ring at once -- every ion the same way is exactly what the electrodes can do.' },
+                   praise: 'The CX fired at S1 in {steps} steps, with both ions moving. One p.simd would have been three steps, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other. That is why Part C turns a whole ring at once: moving every ion the same way is exactly what the electrodes can do.' },
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.gate("CX", [["d0", "d1"]])\n']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.cool()\np.gate("CX", [["d0", "d1"]])\n']]],
@@ -317,11 +330,12 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== B3
     { id: 'B3', part: 'B', title: 'Single-qubit gates and measurement',
-      story: 'A Bell pair is the smallest thing worth entangling. Three gates and a readout.',
+      story: 'A Bell pair is the simplest pair of entangled qubits: an H, a CX, then read both out.',
       teaches: ['p:gate', 'p:measure', 'p:reset', 'rule:R6'],
       text: [
-        'Single-qubit gates name the **site**, not the ion: `p.gate("H", [], ["S0"])` is an H on whatever sits in `S0`. [[p.measure|p:measure]] names ions -- `p.measure(["d0", "d1"])` -- and needs a site whose zone has *spam* (state preparation and measurement): `trap` has it, `data` does not. [[p.reset|p:reset]] puts an ion back to |0>.',
-        'A Bell pair is H on the control, CX, then read both out. Every line is one thing the machine does, and the order of the lines is the order it happens.'
+        'A single-qubit gate names the **site**, not the ion: `p.gate("H", [], ["S0"])` is an H on the ion in `S0`. The `[]` is an empty list of pairs.',
+        '[[p.measure|p:measure]] names ions: `p.measure(["d0", "d1"])`. The site must be able to measure: `trap` can, `data` cannot. [[p.reset|p:reset]] puts an ion back to |0>.',
+        'Each line is one thing the machine does, in the order you write them.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -332,34 +346,31 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'S1', 'S2', { id: 'E1' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\n']],
-      exercise: 'Write the Bell pair: `H` on `S0`, bring `d1` to `S0`, cool, `CX` on `d0`, `d1`, then measure both ions.',
+      exercise: 'Write the Bell pair: `H` on `S0`, bring `d1` to `S0`, cool, `CX` on `d0`, `d1`, then measure both ions. Press **Evaluate**, then **Check**.',
       check: ['all', ['lowered'], ['gateAt', 'H', 'S0'], ['gateBetween', 'd0', 'd1', 'CX'], ['measured', ['d0', 'd1']], ['rulesPass']],
-      hints: [
-        'Five lines after the init: the H, the shuttle, the cool, the CX, the measure.',
-        'p.gate("H", [], ["S0"]) -- an empty pairs list, then the site. p.measure(["d0", "d1"]) at the end.',
-        'Both ions are in S0 when they are measured, and S0 is a trap: measuring is allowed there.'
-      ],
       nudges: {
         lowered: ['The text did not run: {have}'],
-        gateAt: ['No H on S0 yet. Single-qubit gates take an empty pairs list and then the site.'],
+        gateAt: ['No H on S0 yet. A single-qubit gate takes an empty list [] and then the site: p.gate("H", [], ["S0"]).'],
         gateBetween: ['The CX is missing, or names the wrong ions.'],
         measured: ['Not measured yet: {have}. p.measure takes a list of ions.'],
-        rulesPass: ['A rule is red: {have}', 'Cooling goes between the shuttle and the CX.'],
-        'default': ['Not there yet.']
+        rulesPass: ['A rule fails: {have}', 'Put p.cool() between the shuttle and the CX.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'H, CX, measure: a Bell pair in {frames} frames and {steps} steps. Its two readouts agree every time -- which this page cannot show, and that is the honest limit of a hardware tool: it schedules gates, it does not simulate them.',
-      boundary: { exercise: 'Run it twice: after the measurement, reset both ions and do a second H, CX and measurement, still all green.',
+      praise: 'H, CX, measure: a Bell pair in {frames} instructions and {steps} steps. Its two readouts always agree, but this page cannot show that: it schedules gates, it does not simulate them.',
+      boundary: { exercise: 'Run it twice: after the measurement, reset both ions, then do a second H, CX and measurement. No rule may fail.',
                   check: ['all', ['hasFrame', 'reset'], ['gateCount', 'CX', 2], ['rulesPass']],
-                  praise: 'Two rounds, {gates} CX gates, one cooling: the ions did not move between rounds, so nothing heated. A syndrome round in Part C is exactly this shape.' },
+                  praise: 'Two rounds, {gates} CX gates, and a reset between them. The ions did not move between the rounds, so they barely warmed. A syndrome round in Part C has exactly this shape.' },
       solution: { program: 'p.init({"d0": "S0", "d1": "S2"})\np.gate("H", [], ["S0"])\np.shuttle("d1", ["S2", "S1", "S0"])\np.cool()\np.gate("CX", [["d0", "d1"]])\np.measure(["d0", "d1"])\n' } },
 
     // =============================================================== B4
     { id: 'B4', part: 'B', title: 'Reading a failure',
-      story: 'This programme is wrong. The page already knows why; the skill is reading what it says.',
+      story: 'This programme is wrong. The page already knows why. The skill is to read what it says.',
       teaches: ['status', 'tab:R', 'tab:P', 'undo'],
       text: [
-        'When a rule fails, three places say so. The [[strip|status]] under the canvas names the first failing rule and the instruction. The [[Report|tab:R]] panel shows every rule as a badge -- hover a red one for its statement and its source. The [[Program|tab:P]] panel marks the instruction that broke it.',
-        'Debugging a hardware programme is reading that sentence and deciding which of two things to change: the programme, or the device. Here the device has a `data` site in the middle, and the loaded programme meets there.'
+        '**Where a failure shows:** open [[Report|tab:R]]. Each rule is a badge. A failed rule is red, with a count. A line under the badges says what broke and where.',
+        '**What a rule says:** hover a badge to read the rule.',
+        '**Where it happens:** the [[Program|tab:P]] tab lists every instruction. Click one, and the [[line under the canvas|status]] names the instruction the animation is on.',
+        'To fix a failure you change one of two things: the programme or the device. Here the device has a `data` site in the middle, `S1`, and the loaded programme makes the ions meet there.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -371,165 +382,147 @@ var QCCD_TUTORIAL = {
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d0", ["S0", "S1"])\np.shuttle("d1", ["S2", "S1"])\np.cool()\np.gate("CX", [["d0", "d1"]])\n']],
       stages: [
-        { exercise: 'Press **Evaluate** on the loaded programme, read the strip, and pick the rule that fails.',
+        { exercise: 'The programme is loaded and has already run. Open **Report** and find the red badge. Then go back to **Learn**, choose that rule below, and press **Check**.',
           check: ['answer', 'R6'] },
-        { exercise: 'Now fix it without touching the device: `S1` is a `data` site and cannot hold a gate, so meet somewhere that can. Make every badge green with the CX still fired.',
+        { exercise: 'Now fix it without changing the device. `S1` is a `data` site and cannot hold a gate. In **Write**, make the ions meet in a site that can. Keep the CX. No rule may fail.',
           check: ['all', ['rulesPass'], ['gateBetween', 'd0', 'd1', 'CX']] }
       ],
       choices: [
-        { id: 'R7c', text: 'R7c -- there is no cooling before the gate.' },
-        { id: 'R6', text: 'R6 -- the gate is in a site whose zone does not allow gates.' },
-        { id: 'R6b', text: 'R6b -- the two ions are not in the same site.' },
-        { id: 'R1', text: 'R1 -- too many ions in one site.' }
-      ],
-      hints: [
-        'The strip under the canvas begins with the rule\'s number.',
-        'Hover S1: its zone is data, and data has gate=false. Hover S0 and S2: trap allows gates.',
-        'Walk d1 all the way to S0 -- p.shuttle("d1", ["S2", "S1", "S0"]) -- and leave d0 where it is.'
+        { id: 'R7c', text: 'R7c: there is no cooling before the gate.' },
+        { id: 'R6', text: 'R6: the gate is in a site whose zone does not allow gates.' },
+        { id: 'R6b', text: 'R6b: the two ions are not in the same site.' },
+        { id: 'R1', text: 'R1: too many ions in one site.' }
       ],
       nudges: {
-        answer: ['Look at the strip under the canvas: it names the rule.', 'Hover the red badge in Report. The sentence says gate=false.'],
-        rulesPass: ['Still red: {have}', 'Which sites allow a gate? Hover them: trap does, data does not.'],
-        gateBetween: ['Green, but the CX is gone. The fix keeps the gate and moves it.'],
-        'default': ['Not there yet.']
+        answer: ['Open Report: one badge is red. Which rule is it?', 'The line under the badges in Report says gate=false. Which rule is about where a gate may happen?'],
+        rulesPass: ['A rule still fails: {have}', 'Which sites allow a gate? Click a site: the Selection box on the left shows its zone. trap allows gates, data does not.'],
+        gateBetween: ['No rule fails, but the CX is gone. Keep the gate; change where it happens.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'R6 read and repaired: the CX now fires in a trap, and every badge is green. You just debugged a hardware programme the way it is done -- from the sentence to the fix, cost {cost}.',
+      praise: 'R6 found and fixed: the CX now fires in a trap site, and no rule fails. You debugged a hardware programme the real way, from the message to the fix. Cost {cost}.',
       solution: { stages: [
         [['setAnswer', 'R6']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.cool()\np.gate("CX", [["d0", "d1"]])\n']]] } },
 
     // =============================================================== B5
     { id: 'B5', part: 'B', title: 'Loops and rotation',
-      story: 'Six ions, one instruction. The loop is the reason these machines can be big.',
+      story: 'Six ions, one instruction. Loops are why these machines can grow big.',
       teaches: ['p:fill', 'p:rotate', 'el:loop', 'm:steps'],
       text: [
-        'A closed [[loop|el:loop]] is one thing the machine can move as a unit. [[p.fill|p:fill]] puts an ion on every site of it (`d0` on `S0`, `d1` on `S1`, ...). [[p.rotate|p:rotate]] turns it by a number of sites: `p.rotate(2)` moves every ion two sites forward, `p.rotate(-1)` one site back. One instruction, six ions.',
-        'Watch the price. A rotation is charged for every ion it moves, so it is not cheaper than six shuttles in **cost** -- it is cheaper in [[steps|m:steps]]: one step per site turned, with the ions never in each other\'s way.'
+        'A closed [[loop|el:loop]] moves as one unit.',
+        '[[p.fill|p:fill]] puts one ion on every site of the loop: `d0` on `S0`, `d1` on `S1`, and so on.',
+        '[[p.rotate|p:rotate]] turns the loop: `p.rotate(2)` moves every ion two sites forward, and `p.rotate(-1)` moves every ion one site back.',
+        'A rotation is charged for every ion it moves, so its **cost** is no lower than six shuttles. It wins on [[steps|m:steps]]: one step per site turned, and the ions never block each other.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['fit']],
-      exercise: 'Fill the loop and rotate it so that `d0` ends on `S2`, in two statements.',
+      exercise: 'Fill the loop and turn it so that `d0` ends on `S2`. Use two lines.',
       check: ['all', ['lowered'], ['rotated', 'L0', 2], ['instructionsAtMost', 2], ['rulesPass']],
-      hints: [
-        'p.fill() with no argument fills the only loop, L0.',
-        'S0 to S2 is two sites forward: p.rotate(2).',
-        'Two statements, two frames: the fill and the rotate. Nothing else.'
-      ],
       nudges: {
         lowered: ['No programme yet: fill, then rotate.', 'The text did not run: {have}'],
         rotated: ['The loop has not turned by two: {have}.', 'Forward is S0 to S1 to S2. Which sign does that need?'],
-        instructionsAtMost: ['{have} frames. A fill and one rotate is all it takes.'],
-        stepsAtMost: ['{have} steps: four forward costs four. Is there a shorter way round?', 'On a loop of six, forward by four is the same place as back by two.'],
-        rulesPass: ['A rule is red: {have}'],
-        'default': ['Not there yet.']
+        instructionsAtMost: ['{have} instructions. A fill and one rotate are all it takes.'],
+        stepsAtMost: ['{have} steps: four forward takes four steps. Is there a shorter way round?', 'On a loop of six, four forward lands on the same site as two back.'],
+        rulesPass: ['A rule fails: {have}'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Six ions moved by two sites in {steps} steps at cost {cost}. Every one of them moved the same way in the same step -- hold that thought for B7.',
-      challenge: { exercise: 'Sharp: put `d0` on `S4` in at most 2 steps. Four forward is two back.',
+      praise: 'Six ions moved two sites in {steps} steps at cost {cost}. They all moved the same way in the same step. Remember that for B7.',
+      challenge: { exercise: 'Put `d0` on `S4` in at most 2 steps. Four forward is two back.',
                    check: ['all', ['rotated', 'L0', 4], ['stepsAtMost', 2], ['rulesPass']],
-                   praise: 'Two back is four forward: {steps} steps, cost {cost}. Direction is a choice, and the shorter way round is always the cheaper one.' },
+                   praise: 'Two back is four forward: {steps} steps, cost {cost}. You choose the direction, and the shorter way round is the cheaper one.' },
       solution: { program: 'p.fill()\np.rotate(2)\n' } },
 
     // =============================================================== B6
     { id: 'B6', part: 'B', title: 'Moving many ions at once',
-      story: 'A rotation moves everyone. Sometimes you want three ions, not six.',
+      story: 'A rotation moves every ion. Sometimes you want to move three, not six.',
       teaches: ['p:simd', 'el:control', 'rule:R3', 'rule:R5'],
       text: [
-        '[[p.simd|p:simd]] moves several ions in one instruction: `p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]])`. The first argument is the [[movement class|el:control]] -- the kind of motion, from the list the device declares (this ring declares `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock` and two sorting moves). The second is a list of moves, each `[ion, from, to]`, from a site to its neighbour.',
-        'One instruction is one **step** of the machine: every move in it happens at once. The Program panel shows the class in its own column, and the rules judge the step as a whole: no two ions on one rail ([[R3|rule:R3]]), no head-on exchange ([[R5|rule:R5]]), one direction per loop ([[R11|rule:R11]]).'
+        '[[p.simd|p:simd]] moves several ions in one instruction: `p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]])`.',
+        'The first argument is the [[movement class|el:control]]: the kind of motion. It must be one the device declares. This ring declares `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` and `sort_split`.',
+        'The second argument is a list of moves. Each move is `[ion, from, to]`, from a site to the next one.',
+        'One instruction is one **step**: all its moves happen at once. The **Program** tab shows the class in its own column. The rules judge the step as a whole: no two ions on one rail ([[R3|rule:R3]]), no two ions swapping places ([[R5|rule:R5]]), one direction per loop ([[R11|rule:R11]]).'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2", "d2": "S4"})\n']],
       exercise: 'Move all three ions one site forward (`S0` to `S1`, `S2` to `S3`, `S4` to `S5`) in **one** instruction.',
       check: ['all', ['lowered'], ['frames', 2, 2], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S3'], ['ionAt', 'd2', 'S5'], ['rulesPass']],
-      hints: [
-        'One p.simd line under the init, with three moves in its list.',
-        'Each move is [ion, from, to]: ["d0", "S0", "S1"] and so on.',
-        'Two frames in all: the init and the simd. Three shuttles would be four.'
-      ],
       nudges: {
         lowered: ['The text did not run: {have}'],
-        frames: ['{have} frames. The exercise wants exactly two: the init and one simd.', 'Three separate shuttles are three steps. Put the three moves in one list.'],
+        frames: ['{have} instructions. The exercise wants exactly two: the init and one simd.', 'Three separate shuttles are three steps. Put the three moves in one list.'],
         ionAt: ['{have} is not where the exercise asks. Check the from and to of each move.'],
-        rulesPass: ['A rule is red: {have}'],
-        'default': ['Not there yet.']
+        rulesPass: ['A rule fails: {have}'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Three ions, one instruction, {steps} step, cost {cost}. A rotation is exactly this with every site filled -- and now you can write the ones a rotation cannot.',
-      boundary: { exercise: 'Now backward: all three one site back, still one instruction, still green.',
+      praise: 'Three ions, one instruction, {steps} step, cost {cost}. A rotation is this with every site filled. Now you can also write the moves a rotation cannot make.',
+      boundary: { exercise: 'Now backward: all three one site back, still in one instruction, with no rule failing.',
                   check: ['all', ['frames', 2, 2], ['ionAt', 'd0', 'S5'], ['ionAt', 'd1', 'S1'], ['ionAt', 'd2', 'S3'], ['rulesPass']],
-                  praise: 'Same step, other direction. The loop does not care which way, as long as it is one way.' },
+                  praise: 'Same step, other direction. The loop does not mind which way, as long as every ion goes the same way.' },
       solution: { program: 'p.init({"d0": "S0", "d1": "S2", "d2": "S4"})\np.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"], ["d2", "S4", "S5"]])\n' } },
 
     // =============================================================== B7
     { id: 'B7', part: 'B', title: 'Broadcasting in a programme',
-      story: 'Two ions on one loop, wanting to go opposite ways. The chip has one answer for both of them.',
+      story: 'Two ions on one loop want to go opposite ways. The chip can give only one answer to both.',
       teaches: ['el:control', 'rule:R11', 'rule:R4d', 'p:simd'],
       text: [
-        'Here is the sentence from A5 as a programme. This ring is wired **wise**: one channel drives every rail on the loop, so in one step the whole loop gets one waveform, and every ion on it moves the same way. The page checks that as [[R11|rule:R11]]: ions on a loop move by one delta per step. Python checks it again at the channel level, [[R4d|rule:R4d]] -- Part R shows you that verdict.',
-        'It means two ions can never pass each other on a broadcast loop, and that a move forward and a move back are two different steps. A rotation is the honest name for what one step can do: shift everyone by one.'
+        'This is the A5 rule as a programme. This ring uses the `wise` wiring scheme: one channel drives every rail of the loop. So in one step the whole loop gets one signal, and every ion on it moves the same way.',
+        'The page checks this as [[R11|rule:R11]]: in one step, all ions on a loop move by the same amount. The checker checks it again when the page is built, channel by channel, as [[R4d|rule:R4d]]. Part R shows that verdict.',
+        'So two ions can never pass each other on a broadcast loop, and one move forward plus one move back take two steps.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\n']],
       stages: [
-        { exercise: 'Try it: in one `p.simd`, move `d0` forward (`S0` to `S1`) and `d1` back (`S3` to `S2`). Evaluate, read the strip, then Check.',
+        { exercise: 'Try it: in one `p.simd`, move `d0` forward (`S0` to `S1`) and `d1` back (`S3` to `S2`). Press **Evaluate**. Open **Report**: **R11** is red. Then press **Check**.',
           check: ['ruleFails', 'R11'] },
-        { exercise: 'Now do it legally: `d0` on `S1` and `d1` on `S2` with every badge green.',
+        { exercise: 'Now do it legally: `d0` on `S1` and `d1` on `S2`, with no rule failing.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S2']] }
       ],
-      hints: [
-        'p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S3", "S2"]]) -- both moves in one list.',
-        'The strip says R11: the ions move along L0 by [1, 5] in one cycle. One direction per step.',
-        'Two simd lines, one move each: the loop turns one way, then the other.'
-      ],
       nudges: {
-        ruleFails: ['The page should be objecting and is not. Are both moves in ONE simd, in opposite directions?', 'Forward is S0 to S1; back is S3 to S2. One instruction, two moves.'],
+        ruleFails: ['R11 has not failed yet. Are both moves in ONE p.simd, in opposite directions?', 'Forward is S0 to S1; back is S3 to S2. One instruction, two moves.'],
         rulesPass: ['Still refused: {have}', 'One direction per step. Give each move its own instruction.'],
         ionAt: ['{have} is not where the exercise asks. Check the from and to of each move.'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Two steps, one direction each, cost {cost}. That is broadcasting from the programme side: a shared channel makes opposite motions different steps, and a rotation is the one step that moves everyone.',
-      boundary: { exercise: 'Both forward by one in one instruction -- legal, because it is one direction. Show it green.',
+      praise: 'Two steps, one direction each, cost {cost}. That is broadcasting seen from the programme: a shared channel turns opposite moves into separate steps.',
+      boundary: { exercise: 'Move both ions forward by one in one instruction. That is legal, because it is one direction. No rule may fail.',
                   check: ['all', ['frames', 2, 2], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S4'], ['rulesPass']],
-                  praise: 'One step, one direction, two ions: the channel is happy. That is the shape of every move on a broadcast machine.' },
+                  praise: 'One step, one direction, two ions: the channel is happy. Every move on a broadcast machine has this shape.' },
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S3", "S2"]])\n']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d1", "S3", "S2"]])\np.simd("shuttle", [["d0", "S0", "S1"]])\n']]] } },
 
     // =============================================================== B8
     { id: 'B8', part: 'B', title: 'Docks and spurs',
-      story: 'The loop turns as one. To take one ion out of the dance, park it to the side.',
-      teaches: ['region:dock', 'el:control', 'p:shuttle', 'p:rotate'],
+      story: 'The loop turns as one. To keep one ion out of the turn, park it to the side.',
+      teaches: ['el:spur', 'el:control', 'p:shuttle', 'p:rotate'],
       text: [
-        'A [[spur|region:dock]] is a rail off the loop to a side site -- here `A0` off `S0` and `A3` off `S3`. Park an ion there and the loop can turn without it. On this ring the spur sites are the only `trap` sites, so a gate can only ever happen in one: the dock is where the work gets done.',
-        'The classes `dock` and `undock` name that move honestly: they entail a split from the chain and a merge into the dock, and are priced for it. `p.shuttle("d0", ["S0", "A0"], "dock")` -- the third argument is the class. Without it the move is a plain `shuttle`, cheaper on paper because it does not account for the split.'
+        'A [[spur|el:spur]] is a short rail from the loop to a side site. Here `A0` hangs off `S0`, and `A3` off `S3`. An ion parked there stays put while the loop turns.',
+        'On this ring only the spur sites are `trap` sites, so gates can only happen there.',
+        'The classes `dock` and `undock` name this move honestly: the ion splits off its chain and merges into the dock, and the price includes that. Give the class as the third argument: `p.shuttle("d0", ["S0", "A0"], "dock")`. Without it the move is a plain `shuttle`, which looks cheaper because it leaves the split out.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 2 }, { name: 'ring6d' }], ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1"})\n']],
-      exercise: 'Park `d0` in `A0`, rotate the loop so that `d1` ends on `S3`, then bring `d0` back to `S0`.',
+      exercise: 'Park `d0` in `A0`. Turn the loop so that `d1` ends on `S3`. Then bring `d0` back to `S0`.',
       check: ['all', ['lowered'], ['visited', 'd0', 'A0'], ['ionAt', 'd1', 'S3'], ['ionAt', 'd0', 'S0'], ['rulesPass']],
-      hints: [
-        'Three statements after the init: out to the dock, a rotation, back from the dock.',
-        'p.shuttle("d0", ["S0", "A0"]) parks it; S1 to S3 is p.rotate(2); p.shuttle("d0", ["A0", "S0"]) brings it back.',
-        'While d0 is in A0 it is off the loop, so the rotation does not touch it.'
-      ],
       nudges: {
         lowered: ['The text did not run: {have}'],
-        visited: ['d0 never went into the dock. The spur site is A0, joined to S0.'],
-        ionAt: ['{have} is not where the exercise asks. Rotate by 2 for d1; bring d0 back at the end.'],
-        rulesPass: ['A rule is red: {have}'],
-        'default': ['Not there yet.']
+        visited: ['d0 never went into the dock. The spur site is A0, next to S0.'],
+        ionAt: ['{have} is not where the exercise asks. Rotate by 2 for d1, and bring d0 back at the end.'],
+        rulesPass: ['A rule fails: {have}'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'd0 waited in the dock while the loop turned, then rejoined: cost {cost}, {steps} steps. Park, turn, return is how every ion on a deck reaches a gate -- Part C builds circuits out of it.',
-      boundary: { exercise: 'Say what you did: use the `dock` and `undock` classes for the two spur moves and read the price difference in the Program panel.',
+      praise: 'd0 waited in the dock while the loop turned, then came back: cost {cost}, {steps} steps. Park, turn, return: that is how an ion reaches a gate on these machines. Part C builds circuits from it.',
+      boundary: { exercise: 'Now say what you did: use the `dock` and `undock` classes for the two spur moves. Watch **COST** and **STEPS** in the top bar go up.',
                   check: ['all', ['classUsed', 'dock'], ['classUsed', 'undock'], ['ionAt', 'd0', 'S0'], ['rulesPass']],
-                  praise: 'Cost {cost} with the split and the merge accounted for. That is what a dock really costs, and the Report now says so.' },
+                  praise: 'Cost {cost}, with the split and the merge counted. That is what a dock really costs.' },
       solution: { program: 'p.init({"d0": "S0", "d1": "S1"})\np.shuttle("d0", ["S0", "A0"])\np.rotate(2)\np.shuttle("d0", ["A0", "S0"])\n' } },
 
     // =============================================================== R1
     { id: 'R1', part: 'R', title: 'A site holds what it holds',
-      story: 'Three ions were sent into a well built for two. The chip did not stretch.',
+      story: 'Three ions were sent into a site built for two. The chip did not stretch.',
       teaches: ['rule:R1', 'rule:R3', 'rule:R13', 'el:zone_type'],
       text: [
-        'Every rule in this part is one hover away: a rule name in the text, a badge in the Report, a sentence on the strip. [[R1|rule:R1]] is the first and the plainest: a site holds no more ions than its [[zone|el:zone_type]] says. [[R3|rule:R3]] is the same for a rail. [[R13|rule:R13]] is the soft edge of the same idea: a two-qubit gate in a chain of more than about fifteen ions takes too long to be worth doing.',
-        'Each step of this lesson loads a programme that breaks one of the three. Evaluate it, read the strip, repair it. The check wants every badge green and the thing the programme was trying to do still done.'
+        '**How Part R works:** each step loads a programme that breaks a rule, and runs it. Open **Report** to see which rule failed: its badge is red. Fix the programme in **Write**, press **Evaluate**, then **Check**. The check wants no red badge, and the programme still doing its job.',
+        '[[R1|rule:R1]]: a site holds no more ions than its [[zone|el:zone_type]] allows. [[R3|rule:R3]]: the same for a rail.',
+        '[[R13|rule:R13]]: a two-qubit gate in a chain of more than about fifteen ions is too slow to be worth doing.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -542,34 +535,29 @@ var QCCD_TUTORIAL = {
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1", "d2": "S2"})\np.shuttle("d1", ["S1", "S0"])\np.shuttle("d2", ["S2", "S1", "S0"])\n']],
           breaks: [['ruleFails', 'R1']],
-          exercise: 'Evaluate: three ions end up in `S0`, whose capacity is two, and the strip says **R1**. Repair it so that `S0` holds exactly two and nothing is red -- `d2` can stop on `S1`.',
+          exercise: 'Three ions end up in `S0`, which holds two. **Report** shows **R1** in red. Fix it so that `S0` holds exactly two and no rule fails. `d2` can stop on `S1`.',
           check: ['all', ['rulesPass'], ['occupancy', 'S0', 2]] },
         { setup: [['applyProgramSource', 'p.init({"d0": "S1", "d1": "S1"})\np.simd("shuttle", [["d0", "S1", "S2"], ["d1", "S1", "S2"]])\n']],
           breaks: [['ruleFails', 'R3']],
-          exercise: 'A new programme: two ions on one rail in one step, and the strip says **R3** -- this rail carries one. Send them one at a time; both must still arrive on `S2`.',
+          exercise: 'A new programme: two ions use one rail in the same step, and this rail carries one. **Report** shows **R3** in red. Send them one at a time. Both must still end on `S2`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S2'], ['ionAt', 'd1', 'S2']] },
         { setup: [['emit', { method: 'set_zone', args: ['trap'], kwargs: { capacity: 16 } }],
                   ['applyProgramSource', 'p.init({"q0": "S0", "q1": "S0", "q2": "S0", "q3": "S0", "q4": "S0", "q5": "S0", "q6": "S0", "q7": "S0", "q8": "S0", "q9": "S0", "q10": "S0", "q11": "S0", "q12": "S0", "q13": "S0", "q14": "S0", "q15": "S0"})\np.cool()\np.gate("CX", [["q0", "q1"]])\n']],
           breaks: [['ruleFails', 'R13']],
-          exercise: 'Now the zone holds sixteen, and sixteen ions sit in `S0` when a CX fires: **R13**. Take one ion out to `S1` before the gate.',
+          exercise: 'Now the zone holds sixteen, and sixteen ions sit in `S0` when a CX fires: **R13** fails. Move one ion out to `S1` before the gate.',
           check: ['all', ['rulesPass'], ['gateBetween', 'q0', 'q1', 'CX']] }
       ],
-      hints: [
-        'The strip under the canvas names the rule and the instruction; the Report panel has the rule\'s full sentence.',
-        'R1: change where d2 ends. R3: two simd lines, or two shuttles. R13: a shuttle of q15 to S1 before the cool.',
-        'Capacity is per site, per zone: hover S0 to read what it holds.'
-      ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'Read the sentence on the strip: it names the site and the number.'],
+        rulesPass: ['A rule still fails: {have}', 'Open Report and read the line under the badges: it names the site and the number.'],
         occupancy: ['S0 holds {have}; the exercise wants exactly two there.'],
         ionAt: ['{have} is not where that ion should end. Both go to S2, one after the other.'],
-        gateBetween: ['Green, but the CX is gone. Keep the gate; move one ion first.'],
-        'default': ['Not there yet.']
+        gateBetween: ['No rule fails, but the CX is gone. Keep the gate; move one ion out first.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Three rules, three repairs. R1, R3 and R13 are one idea from three sides: a well holds what it holds, a rail carries what it carries, and a chain that is too long gates badly. Cost {cost}, {steps} steps, every badge green.',
-      boundary: { exercise: 'The boundary is legal: put exactly two ions in `S0`, cool, and fire a CX between them. Capacity itself is not a violation.',
+      praise: 'Three rules, three fixes. R1, R3 and R13 are one idea: a site holds what it holds, a rail carries what it carries, and a chain that is too long makes slow gates. Cost {cost}, {steps} steps, no rule failed.',
+      boundary: { exercise: 'The limit itself is allowed: put exactly two ions in `S0`, cool, and fire a CX between them. Being full is not a failure.',
                   check: ['all', ['occupancy', 'S0', 2], ['gateBetween', 'q0', 'q1', 'CX'], ['rulesPass']],
-                  praise: 'Two in a well for sixteen, all green. A rule is a line, and the line itself is on the legal side.' },
+                  praise: 'Two ions in a site for sixteen, and no rule failed. A rule draws a line, and the line itself is on the allowed side.' },
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1", "d2": "S2"})\np.shuttle("d1", ["S1", "S0"])\np.shuttle("d2", ["S2", "S1"])\n']],
         [['applyProgramSource', 'p.init({"d0": "S1", "d1": "S1"})\np.simd("shuttle", [["d0", "S1", "S2"]])\np.simd("shuttle", [["d1", "S1", "S2"]])\n']],
@@ -577,11 +565,12 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== R2
     { id: 'R2', part: 'R', title: 'Junctions: one at a time',
-      story: 'Two ions arrive at the crossroads in the same instant. There is room for one.',
+      story: 'Two ions reach a crossing at the same moment. There is room for one.',
       teaches: ['rule:R2', 'rule:R18', 'rule:R11', 'el:junction'],
       text: [
-        'A [[junction|el:junction]] is where rails meet, and [[R2|rule:R2]] says one ion at a time: never two inside it, never two crossing it in one step. [[R18|rule:R18]] says what makes a node a junction at all -- three or more rails -- and that every crossing is priced by that degree, which is why the Report counts *junction transits* on their own line.',
-        '[[R11|rule:R11]] has two halves: a loop turns one way per step (you met that in B7), and a site connects to at most two shuttling paths -- a site with a spur hanging off it is a junction for R2\'s purposes, and holds one ion at rest.'
+        '[[R2|rule:R2]]: a [[junction|el:junction]] takes one ion at a time. Never two inside it, never two crossing it in one step.',
+        '[[R18|rule:R18]]: a node is a junction when three or more rails meet there. Each crossing is priced by that number, so **Report** counts junction transits on their own line.',
+        '[[R11|rule:R11]] has two parts. A loop turns one way per step (you met this in B7). And a site with three rails counts as a junction for R2: only one ion may rest there.'
       ],
       setup: [
         ['newCanvas', { name: 'cross' }],
@@ -598,34 +587,29 @@ var QCCD_TUTORIAL = {
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.simd("shuttle", [["d0", "S0", "S1", ["E0", "E1"]], ["d1", "S2", "S3", ["E2", "E3"]]])\n']],
           breaks: [['ruleFails', 'R2']],
-          exercise: 'Evaluate: two ions cross `J0` in one step, and the strip says **R2**. Serialise them -- one crossing per instruction -- with `d0` still ending on `S1` and `d1` on `S3`.',
+          exercise: 'Two ions cross `J0` in one step, and **Report** shows **R2** in red. Send them one at a time, one crossing per instruction. `d0` must still end on `S1`, and `d1` on `S3`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S3'], ['transitsAtMost', 2]] },
         { exercise: 'R18: what makes a node a junction, and why does the Report care?',
           check: ['answer', 'deg3'] },
         { setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 2 }, { name: 'ring6d' }], ['fit'],
                   ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1"})\np.shuttle("d1", ["S1", "S0"])\n']],
           breaks: [['ruleFails', 'R2']],
-          exercise: 'A ring with spurs. `S0` has three rails (two on the loop, one to the dock `A0`), so it is a junction for R2: one ion at rest, and none passing through while one sits there. The loaded programme parks a second one on it. Move `d0` out of the way to `S5`, then send `d1` through `S0` into the dock `A0`.',
+          exercise: 'A ring with spurs. `S0` has three rails: two on the loop, one to the dock `A0`. So for R2 it is a junction: one ion may rest there, and no ion may pass through while one rests. The loaded programme parks a second ion on it. Move `d0` out of the way to `S5`. Then send `d1` through `S0` into the dock `A0`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd1', 'A0']] }
       ],
       choices: [
         { id: 'square', text: 'It is drawn as a square.' },
-        { id: 'deg3', text: 'Three or more rails meet there -- and each crossing is priced by that degree.' },
+        { id: 'deg3', text: 'Three or more rails meet there, and each crossing is priced by that number.' },
         { id: 'any', text: 'Any node an ion passes without stopping.' }
       ],
-      hints: [
-        'Two p.shuttle lines, each through J0, one after the other.',
-        'Degree is the number of rails at a node; three is what makes a junction (R18). Hover the junction to read its degree.',
-        'First p.shuttle("d0", ["S0", "S5"]); then p.shuttle("d1", ["S1", "S0", "A0"]) -- through the empty S0, into the dock.'
-      ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'One crossing per step -- and a spur site with an ion on it cannot be passed through. Clear it first.'],
+        rulesPass: ['A rule still fails: {have}', 'One crossing per step. And no ion may pass through a spur site while another ion sits on it: clear it first.'],
         ionAt: ['{have} is not where that ion should end.'],
-        transitsAtMost: ['{have} junction transits: each ion crosses once, so two is the number.'],
-        answer: ['Look at the picture: what do S0 and J0 have that the other sites do not?', 'The Report prices a crossing by the junction\'s degree. What is a degree?'],
-        'default': ['Not there yet.']
+        transitsAtMost: ['{have} junction transits. Each ion crosses once, so the answer is two.'],
+        answer: ['Look at the picture: what do S0 and J0 have that the other sites do not?', 'Report prices a crossing by the number of rails at the junction. How many rails meet there?'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'One at a time through the crossroads, and the dock as the second ion\'s home. {transits} transits, cost {cost}. A junction is the most expensive thing an ion can cross, and now you know why the Report counts them.',
+      praise: 'One at a time through the crossing, and the dock as a home for the second ion. {transits} transits, cost {cost}. A junction is the most expensive thing an ion can cross, and that is why Report counts them.',
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d0", ["S0", "J0", "S1"])\np.shuttle("d1", ["S2", "J0", "S3"])\n']],
         [['setAnswer', 'deg3']],
@@ -633,11 +617,11 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== R3
     { id: 'R3', part: 'R', title: 'Rails: no passing, no ghosts',
-      story: 'Two ions on one rail, walking toward each other. They cannot pass.',
+      story: 'Two ions on one rail walk toward each other. They cannot pass.',
       teaches: ['rule:R5', 'rule:R8', 'el:segment'],
       text: [
-        'A [[rail|el:segment]] is one dimensional. [[R5|rule:R5]]: two ions never exchange positions along one rail in one step -- there is no lane to pass in. This rail has been given capacity two so that R5 is the only thing in the way.',
-        '[[R8|rule:R8]] is the bookkeeping rule: outside loading and unloading, the map from ions to sites is a function -- no ion appears, none vanishes, and none is in two moves of one step. It sounds trivial. It is what makes every other rule checkable.'
+        'A [[rail|el:segment]] is a single lane. [[R5|rule:R5]]: two ions never swap places along one rail in one step. This rail was given room for two ions, so R5 is the only rule in the way.',
+        '[[R8|rule:R8]] is bookkeeping: outside loading, every ion is on exactly one site. No ion appears, none vanishes, and no ion makes two moves in one step. It sounds obvious. It is what makes every other rule checkable.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -650,25 +634,20 @@ var QCCD_TUTORIAL = {
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1"})\np.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S1", "S0"]])\n']],
           breaks: [['ruleFails', 'R5']],
-          exercise: 'Evaluate: `d0` and `d1` swap across `E0` in one step, and the strip says **R5**. Swap them legally -- `d0` ends on `S1`, `d1` on `S0` -- using `S2` as the passing place.',
+          exercise: '`d0` and `d1` swap across `E0` in one step, and **Report** shows **R5** in red. Swap them legally, using `S2` as the passing place: `d0` ends on `S1`, `d1` on `S0`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S0']] },
         { setup: [['applyProgramSource', 'p.init({"d0": "S0"})\np.simd("shuttle", [["d0", "S0", "S1"], ["d0", "S1", "S2"]])\n']],
           breaks: [['ruleFails', 'R8']],
-          exercise: 'One ion in two moves of one step: the strip says **R8**. Get `d0` to `S2` with the map kept a function -- one shuttle, or two steps.',
+          exercise: 'One ion makes two moves in one step: **R8** fails. Get `d0` to `S2` the right way: one shuttle, or two steps.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S2']] }
       ],
-      hints: [
-        'd1 steps aside to S2; d0 moves up to S1; d1 comes back down through S1 to S0. Three shuttles.',
-        'A site of capacity two can be passed through while one ion sits in it -- the Report calls that a transit.',
-        'p.shuttle("d0", ["S0", "S1", "S2"]) is one statement and two steps: the ion is in one move per step.'
-      ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'No exchange on one rail in one step. Use the third site.'],
+        rulesPass: ['A rule still fails: {have}', 'No swapping on one rail in one step. Use the third site.'],
         ionAt: ['{have} is not where that ion should end.'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
       praise: 'A legal swap and an honest walk: cost {cost}, {steps} steps. R5 is why sorting ions on a line is expensive, and R8 is why the page can tell you so.',
-      boundary: { exercise: 'A convoy is legal: from `d0` on `S1` and `d1` on `S0`, move both one rail up (`S1` to `S2`, `S0` to `S1`) in one step -- same direction, different rails.',
+      boundary: { exercise: 'Moving together is legal: start from `d0` on `S1` and `d1` on `S0`, and move both one rail up (`S1` to `S2`, `S0` to `S1`) in one step. Same direction, different rails.',
                   check: ['all', ['frames', 2, 2], ['ionAt', 'd0', 'S2'], ['ionAt', 'd1', 'S1'], ['rulesPass']],
                   praise: 'One step, two rails, one direction: that is how a chain of ions moves along a line without ever breaking R5.' },
       solution: { stages: [
@@ -677,43 +656,40 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== R4
     { id: 'R4', part: 'R', title: 'Steps: one kind of thing',
-      story: 'A step is one setting of every voltage on the chip. It can be one thing.',
+      story: 'One step is one setting of every voltage on the chip. So a step can do only one kind of thing.',
       teaches: ['rule:R4', 'rule:R4b', 'rule:R12', 'el:control'],
       text: [
-        '[[R4|rule:R4]]: a step moves ions by one declared [[movement class|el:control]] -- a class fixes the kind and the direction of the motion, and the device lists the classes it can drive. [[R4b|rule:R4b]]: a step is transport *or* gates, never both; they use different control pathways. [[R12|rule:R12]]: inside one trap, one gate at a time.',
-        'The first of these is caught before any rule runs: a class the device does not declare cannot be priced, so the page withholds the price and says why. The second is caught by the language itself. Only the third gets as far as a red badge.'
+        '[[R4|rule:R4]]: a step moves ions by one declared [[movement class|el:control]]. A class fixes the kind and the direction of the motion, and the device lists the classes it can drive.',
+        '[[R4b|rule:R4b]]: a step has one mode, inter-trap (between traps) or intra-trap (inside a trap), and never mixes moving with gates.',
+        '[[R12|rule:R12]]: inside one trap, one gate at a time.',
+        'The page catches these in three ways. An undeclared class cannot be priced, so the top bar shows no price and the line under the canvas says why. A wrong mode is refused by the language itself. Only R12 gets as far as a red badge in **Report**.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 2 }, { name: 'ring6d' }], ['fit']],
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("teleport", [["d0", "S0", "S1"]])\n']],
           breaks: [['priceBlocked']],
-          exercise: 'Evaluate: the head goes quiet and the strip says the class `teleport` is unknown -- **R4** wants a declared class. Open **Control plane** to see the list, and rename the class to one of them.',
+          exercise: 'The loaded programme uses a class called `teleport`, which this device does not declare. So the top bar shows no price. **R4** wants a declared class: `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` or `sort_split`. In **Write**, replace `teleport` with one of them, so that `d0` still moves from `S0` to `S1`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1']] },
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d0", "S0", "S1"]], "both")\n']],
           breaks: [['refused', 'R4b']],
-          exercise: 'Now the step asks to be intra- and inter-trap at once: the language refuses the statement and names **R4b**. Read the refusal on the strip, then make it a plain transport step.',
+          exercise: 'Now the step asks for mode `"both"`. The language refuses the line, and the line under the canvas names **R4b**. The third argument of `p.simd` is the mode: `"inter"` or `"intra"`; leave it out and it is `"inter"`. Make this a plain transport step.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1']] },
         { setup: [['emit', { method: 'set_zone', args: ['trap'], kwargs: { capacity: 4 } }],
                   ['applyProgramSource', 'p.init({"d0": "A0", "d1": "A0", "d2": "A0", "d3": "A0"})\np.cool()\np.gate("CX", [["d0", "d1"], ["d2", "d3"]])\n']],
           breaks: [['ruleFails', 'R12']],
-          exercise: 'Four ions in the dock `A0` and two CX pairs in one instruction: **R12**, one gate per trap per step. Split them into two instructions.',
+          exercise: 'Four ions sit in the dock `A0`, and one instruction fires two CX pairs there. **Report** shows **R12** in red: one gate per trap per step. Split it into two instructions.',
           check: ['all', ['rulesPass'], ['gateCount', 'CX', 2]] }
       ],
-      hints: [
-        'The Control plane tile lists the classes: shuttle, rotate_cw, rotate_ccw, dock, undock and two sorting moves.',
-        'p.simd takes a third argument, the mode: "inter" (between traps) or "intra". Leave it out and it is inter.',
-        'Two p.gate lines, one pair each. They happen in two steps.'
-      ],
       nudges: {
-        rulesPass: ['Still not green: {have}', 'One class per step, from the declared list; one gate per trap per step.'],
+        rulesPass: ['Not passing yet: {have}', 'One declared class per step; one gate per trap per step.'],
         ionAt: ['{have} is not where d0 should end.'],
-        gateCount: ['{have} CX gates: the exercise keeps both pairs, in two instructions.'],
-        'default': ['Not there yet.']
+        gateCount: ['{have} CX gates. Keep both pairs, in two instructions.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Three ways a step can be too much, three repairs: a declared class, one pathway, one gate per trap. Cost {cost}, {steps} steps. R4 is the rule the whole idea of SIMD control comes from.',
-      boundary: { exercise: 'Two gates in one step **is** legal in two different traps: put `d2` and `d3` in `A3` instead, and fire both pairs in a single instruction.',
+      praise: 'Three ways a step can ask too much, three fixes: a declared class, one mode, one gate per trap. Cost {cost}, {steps} steps. R4 is the rule behind moving many ions with one instruction.',
+      boundary: { exercise: 'Two gates in one step **are** legal in two different traps. Put `d2` and `d3` in `A3` instead, and fire both pairs in one instruction.',
                   check: ['all', ['frames', 3, 3], ['gateBetween', 'd0', 'd1', 'CX'], ['gateBetween', 'd2', 'd3', 'CX'], ['rulesPass']],
-                  praise: 'Two traps, two gates, one step: inter-trap parallelism is unconstrained, and that is where all the speed of these machines lives.' },
+                  praise: 'Two traps, two gates, one step: gates in different traps may run together, and that is where the speed of these machines comes from.' },
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d0", "S0", "S1"]])\n']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d0", "S0", "S1"]])\n']],
@@ -721,50 +697,47 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== R5
     { id: 'R5', part: 'R', title: 'Broadcasting: what one channel can drive',
-      story: 'The chip has one answer for every site on a channel. Two ions asked for two.',
+      story: 'One channel gives one answer to every site on it. Two ions asked for two different answers.',
       teaches: ['rule:R4d', 'rule:R11', 'el:control', 'm:DACs'],
       text: [
-        '[[R4d|rule:R4d]] is R4 derived from the wiring instead of declared: a channel carries one waveform, so the sites sharing it can do one thing per step, and a site can only sit out if it has a switch of its own. The browser does not run this check -- it needs the electrode-to-channel map -- so the box below is **Python\'s verdict**, computed on this exact programme when the page was built.',
-        'The programme is B7\'s head-on pair on a ring wired *wise*. The page catches it as R11; Python names the channel and counts what it was asked to do.'
+        '[[R4d|rule:R4d]] is R4 worked out from the wiring: a channel carries one signal, so all the sites on it do one thing per step. A site can sit out only if it has its own switch.',
+        'The browser cannot run this check: it needs the map from electrodes to channels. So the box below shows **the checker\'s verdict**, computed on this exact programme when the page was built.',
+        'The programme is the B7 pair moving head-on, on a ring with the `wise` wiring scheme. The page itself catches it as R11.'
       ],
       setup: [['loadCase', 'R5'], ['fit']],
       verdict: { 'case': 'R5', which: 'loaded' },
       stages: [
-        { exercise: 'Read Python\'s sentence: *channel drives 8 sites with one waveform, but they are asked to do 2 different things; that needs 2 channels.* Which repair does it point to?',
+        { exercise: 'Read the checker\'s verdict in the box below: "channel ... drives 8 sites with one waveform, but they are asked to do 2 different things ...; that needs 2 channels". Which fix does it point to?',
           check: ['answer', 'steps'] },
         { breaks: [['ruleFails', 'R11'], ['shipped', 'R5', 'loaded', 'R4d', 'failed']],
-          exercise: 'Apply it: two instructions, one direction each, `d0` ending on `S1` and `d1` on `S2`. The page\'s R11 goes green -- and the second box is Python\'s verdict on the repaired programme, shipped with the page.',
+          exercise: 'Apply it in **Write**: two instructions, one direction each, `d0` ending on `S1` and `d1` on `S2`. R11 then passes. The box below now shows the checker\'s verdict on the fixed programme, computed when the page was built.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S2'], ['shipped', 'R5', 'fixed', 'R4d', 'passed']],
           verdict: { 'case': 'R5', which: 'fixed' } }
       ],
       choices: [
         { id: 'rename', text: 'Rename the movement class.' },
-        { id: 'switches', text: 'Add per-site switches -- a switch lets a site sit out, but not do a different thing.' },
-        { id: 'steps', text: 'Give each direction its own step -- or its own channel; that is what "needs 2 channels" means.' }
-      ],
-      hints: [
-        'The sentence ends with what it needs: two channels. With one, the only other way to get two things is two steps.',
-        'Switches are about opting out, not about doing something else; the verdict says "2 different things".',
-        'Two p.simd lines, one move each: d1 back first, then d0 forward.'
+        { id: 'switches', text: 'Add a switch per site. (A switch lets a site sit out, but not do something different.)' },
+        { id: 'steps', text: 'Give each direction its own step, or its own channel. That is what "needs 2 channels" means.' }
       ],
       nudges: {
-        answer: ['Read the last clause of Python\'s sentence again.', 'Two things on one waveform is the problem; renaming changes nothing physical.'],
-        rulesPass: ['Still red: {have}', 'One direction per step. Split the two moves.'],
+        answer: ['Read the end of the checker\'s sentence again.', 'The problem is two different things on one signal. Renaming changes nothing physical.'],
+        rulesPass: ['A rule still fails: {have}', 'One direction per step. Split the two moves.'],
         ionAt: ['{have} is not where that ion should end.'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Python\'s R4d went from failed to passed on the programme you wrote, and the page\'s R11 agreed at every step. That is broadcasting as a rule: one waveform, one motion, per channel, per step -- and cost {cost} for doing it right.',
+      praise: 'The checker\'s R4d verdict went from failed to passed on your programme, and the page agreed through R11. That is broadcasting as a rule: one signal, one motion, per channel, per step. Cost {cost}.',
       solution: { stages: [
         [['setAnswer', 'steps']],
         [['loadCase', 'R5', 'fixed'], ['fit']]] } },
 
     // =============================================================== R6
     { id: 'R6', part: 'R', title: 'Where things may happen',
-      story: 'A gate is a laser beam and a measurement is a camera. Not every site has either.',
+      story: 'A gate needs a laser beam, and a measurement needs a camera. Not every site has them.',
       teaches: ['rule:R6', 'rule:R6b', 'el:zone_type'],
       text: [
-        '[[R6|rule:R6]]: a gate, a measurement or a cooling pulse happens only in a site whose [[zone|el:zone_type]] has that capability -- `trap` has all three here, `data` has cooling only. [[R6b|rule:R6b]]: a two-qubit gate acts on two ions in one site, and if the instruction declares a site, it must be where they are.',
-        'This line has a `data` site in the middle. The first programme measures there; the second fires a gate on ions that never met.'
+        '[[R6|rule:R6]]: a gate, a measurement or a cooling happens only in a site whose [[zone|el:zone_type]] allows it. Here `trap` allows all three, and `data` allows only cooling.',
+        '[[R6b|rule:R6b]]: a two-qubit gate needs both ions in one site. If the instruction names a site, the ions must be there.',
+        'This line has a `data` site in the middle, `S1`. The first programme measures there. The second fires a gate on two ions that never met.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -777,105 +750,94 @@ var QCCD_TUTORIAL = {
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0"})\np.shuttle("d0", ["S0", "S1"])\np.measure(["d0"])\n']],
           breaks: [['ruleFails', 'R6']],
-          exercise: 'Evaluate: the measurement lands on `S1`, a `data` site with no *spam*, and the strip says **R6**. Read `d0` out somewhere it can be read -- it still has to move first.',
+          exercise: 'The measurement happens on `S1`, a `data` site that cannot measure, and **Report** shows **R6** in red. Measure `d0` somewhere it can be measured. It must still pass through `S1` first.',
           check: ['all', ['rulesPass'], ['measured', ['d0']], ['visited', 'd0', 'S1']] },
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.cool()\np.gate("CX", [["d0", "d1"]])\n']],
           breaks: [['ruleFails', 'R6b']],
-          exercise: 'A CX between `d0` on `S0` and `d1` on `S2`: **R6b**, not co-located. Bring them together in a site that allows gates, and fire.',
+          exercise: 'A CX between `d0` on `S0` and `d1` on `S2`: **R6b** fails, because the ions are not together. Bring them into one site that allows gates, then fire.',
           check: ['all', ['rulesPass'], ['gateBetween', 'd0', 'd1', 'CX']] }
       ],
-      hints: [
-        'Hover the sites: S0 and S2 are trap (gate, measure, cool); S1 is data (cool only).',
-        'Walk d0 on through S1 to S2, then measure it there.',
-        'd1 walks S2, S1, S0 -- through the data site, which is allowed; the gate then fires in S0.'
-      ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'Which zone allows what? Hover a site to read its capabilities.'],
+        rulesPass: ['A rule still fails: {have}', 'Which zone allows what? Click a site: the Selection box on the left shows its zone.'],
         measured: ['d0 is not measured yet.'],
-        visited: ['d0 has to pass through S1 on its way -- the exercise keeps the move.'],
-        gateBetween: ['Green, but the CX is gone. Keep the gate; move the ions to it.'],
-        'default': ['Not there yet.']
+        visited: ['d0 has to pass through S1 on its way. Keep that move.'],
+        gateBetween: ['No rule fails, but the CX is gone. Keep the gate; move the ions to it.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Measured where a camera looks, gated where a beam reaches: cost {cost}, {steps} steps. R6 is the reason zones exist at all, and R6b is why a compiler spends most of its effort on transport.',
+      praise: 'Measured where a camera looks, gated where a beam reaches: cost {cost}, {steps} steps. R6 is why zones exist, and R6b is why a compiler spends most of its effort moving ions.',
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0"})\np.shuttle("d0", ["S0", "S1", "S2"])\np.measure(["d0"])\n']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.cool()\np.gate("CX", [["d0", "d1"]])\n']]] } },
 
     // =============================================================== R7
     { id: 'R7', part: 'R', title: 'Heat: the budget, the clock, and why cooling is mandatory',
-      story: 'The ion crossed the junction and arrived shaking. The gate fired anyway -- in the programme. Not on the machine.',
+      story: 'The ion crossed a junction and arrived shaking. The gate fired anyway, in the programme. On the real machine it would fail.',
       teaches: ['rule:R7', 'rule:R7c', 'rule:R17', 'rule:R15', 'rule:R16', 'rule:R7b', 'm:peak n̄', 'el:heating'],
       text: [
-        'Transport heats an ion; a junction crossing heats it most. [[R7|rule:R7]]: both ions of a two-qubit gate must be under the budget -- one quantum on this device -- when the gate fires. [[R7c|rule:R7c]]: under broadcast wiring cooling is mandatory, so a programme with gates and no cooling anywhere is refused outright. [[R17|rule:R17]]: heat also accrues with time, even at rest; the model adds it per millisecond.',
-        'Three badges never go green here. [[R15|rule:R15]] is amber: the page adds quanta, which is an upper bound. [[R16|rule:R16]] is grey in the browser and checked by Python: the gate error is a function of n-bar at gate time, and the box below shows the number. [[R7b|rule:R7b]] is grey everywhere: no device declares a duty-cycle budget, so there is nothing to check -- and the badge says so instead of pretending.'
+        'Moving an ion warms it, and a junction crossing warms it most.',
+        '[[R7|rule:R7]]: both ions of a two-qubit gate must be cool enough when the gate fires: under one quantum on this device.',
+        '[[R7c|rule:R7c]]: with broadcast wiring, cooling is required. A programme with gates and no cooling at all is refused.',
+        '[[R17|rule:R17]]: ions also warm with time, even at rest. The model adds that heat per millisecond.',
+        'Three heat badges never turn green here. [[R15|rule:R15]] is amber: the page adds heats together, which only gives an upper bound. [[R16|rule:R16]] is grey: the checker checks it when the page is built, not the browser. The gate error depends on the heat at gate time, and the box below shows the number. [[R7b|rule:R7b]] is grey everywhere: no device declares a duty-cycle budget, so there is nothing to check, and the page says so.'
       ],
       setup: [['loadCase', 'R7'], ['fit']],
       verdict: { 'case': 'R7', which: 'loaded' },
       stages: [
         { breaks: [['ruleFails', 'R7']],
-          exercise: 'Evaluate: `d0` crosses the junction at `S0` and enters the gate at about 3.2 quanta, and the strip says **R7**. The `p.cool()` before the walk did nothing for it. Move the cooling to after the transport.',
+          exercise: '`d0` crosses the junction at `S0` and reaches the gate at about 3.2 quanta, and **Report** shows **R7** in red. The `p.cool()` before the walk did not help. In **Write**, move the cooling to after the walk.',
           check: ['all', ['rulesPass'], ['gateBetween', 'd0', 'd1', 'CX']],
           verdict: { 'case': 'R7', which: 'loaded' } },
-        { exercise: 'Compare the two boxes: Python\'s gate error (R16) on the hot programme and on the repaired one. Then: why is R15 amber and R7b grey in every Report?',
+        { exercise: 'The box below now shows the checker\'s verdict on the fixed programme. Compare its gate error (R16) with the one in step 1. Then: why are R15 amber and R7b grey in every Report?',
           check: ['answer', 'bound'],
           verdict: { 'case': 'R7', which: 'fixed' } }
       ],
       choices: [
         { id: 'stale', text: 'They have not been checked yet; reload the page.' },
-        { id: 'bound', text: 'R15: quanta are added, which is an upper bound, so the verdict is partial. R7b: no device declares a duty-cycle budget, so there is nothing to check, and the badge says so.' },
-        { id: 'browser', text: 'The browser cannot check them but Python did, and passed both.' }
-      ],
-      hints: [
-        'The order of the lines is the order things happen. Cooling before the walk cools an ion that is about to get hot again.',
-        'p.cool() between the shuttle and the gate: the ion arrives, is cooled, then gates.',
-        'Amber is an honest bound; grey is an honest "nothing to check". Neither is a pass, and neither is a failure.'
+        { id: 'bound', text: 'R15: heats are added, which gives only an upper bound, so the verdict is partial. R7b: no device declares a duty-cycle budget, so there is nothing to check, and the page says so.' },
+        { id: 'browser', text: 'The browser cannot check them, but the checker did, and both passed.' }
       ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'Where is the cooling relative to the crossing? It must come after.'],
-        gateBetween: ['Green, but the CX is gone. Keep the gate; move the cooling.'],
-        answer: ['A partial verdict is a bound; a skipped one says what is missing. Which sentence says both?', 'Neither badge is stale, and Python does not pass R7b either -- hover the grey badge in the Report.'],
-        'default': ['Not there yet.']
+        rulesPass: ['A rule still fails: {have}', 'Where is the cooling compared with the crossing? It must come after.'],
+        gateBetween: ['No rule fails, but the CX is gone. Keep the gate; move the cooling.'],
+        answer: ['A partial verdict is a bound; a skipped one says what is missing. Which answer says both?', 'Neither badge is stale, and the checker does not pass R7b either. Report lists R7b under Not checked here, with the reason.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Cooled after the crossing, gated under budget: cost {cost}, {steps} steps. Python\'s gate error fell with it. R7 is the rule that makes cooling a scheduling problem, and R15, R16 and R7b are the page telling you exactly how much it knows.',
+      praise: 'Cooled after the crossing, gated under the limit: cost {cost}, {steps} steps. The gate error the checker measured fell with it. R7 makes cooling a scheduling problem, and R15, R16 and R7b show exactly how much the page knows.',
       solution: { stages: [
         [['loadCase', 'R7', 'fixed'], ['fit']],
         [['setAnswer', 'bound']]] } },
 
     // =============================================================== R8
     { id: 'R8', part: 'R', title: 'Chains: splitting from the middle',
-      story: 'Three ions in a row, and the one you want is in the middle.',
+      story: 'Three ions sit in a row, and the one you want is in the middle.',
       teaches: ['rule:R14', 'el:site'],
       text: [
-        'Ions in one site sit in a line, a chain. Only an ion at the end of the chain can be split off; [[R14|rule:R14]] says an ion in the middle must first swap to the edge, and a swap is three CNOTs. A programme that splits from the middle without accounting for that is charged nothing for something the machine has to do.',
-        'The `data` zone has been given capacity three, and three ions sit in `S1`. The loaded programme docks the middle one.'
+        'Ions in one site sit in a line: a chain. Only an ion at an end of the chain can be split off.',
+        '[[R14|rule:R14]]: an ion in the middle must first swap to the end, and a swap takes three CNOTs. A programme that splits from the middle without paying for that gets for free a move the machine cannot do for free.',
+        'Here the `data` zone holds three, and three ions sit in `S1`. The loaded programme docks the middle one.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 2 }, { name: 'ring6d' }], ['fit'],
         ['emit', { method: 'set_zone', args: ['data'], kwargs: { capacity: 3 } }],
         ['applyProgramSource', 'p.init({"d0": "S1", "d1": "S1", "d2": "S1"})\np.shuttle("d1", ["S1", "S0", "A0"], "dock")\n']],
       stages: [
         { breaks: [['ruleFails', 'R14']],
-          exercise: 'Evaluate: `d1` splits from a chain of three and the strip says **R14**. Move `d2` out to `S2` first, so that `d1` is at the edge of a chain of two, then dock it.',
+          exercise: '`d1` splits from the middle of a chain of three, and **Report** shows **R14** in red. First move `d2` out to `S2`: then `d1` is at the end of a chain of two. Then dock it.',
           check: ['all', ['rulesPass'], ['ionAt', 'd1', 'A0']] },
-        { exercise: 'R14 charges three CX for an ion to reach the edge. Why three?',
+        { exercise: 'R14 charges three CX for an ion to reach the end. Why three?',
           check: ['answer', 'swap'] }
       ],
       choices: [
         { id: 'three_rails', text: 'The ion crosses three rails on the way.' },
-        { id: 'swap', text: 'A swap of two qubits is three CNOTs, and the ion must swap past its neighbour.' },
-        { id: 'cooling', text: 'Three cooling pulses are needed after a split.' }
-      ],
-      hints: [
-        'A shuttle of d2 from S1 to S2 before the dock line.',
-        'The dock class entails a split; the rule only fires when the chain it splits from is longer than two.',
-        'SWAP = CX, CX, CX. That is where the three comes from.'
+        { id: 'swap', text: 'A swap of two qubits takes three CNOTs, and the ion must swap past its neighbour.' },
+        { id: 'cooling', text: 'A split needs three cooling pulses afterwards.' }
       ],
       nudges: {
-        rulesPass: ['Still red: {have}', 'Shorten the chain before the split.'],
+        rulesPass: ['A rule still fails: {have}', 'Make the chain shorter before the split.'],
         ionAt: ['{have} is not where d1 should end: the dock A0.'],
         answer: ['What is a SWAP gate made of?'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Edge first, then split: cost {cost}, {steps} steps -- and an honest price for reaching the edge. R14 is why a compiler cares which ion is where inside a site, not only which site.',
+      praise: 'End first, then split: cost {cost}, {steps} steps, and an honest price for reaching the end. R14 is why a compiler cares where an ion sits inside a site, not only which site.',
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S1", "d1": "S1", "d2": "S1"})\np.shuttle("d2", ["S1", "S2"])\np.shuttle("d1", ["S1", "S0", "A0"], "dock")\n']],
         [['setAnswer', 'swap']]] } },
@@ -885,8 +847,9 @@ var QCCD_TUTORIAL = {
       story: 'A programme said it would cost two. The replay said three.',
       teaches: ['rule:R9', 'rule:R10', 'tab:R'],
       text: [
-        'A programme may carry claims about itself: `p.claim(total_steps=4, total_cost=3)`. [[R9|rule:R9]] checks every claim against the replay, and the browser does not run it -- so the [[Report|tab:R]] shows R9 grey and the box below shows Python\'s verdict. [[R10|rule:R10]] says a compiled programme implements its circuit; it needs the circuit, which no lesson so far has had.',
-        'The contract behind every badge: **green** means the check ran and passed; **red** means it ran and failed; **amber** means it ran and can only give a bound; **grey** means it did not run here, and the badge says why. Nothing on this page is green for a check that did not happen.'
+        'A programme may make claims about itself: `p.claim(total_steps=5, total_cost=3)`. [[R9|rule:R9]] checks each claim against the replay. The browser does not run R9, so the [[Report|tab:R]] shows it grey, and the box below shows the checker\'s verdict.',
+        '[[R10|rule:R10]] says a compiled programme does what its circuit says. It needs the circuit, and no lesson so far had one.',
+        'What a badge colour means. **Green:** the check ran and passed. **Red:** it ran and failed. **Amber:** it ran, but can only give a bound. **Grey:** it did not run here, and the page says why. Nothing on this page is green for a check that did not run.'
       ],
       setup: [['loadCase', 'R9'], ['fit']],
       verdict: { 'case': 'R9', which: 'loaded' },
@@ -894,31 +857,26 @@ var QCCD_TUTORIAL = {
         { exercise: 'Open **Report**. R9 is grey. What does grey mean on this page?',
           check: ['answer', 'notrun'] },
         { breaks: [['shipped', 'R9', 'loaded', 'R9', 'failed']],
-          exercise: 'Python\'s verdict says what the programme claimed and what the replay found. Correct the `p.claim` line so the two agree -- the head shows the cost and the steps.',
-          check: ['all', ['rulesPass'], ['claimIs', 'total_steps', 4], ['claimIs', 'total_cost', 3], ['shipped', 'R9', 'fixed', 'R9', 'passed']],
+          exercise: 'In step 1 the box showed the claim (cost 2, 3 steps) and what the replay found. In **Write**, correct the `p.claim` line to the true numbers: **COST** and **STEPS** in the top bar show them. The box below now shows the checker\'s verdict on a corrected programme.',
+          check: ['all', ['rulesPass'], ['claimIs', 'total_steps', 5], ['claimIs', 'total_cost', 3], ['shipped', 'R9', 'fixed', 'R9', 'passed']],
           verdict: { 'case': 'R9', which: 'fixed' } },
-        { exercise: 'R10 is grey on every page in this course so far. Why?',
+        { exercise: 'R10 has been grey on every page of this course so far. Why?',
           check: ['answer', 'nocircuit'],
           verdict: { 'case': 'R9', which: 'fixed' } }
       ],
       choices: [
         { id: 'passed', text: 'Passed, with warnings.' },
-        { id: 'notrun', text: 'The check did not run here -- and the badge says why.' },
-        { id: 'nocircuit', text: 'There is no circuit to check against: R10 needs the QASM a programme was compiled from, which Part D brings.' },
+        { id: 'notrun', text: 'The check did not run here, and the page says why.' },
+        { id: 'nocircuit', text: 'There is no circuit to check against: R10 needs the QASM the programme was compiled from. Part D brings one.' },
         { id: 'failed', text: 'Failed quietly.' }
       ],
-      hints: [
-        'Hover the grey R9 badge: it says the claim was not checked in the browser.',
-        'The head reads cost 3 and 4 steps; the claim says 2 and 3. Edit the numbers in p.claim.',
-        'A hand-written programme has no circuit. A compiled one does, and Part D opens one.'
-      ],
       nudges: {
-        answer: ['Hover the badge; its tooltip is the answer.', 'Grey is neither a pass nor a failure.'],
-        rulesPass: ['A rule is red: {have}'],
-        claimIs: ['The claim for that number is {have}; the head shows what the replay found.'],
-        'default': ['Not there yet.']
+        answer: ['Report lists the grey rules under Not checked here, each with its reason.', 'Grey is neither a pass nor a failure.'],
+        rulesPass: ['A rule fails: {have}'],
+        claimIs: ['The claim for that number is {have}. The top bar shows what the replay found.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'A true claim, and Python\'s R9 turned from failed to passed on it. That is the whole contract: a number on this page is either measured, bounded, or marked as not measured -- never guessed. Cost {cost}, {steps} steps, and both are now also what the programme says.',
+      praise: 'A true claim, and the checker\'s R9 verdict turned from failed to passed. That is the whole contract: every number on this page is measured, bounded, or marked as not measured. Never guessed. Cost {cost}, {steps} steps, and the programme now says the same.',
       solution: { stages: [
         [['setAnswer', 'notrun']],
         [['loadCase', 'R9', 'fixed'], ['fit']],
@@ -926,11 +884,12 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== C1
     { id: 'C1', part: 'C', title: 'A syndrome round of the repetition code',
-      story: 'Three data ions, two check ions, four CNOTs, two measurements. The smallest error-correcting round there is, on a line of five wells.',
-      teaches: ['p:gate', 'p:measure', 'rule:R1', 'rule:R6b'],
+      story: 'Three data ions, two check ions, four CNOTs, two measurements: the smallest error-correcting round, on a line of five sites.',
+      teaches: ['p:gate', 'p:measure', 'rule:R1', 'rule:R6b', 'rule:R7'],
       text: [
-        'The three-qubit repetition code keeps one logical bit in `d0 d1 d2` and asks two check ions whether neighbours agree: `c0` collects `d0` and `d1`, `c1` collects `d1` and `d2`. As a circuit that is four CNOTs -- CX(d0,c0), CX(d1,c0), CX(d1,c1), CX(d2,c1) -- and a measurement of both checks.',
-        'On the line the ions start alternating: `d0 c0 d1 c1 d2` in `S0`..`S4`. Every well holds two, so a check ion can visit a data ion but the two checks can never share `S2` with `d1` at once ([[R1|rule:R1]]). Every gate needs both ions in one well ([[R6b|rule:R6b]]), and one cooling anywhere is enough for this little heat.'
+        'The three-qubit repetition code keeps one logical bit in `d0 d1 d2`. Two check ions ask whether neighbours agree: `c0` checks `d0` and `d1`, and `c1` checks `d1` and `d2`.',
+        'As a circuit: four CNOTs, CX(d0,c0), CX(d1,c0), CX(d1,c1), CX(d2,c1), then measure both checks.',
+        'The ions start in the order `d0 c0 d1 c1 d2`, in `S0` to `S4`. Each site holds two. So a check ion can visit a data ion, but both checks cannot be in `S2` with `d1` at once ([[R1|rule:R1]]). Each gate needs both ions in one site ([[R6b|rule:R6b]]). Every move warms the ion that moves, and a gate needs it cold ([[R7|rule:R7]]): cool before each gate that follows a move.'
       ],
       setup: [
         ['newCanvas', { name: 'line5' }],
@@ -945,31 +904,27 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'S3', 'S4', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\n']],
-      exercise: 'Implement the round: the four CNOTs (control first, check ion second) and a measurement of `c0` and `c1`, every badge green.',
+      exercise: 'Write the round: the four CNOTs (data ion first, check ion second) and a measurement of `c0` and `c1`. No rule may fail.',
       check: ['all', ['gateBetween', 'd0', 'c0', 'CX'], ['gateBetween', 'd1', 'c0', 'CX'], ['gateBetween', 'd1', 'c1', 'CX'], ['gateBetween', 'd2', 'c1', 'CX'], ['measured', ['c0', 'c1']], ['rulesPass']],
-      hints: [
-        'c0 walks to d0, gates, walks to d1, gates; then c0 leaves S2 before c1 arrives there; c1 gates with d1, walks to d2, gates. One p.cool() near the top.',
-        'p.shuttle("c0", ["S1", "S0"]) then p.gate("CX", [["d0", "c0"]]) -- and so on down the line.',
-        'The measurement at the end names both check ions: p.measure(["c0", "c1"]). They must be in trap sites, which every site here is.'
-      ],
       nudges: {
         gateBetween: ['A CNOT is missing: {have}', 'Four pairs: d0-c0, d1-c0, d1-c1, d2-c1. Check the ion names in each.'],
         measured: ['Not measured yet: {have}.'],
-        rulesPass: ['A rule is red: {have}', 'Two checks and d1 cannot all be in S2: move c0 away before c1 comes.'],
+        rulesPass: ['A rule fails: {have}', 'A gate right after a move fails R7: put p.cool() between them.', 'Both checks and d1 cannot all be in S2. Move c0 away before c1 comes.'],
         lowered: ['The text did not run: {have}'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'A syndrome round, by hand: {frames} instructions, {steps} steps, cost {cost}. Every CNOT of the circuit is a journey and a gate, and you scheduled all four under the rules.',
-      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.shuttle("c0", ["S1", "S0"])\np.gate("CX", [["d0", "c0"]])\np.shuttle("c0", ["S0", "S1", "S2"])\np.gate("CX", [["d1", "c0"]])\np.shuttle("c0", ["S2", "S1"])\np.shuttle("c1", ["S3", "S2"])\np.gate("CX", [["d1", "c1"]])\np.shuttle("c1", ["S2", "S3", "S4"])\np.gate("CX", [["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
+      praise: 'A syndrome round, by hand: {frames} instructions, {steps} steps, cost {cost}. Each CNOT of the circuit is a trip and a gate, and you scheduled all four under the rules.',
+      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.shuttle("c0", ["S1", "S0"])\np.cool()\np.gate("CX", [["d0", "c0"]])\np.shuttle("c0", ["S0", "S1", "S2"])\np.cool()\np.gate("CX", [["d1", "c0"]])\np.shuttle("c0", ["S2", "S1"])\np.shuttle("c1", ["S3", "S2"])\np.cool()\np.gate("CX", [["d1", "c1"]])\np.shuttle("c1", ["S2", "S3", "S4"])\np.cool()\np.gate("CX", [["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
 
     // =============================================================== C2
     { id: 'C2', part: 'C', title: 'Parallelism under the rules',
-      story: 'The same round, faster. Not by breaking a rule -- by using the ones that allow things.',
+      story: 'The same round, faster. Not by breaking a rule, but by using what the rules allow.',
       teaches: ['p:simd', 'rule:R12', 'rule:R4', 'rule:R22', 'm:steps'],
       text: [
-        'Two rules allow more than the first round used, and one sets the price. [[R12|rule:R12]] forbids two gates in one trap per step -- but two gates in two traps in one instruction are fine: `p.gate("CX", [["d0", "c0"], ["d1", "c1"]])`. [[R4|rule:R4]] lets one `p.simd` move any number of ions in one step -- as long as they all move the same way. One step is one waveform on the electrodes ([[R22|rule:R22]]), so `d0` stepping right while `d2` steps left takes two steps, not one.',
-        'So pick moves that agree. The two check ions sit the same distance apart as the data ions they visit: walk them together, and every move is shared.',
-        'The first round took thirteen steps. The check counts steps, so every instruction you merge shows up in the head.'
+        'Two rules allow more than your first round used. [[R12|rule:R12]] forbids two gates in one trap per step, but two gates in two different traps may share an instruction: `p.gate("CX", [["d0", "c0"], ["d1", "c1"]])`.',
+        '[[R4|rule:R4]] lets one `p.simd` move many ions in one step, if they all move the same way. One step is one signal on the electrodes ([[R22|rule:R22]]), so `d0` moving right while `d2` moves left takes two steps.',
+        'So choose moves that agree. The two check ions are as far apart as the data ions they visit: move them together, and every move is shared.',
+        'The C1 solution took 24 steps. **STEPS** in the top bar shows your count.'
       ],
       setup: [
         ['newCanvas', { name: 'line5' }],
@@ -984,31 +939,27 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'S3', 'S4', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\n']],
-      exercise: 'The same round -- four CNOTs, both checks measured -- in **at most 10 steps**.',
-      check: ['all', ['gateBetween', 'd0', 'c0', 'CX'], ['gateBetween', 'd1', 'c0', 'CX'], ['gateBetween', 'd1', 'c1', 'CX'], ['gateBetween', 'd2', 'c1', 'CX'], ['measured', ['c0', 'c1']], ['rulesPass'], ['stepsAtMost', 10]],
-      hints: [
-        'Move both checks one site left in one simd -- `c0` onto `d0`, `c1` onto `d1` -- and fire both CNOTs in one instruction.',
-        'Then walk both checks right, one site per simd, until `c0` sits on `d1` and `c1` on `d2`, and fire both CNOTs again. Every simd moves the two checks the same way.',
-        'One cool at the top, and one simd back left so each check is measured alone. Count: cool, left, gate, right, right, gate, left, measure -- eight.'
-      ],
+      exercise: 'The same round (four CNOTs, both checks measured) in **at most 12 steps**.',
+      check: ['all', ['gateBetween', 'd0', 'c0', 'CX'], ['gateBetween', 'd1', 'c0', 'CX'], ['gateBetween', 'd1', 'c1', 'CX'], ['gateBetween', 'd2', 'c1', 'CX'], ['measured', ['c0', 'c1']], ['rulesPass'], ['stepsAtMost', 12]],
       nudges: {
         gateBetween: ['A CNOT is missing: {have}'],
         measured: ['Not measured yet: {have}.'],
-        rulesPass: ['A rule is red: {have}'],
+        rulesPass: ['A rule fails: {have}'],
         stepsAtMost: ['{have} steps. Which moves can share an instruction? Which gates can?', 'Two gates in two different traps may share one instruction (R12 is per trap).', 'Moves share a step only when they go the same way (R22). Move the two checks together.'],
         lowered: ['The text did not run: {have}'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: '{steps} steps for the round that took thirteen. Nothing was skipped: four CNOTs, two measurements, every rule green -- the machine was simply asked to do several legal things at once.',
-      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.simd("shuttle", [["c0", "S1", "S0"], ["c1", "S3", "S2"]])\np.gate("CX", [["d0", "c0"], ["d1", "c1"]])\np.simd("shuttle", [["c0", "S0", "S1"], ["c1", "S2", "S3"]])\np.simd("shuttle", [["c0", "S1", "S2"], ["c1", "S3", "S4"]])\np.gate("CX", [["d1", "c0"], ["d2", "c1"]])\np.simd("shuttle", [["c0", "S2", "S1"], ["c1", "S4", "S3"]])\np.measure(["c0", "c1"])\n' } },
+      praise: '{steps} steps for the round that took 24. Nothing was skipped: four CNOTs, two measurements, and no rule failed. The machine simply did several legal things at once.',
+      solution: { program: 'p.init({"d0": "S0", "c0": "S1", "d1": "S2", "c1": "S3", "d2": "S4"})\np.cool()\np.simd("shuttle", [["c0", "S1", "S0"], ["c1", "S3", "S2"]])\np.cool()\np.gate("CX", [["d0", "c0"], ["d1", "c1"]])\np.simd("shuttle", [["c0", "S0", "S1"], ["c1", "S2", "S3"]])\np.simd("shuttle", [["c0", "S1", "S2"], ["c1", "S3", "S4"]])\np.cool()\np.gate("CX", [["d1", "c0"], ["d2", "c1"]])\np.measure(["c0", "c1"])\n' } },
 
     // =============================================================== C3
     { id: 'C3', part: 'C', title: 'One plaquette',
-      story: 'Four data ions around a crossroads, and one check ion that must visit each of them.',
+      story: 'Four data ions around a crossing, and one check ion that must visit each of them.',
       teaches: ['el:junction', 'rule:R2', 'rule:R7', 'm:junctiontransits'],
       text: [
-        'A surface-code check is a plaquette: one check ion touches four data ions. Here the four sit on the arms of a junction, and `a0` starts beside `d0`. Each visit is a CNOT with the data ion as control; each move between arms crosses the [[junction|el:junction]] once -- [[R2|rule:R2]] allows one crossing per step, and the Report counts them as *junction transits*.',
-        'A crossing heats the ion by three quanta on this chip, against a gate budget of one ([[R7|rule:R7]]). So the shape of the programme is forced: gate, cross, cool, gate, cross, cool ... Cooling is not a courtesy here; it is the only way the next gate is legal.'
+        'A surface-code check is a plaquette: one check ion meets four data ions. Here the four sit on the arms of a [[junction|el:junction]], and `a0` starts next to `d0` in `S0`.',
+        'Each visit is a CNOT with the data ion as control. Each move to another arm crosses the junction once. [[R2|rule:R2]] allows one crossing per step, and **Report** counts them as junction transits.',
+        'A crossing warms the ion by about three quanta on this chip, but a gate needs it under one ([[R7|rule:R7]]). So the programme must go: gate, cross, cool, gate, cross, cool, and so on. Here cooling is not optional: it is the only way the next gate is allowed.'
       ],
       setup: [
         ['newCanvas', { name: 'plaquette' }],
@@ -1023,22 +974,17 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'J0', 'S3', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\n']],
-      exercise: 'Measure the check on all four: CX from each data ion onto `a0`, then measure `a0`, with **at most 3 junction transits** and every badge green.',
+      exercise: 'Do the check on all four: a CX from each data ion onto `a0`, then measure `a0`. Use **at most 3 junction transits**. No rule may fail.',
       check: ['all', ['gateBetween', 'd0', 'a0', 'CX'], ['gateBetween', 'd1', 'a0', 'CX'], ['gateBetween', 'd2', 'a0', 'CX'], ['gateBetween', 'd3', 'a0', 'CX'], ['measured', ['a0']], ['transitsAtMost', 3], ['rulesPass']],
-      hints: [
-        'Gate with d0 where a0 already is; then p.shuttle("a0", ["S0", "J0", "S1"]), cool, gate with d1; and so on around.',
-        'Without a p.cool() after each crossing, the next gate fails R7 at about 3.2 quanta.',
-        'Three crossings visit four arms: S0, S1, S2, S3. Measure a0 at the last one.'
-      ],
       nudges: {
         gateBetween: ['A CNOT is missing: {have}'],
         measured: ['a0 is not measured yet.'],
         transitsAtMost: ['{have} junction transits. Four arms need only three crossings.'],
-        rulesPass: ['A rule is red: {have}', 'Cool after every crossing; the gate budget is one quantum.'],
+        rulesPass: ['A rule fails: {have}', 'Cool after every crossing: a gate needs the ion under one quantum.'],
         lowered: ['The text did not run: {have}'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'One plaquette: {transits} crossings, {steps} steps, cost {cost}, runtime {us} us. Most of that time is the three crossings and the three coolings they force -- which is the number a grid architecture lives or dies by.',
+      praise: 'One plaquette: {transits} crossings, {steps} steps, cost {cost}, runtime {us} us. Most of that time is the three crossings and the three coolings they force. A grid architecture lives or dies by this number.',
       solution: { program: 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\np.cool()\np.gate("CX", [["d0", "a0"]])\np.shuttle("a0", ["S0", "J0", "S1"])\np.cool()\np.gate("CX", [["d1", "a0"]])\np.shuttle("a0", ["S1", "J0", "S2"])\np.cool()\np.gate("CX", [["d2", "a0"]])\np.shuttle("a0", ["S2", "J0", "S3"])\np.cool()\np.gate("CX", [["d3", "a0"]])\np.measure(["a0"])\n' } },
 
     // =============================================================== C4
@@ -1046,8 +992,9 @@ var QCCD_TUTORIAL = {
       story: 'Error correction never stops. The second round starts where the first one ended.',
       teaches: ['rule:R7c', 'rule:R7', 'm:runtime', 'p:reset'],
       text: [
-        'After the measurement, `a0` is reset ([[p.reset|p:reset]]) and the round runs again. The naive second round walks `a0` back to `d0` first -- three crossings for nothing. The better one runs the plaquette in reverse order from where `a0` already is.',
-        'The check is on **runtime**: the head shows it, and the Report breaks it into transport, cooling and gates. Every crossing you save saves a cooling too.'
+        'After the measurement, [[p.reset|p:reset]] resets `a0`, and the round runs again.',
+        'The naive second round first walks `a0` back to `d0`: three crossings for nothing. The better one visits the arms in reverse order, starting where `a0` already is.',
+        'The check is on **runtime**. **RUNTIME** in the top bar shows it, in ms. Each crossing you save also saves a cooling.'
       ],
       setup: [
         ['newCanvas', { name: 'plaquette' }],
@@ -1062,66 +1009,59 @@ var QCCD_TUTORIAL = {
         ['joinNodes', 'J0', 'S3', { id: 'E3' }],
         ['fit'],
         ['applyProgramSource', 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\n']],
-      exercise: 'Two full rounds -- eight CNOTs, two measurements, a reset between -- in **under 3300 us**, every badge green.',
-      check: ['all', ['gateCount', 'CX', 8], ['measured', ['a0']], ['hasFrame', 'reset'], ['runtimeAtMost', 3300], ['rulesPass']],
-      hints: [
-        'Round one as in C3. Then p.reset(["a0"]) and gate with d3 right away -- a0 is already there.',
-        'Round two goes d3, d2, d1, d0: the same three crossings, in reverse, with a cool after each.',
-        'Walking back to S0 first costs three extra crossings and about 400 us. The bound forbids it.'
-      ],
+      exercise: 'Two full rounds (eight CNOTs, two measurements, a reset between them) in **under 4500 us** (4.5 ms). No rule may fail.',
+      check: ['all', ['gateCount', 'CX', 8], ['measured', ['a0']], ['hasFrame', 'reset'], ['runtimeAtMost', 4500], ['rulesPass']],
       nudges: {
-        gateCount: ['{have} CX gates so far; two rounds are eight.'],
-        hasFrame: ['No reset between the rounds: p.reset(["a0"]) after the first measurement.'],
-        runtimeAtMost: ['{have} us. Where does a0 start its second round? Do not walk it back.', 'Six crossings in all is the minimum for two rounds; count yours in the Report.'],
-        rulesPass: ['A rule is red: {have}'],
+        gateCount: ['{have} CX gates so far; two rounds need eight.'],
+        hasFrame: ['No reset between the rounds: add p.reset(["a0"]) after the first measurement.'],
+        runtimeAtMost: ['{have} us. Where does a0 start its second round? Do not walk it back.', 'Two rounds need at least six crossings. Report shows your count as junction transits.'],
+        rulesPass: ['A rule fails: {have}'],
         measured: ['a0 is not measured yet.'],
         lowered: ['The text did not run: {have}'],
-        'default': ['Not there yet.']
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Two rounds in {us} us: {gates} CNOTs, six crossings, six coolings, and the reset between. That is a syndrome extraction loop, scheduled by hand under all twenty-three rules -- and Part D shows you what the compiler makes of the same job.',
-      challenge: { label: 'sharp', exercise: 'Sharp: the same two rounds with cooling only where a gate needs it -- cool just `a0` (`p.cool(["a0"])`) after each crossing, nothing else -- still under 3300 us and green.',
-                   check: ['all', ['gateCount', 'CX', 8], ['runtimeAtMost', 3300], ['rulesPass'], ['not', ['broadcastCool']]],
-                   praise: 'Targeted cooling, and the same runtime: on this chip a cooling pulse costs the same for one ion as for all. That is a fact you now know about the model, not a guess.' },
+      praise: 'Two rounds in {us} us: {gates} CNOTs, six crossings, six coolings, and a reset between. That is a syndrome extraction loop, scheduled by hand with no rule failing. Part D shows what the compiler makes of the same job.',
+      challenge: { label: 'sharp', exercise: 'Cool only where a gate needs it: after each crossing, cool just `a0` with `p.cool(["a0"])`, and nothing else. Stay under 4500 us, with no rule failing.',
+                   check: ['all', ['gateCount', 'CX', 8], ['runtimeAtMost', 4500], ['rulesPass'], ['not', ['broadcastCool']]],
+                   praise: 'Targeted cooling, and the same runtime: on this chip a cooling pulse costs the same for one ion as for all. Now you know that about the model.' },
       solution: { program: 'p.init({"d0": "S0", "d1": "S1", "d2": "S2", "d3": "S3", "a0": "S0"})\np.cool()\np.gate("CX", [["d0", "a0"]])\np.shuttle("a0", ["S0", "J0", "S1"])\np.cool()\np.gate("CX", [["d1", "a0"]])\np.shuttle("a0", ["S1", "J0", "S2"])\np.cool()\np.gate("CX", [["d2", "a0"]])\np.shuttle("a0", ["S2", "J0", "S3"])\np.cool()\np.gate("CX", [["d3", "a0"]])\np.measure(["a0"])\np.reset(["a0"])\np.gate("CX", [["d3", "a0"]])\np.shuttle("a0", ["S3", "J0", "S2"])\np.cool()\np.gate("CX", [["d2", "a0"]])\np.shuttle("a0", ["S2", "J0", "S1"])\np.cool()\np.gate("CX", [["d1", "a0"]])\np.shuttle("a0", ["S1", "J0", "S0"])\np.cool()\np.gate("CX", [["d0", "a0"]])\np.measure(["a0"])\n' } },
 
     // =============================================================== D1
     { id: 'D1', part: 'D', title: 'What the compiler does',
-      story: 'You have written every instruction by hand. Now read what a compiler wrote for a real circuit, and find the line that is the CNOT.',
+      story: 'You have written every instruction by hand. Now read what a compiler wrote for a real circuit, and find the instruction that does the CNOT.',
       teaches: ['tab:Q', 'rule:R10', 'tab:P'],
       page: 'micro_grid9x9',
       text: [
-        'The compiler takes a circuit -- `micro.qasm`, four qubits and seven statements -- and a device, and writes the hardware programme: where the ions start, every shuttle, every gate as the pulses that make it, every cooling. It also writes a **certificate**: for every instruction, which statement of the circuit it realises. [[R10|rule:R10]] is the rule that the programme implements the circuit, and the certificate is its evidence.',
-        'On the compiled page the [[Circuit|tab:Q]] pane shows the QASM beside the animation: the statement the current instruction realises is marked, and the one the ions are travelling towards is marked more faintly. Click a statement and the animation jumps to the instruction that discharges it.'
+        'The compiler takes a circuit and a device. The circuit here is `micro.qasm`: four qubits, seven statements. The compiler writes the hardware programme: where the ions start, every shuttle, every gate (as the pulses that make it), every cooling.',
+        'It also writes a **certificate**: for each instruction, which statement of the circuit it carries out. [[R10|rule:R10]] says the programme does what the circuit says. The certificate says where and when each statement is carried out; which gate the pulses make is checked separately, by composing them back into the circuit.',
+        'On this page the [[Circuit|tab:Q]] tab shows the circuit next to the animation. The statement being carried out now is marked. Click a statement, and the animation jumps to the instruction that carries it out.'
       ],
       setup: [['seekTo', 0]],
-      exercise: 'In the **Circuit** pane, click the first `cx q[0],q[1]` statement -- or step the animation until the strip says it is being realised -- so that the current instruction is the one that discharges that CNOT.',
+      exercise: 'Open the **Circuit** tab. Click the statement `cx q[0],q[1]`: the animation jumps to the instruction that carries out that CNOT, and the line above the circuit reads `executing cx q[0],q[1]`. Then go back to **Learn** and press **Check**.',
       check: ['frameIs', 'realises:1'],
-      hints: [
-        'The Circuit pane is the tab after Program. Its statements are clickable.',
-        'The CNOT is the second statement (after h q[0]); a compiled CNOT is several pulses in one instruction: R, MS, R, R.',
-        'The Program pane marks the same instruction; the status strip names the statement it realises.'
-      ],
+      guide: [['stmt', 1], ['check']],
       nudges: {
-        frameIs: ['You are on instruction {have}. Click the cx statement in the Circuit pane.', 'The statement you want is the first cx; the certificate says which instruction realises it.'],
-        'default': ['Not there yet.']
+        frameIs: ['You are on instruction {have}. Click the cx q[0],q[1] statement in the Circuit tab.', 'The statement you want is the first cx. The certificate says which instruction carries it out.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Instruction {frame} is the CNOT: the certificate says so, and the page checked that certificate against the instruction stamps before it drew anything. Every hand-written CNOT in Part B was this, with the compiler doing the journey.',
+      praise: 'Instruction {frame} is the CNOT: the certificate says so, and the page checked that certificate before it drew anything. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip.',
       solution: { steps: [['seekTo', 'realises:1']] } },
 
     // =============================================================== D2
     { id: 'D2', part: 'D', title: 'The same circuit on nine machines',
-      story: 'One circuit, compiled for every shipped architecture, replayed under the same model. The numbers are below. The question is why.',
+      story: 'One circuit, compiled for every shipped device and replayed under the same model. The numbers are in the table below. The question is why.',
       teaches: ['m:cost', 'm:runtime', 'm:junctiontransits', 'el:loop'],
       table: 'micro',
       text: [
-        'These are measured, not estimated: the compiler\'s output for `micro.qasm` on each shipped device, replayed by the verifier when this page was built, with cooling inserted. Cost is the model\'s charge for transport; steps are machine cycles; runtime is wall-clock; DACs are the device\'s control channels.',
-        'Two families stand out. A ring pays for a **rotation** every time it moves anything -- all 144 ions turn together -- so its cost is high and its programme long. A grid pays for **junction crossings** and the cooling they force -- so its runtime is long even when its cost is small. A chain pays for almost nothing on a four-qubit circuit -- and could not hold a bigger one.'
+        'These numbers are measured, not estimated: the compiler output for `micro.qasm` on each shipped device, replayed when this page was built, with cooling added.',
+        'In the table: **cost** is the charge for moving ions, **steps** are machine steps, **runtime** is how long it takes, and **DACs** are the control channels of the device.',
+        'Two families stand out. A ring pays for a **rotation** every time it moves anything, because all 144 ions turn together: its cost is high and its programme long. A grid pays for **junction crossings** and the cooling they force: its runtime is long even when its cost is small. A chain pays almost nothing on a four-qubit circuit, but could not hold a bigger one.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       stages: [
-        { exercise: 'Before you look too hard at the table: which is cheaper in **cost** for this circuit, `ring144_24v` or `grid9x9`?',
+        { exercise: 'Look at the table below. Which has the lower **cost** for this circuit: `ring144_24v` or `grid9x9`?',
           check: ['measuredLess', 'micro', 'total_cost', 'grid9x9', 'ring144_24v'] },
-        { exercise: 'And which is **faster** -- the smaller runtime -- `grid9x9` or `ladder_2x72`?',
+        { exercise: 'Which is **faster** (the smaller runtime): `grid9x9` or `ladder_2x72`?',
           check: ['measuredLess', 'micro', 'runtime_us', 'grid9x9', 'ladder_2x72'] },
         { exercise: 'Why does the ring cost so much more than the grid on this tiny circuit?',
           check: ['answer', 'rotation'] }
@@ -1134,53 +1074,47 @@ var QCCD_TUTORIAL = {
         { id: 'junctions', text: 'The ring has more junctions than the grid.' },
         { id: 'bigger', text: 'The ring is a bigger chip, so everything on it costs more.' }
       ],
-      hints: [
-        'Read the cost column: the ring is the largest number in it.',
-        'Runtime is the fourth column. The ladder has fewer junctions in the way than the grid.',
-        'Part B5: a rotation is charged for every ion it moves. The ring has 144 of them.'
-      ],
       nudges: {
         measuredLess: ['The table says otherwise: {va} against {vb}.', 'Look at the column the question names, not the one next to it.'],
-        answer: ['Think about B5: what does one rotation cost on a full loop?'],
-        'default': ['Not there yet.']
+        answer: ['Think of B5: what does one rotation cost on a full loop?'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'The table agrees with you twice, and so does the reason. An architecture decision is a measured number and the rule that explains it -- never a slogan about rings or grids.',
+      praise: 'The table agrees with you twice, and so does the reason. An architecture decision is a measured number and the rule that explains it, never a slogan about rings or grids.',
       solution: { stages: [[['setAnswer', 'grid9x9']], [['setAnswer', 'ladder_2x72']], [['setAnswer', 'rotation']]] } },
 
     // =============================================================== D3
     { id: 'D3', part: 'D', title: 'Broadcast versus direct at scale',
-      story: 'The same chip, wired two ways. One needs five thousand DACs. The other needs forty-four.',
+      story: 'The same chip, wired two ways. One needs over five thousand DACs. The other needs forty-four.',
       teaches: ['m:DACs', 'm:electrodes', 'el:control', 'rule:R4d'],
       table: 'planes',
       text: [
-        '`grid9x9` and `deck_unit_cell` are the same geometry: 144 traps, 77 junctions, the same electrodes. One is wired **direct** -- every electrode its own DAC -- and the other **broadcast**, the deck\'s unit-cell wiring where whole classes of electrodes share a waveform. The table is the hardware report of every shipped device; the DAC column is the whole argument for broadcasting.',
-        'The price of broadcasting is what Part R\'s R5 showed: one waveform per channel per step, so some programmes need more steps. Look back at the D2 table for the two devices and see whether this one did.'
+        '`grid9x9` and `deck_unit_cell` have the same layout: 144 traps, 77 junctions, and the same 8496 electrodes. The grid is wired **direct**, with thousands of DACs. The deck is wired **broadcast** (the table calls its scheme `wise`): whole groups of electrodes share one signal.',
+        'The table below is the hardware report of every shipped device. Its DAC column is the whole case for broadcasting.',
+        'The price of broadcasting, from R5: one signal per channel per step, so some programmes need more steps. The D2 table shows whether this one did.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       stages: [
-        { exercise: 'What did broadcasting cost `micro.qasm` on the deck, compared with the direct-wired grid? Read both tables.',
+        { exercise: 'What did broadcasting cost `micro.qasm` on the deck, compared with the direct-wired grid? Compare their steps and runtime in the D2 table (the ◀ button above goes back to D2).',
           check: ['all', ['measuredSame', 'micro', 'total_steps', 'grid9x9', 'deck_unit_cell'], ['measuredSame', 'micro', 'runtime_us', 'grid9x9', 'deck_unit_cell'], ['answer', 'nothing']] },
-        { exercise: 'Now put the broadcast one on the canvas: from **Start**, open the `deck_unit_cell` device (its template is on this page). The DACs chip in the head must read the deck\'s number, under the budget of 128 -- with all 144 traps.',
-          check: ['all', ['dacsAtMost', 128], ['sites', 144]] }
+        { exercise: 'Now put the broadcast device on the canvas. Press **Start** in the tools bar. Next to **open**, choose `deck_unit_cell`, then press **open**. **DACS** in the top bar must stay under the budget of 128, with all 144 traps.',
+          check: ['all', ['dacsAtMost', 128], ['sites', 144]],
+          guide: [['tool', 'start'], ['pick', '#palOpen', 'deck_unit_cell', 'Pick deck_unit_cell.'],
+                  ['press', 'button[data-open-pick="palOpen"]', 'Press open.'],
+                  ['goal', ['all', ['dacsAtMost', 128], ['sites', 144]]], ['check']] }
       ],
       choices: [
         { id: 'slower', text: 'It ran slower: more steps and a longer runtime.' },
-        { id: 'nothing', text: 'Nothing, on this programme: the same steps and the same runtime. The penalty only appears when two things on one channel want to happen at once.' },
-        { id: 'hotter', text: 'The ions ran hotter.' }
-      ],
-      hints: [
-        'Same steps, same runtime in the D2 table: broadcasting was free here. The DAC column is where they differ.',
-        'Start (top of the elements rail) lists the shipped devices as templates; deck_unit_cell is one of them.',
-        'The grid reads 5760 DACs, over its budget of 128; the deck reads 44.'
+        { id: 'nothing', text: 'Nothing, on this programme: the same steps and the same runtime. The cost only appears when two things on one channel want to happen at once.' },
+        { id: 'hotter', text: 'The ions got hotter.' }
       ],
       nudges: {
         measuredSame: ['The measured tables disagree with this lesson: {have}. Trust the table.'],
-        answer: ['Compare the two rows in the D2 table first: steps and runtime.', 'The difference between the two devices is in the DAC column, not the runtime column.'],
-        dacsAtMost: ['The head reads {have} DACs. That is the direct-wired one, or a blank canvas.'],
-        sites: ['{have} sites: the deck has 144 traps. Open the deck_unit_cell template, not a generator card.'],
-        'default': ['Not there yet.']
+        answer: ['Compare the two rows in the D2 table first: steps and runtime.', 'The two devices differ in the DAC column, not the runtime column.'],
+        dacsAtMost: ['The top bar reads {have} DACs. That is the direct-wired grid, or an empty canvas.'],
+        sites: ['{have} sites: the deck has 144 traps. Press Start and open deck_unit_cell next to open.'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: '{dacs} DACs for 144 traps and 77 junctions. That is the number that makes a large trapped-ion machine buildable, and R4d is the rule you pay for it with.',
+      praise: '{dacs} DACs for 144 traps and 77 junctions. That number is what makes a large trapped-ion machine buildable, and R4d is the rule you pay for it with.',
       solution: { stages: [[['setAnswer', 'nothing']], [['newFromTemplate', 'deck_unit_cell', { name: 'deck_unit_cell' }], ['fit']]] } },
 
     // =============================================================== D4
@@ -1188,8 +1122,12 @@ var QCCD_TUTORIAL = {
       story: 'Everything on this page came from a command line. Here are the commands.',
       teaches: ['tab:W', 'tab:R'],
       text: [
-        'Build a device in this page and press **Export** to get `<name>.arch.json` and, with a programme, `<name>.tsir.json`. Then, in a terminal: `python -m qccd open <name>.studio.json` runs the full verifier over what you built and prints the five verdicts this page cannot compute. `python -m qccd studio --seed <name>.arch.json --program rotate -o x.html` opens a shipped device on a built-in programme. `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens a compiled programme with its circuit beside it -- the page D1 uses. `python -m qccd tutorial -o tutorial` builds this course with its companion page.',
-        'The compiler takes a QASM file and an architecture and writes the `.tsir.json` and the `.qcert.json` certificate that the Circuit pane checks. The matrix of shipped results in D2 was built with it.'
+        '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the device or the programme, open **Device**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
+        '**Check everything:** `python -m qccd open <name>.studio.json` runs the full checker on what you built, including the rules the [[Report|tab:R]] lists as not checked here.',
+        '**Open a device:** `python -m qccd studio --seed <name>.arch.json --program rotate -o x.html` opens a device with a built-in programme.',
+        '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens it with its circuit beside it. Lesson D1 uses such a page.',
+        '**Build this course:** `python -m qccd tutorial -o tutorial` builds this page and its companion page.',
+        'The compiler takes a QASM file and a device, and writes the `.tsir.json` programme and the `.qcert.json` certificate that the **Circuit** tab checks. The D2 table was built with it. A programme of your own goes in the [[Write|tab:W]] tab.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       exercise: 'Last question. Which command opens a compiled programme with its circuit beside it?',
@@ -1199,16 +1137,11 @@ var QCCD_TUTORIAL = {
         { id: 'studio', text: 'python -m qccd studio --tsir <x>.tsir.json --qasm <x>.qasm -o x.html' },
         { id: 'compile', text: 'python -m qccd compile <x>.qasm' }
       ],
-      hints: [
-        '`open` is the return leg: it verifies what the browser built.',
-        'The Circuit pane needs the QASM and the certificate; only one command takes a --qasm.',
-        'It is the second one.'
-      ],
       nudges: {
-        answer: ['Read the two commands that mention a page again: which one names a circuit?'],
-        'default': ['Not there yet.']
+        answer: ['Read the commands again: which one names a circuit?'],
+        'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'That is the whole loop: design here, verify in Python, compile a circuit, read the result back on a page like this one. You started with one picture of a chip; you can now build, program, break, repair and judge one.',
+      praise: 'That is the whole loop: design here, check everything on your own machine, compile a circuit, and read the result back on a page like this one. You started with one picture of a chip. Now you can build, program, break, fix and judge one.',
       solution: { stages: [[['setAnswer', 'studio']]] } }
   ]
 };

@@ -1,4 +1,4 @@
-"""Beat Cyclone under Cyclone's own cost model.
+"""Cyclone's round under Cyclone's own cost model, run in the circuit's own order.
 
 Cyclone (Khan et al., HPCA 2026, arXiv 2511.15910) runs a syndrome round on a ring of x
 traps: one ancilla per trap, every ancilla does one X check and then one Z check, and all
@@ -10,75 +10,79 @@ where P is the largest number of CX any trap does in the step (the gates of one 
 serial, g = max(100, 13.33 C - 54) us), 3gA is a gate swap charged for every ancilla every
 step, and s = 165 us is split 80 + move 5 + merge 80.  One 100 us H layer opens the round and
 one closes it.  A phase runs while any of its checks has a gate left (the artifact's
-``while (checkEmpty(...) == False)``), so its length is set by the worst check: the number
-of traps its ancilla must pass before it has met every data qubit of the check.
+``while (checkEmpty(...) == False)``).
 
-The artifact places data round-robin (its source: ``#NAIVE MAPPING - REPLACE WITH FIXED
-PARTITIONER``) and gives check i to ancilla i, so some check always spans the whole ring and
-each phase takes a full rotation: 2x steps.  Nothing in the model forces that.  This module
-keeps every primitive, the step rule, the one-way rotation, the per-step swap and the
-circuit, and changes only what the model leaves free:
+The order.  The round is a circuit: X check i is a list of CX(ancilla, data) and Z check i
+a list of CX(data, ancilla), both on ancilla i, in the order the input lists them
+(`importers.cyclone_circuit`, the ``*_true_round.json`` files).  Our schedules keep that
+order exactly: every ancilla runs its check's CX gates in the listed order, and every data
+qubit meets its checks in the order the circuit lists them (X check 0, 1, 2, ... then Z
+check 0, 1, 2, ...).  The gates of a check commute, and so do the checks, so the artifact's
+loop -- each ancilla does whichever gates of its check it finds in its trap -- computes the
+same syndrome; but the order of the input circuit is its author's, and a compiler may not
+change it.  So the X check and the Z check of ancilla i stay on one ion, a{n+i}, as in the
+input, and the ring decides only WHEN each gate can run: ancilla k, starting in trap s_k,
+is in trap (s_k + t) mod x at step t, so its gate with data d (in trap p_d) runs at the
+first step t >= (its previous gate, the data's previous gate + 1) with t = p_d - s_k mod x.
+Where an ancilla passes a data qubit it is not yet allowed to touch, it comes round again a
+full rotation later.  `strict_times` computes that, gate by gate.
+
+The artifact's own loop (``order="artifact"``: per step, each ancilla does the gates of its
+check it has not done that are in its trap) is kept only to replay the artifact's own plan
+(`naive_plan`, `artifact_plan`) and its printed numbers.
+
+A `Plan` says what the model leaves free:
 
     which trap each data qubit sits in        (data per trap <= C - A)
-    which ancilla does which X and Z check    (each ancilla still does one of each)
     where each ancilla starts                 (one per trap, A = 1)
 
-A `Plan` says those three things.  `write` turns a plan into a `TimedSchedule` with exactly
-the event rules `importers.import_cyclone` uses for the artifact's own compiles, by running
-the artifact's loop (gates of a step at t0 + j*g in their trap, then per ancilla a split that
-carries the folded gate swap, a move across the degree-2 junction and a merge into the next
-trap).  `verify` replays the saved schedule with `timed.check` under `models.CYCLONE` and
-`models.cyclone_duration` against the circuit built from the TRUE check matrices, and runs a
-noiseless stim memory experiment over the executed CX order.  `optimize` searches plans.
+(``x_rows``/``z_rows``, which check each ancilla measures, are the identity for our plans;
+a replayed artifact plan carries its own.)  `write` turns a plan into a `TimedSchedule` with
+the event rules `importers.import_cyclone` uses for the artifact's compiles: gates of a step
+at t0 + j*g in their trap, then per ancilla a split that carries the folded gate swap, a move
+across the degree-2 junction and a merge into the next trap.  `verify` replays the saved
+schedule with `timed.check` under `models.CYCLONE` (circuit order ``strict`` for our plans)
+and `models.cyclone_duration` against the circuit built from the TRUE check matrices, and
+runs a noiseless stim memory experiment over the executed CX order.
 
-With one ancilla per trap (x = m/2) every trap starts exactly one X window and one Z window,
-so a plan is equivalent to a *layout*: data traps, plus for each basis a permutation of the
-checks onto start traps (`layout_of`, `plan_from_layout`).  Check r's ancilla meets data d
-at step (trap(d) - start(r)) mod x, so a phase lasts max_r (1 + max_d that offset) steps and
-does max_r (gates of r at offset j) layers at step j.  The searches:
-
-``optimize``  simulated annealing in two stages.
-    1. feasibility: for target phase lengths (kX, kZ), minimise the summed ring distance from
-       every data qubit to the window [start, start + k - 1] of each of its checks; moves are
-       data moves/swaps, swaps and block rotations of start traps, and shifts of a run of
-       traps' contents.  Each time the penalty reaches zero the longer target drops by one.
-    2. cost: with the windows as hard limits, minimise the exact bill 2*100 + sum over steps
-       of (3g + 165 + g * max(1, P_j)), with a small tie-breaker on the number of checks
-       needing a phase's last step and on the number doing a step's most gates.
-    The seed matters more than the moves: `exact_starts` (bipartite matching: the shortest
-    window that gives every check its own start trap) completes any data placement, and
-    `hgp_layout` + `tanner_order` give HGP codes a row-major placement on the product of
-    the two Tanner graphs, `bb_layout` gives BB codes one on their torus.
-``sat_layout``  exact feasibility of (kX, kZ) as SAT (python-sat), with order-encoded data
-    traps; warm-startable from a layout, with a wall-clock limit.  It proves a phase-length
-    pair feasible (and produces the layout) or infeasible.
+``sat_layout`` decides exactly whether a round with L_X = kx steps (exactly) and L_Z <= kz
+exists: data traps and (optionally) start traps one-hot, every gate's step order-encoded
+(windows may exceed a rotation), the row order (<=, equal only in one trap) and the data
+order (<) as implications between the order literals.  ``optimize`` finds the least X
+phase for each start-trap seed, then scans L_X for the least Z phase that still beats the
+best round so far, and keeps the cheapest round the exact propagation confirms.
+``reproduce_ours`` writes the published rounds (``Reproduce/khan2026cyclone/ours``) and
+the plan each was written from.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
-import random
 import time
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from .importers import cyclone_circuit, cyclone_device
 from .models import CYCLONE, cyclone_duration
 from .timed import Event, Report, TimedSchedule, check
 
 __all__ = ["Plan", "gate_us", "ring_device", "naive_plan", "write", "circuit_for",
-           "verify", "stim_check", "step_cost", "plan_cost", "optimize", "exact_starts",
-           "sat_layout", "layout_of", "plan_from_layout", "tanner_order", "hgp_layout", "bb_layout",
-           "hgp",
-           "load_hgp_checks", "load_bb_checks", "artifact_plan"]
+           "verify", "stim_check", "step_cost", "plan_cost", "strict_times", "optimize",
+           "sat_layout", "hgp", "load_hgp_checks", "load_bb_checks", "artifact_plan",
+           "true_rows", "reproduce_ours"]
 
 SPLIT_US = 80.0
 MERGE_US = 80.0
 MOVE_US = 5.0
 H_US = 100.0
+
+#: Our plans' order (each qubit in its input order); the artifact's loop is "artifact".
+STRICT = "strict"
+ARTIFACT = "artifact"
 
 
 def gate_us(capacity: int) -> float:
@@ -98,12 +102,14 @@ def step_cost(capacity: int, p: int, a: int = 1) -> float:
 class Plan:
     """Everything the Cyclone model leaves free, for one code on one ring.
 
-    ``hx``/``hz``   the check supports the compiler EXECUTES (rows of data indices); for a
-                    correct compile these are the code's true checks
+    ``hx``/``hz``   the check supports the compiler EXECUTES (rows of data indices, in the
+                    circuit's order); for a correct compile these are the code's true checks
     ``data_trap``   data qubit q -> trap
     ``anc_start``   ancilla k -> the trap it starts in (ancilla k is ion ``a{n+k}``)
     ``x_rows``      ancilla k -> the row of ``hx`` it measures; ``z_rows`` likewise
     ``data_order``  optional: trap -> data in the order the chain lists them
+    ``order``       "strict" (ours: every qubit in its input order, `strict_times`) or
+                    "artifact" (the artifact's loop, to replay the artifact's own plan)
     """
 
     name: str
@@ -118,6 +124,7 @@ class Plan:
     z_rows: list[int]
     data_order: dict[int, list[int]] | None = None
     note: str = ""
+    order: str = STRICT
 
     @property
     def m2(self) -> int:
@@ -129,7 +136,7 @@ class Plan:
                 "anc_start": self.anc_start, "x_rows": self.x_rows, "z_rows": self.z_rows,
                 "data_order": ({str(k): v for k, v in self.data_order.items()}
                                if self.data_order else None),
-                "note": self.note}
+                "note": self.note, "order": self.order}
 
     @classmethod
     def from_json(cls, d: Mapping[str, Any]) -> "Plan":
@@ -139,7 +146,7 @@ class Plan:
                    data_trap=list(d["data_trap"]), anc_start=list(d["anc_start"]),
                    x_rows=list(d["x_rows"]), z_rows=list(d["z_rows"]),
                    data_order=({int(k): list(v) for k, v in order.items()} if order else None),
-                   note=d.get("note", ""))
+                   note=d.get("note", ""), order=d.get("order", STRICT))
 
     def save(self, path: str | Path) -> Path:
         p = Path(path)
@@ -152,7 +159,12 @@ class Plan:
 
     def validate(self) -> None:
         """The model's static rules: one ancilla per trap (A = 1), data per trap <= C - 1,
-        every data qubit placed, every check row used once per basis."""
+        every data qubit placed, every check row used once per basis.  A strict plan also
+        keeps every check on the ancilla the input circuit gives it (X and Z check k on
+        ancilla k): moving checks between ancillas would change the order in which a data
+        qubit meets them."""
+        if self.order not in (STRICT, ARTIFACT):
+            raise ValueError(f"unknown order {self.order!r}")
         if len(self.data_trap) != self.n:
             raise ValueError(f"{len(self.data_trap)} data placed, the code has {self.n}")
         if any(not 0 <= t < self.x for t in list(self.data_trap) + list(self.anc_start)):
@@ -169,6 +181,9 @@ class Plan:
             raise ValueError("every X and every Z check must go to exactly one ancilla")
         if len(self.x_rows) != self.m2 or len(self.z_rows) != self.m2:
             raise ValueError("one X and one Z check per ancilla")
+        if self.order == STRICT and (self.x_rows != list(range(self.m2))
+                                     or self.z_rows != list(range(self.m2))):
+            raise ValueError("a strict plan keeps X and Z check k on ancilla k, as the circuit does")
 
 
 def ring_device(x: int, capacity: int):
@@ -191,7 +206,8 @@ def naive_plan(name: str, n: int, hx: list[list[int]], hz: list[list[int]], x: i
                capacity: int, *, hz_executed: list[list[int]] | None = None) -> Plan:
     """The artifact's own plan (`cyclone_compiler.get_cyclone_mapping` and the check rule):
     data round-robin over traps in order of first appearance in cx_arr (X rows, then the Z
-    rows the compiler built), ancilla i in trap i mod x, check i -> ancilla i mod (m/2).
+    rows the compiler built), ancilla i in trap i mod x, check i -> ancilla i mod (m/2), run
+    by the artifact's loop.
 
     ``hz_executed`` lets the plan carry the Z rows the unpatched compiler builds (E5: every
     one a copy of the last X row), so its printed time can be reproduced too."""
@@ -215,15 +231,17 @@ def naive_plan(name: str, n: int, hx: list[list[int]], hz: list[list[int]], x: i
                 hz=[list(r) for r in hz_run], data_trap=data_trap,
                 anc_start=[k % x for k in range(m2)], x_rows=list(range(m2)),
                 z_rows=list(range(m2)), data_order=order,
-                note="the artifact's naive plan (round-robin data, check i -> ancilla i)")
+                note="the artifact's naive plan (round-robin data, check i -> ancilla i)",
+                order=ARTIFACT)
 
 
 # ---------------------------------------------------------------------------- the writer
 
 
-def _phase_steps(plan: Plan, rows: list[list[int]], start: list[int]) -> list[list[list[int]]]:
-    """Run one phase of the artifact's loop: per step, for each ancilla, the data of its
-    check in its current trap that it has not met yet.  Returns steps[step][k] = data."""
+def _trap_steps(plan: Plan, rows: list[list[int]], start: list[int]) -> list[list[list[int]]]:
+    """The ARTIFACT's loop for one phase: per step, for each ancilla, the data of its check
+    in its current trap that it has not met yet, whatever their place in the check.
+    Returns steps[step][k] = data."""
     x = plan.x
     left = [set(rows[k]) for k in range(plan.m2)]
     order = [list(rows[k]) for k in range(plan.m2)]
@@ -242,15 +260,70 @@ def _phase_steps(plan: Plan, rows: list[list[int]], start: list[int]) -> list[li
     return steps
 
 
+def _strict_steps(x: int, data_trap: Sequence[int], rows: Sequence[Sequence[int]],
+                  start: Sequence[int]) -> list[list[list[int]]]:
+    """One phase in the circuit's order: ancilla k runs rows[k] in its listed order, and
+    each data qubit meets its rows in row order.  A gate runs at the first step t no earlier
+    than the ancilla's previous gate (the same step only in the same trap) and later than
+    the data's previous gate, with the ancilla in the data's trap: t = p_d - s_k (mod x).
+    Rows are processed in index order, which is a topological order of both constraints.
+    Returns steps[step][k] = the data ancilla k meets at that step, in row order."""
+    n = len(data_trap)
+    last = [-1] * n
+    times: list[list[int]] = []
+    for k, row in enumerate(rows):
+        s = start[k]
+        t = 0
+        ts = []
+        for d in row:
+            lb = max(t, last[d] + 1)
+            t = lb + ((data_trap[d] - s - lb) % x)
+            last[d] = t
+            ts.append(t)
+        times.append(ts)
+    L = 1 + max((t for ts in times for t in ts), default=-1)
+    steps: list[list[list[int]]] = [[[] for _ in rows] for _ in range(max(L, 0))]
+    for k, (row, ts) in enumerate(zip(rows, times)):
+        for d, t in zip(row, ts):
+            steps[t][k].append(d)
+    return steps
+
+
+def _phase_steps(plan: Plan, rows: list[list[int]], start: list[int]) -> list[list[list[int]]]:
+    if plan.order == ARTIFACT:
+        return _trap_steps(plan, rows, start)
+    return _strict_steps(plan.x, plan.data_trap, rows, start)
+
+
+def strict_times(plan: Plan) -> dict:
+    """Per phase, the step of every gate of a strict plan: {"X": [[t per gate of row k]],
+    "Z": ..., "L_X", "L_Z"}."""
+    out: dict[str, Any] = {}
+    where = list(plan.anc_start)
+    for phase, rows_all, idx in (("X", plan.hx, plan.x_rows), ("Z", plan.hz, plan.z_rows)):
+        rows = [rows_all[i] for i in idx]
+        steps = _strict_steps(plan.x, plan.data_trap, rows, where)
+        at = [[0] * len(r) for r in rows]
+        for t, now in enumerate(steps):
+            for k, ds in enumerate(now):
+                for d in ds:
+                    at[k][rows[k].index(d)] = t
+        out[phase] = at
+        out[f"L_{phase}"] = len(steps)
+        where = [(q + len(steps)) % plan.x for q in where]
+    return out
+
+
 def write(plan: Plan, *, name: str | None = None) -> TimedSchedule:
     """A plan -> timed primitives, with `import_cyclone`'s event rules.
 
     Phase X runs until every ancilla has met all of its X check, then phase Z starts from
     wherever the ancillas are and runs until every Z check is done.  Each step: gate layer j
-    at t0 + j*g in each trap (CX(ancilla, data) in X, CX(data, ancilla) in Z); the step's
-    gate time is g * max(1, P); then every ancilla splits (the 3gA gate swap folded into the
-    split, `meta.swap_us`), moves across its degree-2 junction and merges into the next
-    trap.  One 100 us H layer (an ion-less `gate1`) at either end.
+    at t0 + j*g in each trap (CX(ancilla, data) in X, CX(data, ancilla) in Z), an ancilla's
+    gates of the step in its check's order; the step's gate time is g * max(1, P); then every
+    ancilla splits (the 3gA gate swap folded into the split, `meta.swap_us`), moves across
+    its degree-2 junction and merges into the next trap.  One 100 us H layer (an ion-less
+    `gate1`) at either end.  The plan's ``order`` says which gates a step runs.
     """
     plan.validate()
     x, n, A = plan.x, plan.n, 1
@@ -318,10 +391,12 @@ def write(plan: Plan, *, name: str | None = None) -> TimedSchedule:
     claims = {"time_us": total, "steps_X": summary["steps"]["X"],
               "steps_Z": summary["steps"]["Z"], "sum_P_X": summary["sum_P"]["X"],
               "sum_P_Z": summary["sum_P"]["Z"], "P_X": summary["P"]["X"],
-              "P_Z": summary["P"]["Z"], "g_us": g, "swap_us": swap, "A": A}
+              "P_Z": summary["P"]["Z"], "g_us": g, "swap_us": swap, "A": A,
+              "order": plan.order}
     return TimedSchedule(name=name or plan.name, device=dev, chains=chains, events=events,
                          source={"tool": "qccd.repro.opt_cyclone.write", "plan": plan.name,
-                                 "note": plan.note, "x": x, "capacity": plan.capacity},
+                                 "note": plan.note, "x": x, "capacity": plan.capacity,
+                                 "order": plan.order},
                          claims=claims)
 
 
@@ -346,7 +421,8 @@ def plan_cost(plan: Plan) -> dict:
 
 def circuit_for(plan: Plan, hx_true: list[list[int]], hz_true: list[list[int]]):
     """`importers.cyclone_circuit` over the TRUE check matrices, with each row on the ancilla
-    the plan gives it (the rows are only relabelled, never changed)."""
+    the plan gives it (the rows are only relabelled, never changed; a strict plan keeps
+    every row on its own ancilla)."""
     ancillas = {str(plan.n + k): None for k in range(plan.m2)}
     hx = [list(hx_true[plan.x_rows[k]]) for k in range(plan.m2)]
     hz = [list(hz_true[plan.z_rows[k]]) for k in range(plan.m2)]
@@ -451,9 +527,12 @@ def stim_check(sched: TimedSchedule, plan: Plan, hx_true: list[list[int]],
 
 def verify(sched: TimedSchedule, plan: Plan, hx_true: list[list[int]],
            hz_true: list[list[int]], *, stim_shots: int = 32) -> dict:
-    """`timed.check` under Cyclone's profile and duration law against the true circuit, plus
-    the stim memory check.  ``ok`` only when both are clean."""
-    rep: Report = check(sched, CYCLONE, duration=cyclone_duration,
+    """`timed.check` under Cyclone's profile and duration law against the true circuit --
+    in strict circuit order for a strict plan (each qubit exactly in its input order), in
+    the profile's own for a replayed artifact plan -- plus the stim memory check.  ``ok``
+    only when both are clean."""
+    prof = CYCLONE if plan.order == ARTIFACT else dataclasses.replace(CYCLONE, circuit_order="strict")
+    rep: Report = check(sched, prof, duration=cyclone_duration,
                         circuit=circuit_for(plan, hx_true, hz_true))
     st = stim_check(sched, plan, hx_true, hz_true, shots=stim_shots)
     return {"report": rep, "check_ok": rep.ok, "stim": st, "ok": rep.ok and st["ok"],
@@ -503,7 +582,8 @@ def load_bb_checks(run_dir: str | Path) -> tuple[int, list[list[int]], list[list
 def artifact_plan(schedule_json: str | Path, hx_exec: list[list[int]],
                   hz_exec: list[list[int]]) -> Plan:
     """The plan a dumped Cyclone compile actually ran: its initial layout, its ancillas'
-    start traps and its check assignment (matched to rows of the executed matrices)."""
+    start traps and its check assignment (matched to rows of the executed matrices), run by
+    the artifact's loop."""
     s = json.loads(Path(schedule_json).read_text(encoding="utf-8"))
     cfg = s["config"]
     n = int(cfg["n"])
@@ -537,656 +617,44 @@ def artifact_plan(schedule_json: str | Path, hx_exec: list[list[int]],
                 capacity=cap, hx=[list(r) for r in hx_exec], hz=[list(r) for r in hz_exec],
                 data_trap=data_trap, anc_start=[anc_trap[a] for a in ancs],
                 x_rows=rows_of("X", hx_exec), z_rows=rows_of("Z", hz_exec), data_order=order,
-                note="read from the artifact's schedule.json")
+                note="read from the artifact's schedule.json", order=ARTIFACT)
 
 
 # ------------------------------------------------------------------------ the optimizer
 
 
-class _Search:
-    """State and incremental costs for the annealer (one ancilla per trap: m/2 == x)."""
-
-    def __init__(self, n: int, hx: list[list[int]], hz: list[list[int]], x: int, cap: int,
-                 rng: random.Random, capacity: int | None = None):
-        self.n, self.x, self.cap, self.rng = n, x, cap, rng
-        self.g = gate_us(cap + 1 if capacity is None else capacity)
-        self.step_fixed = 3 * self.g + SPLIT_US + MOVE_US + MERGE_US
-        self.rows = (hx, hz)
-        self.of_data = ([[] for _ in range(n)], [[] for _ in range(n)])
-        for ph in (0, 1):
-            for r, row in enumerate(self.rows[ph]):
-                for d in row:
-                    self.of_data[ph][d].append(r)
-        self.pos = [0] * n
-        self.members: list[list[int]] = [[] for _ in range(x)]
-        self.start = ([0] * len(hx), [0] * len(hz))      # row -> start trap
-        self.at = ([0] * x, [0] * x)                     # start trap -> row
-        self.k = [x, x]
-
-    # -- state ----------------------------------------------------------------------
-    def set_layout(self, pos: list[int], sx: list[int], sz: list[int]) -> None:
-        self.pos = list(pos)
-        self.members = [[] for _ in range(self.x)]
-        for d, t in enumerate(self.pos):
-            self.members[t].append(d)
-        self.start = (list(sx), list(sz))
-        self.at = ([0] * self.x, [0] * self.x)
-        for ph in (0, 1):
-            for r, s in enumerate(self.start[ph]):
-                self.at[ph][s] = r
-
-    def snapshot(self) -> tuple:
-        return (list(self.pos), list(self.start[0]), list(self.start[1]))
-
-    # -- window penalty -----------------------------------------------------------------
-    def row_pen(self, ph: int, r: int, s: int | None = None) -> int:
-        s = self.start[ph][r] if s is None else s
-        k, pos, x = self.k[ph], self.pos, self.x
-        tot = 0
-        for d in self.rows[ph][r]:
-            o = (pos[d] - s) % x
-            if o >= k:
-                tot += min(x - o, o - k + 1)
-        return tot
-
-    def penalty(self) -> int:
-        return sum(self.row_pen(ph, r) for ph in (0, 1) for r in range(len(self.rows[ph])))
-
-    def reach(self, ph: int, r: int, s: int | None = None) -> int:
-        s = self.start[ph][r] if s is None else s
-        return 1 + max((self.pos[d] - s) % self.x for d in self.rows[ph][r])
-
-    def lengths(self) -> tuple[int, int]:
-        return tuple(max(self.reach(ph, r) for r in range(len(self.rows[ph]))) for ph in (0, 1))
-
-    # -- stage 1: drive the window penalty to zero for targets k ---------------------------
-    def _permute_traps(self, to: Mapping[int, int]) -> None:
-        """Move the whole contents of trap t (its data and the checks starting there) to
-        trap to[t]; ``to`` permutes a set of traps."""
-        pos, members, start, at = self.pos, self.members, self.start, self.at
-        moved = {t: (members[t], at[0][t], at[1][t]) for t in to}
-        for t, (ds, r0, r1) in moved.items():
-            b = to[t]
-            members[b] = ds
-            for d in ds:
-                pos[d] = b
-            at[0][b], at[1][b] = r0, r1
-            start[0][r0], start[1][r1] = b, b
-
-    def anneal_feasible(self, moves: int, t0: float = 1.5, t1: float = 0.05,
-                        block: float = 0.25, segment: float = 0.0) -> int:
-        rng, x, cap = self.rng, self.x, self.cap
-        pos, members, start, at, of_data, rows = (self.pos, self.members, self.start, self.at,
-                                                  self.of_data, self.rows)
-        k = self.k
-        n = self.n
-        pen = self.penalty()
-        if pen == 0:
-            return 0
-        exp, rand = math.exp, rng.random
-        ln = math.log(t1 / t0)
-
-        def dterm(d: int, p: int) -> int:
-            tot = 0
-            for ph in (0, 1):
-                kk = k[ph]
-                st = start[ph]
-                for r in of_data[ph][d]:
-                    o = (p - st[r]) % x
-                    if o >= kk:
-                        tot += min(x - o, o - kk + 1)
-            return tot
-
-        for it in range(moves):
-            temp = t0 * exp(ln * it / moves)
-            u = rand()
-            if segment and rand() < segment:              # shift a run of traps' contents
-                length = rng.randint(2, 10)
-                a = rng.randrange(x)
-                step = 1 if rand() < 0.5 else -1
-                traps = [(a + i) % x for i in range(length)]
-                to = {t: traps[(i + step) % length] for i, t in enumerate(traps)}
-                rs = (set(), set())
-                for t in traps:
-                    for d in members[t]:
-                        rs[0].update(of_data[0][d])
-                        rs[1].update(of_data[1][d])
-                    rs[0].add(at[0][t])
-                    rs[1].add(at[1][t])
-                old = sum(self.row_pen(ph, r) for ph in (0, 1) for r in rs[ph])
-                self._permute_traps(to)
-                delta = sum(self.row_pen(ph, r) for ph in (0, 1) for r in rs[ph]) - old
-                if delta <= 0 or rand() < exp(-delta / temp):
-                    pen += delta
-                else:
-                    self._permute_traps({b: a_ for a_, b in to.items()})
-                if pen == 0:
-                    return 0
-                continue
-            if u < 0.6:                                   # data move or swap
-                d = rng.randrange(n)
-                pd = pos[d]
-                if rand() < 0.7:
-                    t = (pd + rng.randint(-4, 4)) % x
-                else:
-                    t = rng.randrange(x)
-                if t == pd:
-                    continue
-                if len(members[t]) < cap and rand() < 0.5:
-                    delta = dterm(d, t) - dterm(d, pd)
-                    if delta <= 0 or rand() < exp(-delta / temp):
-                        members[pd].remove(d)
-                        members[t].append(d)
-                        pos[d] = t
-                        pen += delta
-                else:
-                    if not members[t]:
-                        continue
-                    e = members[t][rng.randrange(len(members[t]))]
-                    # shared checks see both move; evaluate exactly by applying
-                    before = dterm(d, pd) + dterm(e, t)
-                    pos[d], pos[e] = t, pd
-                    after = dterm(d, t) + dterm(e, pd)
-                    delta = after - before
-                    if delta <= 0 or rand() < exp(-delta / temp):
-                        members[pd].remove(d)
-                        members[t].remove(e)
-                        members[t].append(d)
-                        members[pd].append(e)
-                        pen += delta
-                    else:
-                        pos[d], pos[e] = pd, t
-            elif rand() < block:                          # rotate the checks of a run of starts
-                ph = 0 if u < 0.8 else 1
-                length = rng.randint(3, 16)
-                s0 = rng.randrange(x)
-                step = 1 if rand() < 0.5 else -1
-                traps = [(s0 + i) % x for i in range(length)]
-                rs = [at[ph][t] for t in traps]
-                new = traps[step:] + traps[:step]         # row at traps[i] -> new[i]
-                delta = 0
-                for r, a, b in zip(rs, traps, new):
-                    delta += self.row_pen(ph, r, b) - self.row_pen(ph, r, a)
-                if delta <= 0 or rand() < exp(-delta / temp):
-                    for r, b in zip(rs, new):
-                        start[ph][r] = b
-                        at[ph][b] = r
-                    pen += delta
-            else:                                         # swap two checks' start traps
-                ph = 0 if u < 0.8 else 1
-                nr = len(rows[ph])
-                r1 = rng.randrange(nr)
-                s1 = start[ph][r1]
-                s2 = (s1 + rng.randint(-6, 6)) % x if rand() < 0.8 else rng.randrange(x)
-                if s2 == s1:
-                    continue
-                r2 = at[ph][s2]
-                delta = (self.row_pen(ph, r1, s2) + self.row_pen(ph, r2, s1)
-                         - self.row_pen(ph, r1, s1) - self.row_pen(ph, r2, s2))
-                if delta <= 0 or rand() < exp(-delta / temp):
-                    start[ph][r1], start[ph][r2] = s2, s1
-                    at[ph][s1], at[ph][s2] = r2, r1
-                    pen += delta
-            if pen == 0:
-                return 0
-        return pen
-
-    # -- stage 2: the exact bill, windows as hard limits -------------------------------
-    def _gates(self, ph: int, r: int) -> tuple[dict[int, int], int]:
-        """Row r's gates per step of its phase ({offset: count}) and its reach."""
-        s, x, pos = self.start[ph][r], self.x, self.pos
-        g: dict[int, int] = {}
-        for d in self.rows[ph][r]:
-            o = (pos[d] - s) % x
-            g[o] = g.get(o, 0) + 1
-        return g, 1 + max(g)
-
-    def _bill_init(self) -> None:
-        x = self.x
-        self.gmap = ([], [])
-        self.rch = ([], [])
-        self.cnt = ([[0] * (self.cap + 2) for _ in range(x)], [[0] * (self.cap + 2) for _ in range(x)])
-        self.hist = ([0] * (x + 1), [0] * (x + 1))
-        for ph in (0, 1):
-            for r in range(len(self.rows[ph])):
-                g, re = self._gates(ph, r)
-                self.gmap[ph].append(g)
-                self.rch[ph].append(re)
-                self.hist[ph][re] += 1
-                for j, c in g.items():
-                    self.cnt[ph][j][c] += 1
-        self.P = ([self._top(0, j) for j in range(x)], [self._top(1, j) for j in range(x)])
-        self.klen = [max(self.rch[0]), max(self.rch[1])]
-
-    def _top(self, ph: int, j: int) -> int:
-        c = self.cnt[ph][j]
-        for v in range(len(c) - 1, 0, -1):
-            if c[v]:
-                return v
-        return 0
-
-    def bill(self) -> float:
-        """465 per step (3g + 165 at g = 100) plus g per gate layer, over both phases."""
-        tot = 2 * H_US
-        for ph in (0, 1):
-            k = self.klen[ph]
-            tot += k * self.step_fixed + self.g * sum(max(1, p) for p in self.P[ph][:k])
-        return tot
-
-    def _rebuild(self, ph: int, r: int) -> tuple[set, bool]:
-        """Recompute row r's gates and reach after a move; returns (touched offsets, ok)."""
-        old = self.gmap[ph][r]
-        cnt = self.cnt[ph]
-        for j, c in old.items():
-            cnt[j][c] -= 1
-        g, re = self._gates(ph, r)
-        for j, c in g.items():
-            cnt[j][c] += 1
-        self.gmap[ph][r] = g
-        h = self.hist[ph]
-        h[self.rch[ph][r]] -= 1
-        h[re] += 1
-        self.rch[ph][r] = re
-        return set(old) | set(g), re <= self.k[ph]
-
-    def anneal_bill(self, moves: int, temp0: float = 150.0, temp1: float = 5.0,
-                    tie: float = 2.0) -> float:
-        """Anneal the exact bill.  Windows (``self.k``) stay hard limits; a small tie-breaker
-        (``tie`` us per check that needs the last step of its phase, and per check doing
-        the most gates of a step) gives the plateaus a slope."""
-        self._bill_init()
-        rng, x, cap, n = self.rng, self.x, self.cap, self.n
-        pos, members, start, at, of_data = (self.pos, self.members, self.start, self.at,
-                                            self.of_data)
-        exp, rand = math.exp, rng.random
-        ln = math.log(temp1 / temp0)
-
-        def score() -> float:
-            tot = self.bill()
-            for ph in (0, 1):
-                tot += tie * self.hist[ph][self.klen[ph]]
-                for j in range(self.klen[ph]):
-                    p = self.P[ph][j]
-                    if p > 1:
-                        tot += tie * self.cnt[ph][j][p]
-            return tot
-
-        cur = score()
-        best = (cur, self.snapshot())
-        for it in range(moves):
-            temp = temp0 * exp(ln * it / moves)
-            u = rand()
-            undo: list = []
-            if u < 0.6:
-                d = rng.randrange(n)
-                pd = pos[d]
-                t = (pd + rng.randint(-3, 3)) % x if rand() < 0.8 else rng.randrange(x)
-                if t == pd:
-                    continue
-                e = -1
-                if not (len(members[t]) < cap and rand() < 0.5):
-                    if not members[t]:
-                        continue
-                    e = members[t][rng.randrange(len(members[t]))]
-                pos[d] = t
-                if e >= 0:
-                    pos[e] = pd
-                undo.append(("data", d, e, pd, t))
-                rows = [(ph, r) for ph in (0, 1) for r in
-                        set(of_data[ph][d]) | (set(of_data[ph][e]) if e >= 0 else set())]
-            else:
-                ph = 0 if u < 0.8 else 1
-                if rand() < 0.3:
-                    length = rng.randint(3, 12)
-                    s0 = rng.randrange(x)
-                    step = 1 if rand() < 0.5 else -1
-                    traps = [(s0 + i) % x for i in range(length)]
-                    new = traps[step:] + traps[:step]
-                else:
-                    s1 = rng.randrange(x)
-                    s2 = (s1 + rng.randint(-5, 5)) % x if rand() < 0.85 else rng.randrange(x)
-                    if s1 == s2:
-                        continue
-                    traps, new = [s1, s2], [s2, s1]
-                rs = [at[ph][t] for t in traps]
-                for r, b in zip(rs, new):
-                    start[ph][r] = b
-                    at[ph][b] = r
-                undo.append(("start", ph, rs, traps))
-                rows = [(ph, r) for r in rs]
-            ok = True
-            touched: list[tuple[int, int]] = []
-            for ph, r in rows:
-                js, good = self._rebuild(ph, r)
-                ok = ok and good
-                touched.extend((ph, j) for j in js)
-            old_P = {}
-            old_k = list(self.klen)
-            for ph, j in touched:
-                if (ph, j) not in old_P:
-                    old_P[(ph, j)] = self.P[ph][j]
-                    self.P[ph][j] = self._top(ph, j)
-            for ph in (0, 1):
-                k = self.k[ph]
-                while k > 1 and not self.hist[ph][k]:
-                    k -= 1
-                self.klen[ph] = k
-            new = score() if ok else math.inf
-            delta = new - cur
-            if ok and (delta <= 0 or rand() < exp(-delta / temp)):
-                cur = new
-                if cur < best[0] - 1e-9:
-                    best = (cur, self.snapshot())
-                if u < 0.6:
-                    kind, d, e, pd, t = undo[0]
-                    members[pd].remove(d)
-                    members[t].append(d)
-                    if e >= 0:
-                        members[t].remove(e)
-                        members[pd].append(e)
-                continue
-            # roll back
-            kind = undo[0][0]
-            if kind == "data":
-                _, d, e, pd, t = undo[0]
-                pos[d] = pd
-                if e >= 0:
-                    pos[e] = t
-            else:
-                _, ph0, rs, traps = undo[0]
-                for r, a in zip(rs, traps):
-                    start[ph0][r] = a
-                    at[ph0][a] = r
-            for ph, r in rows:
-                self._rebuild(ph, r)
-            for (ph, j), p in old_P.items():
-                self.P[ph][j] = p
-            self.klen = old_k
-        self.set_layout(*best[1])
-        self._bill_init()
-        return self.bill()
-
-
-def _spectral_order(n: int, rows: Iterable[list[int]], rng: random.Random) -> list[int]:
-    """Data in the order of the angle of their two lowest non-trivial Laplacian
-    eigenvectors: a cheap circular embedding of the check hypergraph."""
-    import numpy as np
-
-    lap = np.zeros((n, n))
-    for row in rows:
-        w = 1.0 / (len(row) - 1)
-        for i in row:
-            for j in row:
-                if i != j:
-                    lap[i, j] -= w
-                    lap[i, i] += w
-    _, vecs = np.linalg.eigh(lap)
-    ang = np.arctan2(vecs[:, 2], vecs[:, 1])
-    return [int(i) for i in np.argsort(ang)]
-
-
-def tanner_order(h: Sequence[Sequence[int]], *, seed: int = 0, iters: int = 30000) -> list[int]:
-    """A cyclic order of the Tanner graph of ``h`` (bits 0..n-1, then checks n..n+m-1) that
-    keeps every closed neighbourhood on a short arc (annealed: the worst arc first, then the
-    sum of fourth powers)."""
-    m, nb = len(h), len(h[0])
-    N = nb + m
-    adj = [set() for _ in range(N)]
-    for a in range(m):
-        for j in range(nb):
-            if h[a][j]:
-                adj[j].add(nb + a)
-                adj[nb + a].add(j)
-    hoods = [sorted(adj[u] | {u}) for u in range(N)]
-
-    def score(order: list[int]) -> float:
-        where = [0] * N
-        for i, u in enumerate(order):
-            where[u] = i
-        worst, tot = 0, 0
-        for hood in hoods:
-            ps = sorted(where[v] for v in hood)
-            gap = max((ps[(i + 1) % len(ps)] - ps[i]) % N or N for i in range(len(ps)))
-            s = N - gap + 1
-            worst = max(worst, s)
-            tot += s ** 4
-        return worst * 1e4 + tot / 1e3
-
-    rng = random.Random(seed)
-    order = list(range(N))
-    rng.shuffle(order)
-    cur = score(order)
-    best, best_order = cur, list(order)
-    for it in range(iters):
-        temp = 2.0 * (0.005) ** (it / iters)
-        i, j = rng.randrange(N), rng.randrange(N)
-        order[i], order[j] = order[j], order[i]
-        new = score(order)
-        if new <= cur or rng.random() < math.exp(-(new - cur) / temp):
-            cur = new
-            if cur < best:
-                best, best_order = cur, list(order)
-        else:
-            order[i], order[j] = order[j], order[i]
-    return best_order
-
-
-def hgp_layout(h1: Sequence[Sequence[int]], h2: Sequence[Sequence[int]], x: int,
-               rows: Sequence[int], cols: Sequence[int], *, transpose: bool = False) -> list[int]:
-    """Row-major placement of `hgp(h1, h2)`'s data on a ring of x traps.  The data are the
-    bit x bit and check x check nodes of the product of the two Tanner graphs; ``rows`` orders
-    the nodes of h1's graph, ``cols`` those of h2's (as `tanner_order` numbers them).
-    ``transpose`` makes h2's graph the major (slow) coordinate instead."""
-    m1, n1 = len(h1), len(h1[0])
-    m2, n2 = len(h2), len(h2[0])
-    r1 = {u: i for i, u in enumerate(rows)}
-    r2 = {v: i for i, v in enumerate(cols)}
-    n = n1 * n2 + m1 * m2
-
-    def grid(d: int) -> tuple[int, int]:
-        if d < n1 * n2:
-            return d // n2, d % n2
-        e = d - n1 * n2
-        return n1 + e // m2, n2 + e % m2
-
-    if transpose:
-        order = sorted(range(n), key=lambda d: (r2[grid(d)[1]], r1[grid(d)[0]]))
-    else:
-        order = sorted(range(n), key=lambda d: (r1[grid(d)[0]], r2[grid(d)[1]]))
-    pos = [0] * n
-    for i, d in enumerate(order):
-        pos[d] = (i * x) // n
-    return pos
-
-
-def bb_layout(l: int, m: int, x: int, *, a: int = 1, b: int = 1, di: int = 0, dj: int = 0,
-              i_major: bool = True) -> list[int]:
-    """Row-major placement of a bivariate-bicycle code's data on a ring of x traps, in the
-    labelling of IBM's circuit (as the artifact reads it): L(i, j) = i*m + j and
-    R(i, j) = l*m + i*m + j on the torus Z_l x Z_m.  Coordinates are scaled by units a (mod
-    l) and b (mod m); R(i, j) sits beside L(i - di, j - dj); ``i_major`` makes i the slow
-    coordinate."""
-    half = l * m
-    key: dict[int, tuple] = {}
-    for i in range(l):
-        for j in range(m):
-            for side, (ii, jj) in ((0, (i, j)), (1, ((i + di) % l, (j + dj) % m))):
-                ci, cj = (a * ii) % l, (b * jj) % m
-                key[side * half + i * m + j] = ((ci, cj) if i_major else (cj, ci)) + (side,)
-    order = sorted(key, key=key.__getitem__)
-    pos = [0] * (2 * half)
-    for r, d in enumerate(order):
-        pos[d] = (r * x) // (2 * half)
-    return pos
-
-
-def _span(pos: Sequence[int], row: Sequence[int], x: int) -> int:
-    ps = sorted({pos[d] for d in row})
-    if len(ps) <= 1:
-        return len(ps)
-    return x - max((ps[(i + 1) % len(ps)] - ps[i]) % x for i in range(len(ps))) + 1
-
-
-def exact_starts(pos: Sequence[int], rows: Sequence[Sequence[int]], x: int,
-                 k_min: int | None = None) -> tuple[int, list[int]]:
-    """The shortest phase a placement allows: the least k for which every check gets its own
-    start trap whose k-window holds all its data (Kuhn's augmenting paths; m/2 == x)."""
-    k = max(_span(pos, r, x) for r in rows) if k_min is None else k_min
-    while k <= x:
-        cands = []
-        for r in rows:
-            ps = [pos[d] for d in r]
-            cands.append([s for s in range(x) if max((p - s) % x for p in ps) < k])
-        owner = [-1] * x
-
-        def aug(r: int, seen: list[bool]) -> bool:
-            stack = [(r, iter(cands[r]))]
-            path: list[tuple[int, int]] = []
-            while stack:
-                row, it = stack[-1]
-                for s in it:
-                    if not seen[s]:
-                        seen[s] = True
-                        if owner[s] < 0:
-                            path.append((row, s))
-                            for rr, ss in path:          # flip the augmenting path
-                                owner[ss] = rr
-                            return True
-                        path.append((row, s))
-                        stack.append((owner[s], iter(cands[owner[s]])))
-                        break
-                else:
-                    stack.pop()
-                    if path:
-                        path.pop()
-            return False
-
-        ok = True
-        for r in sorted(range(len(rows)), key=lambda r: len(cands[r])):
-            if not aug(r, [False] * x):
-                ok = False
-                break
-        if ok:
-            st = [0] * len(rows)
-            for s, r in enumerate(owner):
-                if r >= 0:
-                    st[r] = s
-            return k, st
-        k += 1
-    raise RuntimeError("no start assignment fits even a full rotation")
-
-
-def optimize(name: str, n: int, hx: list[list[int]], hz: list[list[int]], *, x: int | None = None,
-             capacity: int = 5, seed: int = 1, budget_s: float = 120.0, moves: int = 200_000,
-             t0: float = 0.6, t1: float = 0.05, retries: int = 3, init: Plan | None = None,
-             init_pos: Sequence[int] | None = None, bill_moves: int = 0, segment: float = 0.1,
-             log=print) -> Plan:
-    """Search placement, check assignment and start traps for a short round.
-
-    One ancilla per trap (x = m/2, A = 1).  Stage 1 lowers the phase-length targets until
-    the window penalty can no longer reach zero within ``moves`` annealing moves; stage 2
-    anneals the exact bill inside the best windows found.
-    """
-    m2 = len(hx)
-    if len(hz) != m2:
-        raise ValueError("Cyclone pairs one X and one Z check per ancilla")
-    x = m2 if x is None else x
-    if x != m2:
-        raise NotImplementedError("the optimizer keeps one ancilla per trap: x = m/2")
-    cap = capacity - 1
-    if cap * x < n:
-        raise ValueError(f"{x} traps of {cap} data cannot hold {n} data")
-    rng = random.Random(seed)
-    s = _Search(n, hx, hz, x, cap, rng, capacity)
-    if init is not None:
-        pos = list(init.data_trap)
-        sx = [0] * m2
-        sz = [0] * m2
-        # ancilla k does x_rows[k] from anc_start[k]; its Z start is after the X phase
-        kx = plan_cost(init)["steps_X"]
-        for k in range(m2):
-            sx[init.x_rows[k]] = init.anc_start[k]
-            sz[init.z_rows[k]] = (init.anc_start[k] + kx) % x
-        s.set_layout(pos, sx, sz)
-    else:
-        if init_pos is not None:
-            pos = list(init_pos)
-        else:
-            order = _spectral_order(n, list(hx) + list(hz), rng)
-            pos = [0] * n
-            for i, d in enumerate(order):
-                pos[d] = min(x - 1, (i * x) // n)
-        s.set_layout(pos, exact_starts(pos, hx, x)[1], exact_starts(pos, hz, x)[1])
-    s.k = list(s.lengths())
-    log(f"[{name}] start: windows kX={s.k[0]} kZ={s.k[1]}")
-    best = (tuple(s.k), s.snapshot())
-    t_end = time.time() + budget_s
-    stuck = [False, False]
-    while moves and time.time() < t_end and not all(stuck):
-        ph = 0 if (s.k[0] >= s.k[1] and not stuck[0]) or stuck[1] else 1
-        s.k[ph] -= 1
-        left = -1
-        for attempt in range(retries):          # each retry continues from where the last stopped
-            left = s.anneal_feasible(moves * (attempt + 1), t0, t1, segment=segment)
-            if left == 0 or time.time() > t_end:
-                break
-        if left == 0:
-            s.k = list(s.lengths())
-            best = (tuple(s.k), s.snapshot())
-            stuck = [False, False]
-            log(f"[{name}] feasible kX={s.k[0]} kZ={s.k[1]}  ({budget_s - (t_end - time.time()):.0f} s)")
-        else:
-            s.k[ph] += 1
-            s.set_layout(*best[1])
-            stuck[ph] = True
-    s.k = list(best[0])
-    s.set_layout(*best[1])
-    plan = _to_plan(name, n, hx, hz, x, capacity, s)
-    log(f"[{name}] stage 1 done: {plan_cost(plan)}")
-    if bill_moves:
-        s.k = list(s.lengths())
-        before = plan_cost(plan)["time_us"]
-        got = s.anneal_bill(bill_moves)
-        cand = _to_plan(name, n, hx, hz, x, capacity, s)
-        cost = plan_cost(cand)
-        if abs(cost["time_us"] - got) > 1e-6:
-            raise AssertionError(f"stage 2 priced {got}, the writer's loop prices {cost['time_us']}")
-        if cost["time_us"] <= before:
-            plan = cand
-        log(f"[{name}] stage 2 done: {plan_cost(plan)}")
-    return plan
-
-
 def sat_layout(n: int, hx: list[list[int]], hz: list[list[int]], capacity: int, kx: int,
-               kz: int, *, hint: tuple | None = None, time_limit: float | None = None,
-               solver: str = "cd19", one_layer: bool = False) -> tuple[bool | None, tuple | None]:
-    """Decide exactly whether phase lengths (kX, kZ) are reachable (python-sat; m/2 == x).
+               kz: int, *, starts: Sequence[int] | None = None, x_only: bool = False,
+               time_limit: float | None = None, solver: str = "cd19"
+               ) -> tuple[bool | None, tuple | None]:
+    """Decide exactly whether a strict round fits L_X = kx steps (exactly; with ``x_only``,
+    at most kx and no Z phase) and L_Z <= kz, one ancilla per trap (x = len(hx)).
 
-    Order-encoded data traps, Q[d][t] = (trap(d) >= t), with the one-hot view P[d][t] for
-    the capacity counters (at most C - 1 data per trap); for each basis a permutation
-    S[r][s] of checks onto start traps; and for every check r, start s and data d of r the
-    window clause S[r][s] -> s <= trap(d) < s + k (wrapping round the ring).  X check 0
-    starts in trap 0 (rotation symmetry).  ``hint`` = (data traps, X starts, Z starts) sets
-    the solver's phases.  ``one_layer`` also keeps any two data of one check out of the same
-    trap, so every step does exactly one gate layer.  Returns (True, layout), (False, None)
-    when no layout exists, or
-    (None, None) when ``time_limit`` seconds ran out first -- the query then runs in a child
-    process that is terminated at the deadline (CaDiCaL cannot be interrupted in-process).
+    Data traps P[d][t] are one-hot (at most C - 1 per trap); start traps S[k][t] are a
+    permutation with ancilla 0 in trap 0 (rotation symmetry), or fixed to ``starts``.  Each
+    gate's step is order-encoded, G[g][u] <-> T(g) >= u, T < kx (X) or kz (Z), so a window
+    may span several rotations; T(g) = tau puts the gate's data in trap
+    (s_k + off + tau) mod x, off = kx in the Z phase.  The row order is G[g][u] -> G[g'][u]
+    (a later gate of the check, the same step only in the same trap), the data order
+    G[g][u] -> G[g'][u+1]; and some X gate takes step kx - 1.  Returns (True, (data traps,
+    start traps)), (False, None) when none exists, or (None, None) when ``time_limit``
+    seconds ran out first (the query then runs in a child process that is terminated at
+    the deadline: CaDiCaL cannot be interrupted in-process).
     """
     if time_limit is None:
-        return _sat_solve(n, hx, hz, capacity, kx, kz, hint, solver, one_layer)
+        return _sat_solve(n, hx, hz, capacity, kx, kz, starts, x_only, solver)
     import subprocess
     import sys
 
     root = str(Path(__file__).resolve().parents[2])
     payload = json.dumps({"n": n, "hx": hx, "hz": hz, "capacity": capacity, "kx": kx, "kz": kz,
-                          "hint": hint, "solver": solver, "one_layer": one_layer})
+                          "starts": list(starts) if starts is not None else None,
+                          "x_only": x_only, "solver": solver})
     code = ("import sys; sys.path.insert(0, sys.argv[1]); "
             "from qccd.repro.opt_cyclone import _sat_main; _sat_main()")
     try:
         out = subprocess.run([sys.executable, "-c", code, root], input=payload,
-                             capture_output=True, text=True, timeout=time_limit,
-                             check=False)
+                             capture_output=True, text=True, timeout=time_limit, check=False)
     except subprocess.TimeoutExpired:                 # the child is killed
         return None, None
     if out.returncode != 0:
@@ -1200,133 +668,448 @@ def _sat_main() -> None:
     import sys
 
     a = json.loads(sys.stdin.read())
-    hint = tuple(a["hint"]) if a["hint"] else None
-    ok, lay = _sat_solve(a["n"], a["hx"], a["hz"], a["capacity"], a["kx"], a["kz"], hint,
-                         a["solver"], a.get("one_layer", False))
+    ok, lay = _sat_solve(a["n"], a["hx"], a["hz"], a["capacity"], a["kx"], a["kz"], a["starts"],
+                         a["x_only"], a["solver"])
     sys.stdout.write(json.dumps({"ok": ok, "layout": list(lay) if lay else None}))
 
 
 def _sat_solve(n: int, hx: list[list[int]], hz: list[list[int]], capacity: int, kx: int,
-               kz: int, hint: tuple | None, solver: str,
-               one_layer: bool = False) -> tuple[bool, tuple | None]:
+               kz: int, starts: Sequence[int] | None, x_only: bool,
+               solver: str) -> tuple[bool, tuple | None]:
     from pysat.card import CardEnc, EncType
-    from pysat.formula import CNF, IDPool
+    from pysat.formula import IDPool
     from pysat.solvers import Solver
 
     x = len(hx)
     pool = IDPool()
-
-    def q(d: int, t: int):
-        return True if t <= 0 else (False if t >= x else pool.id(("q", d, t)))
-
-    cnf = CNF()
-    for d in range(n):
-        for t in range(2, x):
-            cnf.append([-q(d, t), q(d, t - 1)])
+    cl: list[list[int]] = []
+    false = pool.id("false")
+    cl.append([-false])
     P = [[pool.id(("p", d, t)) for t in range(x)] for d in range(n)]
     for d in range(n):
-        for t in range(x):
-            p, a, b = P[d][t], q(d, t), q(d, t + 1)
-            if a is not True:
-                cnf.append([-p, a])
-            if b is not False:
-                cnf.append([-p, -b])
-            back = [p] + ([] if a is True else [-a]) + ([] if b is False else [b])
-            cnf.append(back)
+        cl += CardEnc.equals(P[d], 1, vpool=pool, encoding=EncType.seqcounter).clauses
     for t in range(x):
-        cnf.extend(CardEnc.atmost(lits=[P[d][t] for d in range(n)], bound=capacity - 1,
-                                  vpool=pool, encoding=EncType.seqcounter).clauses)
-    S = [[[pool.id(("s", ph, r, s)) for s in range(x)] for r in range(x)] for ph in (0, 1)]
-    for ph in (0, 1):
-        for r in range(x):
-            cnf.extend(CardEnc.equals(lits=S[ph][r], bound=1, vpool=pool,
-                                      encoding=EncType.seqcounter).clauses)
-        for s in range(x):
-            cnf.extend(CardEnc.atmost(lits=[S[ph][r][s] for r in range(x)], bound=1,
-                                      vpool=pool, encoding=EncType.seqcounter).clauses)
-    for ph, rows, k in ((0, hx, kx), (1, hz, kz)):
+        cl += CardEnc.atmost([P[d][t] for d in range(n)], capacity - 1, vpool=pool,
+                             encoding=EncType.seqcounter).clauses
+    S = None
+    if starts is None:
+        S = [[pool.id(("s", k, t)) for t in range(x)] for k in range(x)]
+        for k in range(x):
+            cl += CardEnc.equals(S[k], 1, vpool=pool, encoding=EncType.seqcounter).clauses
+        for t in range(x):
+            cl += CardEnc.equals([S[k][t] for k in range(x)], 1, vpool=pool,
+                                 encoding=EncType.seqcounter).clauses
+        cl.append([S[0][0]])
+    phases = [(0, hx, kx, 0)] + ([] if x_only else [(1, hz, kz, kx)])
+    G: dict[tuple, tuple[list, int]] = {}
+    for ph, rows, k, off in phases:
         for r, row in enumerate(rows):
-            for s in range(x):
-                sv = S[ph][r][s]
-                for d in row:
-                    a = q(d, s)
-                    if s + k <= x:
-                        b = q(d, s + k)
-                        if a is not True:
-                            cnf.append([-sv, a])
-                        if b is not False:
-                            cnf.append([-sv, -b])
+            for i, d in enumerate(row):
+                key = (ph, r, i)
+                g = [None] + [pool.id(("G",) + key + (u,)) for u in range(1, k)]
+                G[key] = (g, k)
+                for u in range(1, k - 1):
+                    cl.append([-g[u + 1], g[u]])
+                if starts is None and k > x:
+                    # free starts over a long window: through the step's residue mod x,
+                    # Rg[rho] <- T = rho (mod x), then S[r][sig] & Rg[rho] -> P[d][sig+off+rho]
+                    # (x*x clauses a gate instead of x*k)
+                    Rg = [pool.id(("R",) + key + (rho,)) for rho in range(x)]
+                    for tau in range(k):
+                        lits = ([-g[tau]] if tau >= 1 else []) + ([g[tau + 1]] if tau + 1 < k else [])
+                        cl.append(lits + [Rg[tau % x]])
+                    for sig in range(x):
+                        for rho in range(x):
+                            cl.append([-S[r][sig], -Rg[rho], P[d][(sig + off + rho) % x]])
+                    continue
+                for tau in range(k):
+                    lits = ([-g[tau]] if tau >= 1 else []) + ([g[tau + 1]] if tau + 1 < k else [])
+                    if starts is not None:
+                        cl.append(lits + [P[d][(starts[r] + off + tau) % x]])
                     else:
-                        b = q(d, s + k - x)
-                        if a is True or b is False:
-                            continue
-                        cnf.append([-sv] + ([] if a is False else [a]) + ([] if b is True else [-b]))
-    if one_layer:
-        for row in list(hx) + list(hz):
-            for t in range(x):
-                for i, a in enumerate(row):
-                    for b in row[i + 1:]:
-                        cnf.append([-P[a][t], -P[b][t]])
-    cnf.append([S[0][0][0]])
-    with Solver(name=solver, bootstrap_with=cnf.clauses) as sv:
-        if hint is not None:
-            pos, sx, sz = hint
-            sh = sx[0]                                   # rotate so X check 0 starts in trap 0
-            pos = [(p - sh) % x for p in pos]
-            st = ([(s - sh) % x for s in sx], [(s - sh) % x for s in sz])
-            phases = []
-            for d in range(n):
-                phases += [pool.id(("q", d, t)) * (1 if pos[d] >= t else -1) for t in range(1, x)]
-                phases += [P[d][t] * (1 if pos[d] == t else -1) for t in range(x)]
-            for ph in (0, 1):
-                for r in range(x):
-                    phases += [S[ph][r][s] * (1 if st[ph][r] == s else -1) for s in range(x)]
-            sv.set_phases(phases)
+                        for sig in range(x):
+                            cl.append(lits + [-S[r][sig], P[d][(sig + off + tau) % x]])
+
+    def ge(key: tuple, u: int):
+        g, k = G[key]
+        return True if u <= 0 else (false if u >= k else g[u])
+
+    def implies(a, b) -> None:
+        if a == false or b is True:
+            return
+        cl.append([b] if a is True else [-a, b])
+
+    for ph, rows, k, off in phases:
+        cols: dict[int, list[tuple[int, int]]] = {}
+        for r, row in enumerate(rows):
+            for i, d in enumerate(row):
+                cols.setdefault(d, []).append((r, i))
+                if i:                                   # the check's order (<=)
+                    for u in range(1, k):
+                        implies(ge((ph, r, i - 1), u), ge((ph, r, i), u))
+        for d, gs in cols.items():                      # the data's order (<)
+            for (r1, i1), (r2, i2) in zip(gs, gs[1:]):
+                for u in range(0, k):
+                    implies(ge((ph, r1, i1), u), ge((ph, r2, i2), u + 1))
+    if not x_only:
+        cl.append([G[(0, r, i)][0][kx - 1] for r, row in enumerate(hx) for i in range(len(row))])
+    with Solver(name=solver, bootstrap_with=cl) as sv:
         if not sv.solve():
             return False, None
         model = {v for v in sv.get_model() if v > 0}
     pos = [next(t for t in range(x) if P[d][t] in model) for d in range(n)]
-    st = [[next(s for s in range(x) if S[ph][r][s] in model) for r in range(x)] for ph in (0, 1)]
-    return True, (pos, st[0], st[1])
+    st = list(starts) if starts is not None else \
+        [next(t for t in range(x) if S[k][t] in model) for k in range(x)]
+    return True, (pos, st)
 
 
-def layout_of(plan: Plan) -> tuple[list[int], list[int], list[int]]:
-    """A plan's layout: data traps and the start trap of every X and every Z check."""
-    kx = plan_cost(plan)["steps_X"]
-    sx = [0] * len(plan.hx)
-    sz = [0] * len(plan.hz)
-    for k in range(plan.m2):
-        sx[plan.x_rows[k]] = plan.anc_start[k]
-        sz[plan.z_rows[k]] = (plan.anc_start[k] + kx) % plan.x
-    return list(plan.data_trap), sx, sz
+def _bill(x: int, g: float, pos: Sequence[int], starts: Sequence[int], hx, hz) -> float:
+    """`plan_cost`'s time for a strict plan, without building the plan (the polish's inner
+    loop): the same propagation, phase by phase."""
+    total = 2 * H_US
+    fixed = 3 * g + SPLIT_US + MOVE_US + MERGE_US
+    where = list(starts)
+    n = len(pos)
+    for rows in (hx, hz):
+        last = [-1] * n
+        width: dict[int, int] = {}
+        L = 0
+        for k, row in enumerate(rows):
+            s, t, prev, run = where[k], 0, -1, 0
+            for d in row:
+                lb = max(t, last[d] + 1)
+                t = lb + ((pos[d] - s - lb) % x)
+                run = run + 1 if t == prev else 1
+                if width.get(t, 0) < run:
+                    width[t] = run
+                prev = last[d] = t
+            L = max(L, t + 1)
+        total += L * fixed + g * sum(max(1, width.get(j, 0)) for j in range(L))
+        where = [(q + L) % x for q in where]
+    return total
 
 
-def plan_from_layout(name: str, n: int, hx: list[list[int]], hz: list[list[int]],
-                     capacity: int, pos: Sequence[int], x_start: Sequence[int],
-                     z_start: Sequence[int], note: str = "") -> Plan:
-    """A layout -- data traps, and for every X and every Z check the trap its window starts
-    in (each a permutation of the traps) -- as a plan: ancilla k starts in trap k, does the X
-    check that starts there, and then the Z check that starts where it stands when the X
-    phase ends."""
+def polish(plan: Plan, *, moves: int = 50_000, seed: int = 1, temp: float = 60.0,
+           budget_s: float | None = None, log=print) -> Plan:
+    """Local search on the exact bill from a strict plan: move or swap data between traps
+    (capacity permitting) and swap two ancillas' start traps, accepting a worse bill with
+    probability exp(-delta / T), T falling from ``temp`` to 1 us.  The solver counts steps
+    only; this also trims the extra gate layers (two gates of one check in one trap at one
+    step) and whatever the greedy propagation leaves.  ``budget_s`` stops it early (the
+    temperature schedule still runs over ``moves``)."""
+    import random
+
+    rng = random.Random(seed)
+    x, cap, n = plan.x, plan.capacity - 1, plan.n
+    g = gate_us(plan.capacity)
+    hx = [plan.hx[i] for i in plan.x_rows]
+    hz = [plan.hz[i] for i in plan.z_rows]
+    pos, st = list(plan.data_trap), list(plan.anc_start)
+    members: list[list[int]] = [[] for _ in range(x)]
+    for d, t in enumerate(pos):
+        members[t].append(d)
+    at = {s: k for k, s in enumerate(st)}
+    cur = _bill(x, g, pos, st, hx, hz)
+    best = (cur, list(pos), list(st))
+    start = cur
+    t_end = time.time() + budget_s if budget_s else None
+    for it in range(moves):
+        if t_end is not None and (it & 255) == 0 and time.time() > t_end:
+            break
+        T = temp * (1.0 / temp) ** (it / moves)
+        if rng.random() < 0.7:
+            d = rng.randrange(n)
+            a = pos[d]
+            b = (a + rng.randint(-3, 3)) % x if rng.random() < 0.8 else rng.randrange(x)
+            if a == b:
+                continue
+            e = -1
+            if len(members[b]) >= cap or rng.random() < 0.5:
+                if not members[b]:
+                    continue
+                e = members[b][rng.randrange(len(members[b]))]
+            pos[d] = b
+            if e >= 0:
+                pos[e] = a
+            new = _bill(x, g, pos, st, hx, hz)
+            if new <= cur or rng.random() < math.exp(-(new - cur) / T):
+                cur = new
+                members[a].remove(d)
+                members[b].append(d)
+                if e >= 0:
+                    members[b].remove(e)
+                    members[a].append(e)
+            else:
+                pos[d] = a
+                if e >= 0:
+                    pos[e] = b
+        else:
+            s1 = rng.randrange(x)
+            s2 = (s1 + rng.randint(-4, 4)) % x if rng.random() < 0.8 else rng.randrange(x)
+            if s1 == s2:
+                continue
+            k1, k2 = at[s1], at[s2]
+            st[k1], st[k2] = s2, s1
+            new = _bill(x, g, pos, st, hx, hz)
+            if new <= cur or rng.random() < math.exp(-(new - cur) / T):
+                cur = new
+                at[s1], at[s2] = k2, k1
+            else:
+                st[k1], st[k2] = s1, s2
+        if cur < best[0]:
+            best = (cur, list(pos), list(st))
+    log(f"[{plan.name}] polish: {start:.0f} -> {best[0]:.0f} us")
+    out = _plan(plan.name, n, plan.hx, plan.hz, plan.capacity, best[1], best[2],
+                plan.note + (f"; polished {start:.0f} -> {best[0]:.0f} us" if best[0] < start else ""))
+    if abs(plan_cost(out)["time_us"] - best[0]) > 1e-6:
+        raise AssertionError("the polish's bill and plan_cost disagree")
+    return out
+
+
+def _plan(name: str, n: int, hx, hz, capacity: int, pos: Sequence[int], starts: Sequence[int],
+          note: str) -> Plan:
     x = len(hx)
-    s = _Search(n, hx, hz, x, capacity - 1, random.Random(0), capacity)
-    s.set_layout(list(pos), list(x_start), list(z_start))
-    s.k = list(s.lengths())
-    p = _to_plan(name, n, hx, hz, x, capacity, s)
-    if note:
-        p.note = note
-    return p
-
-
-def _to_plan(name: str, n: int, hx, hz, x: int, capacity: int, s: _Search) -> Plan:
-    """Ancilla k starts in trap k; it does the X check that starts there and the Z check
-    that starts where it stands when the X phase ends."""
-    m2 = len(hx)
-    kx = s.lengths()[0]
-    x_rows = [s.at[0][k] for k in range(m2)]
-    z_rows = [s.at[1][(k + kx) % x] for k in range(m2)]
-    order: dict[int, list[int]] = {t: sorted(s.members[t]) for t in range(x)}
+    order = {t: [d for d in range(n) if pos[d] == t] for t in range(x)}
     return Plan(name=name, n=n, x=x, capacity=capacity, hx=[list(r) for r in hx],
-                hz=[list(r) for r in hz], data_trap=list(s.pos), anc_start=list(range(m2)),
-                x_rows=x_rows, z_rows=z_rows, data_order=order,
-                note=f"opt_cyclone.optimize (windows {s.k[0]}/{s.k[1]})")
+                hz=[list(r) for r in hz], data_trap=list(pos), anc_start=list(starts),
+                x_rows=list(range(x)), z_rows=list(range(x)), data_order=order, note=note,
+                order=STRICT)
+
+
+def order_bound(rows: Sequence[Sequence[int]], n: int) -> int:
+    """A layout-free lower bound on a strict phase: the longest chain of the circuit's order
+    in which every step to a data qubit's next check costs a step (an ancilla's next gate
+    may share its step)."""
+    last = [-1] * n
+    longest = 0
+    for row in rows:
+        t = 0
+        for d in row:
+            t = max(t, last[d] + 1)
+            last[d] = t
+        longest = max(longest, t + 1)
+    return longest
+
+
+def _least(feasible, lo: int, hi: int | None, out_of_time) -> tuple[int | None, Any]:
+    """The least k >= lo with feasible(k) True: bisection on [lo, hi] when an upper bound is
+    given (and holds), else doubling from lo first.  A query that times out counts as infeasible, so
+    the answer is the least k the solver could CONFIRM.  Returns (k, its witness)."""
+    witness = None
+    if hi is None:
+        k, bad = lo, lo - 1
+        while not out_of_time():
+            ok, w = feasible(k)
+            if ok:
+                witness = (k, w)
+                break
+            bad = k
+            k = max(k + 1, int(k * 1.5))
+        if witness is None:
+            return None, None
+        lo, (hi, w_hi) = bad + 1, witness
+    else:                                # the bound first: if it fails, nothing below can win
+        ok, w_hi = feasible(hi)
+        if not ok:
+            return None, None
+    while lo < hi and not out_of_time():
+        mid = (lo + hi) // 2
+        ok, w = feasible(mid)
+        if ok:
+            hi, w_hi = mid, w
+        else:
+            lo = mid + 1
+    return hi, w_hi
+
+
+def optimize(name: str, n: int, hx: list[list[int]], hz: list[list[int]], *, capacity: int = 5,
+             starts: Sequence[str] | None = None, time_limit: float = 120.0,
+             budget_s: float = 3600.0,
+             kx_grid: Sequence[float] = (1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5),
+             polish_moves: int = 20_000, log=print) -> Plan:
+    """The shortest strict round `sat_layout` can find within ``budget_s``, confirmed by the
+    writer's own propagation.
+
+    For each start seed -- "free" (the solver also places the ancillas for the X phase,
+    and those starts are kept for the round; the default on rings of up to 45 traps),
+    "reversed" (ancilla k in trap -k: every ancilla reaches a trap one step after the one
+    numbered before it, the order in which a data qubit must meet them; the default on
+    larger rings) and "forward" (ancilla k in trap k) -- the least X phase kx_min is found
+    alone, by bisection between `order_bound` and the length a plain layout already
+    achieves (doubling from `order_bound` for "free"); then, for L_X = kx_min times each
+    factor of ``kx_grid`` and around the best of them, the least Z phase that still beats
+    the best round so far.  Each SAT query gets ``time_limit``
+    seconds (a timeout counts as infeasible).  Every layout found is run by `plan_cost`
+    (the greedy propagation: each gate as early as the order allows; it can only be
+    earlier than the solver's steps), the cheapest bill is kept, and `polish` trims it."""
+    x = len(hx)
+    if len(hz) != x:
+        raise ValueError("Cyclone pairs one X and one Z check per ancilla, one ancilla per trap")
+    if (capacity - 1) * x < n:
+        raise ValueError(f"{x} traps of {capacity - 1} data cannot hold {n} data")
+    seeds = list(starts) if starts is not None else (["free"] if x <= 45 else ["reversed"])
+    t_start = time.time()
+    out_of_time = lambda: time.time() - t_start > budget_s
+    plain = [(d * x) // n for d in range(n)]                 # data in index order
+    best: tuple[float, Plan] | None = None
+
+    def best_steps() -> int:
+        c = plan_cost(best[1])
+        return c["steps_X"] + c["steps_Z"]
+
+    def keep(plan: Plan) -> bool:
+        nonlocal best
+        cost = plan_cost(plan)
+        log(f"[{name}] {plan.note}: steps {cost['steps_X']}/{cost['steps_Z']}, {cost['time_us']:.0f} us")
+        if best is None or cost["time_us"] < best[0]:
+            best = (cost["time_us"], plan)
+            return True
+        return False
+
+    for seed in seeds:
+        st = None if seed == "free" else (
+            [(-k) % x for k in range(x)] if seed == "reversed" else list(range(x)))
+        ref = _plan(name, n, hx, hz, capacity, plain, st or [(-k) % x for k in range(x)],
+                    f"{seed} starts, data in index order")
+        keep(ref)
+
+        def fx(k: int):
+            ok, lay = sat_layout(n, hx, hz, capacity, k, k, starts=st, x_only=True,
+                                 time_limit=time_limit)
+            log(f"[{name}/{seed}] X alone in {k}: {ok} ({time.time() - t_start:.0f} s)")
+            return bool(ok), lay
+
+        kx_min, lay_x = _least(fx, order_bound(hx, n), plan_cost(ref)["steps_X"] if st else None,
+                               out_of_time)
+        if kx_min is None:
+            continue
+        if st is None:                   # "free": keep the starts the X phase chose
+            st = list(lay_x[1])
+            seed = "X-phase"
+        # L_X = kx fixes where the ancillas stand when the Z phase starts, so the least kx is
+        # rarely the best round: scan kx upwards, asking only for a Z phase short enough to
+        # beat the best round so far, then refine around the best kx
+        tried: set[int] = set()
+
+        def try_kx(kx: int) -> None:
+            if kx in tried or out_of_time():
+                return
+            tried.add(kx)
+            hi = best_steps() - kx - 1
+            if hi < order_bound(hz, n):
+                return
+
+            def fz(k: int, kx=kx):
+                ok, lay = sat_layout(n, hx, hz, capacity, kx, k, starts=st, time_limit=time_limit)
+                log(f"[{name}/{seed}] L_X = {kx}, Z in {k}: {ok} ({time.time() - t_start:.0f} s)")
+                return bool(ok), lay
+
+            kz, lay = _least(fz, order_bound(hz, n), hi, out_of_time)
+            if kz is not None and keep(_plan(name, n, hx, hz, capacity, lay[0], lay[1],
+                                             f"opt_cyclone.optimize ({seed} starts, SAT "
+                                             f"L_X={kx} L_Z<={kz})")):
+                best_kx[0] = kx
+
+        best_kx = [None]
+        for f in kx_grid:
+            try_kx(int(round(kx_min * f)))
+        step = max(1, int(kx_min * 0.08))
+        while step >= 1 and best_kx[0] is not None and not out_of_time():
+            centre = best_kx[0]
+            for kx in (centre - step, centre + step):
+                if kx >= kx_min:
+                    try_kx(kx)
+            if best_kx[0] == centre:
+                step //= 2
+    if best is None:
+        raise RuntimeError(f"[{name}] no strict round found within the limits")
+    return polish(best[1], moves=polish_moves, log=log) if polish_moves else best[1]
+
+
+# ------------------------------------------------------------------- the published runs
+
+
+def true_rows(pairs: Sequence[Sequence[str]]) -> tuple[int, list[list[int]], list[list[int]]]:
+    """A round as `importers.cyclone_circuit` writes it (CX(a, d) for the X checks, then
+    CX(d, a) for the Z checks) -> (n, hx, hz), row k being ancilla a{n+k}'s check with its
+    data in the circuit's order."""
+    xs: dict[int, list[int]] = {}
+    zs: dict[int, list[int]] = {}
+    for c, t in pairs:
+        if c.startswith("a"):
+            xs.setdefault(int(c[1:]), []).append(int(t[1:]))
+        else:
+            zs.setdefault(int(t[1:]), []).append(int(c[1:]))
+    ancs = sorted(xs)
+    n = ancs[0]
+    if ancs != list(range(n, n + len(ancs))) or sorted(zs) != ancs:
+        raise ValueError("every ancilla must hold one X and one Z check, numbered from n")
+    return n, [xs[a] for a in ancs], [zs[a] for a in ancs]
+
+
+def reproduce_ours(root: str | Path, codes: Sequence[str] | None = None, *,
+                   plans: str | Path | None = None, time_limit: float = 120.0,
+                   budget_s: float = 3600.0, log=print) -> list[dict]:
+    """Write ``ours/<code>_ours.schedule.json.gz`` and its plan, ``ours/<code>_ours.plan.json``,
+    under ``root`` (``Reproduce/khan2026cyclone``) for the catalog's Ours runs: the circuit
+    of the run each is compared with, its ring and capacity, a plan, `write`, and `verify`
+    in strict order before anything is written.  The plan is ``<plans>/<code>_ours.plan.json``
+    when ``plans`` names a directory that has one (``root/"ours"`` re-writes the published
+    schedules from their own plans, without searching), else `optimize`'s."""
+    import gzip
+
+    from . import catalog
+
+    root = Path(root)
+    paper = catalog.paper("khan2026cyclone")
+    out = []
+    for o in catalog.OURS["khan2026cyclone"]["runs"]:
+        code = o["id"].removesuffix("_ours")
+        if codes and code not in codes:
+            continue
+        spec = next(r for r in paper["runs"] if r["id"] == o["against"])
+        pairs = json.loads((root / "circuits" / spec["circuit"]["file"]).read_text(encoding="utf-8"))
+        pairs = pairs["pairs"] if isinstance(pairs, dict) else pairs
+        n, hx, hz = true_rows(pairs)
+        art = root / "artifact" / spec["file"]          # the same ring and capacity as theirs
+        raw = json.loads(gzip.decompress(art.read_bytes()) if art.suffix == ".gz" else art.read_bytes())
+        caps = {int(t["capacity"]) for t in raw["device"]["traps"]}
+        if len(caps) != 1 or len(raw["device"]["traps"]) != len(hx):
+            raise ValueError(f"{code}: expected one ancilla per trap on a uniform ring")
+        capacity = caps.pop()
+        t0 = time.time()
+        given = Path(plans) / f"{code}_ours.plan.json" if plans else None
+        if given is not None and given.exists():
+            plan = Plan.load(given)
+            if (plan.n, plan.hx, plan.hz, plan.capacity, plan.order) != (n, hx, hz, capacity, STRICT):
+                raise ValueError(f"{given} is not a strict plan of this circuit and ring")
+        else:
+            plan = optimize(code, n, hx, hz, capacity=capacity, time_limit=time_limit,
+                            budget_s=budget_s, log=log)
+        sched = write(plan, name=f"{code}_ours")
+        v = verify(sched, plan, hx, hz)
+        if not v["ok"]:
+            raise RuntimeError(f"{code}: our round fails its own checks: {v['report'].summary()} {v['stim']}")
+        data = json.dumps(sched.to_json(), separators=(",", ":")).encode("utf-8")
+        (root / "ours" / f"{code}_ours.schedule.json.gz").write_bytes(gzip.compress(data, mtime=0))
+        plan.save(root / "ours" / f"{code}_ours.plan.json")
+        row = {"code": code, "makespan_us": v["makespan_us"], "steps": (sched.claims["steps_X"],
+               sched.claims["steps_Z"]), "seconds": round(time.time() - t0, 1), "note": plan.note}
+        log(f"{code}: {row}")
+        out.append(row)
+    return out
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Our strict-order Cyclone rounds (Reproduce/khan2026cyclone/ours)")
+    ap.add_argument("root", nargs="?", default=str(Path(__file__).resolve().parents[2] / "Reproduce" / "khan2026cyclone"))
+    ap.add_argument("--codes", default="")
+    ap.add_argument("--plans", default=None, help="a directory of <code>_ours.plan.json to write "
+                    "instead of searching (the root's ours/ re-writes the published ones)")
+    ap.add_argument("--time-limit", type=float, default=120.0)
+    ap.add_argument("--budget", type=float, default=3600.0)
+    a = ap.parse_args()
+    reproduce_ours(a.root, [c for c in a.codes.split(",") if c] or None, plans=a.plans,
+                   time_limit=a.time_limit, budget_s=a.budget)

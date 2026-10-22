@@ -16,6 +16,8 @@ rules -- is `qccd.repro.timed.check`; the page says both, and which is which.
 from __future__ import annotations
 
 import dataclasses
+import math
+import re
 from collections import Counter, defaultdict
 from typing import Any, Mapping
 
@@ -24,7 +26,28 @@ from .devices import TABLES, to_arch_doc
 from .timed import Event, TimedSchedule
 
 __all__ = ["node_id", "studio_arch_doc", "renamed", "named_after_qubits", "gate_label", "to_tsir",
-           "pulse_join", "source_payload"]
+           "native_1q", "pulse_join", "source_payload"]
+
+
+_PAULI_ANGLE = re.compile(r"^([XYZ])_(-?)pi(?:/(\d+))?$")
+
+
+def native_1q(op: str | None) -> tuple[str, tuple[float, ...]] | None:
+    """A one-ion rotation the artifact names by axis and angle, in our language, or None.
+
+    TISCC writes ``P_θ`` for exp(-iθP) (its own table maps X_pi/4 to stim's SQRT_X, Z_pi/4
+    to S, Z_pi/2 to Z; `src/hardwaremodel.cpp`), a turn through 2θ.  Our language's pulse
+    is R(θ, φ) = exp(-iθ/2 (cos φ X + sin φ Y)) and its Z rotation VZ(λ) = diag(1, e^{iλ})
+    (`qccd.qec.native`), so X_θ is R(2θ, 0), Y_θ is R(2θ, π/2) and Z_θ is VZ(2θ).  An
+    artifact that records no angle (Jones's RY, RX) gets None and stays a bare R."""
+    m = _PAULI_ANGLE.match(op) if isinstance(op, str) else None    # TrapSIMD's ops are numbers
+    if not m:
+        return None
+    axis, sign, den = m.groups()
+    turn = (-1.0 if sign else 1.0) * 2.0 * math.pi / (int(den) if den else 1)
+    if axis == "Z":
+        return "VZ", (turn,)
+    return "R", (turn, 0.0 if axis == "X" else math.pi / 2)
 
 
 def node_id(n: str) -> str:
@@ -37,10 +60,12 @@ def node_id(n: str) -> str:
 def studio_arch_doc(sched: TimedSchedule, positions, *, name: str, table: str,
                     gate_us: float, hop_entails: tuple[str, ...] = ("split", "merge"),
                     one_q_us: float = 0.0, measure_us: float = 0.0, reset_us: float = 0.0,
-                    note: str = "") -> dict:
+                    z_us: float | None = None, note: str = "") -> dict:
     """`to_arch_doc` plus what a Studio page needs to price and play a program: the gate,
     measurement and reset primitives (at the paper's values; zero where its model charges
-    nothing), and one declared movement class for a trap-to-trap shuttle."""
+    nothing), a Z rotation's own time where the paper gives one (`z_us`: TISCC's Z turns
+    take 3 us, its X and Y turns 10), and one declared movement class for a trap-to-trap
+    shuttle."""
     # the Studio draws y downward and the paper figures y upward: flip, so the first row of
     # traps a paper draws on top is on top here too
     flipped = {n: (x, -y) for n, (x, y) in positions.items()}
@@ -51,6 +76,10 @@ def studio_arch_doc(sched: TimedSchedule, positions, *, name: str, table: str,
     prims["ms_gate"] = {"us": gate_us, "fidelity_at_n0": 1.0, "source": src,
                         "note": TABLES[table]["note"]}
     prims["1q_gate"] = {"us": one_q_us, "fidelity": 1.0, "source": src}
+    if z_us is not None:
+        # what our cost model charges a VZ (`CostModel.gate_1q`) when the device declares it
+        prims["z_gate"] = {"us": z_us, "fidelity": 1.0, "source": src,
+                           "note": "a Z rotation, at the paper's own time"}
     prims["measure"] = {"us": measure_us, "fidelity": 1.0, "source": src}
     prims["reset"] = {"us": reset_us, "error": 0.0, "source": src}
     prims["cool"] = {"us": 0.0, "removes_quanta": "all", "broadcastable": True,
@@ -151,18 +180,21 @@ def gate_label(sched: TimedSchedule, ops: list[dict]) -> str:
     two-qubit statements are all CNOTs, the schedule has one two-qubit gate per statement,
     and no one-ion pulse besides the circuit's own one-qubit gates -- nothing dresses an MS
     into a CNOT, and the law prices the CNOT as one gate (Cyclone, the QCCDSim family,
-    TrapSIMD's model).  "MS", the trap's native entangling gate, where it schedules native
-    pulses (Jones's RY, RX around each MS; TISCC's ZZ and its rotations) or there is no CNOT.
-    Our language prices a CX as one `ms_gate`, so the name changes nothing but the name.
-    `ops` as `source_payload` takes them.
+    TrapSIMD's model).  "ZZ" where the tool names its entangling gate ZZ (TISCC: a ZZ, not an
+    MS, with its rotations around it).  "MS", the trap's native entangling gate, where it
+    schedules native pulses (Jones's RY, RX around each MS) or there is no CNOT.
+    Our language prices a CX, a ZZ and an MS as one `ms_gate`, so the name changes nothing
+    but the name.  `ops` as `source_payload` takes them.
     """
     two = [o for o in ops if len(o["ions"]) == 2]
     one = [o for o in ops if len(o["ions"]) == 1 and o.get("kind", "gate") == "gate"]
-    gates = sum(1 for e in sched.events if e.kind == "gate")
+    gates = [e for e in sched.events if e.kind == "gate"]
     pulses = sum(1 for e in sched.events if e.kind in ("gate1", "prepare") and e.ions)
     whole = (two and all(o["name"] in ("cx", "cnot") for o in two)
-             and gates == len(two) and pulses == len(one))
-    return "CX" if whole else "MS"
+             and len(gates) == len(two) and pulses == len(one))
+    if whole:
+        return "CX"
+    return "ZZ" if gates and all(e.meta.get("op") == "ZZ" for e in gates) else "MS"
 
 
 def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> TSIR:
@@ -185,16 +217,23 @@ def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> 
     for e in rest:
         if e.kind == "gate":
             ops.append((e.t0, 1, "gate2", e))
-        elif e.kind in ("gate1", "prepare"):
+        elif e.kind == "gate1":
             if e.ions:
                 ops.append((e.t0, 2, "gate1", e))
+        elif e.kind == "prepare":
+            # a preparation in |0> is a reset in our language (TISCC's Prepare_Z is stim's R)
+            if e.ions:
+                ops.append((e.t0, 4, "reset", e))
         elif e.kind == "swap":
             ops.append((e.t0, 1, "swap", e))
         elif e.kind == "measure":
             ops.append((e.t0, 3, "measure", e))
         elif e.kind == "reset":
             ops.append((e.t0, 4, "reset", e))
-    ops.sort(key=lambda o: (o[0], o[1]))
+    # one-ion rotations go by what they are in our language: an R and a VZ starting together
+    # are two instructions (an instruction is one gate), the R first
+    rot = lambda o: (native_1q(o[3].meta.get("op")) or ("R",))[0] if o[2] == "gate1" else ""
+    ops.sort(key=lambda o: (o[0], o[1], rot(o)))
     # a reorder, a move and a gate starting together go in that order
 
     prog = TSIR(name=name, arch_spec=arch)
@@ -231,8 +270,13 @@ def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> 
                                  pairs=tuple(tuple(b.ions) for b in batch),
                                  sites=tuple(node_id(b.at) for b in batch), meta=meta))
         elif kind == "gate1":
-            prog.add(Instruction(type="gate", id=prog.next_id(), gate="R", mode="intra",
+            # each rotation's axis and angle where the artifact records them (`native_1q`):
+            # R(θ, φ) or VZ(λ) with one parameter tuple per ion, as our compiler writes them
+            nat = [native_1q(b.meta.get("op")) for b in batch]
+            prog.add(Instruction(type="gate", id=prog.next_id(),
+                                 gate=nat[0][0] if nat[0] else "R", mode="intra",
                                  arity=1, ions=tuple(b.ions[0] for b in batch),
+                                 params=tuple(n[1] for n in nat) if all(nat) else (),
                                  sites=tuple(node_id(b.at) for b in batch), meta=meta))
         elif kind in ("measure", "reset"):
             prog.add(Instruction(type=kind, id=prog.next_id(),
@@ -249,14 +293,15 @@ def to_tsir(sched: TimedSchedule, *, name: str, arch: str, gate: str = "MS") -> 
             ions, site = set(item["ions"]), item["at"]
         else:
             ions, site = set(item.ions), item.at
-        same = key == (t0, kind)
+        sub = rot((t0, None, kind, item))
+        same = key == (t0, kind, sub)
         clash = bool(ions & busy_ions) or (site is not None and kind in ("gate2", "gate1", "swap",
                                                                          "swapgate")
                                            and site in busy_sites)
         if not same or clash:
             flush(batch, key[1] if key else kind)
             batch, busy_ions, busy_sites = [], set(), set()
-            key = (t0, kind)
+            key = (t0, kind, sub)
         batch.append(item)
         busy_ions |= ions
         if site is not None:

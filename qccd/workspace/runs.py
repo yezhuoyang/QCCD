@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .jsonsafe import canonical_bytes, strict_loads
+from .tasks import board_device
 
 __all__ = ["RunsMixin", "program_catalog", "resolve_program"]
 
@@ -199,7 +200,8 @@ class RunsMixin:
                                f"{n_sites} sites: it cannot run here"}
         work = self.root / ".qccd" / "runs" / jid
         work.mkdir(parents=True, exist_ok=True)
-        (work / "device.arch.json").write_text(json.dumps(r.arch_doc), encoding="utf-8")
+        device = board_device(r.arch_doc, self.release)
+        (work / "device.arch.json").write_text(json.dumps(device), encoding="utf-8")
         (work / "circuit.qasm").write_text(qasm, encoding="utf-8")
         self._progress(jid, "export", "expanding the device for the compiler")
         ex = run_limited([tc.python, tc.bridge / "export_arch.py", work / "device.arch.json", "-o",
@@ -229,7 +231,8 @@ class RunsMixin:
                                + _compiler_reason(log), "log": log[-6000:]}
         self._progress(jid, "cooling", "inserting cooling (R7)")
         co = run_limited([tc.python, tc.bridge / "insert_cooling.py", work / "prog.tsir.json", "--arch",
-                          work / "device.arch.json", "-o", work / "prog.cooled.tsir.json"],
+                          work / "device.arch.json", "-o", work / "prog.cooled.tsir.json", "--table",
+                          self.release.manifest["physics"].get("rank_table", "qccdsim_jones")],
                          cwd=work, timeout=900, cancel=cancel)
         if not (work / "prog.cooled.tsir.json").exists():
             return {"_status": "cancelled" if co.status == "cancelled" else "failed",
@@ -248,7 +251,7 @@ class RunsMixin:
         except Exception:
             t_tr = None
         perf = performance(arch, prog, res, table=table, t_transport_ms=t_tr)
-        d_dev = self.put_artifact(canonical_bytes(r.arch_doc), "application/json", f"run {jid}: device")
+        d_dev = self.put_artifact(canonical_bytes(device), "application/json", f"run {jid}: device")
         d_prog = self.put_artifact(canonical_bytes(strict_loads((work / "prog.cooled.tsir.json").read_bytes())),
                                    "application/json", f"run {jid}: program (cooled)")
         d_times = self.put_artifact(canonical_bytes({"times_us": _step_times(prog, res)}), "application/json",

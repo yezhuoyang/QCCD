@@ -130,15 +130,35 @@ console.log(JSON.stringify({{ worst: worst }}));
 """
 
 
+#: How far the model point under the cursor may move in one wheel notch, in user units
+#: (about one screen pixel each at the fit).  NOT ZERO, because no floating-point form of
+#: the anchor can promise zero: `toModel` after the zoom computes `VB.x' + t'` where the
+#: new origin was itself `m - t`, and `(m - t) + t == m` can fail in IEEE doubles as soon
+#: as `t` carries bits `m` does not.  This test asserted `== 0` and held only by luck of the
+#: numbers: it passed while ring144_24v was laid out 1600 x 188, and once the page opened
+#: at TRUE SCALE (`D.layout_true`, the technology layer of 2026-09-14, first committed in
+#: 69fed50) the same arithmetic -- identical to ef45c60's on the path these zooms take --
+#: met a 1600 x 132 layout and drifted 2.842e-14, one ulp of the y coordinate 193.85.
+#: Measured over device heights 100..400 (step 4) on the shim's 1600 x 400 element, these
+#: four zooms drift somewhere on 56 of the 76 heights with the shipped form (worst
+#: 1.1e-13), and on all 76 with the form that solves the new origin from `toModel`'s own
+#: expression -- there is no exact form to restore.  1e-9 sits four orders above that
+#: rounding and nine below a visible pixel: the unanchored wheel the companion test
+#: plants drifts 33.6, and an origin scaled by (1 + 1e-9) -- invisible on any screen --
+#: still drifts 1.9e-7 and fails here.
+ANCHOR_TOL = 1e-9
+
+
 def test_zoom_keeps_the_point_under_the_cursor(tmp_path):
     """Zoom in, zoom out, at four different points. The model coordinate under the cursor
     must not move -- that is what "anchored at the pointer" means, and it is the property
-    the letterbox correction exists to preserve."""
+    the letterbox correction exists to preserve.  "Not move" is to `ANCHOR_TOL`, the
+    rounding of the arithmetic, and the reason it is not zero is written there."""
     page = _page(tmp_path, "ring144_24v")
     shim = (Path(__file__).parent / "shim.mjs").as_uri()
     r = _drift(page, DRIFT_JS.format(shim=shim))
-    assert r["worst"] == 0, (
-        f"the picture drifts {r['worst']:.4f} user units from the cursor while zooming; "
+    assert r["worst"] <= ANCHOR_TOL, (
+        f"the picture drifts {r['worst']:.3g} user units from the cursor while zooming; "
         f"the wheel anchor is not subtracting the letterbox margin")
 
 
@@ -160,5 +180,5 @@ def test_the_zoom_probe_notices_an_unanchored_wheel(tmp_path):
         "y: VB.y + (clientY - fit.r.top) / Math.max(1, fit.r.height) * VB.h }")
     broken.write_text(html2, encoding="utf-8")
     r = _drift(broken, DRIFT_JS.format(shim=shim))
-    assert r["worst"] > 1.0, (
+    assert r["worst"] > 1.0 > ANCHOR_TOL, (
         "the probe passed a page whose zoom is not anchored at the pointer")

@@ -112,11 +112,14 @@ PAPERS: list[dict] = [
         "venue": "DATE 2022", "year": 2022, "arxiv": "2111.07961",
         "artifact": {"url": "https://github.com/ashsaki/MTS-QCCD-Compiler", "commit": "489a097",
                      "license": "Apache-2.0"},
-        "what": "QCCDSim's six-trap line (L6) with 15 ions per trap (+2), five benchmarks; the "
-                "metric is the number of shuttles (adjacent-trap moves).",
+        "what": "QCCDSim's six-trap line (L6): six traps in a row, each with a capacity of 17 "
+                "ions -- the 15 the compiler places in it at the start, and 2 places kept free "
+                "for ions passing through. Five benchmarks; the metric is the number of shuttles "
+                "(moves of one ion from a trap to the next).",
         "model": {"profile": "QCCDSIM_PHYSICAL", "law": "qccdsim"},
         "figures": [{"run": "mts-sqrt-seed0", "layout": "qccdsim_linear",
-                     "caption": "L6 with 15 ions per trap (+2 for traffic)"}],
+                     "caption": "L6: six traps of capacity 17 (15 placed at the start, 2 kept "
+                                "free for passing ions)"}],
         "runs": [
             *[{"id": f"qccdsim-{b}", "file": f"qccdsim-{b}.schedule.json.gz", "importer": "qccdsim",
                "profile": "QCCDSIM", "law": "qccdsim", "circuit": {"kind": "qasm", "file": f},
@@ -259,7 +262,7 @@ PAPERS: list[dict] = [
              "importer_args": {"nrows": 6, "ncols": 6}, "profile": "TISCC", "law": "tiscc",
              "circuit": {"kind": "pairs", "file": "idle_551.zz.json"},
              "expect": {"tool": {"makespan_us": 9613.0}},
-             "label": "one d=5 error-correction round (TISCC -x 5 -z 5 -t 1 -o idle)"},
+             "label": "one d=5 error-correction round, idling"},
             {"id": "idle_661", "file": "idle_661.spec", "importer": "tiscc",
              "importer_args": {"nrows": 8, "ncols": 8}, "profile": "TISCC", "law": "tiscc",
              "circuit": {"kind": "pairs", "file": "idle_661.zz.json"},
@@ -295,18 +298,31 @@ NOTES: dict[str, list[dict]] = {
     "saki2022": [
         {"title": "The published code and the paper's table",
          "text": "The compiler's public repository dates from 2023, after the paper. Run on the "
-                 "paper's five benchmarks (L6, 15 ions per trap) it reproduces the paper's own "
+                 "paper's five benchmarks (L6, 15 ions placed per trap) it reproduces the paper's own "
                  "shuttle counts for QFT (196) and QuadraticForm (164). For Supremacy it gives "
                  "261 against the printed 223 and for SquareRoot 339 against 355, the same for all "
                  "ten seeds we ran; for QAOA its result depends on an unseeded shuffle and ranges "
                  "from 903 to 1,021 across ten seeds, against 957."},
+        {"title": "How the fidelity is computed",
+         "text": "The fidelity under each Muzzle run is the estimate its code prints, recomputed by "
+                 "our replay with the same model. It is the product, over every two-qubit gate, of "
+                 "max(0.0001, 1 - t/1,000,000 - A(N)(2n + 1)). Here t = 172 us is the gate's "
+                 "duration (QCCDSim's law for a trap of capacity 17: 13.33 x 17 - 54, rounded "
+                 "down); N is the number of ions in the gate's trap when it starts, and A(N) = "
+                 "max(0.0001, 0.0001 N / ln N - 0.00053) is the error that grows with the chain; n "
+                 "is the motional energy of that trap, in quanta. An ion leaving a trap after a "
+                 "reorder takes its share of the trap's energy plus 0.01, every move from one rail "
+                 "to the next adds 0.001 to what it carries, and arriving adds what it carries plus "
+                 "0.01 to the trap it joins. A gate swap counts as three gates. Nothing else is in "
+                 "the model: no single-qubit gate, measurement, idle time or cooling. The paper's "
+                 "table prints no fidelity, so the paper's column shows a dash."},
         {"title": "The baseline column",
          "text": "QCCDSim reproduces the paper's baseline column exactly for four benchmarks. For "
                  "SquareRoot it gives 727 shuttles where the table prints 717; the table's own "
                  "reduction (372 shuttles, 51.17 %) implies 727."},
         {"title": "Passing through a full trap",
          "text": "Every one of the compiler's five schedules routes an ion through a trap that is "
-                 "already full (its capacity is 15 + 2): once each for Supremacy, SquareRoot and "
+                 "already full (it holds its capacity, 17 ions): once each for Supremacy, SquareRoot and "
                  "QFT, twice for QAOA (seed 0) and three times for QuadraticForm. In SquareRoot, "
                  "for example, trap T1 holds 18 ions for 676 µs while ion 17 passes through; the "
                  "compiler's own record of the chain shows the 18th ion. The shuttle counts are "
@@ -340,15 +356,15 @@ NOTES: dict[str, list[dict]] = {
                  "In the d = 3 schedule, data qubit 17 (the artifact's ion D70) meets X-check "
                  "ancilla 25 (M80) in routing pass 2, before Z-check ancilla 18 (M61) in pass 3; "
                  "the circuit has the opposite order. Rebuilt "
-                 "in stim with the CX gates in the router's order, the noiseless circuit has "
-                 "non-deterministic Z detectors on the grid at d = 2, 3, 6 and 12, while stim's own "
-                 "order, rebuilt the same way, has none; the linear and switch schedules keep the "
+                 "with the CX gates in the router's order, the noiseless circuit has "
+                 "non-deterministic Z detectors on the grid at d = 2, 3, 6 and 12, while the paper's "
+                 "circuit file's own order, rebuilt the same way, has none; the linear and switch schedules keep the "
                  "circuit's order. The artifact's error-rate simulation follows the circuit's "
                  "original order, so its logical error rates are for the circuit as written; the "
                  "4,085 µs is the time of the reordered schedule."},
         {"title": "Two timing models in Table 2",
-         "text": "Table 2's switch row (5,325 µs at d = 3) comes out of the artifact only at its 2024 "
-                 "commit 6d4b467, where a junction entry or exit takes 100 µs; the current code, "
+         "text": "Table 2's switch row (5,325 µs at d = 3) comes out of the artifact only in its 2024 "
+                 "version, where a junction entry or exit takes 100 µs; the current code, "
                  "with 50 µs, gives 3,690 µs, while its grid rows are reproduced by the current code. "
                  "The routing-operation counts agree under both."},
         {"title": "Table 2 at d = 6",
@@ -519,11 +535,15 @@ OURS: dict[str, dict] = {
                   "label": "QFT-20 on G2x3, capacity 5"}],
     },
     "khan2026cyclone": {
-        "how": "The same ring, the same traps, one ancilla per trap, Cyclone's own clock "
-               "(a step costs its gate layers, a 300 µs swap and a shuttle). What changes is "
-               "where the data sit and which check starts in which trap: chosen by matching, "
-               "annealing and, for the BB codes, a SAT search. Every check is one of the true "
-               "checks (the Z checks are fixed), each on one ancilla.",
+        "how": "The same ring, the same traps, one ancilla per trap, Cyclone's own clock. Every qubit "
+               "runs its CNOTs in exactly the circuit's order, even where two commute: each ancilla does "
+               "its check's CNOTs in the listed order, each data qubit meets its checks in the listed "
+               "order (all X checks, then all Z checks), and X check i and Z check i stay on ancilla i, "
+               "as in the circuit. An ancilla that passes a data qubit it may not touch yet touches it a "
+               "lap later. We choose where the data sit and where each ancilla starts (ancilla i starts "
+               "i traps behind ancilla 0): for the two smaller HGP codes by a SAT search over the "
+               "round's length, otherwise with the data in index order, then a local search on Cyclone's "
+               "exact bill.",
         "runs": [{"id": f"{c}_ours", "file": f"ours/{c}_ours.schedule.json.gz", "against": a,
                   "profiles": ("CYCLONE",), "circuit_relabel": "checks", "label": lab}
                  for c, a, lab in (
@@ -533,48 +553,52 @@ OURS: dict[str, dict] = {
                      ("bb72", "bb72_cyclone", "BB [[72,12,6]]"),
                      ("bb90", "bb90_cyclone", "BB [[90,8,10]]"),
                      ("bb144", "bb144_cyclone", "BB [[144,12,12]]"))],
-        "found": "Cyclone already ends a phase as soon as every check is done; its full "
-                 "rotations come from placing check i on ancilla i. A round of ours does not end "
-                 "with each ancilla back where it started; every trap holds one ancilla, so the "
-                 "next round starts from whichever is there. A shorter round was not found "
-                 "with fewer ions per trap (a search, not a proof).",
+        "found": "Kept in the circuit's order, a round on Cyclone's ring is slower than Cyclone's own, "
+                 "which does not keep it: Cyclone's loop lets each ancilla take whichever CNOT of its "
+                 "check it finds in its trap, so its own schedules fail the checker in strict order. The "
+                 "BB checks list their CNOTs in IBM's interleaved order, which chains the round's checks "
+                 "one after another: a SAT solver proves that no placement runs even the X phase of "
+                 "[[72,12,6]] in 200 steps or fewer, or of [[90,8,10]] in 73 or fewer, where Cyclone's "
+                 "whole round takes 72 and 90. Our BB rounds come from a plain placement and a short local "
+                 "search, so they are upper bounds, not optima.",
     },
     "khan2025moveless": {
-        "how": "Every CNOT in these benchmarks uses the one ancilla, so the CNOTs run one after "
-               "another whatever the schedule (100 µs each); what a compiler can save is the "
-               "ancilla's travel. Ours stops the ancilla in as few traps as the capacity allows "
-               "and visits each trap once, from one end of the line to the other: it starts with "
-               "4 data in the end trap, and every later trap holds 6 data when it arrives. Every "
-               "trap starts with the paper's 5 ions; the extra one is handed leftwards from trap "
-               "to trap, from the end of each chain, long before the ancilla gets there. In each "
-               "trap the ancilla runs every CNOT of the data it finds, back to back. The CNOTs "
-               "are checked as a set, as for the paper's own schedules.",
+        "how": "Every CNOT uses the one ancilla, so the CNOTs run one after another (100 µs each); what "
+               "a compiler can save is the ancilla's travel. Ours runs them in exactly the order the "
+               "benchmark file lists them, even where two commute: the order is the file's, not ours to "
+               "change. The data stay put and the ancilla walks, one trap at a time, to each CNOT's data "
+               "qubit in turn. A seeded search picks the placement with the shortest walk: up to 6 data "
+               "per trap, at most 4 in the ancilla's starting end trap. No trap starts above the paper's "
+               "5 ions; a trap given a sixth receives it at the start, handed from trap to trap from the "
+               "end of each chain. Ours is checked in the file's order; the paper's Moveless schedules "
+               "are checked as a set, and its ancilla-only (MAO) runs, which keep the file's order, are "
+               "shown beside them.",
         "runs": [{"id": f"{c}_ours", "file": f"ours/{c}_ours.schedule.json.gz",
-                  "against": f"{c}_Moveless_1m", "same_ops": "counts", "profiles": ("QCCDSIM_GATESET",), "label": lab}
+                  "against": f"{c}_Moveless_1m", "also": f"{c}_MAO_1m", "same_ops": "counts", "profiles": ("QCCDSIM_GATESET",), "label": lab}
                  for c, lab in (("SC9_L8", "surface code d=3 on L8"),
                                 ("SC25_L24", "surface code d=5 on L24"),
                                 ("SC49_L48", "surface code d=7 on L48"),
                                 ("CC91_L90", "colour code d=11 on L90"))],
-        "found": "The time is the CNOTs plus the ancilla's moves: 170 µs for the first and 470 µs "
-                 "for each later one. The ancilla enters a trap at one end and must leave by the "
-                 "other, past the data it just used, so every move after the first carries a gate "
-                 "swap (300 µs). We found no schedule on a line that avoids it: turning back keeps "
-                 "the ancilla among data it has finished with. As in the paper's schedules, the "
-                 "ancilla ends in the last trap it visits; in ours the data that were handed "
-                 "along the line also stay where they were handed (the benchmark is one round of "
-                 "CNOTs with no measurement).",
+        "found": "The time is the CNOTs plus the walk: 170 µs per step to a neighbouring trap, plus a 300 "
+                 "µs gate swap when the ancilla leaves past data or passes through a trap that holds data. "
+                 "In the file's order the ancilla goes back and forth between neighbouring traps, so the "
+                 "walk is longer than the CNOTs for the larger codes. The paper's Moveless schedules run "
+                 "each trap's CNOTs together, which the file's order does not allow, and ours roughly ties "
+                 "them. Its ancilla-only runs keep the order: with their placement our walk takes exactly "
+                 "their time, and the searched placement is 1.2-1.5x faster.",
     },
     "jones2025": {
-        "how": "The same grid, the same placement of qubits in traps, the paper's operation "
-               "times and its rule that an operation holds every component it names (a split or "
-               "merge also holds the junction at the far end of its segment, an entry or exit "
-               "holds the junction and the segment). Each ancilla visits its data one after "
-               "another instead of going home after every gate: first the two around one end of "
-               "its trap, then, passing through its own empty trap, the two around the other "
-               "end, and it comes home to be measured. It always leaves a data trap by the end it "
-               "came in, so no gate swap is needed. The order of each tour follows what each "
-               "data qubit needs, so every qubit sees its CNOTs in an order the circuit allows; "
-               "there are no barriers, and every ion ends in the trap it started in.",
+        "how": "The same grid, the same placement of qubits in traps, the paper's operation times and "
+               "its rule that an operation holds every component it names (a split or merge also holds "
+               "the junction at the far end of its segment, an entry or exit holds the junction and the "
+               "segment). Every qubit meets its CNOT partners in the order of the paper's circuit file, even where two CNOTs "
+               "commute: the order is the circuit's, not ours to change. Each ancilla visits its data in "
+               "that order instead of going home after every gate: straight from one data qubit to the "
+               "next when both lie around the same end of its trap, and through its own empty trap when "
+               "the next lies around the other end; it comes home to be measured. It always leaves a "
+               "data trap by the end it came in, so no gate swap is needed. There are no barriers: a "
+               "junction lets ions through in the order of the circuit's CNOT layers, and every ion ends "
+               "in the trap it started in.",
         "runs": [{"id": f"grid_rot_d{d}_c2_ours", "file": f"ours/grid_rot_d{d}_c2_ours.schedule.json.gz",
                   "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES",),
                   "label": f"rotated surface code d={d}, one round, grid, capacity 2"}
@@ -583,11 +607,14 @@ OURS: dict[str, dict] = {
                     "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
                     "label": f"rotated surface code d={d}, WISE broadcast control (one waveform per cycle)"}
                  for d in (2, 3, 6, 12)],
-        "found": "The paper's own grid schedules fail the circuit check (each data qubit must see "
-                 "its CNOTs in an order the circuit allows); ours pass it, with the same "
-                 "operations. Like the paper's, our round takes about the same time at every "
-                 "distance. The table gives the start of the last operation, the time the paper "
-                 "reports; for both schedules it is a final reset, 50 µs before the end.",
+        "found": "The paper's own grid schedules fail the circuit check: a data qubit meets two of its "
+                 "CNOTs in an order the circuit does not allow. Ours keep every qubit's CNOTs in exactly "
+                 "the circuit's order, with the same operations. In that order one kind of check ancilla "
+                 "meets both data qubits around one end of its trap and then both around the other (6 "
+                 "trips), while the other kind alternates ends (8 trips); those tours set the round's "
+                 "length, about the same at every distance. The table gives the start of the last "
+                 "operation, the time the paper reports; for both schedules it is a final reset, 50 µs "
+                 "before the end.",
     },
     "leblond2023": {
         "how": "TISCC's own operations for every ion, with the same partners in the same order "

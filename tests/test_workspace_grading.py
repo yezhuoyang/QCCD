@@ -125,6 +125,35 @@ def test_changed_physics_is_exploratory_never_eligible(frozen, tmp_path):
     assert any(d["id"] == "TASK.PHYSICS_MODIFIED" for d in rep["diagnostics"])
 
 
+def _direct_wiring(per_trap: int):
+    def mutate(docs, man):
+        c = docs["device"].setdefault("control", {})
+        c.pop("channels", None)
+        c["wiring"] = {"scheme": "direct", "electrodes_per_trap": per_trap}
+    return mutate
+
+
+@needs_toolchain
+def test_an_over_budget_device_is_graded_but_never_eligible(frozen, tmp_path):
+    # #15: the budget (128 DACs) is the task's; `over_budget` was computed and never read
+    rep = grade(find_release("ghz4@1"), _reseal(frozen, tmp_path / "b", _direct_wiring(40)), "reference",
+                workdir=tmp_path / "w")
+    assert _stages(rep)["device"] == "failed" and not rep["eligibility"]["eligible"]
+    assert "device: failed" in rep["eligibility"]["reasons"]
+    assert any(d["id"] == "DEVICE.OVER_BUDGET" and "max_dacs 128" in d["message"] for d in rep["diagnostics"])
+    assert rep["metrics"]["T_jones"]["value"] > 0          # still graded: listed, with its numbers
+
+
+@needs_toolchain
+def test_declaring_cheap_wiring_buys_nothing(frozen, tmp_path):
+    rep = grade(find_release("ghz4@1"), _reseal(frozen, tmp_path / "b", _direct_wiring(1)), "reference",
+                workdir=tmp_path / "w")
+    dev = next(st for st in rep["stages"] if st["id"] == "device")
+    traps = sum(1 for n in read_bundle(frozen).docs["device"]["geometry"]["nodes"] if n.get("kind") == "site")
+    assert dev["detail"]["dacs"] == 24 * traps == rep["metrics"]["dacs"]["value"]
+    assert any("declares 1; counted at the physics' 24" in n for n in dev["detail"]["wiring_notes"])
+
+
 @needs_toolchain
 def test_a_certificate_for_another_circuit_is_not_bound(frozen, tmp_path):
     def other(docs, man):

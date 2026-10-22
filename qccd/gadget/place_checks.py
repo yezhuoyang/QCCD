@@ -42,7 +42,7 @@ PLACE_RULES = {
 CLASSICAL_FAMILIES = ("decoder", "archive")
 
 #: syndrome extraction happens inside these ops; between them a block only waits or moves
-SE_OPS = ("prep.", "se.", "zz", "xx", "inject")
+SE_OPS = ("prep.", "se.", "zz", "xx", "inject", "store", "refresh")
 #: a trapped-ion memory keeps its coherence for seconds; one second is the budget here
 COHERENCE_BUDGET_US = 1e6
 

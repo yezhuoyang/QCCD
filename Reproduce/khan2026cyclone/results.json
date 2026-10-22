@@ -39,6 +39,84 @@
     "circuit": "failed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "fails",
+      "core": true,
+      "count": 1464,
+      "examples": [
+       "c = circuit operation 756 (cx d24,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 757 (cx d36,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 758 (cx d60,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 759 (cx d120,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 760 (cx d148,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 761 (cx d150,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 762 (cx d152,a225): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 763 (cx d25,a226): gate_count(c) is 0 and 1 is 1"
+      ]
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "circuit": 1
    },
@@ -116,7 +194,7 @@
     },
     "config_name": "hgp225_cyclone"
    },
-   "seconds": 1.67
+   "seconds": 6.17
   },
   {
    "id": "hgp225_cyclone_zfix",
@@ -137,6 +215,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -196,7 +341,7 @@
     },
     "config_name": "hgp225_cyclone_zfix"
    },
-   "seconds": 2.33
+   "seconds": 6.33
   },
   {
    "id": "hgp375_cyclone",
@@ -217,6 +362,84 @@
     "circuit": "failed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "fails",
+      "core": true,
+      "count": 2472,
+      "examples": [
+       "c = circuit operation 1260 (cx d40,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1261 (cx d60,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1262 (cx d100,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1263 (cx d200,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1264 (cx d246,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1265 (cx d248,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1266 (cx d249,a375): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 1267 (cx d41,a376): gate_count(c) is 0 and 1 is 1"
+      ]
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "circuit": 1
    },
@@ -284,7 +507,7 @@
     },
     "config_name": "hgp375_cyclone"
    },
-   "seconds": 3.94
+   "seconds": 16.34
   },
   {
    "id": "hgp375_cyclone_zfix",
@@ -305,6 +528,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -364,7 +654,7 @@
     },
     "config_name": "hgp375_cyclone_zfix"
    },
-   "seconds": 4.6
+   "seconds": 17.14
   },
   {
    "id": "hgp625_cyclone",
@@ -385,6 +675,84 @@
     "circuit": "failed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "fails",
+      "core": true,
+      "count": 4152,
+      "examples": [
+       "c = circuit operation 2100 (cx d100,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2101 (cx d180,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2102 (cx d220,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2103 (cx d360,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2104 (cx d406,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2105 (cx d408,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2106 (cx d409,a625): gate_count(c) is 0 and 1 is 1",
+       "c = circuit operation 2107 (cx d101,a626): gate_count(c) is 0 and 1 is 1"
+      ]
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "circuit": 1
    },
@@ -452,7 +820,7 @@
     },
     "config_name": "hgp625_cyclone"
    },
-   "seconds": 13.09
+   "seconds": 48.71
   },
   {
    "id": "hgp625_cyclone_zfix",
@@ -473,6 +841,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -532,7 +967,7 @@
     },
     "config_name": "hgp625_cyclone_zfix"
    },
-   "seconds": 11.59
+   "seconds": 51.44
   },
   {
    "id": "hgp225_baseline_Gx15_c5",
@@ -553,6 +988,90 @@
     "circuit": "passed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "qccdsim",
+    "title": "QCCDSim's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "fails",
+      "core": true,
+      "count": 36,
+      "examples": [
+       "s = T30, t = t = 17645 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T60, t = t = 22620 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T36, t = t = 26255 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T36, t = t = 28765 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T34, t = t = 30085 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T34, t = t = 30875 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T34, t = t = 39645 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T34, t = t = 48270 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7"
+      ]
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R25",
+      "title": "Each qubit's operations keep the circuit's order",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "capacity": 14
    },
@@ -685,7 +1204,7 @@
     },
     "circuit_file": "QLPDC[[225,9,6]].qasm"
    },
-   "seconds": 4.66
+   "seconds": 5.18
   },
   {
    "id": "bb72_cyclone",
@@ -706,6 +1225,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -772,7 +1358,7 @@
     },
     "config_name": "bb72_cyclone"
    },
-   "seconds": 0.26
+   "seconds": 0.67
   },
   {
    "id": "bb90_cyclone",
@@ -793,6 +1379,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -859,7 +1512,7 @@
     },
     "config_name": "bb90_cyclone"
    },
-   "seconds": 0.7
+   "seconds": 1.23
   },
   {
    "id": "bb144_cyclone",
@@ -880,6 +1533,73 @@
     "circuit": "passed"
    },
    "ok": true,
+   "rules": {
+    "ruleset": "cyclone",
+    "title": "Cyclone's rules",
+    "ok": true,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R26",
+      "title": "Each qubit's gates keep the circuit's order, up to commuting CNOTs",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {},
    "first_violations": [],
    "notes": {},
@@ -946,7 +1666,7 @@
     },
     "config_name": "bb144_cyclone"
    },
-   "seconds": 1.2
+   "seconds": 3.2
   },
   {
    "id": "bb72_baseline_Gx9_c5",
@@ -967,6 +1687,87 @@
     "circuit": "passed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "qccdsim",
+    "title": "QCCDSim's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "fails",
+      "core": true,
+      "count": 5,
+      "examples": [
+       "s = T19, t = t = 8135 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T19, t = t = 10000 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T12, t = t = 21770 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T12, t = t = 22720 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T9, t = t = 58670 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7"
+      ]
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R25",
+      "title": "Each qubit's operations keep the circuit's order",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "capacity": 3
    },
@@ -1054,7 +1855,7 @@
     },
     "circuit_file": "QLPDC[[72,12,6]].qasm"
    },
-   "seconds": 0.51
+   "seconds": 0.62
   },
   {
    "id": "bb90_baseline_Gx10_c5",
@@ -1075,6 +1876,87 @@
     "circuit": "passed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "qccdsim",
+    "title": "QCCDSim's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "fails",
+      "core": true,
+      "count": 5,
+      "examples": [
+       "s = T25, t = t = 66245 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T30, t = t = 109110 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T30, t = t = 113685 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T30, t = t = 120195 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T13, t = t = 177490 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7"
+      ]
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R25",
+      "title": "Each qubit's operations keep the circuit's order",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "capacity": 3
    },
@@ -1162,7 +2044,7 @@
     },
     "circuit_file": "QLPDC[[90,8,10]].qasm"
    },
-   "seconds": 0.79
+   "seconds": 0.83
   },
   {
    "id": "bb144_baseline_Gx12_c5",
@@ -1183,6 +2065,89 @@
     "circuit": "passed"
    },
    "ok": false,
+   "rules": {
+    "ruleset": "qccdsim",
+    "title": "QCCDSim's rules",
+    "ok": false,
+    "results": [
+     {
+      "id": "R0",
+      "title": "Every operation finds its ions where it says they are",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R1",
+      "title": "A site holds at most its capacity",
+      "verdict": "fails",
+      "core": true,
+      "count": 7,
+      "examples": [
+       "s = T26, t = t = 14005 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T14, t = t = 16665 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T14, t = t = 17455 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T14, t = t = 19855 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T14, t = t = 21175 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T18, t = t = 176220 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7",
+       "s = T37, t = t = 219345 \u00b5s: occupancy(s, t) is 8 and capacity(s) is 7"
+      ]
+     },
+     {
+      "id": "R2",
+      "title": "A junction holds one ion at a time",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R3",
+      "title": "A rail carries at most its capacity",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R6b",
+      "title": "A two-ion gate acts on two ions standing in one site",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R8",
+      "title": "An ion does one thing at a time",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R14",
+      "title": "A split takes the ion at the end of its chain, or pays to reorder",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R24",
+      "title": "Every two-qubit gate of the circuit is performed, and no other",
+      "verdict": "holds",
+      "core": true
+     },
+     {
+      "id": "R25",
+      "title": "Each qubit's operations keep the circuit's order",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R27",
+      "title": "One operation at a time in a trap",
+      "verdict": "holds",
+      "core": false
+     },
+     {
+      "id": "R29",
+      "title": "Every operation lasts what the clock says",
+      "verdict": "holds",
+      "core": false
+     }
+    ]
+   },
    "violations": {
     "capacity": 4
    },
@@ -1275,7 +2240,7 @@
     },
     "circuit_file": "QLPDC[[144,12,12]].qasm"
    },
-   "seconds": 1.83
+   "seconds": 1.71
   }
  ],
  "ratios": [],
@@ -1304,15 +2269,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 55570.0,
-    "last_start_us": 55470.0,
-    "moves": 10584
+    "makespan_us": 209285.0,
+    "last_start_us": 209185.0,
+    "moves": 39852
    },
    "theirs": {
     "makespan_us": 124140.0,
@@ -1320,7 +2352,7 @@
     "moves": 23328
    },
    "theirs_ok": true,
-   "seconds": 1.78
+   "seconds": 13.6
   },
   {
    "id": "hgp375_ours",
@@ -1346,15 +2378,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 83455.0,
-    "last_start_us": 83355.0,
-    "moves": 26460
+    "makespan_us": 379315.0,
+    "last_start_us": 379215.0,
+    "moves": 120780
    },
    "theirs": {
     "makespan_us": 204800.0,
@@ -1362,7 +2461,7 @@
     "moves": 64800
    },
    "theirs_ok": true,
-   "seconds": 4.99
+   "seconds": 40.14
   },
   {
    "id": "hgp625_ours",
@@ -1388,15 +2487,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 136965.0,
-    "last_start_us": 136865.0,
-    "moves": 72300
+    "makespan_us": 674810.0,
+    "last_start_us": 674710.0,
+    "moves": 358200
    },
    "theirs": {
     "makespan_us": 341500.0,
@@ -1404,7 +2570,7 @@
     "moves": 180000
    },
    "theirs_ok": true,
-   "seconds": 11.71
+   "seconds": 109.72
   },
   {
    "id": "bb72_ours",
@@ -1430,15 +2596,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 17150.0,
-    "last_start_us": 17050.0,
-    "moves": 1080
+    "makespan_us": 764945.0,
+    "last_start_us": 764845.0,
+    "moves": 48708
    },
    "theirs": {
     "makespan_us": 42280.0,
@@ -1446,7 +2679,7 @@
     "moves": 2592
    },
    "theirs_ok": true,
-   "seconds": 0.13
+   "seconds": 12.7
   },
   {
    "id": "bb90_ours",
@@ -1472,15 +2705,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 18280.0,
-    "last_start_us": 18180.0,
-    "moves": 1440
+    "makespan_us": 387790.0,
+    "last_start_us": 387690.0,
+    "moves": 30870
    },
    "theirs": {
     "makespan_us": 52450.0,
@@ -1488,7 +2788,7 @@
     "moves": 4050
    },
    "theirs_ok": true,
-   "seconds": 0.3
+   "seconds": 7.51
   },
   {
    "id": "bb144_ours",
@@ -1514,15 +2814,82 @@
       "circuit": "passed"
      },
      "ok": true,
+     "rules": {
+      "ruleset": "cyclone",
+      "title": "Cyclone's rules",
+      "ok": true,
+      "results": [
+       {
+        "id": "R0",
+        "title": "Every operation finds its ions where it says they are",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R1",
+        "title": "A site holds at most its capacity",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R2",
+        "title": "A junction holds one ion at a time",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R3",
+        "title": "A rail carries at most its capacity",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R6b",
+        "title": "A two-ion gate acts on two ions standing in one site",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R8",
+        "title": "An ion does one thing at a time",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R24",
+        "title": "Every two-qubit gate of the circuit is performed, and no other",
+        "verdict": "holds",
+        "core": true
+       },
+       {
+        "id": "R25",
+        "title": "Each qubit's operations keep the circuit's order",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R27",
+        "title": "One operation at a time in a trap",
+        "verdict": "holds",
+        "core": false
+       },
+       {
+        "id": "R29",
+        "title": "Every operation lasts what the clock says",
+        "verdict": "holds",
+        "core": false
+       }
+      ]
+     },
      "violations": {},
      "first_violations": []
     }
    },
    "ok": true,
    "measured": {
-    "makespan_us": 22800.0,
-    "last_start_us": 22700.0,
-    "moves": 2880
+    "makespan_us": 3181350.0,
+    "last_start_us": 3181250.0,
+    "moves": 405360
    },
    "theirs": {
     "makespan_us": 81860.0,
@@ -1530,7 +2897,7 @@
     "moves": 10368
    },
    "theirs_ok": true,
-   "seconds": 0.66
+   "seconds": 112.64
   }
  ]
 }

@@ -2499,7 +2499,7 @@ function priceHead() {
 }
 function priceNote() {
   if (!READY || !PRICE) return '';
-  if (PRICE.blocked) return 'recompile in Python';
+  if (PRICE.blocked) return 'compile it again to price it';
   if (!EDITS.length && !PROG.length) return '';
   // THE FIFTH STATE.  The per-frame self-check compares each re-priced frame against the
   // cost PYTHON shipped for it; an AUTHORED programme has no such frames, so there is
@@ -2515,22 +2515,22 @@ function priceNote() {
     // a programme written HERE has no tsir pair to download: its return leg to Python is
     // the saved snapshot, which `qccd open` replays and prices from first principles
     if (AUTHORED) {
-      return 'no per-frame oracle: these frames were never priced by Python. ' +
+      return 'no per-frame reference: the checker never priced these frames. ' +
              'Save (ctrl+S) and run: python -m qccd open ' +
              ((STATE && STATE.name) || 'design') + '.studio.json';
     }
-    return 'no per-frame oracle: these frames were never priced by Python. ' +
+    return 'no per-frame reference: the checker never priced these frames. ' +
            'Download the pair and run: python -m qccd run ' + A.name +
            '.arch.json --tsir ' + A.name + '.tsir.json';
   }
   if (PRICE.frameDrift === 0) {
     return 're-priced client-side; every one of ' + fmt(PRICE.frameChecked) +
-           ' frames still agrees with the Python verifier';
+           ' frames still agrees with the checker';
   }
   if (!EDITS.some(function (o) { return priceAffecting(o); })) {
     return 'price unchanged: this model ignores the geometry you changed';
   }
-  return 're-priced client-side · re-verify in Python: ' +
+  return 're-priced in the browser · check it again with the checker: ' +
          'python -m qccd run ' + A.name + ' --program ' + P.name;
 }
 function priceAffecting(op) {
@@ -4488,10 +4488,12 @@ var HINTS = {
   'search': { t: 'Search', d: 'Type any words: every control on the page, its hint, and every lesson is indexed. Choose a hit to open where it lives, scroll to it and flash it. Ctrl+K focuses this box.' },
   'region:stage': { t: '2 \u00b7 Canvas', d: 'The device, drawn to scale. Drag a part to move it; drag empty space to pan; wheel to zoom; shift-drag one site onto another to join them with a rail.' },
   'region:bar':   { t: 'Transport', d: 'Plays the hardware programme on this device: every step is one instruction that moves, gates or measures ions.' },
+  'el:spur': { t: 'Spur', d: 'A short rail from the loop to a side site, where an ion can be parked. A parked ion stays put while the loop turns; moving onto the spur and back off it are the dock and undock moves.' },
   'region:dock':  { t: '4 \u00b7 Panel', d: 'One panel at a time, opened from the menu in the head: the course, the device as code, the machine settings, a place to write your own test programme, or the report. Press its menu item again to close it.' },
   'region:prog':  { t: '3 \u00b7 Program', d: 'The hardware programme one instruction per row, and the circuit it was compiled from, beside the animation: the executing instruction is marked and the next ones are in view. Hardware, Gates or Both.' },
-  'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both stacked. Only a compiled page has a circuit.' },
+  'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both side by side. Only a compiled page has a circuit.' },
   'progpin': { t: 'Beside the animation', d: 'Keep the programme in its own column next to the canvas, the whole height, or put it back among the panels to give the canvas the width.' },
+  'ruleset': { t: 'The paper’s rules', d: 'This schedule was written for another machine model: a paper’s. Its rule set, judged rule by rule when the page was built, comes first; hover a rule for its first counterexample or for why it does not apply. The badges after it are this website’s own rules, which the paper did not assume.' },
   // the picture, element by element
   'el:site':       { t: 'Trapping site', d: 'A pocket in the electric field where ions sit still. Each site holds a few ions (its capacity), and its zone says what may happen there: a gate, a measurement, cooling.', k: 'press the tile, then click the canvas' },
   'el:junction':   { t: 'Junction', d: 'A crossing where rails meet. Ions pass through it on the way somewhere else and never rest in it, and every crossing heats the ion a little.', k: 'press the tile, then click the canvas' },
@@ -4519,6 +4521,8 @@ var HINTS = {
   'phase':  { t: 'Phase', d: 'Jump to the next batch of instructions that run together.' },
   'reset':  { t: 'Reset', d: 'Back to the first instruction.', k: 'home' },
   'fit':    { t: 'Fit', d: 'Zoom so the whole device fills the canvas.', k: 'f' },
+  'zoom:in':  { t: 'Zoom in', d: 'Closer, about the middle of the canvas. The wheel (with or without Ctrl) zooms at the pointer.' },
+  'zoom:out': { t: 'Zoom out', d: 'Further away, about the middle of the canvas, as far out as twelve devices wide.' },
   'slider': { t: 'Position', d: 'Where you are in the programme. Drag to scrub.' },
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
@@ -4559,8 +4563,8 @@ var HINTS = {
   'gripDock': { t: 'Panels', d: 'Hide or show the side panels.', k: ']' },
   // the head
   'c:steps': { t: 'Steps', d: 'Instructions executed so far, out of the total. A step is one hardware instruction: a move, a gate, a measurement.' },
-  'c:cost':  { t: 'Cost', d: 'Heating spent so far, in motional quanta summed over every ion, out of the programme\u2019s total. Lower is better: a hot ion gates badly.' },
-  'm:cost':  { t: 'Cost', d: 'The heating the whole programme puts into the ions, in motional quanta. The number a design is judged by.' },
+  'c:cost':  { t: 'Cost', d: 'What the cost model has charged so far for moving ions -- shuttles, junction crossings, splits and merges -- out of the programme\u2019s total. Lower is better.' },
+  'm:cost':  { t: 'Cost', d: 'What the cost model charges for the whole programme\u2019s moves: shuttles, junction crossings, splits and merges. Lower is better. The heat the moves leave in the ions is peak n-bar, in Report.' },
   'm:steps': { t: 'Steps', d: 'How many hardware instructions the programme takes.' },
   'm:runtime': { t: 'Runtime', d: 'Wall-clock time to run the programme once.' },
   'm:quanta': { t: 'Quanta', d: 'Heating summed over every ion: moves, crossings and waiting.' },
@@ -4583,12 +4587,16 @@ var HINTS = {
   'menu': { t: 'Panels', d: 'One item per panel. Click to open it beside (or under) the canvas; click the lit item to close it and give the canvas the room back.' },
   'tab:L': { t: 'Learn', d: 'The course: what the machine is, how to build and program it by hand, every rule it must obey, and how to choose an architecture. Small lessons, each with an exercise the page checks.' },
   'learn:pick': { t: 'Lessons', d: 'Jump to any lesson. Stars show what you have passed.' },
+  'learn:lean': { t: 'The tutorial in Lean', d: 'The tutorial goes on past this page: Parts E onward are lessons whose code is Lean, checked as you type, on the site’s Learn page. Opens in a new tab.' },
   'learn:load': { t: 'Load', d: 'Put this lesson\u2019s device and programme on the canvas. Undo takes you back to what was there.' },
   'learn:check': { t: 'Check', d: 'Test your answer against what the page measures: the frames, the verdicts, the price.' },
-  'learn:hint': { t: 'Hint', d: 'Three hints, each deeper. Taking one costs nothing.' },
+  'learn:hint': { t: 'Hint', d: 'Shows you the next step: the page dims, the one control to press lights up, and a pointer makes the gesture. Taking it costs nothing.' },
+  'guide:do': { t: 'Show me', d: 'Do this one step for me, the way the pointer shows, and stay on the walk-through.' },
+  'guide:next': { t: 'Next', d: 'I have read this: on to the next step.' },
+  'guide:exit': { t: 'Close the walk-through', d: 'Back to the page as it was, with nothing dimmed. Hint brings it back where you left off.' },
   'learn:solution': { t: 'Solution', d: 'Show one way to do it, applied to the canvas so you can read it back.' },
   'learn:next': { t: 'Next', d: 'On to the next lesson.' },
-  'learn:verdict': { t: 'Python\u2019s verdict', d: 'Five rules are not checked in the browser. For these lessons the page carries the verdict Python computed on this exact programme when the page was built \u2014 the rule, its state, and the verifier\u2019s own sentences.' },
+  'learn:verdict': { t: 'The checker\u2019s verdict', d: 'Some rules are not checked in the browser. For these lessons the page carries the verdict the checker computed on this exact programme when the page was built \u2014 the rule, its state, and the verifier\u2019s own sentences.' },
   'p:init': { t: 'p.init', d: 'Puts named ions on named sites: p.init({"d0": "S0"}). The first line of every programme; a device starts empty.' },
   'p:shuttle': { t: 'p.shuttle', d: 'Pushes one ion along a path of site ids, one rail per step: p.shuttle("d0", ["S0", "S1", "S2"]). A third argument names the movement class (default: shuttle).' },
   'p:move': { t: 'p.move', d: 'One ion, one hop: p.move("d0", "S0", "S1"). The same thing p.shuttle does for one rail.' },
@@ -4601,7 +4609,7 @@ var HINTS = {
   'p:rotate': { t: 'p.rotate', d: 'Turns a closed loop: p.rotate(2) moves every ion on it two sites forward, p.rotate(-1) one site back. One instruction, every ion.' },
   'p:barrier': { t: 'p.barrier', d: 'A step in which nothing happens; a marker between phases of a programme.' },
   'p:decode': { t: 'p.decode', d: 'Calls the decoder: p.decode() sends the outcomes of every ion measured since the last decode down the wires to the decoder, and its correction on to the classical memory. p.decode(["a0"]) names them. It moves no ion and takes no machine time -- the decoder works alongside the ions -- and the wires light while it runs.' },
-  'tab:R': { t: 'Report', d: 'The verdict: every cost figure with its provenance, and each of the 27 hardware rules \u2014 passed, failed, or not checkable here.' },
+  'tab:R': { t: 'Report', d: 'The verdict: every cost figure with its provenance, and each hardware rule \u2014 passed, failed, partly checked, or not checked on this page.' },
   'follow': { t: 'Follow', d: 'Keep the executing instruction scrolled into view.', k: 'F' },
   'filter': { t: 'Filter', d: 'Show only the rows containing this text.', k: '/' },
   'evaluate': { t: 'Evaluate', d: 'Price the programme, check it against the rules, and play it.' },
@@ -4938,12 +4946,16 @@ function courseFacts() {
 function lessonLoad(id) {
   var L = lessonById(id);
   if (!L) return { ok: false, problems: [{ code: 'no_lesson', message: 'no lesson ' + id }] };
+  // a lesson is the tutorial: the page enters course mode, which is what shows the Learn
+  // tab at all (a design page has none -- render.py, `inCourse`)
+  try { if (typeof document !== 'undefined' && document.body && document.body.setAttribute) document.body.setAttribute('data-course', '1'); } catch (e) { /* no DOM */ }
   if (GHOST) cancel();
   if (ARMED_EL) arm(null);
   if (FORM) openForm(null);
   LSTATE = { id: id, stage: 0, attempts: 0, hints: 0, recorded: {}, feedback: null,
              answer: null, passed: false, shown: false };
   var r = runSteps(L.setup);
+  if (r.ok) lessonText();
   if (r.ok) r = enterStage(L, 0);
   if (!r.ok) {
     LSTATE.feedback = { kind: 'bad', text: 'this lesson could not be set up: ' + r.problems[0].message };
@@ -4987,8 +4999,17 @@ function enterStage(L, k) {
     var r = runSteps(st.setup);
     if (!r.ok) return r;
     setSelection([]);
+    lessonText();
   }
   return { ok: true };
+}
+// A LESSON'S PROGRAMME IS SHOWN, not the one typed before it.  The Write pane keeps text
+// the reader typed through every repaint, and a stage that loads a new programme never
+// said the old text was done with -- so step 2 of R1 ran a programme while the pane still
+// showed step 1's (found walking every lesson by its Hint, 2026-10-17).
+function lessonText() {
+  var ta = $('pwText');
+  if (ta) { ta._touched = false; ta.value = programSource(); }
 }
 function lessonTask(L) {
   if (!L) return null;
@@ -5172,7 +5193,7 @@ var CHECKS = {
     var v = shippedVerdict(id, which);
     if (!v) return { ok: false, why: 'no shipped verdict for ' + id, have: null, facts: {} };
     var s = (v.focus && v.focus.rule === rule) ? v.focus.state : verdictState(v.rules, rule);
-    return { ok: s === state, why: rule + ' is ' + s + ' in Python\u2019s verdict', have: s,
+    return { ok: s === state, why: rule + ' is ' + s + ' in the checker\u2019s verdict', have: s,
              facts: { rule: rule, state: s, gateError: v.metrics ? v.metrics.gate_error_sum : undefined } };
   },
   // the price is withheld: the programme asks for something the device cannot price
@@ -5313,7 +5334,7 @@ function lessonCheck() {
       LSTATE.attempts++;
       var nudge = pickNudge(L, r);
       // the third miss opens the next hint on its own: nobody should have to ask
-      if (LSTATE.attempts >= 3 && L.hints && LSTATE.hints < L.hints.length) LSTATE.hints++;
+      if (LSTATE.attempts >= 3 && !GUIDE && guideSpec(L, LSTATE.stage)) LSTATE.guideNext = 1;
       LSTATE.feedback = { kind: 'bad', text: nudge };
     }
   } else {
@@ -5343,15 +5364,14 @@ function lessonCheck() {
   }
   renderLearn();
   renderLessonStrip();
+  if (LSTATE.guideNext) { LSTATE.guideNext = 0; guideStart(); }
   return { ok: !!r.ok, why: r.why, pred: r.pred, have: r.have, stage: LSTATE.stage, passed: LSTATE.passed,
            feedback: LSTATE.feedback ? LSTATE.feedback.text : '' };
 }
+// HINT IS THE WALK-THROUGH (`guideStart`, below): what it returns is the step it shows.
 function lessonHint() {
-  var L = lessonById(LSTATE.id);
-  if (!L || !L.hints) return null;
-  if (LSTATE.hints < L.hints.length) LSTATE.hints++;
-  renderLearn();
-  return L.hints[LSTATE.hints - 1];
+  var g = guideStart();
+  return g && g.say ? g.say : null;
 }
 function lessonSolution(opts) {
   var L = lessonById(LSTATE.id);
@@ -5488,7 +5508,8 @@ function renderLearn() {
     var first = COURSE.lessons[0];
     h += '<div class="learn-story">A course for people who have never seen one of these machines: ' +
          COURSE.lessons.length + ' lessons in ' + COURSE.parts.length + ' parts, each a few minutes, each with an exercise this page checks.</div>' +
-         '<div class="learn-btns"><button class="p" id="lnLoad" data-hint="learn:load">Start with ' + esc2(first.id) + ' \u00b7 ' + esc2(first.title) + '</button></div>';
+         '<div class="learn-btns"><button class="p" id="lnLoad" data-hint="learn:load">Start with ' + esc2(first.id) + ' \u00b7 ' + esc2(first.title) + '</button></div>' +
+         continuesNote();
     host.innerHTML = h;
     wireLearn(host);
     return;
@@ -5511,7 +5532,7 @@ function renderLearn() {
   h += '<div class="learn-btns">' +
        '<button id="lnLoad" data-hint="learn:load">Load</button>' +
        '<button class="p" id="lnCheck" data-hint="learn:check">Check</button>' +
-       '<button id="lnHint" data-hint="learn:hint"' + (L.hints && LSTATE.hints < L.hints.length ? '' : ' disabled') + '>Hint</button>' +
+       '<button id="lnHint" data-hint="learn:hint"' + (guideSpec(L, LSTATE.stage) ? '' : ' disabled') + '>Hint</button>' +
        '<button id="lnSol" data-hint="learn:solution"' + (L.solution ? '' : ' disabled') + '>Solution</button>' +
        '<button id="lnGo" data-hint="learn:next"' + (LSTATE.passed ? ' class="p"' : '') + '>Next \u25b6</button></div></div>';
   if (L.page && !D.source) {
@@ -5526,22 +5547,33 @@ function renderLearn() {
          (LSTATE.feedback.stars ? '<span class="learn-fbstars">' + starsOf(LSTATE.feedback.stars, starsMax(L)) + '</span>' : '') +
          esc2(LSTATE.feedback.text).replace(/\n/g, '<br>') + '</div>';
   }
-  if (LSTATE.hints > 0) {
-    h += '<div class="learn-hints">';
-    for (i = 0; i < LSTATE.hints; i++) h += '<div class="learn-hint"><span>' + (i + 1) + '</span>' + inline(L.hints[i]) + '</div>';
-    h += '</div>';
-  }
   if (LSTATE.passed && (L.boundary || L.challenge)) {
     var extra = (L.boundary && stars < 2) ? L.boundary : (L.challenge && stars < 3) ? L.challenge : null;
-    if (extra) h += '<div class="learn-ex extra"><div class="learn-exh">' + (extra === L.boundary ? 'Second star \u00b7 the boundary' : 'Third star \u00b7 sharp') + '</div><div>' + inline(extra.exercise) + '</div></div>';
+    if (extra) h += '<div class="learn-ex extra"><div class="learn-exh">' + (extra === L.boundary ? 'Second star \u00b7 the boundary' : (L.boundary ? 'Third' : 'Second') + ' star \u00b7 sharp') + '</div><div>' + inline(extra.exercise) + '</div></div>';
   }
+  // the last lesson here, passed: where the tutorial goes on
+  if (LSTATE.passed && COURSE.lessons[COURSE.lessons.length - 1].id === L.id) h += continuesNote();
   host.innerHTML = h;
   wireLearn(host);
 }
+// The tutorial's Lean parts (tutorial.js `continues`), one link each to its place in the Learn
+// page's contents.  Only links: their lessons run on the site, never on this page.
+function continuesNote() {
+  var C = COURSE && COURSE.continues;
+  if (!C || !C.parts || !C.parts.length) return '';
+  var h = '<div class="learn-note">The tutorial goes on in Lean, checked as you type, on the Learn page:' +
+          '<ul style="margin:4px 0 0 18px;padding:0">';
+  for (var i = 0; i < C.parts.length; i++) {
+    var p = C.parts[i];
+    h += '<li><a href="' + esc2(C.href + '#part-' + p.id) + '" target="_blank" rel="noopener" data-hint="learn:lean">' +
+         esc2('Part ' + p.id + ' \u00b7 ' + p.title) + '</a></li>';
+  }
+  return h + '</ul></div>';
+}
 function renderVerdict(vd) {
   var V = shippedVerdict(vd['case'], vd.which);
-  if (!V) return '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">Python\u2019s verdict</div><div class="mut">this page carries no verdict for case ' + esc2(vd['case']) + '</div></div>';
-  var h = '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">Python\u2019s verdict on the ' +
+  if (!V) return '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">The checker\u2019s verdict</div><div class="mut">this page carries no verdict for case ' + esc2(vd['case']) + '</div></div>';
+  var h = '<div class="learn-verdict" data-hint="learn:verdict"><div class="learn-exh">The checker\u2019s verdict on the ' +
           (vd.which === 'fixed' ? 'repaired' : 'loaded') + ' programme \u00b7 computed when this page was built \u00b7 ' + esc2(V.model || '') + ' model</div>';
   var f = V.focus, i;
   if (f) {
@@ -5571,7 +5603,7 @@ function wireLearn(host) {
   var on = function (id, f) { var e = $(id); if (e) e.onclick = function () { f(); unfocus(e); }; };
   on('lnLoad', function () { lessonLoad(LSTATE.id || (COURSE.lessons[0] && COURSE.lessons[0].id)); });
   on('lnCheck', lessonCheck);
-  on('lnHint', lessonHint);
+  on('lnHint', guideStart);
   on('lnSol', lessonSolution);
   on('lnGo', lessonNext);
   on('lnNext', lessonNext);
@@ -5597,9 +5629,795 @@ function renderLessonStrip() {
   if (el.style) el.style.display = '';
   var c = $('lsCheck'), hh = $('lsHint');
   if (c) c.onclick = function () { lessonCheck(); unfocus(c); setPaneL(); };
-  if (hh) hh.onclick = function () { lessonHint(); unfocus(hh); setPaneL(); };
+  if (hh) hh.onclick = function () { guideStart(); unfocus(hh); };
 }
 function setPaneL() { if (typeof setPane === 'function') setPane('L'); }
+
+// ================================================================== THE GUIDE: Hint, shown
+//
+// HINT SHOWS, IT DOES NOT TELL (asked 2026-10-17: "the website will highlight the button he
+// should click in the next step, with description -- like a video game: only the button is
+// highlighted, and the rest of the page becomes dim -- so even a reader who does not
+// understand English can click Hint, find the button, and complete the task").  The three
+// text hints asked a reader to turn a paragraph into gestures; this does the turning.
+//
+// A guide is the task as GOALS, states the page can see -- a site at (1, 0), a rail between
+// two of them, the programme reads so and was evaluated, the check passed -- each reached
+// by STEPS, one control and one gesture each.  Hint dims the page, rings the first step of
+// the first goal not yet met, draws its gesture (a left or a right click, a shift-drag from
+// here to there, the lines to type), and lets nothing but that control take a press.  The
+// page is read again four times a second, so whatever the reader does by hand counts, in
+// any order, and undoing it brings the step back.
+//
+// Most guides are not written at all: a lesson's SOLUTION already says what passes, so a
+// programme becomes "make these lines read so, Evaluate, Check" and an answer "this one,
+// Check" (`guideDerive`).  A lesson whose solution is a gesture (place, join, select, a
+// form) writes its `guide` in tutorial.js.  `tests/guide.mjs` follows every guide with real
+// mouse and keyboard input until the lesson passes -- which is what keeps a guide, and the
+// lesson text beside it, honest about what the page actually does.
+var GUIDE = null;          // { id, stage, goals, seen, at, timer, drawn, finished }
+
+function guideTask(les, k) {
+  return les.stages ? les.stages[Math.min(k, les.stages.length - 1)] : les;
+}
+function guideSpec(les, k) {
+  var task = guideTask(les, k);
+  return task.guide || guideDerive(les, k);
+}
+// THE SOLUTION, AS GESTURES.  Only verbs a reader reaches by typing or choosing are derived;
+// anything else (a canvas gesture, a form) has no derivation and the lesson must write one.
+function guideDerive(les, k) {
+  var sol = les.solution || {}, steps = null, out = [], i;
+  if (sol.program !== undefined) steps = [['applyProgramSource', sol.program]];
+  else if (sol.stages) steps = sol.stages[k] || null;
+  else if (sol.steps) steps = sol.steps;
+  else if (sol.answer !== undefined) steps = [['setAnswer', sol.answer]];
+  if (!steps) return null;
+  for (i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    if (s[0] === 'fit') continue;
+    if (s[0] === 'applyProgramSource') out.push(['edit', s[1]], ['evaluate', s[1]]);
+    else if (s[0] === 'setAnswer') out.push(['answer', s[1]]);
+    else if (s[0] === 'seekTo') out.push(['row', s[1]]);
+    else if (s[0] === 'loadCase') {
+      var c = (D.tutorial_cases || {})[s[1]];
+      var recs = c ? (s[2] === 'fixed' ? c.fixed : c.program) : null;
+      if (!recs) return null;
+      var src = Q.renderProgramSource(recs);
+      out.push(['edit', src], ['evaluate', src]);
+    } else return null;
+  }
+  out.push(['check']);
+  return out;
+}
+
+// ---- where things are -----------------------------------------------------------------
+function gdQ(sel) {
+  if (String(sel).slice(0, 6) === 'label:') return gdLabelled(String(sel).slice(6));
+  try { return (document.querySelector && document.querySelector(sel)) || null; } catch (err) { return null; }
+}
+// `label:<text>`: the input in the form row whose label reads <text> (a schema form's
+// fields are numbered, not named)
+function gdLabelled(text) {
+  var rows = (document.querySelectorAll && document.querySelectorAll('.fieldrow')) || [], i;
+  for (i = 0; i < rows.length; i++) {
+    var lab = rows[i].querySelector ? rows[i].querySelector('label') : null;
+    if (lab && String(lab.textContent).trim() === text && gdBox(rows[i])) return rows[i].querySelector('input, select, textarea');
+  }
+  return null;
+}
+function gdBox(el) {
+  if (!el || !el.getBoundingClientRect) return null;
+  var r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return null;
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+}
+function gdLattice(x, y) { return toClient(L.ox + x * L.sx, L.oy + y * (L.sy || L.sx)); }
+function gdNodePt(n) { return n ? toClient(px(n), py(n)) : null; }
+// a node named by id, or by the lattice point it stands on
+function gdNode(ref) {
+  if (typeof ref === 'string') return nodeById[ref] || null;
+  if (!ref || !STATE || !STATE.device) return null;
+  var best = null, id;
+  for (id in STATE.device.nodes) if (has(STATE.device.nodes, id)) {
+    var n = nodeById[id];
+    if (n && Math.abs(n.x - ref[0]) < 0.3 && Math.abs(n.y - ref[1]) < 0.3) best = n;
+  }
+  return best;
+}
+function gdJoined(a, b) {
+  if (!a || !b || !STATE || !STATE.device) return false;
+  for (var sid in STATE.device.segments) if (has(STATE.device.segments, sid)) {
+    var s = STATE.device.segments[sid];
+    if ((s.a === a.id && s.b === b.id) || (s.a === b.id && s.b === a.id)) return true;
+  }
+  return false;
+}
+function gdSelected(id) {
+  for (var i = 0; i < SELSET.length; i++) if (SELSET[i].id === id) return true;
+  return false;
+}
+function gdStage() { return gdBox(svg); }
+// hidden by a scrolling panel it sits in, or off the window
+function gdClipped(el) {
+  var b = gdBox(el), W = window.innerWidth || 0, H = window.innerHeight || 0;
+  if (!b) return false;
+  if (b.x < 0 || b.y < 0 || b.x + b.w > W || b.y + b.h > H) return true;
+  for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    var cs = (typeof getComputedStyle === 'function') ? getComputedStyle(p) : null;
+    if (!cs || !/auto|scroll|hidden/.test(String(cs.overflow) + cs.overflowY)) continue;
+    var r = gdBox(p);
+    if (r && (b.y < r.y - 1 || b.y + b.h > r.y + r.h + 1 || b.x < r.x - 1 || b.x + b.w > r.x + r.w + 1)) return true;
+  }
+  return false;
+}
+function gdReveal(el) {
+  try { if (el && el.scrollIntoView && gdClipped(el)) el.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (err) { /* the shim */ }
+}
+// can a press at the ring's centre reach the thing the ring is round?  Asked of the
+// browser's own hit test, so a card, a panel or a scroll edge in the way says no.
+function gdReachable(st, pt) {
+  if (!pt || !document.elementFromPoint) return false;
+  var hit = document.elementFromPoint(pt.x, pt.y);
+  if (!hit) return false;
+  if (st.canvas) return hit === svg || !!(svg.contains && svg.contains(hit));
+  var t = st.el ? st.el() : null;
+  return !!t && (hit === t || !!(t.contains && t.contains(hit)));
+}
+function gdInside(pt, b, pad) {
+  pad = pad || 0;
+  return !!pt && !!b && pt.x >= b.x + pad && pt.x <= b.x + b.w - pad && pt.y >= b.y + pad && pt.y <= b.y + b.h - pad;
+}
+function gdPane() { try { return PANE; } catch (err) { return null; } }
+function gdPop() { try { return POP; } catch (err) { return null; } }
+function gdCol() { try { return !!PROG_COL; } catch (err) { return false; } }
+function gdTry(f) { try { return !!f(); } catch (err) { return false; } }
+function gdRec(src) {
+  // a programme as its statements, so spacing and quoting never decide "it reads so"
+  var p = Q.parse(String(src || ''));
+  if (p.errors.length || p.arch.length) return null;
+  return JSON.stringify(p.prog.map(function (r) { return [r.method, r.args, r.kwargs]; }));
+}
+function gdApplied() {
+  return PROG.length ? JSON.stringify(PROG.map(function (r) { return [r.method, r.args, r.kwargs]; })) : null;
+}
+
+// ---- the steps --------------------------------------------------------------------------
+// A step: { say, gesture, el() | pts() | box(), here(), act(), code, next }.  `here` says the
+// step's own state is already on the page (the tab is open, the tile is armed); the step
+// shown is the one after the last step that is `here`.
+var PANE_NAME = { L: 'Learn', P: 'Program', A: 'Device', M: 'Machine', W: 'Write', R: 'Report' };
+function gsTab(k) {
+  if (k === 'P' && gdCol()) return null;        // the programme sits beside the animation
+  return { say: 'Open the ' + PANE_NAME[k] + ' tab.', gesture: 'click', nav: true,
+           el: function () { return gdQ('#tab' + k); },
+           // current AND on the screen: the website's studio opens with the dock folded
+           here: function () { return gdPane() === k && !!gdBox(gdQ('#pane' + k)); },
+           act: function () { setPane(k); } };
+}
+var TOOL_BTN = { start: 'tbStart', row: 'tbRows', block: 'tbMachine', component: 'tbComponents' };
+var TOOL_NAME = { start: 'Start', row: 'Append a row', block: 'Machine settings', component: 'Components' };
+function gsTool(key, say) {
+  return { say: say || 'Open ' + TOOL_NAME[key] + ' in the tools bar.', gesture: 'click', nav: true,
+           el: function () { return gdQ('#' + TOOL_BTN[key]); },
+           here: function () { return gdPop() === key; },
+           act: function () { openPop(key); } };
+}
+function gsTile(type, say) {
+  return { say: say, gesture: 'click', nav: true,
+           el: function () { return gdQ('#palBody .pal-item[data-el="' + type + '"]'); },
+           here: function () { return ARMED_EL === type || !!(FORM && FORM.type === type); },
+           act: function () { var b = gdQ('#palBody .pal-item[data-el="' + type + '"]'); if (b) b.click(); } };
+}
+function gsPress(sel, say, here) {
+  return { say: say, gesture: 'click', nav: true, el: function () { return gdQ(sel); },
+           here: here ? function () { return gdTry(here); } : null,
+           act: function () { var b = gdQ(sel); if (b) b.click(); } };
+}
+function gsFill(sel, value, say) {
+  return { say: say, gesture: 'type', code: String(value), fill: String(value),
+           el: function () { return gdQ(sel); },
+           here: function () { var e = gdQ(sel); return !!e && String(e.value).trim() === String(value); },
+           act: function () { var e = gdQ(sel); if (e) { e.value = String(value); gdFire(e, 'input'); gdFire(e, 'change'); } } };
+}
+function gsPick(sel, value, say) {
+  return { say: say, gesture: 'pick', code: String(value), pick: String(value),
+           el: function () { return gdQ(sel); },
+           here: function () { var e = gdQ(sel); return !!e && e.value === String(value); },
+           act: function () { var e = gdQ(sel); if (e) { e.value = String(value); gdFire(e, 'change'); } } };
+}
+function gsView(v) {
+  var id = { prog: 'avB', dev: 'avD', src: 'avS' }[v], name = { prog: 'Program', dev: 'Device', src: 'Source' }[v];
+  return { say: 'Press ' + name + '.', gesture: 'click', nav: true, el: function () { return gdQ('#' + id); },
+           here: function () { try { return ARCHVIEW === v; } catch (err) { return false; } },
+           act: function () { setArchView(v); } };
+}
+function gdSpaced(t) { return String(t || '').replace(/\s+/g, ''); }
+function gsLine(sel, text, say) {
+  function typing() {
+    var e = gdQ(sel); if (!e) return null;
+    var v = String(e.value);
+    return { range: [v.length, v.length], text: (v && v.slice(-1) !== '\n' ? '\n' : '') + text + '\n' };
+  }
+  return { say: say || 'Type this line at the end.', gesture: 'type', code: text, el: function () { return gdQ(sel); },
+           typing: typing,
+           here: function () { var e = gdQ(sel); return !!e && gdSpaced(e.value).indexOf(gdSpaced(text)) >= 0; },
+           act: function () { var e = gdQ(sel), t = typing(); if (e && t) { e.value = e.value + t.text; gdFire(e, 'input'); } } };
+}
+function gdFire(el, type) {
+  try { el.dispatchEvent(new Event(type, { bubbles: true })); } catch (err) { /* the shim */ }
+}
+// the Check button where the reader already is: the Write pane carries one in its strip
+function gsCheck() {
+  return { say: 'Press Check.', gesture: 'click',
+           el: function () {
+             var s = gdQ('#lsCheck');
+             if (gdPane() === 'W' && gdBox(s)) return s;
+             return gdBox(gdQ('#lnCheck')) ? gdQ('#lnCheck') : gdQ('#tabL');
+           },
+           act: function () { lessonCheck(); } };
+}
+
+// ---- the goals --------------------------------------------------------------------------
+// Each spec entry is a UI step (it waits for the goal after it) or a goal (it closes one).
+function guideCompile(spec) {
+  var goals = [], wait = [], i;
+  function goal(done, steps, label) {
+    goals.push({ done: done, steps: wait.concat(steps.filter(Boolean)), label: label || '' });
+    wait = [];
+  }
+  for (i = 0; i < (spec || []).length; i++) {
+    var s = spec[i], v = s[0];
+    if (v === 'tab') { var t = gsTab(s[1]); if (t) wait.push(t); }
+    else if (v === 'tool') wait.push(gsTool(s[1], s[2]));
+    else if (v === 'tile') wait.push(gsTile(s[1], s[2]));
+    else if (v === 'press') wait.push(gsPress(s[1], s[2], s[3]));
+    else if (v === 'fill') wait.push(gsFill(s[1], s[2], s[3]));
+    else if (v === 'pick') wait.push(gsPick(s[1], s[2], s[3]));
+    else if (v === 'view') wait.push(gsView(s[1]));
+    else if (v === 'line') wait.push(gsLine(s[1], s[2], s[3]));
+    else if (v === 'fresh') goal.apply(null, guideFresh(s[1]));
+    else if (v === 'goal') goal(function (c) { return function () { return evalCheck(c).ok; }; }(s[1]), [], s[2]);
+    else if (v === 'look') { var lk = guideLook(s[1], s[2]); goal(lk.done, [lk]); }
+    else if (v === 'snap') goal(function () { return !!SNAP; },
+      [gsPress('#tSnap', 'Turn on Snap: what you place lands on the grid.')]);
+    else if (v === 'site' || v === 'junction') goal.apply(null, guidePlace(v, s[1], s[2], s[3] || {}));
+    else if (v === 'rail') goal.apply(null, guideRail(s[1], s[2]));
+    else if (v === 'box') goal.apply(null, guideBox(s[1]));
+    else if (v === 'click') goal.apply(null, guideClickNode(s[1], s[2], s[3]));
+    else if (v === 'menu') goal.apply(null, guideMenu(s[1], s[2], s[3], s[4]));
+    else if (v === 'edit') goal.apply(null, guideEdit(s[1]));
+    else if (v === 'evaluate') goal.apply(null, guideEvaluate(s[1]));
+    else if (v === 'answer') goal.apply(null, guideAnswer(s[1]));
+    else if (v === 'row') goal.apply(null, guideRow(s[1]));
+    else if (v === 'stmt') goal.apply(null, guideStmt(s[1]));
+    else if (v === 'check') goal(function () {
+      return LSTATE.id === GUIDE.id && (LSTATE.passed || LSTATE.stage > GUIDE.stage);
+    }, [gsCheck()], 'check');
+  }
+  if (wait.length) goal(function () { return false; }, []);
+  return goals;
+}
+function guideFresh(pts) {
+  return [function () {
+    if (!STATE || !STATE.device) return true;
+    for (var id in STATE.device.nodes) if (has(STATE.device.nodes, id)) {
+      var n = nodeById[id], ok = false;
+      for (var i = 0; n && i < pts.length; i++) if (Math.abs(n.x - pts[i][0]) < 0.3 && Math.abs(n.y - pts[i][1]) < 0.3) ok = true;
+      if (!ok) return false;
+    }
+    return true;
+  }, [gsTab('L'), gsPress('#lnLoad', 'Press Load: this exercise starts again, from an empty chip.')], 'fresh'];
+}
+function guideLook(sel, say) {
+  var key = 'look:' + sel + ':' + say;
+  return { say: say, gesture: 'look', next: true, key: key,
+           el: function () { return gdQ(sel); },
+           done: function () { return !!(GUIDE && GUIDE.seen[key]); },
+           act: function () { if (GUIDE) GUIDE.seen[key] = 1; } };
+}
+function guidePlace(kind, x, y, o) {
+  var zone = o.zone || null, chip = !!o.chip;
+  var arm = chip
+    ? { say: 'Press the ' + zone + ' chip: the next site will be a ' + zone + ' site.', gesture: 'click', nav: true,
+        el: function () { return gdQ('#palBody .zonechip[data-zone="' + zone + '"]'); },
+        here: function () { return ARMED_EL === 'site' && NEW_ZONE === zone; },
+        act: function () { var b = gdQ('#palBody .zonechip[data-zone="' + zone + '"]'); if (b) b.click(); } }
+    : gsTile(kind, kind === 'junction' ? 'Press Junction.' : 'Press Trapping site.');
+  var put = { say: 'Click here to put it down.', gesture: 'click', canvas: true,
+              pts: function () { return [gdLattice(x, y)]; },
+              act: function () { API.addNodeAt(x, y, { kind: kind === 'junction' ? 'junction' : 'site', zone: zone || undefined }); } };
+  return [function () {
+    var n = gdNode([x, y]);
+    return !!n && (kind === 'junction' ? n.kind === 'junction' : n.kind !== 'junction') && (!zone || n.zone === zone);
+  }, [arm, put], kind + ' at ' + x + ',' + y];
+}
+function guideRail(a, b) {
+  return [function () { return gdJoined(gdNode(a), gdNode(b)); },
+    [{ say: 'Hold Shift and drag from this part to that one: a rail joins them.', gesture: 'shiftdrag', canvas: true,
+       pts: function () { var p = gdNodePt(gdNode(a)), q = gdNodePt(gdNode(b)); return p && q ? [p, q] : null; },
+       act: function () { var na = gdNode(a), nb = gdNode(b); if (na && nb) API.joinNodes(na.id, nb.id); } }], 'rail'];
+}
+function guideBox(refs) {
+  function nodes() { var out = []; for (var i = 0; i < refs.length; i++) { var n = gdNode(refs[i]); if (n) out.push(n); } return out; }
+  return [function () {
+    var ns = nodes(); if (ns.length !== refs.length) return false;
+    for (var i = 0; i < ns.length; i++) if (!gdSelected(ns[i].id)) return false;
+    return true;
+  }, [{ say: 'Hold Shift and drag a box around all of these: that selects them.', gesture: 'shiftdrag', canvas: true, box: true,
+        pts: function () {
+          var ns = nodes(); if (!ns.length) return null;
+          var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, i, pad = Math.max(18, 0.42 * (L.g || 40) * fitBox().k);
+          for (i = 0; i < ns.length; i++) { var p = gdNodePt(ns[i]); x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+          return [{ x: x0 - pad, y: y0 - pad }, { x: x1 + pad, y: y1 + pad }];
+        },
+        act: function () { setSelection(nodes().map(function (n) { return { kind: n.kind === 'junction' ? 'junction' : 'site', id: n.id }; })); } }], 'select'];
+}
+function guideClickNode(ref, check, say) {
+  return [function () { return evalCheck(check).ok; },
+    [{ say: say || 'Click this part.', gesture: 'click', canvas: true,
+       pts: function () { var p = gdNodePt(gdNode(ref)); return p ? [p] : null; },
+       act: function () { var n = gdNode(ref); if (n) setSelection([{ kind: n.kind === 'junction' ? 'junction' : 'site', id: n.id }]); } }], 'click'];
+}
+function guideMenu(ref, item, check, say) {
+  return [function () { return evalCheck(check).ok; }, [
+    { say: 'Right-click this part: its menu opens.', gesture: 'right', canvas: true, nav: true,
+      pts: function () { var p = gdNodePt(gdNode(ref)); return p ? [p] : null; },
+      here: function () { return !!(MENU && !MDLG); },
+      act: function () { var n = gdNode(ref); if (n) menuOpen(px(n), py(n)); } },
+    { say: say || 'Press this item in the menu.', gesture: 'click',
+      el: function () { return gdQ('#ctxmenu .cmitem[data-item="' + item + '"]'); },
+      act: function () { menuInvoke(item); } }], 'menu ' + item];
+}
+// THE PROGRAMME, one change at a time: the first block of lines where the pane and the
+// solution differ, as lines to take out and lines to put in.  Re-read every tick, so a
+// change the reader types by hand is a change the guide stops asking for.
+function guideHunk(cur, want) {
+  var a = String(cur).replace(/\r/g, '').split('\n'), b = String(want).replace(/\r/g, '').split('\n');
+  var norm = function (s) { return s.replace(/\s+$/, ''); };
+  while (a.length && !norm(a[a.length - 1])) a.pop();
+  while (b.length && !norm(b[b.length - 1])) b.pop();
+  var n = a.length, m = b.length, i, j, T = [];
+  for (i = 0; i <= n; i++) { T.push([]); for (j = 0; j <= m; j++) T[i].push(0); }
+  for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) {
+    T[i][j] = norm(a[i]) === norm(b[j]) ? T[i + 1][j + 1] + 1 : Math.max(T[i + 1][j], T[i][j + 1]);
+  }
+  i = 0; j = 0;
+  while (i < n && j < m && norm(a[i]) === norm(b[j])) { i++; j++; }
+  if (i === n && j === m) return null;
+  var a0 = i, b0 = j;
+  // walk the edit script until the two agree again
+  while (i < n || j < m) {
+    if (i < n && j < m && norm(a[i]) === norm(b[j]) && T[i][j] === T[i + 1][j + 1] + 1) break;
+    if (j < m && (i >= n || T[i][j + 1] >= T[i + 1][j])) j++; else i++;
+  }
+  var lines = a.slice(0, a0).concat(b.slice(b0, j), a.slice(i));
+  var next = lines.join('\n') + (lines.length ? '\n' : '');
+  // the same change as one replacement of characters, for a keyboard to make
+  var s = 0, src = String(cur).replace(/\r/g, '');
+  while (s < src.length && s < next.length && src[s] === next[s]) s++;
+  var e1 = src.length, e2 = next.length;
+  while (e1 > s && e2 > s && src[e1 - 1] === next[e2 - 1]) { e1--; e2--; }
+  return { line: a0, del: a.slice(a0, i), add: b.slice(b0, j), before: a0 > 0 ? a[a0 - 1] : null,
+           range: [s, e1], text: next.slice(s, e2), next: next };
+}
+function guideEdit(src) {
+  var want = gdRec(src);
+  return [function () {
+    var ta = gdQ('#pwText'), have = ta ? ta.value : programSource();
+    return want !== null && gdRec(have) === want;
+  }, [gsTab('W'),
+    { say: 'Change the programme: take out the red lines, type the green ones.', gesture: 'type', edit: true,
+      el: function () { return gdQ('#pwText'); },
+      hunk: function () { var ta = gdQ('#pwText'); return ta ? guideHunk(ta.value, src) : null; },
+      typing: function () { var ta = gdQ('#pwText'); return ta ? guideHunk(ta.value, src) : null; },
+      act: function () {
+        var ta = gdQ('#pwText'), h = ta ? guideHunk(ta.value, src) : null;
+        if (!h) return;
+        ta.value = h.next; ta._touched = true; gdFire(ta, 'input');
+      } }], 'edit'];
+}
+function guideEvaluate(src) {
+  var want = gdRec(src);
+  return [function () { return want !== null && gdApplied() === want && !PARSE_ERRS.length; },
+    [gsTab('W'), gsPress('#pwRun', 'Press Evaluate: the page runs the programme.')], 'evaluate'];
+}
+function guideAnswer(id) {
+  return [function () { return LSTATE.answer === id; }, [gsTab('L'),
+    { say: 'Choose this answer.', gesture: 'click',
+      el: function () { var i = gdQ('#learnBody input[name="lnChoice"][value="' + id + '"]'); return i && i.parentNode ? i.parentNode : i; },
+      act: function () { setAnswer(id); renderLearn(); } }], 'answer'];
+}
+function guideRow(which) {
+  function row() {
+    var f = frameFor(which);
+    if (f < 0) return -1;
+    try { for (var r = 0; r < VIEW.length; r++) if (VIEW[r] === f) return r; } catch (err) { /* no list */ }
+    return -1;
+  }
+  return [function () { return typeof frame === 'number' && frame === frameFor(which); }, [gsTab('P'),
+    { say: 'Click this instruction: the animation jumps to it.', gesture: 'click',
+      el: function () {
+        var r = row(); if (r < 0) return null;
+        var e = gdQ('#pWin [data-row="' + r + '"]');
+        if (!gdBox(e) && typeof PLIST !== 'undefined' && PLIST && PLIST.scrollToRow) { PLIST.scrollToRow(r, 'center'); e = gdQ('#pWin [data-row="' + r + '"]'); }
+        return e;
+      },
+      act: function () { seekTo(which); } }], 'row'];
+}
+function guideStmt(k) {
+  function row() { try { var op = SRC.ops[k]; return op ? op.line - 1 : -1; } catch (err) { return -1; } }
+  return [function () { return evalCheck(['frameIs', 'realises:' + k]).ok; }, [
+    gsPress('#tabQ', 'Open the Circuit pane.', function () { var q = gdQ('#paneQ'); return !!gdBox(q); }),
+    { say: 'Click this statement: the animation jumps to the instruction that carries it out.', gesture: 'click',
+      el: function () {
+        var r = row(); if (r < 0) return null;
+        var e = gdQ('#qWin [data-row="' + r + '"]');
+        if (!gdBox(e) && typeof QLIST !== 'undefined' && QLIST && QLIST.scrollToRow) { QLIST.scrollToRow(r, 'center'); e = gdQ('#qWin [data-row="' + r + '"]'); }
+        return e;
+      },
+      act: function () { seekTo('realises:' + k); } }], 'statement'];
+}
+
+// ---- running it -------------------------------------------------------------------------
+function guideStart() {
+  var les = lessonById(LSTATE.id);
+  if (!les) return null;
+  var spec = guideSpec(les, LSTATE.stage);
+  if (!spec) { toast('warn', 'this step has no guide yet'); return null; }
+  if (GUIDE && GUIDE.timer) clearInterval(GUIDE.timer);
+  GUIDE = { id: les.id, stage: LSTATE.stage, goals: guideCompile(spec), seen: {}, drawn: '', finished: 0 };
+  LSTATE.hints++;
+  if (typeof setInterval === 'function') GUIDE.timer = setInterval(guideTick, 250);
+  guideTick();
+  return guideState();
+}
+function guideStop() {
+  if (GUIDE && GUIDE.timer) clearInterval(GUIDE.timer);
+  GUIDE = null;
+  guideDraw(null);
+  return { ok: true };
+}
+// the goal and the step the reader is on: the first goal not met, and in it the step after
+// the last one whose own state is already on the page
+function guideNow() {
+  if (!GUIDE) return null;
+  for (var g = 0; g < GUIDE.goals.length; g++) {
+    var G = GUIDE.goals[g];
+    if (gdTry(G.done)) continue;
+    var at = 0, j;
+    for (j = 0; j < G.steps.length; j++) if (G.steps[j].nav && G.steps[j].here && gdTry(G.steps[j].here)) at = j + 1;
+    while (at < G.steps.length - 1 && !G.steps[at].nav && G.steps[at].here && gdTry(G.steps[at].here)) at++;
+    var st = G.steps[Math.min(at, G.steps.length - 1)] || null;
+    // a control scrolled out of its panel is brought into view, or the ring would circle
+    // a place the reader cannot see (Control plane's apply sits below a long form)
+    if (st && st.el && !st.canvas) gdReveal(st.el());
+    // a point on the canvas that the view has scrolled away from: bring the device back first
+    if (st && st.canvas) {
+      var pts = null; try { pts = st.pts(); } catch (err) { pts = null; }
+      var stage = gdStage(), off = !pts;
+      for (var p = 0; pts && p < pts.length; p++) if (!gdInside(pts[p], stage, 6)) off = true;
+      if (off) st = { say: 'Press Fit: the whole device comes into view.', gesture: 'click',
+                      el: function () { return gdQ('#fit'); }, act: function () { if (typeof fit === 'function') fit(); } };
+    }
+    return { g: g, step: st };
+  }
+  return null;
+}
+function guideTick() {
+  if (!GUIDE) return;
+  if (LSTATE.id !== GUIDE.id) { guideStop(); return; }
+  var les = lessonById(GUIDE.id);
+  if (LSTATE.passed && !GUIDE.finished) {
+    GUIDE.finished = 1;
+    guideDraw({ finished: true });
+    setTimeout(function () { if (GUIDE && GUIDE.finished) guideStop(); }, 2600);
+    return;
+  }
+  if (GUIDE.finished) return;
+  if (LSTATE.stage !== GUIDE.stage) {
+    // the next step of a staged lesson carries straight on
+    var spec = guideSpec(les, LSTATE.stage);
+    if (!spec) { guideStop(); return; }
+    GUIDE.stage = LSTATE.stage; GUIDE.goals = guideCompile(spec); GUIDE.seen = {};
+  }
+  guideDraw(guideNow());
+}
+// what a harness needs to make the gesture the guide asks for
+function guideState() {
+  if (!GUIDE) return { active: false, passed: !!LSTATE.passed };
+  var now = guideNow(), st = now ? now.step : null, out = {
+    active: true, id: GUIDE.id, stage: GUIDE.stage, finished: !!GUIDE.finished, passed: !!LSTATE.passed,
+    goal: now ? now.g : GUIDE.goals.length, goals: GUIDE.goals.length, label: now ? GUIDE.goals[now.g].label : ''
+  };
+  if (!st) return out;
+  out.say = st.say; out.gesture = st.gesture; out.next = !!st.next;
+  var hb = guideHoles(st);
+  out.holes = hb.holes; out.from = hb.from; out.to = hb.to;
+  out.reachable = st.next ? true : gdReachable(st, hb.from);
+  if (st.el) { var e = st.el(); out.el = e && e.id ? '#' + e.id : null; }
+  if (st.fill !== undefined) out.fill = st.fill;
+  if (st.pick !== undefined) out.pick = st.pick;
+  if (st.typing) { var h = st.typing(); if (h) { out.range = h.range; out.text = h.text; if (h.add) { out.del = h.del; out.add = h.add; } } }
+  return out;
+}
+function guideDo() {
+  var now = guideNow();
+  if (!now || !now.step || !now.step.act) return { ok: false };
+  now.step.act();
+  guideTick();
+  return { ok: true };
+}
+function guideNext() {
+  var now = guideNow();
+  if (now && now.step && now.step.next && now.step.act) now.step.act();
+  guideTick();
+  return guideState();
+}
+// the rectangles to cut out of the dimming, and a drag's two ends
+function guideHoles(st) {
+  var holes = [], from = null, to = null;
+  if (st.canvas) {
+    var pts = null; try { pts = st.pts(); } catch (err) { pts = null; }
+    if (pts && pts.length) {
+      var R = Math.max(16, 0.38 * (L.g || 40) * fitBox().k);
+      if (st.box) {
+        holes.push({ x: Math.min(pts[0].x, pts[1].x), y: Math.min(pts[0].y, pts[1].y),
+                     w: Math.abs(pts[1].x - pts[0].x), h: Math.abs(pts[1].y - pts[0].y) });
+      } else {
+        for (var i = 0; i < pts.length; i++) holes.push({ x: pts[i].x - R, y: pts[i].y - R, w: 2 * R, h: 2 * R });
+      }
+      from = pts[0]; to = pts.length > 1 ? pts[pts.length - 1] : null;
+    }
+  } else if (st.el) {
+    var b = gdBox(st.el());
+    if (b) { holes.push({ x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }); from = { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
+  }
+  return { holes: holes, from: from, to: to };
+}
+
+// ---- drawing it -------------------------------------------------------------------------
+// ONE LAYER OVER THE PAGE: a dimming with holes cut where the reader may press, four
+// transparent panels around them that take every other press, a pulsing ring, a pointer
+// that makes the gesture, and a card.  The card speaks in pictures first -- a mouse with
+// the left or the right button lit, the Shift key, a keyboard, the lines to type in red and
+// green -- and in one short sentence after.
+var GD_CSS = '#gdRoot{position:fixed;left:0;top:0;width:0;height:0;z-index:10000;font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}' +
+  '#gdRoot .gdb{position:fixed;pointer-events:auto;background:transparent}' +
+  // the studio's sheet paints every svg with the panel colour: these must stay see-through
+  '#gdRoot svg{background:transparent!important}' +
+  '#gdDim{position:fixed;left:0;top:0;pointer-events:none}' +
+  '#gdRoot .gdr{position:fixed;pointer-events:none;border:3px solid #ffb020;border-radius:10px;animation:gdPulse 1.1s ease-in-out infinite}' +
+  '#gdRoot .gdr.gdx{animation:gdShake .35s ease-in-out 2}' +
+  '@keyframes gdPulse{0%,100%{box-shadow:0 0 0 2px rgba(255,176,32,.3),0 0 10px rgba(255,176,32,.5)}50%{box-shadow:0 0 0 8px rgba(255,176,32,.1),0 0 26px rgba(255,176,32,.9)}}' +
+  '@keyframes gdShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}' +
+  '#gdHand{position:fixed;pointer-events:none;width:40px;height:40px;margin:-4px 0 0 -6px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}' +
+  '#gdTap{position:fixed;pointer-events:none;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid #ffb020;opacity:0}' +
+  '#gdTap.on{animation:gdTap 1.1s ease-out infinite}' +
+  '@keyframes gdTap{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.5);opacity:0}}' +
+  '#gdCard{position:fixed;pointer-events:auto;width:300px;max-width:calc(100vw - 24px);background:#fff;color:#182230;border:2px solid #ffb020;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.4);padding:10px 12px 9px}' +
+  '#gdCard .gdtop{display:flex;align-items:center;gap:10px}' +
+  '#gdCard .gdpic{flex:0 0 auto;display:flex;align-items:center;gap:4px}' +
+  '#gdCard .gdpic svg{display:block}' +
+  '#gdCard .gdsay{flex:1 1 auto;font-weight:600;font-size:13.5px;line-height:1.35}' +
+  '#gdCard .gddots{display:flex;gap:4px;margin:7px 0 0}' +
+  '#gdCard .gddots i{width:9px;height:9px;border-radius:50%;background:#e4e7ec}' +
+  '#gdCard .gddots i.on{background:#ffb020}#gdCard .gddots i.ok{background:#12b76a}' +
+  '#gdCard pre{margin:8px 0 0;padding:6px 8px;background:#f8f9fb;border-radius:6px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}' +
+  '#gdCard pre .gdc{color:#98a2b3}#gdCard pre .gdm{color:#b42318;text-decoration:line-through;background:#fef3f2;display:block}#gdCard pre .gdp{color:#067647;background:#ecfdf3;display:block;font-weight:600}' +
+  '#gdCard .gdbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}' +
+  '#gdCard button{font:inherit;font-size:12px;border:1px solid #d0d5dd;background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;color:#182230}' +
+  '#gdCard button.p{background:#ffb020;border-color:#ffb020;color:#1d2939;font-weight:650}' +
+  '#gdCard .gdok{font-size:15px;font-weight:700;color:#067647;text-align:center;padding:6px 0}';
+var GD = null;              // the layer's elements, made once
+function gdSvg(tag, attrs) {
+  var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (var k in attrs) if (has(attrs, k)) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function gdLayer() {
+  if (GD) return GD;
+  if (typeof document === 'undefined' || !document.body || !document.createElementNS || !document.head) return null;
+  var css = document.createElement('style'); css.id = 'gdCss'; css.textContent = GD_CSS; document.head.appendChild(css);
+  var root = document.createElement('div'); root.id = 'gdRoot'; root.style.display = 'none';
+  var dim = gdSvg('svg', { id: 'gdDim' });
+  var blocks = [], i;
+  for (i = 0; i < 4; i++) {
+    var b = document.createElement('div'); b.className = 'gdb';
+    b.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); gdNudge(); }, true);
+    b.addEventListener('contextmenu', function (ev) { ev.preventDefault(); ev.stopPropagation(); }, true);
+    blocks.push(b); root.appendChild(b);
+  }
+  root.appendChild(dim);
+  var tap = document.createElement('div'); tap.id = 'gdTap'; root.appendChild(tap);
+  var hand = gdSvg('svg', { id: 'gdHand', viewBox: '0 0 40 40' });
+  hand.innerHTML = '<path d="M6 3 L6 30 L13 23.5 L18 35 L23 33 L18 21.5 L27 21.5 Z" fill="#fff" stroke="#111" stroke-width="2.2" stroke-linejoin="round"/>' +
+                   '<g id="gdKey"></g>';
+  root.appendChild(hand);
+  var card = document.createElement('div'); card.id = 'gdCard'; root.appendChild(card);
+  document.body.appendChild(root);
+  GD = { root: root, dim: dim, blocks: blocks, rings: [], tap: tap, hand: hand, card: card, anim: null };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(gdAnimate);
+  return GD;
+}
+function gdNudge() {
+  if (!GD) return;
+  for (var i = 0; i < GD.rings.length; i++) {
+    var r = GD.rings[i]; r.className = 'gdr'; void r.offsetWidth; r.className = 'gdr gdx';
+  }
+}
+// pictures for the card: a mouse with a button lit, the Shift key, a keyboard, an eye, a list
+function gdPic(g) {
+  var mouse = function (side) {
+    return '<svg width="30" height="42" viewBox="0 0 30 42"><rect x="2" y="2" width="26" height="38" rx="13" fill="#fff" stroke="#344054" stroke-width="2"/>' +
+      '<path d="M15 2 V17 M2 17 H28" stroke="#344054" stroke-width="2"/>' +
+      (side === 'left' ? '<path d="M15 3 V16 H3 V15 A12 12 0 0 1 15 3 Z" fill="#ffb020"/>' : '') +
+      (side === 'right' ? '<path d="M15 3 V16 H27 V15 A12 12 0 0 0 15 3 Z" fill="#ffb020"/>' : '') + '</svg>';
+  };
+  var shift = '<svg width="44" height="30" viewBox="0 0 44 30"><rect x="1.5" y="1.5" width="41" height="27" rx="5" fill="#fff" stroke="#344054" stroke-width="2"/>' +
+    '<path d="M22 6 L13 15 H18 V23 H26 V15 H31 Z" fill="#ffb020" stroke="#344054" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  var arrow = '<svg width="26" height="20" viewBox="0 0 26 20"><path d="M2 10 H20 M14 4 L21 10 L14 16" fill="none" stroke="#344054" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var keys = '<svg width="46" height="30" viewBox="0 0 46 30"><rect x="1.5" y="1.5" width="43" height="27" rx="4" fill="#fff" stroke="#344054" stroke-width="2"/>' +
+    '<g fill="#ffb020"><rect x="6" y="6" width="6" height="5" rx="1"/><rect x="14" y="6" width="6" height="5" rx="1"/><rect x="22" y="6" width="6" height="5" rx="1"/><rect x="30" y="6" width="9" height="5" rx="1"/>' +
+    '<rect x="6" y="13" width="8" height="5" rx="1"/><rect x="16" y="13" width="6" height="5" rx="1"/><rect x="24" y="13" width="6" height="5" rx="1"/><rect x="32" y="13" width="7" height="5" rx="1"/><rect x="11" y="20" width="24" height="5" rx="1"/></g></svg>';
+  var eye = '<svg width="40" height="28" viewBox="0 0 40 28"><path d="M2 14 C10 2 30 2 38 14 C30 26 10 26 2 14 Z" fill="#fff" stroke="#344054" stroke-width="2"/><circle cx="20" cy="14" r="6" fill="#ffb020" stroke="#344054" stroke-width="2"/></svg>';
+  var list = '<svg width="34" height="30" viewBox="0 0 34 30"><rect x="1.5" y="1.5" width="31" height="11" rx="3" fill="#fff" stroke="#344054" stroke-width="2"/><path d="M23 5 L26 9 L29 5" fill="none" stroke="#344054" stroke-width="2"/>' +
+    '<rect x="1.5" y="15" width="31" height="13" rx="3" fill="#fff4dc" stroke="#ffb020" stroke-width="2"/></svg>';
+  if (g === 'right') return mouse('right');
+  if (g === 'shiftdrag') return shift + mouse('left') + arrow;
+  if (g === 'drag') return mouse('left') + arrow;
+  if (g === 'type') return keys;
+  if (g === 'pick') return list;
+  if (g === 'look') return eye;
+  return mouse('left');
+}
+function gdEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function guideDraw(now) {
+  var G = gdLayer();
+  if (!G) return;
+  if (!now) { G.root.style.display = 'none'; G.anim = null; if (GUIDE) GUIDE.drawn = ''; return; }
+  var W = window.innerWidth || 1200, H = window.innerHeight || 800;
+  var st = now.step || null, hb = st ? guideHoles(st) : { holes: [], from: null, to: null };
+  var h = st && st.edit ? st.hunk() : null;
+  var sig = JSON.stringify([now.finished ? 'done' : now.g, st ? st.say : '', hb.holes.map(function (r) {
+    return [Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h)]; }), h ? h.range.concat([h.text]) : 0, W, H,
+    st && st.typing && st.el && st.el() ? [st.el().scrollTop, String(st.el().value).length] : 0]);
+  if (GUIDE && GUIDE.drawn === sig) return;
+  if (GUIDE) GUIDE.drawn = sig;
+  G.root.style.display = '';
+  // the dimming, with a hole for every place a press is wanted
+  G.dim.setAttribute('width', W); G.dim.setAttribute('height', H);
+  var holes = hb.holes, m = '<defs><mask id="gdMask"><rect width="' + W + '" height="' + H + '" fill="#fff"/>', i;
+  for (i = 0; i < holes.length; i++) m += '<rect x="' + holes[i].x + '" y="' + holes[i].y + '" width="' + holes[i].w + '" height="' + holes[i].h + '" rx="10" fill="#000"/>';
+  m += '</mask></defs><rect width="' + W + '" height="' + H + '" fill="rgba(9,13,22,.62)" mask="url(#gdMask)"/>';
+  // WHERE IN THE TEXT: a band over the line the change goes in, and a marker beside it, so
+  // "type the green lines" says at which line without a word
+  var band = st && st.typing && st.el ? gdLineBand(st.el(), st.typing()) : null;
+  if (band) {
+    m += '<rect x="' + band.x + '" y="' + band.y + '" width="' + band.w + '" height="' + band.h + '" rx="3" fill="rgba(255,176,32,.28)" stroke="#ffb020" stroke-width="1.5"/>' +
+         '<path d="M' + (band.x - 16) + ' ' + (band.y + band.h / 2 - 8) + ' L' + (band.x - 3) + ' ' + (band.y + band.h / 2) + ' L' + (band.x - 16) + ' ' + (band.y + band.h / 2 + 8) + ' Z" fill="#ffb020"/>';
+  }
+  if (st && st.gesture && (st.gesture === 'shiftdrag' || st.gesture === 'drag') && hb.to && !st.box) {
+    m += '<path d="M' + hb.from.x + ' ' + hb.from.y + ' L' + hb.to.x + ' ' + hb.to.y + '" stroke="#ffb020" stroke-width="4" stroke-dasharray="9 7" fill="none"/>';
+  }
+  G.dim.innerHTML = m;
+  // everything outside the holes takes the press and says "not there"
+  var u = null;
+  for (i = 0; i < holes.length; i++) {
+    var r = holes[i];
+    u = u ? { x0: Math.min(u.x0, r.x), y0: Math.min(u.y0, r.y), x1: Math.max(u.x1, r.x + r.w), y1: Math.max(u.y1, r.y + r.h) }
+          : { x0: r.x, y0: r.y, x1: r.x + r.w, y1: r.y + r.h };
+  }
+  var bx = u ? [[0, 0, W, u.y0], [0, u.y1, W, H - u.y1], [0, u.y0, u.x0, u.y1 - u.y0], [u.x1, u.y0, W - u.x1, u.y1 - u.y0]]
+             : [[0, 0, W, H], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+  if (now.finished || (st && st.next)) bx = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+  for (i = 0; i < 4; i++) {
+    var s = G.blocks[i].style;
+    s.left = bx[i][0] + 'px'; s.top = bx[i][1] + 'px'; s.width = Math.max(0, bx[i][2]) + 'px'; s.height = Math.max(0, bx[i][3]) + 'px';
+  }
+  // a ring round each hole
+  while (G.rings.length < holes.length) { var rg = document.createElement('div'); rg.className = 'gdr'; G.root.insertBefore(rg, G.tap); G.rings.push(rg); }
+  for (i = 0; i < G.rings.length; i++) {
+    var ring = G.rings[i];
+    if (i < holes.length) {
+      ring.style.display = ''; ring.style.left = (holes[i].x - 3) + 'px'; ring.style.top = (holes[i].y - 3) + 'px';
+      ring.style.width = holes[i].w + 'px'; ring.style.height = holes[i].h + 'px';
+    } else ring.style.display = 'none';
+  }
+  // the pointer making the gesture
+  G.anim = (!now.finished && st && hb.from && st.gesture !== 'look' && st.gesture !== 'type' && st.gesture !== 'pick')
+    ? { g: st.gesture, from: hb.from, to: hb.to, box: !!st.box, t0: Date.now() } : null;
+  var key = G.hand.querySelector ? G.hand.querySelector('#gdKey') : null;
+  if (key) key.innerHTML = G.anim && G.anim.g === 'shiftdrag'
+    ? '<rect x="22" y="0" width="17" height="13" rx="3" fill="#ffb020" stroke="#111" stroke-width="1.4"/><path d="M30.5 2.5 L26 7.5 H28.5 V11 H32.5 V7.5 H35 Z" fill="#111"/>'
+    : G.anim && G.anim.g === 'right'
+      ? '<rect x="23" y="1" width="14" height="19" rx="7" fill="#fff" stroke="#111" stroke-width="1.4"/><path d="M30 1.5 A6.5 6.5 0 0 1 36.5 8 H30 Z" fill="#ffb020" stroke="#111" stroke-width="1"/>'
+      : '';
+  G.hand.style.display = G.anim ? '' : 'none';
+  G.tap.className = G.anim && (G.anim.g === 'click' || G.anim.g === 'right') ? 'on' : '';
+  if (G.anim) { G.tap.style.left = hb.from.x + 'px'; G.tap.style.top = hb.from.y + 'px'; }
+  // the card
+  var c = '';
+  if (now.finished) {
+    c = '<div class="gdok">★ ✓</div>';
+  } else if (st) {
+    c += '<div class="gdtop"><div class="gdpic">' + gdPic(st.gesture) + '</div><div class="gdsay">' + gdEsc(st.say) + '</div></div>';
+    if (h) {
+      var pre = '';
+      if (h.before !== null) pre += '<span class="gdc">' + gdEsc(h.before) + '</span>\n';
+      for (i = 0; i < h.del.length; i++) pre += '<span class="gdm">− ' + gdEsc(h.del[i]) + '</span>';
+      for (i = 0; i < h.add.length; i++) pre += '<span class="gdp">+ ' + gdEsc(h.add[i]) + '</span>';
+      c += '<pre>' + pre + '</pre>';
+    } else if (st.fill !== undefined || st.pick !== undefined || st.code) {
+      c += '<pre><span class="gdp">' + gdEsc(st.fill !== undefined ? st.fill : st.pick !== undefined ? st.pick : st.code) + '</span></pre>';
+    }
+    var dots = '';
+    for (i = 0; i < GUIDE.goals.length; i++) dots += '<i class="' + (i < now.g ? 'ok' : i === now.g ? 'on' : '') + '"></i>';
+    c += '<div class="gddots">' + dots + '</div>';
+    c += '<div class="gdbtns">' + (st.next ? '<button class="p" id="gdNext" data-hint="guide:next">Next ▶</button>' : '') +
+         (st.act && !st.next ? '<button id="gdDo" data-hint="guide:do">Show me</button>' : '') +
+         '<button id="gdExit" data-hint="guide:exit">✕</button></div>';
+  } else {
+    c = '<div class="gdtop"><div class="gdsay">…</div></div><div class="gdbtns"><button id="gdExit" data-hint="guide:exit">✕</button></div>';
+  }
+  G.card.innerHTML = c;
+  var nb = G.card.querySelector('#gdNext'), db = G.card.querySelector('#gdDo'), xb = G.card.querySelector('#gdExit');
+  if (nb) nb.onclick = function () { guideNext(); };
+  if (db) db.onclick = function () { guideDo(); };
+  if (xb) xb.onclick = function () { guideStop(); };
+  gdPlaceCard(G.card, u, W, H);
+}
+// the line a typed change starts on, as a rectangle on the screen: the text before the
+// change counts the lines, the field's own metrics place them, and the field is scrolled
+// so that line is in view
+function gdLineBand(ta, t) {
+  if (!ta || !t || !t.range || typeof getComputedStyle !== 'function') return null;
+  var b = gdBox(ta); if (!b) return null;
+  var cs = getComputedStyle(ta), lh = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 12) * 1.4;
+  var pad = parseFloat(cs.paddingTop) || 0, padL = parseFloat(cs.paddingLeft) || 0;
+  var before = String(ta.value).slice(0, t.range[0]), line = before.split('\n').length - 1;
+  if (t.add && t.line !== undefined) line = t.line;
+  var rows = Math.max(1, t.add ? Math.max(t.add.length, (t.del || []).length) : 1);
+  var y = b.y + pad + line * lh - ta.scrollTop;
+  if (y < b.y || y + lh > b.y + b.h) {
+    ta.scrollTop = Math.max(0, pad + line * lh - b.h / 3);
+    y = b.y + pad + line * lh - ta.scrollTop;
+  }
+  return { x: b.x + padL - 2, y: y - 1, w: b.w - padL - 6, h: Math.min(rows * lh + 2, b.y + b.h - y) };
+}
+// the card goes beside the holes, never over them
+function gdPlaceCard(card, u, W, H) {
+  var cw = card.offsetWidth || 300, ch = card.offsetHeight || 120, gap = 14, x, y;
+  if (!u) { card.style.left = Math.round((W - cw) / 2) + 'px'; card.style.top = Math.round((H - ch) / 2) + 'px'; return; }
+  var cands = [
+    [u.x0, u.y1 + gap], [u.x1 - cw, u.y1 + gap], [u.x0, u.y0 - ch - gap], [u.x1 - cw, u.y0 - ch - gap],
+    [u.x1 + gap, u.y0], [u.x0 - cw - gap, u.y0], [u.x1 + gap, u.y1 - ch], [u.x0 - cw - gap, u.y1 - ch]
+  ];
+  var best = null, i;
+  for (i = 0; i < cands.length; i++) {
+    x = Math.min(Math.max(8, cands[i][0]), W - cw - 8); y = Math.min(Math.max(48, cands[i][1]), H - ch - 8);
+    var clear = x + cw <= u.x0 - 2 || x >= u.x1 + 2 || y + ch <= u.y0 - 2 || y >= u.y1 + 2;
+    if (clear) { best = [x, y]; break; }
+  }
+  if (!best) best = [Math.min(Math.max(8, u.x1 + gap), W - cw - 8), Math.min(Math.max(48, u.y0), H - ch - 8)];
+  card.style.left = Math.round(best[0]) + 'px'; card.style.top = Math.round(best[1]) + 'px';
+}
+// the pointer: it travels to a click and presses, or drags from one end to the other
+function gdAnimate() {
+  if (GD && GD.anim) {
+    var a = GD.anim, t = ((Date.now() - a.t0) % 1800) / 1800, x, y;
+    if (a.to && (a.g === 'shiftdrag' || a.g === 'drag')) {
+      var k = t < 0.15 ? 0 : t > 0.8 ? 1 : (t - 0.15) / 0.65;
+      k = k * k * (3 - 2 * k);
+      x = a.from.x + (a.to.x - a.from.x) * k; y = a.from.y + (a.to.y - a.from.y) * k;
+    } else {
+      var lift = t < 0.5 ? (1 - t / 0.5) : 0;
+      x = a.from.x + 26 * lift; y = a.from.y + 26 * lift;
+    }
+    GD.hand.style.left = x + 'px'; GD.hand.style.top = y + 'px';
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(gdAnimate);
+}
 
 // verbs the lessons use that had no API entry of their own
 function seekTo(which) {
@@ -5624,7 +6442,7 @@ function boot() {
   // The engine keeps no copy, so this must happen before the first `serialize()`.
   if (!D.schema) {
     WHY_NOT = 'this page was emitted without the schema, so the browser cannot tell ' +
-              'which documents the Python loader will accept';
+              'which documents the checker will accept';
     return;
   }
   try { Q.setSchema(D.schema); E.setBounds(D.schema.bounds); }
@@ -5663,7 +6481,7 @@ function boot() {
       if (Q.LAYOUT_CONSTS[k] !== consts[k]) {
         WHY_NOT = 'the engine and this page disagree about the layout constant ' + k +
                   ' (' + Q.LAYOUT_CONSTS[k] + ' vs ' + consts[k] + '), so the picture it ' +
-                  'would draw is not the picture Python measured';
+                  'would draw is not the picture the checker measured';
         return;
       }
     }
@@ -5864,7 +6682,7 @@ function newCanvas(opts) {
   // Seed the one key that makes a blank canvas RUNNABLE. `control.model` is required by
   // the schema, and without it `declare_class` is refused ("$.control: missing required
   // key 'model'") -- so a from-scratch device could be built and exported but never
-  // priced, and every one of the 27 rules stayed `unchecked` forever. `simd_classes` is
+  // priced, and every rule stayed `unchecked` forever. `simd_classes` is
   // the model every shipped architecture uses; `set_control` changes it.
   // Plus the smallest primitive set that makes a device PRICEABLE. Without these,
   // `declare_class` succeeds and pricing then dies on "architecture declares no
@@ -6584,9 +7402,9 @@ function framesAsTsir(stem) {
 
 // ------------------------------------------------------------------- the verdicts
 //
-// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 27 is
-// state-free; the browser re-derives 21 of them off the pricing walk; the other 6 need
-// Python, and each is named WITH ITS REASON rather than being absent.
+// THREE STATES PER RULE, and the header counts rather than saying "all".  1 of the 28 is
+// state-free; the browser re-derives 21 of them (that one included) off the pricing walk;
+// the other 7 need Python, and each is named WITH ITS REASON rather than being absent.
 var RULES = null;
 function ruleReport() { return RULES; }
 
@@ -6631,12 +7449,12 @@ function evaluateNow(model) {
       RULES.checked = [];
       RULES.passed = [];
       RULES.withdrawn = "this page's own rule counts disagree with the verifier that " +
-                        'produced it; trust Python, not this page';
+                        'produced it; trust the checker, not this page';
     }
   }
 }
 
-// 27 entries, one per rule, each with its state and its reason.  The header text is
+// One entry per rule, each with its state and its reason.  The header text is
 // DERIVED from this array and never written down.
 function ruleCoverage() {
   var all = (D.evidence && D.evidence.rules_all) || [];
@@ -9845,13 +10663,17 @@ function blockForm(host, e) {
   }
   for (i = 0; i < editable.length; i++) {
     var ent = editable[i], v = pathGet(live, ent.parts);
-    var ctrl = textInput('bf_' + i, v === undefined || v === null ? '' : v);
-    if (ent.f.inert) ctrl.setAttribute('disabled', 'disabled');
+    // A LIST OR A MAP IS NOT A FIELD: drawn as text it read "[object Object]" (Control
+    // plane's channels.roles, found walking lesson A5).  It is shown as what it holds, and
+    // left alone by apply -- one value per box is what this form can write back.
+    ent.obj = v !== null && typeof v === 'object';
+    var ctrl = textInput('bf_' + i, v === undefined || v === null ? '' : ent.obj ? JSON.stringify(v) : v);
+    if (ent.f.inert || ent.obj) ctrl.setAttribute('disabled', 'disabled');
     if (ent.f.default !== undefined && ent.f.default !== null) {
       ctrl.setAttribute('placeholder', String(ent.f.default));
     }
     host.append(fieldRow(ent.parts.join('.'), ctrl,
-                         ent.f.inert ? 'nothing reads this' : ''));
+                         ent.f.inert ? 'nothing reads this' : ent.obj ? 'a record: change it in Source' : ''));
   }
   var skipped = e.fields.length - editable.length;
   var bar = elh('div', 'formbtns');
@@ -9860,7 +10682,7 @@ function blockForm(host, e) {
     var flat = {}, j, changed = 0;
     for (j = 0; j < editable.length; j++) {
       var en = editable[j];
-      if (en.f.inert) continue;
+      if (en.f.inert || en.obj) continue;
       var raw = val('bf_' + j), was = pathGet(live, en.parts);
       if (raw === '' || String(was === undefined || was === null ? '' : was) === raw) continue;
       // ONLY THE CHANGED FIELDS: writing a default back is indistinguishable from the
@@ -10146,7 +10968,7 @@ function renderWrite() {
   var f = $('pwFoot');
   if (f) {
     f.innerHTML = AUTHORED
-      ? 'this programme was written here. <b>No Python replay exists to check it against</b>, ' +
+      ? 'this programme was written here. <b>The checker has not replayed it</b>, ' +
         'so the per-frame oracle does not apply: <code>frameChecked</code> is ' +
         ((PRICE && PRICE.frameChecked) || 0) + '. Download the pair and run ' +
         '<code>python -m qccd run &lt;name&gt;.arch.json --tsir &lt;name&gt;.tsir.json</code>.'
@@ -10185,8 +11007,8 @@ function renderReport() {
     h += '<div class="mut">' + (
       PRICE.frameChecked
         ? 'per-frame self-check: ' + PRICE.frameChecked + ' frames compared against the ' +
-          'numbers Python shipped, worst drift ' + fmt(PRICE.frameDrift, 6)
-        : '<b>no per-frame oracle</b>: these frames were not priced by Python, so there is ' +
+          'numbers the checker shipped, worst drift ' + fmt(PRICE.frameDrift, 6)
+        : '<b>no per-frame reference</b>: the checker did not price these frames, so there is ' +
           'nothing to compare them against. The arithmetic is parity-tested; <i>this ' +
           'programme</i> is not.') + '</div>';
   } else {
@@ -10215,10 +11037,10 @@ function renderReport() {
   if (RULES && RULES.oracle) {
     h += '<div class="mut">' + (RULES.oracle.ok
       ? '<span class="badge ok">self-check</span> all ' + RULES.oracle.n +
-        ' browser-set rule counts match the ones Python shipped with this page.'
+        ' browser-set rule counts match the ones the checker shipped with this page.'
       : '<span class="badge bad">self-check FAILED</span> ' +
         esc2(RULES.oracle.drift.join('; ')) +
-        ' &mdash; the verdicts are withdrawn; trust Python, not this page.') + '</div>';
+        ' &mdash; the verdicts are withdrawn; trust the checker, not this page.') + '</div>';
   }
   h += '<div>' + cov.map(function (c) {
     var cls = { checked: 'ok', failed: 'bad', partial: 'warn', unchecked: 'unchecked' }[c.state];
@@ -10407,8 +11229,11 @@ var API = {
   // the course
   lessonsReady: lessonsReady, lessonList: lessonList, lessonState: lessonState,
   lessonLoad: lessonLoad, lessonCheck: lessonCheck, lessonHint: lessonHint,
+  guideStart: guideStart, guideStop: guideStop, guideState: guideState, guideDo: guideDo, guideNext: guideNext,
   lessonSolution: lessonSolution, lessonNext: lessonNext, lessonAnswer: lessonAnswer, setAnswer: setAnswer,
   courseProgress: courseProgress, evalCheck: evalCheck, loadCase: loadCase, shippedVerdict: shippedVerdict,
+  // the device's hardware as it is NOW (electrodes, DACs, switches...), repriced on every edit
+  hardware: function () { return HW; },
   courseBlob: function () {
     return { model: D.model || null, table: (PH && PH.policy) ? PH.policy.table : null,
              cases: D.tutorial_cases || null, verdicts: D.tutorial_verdicts || null };

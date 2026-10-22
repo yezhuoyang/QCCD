@@ -24,7 +24,8 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
-__all__ = ["NoiseModel", "CHANNELS", "CHANNEL_NAMES", "MODELS", "get", "describe", "MsError",
+__all__ = ["NoiseModel", "NoiseModel2", "CHANNELS", "CHANNEL_NAMES", "CHANNEL_NAMES_2", "MODELS", "get",
+           "describe", "MsError",
            "CAPS"]
 
 #: The error-budget channels, in the order a report lists them.
@@ -130,6 +131,10 @@ class NoiseModel:
     ``table``    the operating-point table the replay's durations and heating come from
     """
 
+    #: the stim channel `@2`'s crosstalk emits with (a class attribute, not a field, so a
+    #: model's settings document is unchanged by it)
+    crosstalk_op = "DEPOLARIZE1"
+
     id: str = "qccd-noise@1"
     t2_s: float | None = None
     scale: float = 1.0
@@ -175,7 +180,7 @@ class NoiseModel:
         three parts always add up to exactly the number the replay prices (R16).  A capped
         total shrinks the parts in proportion, so the budget still sums to the circuit.
         """
-        nbar_eff = max(float(nbar), 0.0) if self.heating else 0.0
+        nbar_eff = self.nbar_at_gate(max(float(nbar), 0.0)) if self.heating else 0.0
         n_eff = int(n_chain) if (self.chain and n_chain) else 2
         e_base = cost_model.gate_error(arch, 0.0, 2)
         e_heat = cost_model.gate_error(arch, nbar_eff, 2)
@@ -207,9 +212,226 @@ class NoiseModel:
     def to_json(self) -> dict:
         return asdict(self)
 
+    # ------------------------------------------------------------------ what @2 adds
+    #
+    # `qccd-noise@1` prices only the gates, so two machines running one circuit differ only
+    # where their gate counts or chain lengths do.  These hooks are where a model that also
+    # prices the SCHEDULE puts the rest; `@1` answers none of them, so its circuits are
+    # unchanged byte for byte.
+
+    def channel_names(self) -> tuple[str, ...]:
+        return CHANNEL_NAMES
+
+    def channels(self) -> tuple[dict[str, str], ...]:
+        return CHANNELS
+
+    def nbar_at_gate(self, replay_nbar: float) -> float:
+        """The n̄ an MS gate sees, from the replay's (which counts from the last cool)."""
+        return replay_nbar
+
+    def crosstalk_error(self, params: Mapping, kind: str) -> float:
+        """The error a measurement or reset puts on each OTHER ion of its trap; 0 under `@1`."""
+        return 0.0
+
+    def crosstalk_global(self, params: Mapping, kind: str) -> float:
+        """The error a measurement or reset puts on each ion in ANOTHER trap; 0 under `@1`."""
+        return 0.0
+
+    def p_initial(self, params: Mapping) -> float:
+        """The error of each ion's first preparation in |0⟩; `@1` takes it as noiseless."""
+        return 0.0
+
+    #: `@2` replaces the per-instruction T₂ channel with memory charged per ion: linearly in
+    #: the time it is not being operated on, and coherently over each idle stretch.
+    per_ion_memory = False
+
+    def memory_linear(self, params: Mapping, dt_us: float) -> float:
+        return 0.0
+
+    def memory_coherent(self, params: Mapping, stretch_us: float) -> float:
+        return 0.0
+
+
+# ---------------------------------------------------------------------- qccd-noise@2
+#
+# What a SCHEDULE costs, so that two machines running one circuit get different logical error
+# rates when they spend different time idle, in transport or beside a readout.  Every number
+# is a published measurement on trapped-ion QCCD hardware (or arithmetic on two of them, said
+# where it is), and every channel is a Pauli channel stim samples directly: a coherent rotation
+# enters as its Pauli twirl, and leakage as the Pauli error the vendor's own stabilizer emulator
+# converts it to.  What the literature does not support is left out and said so, rather than
+# given an invented number.
+#
+# `@2` reads the device's gate, readout and transport numbers exactly as `@1` does, from the
+# fixed blocks of its physics; the boards that use it pin a physics whose every number is cited
+# (qccd/workspace/physics/qccd-physics@2.json), and its operating-point table is "quantinuum":
+# Quantinuum's published transport measurements.
+
+#: Helios (Quantinuum, 98 ¹³⁷Ba⁺ qubits) measures memory error growing linearly and
+#: quadratically with idle time (arXiv:2511.05465, Table II p.7, §III B4: a + b·l + c·l² per
+#: 55 ms depth-1 layer).  The vendor's emulator fixes the two rates it uses for exactly this, on
+#: idle AND transport time: Z with probability r·t, and a coherent Z rotation at f (in units of
+#: 2π rad/s) whose stabilizer form is Z with probability sin²(π·f·t) (Quantinuum Helios-1E
+#: emulator parameters, docs.quantinuum.com, 2025-11-18).  The two sources agree:
+#: sin²(π·f·55 ms) = 1.0e-4, i.e. 6.7e-5 average infidelity, the paper's c = 7(2)e-5.  The
+#: paper finds most of the linear term is leakage (4.0e-4 of 5e-4 per layer); the emulator
+#: charges it as Z, and so does this model.  The emulator's stabilizer default also multiplies
+#: f by 1.5 to stand in for coherent build-up; this model keeps the measured f.
+HELIOS_MEMORY_RATE_PER_S = 7.9e-3
+HELIOS_COHERENT_DEPHASING_HZ = 0.058
+#: Ground-state cooling leaves n̄ < 0.05 on the axial modes (EIT on Ba⁺ plus sideband on Yb⁺,
+#: Burton et al., arXiv:2206.11888, the Ba-Yb experiment of Fig. 3), not 0: every gate starts
+#: from at least this.
+COOLING_NBAR_FLOOR = 0.05
+#: A mid-circuit measurement and reset disturbs the other ions (Helios, arXiv:2511.05465
+#: §III B5 p.10, Fig. 10): 2.1(1)e-4 on each of the 3 laser-adjacent ions, 4.8(1)e-5 averaged
+#: over all 97 spectators.  The ions that do not share the trap therefore see
+#: (97·4.8e-5 − 3·2.1e-4)/94 = 4.3e-5 each.  The channel is bit-flip plus leakage; twirled here.
+#: It is charged once per measure-and-reset, at the measurement.
+CROSSTALK_LOCAL = 2.1e-4
+CROSSTALK_GLOBAL_AVERAGE, HELIOS_SPECTATORS, HELIOS_ADJACENT = 4.8e-5, 97, 3
+CROSSTALK_GLOBAL = ((HELIOS_SPECTATORS * CROSSTALK_GLOBAL_AVERAGE - HELIOS_ADJACENT * CROSSTALK_LOCAL)
+                    / (HELIOS_SPECTATORS - HELIOS_ADJACENT))
+#: A reset alone disturbs the other ions far less: 3.5e-6 (Helios-1E `p_crosstalk_init`).
+CROSSTALK_RESET = 3.5e-6
+
+CHANNEL_NAMES_2 = ("ms_base", "ms_heating", "ms_chain", "gate_1q", "measure", "reset",
+                   "memory", "memory_coherent", "crosstalk", "crosstalk_global")
+
+
+def _channels_2() -> tuple[dict[str, str], ...]:
+    keep = {c["channel"]: dict(c) for c in CHANNELS}
+    heat = keep["ms_heating"]
+    heat["formula"] = (heat["formula"] + ", plus the n̄ ground-state cooling leaves behind "
+                       f"({COOLING_NBAR_FLOOR}, so no gate is ever at n̄ = 0)")
+    heat["source"] = (heat["source"] + ", at the \"quantinuum\" table; the cooling floor from "
+                      "arXiv:2206.11888 (Fig. 3's Ba-Yb experiment)")
+    return (
+        keep["ms_base"], heat, keep["ms_chain"], keep["gate_1q"], keep["measure"], keep["reset"],
+        {
+            "channel": "memory",
+            "where": "after every instruction, on every ion it does not operate on (idling, "
+                     "riding a rotation or being shuttled: Quantinuum charges memory on idle "
+                     "and transport time alike)",
+            "stim": "Z_ERROR(s · r · Δt)",
+            "formula": f"r = {HELIOS_MEMORY_RATE_PER_S} /s, the Helios linear memory rate; Δt the "
+                       "instruction's replayed duration. Most of the measured linear term is "
+                       "leakage, which the vendor's stabilizer emulator charges as Z, as here",
+            "source": "arXiv:2511.05465 Table II and §III B4 (linear memory term); Quantinuum "
+                      "Helios-1E emulator parameters (linear_dephasing_rate)",
+        },
+        {
+            "channel": "memory_coherent",
+            "where": "on an ion at the end of each of its idle stretches: before the next gate, "
+                     "measurement or reset that operates on it, and before the final readout",
+            "stim": "Z_ERROR(s · sin²(π · f · T))",
+            "formula": f"f = {HELIOS_COHERENT_DEPHASING_HZ} Hz, a coherent Z rotation of angle "
+                       "2πfT over the stretch's length T, entered as its Pauli twirl; it grows "
+                       "as T², so a long wait costs far more than many short ones",
+            "source": "arXiv:2511.05465 Table II (quadratic memory term, 7(2)e-5·l² per 55 ms "
+                      "layer); Quantinuum Helios-1E emulator parameters (quadratic_dephasing_rate)",
+        },
+        {
+            "channel": "crosstalk",
+            "where": "after every measurement, on each OTHER ion in the same trap",
+            "stim": f"DEPOLARIZE1(s · {CROSSTALK_LOCAL})",
+            "formula": "the error a measurement and reset puts on the laser-adjacent ions",
+            "source": "arXiv:2511.05465 §III B5 p.10, Fig. 10 (local MCMR crosstalk 2.1(1)e-4)",
+        },
+        {
+            "channel": "crosstalk_global",
+            "where": "after every measurement, and every reset, on each ion in ANOTHER trap",
+            "stim": f"DEPOLARIZE1(s · {CROSSTALK_GLOBAL:.2g}) after a measurement, "
+                    f"DEPOLARIZE1(s · {CROSSTALK_RESET:g}) after a reset",
+            "formula": f"(97 · 4.8e-5 − 3 · 2.1e-4) / 94 = {CROSSTALK_GLOBAL:.2g}: Helios's average "
+                       "over all 97 spectators with the 3 laser-adjacent ones taken out",
+            "source": "arXiv:2511.05465 §III B5 p.10 (global MCMR crosstalk 4.8(1)e-5); "
+                      "Quantinuum Helios-1E emulator parameters (p_crosstalk_init)",
+        },
+    )
+
+
+@dataclass(frozen=True)
+class NoiseModel2(NoiseModel):
+    """`qccd-noise@1` plus what the schedule does (see `CHANNEL_NAMES_2` and `_channels_2`).
+
+    Left out, each for want of a published number: a per-primitive qubit error for a shuttle,
+    junction, split or swap (no QCCD vendor or experiment reports one: transport costs its time,
+    which `memory` charges, and its heating, which the MS error charges); ion loss (no vendor
+    number, and not a Pauli channel); MS-gate crosstalk (not detected on Helios, below 4.3e-4).
+    Leakage is inside the measured gate and memory errors and is charged as their Pauli error.
+    """
+
+    id: str = "qccd-noise@2"
+    table: str = "quantinuum"
+    memory_rate_per_s: float = HELIOS_MEMORY_RATE_PER_S
+    coherent_dephasing_hz: float = HELIOS_COHERENT_DEPHASING_HZ
+    nbar_floor: float = COOLING_NBAR_FLOOR
+    crosstalk_local: float = CROSSTALK_LOCAL
+    crosstalk_far: float = CROSSTALK_GLOBAL
+    crosstalk_reset: float = CROSSTALK_RESET
+
+    per_ion_memory = True
+
+    def resolve(self, arch) -> dict[str, Any]:
+        # the operating-point policy falls back to another table's points when its own has none,
+        # which would price this model's schedule from numbers it does not cite: refuse instead
+        prim = arch.primitives
+        missing = [name for name, curve in prim.curves.items()
+                   if not any(p.table == self.table for p in curve.points)]
+        missing += [f"{name}[degree {d}]" for name, dc in prim.degree_curves.items()
+                    for d, curve in dc.by_degree.items()
+                    if d >= 3 and not any(p.table == self.table for p in curve.points)]
+        if missing:
+            raise ValueError(f"{self.id} prices transport from the {self.table!r} operating-point "
+                             f"table, which this device's physics does not declare for "
+                             f"{', '.join(sorted(missing))}")
+        out = super().resolve(arch)
+        out.update({"memory_rate_per_s": self.memory_rate_per_s,
+                    "coherent_dephasing_hz": self.coherent_dephasing_hz,
+                    "nbar_floor": self.nbar_floor, "crosstalk_local": self.crosstalk_local,
+                    "crosstalk_far": self.crosstalk_far, "crosstalk_reset": self.crosstalk_reset})
+        # the T₂ channel of @1 is replaced by `memory`: say so rather than report a T₂ it never uses
+        out["t2_s"], out["t2_source"] = None, "replaced by the memory channels"
+        return out
+
+    def channel_names(self) -> tuple[str, ...]:
+        return CHANNEL_NAMES_2
+
+    def channels(self) -> tuple[dict[str, str], ...]:
+        return _channels_2()
+
+    def nbar_at_gate(self, replay_nbar: float) -> float:
+        return replay_nbar + self.nbar_floor
+
+    def p_idle(self, params: Mapping, dt_us: float) -> float:
+        return 0.0                      # replaced by memory_linear, per ion
+
+    def memory_linear(self, params: Mapping, dt_us: float) -> float:
+        if dt_us <= 0:
+            return 0.0
+        return min(CAPS["Z_ERROR"], self.scale * self.memory_rate_per_s * dt_us * 1e-6)
+
+    def memory_coherent(self, params: Mapping, stretch_us: float) -> float:
+        if stretch_us <= 0:
+            return 0.0
+        p = math.sin(math.pi * self.coherent_dephasing_hz * stretch_us * 1e-6) ** 2
+        return min(CAPS["Z_ERROR"], self.scale * p)
+
+    def crosstalk_error(self, params: Mapping, kind: str) -> float:
+        p = self.crosstalk_local if kind == "measure" else 0.0
+        return min(CAPS["DEPOLARIZE1"], self.scale * p)
+
+    def crosstalk_global(self, params: Mapping, kind: str) -> float:
+        p = self.crosstalk_far if kind == "measure" else self.crosstalk_reset
+        return min(CAPS["DEPOLARIZE1"], self.scale * p)
+
+    def p_initial(self, params: Mapping) -> float:
+        return self.p_reset(params)     # the first preparation is a reset like any other
+
 
 #: The published models.  `qccd-noise@1` is `NoiseModel()` with its defaults.
-MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel()}
+MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2()}
 
 
 def get(model_id: str) -> NoiseModel:
@@ -222,9 +444,11 @@ def get(model_id: str) -> NoiseModel:
 def describe(model_id: str = "qccd-noise@1") -> dict:
     """A model's settings and its channel table, JSON-safe: the `noise` reference section."""
     m = get(model_id)
-    return {"id": m.id, "settings": m.to_json(), "channels": [dict(c) for c in CHANNELS],
+    return {"id": m.id, "settings": m.to_json(), "channels": [dict(c) for c in m.channels()],
             "caps": dict(CAPS),
             "notes": ["probabilities are per operand: per pair for DEPOLARIZE2, per ion "
                       "otherwise",
-                      "the initial |0⟩ of every ion is noiseless; an explicit reset is not",
+                      "the initial |0⟩ of every ion is noiseless; an explicit reset is not"
+                      if type(m).p_initial is NoiseModel.p_initial else
+                      "the initial |0⟩ of every ion carries the reset's error, as every reset does",
                       "the logical error rate per round is 1 − (1 − LER)^(1/rounds)"]}

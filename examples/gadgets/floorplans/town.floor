@@ -1,0 +1,130 @@
+# The town: every verified place, in two rows between three streets, and the control floor
+# below them.  Each place stands at its footprint's top-left corner (model units); each door
+# takes a vertical road to a junction on the street above or below its row, and end junctions
+# join the streets.  Every Logical Algorithm example runs on it unless it names a floorplan of
+# its own.
+
+floorplan town_d3 "A town of verified places (surface code, d = 3)"
+code surface_d3
+
+region supply
+place depot     depot9  at 0 11
+
+region compute
+place prep      prep_d3 at 14 10
+place clinic    se_d3   at 31 10
+place workshop  tcx_d3  at 48 11
+place post      read_d3 at 62 10
+place bridge    ls_d3   at 27 36
+
+region memory
+place zone1     zone_d3 at 73 10
+place zone2     zone_d3 at 62 36
+place zone3     zone_d3 at 73 36
+
+region factory
+place factory   msf15   at 84 36
+place pharmacy  inj_d3  at 99 36
+
+region control
+place decoder   dec_d3  at 2 72
+place archive   arch1   at 24 72
+
+# junctions: where roads meet
+junction j0_0 at 0 0
+junction j0_1 at 8 0
+junction j0_2 at 14 0
+junction j0_3 at 25 0
+junction j0_4 at 31 0
+junction j0_5 at 42 0
+junction j0_6 at 48 0
+junction j0_7 at 56 0
+junction j0_8 at 62 0
+junction j0_9 at 67 0
+junction j0_10 at 73 0
+junction j0_11 at 78 0
+junction w0 at -6 0
+junction e0 at 116 0
+junction j1_0 at 27 26
+junction j1_1 at 48 26
+junction j1_2 at 56 26
+junction j1_3 at 62 26
+junction j1_4 at 67 26
+junction j1_5 at 73 26
+junction j1_6 at 78 26
+junction j1_7 at 93 26
+junction j1_8 at 99 26
+junction j1_9 at 110 26
+junction w1 at -6 26
+junction e1 at 116 26
+junction j2_0 at 27 52
+junction j2_1 at 56 52
+junction j2_2 at 84 52
+junction j2_3 at 99 52
+junction w2 at -6 52
+junction e2 at 116 52
+
+# roads: conveyors between doors and junction arms
+road j0_0.s -- depot.out as door_depot_out
+road j0_1.s -- depot.in as door_depot_in
+road j0_2.s -- prep.in as door_prep_in
+road j0_3.s -- prep.out as door_prep_out
+road j0_4.s -- clinic.in as door_clinic_in
+road j0_5.s -- clinic.out as door_clinic_out
+road j0_6.s -- workshop.a_in as door_workshop_a_in
+road j0_7.s -- workshop.a_out as door_workshop_a_out
+road j0_8.s -- post.in as door_post_in
+road j0_9.s -- post.out as door_post_out
+road j0_10.s -- zone1.in as door_zone1_in
+road j0_11.s -- zone1.out as door_zone1_out
+road w0.e -- j0_0.w as street0_w0_j0_0
+road j0_0.e -- j0_1.w as street0_j0_0_j0_1
+road j0_1.e -- j0_2.w as street0_j0_1_j0_2
+road j0_2.e -- j0_3.w as street0_j0_2_j0_3
+road j0_3.e -- j0_4.w as street0_j0_3_j0_4
+road j0_4.e -- j0_5.w as street0_j0_4_j0_5
+road j0_5.e -- j0_6.w as street0_j0_5_j0_6
+road j0_6.e -- j0_7.w as street0_j0_6_j0_7
+road j0_7.e -- j0_8.w as street0_j0_7_j0_8
+road j0_8.e -- j0_9.w as street0_j0_8_j0_9
+road j0_9.e -- j0_10.w as street0_j0_9_j0_10
+road j0_10.e -- j0_11.w as street0_j0_10_j0_11
+road j0_11.e -- e0.w as street0_j0_11_e0
+road j1_0.s -- bridge.in_a as door_bridge_in_a
+road j1_1.n -- workshop.b_in as door_workshop_b_in
+road j1_2.n -- workshop.b_out as door_workshop_b_out
+road j1_2.s -- bridge.out_a as door_bridge_out_a
+road j1_3.s -- zone2.in as door_zone2_in
+road j1_4.s -- zone2.out as door_zone2_out
+road j1_5.s -- zone3.in as door_zone3_in
+road j1_6.s -- zone3.out as door_zone3_out
+road j1_7.s -- factory.out as door_factory_out
+road j1_8.s -- pharmacy.in as door_pharmacy_in
+road j1_9.s -- pharmacy.out as door_pharmacy_out
+road w1.e -- j1_0.w as street1_w1_j1_0
+road j1_0.e -- j1_1.w as street1_j1_0_j1_1
+road j1_1.e -- j1_2.w as street1_j1_1_j1_2
+road j1_2.e -- j1_3.w as street1_j1_2_j1_3
+road j1_3.e -- j1_4.w as street1_j1_3_j1_4
+road j1_4.e -- j1_5.w as street1_j1_4_j1_5
+road j1_5.e -- j1_6.w as street1_j1_5_j1_6
+road j1_6.e -- j1_7.w as street1_j1_6_j1_7
+road j1_7.e -- j1_8.w as street1_j1_7_j1_8
+road j1_8.e -- j1_9.w as street1_j1_8_j1_9
+road j1_9.e -- e1.w as street1_j1_9_e1
+road j2_0.n -- bridge.in_b as door_bridge_in_b
+road j2_1.n -- bridge.out_b as door_bridge_out_b
+road j2_2.n -- factory.in as door_factory_in
+road j2_3.n -- pharmacy.magic as door_pharmacy_magic
+road w2.e -- j2_0.w as street2_w2_j2_0
+road j2_0.e -- j2_1.w as street2_j2_0_j2_1
+road j2_1.e -- j2_2.w as street2_j2_1_j2_2
+road j2_2.e -- j2_3.w as street2_j2_2_j2_3
+road j2_3.e -- e2.w as street2_j2_3_e2
+road w0.s -- w1.n as west_0
+road e0.s -- e1.n as east_0
+road w1.s -- w2.n as west_1
+road e1.s -- e2.n as east_1
+
+# wires: bits, never ions -- every classical door to the control floor, along a bus
+wires auto bus 62

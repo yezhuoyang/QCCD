@@ -248,3 +248,80 @@ def test_the_documents_match_their_published_schemas(tmp_path, suite):
     jsonschema.validate(json.loads(json.dumps(rep)), sch("compiler_report"))
     jsonschema.validate(json.loads((starter(tmp_path / "c") / "qccd-compiler.json").read_text()), sch("compiler_manifest"))
     jsonschema.validate(suite.manifest, sch("compiler_suite"))
+
+
+# ---------------------------------------------------------------------- measurements, resets and MS
+#
+# The grader's semantic checks compared unitaries: its Clifford check added only a per-qubit
+# COUNT of measurements, and its unitary check nothing, so a measurement moved past a gate on
+# its qubit, any reset fault, and (on the unitary route) an MS written as two `ions` were
+# graded `valid`.  Both checks now read the program and the circuit through check_cert's
+# functions -- program_steps, readout_plan -- the reading R10 uses.  Each compiler below runs
+# the reference, then plants one fault.
+
+READOUT = 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[2];\ncreg c[2];\n' \
+          'h q[0];\ncx q[0],q[1];\nmeasure q[0] -> c[0];\nreset q[0];\nh q[0];\ncx q[0],q[1];\n' \
+          'measure q[0] -> c[0];\nmeasure q[1] -> c[1];\n'
+GENERAL = 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\ncreg c[3];\n' \
+          'h q[0];\nt q[0];\ncx q[0],q[1];\nt q[1];\ncx q[1],q[2];\nh q[2];\nmeasure q -> c;\n'
+
+#: the helpers every planted compiler shares: find an instruction on the ion of qubit q
+PLANT = (
+    "rc = ref(argv)\np = out / 'program.tsir.json'\nd = json.loads(p.read_text())\nI = d['instructions']\n"
+    "ion = lambda q: d['meta']['qubit_map'][str(q)]\n"
+    "on = lambda k, i: i in (I[k].get('ions') or []) or any(i in x for x in (I[k].get('pairs') or []))\n"
+    "at = lambda typ, q: next(k for k in range(len(I)) if I[k]['type'] == typ and ion(q) in (I[k].get('ions') or []))\n"
+    "gates = lambda q: [k for k in range(len(I)) if I[k]['type'] == 'gate' and on(k, ion(q))]\n"
+    "def new(typ, q):\n    d['id_seq'] += 1\n    return {'type': typ, 'id': d['id_seq'] - 1, 'ions': [ion(q)]}\n")
+FINISH = "p.write_text(json.dumps(d))\nsys.exit(rc)\n"
+
+READOUT_PLANTS = {
+    "the honest program": ("readout", "", "valid"),
+    "a measurement moved before the CNOT it controls (the same experiment)": ("readout",
+        "m = I.pop(at('measure', 0))\nms = next(k for k in range(len(I)) if I[k].get('gate') == 'MS')\n"
+        "I.insert(max(k for k in gates(0) if k < ms and I[k].get('gate') == 'VZ') + 1, m)\n", "valid"),
+    "a measurement moved before the H on its qubit": ("readout",
+        "m = I.pop(at('measure', 0))\nI.insert(gates(0)[0], m)\n", "wrong"),
+    "the reset moved after the H on its qubit": ("readout",
+        "k = at('reset', 0)\nr = I.pop(k)\nI.insert([g for g in gates(0) if g >= k][1] + 1, r)\n", "wrong"),
+    "an extra reset, mid-circuit": ("readout", "I.insert(at('measure', 0) + 1, new('reset', 1))\n", "wrong"),
+    "the reset on the wrong ion": ("readout", "I[at('reset', 0)]['ions'] = [ion(1)]\n", "wrong"),
+    "an extra measurement, mid-circuit": ("readout", "I.insert(at('measure', 0) + 1, new('measure', 1))\n", "wrong"),
+    # before its qubit's LAST pulse would be no fault: that is the VZ of the final H, which a Z
+    # measurement commutes with, and the grader rightly calls it valid
+    "a measurement moved before the CNOT onto its qubit (unitary route)": ("general",
+        "m = I.pop(at('measure', 2))\nI.insert(gates(2)[0], m)\n", "wrong"),
+    "an extra MS written as two ions (unitary route)": ("general",
+        "g = next(x for x in I if x.get('gate') == 'MS')\n"
+        "e = {k: v for k, v in g.items() if k not in ('pairs', 'arity')}\n"
+        "d['id_seq'] += 1\ne.update(id=d['id_seq'] - 1, ions=list(g['pairs'][0]), params=[g['params'][0]])\n"
+        "I.insert(I.index(g) + 1, e)\n", "wrong"),
+}
+
+
+@pytest.fixture(scope="module")
+def readout_suite(tmp_path_factory) -> Suite:
+    pytest.importorskip("stim")
+    pytest.importorskip("qiskit")
+    from qccd.api import Machine
+    from qccd.workspace.tasks import find_release
+    root = build_suite("r", "1", out_dir=tmp_path_factory.mktemp("rsuites"),
+                       circuits=[{"name": "readout", "qasm": READOUT}, {"name": "general", "qasm": GENERAL}],
+                       devices=[{"name": "chain4", "doc": Machine.chain(n=4, name="chain4").arch.to_json()}],
+                       physics=find_release("ghz4@1").physics(), title="readout suite", description="",
+                       limits={"pair_timeout_s": 60, "pair_mem_mb": 4096, "build_timeout_s": 60},
+                       ler={"noise": "qccd-noise@1", "max_shots": 5000, "max_errors": 20, "seed": 1}, hidden_count=0)
+    return Suite.load(root)
+
+
+@needs_toolchain
+@pytest.mark.parametrize("plant", list(READOUT_PLANTS))
+def test_the_grader_judges_where_a_program_measures_and_resets(tmp_path, readout_suite, plant):
+    from qccd.bench.harness import run_suite
+    circuit, body, status = READOUT_PLANTS[plant]
+    spec = load_compiler(_compiler(tmp_path / "c", PLANT + body + FINISH))
+    rep = run_suite(readout_suite, spec, workdir=tmp_path / "w", only=[f"{circuit}@chain4"], reference={})
+    (r,) = rep["pairs"]
+    assert r["status"] == status, r
+    if status == "wrong":
+        assert r["reason"].startswith("semantics"), r["reason"]

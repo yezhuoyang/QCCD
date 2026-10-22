@@ -1,0 +1,18 @@
+{
+ "id": "ry",
+ "title": "ry(\u03b8)",
+ "note": "any angle at all, about y: one pulse",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "device": "ring6d",
+ "device_about": "the six-site ring with two dock spurs",
+ "notes": [
+  "seeded q0 (weight 0) at A0",
+  "candidates: greedy 0, spectral 0 -> greedy",
+  "weighted interaction distance 0 over 0 distinct pairs",
+  "junctions: 2 site(s) where three or more rails meet are crossed, never rested on"
+ ],
+ "regime": "conveyor",
+ "n_qubits": 2,
+ "compile_seconds": 0.03,
+ "check_seconds": 1.3
+}

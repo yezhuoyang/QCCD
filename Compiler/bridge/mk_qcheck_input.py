@@ -65,16 +65,13 @@ def trap_hops(arch: dict, max_transit: int = 3) -> list[dict]:
     return out
 
 
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("prefix", help="the compiler's -o prefix (reads <prefix>.qcert.json)")
-    ap.add_argument("--arch", required=True, help="the EXPANDED architecture document")
-    ap.add_argument("-o", "--out", required=True)
-    args = ap.parse_args(argv)
+def build(cert: dict, arch: dict) -> dict:
+    """The checker's input: the certificate's fields, and the device facts read from the
+    EXPANDED architecture `arch` (`export_arch.expand`).
 
-    cert = json.loads(Path(args.prefix + ".qcert.json").read_text(encoding="utf-8"))
-    arch = json.loads(Path(args.arch).read_text(encoding="utf-8"))
-
+    One definition: `check_cert.py --qcheck` rebuilds the input with this and refuses a
+    file that differs, so the Lean verdict it reports is about THIS certificate on THIS
+    device and not about whatever input it was handed."""
     gate_sites = sorted(n for n, c in arch["node_caps"].items() if c.get("gate"))
     hops = trap_hops(arch)
     # The cyclic node order of each closed loop, so the checker can replay a rotation
@@ -86,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         if l.get("closed", l.get("kind") == "ring")
     }
 
-    doc = {
+    return {
         "circuit": cert["circuit"],
         "arch": cert["arch"],
         "n_qubits": cert["n_qubits"],
@@ -102,6 +99,19 @@ def main(argv: list[str] | None = None) -> int:
         "hops": hops,
         "loops": loops,
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("prefix", help="the compiler's -o prefix (reads <prefix>.qcert.json)")
+    ap.add_argument("--arch", required=True, help="the EXPANDED architecture document")
+    ap.add_argument("-o", "--out", required=True)
+    args = ap.parse_args(argv)
+
+    cert = json.loads(Path(args.prefix + ".qcert.json").read_text(encoding="utf-8"))
+    arch = json.loads(Path(args.arch).read_text(encoding="utf-8"))
+    doc = build(cert, arch)
+    gate_sites, hops, loops = doc["gate_sites"], doc["hops"], doc["loops"]
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(doc) + "\n", encoding="utf-8")
     print(f"{cert['circuit']} on {cert['arch']}: {len(cert['gates'])} witnesses, "

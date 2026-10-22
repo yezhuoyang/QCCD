@@ -6,8 +6,19 @@ theorem in `Sound.lean` mean something rather than being a tautology dressed up.
 
 `Implements` is a **Prop**, written in terms of a replay of the certificate's movement from
 the initial placement.  It never mentions the checker.  It says what it means for the
-compiled program to realise the circuit, and it would say the same thing if no checker
-existed.
+compiled program to follow its certificate -- qubits on distinct ions, every move a hop the
+architecture admits, every op other than a measurement, reset or barrier witnessed exactly
+once, by the ions its qubits are mapped to, which the replay has together in a trap that
+can gate, any two ops on a common qubit in program order -- and it would say the same thing
+if no checker existed.
+
+It does not say that the program applies the circuit's gates.  A witness (`GateW`) names an
+op, a cycle, a trap and ions; it names no gate, and the checker never reads the pulses the
+program emits.  Which gate fires is decided by the semantic comparison in
+`bridge/check_cert.py`, which composes the emitted pulses and compares them with the source
+circuit, and R10 rests on the two together.  A compiler that turned a two-qubit `barrier`
+or a docked `cz` into a CX (releases up to c7c535380bfb) was accepted here and refused
+there.
 
 `check` is then *nothing but* `decide (Implements inp)`.  So the theorem
 `check inp = true → Implements inp` is `of_decide_eq_true`, and all of the content has
@@ -17,20 +28,27 @@ meaning is the arrangement that hides its assumptions; this one cannot.
 
 The conjuncts are the whole claim:
 
-  1. `unrealised = []`   -- the compiler realised every op it was given
+  1. `unrealised = []`   -- the compiler declined no op it was given
   2. `MapInjective`      -- distinct qubits get distinct ions
   3. `MapTotal`          -- every qubit of the circuit is mapped
   4. `EventsSorted`      -- movement is in cycle order, so replaying it is well defined
   5. `RotationsKnown`    -- every rotation names a loop the ARCHITECTURE declares
   6. `MovesAreHops`      -- an ion never teleports: every move is one the architecture
                             admits, and departs from where the ion actually is
-  7. `GatesLegal`        -- operands co-located, at the named trap, and that trap can gate
-  8. `Covered`           -- every circuit op that needs a witness has exactly one
-  9. `Grounded`          -- and every witness realises an op that exists
- 10. `RespectsOrder`     -- two ops sharing a qubit happen in program order
+  7. `GatesLegal`        -- the ions a witness names are together at the trap it names,
+                            and that trap can gate
+  8. `OwnIons`           -- and they are its op's own ions: the ones the op's qubits are
+                            mapped to, no more and no fewer, in any order
+  9. `Covered`           -- every circuit op that needs a witness has exactly one
+ 10. `Grounded`          -- and every witness realises an op that exists
+ 11. `RespectsOrder`     -- two ops sharing a qubit happen in program order, whether or
+                            not they commute
 
-Together they are O1, and O3 comes with (8)-(10): a dropped gate fails coverage, an
-invented one fails grounding, and a reordered pair fails the order check.
+Together they are O1: a dropped gate fails coverage, an invented one fails grounding, a
+witness that puts two other ions together in place of its op's fails `OwnIons`, and a
+reordered pair -- a commuting one too -- fails the order check.  None of them is O3, the
+Pauli frame, and none is gate identity; both are the semantic comparison's
+(`Compiler/PLAN.md` D1).
 
 ## Why the replay is a list
 
@@ -50,7 +68,7 @@ what the fold said -- the snapshots are computed here, from `init` and the witne
 none of them is supplied by the compiler.
 -/
 import QCCDC.Cert.Syntax
-import QCCDC.Cert.Commute
+import QCCDC.Cert.Perm
 
 namespace QCCDC.Cert
 
@@ -188,13 +206,34 @@ def MovesAreHops (inp : Input) : Prop :=
   ∀ m ∈ inp.moves,
     (m.src, m.dst) ∈ inp.hops ∧ look (stateIn R m.t) m.ion = some m.src
 
-/-- Each gate's operands are co-located, at the trap the witness names, and that trap can
-gate. -/
+/-- Every ion a witness names is, in the replay, at the trap the witness names at its cycle,
+and that trap can gate.
+
+These are the ions the WITNESS names.  That they are its op's operands is `OwnIons`, the
+next conjunct: on its own this one accepts a witness naming any ions that happen to stand
+together. -/
 def GatesLegal (inp : Input) : Prop :=
   let R := replay inp
   ∀ g ∈ inp.gates,
     g.site ∈ inp.gateSites ∧
     ∀ i ∈ g.ions, look (stateIn R g.t) i = some g.site
+
+/-- The ion qubit `q` is mapped to, or `none` if the map does not have it. -/
+def ionOf (inp : Input) (q : Nat) : Option String :=
+  (inp.qmap.find? (fun p => p.1 = q)).map Prod.snd
+
+/-- Each witness names its op's own ions: the ions its op's qubits are mapped to, no more
+and no fewer, in any order.  With `GatesLegal`, that puts the op's operands -- not merely
+some ions -- together in a trap that can gate.
+
+`List.Perm` is "the same list, rearranged", so a one-qubit op's witness names exactly the
+one ion its qubit is on, and a two-qubit op's names both of its ions, each once.  The order
+is free because a witness's ions say where its op ran, not which operand plays which part:
+the pulses say that, and the semantic half of R10 reads them (`Perm.lean` has the numbers).
+A qubit the map does not have looks up to `none`, which no named ion is. -/
+def OwnIons (inp : Input) : Prop :=
+  ∀ g ∈ inp.gates, ∀ o ∈ inp.ops, o.idx = g.dag →
+    (g.ions.map some).Perm (o.qubits.map (ionOf inp))
 
 /-- The ops that must be realised: everything that is not classical bookkeeping. -/
 def needsWitness (o : Op) : Bool :=
@@ -214,33 +253,53 @@ def Grounded (inp : Input) : Prop :=
 
 The qubits are looked up in the circuit's own op list, so this is a join and not something
 the compiler asserts.  Materialising it turns the order check from a quadruple quantifier
-into a double one -- on a BB round, 750 000 pairs rather than 10^10. -/
+into a double one -- on a BB round, 750 000 pairs rather than 10^10.
+
+It carries no gate name.  It used to, for the commutation exemption the order rule had until
+2026-10-19 (`RespectsOrder`); the rule now reads only which qubits two ops share, so the
+join carries only that. -/
 structure WQ where
   idx : Nat            -- the op index, i.e. program order
   t : Nat              -- the cycle its witness claims
-  name : String
   qubits : List Nat
   deriving Repr, DecidableEq, Inhabited
 
 def witnessQubits (inp : Input) : List WQ :=
   inp.gates.filterMap fun g =>
     (inp.ops.find? (fun o => o.idx = g.dag)).map fun o =>
-      { idx := g.dag, t := g.t, name := o.name, qubits := o.qubits }
+      { idx := g.dag, t := g.t, qubits := o.qubits }
 
-/-- Two ops sharing a qubit are realised in program order -- unless they commute.
+/-- Two ops sharing a qubit are realised in program order: the earlier op's witness at a
+strictly earlier cycle than the later one's.  There is no exemption, not even for two ops
+that commute.
 
-This is where a reordering shows up.  Two things keep it honest.  The precedence is
-DERIVED from the op list, so a compiler cannot supply a permissive one; and the exemption
-is `Commutes`, whose two cases are the two proved in `Commute.lean` and no others.  A
-certificate cannot claim that a pair commutes. -/
+This is where a reordering shows up, and it is strict by the user's decision of
+2026-10-19: the order of a qubit's gates is the circuit author's, and the compiler keeps
+it.  Until that day the rule let through the two reorderings `Commute.lean` proves harmless
+-- two `cx` sharing a control, or sharing a target -- and the rotation compiler used the
+gap to serve a syndrome round's fan of CNOTs in whatever order the loop brought the
+ancillas round.  The exemption was true as a statement about unitaries, and that is
+exactly why it had to go.  Swapping two commuting CNOTs gives the same unitary, so the
+semantic half of R10 (`bridge/check_cert.py`, which composes the emitted pulses and
+compares them with the circuit) cannot see the swap at all; this clause is the only place
+in either half where such a reorder can be caught, and a rule that admits it here admits
+it everywhere.  And the order can matter where the unitary cannot show it: in a syndrome
+round, the order of an ancilla's CNOTs decides which data qubits a single fault on that
+ancilla spreads to, which is a choice the circuit's author makes and the compiler keeps.
+
+What keeps it honest is unchanged: the precedence is DERIVED from the op list, so a
+compiler cannot supply a permissive one, and nothing in the certificate can claim that a
+pair is exempt, because no pair is. -/
 def RespectsOrder (inp : Input) : Prop :=
   let W := witnessQubits inp
   ∀ a ∈ W, ∀ b ∈ W, a.idx < b.idx →
-    (a.qubits.any (fun q => b.qubits.contains q)) = true →
-      Commutes a.name a.qubits b.name b.qubits = true ∨ a.t < b.t
+    (a.qubits.any (fun q => b.qubits.contains q)) = true → a.t < b.t
 
-/-- **The specification.**  What it means for the compiled program to implement the
-circuit, said without reference to any checker. -/
+/-- **The specification.**  What it means for the compiled program to follow its
+certificate -- mapping, transport, co-location of each op's own ions, and order -- said
+without reference to any checker.  It names no gate, so it is not by itself "the program
+implements the circuit": which gates the program applies is decided by comparing its
+emitted pulses with the source circuit (`bridge/check_cert.py`), and R10 needs both. -/
 def Implements (inp : Input) : Prop :=
   inp.unrealised = [] ∧
   MapInjective inp ∧
@@ -249,6 +308,7 @@ def Implements (inp : Input) : Prop :=
   RotationsKnown inp ∧
   MovesAreHops inp ∧
   GatesLegal inp ∧
+  OwnIons inp ∧
   Covered inp ∧
   Grounded inp ∧
   RespectsOrder inp
@@ -281,8 +341,7 @@ def GatesLegalIn (inp : Input) (R : Replay) : Prop :=
 /-- `RespectsOrder` over a given witness join. -/
 def RespectsOrderIn (W : List WQ) : Prop :=
   ∀ a ∈ W, ∀ b ∈ W, a.idx < b.idx →
-    (a.qubits.any (fun q => b.qubits.contains q)) = true →
-      Commutes a.name a.qubits b.name b.qubits = true ∨ a.t < b.t
+    (a.qubits.any (fun q => b.qubits.contains q)) = true → a.t < b.t
 
 /-- The specification with the replay and the witness join as parameters. -/
 def ImplementsIn (inp : Input) (R : Replay) (W : List WQ) : Prop :=
@@ -293,6 +352,7 @@ def ImplementsIn (inp : Input) (R : Replay) (W : List WQ) : Prop :=
   RotationsKnown inp ∧
   MovesAreHopsIn inp R ∧
   GatesLegalIn inp R ∧
+  OwnIons inp ∧
   Covered inp ∧
   Grounded inp ∧
   RespectsOrderIn W
@@ -330,6 +390,22 @@ instance (inp : Input) : Decidable (MovesAreHops inp) :=
 instance (inp : Input) : Decidable (GatesLegal inp) :=
   decidable_of_iff _ (gatesLegal_iff inp).symm
 
+/-- One witness against one op.  Written out rather than inferred, for two reasons: the
+permutation is decided by `decPerm` (`Perm.lean`), whose proof needs only `propext`, and
+never by core's `List.decidablePerm`, which needs `Classical.choice`; and it is compared
+only when the op carries the witness's index, so the check costs one index comparison per
+op and witness, not one permutation. -/
+def ownIonsAt (inp : Input) (g : GateW) (o : Op) :
+    Decidable (o.idx = g.dag → (g.ions.map some).Perm (o.qubits.map (ionOf inp))) :=
+  if h : o.idx = g.dag then
+    match decPerm (g.ions.map some) (o.qubits.map (ionOf inp)) with
+    | isTrue hp => isTrue fun _ => hp
+    | isFalse hp => isFalse fun f => hp (f h)
+  else isTrue fun e => absurd e h
+
+instance (inp : Input) : Decidable (OwnIons inp) :=
+  @List.decidableBAll _ _ (fun g => @List.decidableBAll _ _ (ownIonsAt inp g) inp.ops) inp.gates
+
 instance (inp : Input) : Decidable (Covered inp) := by
   unfold Covered; infer_instance
 
@@ -353,6 +429,22 @@ def check (inp : Input) : Bool := decide (Implements inp)
 
 Which conjunct failed.  Not part of the trusted claim -- `check` alone is -- but a checker
 that says only "no" is a checker nobody runs twice. -/
+
+/-- The first pair `RespectsOrder` refuses, named: an op, a later op sharing a qubit with
+it, and the cycles their witnesses claim.  The witness join `W` is a parameter so that it is
+computed once, by the caller.  Diagnosis only; `check` never runs it. -/
+def orderWhy (inp : Input) (W : List WQ) : String :=
+  let nameOf (i : Nat) : String := ((inp.ops.find? (fun o => o.idx = i)).map Op.name).getD "?"
+  let bad := W.findSome? fun a =>
+    (W.find? fun b => decide (a.idx < b.idx) && a.qubits.any (fun q => b.qubits.contains q)
+        && !decide (a.t < b.t)).map fun b => (a, b)
+  match bad with
+  | some (a, b) =>
+    s!"two ops sharing a qubit are out of order: op {a.idx} ({nameOf a.idx} {a.qubits}) comes \
+before op {b.idx} ({nameOf b.idx} {b.qubits}) in the circuit, but its witness is at cycle {a.t}, \
+not before {b.t}"
+  | none => "two ops sharing a qubit are out of order"
+
 def diagnose (inp : Input) : List String :=
   let add (b : Bool) (s : String) : List String := if b then [] else [s]
   (add (decide (inp.unrealised = [])) "some circuit ops were never realised")
@@ -363,9 +455,11 @@ def diagnose (inp : Input) : List String :=
     ++ add (decide (MovesAreHops inp))
          "a move is not a one-cycle hop, or departs from the wrong trap"
     ++ add (decide (GatesLegal inp))
-         "a gate's operands are not co-located at a gate-capable trap"
+         "a gate witness's ions are not together at a gate-capable trap"
+    ++ add (decide (OwnIons inp))
+         "a gate witness names other ions than the ones its op's qubits are mapped to"
     ++ add (decide (Covered inp)) "a circuit op has no witness, or has several"
     ++ add (decide (Grounded inp)) "a gate witness names a circuit op that does not exist"
-    ++ add (decide (RespectsOrder inp)) "two ops sharing a qubit are out of order"
+    ++ (if decide (RespectsOrder inp) then [] else [orderWhy inp (witnessQubits inp)])
 
 end QCCDC.Cert

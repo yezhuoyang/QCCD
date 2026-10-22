@@ -178,13 +178,114 @@ let class_of_json (cid, j) =
     entails = strings "entails" j;
   }
 
+(* {1 One device, one programme: the canonical order}
+
+   The same device can be written down in many orders -- its nodes in any order, its
+   segments in any order, each segment's two ends either way round, its loops and its SIMD
+   classes in any order -- and every one of those files describes the same machine.  The
+   compiler used to keep the file's order and break its ties by it: the placer, the meeting
+   point and the nearest gate or readout zone are the FIRST trap of equal score in node
+   order, the routing horizon is sized from the first trap's eccentricity, rotation drives
+   the first closed loop and names the first matching class.  So one device, reordered,
+   compiled to another programme with another time, and the hillclimb agents of PRs #10-#14
+   searched over file order to win: on bb144, listing the data traps first took one round
+   from 134.6 to 110.6 ms, and an order search took a design from 103.1 to 96.74 ms (issue
+   #20).  A leaderboard ranks devices, not their serialisation.
+
+   So the lists are put in one order here, as the document is read and before anything
+   iterates over them, and every tie downstream is broken by the device instead of the file:
+
+   - nodes, segments, loops and SIMD classes by id (`id_compare`), whatever order the file
+     lists them in;
+   - a segment's two ends, smaller id first;
+   - a named path's OWN node list exactly as written.  That one is not a serialisation: it
+     says which way `+1` goes and which slot is slot 0, and a `--placement` names loop slots
+     by their index in it.
+
+   Every hash table the passes build is filled from these lists, so its iteration order --
+   which depends on insertion order -- is fixed by the device too.
+
+   {2 Which order}
+
+   The order is a choice, and every choice changes some programme: a tie broken one way in
+   the file's order is broken another way in any other.  So the key is the one that changes
+   the fewest programmes already published, measured by recompiling all 191 programmes of the
+   compiler suite (suite@1) and the SmallCode and MemoryBoard boards: ids grouped by SHAPE --
+   the id with each run of digits read as `#` -- and numerically within a shape, changes 42
+   of them.  The natural order of ids (`S2` before `S10`, shapes interleaved) changes 88,
+   plain string order 127, and position (y, then x) 122 and turns one compiled pair into a
+   refusal.  The generators write a lattice as its junctions row by row, then its
+   horizontal traps, then its vertical ones (`J#_#`, `T#_#h`, `T#_#v`), and that is the
+   shape order exactly; the natural order interleaves `T0_0h` and `T0_0v`.  Within one
+   shape the two orders are the same: `S0 .. S9, S10 .. S143`.
+
+   What this does not take away: ids are names the device gives itself, so RENAMING nodes
+   can still move a tie, and a closed loop's direction and first slot are kept as written
+   (above).  Reordering the file can no longer move anything. *)
+
+(* `T10_2h` is the shape `T#_#h` with the numerals 10 and 2. *)
+let id_shape (s : string) : string * string list =
+  let n = String.length s in
+  let is_digit i = s.[i] >= '0' && s.[i] <= '9' in
+  let shape = Buffer.create n and nums = ref [] in
+  let i = ref 0 in
+  while !i < n do
+    if is_digit !i then begin
+      let j = ref !i in
+      while !j < n && is_digit !j do incr j done;
+      Buffer.add_char shape '#';
+      nums := String.sub s !i (!j - !i) :: !nums;
+      i := !j
+    end
+    else begin
+      Buffer.add_char shape s.[!i];
+      incr i
+    end
+  done;
+  (Buffer.contents shape, List.rev !nums)
+
+(* Two numerals by value, `007` as `7`. *)
+let compare_numeral (a : string) (b : string) : int =
+  let strip s =
+    let k = ref 0 in
+    while !k < String.length s - 1 && s.[!k] = '0' do incr k done;
+    String.sub s !k (String.length s - !k)
+  in
+  let a = strip a and b = strip b in
+  match compare (String.length a) (String.length b) with 0 -> String.compare a b | c -> c
+
+(* Shape, then the numerals in order, then -- for `a01` against `a1`, equal so far -- the plain
+   string order, so that two different ids never compare equal and the sort leaves no tie for
+   the file to break. *)
+let id_compare (x : string) (y : string) : int =
+  let sx, nx = id_shape x and sy, ny = id_shape y in
+  match String.compare sx sy with
+  | 0 -> ( match List.compare compare_numeral nx ny with 0 -> String.compare x y | c -> c)
+  | c -> c
+
+(* Two records with one id -- a malformed file -- are ordered by their whole contents, so even
+   then the answer does not depend on the file. *)
+let by_id (id : 'a -> string) (x : 'a) (y : 'a) =
+  match id_compare (id x) (id y) with 0 -> compare x y | c -> c
+
+let canonical_nodes (ns : node list) : node list = List.stable_sort (by_id (fun n -> n.id)) ns
+
+let canonical_segments (ss : segment list) : segment list =
+  List.map (fun s -> if id_compare s.a s.b <= 0 then s else { s with a = s.b; b = s.a }) ss
+  |> List.stable_sort (by_id (fun s -> s.sid))
+
+let canonical_loops (ls : loop list) : loop list = List.stable_sort (by_id (fun l -> l.lid)) ls
+
+let canonical_classes (cs : simd_class list) : simd_class list =
+  List.stable_sort (by_id (fun c -> c.cid)) cs
+
 let of_json (j : json) : t =
   let geometry = Option.value (mem "geometry" j) ~default:(`Assoc []) in
   let caps = Option.value (mem "node_caps" j) ~default:(`Assoc []) in
   let corner_ends = Option.value (mem "corner_endpoints" j) ~default:(`Assoc []) in
   let corners = Option.value (mem "loop_corners" j) ~default:(`Assoc []) in
   let nodes_json = list_of "nodes" geometry in
-  let node_list = List.map (node_of_json caps) nodes_json in
+  let node_list = canonical_nodes (List.map (node_of_json caps) nodes_json) in
   let tbl = Hashtbl.create (List.length node_list) in
   List.iter (fun n -> Hashtbl.replace tbl n.id n) node_list;
   let control = Option.value (mem "control" j) ~default:(`Assoc []) in
@@ -195,12 +296,14 @@ let of_json (j : json) : t =
     sha256 = str_or "sha256" "" j;
     nodes = tbl;
     node_order = List.map (fun n -> n.id) node_list;
-    segments = List.map (segment_of_json corner_ends) (list_of "segments" geometry);
-    loops = List.map (loop_of_json corners) (list_of "loops" geometry);
+    segments =
+      canonical_segments (List.map (segment_of_json corner_ends) (list_of "segments" geometry));
+    loops = canonical_loops (List.map (loop_of_json corners) (list_of "loops" geometry));
     classes =
-      (match mem "simd_classes" j with
-      | Some (`Assoc kvs) -> List.map class_of_json kvs
-      | _ -> []);
+      canonical_classes
+        (match mem "simd_classes" j with
+        | Some (`Assoc kvs) -> List.map class_of_json kvs
+        | _ -> []);
     max_classes_per_cycle = int_or "max_simd_classes_per_cycle" 1 j;
     wiring = str_or "scheme" "direct" wiring;
     grouping = str_or "grouping" "direct" channels;
@@ -225,15 +328,16 @@ let junctions a = List.filter (fun id -> match node a id with Some n -> n.is_jun
 (* R13's bound: a two-qubit gate in a chain of more than ~15 ions degrades sharply, so a
    trap that will ever host a gate may hold at most this many.  R1's capacity can be far
    larger -- `stationary_chain`'s `register` zone declares 32 -- and placing against R1
-   alone puts 16 ions in a trap and violates R13 at the very first gate. *)
-let gate_chain_limit = 15
+   alone puts 16 ions in a trap and violates R13 at the very first gate.  The bound is the
+   rule set's (`Rules`): R13's `max_chain`, or none when the rule set has no R13. *)
+let gate_chain_limit () = !Rules.chain_limit
 
 let eff_capacity a id =
   match node a id with
   | None -> 0
   | Some n ->
     if n.is_junction then min n.capacity 1
-    else min n.capacity gate_chain_limit
+    else match gate_chain_limit () with Some l -> min n.capacity l | None -> n.capacity
 
 let gate_sites a = List.filter (fun id -> match node a id with Some n -> n.can_gate | None -> false) a.node_order
 

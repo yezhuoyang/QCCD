@@ -13,6 +13,15 @@ in which ions moved in different directions:
 Each case here failed R22 with compiler f52d3ba63b9a.  The program is compiled exactly as the
 workspace does it (export, qccdc_cli rotate on a closed loop else compile, cooling) and
 replayed with every rule on.
+
+Two more shapes failed it once R22's hop label stopped being coarser than the motion (2026-10,
+issues #18 and #19), with the compiler of a9ead69, which labelled hops as coarsely as the
+verifier then did:
+
+  * rails at 30 and 60 degrees -- both read `+x+y` under the sign-only label, and the router
+    played hops on both in one cycle;
+  * a torus declared as one loop through its junctions -- a trap between two loop junctions
+    read as a spur, so two ions leaving two such traps in opposite directions shared a cycle.
 """
 
 from __future__ import annotations
@@ -75,7 +84,49 @@ def line_docks(width, verticals):
     return doc
 
 
+def slanted_chain(n):
+    """A chain (one open path) whose rails alternate 60 and 30 degrees: every hop reads
+    `+x+y` under the sign-only label R22 had until issue #19, and the router put hops on
+    both kinds of rail into one cycle."""
+    s30 = (math.cos(math.radians(30)), math.sin(math.radians(30)))
+    s60 = (math.cos(math.radians(60)), math.sin(math.radians(60)))
+    return bent_chain(n, {i: (s30 if i % 2 else s60) for i in range(n)})
+
+
+#: Two edge-disjoint Hamiltonian cycles of the 3 x 3 torus `Machine.grid(3, 3, periodic=True)`,
+#: junction, trap, junction, ...: between them they hold all 18 rails.
+TORUS_CYCLES = {
+    "L0": ["J0_0", "T0_0h", "J1_0", "T1_0h", "J2_0", "T2_0v", "J2_1", "T2_1h", "J0_1",
+           "T0_1h", "J1_1", "T1_1v", "J1_2", "T1_2h", "J2_2", "T2_2h", "J0_2", "T0_2v"],
+    "L1": ["J0_0", "T0_0v", "J0_1", "T0_1v", "J0_2", "T0_2h", "J1_2", "T1_2v", "J1_0",
+           "T1_0v", "J1_1", "T1_1h", "J2_1", "T2_1v", "J2_2", "T2_2v", "J2_0", "T2_0h"],
+}
+
+
+def torus_loops(loops):
+    """The 3 x 3 torus with `loops` of its two Hamiltonian cycles declared as closed loops.
+    With one, the other cycle's nine traps are chords between two loop junctions: the bb144
+    design of issue #18, which R22 read as spurs, so opposite moves shared a waveform."""
+    doc = Machine.grid(3, 3, periodic=True, name="torus").arch.to_json(expanded=True)
+    g = doc["geometry"]
+    g["generator"], g["params"] = "explicit", {}
+    on = {}
+    for lid in list(TORUS_CYCLES)[:loops]:
+        seq = TORUS_CYCLES[lid]
+        on.update((frozenset(e), lid) for e in zip(seq, seq[1:] + seq[:1]))
+        g.setdefault("loops", []).append({"id": lid, "kind": "ring", "nodes": seq, "closed": True})
+    for s in g["segments"]:
+        s["loop"] = on.get(frozenset(s["ends"]))
+    return _fresh(doc)
+
+
+#: The torus cases name the general router: the bb144 design compiled with it, because
+#: rotation declines there (24 qubits need a dock, the torus has 18).
 CASES = {
+    "chain at 30 and 60 degrees, adder": (lambda: slanted_chain(14), "adder3"),
+    "chain at 30 and 60 degrees, QFT": (lambda: slanted_chain(20), "qft8"),
+    "torus, one loop through its junctions, QFT": (lambda: torus_loops(1), "qft8", "compile"),
+    "torus, one loop through its junctions, Steane": (lambda: torus_loops(1), "steane_esm", "compile"),
     "L-shaped path, adder": (lambda: bent_chain(20, {9: (0.0, 1.0)}), "adder3"),
     "U-shaped path, QFT": (lambda: bent_chain(16, {5: (0.0, 1.0), 10: (-1.0, 0.0)}), "qft8"),
     "zig-zag path, adder": (lambda: bent_chain(14, {3: (0.0, 1.0), 6: (1.0, 0.0), 9: (0.0, -1.0)}), "adder3"),
@@ -85,15 +136,16 @@ CASES = {
 }
 
 
-def _compile(doc, circuit, tmp_path, mode=None):
-    """Compile `circuit` on `doc` exactly as the workspace does; the cooled program (as JSON),
-    the architecture, and what the replay found."""
+def _compile(doc, circuit, tmp_path, mode=None, qasm=None):
+    """Compile `circuit` (or the file `qasm`) on `doc` exactly as the workspace does; the cooled
+    program (as JSON), the architecture, and what the replay found."""
     (tmp_path / "device.arch.json").write_text(json.dumps(doc), encoding="utf-8")
     subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(tmp_path / "device.arch.json"), "-o",
                     str(tmp_path / "device.expanded.json")], check=True, capture_output=True)
     arch = Architecture.from_json(doc)
     mode = mode or ("rotate" if closed_loops(arch) else "compile")
-    cp = subprocess.run([str(QCCDC), mode, str(REPO / "Compiler" / "examples" / f"{circuit}.qasm"), "--arch",
+    qasm = qasm or REPO / "Compiler" / "examples" / f"{circuit}.qasm"
+    cp = subprocess.run([str(QCCDC), mode, str(qasm), "--arch",
                          str(tmp_path / "device.expanded.json"), "-o", str(tmp_path / "prog")],
                         capture_output=True, text=True, timeout=600)
     assert cp.returncode == 0, cp.stdout[-800:] + cp.stderr[-800:]
@@ -108,8 +160,8 @@ def _compile(doc, circuit, tmp_path, mode=None):
 
 @pytest.mark.parametrize("case", list(CASES))
 def test_every_program_the_compiler_emits_passes_every_rule(case, tmp_path):
-    make, circuit = CASES[case]
-    _, _, bad = _compile(make(), circuit, tmp_path)
+    make, circuit, *mode = CASES[case]
+    _, _, bad = _compile(make(), circuit, tmp_path, *mode)
     assert not bad, f"{case}: {dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
 
 
@@ -291,3 +343,214 @@ def test_h2_minimal_examples_compile_pass_every_rule_and_are_certified(case, tmp
         assert steps and all(len(i["participants"]) <= 4 for i in steps)
         assert len(ms) == 1 and ms[0]["sites"][0].startswith("DG")
         assert {"R1", "R3", "R4", "R11"} <= set(summary["passed"])
+
+
+# ------------------------------------------------------------------ a barrier is a fence
+#
+# Reported 2026-10-17 on BB[[144,12,12]] with a `barrier a,b` after each of its 864 CNOTs:
+# compiler c7c535380bfb's conveyor (`qccdc rotate`) read a two-qubit barrier by its SHAPE and
+# compiled it as a CX -- 1728 contacts for 864 CNOTs, a certificate its own self-check passed,
+# and a programme whose tableau is not the circuit's (R10).  The same reading made a barrier
+# between two riders a reason to refuse (the interaction graph "was not bipartite"), compiled a
+# CZ contact as a CX (the contact never asked which gate it was), and made the general router's
+# placer pull two ions together because a barrier named them.  A barrier of any width -- one
+# qubit, two, many -- orders the ops on its wires and does nothing else, in every pass.
+#
+# Every case below fails on c7c535380bfb (`QCCD_QCCDC=<exe>` reruns them on another compiler)
+# except the general router's and the race track's compiles, which always read the name before
+# the arity and are pinned here so that they keep doing so.
+
+QASM_HEAD = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n'
+
+# an ESM-shaped round: ancillas q4 and q5 dock, q0..q3 ride; fences of width 1, 2 and 3
+FENCED = QASM_HEAD + """qreg q[6];
+creg c[2];
+reset q[4];
+reset q[5];
+h q[4];
+cx q[4],q[0];
+barrier q[4],q[0];
+cx q[4],q[1];
+barrier q[4],q[1];
+cx q[4],q[2];
+barrier q[4];
+h q[4];
+cx q[0],q[5];
+barrier q[0],q[5];
+cx q[1],q[5];
+barrier q[1],q[5];
+cx q[3],q[5];
+barrier q[3],q[5],q[4];
+measure q[4] -> c[0];
+measure q[5] -> c[1];
+"""
+# the same round fenced between two riders as well: they never meet, so nothing is refused
+FENCED_RIDERS = FENCED.replace("barrier q[4];\n", "barrier q[4];\nbarrier q[0],q[1];\n")
+# two CZ contacts and a CX, which are different gates (no barrier: this one is the contact's)
+CZ = QASM_HEAD + """qreg q[4];
+creg c[1];
+h q[3];
+cz q[3],q[0];
+cx q[1],q[3];
+cz q[2],q[3];
+measure q[3] -> c[0];
+"""
+
+FENCE_CASES = {
+    "ring with docks, rotate: barriers between a docked and a riding qubit": ("ring", FENCED, "rotate"),
+    "ring with docks, rotate: a barrier between two riders": ("ring", FENCED_RIDERS, "rotate"),
+    "chain, general router": ("chain", FENCED_RIDERS, "compile"),
+    "grid, general router": ("grid", FENCED, "compile"),
+}
+FENCE_DEVICES = {
+    "ring": lambda: Machine.ring(12, 2, 6, name="docks").arch.to_json(),
+    "chain": lambda: Machine.chain(8, name="line").arch.to_json(),
+    "grid": lambda: Machine.grid(3, 3, name="g").arch.to_json(),
+}
+
+
+def _two_qubit_gates(qasm):
+    return sum(1 for ln in qasm.splitlines() if ln.split(" ")[0] in ("cx", "cz"))
+
+
+def _r10(prefix, qasm, arch, expanded):
+    """R10 on a compiled programme: the stabilizer tableau composed from the emitted pulses
+    against the circuit's (`check_cert.py`), and the proved Lean checker when it is built."""
+    pytest.importorskip("stim")
+    pytest.importorskip("qiskit")
+    sys.path.insert(0, str(BRIDGE))
+    from check_cert import find_qcheck
+
+    cmd = [sys.executable, str(BRIDGE / "check_cert.py"), str(prefix), "--qasm", str(qasm), "--arch", str(arch),
+           "--json"]
+    if find_qcheck(REPO / "Compiler" / "lean") is not None:
+        subprocess.run([sys.executable, str(BRIDGE / "mk_qcheck_input.py"), str(prefix), "--arch", str(expanded),
+                        "-o", str(prefix) + ".qin.json"], check=True, capture_output=True)
+        cmd += ["--qcheck", str(prefix) + ".qin.json"]
+    cp = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    return json.loads(cp.stdout)
+
+
+def _fenced_right(raw, cert, qasm, verdict):
+    """The programme has exactly the circuit's two-qubit gates, a witness for every gate and
+    none for a barrier, and R10 accepts it."""
+    ms = sum(len(i.get("pairs") or []) for i in raw["instructions"] if i["type"] == "gate" and i.get("gate") == "MS")
+    assert ms == _two_qubit_gates(qasm), f"{ms} entangling pulses for {_two_qubit_gates(qasm)} two-qubit gates"
+    name = {o["i"]: o["name"] for o in cert["circuit_ops"]}
+    seen = Counter(g["dag"] for g in cert["gates"])
+    assert not [d for d in seen if name[d] == "barrier"], "a barrier has a gate witness"
+    gates = [i for i, n in name.items() if n not in ("barrier", "measure", "reset")]
+    assert all(seen[i] == 1 for i in gates) and len(seen) == len(gates)
+    assert verdict["o2_semantics"] == "ok", verdict
+    assert verdict["R10"] in ("partial", "passed"), verdict
+    assert verdict.get("lean", "accepted") == "accepted", verdict
+
+
+def _compiled_right(device, qasm, mode, tmp_path):
+    (tmp_path / "c.qasm").write_text(qasm, encoding="utf-8")
+    raw, _, bad = _compile(FENCE_DEVICES[device](), None, tmp_path, mode=mode, qasm=tmp_path / "c.qasm")
+    assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+    cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
+    if mode == "rotate":
+        assert dict(cert["claims"])["contacts"] == _two_qubit_gates(qasm)
+    verdict = _r10(tmp_path / "prog", tmp_path / "c.qasm", tmp_path / "device.arch.json",
+                   tmp_path / "device.expanded.json")
+    _fenced_right(raw, cert, qasm, verdict)
+
+
+@pytest.mark.parametrize("case", list(FENCE_CASES))
+def test_a_barrier_of_any_width_is_a_fence_never_a_gate(case, tmp_path):
+    _compiled_right(*FENCE_CASES[case], tmp_path)
+
+
+def test_a_contact_runs_its_own_gate_not_a_cx(tmp_path):
+    """The conveyor's contact emitted the CX decomposition for every two-qubit op; a CZ is
+    another gate, and the programme passed every rule while computing something else."""
+    _compiled_right("ring", CZ, "rotate", tmp_path)
+
+
+@pytest.mark.parametrize("device", ["chain", "grid"])
+def test_a_barrier_does_not_pull_two_ions_together(device, tmp_path):
+    """The placer weighs a pair by how often its qubits interact.  c7c535380bfb counted
+    `barrier a,b` as an interaction, so a fence at the very END of a circuit, where it orders
+    nothing, still moved where the ions start (on the chain: 10 transport cycles became 16).
+    The programme with it is the programme without it."""
+    body = "qreg q[6];\nh q[0];\n" + "".join(f"cx q[{i}],q[{i + 1}];\n" for i in range(5))
+    progs = {}
+    for tag, tail in (("plain", ""), ("fenced", "barrier q[0],q[5];\n")):
+        (tmp_path / tag).mkdir()
+        (tmp_path / tag / "c.qasm").write_text(QASM_HEAD + body + tail, encoding="utf-8")
+        raw, _, bad = _compile(FENCE_DEVICES[device](), None, tmp_path / tag, mode="compile",
+                               qasm=tmp_path / tag / "c.qasm")
+        assert not bad, f"{tag}: {dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+        progs[tag] = [{k: v for k, v in i.items() if k != "meta"} for i in raw["instructions"]
+                      if i["type"] != "barrier"]
+    assert progs["fenced"][0] == progs["plain"][0], "the barrier moved where the ions start"
+    assert progs["fenced"] == progs["plain"]
+
+
+def test_a_barrier_on_the_race_track_is_a_fence(tmp_path):
+    """The race track (H2: one loop, no docks) with a two-qubit barrier either side of its one
+    CX: one entangling pulse, no witness for either barrier, and R10 accepts it."""
+    m5 = next(c for c in H2_MINIMAL if c["id"].startswith("M5"))
+    qasm = (QASM_HEAD + "qreg q[32];\nh q[0];\nbarrier q[0],q[31];\ncx q[0],q[31];\nbarrier q[31],q[0];\n"
+            "h q[31];\n")
+    raw, _ = _h2_minimal({**m5, "id": "pair barriers", "qasm": qasm}, tmp_path)
+    assert any((i.get("template") or {}).get("kind") == "loop_shift" for i in raw["instructions"]
+               if i["type"] == "simd"), "not the race track: the subject is its pass"
+    exp = tmp_path / "h2.expanded.json"
+    cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
+    _fenced_right(raw, cert, qasm, _r10(tmp_path / "prog", tmp_path / "c.qasm", H2_ARCH, exp))
+
+
+# ------------------------------------------------------------------ a crowded layer is split
+#
+# Two surface-5 patches side by side (98 ions; the X and the Z memory of `qccd.qec`) put about
+# 50 movers into each CNOT layer of grid9x9.  Prioritised planning parks the first ions it
+# routes, and they wall in the last: every placement and every trap order was refused, on every
+# shipped device (2026-10-21).  The split rung runs such a round with half its ops and defers
+# the rest, which is what a round already does for an op that finds no free trap.
+
+def test_a_crowded_layer_is_split_not_refused(tmp_path):
+    from qccd.qec.experiments import rotated_surface_xz
+
+    exp = rotated_surface_xz(5)
+    (tmp_path / "c.qasm").write_text(exp.qasm, encoding="utf-8")
+    doc = json.loads((REPO / "arch" / "grid9x9.arch.json").read_text(encoding="utf-8"))
+    _, _, bad = _compile(doc, None, tmp_path, mode="compile", qasm=tmp_path / "c.qasm")
+    assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+    cp = subprocess.run([sys.executable, str(BRIDGE / "check_cert.py"), str(tmp_path / "prog"),
+                         "--qasm", str(tmp_path / "c.qasm"), "--arch", str(tmp_path / "device.arch.json"),
+                         "--json"], capture_output=True, text=True, timeout=600)
+    verdict = json.loads(cp.stdout)
+    assert verdict["order"] == "ok" and verdict["o2_semantics"] == "ok" and verdict["o1_transport"] == "ok"
+
+
+def _dedicated(n: int) -> str:
+    """One ancilla per check: n data, n ancillas, each check reset-H-CX-CX-H-measure."""
+    body = "".join(f"reset q[{n + a}];\nh q[{n + a}];\ncx q[{n + a}],q[{a}];\ncx q[{n + a}],q[{(a + 1) % n}];\n"
+                   f"h q[{n + a}];\nmeasure q[{n + a}] -> c[{a}];\n" for a in range(n))
+    return f'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[{2 * n}];\ncreg c[{n}];\n' + body
+
+
+@pytest.mark.parametrize("switches", [True, False])
+def test_dedicated_ancillas_dock_without_a_placement(switches, tmp_path):
+    """A round with one ancilla per check splits its qubits evenly, and rotate parked the
+    data -- the tie went to the side holding q0 -- then refused every ancilla's reset:
+    "reset acts on q4, which rides the loop" (BB[[144,12,12]] with 144 dedicated ancillas on
+    a 144-dock ring, 2026-10-21).  It now docks the side that acts alone.  On a ring whose
+    spurs share one waveform (no per-site switch) it also docks every rider in every batch,
+    unasked: anything else breaks R4."""
+    doc = Machine.ring(8, 2, verticals=4, name="dedicated").arch.to_json()
+    doc["control"]["channels"]["switch_per_site"] = switches
+    (tmp_path / "c.qasm").write_text(_dedicated(4), encoding="utf-8")
+    raw, arch, bad = _compile(doc, None, tmp_path, mode="rotate", qasm=tmp_path / "c.qasm")
+    assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
+    cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
+    on_loop = {n for lp in arch.device.loops.values() if lp.closed for n in lp.nodes}
+    ancilla_sites = {cert["init"][cert["map"][str(4 + a)]] for a in range(4)}
+    data_sites = {cert["init"][cert["map"][str(d)]] for d in range(4)}
+    assert not ancilla_sites & on_loop and data_sites <= on_loop  # the ancillas are the docked side
+    moves = Counter(m["ion"] for m in cert["moves"])
+    if not switches:                                              # dock-all: idle riders dock too
+        assert len(moves) == 4 and sum(moves.values()) > 2 * 8

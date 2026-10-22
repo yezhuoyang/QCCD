@@ -37,9 +37,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Mapping
 
+from .bundle import _FILE_LIMITS as PROGRAM_LIMITS
 from .bundle import BundleError, archive_bundle, read_bundle, write_bundle
 from .jsonsafe import canonical_bytes, digest, strict_loads
 from .store import dumps, loads
+from .tasks import board_device
+
+# The compiler's programmes are read with the limits a submitted bundle's files get
+# (`bundle._FILE_LIMITS`), not the general default: a canonicalised bb144 round is 15,223
+# instructions, 504,193 JSON members, and the default's 500,000 refused at the workspace a
+# programme the grader accepts.
 
 __all__ = ["ResultsMixin", "JOB_KINDS", "JOB_RUNNERS"]
 
@@ -253,8 +260,8 @@ class ResultsMixin:
             raise WorkspaceError("design_invalid", "the design at that revision does not build", status=422)
         work = self.root / ".qccd" / "runs" / jid
         work.mkdir(parents=True, exist_ok=True)
-        (work / "device.arch.json").write_text(json.dumps(r.arch_doc), encoding="utf-8")
         rel = self.board(params.get("board"))
+        (work / "device.arch.json").write_text(json.dumps(board_device(r.arch_doc, rel)), encoding="utf-8")
         (work / "circuit.qasm").write_bytes(rel.circuit_path.read_bytes())
         self._progress(jid, "export", "expanding the device for the compiler")
         ex = run_limited([tc.python, tc.bridge / "export_arch.py", work / "device.arch.json", "-o",
@@ -288,7 +295,8 @@ class ResultsMixin:
                     + _compiler_reason(log), "log": log, "refusal": _compiler_reason(log)}
         self._progress(jid, "cooling", "inserting cooling (R7)")
         co = run_limited([tc.python, tc.bridge / "insert_cooling.py", work / "prog.tsir.json", "--arch",
-                          work / "device.arch.json", "-o", work / "prog.cooled.tsir.json"],
+                          work / "device.arch.json", "-o", work / "prog.cooled.tsir.json", "--table",
+                          (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones")],
                          cwd=work, timeout=600, cancel=cancel)
         if not (work / "prog.cooled.tsir.json").exists():
             return {"_status": "cancelled" if co.status == "cancelled" else "failed",
@@ -301,10 +309,10 @@ class ResultsMixin:
         raw = (work / "prog.tsir.json").read_bytes()
         cooled = (work / "prog.cooled.tsir.json").read_bytes()
         certb = (work / "prog.qcert.json").read_bytes()
-        d_raw = self.put_artifact(canonical_bytes(strict_loads(raw)), "application/json", "certified program")
-        d_cool = self.put_artifact(canonical_bytes(strict_loads(cooled)), "application/json", "final program (cooled)")
-        d_cert = self.put_artifact(canonical_bytes(strict_loads(certb)), "application/json", "certificate")
-        n_instr = len(strict_loads(cooled).get("instructions", []))
+        d_raw = self.put_artifact(canonical_bytes(strict_loads(raw, PROGRAM_LIMITS)), "application/json", "certified program")
+        d_cool = self.put_artifact(canonical_bytes(strict_loads(cooled, PROGRAM_LIMITS)), "application/json", "final program (cooled)")
+        d_cert = self.put_artifact(canonical_bytes(strict_loads(certb, PROGRAM_LIMITS)), "application/json", "certificate")
+        n_instr = len(strict_loads(cooled, PROGRAM_LIMITS).get("instructions", []))
         final_ref = {"artifact": d_cool, "certified": d_raw, "certificate": d_cert,
                      "compiled_for": r.arch_digest(), "compiler": mode,
                      "board": rel.id, "circuit_digest": rel.manifest["circuit"]["digest"],
@@ -334,9 +342,9 @@ class ResultsMixin:
             raise WorkspaceError("program_for_another_board",
                                  f"the design's program was compiled for another board, not {rel.title}: "
                                  f"compile it for {rel.title} first (submit_design does that)", status=409)
-        prog = strict_loads(self.get_artifact(fp["artifact"]))
-        certified = strict_loads(self.get_artifact(fp["certified"])) if fp.get("certified") else None
-        cert = strict_loads(self.get_artifact(fp["certificate"])) if fp.get("certificate") else None
+        prog = strict_loads(self.get_artifact(fp["artifact"]), PROGRAM_LIMITS)
+        certified = strict_loads(self.get_artifact(fp["certified"]), PROGRAM_LIMITS) if fp.get("certified") else None
+        cert = strict_loads(self.get_artifact(fp["certificate"]), PROGRAM_LIMITS) if fp.get("certificate") else None
         sid = new_id("snap")
         d = self.snapshots_dir / sid
         d.mkdir(parents=True)
@@ -345,7 +353,7 @@ class ResultsMixin:
                 "compiled_for": fp.get("compiled_for"), "compiler": fp.get("compiler")}
         pres = {"title": title[:200], "studio": rev.state.to_studio(None)}
         b = write_bundle(d / "bundle", task_id=rel.id, task_digest=rel.digest,
-                         device=r.arch_doc, program=prog, certified_program=certified, certificate=cert,
+                         device=board_device(r.arch_doc, rel), program=prog, certified_program=certified, certificate=cert,
                          presentation=pres, provenance=prov)
         _freeze_dir(d / "bundle")
         with self.store.tx() as db:
@@ -554,7 +562,7 @@ class ResultsMixin:
             try:
                 if self.get_artifact(arts["circuit"]).decode("utf-8").replace("\r\n", "\n") != want:
                     continue
-                n_instr = len(strict_loads(self.get_artifact(arts["program"])).get("instructions", []))
+                n_instr = len(strict_loads(self.get_artifact(arts["program"]), PROGRAM_LIMITS).get("instructions", []))
             except Exception:
                 continue
             ref = {"artifact": arts["program"], "certified": arts["certified"], "certificate": arts["certificate"],

@@ -154,9 +154,34 @@ def _flow(lib, gir, eid, name):
     raise KeyError(f"{e[3]} {e[4]} reports no flow {name!r}")
 
 
+#: the most branches the flat sign-off will take one by one
+MAX_BRANCHES = 64
+
+
 def sign_off(alg: Algorithm, gir: dict, lib, leaves, *, distance: bool = True) -> dict:
-    """Sign the schedule off against the algorithm -- once per branch if it is guarded."""
+    """Sign the schedule off against the algorithm -- once per branch if it is guarded.
+
+    Two kinds of program are out of reach, and say so instead of being checked partly:
+    one whose guards read outcomes corrected by a frame that depends on a branch (a
+    conditional Clifford before a measurement a guard reads: the frame is a product of bits,
+    and this check folds frames as parities), and one with more branches than `MAX_BRANCHES`.
+    Both are checked compositionally (docs/ARCHITECTURE.md §6)."""
+    if gir.get("branch_frames"):
+        bf = gir["branch_frames"][0]
+        return {"kind": "flat", "passed": None, "relations": [], "flows": [], "why": [],
+                "skipped": (f"{len(gir['branch_frames'])} outcome(s) a guard reads are corrected "
+                            f"by a frame that depends on a branch (first: {bf['what']} on "
+                            f"{bf['block']}, after {bf['after']}); the flat sign-off folds "
+                            f"frames as parities and cannot follow a product of bits, so this "
+                            f"program is checked compositionally instead"),
+                "circuit": {"qubits": 0, "ops": {}, "records": 0}}
     branches = alg.branches()
+    if len(branches) > MAX_BRANCHES:
+        return {"kind": "flat", "passed": None, "relations": [], "flows": [], "why": [],
+                "skipped": (f"{len(branches)} branches ({len(alg.guard_cvars)} outcomes "
+                            f"guards read): more than {MAX_BRANCHES} to sign off one by one; "
+                            f"this program is checked compositionally instead"),
+                "circuit": {"qubits": 0, "ops": {}, "records": 0}}
     if len(branches) == 1:
         return _sign_off(alg, gir, lib, leaves, {}, distance=distance)
     t0 = time.time()
@@ -242,6 +267,8 @@ def _sign_off_branch(alg: Algorithm, gir: dict, lib, leaves, branch: dict, *,
         """Does a guard recorded in the GIR hold in this branch?"""
         if not cond:
             return True
+        if cond.get("all"):                 # a conjunction: every parity must hold
+            return all(_holds(c) for c in cond["all"])
         c = int(cond.get("const", 0))
         for n in cond.get("cvars", ()):
             c ^= int(branch.get(n, 0)) & 1
@@ -277,6 +304,8 @@ def _sign_off_branch(alg: Algorithm, gir: dict, lib, leaves, branch: dict, *,
         else:
             if delta.get("conjugate") == "S":      # S̄ takes X̄ to Ȳ: az takes ax
                 cur["az"] = xor_expr(cur["az"], cur["ax"])
+            elif delta.get("conjugate") == "SX":   # √X̄ takes Z̄ to Ȳ: ax takes az
+                cur["ax"] = xor_expr(cur["ax"], cur["az"])
             for part, other in (delta.get("copy") or {}).items():
                 src = block_frame.get(other) or {"ax": (0, []), "az": (0, [])}
                 cur[part] = xor_expr(cur[part], src[part])

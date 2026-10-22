@@ -239,6 +239,10 @@ def build_view_model(
             # and two for an MS instead of lighting none for either.
             f["acts"] = [list(t) for t in iter_operands(instr)]
             f["sites"] = list(instr.sites)
+            # the rotation each operand gets: R(theta, phi), VZ(lambda), MS(theta) --
+            # without it the list printed a bare R for every pulse (thread 44)
+            if instr.params:
+                f["params"] = [list(p) for p in instr.params]
         elif instr.type == "cool":
             f["broadcast"] = bool(instr.broadcast)
             f["ions"] = list(instr.ions)
@@ -250,7 +254,7 @@ def build_view_model(
             f["gate"] = instr.gate
         meta = instr.meta or {}
         for key in ("batch", "check", "kind", "round", "group", "phase", "trigger",
-                    "hops", "window"):
+                    "hops", "window", "gate_swaps"):
             if key in meta:
                 f[key] = meta[key]
         if isinstance(meta.get("call"), int) and not isinstance(meta.get("call"), bool):
@@ -791,6 +795,11 @@ def _refuse_repository_paths(blob: str) -> None:
             " -- emit the bare artifact name instead of its location in the tree")
 
 
+def _escape_text(s: str) -> str:
+    """Text for an HTML text node (the page's <title>): the names a device or programme file gives."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _escape_blob(blob: str) -> str:
     r"""Make the JSON data block incapable of looking like markup or a network call.
 
@@ -928,6 +937,18 @@ text-transform:uppercase;margin-right:4px}
 #paneP[data-view="gates"] #pHw{display:none}
 #paneP[data-view="both"] .lst{min-height:80px}
 #paneP[data-view="both"] .pblock{flex:1 1 50%}
+/* BOTH IS TWO COLUMNS, the hardware programme on the left and the circuit on the right
+   under the one header (the user, 2026-10-22: "two Column, but not two row"), and the
+   column or dock holding the pane doubles so each listing keeps a listing's width.
+   Only the narrow regime still stacks them: two columns there would be under 200 px. */
+.row:not([data-layout="narrow"]) .progcol #paneP[data-view="both"],
+.row:not([data-layout="narrow"]) .dock #paneP.on[data-view="both"]{display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+  column-gap:14px;row-gap:8px}
+.row:not([data-layout="narrow"]) #paneP[data-view="both"]>header{grid-column:1/-1}
+.row:not([data-layout="narrow"]) #paneP[data-view="both"] .pblock{grid-row:2;min-width:0}
+.row:not([data-layout="narrow"]) .progcol[data-view="both"],
+.row:not([data-layout="narrow"]) .dock[data-view="both"]{width:min(760px,46vw)}
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;
   grid-column:2;grid-row:1}
 .stage[data-drop="1"] svg{outline:2px dashed var(--accent);outline-offset:-4px}
@@ -979,6 +1000,11 @@ text-transform:uppercase;margin-right:4px}
 .ql.qw{background:color-mix(in srgb,var(--active) 10%,transparent)}
 .ql.qz .a{color:var(--muted)}
 .tab.off{display:none}
+/* THE COURSE IS THE TUTORIAL'S.  A design page -- a board entry, a compiled example, the
+   blank canvas -- shows no Learn tab and never opens the Learn pane: the page is busy
+   enough.  The course comes in only when the reader asks for it (#learn, a lesson, the
+   pane itself), and `data-course` on <body> says so. */
+body:not([data-course="1"]) #tabL{display:none}
 .pal{border:1px solid var(--line);border-radius:9px;padding:7px;background:var(--panel)}
 /* the Selection section stays at the foot of the rail, over whatever scrolled under it */
 #palInspect{position:sticky;bottom:0;margin-top:auto;z-index:1}
@@ -1191,8 +1217,12 @@ input[type=range]{flex:1 1 60px;min-width:60px;max-width:260px;accent-color:var(
 .track{flex:0 0 auto;height:10px;background:var(--soft);border-top:1px solid var(--line);
 display:flex;overflow:hidden;margin:0}
 .track i{display:block;height:100%}
-/* THE TRANSPORT APPARATUS FOLDS AWAY WHILE THERE IS NOTHING TO TRANSPORT. */
-body[data-noprog="1"] .ctrl,
+/* THE TRANSPORT APPARATUS FOLDS AWAY WHILE THERE IS NOTHING TO TRANSPORT -- but not the
+   view: Fit, + and - stay, since a design with no programme is the page you build on, and
+   folding the whole group took the only zoom buttons with it (asked 2026-10-17). */
+body[data-noprog="1"] #play,body[data-noprog="1"] #step,body[data-noprog="1"] #glide,
+body[data-noprog="1"] #phase,body[data-noprog="1"] #reset,body[data-noprog="1"] #slider,
+body[data-noprog="1"] #speed,body[data-noprog="1"] #mode,
 body[data-noprog="1"] #track,
 body[data-noprog="1"] #tl,
 body[data-noprog="1"] .metrics,
@@ -1360,7 +1390,7 @@ border-radius:12px;padding:22px}
    The card is `position:fixed` at the pointer and takes no pointer events, so it can
    never sit between the pointer and the thing it explains.  The captions live inside
    their regions and appear only while <body data-explain="1">. */
-.hint{position:fixed;z-index:8;max-width:320px;background:var(--panel);color:var(--ink);
+.hint{position:fixed;z-index:96;max-width:320px;background:var(--panel);color:var(--ink);
   border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
   padding:7px 10px;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.14);
   pointer-events:none}
@@ -1631,6 +1661,8 @@ textarea.src.out{min-height:120px;opacity:.85}
         <button id="phase" title="next phase" data-hint="phase">Phase</button>
         <button id="reset" data-hint="reset">Reset</button>
         <button id="fit" data-hint="fit">Fit</button>
+        <button id="zIn" data-hint="zoom:in" title="zoom in" aria-label="zoom in">+</button>
+        <button id="zOut" data-hint="zoom:out" title="zoom out" aria-label="zoom out">−</button>
         <input type="range" id="slider" min="0" value="0" data-hint="slider">
         <select id="speed" data-hint="speed"><option value="1">1x</option>
         <option value="4" selected>4x</option>
@@ -1697,14 +1729,14 @@ textarea.src.out{min-height:120px;opacity:.85}
 
         <!-- THE PROGRAM PANE: two listings, one switch.  The hardware programme and the
              source circuit it was compiled from (when the page carries one), shown one at
-             a time or stacked, in lockstep with the animation.  `#paneQ` keeps its id and
+             a time or side by side, in lockstep with the animation.  `#paneQ` keeps its id and
              its `data-off` switch: the harnesses read both. -->
         <section class="pane card on" id="paneP" data-view="hw">
           <header class="ph"><h3>Program</h3>
             <span class="seg" id="pView" data-hint="progview" style="display:none">
               <button class="on" id="pvhw" data-view="hw" title="the hardware instructions">Hardware</button>
               <button id="pvgates" data-view="gates" title="the circuit statements">Gates</button>
-              <button id="pvboth" data-view="both" title="both, stacked">Both</button>
+              <button id="pvboth" data-view="both" title="both, side by side">Both</button>
             </span>
             <span class="grow"></span>
             <button class="grip" id="pPin" data-hint="progpin" aria-pressed="false"
@@ -2441,16 +2473,30 @@ function applyFrame(st, f) {
         st.q[ion]=(st.q[ion]||0)+shuttleQ+junctionQ((nodeById[moved[ion]]||{deg:0}).deg);}
     }
   } else if (f.moves){
-    const ent=f.entails||[];
+    // what each move splits and merges is the ENGINE's answer (`QCCD.moveEntails`, the twin
+    // of `replay.move_entails`), read off the whole cycle against the occupancy before it:
+    // the class's list alone left a shuttle out of a chain uncharged here while the verifier
+    // charged it, and the ion's n-bar on the stage disagreed with the numbers (#16)
+    const ent=f.entails||[], occ={};
+    for(const ion in st.pos) occ[st.pos[ion]]=(occ[st.pos[ion]]||0)+1;
+    const parts=[], routes=[];
     for(const [ion,path] of f.moves){
+      parts.push([ion, path[0], path[path.length-1]]);
+      const r=[]; for(let i=1;i<path.length;i++){ const s=SPUR_CTX.pair[path[i-1]+'>'+path[i]]; if(s!==undefined) r.push(s); }
+      routes.push(r);
+    }
+    const per=globalThis.QCCD.moveEntails(ent, parts, occ, routes, SPUR_CTX.segs, SPUR_CTX.onLoop, SPUR_CTX.rails);
+    let mi=0;
+    for(const [ion,path] of f.moves){
+      const entM=per[mi++][0];
       st.pos[ion]=path[path.length-1];
       // A node the programme names may not exist on the device CURRENTLY on the stage --
       // that is precisely the state `PROGRAM_STALE` freezes the animation on, and the
       // freeze happens after this table is built.  Charging zero for a hop across a node
       // that is gone is not a claim about anything: the frame it feeds is never drawn.
       let dq=0; for(let i=1;i<path.length;i++) dq+=shuttleQ+junctionQ((nodeById[path[i]]||{deg:0}).deg);
-      if(ent.includes('split')) dq+=splitQ;
-      if(ent.includes('merge')) dq+=mergeQ;
+      if(entM.includes('split')) dq+=splitQ;
+      if(entM.includes('merge')) dq+=mergeQ;
       st.q[ion]=(st.q[ion]||0)+dq;
     }
   }
@@ -2480,7 +2526,18 @@ function cumAt(i){
   }
   return CUMA[i]||{cost:0,steps:0};
 }
+// the device as `QCCD.moveEntails` reads it, built once per derivation: rails by id, the
+// node pair -> rail index, the nodes on a named path, and each off-path node's rails to one
+let SPUR_CTX = null;
+function spurContext(){
+  const segs={}, pair={};
+  for(const s of A.segments){ segs[s.id]=s; pair[s.a+'>'+s.b]=s.id; pair[s.b+'>'+s.a]=s.id; }
+  // the conveyors and their dead ends, decided by the engine exactly as `priceFrames` does
+  const onLoop=globalThis.QCCD.conveyorNodes(A.loops, segs);
+  return {segs, pair, onLoop, rails: globalThis.QCCD.spurRails(onLoop, segs)};
+}
 function deriveStage(frames){
+  SPUR_CTX = spurContext();
   const st={pos:{},q:{}}, running={cost:0,steps:0};
   states=[]; before=[]; cum=[]; SLOTS=[];
   for(const f of frames){
@@ -3286,15 +3343,19 @@ function zoomAt(clientX, clientY, deltaY){
         y: VB.y + (clientY - fit.r.top  - fit.oy) / fit.s };
   // the outer bound admits where `fit()` put the box: on a small device that is wider
   // than 2.5 x the device, and the first wheel notch must not snap the view in
-  const k=clamp(0.12*L.W, VB.w*Math.pow(1.0018, deltaY), Math.max(2.5*L.W, VB.w));
+  // the outer bound: twelve times the device, never under sixty grid steps -- it was
+  // 2.5 x the device, eleven steps on a small one, and the wheel then did nothing
+  // ("sometimes I get stuck when I try to zoom out", 2026-10-17)
+  const far=Math.max(12*Math.max(L.W, L.H*VB.w/Math.max(1e-9, VB.h)), 60*(L.g||72), VB.w);
+  const k=clamp(0.12*L.W, VB.w*Math.pow(1.0018, deltaY), far);
   // The box keeps ITS OWN shape when a fit framed more than the device (the classical
   // floor below it), or its first wheel notch would crop that back out.  Otherwise the
-  // arithmetic is exactly what it always was: `m` stays under the cursor to the bit, which
-  // `tests/test_aim.py` holds it to, and a rewrite that was merely equal in exact
-  // arithmetic drifted by 3e-14.
+  // arithmetic is exactly what it always was: `m` stays under the cursor to rounding.  At
+  // some device heights that is one ulp (3e-14 at true scale on a 1600x132 device), and no
+  // rearrangement is exact at all of them, so `tests/test_aim.py` holds it to ANCHOR_TOL.
   const own = Math.abs(VB.h*L.W - VB.w*L.H) > 1e-9*Math.max(1, VB.w*L.H);
   const nh = own ? VB.h*(k/Math.max(1e-9, VB.w)) : k*(L.H/L.W);
-  // keep `m` exactly under the cursor: its offset from the origin scales with the box
+  // keep `m` under the cursor: its offset from the origin scales with the box
   VB.x = m.x - (m.x - VB.x) * (k / VB.w);
   VB.y = m.y - (m.y - VB.y) * (nh / VB.h);
   VB.w = k; VB.h = nh; applyVB();
@@ -3439,9 +3500,9 @@ const capHist=SUM.capacity_histogram||{};
 // all.  Everything on the R1-R18 surface except the structural check needs a CycleView
 // built from a program, so it genuinely cannot be re-run in the browser -- and saying so
 // is the honest behaviour, not a limitation to paper over.
-// THE VERDICT SURFACE.  `RULES_STALE` -- which struck all 27 verdicts through the moment
-// anything was edited -- is GONE, not kept alongside: 21 of the 27 are now re-derived
-// client-side off the same walk that prices the programme, and only the other 6 go grey.
+// THE VERDICT SURFACE.  `RULES_STALE` -- which struck every verdict through the moment
+// anything was edited -- is GONE, not kept alongside: 21 of the 28 rules are now re-derived
+// client-side off the same walk that prices the programme, and only the other 7 go grey.
 // Two mechanisms would give the page two answers about the same rule.
 //
 // THREE STATES, and the heading COUNTS rather than saying "all": checked here, failed
@@ -3468,10 +3529,33 @@ function ruleBadges(){
     `<div>`+cov.map(c=>`<span class="badge ${cls[c.state]}" data-hint="rule:${esc(c.rule)}" title="${esc(c.statement||c.rule)}">`+
       `${c.rule}${c.count?' '+c.count:''}</span>`).join('')+`</div>`;
 }
+// A PAPER'S RULE SET.  A page that plays a paper's schedule carries that paper's rules, judged
+// when the page was built, rule by rule (`D.ruleset`); they come first, because they are the
+// rules the schedule was written for.  The badges after them are this website's machine.
+function rulesetBlock(){
+  const R = D.ruleset;
+  if(!R || !R.results) return '';
+  const res = R.results;
+  const hold = res.filter(r=>r.verdict==='holds'), fail = res.filter(r=>r.verdict==='fails');
+  const cls = {holds:'ok', fails:'bad'};
+  const tip = r => r.id+' '+r.verdict+(r.examples&&r.examples.length?': '+r.examples[0]:'')+
+                   (r.reason?': '+r.reason:'');
+  return `<div class="mut" style="margin-bottom:6px" data-hint="ruleset">judged by `+
+    `<b>${esc(R.title||R.ruleset)}</b>: ${hold.length} of ${res.length} rules hold`+
+    (fail.length ? ` &middot; <b>${fail.length} failing</b>` : '')+`</div>`+
+    `<div>`+res.map(r=>`<span class="badge ${cls[r.verdict]||'unchecked'}" title="${esc(tip(r))}">`+
+      `${esc(r.id)}${r.count?' '+r.count:''}</span>`).join('')+`</div>`+
+    (R.note ? `<div class="mut" style="margin:8px 0 4px">${esc(R.note)}</div>` : '')+
+    `<h3 style="margin-top:12px">This website's rules</h3>`;
+}
 function renderSide(){
 const evd = D.evidence || {replayed_cycles: P.frames.length};
+// THE DEVICE ON THE CANVAS, not the one the page was built with: `A.hardware` is fixed at
+// build time, so on the studio's blank canvas this table read 0 DACs for a device the
+// Report priced at 33 (found walking lesson A5, 2026-10-17).  The editor reprices it live.
+const hw = (window.EDITOR && EDITOR.hardware && EDITOR.hardware()) || A.hardware;
 document.getElementById('side').innerHTML =
-  `<h3>Rules</h3>`+
+  `<h3>Rules</h3>`+ rulesetBlock() +
   (evd.replayed_cycles === 0 && !P.frames.length
     ? `<div class="mut">no programme has been replayed, so none of the `+
       `${(evd.rules_all||[]).length||27} rules has been evaluated. Write one in the `+
@@ -3503,16 +3587,16 @@ document.getElementById('side').innerHTML =
   `<div class="note">`+
   (drift<1e-6
     ? (EV.self_check_ions === 0
-        ? `<span class="badge unchecked">no self-check</span> no Python replay accompanies `+
-          `this page, so there is nothing to check this one against. The cost figures come `+
-          `from the browser's own <code>priceFrames</code>, which is parity-tested against `+
-          `Python but has not been run against <b>this</b> programme in Python.`
+        ? `<span class="badge unchecked">no self-check</span> the checker did not replay this `+
+          `programme when the page was built, so there is nothing to compare this page's replay `+
+          `with. The cost figures are the browser's own, which are tested to agree with the `+
+          `checker's, but have not been compared on <b>this</b> programme.`
         : `<span class="badge ok">self-check</span> this page's own replay of `+
-          `${D.checksum_components.join(' + ')} agrees with the Python verifier to `+
+          `${D.checksum_components.join(' + ')} agrees with the checker's replay to `+
           `${drift.toExponential(1)} quanta per ion, over ${EV.self_check_ions} ion(s).`)
     : `<span class="badge bad">self-check FAILED</span> the page disagrees with the `+
       `verifier by ${drift.toFixed(4)} quanta on <code>${driftIon}</code>. Trust the `+
-      `Python numbers, not this animation.`)+
+      `checker's numbers, not this animation.`)+
   (P.truncated?`<br><span class="badge warn">truncated</span> only the first ${P.frames.length} instructions are animated.`:'')+
   `<br>scale ${L.sx.toFixed(1)}&times;${L.sy.toFixed(1)} px/unit &middot; nearest sites `+
   `${L.g.toFixed(1)} px apart &middot; ion radius ${L.r_ion.toFixed(1)} px`+
@@ -3613,6 +3697,12 @@ document.getElementById('phase').onclick=()=>{stop(); unfocus(document.getElemen
 document.getElementById('reset').onclick=()=>{stop();frame=0;phase=1;fit();draw();
   unfocus(document.getElementById('reset'));};
 document.getElementById('fit').onclick=()=>{fit(); unfocus(document.getElementById('fit'));};
+// + and -: the wheel's own zoom, three notches at a time, about the middle of the canvas
+for(const [id, dy] of [['zIn', -200], ['zOut', 200]]){
+  const b=document.getElementById(id);
+  if(b) b.onclick=()=>{ const r=svg.getBoundingClientRect();
+    zoomAt(r.left+r.width/2, r.top+r.height/2, dy); unfocus(b); };
+}
 slider.oninput=e=>{stop();frame=parseInt(e.target.value,10);phase=1;draw();};
 MODE.onchange=draw;
 
@@ -3778,6 +3868,17 @@ function opText(f){
   if(li!=null) return LST.ops[LST.op[li]];
   return (f.type||'').toUpperCase().slice(0,6);
 }
+// a gate's angles, as multiples of pi/4 where they are, from its FIRST operand; a
+// trailing `…` when the operands of one instruction do not all turn alike
+function angles(f){
+  const P=f.params; if(!P||!P.length) return '';
+  const a=x=>{const k=Math.round(x/(Math.PI/4));
+    if(Math.abs(x-k*Math.PI/4)>1e-6) return Number(x).toPrecision(3);
+    const n={0:'0',1:'π/4',2:'π/2',3:'3π/4',4:'π',[-1]:'−π/4',[-2]:'−π/2',[-3]:'−3π/4',[-4]:'−π'}[k];
+    return n===undefined?k+'π/4':n;};
+  const one=JSON.stringify(P[0]), same=P.every(p=>JSON.stringify(p)===one);
+  return '('+P[0].map(a).join(', ')+')'+(same?'':'…');
+}
 function argsHTML(f){
   if(f.shift){
     const loop=f.shift[0], d=f.shift[1];
@@ -3798,7 +3899,7 @@ function argsHTML(f){
     const n=f.pairs.length, out=[];
     for(let j=0;j<Math.min(2,n);j++)
       out.push(ref('ion',f.pairs[j][0])+'&middot;'+ref('ion',f.pairs[j][1]));
-    return (f.gate?esc(f.gate)+' ':'')+out.join(', ')
+    return (f.gate?esc(f.gate)+angles(f)+' ':'')+out.join(', ')
       +(n>2?' <i class="mut">+'+(n-2)+'</i>':'')
       +((f.sites&&f.sites.length)?' @'+ref('site',f.sites[0]):'');
   }
@@ -3970,11 +4071,14 @@ function ctlHTML(f){
   let h = '<br><span class="mut">control:</span> <b>'+esc(r.driver)+'</b>'
     + ' &middot; ' + esc(r.action);
   if(r.driver==='transport'){
+    // a channel with no switch elements at all (H2's conveyor) holds nothing out by a
+    // switch: the clause read "0 held out by their switch" on a machine that has none
+    const noSwitch = !sw[1] && !sw[2];
     h += ' &middot; '+ch[0]+'/'+ch[1]+' channels driven'
       + (CTLD.spec && CTLD.spec.grouping ? ' ('+esc(CTLD.spec.grouping)+')' : '')
-      + ' &middot; '+si[0]+'/'+si[2]+' sites moving, '+si[1]
-      + ' held out by their switch'
-      + ' &middot; '+fmt(sw[1])+'/'+fmt(sw[2])+' switch elements';
+      + ' &middot; '+si[0]+'/'+si[2]+' sites moving'
+      + (noSwitch ? '' : ', '+si[1]+' held out by their switch'
+                         + ' &middot; '+fmt(sw[1])+'/'+fmt(sw[2])+' switch elements');
     for(const b of (r.banks||[])) h += '<br><span class="bank">&nbsp;&nbsp;'
       + esc(b[0])+' &times;'+b[1]+' &nbsp;each drives '+b[2]+' sites &rarr; '+b[3]
       + ' follow &nbsp;<b>'+esc(b[4])+'</b>'+(b[5]?'':' <i>(not verifiable)</i>')
@@ -4282,8 +4386,14 @@ function placeProgram(){
     pin.innerHTML = col ? 'Into the panels &#9654;' : '&#9664; Beside the animation';
     pin.setAttribute('aria-pressed', col ? 'true' : 'false');
   }
-  // the dock cannot show a pane that is not in it: fall through to the course
-  setPane(col && PANE === 'P' ? 'L' : PANE);
+  // the dock cannot show a pane that is not in it.  In the course it falls through to the
+  // course; anywhere else it has nothing to show, so it folds -- a design page never opens
+  // on the Learn pane it did not ask for
+  if(col && PANE === 'P'){
+    if(inCourse()) setPane('L');
+    else { foldPanel(dock, true); syncMenu(); }
+  } else setPane(PANE);
+  syncProgWidth();
   return col;
 }
 function progPinToggle(on){
@@ -4307,8 +4417,24 @@ function setProgView(v){
   const seg = document.getElementById('pView'); if(seg) seg.style.display = SRC ? '' : 'none';
   try { localStorage.setItem('qccd.studio.progview', v); } catch (e) { /* no store */ }
   syncQ();
-  sizeLists();
+  if(syncProgWidth()) sizeStage(); else sizeLists();
   return v;
+}
+// BOTH WIDENS WHAT HOLDS THE PANE: the CSS doubles the column, or the dock, that carries
+// `data-view="both"` -- the dock only while the Program pane is the one it shows, so the
+// Learn pane never opens twice as wide.  Returns whether the width changed, so the caller
+// refits the canvas beside it.
+function syncProgWidth(){
+  const both = PROG_VIEW === 'both' && !!SRC;
+  let changed = false;
+  const mark = (el, on) => {
+    if(!el) return;
+    const v = on ? 'both' : 'one';
+    if(el.getAttribute('data-view') !== v){ el.setAttribute('data-view', v); changed = true; }
+  };
+  mark(document.getElementById('progcol'), both && PROG_COL);
+  mark(document.getElementById('dock'), both && !PROG_COL && PANE === 'P');
+  return changed;
 }
 // the Circuit listing's off switch is an attribute: a pane that shows every block must
 // not show this one with nothing behind it
@@ -4351,7 +4477,11 @@ function menuPick(k){
   setPane(k);
   return { pane: PANE, view: PROG_VIEW };
 }
+// Course mode: the tutorial's Learn tab and pane.  Asking for the pane is asking for the
+// course -- #learn, a lesson found by search, a lesson's own Check -- so it turns the mode on.
+function inCourse(){ return document.body.getAttribute('data-course') === '1'; }
 function setPane(which){
+  if(which === 'L' && !inCourse()) document.body.setAttribute('data-course', '1');
   if(which === 'Q'){ setProgView('gates'); which = 'P'; }
   // the programme beside the animation is not a dock pane: the dock keeps what it shows
   if(which === 'P' && PROG_COL){ syncQ(); sizeLists(); return; }
@@ -4361,6 +4491,7 @@ function setPane(which){
     document.getElementById('pane'+k).className = 'pane card'+(on?' on':'');
   }
   syncQ();
+  if(syncProgWidth()){ sizeStage(); return; }
   // the wide strip scrolls sideways when its panes do not all fit: bring the pane in
   const panes=document.getElementById('panes'), pe=document.getElementById('pane'+which);
   if(panes && pe && typeof pe.offsetLeft==='number' &&
@@ -4730,7 +4861,9 @@ sizeLists();
   setProgView(v || (SRC ? 'both' : 'hw'));
   // the page opens on the canvas; a page built for the course opens on its Learn pane
   if(D.open_pane && document.getElementById('pane' + D.open_pane)){
-    foldPanel(document.getElementById('dock'), false);
+    // the programme in its column already shows P and Q: the dock stays folded
+    if(!(PROG_COL && (D.open_pane === 'P' || D.open_pane === 'Q')))
+      foldPanel(document.getElementById('dock'), false);
     setPane(D.open_pane);
   }
   syncMenu();
@@ -4763,6 +4896,7 @@ def render_html(
     source: dict | None = None,
     open_pane: str | None = None,
     tech=None,
+    ruleset: dict | None = None,
 ) -> Path:
     """Write the self-contained page.  Returns the path written.
 
@@ -4774,7 +4908,11 @@ def render_html(
                             template_stems=template_stems, metal=metal,
                             source=source, tech=tech)
     view["open_pane"] = open_pane
-    html = _TEMPLATE.replace("__TITLE__", f"{arch.name} - {prog.name}")
+    if ruleset:
+        # absent unless given, so every other page is byte-identical to before
+        view["ruleset"] = ruleset
+    # names come from the device and programme files, which can be anyone's (a leaderboard entry)
+    html = _TEMPLATE.replace("__TITLE__", _escape_text(f"{arch.name} - {prog.name}"))
     html = html.replace("__STAMP__", page_stamp())
     html = html.replace("__CSSVARS__", css_vars())
     blob = json.dumps(view, separators=(",", ":"))

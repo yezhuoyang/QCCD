@@ -1,0 +1,17 @@
+{
+ "id": "algo_par",
+ "title": "Two Bell pairs, then joined",
+ "note": "four layers: two Hadamards fire in one instruction, two CNOTs run side by side in two traps, then one CNOT joins the pairs",
+ "compiler": "4 layers, 3 transport cycles, 14 beams, 3 MS, 2 virtual-Z, 19 instructions",
+ "device": "grid2x3",
+ "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",
+ "notes": [
+  "seeded q1 (weight 2) at T0_1h",
+  "candidates: greedy 3, spectral 4 -> greedy",
+  "weighted interaction distance 3 over 3 distinct pairs"
+ ],
+ "regime": "broadcast-free",
+ "n_qubits": 4,
+ "compile_seconds": 0.03,
+ "check_seconds": 1.1
+}

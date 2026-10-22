@@ -1,0 +1,369 @@
+"""Two injected blocks that connect qccd.academy to the local co-design workspace.
+
+* `studio_block()`: the Design page's **Agent** button (in the site bar) and its panel.
+  Co-design itself runs in a local workspace (`qccd studio`, `qccd/workspace/`), because
+  the agent and the design live on the person's machine; this page does not connect to
+  it.  The panel says how to set one up, saves the current design as a `.studio.json`
+  file (`EDITOR.snapshot()`, the document `qccd import` reads), and says how to submit.
+* `board_section()`: the Leaderboard's **Official submissions**, read live from the
+  official service at `/official/v1/` (qccd/official/, deploy/official/).  Only eligible,
+  public submissions are listed there; the static boards above it are untouched.
+
+Both are injected by `build.py` the way `qec_cycle` is, so the studio and the board
+templates are not edited.  An embedded studio (`#embed`, or inside an iframe) gets no
+button.  The panel opens by itself when the page is loaded with `?agent`.
+"""
+
+from __future__ import annotations
+
+REPO_CLONE = "git clone -b compiler https://github.com/yezhuoyang/QCCD"
+
+STUDIO_CSS = """
+#qa-btn{font:inherit;font-size:13px;margin:0 6px 0 4px;padding:4px 11px 4px 9px;border:1px solid #bcd4f2;
+ border-radius:99px;background:#eef4fc;color:#1d4f91;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+ white-space:nowrap}
+#qa-btn:hover{background:#e2edfb;border-color:#9dbfe9}
+#qa-btn[aria-expanded="true"]{background:#2a78d6;border-color:#2a78d6;color:#fff}
+#qa-btn i{width:7px;height:7px;border-radius:50%;background:#2a78d6;display:inline-block}
+#qa-btn[aria-expanded="true"] i{background:#fff}
+#qa-panel{position:fixed;top:48px;right:12px;width:min(480px,calc(100vw - 24px));max-height:calc(100vh - 62px);
+ overflow:auto;background:#fff;border:1px solid #cfceca;border-radius:10px;box-shadow:0 14px 36px rgba(0,0,0,.18);
+ z-index:1100;display:none;padding:16px 18px 14px;color:#1d1d1b;
+ font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#qa-panel[data-open="1"]{display:block}
+#qa-panel h2{font-size:17px;margin:0 28px 6px 0;line-height:1.3}
+#qa-panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#6b6a66;margin:16px 0 5px;font-weight:600}
+#qa-panel p{margin:6px 0}
+#qa-panel a{color:#1d4f91}
+#qa-panel code,#qa-panel pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;background:#f5f4f1;border-radius:5px}
+#qa-panel code{padding:1px 4px}
+#qa-panel pre{padding:7px 9px;margin:4px 0 8px;white-space:pre-wrap;word-break:break-word;user-select:all}
+#qa-panel .qa-note{background:#f3f7fd;border:1px solid #d7e4f6;border-radius:7px;padding:8px 10px;font-size:13px}
+#qa-panel .qa-small{font-size:12.5px;color:#52514e}
+#qa-panel .qa-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:#6b6a66;padding:4px}
+#qa-panel .qa-save{font:inherit;font-size:13.5px;padding:6px 12px;border:1px solid #2a78d6;border-radius:6px;background:#2a78d6;color:#fff;cursor:pointer}
+#qa-panel .qa-save:hover{background:#1f66bd}
+#qa-panel .qa-saved{font-size:12.5px;color:#0b7a4b;margin-left:8px}
+#qa-panel .qa-go{display:inline-block;margin:6px 8px 4px 0;padding:8px 14px;border-radius:7px;background:#2a78d6;color:#fff;
+ font-weight:600;text-decoration:none;border:1px solid #2a78d6}
+#qa-panel .qa-go:hover{background:#1f66bd}
+#qa-panel .qa-go.alt{background:#fff;color:#1d4f91;border-color:#bcd4f2}
+#qa-panel .qa-go.alt:hover{background:#eef4fc}
+"""
+
+PANEL_HTML = """
+<button class="qa-x" type="button" aria-label="close">&times;</button>
+<h2>Design with an AI agent</h2>
+<p>Work on a design together with an agent: Codex, Claude Code or Cursor. Select parts of the device,
+lasso a region, sketch an arrow, or show an edit once, and ask. The agent gets exactly what you
+pointed at and edits the same design through checked changes. You watch each change arrive in
+the Studio. Parts you lock stay locked, and any change can be undone.</p>
+<p><a class="qa-go" data-go="studio" target="_blank" rel="noopener">Open my Studio</a><a class="qa-go alt"
+data-go="page" target="_blank" rel="noopener">Open this page with my agent</a></p>
+<p class="qa-note">This runs on your own computer, in a local workspace that this page does not
+connect to: the buttons are links to 127.0.0.1, and work while your workspace is running.
+Nothing leaves your machine unless you publish it.</p>
+<h3>Set up once</h3>
+<p class="qa-small"><b>macOS or Linux.</b> QCCD needs Python 3.10 or newer, and the
+<code>python3</code> a Mac comes with is 3.9: install a newer one first with
+<code>brew install python@3.13</code>.</p>
+<pre>__CLONE__
+cd QCCD
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[agent]"
+qccd toolchain install
+cd ..</pre>
+<p class="qa-small"><b>Windows.</b></p>
+<pre>__CLONE__
+cd QCCD
+py -m venv .venv
+.venv\\Scripts\\activate
+pip install -e ".[agent]"
+qccd toolchain install
+cd ..</pre>
+<p class="qa-small">If PowerShell refuses to run the activate script, run
+<code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once. The virtual
+environment keeps QCCD's libraries apart from the rest of your Python, so installing it cannot
+change a version another package of yours needs. Activate it again in each new terminal.
+<code>qccd toolchain install</code> downloads the compiler that runs your programs (Windows and
+Linux on x86-64, and Macs with Apple silicon) and, on a Mac, the Lean checker that a reference
+grade on your own machine needs. It checks each file against a hash pinned in the repository
+before using it. On Windows and Linux, build the checker once: install Lean with
+<a href="https://github.com/leanprover/elan">elan</a>, then run <code>lake build</code> in the
+checker's folder of your clone, which <code>qccd toolchain install</code> names when it finishes
+(about a minute). An Intel Mac builds the compiler from source, as
+<a href="https://github.com/yezhuoyang/QCCD/blob/compiler/Compiler/README.md">the compiler's README</a> describes.</p>
+<p class="qa-small"><b>Cursor.</b> The chat runs Cursor&rsquo;s command-line agent, which the Cursor editor does not include. Install it and sign in once (on Windows: <code>irm "https://cursor.com/install?win32=true" | iex</code>, then <code>cursor-agent login</code> in a new terminal):</p>
+<pre>curl https://cursor.com/install -fsS | bash
+~/.local/bin/cursor-agent login</pre>
+<p class="qa-small">Then use <code>--client cursor</code> below. <code>qccd agent install --client cursor</code> says whether Cursor is ready, or the one command still missing. Opened in the Cursor editor, the same workspace also gives its own agent the QCCD tools: approve the <code>qccd</code> server when Cursor asks.</p>
+<h3>Start a workspace</h3>
+<p class="qa-small">Run these from the folder that holds QCCD, not inside it. Type them as shown,
+except the folder name, which is yours.</p>
+<pre>qccd init "My QCCD designs"
+cd "My QCCD designs"
+qccd agent install --client codex
+qccd studio --keep-alive</pre>
+<p class="qa-small"><b>Yours to name, anything you like:</b> the workspace folder ("My QCCD designs" is
+only an example; <code>qccd init</code> with no name makes the folder you are in the workspace; rename
+or move it later while <code>qccd stop</code>ped), every design (the design menu at the top of the
+chat saves, renames and switches them, or ask the agent), and the name shown if you publish. One
+workspace holds any number of designs for every leaderboard. <b>Type as shown:</b> the commands. Use
+<code>--client claude</code> if you have Claude Code, or <code>--client cursor</code> if you use Cursor.</p>
+<p>That opens the live Studio, with a chat at the bottom right. Type to the agent there. Codex, Claude
+Code or Cursor, whichever you set up, starts by itself when you send (switch under &hellip; in the chat). Ask it to
+change the design, or to run a program and explain it, for example <em>"Make a new design with a
+large triangle and a smaller one, and submit it to the BB code"</em>, <em>"Compile and run the BB code
+on this design and summarize the bottleneck"</em> or <em>"Run the BB code on my two designs side by
+side"</em>.</p>
+<h3>Ask about any page</h3>
+<p>Your workspace also serves this whole website with the same chat on every page. In the workspace
+folder, run:</p>
+<pre>qccd web</pre>
+<p>Ask about the page you are reading: a rule, a lesson, a leaderboard entry. Select a sentence
+and it goes with your question. The agent reads the page and points at the answer on it. It
+can also step the embedded examples, open lessons and take you to other pages. The
+pages come from this site; the chat and the agent stay on your computer, and this public
+site still does not connect to it.</p>
+<h3>Bring this design</h3>
+<p><button class="qa-save" type="button">Save this design as a file</button><span class="qa-saved"></span></p>
+<p>Put the file in your workspace folder, then run this (with the name the file was saved under):</p>
+<pre class="qa-import">qccd import qccd-design.studio.json</pre>
+<h3>Put it on the leaderboard</h3>
+<p>In your Studio, press <b>Submit to Leaderboard</b> at the top, pick the board, press <b>Test on this
+board</b>, and when it passes, <b>Submit</b>. The first time, it asks you to sign in with your
+qccd.academy account (on this site: your password never passes through your computer's workspace), and
+the <a href="__ROOT__board/">leaderboard</a> then shows your name with your design. Every board there also
+has <b>Try your own design</b>, which opens your Studio on that board. Or ask the agent, for example
+<em>"Test this design on the BB board and submit it"</em>: it tests the design and asks you to press
+Submit. In a terminal:</p>
+<pre>qccd login
+qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
+qccd publish --submission &lt;id&gt;</pre>
+<p><b>Yours to name, anything you like:</b> the design (<code>"Two triangles"</code> is only an example)
+and the name it is shown under. <b>Type as shown:</b> the commands, and a board by its title or any
+unambiguous part of it, such as <code>BB</code> or <code>"surface code"</code> (<code>qccd boards</code>
+lists them). The second command tests the design on your machine with the reference checker; the third
+submits it once you approve (<code>&lt;id&gt;</code> is what the second printed). Nothing leaves your
+machine before that. The server grades it again, then lists it.</p>
+<p class="qa-small"><a href="https://github.com/yezhuoyang/QCCD/blob/compiler/docs/workspace.md">How it works</a>:
+the workspace, what is and is not tested, and the security model.</p>
+"""
+
+STUDIO_JS = r"""
+(function(){
+  if (window.self !== window.top) return;                 // an embed inside another page
+  if (/^#embed/.test(location.hash)) return;
+  var nav = document.getElementById('sitenav');
+  if (!nav || document.getElementById('qa-btn')) return;
+  var btn = document.createElement('button');
+  btn.id = 'qa-btn'; btn.type = 'button'; btn.setAttribute('aria-expanded', 'false');
+  btn.title = 'Design with an AI agent (Codex, Claude Code or Cursor)';
+  btn.innerHTML = '<i></i>Agent';
+  nav.insertBefore(btn, nav.querySelector('.sn-sp'));
+  var panel = document.createElement('div');
+  panel.id = 'qa-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Design with an AI agent');
+  panel.setAttribute('data-open', '0');
+  panel.innerHTML = __PANEL__;
+  // the workspace's website listens on 47100 (qccd/workspace/mirror.py WEB_PORT); its /studio
+  // leads on to the person's own Studio.  Plain links: this page connects to nothing.
+  var LOCAL = 'http://127.0.0.1:47100';
+  panel.querySelector('[data-go="studio"]').href = LOCAL + '/studio';
+  panel.querySelector('[data-go="page"]').href = LOCAL + '/web/studio.html' + location.hash;
+  document.body.appendChild(panel);
+  function open(v){ panel.setAttribute('data-open', v ? '1' : '0'); btn.setAttribute('aria-expanded', v ? 'true' : 'false'); }
+  btn.addEventListener('click', function(){ open(panel.getAttribute('data-open') !== '1'); });
+  panel.querySelector('.qa-x').addEventListener('click', function(){ open(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') open(false); });
+  var saved = panel.querySelector('.qa-saved');
+  panel.querySelector('.qa-save').addEventListener('click', function(){
+    var E = window.EDITOR;
+    if (!E || typeof E.snapshot !== 'function') { saved.textContent = 'this page cannot export a design'; return; }
+    var snap = E.snapshot();
+    var base = String((snap && snap.arch && snap.arch.name) || '').toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!base || base === 'studio' || base === 'design') base = 'qccd-design';   // a fresh canvas's generic name
+    var name = base + '.studio.json';
+    var url = URL.createObjectURL(new Blob([JSON.stringify(snap, null, 1)], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = name; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+    panel.querySelector('.qa-import').textContent = 'qccd import ' + name;
+    saved.textContent = 'saved ' + name;
+    window.__qaLastSave = { name: name, snap: snap };      // for tests
+  });
+  if (/(^|[?&])agent(=|&|$)/.test(location.search.slice(1))) open(true);
+})();
+"""
+
+BOARD_CSS = """
+#official{margin-top:34px}
+#official table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 14px}
+#official th,#official td{text-align:left;padding:6px 8px;border-bottom:1px solid #e6e5e1}
+#official th{font-weight:600;color:#52514e;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+#official td.qo-n{font-variant-numeric:tabular-nums}
+#official .qo-task h3{margin:18px 0 2px}
+#official .qo-task h3 small{font-weight:400;color:#8a8985;margin-left:6px}
+#official .qo-empty,#official .qo-wait{color:#6b6a66}
+#official .qo-err{color:#9a3412}
+"""
+
+BOARD_JS = r"""
+(function(){
+  var box = document.getElementById('qo-boards');
+  if (!box) return;
+  var API = '/official/v1';
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function get(path){
+    return fetch(API + path, { headers: { 'Accept': 'application/json' } }).then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function fmt(v){ return (typeof v === 'number') ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toPrecision(4)) : '-'; }
+  var cbox = document.getElementById('qo-compiler');
+  function isCompiler(task){ return task.track === 'compiler'; }
+  get('/tasks').then(function(t){
+    var all0 = ((t && t.tasks) || []).slice();
+    var suites = all0.filter(isCompiler);
+    if (cbox) compilerBoards(suites);
+    var tasks = all0.filter(function(x){ return !isCompiler(x); });
+    var rank = function(task){ var i = ORDER.indexOf(task.id); return i < 0 ? ORDER.length : i; };
+    tasks.sort(function(a, b){ return rank(a) - rank(b); });
+    return Promise.all(tasks.map(function(task){
+      return get('/leaderboard/' + encodeURIComponent(task.id)).then(function(b){ return { task: task, board: b }; });
+    }));
+  }).then(function(all){
+    box.textContent = '';
+    if (!all.length) { box.appendChild(el('p', 'qo-empty', 'The official server lists no tasks.')); return; }
+    // a board with its own block above (leaderboard.py: "Try your own design" and its submissions) is
+    // listed there; this section keeps the others, so every board the server ranks is on the page once
+    var own = function(task){ return document.querySelector('.lbx-live[data-board="' + String(task.id).split('@')[0] + '"]'); };
+    all = all.filter(function(x){ return !own(x.task); });
+    if (!all.length) { box.appendChild(el('p', 'qo-empty', 'Every board the official server ranks is listed above, with its submissions.')); }
+    all.forEach(function(x){
+      var sec = el('div', 'qo-task');
+      var h = el('h3', null, x.task.title || x.task.id); sec.appendChild(h);
+      var tr0 = document.createElement('button'); tr0.type = 'button'; tr0.className = 'lbx-try'; tr0.textContent = 'Try your own design';
+      tr0.setAttribute('data-board', String(x.task.id).split('@')[0]); tr0.setAttribute('data-title', x.task.title || x.task.id);
+      tr0.setAttribute('data-hint', 'board:try'); sec.appendChild(tr0);
+      var rows = x.board.rows || [];
+      var unit = ((x.task.metrics || []).filter(function(m){ return m.name === x.board.rank_by; })[0] || {}).unit || '';
+      if (!rows.length) {
+        sec.appendChild(el('p', 'qo-empty', 'No published submissions yet.'));
+      } else {
+        var tb = el('table'), hd = el('tr');
+        ['#', 'design', 'by', x.board.rank_by + (unit ? ' (' + unit + ')' : ''), 'submitted', ''].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
+        var body = el('tbody');
+        rows.forEach(function(r, i){
+          var tr = el('tr');
+          tr.appendChild(el('td', 'qo-n', String(i + 1)));
+          var td0 = el('td'), a0 = el('a', null, r.display_name || r.id);
+          a0.href = API + '/submissions/' + encodeURIComponent(r.id) + '/page'; td0.appendChild(a0); tr.appendChild(td0);
+          tr.appendChild(el('td', null, r.by || '-'));
+          tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
+          tr.appendChild(el('td', null, r.created_at ? new Date(r.created_at * 1000).toISOString().slice(0, 10) : '-'));
+          var td = el('td');
+          [['watch', '/page'], ['bundle', '/bundle.zip'], ['report', '/report']].forEach(function(x){
+            var a = el('a', null, x[0]); a.href = API + '/submissions/' + encodeURIComponent(r.id) + x[1];
+            a.style.marginRight = '10px'; td.appendChild(a); });
+          tr.appendChild(td);
+          body.appendChild(tr);
+        });
+        tb.appendChild(body); sec.appendChild(tb);
+      }
+      box.appendChild(sec);
+    });
+  }).catch(function(err){
+    box.textContent = '';
+    box.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + '). The boards above are unaffected.'));
+    if (cbox) { cbox.textContent = ''; cbox.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + ').')); }
+  });
+  // the Compiler board: one ranking per suite, with each entry's coverage and wrong pairs from its report
+  function compilerBoards(suites){
+    if (!suites.length) { cbox.textContent = ''; cbox.appendChild(el('p', 'qo-empty', 'The official server lists no compiler suite yet.')); return; }
+    Promise.all(suites.map(function(s){
+      return get('/leaderboard/' + encodeURIComponent(s.id)).then(function(b){
+        return Promise.all((b.rows || []).map(function(r){
+          return get('/submissions/' + encodeURIComponent(r.id)).then(function(x){ r.m = (x.report || {}).metrics || {}; return r; },
+                                                                     function(){ r.m = {}; return r; });
+        })).then(function(rows){ return { suite: s, rows: rows }; });
+      });
+    })).then(function(all){
+      cbox.textContent = '';
+      all.forEach(function(x){
+        var sec = el('div', 'qo-task');
+        sec.appendChild(el('h3', null, x.suite.title || x.suite.id));
+        if (!x.rows.length) { sec.appendChild(el('p', 'qo-empty', 'No published compiler yet: the reference compiler is 1.00x by definition.')); cbox.appendChild(sec); return; }
+        var tb = el('table'), hd = el('tr');
+        ['#', 'compiler', 'by', 'speedup (x)', 'coverage', 'LER ratio', 'submitted', 'report'].forEach(function(c){ hd.appendChild(el('th', null, c)); });
+        var th = el('thead'); th.appendChild(hd); tb.appendChild(th);
+        var body = el('tbody');
+        x.rows.forEach(function(r, i){
+          var tr = el('tr');
+          tr.appendChild(el('td', 'qo-n', String(i + 1)));
+          tr.appendChild(el('td', null, r.display_name || r.id));
+          tr.appendChild(el('td', null, r.by || '-'));
+          tr.appendChild(el('td', 'qo-n', fmt(r.rank_value)));
+          tr.appendChild(el('td', 'qo-n', typeof r.m.coverage === 'number' ? Math.round(100 * r.m.coverage) + '%' : '-'));
+          tr.appendChild(el('td', 'qo-n', fmt(r.m.ler_ratio)));
+          tr.appendChild(el('td', null, r.created_at ? new Date(r.created_at * 1000).toISOString().slice(0, 10) : '-'));
+          var td = el('td'), a = el('a', null, 'report');
+          a.href = API + '/submissions/' + encodeURIComponent(r.id) + '/report'; td.appendChild(a); tr.appendChild(td);
+          body.appendChild(tr);
+        });
+        tb.appendChild(body); sec.appendChild(tb); cbox.appendChild(sec);
+      });
+    }, function(err){ cbox.textContent = ''; cbox.appendChild(el('p', 'qo-err', 'The official server did not answer (' + err.message + ').')); });
+  }
+})();
+"""
+
+BOARD_HTML = """<section id="official">
+<h2>Official submissions: more boards</h2>
+<p class="sub">The other boards the official server ranks, live.</p>
+<div id="qo-boards"><p class="qo-wait">Loading the official leaderboard...</p></div>
+<details class="lb-more-d"><summary>How to take part</summary><p>Press <b>Try your own design</b> on a
+board: your own QCCD workspace opens on it, you test a design with the same checks, and press
+<b>Submit</b> (signed in with your qccd.academy account, which the leaderboard credits). In a
+terminal: <code>qccd login</code>, <code>qccd submit --local --board "BB [[144,12,12]]" --wait</code>,
+then <code>qccd publish --submission &lt;id&gt;</code>.</p></details>
+</section>"""
+
+
+def studio_block(root: str = "") -> str:
+    """The Design page's Agent button and panel, as one style + script block.  `root` is
+    the page's path to the site root ('' for studio.html itself)."""
+    import json
+    panel = PANEL_HTML.replace("__CLONE__", REPO_CLONE).replace("__ROOT__", root)
+    js = STUDIO_JS.replace("__PANEL__", json.dumps(panel).replace("</", "<\\/"))
+    return f"<style>{STUDIO_CSS}</style>\n<script>{js}</script>\n"
+
+
+def board_section() -> str:
+    """The Leaderboard's live Official submissions section for devices (HTML with its style); its
+    script, which also fills the Compiler section's ranking, is `board_script()`, placed after both."""
+    return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n"
+
+
+def board_script() -> str:
+    """The script that reads the official server: the device boards in the website's own order (the
+    releases carry it), and each compiler suite's ranking into the Compiler section (#qo-compiler)."""
+    import json
+    try:
+        from ..workspace.tasks import list_boards
+        order = [b.id for b in list_boards()]
+    except Exception:                      # the workspace package is optional for a site build
+        order = []
+    js = BOARD_JS.replace("var API = '/official/v1';",
+                          "var API = '/official/v1', ORDER = " + json.dumps(order) + ";")
+    return f"<script>{js}</script>\n"
+
+
+#: the note this section replaces on the board page (build.py wrote it before the official
+#: service existed); kept here so a live page can be patched in place to exactly what a build
+#: now produces
+OLD_BOARD_NOTE_START = '<p class="note">Contributing a design from the studio (Verify &rarr; Contribute) arrives in phase 3 of '

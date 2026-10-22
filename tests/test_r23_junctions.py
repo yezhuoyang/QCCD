@@ -97,3 +97,15 @@ def test_a_device_with_no_room_off_its_junctions_is_not_judged():
     q.init({"d0": "H", "d1": "A0", "d2": "A1"})
     q.cool()
     assert len(r23(m, q.build())) == 1
+
+
+def test_the_rails_of_a_conveyor_are_not_places_to_rest():
+    """A transversal-CNOT station is a comb: two conveyor rails over a row of gate traps, so
+    every rail site meets three rails (two along the rail, one rung).  The bundles stand on
+    the rails between shifts that move every ion on them together; that is a conveyor, the
+    case R23 exempts by name, and before 2026-10-19 only a rotation template was recognised
+    as one (the gadget page's G9 failed on `tcx72.cx`)."""
+    from qccd.gadget.leaves.transport import station
+    b = station(3, code="t")
+    assert b.machine.arch.device.degree("A1") == 3
+    assert r23(b.machine, b.programs["cx"]) == []

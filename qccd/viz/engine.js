@@ -2458,8 +2458,19 @@ function makeModel(prims, deg, ce, segs, opts) {
     if (!v) throw new EngineError('architecture declares no `' + name + '` primitive');
     return v;
   }
-  function nonTransport(type, gateName) {
+  function nonTransport(type, gateName, single) {
     if (kind === 'deck') return _charge(0, 0, 0, {});
+    // `CostModel.gate_1q`: a single-qubit gate is priced from `1q_gate`, never from
+    // `ms_gate` -- a VZ from `z_gate` where the device declares one, else as three
+    // pulses (`Z_AS_PULSES`).  Pricing every gate frame at `ms_gate` charged each
+    // 10 us rotation of a reproduced TISCC round 2,000 us (thread 44).
+    if (type === 'gate' && single) {
+      if (gateName === 'VZ') {
+        if (own(prims.scalars, 'z_gate')) return _charge(0, 1, num(scalar('z_gate').us), {});
+        return _charge(0, 1, 3 * num(scalar('1q_gate').us), {});
+      }
+      return _charge(0, 1, num(scalar('1q_gate').us), {});
+    }
     if (type === 'gate') {
       if (gateName === 'SWAP') {
         var sw = scalar('gate_swap'), ms = scalar('ms_gate');
@@ -2473,6 +2484,7 @@ function makeModel(prims, deg, ce, segs, opts) {
   return {
     kind: kind,
     _deg: deg,
+    _segs: segs,          // `_moveEntails` reads each route's rails off it
     _anomalousPerUs: (opts.include_anomalous === false || kind === 'deck')
       ? 0 : (opts.anomalous_per_ms || 0) / 1000.0,
     nonTransport: nonTransport,
@@ -2504,6 +2516,16 @@ function makeModel(prims, deg, ce, segs, opts) {
       return ch;
     }
   };
+}
+
+// A gate frame is single-qubit when an operand is one ion -- `replay.py`'s test,
+// `iter_operands(instr)` holding a 1-tuple, read off the frame's `acts`.  A frame from
+// before `acts` existed carries `pairs` only and is priced as it always was.
+function _singleQubit(f) {
+  var a = f.acts;
+  if (f.type !== 'gate' || !a) return false;
+  for (var i = 0; i < a.length; i++) if (a[i].length === 1) return true;
+  return false;
 }
 
 // Python's `round()` -- HALF TO EVEN.  `Math.round` is half-up and also disagrees on
@@ -2546,6 +2568,9 @@ function priceFrames(frames, loops, model, classes, opts) {
   var warnings = [];
   var work = 0, workCap = opts.workCap || 0;
   var EMPTY = {};      // shared, never written: the transit map of a cycle with none
+  // the conveyors and their dead ends, for `_moveEntails`' dock test (`conveyor_nodes`)
+  var onLoop = _conveyorNodes(loops, model._segs || {});
+  var loopRails = _spurRails(onLoop, model._segs || {});
 
   // Overwrite pool slot `i`, growing the pool only when a cycle is wider than any before.
   function _pool(win, i, ion, src, dst, seg, ent) {
@@ -2625,7 +2650,7 @@ function priceFrames(frames, loops, model, classes, opts) {
         }
       }
       var ch0;
-      try { ch0 = model.nonTransport(f.type, f.gate); }
+      try { ch0 = model.nonTransport(f.type, f.gate, _singleQubit(f)); }
       catch (err) { ch0 = _charge(0, 1, 0, {}); warnings.push(err.message); }
       fc += ch0.cost; fd += ch0.depth; fus += ch0.us;
       _anom(model, pos, q, life, comp, fus, peak);
@@ -2664,18 +2689,27 @@ function priceFrames(frames, loops, model, classes, opts) {
             var subC = 0, subD = 0, subUs = 0;
             var ionIds = Object.keys(pos).sort(_cmpStr);   // participants sorted by ion id
             var moved = {}, wParts = [], pb = {}, ob = {}, nmv = 0;
-            for (var ii = 0; ii < ionIds.length; ii++) {
-              var ion = ionIds[ii], i0 = idx[pos[ion]];
-              if (i0 === undefined) continue;
-              var dstNode = seq[((i0 + step) % kk + kk) % kk];
+            // the cycle's participants first, so what each one splits and merges can be
+            // read off all of them (`move_entails`), then priced in the same order
+            var sParts = [], sRoutes = [];
+            for (var ij = 0; ij < ionIds.length; ij++) {
+              var i1 = idx[pos[ionIds[ij]]];
+              if (i1 === undefined) continue;
+              var d1 = seq[((i1 + step) % kk + kk) % kk];
+              sParts.push([ionIds[ij], pos[ionIds[ij]], d1]);
+              sRoutes.push([_between(model, pos[ionIds[ij]], d1)]);
+            }
+            var sEnt = _moveEntails(ent, sParts, occ, sRoutes, model._segs, onLoop, loopRails);
+            for (var ii = 0; ii < sParts.length; ii++) {
+              var ion = sParts[ii][0], dstNode = sParts[ii][2], segId = sRoutes[ii][0];
+              var entI = sEnt[ii][0], judgedI = sEnt[ii][1];
               moved[ion] = dstNode;
-              var segId = _between(model, pos[ion], dstNode);
-              var ch = model.move(segId, pos[ion], dstNode, ent);
+              var ch = model.move(segId, pos[ion], dstNode, entI);
               subC += ch.cost; subD = Math.max(subD, ch.depth); subUs = Math.max(subUs, ch.us);
               _deposit(q, life, comp, ion, ch.q, peak);
               if (deg(model, dstNode) >= 3) transits++;
               if (onCycle) {
-                _pool(w, nmv++, ion, pos[ion], dstNode, segId, ent);
+                _pool(w, nmv++, ion, pos[ion], dstNode, segId, judgedI);
                 wParts.push(ion);
                 pb[ion] = pos[ion];
                 if (ob[pos[ion]] === undefined) ob[pos[ion]] = occ[pos[ion]] || 0;
@@ -2717,8 +2751,18 @@ function priceFrames(frames, loops, model, classes, opts) {
             }
           }
         }
+        // what each move splits and merges is read off the whole cycle before any is priced
+        // (`move_entails`), against the occupancy before anything moved
+        var mParts = [], mRoutes = [];
+        for (var mj = 0; mj < f.moves.length; mj++) {
+          var pth = f.moves[mj][1], rt = [];
+          for (var pj = 1; pj < pth.length; pj++) rt.push(_between(model, pth[pj - 1], pth[pj]));
+          mParts.push([f.moves[mj][0], pth[0], pth[pth.length - 1]]);
+          mRoutes.push(rt);
+        }
+        var mEnt = _moveEntails(ent, mParts, occ, mRoutes, model._segs, onLoop, loopRails);
         for (var mi = 0; mi < f.moves.length; mi++) {
-          var ionb = f.moves[mi][0], path = f.moves[mi][1];
+          var ionb = f.moves[mi][0], path = f.moves[mi][1], entM = mEnt[mi][0], judgedM = mEnt[mi][1];
           // TWO LEVELS OF COMPOSITION, and getting them the wrong way round is invisible
           // in the cost and wrong in the steps.  ALONG one ion's route the charges compose
           // SEQUENTIALLY (`then`: cost, depth and us all add -- the ion really does
@@ -2734,12 +2778,12 @@ function priceFrames(frames, loops, model, classes, opts) {
             // entails once per MOVE, on the FIRST segment of a multi-segment route: one
             // dock is one split plus one merge however long the spur is.
             charge = _then(charge, model.move(sid, path[pi - 1], path[pi],
-                                              pi === 1 ? ent : []));
+                                              pi === 1 ? entM : []));
             // a junction TRANSIT is ENTERING a node of degree >= 3, not traversing a
             // segment; the two differ by a factor of three on the shipped ring.
             if (deg(model, path[pi]) >= 3) transits++;
             if (onCycle) {
-              _pool(w, nmv2++, ionb, path[pi - 1], path[pi], sid, ent);
+              _pool(w, nmv2++, ionb, path[pi - 1], path[pi], sid, judgedM);
               // every node the path ENTERED except the last is passed THROUGH, and a site
               // with no room to spare there is a roadblock (R1)
               if (pi < path.length - 1) tr2[path[pi]] = (tr2[path[pi]] || 0) + 1;
@@ -2834,6 +2878,81 @@ function _between(model, a, b) {
     throw new EngineError('no segment between ' + pyRepr(a) + ' and ' + pyRepr(b));
   }
   return s;
+}
+
+// `replay.py::move_entails`, line for line: what each move of one cycle splits and merges,
+// from what it DOES (#16, #17) -- the class's own list, then a hop across a spur (a dock,
+// whatever the class is called), then the chains: ions left behind or going elsewhere are a
+// split, ions staying or arriving from elsewhere at the destination are a merge.  Ions that
+// leave one site for one destination together are a chain moving whole.  `parts[k]` is
+// `[ion, src, dst]`, `routes[k]` its segment ids, `occ` the occupancy BEFORE the cycle and
+// `onLoop` the set of nodes on a named loop or path.  Returns `[priced, judged]` per move:
+// what it is charged, and what R14 judges -- the class's own list, as before #16 (#22).
+function _moveEntails(declared, parts, occ, routes, segs, onLoop, rails) {
+  var leaving = {}, arriving = {}, together = {}, out = [], k, i;
+  function ordered(need) {
+    var e = declared.slice();
+    if (need.split && declared.indexOf('split') < 0) e.push('split');
+    if (need.merge && declared.indexOf('merge') < 0) e.push('merge');
+    return e;
+  }
+  for (k = 0; k < parts.length; k++) {
+    var s0 = parts[k][1], d0 = parts[k][2], key0 = s0 + '>' + d0;
+    leaving[s0] = (leaving[s0] || 0) + 1;
+    arriving[d0] = (arriving[d0] || 0) + 1;
+    together[key0] = (together[key0] || 0) + 1;
+  }
+  for (k = 0; k < parts.length; k++) {
+    var src = parts[k][1], dst = parts[k][2], need = {};
+    if (src !== dst) {
+      var n = together[src + '>' + dst];
+      if ((occ[src] || 0) > n) need.split = true;
+      if ((occ[dst] || 0) - (leaving[dst] || 0) > 0 || arriving[dst] > n) need.merge = true;
+      var r = routes[k];
+      for (i = 0; i < r.length; i++) {
+        var sg = segs[r[i]];
+        // a SPUR: the off-path end is a dead end, one rail to the path (R22's `_loopRails`);
+        // a chord across two path nodes is a translation, not a dock (#18)
+        if (sg.loop == null && own(onLoop, sg.a) !== own(onLoop, sg.b) &&
+            (rails[own(onLoop, sg.a) ? sg.b : sg.a] || 0) === 1) {
+          need.split = need.merge = true;
+          break;
+        }
+      }
+    }
+    out.push([ordered(need), declared.slice()]);
+  }
+  return out;
+}
+
+// `rules.conveyor_nodes`: every node of a loop its rails close -- as many rails carry the
+// loop's id as it has nodes; an open path of k nodes has k - 1.  Read off the rails, as the
+// replay does, because `loops` here is bare node lists.  A hop from one of these to a dead
+// end is a dock; off an open path it is transport (`_moveEntails`).
+function _conveyorNodes(loops, segs) {
+  var count = {}, out = {}, sid, lid, i;
+  for (sid in segs) if (own(segs, sid)) {
+    var l = segs[sid].loop;
+    if (l != null) count[l] = (count[l] || 0) + 1;
+  }
+  for (lid in loops) if (own(loops, lid)) {
+    var nodes = loops[lid];
+    if (nodes.length > 2 && (count[lid] || 0) >= nodes.length) {
+      for (i = 0; i < nodes.length; i++) out[nodes[i]] = true;
+    }
+  }
+  return out;
+}
+
+// `rails_to_loop` against `conv`, for every node off it: 1 is a dead end, a spur
+function _spurRails(conv, segs) {
+  var r = {};
+  for (var sid in segs) if (own(segs, sid)) {
+    var s = segs[sid], ia = own(conv, s.a), ib = own(conv, s.b);
+    if (ia && !ib) r[s.b] = (r[s.b] || 0) + 1;
+    else if (ib && !ia) r[s.a] = (r[s.a] || 0) + 1;
+  }
+  return r;
 }
 
 function pairIndex(dev) {
@@ -3565,7 +3684,8 @@ function geometryViolations(st) {
     for (i = 0; i < segs.length; i++) {
       for (j = i + 1; j < segs.length; j++) {
         var ang = _railAngleDeg(dev, nid, segs[i], segs[j]);
-        if (ang < minAng - 1e-9) {
+        // R20_TOL_DEG in rules.py: a corner drawn at the limit is stored a hair under it
+        if (ang < minAng - 1e-3) {
           out.push({ rule: 'R20', node: nid,
                      message: 'rails ' + segs[i] + ' and ' + segs[j] + ' meet at ' + nid +
                               ' at ' + ang.toFixed(1) + ' degrees, less than the ' +
@@ -4650,10 +4770,47 @@ function _onLoopSet(w) {
   return s;
 }
 
+// `rails_to_loop(dev, on_loop, node)` for every node at once, cached on the window like
+// `_onLoopSet`: node id -> how many rails join it to a node on a named path.  Only nodes
+// OFF every path are counted, which are the only ones `_hopLabel` asks about.  A spur's
+// off-path end has exactly one; a chord between two path nodes has two and is no spur.
+function _loopRails(w) {
+  var r = w._loopRails;
+  if (r) return r;
+  var on = _onLoopSet(w), segs = w.dev.segments;
+  r = w._loopRails = {};
+  for (var sid in segs) if (own(segs, sid)) {
+    var s = segs[sid], ia = own(on, s.a), ib = own(on, s.b);
+    if (ia && !ib) r[s.b] = (r[s.b] || 0) + 1;
+    else if (ib && !ia) r[s.a] = (r[s.a] || 0) + 1;
+  }
+  return r;
+}
+
+//: `HOP_ANGLE_TIE`: see `rules.py`.  V8's `Math.atan2` is its own fdlibm port, not the
+//: libm Python and OCaml call, so an angle at exactly x.5 degrees must not be decided by
+//: the last bit.
+var HOP_ANGLE_TIE = 1e-9;
+
+// `direction_label(dx, dy)`: `+x`, `-y` or `0` along an axis, `+x+y@30` off one -- the
+// angle in whole degrees counter-clockwise from +x, in [0, 360), rounded `floor(x + 0.5)`
+// after the tie nudge.  Python's `% 360` on a floor that can reach 360 is the `>= 360`.
+function _directionLabel(dx, dy) {
+  var sx = dx > RAIL_EPS ? '+x' : dx < -RAIL_EPS ? '-x' : '';
+  var sy = dy > RAIL_EPS ? '+y' : dy < -RAIL_EPS ? '-y' : '';
+  if (!sx || !sy) return (sx + sy) || '0';
+  var deg = Math.atan2(dy, dx) * RAD_TO_DEG;
+  if (deg < 0.0) deg += 360.0;
+  var r = Math.floor(deg + 0.5 + HOP_ANGLE_TIE);
+  if (r >= 360) r -= 360;
+  return sx + sy + '@' + r;
+}
+
 // `hop_label(dev, on_loop, src, dst, seg)`: a named path gives `L0:+1`, a rail that leaves
-// a path for a dock gives `spur:inward` / `spur:outward`, and everything else falls back to
-// the lab-frame axis.  The fall-through order is Python's and is load-bearing: a segment
-// that NAMES a loop it is not actually on skips the spur branch entirely.
+// a path for a dead end gives `spur:inward` / `spur:outward`, and everything else falls
+// back to the lab-frame direction.  The fall-through order is Python's and is load-bearing:
+// a segment that NAMES a loop it is not actually on skips the spur branch entirely, and a
+// chord (an off-path trap with two rails to the path) skips it too.
 function _hopLabel(w, m) {
   var dev = w.dev, seg = dev.segments[m.seg];
   var loop = seg.loop === undefined ? null : seg.loop;
@@ -4670,14 +4827,12 @@ function _hopLabel(w, m) {
     }
   }
   var on = _onLoopSet(w);
-  if (loop === null && own(on, m.src) !== own(on, m.dst)) {
+  if (loop === null && own(on, m.src) !== own(on, m.dst) &&
+      _loopRails(w)[own(on, m.src) ? m.dst : m.src] === 1) {
     return own(on, m.src) ? 'spur:inward' : 'spur:outward';
   }
   var a = _xyOf(dev.nodes[m.src].pos), b = _xyOf(dev.nodes[m.dst].pos);
-  var dx = b[0] - a[0], dy = b[1] - a[1];
-  var label = (dx > RAIL_EPS ? '+x' : dx < -RAIL_EPS ? '-x' : '') +
-              (dy > RAIL_EPS ? '+y' : dy < -RAIL_EPS ? '-y' : '');
-  return label || '0';
+  return _directionLabel(b[0] - a[0], b[1] - a[1]);
 }
 
 // R22: one transport cycle is one waveform.
@@ -4754,7 +4909,9 @@ function _makeChecker(dev, loops, classes, ctx) {
     _dir: {},
     // `loop_node_set(dev)`, built on first use and then constant: the device cannot
     // change inside one `evaluate`, so R22 walks the loops once rather than per cycle.
-    _onLoop: null
+    _onLoop: null,
+    // `rails_to_loop` per off-path node, built on first use for the same reason
+    _loopRails: null
   };
   var violations = [], byRule = {}, only = ctx.rules || null;
   var names = Object.keys(RULE_FNS);
@@ -4852,16 +5009,20 @@ function _report(chk, frames, priced, ctx, fatal) {
   // WHAT THIS PAGE CANNOT CHECK, enumerated with its reason.  Silence is not acceptable
   // and neither is a green tick: an un-run rule is a THIRD state.
   skipped.R4d = 'the channel-membership map has to be rebuilt from the edited wiring; ' +
-                'ControlPlane.drivable is deliberately not mirrored, so R4d needs Python';
+                'the browser does not decide which channel drives which site, so R4d is checked when the page is built';
   skipped.R7b = 'no architecture declares a per-zone duty-cycle budget, so there is ' +
-                'nothing to check anywhere -- Python lists R7b as unimplemented too';
+                'nothing to check anywhere -- the checker cannot decide R7b either';
   skipped.R9 = "the programme's cost and step claims describe the device this page was " +
                'built for, not this one; after an edit the only honest verdict is "not ' +
                'applicable"';
-  skipped.R10 = 'needs the source circuit and a Pauli-frame tracker; the page carries no ' +
-                'circuit, only compiled output';
-  skipped.R16 = 'gate error against n-bar is not mirrored client-side, and adding it ' +
-                'without a parity bucket would introduce a number with no oracle';
+  skipped.R10 = 'needs the source circuit: the proved checker holds the programme to its ' +
+                'certificate, and the tableau composes its pulses back into that circuit; ' +
+                'the page carries no circuit, only compiled output';
+  skipped.R23 = 'whether an ion rests on a junction is judged against the room off the ' +
+                'junctions, counted as the compiler counts it, and the loops the programme ' +
+                'rotates; that is not carried into the browser yet, so R23 is checked when the page is built';
+  skipped.R16 = 'gate error against n-bar is not computed in the browser, so R16 is ' +
+                'checked when the page is built';
   partial.R15 = 'quanta are composed additively here, which R15 says is an upper bound; ' +
                 'the interference term needs a secular-phase model the corpus does not supply';
   vacuous['R4-concurrency'] = 'no instruction carries t0/t1, so nothing overlaps in time ' +
@@ -5319,13 +5480,14 @@ var API = {
   framesToInstructions: framesToInstructions,
   renderProgramStmt: renderProgramStmt, renderProgramSource: renderProgramSource,
   // pricing
-  pickPoint: pickPoint, makeModel: makeModel, priceFrames: priceFrames,
+  pickPoint: pickPoint, makeModel: makeModel, priceFrames: priceFrames, moveEntails: _moveEntails,
+  conveyorNodes: _conveyorNodes, spurRails: _spurRails,
   pairIndex: pairIndex, validateProgram: validateProgram, loopLengths: loopLengths,
   // lint
   lint: lint, architectureViolations: architectureViolations,
   geometryViolations: geometryViolations, geometryLimits: geometryLimits,
   classParticipants: classParticipants, zonesInUse: zonesInUse,
-  // the browser rule set -- 21 of the 27, derived from the dispatcher and never listed
+  // the browser rule set -- 21 of the 28, derived from the dispatcher and never listed
   get MIRRORED_RULES() { return mirroredRules(); },
   checkFrames: checkFrames, evaluate: evaluate, RULE_WORK_CAP: RULE_WORK_CAP,
   // component variants -- the browser half of arch/variants.py

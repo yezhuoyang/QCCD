@@ -99,6 +99,107 @@ def test_upload_is_idempotent_and_graded_independently(svc, local, tmp_path):
 
 
 @needs_toolchain
+def test_a_leaderboard_entry_opens_its_animation_its_files_and_its_bundle(svc, local, tmp_path):
+    """A public entry: the leaderboard carries every metric (a reader ranks by any of them), and
+    the entry opens the studio page the grader drew from the graded bundle, each bundle file and
+    the whole archive.  A private one opens nothing for anyone but its owner."""
+    from starlette.testclient import TestClient
+    up = svc.authenticate(svc.create_uploader("frank"), "10.0.0.1")
+    a = svc.submit(up, local["archive"], task="ghz4@1", visibility="public", display_name="frank's chain")
+    assert process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    board = svc.leaderboard("ghz4@1")
+    row = board["rows"][0]
+    assert row["by"] == "frank" and row["display_name"] == "frank's chain"
+    assert set(row["metrics"]) >= {m["name"] for m in board["metrics"]} and row["metrics"][board["rank_by"]] == row["rank_value"]
+    assert all({"name", "better", "unit"} <= set(m) for m in board["metrics"])
+    sid = a["submission_id"]
+    page = svc.artifacts / "pages" / f"{sid}.html"
+    assert page.exists(), "the grader drew no page"
+    c = TestClient(create_app(svc))
+    r = c.get(f"/v1/submissions/{sid}/page")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html") and 'name="qccd-page"' in r.text
+    for name in svc.READABLE[:5]:
+        f = c.get(f"/v1/submissions/{sid}/files/{name}")
+        assert f.status_code == 200 and json.loads(f.content), name
+    assert c.get(f"/v1/submissions/{sid}/files/report.json").status_code == 404
+    z = c.get(f"/v1/submissions/{sid}/bundle.zip")
+    assert z.status_code == 200 and z.content == local["archive"]
+    # the page is made from an uploaded bundle: it runs sandboxed, never as a page of the site
+    csp = r.headers["content-security-policy"]
+    assert csp.startswith("sandbox") and "allow-same-origin" not in csp
+    assert z.headers["x-content-type-options"] == "nosniff"
+    # an entry graded before pages existed has none until a regrade draws it; the service never draws
+    page.unlink()
+    g = c.get(f"/v1/submissions/{sid}/page")
+    assert g.status_code == 404 and g.json()["error"]["code"] == "no_page"
+    svc.regrade("ghz4@1")
+    while process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR):
+        pass
+    assert page.exists() and c.get(f"/v1/submissions/{sid}/page").status_code == 200
+    # private: nothing opens for a stranger
+    q = svc.submit(svc.authenticate(svc.create_uploader("gina"), "10.0.0.3"), local["archive"],
+                   task="ghz4@1", visibility="private")
+    process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    for path in ("page", "files/device.arch.json", "bundle.zip"):
+        assert c.get(f"/v1/submissions/{q['submission_id']}/{path}").status_code == 404
+
+
+@needs_toolchain
+def test_a_page_drawn_from_a_bundle_escapes_the_names_in_it(local, tmp_path):
+    """The page is drawn from an uploaded bundle: a name made to end the <title> early stays text.
+    (A device's name is held to an identifier by its schema; a programme's name is free text.)"""
+    from qccd.arch.device import Architecture
+    from qccd.cost.models import corrected_model
+    from qccd.ir.tsir import TSIR
+    from qccd.verify import verify
+    from qccd.viz.render import render_html
+    from qccd.workspace.bundle import extract_archive
+    extract_archive(local["archive"], tmp_path / "b")
+    arch = Architecture.from_json(json.loads((tmp_path / "b" / "device.arch.json").read_text(encoding="utf-8")))
+    doc = json.loads((tmp_path / "b" / "program.tsir.json").read_text(encoding="utf-8"))
+    doc["name"] = "</title><script>alert(1)</script>"
+    prog = TSIR.from_json(doc)
+    model = corrected_model("qccdsim_jones")
+    out = render_html(arch, prog, verify(prog, arch, model).result, model, tmp_path / "p.html")
+    page = Path(out).read_text(encoding="utf-8")
+    assert "<script>alert(1)" not in page and "&lt;/title&gt;&lt;script&gt;alert(1)" in page
+
+
+@needs_toolchain
+def test_qccd_grade_reproduces_a_downloaded_entry(svc, local, tmp_path, capsys):
+    """Reproduce: download an entry's bundle.zip and `qccd grade` it here; on the same machine
+    the metrics are the server's (a logical error rate elsewhere is a sample of its own)."""
+    from starlette.testclient import TestClient
+    from qccd.workspace.cli import main
+    up = svc.authenticate(svc.create_uploader("hana"), "10.0.0.1")
+    sid = svc.submit(up, local["archive"], task="ghz4@1", visibility="public")["submission_id"]
+    assert process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    z = tmp_path / "entry.zip"
+    z.write_bytes(TestClient(create_app(svc)).get(f"/v1/submissions/{sid}/bundle.zip").content)
+    capsys.readouterr()
+    assert main(["grade", str(z), "--json"]) == 0
+    mine = json.loads(capsys.readouterr().out)
+    assert comparable(mine)["metrics"] == comparable(svc.report(sid, None))["metrics"]
+
+
+@needs_toolchain
+def test_a_new_template_redraws_every_entry_page_without_grading_again(svc, local, tmp_path):
+    """`worker redraw`: every graded entry's page drawn again from its stored archive, and the
+    reports untouched (a regrade would sample the logical error rate again)."""
+    from qccd.official.worker import redraw
+    up = svc.authenticate(svc.create_uploader("ivy"), "10.0.0.1")
+    sid = svc.submit(up, local["archive"], task="ghz4@1", visibility="public")["submission_id"]
+    assert process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    page = svc.artifacts / "pages" / f"{sid}.html"
+    page.write_text("an old page", encoding="utf-8")
+    reports = svc.db.all("SELECT id FROM reports WHERE submission=?", (sid,))
+    r = redraw(svc, RELEASES_DIR)
+    assert r["drawn"] == 1 and r["failed"] == []
+    assert 'name="qccd-page"' in page.read_text(encoding="utf-8")
+    assert svc.db.all("SELECT id FROM reports WHERE submission=?", (sid,)) == reports
+
+
+@needs_toolchain
 def test_wrong_task_and_tampered_archives_are_refused(svc, local):
     up = svc.authenticate(svc.create_uploader("bob"), "10.0.0.1")
     z = zipfile.ZipFile(io.BytesIO(local["archive"]))
@@ -144,3 +245,34 @@ def test_http_api_requires_a_token_and_returns_an_id_at_once(svc, local):
                headers={"Authorization": f"Bearer {tok}", "X-QCCD-Task": "ghz4@1", "Content-Type": "application/zip"})
     assert r.status_code == 202 and r.json()["status"] == "queued"
     assert c.get(f"/v1/submissions/{r.json()['submission_id']}/report").status_code == 409   # not graded yet
+
+
+def test_goal_1_ranks_every_noise_2_memory_together(svc):
+    """Goal 1 is one ranking across releases: every curated memory on the shared noise model, by
+    the logical error rate per round per logical qubit (the user's decisions, 2026-10-21)."""
+    g = svc.goal_board("goal1")
+    assert "surface5xz_mem@1" in [r["id"] for r in g["releases"]]
+    assert all(svc.releases[r["id"]].manifest["qec"]["noise"] == "qccd-noise@2" for r in g["releases"])
+    assert g["rank_by"] == "ler_per_round_per_logical" and g["metrics"][0]["name"] == g["rank_by"]
+    assert g["max_ions"] == 200 and g["rows"] == []
+    with pytest.raises(OfficialError) as e:
+        svc.goal_board("goal9")
+    assert e.value.status == 404
+
+
+def test_goal_1_measures_what_a_code_buys_logical_qubits_and_their_ions(svc, monkeypatch):
+    """Logical qubits and ions per logical qubit are figures of merit beside the logical error
+    rate (the user, 2026-10-21: FTL's target is 60 logical qubits within 2000 ions)."""
+    def rows(task):
+        exp = ({"ions": 144, "k": 12} if task.startswith("surface5xz") else {"ions": 98, "k": 1})
+        return ([{"id": f"os_{task[:4]}", "display_name": "d", "by": "x", "created_at": 0, "rank_value": None,
+                  "metrics": {"ler_per_round": 1e-4 * exp["k"]}, "experiment": exp}], {})
+    monkeypatch.setattr(svc, "_ranked_rows", rows)
+    g = svc.goal_board("goal1")
+    names = [m["name"] for m in g["metrics"]]
+    assert names[:4] == ["ler_per_round_per_logical", "logical_qubits", "ions", "ions_per_logical_qubit"]
+    better = {m["name"]: m["better"] for m in g["metrics"]}
+    assert better["logical_qubits"] == "high" and better["ions_per_logical_qubit"] == "low"
+    big = next(r for r in g["rows"] if r["experiment"]["k"] == 12)
+    assert big["metrics"]["logical_qubits"] == 12 and big["metrics"]["ions_per_logical_qubit"] == 12.0
+    assert g["ftl_target"] == {"logical_qubits": 60, "ions": 2000}

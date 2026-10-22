@@ -3,7 +3,8 @@
 A fresh clone has the compiler's OCaml source but no binary. `qccd toolchain install`
 (`qccd/workspace/toolchain.py`) downloads a prebuilt `qccdc_cli` for Windows or Linux on x86-64
 or macOS on Apple silicon from `https://qccd.academy/downloads/toolchain/qccdc/<version>/`, and
-the proved Lean checker `qcheck` (macOS on Apple silicon so far) from `.../toolchain/qcheck/<version>/`.
+the proved Lean checker `qcheck` (Windows and Linux on x86-64; macOS when a Mac build of the current
+version is made) from `.../toolchain/qcheck/<version>/`.
 It refuses each file unless its size and SHA-256 match `qccd/workspace/toolchain.json`, installs
 it under `~/.qccd/toolchain/`, and runs it once: the compiler on a Bell circuit, the checker on a
 certificate it must accept and one it must reject. An Intel Mac builds from source.
@@ -39,6 +40,26 @@ cp /tmp/tc/src/Compiler/ocaml/_build/default/bin/qccdc_cli.exe /tmp/tc/pub/$V/qc
 cp /tmp/tc/linux/qccdc_cli /tmp/tc/pub/$V/qccdc_cli-linux-x86_64
 (cd /tmp/tc/pub/$V && sha256sum qccdc_cli-* > SHA256SUMS)
 ```
+
+The checker for Windows and Linux, from the same commit's `Compiler/lean` (its own package,
+`Compiler/lean/checker`, needs no Mathlib; elan fetches the Lean version `lean-toolchain` pins).
+Each binary carries the Lean runtime (about 140 MB), so both are published gzipped (about 43 MB).
+
+```bash
+git archive $C Compiler/lean | tar -x -C /tmp/tc/src
+QV=$(python -c "import subprocess as s; from qccd.workspace.toolchain import QCHECK_SOURCES as P, qcheck_version as v; \
+print(v({p: s.check_output(['git','rev-parse','--verify','-q','$C:'+p], text=True).strip() for p in P}))")
+(cd /tmp/tc/src/Compiler/lean/checker && rm -rf .lake && lake build qcheck)                     # Windows
+docker build -f deploy/toolchain/Dockerfile.qcheck-linux -o type=local,dest=/tmp/tc/qlinux /tmp/tc/src   # Linux
+mkdir -p /tmp/tc/pub/qcheck/$QV && cd /tmp/tc/pub/qcheck/$QV
+cp /tmp/tc/src/Compiler/lean/checker/.lake/build/bin/qcheck.exe qcheck-windows-x86_64.exe
+cp /tmp/tc/qlinux/qcheck qcheck-linux-x86_64
+gzip -9 -k qcheck-windows-x86_64.exe qcheck-linux-x86_64 && sha256sum qcheck-* > SHA256SUMS
+```
+
+Before publishing: the Windows one runs from a folder with no Lean on `PATH`, and the Linux
+one in stock `debian:12-slim` and `ubuntu:22.04` -- each accepting a published certificate
+and refusing `{}`. Upload only the `.gz` files and `SHA256SUMS`.
 
 macOS on Apple silicon, on a Mac. Build in a switch created with the deployment target set, so
 the OCaml runtime is compiled for it too; without it the binary is marked for the build
@@ -93,4 +114,6 @@ site deploy runs `rsync --delete` into `/var/www/qccd.academy`. nginx serves the
 `nginx-qccd-downloads.conf`, installed as `/etc/nginx/snippets/qccd-downloads.conf` and
 included in qccd.academy's HTTPS server block after `qccd-official.conf`.
 
-First release: version `73864a5c493d`, from commit `3df0d19`, published 2026-09-23.
+First release: version `73864a5c493d`, from commit `3df0d19`, published 2026-09-23. The first
+Windows and Linux checker: `b92bb9c600b2`, from `a1bc1df` (the strict reader), 2026-10-20,
+replaced the same day by `e8acd6640fd3` from `1f80ea8` (a malformed entry says why).

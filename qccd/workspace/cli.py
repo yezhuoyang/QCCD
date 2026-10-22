@@ -49,7 +49,8 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login", "logout")
+            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login", "logout",
+            "grade")
 
 
 def _root(args) -> Path:
@@ -265,8 +266,27 @@ def cmd_trace(a) -> int:
 
 def cmd_toolchain(a) -> int:
     """The prebuilt compiler (toolchain.py): `install` fetches the one for this computer,
-    checked against the SHA-256 pinned in the repository; `status` says what is in use."""
-    from .toolchain import ToolchainError, install, status
+    checked against the SHA-256 pinned in the repository; `status` says what is in use;
+    `build-checker` builds the proved checker from source; `check FILE` runs it."""
+    from .toolchain import ToolchainError, build_checker, install, run_checker, status
+    if a.action == "build-checker":
+        try:
+            exe = build_checker()
+        except ToolchainError as exc:
+            print(f"qccd toolchain build-checker: {exc}", file=sys.stderr)
+            return 1
+        print(f"built the checker (checked: it accepted and rejected a test certificate): {exe}")
+        print("the workspace uses it from now on; `qccd toolchain check <file>.qcheck.json` runs it")
+        return 0
+    if a.action == "check":
+        if not a.file:
+            print("usage: qccd toolchain check <file>.qcheck.json", file=sys.stderr)
+            return 2
+        try:
+            return run_checker(a.file)
+        except ToolchainError as exc:
+            print(f"qccd toolchain check: {exc}", file=sys.stderr)
+            return 2
     if a.action == "status":
         s = status()
         if a.json:
@@ -284,7 +304,7 @@ def cmd_toolchain(a) -> int:
         c = (s.get("qcheck") or {}).get("in_use")
         print("checker   " + (f"{c['path']}  ({c['from']})" if c else
                               "none: reference grades report the Lean stage `unsupported` "
-                              "(`qccd toolchain install`, or `lake build` in Compiler/lean/checker)"))
+                              "(`qccd toolchain install`, or `qccd toolchain build-checker`)"))
         return 0
     try:
         r = install(force=a.force)
@@ -462,6 +482,48 @@ def cmd_import(a) -> int:
     r = _call(info, "POST", "/api/import", {"path": a.path, "mode": "preview" if a.preview else "apply"})
     print(f"{r['status']} r{r['revision']}: {r['summary']}")
     return 0
+
+
+def cmd_grade(a) -> int:
+    """Grade a submission bundle here, with the reference evaluator the official server runs: a
+    leaderboard entry's bundle.zip (or a bundle folder), checked again on your own computer.  It
+    prints each stage's verdict and the metrics; `--json` prints the whole report."""
+    import tempfile
+    from .bundle import extract_archive, read_bundle
+    from .evaluator import grade
+    from .tasks import RELEASES_DIR, TaskRelease
+    src = Path(a.bundle)
+    with tempfile.TemporaryDirectory() as td:
+        if src.is_dir():
+            bdir = src
+        else:
+            bdir = Path(td) / "bundle"
+            extract_archive(src.read_bytes(), bdir)
+        task = read_bundle(bdir).manifest["task"]
+        rid = str(task.get("id", ""))
+        if "/" in rid or "\\" in rid or ".." in rid or not (RELEASES_DIR / rid / "release.json").is_file():
+            print(f"this bundle is for {rid!r}, which this installation does not have", file=sys.stderr)
+            return 2
+        rel = TaskRelease.load(RELEASES_DIR / rid)
+        rep = grade(rel, bdir, "reference", workdir=Path(td) / "work")
+    if a.json:
+        print(json.dumps(rep, indent=1, sort_keys=True))
+        return 0 if (rep.get("eligibility") or {}).get("eligible") else 1
+    el = (rep.get("eligibility") or {})
+    print(f"{rel.title} ({rel.id}): {'eligible' if el.get('eligible') else 'not eligible'}")
+    for s in rep.get("stages", []):
+        print(f"  {s['id']:22s} {s['status']}")
+        if s["status"] != "passed":
+            for d in s.get("diagnostics", [])[:3]:
+                print(f"  {'':22s}   {d['message']}")
+    for k, v in (rep.get("metrics") or {}).items():
+        print(f"  {k:22s} {v.get('value')} {v.get('unit') or ''}".rstrip())
+    for r in el.get("reasons") or []:
+        print(f"  why: {r}")
+    if "ler_per_round" in (rep.get("metrics") or {}):
+        print("  (the logical error rate is a sample: stim repeats a seeded sample only on the same kind of\n"
+              "   processor, so this one is an estimate; the official number is the server's, with its 95% interval)")
+    return 0 if el.get("eligible") else 1
 
 
 def cmd_releases(a) -> int:
@@ -790,8 +852,13 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             q.add_argument("path")
             q.add_argument("--preview", action="store_true")
+    p = sub.add_parser("grade", help="grade a submission bundle (a leaderboard entry's bundle.zip) here, "
+                                     "with the official reference evaluator")
+    p.add_argument("bundle", help="the bundle .zip, or a bundle folder")
+    p.add_argument("--json", action="store_true", help="print the whole report")
     p = sub.add_parser("toolchain", help="the prebuilt compiler and checker: install them, or see which are in use")
-    p.add_argument("action", choices=["install", "status"])
+    p.add_argument("action", choices=["install", "status", "build-checker", "check"])
+    p.add_argument("file", nargs="?", default=None, help="check: the .qcheck.json to check")
     p.add_argument("--force", action="store_true", help="download and check it again")
     p.add_argument("--json", action="store_true")
     p = sub.add_parser("agent")
@@ -875,7 +942,7 @@ def main(argv=None) -> int:
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench,
-          "login": cmd_login, "logout": cmd_logout}[a.cmd]
+          "login": cmd_login, "logout": cmd_logout, "grade": cmd_grade}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
     if a.cmd not in ("mcp", "serve"):

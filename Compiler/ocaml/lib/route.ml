@@ -93,10 +93,17 @@ let action_of (li : (string, (string, int) Hashtbl.t * int * bool) Hashtbl.t) sr
    The signature is per HOP, not per move: a grid move crosses two segments through a
    junction and the verifier labels both of them.  Keep the three cases and the order
    they are tried in identical to the Python -- along a named loop, across a spur, else
-   the lab-frame axis -- because a signature that differs in a single label is a cycle
-   the verifier splits and the compiler did not. *)
+   the lab-frame direction -- because a signature that differs in a single label is a
+   cycle the verifier splits and the compiler did not. *)
 
 let sig_eps = 1e-6
+
+(* `HOP_ANGLE_TIE` and `math.degrees` in `rules.py`: the nudge that keeps an angle at
+   exactly x.5 degrees from being rounded by the last bit of whichever libm's `atan2`, and
+   the radians-to-degrees factor folded once, as CPython and the browser fold it. *)
+let hop_angle_tie = 1e-9
+
+let rad_to_deg = 180.0 /. Float.pi
 
 type sigctx = {
   sarch : Arch.t;
@@ -106,6 +113,10 @@ type sigctx = {
      loop alone (see `hop_label`) *)
   closed_loops : (string, unit) Hashtbl.t;
   on_loop : (string, unit) Hashtbl.t;
+  (* node off every named path -> how many rails join it to a node on one
+     (`rails_to_loop` in `rules.py`).  A spur's off-path end has exactly one; a chord
+     between two path nodes has two, and is labelled by direction, not as a spur. *)
+  loop_rails : (string, int) Hashtbl.t;
   (* (src, dst) -> signature.  `hop_free` asks for this inside the A* inner loop, and a
      directed hop's `via` is fixed by `Traps.build` (one hop per ordered pair), so the
      answer never changes and is worth keeping.  Recomputing it per expanded state turned
@@ -125,24 +136,39 @@ let sigctx (a : Arch.t) : sigctx =
       if l.closed then Hashtbl.replace closed_loops l.lid ();
       List.iter (fun n -> Hashtbl.replace on_loop n ()) l.nodes)
     a.loops;
-  { sarch = a; seg_by_id; loop_seq; closed_loops; on_loop; hop_sig = Hashtbl.create 1024 }
+  let loop_rails = Hashtbl.create 64 in
+  let bump n =
+    Hashtbl.replace loop_rails n (1 + Option.value ~default:0 (Hashtbl.find_opt loop_rails n))
+  in
+  List.iter
+    (fun (s : Arch.segment) ->
+      let ia = Hashtbl.mem on_loop s.a and ib = Hashtbl.mem on_loop s.b in
+      if ia && not ib then bump s.b else if ib && not ia then bump s.a)
+    a.segments;
+  { sarch = a; seg_by_id; loop_seq; closed_loops; on_loop; loop_rails;
+    hop_sig = Hashtbl.create 1024 }
 
 (* `stationary_chain` declares `control.model = "direct"` -- every electrode is its own
    channel, so a cycle may legitimately ask two ions to do different things and R22 does
    not apply.  Splitting there would inflate the schedule to satisfy a rule that is not
-   being checked. *)
+   being checked.  The same holds on any device when the rule set has no R22 (`Rules`). *)
 let control_model (a : Arch.t) =
-  match Arch.mem "control" a.raw with
-  | Some c -> Arch.str_or "model" "simd_classes" c
-  | None -> "simd_classes"
+  if not !Rules.uniform_motion then "direct"   (* the rule set has no R22 *)
+  else
+    match Arch.mem "control" a.raw with
+    | Some c -> Arch.str_or "model" "simd_classes" c
+    | None -> "simd_classes"
 
 let index_in (seq : string array) (x : string) =
   let r = ref None in
   Array.iteri (fun i n -> if !r = None && n = x then r := Some i) seq;
   !r
 
-(* The lab-frame axis of one hop: `+x`, `-y`, `+x+y`, or `0`. *)
-let axis_label (c : sigctx) src dst =
+(* The lab-frame direction of one hop (`direction_label` in `rules.py`): `+x`, `-y` or `0`
+   along an axis, and off an axis the signs and the angle in whole degrees, `+x+y@30`.
+   The signs alone let a hop at 30 degrees and one at 60 share a waveform (issue #19);
+   the router must label at least as finely as the verifier, so it labels identically. *)
+let direction_label (c : sigctx) src dst =
   let p id =
     match Arch.node c.sarch id with Some (n : Arch.node) -> n.pos | None -> (0.0, 0.0)
   in
@@ -150,18 +176,25 @@ let axis_label (c : sigctx) src dst =
   let dx = bx -. ax and dy = by -. ay in
   let sx = if dx > sig_eps then "+x" else if dx < -.sig_eps then "-x" else "" in
   let sy = if dy > sig_eps then "+y" else if dy < -.sig_eps then "-y" else "" in
-  if sx = "" && sy = "" then "0" else sx ^ sy
+  if sx = "" || sy = "" then (if sx = "" && sy = "" then "0" else sx ^ sy)
+  else begin
+    let deg = Float.atan2 dy dx *. rad_to_deg in
+    let deg = if deg < 0.0 then deg +. 360.0 else deg in
+    let r = int_of_float (Float.floor (deg +. 0.5 +. hop_angle_tie)) in
+    Printf.sprintf "%s%s@%d" sx sy (if r >= 360 then r - 360 else r)
+  end
 
-(* The Python labels a step along an OPEN path by its lab-frame axis alone, and a step
-   along a closed loop by the loop.  This labels the open-path step by both, `P0:+1/+x`.
+(* The Python labels a step along an OPEN path by its lab-frame direction alone, and a
+   step along a closed loop by the loop.  This labels the open-path step by both,
+   `P0:+1/+x` (or `P0:+1/+x+y@30` on a slanted path).
    It must never be COARSER than the verifier's label -- two hops the verifier calls
    different must be different here too, or the router puts them in one cycle and R22
    fails -- and it must not change the programmes already published.  The path's own
    step alone was coarser: on a path with a corner, as the Studio's sketch draws, `P0:+1`
    is `+x` before the corner and `+y` after it, and the router played both in one cycle.
-   The axis alone would merge two parallel straight rails that the router has always kept
-   apart, changing every ladder programme; with both, a straight path splits exactly as
-   it did and a bent one splits where the verifier does. *)
+   The direction alone would merge two parallel straight rails that the router has always
+   kept apart, changing every ladder programme; with both, a straight path splits exactly
+   as it did and a bent one splits where the verifier does. *)
 let hop_label (c : sigctx) (seg : Arch.segment) src dst =
   let along =
     match seg.loop with
@@ -176,20 +209,24 @@ let hop_label (c : sigctx) (seg : Arch.segment) src dst =
           let d = (((j - i) mod k) + k) mod k in
           let d = if d <= k / 2 then d else d - k in
           if Hashtbl.mem c.closed_loops lid then Some (Printf.sprintf "%s:%+d" lid d)
-          else Some (Printf.sprintf "%s:%+d/%s" lid d (axis_label c src dst))
+          else Some (Printf.sprintf "%s:%+d/%s" lid d (direction_label c src dst))
         | _ -> None))
   in
   match along with
   | Some l -> l
   | None -> (
+    (* A spur only when its off-path end has ONE rail to the path: a trap between two
+       path nodes is a chord, and labelling it as a spur gave the trips J1->T->J2 and
+       J2->T->J1 one waveform (issue #18). *)
     let spur =
       if seg.loop <> None then None
       else
         let s_on = Hashtbl.mem c.on_loop src and d_on = Hashtbl.mem c.on_loop dst in
         if s_on = d_on then None
+        else if Hashtbl.find_opt c.loop_rails (if s_on then dst else src) <> Some 1 then None
         else Some (if s_on then "spur:inward" else "spur:outward")
     in
-    match spur with Some l -> l | None -> axis_label c src dst)
+    match spur with Some l -> l | None -> direction_label c src dst)
 
 (* The waveform one move needs: the instruction's class, then a label per segment the ion
    crosses, in the order it crosses them.  `via` is ordered from the source, which is how
@@ -863,8 +900,9 @@ let plan_orders (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(pos : (string, st
    The horizon is raised ON DEMAND rather than set high to begin with: the A* state space
    is (traps x horizon), so a horizon sized for the worst layer would be paid by every
    easy one. *)
-let plan_layer (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(pos : (string, string) Hashtbl.t)
-    ~(targets : (string * string) list) ~(horizon : int) : layer_plan =
+let plan_layer ?(tolerate = true) (a : Arch.t) (t : Traps.t) (d : Traps.dists)
+    ~(pos : (string, string) Hashtbl.t) ~(targets : (string * string) list) ~(horizon : int) :
+    layer_plan =
   let try_rung ~uniform ~strict ~doublings =
     let rec go h tries =
       match plan_orders a t d ~pos ~targets ~horizon:h ~uniform ~strict with
@@ -890,5 +928,8 @@ let plan_layer (a : Arch.t) (t : Traps.t) (d : Traps.dists) ~(pos : (string, str
       match try_rung ~uniform:false ~strict:true ~doublings:1 with
       | p -> p
       | exception Unroutable m2 ->
+        (* `~tolerate:false` (the compiler's split rung): a caller that can route fewer ions
+           instead would rather be told than handed a plan the verifier rejects *)
+        if not tolerate then raise (Unroutable m2);
         fell_back 3 m2;
         try_rung ~uniform:false ~strict:false ~doublings:0)

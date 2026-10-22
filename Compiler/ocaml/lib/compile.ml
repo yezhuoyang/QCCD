@@ -226,8 +226,8 @@ let placement_of_init (a : Arch.t) (c : Circuit.t) (init : (string * string) lis
   { Place.ion; site; notes = [ Printf.sprintf "placement: %d ions placed by --init-placement" (List.length init) ] }
 
 let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option)
-    ?(variant = 0) ?(eager = true) ?init ?rest (a : Arch.t) (c : Circuit.t) ~(arch_path : string)
-    ~(qasm_path : string) : result =
+    ?(variant = 0) ?(eager = true) ?(split = false) ?init ?rest (a : Arch.t) (c : Circuit.t)
+    ~(arch_path : string) ~(qasm_path : string) : result =
   (* Lower first.  The router meets a PAIR of ions in one trap; three ions in one trap is
      a different problem most shipped devices cannot host at all, so a Toffoli becomes six
      CX before placement ever sees it.  Everything downstream -- placement, routing, the
@@ -268,16 +268,21 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     if policy.horizon > 0 then policy.horizon
     else
       (* generous: the router may need to detour around parked ions, and a horizon that
-         is merely "the diameter" makes a solvable instance look unroutable *)
-      let ecc =
-        match t.sites with
-        | [] -> 1
-        | s0 :: _ -> (
-          match Hashtbl.find_opt d s0 with
-          | None -> 1
-          | Some row -> Hashtbl.fold (fun _ v acc -> max acc v) row 1)
+         is merely "the diameter" makes a solvable instance look unroutable.
+
+         Twice the trap graph's DIAMETER, plus slack.  It used to be twice the eccentricity
+         of the first trap in the file -- the diameter on a ring, as little as half of it
+         elsewhere -- so the file's order sized the search, and after `Arch.of_json` put
+         the device in canonical order, its node NAMES did.  The diameter is the graph's
+         own: no order and no renaming changes it, and it is at least what any first trap
+         ever gave, so no device is searched less than it could have been.  A plan still
+         fails where no route exists: `Route.plan_one` gives up at once on a goal in
+         another component, A* gives up at the horizon, and `Route.plan_layer` doubles the
+         horizon on demand before it does. *)
+      let diameter =
+        Hashtbl.fold (fun _ row acc -> Hashtbl.fold (fun _ v acc -> max acc v) row acc) d 1
       in
-      (2 * ecc) + 8
+      (2 * diameter) + 8
   in
 
   let prog = ref (Tsir.
@@ -551,8 +556,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
      cannot be routed is run again as the single pass was (`eager = false`): the new
      paths only ever add a program, they never lose one.  A round that places nothing
      ends the layer, and what is left of it is unrealised. *)
-  let round ~(eager : bool) (layer_i : int) (round_i : int) (ops : Circuit.op list) :
-      Circuit.op list =
+  let round ~(eager : bool) ?(cap : int option) (layer_i : int) (round_i : int)
+      (ops : Circuit.op list) : Circuit.op list =
     let claimed = Hashtbl.create 16 in
     let occ = occupancy pos in
     (* this round's moves so far, per site.  Read only by the paths the single pass never
@@ -683,15 +688,22 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
       if eager then deferred := o :: !deferred else unrealised := o.index :: !unrealised
     in
     let sited_rev = ref [] in
+    (* `cap` (the split rung, `run`): at most this many ops take a trap this round, the
+       first in circuit order; the rest wait for the next round, as an op with no free trap
+       does.  They share no qubit, so every qubit still runs its gates in circuit order. *)
+    let n_sited = ref 0 in
+    let full () = match cap with Some k -> !n_sited >= k | None -> false in
     List.iter
       (fun (o : Circuit.op) ->
         let site_at s ions =
           List.iter (fun i -> send i s) ions;
+          incr n_sited;
           sited_rev := (o, Some (s, ions)) :: !sited_rev
         in
         let claim s = Hashtbl.replace claimed s () in
         match (o.name, o.qubits) with
         | "barrier", _ -> sited_rev := (o, None) :: !sited_rev
+        | _ when full () -> later o
         | ("measure" | "reset"), [ q ] -> (
           (* SPAM does NOT compete with gates for traps.  R12 bounds one *gate* per
              trap per cycle; a measurement is a different instruction in a different
@@ -794,6 +806,86 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
           settle ())
     in
     settle ();
+    (* Clear the way (the split rung only).  An ion can only enter a trap with room, and the
+       router never asks an idle ion to step aside, so an operand whose meeting trap is
+       ringed by full traps cannot get there at any horizon and any split: on grid9x9 with
+       two surface-5 patches, a corner trap's three neighbours each held two idle ions.  So
+       where an operand cannot reach its trap through traps with room, one idle ion leaves
+       each full trap on its shortest path, to the nearest site with room, as an eviction
+       from a full gate zone does. *)
+    if split then begin
+      let enterable goal v = v = goal || proj v < capacity a v in
+      let reaches src goal =
+        let seen = Hashtbl.create 64 and q = Queue.create () in
+        Hashtbl.replace seen src ();
+        Queue.add src q;
+        while (not (Hashtbl.mem seen goal)) && not (Queue.is_empty q) do
+          let u = Queue.pop q in
+          List.iter
+            (fun (h : Traps.hop) ->
+              if (not (Hashtbl.mem seen h.dst)) && enterable goal h.dst then begin
+                Hashtbl.replace seen h.dst ();
+                Queue.add h.dst q
+              end)
+            (Traps.neighbours t u)
+        done;
+        Hashtbl.mem seen goal
+      in
+      (* the traps strictly between `src` and `goal` on a shortest path, ignoring who is in them *)
+      let between src goal =
+        let parent = Hashtbl.create 64 and q = Queue.create () in
+        Hashtbl.replace parent src src;
+        Queue.add src q;
+        while (not (Hashtbl.mem parent goal)) && not (Queue.is_empty q) do
+          let u = Queue.pop q in
+          List.iter
+            (fun (h : Traps.hop) ->
+              if not (Hashtbl.mem parent h.dst) then begin
+                Hashtbl.replace parent h.dst u;
+                Queue.add h.dst q
+              end)
+            (Traps.neighbours t u)
+        done;
+        if not (Hashtbl.mem parent goal) then []
+        else
+          let rec back v acc =
+            let p = Hashtbl.find parent v in
+            if p = src then acc else back p (p :: acc)
+          in
+          back goal []
+      in
+      List.iter
+        (fun ((_ : Circuit.op), site) ->
+          match site with
+          | None -> ()
+          | Some (s, ions) ->
+            List.iter
+              (fun i ->
+                let p = Hashtbl.find pos i in
+                if p <> s && not (reaches p s) then
+                  List.iter
+                    (fun v ->
+                      if proj v >= capacity a v then
+                        match
+                          List.find_opt
+                            (fun j ->
+                              Hashtbl.find pos j = v
+                              && (not (Hashtbl.mem busy j))
+                              && not (Hashtbl.mem goes j))
+                            (Array.to_list pl.ion)
+                        with
+                        | None -> ()
+                        | Some e -> (
+                          match refuge ~from:v ~taken:(Hashtbl.create 1) with
+                          | Some r ->
+                            send e r;
+                            evictions := (e, r) :: !evictions;
+                            Hashtbl.replace home e r
+                          | None -> ()))
+                    (between p s))
+              ions)
+        (List.rev !sited_rev)
+    end;
     let sited =
       List.stable_sort
         (fun ((x : Circuit.op), _) ((y : Circuit.op), _) -> compare x.index y.index)
@@ -834,7 +926,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     let ops_of i = try Hashtbl.find ion_ops i with Not_found -> [] in
     if targets <> [] then begin
       let before = Hashtbl.copy pos in
-      match Route.plan_layer a t d ~pos ~targets ~horizon with
+      match Route.plan_layer ~tolerate:(not split) a t d ~pos ~targets ~horizon with
       | plan ->
         (* record the sub-problem AND what the heuristic achieved on it, so C4 can measure
            the gap against an optimal solver on the very same instance.
@@ -1069,7 +1161,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
       |> List.map (fun i -> (i, Hashtbl.find home i))
     in
     if returning <> [] then begin
-      match Route.plan_layer a t d ~pos ~targets:returning ~horizon with
+      match Route.plan_layer ~tolerate:(not split) a t d ~pos ~targets:returning ~horizon with
       | plan ->
         (* the layer's ops again: this transport is not travelling TOWARDS them -- they
            have happened -- it is clearing the gate zone after them, and
@@ -1125,13 +1217,39 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     deferred
   in
 
+  (* The split rung (`run`): a round that cannot be routed is run again with half as many
+     ops, the rest deferred to the next round, down to one op at a time; each round after
+     one that routed may try twice as many again.  Nothing of a failed round was emitted,
+     and the homes its evictions moved are put back before it is retried. *)
+  let gates_in (l : Circuit.op list) =
+    List.length (List.filter (fun (o : Circuit.op) -> o.name <> "barrier") l)
+  in
   Array.iteri
     (fun layer_i (ops : Circuit.op list) ->
-      let rec go round_i pending =
-        let later =
-          match round ~eager layer_i round_i pending with
-          | l -> l
-          | exception Round_gave_up m ->
+      let rec go ?cap round_i pending =
+        let home_snap = if split then Some (Hashtbl.copy home) else None in
+        let halve () =
+          let n = gates_in pending in
+          let k = match cap with Some k -> min k n | None -> n in
+          if k > 1 then Some (k / 2) else None
+        in
+        match round ~eager ?cap layer_i round_i pending with
+        | later -> continue ?cap round_i pending later
+        | exception ((Round_gave_up _ | Route.Unroutable _) as e)
+          when split && halve () <> None ->
+          (match home_snap with
+          | Some h ->
+            Hashtbl.reset home;
+            Hashtbl.iter (fun k v -> Hashtbl.replace home k v) h
+          | None -> ());
+          if Sys.getenv_opt "QCCDC_DEBUG" <> None then
+            Printf.eprintf "  [split] layer %d round %d: %d op(s) did not route (%s); trying %d\n"
+              layer_i round_i (gates_in pending)
+              (match e with Round_gave_up m | Route.Unroutable m -> m | _ -> "")
+              (Option.get (halve ()));
+          go ?cap:(halve ()) round_i pending
+        | exception Round_gave_up m ->
+          let later =
             if round_i = 0 && eager then begin
               notes :=
                 Printf.sprintf "layer %d: deferral and eviction could not be routed (%s); %s"
@@ -1150,13 +1268,15 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 pending;
               []
             end
-        in
+          in
+          continue round_i pending later
+      and continue ?cap round_i pending later =
         match later with
         | [] -> ()
         | _ when List.length later >= List.length pending ->
           (* this round placed nothing: no later round will do better *)
           List.iter (fun (o : Circuit.op) -> unrealised := o.index :: !unrealised) later
-        | _ -> go (round_i + 1) later
+        | _ -> go ?cap:(Option.map (fun k -> 2 * k) cap) (round_i + 1) later
       in
       go 0 ops)
     by_layer;
@@ -1220,8 +1340,9 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
    compiled compiles identically; but the state they leave can make a LATER layer
    unroutable, and a compile that used to end with a (refused) partial programme must not
    end with nothing.  So the new paths can only add a programme, never take one away. *)
-let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?init
-    (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result =
+let run_in_order ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?init
+    ?(split = false) (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string)
+    : result =
   (* a placement given from outside has no runner-up: it either routes or it does not *)
   let last_variant = if init = None then 2 else 0 in
   let attempts ?rest () =
@@ -1235,7 +1356,9 @@ let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?in
     let rec attempt pass v last partial =
       let eager = pass = 0 in
       if v > last_variant then
-        if pass = 0 then attempt 1 0 last partial
+        (* the split rung defers, so it has no single pass: an op the single pass cannot
+           site is unrealised rather than deferred *)
+        if pass = 0 && not split then attempt 1 0 last partial
         else
           match (partial, last) with
           | Some (r, s), _ ->
@@ -1245,7 +1368,9 @@ let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?in
           | None, None -> assert false
       else begin
         (match record with Some acc -> acc := [] | None -> ());
-        match run_once ~policy ?record ~variant:v ~eager ?init ?rest a c ~arch_path ~qasm_path with
+        match
+          run_once ~policy ?record ~variant:v ~eager ~split ?init ?rest a c ~arch_path ~qasm_path
+        with
         | r when r.cert.unrealised = [] || not eager -> r
         | r ->
           if Sys.getenv_opt "QCCDC_DEBUG" <> None then
@@ -1276,3 +1401,103 @@ let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?in
     | _ -> None
   in
   attempts ?rest ()
+
+(* {1 When nothing routes: the same device, its traps taken in another order}
+
+   Every choice the passes make between equals -- the trap a qubit starts in, where two
+   ions meet, which zone is nearest -- goes to the first trap in the device's order, and
+   whether a layer can be routed at all can hang on those choices.  Prioritised planning
+   cannot ask a parked ion to step aside, so a placement that fills the wrong trap leaves a
+   layer with no route at any horizon.  On the surface17 hillclimb designs (five traps,
+   seventeen ions) the published compiler compiled only 6, 11 and 15 of 30 random file
+   orders of three of them; they compiled because a search over file order had found one
+   that worked, and the canonical order (`Arch.of_json`) is one that does not (2026-10-20).
+
+   So when no placement routes in the canonical order, the trap order is ROTATED -- the
+   sites taken from the k-th on, then the first k -- for three k spread over the sites,
+   and the first that compiles completely is the answer.  Every one of those orders is
+   the device's, so the search is the same for every file that describes it: the order
+   search the hillclimb ran by hand, run by the compiler, for every device alike, and only
+   where it would otherwise refuse.  A device that compiles in the canonical order compiles
+   exactly as before, and one that compiles in none of them is refused with the canonical
+   order's own answer, as before -- after up to three more tries, which is what a refusal
+   now costs. *)
+let rotations (a : Arch.t) : (int * Arch.t) list =
+  let is_site id = match Arch.node a id with Some n -> n.kind = "site" | None -> false in
+  let sites, others = List.partition is_site a.node_order in
+  let n = List.length sites in
+  let k = min n 4 in
+  List.init (max 0 (k - 1)) (fun j -> (j + 1) * n / k)
+  |> List.sort_uniq compare
+  |> List.filter (fun r -> r > 0 && r < n)
+  |> List.map (fun r ->
+         let front = List.filteri (fun i _ -> i < r) sites
+         and back = List.filteri (fun i _ -> i >= r) sites in
+         (r, { a with node_order = back @ front @ others }))
+
+let run ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?init
+    (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result =
+  let once a = run_in_order ~policy ?record ?init a c ~arch_path ~qasm_path in
+  let complete (r : result) = r.cert.unrealised = [] in
+  let first = match once a with r -> Ok r | exception (Route.Unroutable _ as e) -> Error e in
+  match first with
+  | Ok r when complete r -> r
+  | _ ->
+    (* the canonical order's answer, and what it recorded, stand if no other order does
+       better *)
+    let kept = match record with Some acc -> Some !acc | None -> None in
+    let rec next = function
+      | [] -> (
+        (match (record, kept) with Some acc, Some l -> acc := l | _ -> ());
+        match first with Ok r -> r | Error e -> raise e)
+      | (k, rotated) :: rest -> (
+        match once rotated with
+        | r when complete r ->
+          {
+            r with
+            notes =
+              r.notes
+              @ [
+                  Printf.sprintf
+                    "no placement routed with the traps in canonical order; with that order \
+                     rotated by %d trap%s, one did"
+                    k (if k = 1 then "" else "s");
+                ];
+          }
+        | _ -> next rest
+        | exception Route.Unroutable _ -> next rest)
+    in
+    next (rotations a)
+
+(* {1 The split rung: when whole layers do not route}
+
+   Prioritised planning moves every operand of a layer at once, and on a crowded device (two
+   surface-5 patches, 98 ions, on grid9x9) the ions it parks first wall in the ones it plans
+   last: every placement and every trap order is refused (2026-10-21).  The split rung runs
+   each round that cannot be routed with half its ops and defers the rest to the next round
+   (`run_once ~split`), which is the deferral a round already makes for an op that finds no
+   free trap.  A round only ever holds gates on disjoint qubits, so each qubit still runs its
+   gates in circuit order.  Two more things change on this rung only: an operand walled off
+   from its meeting trap by full traps has its path cleared (`round`), and the router's last,
+   tolerant rung is off (`Route.plan_layer ~tolerate:false`), so a plan the verifier would
+   reject is split again instead of emitted.
+
+   `qccdc compile` calls it LAST -- after the general router (`run`), rigid rotation and the
+   race track have all declined -- so it can add programs that compile and never changes one
+   that already did.  `None` when it does not complete either; the canonical trap order is
+   tried first, then the same rotations `run` tries. *)
+let run_split ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option) ?init
+    (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) : result option =
+  let note =
+    "no placement routed with whole layers; with each unroutable round split in halves and \
+     the rest deferred to the next round, one did"
+  in
+  let rec go = function
+    | [] -> None
+    | dev :: rest -> (
+      match run_in_order ~policy ?record ?init ~split:true dev c ~arch_path ~qasm_path with
+      | r when r.cert.unrealised = [] -> Some { r with notes = r.notes @ [ note ] }
+      | _ -> go rest
+      | exception Route.Unroutable _ -> go rest)
+  in
+  go (a :: List.map snd (rotations a))

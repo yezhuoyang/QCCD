@@ -21,10 +21,10 @@ odd-even sort shows a column of `SORT.S` / `SORT.M`.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from typing import Iterable, Iterator, Mapping, Sequence
 
-from .tsir import TSIR, Instruction, iter_pairs
+from .tsir import TSIR, Instruction, iter_operands, iter_pairs
 
 __all__ = [
     "OpPoint", "Movement", "Operand", "Cost", "GroupKey", "Line", "Section",
@@ -82,6 +82,8 @@ SHORT_PRIMITIVE = {
     "junction_cross": "junc",
     "ms_gate": "MS",
     "gate_swap": "swap",
+    "1q_gate": "1q",
+    "z_gate": "Z",
 }
 
 
@@ -558,9 +560,18 @@ def _opoints(instr: Instruction, arch, model, mv: Movement, width: int):
             if p:
                 out.append(p)
     elif instr.type == "gate":
-        key = {"MS": "ms_gate", "CX": "ms_gate", "SWAP": "gate_swap"}.get(
-            instr.gate or "MS", "ms_gate")
-        p = from_scalar(key, width or 1)
+        if any(len(o) == 1 for o in iter_operands(instr)):
+            # a single-qubit gate is priced from `1q_gate` (a VZ from `z_gate` where the
+            # device declares one), exactly as `CostModel.gate_1q` charges it; naming
+            # `ms_gate` here printed "MS@2000us" beside a 10 us rotation
+            z = instr.gate == "VZ" and "z_gate" in arch.primitives.scalars
+            p = from_scalar("z_gate" if z else "1q_gate", width or 1)
+            if p and instr.gate == "VZ" and not z and p.us is not None:
+                p = replace(p, us=p.us * 3)      # `CostModel.Z_AS_PULSES` pulses
+        else:
+            key = {"MS": "ms_gate", "CX": "ms_gate", "SWAP": "gate_swap"}.get(
+                instr.gate or "MS", "ms_gate")
+            p = from_scalar(key, width or 1)
         if p:
             out.append(p)
     elif instr.type in ("cool", "measure", "reset"):

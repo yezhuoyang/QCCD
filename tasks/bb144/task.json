@@ -1,0 +1,30 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "bb144",
+ "order": 1,
+ "title": "BB [[144,12,12]]",
+ "short": "BB",
+ "description": "One syndrome-extraction round of the bivariate-bicycle [[144,12,12]] code: 144 weight-6 checks, 864 two-qubit contacts.",
+ "circuit": "circuit.qasm",
+ "n_data": 144,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "qccdsim_jones",
+   "qccdsim_transport"
+  ]
+ },
+ "metrics": [
+  "T_jones",
+  "T_transport",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable",
+  "p_eff_vs_threshold"
+ ],
+ "rank_by": "T_jones",
+ "seed": "BBResults/studio",
+ "note": "The seed entries were compiled from ancilla-layout variants of this circuit (Compiler/build/q06/*.qasm, 864 contacts each); phase 3 fixes this file as the task's circuit for new submissions."
+}

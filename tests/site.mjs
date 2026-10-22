@@ -45,11 +45,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json',
                '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.js': 'text/javascript' };
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
-  // the comment layer asks /api/me on every page; this copy has no accounts service, so
-  // answer as one with nobody signed in (a 404 would be a console error on every page)
+  // the comment layer asks /api/me on every page, and the course's progress (the Learn page
+  // and every studio page) asks /api/progress; this copy has no accounts service, so answer
+  // as one with nobody signed in (a 404 would be a console error on every page)
   if (u.startsWith('/api/')) {
-    const body = u === '/api/me' ? '{"user":null}' : '{"error":"sign in first"}';
-    res.writeHead(u === '/api/me' ? 200 : 401, { 'content-type': 'application/json' }); return res.end(body);
+    const anon = { '/api/me': '{"user":null}', '/api/progress': '{"user":null,"progress":null}' }[u];
+    res.writeHead(anon ? 200 : 401, { 'content-type': 'application/json' }); return res.end(anon || '{"error":"sign in first"}');
   }
   let p = path.join(site, u);
   if (u.endsWith('/')) p = path.join(p, 'index.html');

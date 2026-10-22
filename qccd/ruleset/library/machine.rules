@@ -1,0 +1,123 @@
+# The machine's rules: a floorplan of verified places, and a logical program scheduled on it.
+#
+# One level up from the device rules.  The words -- places, roads, doors, carries, events,
+# blocks, instructions, windows -- are defined on the Rules page, each with how it is read off
+# the floorplan and off the schedule (docs/ARCHITECTURE.md §4-§5).  G1-G11 are the checks the
+# place model has always made (docs/GADGETS.md §8-§10), now written as assertions.
+
+ruleset "machine"
+level "machine"
+title "The machine's rules"
+about "A floorplan of verified places joined by roads and wires, and a logical program scheduled on it: what every gadget-level schedule must respect, whatever runs in parallel."
+
+param coherence_budget = 1000000
+
+# ---------------------------------------------------------------- interface
+
+rule G1 "Ports on a road agree, and every bundle arrives in the order its place takes it in" core
+  about "A road or a wire joins two doors that carry the same thing (ions of the same role, width and code, or bits of the same signal) in opposite directions; a door that is not a free-for-all is on one road at most; and every bundle an op takes in arrives, in exactly the order the op's verified program takes it."
+  (for all r in roads, a in ends(r), b in ends(r) where a != b:
+     medium(a) = medium(b)
+     and (role(a) = role(b) or role(a) = "any" or role(b) = "any")
+     and (role(a) != "data" or role(b) != "data" or
+          (width(a) = width(b) and (code(a) = none or code(b) = none or code(a) = code(b))))
+     and (dir(a) != dir(b) or dir(a) = "inout"))
+  and (for all w in wires, a in ends(w), b in ends(w) where a != b:
+     medium(a) = medium(b)
+     and (signal(a) = signal(b) or signal(a) = "any" or signal(b) = "any")
+     and (dir(a) != dir(b) or dir(a) = "inout"))
+  and (for all d in doors where role(d) != "any":
+     count(r in roads where d in ends(r)) <= 1)
+  and (for all k in intakes:
+     delivered_by(k) != none and order(delivered_by(k)) = expected(k))
+
+# ---------------------------------------------------------------- ownership and capacity
+
+rule G2 "Every ion leaves only from where it is, and ends where it should" core
+  about "Follow every ion through every handoff: it is loaded only if it did not exist, it leaves only the place it is in, it arrives only from the road it is on; every resident ion ends at home, and every loaded ion ends dumped at a depot or in a block still alive."
+  (for all h in handoffs: location(ion(h), before(h)) = origin(h))
+  and (for all i in residents: location(i, final()) = home(i))
+  and (for all i in loaded where i not in living: location(i, final()) in depots)
+
+rule G3 "No place holds more ions than its capacity" core
+  about "At every instant, counting an ion in a place from the moment it arrives until the moment it leaves, no place other than a depot holds more ions than it was built for, or gives away more than it has."
+  for all p in places, t in instants where family(p) != "depot":
+    occupancy(p, t) <= capacity(p) and occupancy(p, t) >= 0
+
+rule G4 "A road holds at most its sites, and carries one way at a time" core
+  about "No road ever holds more ions than it has sites, and no two bundles travel it in opposite directions at once."
+  (for all r in roads, t in instants: occupancy(r, t) <= capacity(r))
+  and (for all c1, c2 in carries where road(c1) = road(c2) and simultaneous(c1, c2):
+     origin(c1) = origin(c2))
+
+rule G5 "A place runs one op at a time" core
+  about "Two ops of the same place, junctions and the classical places included, never overlap."
+  for all a, b in events where a != b and place(a) = place(b) and duration(a) > 0 and duration(b) > 0:
+    not simultaneous(a, b)
+
+rule G6 "No ion gets hotter than the ion-loss limit"
+  about "Neither inside a place's op nor crossing one of its doors does an ion's motional energy pass the limit beyond which it is likely to be lost."
+  source "arXiv:1210.3655"
+  for all e in events:
+    exit_heat(e) <= ion_loss_limit() and peak_heat(e) <= ion_loss_limit()
+
+# ---------------------------------------------------------------- composition
+
+rule G7 "Every instruction is carried out, and each block's in program order" core
+  about "No instruction is refused or left without an event, and an instruction that acts on a block's ions starts only after the previous instruction on that block has finished with them."
+  (for all i in instructions: not refused(i) and realised(i))
+  and (for all i, j in instructions where next_on_block(i, j): begins(j) >= finishes(i))
+
+rule G8 "No block waits longer than its coherence budget without syndrome extraction"
+  about "Between ops that extract its syndromes, a block may wait or travel, but not for longer than the memory's coherence lets it."
+  for all b in blocks: longest_gap(b) <= coherence_budget
+
+rule G9 "Every op used is verified" core
+  about "Every op the schedule runs at a place is verified as hardware and as logic (or certified); an op of the classical half is modeled, its latency a stated number."
+  for all e in events:
+    (status(e) = "verified" or status(e) = "certified" or (classical(e) and status(e) = "modeled"))
+    and not logic_failed(e)
+
+# ---------------------------------------------------------------- the classical half
+
+rule G10 "Every classical bit is used after it exists"
+  about "A message crosses a wire the floorplan has, between that wire's doors, in that wire's latency; it leaves no earlier than the op that measured its bits began and, unless it is a syndrome a decode sent out of its readout buffer, no later than that op ended; something at its destination uses it after it arrives; and no line of the classical memory names a measurement that has not begun."
+  when count(m in messages) > 0 or count(w in wires) > 0:
+  (for all m in messages:
+     wire(m) != none and connects(wire(m), m) and approx(duration(m), latency(wire(m))))
+  and (for all m in messages where measured_by(m) != none: start(m) >= start(measured_by(m)))
+  and (for all m in messages where measured_by(m) != none and not held(m) and not classical(origin(m)):
+     start(m) <= end(measured_by(m)))
+  and (for all m in messages:
+     for some e in events where place(e) = destination(m) and instruction(e) = instruction(m):
+       start(e) >= end(m))
+  and (for all f in frame_rows, e in named(f): start(e) <= at(f))
+  and (for all o in outcomes, e in named(o): start(e) <= at(o))
+
+rule G11 "The decoder is called, and keeps up"
+  about "Every syndrome the machine measures is sent to the decoder by a decode instruction, no earlier than it was measured; every decoding job starts after its syndrome arrives and before the next one does (or the decoder falls behind); a classically controlled op starts only once its guard is at its door; and nothing reads an outcome before the decoder has corrected it."
+  when decoder_present() or count(e in guarded) > 0:
+  (for all j in decode_jobs:
+     syndrome_of(j) != none and start(j) >= end(syndrome_of(j))
+     and (next_syndrome(j) = none or start(j) <= end(next_syndrome(j))))
+  and (for all e in guarded:
+     start(e) >= ready(e) and (for some m in decisions(e): end(m) <= start(e)))
+  and (for all w in windows:
+     decoded(w) and (for some m in sends(w): start(m) >= measured(w))
+     and (for all m in sends(w): start(m) >= measured(w)))
+  and (for all e in guarded, w in reads(e): ready(e) >= written(w))
+  and (for all f in frame_rows, w in reads(f): at(f) >= written(w))
+
+# ---------------------------------------------------------------- parallel execution
+
+rule G12 "Every bundle that travels is taken in at the far end" core
+  about "No ion is left on a road: every carry ends with an op at its destination (a place's op, a junction's pass, a depot taking used ions back) taking its bundle in, and exactly one op does."
+  for all c in carries: count(k in intakes where delivered_by(k) = c) = 1
+
+rule G13 "A road carries one bundle at a time" core
+  about "A road is leased to one bundle from the moment its first ion enters until its last is taken off the far end; two bundles never share a road at once, so neither can block or overtake the other, whatever runs in parallel."
+  for all c1, c2 in carries where c1 != c2 and road(c1) = road(c2): not simultaneous(c1, c2)
+
+rule G14 "A road holds the ions on it"
+  about "At no moment are more of a bundle's ions on a road -- travelling, or stopped at the far end until they are taken in -- than the road has sites. A whole bundle can stop only on a road as long as the bundle, the one in front of a door; a short street between junctions holds the few ions crossing it at once."
+  for all c in carries: crowd(c) <= length(road(c))
