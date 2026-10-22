@@ -349,6 +349,60 @@ def test_the_control_record_and_the_verifier_cannot_disagree(ring):
         assert list(rec.problems) == [v.message for v in viols]
 
 
+H2 = ROOT / "Reproduce" / "moses2023"
+
+
+def _h2_cycles(prog):
+    from qccd.verify.rules import r4_drivable
+
+    arch = load(H2 / "h2.arch.json")
+    seen = []
+    replay(prog, arch, corrected_model(table="local"), check_rules=False, keep_cycles=False,
+           on_cycle=lambda v: seen.append((v.instr, control_record(v), r4_drivable(v),
+                                           dict(v.occ_before))))
+    return arch, seen
+
+
+@pytest.mark.skipif(not (H2 / "demo" / "ghz32.tsir.json").exists(),
+                    reason="the H2 reproduction is not in this checkout")
+def test_an_empty_conveyor_well_is_not_a_site_idling_in_the_panel_either():
+    """H2's 40 conveyor wells ride three channels with no per-site switch.  A loop shift
+    that leaves wells empty moves every LOADED well the same way, so R4d passes it; the
+    panel used to judge every site of the channel instead and printed "NOT DRIVABLE (R4d)"
+    on 51 shifts of the GHZ-32 demo (the first is #45, every cited well empty) beside a
+    rule summary in which R4d passed.  The panel's verdict is now R4d's, cycle by cycle."""
+    arch, seen = _h2_cycles(TSIR.load(H2 / "demo" / "ghz32.tsir.json"))
+    assert not arch.control_plane.switch_per_site
+    conveyor = [g for g in arch.control_plane.groups if g.role == "conveyor"]
+    for instr, rec, viols, _ in seen:
+        assert (rec.feasible is False) == bool(viols), instr.id
+        assert list(rec.problems) == [v.message for v in viols], instr.id
+    shifts = [(i, rec) for i, rec, _, occ in seen
+              if i.cls and i.cls.startswith("batch_shift")
+              and any(occ.get(s, 0) == 0 for g in conveyor for s in g.sites)]
+    assert len({i.id for i, _ in shifts}) >= 51
+    for i, rec in shifts:
+        assert rec.feasible is True and rec.problems == (), i.id
+        assert rec.sites_held == 0, "no per-site switch, so nothing is held out by one"
+        assert rec.banks and all(b.verified for b in rec.banks), \
+            "the action is read off the loop, so R4d judged it"
+
+
+def test_a_loaded_conveyor_well_left_behind_is_still_not_drivable():
+    """The planted fault for the test above: two ions in conveyor wells CR01 and CR03, and
+    only the first moves.  CR03 is loaded and shares the switchless channel, so R4d fails
+    the cycle, and the panel says NOT DRIVABLE with R4d's own words."""
+    prog = TSIR.from_json({"name": "left behind", "arch_spec": "h2_moses2023", "instructions": [
+        {"type": "init", "id": 0, "placement": {"a": "CR01", "b": "CR03"}},
+        {"type": "simd", "id": 1, "class": "shuttle", "mode": "inter",
+         "participants": [{"ion": "a", "from": "CR01", "to": "CR02", "via": ["e09"]}]}]})
+    _, seen = _h2_cycles(prog)
+    (instr, rec, viols, _), = [c for c in seen if c[0].id == 1]
+    assert viols and rec.feasible is False
+    assert list(rec.problems) == [v.message for v in viols]
+    assert any("all-or-nothing" in p and "CR03" in p for p in rec.problems), rec.problems
+
+
 def test_drivability_still_reads_the_way_the_rule_documents_it(ring):
     """Two ions counter-rotating on one broadcast loop is the canonical R4 failure."""
     plane = ring.control_plane

@@ -44,7 +44,7 @@ from typing import Any, Mapping
 from .experiments import MemoryExperiment, append_readout
 from .native import (ABSTRACT_2Q, NotClifford, canonical_abstract, emit_abstract,
                      emit_ms, emit_r, emit_vz)
-from .noise import CHANNEL_NAMES, NoiseModel, get as get_noise
+from .noise import NoiseModel, get as get_noise
 from .qasm import parse_qasm
 from .stimtext import StimText, declare
 
@@ -240,9 +240,14 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
     trace: list[dict[str, Any]] = []
     why: list[str] = []
     c.append("R", everyone)
+    budget = {k: 0.0 for k in nm.channel_names()}
+    p0 = nm.p_initial(params)
+    if p0 > 0:
+        c.append("X_ERROR", everyone, p0)
+        budget["reset"] += p0 * len(everyone)
     trace.append({"id": None, "type": "prepare", "a": 0, "b": len(c.lines), "dt_us": 0.0,
-                  "why": ["every ion starts in |0>"]})
-    budget = {k: 0.0 for k in CHANNEL_NAMES}
+                  "why": ["every ion starts in |0>" + (f", prepared with the reset's error p = {p0:.3g}"
+                                                         if p0 > 0 else "")]})
     count: dict[int, int] = defaultdict(int)
     meas_of_bit: dict[int, int] = {}
     n_meas = 0
@@ -273,10 +278,30 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
         if not why or not why[-1].startswith("one-qubit"):
             why.append(f"one-qubit gate: p = {p:.3g} each (1 - fidelity)")
 
+    # `qccd-noise@2`'s memory, per ion: how long each ion has waited since it was last operated
+    # on (riding a rotation or being shuttled counts as waiting: Quantinuum charges memory on
+    # idle and transport time alike), closed by its next gate, measurement or reset
+    stretch: dict[str, float] = {ion: 0.0 for ion in sq}
+
+    def close_stretch(targets) -> None:
+        for ion in targets:
+            p = nm.memory_coherent(params, stretch.get(ion, 0.0))
+            if p > 0:
+                c.append("Z_ERROR", [sq[ion]], p)
+                budget["memory_coherent"] += p
+                why.append(f"{ion} waited {stretch[ion]:.4g} us since it was last operated on: "
+                           f"coherent dephasing, p = {p:.3g}")
+            stretch[ion] = 0.0
+
     for ins in prog.instructions:
         view = first.get(ins.id, ({}, {}, {}))
         line0 = len(c.lines)
         why = []
+        operated: list[str] = []
+        if nm.per_ion_memory and ins.type in ("gate", "measure", "reset"):
+            operated = [i for i in dict.fromkeys(list(ins.ions) + [x for p in ins.pairs for x in p])
+                        if i in sq]
+            close_stretch(operated)
         try:
             unknown = [i for i in (list(ins.ions) + [x for p in ins.pairs for x in p])
                        if i not in sq]
@@ -357,7 +382,38 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
                 n["cool"] += 1
         except NotClifford as exc:
             raise ExtractionError(f"instruction {ins.id}: {exc}") from exc
+        # -- what the schedule does besides its gates (`qccd-noise@2`; `@1` prices none of
+        # it): a measurement or reset disturbs the other ions, most of all those in its trap
+        if ins.type in ("measure", "reset"):
+            _, pos, _ = view
+            acted = set(ins.ions)
+            sites = {pos.get(i) for i in acted}
+            near = sorted(i for i, node in pos.items()
+                          if node in sites and i not in acted and i in sq)
+            far = sorted(i for i in sq if i not in acted and i not in set(near))
+            p = nm.crosstalk_error(params, ins.type)
+            if p > 0 and near:
+                c.append(nm.crosstalk_op, [sq[i] for i in near], p)
+                budget["crosstalk"] += p * len(near)
+                why.append(f"{ins.type} in a shared trap: {len(near)} other ion(s) disturbed "
+                           f"with p = {p:.3g} each")
+            p = nm.crosstalk_global(params, ins.type)
+            if p > 0 and far:
+                c.append(nm.crosstalk_op, [sq[i] for i in far], p)
+                budget["crosstalk_global"] += p * len(far)
+                why.append(f"{ins.type}: the {len(far)} ion(s) in other traps are disturbed "
+                           f"with p = {p:.3g} each")
         dt = dur.get(ins.id, 0.0)
+        if nm.per_ion_memory and dt > 0:
+            waiting = [i for i in sq if i not in set(operated)]
+            p = nm.memory_linear(params, dt)
+            if p > 0 and waiting:
+                c.append("Z_ERROR", sorted(sq[i] for i in waiting), p)
+                budget["memory"] += p * len(waiting)
+                why.append(f"takes {dt:.4g} us: the {len(waiting)} ion(s) not operated on lose "
+                           f"memory, p = {p:.3g} each (r = {nm.memory_rate_per_s}/s)")
+            for i in waiting:
+                stretch[i] += dt
         pz = nm.p_idle(params, dt)
         if pz > 0:
             c.append("Z_ERROR", everyone, pz)
@@ -376,16 +432,21 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
     # -- the appended data readout (see the module docstring)
     n_appended = 0
     line0 = len(c.lines)
+    why = ["the grader reads the data out after the last instruction, in the memory's basis, "
+           "with the readout error" + ("" if nm.per_ion_memory else " and one measurement's idle")]
     if exp.readout == "appended":
         taken = [b for q, b in exp.readout_bits if b in meas_of_bit]
         if taken:
             raise ExtractionError(f"the source circuit itself writes the appended readout "
                                   f"bit(s) {taken[:6]}")
+        if nm.per_ion_memory:
+            # the data ions' last idle stretch ends at the readout
+            close_stretch([qmap[q] for q, _ in exp.readout_bits if q in qmap and qmap[q] in sq])
         p = nm.p_measure(params)
-        for q, b in exp.readout_bits:
+        for q, b, basis in exp.readout_plan():
             if q not in qmap or qmap[q] not in sq:
                 raise ExtractionError(f"no ion holds data qubit {q} for the appended readout")
-            append_readout(c, exp.basis, [sq[qmap[q]]], p)
+            append_readout(c, basis, [sq[qmap[q]]], p)
             meas_of_bit[b] = n_meas
             n_meas += 1
             n_appended += 1
@@ -397,8 +458,7 @@ def extract(prog, arch, exp_or_spec, qasm: str | None = None, *,
             budget["idle"] += pz * len(everyone)
     if len(c.lines) > line0:
         trace.append({"id": None, "type": "readout", "a": line0, "b": len(c.lines), "dt_us": 0.0,
-                      "why": ["the grader reads the data out after the last instruction, in the "
-                              "memory's basis, with the readout error and one measurement's idle"]})
+                      "why": why})
     line0 = len(c.lines)
     try:
         declare(c, exp.detectors, exp.observables, meas_of_bit, n_meas)

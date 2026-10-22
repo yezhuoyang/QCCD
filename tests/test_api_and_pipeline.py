@@ -232,11 +232,12 @@ def test_the_compiler_is_measured_against_the_shipped_schedule(compiled):
 
     Not an equality: the compiler is free to be better. But it must realize the same 864
     contacts, and its hop count has to be reported next to 2672 rather than on its own.
+    Since 2026-10-19 each check's CNOTs run in the code's member order, which the shipped
+    schedule does not keep: fewer hops still, but more batches than its 396 (715).
     """
     _, r = compiled
     assert r.contacts == 864
     assert 0 < r.hops < 2672, f"{r.hops} hops against the shipped 2672"
-    assert r.batches < 396
 
 
 def test_policy_changes_the_schedule_and_nothing_else(compiled):

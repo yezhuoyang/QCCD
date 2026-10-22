@@ -34,7 +34,7 @@ import urllib.request
 from pathlib import Path
 
 __all__ = ["manifest", "platform_key", "qcheck_version", "QCHECK_SOURCES", "installed", "installed_qcheck", "installed_path", "install", "status",
-           "ToolchainError", "RETIRED_QCCDC", "retired", "upgrade_hint"]
+           "ToolchainError", "RETIRED_QCCDC", "retired", "upgrade_hint", "build_checker", "run_checker"]
 
 #: compiler releases withdrawn because they emit programs that break a rule: the SHA-256 of
 #: each published binary (unpacked) -> its version.  A machine that installed one keeps it
@@ -50,6 +50,13 @@ RETIRED_QCCDC = {
     "014c83bc139136dbbcd3d9905b87da7400f2c25eacc4d6b93dd4244b692fd174": "f88a49f79af1",   # linux-x86_64
     # f88a49f79af1 for macos-arm64 is NOT listed yet: no newer Mac build exists, and a Mac with
     # no compiler at all is worse than one whose junction-resting programs R23 then refuses.
+    "65a30e83188e6f5d9663bc494c465ca2a36b529e741dfc658c4f2ad7ab03320d": "35bf68427d9c",   # linux-x86_64
+    "95951a42795a6ada42a5ccecb84d60b9c17361e16536644a83188896727fc0fc": "35bf68427d9c",   # windows-x86_64
+    "a26ffbb5ee873e1b00787fbeaa87880f4613a31b047c875fe065a7e8883dfd21": "02bceb9117e7",   # linux-x86_64
+    "b771fdf039679f10ab2aeed8bcf9fc3488d5597b14cfe36b462a2558f2affc9d": "02bceb9117e7",   # windows-x86_64
+    "01c23f4f1369764fef261f7b442a54f58d4f18131b7793085dde24f23e082b7d": "c7c535380bfb",   # linux-x86_64
+    "68b1ba824008979c16d98d20bcfe893b165cc33129bac8c4b0f086bbf22842b2": "c7c535380bfb",   # windows-x86_64
+    # (none of the three was ever built for macos-arm64)
 }
 _RETIRED_WHY = {
     "73864a5c493d": "it predates the router fix that keeps one waveform per cycle (R22): on a design "
@@ -59,8 +66,21 @@ _RETIRED_WHY = {
                     "ions standing on that junction with empty traps beside it, so the program it makes "
                     "breaks R23",
 }
+# the dock-and-rotate pass of these three turned a two-qubit `barrier a,b` into a CX and every
+# docked contact into a CX whatever its gate (a `cz` too), so a circuit with either compiled to a
+# program that does not implement it -- R10 rejects it, though the compiler's own check passed it
+# (fixed in 7265883d596f; tests/test_compiler_new_designs.py fails on each of them)
+for _v in ("35bf68427d9c", "02bceb9117e7", "c7c535380bfb"):
+    _RETIRED_WHY[_v] = ("its dock-and-rotate pass compiles a two-qubit `barrier a,b` as a CX and "
+                        "any docked two-qubit gate (a `cz` too) as a CX, so a circuit with either "
+                        "compiles to a program that does not implement it (R10)")
 
 MANIFEST = Path(__file__).with_name("toolchain.json")
+#: the checker's own package: Lean core only, no Mathlib (its lakefile says why)
+CHECKER_DIR = Path(__file__).resolve().parents[2] / "Compiler" / "lean" / "checker"
+ELAN_HINT = ("install Lean with elan -- macOS: `brew install elan-init`; Linux: "
+             "`curl https://elan.lean-lang.org/elan-init.sh -sSf | sh`; Windows: the installer at "
+             "https://github.com/leanprover/elan -- then open a new terminal")
 #: what `qcheck` is built from (Compiler/lean/checker/lakefile.toml): its version is a digest of
 #: these paths' git object ids, so a change to the Pulse proofs beside them does not stale it
 QCHECK_SOURCES = ("Compiler/lean/Main.lean", "Compiler/lean/QCCDC/Cert", "Compiler/lean/lean-toolchain",
@@ -71,8 +91,8 @@ _TOOLS = {"qccdc_cli": ("qccdc", "qccdc_cli"), "qcheck": ("qcheck", "qcheck")}
 
 def _source_hint(tool: str = "qccdc_cli") -> str:
     if tool == "qcheck":
-        return ("build it from source instead: install Lean with elan (macOS: `brew install elan-init`), then "
-                "in Compiler/lean/checker run `lake build` (about a minute; it does not need Mathlib)")
+        return ("build it from source instead: " + ELAN_HINT + ", and run `qccd toolchain build-checker` "
+                "(about a minute; it does not need Mathlib)")
     brew = "`brew install opam`, " if sys.platform == "darwin" else ""
     return ("build it from source instead: install OCaml 5.3 with opam (" + brew + "`opam init`, "
             "`opam switch create 5.3.0`), then `opam install dune yojson.2.2.2` and, in Compiler/ocaml, "
@@ -169,10 +189,12 @@ def _smoke(exe: Path, tool: str = "qccdc_cli") -> None:
     with tempfile.TemporaryDirectory() as td:
         if tool == "qcheck":
             ok, bad = Path(td) / "ok.json", Path(td) / "bad.json"
-            ok.write_text('{"circuit": "smoke", "arch": "none", "n_qubits": 0}', encoding="utf-8")
+            empty = '"moves": [], "gates": [], "gate_sites": ["S0"], "hops": []'
+            ok.write_text('{"circuit": "smoke", "arch": "none", "n_qubits": 0, "map": {}, "init": {}, '
+                          '"circuit_ops": [], ' + empty + '}', encoding="utf-8")
             bad.write_text('{"circuit": "smoke", "arch": "none", "n_qubits": 2, "map": {"0": "a", "1": "b"}, '
-                           '"init": {"a": "S0", "b": "S0"}, "circuit_ops": [{"i": 0, "name": "cx", "qubits": [0, 1]}]}',
-                           encoding="utf-8")
+                           '"init": {"a": "S0", "b": "S0"}, "circuit_ops": [{"i": 0, "name": "cx", "qubits": [0, 1]}], '
+                           + empty + '}', encoding="utf-8")
             a, r = _run(exe, [ok], "checker"), _run(exe, [bad], "checker")
             if a.returncode != 0 or "ACCEPTED" not in a.stdout:
                 raise ToolchainError("the downloaded checker did not run here: " + (a.stderr or a.stdout)[-600:])
@@ -313,6 +335,54 @@ def install(*, force: bool = False, man: dict | None = None, say=print) -> dict:
     else:
         out["qcheck"] = {"status": "not_available", "hint": _source_hint("qcheck")}
     return out
+
+
+def _lake() -> str | None:
+    import shutil
+    found = shutil.which("lake")
+    if found:
+        return found
+    p = Path.home() / ".elan" / "bin" / ("lake.exe" if os.name == "nt" else "lake")
+    return str(p) if p.is_file() else None
+
+
+def build_checker(*, say=print, lake: str | None = None) -> Path:
+    """Build `qcheck` from this checkout's source and run it once -- on a certificate it must
+    accept and one it must reject -- before calling it built.  The workspace then uses it: a
+    checker built in the checkout comes before an installed one (`evaluator.Toolchain.discover`).
+    The first build downloads the Lean version the package pins (`lean-toolchain`)."""
+    if not (CHECKER_DIR / "lakefile.toml").is_file():
+        raise ToolchainError(f"the checker's source is not here ({CHECKER_DIR}): this needs a full checkout")
+    lake = lake or _lake()
+    if lake is None:
+        raise ToolchainError("Lean is not installed: " + ELAN_HINT + ", and run this again")
+    say(f"building the checker in {CHECKER_DIR} (about a minute the first time; it does not need Mathlib) ...")
+    try:
+        cp = subprocess.run([lake, "build", "qcheck"], cwd=CHECKER_DIR, capture_output=True, text=True,
+                            timeout=3600)
+    except OSError as exc:
+        raise ToolchainError(f"could not run {lake} ({exc})") from None
+    if cp.returncode != 0:
+        raise ToolchainError("the build failed:\n" + (cp.stdout + cp.stderr)[-2000:])
+    exe = CHECKER_DIR / ".lake" / "build" / "bin" / ("qcheck.exe" if os.name == "nt" else "qcheck")
+    if not exe.is_file():
+        raise ToolchainError(f"the build said it succeeded but left no checker at {exe}")
+    _smoke(exe, "qcheck")
+    return exe
+
+
+def run_checker(path, *, qcheck: Path | None = None) -> int:
+    """Run the checker the workspace uses on one `.qcheck.json`: its own output, its own exit
+    code (0 accepted, 1 rejected, 2 unreadable)."""
+    if qcheck is None:
+        from .evaluator import Toolchain
+        qcheck = Toolchain.discover().qcheck
+    if qcheck is None:
+        raise ToolchainError("there is no checker here: run `qccd toolchain install`, or "
+                             "`qccd toolchain build-checker` to build it from source")
+    if not Path(path).is_file():
+        raise ToolchainError(f"no such file: {path}")
+    return subprocess.run([str(qcheck), str(path)]).returncode
 
 
 def status(man: dict | None = None) -> dict:

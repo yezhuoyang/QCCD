@@ -54,7 +54,7 @@ function evidence(label) {
     layout: (({ W, H, sx, sy, g, n, wide }) => ({ W, H, sx, sy, g, n, wide }))(PG.layout()),
     data_layout: (byId['row'].attrs || {})['data-layout'] || null,
     // THE THREE HONESTY SENTENCES, matched on the page's own words
-    says_agrees_with_python: /agrees with the Python verifier/.test(side),
+    says_agrees_with_python: /agrees with the (Python verifier|checker's replay)/.test(side),
     says_nothing_to_check: /nothing to check this one against/.test(side),
     says_no_programme_replayed: /no programme has been replayed/.test(side),
     says_all_pass: /all rules pass/i.test(side),

@@ -1,0 +1,17 @@
+{
+ "id": "y",
+ "title": "y",
+ "note": "a bit flip with a phase: one pulse, about a different axis",
+ "compiler": "1 layers, 0 transport cycles, 1 beams, 0 MS, 1 virtual-Z, 4 instructions",
+ "device": "grid2x3",
+ "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",
+ "notes": [
+  "seeded q0 (weight 0) at T0_1h",
+  "candidates: greedy 0, spectral 0 -> greedy",
+  "weighted interaction distance 0 over 0 distinct pairs"
+ ],
+ "regime": "broadcast-free",
+ "n_qubits": 2,
+ "compile_seconds": 0.03,
+ "check_seconds": 1.4
+}

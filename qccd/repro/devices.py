@@ -167,9 +167,13 @@ TABLES: dict[str, dict[str, Any]] = {
                         "junction_us": {"2": 0, "3": 100, "4": 120},
                         "note": "as the artifact prices it: s = 80 + 5 + 80 = 165 us per step, a "
                                 "gate swap of 3 gate times per ancilla per step"},
+    # a move through a junction is split 80, rail 5, entry 50, exit 50, rail 5, merge 80 =
+    # 270 us; the Studio overlaps the first rail with the junction, so the junction is
+    # declared at 105 (as for TISCC below) and the move costs the paper's 270, not 265
     "jones2025": {"source": "2510.23519", "shuttle_us": 5, "split_us": 80, "merge_us": 80,
-                  "junction_us": {"3": 100, "4": 100},
-                  "note": "Table 1; a junction passage is an entry and an exit of 50 us each"},
+                  "junction_us": {"3": 105, "4": 105},
+                  "note": "Table 1; a junction passage is an entry and an exit of 50 us each, "
+                          "and a move through one costs 80 + 5 + 50 + 50 + 5 + 80 = 270 us"},
     "schoenberger2024": {"source": "2311.03454", "shuttle_us": 0.5, "split_us": 0.25,
                          "merge_us": 0.25, "junction_us": {"2": 0, "3": 0, "4": 0},
                          "note": "abstract time steps, one per transition (one per loop iteration "
@@ -179,8 +183,11 @@ TABLES: dict[str, dict[str, Any]] = {
                  "note": "Table 1: intra-trap shift 58 us a position, inter-trap shift 250 us a "
                          "broadcast cycle, swaps 200 / 500 us; two-qubit gate 141 us effective "
                          "(58 + 25 + 58), which both worked examples need"},
+    # a junction move crosses two segments, zone -> junction -> zone: the first overlaps the
+    # junction's 105 us and the second adds 5.25, so it costs Move + Junction = 110.25 us,
+    # TISCC's own price (declaring the junction at 110.25 charged 115.5)
     "leblond2023": {"source": "2311.10687", "shuttle_us": 5.25, "split_us": 0, "merge_us": 0,
-                    "junction_us": {"3": 110.25, "4": 110.25},
+                    "junction_us": {"3": 105, "4": 105},
                     "note": "TISCC's gate table: Move 5.25 us; a junction move is Move + Junction "
                             "(105 us); ZZ 2000 us includes split, merge and cooling"},
 }

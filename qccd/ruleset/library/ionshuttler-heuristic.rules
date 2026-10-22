@@ -1,0 +1,7 @@
+# Schoenberger et al. 2024: the MQT IonShuttler, heuristic router.
+
+ruleset "ionshuttler-heuristic"
+title "IonShuttler's rules (heuristic router)"
+about "As the exact router's rules, except that the heuristic lets two chains pass the processing zone in one step, so rails and junctions are not held to one ion at a time here; the paper's replay checks its own rules about that zone instead."
+
+use R0, R1, R8, R24, R25, R29

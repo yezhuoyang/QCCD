@@ -1,0 +1,233 @@
+# found by the floorplan optimiser from the floorplan shor, for Shor's algorithm: objective traffic,
+# 150 candidates (seed 7), each scheduled;
+# traffic 312,441 -> 189,743 ion-sites (before refresh rounds), makespan 10.67 -> 10.64 s
+# re-measured 2026-10-20, split and merge charged for what a move does: 313,727 -> 199,580 ion-sites
+# (refresh rounds included), makespan 11.16 -> 11.04 s
+
+floorplan shor_d3_traffic "A machine for Shor's algorithm (surface code, d = 3) (less traffic)"
+code surface_d3
+
+region supply
+place depot1    depot9  at 0 11
+place depot2    depot9  at 0 63
+
+region compute
+place bridge1   ls_d3   at 14 10
+place workshop  tcx_d3  at 66 11
+place post1     read_d3 at 80 10
+place prep      prep_d3 at 125 10
+place post2     read_d3 at 9 36
+place bridge2   ls_d3   at 54 36
+place bridge3   ls_d3   at 95 62
+
+region memory
+place mem1      mem_d3  at 49 10
+place mem3      mem_d3  at 91 10
+place mem2      mem_d3  at 108 10
+place mem4      mem_d3  at 20 36
+place mem6      mem_d3  at 37 36
+place mem5      mem_d3  at 48 62
+
+region factory
+place pharmacy1 inj_d3  at 14 62
+place pharmacy2 inj_d3  at 31 62
+place factory1  msf15   at 65 62
+place factory2  msf15   at 80 62
+
+region control
+place decoder   dec_d3  at 2 98
+place archive   arch1   at 24 98
+
+# junctions: where roads meet
+junction j0_0 at 0 0
+junction j0_1 at 8 0
+junction j0_2 at 14 0
+junction j0_3 at 43 0
+junction j0_4 at 49 0
+junction j0_5 at 60 0
+junction j0_6 at 66 0
+junction j0_7 at 74 0
+junction j0_8 at 80 0
+junction j0_9 at 85 0
+junction j0_10 at 91 0
+junction j0_11 at 102 0
+junction j0_12 at 108 0
+junction j0_13 at 119 0
+junction j0_14 at 125 0
+junction j0_15 at 136 0
+junction w0 at -6 0
+junction e0 at 142 0
+junction j1_0 at 9 26
+junction j1_1 at 14 26
+junction j1_2 at 20 26
+junction j1_3 at 31 26
+junction j1_4 at 37 26
+junction j1_5 at 43 26
+junction j1_6 at 48 26
+junction j1_7 at 54 26
+junction j1_8 at 66 26
+junction j1_9 at 74 26
+junction j1_10 at 83 26
+junction w1 at -6 26
+junction e1 at 142 26
+junction j2_0 at 0 52
+junction j2_1 at 8 52
+junction j2_2 at 14 52
+junction j2_3 at 25 52
+junction j2_4 at 31 52
+junction j2_5 at 42 52
+junction j2_6 at 48 52
+junction j2_7 at 54 52
+junction j2_8 at 59 52
+junction j2_9 at 74 52
+junction j2_10 at 83 52
+junction j2_11 at 89 52
+junction j2_12 at 95 52
+junction j2_13 at 124 52
+junction w2 at -6 52
+junction e2 at 142 52
+junction j3_0 at 14 78
+junction j3_1 at 31 78
+junction j3_2 at 65 78
+junction j3_3 at 80 78
+junction j3_4 at 95 78
+junction j3_5 at 124 78
+junction w3 at -6 78
+junction e3 at 142 78
+
+# roads: conveyors between doors and junction arms
+road j0_0.s -- depot1.out as door_depot1_out
+road j0_1.s -- depot1.in as door_depot1_in
+road j0_2.s -- bridge1.in_a as door_bridge1_in_a
+road j0_3.s -- bridge1.out_a as door_bridge1_out_a
+road j0_4.s -- mem1.in as door_mem1_in
+road j0_5.s -- mem1.out as door_mem1_out
+road j0_6.s -- workshop.a_in as door_workshop_a_in
+road j0_7.s -- workshop.a_out as door_workshop_a_out
+road j0_8.s -- post1.in as door_post1_in
+road j0_9.s -- post1.out as door_post1_out
+road j0_10.s -- mem3.in as door_mem3_in
+road j0_11.s -- mem3.out as door_mem3_out
+road j0_12.s -- mem2.in as door_mem2_in
+road j0_13.s -- mem2.out as door_mem2_out
+road j0_14.s -- prep.in as door_prep_in
+road j0_15.s -- prep.out as door_prep_out
+road w0.e -- j0_0.w as street0_w0_j0_0
+road j0_0.e -- j0_1.w as street0_j0_0_j0_1
+road j0_1.e -- j0_2.w as street0_j0_1_j0_2
+road j0_2.e -- j0_3.w as street0_j0_2_j0_3
+road j0_3.e -- j0_4.w as street0_j0_3_j0_4
+road j0_4.e -- j0_5.w as street0_j0_4_j0_5
+road j0_5.e -- j0_6.w as street0_j0_5_j0_6
+road j0_6.e -- j0_7.w as street0_j0_6_j0_7
+road j0_7.e -- j0_8.w as street0_j0_7_j0_8
+road j0_8.e -- j0_9.w as street0_j0_8_j0_9
+road j0_9.e -- j0_10.w as street0_j0_9_j0_10
+road j0_10.e -- j0_11.w as street0_j0_10_j0_11
+road j0_11.e -- j0_12.w as street0_j0_11_j0_12
+road j0_12.e -- j0_13.w as street0_j0_12_j0_13
+road j0_13.e -- j0_14.w as street0_j0_13_j0_14
+road j0_14.e -- j0_15.w as street0_j0_14_j0_15
+road j0_15.e -- e0.w as street0_j0_15_e0
+road j1_0.s -- post2.in as door_post2_in
+road j1_1.n -- bridge1.in_b as door_bridge1_in_b
+road j1_1.s -- post2.out as door_post2_out
+road j1_2.s -- mem4.in as door_mem4_in
+road j1_3.s -- mem4.out as door_mem4_out
+road j1_4.s -- mem6.in as door_mem6_in
+road j1_5.n -- bridge1.out_b as door_bridge1_out_b
+road j1_6.s -- mem6.out as door_mem6_out
+road j1_7.s -- bridge2.in_a as door_bridge2_in_a
+road j1_8.n -- workshop.b_in as door_workshop_b_in
+road j1_9.n -- workshop.b_out as door_workshop_b_out
+road j1_10.s -- bridge2.out_a as door_bridge2_out_a
+road w1.e -- j1_0.w as street1_w1_j1_0
+road j1_0.e -- j1_1.w as street1_j1_0_j1_1
+road j1_1.e -- j1_2.w as street1_j1_1_j1_2
+road j1_2.e -- j1_3.w as street1_j1_2_j1_3
+road j1_3.e -- j1_4.w as street1_j1_3_j1_4
+road j1_4.e -- j1_5.w as street1_j1_4_j1_5
+road j1_5.e -- j1_6.w as street1_j1_5_j1_6
+road j1_6.e -- j1_7.w as street1_j1_6_j1_7
+road j1_7.e -- j1_8.w as street1_j1_7_j1_8
+road j1_8.e -- j1_9.w as street1_j1_8_j1_9
+road j1_9.e -- j1_10.w as street1_j1_9_j1_10
+road j1_10.e -- e1.w as street1_j1_10_e1
+road j2_0.s -- depot2.out as door_depot2_out
+road j2_1.s -- depot2.in as door_depot2_in
+road j2_2.s -- pharmacy1.in as door_pharmacy1_in
+road j2_3.s -- pharmacy1.out as door_pharmacy1_out
+road j2_4.s -- pharmacy2.in as door_pharmacy2_in
+road j2_5.s -- pharmacy2.out as door_pharmacy2_out
+road j2_6.s -- mem5.in as door_mem5_in
+road j2_7.n -- bridge2.in_b as door_bridge2_in_b
+road j2_8.s -- mem5.out as door_mem5_out
+road j2_9.s -- factory1.out as door_factory1_out
+road j2_10.n -- bridge2.out_b as door_bridge2_out_b
+road j2_11.s -- factory2.out as door_factory2_out
+road j2_12.s -- bridge3.in_a as door_bridge3_in_a
+road j2_13.s -- bridge3.out_a as door_bridge3_out_a
+road w2.e -- j2_0.w as street2_w2_j2_0
+road j2_0.e -- j2_1.w as street2_j2_0_j2_1
+road j2_1.e -- j2_2.w as street2_j2_1_j2_2
+road j2_2.e -- j2_3.w as street2_j2_2_j2_3
+road j2_3.e -- j2_4.w as street2_j2_3_j2_4
+road j2_4.e -- j2_5.w as street2_j2_4_j2_5
+road j2_5.e -- j2_6.w as street2_j2_5_j2_6
+road j2_6.e -- j2_7.w as street2_j2_6_j2_7
+road j2_7.e -- j2_8.w as street2_j2_7_j2_8
+road j2_8.e -- j2_9.w as street2_j2_8_j2_9
+road j2_9.e -- j2_10.w as street2_j2_9_j2_10
+road j2_10.e -- j2_11.w as street2_j2_10_j2_11
+road j2_11.e -- j2_12.w as street2_j2_11_j2_12
+road j2_12.e -- j2_13.w as street2_j2_12_j2_13
+road j2_13.e -- e2.w as street2_j2_13_e2
+road j3_0.n -- pharmacy1.magic as door_pharmacy1_magic
+road j3_1.n -- pharmacy2.magic as door_pharmacy2_magic
+road j3_2.n -- factory1.in as door_factory1_in
+road j3_3.n -- factory2.in as door_factory2_in
+road j3_4.n -- bridge3.in_b as door_bridge3_in_b
+road j3_5.n -- bridge3.out_b as door_bridge3_out_b
+road w3.e -- j3_0.w as street3_w3_j3_0
+road j3_0.e -- j3_1.w as street3_j3_0_j3_1
+road j3_1.e -- j3_2.w as street3_j3_1_j3_2
+road j3_2.e -- j3_3.w as street3_j3_2_j3_3
+road j3_3.e -- j3_4.w as street3_j3_3_j3_4
+road j3_4.e -- j3_5.w as street3_j3_4_j3_5
+road j3_5.e -- e3.w as street3_j3_5_e3
+road w0.s -- w1.n as west_0
+road e0.s -- e1.n as east_0
+road w1.s -- w2.n as west_1
+road e1.s -- e2.n as east_1
+road w2.s -- w3.n as west_2
+road e2.s -- e3.n as east_2
+
+# wires: bits, never ions
+wire bridge1.syn -> decoder.syn latency 5 via 24.15 88, 2 88 as wire_bridge1_syn
+wire bridge1.res -> archive.in latency 5 via 31.4 88, 24 88 as wire_bridge1_res
+wire archive.ctl -> bridge1.ctl latency 2 via 33 88, 38.65 88 as wire_bridge1_ctl
+wire mem1.syn -> decoder.syn latency 5 via 52.85 88, 2 88 as wire_mem1_syn
+wire archive.ctl -> workshop.ctl latency 2 via 33 88, 72.8 88 as wire_workshop_ctl
+wire post1.syn -> decoder.syn latency 5 via 81.75 88, 2 88 as wire_post1_syn
+wire post1.res -> archive.in latency 5 via 83 88, 24 88 as wire_post1_res
+wire archive.ctl -> post1.ctl latency 2 via 33 88, 84.25 88 as wire_post1_ctl
+wire mem3.syn -> decoder.syn latency 5 via 94.85 88, 2 88 as wire_mem3_syn
+wire mem2.syn -> decoder.syn latency 5 via 111.85 88, 2 88 as wire_mem2_syn
+wire prep.syn -> decoder.syn latency 5 via 128.85 88, 2 88 as wire_prep_syn
+wire post2.syn -> decoder.syn latency 5 via 10.75 88, 2 88 as wire_post2_syn
+wire post2.res -> archive.in latency 5 via 12 88, 24 88 as wire_post2_res
+wire archive.ctl -> post2.ctl latency 2 via 33 88, 13.25 88 as wire_post2_ctl
+wire mem4.syn -> decoder.syn latency 5 via 23.85 88, 2 88 as wire_mem4_syn
+wire mem6.syn -> decoder.syn latency 5 via 40.85 88, 2 88 as wire_mem6_syn
+wire bridge2.syn -> decoder.syn latency 5 via 64.15 88, 2 88 as wire_bridge2_syn
+wire bridge2.res -> archive.in latency 5 via 71.4 88, 24 88 as wire_bridge2_res
+wire archive.ctl -> bridge2.ctl latency 2 via 33 88, 78.65 88 as wire_bridge2_ctl
+wire pharmacy1.syn -> decoder.syn latency 5 via 17.85 88, 2 88 as wire_pharmacy1_syn
+wire archive.ctl -> pharmacy1.ctl latency 2 via 33 88, 23.35 88 as wire_pharmacy1_ctl
+wire pharmacy2.syn -> decoder.syn latency 5 via 34.85 88, 2 88 as wire_pharmacy2_syn
+wire archive.ctl -> pharmacy2.ctl latency 2 via 33 88, 40.35 88 as wire_pharmacy2_ctl
+wire mem5.syn -> decoder.syn latency 5 via 51.85 88, 2 88 as wire_mem5_syn
+wire bridge3.syn -> decoder.syn latency 5 via 105.15 88, 2 88 as wire_bridge3_syn
+wire bridge3.res -> archive.in latency 5 via 112.4 88, 24 88 as wire_bridge3_res
+wire archive.ctl -> bridge3.ctl latency 2 via 33 88, 119.65 88 as wire_bridge3_ctl
+wire decoder.frame -> archive.frame latency 1 as wire_decoder_frame

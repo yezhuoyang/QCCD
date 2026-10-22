@@ -27,6 +27,7 @@ stim = pytest.importorskip("stim")
 
 from qccd.qec import (EXPERIMENTS, MemoryExperiment, bb, get_experiment,  # noqa: E402
                       ideal_stim, noiseless_check, repetition, rotated_surface, steane)
+from qccd.qec.experiments import rotated_surface_xz, steane_code  # noqa: E402
 from qccd.qec.qasm import QasmError, parse_qasm  # noqa: E402
 
 SEARCH = dict(dont_explore_detection_event_sets_with_size_above=4,
@@ -81,6 +82,36 @@ def test_circuit_distance_is_the_code_distance(make, d):
     exp = make()
     assert exp.distance == d
     assert circuit_distance(exp) == d
+
+
+@pytest.mark.parametrize("readout", ["appended", "program"])
+def test_both_bases_side_by_side_keep_the_distance(readout):
+    exp = rotated_surface_xz(3, readout=readout)
+    assert exp.basis == "XZ" and exp.n_data == 18 and len(exp.observables) == 2
+    assert circuit_distance(exp) == 3
+    if readout == "appended":
+        assert [s for _, _, s in exp.readout_plan()] == ["Z"] * 9 + ["X"] * 9
+
+
+def test_each_patch_sees_its_own_error_type():
+    """A logical X on the Z patch flips observable 0 only; a logical Z on the X patch flips
+    observable 1 only; neither fires a detector.  So the pair sees bit flips AND dephasing."""
+    from qccd.gadget.surface import patch
+
+    exp = rotated_surface_xz(3)
+    p = patch(3, 3)
+    lines = str(ideal_stim(exp, 0.0)).splitlines()
+    # data qubit 0 is first measured by the appended Z readout, the X patch by the first MX
+    at_m = next(i for i, ln in enumerate(lines) if ln.startswith("M ") and "0" in ln.split()[1:])
+    at_mx = next(i for i, ln in enumerate(lines) if ln.startswith("MX "))
+    # as error channels: the sampler reports flips against the noiseless reference, which a
+    # plain X gate would be part of
+    for flip, at, want in (("X_ERROR(1) " + " ".join(map(str, p.logical("X"))), at_m, [True, False]),
+                           ("Z_ERROR(1) " + " ".join(str(q + 9) for q in p.logical("Z")), at_mx,
+                            [False, True])):
+        c = stim.Circuit("\n".join(lines[:at] + [flip] + lines[at:]))
+        det, obs = c.compile_detector_sampler().sample(8, separate_observables=True)
+        assert not det.any() and (obs == want).all(), flip
 
 
 def test_steane_needs_its_flags():
@@ -146,3 +177,43 @@ def test_qccdc_parses_the_qasm(key, tmp_path):
     cp = subprocess.run([str(qccdc), "parse", str(p)], capture_output=True, text=True,
                         timeout=60)
     assert cp.returncode == 0, cp.stdout[-500:] + cp.stderr[-500:]
+
+
+def test_logical_qubits_count_each_qubit_once_across_both_bases():
+    """Goal 1 divides a rate per round by k: a two-basis memory tests each logical qubit twice."""
+    from qccd.qec.experiments import logical_qubits
+    assert logical_qubits(rotated_surface_xz(3)) == 1 and logical_qubits(rotated_surface_xz(5)) == 1
+    assert logical_qubits(rotated_surface(3)) == 1 and logical_qubits(get_experiment("bb72")) == 12
+    s = rotated_surface_xz(5).summary()
+    assert s["logical_qubits"] == 1 and s["ions"] == 98
+
+
+@pytest.mark.parametrize("key,d", [("steanexz", 3), ("shorxz", 2), ("rep3xz", 1), ("bb18xz", 4)])
+def test_every_small_code_in_both_bases_has_its_stated_circuit_distance(key, d):
+    """Goal 1's other codes: what each schedule really protects (Shor's single flag cannot save a
+    weight-6 check, so 2; a repetition code's X memory has none, so 1)."""
+    exp = get_experiment(key)
+    assert exp.basis == "XZ" and exp.distance == d
+    assert circuit_distance(exp) == d
+
+
+def test_one_block_in_both_bases_measures_z_then_x():
+    """The sequential form (bb72, bb90 under 200 ions): phase 1 is read out in the program, every
+    ion is reset, phase 2 is appended in X; 2k observables, k logical qubits, one phase's rounds."""
+    from qccd.qec.experiments import css_memory_seq
+    exp = css_memory_seq(steane_code(), 3, "steaneseq", distance=3, flags=True)
+    assert exp.basis == "XZ" and exp.logical_qubits == 1 and len(exp.observables) == 2
+    assert exp.rounds == 3 and exp.n_data == 7
+    assert [s for _, _, s in exp.readout_plan()] == ["X"] * 7
+    assert exp.qasm.count("measure q[0]") == 1          # phase 1's data readout, in the program
+    assert noiseless_check(ideal_stim(exp, 0.0)).ok
+    assert circuit_distance(exp) == 3
+
+
+@pytest.mark.parametrize("key,k,ions", [("bb72seq", 12, 144), ("bb90seq", 8, 180)])
+def test_the_large_bivariate_bicycle_codes_fit_goal_one_in_one_block(key, k, ions):
+    """What the bb72seq / bb90seq boards are ranked on: k logical qubits, both bases, under 200 ions."""
+    exp = get_experiment(key)
+    s = exp.summary()
+    assert exp.basis == "XZ" and exp.logical_qubits == k and len(exp.observables) == 2 * k
+    assert s["ions"] == ions <= 200 and s["logical_qubits"] == k

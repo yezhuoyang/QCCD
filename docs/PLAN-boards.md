@@ -178,14 +178,95 @@ Flow:
 
 Order: 0 → 1 → (2 ∥ 3) → 4 → 5.
 
-## Later: a more realistic noise model (`qccd-noise@2`)
+## `qccd-noise@2` and `qccd-physics@2` (2026-10-21)
 
-* Idle time per ion from the schedule's `t0/t1`, not the serial replay.
-* Dephasing induced by transport and junctions.
-* Crosstalk from gates in neighbouring zones.
-* Ion loss after about 85 uncooled junction round trips.
-* Imperfect sympathetic cooling.
-* A calibrated T2.
+`qccd-noise@2` (`qccd/qec/noise.py`) prices what a schedule does, not only its gates, and
+`qccd/workspace/physics/qccd-physics@2.json` is the physics it is graded under. Every number
+cites a measurement, and every channel is a Pauli channel stim samples directly. The plan's
+list, item by item:
+
+* **Idle time per ion.** Each ion pays `Z_ERROR(r·Δt)` for every instruction that does not
+  operate on it, whether it idles, rides a rotation or is shuttled. r = 7.9e-3/s is Helios's
+  linear memory rate (arXiv:2511.05465 Table II; Helios-1E emulator). Each idle stretch T
+  also ends with `Z_ERROR(sin²(πfT))`, with f = 0.058 Hz. This is the twirl of the coherent
+  term, and it reproduces the paper's quadratic memory parameter.
+* **Dephasing from transport.** No QCCD experiment or vendor publishes a per-shuttle,
+  per-junction or per-split qubit error. Transport is charged through its time (the memory
+  channel) and its heating (the MS error).
+* **Crosstalk.** Each measurement puts `DEPOLARIZE1(2.1e-4)` on the other ions in its trap
+  and 4.3e-5 on every other ion; each reset puts 3.5e-6 on every other ion (Helios §III B5,
+  Fig. 10; Helios-1E). MS crosstalk was not detected on Helios, below 4.3e-4, so it is 0.
+* **Ion loss.** Not modelled: it is not a Pauli channel and no vendor number exists. Leakage
+  is already inside the measured gate and memory errors and is charged as their Pauli error,
+  as the vendor's stabilizer emulator does.
+* **Imperfect cooling.** Every MS gate sees n̄ plus 0.05, the floor ground-state cooling leaves
+  (arXiv:2206.11888).
+* **A calibrated T2.** Replaced by the memory channels. The first |0⟩ carries the reset error.
+
+`qccd-physics@2` replaces numbers in `@1`'s block that no source supports. Gate, readout and
+memory errors become Helios's (137Ba⁺, 171Yb⁺ coolant). Transport becomes Quantinuum's
+published primitives in a new operating-point table, `quantinuum`:
+
+* split and merge: 128 µs, at most 1 quantum (arXiv:2003.01293 Table II);
+* one 375 µm leg: 94 µs at 4 m/s, a share of ≤ 0.03 quanta per junction round trip
+  (arXiv:2206.11888);
+* MS: 7.9e-4, 9.5e-4 per quantum (arXiv:0810.0670 §5.2).
+
+`@1`'s junction figure, 3 quanta, comes from the 2009 NIST experiment and is about 100 times
+modern data. Its "+2e-3 per quantum" and T2 = 600 s have no source. A board pins both ids, so
+`@1` boards are unchanged: their LERs and budgets are identical to the last bit.
+
+The finding that shapes the boards: **a Z-basis memory cannot see dephasing**, because a Z
+error flips no Z logical. Under `@2` on surface-3, h2_racetrack has the most memory error but
+the best Z-basis LER, and the third worst X-basis LER. A board that ranks schedules must
+measure both bases. rep5 cannot rank at all: its LER is about 1e-7 per round.
+
+`rotated_surface_xz(d)` (`surface3xz`, `surface5xz`) runs a Z-memory patch and an X-memory
+patch in lockstep in one circuit, so a board keeps one circuit and one program. A shot fails
+if either observable flips. The appended readout reads each data qubit in its own basis
+(`readout_basis` in the detector spec, present only when the bases differ). Measured under
+`@2`, 4M shots:
+
+| experiment | ions | designs graded | spread | separated tiers |
+|---|---|---|---|---|
+| surface3, Z basis | 17 | 12 | 1.75× | 3 |
+| surface3, X basis | 17 | 11 | 1.81× | 5 |
+| surface3xz | 34 | 9 | 2.13× | 4 |
+| surface5, X basis | 49 | 4 | 22× (2.0e-5 to 4.4e-4) | — |
+
+At d = 5 the slowest design, ring144_24v (1.8 s for five rounds), is worse than its own d = 3:
+transport time takes it above threshold.
+
+**The limit for Goal 1 was the reference compiler, not the noise.** qccdc e799ecf5a5cd
+refuses surface5 (49 ions) on 8 of 12 designs and surface5xz (98 ions) on every design:
+unroutable, short of docks, or short of capacity. It also refuses the X-basis surface3 on
+ring16, because the rotation cannot apply `h` to an ion that rides the loop.
+
+Split rounds (`Compiler/README.md`) are qccdc's last fallback. With them:
+
+* surface5xz compiles on grid9x9 (6.0e-5 per round, 598 ms), deck_unit_cell and cyclone_base
+  (6.5e-5, 696 ms), passes every rule, and on grid9x9 passes R10 with the proved checker;
+* surface5 compiles on grid5x5 (3.8e-5), ladder_2x72 (5.1e-5), torus4x4 and random16. The last
+  two fail only R20/R21, their wiring budget, as they do at d = 3.
+
+Still refused: ring144_24v at 98 ions (rotation needs 48 docks, it has 24), ring24_8, and
+devices with fewer slots than ions.
+
+### Goal 1's board: `surface5xz_mem@1` (2026-10-21)
+
+The board is `surface5xz` (98 ions) under `qccd-noise@2` and `qccd-physics@2`. It is timed on
+the `quantinuum` table (`T_quantinuum`), ranked by the LER per round, and sampled up to 2,000,000
+shots or 400 logical errors (seed 20261021). The starter is grid(9, 9).
+
+A design is entered on a board with that board's physics (`qccd.workspace.tasks.board_device`).
+A design still carrying the template's fixed blocks takes the board's, and one whose physics was
+edited keeps it and is exploratory, as before. This applies to the compile job, the frozen
+bundle, program runs and a board's LER job. Every earlier board's physics is the template's, so
+nothing changes on them.
+
+End to end with the released tools (qccdc c774b87b677f, qcheck e8acd6640fd3), the starter is
+eligible: every stage passes, 5.2e-5 per round, 598 ms. `Codesign/scripts/memory_boards.py`
+builds the board's pages from the release its task names.
 
 ## As built (2026-09-28)
 

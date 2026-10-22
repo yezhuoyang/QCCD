@@ -66,9 +66,11 @@
     "hop"
    ],
    "declared_locks": false,
+   "op_zones": [],
    "tol": 1e-06
   },
   "effective_2q_us": 141.0,
+  "ours_circuit_order": "strict",
   "doc": "MODEL.md"
  },
  "runs": [
@@ -138,6 +140,7 @@
    },
    "file": "examples/fig6_eager.schedule.json.gz",
    "seconds": 0.0,
+   "circuit_order": "commuting",
    "compare": {
     "paper": {
      "T_exe_us": {
@@ -154,12 +157,10 @@
     "ok": false,
     "duration_mismatches": 3
    },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
+   "in_strict_order": {
     "ok": true,
-    "makespan_us": 982.0,
-    "violations": {}
+    "program": "passed",
+    "circuit": "passed"
    }
   },
   {
@@ -228,6 +229,7 @@
    },
    "file": "examples/fig6_batched.schedule.json.gz",
    "seconds": 0.0,
+   "circuit_order": "commuting",
    "compare": {
     "paper": {
      "T_exe_us": {
@@ -244,12 +246,10 @@
     "ok": false,
     "duration_mismatches": 3
    },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
+   "in_strict_order": {
     "ok": true,
-    "makespan_us": 732.0,
-    "violations": {}
+    "program": "passed",
+    "circuit": "passed"
    }
   },
   {
@@ -318,6 +318,7 @@
    },
    "file": "examples/fig7_depth.schedule.json.gz",
    "seconds": 0.0,
+   "circuit_order": "commuting",
    "compare": {
     "paper": {
      "T_exe_us": {
@@ -334,12 +335,10 @@
     "ok": false,
     "duration_mismatches": 3
    },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
+   "in_strict_order": {
     "ok": true,
-    "makespan_us": 823.0,
-    "violations": {}
+    "program": "passed",
+    "circuit": "passed"
    }
   },
   {
@@ -408,6 +407,7 @@
    },
    "file": "examples/fig7_sliced.schedule.json.gz",
    "seconds": 0.0,
+   "circuit_order": "commuting",
    "compare": {
     "paper": {
      "T_exe_us": {
@@ -424,12 +424,10 @@
     "ok": false,
     "duration_mismatches": 3
    },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 545.0,
-    "violations": {}
+   "in_strict_order": {
+    "ok": false,
+    "program": "failed",
+    "circuit": "failed"
    }
   },
   {
@@ -468,15 +466,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 23531.0,
-    "T_inter_us": 14250.0,
-    "T_intra_us": 9281.0,
+    "makespan_us": 32697.0,
+    "T_inter_us": 16000.0,
+    "T_intra_us": 16697.0,
     "fidelity": {
-     "F": 0.6162937128542976,
+     "F": 0.6142104308039862,
      "F_1Q": 0.9990004873456586,
      "F_2Q": 0.7101293305297803,
-     "F_transport": 0.8694112039870258,
-     "F_decoh": 0.9992159408684552,
+     "F_transport": 0.8667370754715891,
+     "F_decoh": 0.998910693725285,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -485,12 +483,12 @@
     "gate1": 40,
     "gate2": 190,
     "measure": 0,
-    "intra_shift": 294,
+    "intra_shift": 300,
     "intra_swap": 190,
-    "inter_shift": 76,
-    "inter_cycles": 57
+    "inter_shift": 80,
+    "inter_cycles": 64
    },
-   "events": 1654,
+   "events": 1670,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -508,40 +506,41 @@
      "D->R",
      "R->D"
     ],
-    "rounds": 20,
+    "rounds": 37,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 34744.0,
+      "T_exe_us": 44785.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 23531.0,
+      "T_exe_us": 32697.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 27427.0,
+      "T_exe_us": 35990.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa20_L8.schedule.json.gz",
-   "seconds": 1.94,
+   "seconds": 0.31,
    "circuit": {
     "name": "qaoa20_complete",
     "qubits": 20,
     "ops": 230,
     "two_qubit": 190,
     "one_qubit": 40,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 20,
    "L": 8,
@@ -564,29 +563,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 23531.0,
+      "ours": 32697.0,
       "theirs": 93845,
-      "ratio": 3.988143300327228,
+      "ratio": 2.8701409915282747,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 173561
      },
      "F": {
-      "ours": 0.6162937128542976,
+      "ours": 0.6142104308039862,
       "theirs": 0.61,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 23531.0,
-    "violations": {}
    }
   },
   {
@@ -710,16 +702,17 @@
     ]
    },
    "file": "ours/rca20_L8.schedule.json.gz",
-   "seconds": 1.76,
+   "seconds": 0.37,
    "circuit": {
     "name": "rca20",
     "qubits": 20,
     "ops": 307,
     "two_qubit": 145,
     "one_qubit": 162,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 9 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 20,
    "L": 8,
@@ -758,13 +751,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 62686.0,
-    "violations": {}
    }
   },
   {
@@ -887,14 +873,14 @@
     ]
    },
    "file": "ours/bv20_L8.schedule.json.gz",
-   "seconds": 0.23,
+   "seconds": 0.08,
    "circuit": {
     "name": "bv20",
     "qubits": 20,
     "ops": 49,
     "two_qubit": 9,
     "one_qubit": 40,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 9 ones, seed 0",
     "secret_ones": [
      1,
@@ -908,6 +894,7 @@
      17
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 20,
    "L": 8,
@@ -946,13 +933,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 4145.0,
-    "violations": {}
    }
   },
   {
@@ -1055,16 +1035,17 @@
     ]
    },
    "file": "ours/vqe20_L8.schedule.json.gz",
-   "seconds": 2.01,
+   "seconds": 0.28,
    "circuit": {
     "name": "vqe20",
     "qubits": 20,
     "ops": 230,
     "two_qubit": 190,
     "one_qubit": 40,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 20,
    "L": 8,
@@ -1103,13 +1084,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 32697.0,
-    "violations": {}
    }
   },
   {
@@ -1148,15 +1122,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 67171.0,
-    "T_inter_us": 48750.0,
-    "T_intra_us": 18421.0,
+    "makespan_us": 90977.0,
+    "T_inter_us": 56000.0,
+    "T_intra_us": 34977.0,
     "fidelity": {
-     "F": 0.1357086987275159,
+     "F": 0.13433574433545054,
      "F_1Q": 0.9980019737168634,
      "F_2Q": 0.24530201376125435,
-     "F_transport": 0.5568265981014496,
-     "F_decoh": 0.9955319449241035,
+     "F_transport": 0.5520687014757261,
+     "F_decoh": 0.9939532224589841,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -1165,12 +1139,12 @@
     "gate1": 80,
     "gate2": 780,
     "measure": 0,
-    "intra_shift": 1179,
+    "intra_shift": 1200,
     "intra_swap": 780,
-    "inter_shift": 351,
-    "inter_cycles": 195
+    "inter_shift": 360,
+    "inter_cycles": 224
    },
-   "events": 6689,
+   "events": 6740,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -1195,40 +1169,41 @@
      "R->D",
      "R->R"
     ],
-    "rounds": 40,
+    "rounds": 77,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 80294.0,
+      "T_exe_us": 121885.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 67171.0,
+      "T_exe_us": 90977.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 84297.0,
+      "T_exe_us": 120230.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa40_L8.schedule.json.gz",
-   "seconds": 4.3,
+   "seconds": 1.3,
    "circuit": {
     "name": "qaoa40_complete",
     "qubits": 40,
     "ops": 860,
     "two_qubit": 780,
     "one_qubit": 80,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 40,
    "L": 8,
@@ -1251,29 +1226,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 67171.0,
+      "ours": 90977.0,
       "theirs": 327601,
-      "ratio": 4.877119590299385,
+      "ratio": 3.600921111929389,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 733637
      },
      "F": {
-      "ours": 0.1357086987275159,
+      "ours": 0.13433574433545054,
       "theirs": 0.13,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 67171.0,
-    "violations": {}
    }
   },
   {
@@ -1429,16 +1397,17 @@
     ]
    },
    "file": "ours/rca40_L8.schedule.json.gz",
-   "seconds": 3.45,
+   "seconds": 0.89,
    "circuit": {
     "name": "rca40",
     "qubits": 40,
     "ops": 647,
     "two_qubit": 305,
     "one_qubit": 342,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 19 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 40,
    "L": 8,
@@ -1477,13 +1446,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 148791.0,
-    "violations": {}
    }
   },
   {
@@ -1632,14 +1594,14 @@
     ]
    },
    "file": "ours/bv40_L8.schedule.json.gz",
-   "seconds": 0.75,
+   "seconds": 0.26,
    "circuit": {
     "name": "bv40",
     "qubits": 40,
     "ops": 99,
     "two_qubit": 19,
     "one_qubit": 80,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 19 ones, seed 0",
     "secret_ones": [
      2,
@@ -1663,6 +1625,7 @@
      38
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 40,
    "L": 8,
@@ -1701,13 +1664,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 9003.0,
-    "violations": {}
    }
   },
   {
@@ -1817,16 +1773,17 @@
     ]
    },
    "file": "ours/vqe40_L8.schedule.json.gz",
-   "seconds": 5.13,
+   "seconds": 1.36,
    "circuit": {
     "name": "vqe40",
     "qubits": 40,
     "ops": 860,
     "two_qubit": 780,
     "one_qubit": 80,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 40,
    "L": 8,
@@ -1865,13 +1822,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 90977.0,
-    "violations": {}
    }
   },
   {
@@ -1910,15 +1860,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 101311.0,
-    "T_inter_us": 73750.0,
-    "T_intra_us": 27561.0,
+    "makespan_us": 143257.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 53257.0,
     "fidelity": {
-     "F": 0.010661573301938438,
+     "F": 0.010468483481545764,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.2620795228878215,
-     "F_decoh": 0.9899200467236889,
+     "F_transport": 0.2584147243993546,
+     "F_decoh": 0.9857764245898729,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -1927,12 +1877,12 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 2664,
+    "intra_shift": 2700,
     "intra_swap": 1770,
-    "inter_shift": 826,
-    "inter_cycles": 295
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 15124,
+   "events": 15210,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -1962,40 +1912,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 150344.0,
+      "T_exe_us": 209985.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 101311.0,
+      "T_exe_us": 143257.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 126167.0,
+      "T_exe_us": 196970.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_L8.schedule.json.gz",
-   "seconds": 9.08,
+   "seconds": 3.18,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -2018,29 +1969,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 101311.0,
+      "ours": 143257.0,
       "theirs": 744943,
-      "ratio": 7.353031753708876,
+      "ratio": 5.200046071047139,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.010661573301938438,
+      "ours": 0.010468483481545764,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 101311.0,
-    "violations": {}
    }
   },
   {
@@ -2216,16 +2160,17 @@
     ]
    },
    "file": "ours/rca60_L8.schedule.json.gz",
-   "seconds": 7.33,
+   "seconds": 1.69,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 8,
@@ -2264,13 +2209,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 208576.0,
-    "violations": {}
    }
   },
   {
@@ -2443,14 +2381,14 @@
     ]
    },
    "file": "ours/bv60_L8.schedule.json.gz",
-   "seconds": 3.25,
+   "seconds": 0.58,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -2484,6 +2422,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 8,
@@ -2522,13 +2461,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 13861.0,
-    "violations": {}
    }
   },
   {
@@ -2643,16 +2575,17 @@
     ]
    },
    "file": "ours/vqe60_L8.schedule.json.gz",
-   "seconds": 9.03,
+   "seconds": 3.4,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 8,
@@ -2691,13 +2624,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 143257.0,
-    "violations": {}
    }
   },
   {
@@ -2736,15 +2662,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 160907.0,
-    "T_inter_us": 74750.0,
-    "T_intra_us": 86157.0,
+    "makespan_us": 277950.0,
+    "T_inter_us": 117500.0,
+    "T_intra_us": 160450.0,
     "fidelity": {
-     "F": 3.1127361763138005e-06,
+     "F": 3.041875144584827e-06,
      "F_1Q": 0.9950124170033573,
      "F_2Q": 0.00013395205295540287,
-     "F_transport": 0.02398895201164546,
-     "F_decoh": 0.9735385716484962,
+     "F_transport": 0.02390463966801,
+     "F_decoh": 0.9547316239856926,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -2753,12 +2679,12 @@
     "gate1": 200,
     "gate2": 4950,
     "measure": 0,
-    "intra_shift": 8221,
+    "intra_shift": 8219,
     "intra_swap": 4950,
-    "inter_shift": 1891,
-    "inter_cycles": 299
+    "inter_shift": 1900,
+    "inter_cycles": 470
    },
-   "events": 43283,
+   "events": 43288,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 5,
@@ -2793,40 +2719,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 100,
+    "rounds": 197,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 201194.0,
+      "T_exe_us": 345685.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 194341.0,
+      "T_exe_us": 301817.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 160907.0,
+      "T_exe_us": 277950.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa100_L8.schedule.json.gz",
-   "seconds": 32.07,
+   "seconds": 11.58,
    "circuit": {
     "name": "qaoa100_complete",
     "qubits": 100,
     "ops": 5150,
     "two_qubit": 4950,
     "one_qubit": 200,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 100,
    "L": 8,
@@ -2849,29 +2776,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 160907.0,
+      "ours": 277950.0,
       "theirs": 2256313,
-      "ratio": 14.022466393631104,
+      "ratio": 8.117693829825509,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 4687884
      },
      "F": {
-      "ours": 3.1127361763138005e-06,
+      "ours": 3.041875144584827e-06,
       "theirs": 5.85e-07,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 160907.0,
-    "violations": {}
    }
   },
   {
@@ -3098,16 +3018,17 @@
     ]
    },
    "file": "ours/rca100_L8.schedule.json.gz",
-   "seconds": 15.05,
+   "seconds": 5.55,
    "circuit": {
     "name": "rca100",
     "qubits": 100,
     "ops": 1667,
     "two_qubit": 785,
     "one_qubit": 882,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 49 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 100,
    "L": 8,
@@ -3146,13 +3067,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 354216.0,
-    "violations": {}
    }
   },
   {
@@ -3374,14 +3288,14 @@
     ]
    },
    "file": "ours/bv100_L8.schedule.json.gz",
-   "seconds": 6.3,
+   "seconds": 2.92,
    "circuit": {
     "name": "bv100",
     "qubits": 100,
     "ops": 249,
     "two_qubit": 49,
     "one_qubit": 200,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 49 ones, seed 0",
     "secret_ones": [
      0,
@@ -3435,6 +3349,7 @@
      97
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 100,
    "L": 8,
@@ -3473,13 +3388,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 23577.0,
-    "violations": {}
    }
   },
   {
@@ -3599,16 +3507,17 @@
     ]
    },
    "file": "ours/vqe100_L8.schedule.json.gz",
-   "seconds": 25.5,
+   "seconds": 11.34,
    "circuit": {
     "name": "vqe100",
     "qubits": 100,
     "ops": 5150,
     "two_qubit": 4950,
     "one_qubit": 200,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 100,
    "L": 8,
@@ -3647,13 +3556,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 277950.0,
-    "violations": {}
    }
   },
   {
@@ -3692,15 +3594,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 27939.0,
-    "T_inter_us": 14250.0,
-    "T_intra_us": 13689.0,
+    "makespan_us": 40585.0,
+    "T_inter_us": 16000.0,
+    "T_intra_us": 24585.0,
     "fidelity": {
-     "F": 0.5529816481571925,
+     "F": 0.5476640609090052,
      "F_1Q": 0.9990004873456586,
      "F_2Q": 0.7101293305297803,
-     "F_transport": 0.7802109230997214,
-     "F_decoh": 0.9990691335252538,
+     "F_transport": 0.7730340425386688,
+     "F_decoh": 0.9986480813331703,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -3709,12 +3611,12 @@
     "gate1": 40,
     "gate2": 190,
     "measure": 0,
-    "intra_shift": 786,
+    "intra_shift": 820,
     "intra_swap": 190,
-    "inter_shift": 76,
-    "inter_cycles": 57
+    "inter_shift": 80,
+    "inter_cycles": 64
    },
-   "events": 2638,
+   "events": 2710,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -3732,40 +3634,41 @@
      "D->R",
      "R->D"
     ],
-    "rounds": 20,
+    "rounds": 37,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 39447.0,
+      "T_exe_us": 52905.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 27939.0,
+      "T_exe_us": 40585.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 34440.0,
+      "T_exe_us": 45386.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa20_L14.schedule.json.gz",
-   "seconds": 2.68,
+   "seconds": 0.45,
    "circuit": {
     "name": "qaoa20_complete",
     "qubits": 20,
     "ops": 230,
     "two_qubit": 190,
     "one_qubit": 40,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 20,
    "L": 14,
@@ -3788,29 +3691,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 27939.0,
+      "ours": 40585.0,
       "theirs": 128886,
-      "ratio": 4.613121443143992,
+      "ratio": 3.175705309843538,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 265068
      },
      "F": {
-      "ours": 0.5529816481571925,
+      "ours": 0.5476640609090052,
       "theirs": 0.58,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 27939.0,
-    "violations": {}
    }
   },
   {
@@ -3935,16 +3831,17 @@
     ]
    },
    "file": "ours/rca20_L14.schedule.json.gz",
-   "seconds": 2.35,
+   "seconds": 0.69,
    "circuit": {
     "name": "rca20",
     "qubits": 20,
     "ops": 307,
     "two_qubit": 145,
     "one_qubit": 162,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 9 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 20,
    "L": 14,
@@ -3983,13 +3880,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 74363.0,
-    "violations": {}
    }
   },
   {
@@ -4112,14 +4002,14 @@
     ]
    },
    "file": "ours/bv20_L14.schedule.json.gz",
-   "seconds": 0.2,
+   "seconds": 0.11,
    "circuit": {
     "name": "bv20",
     "qubits": 20,
     "ops": 49,
     "two_qubit": 9,
     "one_qubit": 40,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 9 ones, seed 0",
     "secret_ones": [
      1,
@@ -4133,6 +4023,7 @@
      17
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 20,
    "L": 14,
@@ -4171,13 +4062,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 4793.0,
-    "violations": {}
    }
   },
   {
@@ -4280,16 +4164,17 @@
     ]
    },
    "file": "ours/vqe20_L14.schedule.json.gz",
-   "seconds": 0.93,
+   "seconds": 0.49,
    "circuit": {
     "name": "vqe20",
     "qubits": 20,
     "ops": 230,
     "two_qubit": 190,
     "one_qubit": 40,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 20,
    "L": 14,
@@ -4328,13 +4213,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 40585.0,
-    "violations": {}
    }
   },
   {
@@ -4373,15 +4251,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 76219.0,
-    "T_inter_us": 48750.0,
-    "T_intra_us": 27469.0,
+    "makespan_us": 108145.0,
+    "T_inter_us": 56000.0,
+    "T_intra_us": 52145.0,
     "fidelity": {
-     "F": 0.08391586210642966,
+     "F": 0.08196919219569658,
      "F_1Q": 0.9980019737168634,
      "F_2Q": 0.24530201376125435,
-     "F_transport": 0.3445230736113863,
-     "F_decoh": 0.9949316211307837,
+     "F_transport": 0.33724790456709475,
+     "F_decoh": 0.9928162606335739,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -4390,12 +4268,12 @@
     "gate1": 80,
     "gate2": 780,
     "measure": 0,
-    "intra_shift": 3361,
+    "intra_shift": 3440,
     "intra_swap": 780,
-    "inter_shift": 351,
-    "inter_cycles": 195
+    "inter_shift": 360,
+    "inter_cycles": 224
    },
-   "events": 11053,
+   "events": 11220,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -4420,40 +4298,41 @@
      "R->D",
      "R->R"
     ],
-    "rounds": 40,
+    "rounds": 77,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 89574.0,
+      "T_exe_us": 139285.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 76219.0,
+      "T_exe_us": 108145.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 98270.0,
+      "T_exe_us": 143546.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa40_L14.schedule.json.gz",
-   "seconds": 3.57,
+   "seconds": 1.79,
    "circuit": {
     "name": "qaoa40_complete",
     "qubits": 40,
     "ops": 860,
     "two_qubit": 780,
     "one_qubit": 80,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 40,
    "L": 14,
@@ -4476,29 +4355,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 76219.0,
+      "ours": 108145.0,
       "theirs": 370858,
-      "ratio": 4.865689657434498,
+      "ratio": 3.4292662628877895,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1053797
      },
      "F": {
-      "ours": 0.08391586210642966,
+      "ours": 0.08196919219569658,
       "theirs": 0.12,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 76219.0,
-    "violations": {}
    }
   },
   {
@@ -4647,16 +4519,17 @@
     ]
    },
    "file": "ours/rca40_L14.schedule.json.gz",
-   "seconds": 5.53,
+   "seconds": 1.88,
    "circuit": {
     "name": "rca40",
     "qubits": 40,
     "ops": 647,
     "two_qubit": 305,
     "one_qubit": 342,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 19 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 40,
    "L": 14,
@@ -4695,13 +4568,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 156135.0,
-    "violations": {}
    }
   },
   {
@@ -4850,14 +4716,14 @@
     ]
    },
    "file": "ours/bv40_L14.schedule.json.gz",
-   "seconds": 1.61,
+   "seconds": 0.34,
    "circuit": {
     "name": "bv40",
     "qubits": 40,
     "ops": 99,
     "two_qubit": 19,
     "one_qubit": 80,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 19 ones, seed 0",
     "secret_ones": [
      2,
@@ -4881,6 +4747,7 @@
      38
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 40,
    "L": 14,
@@ -4919,13 +4786,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 10473.0,
-    "violations": {}
    }
   },
   {
@@ -5035,16 +4895,17 @@
     ]
    },
    "file": "ours/vqe40_L14.schedule.json.gz",
-   "seconds": 9.63,
+   "seconds": 2.08,
    "circuit": {
     "name": "vqe40",
     "qubits": 40,
     "ops": 860,
     "two_qubit": 780,
     "one_qubit": 80,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 40,
    "L": 14,
@@ -5083,13 +4944,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 108145.0,
-    "violations": {}
    }
   },
   {
@@ -5128,15 +4982,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 114999.0,
-    "T_inter_us": 73750.0,
-    "T_intra_us": 41249.0,
+    "makespan_us": 169705.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 79705.0,
     "fidelity": {
-     "F": 0.0034879509266114604,
+     "F": 0.003354824569894923,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.08585718014447859,
-     "F_decoh": 0.9885659711045052,
+     "F_transport": 0.08303322782601763,
+     "F_decoh": 0.983172687801401,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -5145,12 +4999,12 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 7736,
+    "intra_shift": 7860,
     "intra_swap": 1770,
-    "inter_shift": 826,
-    "inter_cycles": 295
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 25268,
+   "events": 25530,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -5180,40 +5034,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 164264.0,
+      "T_exe_us": 236665.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 114999.0,
+      "T_exe_us": 169705.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 147100.0,
+      "T_exe_us": 234206.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_L14.schedule.json.gz",
-   "seconds": 9.62,
+   "seconds": 5.27,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 14,
@@ -5236,29 +5091,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 114999.0,
+      "ours": 169705.0,
       "theirs": 822641,
-      "ratio": 7.153462204019165,
+      "ratio": 4.847476503344038,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 2403532
      },
      "F": {
-      "ours": 0.0034879509266114604,
+      "ours": 0.003354824569894923,
       "theirs": 0.00801,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 114999.0,
-    "violations": {}
    }
   },
   {
@@ -5431,16 +5279,17 @@
     ]
    },
    "file": "ours/rca60_L14.schedule.json.gz",
-   "seconds": 8.49,
+   "seconds": 3.33,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 14,
@@ -5479,13 +5328,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 236323.0,
-    "violations": {}
    }
   },
   {
@@ -5658,14 +5500,14 @@
     ]
    },
    "file": "ours/bv60_L14.schedule.json.gz",
-   "seconds": 1.35,
+   "seconds": 0.79,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -5699,6 +5541,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 14,
@@ -5737,13 +5580,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 16153.0,
-    "violations": {}
    }
   },
   {
@@ -5858,16 +5694,17 @@
     ]
    },
    "file": "ours/vqe60_L14.schedule.json.gz",
-   "seconds": 16.15,
+   "seconds": 4.43,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 14,
@@ -5906,13 +5743,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 169705.0,
-    "violations": {}
    }
   },
   {
@@ -5951,15 +5781,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 195760.0,
-    "T_inter_us": 74750.0,
-    "T_intra_us": 121010.0,
+    "makespan_us": 343026.0,
+    "T_inter_us": 117500.0,
+    "T_intra_us": 225526.0,
     "fidelity": {
-     "F": 2.4504689842892617e-07,
+     "F": 2.3441725464026677e-07,
      "F_1Q": 0.9950124170033573,
      "F_2Q": 0.00013395205295540287,
-     "F_transport": 0.001899507080878616,
-     "F_decoh": 0.9678998414196908,
+     "F_transport": 0.0018622618685524713,
+     "F_decoh": 0.9444325575903121,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -5968,12 +5798,12 @@
     "gate1": 200,
     "gate2": 4950,
     "measure": 0,
-    "intra_shift": 19747,
+    "intra_shift": 19819,
     "intra_swap": 4950,
-    "inter_shift": 1891,
-    "inter_cycles": 299
+    "inter_shift": 1900,
+    "inter_cycles": 470
    },
-   "events": 66335,
+   "events": 66488,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 5,
@@ -6008,40 +5838,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 100,
+    "rounds": 197,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 224394.0,
+      "T_exe_us": 390925.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 217309.0,
+      "T_exe_us": 346825.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 195760.0,
+      "T_exe_us": 343026.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa100_L14.schedule.json.gz",
-   "seconds": 58.45,
+   "seconds": 22.25,
    "circuit": {
     "name": "qaoa100_complete",
     "qubits": 100,
     "ops": 5150,
     "two_qubit": 4950,
     "one_qubit": 200,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 100,
    "L": 14,
@@ -6064,29 +5895,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 195760.0,
+      "ours": 343026.0,
       "theirs": 2568088,
-      "ratio": 13.11855333060891,
+      "ratio": 7.486569531172564,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 6450674
      },
      "F": {
-      "ours": 2.4504689842892617e-07,
+      "ours": 2.3441725464026677e-07,
       "theirs": 3.51e-07,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 195760.0,
-    "violations": {}
    }
   },
   {
@@ -6308,16 +6132,17 @@
     ]
    },
    "file": "ours/rca100_L14.schedule.json.gz",
-   "seconds": 30.58,
+   "seconds": 8.81,
    "circuit": {
     "name": "rca100",
     "qubits": 100,
     "ops": 1667,
     "two_qubit": 785,
     "one_qubit": 882,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 49 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 100,
    "L": 14,
@@ -6356,13 +6181,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 396199.0,
-    "violations": {}
    }
   },
   {
@@ -6584,14 +6402,14 @@
     ]
    },
    "file": "ours/bv100_L14.schedule.json.gz",
-   "seconds": 9.18,
+   "seconds": 3.26,
    "circuit": {
     "name": "bv100",
     "qubits": 100,
     "ops": 249,
     "two_qubit": 49,
     "one_qubit": 200,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 49 ones, seed 0",
     "secret_ones": [
      0,
@@ -6645,6 +6463,7 @@
      97
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 100,
    "L": 14,
@@ -6683,13 +6502,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 27513.0,
-    "violations": {}
    }
   },
   {
@@ -6809,16 +6621,17 @@
     ]
    },
    "file": "ours/vqe100_L14.schedule.json.gz",
-   "seconds": 54.88,
+   "seconds": 26.06,
    "circuit": {
     "name": "vqe100",
     "qubits": 100,
     "ops": 5150,
     "two_qubit": 4950,
     "one_qubit": 200,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 100,
    "L": 14,
@@ -6857,13 +6670,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 343026.0,
-    "violations": {}
    }
   },
   {
@@ -6902,15 +6708,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 97733.0,
-    "T_inter_us": 72500.0,
-    "T_intra_us": 25233.0,
+    "makespan_us": 128526.0,
+    "T_inter_us": 86500.0,
+    "T_intra_us": 42026.0,
     "fidelity": {
-     "F": 0.2252637493806104,
+     "F": 0.22157708207096377,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.8503170702787376,
-     "F_transport": 0.26832293806193314,
-     "F_decoh": 0.9902743034891627,
+     "F_transport": 0.2647455409812161,
+     "F_decoh": 0.9872296419453865,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -6919,12 +6725,12 @@
     "gate1": 120,
     "gate2": 90,
     "measure": 0,
-    "intra_shift": 2614,
-    "intra_swap": 1741,
-    "inter_shift": 812,
-    "inter_cycles": 290
+    "intra_shift": 2656,
+    "intra_swap": 1734,
+    "inter_shift": 825,
+    "inter_cycles": 346
    },
-   "events": 13214,
+   "events": 13283,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -6954,57 +6760,57 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 59,
+    "rounds": 106,
     "method": "line-partial",
     "tried": [
      {
       "method": "router",
       "per_trap": 3,
-      "T_exe_us": 206290.0,
+      "T_exe_us": 188431.0,
       "ok": true
      },
      {
       "method": "router",
       "per_trap": 4,
-      "T_exe_us": 162254.0,
-      "ok": true
+      "error": "cannot place [('g', 1, 83, False), ('1', 5, [201]), ('1', 6, [203])] in trap H33"
      },
      {
       "method": "router",
       "per_trap": 5,
-      "error": "cannot place [('x', 2), ('x', 4), ('1', 6, [197]), ('x', 0)] in trap V13"
+      "error": "cannot place [('x', 4), ('1', 3, [153]), ('g', 0, 134, False)] in trap V22"
      },
      {
       "method": "line-partial",
       "per_trap": 3,
-      "T_exe_us": 145441.0,
+      "T_exe_us": 192688.0,
       "ok": true
      },
      {
       "method": "line-partial",
       "per_trap": 4,
-      "T_exe_us": 97733.0,
+      "T_exe_us": 128526.0,
       "ok": true
      },
      {
       "method": "line-partial",
       "per_trap": 5,
-      "T_exe_us": 111960.0,
+      "T_exe_us": 164977.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_3reg_L8.schedule.json.gz",
-   "seconds": 16.83,
+   "seconds": 6.45,
    "circuit": {
     "name": "qaoa60_3reg_s0",
     "qubits": 60,
     "ops": 210,
     "two_qubit": 90,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on a random 3-regular graph (networkx seed 0), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -7027,29 +6833,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 97733.0,
+      "ours": 128526.0,
       "theirs": 744943,
-      "ratio": 7.622225860251911,
+      "ratio": 5.79604904844156,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.2252637493806104,
+      "ours": 0.22157708207096377,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 97733.0,
-    "violations": {}
    }
   },
   {
@@ -7088,15 +6887,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 111106.0,
-    "T_inter_us": 72500.0,
-    "T_intra_us": 38606.0,
+    "makespan_us": 152488.0,
+    "T_inter_us": 86500.0,
+    "T_intra_us": 65988.0,
     "fidelity": {
-     "F": 0.07507246956354109,
+     "F": 0.07267024064641861,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.8503170702787376,
-     "F_transport": 0.08954224459342654,
-     "F_decoh": 0.9889508947575838,
+     "F_transport": 0.08703643018928874,
+     "F_decoh": 0.9848668742398847,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -7105,12 +6904,12 @@
     "gate1": 120,
     "gate2": 90,
     "measure": 0,
-    "intra_shift": 7602,
-    "intra_swap": 1741,
-    "inter_shift": 812,
-    "inter_cycles": 290
+    "intra_shift": 7712,
+    "intra_swap": 1734,
+    "inter_shift": 825,
+    "inter_cycles": 346
    },
-   "events": 23190,
+   "events": 23395,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -7140,58 +6939,59 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 59,
+    "rounds": 106,
     "method": "line-partial",
     "tried": [
      {
       "method": "router",
       "per_trap": 3,
-      "T_exe_us": 234478.0,
+      "T_exe_us": 218934.0,
       "ok": true
      },
      {
       "method": "router",
       "per_trap": 4,
-      "T_exe_us": 191054.0,
+      "T_exe_us": 177373.0,
       "ok": true
      },
      {
       "method": "router",
       "per_trap": 5,
-      "T_exe_us": 211954.0,
+      "T_exe_us": 195901.0,
       "ok": true
      },
      {
       "method": "line-partial",
       "per_trap": 3,
-      "T_exe_us": 158440.0,
+      "T_exe_us": 215604.0,
       "ok": true
      },
      {
       "method": "line-partial",
       "per_trap": 4,
-      "T_exe_us": 111106.0,
+      "T_exe_us": 152488.0,
       "ok": true
      },
      {
       "method": "line-partial",
       "per_trap": 5,
-      "T_exe_us": 132263.0,
+      "T_exe_us": 199772.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_3reg_L14.schedule.json.gz",
-   "seconds": 28.17,
+   "seconds": 10.9,
    "circuit": {
     "name": "qaoa60_3reg_s0",
     "qubits": 60,
     "ops": 210,
     "two_qubit": 90,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on a random 3-regular graph (networkx seed 0), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 14,
@@ -7214,29 +7014,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 111106.0,
+      "ours": 152488.0,
       "theirs": 822641,
-      "ratio": 7.404109589041096,
+      "ratio": 5.394791721315776,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 2403532
      },
      "F": {
-      "ours": 0.07507246956354109,
+      "ours": 0.07267024064641861,
       "theirs": 0.00801,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 111106.0,
-    "violations": {}
    }
   },
   {
@@ -7275,15 +7068,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 125329.0,
-    "T_inter_us": 73750.0,
-    "T_intra_us": 51579.0,
+    "makespan_us": 187624.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 97624.0,
     "fidelity": {
-     "F": 0.01063599706198342,
+     "F": 0.010422140841098167,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.2620795228878215,
-     "F_decoh": 0.9875453097187213,
+     "F_transport": 0.2584147243993546,
+     "F_decoh": 0.9814125181571006,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -7292,12 +7085,12 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 2664,
+    "intra_shift": 2700,
     "intra_swap": 1770,
-    "inter_shift": 826,
-    "inter_cycles": 295
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 15124,
+   "events": 15210,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -7327,40 +7120,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 174415.0,
+      "T_exe_us": 252804.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 125329.0,
+      "T_exe_us": 187624.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 150069.0,
+      "T_exe_us": 241497.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_L8_onegate.schedule.json.gz",
-   "seconds": 9.88,
+   "seconds": 4.82,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -7383,29 +7177,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 125329.0,
+      "ours": 187624.0,
       "theirs": 744943,
-      "ratio": 5.943899656105131,
+      "ratio": 3.970403573103654,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.01063599706198342,
+      "ours": 0.010422140841098167,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 125329.0,
-    "violations": {}
    }
   },
   {
@@ -7444,15 +7231,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 94351.0,
-    "T_inter_us": 73750.0,
-    "T_intra_us": 20601.0,
+    "makespan_us": 129685.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 39685.0,
     "fidelity": {
-     "F": 0.010668996339874134,
+     "F": 0.010482700953120759,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.2620795228878215,
-     "F_decoh": 0.9906092708983988,
+     "F_transport": 0.2584147243993546,
+     "F_decoh": 0.987115228660263,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -7461,12 +7248,12 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 2664,
+    "intra_shift": 2700,
     "intra_swap": 1770,
-    "inter_shift": 826,
-    "inter_cycles": 295
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 15124,
+   "events": 15210,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -7496,40 +7283,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 143384.0,
+      "T_exe_us": 196413.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 94351.0,
+      "T_exe_us": 129685.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 112247.0,
+      "T_exe_us": 172146.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_L8_tg25.schedule.json.gz",
-   "seconds": 10.93,
+   "seconds": 3.8,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -7552,29 +7340,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 94351.0,
+      "ours": 129685.0,
       "theirs": 744943,
-      "ratio": 7.895443609500695,
+      "ratio": 5.744249527701739,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.010668996339874134,
+      "ours": 0.010482700953120759,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 94351.0,
-    "violations": {}
    }
   },
   {
@@ -7613,15 +7394,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 101311.0,
-    "T_inter_us": 73750.0,
-    "T_intra_us": 27561.0,
+    "makespan_us": 143257.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 53257.0,
     "fidelity": {
-     "F": 0.010661573301938438,
+     "F": 0.010468483481545764,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.2620795228878215,
-     "F_decoh": 0.9899200467236889,
+     "F_transport": 0.2584147243993546,
+     "F_decoh": 0.9857764245898729,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -7630,12 +7411,12 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 2664,
+    "intra_shift": 2700,
     "intra_swap": 1770,
-    "inter_shift": 826,
-    "inter_cycles": 295
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 15124,
+   "events": 15210,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
     "per_trap": 4,
@@ -7665,40 +7446,41 @@
      "R->D",
      "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 150344.0,
+      "T_exe_us": 209985.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "T_exe_us": 101311.0,
+      "T_exe_us": 143257.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 5,
-      "T_exe_us": 126167.0,
+      "T_exe_us": 196970.0,
       "ok": true
      }
     ]
    },
    "file": "ours/qaoa60_L8_swapanywhere.schedule.json.gz",
-   "seconds": 8.48,
+   "seconds": 3.22,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -7721,29 +7503,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 101311.0,
+      "ours": 143257.0,
       "theirs": 744943,
-      "ratio": 7.353031753708876,
+      "ratio": 5.200046071047139,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.010661573301938438,
+      "ours": 0.010468483481545764,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 101311.0,
-    "violations": {}
    }
   },
   {
@@ -7782,15 +7557,15 @@
    "first_violations": [],
    "notes": {},
    "measured": {
-    "makespan_us": 153766.0,
-    "T_inter_us": 119250.0,
-    "T_intra_us": 34516.0,
+    "makespan_us": 150217.0,
+    "T_inter_us": 90000.0,
+    "T_intra_us": 60217.0,
     "fidelity": {
-     "F": 0.00577200095193323,
+     "F": 0.010188608330181302,
      "F_1Q": 0.9970044581150757,
      "F_2Q": 0.04121838659783713,
-     "F_transport": 0.14263177209340147,
-     "F_decoh": 0.9847410162958509,
+     "F_transport": 0.2516811097901031,
+     "F_decoh": 0.9850905629059112,
      "f_2q": 0.9982,
      "transport_counted": "per ion moved; a swap once"
     }
@@ -7799,60 +7574,55 @@
     "gate1": 120,
     "gate2": 1770,
     "measure": 0,
-    "intra_shift": 4819,
+    "intra_shift": 2820,
     "intra_swap": 1770,
-    "inter_shift": 1131,
-    "inter_cycles": 477
+    "inter_shift": 840,
+    "inter_cycles": 360
    },
-   "events": 19739,
+   "events": 15450,
    "source": {
     "scheduler": "qccd.repro.trapsimd.schedule_line",
-    "per_trap": 3,
+    "per_trap": 4,
     "tg_us": 141.0,
     "device": "grid4x4_L8_gz2",
     "trail": [
      "H00R",
-     "H01R",
-     "H02R",
-     "H03R",
-     "V04D",
-     "H13L",
-     "V13D",
-     "H22L",
-     "H21L",
-     "H20L",
-     "V20D",
-     "H30R",
-     "H31R",
-     "H32R",
+     "V01D",
+     "H11R",
+     "V12D",
+     "H22R",
+     "V23D",
      "H33R",
      "V34D",
      "H43L",
-     "H42L",
-     "H41L",
-     "H40L"
+     "V33U",
+     "H32L",
+     "V22U",
+     "H21L",
+     "V11U",
+     "H10L"
     ],
     "trail_classes": [
      "D->L",
      "D->R",
-     "L->D",
-     "L->L",
+     "L->U",
      "R->D",
-     "R->R"
+     "U->L"
     ],
-    "rounds": 60,
+    "rounds": 117,
     "method": "line",
     "tried": [
      {
       "method": "line",
       "per_trap": 3,
-      "T_exe_us": 153766.0,
+      "T_exe_us": 216655.0,
       "ok": true
      },
      {
       "method": "line",
       "per_trap": 4,
-      "error": "cannot place [('1', 0, [1834]), ('1', 1, [1833]), ('1', 2, [1832]), ('1', 3, [1831]), ('1', 4, [1830])] in trap H10"
+      "T_exe_us": 150217.0,
+      "ok": true
      },
      {
       "method": "line",
@@ -7862,16 +7632,17 @@
     ]
    },
    "file": "ours/qaoa60_L8_gzedge.schedule.json.gz",
-   "seconds": 4.6,
+   "seconds": 2.44,
    "circuit": {
     "name": "qaoa60_complete",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "multiset",
+    "order": "strict",
     "source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"
    },
+   "circuit_order": "strict",
    "benchmark": "QAOA",
    "n": 60,
    "L": 8,
@@ -7894,29 +7665,22 @@
    "compare": {
     "paper": {
      "T_exe_us": {
-      "ours": 153766.0,
+      "ours": 150217.0,
       "theirs": 744943,
-      "ratio": 4.844653564507108,
+      "ratio": 4.9591124839399,
       "verdict": "ours faster",
       "where": "Table 3, 'Our T_exe' (FluxTrap)",
       "printed": true,
       "shaper_star": 1684718
      },
      "F": {
-      "ours": 0.00577200095193323,
+      "ours": 0.010188608330181302,
       "theirs": 0.00891,
       "where": "Table 3, 'Our Fidelity'",
       "printed": true,
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 153766.0,
-    "violations": {}
    }
   },
   {
@@ -8092,16 +7856,17 @@
     ]
    },
    "file": "ours/rca60_L8_onegate.schedule.json.gz",
-   "seconds": 3.26,
+   "seconds": 1.95,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 8,
@@ -8140,13 +7905,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 207681.0,
-    "violations": {}
    }
   },
   {
@@ -8322,16 +8080,17 @@
     ]
    },
    "file": "ours/rca60_L8_tg25.schedule.json.gz",
-   "seconds": 6.43,
+   "seconds": 2.18,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 8,
@@ -8370,13 +8129,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 160736.0,
-    "violations": {}
    }
   },
   {
@@ -8552,16 +8304,17 @@
     ]
    },
    "file": "ours/rca60_L8_swapanywhere.schedule.json.gz",
-   "seconds": 6.59,
+   "seconds": 1.98,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 8,
@@ -8600,13 +8353,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 196802.0,
-    "violations": {}
    }
   },
   {
@@ -8787,16 +8533,17 @@
     ]
    },
    "file": "ours/rca60_L8_gzedge.schedule.json.gz",
-   "seconds": 2.95,
+   "seconds": 1.48,
    "circuit": {
     "name": "rca60",
     "qubits": 60,
     "ops": 987,
     "two_qubit": 465,
     "one_qubit": 522,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: Cuccaro MAJ/UMA, m = 29 bits, 6-CX Toffoli"
    },
+   "circuit_order": "strict",
    "benchmark": "RCA",
    "n": 60,
    "L": 8,
@@ -8835,13 +8582,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 257002.0,
-    "violations": {}
    }
   },
   {
@@ -9014,14 +8754,14 @@
     ]
    },
    "file": "ours/bv60_L8_onegate.schedule.json.gz",
-   "seconds": 0.99,
+   "seconds": 0.7,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -9055,6 +8795,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 8,
@@ -9093,13 +8834,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 13989.0,
-    "violations": {}
    }
   },
   {
@@ -9272,14 +9006,14 @@
     ]
    },
    "file": "ours/bv60_L8_tg25.schedule.json.gz",
-   "seconds": 1.03,
+   "seconds": 0.72,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -9313,6 +9047,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 8,
@@ -9351,13 +9086,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 10502.0,
-    "violations": {}
    }
   },
   {
@@ -9530,14 +9258,14 @@
     ]
    },
    "file": "ours/bv60_L8_swapanywhere.schedule.json.gz",
-   "seconds": 1.25,
+   "seconds": 0.88,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -9571,6 +9299,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 8,
@@ -9609,13 +9338,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 13571.0,
-    "violations": {}
    }
   },
   {
@@ -9796,14 +9518,14 @@
     ]
    },
    "file": "ours/bv60_L8_gzedge.schedule.json.gz",
-   "seconds": 2.76,
+   "seconds": 0.53,
    "circuit": {
     "name": "bv60",
     "qubits": 60,
     "ops": 149,
     "two_qubit": 29,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: balanced secret, 29 ones, seed 0",
     "secret_ones": [
      2,
@@ -9837,6 +9559,7 @@
      56
     ]
    },
+   "circuit_order": "strict",
    "benchmark": "BV",
    "n": 60,
    "L": 8,
@@ -9875,13 +9598,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 15368.0,
-    "violations": {}
    }
   },
   {
@@ -9996,16 +9712,17 @@
     ]
    },
    "file": "ours/vqe60_L8_onegate.schedule.json.gz",
-   "seconds": 18.71,
+   "seconds": 5.71,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 8,
@@ -10044,13 +9761,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 187624.0,
-    "violations": {}
    }
   },
   {
@@ -10165,16 +9875,17 @@
     ]
    },
    "file": "ours/vqe60_L8_tg25.schedule.json.gz",
-   "seconds": 6.22,
+   "seconds": 5.42,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 8,
@@ -10213,13 +9924,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 129685.0,
-    "violations": {}
    }
   },
   {
@@ -10334,16 +10038,17 @@
     ]
    },
    "file": "ours/vqe60_L8_swapanywhere.schedule.json.gz",
-   "seconds": 7.76,
+   "seconds": 5.64,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 8,
@@ -10382,13 +10087,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 143257.0,
-    "violations": {}
    }
   },
   {
@@ -10502,16 +10200,17 @@
     ]
    },
    "file": "ours/vqe60_L8_gzedge.schedule.json.gz",
-   "seconds": 7.97,
+   "seconds": 3.81,
    "circuit": {
     "name": "vqe60",
     "qubits": 60,
     "ops": 1890,
     "two_qubit": 1770,
     "one_qubit": 120,
-    "order": "commuting",
+    "order": "strict",
     "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
    },
+   "circuit_order": "strict",
    "benchmark": "VQE",
    "n": 60,
    "L": 8,
@@ -10550,182 +10249,6 @@
       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
      }
     }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 150217.0,
-    "violations": {}
-   }
-  },
-  {
-   "id": "vqe60_L8_strict",
-   "label": "VQE-60, L=8, judged in strict program order (no CX commutation)",
-   "kind": "sensitivity",
-   "profile": "trapsimd",
-   "rules": {
-    "inter_exclusive": "all",
-    "gz_1q": true,
-    "swap_gz": true,
-    "one_gate_per_trap": false
-   },
-   "tg_us": 141.0,
-   "checks": {
-    "segment_mutex": "skipped: the profile allows sharing",
-    "trap_serial": "skipped: the profile lets a trap overlap",
-    "chain_order": "skipped: chain order is not tracked",
-    "declared_locks": "skipped: the artifact states no locks",
-    "structure": "passed",
-    "positions": "passed",
-    "capacity": "passed",
-    "ion_serial": "passed",
-    "junction_mutex": "passed",
-    "broadcast": "passed",
-    "durations": "passed",
-    "circuit": "passed",
-    "intra": "passed",
-    "inter": "passed",
-    "modes": "passed",
-    "zones": "passed",
-    "program": "passed"
-   },
-   "ok": true,
-   "violations": {},
-   "first_violations": [],
-   "notes": {},
-   "measured": {
-    "makespan_us": 143257.0,
-    "T_inter_us": 90000.0,
-    "T_intra_us": 53257.0,
-    "fidelity": {
-     "F": 0.010468483481545764,
-     "F_1Q": 0.9970044581150757,
-     "F_2Q": 0.04121838659783713,
-     "F_transport": 0.2584147243993546,
-     "F_decoh": 0.9857764245898729,
-     "f_2q": 0.9982,
-     "transport_counted": "per ion moved; a swap once"
-    }
-   },
-   "counts": {
-    "gate1": 120,
-    "gate2": 1770,
-    "measure": 0,
-    "intra_shift": 2700,
-    "intra_swap": 1770,
-    "inter_shift": 840,
-    "inter_cycles": 360
-   },
-   "events": 15210,
-   "source": {
-    "scheduler": "qccd.repro.trapsimd.schedule_line",
-    "per_trap": 4,
-    "tg_us": 141.0,
-    "device": "grid4x4_L8_gz2",
-    "trail": [
-     "H00R",
-     "V01D",
-     "H11R",
-     "V12D",
-     "H22R",
-     "V23D",
-     "H33R",
-     "V34D",
-     "H43L",
-     "V33U",
-     "H32L",
-     "V22U",
-     "H21L",
-     "V11U",
-     "H10L"
-    ],
-    "trail_classes": [
-     "D->L",
-     "D->R",
-     "L->U",
-     "R->D",
-     "U->L"
-    ],
-    "rounds": 117,
-    "method": "line",
-    "tried": [
-     {
-      "method": "line",
-      "per_trap": 3,
-      "T_exe_us": 209985.0,
-      "ok": true
-     },
-     {
-      "method": "line",
-      "per_trap": 4,
-      "T_exe_us": 143257.0,
-      "ok": true
-     },
-     {
-      "method": "line",
-      "per_trap": 5,
-      "T_exe_us": 196970.0,
-      "ok": true
-     }
-    ]
-   },
-   "file": "ours/vqe60_L8_strict.schedule.json.gz",
-   "seconds": 10.89,
-   "circuit": {
-    "name": "vqe60",
-    "qubits": 60,
-    "ops": 1890,
-    "two_qubit": 1770,
-    "one_qubit": 120,
-    "order": "commuting",
-    "source": "rebuilt: RY, full CX entanglement, RY (reps=1)"
-   },
-   "benchmark": "VQE",
-   "n": 60,
-   "L": 8,
-   "level": "model",
-   "device": {
-    "name": "grid4x4_L8_gz2",
-    "D": 4,
-    "L": 8,
-    "gate_zones": [
-     2,
-     5
-    ],
-    "traps": 40,
-    "positions": 320
-   },
-   "two_qubit_gates": {
-    "ours": 1770,
-    "paper_implied": 1770
-   },
-   "compare": {
-    "paper": {
-     "T_exe_us": {
-      "ours": 143257.0,
-      "theirs": 1255877,
-      "ratio": 8.766601283008859,
-      "verdict": "ours faster",
-      "where": "Table 3, 'Our T_exe' (FluxTrap)",
-      "printed": true,
-      "shaper_star": 1921069
-     },
-     "F": {
-      "ours": 0.010468483481545764,
-      "theirs": 0.00333,
-      "where": "Table 3, 'Our Fidelity'",
-      "printed": true,
-      "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"
-     }
-    }
-   },
-   "rechecked": {
-    "strict": true,
-    "core": "hop follows segments; broadcast cycles never overlap",
-    "ok": true,
-    "makespan_us": 143257.0,
-    "violations": {}
    }
   }
  ]

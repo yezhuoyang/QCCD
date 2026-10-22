@@ -1,0 +1,18 @@
+{
+ "id": "algo_ccx",
+ "title": "A Toffoli, lowered",
+ "note": "one three-qubit gate becomes six CNOTs and nine single-qubit gates before placement; R10 is decided against the exact unitary",
+ "compiler": "11 layers, 10 transport cycles, 33 beams, 6 MS, 9 virtual-Z, 53 instructions",
+ "device": "grid2x3",
+ "device_about": "a 2\u00d73 lattice: T-junctions and corners, one trap on every wire",
+ "notes": [
+  "seeded q0 (weight 4) at T0_1h",
+  "candidates: greedy 6, spectral 6 -> greedy",
+  "weighted interaction distance 6 over 3 distinct pairs",
+  "lowered 1 multi-qubit gate(s) to 1- and 2-qubit gates"
+ ],
+ "regime": "broadcast-free",
+ "n_qubits": 3,
+ "compile_seconds": 0.02,
+ "check_seconds": 1.4
+}

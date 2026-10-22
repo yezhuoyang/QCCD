@@ -12,8 +12,14 @@ The paper has no artifact, so its reproduction has two parts:
 Our compiler lays a line of ions along a trail of traps chosen to need as few JT-SIMD classes
 as possible (`trap_trail`) and runs line rounds on it (`LineExecutor`): the odd-even
 transposition network for the all-pairs circuits (`all_pairs_rounds`: QAOA on the complete
-graph in n rounds, VQE's full entanglement in 2n - 3, its dependency depth), and a
-first-come-first-served line router for the rest (`lnn_rounds`: BV, the ripple-carry adder).
+graph and VQE's full entanglement in 2n - 3 rounds, the dependency depth of their input
+order), and a first-come-first-served line router for the rest (`lnn_rounds`: BV, the
+ripple-carry adder).  Every qubit runs exactly its input sequence of operations: a gate
+starts only when it is the next operation of each of its qubits.  Gates that commute (the
+ZZ gates of QAOA, a run of CX gates sharing a control) could be reordered without changing
+the result, and the paper's model allows it; ours does not, because the order of the input
+circuit is its author's and a compiler may not change it.  Our schedules are judged in
+strict program order.
 
 How the model is written down (MODEL.md in ``Reproduce/ruan2025`` lists every primitive):
 
@@ -60,9 +66,11 @@ TrapSIMD rules the core checker does not have, checked here (`simd_rules`):
     zones    two- and one-qubit gates name a gate-zone position; a swap has one of its ions
              in a gate zone (`Rules.swap_gz`: not stated, but every swap the paper draws is
              one); optionally at most one gate at a time per trap (`Rules.one_gate_per_trap`)
-    program  with the circuit: every operation executed once, on its qubits, in an order the
-             circuit allows (runs of CX gates in which a qubit keeps its role commute; a
-             one-qubit gate is a barrier for its qubit; ZZ gates commute)
+    program  with the circuit: every operation executed once, on its qubits, and per qubit
+             in the program's order: for our schedules ("strict") exactly the input
+             sequence; for the paper's worked examples ("commuting", the paper's rule) runs
+             of CX gates in which a qubit keeps its role commute, ZZ gates commute, and a
+             one-qubit gate is a barrier for its qubit
 """
 
 from __future__ import annotations
@@ -260,7 +268,9 @@ TRAPSIMD_F = {"gate1": 0.999975, "gate2": 0.9982, "measure": 0.9984, "intra_shif
 #: The rules the paper states.  Inside a trap nothing is serial (single-site addressing:
 #: Figs. 6-7 run gates, shifts and swaps of one trap at once); a junction passes one ion at
 #: a time; the inter-trap shift is broadcast.  Circuit order: CX runs commute (Fig. 7's
-#: time-sliced schedule runs CX(Q3,Q4) before CX(Q3,Q1), "actually commutable").
+#: time-sliced schedule runs CX(Q3,Q4) before CX(Q3,Q1), "actually commutable") -- the
+#: PAPER's rule, by which its worked examples are judged.  `check_trapsimd` takes the order
+#: from the program instead, and every circuit our compiler schedules is "strict".
 TRAPSIMD = Profile(
     "trapsimd",
     trap_serial=(),
@@ -546,6 +556,10 @@ def simd_rules(sched: TimedSchedule, rules: Rules = Rules(),
 
 
 def _program_rule(sched: TimedSchedule, prog: "Program", evs: list[Event], v) -> None:
+    """Every operation once, on its qubits, and per qubit in the order ``prog.order`` asks:
+    under "strict" (every schedule of ours) exactly the input sequence, one-qubit and
+    two-qubit operations alike; under "commuting" (the paper's worked examples) blocks in
+    order, any order inside a block (`Program.block_index`)."""
     ion_of = sched.qubits or {}
     to_ion = lambda q: ion_of.get(prog.qname(q), prog.qname(q))
     seen: dict[int, Event] = {}
@@ -572,15 +586,17 @@ def _program_rule(sched: TimedSchedule, prog: "Program", evs: list[Event], v) ->
     if missing:
         v("program", f"{len(missing)} operations never executed (e.g. "
           f"{[(k, prog.ops[k].name, prog.ops[k].qubits) for k in missing[:4]]})")
+    strict = prog.order == "strict"
     bidx = prog.block_index()
     for q, xs in per_q.items():
         xs.sort()
         last = -1
         for t0, eid, k in xs:
             b = bidx[k][q]
-            if b < last:
-                v("program", f"qubit {q}: operation {k} ({prog.ops[k].name}) runs after a later "
-                  f"block of that qubit", eid)
+            if b < last or (strict and b == last):
+                v("program", f"qubit {q}: operation {k} ({prog.ops[k].name}) runs after "
+                  + ("an operation that follows it in the input circuit" if strict else
+                     "a later block of that qubit"), eid)
                 break
             last = b
 
@@ -754,16 +770,23 @@ _DIAGONAL_2Q = frozenset({"zz", "cz", "rzz"})
 class Program:
     """A circuit as the scheduler and `simd_rules` see it.
 
-    ``order`` is the core checker's circuit order for its two-qubit pairs; `block_index`
-    is the exact rule: per qubit, a maximal run of CX gates in which the qubit keeps its
-    role (or of diagonal gates) is one block whose gates commute; a one-qubit gate is a
-    block of its own.
+    ``order`` is how a schedule of it is JUDGED: the core checker's circuit order for its
+    two-qubit pairs, and `block_index` for every operation.  "strict" (every benchmark
+    circuit, i.e. everything our compiler schedules): each qubit runs exactly its input
+    sequence of operations.  "commuting": per qubit, a maximal run of CX gates in which the
+    qubit keeps its role (or of diagonal gates) is one block whose gates may run in any
+    order, and a one-qubit gate is a block of its own -- the rule the paper's own worked
+    examples are judged by, because Fig. 7's time-sliced schedule reorders such a run.
+
+    Our schedulers never use that freedom, whatever ``order`` says: they read
+    ``block_index(strict=True)``.  The order of the input circuit is its author's, and a
+    compiler may not change it, even where two gates commute.
     """
 
     name: str
     n: int
     ops: list[Op]
-    order: str = "commuting"
+    order: str = "strict"
     names: list[str] | None = None
     meta: dict = field(default_factory=dict)
 
@@ -792,8 +815,14 @@ class Program:
             return "c" if q == op.qubits[0] else "t"
         return None
 
-    def block_index(self) -> list[dict[int, int]]:
-        cached = self.meta.get("_bidx")
+    def block_index(self, strict: bool | None = None) -> list[dict[int, int]]:
+        """Per operation, per qubit: which block of that qubit's sequence it is in.  Blocks
+        run in order; the operations of one block may run in any order among themselves.
+        ``strict`` (default: ``order == "strict"``) makes every operation a block of its
+        own, so the blocks ARE the input sequence."""
+        strict = self.order == "strict" if strict is None else strict
+        key = "_bidx_strict" if strict else "_bidx_commuting"
+        cached = self.meta.get(key)
         if cached is not None and len(cached) == len(self.ops):
             return cached
         cur: dict[int, int] = {}
@@ -805,12 +834,12 @@ class Program:
                 r = self._role(op, q)
                 if q not in cur:
                     cur[q] = 0
-                elif r is None or last[q] is None or r != last[q]:
+                elif strict or r is None or last[q] is None or r != last[q]:
                     cur[q] += 1
                 last[q] = r
                 d[q] = cur[q]
             out.append(d)
-        self.meta["_bidx"] = out
+        self.meta[key] = out
         return out
 
     def describe(self) -> dict:
@@ -820,13 +849,16 @@ class Program:
 
 
 def w1_program() -> Program:
-    """Fig. 6(a1): CX(Q2,Q3), CX(Q1,Q3), CX(Q4,Q5)."""
+    """Fig. 6(a1): CX(Q2,Q3), CX(Q1,Q3), CX(Q4,Q5).  Judged "commuting", the paper's rule:
+    this program is the PAPER's, and so are the schedules replayed against it."""
     return Program("fig6", 5, [Op("cx", (1, 2)), Op("cx", (0, 2)), Op("cx", (3, 4))],
                    "commuting", names=["Q1", "Q2", "Q3", "Q4", "Q5"])
 
 
 def w2_program() -> Program:
-    """Fig. 7(a1): CX(Q3,Q1), H(Q4), CX(Q3,Q4), CX(Q3,Q5)."""
+    """Fig. 7(a1): CX(Q3,Q1), H(Q4), CX(Q3,Q4), CX(Q3,Q5).  Judged "commuting", the paper's
+    rule: its time-sliced schedule (Fig. 7(c1)) runs CX(Q3,Q4) before CX(Q3,Q1), which the
+    paper calls "actually commutable"; in strict order that schedule is refused."""
     return Program("fig7", 5, [Op("cx", (2, 0)), Op("h", (3,)), Op("cx", (2, 3)), Op("cx", (2, 4))],
                    "commuting", names=["Q1", "Q2", "Q3", "Q4", "Q5"])
 
@@ -839,23 +871,26 @@ def vqe(n: int) -> Program:
     ops = [Op("ry", (q,)) for q in range(n)]
     ops += [Op("cx", (i, j)) for i in range(n) for j in range(i + 1, n)]
     ops += [Op("ry", (q,)) for q in range(n)]
-    return Program(f"vqe{n}", n, ops, "commuting",
+    return Program(f"vqe{n}", n, ops, "strict",
                    meta={"source": "rebuilt: RY, full CX entanglement, RY (reps=1)"})
 
 
 def qaoa_complete(n: int) -> Program:
     """QAOA p=1 with a ZZ on EVERY pair: n(n-1)/2 two-qubit gates, the count the paper's
-    Fig. 9 F_2Q points imply (1770 at n=60) although its text says 3-regular graphs."""
+    Fig. 9 F_2Q points imply (1770 at n=60) although its text says 3-regular graphs.  The
+    ZZ gates are listed (0,1), (0,2), ..., (n-2,n-1) and each qubit runs its ZZ gates in
+    that order: they commute, but the order is the circuit's, and ours keeps it."""
     ops = [Op("h", (q,)) for q in range(n)]
     ops += [Op("zz", (i, j)) for i in range(n) for j in range(i + 1, n)]
     ops += [Op("rx", (q,)) for q in range(n)]
-    return Program(f"qaoa{n}_complete", n, ops, "multiset",
+    return Program(f"qaoa{n}_complete", n, ops, "strict",
                    meta={"source": "rebuilt: H, ZZ on all pairs (one native 2Q gate each), RX; p=1"})
 
 
 def qaoa_regular(n: int, seed: int = 0, degree: int = 3) -> Program:
     """QAOA p=1 on a random 3-regular graph, as the text says ("ZZ gates are applied only
-    between graph-connected qubits"); the seed is ours.  3n/2 ZZ gates."""
+    between graph-connected qubits"); the seed is ours.  3n/2 ZZ gates, listed by sorted
+    edge, which is the order each qubit runs them in."""
     import networkx as nx
 
     g = nx.random_regular_graph(degree, n, seed=seed)
@@ -863,7 +898,7 @@ def qaoa_regular(n: int, seed: int = 0, degree: int = 3) -> Program:
     ops = [Op("h", (q,)) for q in range(n)]
     ops += [Op("zz", e) for e in edges]
     ops += [Op("rx", (q,)) for q in range(n)]
-    return Program(f"qaoa{n}_3reg_s{seed}", n, ops, "multiset",
+    return Program(f"qaoa{n}_3reg_s{seed}", n, ops, "strict",
                    meta={"source": f"rebuilt: H, ZZ on a random {degree}-regular graph "
                          f"(networkx seed {seed}), RX; p=1"})
 
@@ -878,7 +913,7 @@ def bv(n: int, seed: int = 0) -> Program:
     ops = [Op("x", (anc,)), Op("h", (anc,))] + [Op("h", (q,)) for q in range(n - 1)]
     ops += [Op("cx", (q, anc)) for q in ones]
     ops += [Op("h", (q,)) for q in range(n - 1)]
-    return Program(f"bv{n}", n, ops, "commuting",
+    return Program(f"bv{n}", n, ops, "strict",
                    meta={"source": f"rebuilt: balanced secret, {len(ones)} ones, seed {seed}",
                          "secret_ones": ones})
 
@@ -919,7 +954,7 @@ def rca(n: int) -> Program:
     for i in range(m - 1, 0, -1):
         uma(a[i - 1], b[i], a[i])
     uma(cin, b[0], a[0])
-    return Program(f"rca{n}", n, ops, "commuting",
+    return Program(f"rca{n}", n, ops, "strict",
                    meta={"source": f"rebuilt: Cuccaro MAJ/UMA, m = {m} bits, 6-CX Toffoli"})
 
 
@@ -927,10 +962,13 @@ def rca(n: int) -> Program:
 #
 # The all-pairs circuits (VQE's full entanglement, QAOA on the complete graph) are odd-even
 # transposition networks on a line: in round r every pair of neighbours (p, p+1) with
-# p = r mod 2 meets -- its gate, then the two ions exchange places.  QAOA (all ZZ commute)
-# needs n rounds; VQE meets a pair only when its lower qubit has received every CX it is the
-# target of, and needs 2n - 3 rounds, its dependency depth.  `LineExecutor` lays that line
-# along a trail of traps and runs the rounds on the TrapSIMD machine.
+# p = r mod 2 may meet -- its gate, then the two ions exchange places.  A pair meets only
+# when its gate is the NEXT operation of both of its qubits in the input circuit, so every
+# qubit runs exactly its input sequence; both VQE and QAOA then need 2n - 3 rounds, the
+# dependency depth of that order.  (QAOA's ZZ gates commute and could all meet in n rounds;
+# we do not use that: the order of the input circuit is its author's, and a compiler may not
+# change it.)  `LineExecutor` lays that line along a trail of traps and runs the rounds on
+# the TrapSIMD machine.
 
 _STEP = {"R": (0, 1), "L": (0, -1), "D": (1, 0), "U": (-1, 0)}
 
@@ -986,13 +1024,13 @@ def trap_trail(dev: Device, m: int, budget: int = 2_000_000) -> list[tuple[str, 
 def all_pairs_rounds(prog: Program, *, partial: bool = False) -> list[list[tuple]]:
     """The odd-even rounds of an all-pairs program on the line q0, q1, ..., q(n-1): a list
     of rounds, each a list of ("2", line position p, operation, True) -- the operation's
-    two ions are at p and p+1 and exchange after it.  "multiset" programs (all two-qubit
-    gates commute) meet every pair of the round's parity; otherwise a pair meets only when
-    its left ion has the lower index and the operation is ready (VQE's activation order).
+    two ions are at p and p+1 and exchange after it.  A pair meets only when its left ion
+    has the lower index and the operation is the next one of both its qubits in the input
+    circuit (`Program.block_index` with ``strict=True``); otherwise it waits where it is.
 
-    ``partial``: a "multiset" program on SOME of the pairs (QAOA on a sparse graph) runs the
-    same network, the pairs it has no gate for only exchanging (("x", p)), until every
-    gate it has has run."""
+    ``partial``: a program on SOME of the pairs (QAOA on a sparse graph) runs the network
+    of the complete program, the pairs it has no gate for only exchanging (("x", p)), until
+    every gate it has has run; each qubit's partners must be listed in increasing index."""
     n = prog.n
     pair_op: dict[tuple[int, int], int] = {}
     for k, o in enumerate(prog.ops):
@@ -1001,12 +1039,9 @@ def all_pairs_rounds(prog: Program, *, partial: bool = False) -> list[list[tuple
             if key in pair_op:
                 raise ValueError("not an all-pairs program: a pair repeats")
             pair_op[key] = k
-    if partial:
-        if prog.order != "multiset":
-            raise ValueError("a partial line network needs commuting two-qubit gates")
-    elif len(pair_op) != n * (n - 1) // 2:
+    if not partial and len(pair_op) != n * (n - 1) // 2:
         raise ValueError("not an all-pairs program")
-    bidx = prog.block_index()
+    bidx = prog.block_index(strict=True)
     blocks: dict[int, list[list[int]]] = defaultdict(list)
     for k, d in enumerate(bidx):
         for q, b in d.items():
@@ -1034,7 +1069,21 @@ def all_pairs_rounds(prog: Program, *, partial: bool = False) -> list[list[tuple
                 (bidx[j][o.qubits[0]] for j in pair_op.values() if o.qubits[0] in prog.ops[j].qubits),
                 default=math.inf):
             finish(k)
-    free = prog.order == "multiset"
+    # A partial program runs the network of the COMPLETE one: every qubit meets the others
+    # in increasing index, the order in which the complete program lists its pairs, and a
+    # pair the program has no gate for only exchanges when its turn comes.  Its gates then
+    # run in its own order exactly when each qubit's partners are listed in increasing
+    # index (QAOA's sorted edges); any other order is refused rather than changed.
+    nxt = None
+    if partial:
+        for q in range(n):
+            mine = sorted((k for k, o in enumerate(prog.ops) if len(o.qubits) == 2 and q in o.qubits),
+                          key=lambda k: bidx[k][q])
+            partners = [sum(prog.ops[k].qubits) - q for k in mine]
+            if partners != sorted(partners):
+                raise ValueError(f"qubit {q} meets its partners out of index order in the program; "
+                                 "the partial line network cannot keep that order")
+        nxt = {q: 0 if q else 1 for q in range(n)}       # each qubit's next partner, in index order
     line = list(range(n))
     rounds: list[list[tuple[int, int]]] = []
     met = 0
@@ -1046,12 +1095,20 @@ def all_pairs_rounds(prog: Program, *, partial: bool = False) -> list[list[tuple
         for p in range(r % 2, n - 1, 2):
             u, v = line[p], line[p + 1]
             k = pair_op.get((min(u, v), max(u, v)))
+            if partial:
+                # the line reverses: a pair takes its turn with its lower qubit on the left,
+                # when each is the other's next partner
+                if u > v or nxt[u] != v or nxt[v] != u or (k is not None and not ready(k)):
+                    continue
+                for a_, b_ in ((u, v), (v, u)):
+                    nxt[a_] = b_ + 1 + (b_ + 1 == a_)
+                cur.append(("x", p) if k is None else ("2", p, k, True))
+                continue
             if k is None:
                 cur.append(("x", p))
                 continue
-            if done[k] or not ready(k) or (not free and u > v):
-                if partial:
-                    cur.append(("x", p))
+            # the network reverses the line, so a pair meets with its lower qubit on the left
+            if done[k] or not ready(k) or u > v:
                 continue
             cur.append(("2", p, k, True))
         for a in cur:
@@ -1457,9 +1514,15 @@ def schedule_line(dev: Device, prog: Program, *, per_trap: int = 4,
     m = -(-prog.n // per_trap)
     trail = trap_trail(dev, m)
     ex = LineExecutor(dev, prog, trail, per_trap=per_trap, tg=tg, rules=rules)
-    bidx = prog.block_index()
+    bidx = prog.block_index(strict=True)
     first2 = {q: min((bidx[k][q] for k, o in enumerate(prog.ops) if len(o.qubits) == 2 and q in o.qubits),
                      default=math.inf) for q in range(prog.n)}
+    last2 = {q: max((bidx[k][q] for k, o in enumerate(prog.ops) if len(o.qubits) == 2 and q in o.qubits),
+                    default=-math.inf) for q in range(prog.n)}
+    for k, o in enumerate(prog.ops):        # the one-qubit phases run before and after the rounds
+        if len(o.qubits) == 1 and first2[o.qubits[0]] < bidx[k][o.qubits[0]] < last2[o.qubits[0]]:
+            raise ValueError(f"operation {k} ({o.name}) sits between two-qubit gates of its qubit: "
+                             "the line network would move it")
     pre: dict[str, list[int]] = defaultdict(list)
     post: dict[str, list[int]] = defaultdict(list)
     for k, o in enumerate(prog.ops):
@@ -1483,12 +1546,14 @@ def lnn_rounds(prog: Program, order: Sequence[int]) -> list[list[tuple]]:
     program order claim line positions first come first served -- a ready one-qubit
     operation runs with the one-qubit operations that follow it on that qubit; a ready
     two-qubit operation runs if its qubits are neighbours, otherwise each of them steps
-    one place toward the other by an exchange.  The earliest ready operation always
-    advances, so the rounds end."""
+    one place toward the other by an exchange.  Ready means next in the input sequence of
+    every qubit it acts on (`Program.block_index` with ``strict=True``), so each qubit runs
+    exactly its input sequence.  The earliest ready operation always advances, so the
+    rounds end."""
     n = prog.n
     line = list(order)
     pos = {q: i for i, q in enumerate(line)}
-    bidx = prog.block_index()
+    bidx = prog.block_index(strict=True)
     blocks: dict[int, list[list[int]]] = defaultdict(list)
     seq: dict[int, list[int]] = defaultdict(list)
     for k, d in enumerate(bidx):
@@ -1604,11 +1669,14 @@ def line_order(prog: Program) -> list[int]:
 def schedule_ours(dev: Device, prog: Program, *, tg: float = TRAPSIMD_US["gate2_effective"],
                   rules: Rules = Rules(), per_trap: Sequence[int] = (3, 4, 5)) -> tuple[TimedSchedule, Report]:
     """OUR schedule of ``prog``: the all-pairs line network when the program is one (VQE,
-    complete-graph QAOA); else the line router on `line_order`, and for commuting gates
-    also the line network that only exchanges the pairs it has no gate for.  Every method
+    complete-graph QAOA); else the line router on `line_order`, and for a program of
+    diagonal two-qubit gates (sparse QAOA) also the line network that only exchanges the
+    pairs it has no gate for.  Every method keeps each qubit's input order.  Every method
     and every line density in ``per_trap`` is tried, each schedule is judged by
-    `check_trapsimd`, and the fastest one that passes every check is returned with its
-    report; ``source["tried"]`` lists them all."""
+    `check_trapsimd` in STRICT program order (whatever ``prog.order`` says), and the
+    fastest one that passes every check is returned with its report; ``source["tried"]``
+    lists them all."""
+    judged = prog if prog.order == "strict" else dataclasses.replace(prog, order="strict")
     builds = []
     try:
         all_pairs_rounds(prog)
@@ -1616,7 +1684,7 @@ def schedule_ours(dev: Device, prog: Program, *, tg: float = TRAPSIMD_US["gate2_
     except ValueError:
         order = line_order(prog)
         builds.append(("router", lambda p: schedule_lnn(dev, prog, order, per_trap=p, tg=tg, rules=rules)))
-        if prog.order == "multiset":
+        if all(o.name in _DIAGONAL_2Q for o in prog.ops if len(o.qubits) == 2):
             builds.append(("line-partial", lambda p: schedule_line(dev, prog, per_trap=p, tg=tg,
                                                                      rules=rules, partial=True)))
     best = None
@@ -1629,7 +1697,7 @@ def schedule_ours(dev: Device, prog: Program, *, tg: float = TRAPSIMD_US["gate2_
         except (RuntimeError, ValueError) as e:
             tried.append({"method": how[0], "per_trap": p, "error": str(e)[:200]})
             continue
-        r = check_trapsimd(s, program=prog, tg=tg, rules=rules)
+        r = check_trapsimd(s, program=judged, tg=tg, rules=rules)
         t = r.metrics["makespan_us"]
         tried.append({"method": how[0], "per_trap": p, "T_exe_us": t, "ok": r.ok})
         if r.ok and (best is None or t < best[0]):
@@ -1737,35 +1805,39 @@ def reproduce(out: str | Path, *, sizes: Sequence[int] = (20, 40, 60, 100), leng
         t0 = time.time()
         s = build()
         rep = check_trapsimd(s, program=prog, tg=tg, rules=rules)
-        f = f"examples/{rid}.schedule.json"
-        s.save(out / f)
+        f = _save_gz(s, out, f"examples/{rid}.schedule.json.gz")
         ms = rep.metrics["makespan_us"]
         bare = check_trapsimd(s, program=prog, tg=TRAPSIMD_US["gate2_table"], rules=rules)
+        strict = check_trapsimd(s, program=dataclasses.replace(prog, order="strict"), tg=tg, rules=rules)
         runs.append(_run_record(rid, f"{where}, as drawn", s, rep, kind="example", file=f,
                                 seconds=time.time() - t0, tg=tg, rules=rules, extra={
+            "circuit_order": prog.order,
             "compare": {"paper": {"T_exe_us": {"ours": ms, "theirs": claim, "rel": abs(ms - claim) / claim,
                                                "verdict": "exact" if ms == claim else "differs",
                                                "where": where, "printed": True}}},
-            "with_table1_25us_gate": {"ok": bare.ok, "duration_mismatches": bare.metrics["duration_mismatches"]}}))
+            "with_table1_25us_gate": {"ok": bare.ok, "duration_mismatches": bare.metrics["duration_mismatches"]},
+            # the paper's rule lets a run of commuting CX gates reorder; for information,
+            # whether the drawn schedule also keeps each qubit's exact input order
+            "in_strict_order": {"ok": strict.ok, "program": strict.checks.get("program"),
+                                "circuit": strict.checks.get("circuit")}}))
         log(f"{rid}: {ms:g} us (paper {claim}), ok={rep.ok}")
 
     # -- model level: Table 3's grid
     def ours(bench: str, n: int, L: int, *, prog: Program | None = None, rid: str | None = None,
              label: str | None = None, tg_: float = tg, rules_: Rules = rules, gz=None,
-             strict: bool = False, kind: str = "ours") -> dict | None:
+             kind: str = "ours") -> dict | None:
         prog = prog or _BENCH[bench](n)
         dev = grid_device(TABLE2_D[n], L, gz=gz)
         rid = rid or f"{bench.lower()}{n}_L{L}"
         t0 = time.time()
         try:
+            # judged in strict program order: each qubit runs exactly its input sequence
             s, rep = schedule_ours(dev, prog, tg=tg_, rules=rules_)
         except RuntimeError as e:
             log(f"{rid}: FAILED {e}")
             runs.append({"id": rid, "label": label or rid, "kind": kind, "ok": False, "error": str(e)[:400]})
             return None
-        if strict:
-            rep = check_trapsimd(s, program=dataclasses.replace(prog, order="strict"), tg=tg_, rules=rules_)
-        f = f"ours/{rid}.schedule.json"
+        f = f"ours/{rid}.schedule.json.gz"
         s.claims = {}
         paper = TABLE3.get((L, bench, n))
         ms = rep.metrics["makespan_us"]
@@ -1780,10 +1852,11 @@ def reproduce(out: str | Path, *, sizes: Sequence[int] = (20, 40, 60, 100), leng
                       "where": "Table 3, 'Our Fidelity'", "printed": True,
                       "note": "ours: Table 1 fidelities, transport counted per ion moved, a swap once"}}}
             s.claims = {"paper_T_exe_us": paper[1], "where": "Table 3"}
-        s.save(out / f)
+        _save_gz(s, out, f)
         rec = _run_record(rid, label or f"{bench}-{n} on A-{n} ({TABLE2_D[n]}x{TABLE2_D[n]} grid, "
                           f"{len(dev.traps)} traps, L={L}, 2 gate zones), ours", s, rep, kind=kind, file=f,
                           seconds=time.time() - t0, tg=tg_, rules=rules_, extra={
+            "circuit_order": "strict",
             "benchmark": bench, "n": n, "L": L, "level": "model",
             "device": {"name": dev.name, **{k: v for k, v in dev.params.items() if k != "centers"},
                        "traps": len(dev.traps), "positions": dev.n_positions},
@@ -1814,14 +1887,37 @@ def reproduce(out: str | Path, *, sizes: Sequence[int] = (20, 40, 60, 100), leng
                  label=f"{bench}-60, L=8, swaps allowed outside gate zones")
             ours(bench, 60, 8, rid=f"{b}60_L8_gzedge", kind="sensitivity", gz=(1, 6),
                  label=f"{bench}-60, L=8, gate zones next to the trap ends (1, 6)")
-        ours("VQE", 60, 8, rid="vqe60_L8_strict", kind="sensitivity", strict=True,
-             label="VQE-60, L=8, judged in strict program order (no CX commutation)")
     result = {"paper": PAPER_META, "model": {
         "timing_us": TRAPSIMD_US, "fidelity": TRAPSIMD_F, "rules": dataclasses.asdict(rules),
         "profile": TRAPSIMD.to_json(), "effective_2q_us": tg,
+        "ours_circuit_order": "strict",
         "doc": "MODEL.md"}, "runs": runs}
     (out / "results.json").write_text(json.dumps(result, indent=1, default=str), encoding="utf-8")
+    # the folder holds exactly the schedules results.json names (a run dropped from the
+    # list must not leave its old file behind)
+    named = {r["file"] for r in runs if r.get("file")}
+    for sub in ("examples", "ours"):
+        for f in (out / sub).glob("*.schedule.json*"):
+            if f"{sub}/{f.name}" not in named:
+                f.unlink()
     return result
+
+
+def _save_gz(sched: TimedSchedule, out: Path, rel: str) -> str:
+    """Save ``sched`` gzipped at ``out / rel`` (no timestamp in the header, so the bytes
+    depend only on the schedule); an existing file with the same content is left alone."""
+    import gzip
+
+    data = json.dumps(sched.to_json(), separators=(",", ":")).encode("utf-8")
+    path = out / rel
+    if path.exists():
+        try:
+            if gzip.decompress(path.read_bytes()) == data:
+                return rel
+        except OSError:
+            pass
+    path.write_bytes(gzip.compress(data, mtime=0))
+    return rel
 
 
 if __name__ == "__main__":

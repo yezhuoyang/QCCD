@@ -410,9 +410,11 @@ def test_the_t_gadget_correction_table_is_right():
     The per-branch sign-off shows the hardware runs exactly the conditional *Clifford*
     program the algorithm states; that the program is the right one for a T gate is a
     statement about a non-Clifford state, so it is checked here on the two-qubit logical
-    circuit: |+> and the magic state in, a ZZ measurement, an X readout of the magic block,
+    circuit: |+> and the magic block in, a ZZ measurement, an X readout of the magic block,
     then S if the ZZ outcome was 1 and Z if the X outcome was 1.  Every branch must leave
-    T|+> on the data block."""
+    T|+> on the data block.  The magic block holds what the factory is verified to make,
+    T†|+>, and the program's own X̄ on it -- which an earlier version of this test assumed
+    away by starting from T|+>, so the gadget it checked was not the one that ran."""
     import cmath
     import math
 
@@ -421,9 +423,11 @@ def test_the_t_gadget_correction_table_is_right():
     target = (r2, r2 * t)                       # T|+>
     for m in (0, 1):
         for k in (0, 1):
-            # |+> (data, index 0) x |T> (magic, index 1), as amplitudes a[data][magic]
-            a = {(d, g): (r2 if d == 0 else r2) * (r2 if g == 0 else r2 * t)
-                 for d in (0, 1) for g in (0, 1)}
+            # |+> (data, index 0) x the magic block (index 1): the factory's T†|+>, then the
+            # program's X̄ on it, as amplitudes a[data][magic]
+            magic = (r2, r2 * t.conjugate())                    # T†|+>
+            magic = (magic[1], magic[0])                        # X̄
+            a = {(d, g): r2 * magic[g] for d in (0, 1) for g in (0, 1)}
             a = {key: v for key, v in a.items() if ((key[0] ^ key[1]) == m)}   # ZZ = (-1)^m
             # read the magic block in X: project on (|0> + (-1)^k |1>)/sqrt(2)
             out = [0j, 0j]

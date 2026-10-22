@@ -1569,9 +1569,9 @@ def _rule_hand_cases() -> list[dict]:
 
     out = []
 
-    def case(name, mutate, build):
-        m = Machine.ring(width=12, height=2, verticals=2, name="mini_ring",
-                         template=DEFAULT_TEMPLATE)
+    def case(name, mutate, build, seed=None):
+        m = seed() if seed else Machine.ring(width=12, height=2, verticals=2,
+                                             name="mini_ring", template=DEFAULT_TEMPLATE)
         calls = _calls_of(m.arch) + list(mutate)
         arch = _replay(calls).arch
         mm = Machine(arch)
@@ -1668,6 +1668,60 @@ def _rule_hand_cases() -> list[dict]:
     # and a mirror that ignored the control model would report a violation nobody made.
     case("r22-direct-control-opts-out",
          [{"method": "set_control", "args": [], "kwargs": {"model": "direct"}}], r22_farther)
+
+    # R22's LAB-FRAME LABEL off the axes, and its SPUR TEST, on a drawn device: five slanted
+    # rails, and a closed loop with two chords across it and two docks.  `direction_label`
+    # and `rails_to_loop` are new code on both sides, and a generated device exercises
+    # neither -- every shipped one is axis-aligned and has no chord -- so these are the only
+    # cases that can tell the two mirrors' angle arithmetic and spur test apart.
+    #
+    #   * 30 against 60 degrees (issue #19): `+x+y` on both under the old label;
+    #   * 330 against 300: the angle normalised into [0, 360), not atan2's (-180, 180];
+    #   * two 60-degree rails stored 1e-6 apart in angle: ONE waveform, so no violation;
+    #   * two ions leaving two chords in opposite directions (issue #18): both read
+    #     `spur:outward` while a chord was taken for a spur;
+    #   * a dock above the rail and a two-trap spur below it: still one waveform.
+    def slanted():
+        from qccd.arch.builder import DeviceBuilder
+
+        b = DeviceBuilder("explicit")
+        for k, (sid, dx, dy) in enumerate((("R30", 1.732051, 1.0), ("R60", 1.0, 1.732051),
+                                           ("R60b", 0.5, 0.866025), ("R330", 1.732051, -1.0),
+                                           ("R300", 1.0, -1.732051))):
+            b.site(sid + "o", 5.0 * k, 0.0, zone="trap")
+            b.site(sid + "e", 5.0 * k + dx, dy, zone="trap")
+            b.segment(sid, sid + "o", sid + "e")
+        ring = [("C1", 0, 10), ("J1", 0, 11), ("J3", 0, 13), ("C2", 0, 14), ("M", 2, 14),
+                ("C3", 4, 14), ("J4", 4, 13), ("J2", 4, 11), ("C4", 4, 10), ("B", 2, 10)]
+        for nid, x, y in ring + [("T1", 2, 11), ("T3", 2, 13), ("D", 2, 15), ("E", 2, 9),
+                                 ("E2", 2, 8)]:
+            b.site(nid, float(x), float(y), zone="trap")
+        for i, (nid, _, _) in enumerate(ring):
+            b.segment(f"L{i}", nid, ring[(i + 1) % len(ring)][0], loop="L0")
+        b.loop("L0", [nid for nid, _, _ in ring], closed=True)
+        for sid, u, v in (("c1a", "J1", "T1"), ("c1b", "T1", "J2"), ("c3a", "J3", "T3"),
+                          ("c3b", "T3", "J4"), ("dk", "M", "D"), ("sp", "B", "E"),
+                          ("sp2", "E", "E2")):
+            b.segment(sid, u, v)
+        return Machine.from_device(b.build(), name="slanted", template=DEFAULT_TEMPLATE)
+
+    def one_cycle(*moves):
+        def build(p):
+            p.init({ion: src for ion, src, _, _ in moves})
+            p.simd("shuttle", [list(mv) for mv in moves])
+        return build
+
+    case("r22-hops-at-30-and-60-degrees", [],
+         one_cycle(("a", "R30o", "R30e", ["R30"]), ("b", "R60o", "R60e", ["R60"])), slanted)
+    case("r22-hops-at-330-and-300-degrees", [],
+         one_cycle(("a", "R330o", "R330e", ["R330"]), ("b", "R300o", "R300e", ["R300"])),
+         slanted)
+    case("r22-parallel-slanted-hops-share-a-waveform", [],
+         one_cycle(("a", "R60o", "R60e", ["R60"]), ("b", "R60bo", "R60be", ["R60b"])), slanted)
+    case("r22-opposite-moves-off-two-chords", [],
+         one_cycle(("a", "T1", "J2", ["c1b"]), ("b", "T3", "J3", ["c3a"])), slanted)
+    case("r22-docks-above-and-below-the-rail", [],
+         one_cycle(("a", "M", "D", ["dk"]), ("b", "B", "E", ["sp"])), slanted)
 
     # R19/R20/R21: THE DRAWING.  A shipped architecture is clean geometry by construction,
     # so these break it the two ways a user can: retune the limits the document declares,
@@ -2057,7 +2111,7 @@ def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
     cases["build"] = _build_cases(rng)
     cases["build_vocabulary"] = {"build": sorted(BUILD_METHODS),
                                  "seed": sorted(SEED_METHODS)}
-    # the verdicts: 21 of the 27 rules, re-derived client-side off the pricing walk
+    # the verdicts: 21 of the 28 rules, re-derived client-side off the pricing walk
     cases["rules"] = _rule_cases()
     cases["browser_set"] = list(BROWSER_SET)
     # the programme lane: the twelve authoring verbs, lowered to frames and to TSIR
@@ -2677,9 +2731,9 @@ _RULE_MUTATIONS_JS = [
     ("    if (d > maxDeg) {",
      "    if (d > maxDeg + 1) {",
      "R19's degree comparison -- a mirror one rail more permissive than Python"),
-    ("        if (ang < minAng - 1e-9) {",
+    ("        if (ang < minAng - 1e-3) {",
      "        if (ang < minAng - 1.0) {",
-     "R20's angle tolerance, 1e-9 for a whole degree"),
+     "R20's angle tolerance, R20_TOL_DEG's thousandth of a degree for a whole degree"),
     ("  if (Math.abs(cross) > RAIL_EPS * Math.sqrt(l2)) return false;",
      "  if (Math.abs(cross) > 0.5 * Math.sqrt(l2)) return false;",
      "R21's coincidence tolerance -- 1e-6 of a lattice unit for half of one, which turns "
@@ -2694,6 +2748,18 @@ _RULE_MUTATIONS_JS = [
     ("    return own(on, m.src) ? 'spur:inward' : 'spur:outward';",
      "    return 'spur:inward';",
      "R22's spur direction, docking and undocking given the same label"),
+    ("      _loopRails(w)[own(on, m.src) ? m.dst : m.src] === 1) {",
+     "      true) {",
+     "R22's spur test without the dead end: a chord between two loop nodes taken for a "
+     "spur, so two ions leaving two chords in opposite directions share `spur:outward` "
+     "(issue #18)"),
+    ("  return sx + sy + '@' + r;",
+     "  return sx + sy;",
+     "R22's direction label without its angle: the sign-only label under which hops at 30 "
+     "and 60 degrees shared a waveform (issue #19)"),
+    ("  if (deg < 0.0) deg += 360.0;",
+     "",
+     "the direction angle's range, [0, 360) and not atan2's (-180, 180]"),
     ("  if (w.type !== 'simd' || !w.nmv || w.directControl) return [];",
      "  if (w.type !== 'simd' || !w.nmv) return [];",
      "R22's control-model gate: a directly-addressed plane is not broadcast and R22 does "

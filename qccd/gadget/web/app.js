@@ -97,6 +97,12 @@
       }
       case "vault":
         return `M${f(x)} ${f(y)}H${f(x + w)}V${f(y + h)}H${f(x)}Z`;
+      case "ward": {
+        // a block with a raised centre: the memory, where a resting block is cared for
+        const q = Math.min(h * 0.22, w * 0.12);
+        return `M${f(x)} ${f(y + q)}H${f(x + w * 0.36)}V${f(y)}H${f(x + w * 0.64)}V${f(y + q)}` +
+               `H${f(x + w)}V${f(y + h)}H${f(x)}Z`;
+      }
       case "chip": {
         // a package with pins down both sides: the decoder
         const n = Math.max(2, Math.min(6, Math.floor(h / Math.max(1e-6, m * 0.3))));
@@ -131,6 +137,10 @@
     if (shape === "vault") {          // the second line a vault has: its inner wall
       const i = Math.min(w, h) * 0.09;
       return `M${f(x + i)} ${f(y + i)}H${f(x + w - i)}V${f(y + h - i)}H${f(x + i)}Z`;
+    }
+    if (shape === "ward") {           // a cross in the raised centre
+      const cx = x + w / 2, cy = y + Math.min(h * 0.22, w * 0.12) + h * 0.2, a = Math.min(w, h) * 0.1;
+      return `M${f(cx - a)} ${f(cy)}H${f(cx + a)}M${f(cx)} ${f(cy - a)}V${f(cy + a)}`;
     }
     if (shape === "drum") {           // the rows of cells inside
       let d = "";
@@ -427,6 +437,9 @@
   const CLASSICAL = new Set(["decoder", "archive"]);
   const putAway = (cm) => !S.showClassical && CLASSICAL.has(cm.family);
   const sims = {};
+  // before the leaves arrive: a page with its leaves inline (a tutorial figure) hands them
+  // over right here, not after the page has loaded
+  const portCache = new Map();
   window.__gadgetLeaf = function (d) {
     M.leafData[d.master] = d;
     sims[d.master] = new LeafSim(d);
@@ -443,7 +456,6 @@
 
   // ------------------------------------------------------------------ geometry
 
-  const portCache = new Map();
   // Where port `port` of master `mname` sits in the master's own frame.
   function portXY(mname, port) {
     const key = mname + "|" + port;
@@ -1532,11 +1544,39 @@
     }
   }
 
+  // The compositional sign-off (docs/ARCHITECTURE.md §1, §6): for a program the flat
+  // check cannot enumerate, five parts, each a check that ran.
+  function compositionalHtml(c) {
+    const parts = c.parts || {};
+    let h = `<div class="so ${c.passed ? "pass" : "fail"}">${c.passed ? "✓ signed off in parts: every part checked and held" : "✗ a part of the sign-off did not hold"}</div>`;
+    const row = (ok, text) => `<div class="sol ${ok ? "pass" : "fail"}">${ok ? "✓" : "✗"} ${text}</div>`;
+    if (parts.places) h += row(parts.places.passed, "every op the schedule runs is a verified place op (G9)");
+    if (parts.gadgets && parts.gadgets.rows.length)
+      h += row(parts.gadgets.passed, "the π/4 gadgets are their rotations in every branch: " +
+        parts.gadgets.rows.map((g) => `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} (${escapeHtml(g.correction || "")})`).join("; "));
+    if (parts.gates && parts.gates.rows.length)
+      h += row(parts.gates.passed, "every gate called is its contract in every branch: " +
+        parts.gates.rows.map((g) => `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} ` +
+          `(${(g.branches || []).length} branch${(g.branches || []).length === 1 ? "" : "es"}, ${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`).join("; "));
+    if (parts.composition) h += row(parts.composition.passed, `the floorplan and the schedule obey every machine rule (${(parts.composition.held || []).length} hold)`);
+    if (parts.semantics) {
+      const d = parts.semantics.distribution || [];
+      h += row(parts.semantics.passed, `the program, every call as its contract, gives: ` +
+        d.map((x) => `${Object.entries(x.outcomes).map(([k, v]) => `${escapeHtml(k)}=${v}`).join(" ")} with probability ${(+x.p).toFixed(3)}`).join("; "));
+    }
+    return h;
+  }
+
   function renderSignoff() {
     const box = $("verif");
     const r = D.signoff;
     if (!box) return;
     if (!r) { box.style.display = "none"; return; }
+    if (r.passed == null && r.skipped && D.compositional) {
+      $("verifBody").innerHTML = compositionalHtml(D.compositional) +
+        `<div class="note">the flat sign-off does not apply: ${escapeHtml(r.skipped)}</div>`;
+      return;
+    }
     let h = `<div class="so ${r.passed ? "pass" : "fail"}">${r.passed ? "✓ the schedule computes the algorithm" : "✗ the schedule does not match the algorithm"}</div>`;
     h += `<div class="note">flattened: ${r.circuit.qubits} ions, ${Object.entries(r.circuit.ops).map(([k, v]) => `${v} ${k}`).join(" · ")}; one symbolic run</div>`;
     for (const x of r.relations || []) h += `<div class="sol ${x.ok ? "pass" : "fail"}">${x.ok ? "✓" : "✗"} ${escapeHtml(x.relation)}${x.why ? `<br><span class="muted">${escapeHtml(x.why)}</span>` : ""}</div>`;
@@ -1561,7 +1601,78 @@
     $("verifBody").innerHTML = h;
   }
 
+  // The machine's rules, as the rule language decided them: F1-F9 on the floorplan, G1-G14
+  // on the schedule.  A rule opens to its own assertion, word for word, and what it found.
+  function renderMachineRules(mr) {
+    const el = $("checksBody");
+    el.textContent = "";
+    const groups = [["F", "the floorplan"], ["G", "the schedule"]];
+    for (const [pre, title] of groups) {
+      const rows = (mr.rules || []).filter((r) => r.id.startsWith(pre));
+      if (!rows.length) continue;
+      const g = document.createElement("div");
+      g.className = "ck";
+      g.innerHTML = `<span class="grp">${title}</span>`;
+      el.appendChild(g);
+      for (const r of rows) {
+        const div = document.createElement("div");
+        div.className = "ck";
+        const state = r.verdict === "holds" ? "pass" : r.verdict === "fails" ? "fail" : "skip";
+        let more = "";
+        if (r.about) more += `<div>${escapeHtml(r.about)}</div>`;
+        if (r.text) more += `<pre>${escapeHtml(r.text)}</pre>`;
+        if (r.verdict === "fails") more += `<div style="color:var(--bad)">${r.count || 0} counterexample(s): ${escapeHtml((r.examples || []).slice(0, 4).join("; "))}</div>`;
+        else if (r.reason) more += `<div class="muted">${escapeHtml(r.verdict)}: ${escapeHtml(r.reason)}</div>`;
+        div.innerHTML = `<b class="${state}">${r.id}</b><span>${escapeHtml(r.title)}</span><div class="t">${more}</div>`;
+        if (state === "fail") div.classList.add("open");
+        div.onclick = () => div.classList.toggle("open");
+        el.appendChild(div);
+      }
+    }
+    const nf = (mr.failed || []).length;
+    // a rule that does not apply (F9 on a floorplan without regions) is not one that failed
+    const na = Object.keys(mr.not_applicable || {}).length;
+    $("checksCount").textContent = `${(mr.passed || []).length} of ${(mr.rules || []).length - na} hold` +
+      (na ? ` · ${na} does not apply` : "");
+    const b = $("checksBadge");
+    b.textContent = nf ? `${nf} rule${nf === 1 ? "" : "s"} failed` : "F1–F9 · G1–G14 ✓";
+    b.className = nf ? "bad" : "ok";
+    b.title = "the machine's rules: the floorplan's (F) and the schedule's (G), each an assertion in the rule language";
+  }
+
+  function renderTraffic() {
+    const t = D.traffic;
+    if (!t) return;
+    $("traffic").hidden = false;
+    const fmt = (v) => typeof v === "number" ? v.toLocaleString() : escapeHtml(String(v));
+    const rows = [
+      ["ion-sites shuttled", fmt(t.ion_sites)],
+      ["bundles carried", fmt(t.carries)],
+      ["junction passes", fmt(t.junction_passes)],
+      ["time bundles waited", `${(t.wait_us / 1000).toFixed(1)} ms`],
+      ["longest wait on a road", `${(t.longest_wait_us / 1000).toFixed(1)} ms`],
+      ["busiest road", `${escapeHtml(t.busiest_road || "-")} (${(100 * t.busiest_road_share).toFixed(0)}%)`],
+      ["places at work at once", `${t.peak_parallel_ops} at most, ${(+t.mean_parallel_ops).toFixed(2)} on average`],
+    ];
+    $("trafficBody").innerHTML = rows.map(([k, v]) => `<span class="k">${k}</span><span class="n">${v}</span>`).join("");
+  }
+
+  function setupFloorplan() {
+    if (!D.floorplan) return;
+    const b = $("bFloor");
+    b.hidden = false;
+    $("fvText").textContent = D.floorplan;
+    const m = /^floorplan\s+(\w+)/m.exec(D.floorplan);
+    $("fvTitle").textContent = `Floorplan ${m ? m[1] : ""}`;
+    const save = $("fvSave");
+    save.href = URL.createObjectURL(new Blob([D.floorplan], { type: "text/plain" }));
+    save.download = `${m ? m[1] : "floorplan"}.floor`;
+    b.onclick = () => $("floorView").classList.toggle("open");
+    $("fvClose").onclick = () => $("floorView").classList.remove("open");
+  }
+
   function renderChecks() {
+    if (D.machineRules && (D.machineRules.rules || []).length) { renderMachineRules(D.machineRules); return; }
     const ck = D.checks || {};
     const el = $("checksBody");
     el.textContent = "";
@@ -2051,6 +2162,33 @@
     const h = new URLSearchParams(location.hash.slice(1));
     if (h.has("t")) S.t = +h.get("t") || 0;
     if (h.has("p") && h.get("p") in M.nodes) S.path = h.get("p");
+    return { focus: h.get("f") || D.focus || null, t: h.has("t") ? S.t : null };
+  }
+
+  // WHAT A PAGE THAT EMBEDS THIS ONE POINTS AT (the tutorial's figures).  A place on the
+  // floorplan by its path ("row1.msf15_0") or by its kind ("msf15": the first one), or an
+  // instruction of the program by its number ("i5") or its line ("L13"), which also moves the
+  // clock to where it starts.  False when the page has no such thing.
+  function focusOn(id) {
+    id = String(id == null ? "" : id);
+    const ins = M.gir.program.instructions || [];
+    let k = /^i\d+$/.test(id) ? +id.slice(1)
+      : /^L\d+$/.test(id) ? (ins.find((x) => x.line === +id.slice(1)) || { id: -1 }).id : null;
+    if (k !== null) {
+      const sp = M.insSpan[k];
+      if (!sp) return false;
+      const dec = DECODE_OF[k];
+      seek(dec ? dec.show : sp[0]);
+      focusInstruction(k);
+      return true;
+    }
+    let path = id in M.nodes ? id : null;
+    if (path === null) for (const p in M.nodes) if (p && M.nodes[p].master === id) { path = p; break; }
+    if (path === null) return false;
+    if (path === "") { go(""); return true; }
+    go(M.node(path).parent || "");
+    select({ kind: "inst", path });
+    return true;
   }
 
   // ------------------------------------------------------------------ input
@@ -2348,7 +2486,7 @@
 
   // ------------------------------------------------------------------ boot
 
-  readHash();
+  const ASKED = readHash();
   $("designTitle").textContent = `${M.gir.program.title || M.masters[M.top].title} · ${M.gir.stats ? M.gir.stats.ions.toLocaleString() + " ions" : ""}`;
   document.title = `${M.gir.program.title || M.gir.program.name} — QCCD gadgets`;
   $("rate").value = String(S.rate);
@@ -2358,10 +2496,14 @@
   for (const p of M.ancestors(S.path)) treeOpen.add(p);
   renderChecks();
   renderSignoff();
+  renderTraffic();
+  setupFloorplan();
   renderProgram();
   legend();
   go(S.path);
   fit();
+  if (ASKED.focus) focusOn(ASKED.focus);
+  if (ASKED.t !== null) seek(ASKED.t);
   requestAnimationFrame(frame);
 
   // the handle a headless test drives
@@ -2373,4 +2515,11 @@
     redraw: () => { S.dirty = true; },
     ready: () => Object.keys(D.leafFiles || {}).every((m) => M.leafData[m]) };
   if (window.GADGET_EDITOR) window.GADGET_EDITOR.attach(window.GADGETS);
+  // the handle a page that embeds this one drives: `ready()` once every leaf is drawn,
+  // `focus(id)` as `#f=`, `seek(us)` as `#t=`
+  window.GADGET = {
+    ready: window.GADGETS.ready,
+    focus: (id) => focusOn(id),
+    seek: (us) => { seek(+us || 0); writeHash(); return S.t; },
+  };
 })();

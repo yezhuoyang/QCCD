@@ -680,8 +680,12 @@ class Architecture:
         potential -- nothing splits (PLAN §0.8; H2 drives 20 wells per side from three
         broadcast signals).  A dock lifts one ion out of the rail's potential and inserts
         it into a separate trap, so it costs a split at the source and a merge at the
-        destination, each way.  That difference is a property of the movement class, not
-        of occupancy, so the architecture declares it.
+        destination, each way.  That difference is a property of the motion, so the
+        architecture declares it -- but the declaration is a floor, not the whole price:
+        the replay also charges a dock it can SEE (a hop across a spur, whatever the class
+        is called) and a split or merge the chains force (an ion leaving ions behind, or
+        joining others), so deleting this list buys nothing (#16, #17;
+        `qccd.verify.replay.move_entails`).
         """
         try:
             return tuple(self.simd_class(cls_id).get("entails", ()) or ())

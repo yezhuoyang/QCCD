@@ -1,0 +1,3 @@
+ccx: 3 qubits, 3 clbits, 1 ops (0 two-qubit), 0 edges, 1 non-Clifford ops
+  native: 33 beams, 6 MS gates, 9 virtual-Z frame updates (free)
+  physical pulses: 39

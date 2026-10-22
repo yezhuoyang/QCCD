@@ -153,9 +153,20 @@ def test_a_device_that_declares_no_channels_is_not_judged():
         c.move("b", "S5", "S4")
     out = m.run(p, check_metrics=False)
     # R11 still catches it -- shuttling is unidirectional per path -- but the
-    # DRIVABILITY check stays silent, because this device has not said how it is wired
+    # DRIVABILITY check stays silent, because this device has not said how it is wired.
+    # That check is R4d, and it reports under "R4" with a message naming the channel
+    # ("channel 'linear_h.all.0' drives 16 sites with one waveform, ..."): the declared
+    # ring with the same cycle gets 32 of them.  The test used to look for "one waveform"
+    # anywhere, which was R4d's fingerprint until R22 arrived.
     assert "R11" in out.rules_failed
-    assert not any("one waveform" in str(v) for v in out.violations)
+    drivability = [str(v) for v in out.violations if v.rule == "R4"]
+    assert not drivability, drivability
+    # R22 DOES judge this cycle, and that is not a verdict on the wiring: it asks whether
+    # one cycle is one waveform under the control MODEL (skipped only for
+    # `control.model == "direct"`), and this device still declares broadcast SIMD
+    # classes -- it is silent only about WHICH sites share a channel.
+    assert "R22" in out.rules_failed
+    assert m.arch.control.get("model", "simd_classes") != "direct"
 
 
 def test_row_wiring_lets_lines_differ_but_not_sites_within_a_line():
@@ -173,6 +184,178 @@ def test_row_wiring_lets_lines_differ_but_not_sites_within_a_line():
     ok, why = plane.drivable({"T0": "right", "T1": "left"})
     assert not ok, "two traps on one rail may not"
     assert "different things" in why[0]
+
+
+# ------------------------------------------------- R22: what one waveform is, hop by hop
+#
+# Two ways the hop label used to be coarser than the motion, both found by the hillclimb
+# agents (issues #18 and #19).  A label that is too coarse lets R22 put two different
+# motions on one broadcast waveform, and the router, which labels exactly as R22 does,
+# then compiles them into one cycle.
+
+
+def _cycle_r22(m, moves):
+    """The R22 violations of one broadcast cycle: `moves` are `(ion, src, dst, via)`."""
+    p = m.program("one_cycle").init({ion: src for ion, src, _, _ in moves})
+    p.simd("shuttle", [list(mv) for mv in moves])
+    return [v for v in m.run(p, check_metrics=False).violations if v.rule == "R22"]
+
+
+def _fan():
+    """Three separate rails leaving three sites: one at 30 degrees and two at 60.  The
+    60-degree rails are stored the way a generator stores them, rounded to 6 places, so
+    their angles are 60.000005 and 59.999997 degrees and not 60."""
+    from qccd.arch.builder import DeviceBuilder
+
+    b = DeviceBuilder("explicit")
+    for sid, (x, y), (dx, dy) in (("R30", (0.0, 0.0), (1.732051, 1.0)),
+                                  ("R60", (5.0, 0.0), (1.0, 1.732051)),
+                                  ("R60b", (10.0, 0.0), (0.5, 0.866025))):
+        b.site(sid + ".o", x, y, zone="trap")
+        b.site(sid + ".e", x + dx, y + dy, zone="trap")
+        b.segment(sid, sid + ".o", sid + ".e")
+    return Machine.from_device(b.build(), name="fan")
+
+
+def test_a_hop_off_the_axes_is_labelled_by_its_angle():
+    """`+x+y` was every hop up and to the right.  The sign prefix stays, so an axis-aligned
+    label is what it always was; the angle is whole degrees in [0, 360)."""
+    from qccd.verify.rules import direction_label
+
+    assert direction_label(1.0, 0.0) == "+x" and direction_label(0.0, -2.5) == "-y"
+    assert direction_label(0.0, 0.0) == "0"
+    assert direction_label(1.732051, 1.0) == "+x+y@30"
+    assert direction_label(1.0, 1.732051) == direction_label(0.5, 0.866025) == "+x+y@60"
+    assert direction_label(1.0, 1.0) == "+x+y@45"
+    assert direction_label(-1.0, -1.732051) == "-x-y@240"
+    assert direction_label(1.732051, -1.0) == "+x-y@330"
+    # a hop just below the x axis by more than RAIL_EPS keeps its sign and rounds to 0
+    assert direction_label(1000.0, -2e-6) == "+x-y@0"
+
+
+def test_hops_at_30_and_60_degrees_in_one_broadcast_cycle_are_two_waveforms():
+    """Issue #19: both hops read `+x+y` under the sign-only label, so R22 passed a cycle
+    that one broadcast waveform cannot play."""
+    bad = _cycle_r22(_fan(), [("a", "R30.o", "R30.e", ["R30"]), ("b", "R60.o", "R60.e", ["R60"])])
+    assert len(bad) == 1, bad
+    assert "shuttle +x+y@30 and shuttle +x+y@60" in bad[0].message
+
+
+def test_two_parallel_slanted_hops_share_one_waveform():
+    """...and the angle is rounded, so two rails a generator stored a few 1e-6 apart in
+    angle are still parallel, and one waveform still drives both."""
+    assert _cycle_r22(_fan(), [("b", "R60.o", "R60.e", ["R60"]), ("c", "R60b.o", "R60b.e", ["R60b"])]) == []
+
+
+def _chords():
+    """A closed loop L0 round a 4 x 4 square, two chords across it (J1-T1-J2 at y = 1 and
+    J3-T3-J4 at y = 3, on no loop), and two real docks: D off M at the top, a two-trap spur
+    E-E2 off B at the bottom.  Every node is a site, so R4d's spur test applies too."""
+    from qccd.arch.builder import DeviceBuilder
+
+    b = DeviceBuilder("explicit")
+    ring = [("C1", 0, 0), ("J1", 0, 1), ("J3", 0, 3), ("C2", 0, 4), ("M", 2, 4), ("C3", 4, 4),
+            ("J4", 4, 3), ("J2", 4, 1), ("C4", 4, 0), ("B", 2, 0)]
+    for nid, x, y in ring + [("T1", 2, 1), ("T3", 2, 3), ("D", 2, 5), ("E", 2, -1), ("E2", 2, -2)]:
+        b.site(nid, float(x), float(y), zone="trap")
+    for i, (nid, _, _) in enumerate(ring):
+        b.segment(f"L{i}", nid, ring[(i + 1) % len(ring)][0], loop="L0")
+    b.loop("L0", [nid for nid, _, _ in ring], closed=True)
+    for sid, u, v in (("c1a", "J1", "T1"), ("c1b", "T1", "J2"), ("c3a", "J3", "T3"),
+                      ("c3b", "T3", "J4"), ("dk", "M", "D"), ("sp", "B", "E"), ("sp2", "E", "E2")):
+        b.segment(sid, u, v)
+    return Machine.from_device(b.build(), name="chords")
+
+
+def test_a_chord_between_two_loop_nodes_is_not_a_spur():
+    """Issue #18.  T1 has a rail to J1 AND one to J2, both on the loop, so an ion crossing
+    it is translated.  Labelled as a spur, the trip J1->T1->J2 and the trip back were both
+    `spur:inward,spur:outward`: opposite motions on one waveform."""
+    from qccd.verify.rules import hop_label, loop_node_set, rails_to_loop
+
+    dev = _chords().arch.device
+    on = loop_node_set(dev)
+
+    def trip(*path):
+        return ",".join(hop_label(dev, on, u, v, dev.segment_between(u, v))
+                        for u, v in zip(path, path[1:]))
+
+    assert rails_to_loop(dev, on, "T1") == 2
+    assert trip("J1", "T1", "J2") == "+x,+x"
+    assert trip("J2", "T1", "J1") == "-x,-x"
+    # a dock is a dead end, and a longer spur's first trap is one too: both keep the spur
+    # labels, so the docks above and below a rail still share one waveform
+    assert rails_to_loop(dev, on, "D") == rails_to_loop(dev, on, "E") == 1
+    assert trip("M", "D") == trip("B", "E") == "spur:inward"
+    assert trip("D", "M") == trip("E", "B") == "spur:outward"
+    assert trip("E", "E2") == "-y"
+
+
+def test_opposite_moves_across_two_chords_are_two_waveforms():
+    """The same cycle the bb144 one-loop torus relied on: two ions leave two chords in
+    opposite directions.  Both were `spur:outward` before."""
+    m = _chords()
+    bad = _cycle_r22(m, [("a", "T1", "J2", ["c1b"]), ("b", "T3", "J3", ["c3a"])])
+    assert len(bad) == 1 and "shuttle +x and shuttle -x" in bad[0].message, bad
+    # the docks are unchanged: above the rail and below it, one waveform
+    assert _cycle_r22(m, [("a", "M", "D", ["dk"]), ("b", "B", "E", ["sp"])]) == []
+
+
+def test_r4d_and_r22_agree_on_what_a_spur_is():
+    """R4d's spur clause judges the sites that HAVE a spur; a chord's ends are not among
+    them, so a chord move is judged as the lab-frame translation it is."""
+    from types import SimpleNamespace
+
+    from qccd.verify.rules import spur_actions
+
+    _, spur_sites = spur_actions(SimpleNamespace(arch=_chords().arch, moves=[]))
+    assert spur_sites == {"M", "D", "B", "E"}
+
+
+def _torus(loops):
+    """`Machine.grid(3, 3, periodic=True)` -- nine junctions, a trap on each of the 18
+    rails -- with its rails split into two edge-disjoint Hamiltonian cycles, A and B.
+    `loops=1` declares A alone as the closed loop L0, which leaves every B trap a chord
+    between two loop junctions (the bb144 design of issue #18); `loops=2` declares B too,
+    as L1 (the honest version of the same torus)."""
+    from qccd.arch import Architecture
+
+    cycles = {
+        "L0": ["J0_0", "T0_0h", "J1_0", "T1_0h", "J2_0", "T2_0v", "J2_1", "T2_1h", "J0_1",
+               "T0_1h", "J1_1", "T1_1v", "J1_2", "T1_2h", "J2_2", "T2_2h", "J0_2", "T0_2v"],
+        "L1": ["J0_0", "T0_0v", "J0_1", "T0_1v", "J0_2", "T0_2h", "J1_2", "T1_2v", "J1_0",
+               "T1_0v", "J1_1", "T1_1h", "J2_1", "T2_1v", "J2_2", "T2_2v", "J2_0", "T2_0h"],
+    }
+    doc = Machine.grid(3, 3, periodic=True, name="torus").arch.to_json(expanded=True)
+    g = doc["geometry"]
+    g["generator"], g["params"] = "explicit", {}
+    for n in g["nodes"]:
+        n.pop("corner", None)
+        n.pop("degree", None)
+    on = {}
+    for lid in list(cycles)[:loops]:
+        seq = cycles[lid]
+        for u, v in zip(seq, seq[1:] + seq[:1]):
+            on[frozenset((u, v))] = lid
+        g.setdefault("loops", []).append({"id": lid, "kind": "ring", "nodes": seq, "closed": True})
+    for s in g["segments"]:
+        s.pop("corner_endpoints", None)
+        s["loop"] = on.get(frozenset(s["ends"]))
+    assert sum(s["loop"] is not None for s in g["segments"]) == 18 * loops
+    return Machine(Architecture.from_json(doc))
+
+
+def test_the_one_loop_and_the_two_loop_torus_get_the_same_r22_verdict():
+    """The test issue #18 asks for.  Two ions cross two B rails in opposite directions
+    along B.  Declared as L1 that is `L1:+1,L1:+1` against `L1:-1,L1:-1`; left off every
+    loop it is now `+y,+y` against `-x,-y` -- two waveforms either way.  With the chord
+    read as a spur, the one-loop torus said `spur:outward,spur:inward` for both."""
+    moves = [("a", "T0_0v", "T0_1v", ["T0_0v.b", "T0_1v.a"]),     # forward along B
+             ("b", "T1_1h", "T1_0v", ["T1_1h.a", "T1_0v.b"])]     # backward along B
+    one, two = _cycle_r22(_torus(1), moves), _cycle_r22(_torus(2), moves)
+    assert len(one) == len(two) == 1, (one, two)
+    assert "shuttle +y,+y" in one[0].message and "shuttle -x,-y" in one[0].message
+    assert "shuttle L1:+1,L1:+1" in two[0].message and "shuttle L1:-1,L1:-1" in two[0].message
 
 
 def test_the_plane_reports_what_it_does_not_model():

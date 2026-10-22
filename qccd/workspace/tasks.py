@@ -36,7 +36,7 @@ from .jsonsafe import canonical_text, digest, normalize_numbers, strict_loads
 
 __all__ = ["TaskRelease", "ReleaseError", "RELEASES_DIR", "find_release", "list_releases", "find_board",
            "list_boards", "DEFAULT_BOARD", "write_lock", "read_lock", "LOCK_NAME", "physics_mismatch",
-           "FIXED_BLOCKS"]
+           "FIXED_BLOCKS", "board_device"]
 
 RELEASES_DIR = Path(__file__).resolve().parent / "releases"
 LOCK_NAME = "qccd.lock.json"
@@ -198,6 +198,31 @@ def find_board(ref: str | None, extra: Path | None = None) -> TaskRelease:
     raise ReleaseError(f"no board {ref!r}; the boards are: " + "; ".join(b.title for b in boards))
 
 
+def board_device(arch_doc: Mapping, release: TaskRelease) -> dict:
+    """The device a design is entered on `release` with.
+
+    The fixed blocks are not design variables.  A design that never set its own physics -- its
+    fixed blocks are still those of the template every new design starts from -- takes the
+    board's, so a board with physics of its own (`qccd-physics@2`) can be entered by any design.
+    A design whose physics was edited keeps it, and the physics lock calls it exploratory, as
+    before.  On a board whose physics is the template's (every board before `@2`), and for a
+    design already carrying the board's physics, the design comes back unchanged.
+    """
+    from ..api import _template_doc
+
+    def same(a, b) -> bool:
+        return canonical_text(normalize_numbers(a)) == canonical_text(normalize_numbers(b))
+
+    ref = release.physics()
+    doc = dict(arch_doc)
+    if all(same(doc.get(b), ref.get(b)) for b in FIXED_BLOCKS):
+        return doc
+    default = _template_doc(None)
+    if all(same(doc.get(b), default.get(b)) for b in FIXED_BLOCKS):
+        doc.update({b: ref[b] for b in FIXED_BLOCKS if b in ref})
+    return doc
+
+
 def physics_mismatch(arch_doc: Mapping, release: TaskRelease) -> list:
     """The fixed blocks whose values differ from the release's trusted physics."""
     ref = release.physics()
@@ -248,7 +273,8 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                   title: str, description: str, out_dir: Path, metrics: list,
                   rank_by: str, starter: Mapping | None = None, stabilizers=None,
                   limits: Mapping | None = None, order: int | None = None,
-                  qec: Mapping | None = None) -> Path:
+                  qec: Mapping | None = None, rank_table: str = "qccdsim_jones",
+                  tables: list | None = None) -> Path:
     """Write a release directory (a maintainer tool; releases are immutable once published)."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
@@ -262,8 +288,8 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
         "track": "codesign-artifact",
         "circuit": {"file": "circuit.qasm", "digest": _sha256_file(d / "circuit.qasm")},
         "physics": {"file": "physics.json", "digest": _sha256_file(d / "physics.json"),
-                    "model": "corrected", "rank_table": "qccdsim_jones",
-                    "tables": ["qccdsim_jones", "transport_excitation"],
+                    "model": "corrected", "rank_table": rank_table,
+                    "tables": list(tables or ["qccdsim_jones", "transport_excitation"]),
                     "fixed_blocks": list(FIXED_BLOCKS)},
         "design_variables": ["geometry", "zone_types", "control", "name", "description"],
         "allowed_transformations": ["insert:cool"],
@@ -294,6 +320,10 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                                           encoding="utf-8")
         man["qec"] = {"experiment": qec["experiment"], "noise": qec["noise"], "ler": dict(qec["ler"]),
                       "detectors": {"file": "detectors.json", "digest": _sha256_file(d / "detectors.json")}}
+        # Goal 1's leaderboard reads these: what a row's rate is divided by, and the ion count
+        for key in ("logical_qubits", "n_ions"):
+            if qec.get(key) is not None:
+                man["qec"][key] = int(qec[key])
         man["required_checks"].append("ler")
     (d / "release.json").write_text(json.dumps(man, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
                                     encoding="utf-8")

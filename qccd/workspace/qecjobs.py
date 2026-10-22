@@ -57,12 +57,13 @@ class QecMixin:
             raise WorkspaceError("bad_request", "max_shots must be an integer from 1000 to 2000000", status=422)
 
     def _memory_experiment(self, ref: str):
-        """A memory board (by title) or a named experiment -> (experiment, noise id, budget, label)."""
+        """A memory board (by title) or a named experiment -> (experiment, noise id, budget, label,
+        the board's release or None)."""
         from ..qec import EXPERIMENTS, MemoryExperiment, get_experiment
         from .core import WorkspaceError
         if ref in EXPERIMENTS:
             e = get_experiment(ref)
-            return e, "qccd-noise@1", {}, e.name
+            return e, "qccd-noise@1", {}, e.name, None
         try:
             rel = self.board(ref)
         except Exception as exc:
@@ -73,36 +74,41 @@ class QecMixin:
                                  f"Memory experiments: {', '.join(EXPERIMENTS)}", status=422)
         q = rel.manifest["qec"]
         return (MemoryExperiment.from_spec(rel.detectors(), rel.circuit_text()), q["noise"],
-                {k: v for k, v in (q.get("ler") or {}).items() if k != "seed"}, rel.title)
+                {k: v for k, v in (q.get("ler") or {}).items() if k != "seed"}, rel.title, rel)
 
     def _job_ler(self, jid, params, actor, origin_prompt_id, cancel) -> dict:
         from ..qec import CompileFailed, compile_with_qccdc, evaluate_memory
+        from ..qec.noise import get as get_noise
         from .core import WorkspaceError
+        from .tasks import board_device
         branch, rev = params["branch"], params["revision"]
         r = self.replayed(branch, rev)
         if not r.ok:
             raise WorkspaceError("design_invalid", "the design at that revision does not build", status=422)
-        exp, noise, budget, label = self._memory_experiment(params["experiment"])
+        exp, noise, budget, label, rel = self._memory_experiment(params["experiment"])
+        nm = get_noise(params.get("noise") or noise)
+        # a board's experiment runs on the design as entered on that board (its physics, `board_device`)
+        device = board_device(r.arch_doc, rel) if rel is not None else r.arch_doc
         budget = {**budget, "max_shots": int(params.get("max_shots", budget.get("max_shots", 100000)))}
         work = self.root / ".qccd" / "runs" / jid
         self._progress(jid, "compile", f"compiling {label} onto the design with the reference compiler")
         try:
-            prog, cert = compile_with_qccdc(exp.qasm, r.arch_doc, work, cool=True,
-                                            timeout=float(params.get("timeout_s", 900)))
+            prog, cert = compile_with_qccdc(exp.qasm, device, work, cool=True,
+                                            timeout=float(params.get("timeout_s", 900)), table=nm.table)
         except CompileFailed as exc:
             return {"_status": "failed", "summary": f"the reference compiler could not compile {label} onto this "
                     f"design: {exc}", "refusal": str(exc), "log": exc.log[-2000:]}
         if cancel.is_set():
             return {"_status": "cancelled", "summary": "cancelled after compiling"}
         self._progress(jid, "ler", f"sampling the logical error rate of {label}")
-        rep = evaluate_memory(prog, r.arch_doc, exp, noise_id=params.get("noise") or noise,
+        rep = evaluate_memory(prog, device, exp, noise_id=params.get("noise") or noise,
                               cert=json.loads(Path(cert).read_text(encoding="utf-8")), ler_budget=budget,
                               seed=params.get("seed"))
         from ..verify import verify
         from ..cost.models import corrected_model
         from ..ir.tsir import TSIR
         from ..arch import Architecture
-        rules = verify(TSIR.load(prog), Architecture.from_json(r.arch_doc), corrected_model("qccdsim_jones"),
+        rules = verify(TSIR.load(prog), Architecture.from_json(device), corrected_model(nm.table),
                        check_metrics=False).rules.summary()
         failed = sorted(rules.get("failed") or [])
         chk, est = rep.get("check") or {}, rep.get("ler")

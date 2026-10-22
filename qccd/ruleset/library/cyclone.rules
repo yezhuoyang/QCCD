@@ -1,0 +1,8 @@
+# Khan et al., HPCA 2026: Cyclone.
+
+ruleset "cyclone"
+title "Cyclone's rules"
+about "A trap does one gate, split or merge at a time; a rail and a junction hold one ion at a time; the compiler keeps a list of ions per trap, not a chain, so no chain order is tracked; every operation lasts what Cyclone's duration law says; each qubit's gates run in the circuit's order, except that consecutive CNOTs in which it plays the same role may run in any order."
+
+use R0, R1, R2, R3, R6b, R8, R24, R26, R27, R29
+param serial_kinds = {"gate2", "split", "merge"}

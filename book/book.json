@@ -1,0 +1,304 @@
+{
+  "about": "The tutorial's parts on the verified compiler: lessons whose code is Lean that runs in the page. The rest of the tutorial (Parts A-D) is in qccd/viz/js/tutorial.js.",
+  "parts": [
+    {
+      "part": "E",
+      "title": "The machine as data",
+      "about": "Devices as graphs, programmes as data, replay as a function, and the rules as statements Lean can decide.",
+      "lessons": [
+        {
+          "id": "E1",
+          "title": "Devices are graphs",
+          "status": "live",
+          "slug": "E1-devices",
+          "source": "chapters/E1-devices.lean",
+          "ids": "book:E1"
+        },
+        {
+          "id": "E2",
+          "title": "Programmes and replay",
+          "status": "live",
+          "slug": "E2-replay",
+          "source": "chapters/E2-replay.lean",
+          "ids": "book:E2"
+        },
+        {
+          "id": "E3",
+          "title": "Rules as propositions",
+          "status": "live",
+          "slug": "E3-rules",
+          "source": "chapters/E3-rules.lean",
+          "ids": "book:E3"
+        },
+        {
+          "id": "E4",
+          "title": "Rule sets",
+          "status": "live",
+          "slug": "E4-rule-sets",
+          "source": "chapters/E4-rule-sets.lean",
+          "ids": "book:E4"
+        }
+      ]
+    },
+    {
+      "part": "F",
+      "title": "Certificates and the proved checker",
+      "about": "What a certificate records, what it means for one to hold, the decision procedure that settles it, and the proof that the procedure is right.",
+      "lessons": [
+        {
+          "id": "F1",
+          "title": "Certificates: the Bell pair, proved",
+          "status": "live",
+          "source": "chapters/2.1-certificates.lean",
+          "slug": "2.1-certificates",
+          "store": "2.1",
+          "story": "Take one real certificate from the Compilation page, watch it play, prove it holds, and prove three lies about it refused."
+        },
+        {
+          "id": "F2",
+          "title": "The specification, condition by condition",
+          "status": "live",
+          "slug": "F2-specification",
+          "source": "chapters/F2-specification.lean",
+          "ids": "book:F2"
+        },
+        {
+          "id": "F3",
+          "title": "Decision procedures",
+          "status": "live",
+          "slug": "F3-decision",
+          "source": "chapters/F3-decision.lean",
+          "ids": "book:F3"
+        },
+        {
+          "id": "F4",
+          "title": "Soundness and completeness",
+          "status": "live",
+          "slug": "F4-soundness",
+          "source": "chapters/F4-soundness.lean",
+          "ids": "book:F4"
+        },
+        {
+          "id": "F5",
+          "title": "The mutation lab",
+          "status": "live",
+          "slug": "F5-mutations",
+          "source": "chapters/F5-mutations.lean",
+          "ids": "book:F5"
+        },
+        {
+          "id": "F6",
+          "title": "What you trust",
+          "status": "live",
+          "slug": "F6-trust",
+          "source": "chapters/F6-trust.lean",
+          "ids": "book:F6"
+        }
+      ]
+    },
+    {
+      "part": "G",
+      "title": "Semantics: which gate the pulses make",
+      "about": "Exact numbers, the native pulses as matrices, u3 from two pulses, CX from one entangling pulse, stabilizer tableaux, and measurement -- without Mathlib.",
+      "lessons": [
+        {
+          "id": "G1",
+          "title": "Exact numbers",
+          "status": "live",
+          "slug": "G1-exact-numbers",
+          "source": "chapters/G1-exact-numbers.lean",
+          "ids": "book:G1"
+        },
+        {
+          "id": "G2",
+          "title": "The native pulses",
+          "status": "live",
+          "slug": "G2-pulses",
+          "source": "chapters/G2-pulses.lean",
+          "ids": "book:G2"
+        },
+        {
+          "id": "G3",
+          "title": "u3 from two pulses",
+          "status": "live",
+          "slug": "G3-u3",
+          "source": "chapters/G3-u3.lean",
+          "ids": "book:G3"
+        },
+        {
+          "id": "G4",
+          "title": "CX from MS",
+          "status": "live",
+          "slug": "G4-cx-from-ms",
+          "source": "chapters/G4-cx-from-ms.lean",
+          "ids": "book:G4"
+        },
+        {
+          "id": "G5",
+          "title": "Stabilizer tableaux",
+          "status": "live",
+          "slug": "G5-tableaux",
+          "source": "chapters/G5-tableaux.lean",
+          "ids": "book:G5"
+        },
+        {
+          "id": "G6",
+          "title": "Measurement and reset",
+          "status": "live",
+          "slug": "G6-measurement",
+          "source": "chapters/G6-measurement.lean",
+          "ids": "book:G6"
+        },
+        {
+          "id": "G7",
+          "title": "The semantic check",
+          "status": "live",
+          "slug": "G7-semantic-check",
+          "source": "chapters/G7-semantic-check.lean",
+          "ids": "book:G7"
+        }
+      ]
+    },
+    {
+      "part": "H",
+      "title": "Verify the website yourself",
+      "about": "Every compiled case this site publishes, checked by you: in the page for the small ones, with the downloadable checker for the large ones.",
+      "lessons": [
+        {
+          "id": "H1",
+          "title": "The Compilation page",
+          "status": "live",
+          "slug": "H1-compilation-page",
+          "source": "chapters/H1-compilation-page.lean",
+          "ids": "book:H1"
+        },
+        {
+          "id": "H2",
+          "title": "The boards",
+          "status": "live",
+          "slug": "H2-boards",
+          "source": "chapters/H2-boards.lean",
+          "ids": "book:H2"
+        },
+        {
+          "id": "H3",
+          "title": "The official grader",
+          "status": "live",
+          "slug": "H3-official-grader",
+          "source": "chapters/H3-official-grader.lean",
+          "ids": "book:H3"
+        },
+        {
+          "id": "H4",
+          "title": "Every verdict, reproduced",
+          "status": "live",
+          "slug": "H4-reproduced",
+          "source": "chapters/H4-reproduced.lean",
+          "ids": "book:H4"
+        }
+      ]
+    },
+    {
+      "part": "I",
+      "title": "Build your own verified compiler",
+      "about": "A compiler for a chain of traps written in Lean and proved correct by construction; then a compiler in any language, validated by the checker; then the Compiler board.",
+      "lessons": [
+        {
+          "id": "I1",
+          "title": "A compiler in Lean",
+          "status": "live",
+          "slug": "I1-compiler-in-lean",
+          "source": "chapters/I1-compiler-in-lean.lean",
+          "ids": "book:I1"
+        },
+        {
+          "id": "I2",
+          "title": "Correct by construction",
+          "status": "live",
+          "slug": "I2-correct-by-construction",
+          "source": "chapters/I2-correct-by-construction.lean",
+          "ids": "book:I2"
+        },
+        {
+          "id": "I3",
+          "title": "Any language, checked",
+          "status": "live",
+          "slug": "I3-any-language",
+          "source": "chapters/I3-any-language.lean",
+          "ids": "book:I3"
+        },
+        {
+          "id": "I4",
+          "title": "The certificate format",
+          "status": "live",
+          "slug": "I4-certificate-format",
+          "source": "chapters/I4-certificate-format.lean",
+          "ids": "book:I4"
+        },
+        {
+          "id": "I5",
+          "title": "The Compiler board",
+          "status": "live",
+          "slug": "I5-compiler-board",
+          "source": "chapters/I5-compiler-board.lean",
+          "ids": "book:I5"
+        }
+      ]
+    },
+    {
+      "part": "J",
+      "title": "Gadgets and fault-tolerant architecture",
+      "about": "Places as boxes with doors and promises; the machine's rules as propositions, and why parallel work is safe; designing a floorplan and its traffic; gates built from places and proved, including the T gadget that was not T; why a program of proved gates is the program it says; and Shor's algorithm, fault-tolerant, end to end.",
+      "lessons": [
+        {
+          "id": "J1",
+          "title": "Places: a gadget is a box with doors and a promise",
+          "status": "live",
+          "slug": "J1-places",
+          "source": "chapters/J1-places.lean",
+          "ids": "book:J1"
+        },
+        {
+          "id": "J2",
+          "title": "The machine's rules, and why parallel work is safe",
+          "status": "live",
+          "slug": "J2-machine-rules",
+          "source": "chapters/J2-machine-rules.lean",
+          "ids": "book:J2"
+        },
+        {
+          "id": "J3",
+          "title": "Floorplans: designing the machine, and what its traffic costs",
+          "status": "live",
+          "slug": "J3-floorplans",
+          "source": "chapters/J3-floorplans.lean",
+          "ids": "book:J3"
+        },
+        {
+          "id": "J4",
+          "title": "Gates from places, and the T gadget that was not T",
+          "status": "live",
+          "slug": "J4-gates-from-places",
+          "source": "chapters/J4-gates-from-places.lean",
+          "ids": "book:J4"
+        },
+        {
+          "id": "J5",
+          "title": "Composition: a program of proved gates is the program it says",
+          "status": "live",
+          "slug": "J5-composition",
+          "source": "chapters/J5-composition.lean",
+          "ids": "book:J5"
+        },
+        {
+          "id": "J6",
+          "title": "Shor's algorithm, fault-tolerant, end to end",
+          "status": "live",
+          "slug": "J6-shor",
+          "source": "chapters/J6-shor.lean",
+          "ids": "book:J6"
+        }
+      ]
+    }
+  ]
+}

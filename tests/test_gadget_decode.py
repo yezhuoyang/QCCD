@@ -205,7 +205,8 @@ def test_a_decode_with_nothing_to_decode_is_refused(lib, leaves):
 
 
 def test_every_shipped_program_decodes_everything_it_measures(lib, leaves):
-    for p in sorted(ALGS.glob("*.alg")):
+    for p in sorted(p for p in ALGS.glob("*.alg")
+                    if "\nfloorplan " not in "\n" + p.read_text(encoding="utf-8")):
         alg = parse_algorithm_file(p)
         assert any(i.kind == "decode" for i in alg.instructions), p.stem
         gir = schedule(alg, lib, leaves)

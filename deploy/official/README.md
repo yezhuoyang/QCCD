@@ -16,12 +16,14 @@ It lives in `/opt/qccd-official/` on the droplet (qccd.academy). That directory 
 `docker-compose.prod.yml`, `.env` (`QCCD_OFFICIAL_TAG=<commit>`) and `VERSION` (the commit,
 the image id and the date). nginx serves `https://qccd.academy/official/v1/…` through
 `/etc/nginx/snippets/qccd-official.conf`, which the site's HTTPS block includes. The api
-listens on 127.0.0.1:8300 only. It is JSON only:
+listens on 127.0.0.1:8300 only. It is JSON, except an entry's studio page (HTML) and its
+bundle (zip):
 
 | endpoint | who |
 |---|---|
-| `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` | anyone |
+| `GET /official/v1/health`, `/v1/tasks`, `/v1/leaderboard/<task>` (each row: `by`, every metric, the LER interval) | anyone |
 | `GET /official/v1/submissions/<id>` and `/report` | anyone for public submissions; the uploader (or any key of the same person) for private ones |
+| `GET /official/v1/submissions/<id>/page`, `/files/<name>`, `/bundle.zip` | the same: the studio page the grader drew from the graded bundle (drawn on first request for an entry graded before pages existed, into `artifacts/pages/`), one bundle file, the whole archive |
 | `POST /official/v1/submissions` | an uploader token (`add-uploader`) or a person's key (below); fails closed without one |
 | `POST /official/v1/links`, `GET /v1/links/<code>`, `POST /v1/links/<code>/token` | a workspace signing in (the code, then its key, once) |
 | `POST /official/v1/links/<code>/approve` / `deny` | the site's `/connect/` page, with a grant from the accounts service |
@@ -95,13 +97,209 @@ docker compose -f docker-compose.prod.yml run --rm -T api python -m qccd.officia
 
 `add-uploader` prints the new token once. Deliver it privately.
 
+A new studio template (a change to `qccd/viz/render.py`'s page or the JS it stamps) changes the
+page every entry opens. Draw them all again from the stored archives, without grading again (a
+regrade samples every logical error rate again, 25-45 min per BB entry), as a one-off container with
+the grader's memory:
+
+```bash
+docker run --rm -m 1g --network none -e HOME=/tmp -e QCCD_GRADER_MEM_MB=4096 \
+  -e QCCD_OFFICIAL_DB=sqlite:////data/official.db -e QCCD_OFFICIAL_ARTIFACTS=/artifacts \
+  -v qccd-official_data:/data -v qccd-official_artifacts:/artifacts \
+  qccd-official:<tag> python -m qccd.official.worker redraw [--task <release>]
+```
+
 **Rolling back.** Set `.env` to the previous tag and `up -d`. To take the service down
 completely: `docker compose -f docker-compose.prod.yml down` (volumes survive), then remove
 the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reload nginx`.
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-05 16:36 UTC, from commit `f1e6273` (pushed): compiler `f88a49f79af1`, which
+**Deployed** 2026-10-21 (late), from commit `6012b17` (pushed, also on `website/invitations`):
+`bb90seq_mem@1` (one [[90,8,10]] block, Z then X, 180 ions; the tightest grade, ~2600-2700 s on the
+droplet) completes Goal 1's curated codes, and `/v1/goals/goal1` carries `logical_qubits`, `ions`
+and `ions_per_logical_qubit` for every entry and the FTL target (60 logical qubits within 2000 ions).
+Same derivation as below (`qccd/` from `6012b17`); 47 layers identical; rollback `*.bak-82f95f2`.
+Rehearsal smoke passed, and the queue was empty at the switch.
+
+**Before that** 2026-10-21 (evening), from commit `82f95f2` (pushed, also on `website/invitations`):
+Goal 1's other codes (`steanexz`, `shorxz`, `rep3xz`, `rep5xz`, `bb18xz` two-copy; `bb72seq` one block,
+Z then X, 144 ions; `ldpc` decodes the BB and Steane ones), `/v1/goals/goal1` with each release's
+ions, logical qubits and entries, and the studio template that shows the Learn panel only in the
+tutorial. Derived from `d2da98d` (`qccd/` from `82f95f2`; outside it only `Compiler/ocaml` changed,
+the rotate fix released as qccdc `b4a003dbb4ae`, byte-identical on the suite and the seeds, so the
+image keeps `c774b87b677f`). 47 layers identical; rollback `*.bak-0b8678f`. Rehearsal smoke passed and
+an entry page drawn there hides the Learn tab at 1600 and 1100 px. The three public boards were
+regraded on production (`regrade surface3xz_mem@1` / `surface5xz_mem@1` / `surface7xz_mem@1`, 28
+jobs) to redraw every entry page; the numbers were the same.
+
+**Before that** 2026-10-21 (afternoon), from commit `0b8678f` (pushed, also on `website/invitations`):
+- A leaderboard entry opens: `/submissions/<id>/page` (the studio page the grader draws after a
+  passing grade, in a child of its own; served with CSP `sandbox`), `/files/<name>`, `/bundle.zip`.
+- Rows carry `by`, every metric, the LER interval and the experiment; `GET /v1/goals/goal1` ranks
+  every curated `qccd-noise@2` memory under 200 ions together by `ler_per_round_per_logical`.
+- New releases `surface3xz_mem@1` (34 ions) and `surface7xz_mem@1` (194 ions).
+- The worker's `artifacts` mount is writable (it keeps the pages): `docker-compose.prod.yml` changed.
+
+The image is derived from `qccd-official:d2da98d` with `qccd/` from `0b8678f` (nothing outside
+`qccd/` changed); its 47 layers are identical on both machines. Rollback: `.env.bak-d2da98d`,
+`VERSION.bak-d2da98d`, `docker-compose.prod.yml.bak-d2da98d`. Rehearsed with the prod compose,
+then the production smoke (operator `deploy-smoke-0b8678f`, quota 2, token deleted) passed with no
+stage and no metric different, and every new door checked (page sandboxed, file, archive byte for
+byte, 404 for a stranger, absent from Goal 1): GHZ `os_c7641ce0f9c24fe0`, and the 194-ion
+surface-7 seed `os_3f43da41121a7780` (its 4.6 MB page drawn inside the 1 GB grader).
+
+**Before that** 2026-10-21, from commit `d2da98d` (pushed, also on `website/invitations`):
+- `qccd-noise@2` and `qccd-physics@2`: every number cited, every channel a Pauli channel for stim.
+- Goal 1's board, `surface5xz_mem@1`: a Z and an X surface-5 memory side by side, 98 ions.
+- A design entered on a board takes that board's physics (`board_device`).
+- The compiler is `c774b87b677f`. Its new last fallback, split rounds, compiles 98-ion memories,
+  and it is byte-identical on every program `e799ecf5a5cd` produced (77/77), so suite@1 was not
+  re-pinned.
+
+The image is derived from `qccd-official:db3e6fc`:
+- `qccd/`, `arch/` and `Compiler/bridge` are the git archive of `d2da98d`;
+- `qccdc_cli` is the published Linux `c774b87b677f` (sha256 `ed8838c6...`);
+- qcheck is db3e6fc's (`e8acd6640fd3`, sha256 `923528c0...`).
+
+The 45 layers are identical on both machines, and the previous deployment is in `.env.bak-db3e6fc`,
+`VERSION.bak-db3e6fc` and `docker-compose.prod.yml.bak-db3e6fc`.
+
+The local rehearsal and production agreed. The operator uploader was `deploy-smoke-d2da98d`
+(quota 2, token deleted). Both private smoke tests matched their local reports, with no stage
+and no metric different:
+- GHZ, `os_b9a317a40d4cfee2`: eligible.
+- The Goal 1 board's starter, `os_25336188e127741b`: eligible in about 23 s, at 5.2e-5 per round
+  and 598 ms.
+
+**Before that** 2026-10-21 07:57 UTC (00:57 PDT), from commit `db3e6fc` (pushed): the platform fixes
+#15-#21 that the hillclimb PRs (#10-#14) prompted. The device stage fails a device over the
+release's budget (`DEVICE.OVER_BUDGET`), counting what it declares about its own wiring at no
+less than the deck's physics (#15); a move is charged split and merge for what it does -- the
+class, a hop from a conveyor to a dead end, the chains -- whatever its class is called (#16,
+#17); R22 labels a hop by its direction and a chord is not a spur (#18, #19); `verify()` judges
+R19-R21 (#21); and the compiler is `e799ecf5a5cd`, which reads a device in one canonical order
+(#20) and mirrors the new R22 labels. suite@1 was re-pinned for it (283ec95, measured in this
+image: 100 valid / 0 wrong / 8 refused, T_jones median 1.78x, digest `303ed0d5...`).
+The image was derived from `qccd-official:6ac56ad`: `rm` and `COPY` of `qccd/`, `arch/` and
+`Compiler/bridge` from the git archive of `db3e6fc`, and `qccdc_cli` the published Linux
+`e799ecf5a5cd` (sha256 `2b5f562e...`); qcheck is 6ac56ad's (sha256 `923528c0...`, `e8acd6640fd3`).
+The 40 layers are identical on both machines. The previous deployment is in `.env.bak-6ac56ad`,
+`VERSION.bak-6ac56ad` and `docker-compose.prod.yml.bak-6ac56ad`. Private smoke tests by the
+operator uploader `deploy-smoke-db3e6fc` (quota 2, token deleted): GHZ `os_279a40d1b742be4e`
+eligible, and the Compiler board `os_c91a6abb7a186f36` eligible in 473 s, 108 valid / 0 wrong /
+8 refused of 116, speedup 1.0, ler_ratio 1.000, no public pair different from the baseline. The
+local rehearsal gave the same (721 s).
+
+**Before that** 2026-10-20 17:22 UTC (10:22 PDT), from commit `6ac56ad` (pushed): the proved
+checker reads its input strictly -- a file missing a field the checker relies on, or with an
+entry it cannot read (a move whose `t` is `20.0`, an op's qubit `0.5`), is REJECTED naming
+what is wrong, where before `{}` was accepted as an empty programme and an unreadable move was
+dropped (qcheck `e8acd6640fd3`, the version published for Windows and Linux the same day);
+and `check_cert.py` checks a certificate's shape before reading it, so a malformed one is
+`R10 FAILED` by name rather than a TypeError. Well-formed certificates, which is every one the
+compiler writes, get the verdicts they got before, so suite@1 was not re-pinned. Compiler
+`f88754a2fa71` is unchanged.
+
+The image was derived from `qccd-official:e9bbf0b`: the Dockerfile's Lean stage verbatim, then
+`rm` and `COPY` of `qccd/`, `arch/`, `Compiler/bridge` and `qcheck` (sha256 `923528c0…`);
+`qccdc_cli` is e9bbf0b's (sha256 `3a11247f…`, the published Linux `f88754a2fa71`). The code
+under `qccd/`, `arch/` and `Compiler/bridge` hashes the same as the git archive of `6ac56ad`;
+the 34 layers are identical on both machines. The previous deployment is in
+`.env.bak-e9bbf0b`, `VERSION.bak-e9bbf0b` and `docker-compose.prod.yml.bak-e9bbf0b`. Private
+smoke tests by the operator uploader `deploy-smoke-6ac56ad` (quota 2, token deleted): GHZ
+`os_dc4bbf2d0d94a0f7` eligible in 16 s, and the Compiler board `os_5a163b8811cfcbcd` eligible
+in 444 s, 108 valid / 0 wrong / 8 refused of 116, speedup 1.0, ler_ratio 1.000, no public pair
+different from the baseline. The local rehearsal gave the same (`os_eff78fb8ebdecfaa`, 642 s).
+
+**Before that** 2026-10-20 07:00 UTC (00:00 PDT), from commit `e9bbf0b` (pushed): compiler
+`f88754a2fa71` (built from `651f39c`), which takes a rule set (`qccdc --rules`) and without one
+writes what `dbd13d8952f3` wrote: all 216 compiles of suite@1's public pairs (`compile` and
+`rotate`) are byte-identical between the two, so suite@1 was not re-pinned. The grader now
+fails a submission's semantics stage when `check_cert.py`'s per-qubit order check is not
+`ok` (before, only O1, unrealised ops and O2 could fail it), and `check_cert.py` ties the
+programme's transport to the certificate's, ion by ion and in order. qcheck `1c067263bdc9`
+is unchanged.
+
+The image was derived from `qccd-official:972d8bf`: the Dockerfile's OCaml stage verbatim,
+then `rm` and `COPY` of `qccd/`, `arch/`, `Compiler/bridge` and `qccdc_cli`; qcheck is
+972d8bf's (sha256 `4c78a9d5…`). Its `qccdc_cli` is the published Linux `f88754a2fa71` byte
+for byte (sha256 `3a11247f…`); the suite files are identical to 972d8bf's; the 29 layers are
+identical on both machines. The previous deployment is in `.env.bak-972d8bf`,
+`VERSION.bak-972d8bf` and `docker-compose.prod.yml.bak-972d8bf`. Private smoke tests by the
+operator uploader `deploy-smoke-e9bbf0b` (quota 2, token deleted): GHZ `os_0bd9e3e6c91a0cbf`
+ok in 15 s, and the Compiler board `os_f1165eea3f41707f` eligible in 463 s, 108 valid /
+0 wrong / 8 refused of 116, speedup 1.0, ler_ratio 1.000, no public pair different from the
+baseline. The local rehearsal gave the same (`os_b22b2bf98b42f6f3`, 671 s).
+
+**Before that** 2026-10-19 20:30 UTC, from commit `972d8bf` (pushed): compiler `dbd13d8952f3`,
+which never changes the order of a qubit's gates, commuting or not (the user's decision of
+2026-10-19), and whose conveyor sweeps greedily; `check_cert.py`'s R10 checks each qubit's
+order from the program; and qcheck `1c067263bdc9`, whose order clause lost its commutation
+exemption. suite@1 was re-pinned in `972d8bf`, measured in a rehearsal of this image: only the
+three memory pairs on `ring144_24v` changed, and the reference still has 100 valid, 0 wrong and
+8 refused. Production also gets the R10 work of 2026-10-18 (d5717e1, 80d4d71, b26eeca, acca452)
+and the Linux-measured baseline of c6491e0, which the previous image predated.
+
+The image was derived from `qccd-official:5b1a3f3`: the Dockerfile's OCaml AND Lean stages
+verbatim, then `rm` and `COPY` of `qccd/`, `arch/`, `Compiler/bridge`, `qccdc_cli` and `qcheck`
+(the previous derived images reused e70144e's qcheck; the strict order clause needed a new
+one). Its `qccdc_cli` is the published Linux `dbd13d8952f3` byte for byte (sha256
+`9897b5f6…`), its qcheck sha256 `4c78a9d5…`; the 24 layers are identical on both machines. The
+previous deployment is in `.env.bak-5b1a3f3`, `VERSION.bak-5b1a3f3` and
+`docker-compose.prod.yml.bak-5b1a3f3`. Private smoke tests by the operator uploader
+`deploy-smoke-972d8bf` (quota 2, token deleted): GHZ `os_463dedd83cadfe37` ok in 16 s, and the
+Compiler board `os_108ea475e6c5f306` eligible in 410 s, 108 valid / 0 wrong / 8 refused of 116,
+speedup 1.0, ler_ratio 1.000, no public pair different from the baseline. The local rehearsal
+gave the same (`os_c9fdff1a1274e4c2`). `smoke_test.py` must run from the checkout: from a git
+archive it has no compiler for its local grade.
+
+**Before that** 2026-10-18 03:23 UTC (2026-10-17 20:23 PDT), from commit `5b1a3f3` (pushed):
+compiler `7265883d596f`, in which a barrier is a fence and a docked two-qubit gate is its own
+gate. Every release from `35bf68427d9c` to `c7c535380bfb` compiled a two-qubit `barrier a,b`,
+and any docked `cz`, in the conveyor as a CX. Production ran `f88a49f79af1`, which predates
+them, so this deployment also brings what they added: R23 (no ion rests on a junction, in the
+verifier and in the compiler), the barrier as a fence, and the race-track pass. The previous
+deployment is in `.env.bak-f1e6273`, `VERSION.bak-f1e6273` and
+`docker-compose.prod.yml.bak-f1e6273` for a rollback.
+
+suite@1 was re-pinned in `5b1a3f3`, because the reference compiler's programs changed. The old
+and new published compilers on its 216 compiles (108 public pairs, rotate and compile) are
+byte-identical in rotate mode and differ on 41 compile runs. R23 changes 22 programs on
+`ladder_2x72` and `ring144_24v`, `02bceb9117e7` finishes 8 that ended unrealised, the race track
+compiles 3 on `h2_racetrack`, and `7265883d596f` itself changes none. The reference now has 100
+valid, 0 wrong and 8 refused (it had 88, 0 and 20). Only `baseline.json` and `suite.json`
+changed, so suite@1's digest is now `sha256:6624543e…`; every board's digest is unchanged.
+suite@1's public leaderboard was empty.
+
+The image was derived from `qccd-official:e70144e` again, the same way as `f1e6273`: the
+Dockerfile's OCaml stage verbatim, then `rm` and `COPY` of `qccd/`, `arch/` and
+`Compiler/bridge`. The OCaml stage was `CACHED` up to `dune build`, and its `qccdc_cli` is the
+published Linux `7265883d596f`, byte for byte (sha256 `ea3d4d42…`). Checked: the 312 files
+under `/opt/qccd/{qccd,arch,Compiler/bridge}` equal the `git archive` of `5b1a3f3`. Against
+`f1e6273`'s image, exactly the 38 files git changed and `qccdc_cli` differ, and `qcheck` is
+unchanged. The 18 layers are identical on both machines, and the first 13 are `e70144e`'s.
+`git archive` on this Windows checkout writes CRLF (core.autocrlf), so the image's Python files
+have CRLF line ends, as in `e70144e`'s and `f1e6273`'s. The suites and releases are marked
+`-text` and keep their pinned bytes.
+
+All checks were PRIVATE uploads by the operator uploader `deploy-smoke-5b1a3f3` (quota 2, its
+token deleted), one set in a local rehearsal and one in production:
+
+| check | rehearsal | production |
+|---|---|---|
+| GHZ starter, end to end | 11 s, `os_6dfa797b663dedda` | 9 s, `os_27bca510de26893f` |
+| Compiler board, the starter compiler (= the reference), 116 pairs | 721 s, `os_d5c2c3b0f1f13e5a` | 425 s, `os_c4bce259b7d0bc7a` |
+
+GHZ was eligible on both, with no stage or metric differences from the local grade. The
+compiler board was ELIGIBLE on both: 108 valid, 0 wrong, 8 refused (all 8 hidden pairs valid),
+speedup 1.0. Status and metrics equal `baseline.json` on all 108 public pairs. The LERs are
+equal on only 3 of the 32 memory pairs, so `ler_ratio` is 0.992, not 1. Seeded sampling is
+deterministic on each platform but differs between Windows, where the baseline is measured,
+and Linux. The `e70144e` run (2026-09-29) showed the same thing. The rehearsal's and
+production's 108 public records are identical, LERs included.
+
+**Deployed before** 2026-10-05 16:36 UTC, from commit `f1e6273` (pushed): compiler `f88a49f79af1`, which
 keeps one waveform per cycle (R22) on drawn designs too. Before it, the reference compiler in
 the image put 15 R22 violations into `adder3` on an L-shaped path; now none. `VERSION` on the
 server is the record of every deployment, including the two between this one and the next
@@ -127,7 +325,7 @@ cancel if it is not: the base tag moves without notice. And a script piped to
 `ssh ... 'bash -s'` is cut short by the first `docker compose exec` in it, which reads the
 rest of the script as its stdin: give those commands `</dev/null`.
 
-**Deployed before** 2026-09-26 19:11 UTC (12:11 PDT), from commit `67703cb` (pushed). It carries
+**And before that** 2026-09-26 19:11 UTC (12:11 PDT), from commit `67703cb` (pushed). It carries
 `3eea898`, in which the Lean checker computes a certificate's replay once instead of about
 3,700 times. The specification, the soundness theorem and its axioms are unchanged. The
 previous deployment (`259aba6`) is in `.env.bak-259aba6` and `VERSION.bak-259aba6` for a
@@ -146,7 +344,7 @@ image stores name images differently. The operator uploader `deploy-smoke-67703c
 holds the private smoke submissions `os_2901e4026a976ff4` (GHZ) and `os_0909b51fd3c47007` (BB);
 its token was deleted after use.
 
-**And before that** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
+**Earlier** 2026-09-25 05:00 UTC (2026-09-24 22:00 PDT), from commit `259aba6` (pushed), which
 adds the website's five boards to the GHZ starter: `bb144@1`, `rep9@1`, `five_qubit@1`,
 `steane@1`, `surface17@1`. `VERSION` on the server records it; the previous deployment
 (`10152b1`, 2026-09-23) is in `.env.bak-10152b1` for a rollback. The GHZ release is

@@ -8,8 +8,11 @@ shaped the way it is, and what each milestone has to prove.
 
 The one-sentence version: `qccd/verify` reported 22 of its 23 rules on any program and skipped
 **R10 — "the compiled program implements the input circuit"** — because there was no QASM front end
-to check against. This directory is the front end, and **R10 now reports `passed`**, decided by a
-checker written in Lean and proved sound there (`QCCDC.Cert.check_sound`, axioms: `propext` only).
+to check against. This directory is the front end, and **R10 now reports `passed`**, decided in
+two halves: a checker written in Lean and proved sound there (`QCCDC.Cert.check_sound`, axioms:
+`propext` only) that the program follows its certificate — mapping, transport, co-location of
+each op's own ions, order — and a comparison of the emitted pulses with the source circuit,
+computed rather than proved, which is the half that sees which gate fires.
 
 ## Status
 
@@ -21,7 +24,7 @@ checker written in Lean and proved sound there (`QCCDC.Cert.check_sound`, axioms
 | **C3** place + route + aggregate → end-to-end compile, R10 `partial` | ✅ done |
 | **C4** SAT routing + optimality oracle | ✅ done |
 | **C5** placement relaxation + the (runtime, error) frontier | ✅ done |
-| **C6** Lean verified checker, **R10 `passed`** | ✅ done |
+| **C6** Lean verified checker; with the tableau check, **R10 `passed`** | ✅ done |
 | **C7** oracle reproduction — rigid rotation; BB[[144,12,12]] compiles and passes R10 (§11.9) | ◐ partial |
 
 C7 is ◐ because Cyclone's external oracle is still unattempted, not because the ring is.
@@ -47,7 +50,7 @@ The same seven statements on the same twelve traps, wired as a loop rather than 
 | machine steps | **32** | 44 |
 | runtime | **2.045 ms** | 2.615 ms |
 | all 20 checkable rules | pass | pass |
-| R10 (proved Lean checker) | **passed** | **passed** |
+| R10 (proved Lean checker + tableau) | **passed** | **passed** |
 
 The grid runs it **1.28x faster on the same number of traps**, and the reason is one row: a
 lattice gates where the ions already are; a ring has four gate zones and has to carry every
@@ -119,18 +122,25 @@ skipped R10: needs symbolic permutation + Pauli-frame tracking against a QASM DA
 It is now checked, in two halves.
 
 **Transport and ordering.** `QCCDC.Cert.check` is defined as `decide (Implements inp)`,
-where `Implements` is a *proposition* saying what it means for the program to realise the
-circuit: operands co-located at a trap that can gate, every move a hop the **architecture**
-admits, every op witnessed exactly once, dependent ops in program order. Soundness is then
-`of_decide_eq_true`, so all the content sits in a statement a reader can judge rather than
-in a pile of `Bool`s with a meaning asserted elsewhere. Ten further theorems prove each
-named way of being wrong is one `check` *cannot* accept — a dropped gate, a teleport, an
-aliased qubit, a reordering — and [`bridge/mutate_cert.py`](bridge/mutate_cert.py) injects
-all ten into real compiled certificates to confirm the checker rejects them in practice too.
+where `Implements` is a *proposition* saying what it means for the program to follow its
+certificate: each witness naming exactly the ions its op's qubits are mapped to, in any
+order, and the replay having them together at a trap that can gate; every move a hop the
+**architecture** admits; every op witnessed exactly once; dependent ops in program order.
+Soundness is then `of_decide_eq_true`, so all the content sits in a statement a reader can
+judge rather than in a pile of `Bool`s with a meaning asserted elsewhere. Eleven further
+theorems prove each named way of being wrong is one `check` *cannot* accept — a dropped
+gate, a teleport, an aliased qubit, a witness naming two other ions that happen to stand
+together, a reordering — and [`bridge/mutate_cert.py`](bridge/mutate_cert.py) seeds twelve
+such defects into real compiled certificates to confirm the checker rejects them in
+practice too. None of them is a wrong gate: a witness names an op, a cycle, a trap and
+ions, never a gate, so a two-qubit `barrier` compiled as a CX passes this half — compilers
+up to `c7c535380bfb` did exactly that — and only the semantic half refuses it.
 
-**Semantics.** The pulses are composed back into a stabilizer tableau — or, for small
-non-Clifford circuits, an exact unitary — and compared against the QASM. This reads the
-emitted program, not the compiler's claims about it.
+**Semantics.** The pulses are read out of the emitted program and composed back into a
+stabilizer tableau — or, for small non-Clifford circuits, an exact unitary — and compared
+with the source circuit's own, built from the QASM. This reads the emitted program, not the
+compiler's claims about it, and it is the half that says which gate fires. It is computed,
+not proved.
 
 The facts the checker judges against — which traps can gate, which pairs are one cycle
 apart, the cyclic order of each loop — are re-derived from the architecture document by code
@@ -164,21 +174,43 @@ limit: one `loop_shift` template advances *every* ion at once, so occupancy neve
 | batches | — | 546 | **396** |
 
 Fewer hops, more cycles — a different trade, not a free win. All applicable rules pass and
-R10 is `passed`, the proved checker deciding a 1,008-witness certificate in about five
-minutes.
+R10 is `passed`: the proved checker accepts the 1,008-witness certificate in under a second,
+and the tableau composed from the emitted pulses matches the circuit's.
 
 `compile` tries the general router first and rotation only once it has declined, so it can
 add programs that compile but never change one that already did. `--no-rotate` refuses the
 fallback, which is what [`bridge/c7_occupancy.py`](bridge/c7_occupancy.py) needs in order to
 measure the individual-ion router rather than the pair of them.
 
+The last fallback, after the race track, is **split rounds** (`Compile.run_split`, 2026-10-21).
+Two surface-5 patches side by side put 98 ions and about 50 movers per CNOT layer on grid9x9.
+Prioritised planning parks the first ions it routes, and they wall in the last, so every
+placement and trap order was refused on every shipped device. Split rounds change three things:
+
+* a round that cannot be routed runs again with half its gates; the rest wait for the next
+  round, as a gate with no free trap already does;
+* an operand walled off from its meeting trap by full traps has one idle ion moved out of each
+  full trap on its path;
+* the router's tolerant last rung is off, so a plan the verifier would reject is split again
+  rather than emitted.
+
+A round holds only gates on disjoint qubits, so each qubit keeps its gate order. Results:
+
+* the 98-ion circuit compiles on grid9x9, deck_unit_cell and cyclone_base;
+* every rule passes, and R10 passes with the proved checker on grid9x9;
+* outputs the general router, rotation or the race track produced before are byte-identical.
+
 Two of those results are ones the checker found rather than testing: the first rotation
 compiler emitted the ancilla Hadamards as pulses but never *witnessed* them (invisible to a
 tableau, which composes from what was emitted), and its scheduler reordered commuting `cx`
-gates, which the order rule rejected outright. The fix for the second was not to relax the
-rule but to prove the exemption — [`Cert/Commute.lean`](lean/QCCDC/Cert/Commute.lean) proves
-two `cx` gates commute when they share a control with distinct targets, or a target with
-distinct controls, and exhibits a state where a control/target chain does not.
+gates, which the order rule rejected outright. For a while the checker admitted that second
+reordering through a proved exemption — [`Cert/Commute.lean`](lean/QCCDC/Cert/Commute.lean)
+proves two `cx` gates commute when they share a control with distinct targets, or a target
+with distinct controls. Since 2026-10-19 it does not: the order of a qubit's gates is the
+circuit author's, not the compiler's (a syndrome round's CNOT order is chosen on purpose), and
+a reorder of commuting gates is invisible to the tableau, so the order rule is the only place
+to catch it. The scheduler now keeps each qubit's order, and both the order rule and
+`check_cert.py` reject a reorder, commuting or not.
 
 ## Build and run
 
@@ -210,7 +242,8 @@ bash Compiler/run_c1.sh
 bash Compiler/run_c2.sh
 
 # the C3 gate: compile 4 circuits onto 6 architectures, insert cooling, check all
-# 23 rules, and discharge R10 against the certificate
+# 23 rules, and decide R10: the proved checker holds the program to its
+# certificate, and the tableau composes its pulses back into the circuit
 bash Compiler/run_c3.sh
 
 # the C4 oracle: re-solve the router's own sub-problems exactly, and price the
@@ -251,9 +284,9 @@ cloning Mathlib at all.
 | [`ocaml/lib/place.ml`](ocaml/lib/place.ml) | placement — greedy weighted insertion |
 | [`ocaml/lib/route.ml`](ocaml/lib/route.ml) | the router: prioritised space-time A*, with the rules as its reservation table |
 | [`ocaml/lib/compile.ml`](ocaml/lib/compile.ml) | the pipeline, and TSIR emission |
-| [`ocaml/lib/cert.ml`](ocaml/lib/cert.ml) | the certificate R10 is discharged against |
+| [`ocaml/lib/cert.ml`](ocaml/lib/cert.ml) | the certificate: where and when each statement runs, which the proved checker holds the program to |
 | [`lean/QCCDC/Cert/`](lean/QCCDC/Cert/) | `Check.lean` (the specification), `Sound.lean` (proved), `qcheck` (compiled) |
-| [`bridge/mutate_cert.py`](bridge/mutate_cert.py) | 11 seeded defects the checker has to reject |
+| [`bridge/mutate_cert.py`](bridge/mutate_cert.py) | 12 seeded defects the checker has to reject |
 | [`bench/`](bench/) | the C1 corpus: 7 named circuits + 500 seeded random ones |
 | [`ocaml/bin/qccdc_cli.ml`](ocaml/bin/qccdc_cli.ml) | `qccdc` — the CLI |
 | [`bridge/`](bridge/) | Python side of the interface: export, replay, diff |

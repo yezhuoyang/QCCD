@@ -1,0 +1,215 @@
+# A machine for Shor's algorithm (the program shor15): the order of 7
+# modulo 15, fault-tolerant, every logical qubit a d = 3 surface-code block.
+#
+# What the program needs at once decided what is here:
+#   memory   six memories (mem_d3): the four work blocks and a control block rest for
+#            seconds between iterations, and a memory corrects a resting block in place --
+#            the town's three passive zones could neither hold them all nor keep them alive
+#            past the one-second budget (G8)
+#   compute  three lattice-surgery bridges: every T gate and every S-bar / sqrt-X-bar gadget
+#            is a surgery (44 of them), the busiest resource by far; one workshop for the
+#            22 transversal CNOTs; two readouts; one preparation place
+#   factory  two factories, each beside a pharmacy: 15 magic states, made while the
+#            computation runs
+#   supply   two depots, one for the compute rows and one beside the factories
+#   control  the decoder and the classical memory, wired to every door that carries bits
+#
+# Laid out in three rows between four streets, like the town; Shor's algorithm names this
+# floorplan (floorplan "shor"), and the floorplan rules F1-F9 hold on it.
+
+floorplan shor_d3 "A machine for Shor's algorithm (surface code, d = 3)"
+code surface_d3
+
+region supply
+place depot1    depot9  at 0 11
+place depot2    depot9  at 27 63
+
+region compute
+place prep      prep_d3 at 14 10
+place workshop  tcx_d3  at 48 11
+place post1     read_d3 at 62 10
+place bridge1   ls_d3   at 27 36
+place bridge2   ls_d3   at 79 36
+place post2     read_d3 at 114 36
+place bridge3   ls_d3   at 139 62
+
+region memory
+place mem1      mem_d3  at 31 10
+place mem2      mem_d3  at 73 10
+place mem3      mem_d3  at 90 10
+place mem4      mem_d3  at 62 36
+place mem5      mem_d3  at 73 62
+place mem6      mem_d3  at 90 62
+
+region factory
+place factory1  msf15   at 41 62
+place pharmacy1 inj_d3  at 56 62
+place factory2  msf15   at 107 62
+place pharmacy2 inj_d3  at 122 62
+
+region control
+place decoder   dec_d3  at 2 98
+place archive   arch1   at 24 98
+
+# junctions: where roads meet
+junction j0_0 at 0 0
+junction j0_1 at 8 0
+junction j0_2 at 14 0
+junction j0_3 at 25 0
+junction j0_4 at 31 0
+junction j0_5 at 42 0
+junction j0_6 at 48 0
+junction j0_7 at 56 0
+junction j0_8 at 62 0
+junction j0_9 at 67 0
+junction j0_10 at 73 0
+junction j0_11 at 84 0
+junction j0_12 at 90 0
+junction j0_13 at 101 0
+junction w0 at -6 0
+junction e0 at 174 0
+junction j1_0 at 27 26
+junction j1_1 at 48 26
+junction j1_2 at 56 26
+junction j1_3 at 62 26
+junction j1_4 at 73 26
+junction j1_5 at 79 26
+junction j1_6 at 108 26
+junction j1_7 at 114 26
+junction j1_8 at 119 26
+junction w1 at -6 26
+junction e1 at 174 26
+junction j2_0 at 27 52
+junction j2_1 at 35 52
+junction j2_2 at 50 52
+junction j2_3 at 56 52
+junction j2_4 at 67 52
+junction j2_5 at 73 52
+junction j2_6 at 79 52
+junction j2_7 at 84 52
+junction j2_8 at 90 52
+junction j2_9 at 101 52
+junction j2_10 at 108 52
+junction j2_11 at 116 52
+junction j2_12 at 122 52
+junction j2_13 at 133 52
+junction j2_14 at 139 52
+junction j2_15 at 168 52
+junction w2 at -6 52
+junction e2 at 174 52
+junction j3_0 at 41 78
+junction j3_1 at 56 78
+junction j3_2 at 107 78
+junction j3_3 at 122 78
+junction j3_4 at 139 78
+junction j3_5 at 168 78
+junction w3 at -6 78
+junction e3 at 174 78
+
+# roads: conveyors between doors and junction arms
+road j0_0.s -- depot1.out as door_depot1_out
+road j0_1.s -- depot1.in as door_depot1_in
+road j0_2.s -- prep.in as door_prep_in
+road j0_3.s -- prep.out as door_prep_out
+road j0_4.s -- mem1.in as door_mem1_in
+road j0_5.s -- mem1.out as door_mem1_out
+road j0_6.s -- workshop.a_in as door_workshop_a_in
+road j0_7.s -- workshop.a_out as door_workshop_a_out
+road j0_8.s -- post1.in as door_post1_in
+road j0_9.s -- post1.out as door_post1_out
+road j0_10.s -- mem2.in as door_mem2_in
+road j0_11.s -- mem2.out as door_mem2_out
+road j0_12.s -- mem3.in as door_mem3_in
+road j0_13.s -- mem3.out as door_mem3_out
+road w0.e -- j0_0.w as street0_w0_j0_0
+road j0_0.e -- j0_1.w as street0_j0_0_j0_1
+road j0_1.e -- j0_2.w as street0_j0_1_j0_2
+road j0_2.e -- j0_3.w as street0_j0_2_j0_3
+road j0_3.e -- j0_4.w as street0_j0_3_j0_4
+road j0_4.e -- j0_5.w as street0_j0_4_j0_5
+road j0_5.e -- j0_6.w as street0_j0_5_j0_6
+road j0_6.e -- j0_7.w as street0_j0_6_j0_7
+road j0_7.e -- j0_8.w as street0_j0_7_j0_8
+road j0_8.e -- j0_9.w as street0_j0_8_j0_9
+road j0_9.e -- j0_10.w as street0_j0_9_j0_10
+road j0_10.e -- j0_11.w as street0_j0_10_j0_11
+road j0_11.e -- j0_12.w as street0_j0_11_j0_12
+road j0_12.e -- j0_13.w as street0_j0_12_j0_13
+road j0_13.e -- e0.w as street0_j0_13_e0
+road j1_0.s -- bridge1.in_a as door_bridge1_in_a
+road j1_1.n -- workshop.b_in as door_workshop_b_in
+road j1_2.n -- workshop.b_out as door_workshop_b_out
+road j1_2.s -- bridge1.out_a as door_bridge1_out_a
+road j1_3.s -- mem4.in as door_mem4_in
+road j1_4.s -- mem4.out as door_mem4_out
+road j1_5.s -- bridge2.in_a as door_bridge2_in_a
+road j1_6.s -- bridge2.out_a as door_bridge2_out_a
+road j1_7.s -- post2.in as door_post2_in
+road j1_8.s -- post2.out as door_post2_out
+road w1.e -- j1_0.w as street1_w1_j1_0
+road j1_0.e -- j1_1.w as street1_j1_0_j1_1
+road j1_1.e -- j1_2.w as street1_j1_1_j1_2
+road j1_2.e -- j1_3.w as street1_j1_2_j1_3
+road j1_3.e -- j1_4.w as street1_j1_3_j1_4
+road j1_4.e -- j1_5.w as street1_j1_4_j1_5
+road j1_5.e -- j1_6.w as street1_j1_5_j1_6
+road j1_6.e -- j1_7.w as street1_j1_6_j1_7
+road j1_7.e -- j1_8.w as street1_j1_7_j1_8
+road j1_8.e -- e1.w as street1_j1_8_e1
+road j2_0.n -- bridge1.in_b as door_bridge1_in_b
+road j2_0.s -- depot2.out as door_depot2_out
+road j2_1.s -- depot2.in as door_depot2_in
+road j2_2.s -- factory1.out as door_factory1_out
+road j2_3.n -- bridge1.out_b as door_bridge1_out_b
+road j2_3.s -- pharmacy1.in as door_pharmacy1_in
+road j2_4.s -- pharmacy1.out as door_pharmacy1_out
+road j2_5.s -- mem5.in as door_mem5_in
+road j2_6.n -- bridge2.in_b as door_bridge2_in_b
+road j2_7.s -- mem5.out as door_mem5_out
+road j2_8.s -- mem6.in as door_mem6_in
+road j2_9.s -- mem6.out as door_mem6_out
+road j2_10.n -- bridge2.out_b as door_bridge2_out_b
+road j2_11.s -- factory2.out as door_factory2_out
+road j2_12.s -- pharmacy2.in as door_pharmacy2_in
+road j2_13.s -- pharmacy2.out as door_pharmacy2_out
+road j2_14.s -- bridge3.in_a as door_bridge3_in_a
+road j2_15.s -- bridge3.out_a as door_bridge3_out_a
+road w2.e -- j2_0.w as street2_w2_j2_0
+road j2_0.e -- j2_1.w as street2_j2_0_j2_1
+road j2_1.e -- j2_2.w as street2_j2_1_j2_2
+road j2_2.e -- j2_3.w as street2_j2_2_j2_3
+road j2_3.e -- j2_4.w as street2_j2_3_j2_4
+road j2_4.e -- j2_5.w as street2_j2_4_j2_5
+road j2_5.e -- j2_6.w as street2_j2_5_j2_6
+road j2_6.e -- j2_7.w as street2_j2_6_j2_7
+road j2_7.e -- j2_8.w as street2_j2_7_j2_8
+road j2_8.e -- j2_9.w as street2_j2_8_j2_9
+road j2_9.e -- j2_10.w as street2_j2_9_j2_10
+road j2_10.e -- j2_11.w as street2_j2_10_j2_11
+road j2_11.e -- j2_12.w as street2_j2_11_j2_12
+road j2_12.e -- j2_13.w as street2_j2_12_j2_13
+road j2_13.e -- j2_14.w as street2_j2_13_j2_14
+road j2_14.e -- j2_15.w as street2_j2_14_j2_15
+road j2_15.e -- e2.w as street2_j2_15_e2
+road j3_0.n -- factory1.in as door_factory1_in
+road j3_1.n -- pharmacy1.magic as door_pharmacy1_magic
+road j3_2.n -- factory2.in as door_factory2_in
+road j3_3.n -- pharmacy2.magic as door_pharmacy2_magic
+road j3_4.n -- bridge3.in_b as door_bridge3_in_b
+road j3_5.n -- bridge3.out_b as door_bridge3_out_b
+road w3.e -- j3_0.w as street3_w3_j3_0
+road j3_0.e -- j3_1.w as street3_j3_0_j3_1
+road j3_1.e -- j3_2.w as street3_j3_1_j3_2
+road j3_2.e -- j3_3.w as street3_j3_2_j3_3
+road j3_3.e -- j3_4.w as street3_j3_3_j3_4
+road j3_4.e -- j3_5.w as street3_j3_4_j3_5
+road j3_5.e -- e3.w as street3_j3_5_e3
+road w0.s -- w1.n as west_0
+road e0.s -- e1.n as east_0
+road w1.s -- w2.n as west_1
+road e1.s -- e2.n as east_1
+road w2.s -- w3.n as west_2
+road e2.s -- e3.n as east_2
+
+# wires: bits, never ions -- every classical door to the control floor, along a bus
+wires auto bus 88

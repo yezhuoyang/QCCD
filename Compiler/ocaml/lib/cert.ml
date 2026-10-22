@@ -233,6 +233,21 @@ let check ?(loops : (string * string array) list = []) (c : t) : failure list =
     bad "map"
       (Printf.sprintf "covers %d of %d qubits" (List.length c.map_) c.n_qubits);
 
+  (* a gate witness names a GATE.  A barrier is a fence and is performed by nothing, so a
+     witness for one means pulses were emitted for it: the conveyor compiled `barrier a,b`
+     as a CX, and this check, which only asked where the operands stood, said OK. *)
+  let barrier = Hashtbl.create 16 in
+  List.iter
+    (fun (o : circuit_op) -> if o.oname = "barrier" then Hashtbl.replace barrier o.oi ())
+    c.circuit_ops;
+  List.iter
+    (fun (g : gate_witness) ->
+      if Hashtbl.mem barrier g.dag then
+        bad
+          (Printf.sprintf "gate dag=%d" g.dag)
+          "op is a barrier: an ordering fence, which no gate performs")
+    c.gates;
+
   (* replay the moves; the certificate's own positions are never consulted *)
   let pos = Hashtbl.create 64 in
   List.iter (fun (ion, site) -> Hashtbl.replace pos ion site) c.init;

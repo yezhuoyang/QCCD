@@ -57,16 +57,110 @@ def _cmd_algorithm(a) -> int:
     from .verified import build_algorithm
     out = a.out or f"out/gadgets/algorithms/{Path(a.program).stem}"
     res = build_algorithm(a.program, out_dir=out, cache_dir=a.cache, rebuild=a.rebuild,
-                          studio_dir=Path(out) / "studio" if a.studio else None)
+                          studio_dir=Path(out) / "studio" if a.studio else None,
+                          floorplan=a.floorplan, parallel=not a.sequential)
     so = res["signoff"]
+    st = res["stats"]
+    tr = st["traffic"]
+    print(f"  {st['policy']}: makespan {st['makespan_ms']} ms; traffic {tr['ion_sites']} ion-sites "
+          f"in {tr['carries']} carries, {tr['junction_passes']} junction passes, bundles waited "
+          f"{tr['wait_us'] / 1000:.1f} ms; up to {tr['peak_parallel_ops']} places at work at once")
+    rl = res["rules"]
+    print(f"  machine rules: {len(rl['passed'])} hold" + (f", FAIL {', '.join(rl['failed'])}"
+                                                          if rl["failed"] else ""))
+    for r in rl["rules"]:
+        if r["verdict"] == "fails":
+            print(f"    {r['id']}: {r.get('count', 0)} counterexample(s), e.g. "
+                  f"{'; '.join(r.get('examples', [])[:2])}")
     for r in so.get("relations", []):
         print(f"  {'ok ' if r['ok'] else 'BAD'} {r['relation']}")
     for f in so.get("flows", []):
         print(f"  {'ok ' if f['ok'] else 'BAD'} {f['flow']}")
     d = so.get("distance", {})
-    print(f"  distance: {d.get('skipped') or ('>= 3' if d.get('passed') else d)}")
+    if so.get("skipped"):
+        print(f"  flat sign-off: not run -- {so['skipped']}")
+    else:
+        print(f"  distance: {d.get('skipped') or ('>= 3' if d.get('passed') else d)}")
+    cs = res["compositional"]
+    print(f"  compositional sign-off: {'passed' if cs['passed'] else 'NOT passed'}")
+    for part, row in cs["parts"].items():
+        extra = ""
+        if part == "gates":
+            extra = ", ".join(f"{g['gate']}={g['contract']} ({len(g.get('branches', []))} branch"
+                              f"{'es' if len(g.get('branches', [])) != 1 else ''})"
+                              for g in row["rows"])
+        elif part == "semantics":
+            extra = "; ".join(f"{' '.join(f'{k}={v}' for k, v in r['outcomes'].items())}: {r['p']:g}"
+                              for r in row["distribution"][:8])
+        elif part == "composition":
+            extra = f"{len(row['held'])} machine rules hold" + (f", FAIL {row['failed']}" if row["failed"] else "")
+        print(f"    {'ok ' if row['passed'] else 'BAD'} {part}{': ' + extra if extra else ''}")
+    if st.get("refreshes"):
+        print(f"  {st['refreshes']} syndrome round(s) added so no block waits past its budget")
     print(f"  wrote {Path(out) / 'index.html'}")
-    return 0 if so.get("passed") and not res["checks"]["failed"] else 1
+    signed = so.get("passed") or res["compositional"]["passed"]
+    return 0 if signed and not res["checks"]["failed"] and not rl["failed"] else 1
+
+
+def _cmd_floorplan(a) -> int:
+    """Read a floorplan, judge it by the floorplan rules, print the verdicts."""
+    from .floorplan import FloorplanError, load_file
+    from .judge import judge_floorplan
+    from .library import LeafLibrary
+    leaves = LeafLibrary(a.cache, rebuild=a.rebuild)
+    try:
+        lib, fp = load_file(a.floorplan, leaves)
+    except FloorplanError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    top = lib[lib.top]
+    n_j = sum(1 for i in top.instances if i.master == "junc9")
+    print(f"{fp.name}: {len(top.instances) - n_j} places, {n_j} junctions, "
+          f"{sum(1 for c in top.channels if c.kind != 'wire')} roads, "
+          f"{sum(1 for c in top.channels if c.kind == 'wire')} wires")
+    rep = judge_floorplan(lib, leaves, regions=fp.regions)
+    for r in rep["rules"]:
+        mark = {"holds": "ok  ", "fails": "FAIL"}.get(r["verdict"], "--  ")
+        extra = (f": {r.get('count', 0)} counterexample(s), e.g. "
+                 f"{'; '.join(r.get('examples', [])[:3])}" if r["verdict"] == "fails" else
+                 (f": {r.get('reason')}" if r.get("reason") else ""))
+        print(f"  {mark} {r['id']} {r['title']}{extra}")
+    return 0 if rep["ok"] else 1
+
+
+def _cmd_optimize(a) -> int:
+    """Search the floorplans of the town family for one that runs a program with less
+    traffic (or a shorter makespan), each candidate scheduled; write the best as text."""
+    from pathlib import Path as _P
+    from .algorithm import parse_algorithm_file
+    from .floorplan import FLOORPLANS_DIR, load_file
+    from .library import LeafLibrary
+    from .optimize import floorplan_text, optimise, rows_of
+    leaves = LeafLibrary(a.cache, rebuild=a.rebuild)
+    alg = parse_algorithm_file(a.program)
+    base = a.floorplan or (FLOORPLANS_DIR / f"{alg.floorplan}.floor" if alg.floorplan else None)
+    if base is None:
+        print("name a floorplan to start from (--floorplan F)", file=sys.stderr)
+        return 2
+    lib, fp = load_file(base, leaves)
+    res = optimise(alg, rows_of(lib), leaves, objective=a.objective, budget=a.budget,
+                   seed=a.seed, log=print)
+    s0, s1 = res["start"], res["best"]
+    print(f"  {res['seconds']} s, {a.budget} candidates scheduled: traffic {s0['traffic']:,} -> "
+          f"{s1['traffic']:,} ion-sites ({100 * (s1['traffic'] - s0['traffic']) / s0['traffic']:+.1f}%), "
+          f"makespan {s0['makespan_us'] / 1e6:.2f} -> {s1['makespan_us'] / 1e6:.2f} s")
+    out = _P(a.out or _P(base).with_name(_P(base).stem + f"_{a.objective}.floor"))
+    # the note is part of the file, and the file is shown on the design page: site words only
+    note = (f"found by the floorplan optimiser from the floorplan {_P(base).stem}, for {alg.title}: "
+            f"objective {a.objective},\n{a.budget} candidates (seed {a.seed}), each scheduled;\n"
+            f"traffic {s0['traffic']:,} -> {s1['traffic']:,} ion-sites (before refresh rounds), makespan "
+            f"{s0['makespan_us'] / 1e6:.2f} -> {s1['makespan_us'] / 1e6:.2f} s")
+    from .town import town as _town
+    res["lib"] = _town(leaves, name=f"{fp.name}_{a.objective}", rows=res["rows"])
+    out.write_text(floorplan_text(res, title=f"{fp.title} (less {a.objective})", comment=note),
+                   encoding="utf-8", newline="\n")
+    print(f"  wrote {out}")
+    return 0
 
 
 def _cmd_parse(a) -> int:
@@ -172,12 +266,26 @@ def main(argv=None) -> int:
     common(b)
     pl = sub.add_parser("places", help="characterize and verify the place library, print it")
     common(pl)
-    al = sub.add_parser("algorithm", help="schedule a logical algorithm on the town, sign it off")
+    al = sub.add_parser("algorithm", help="schedule a logical algorithm on a floorplan, sign it off")
     al.add_argument("program", help="an .alg file (qccd/gadget/algorithm.py)")
     al.add_argument("-o", "--out")
+    al.add_argument("--floorplan", help="a .floor file to run on (default: the town)")
+    al.add_argument("--sequential", action="store_true",
+                    help="one instruction, and one road trip, at a time")
     al.add_argument("--studio", action="store_true",
                     help="also write the full studio page for every op used")
     common(al)
+    op = sub.add_parser("optimize", help="search floorplans for less traffic, each candidate scheduled")
+    op.add_argument("program", help="an .alg file")
+    op.add_argument("--floorplan", help="the floorplan to start from (default: the one the program names)")
+    op.add_argument("--objective", choices=("traffic", "makespan", "both"), default="traffic")
+    op.add_argument("--budget", type=int, default=40, help="candidates to schedule (default 40)")
+    op.add_argument("--seed", type=int, default=1)
+    op.add_argument("-o", "--out")
+    common(op)
+    fl = sub.add_parser("floorplan", help="read a floorplan and judge it by the floorplan rules")
+    fl.add_argument("floorplan", help="a .floor file (qccd/gadget/floorplan.py)")
+    common(fl)
     p = sub.add_parser("parse", help="show what the LogicQ front end understood")
     p.add_argument("program")
     lb = sub.add_parser("library", help="characterize and print the leaf and pair masters")
@@ -199,7 +307,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     return {"build": _cmd_build, "parse": _cmd_parse, "library": _cmd_library,
             "showcase": _cmd_showcase, "site": _cmd_site, "places": _cmd_places,
-            "algorithm": _cmd_algorithm}[a.cmd](a)
+            "algorithm": _cmd_algorithm, "floorplan": _cmd_floorplan,
+            "optimize": _cmd_optimize}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,18 @@
+{
+ "id": "algo_ghz",
+ "title": "A GHZ chain",
+ "note": "every CNOT shares a qubit with the next: the placer lays the chain along the register, and no ion is sent home while the next gate still needs it",
+ "compiler": "5 layers, 3 transport cycles, 13 beams, 3 MS, 1 virtual-Z, 25 instructions",
+ "device": "chain4",
+ "device_about": "a four-site linear register C0\u2013C3, every site a trap, no junctions",
+ "notes": [
+  "seeded q1 (weight 2) at C1",
+  "candidates: greedy 5, spectral 4 -> spectral",
+  "hill-climb 4 -> 3 in 2 rounds",
+  "weighted interaction distance 3 over 3 distinct pairs"
+ ],
+ "regime": "conveyor",
+ "n_qubits": 4,
+ "compile_seconds": 0.02,
+ "check_seconds": 1.1
+}

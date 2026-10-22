@@ -160,10 +160,11 @@ router stops at **46.2% loop occupancy**; rigid rotation has no such limit but p
 cyclic order, so it only serves bipartite interaction graphs.
 
 Unexplored: the SAT encoding from `Compiler/PLAN.md` §6 as an *optimiser* rather than an
-oracle; hybrid rotation + local swaps; routing that reorders commuting `cx` gates
-(the commutation rule is already **proved** in
-[`Cert/Commute.lean`](../Compiler/lean/QCCDC/Cert/Commute.lean), so a scheduler may use it
-and still pass R10).
+oracle; hybrid rotation + local swaps. Not open: routing that reorders commuting `cx`
+gates. Since 2026-10-19 the compiler may not change the order of a qubit's gates, commuting
+or not -- the order is the circuit author's -- and R10 rejects such a program (the Lean order
+rule and `check_cert.py` both). A schedule that wants another CNOT order must emit it as the
+circuit (`gen_bb144.py --schedule`), where `esm_check.py` can judge it.
 
 ### 4. Cooling budget
 

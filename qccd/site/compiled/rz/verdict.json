@@ -1,0 +1,15 @@
+{
+ "program": "circuit",
+ "arch": "chain4",
+ "circuit_sha256": "e91b74274605f957819f7924089970b1c0c27d56be3101d8f070ebf6f8f3427c",
+ "binding": "ok",
+ "o1_transport": "ok",
+ "order": "ok",
+ "lean": "accepted",
+ "unrealised_ops": 0,
+ "readout": "ok: 0 measurement(s)/reset(s) compared in place, final measurements at the end",
+ "o2_semantics": "ok (max entry error 1.12e-16)",
+ "method": "exact 4x4 unitary, built from the emitted pulses, against the source QASM; global phase +0.3927",
+ "R10": "passed",
+ "R10_reason": "O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by exact 4x4 unitary, built from the emitted pulses, against the source QASM; global phase +0.3927"
+}

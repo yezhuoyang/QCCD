@@ -724,7 +724,7 @@
   "hardware": {
    "use": "agent",
    "kind": "read",
-   "does": "the hardware totals (DACs, junctions, electrodes, ...)"
+   "does": "the device's hardware as it is now: electrodes, DACs, switches, junctions, ion capacity"
   },
   "programBreaks": {
    "use": "agent",
@@ -1062,8 +1062,31 @@
   },
   "lessonHint": {
    "use": "agent",
+   "kind": "view",
+   "does": "start the lesson's walk-through (Hint): the page dims and the next control to press is ringed; returns that step's sentence"
+  },
+  "guideStart": {
+   "use": "agent",
+   "kind": "view",
+   "does": "start the walk-through for the open lesson's step: dims the page and rings the next control to press"
+  },
+  "guideStop": {
+   "use": "agent",
+   "kind": "view",
+   "does": "close the walk-through; nothing on the page is dimmed"
+  },
+  "guideState": {
+   "use": "agent",
    "kind": "read",
-   "does": "the lesson's next hint"
+   "does": "the walk-through's current step: what to do, the gesture, where on the screen, and whether a press there reaches it"
+  },
+  "guideDo": {
+   "use": "harness",
+   "does": "make the walk-through's current step (its Show me button)"
+  },
+  "guideNext": {
+   "use": "harness",
+   "does": "the walk-through's Next button, for a step that is only read"
   },
   "lessonSolution": {
    "use": "agent",

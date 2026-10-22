@@ -1,0 +1,65 @@
+# A floorplan's rules: where places stand, and how roads and wires join them.
+#
+# Judged on the floorplan alone, before any program runs on it (docs/ARCHITECTURE.md §3).
+# Every word is defined on the Rules page; a floorplan is written in the language of
+# qccd/gadget/floorplan.py.
+
+ruleset "floorplan"
+level "machine"
+title "A floorplan's rules"
+about "Places, junctions, roads and wires, judged before any program is scheduled: what any floorplan must respect, whoever drew it."
+
+rule F1 "A road or a wire joins two doors that agree" core
+  about "Both ends carry the same thing -- ions of the same role, width and code, or bits of the same signal -- and they face opposite ways."
+  (for all r in roads, a in ends(r), b in ends(r) where a != b:
+     medium(a) = medium(b)
+     and (role(a) = role(b) or role(a) = "any" or role(b) = "any")
+     and (role(a) != "data" or role(b) != "data" or
+          (width(a) = width(b) and (code(a) = none or code(b) = none or code(a) = code(b))))
+     and (dir(a) != dir(b) or dir(a) = "inout"))
+  and (for all w in wires, a in ends(w), b in ends(w) where a != b:
+     medium(a) = medium(b)
+     and (signal(a) = signal(b) or signal(a) = "any" or signal(b) = "any")
+     and (dir(a) != dir(b) or dir(a) = "inout"))
+
+rule F2 "Every door of a place is on one road, and a junction arm on one at most" core
+  about "A place's ions come and go through its doors, so each door is on exactly one road; a junction's arm is on at most one."
+  (for all d in doors where medium(d) = "ions" and family(owner(d)) != "road":
+     count(r in roads where d in ends(r)) = 1)
+  and (for all d in doors where family(owner(d)) = "road":
+     count(r in roads where d in ends(r)) <= 1)
+
+rule F3 "Footprints do not overlap" core
+  about "No two places (or junctions) stand on the same piece of the chip."
+  for all p, q in placed where p != q: not overlaps(p, q)
+
+rule F4 "Roads meet only at junctions" core
+  about "A road runs through no place it does not serve, and two roads never cross or touch: where roads meet, there is a junction, and they meet it through its arms."
+  (for all r in roads, p in placed where p not in owners(r): not passes_through(r, p))
+  and (for all r1, r2 in roads where r1 != r2: not crosses(r1, r2))
+
+rule F5 "A bundle can wait in front of every door"
+  about "A road that ends at a place's door holds at least a whole bundle, so a bundle that arrives while the place is busy can wait on it."
+  for all r in roads, d in ends(r) where family(owner(d)) != "road":
+    length(r) >= width(d)
+
+rule F6 "Every out door reaches every in door"
+  about "A bundle leaving any place can be brought to any other place, along roads and through junctions."
+  for all a, b in doors where medium(a) = "ions" and medium(b) = "ions" and dir(a) = "out" and dir(b) = "in" and family(owner(a)) != "road" and family(owner(b)) != "road" and owner(a) != owner(b):
+    reachable(a, b)
+
+rule F7 "Every classical door of a place is wired to the control floor"
+  about "Every place that measures, reports an outcome or can be told to run has each of those doors wired to the decoder or the classical memory."
+  for all d in doors where medium(d) = "bits" and not classical(owner(d)):
+    for some w in wires where d in ends(w):
+      for some e in ends(w) where e != d: classical(owner(e))
+
+rule F8 "The decoder's corrections reach the classical memory"
+  about "The decoder's frame door is wired to a classical memory, which is where corrections are kept."
+  for all d in doors where family(owner(d)) = "decoder" and signal(d) = "frame":
+    for some w in wires where d in ends(w):
+      for some e in ends(w) where e != d: family(owner(e)) = "archive"
+
+rule F9 "Every place stands in a region of its kind"
+  about "Zones in memory; preparation, syndrome extraction, transversal gates, lattice surgery and readout in compute; factories and injection in factory; depots in supply; the decoder and the classical memory in control; junctions in traffic."
+  for all p in placed: region(p) = home_region(family(p))

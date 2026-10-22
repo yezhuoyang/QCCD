@@ -90,6 +90,40 @@ def _arc(slots: Sequence[int], capacity: int) -> tuple[int, list[int]]:
     return anchor, [(anchor - x) % capacity for x in s]
 
 
+def _ordered_arc(slots: Sequence[int], capacity: int) -> tuple[int, list[int]]:
+    """The anchor slot and the relative contact offsets of a check, IN MEMBER ORDER.
+
+    A check's CNOTs happen in the order its members are listed: that order is the code's,
+    not the scheduler's, and two of them commuting does not make it ours to change
+    (decided 2026-10-19). The first member fixes when the check starts; every later member
+    is met at its first arrival after the previous contact, `(slot(prev) - slot(q)) mod
+    capacity` offsets on. So the anchor is the first member's slot and the arc can be wider
+    than `_arc`'s narrowest one -- more than a revolution, when the order runs against the
+    loop.
+    """
+    s = [x % capacity for x in slots]
+    rel, at = [0], 0
+    for prev, q in zip(s, s[1:]):
+        at += (prev - q) % capacity or capacity
+        rel.append(at)
+    return s[0], rel
+
+
+def _in_member_order(c: Check, slot_of: Mapping[int, int], dock: int, start: int,
+                     capacity: int) -> list[tuple[int, int]]:
+    """`(offset, member)` for every member of `c` at `dock`, in member order: the first at
+    its first arrival at or after `start`, each later one at its first arrival after the
+    previous contact."""
+    out: list[tuple[int, int]] = []
+    lo = start
+    for q in c.members:
+        base = (dock - slot_of[q]) % capacity
+        off = lo + (base - lo) % capacity
+        out.append((off, q))
+        lo = off + 1
+    return out
+
+
 def bind_dynamic(
     checks: Sequence[Check],
     slot_of: Mapping[int, int],
@@ -121,7 +155,7 @@ def bind_dynamic(
     anchors: dict[int, tuple[int, int]] = {}   # check index -> (anchor slot, width)
     by_anchor: dict[int, list[int]] = {}
     for i, c in enumerate(checks):
-        anchor, rel = _arc([slot_of[q] for q in c.members], capacity)
+        anchor, rel = _ordered_arc([slot_of[q] for q in c.members], capacity)
         anchors[i] = (anchor, max(rel))
         by_anchor.setdefault(anchor, []).append(i)
     if order == "widest_first":
@@ -148,12 +182,7 @@ def bind_dynamic(
             if pick is None:
                 continue
             c = checks[pick]
-            contacts = []
-            for q in c.members:
-                base = (d - slot_of[q]) % capacity
-                off = t + (base - t) % capacity
-                contacts.append((off, q))
-            contacts.sort()
+            contacts = _in_member_order(c, slot_of, d, t, capacity)
             end = contacts[-1][0]
             out.append(Assignment(c, d, t, end, tuple(contacts)))
             busy_until[d] = end
@@ -207,13 +236,7 @@ def bind_fixed_waves(
         wave_end = cursor
         for j, c in enumerate(group):
             dock = docks[j % len(docks)]
-            contacts = []
-            for q in c.members:
-                base = (dock - slot_of[q]) % capacity
-                off = base + ((cursor - base + capacity - 1) // capacity) * capacity \
-                    if cursor > base else base
-                contacts.append((off, q))
-            contacts.sort()
+            contacts = _in_member_order(c, slot_of, dock, cursor, capacity)
             out.append(Assignment(c, dock, contacts[0][0], contacts[-1][0],
                                   tuple(contacts)))
             wave_end = max(wave_end, contacts[-1][0])

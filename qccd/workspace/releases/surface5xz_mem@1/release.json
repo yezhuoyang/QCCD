@@ -1,0 +1,130 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:6eab85c3ed8ba84bd70082a9dc83324316a5e5e8495862f1f2481b542acaef71",
+  "file": "circuit.qasm"
+ },
+ "description": "Five rounds of two distance-5 rotated surface-code patches in lockstep, one a Z memory and one an X memory (98 ions: 50 data, 48 ancillas, reset and reused every round), then the data read out, each patch in its own basis. Ranked by the logical error rate per round (a shot fails if either patch does) under qccd-noise@2, with Helios-class physics in which every number is cited.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 600,
+  "lean_timeout_s": 1800,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('quantinuum')",
+   "better": "low",
+   "name": "T_quantinuum",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  },
+  {
+   "about": "logical error rate per syndrome round, 1-(1-LER)^(1/rounds), under the release's noise model",
+   "better": "low",
+   "name": "ler_per_round",
+   "unit": "per round"
+  },
+  {
+   "about": "logical error rate of the whole memory experiment (Monte Carlo, fixed seed, 95% interval in the report)",
+   "better": "low",
+   "name": "ler",
+   "unit": "per experiment"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 8,
+ "physics": {
+  "digest": "sha256:8f08a9b687e5f7026b85e71270bfff1591c421dfc2da0fa08391c11a923c967c",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "quantinuum",
+  "tables": [
+   "quantinuum"
+  ]
+ },
+ "qec": {
+  "detectors": {
+   "digest": "sha256:ef450c0b0cfcecb5c1883b54cb5d9661a0202d8063809ca6dd67321db6f62ed0",
+   "file": "detectors.json"
+  },
+  "experiment": "surface5xz_r5",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 400,
+   "max_shots": 2000000,
+   "seed": 20261021
+  },
+  "noise": "qccd-noise@2"
+ },
+ "rank_by": "ler_per_round",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics",
+  "ler"
+ ],
+ "starter": {
+  "generator": "grid",
+  "name": "grid9x9",
+  "params": {
+   "a": 9,
+   "b": 9
+  }
+ },
+ "task": "surface5xz_mem",
+ "title": "Surface code memory, distance 5, both bases",
+ "track": "codesign-artifact",
+ "version": 1
+}

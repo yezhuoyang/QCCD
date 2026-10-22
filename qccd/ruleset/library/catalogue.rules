@@ -1,0 +1,246 @@
+# Every rule this website knows, each written once.  A rule set picks the ones it assumes
+# (`use`), sets their parameters (`param`) and may write rules of its own.  The rules marked
+# `core` hold in every rule set: no model of a QCCD machine does without them.
+#
+# The words a rule may use -- sites, occupancy, simultaneous, ... -- are defined on the
+# Rules page, with how each is read off a programme and off a paper's timed schedule.
+
+ruleset "catalogue"
+title "Every rule"
+
+param max_chain = 15
+param serial_kinds = {"gate2", "split", "merge"}
+
+# ---------------------------------------------------------------- what every model shares
+
+rule R0 "Every operation finds its ions where it says they are" core
+  about "Each operation names its ions and where they are; replaying the execution from the start must find them there, and every ion must end it standing in a site."
+  setup_ok()
+  and (for all o in operations: well_formed(o) and found(o))
+  and (for all i in ions: position(i, final()) != none)
+
+rule R1 "A site holds at most its capacity" core
+  about "An ion standing in a site, or passing through it, takes one of its places."
+  source "deck_v3; arXiv:2004.04706; arXiv:2511.15910"
+  for all s in sites, t in instants:
+    occupancy(s, t) <= capacity(s)
+
+rule R8 "An ion does one thing at a time" core
+  about "No ion takes part in two operations at once: it cannot be gated in one place while it is carried to another."
+  source "deck_v3"
+  for all a, b in operations where a != b and simultaneous(a, b):
+    disjoint(ions(a), ions(b))
+
+rule R24 "Every two-qubit gate of the circuit is performed, and no other" core
+  about "Each two-qubit gate of the input circuit is carried out, and the execution performs no two-qubit gate the circuit does not ask for."
+  (for all c in circuit_ops where needs_gate(c): gate_count(c) >= 1)
+  and (for all g in two_qubit_gates: serves_circuit(g))
+
+# ---------------------------------------------------------------- transport
+
+rule R2 "A junction holds one ion at a time"
+  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through."
+  source "deck_v3; arXiv:2510.23519"
+  for all j in junctions, t in instants:
+    occupancy(j, t) <= 1
+
+rule R3 "A rail carries at most its capacity"
+  about "No more ions travel along one rail at once than the rail is built for (one, on most devices)."
+  source "deck_v3; arXiv:2510.23519"
+  for all r in rails, t in instants:
+    occupancy(r, t) <= capacity(r)
+
+rule R4 "Every transport step uses a movement the device declares"
+  about "A step's motion is one of the movement classes the device's control system is built to produce."
+  source "deck_v3; arXiv:2504.17886"
+  for all k in steps where is_transport(k): class_declared(k)
+
+rule R4d "The control channels can drive every transport step"
+  about "One channel carries one waveform: every ion a channel moves must move the same way, and a site may sit a step out only if it has its own switch."
+  source "deck_v3; arXiv:2403.00756; arXiv:2305.03828"
+  for all k in steps where is_transport(k): drivable(k)
+
+rule R4b "A step either moves ions or gates them, never both"
+  about "Moving ions within traps and between them use different control pathways, and neither runs alongside gates."
+  source "arXiv:2504.17886"
+  for all k in steps where is_transport(k):
+    mode(k) in {"intra", "inter"} and not carries_gates(k)
+
+rule R5 "No two ions swap places along one rail in one step"
+  about "Two ions cannot pass each other on a rail."
+  source "deck_v3"
+  for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b):
+    not (from(a) = to(b) and to(a) = from(b))
+
+rule R11 "Along a loop, every ion moves the same way in a step"
+  about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the device."
+  source "arXiv:2511.15910"
+  (for all a, b in hops where simultaneous(a, b) and loop(a) = loop(b) and loop(a) != none:
+     shift(a) = shift(b))
+  and (for all j in junctions: priced(j))
+
+rule R14 "A split takes the ion at the end of its chain, or pays to reorder"
+  about "An ion leaves its chain from the end that faces the rail; an ion further in must first be swapped to that end, which costs gates."
+  source "arXiv:2510.23519"
+  for all m in splits: at_chain_end(m) or swap_paid(m)
+
+rule R22 "A transport step is one waveform"
+  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else."
+  source "collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773"
+  when control() != "direct":
+  for all a, b in transport where simultaneous(a, b):
+    motion(a) = motion(b)
+
+rule R23 "A junction is crossed, not rested on"
+  about "No ion stops where three or more rails meet while the traps elsewhere have room for every ion. A slot of a loop or rail the programme moves as a whole is part of a conveyor, and is not such a stop."
+  source "reader report 2026-09; deck_v3; arXiv:2510.23519"
+  when count(ions) <= sum(min(capacity(s), max_chain) for s in sites where s not in junctions):
+  for all i in ions, t in instants:
+    position(i, t) in junctions implies rotated(position(i, t))
+
+# ---------------------------------------------------------------- gates and their places
+
+rule R6 "Each operation runs only where the site is equipped for it"
+  about "Gates only in sites with a gate laser, measurement and reset only where there is readout, cooling only where there is a cooling beam."
+  source "deck_v3; arXiv:2504.17886"
+  (for all g in gates: can(site(g), "gate"))
+  and (for all o in operations where kind(o) in {"measure", "reset"}: can(site(o), "spam"))
+  and (for all c in coolings, i in ions(c): can(position(i, start(c)), "cool"))
+
+rule R6b "A two-ion gate acts on two ions standing in one site"
+  about "Both ions of a two-qubit gate are in the same trap when it starts, and in the trap the programme names for it, if it names one."
+  source "arXiv:2504.17886"
+  (for all g in two_qubit_gates, i in ions(g): position(i, start(g)) = site(g))
+  and (for all g in two_qubit_gates where size(declared_sites(g)) > 0:
+         site(g) in declared_sites(g))
+
+rule R12 "One gate at a time in a trap"
+  about "A trap's laser serves one gate at a time; different traps may gate together."
+  source "arXiv:2511.15910; arXiv:2004.04706"
+  for all a, b in gates where a != b and simultaneous(a, b):
+    site(a) != site(b)
+
+rule R13 "A gate's chain holds at most max_chain ions"
+  about "A gate in a chain longer than about fifteen ions is slow and poor, so no gate starts in a site holding more."
+  source "arXiv:2511.15910; arXiv:2004.04706"
+  for all g in gates: occupancy(site(g), start(g)) <= max_chain
+
+rule R27 "One operation at a time in a trap"
+  about "The operations of the kinds listed in serial_kinds hold their trap: two of them in one trap never overlap in time."
+  for all a, b in operations where a != b and kind(a) in serial_kinds and kind(b) in serial_kinds
+      and site(a) = site(b) and site(a) != none:
+    not simultaneous(a, b)
+
+rule R32 "Single-ion operations run only in the zones the model allows"
+  about "Rotations, preparation and measurement happen only in the zones listed in single_ion_zones."
+  for all o in operations where kind(o) in {"gate1", "reset", "measure"}:
+    zone(site(o)) in single_ion_zones
+
+rule R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
+  about "On devices whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other."
+  for all g in two_qubit_gates, i, j in ions(g):
+    position(i, start(g)) = position(j, start(g))
+    or neighbours(position(i, start(g)), position(j, start(g)))
+
+# ---------------------------------------------------------------- heat
+
+rule R7 "A two-ion gate starts with cool enough ions"
+  about "Both ions' motional energy at the start of a two-qubit gate is within the device's budget; a cooling operation must come first otherwise."
+  source "deck_v3; arXiv:2511.15910"
+  for all g in two_qubit_gates, i in ions(g):
+    heat(i, start(g)) <= heat_budget()
+
+rule R7b "A gate zone stays within its heat duty cycle"
+  about "A gate zone may absorb only so much heat over time; no device declares such a budget yet."
+  source "arXiv:2504.17886"
+  when declares_duty_budget():
+  for all s in sites: duty(s) <= duty_budget(s)
+
+rule R7c "A programme with two-ion gates cools"
+  about "Under broadcast wiring cooling is not optional: a programme that gates and never cools cannot reach a useful error rate."
+  source "arXiv:2510.23519; arXiv:2606.06455"
+  when models_heating():
+  count(two_qubit_gates) = 0 or count(coolings) > 0
+
+rule R15 "Heat figures are upper bounds"
+  about "The heat from successive motions can interfere and partly cancel; the clock adds it up instead, so every heat figure is an upper bound."
+  source "arXiv:2605.25118"
+  when models_heating():
+  heat_is_upper_bound()
+
+rule R16 "Gate error depends on the ions' heat"
+  about "The error of a two-qubit gate is computed from how hot its ions are when it starts, not taken as a constant."
+  source "arXiv:2510.23519; arXiv:2605.25118"
+  when models_heating():
+  gate_error_reads_heat()
+
+rule R17 "Ions heat with elapsed time, moving or not"
+  about "Background heating accrues with time for every ion, whether or not it moves."
+  source "arXiv:2605.25118"
+  when models_heating():
+  heat_accrues_with_time()
+
+# ---------------------------------------------------------------- the device's drawing
+
+rule R18 "A junction is where three or more rails meet"
+  about "Whatever a node is called, it is a junction exactly when three or more rails meet at it, and crossing it is priced by that number."
+  source "quant-ph/0702175; arXiv:2305.03828; arXiv:1210.3655"
+  for all n in nodes: (n in junctions) = (degree(n) >= 3)
+
+rule R19 "A junction joins at most max_junction_degree() rails"
+  about "A surface trap has T- and X-junctions and nothing denser, unless the device declares otherwise."
+  source "collaborator review 2026-09; arXiv:2201.12579"
+  for all n in nodes: degree(n) <= max_junction_degree()
+
+rule R20 "Rails meet at a wide enough angle"
+  about "Any two rails meeting at a node make at least the device's minimum angle (60 degrees unless it declares another)."
+  source "collaborator review 2026-09; arXiv:2201.12579"
+  for all n in nodes, r1, r2 in rails_at(n) where r1 != r2:
+    angle(n, r1, r2) >= min_rail_angle()
+
+rule R21 "Rails lie in a plane"
+  about "A rail meets only the nodes it ends at, and two rails cross only at a node they share: the drawing must be a surface trap."
+  source "collaborator review 2026-09; quant-ph/0702175"
+  (for all r in rails, n in nodes: not lies_on(n, r))
+  and (for all r1, r2 in rails where r1 < r2: not cross(r1, r2))
+
+# ---------------------------------------------------------------- the programme's own claims
+
+rule R9 "The programme's figures are the replay's figures"
+  about "Every time, cost, step count or heat figure the programme states about itself equals what replaying it computes."
+  for all c in claims: approx(claimed(c), replayed(c))
+
+# ---------------------------------------------------------------- what is computed, and in what order
+
+rule R10 "The programme computes the circuit"
+  about "The pulses the programme fires, read through which ion plays which qubit, compose to the circuit's operation; every gate is performed once, by its own ions, together in a trap that can gate."
+  source "this website; arXiv:2406.19479"
+  computes_circuit()
+
+rule R25 "Each qubit's operations keep the circuit's order"
+  about "On every qubit, each operation is over before the next one on that qubit begins, in the order the circuit is written -- even where two of them would commute."
+  for all c1, c2 in circuit_ops where next_on_qubit(c1, c2) and performed(c1) and performed(c2):
+    end(last(c1)) <= start(first(c2))
+
+rule R26 "Each qubit's gates keep the circuit's order, up to commuting CNOTs"
+  about "As R25, except that consecutive CNOTs in which a qubit plays the same role (always the control, or always the target) commute, and may run in any order among themselves."
+  for all c1, c2 in circuit_ops where next_run(c1, c2) and performed(c1) and performed(c2):
+    end(last(c1)) <= start(first(c2))
+
+# ---------------------------------------------------------------- a paper's own model
+
+rule R29 "Every operation lasts what the clock says"
+  about "Each operation's duration is the one the model's duration law gives it."
+  for all o in operations where clocked(o): approx(duration(o), clock(o))
+
+rule R30 "Operations that hold the same component never overlap"
+  about "The schedule states, for every operation, the components it holds while it runs; two operations naming one component never overlap in time."
+  for all a, b in operations where a != b and simultaneous(a, b):
+    disjoint(locks(a), locks(b))
+
+rule R31 "Broadcast transport moves in lockstep"
+  about "One waveform drives every broadcast move of a cycle: moves that overlap start and end together and are of one class, and every such move names its class."
+  (for all a in operations where kind(a) = "hop": motion(a) != none)
+  and (for all a, b in operations where kind(a) = "hop" and kind(b) = "hop" and a != b
+         and simultaneous(a, b):
+       start(a) = start(b) and end(a) = end(b) and motion(a) = motion(b))

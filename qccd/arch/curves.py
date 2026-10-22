@@ -49,6 +49,8 @@ TABLES = (
     "measured",
     "deck_v3",
     "local",
+    # Quantinuum's published transport primitives (qccd/workspace/physics/qccd-physics@2.json)
+    "quantinuum",
 )
 
 

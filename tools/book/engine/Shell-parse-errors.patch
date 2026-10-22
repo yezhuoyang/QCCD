@@ -1,0 +1,35 @@
+--- a/src/Lean/Shell.lean
++++ b/src/Lean/Shell.lean
+@@ -137,12 +137,31 @@
+   -- every command, so the final state holds only the last command's messages.
+   -- Collect the log after each command instead of reading the end state; seed it
+   -- with any header (import) parse errors.
++  --
++  -- That reset also discarded the *parser's* messages: `Frontend.processCommand` puts them
++  -- into `commandState.messages` and then elaborates, so an unclosed paren or a
++  -- `def broken : Nat :=` vanished and the file looked accepted.  So this loop is
++  -- `Frontend.processCommand` inlined, keeping the parse messages of each command.
+   let collect : Elab.Frontend.FrontendM MessageLog := do
+     let mut acc : MessageLog := headerMessages
+     let mut done := false
+     while !done do
+-      done := (← Elab.Frontend.processCommand)
++      Elab.Frontend.updateCmdPos
++      let cmdState ← Elab.Frontend.getCommandState
++      let ictx ← Elab.Frontend.getInputContext
++      let pstate ← Elab.Frontend.getParserState
++      let scope := cmdState.scopes.head!
++      let pmctx := { env := cmdState.env, options := scope.opts,
++                     currNamespace := scope.currNamespace, openDecls := scope.openDecls }
++      let (cmd, ps, parseMsgs) :=
++        profileit "parsing" scope.opts fun _ => Parser.parseCommand ictx pmctx pstate {}
++      acc := acc ++ parseMsgs
++      modify fun s => { s with commands := s.commands.push cmd }
++      Elab.Frontend.setParserState ps
++      Elab.Frontend.setMessages {}
++      Elab.Frontend.elabCommandAtFrontend cmd
+       acc := acc ++ (← Elab.Frontend.getCommandState).messages
++      done := Parser.isTerminalCommand cmd
+     return acc
+   let (msgLog, _s) ← StateRefT'.run (ReaderT.run collect frontendCtx) frontendState
+ 

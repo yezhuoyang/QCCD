@@ -12,8 +12,13 @@ The checks, in order; the first that fails decides the pair's status:
                  memory    the extracted stim circuit's detectors and observables are
                            deterministic AND have the source circuit's parity (qccd.qec.check)
                  clifford  the stabilizer tableau of the emitted pulses, through the qubit map,
-                           equals the circuit's; each qubit is measured as often as in the circuit
-                 general   the exact unitary, up to global phase, for circuits of <= 10 qubits
+                           equals the circuit's, with each measurement and reset compared where
+                           it happens (deferred onto a fresh qubit, `check_cert.readout_plan`)
+                 general   the exact unitary, up to global phase, for circuits of <= 10 qubits,
+                           measurements and resets compared the same way
+               Both read the program and the circuit through Compiler/bridge/check_cert.py, the
+               functions R10 uses: one reading of the pulses (an MS written as two ions is a
+               pair), of the source, and of where it is measured.
   metrics      the board numbers (T_jones and the rest), under the suite's physics
   ler          memory pairs: the logical error rate under the suite's noise model and budget
 
@@ -127,7 +132,7 @@ def grade_pair(pair, program_path: Path, *, physics: Mapping, ler: Mapping | Non
                               f"{chk.get('reason') or chk}")
             checks["semantics"] = {"ok": True, "method": "detectors deterministic with the circuit's parity (stim)"}
         elif pair.kind == "clifford":
-            _clifford_check(prog, qmap, pair)
+            _clifford_check(prog, qmap, pair, workdir)
             checks["semantics"] = {"ok": True, "method": "stabilizer tableau of the emitted pulses"}
         else:
             if pair.n_qubits > MAX_UNITARY_QUBITS:
@@ -161,75 +166,55 @@ class _Mismatch(Exception):
     pass
 
 
-def _measure_counts(prog, qmap) -> dict[int, int]:
-    ion_q = {ion: q for q, ion in qmap.items()}
-    got: dict[int, int] = {}
-    for i in prog.instructions:
-        if i.type == "measure":
-            for ion in i.ions:
-                if ion in ion_q:
-                    got[ion_q[ion]] = got.get(ion_q[ion], 0) + 1
-    return got
-
-
-def _clifford_check(prog, qmap, pair) -> None:
+def _semantics_inputs(prog, qmap, pair, workdir):
+    """What both semantic checks read, through `check_cert` -- the ONE reading R10 uses: the
+    source circuit (qiskit, `load_source`/`source_ops`), the program's pulses with every
+    operand spelling the IR allows (`program_steps`, so an MS written as two ions is a pair),
+    and the circuit's measurements and resets paired with the program's (`readout_plan`)."""
+    import tempfile
     cc = _bridge("check_cert")
+    cert = {"map": {str(q): ion for q, ion in qmap.items()}}
+    with tempfile.TemporaryDirectory(dir=workdir) as td:
+        p = Path(td) / "c.qasm"
+        p.write_text(pair.qasm, encoding="utf-8")
+        src = cc.source_ops(cc.load_source(p))
+    try:
+        steps = list(cc.program_steps(prog, {ion: q for q, ion in qmap.items()}))
+        anc, problems = cc.readout_plan(src, steps, pair.n_qubits)
+    except NotImplementedError as exc:
+        raise _Mismatch(f"the program cannot be read exactly: {exc}") from None
+    if problems:
+        raise _Mismatch(f"the program's measurements and resets are not the circuit's: {problems[0]}")
+    return cc, cert, src, anc
+
+
+def _clifford_check(prog, qmap, pair, workdir=None) -> None:
+    cc, cert, src, anc = _semantics_inputs(prog, qmap, pair, workdir)
     n = pair.n_qubits
     try:
-        got = cc.tableau_from_program(prog, {"map": {str(q): ion for q, ion in qmap.items()}}, n)
+        got = cc.tableau_from_program(prog, cert, n, anc)
+        want = cc.circuit_tableau(None, n, src, anc)
     except NotImplementedError as exc:
         raise _Mismatch(f"the program is not Clifford: {exc}") from None
-    want = _source_tableau(pair.qasm, n, cc)
     if got != want:
-        raise _Mismatch("the program's stabilizer tableau is not the circuit's")
-    if _measure_counts(prog, qmap) != _source_measures(pair.qasm):
-        raise _Mismatch("the program does not measure each qubit as often as the circuit does")
-
-
-def _source_tableau(qasm: str, n: int, cc):
-    import tempfile
-    with tempfile.TemporaryDirectory() as td:
-        p = Path(td) / "c.qasm"
-        p.write_text(qasm, encoding="utf-8")
-        return cc.circuit_tableau(p, n)
-
-
-def _source_measures(qasm: str) -> dict[int, int]:
-    """How often the circuit measures each qubit, read by qiskit (it expands `measure q -> c`)."""
-    from qiskit import qasm2
-    qc = qasm2.loads(qasm, custom_instructions=qasm2.LEGACY_CUSTOM_INSTRUCTIONS)
-    out: dict[int, int] = {}
-    for inst in qc.data:
-        if inst.operation.name == "measure":
-            q = qc.find_bit(inst.qubits[0]).index
-            out[q] = out.get(q, 0) + 1
-    return out
+        raise _Mismatch("the program's stabilizer tableau, measurements and resets included, is not the circuit's")
 
 
 def _unitary_check(prog, qmap, pair, workdir) -> None:
-    import tempfile
-    from ..workspace.evaluator import Toolchain
-    from ..workspace.procs import run_limited
-    U = _bridge("unitary")
-    tc = Toolchain.discover()
-    if tc.qccdc is None:
-        raise _Mismatch("the trusted parser (qccdc_cli parse) is not installed, so the circuit cannot be lowered")
-    with tempfile.TemporaryDirectory(dir=workdir) as td:
-        cp, op = Path(td) / "c.qasm", Path(td) / "c.parsed.json"
-        cp.write_text(pair.qasm, encoding="utf-8")
-        r = run_limited([tc.qccdc, "parse", cp, "-o", op], cwd=td, timeout=120, mem_mb=2048)
-        if not r.ok:
-            raise _Mismatch(f"the trusted parser failed on the circuit: {(r.stderr or r.stdout)[-300:]}")
-        ops = json.loads(op.read_text(encoding="utf-8"))["ops"]
-    qubit_of = {ion: q for q, ion in qmap.items()}
+    cc, cert, src, anc = _semantics_inputs(prog, qmap, pair, workdir)
+    width = pair.n_qubits + len(anc)
+    if width > MAX_UNITARY_QUBITS:
+        raise _Mismatch(f"{pair.n_qubits} qubits and {len(anc)} mid-circuit measurement(s)/reset(s) cannot be "
+                        f"checked as one unitary (the suite keeps these to <= {MAX_UNITARY_QUBITS})")
     try:
-        a = U.program_unitary(prog.instructions, qubit_of, pair.n_qubits)
-        b = U.circuit_unitary(ops, pair.n_qubits)
+        a = cc.program_unitary(prog, cert, pair.n_qubits, anc)
+        b = cc.source_unitary(src, pair.n_qubits, anc)
     except NotImplementedError as exc:
         raise _Mismatch(f"the unitary cannot be built: {exc}") from None
-    ok, _alpha, worst = U.same_up_to_phase(a, b)
+    ok, _alpha, worst = cc._unitary().same_up_to_phase(a, b)
     if not ok:
-        raise _Mismatch(f"the program's unitary is not the circuit's (max entry error {worst:.2e})")
+        raise _Mismatch(f"the program's unitary, measurements and resets included, is not the circuit's "
+                        f"(max entry error {worst:.2e})")
 
 
 def geomean(xs) -> float | None:

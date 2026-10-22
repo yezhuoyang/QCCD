@@ -66,6 +66,10 @@ def shape_d(shape: str, x: float, y: float, w: float, h: float) -> str:
                 f"A{f(r)} {f(r)} 0 1 0 {f(cx - r)} {f(cy)}Z")
     if shape == "vault":
         return f"M{f(x)} {f(y)}H{f(x + w)}V{f(y + h)}H{f(x)}Z"
+    if shape == "ward":                        # a block with a raised centre: the memory
+        q = min(h * 0.22, w * 0.12)
+        return (f"M{f(x)} {f(y + q)}H{f(x + w * 0.36)}V{f(y)}H{f(x + w * 0.64)}V{f(y + q)}"
+                f"H{f(x + w)}V{f(y + h)}H{f(x)}Z")
     if shape == "chip":                        # a package with pins down both sides
         n = max(2, min(6, int(h // max(1e-6, m * 0.3))))
         pin = min(w * 0.12, h / (2 * n + 1))
@@ -93,6 +97,10 @@ def shape_detail(shape: str, x: float, y: float, w: float, h: float) -> str:
     if shape == "vault":
         i = min(w, h) * 0.09
         return f"M{f(x + i)} {f(y + i)}H{f(x + w - i)}V{f(y + h - i)}H{f(x + i)}Z"
+    if shape == "ward":                        # a cross in the raised centre
+        cx, a = x + w / 2, min(w, h) * 0.1
+        cy = y + min(h * 0.22, w * 0.12) + h * 0.2
+        return f"M{f(cx - a)} {f(cy)}H{f(cx + a)}M{f(cx)} {f(cy - a)}V{f(cy + a)}"
     if shape == "drum":                        # the rows of cells inside
         out = ""
         for k in (1, 2):

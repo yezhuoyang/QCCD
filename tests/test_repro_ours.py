@@ -33,7 +33,8 @@ def test_one_of_ours_passes_on_the_papers_own_terms():
     p, o = _bb72()
     row = check_ours(p, o, {})
     assert row["ok"] and row["same_device"] and row["circuit_rows"] == "true", row
-    assert row["measured"]["makespan_us"] == 17150.0
+    # in the circuit's own order (2026-10-19): far slower than the reordering round it replaced
+    assert row["measured"]["makespan_us"] == 764945.0
 
 
 def test_a_gate_on_the_wrong_data_or_a_free_operation_keeps_it_off_the_page():

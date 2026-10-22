@@ -1,0 +1,18 @@
+# The Linux x86-64 checker that `qccd toolchain install` fetches.
+# Build context: a `git archive` of the commit's Compiler/lean, so the binary holds exactly
+# committed source, built by the checker's own package (Compiler/lean/checker: Lean core
+# only, no Mathlib) -- the package `toolchain.QCHECK_SOURCES` versions.
+#   docker build -f deploy/toolchain/Dockerfile.qcheck-linux -o type=local,dest=out <archive dir>
+# The same Lean stage as deploy/official/Dockerfile.
+FROM debian:12-slim AS lean
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git \
+ && rm -rf /var/lib/apt/lists/*
+RUN curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+    | sh -s -- -y --default-toolchain none
+ENV PATH="/root/.elan/bin:${PATH}"
+WORKDIR /src
+COPY Compiler/lean/ ./
+RUN cd checker && rm -rf .lake && lake build qcheck && ls -l .lake/build/bin/qcheck
+
+FROM scratch
+COPY --from=lean /src/checker/.lake/build/bin/qcheck /qcheck

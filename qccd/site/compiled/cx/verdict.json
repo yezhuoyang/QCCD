@@ -1,0 +1,15 @@
+{
+ "program": "circuit",
+ "arch": "grid2x3",
+ "circuit_sha256": "81779ca1746d20047864d357acefb4ad6ce449828134f586151d2df10c561e04",
+ "binding": "ok",
+ "o1_transport": "ok",
+ "order": "ok",
+ "lean": "accepted",
+ "unrealised_ops": 0,
+ "readout": "ok: 0 measurement(s)/reset(s) compared in place, final measurements at the end",
+ "o2_semantics": "ok",
+ "method": "stabilizer tableau, composed from the emitted pulses, against the source QASM",
+ "R10": "passed",
+ "R10_reason": "O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM"
+}

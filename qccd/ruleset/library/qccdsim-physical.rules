@@ -1,0 +1,6 @@
+ruleset "qccdsim-physical"
+title "QCCDSim's rules, with a physical gate swap"
+about "QCCDSim's rules, except that a reorder before a split is a real gate swap: the end ion's state moves to where the departing ion stood, instead of the departing ion being lifted out in place."
+
+include "qccdsim"
+param chain_order = "physical"

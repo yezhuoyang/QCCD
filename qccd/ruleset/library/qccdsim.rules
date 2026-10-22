@@ -1,0 +1,11 @@
+# Murali et al., ISCA 2020, and every artifact built on its code: Muzzle the Shuttle
+# (Saki et al., DATE 2022), Moveless (Khan et al. 2025), Cyclone's baseline, Bach et al.
+
+ruleset "qccdsim"
+title "QCCDSim's rules"
+about "The rules QCCDSim's scheduler enforces: a trap does one gate, split or merge at a time; a shuttle reserves its whole path, so a rail and a junction hold one ion at a time; a split takes the end ion of its chain or pays for a reorder (the reordered ion is lifted out where it stood); every operation lasts what QCCDSim's duration law says; each qubit's gates run in the circuit's order."
+
+use R0, R1, R2, R3, R6b, R8, R14, R24, R25, R27, R29
+
+param serial_kinds = {"gate2", "split", "merge"}
+param chain_order = "qccdsim"

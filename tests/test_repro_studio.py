@@ -25,7 +25,8 @@ import pytest
 from qccd.repro import catalog, importers
 from qccd.repro.__main__ import ROOT, _circuit, _open
 from qccd.repro.importers import JONES_NATIVE
-from qccd.repro.studio import (gate_label, named_after_qubits, pulse_join, renamed, source_payload,
+from qccd.repro.studio import (gate_label, named_after_qubits, native_1q, pulse_join, renamed,
+                               source_payload,
                                studio_arch_doc, to_tsir)
 from qccd.repro.timed import Event, PortGraph, TimedSchedule
 
@@ -211,7 +212,7 @@ def _run(key: str, run_id: str):
     ("bach2025", "qft20_G2x3_c5_FM_GS_Greedy", "CX"),
     ("jones2025", "grid_rot_d2_c2", "MS"),                  # RY, RX around each MS
     ("jones2025", "linear_rep_d3_c3", "MS"),
-    ("leblond2023", "idle_551", "MS"),                      # TISCC's native ZZ and rotations
+    ("leblond2023", "idle_551", "ZZ"),                      # TISCC's own ZZ, rotations around it
 ])
 def test_a_tool_that_runs_whole_cnots_is_shown_running_cx(key, run_id, label):
     p, run, s, ops = _run(key, run_id)
@@ -268,3 +269,200 @@ def test_calling_the_gate_cx_changes_nothing_but_its_name(key, run_id):
     ja, jb = (source_payload(prog, "c", lines, ops) for prog in (ms, cx))
     assert ja["realises"] == jb["realises"] and ja["toward"] == jb["toward"]
     assert len({i for v in jb["realises"].values() for i in v}) > 0
+
+
+# ------------------------------------------------- TISCC on the Studio's clock (T44)
+#
+# A reader (Zhuangzhuang Chen, thread 44) compared the TISCC pages with the paper's clock:
+# 9,613 us on TISCC's clock, 9,718 us in the Studio for the same round, and for our schedule
+# 95.04 ms at the top of the page and 433.34 ms in its Report.  Three faults: the browser
+# priced every one-qubit frame at `ms_gate` (2,000 us; `engine.js`, a patch is proposed
+# separately), the replay's device priced a junction move at 115.5 us and a Z turn at 10 us
+# (TISCC: 110.25 and 3), and our schedule's moves were declared to entail a split and a merge
+# TISCC does not have.  The asynchronous schedule's lockstep sum is a different quantity and
+# the pages now say so; what is tested here is that every instruction the Studio plays lasts
+# exactly what TISCC's law gives the operations folded into it.
+
+#: TISCC's own table of what its rotations are (`TI_ops_to_stim`, src/hardwaremodel.cpp at
+#: 1212aec): P_θ is exp(-iθP), so X_pi/4 is SQRT_X and Z_pi/2 is Z
+TISCC_TO_STIM = {"X_pi/2": "X", "Y_pi/2": "Y", "Z_pi/2": "Z", "X_pi/4": "SQRT_X",
+                 "Y_pi/4": "SQRT_Y", "Z_pi/4": "S", "X_-pi/4": "SQRT_X_DAG",
+                 "Y_-pi/4": "SQRT_Y_DAG", "Z_-pi/4": "S_DAG"}
+
+
+@pytest.mark.parametrize("op, stim_name", sorted(TISCC_TO_STIM.items()))
+def test_a_tiscc_rotation_is_the_same_clifford_in_our_language(op, stim_name):
+    """The replay writes TISCC's rotations as our compiler's R(θ, φ) and VZ(λ), with the
+    angles; the stabilizer extraction's reading of those must be TISCC's own gate."""
+    stim = pytest.importorskip("stim")
+    from qccd.qec.native import emit_r, emit_vz
+
+    gate, params = native_1q(op)
+    assert (gate == "VZ") == op.startswith("Z_")
+    ours = stim.Circuit()
+    (emit_vz if gate == "VZ" else emit_r)(ours, 0, *params)
+    assert stim.Tableau.from_circuit(ours) == stim.Tableau.from_circuit(stim.Circuit(f"{stim_name} 0"))
+
+
+def test_a_pulse_with_no_recorded_angle_stays_a_bare_r():
+    """Jones's artifact records RY and RX with no angle: nothing is invented for them."""
+    assert native_1q("RY") is None and native_1q("RX") is None and native_1q(None) is None
+    assert native_1q(3) is None                  # TrapSIMD numbers its operations
+    _, _, s, _ = _run("jones2025", "grid_rot_d2_c2")
+    ones = [i for i in to_tsir(s, name="t", arch="x").instructions if i.type == "gate" and i.arity == 1]
+    assert ones and {i.gate for i in ones} == {"R"} and not any(i.params for i in ones)
+
+
+def _tiscc_programme(rid: str):
+    """A TISCC run, or ours, exactly as its Studio page plays it."""
+    reproduce = pytest.importorskip("qccd.site.reproduce",
+                                    reason="the site package is not in this tree")
+    p = catalog.paper("leblond2023")
+    o = next((x for x in catalog.OURS["leblond2023"]["runs"] if x["id"] == rid), None)
+    if o is not None:
+        spec = next(x for x in p["runs"] if x["id"] == o["against"])
+        m, prog, s, _ = reproduce._ours_programme(p, o, spec)
+    else:
+        m, prog, s, _ = reproduce._run_programme(p, next(x for x in p["runs"] if x["id"] == rid))
+    return m, prog, s
+
+
+@pytest.mark.parametrize("rid", ["idle_551", "idle_661", "idle_551_ours"])
+def test_every_instruction_of_a_tiscc_replay_lasts_what_tiscc_says(rid):
+    """Each instruction folds operations of one kind that START together, so it must last
+    exactly as long as the longest of them on TISCC's clock: a rotation 10 us, a Z turn 3, a
+    preparation 10, a ZZ 2,000, a move 5.25, a move through a junction 110.25."""
+    from collections import defaultdict
+
+    from qccd.cost.models import corrected_model
+    from qccd.verify.replay import replay
+
+    m, prog, s = _tiscc_programme(rid)
+    res = replay(prog, m.arch, corrected_model("local"), check_rules=False, keep_cycles=True)
+    took: dict[int, float] = defaultdict(float)
+    for c in res.cycles:
+        took[c.instr_id] += c.t1 - c.t0
+    timed = [i for i in prog.instructions if "t0_us" in i.meta]
+    assert len(timed) == len(prog.instructions) - 2              # all but init and the cool
+    wrong = [(i.id, i.type, i.gate, took[i.id], i.meta["t1_us"] - i.meta["t0_us"])
+             for i in timed if abs(took[i.id] - (i.meta["t1_us"] - i.meta["t0_us"])) > 1e-9]
+    assert not wrong, wrong[:6]
+    gates = {i.gate for i in prog.instructions if i.type == "gate"}
+    assert gates == {"R", "VZ", "ZZ"}                            # named for what they are
+    assert all(i.params and len(i.params) == len(i.ions)
+               for i in prog.instructions if i.type == "gate" and i.arity == 1)
+
+
+def test_tiscc_s_layered_round_takes_tiscc_s_time_one_instruction_at_a_time():
+    """TISCC's round runs in layers, so played one instruction at a time it takes TISCC's
+    9,613 us, plus 3 us at each of the four moments where TISCC turns some ions about X or Y
+    and others about Z together (two instructions in our language).  Before the fix: 9,718."""
+    m, prog, s = _tiscc_programme("idle_551")
+    from qccd.cost.models import corrected_model
+
+    r = m.run(prog, model=corrected_model("local"), check_metrics=False)
+    makespan = max(e.t1 for e in s.events)
+    fam = {}
+    for e in s.events:
+        if e.kind == "gate1":
+            fam.setdefault(e.t0, set()).add("Z" if e.meta["op"].startswith("Z_") else "XY")
+    mixed = sum(1 for f in fam.values() if len(f) == 2)
+    assert (makespan, mixed) == (9613.0, 4)
+    assert r.runtime_ms * 1000 == pytest.approx(makespan + 3.0 * mixed, abs=1e-9)
+    # and a TISCC move is one Move: no split, no merge, in theirs and in ours alike
+    for rid in ("idle_551", "idle_551_ours"):
+        assert tuple(_tiscc_programme(rid)[0].arch.entails("shuttle")) == ()
+
+
+def test_the_browser_prices_a_tiscc_round_as_python_does(tmp_path):
+    """The Studio re-prices the shipped frames in the browser (`priceFrames`) and shows that
+    number in its status line and Report.  It must be Python's, frame for frame: on the
+    live page it was 433.34 ms against Python's 95.04."""
+    import shutil
+
+    if shutil.which("node") is None:
+        pytest.skip("node is not on PATH")
+    import test_engine_parity as T
+    from qccd.arch.schema import SCHEMA_VERSION, export_schema
+    from qccd.cost.models import corrected_model
+    from qccd.verify.replay import replay
+    from qccd.viz.render import build_view_model
+
+    model = corrected_model("local")
+    pricing = []
+    for rid in ("idle_551", "idle_551_ours"):
+        m, prog, _ = _tiscc_programme(rid)
+        res = replay(prog, m.arch, model, check_rules=False)
+        vm = build_view_model(m.arch, prog, res, model)
+        pricing.append({
+            "name": f"tiscc:{rid}", "calls": T._calls_of(m.arch), "frames": vm["program"]["frames"],
+            "loops": vm["arch"]["loops"], "classes": vm.get("classes") or {},
+            "model": {"kind": model.name, "corner_hops": 1, "junction_min_degree": 3,
+                      "length_scaling": False, "pitch": 1.0, "include_anomalous": True,
+                      "anomalous_per_ms": float(vm["physics"].get("anomalous_per_ms", 0.0)),
+                      "policy": {"table": getattr(model.policy, "table", "qccdsim_jones"),
+                                 "objective": getattr(model.policy, "objective", "fastest")}},
+            "totals": {"cost": res.total_cost, "steps": res.total_steps, "us": res.total_us},
+            "transits": sum(res.junction_transits.values()), "peak": res.peak_quanta,
+            "comp": {k: float(v) for k, v in res.quanta_components.items()},
+            "per_ion": {k: float(sum(v.values())) for k, v in res.per_ion_quanta.items()},
+        })
+    cases = {"engine": str(T.ENGINE), "edit_js": str(T.EDIT_JS), "schema_blob": export_schema(),
+             "schema_version": SCHEMA_VERSION, "templates": T._template_cases(),
+             "template_default": T.DEFAULT_TEMPLATE, "pricing": pricing}
+    r = T.run_parity(cases, tmp_path, "tiscc_pricing")
+    assert r["compared"] >= 2 * 4, r
+    assert r.get("mismatched") == 0, T._report(r)
+
+
+def test_the_timed_schedule_file_holds_what_the_checker_judged():
+    """The file each run offers (`export.timeline`): every event with its interval and what
+    it holds, every zone's residency -- and they agree with the checker's own verdicts, so a
+    reader recomputing the time or the occupancy from the file gets the checked answer.  A
+    planted junction clash shows up in both the file and the checker."""
+    from qccd.repro import export, models
+    from qccd.repro.timed import check
+
+    docs = dict(export.paper_timelines("leblond2023"))
+    res = json.loads((ROOT / "leblond2023" / "results.json").read_text(encoding="utf-8"))
+    want = {r["id"]: r["measured"]["makespan_us"] for r in res["runs"] + res["ours"]}
+    assert set(docs) == set(want)
+    for rid, doc in docs.items():
+        back = json.loads(export.dumps(doc))
+        assert back["makespan_us"] == want[rid] == max(e["t1"] for e in back["events"])
+        assert all(v in ("passed",) or v.startswith("skipped") for v in back["rules"]["checks"].values())
+        law = back["law"]
+        for e in back["events"]:
+            dur = law[e["op"]] + (law["Junction"] if e["junctions"] else 0.0)
+            assert e["t1"] - e["t0"] == pytest.approx(dur), e
+        cap = {z: a["capacity"] for z, a in back["device"]["zones"].items()}
+        for z, rows in back["residency"].items():
+            marks = sorted([(a if a is not None else -1e18, 1) for _, a, _ in rows]
+                           + [(b if b is not None else 1e18, -1) for _, _, b in rows])
+            n = top = 0
+            for _, d in marks:
+                n += d
+                top = max(top, n)
+            assert top <= cap[z], (rid, z)
+        busy: dict = {}
+        for e in back["events"]:
+            for j in e["junctions"]:
+                busy.setdefault(j, []).append((e["t0"], e["t1"]))
+        assert all(b[0] >= a[1] for iv in busy.values() for a, b in zip(sorted(iv), sorted(iv)[1:]))
+    # plant: the first crossing of the busiest junction is still in it when the next begins
+    s = importers.import_tiscc(_open(ROOT / "leblond2023" / "artifact" / "idle_551.spec"),
+                               nrows=6, ncols=6)
+    by_j: dict = {}
+    for e in s.events:
+        if e.kind == "hop" and e.path:
+            by_j.setdefault(e.path[0], []).append(e)
+    a, b = sorted(max(by_j.values(), key=len), key=lambda e: e.t0)[:2]
+    assert b.t0 >= a.t1                                          # apart, as TISCC wrote them
+    bad = dataclasses.replace(s, events=[dataclasses.replace(e, t1=b.t0 + 1.0) if e.id == a.id
+                                         else e for e in s.events])
+    rep = check(bad, models.TISCC, duration=models.tiscc_duration)
+    assert rep.checks["junction_mutex"] == "failed"
+    doc = export.timeline(bad, title="planted", by="test", law=models.TISCC_US, report=rep)
+    assert doc["rules"]["checks"]["junction_mutex"] == "failed"
+    iv = sorted((e["t0"], e["t1"]) for e in doc["events"] if a.path[0] in e["junctions"])
+    assert any(y[0] < x[1] for x, y in zip(iv, iv[1:]))

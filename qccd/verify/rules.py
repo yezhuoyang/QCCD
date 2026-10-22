@@ -45,6 +45,9 @@ __all__ = [
     "geometry_limits",
     "motion_signature",
     "hop_label",
+    "direction_label",
+    "rails_to_loop",
+    "conveyor_nodes",
     "loop_node_set",
 ]
 
@@ -111,7 +114,7 @@ RULE_STATEMENTS: Mapping[str, str] = {
     "R21": "rails are planar: a rail meets only the nodes it ends at, and rails cross only at a shared node",
     "R22": "one transport cycle is one waveform: every moving ion performs the same motion; a site may only opt out",
     "R23": "a junction is crossed, not rested on: no ion ends a cycle where three or more rails meet "
-           "while the traps off the junctions have room, unless a rotating loop carries it there",
+           "while the traps off the junctions have room, unless a conveyor carries it there",
 }
 
 
@@ -402,18 +405,25 @@ def spur_actions(v: CycleView) -> tuple[dict[str, str], frozenset[str]]:
     So the action is judged against the sites that HAVE a spur, not against the whole
     channel: a rail slot with no spur cannot dock anything, and a waveform it ignores is
     not a site idling while its channel-mates move.
+
+    A spur is what R22 calls one (`rails_to_loop`): a rail off every path whose off-path
+    end has no other rail to a path.  A trap between two path sites is a chord, and a
+    move across it is a translation for the lab-frame clause of `r4_drivable`, not a
+    dock.  Both ends must also be SITES here, as before, because what R4d judges is
+    which channel drives which site, and the control plane's channel groups contain only
+    sites; R22's label needs no such condition, since a waveform moves an ion off a bare
+    junction as surely as off a trap.
     """
     dev = v.arch.device
-    on_loop: set[str] = set()
-    for lp in dev.loops.values():
-        on_loop.update(lp.nodes)
+    on_loop = loop_node_set(dev)
     spur_sites: set[str] = set()
     for sg in dev.segments.values():
         if sg.loop is not None:
             continue
         a, b = sg.ends
         if dev.nodes[a].kind == "site" and dev.nodes[b].kind == "site" \
-                and (a in on_loop) != (b in on_loop):
+                and (a in on_loop) != (b in on_loop) \
+                and rails_to_loop(dev, on_loop, b if a in on_loop else a) == 1:
             spur_sites.update((a, b))
     acts: dict[str, str] = {}
     for m in v.moves:
@@ -809,6 +819,11 @@ DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0
 #: Coincidence tolerance for R21, in lattice units.  Positions are declared numbers, so
 #: a rail is "through" a node when the node is within this distance of the rail's axis.
 RAIL_EPS = 1e-6
+#: Slack on R20's angle, in degrees.  Generators store COMPUTED positions, so a corner drawn
+#: at exactly the limit comes back a hair under it: a surface17 design whose rails meet at
+#: 60 degrees reads 59.99998, and a tolerance of 1e-9 failed it.  A thousandth of a degree is
+#: far below anything a drawing or a fabricated trap can mean, and far above float noise.
+R20_TOL_DEG = 1e-3
 
 
 def geometry_limits(arch: Architecture) -> tuple[int, float]:
@@ -888,7 +903,7 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
         for i in range(len(segs)):
             for j in range(i + 1, len(segs)):
                 ang = rail_angle_deg(dev, nid, segs[i], segs[j])
-                if ang < min_ang - 1e-9:
+                if ang < min_ang - R20_TOL_DEG:
                     out.append(Violation(
                         "R20", -1,
                         f"rails {segs[i]} and {segs[j]} meet at {nid} at {ang:.1f} degrees, "
@@ -941,7 +956,8 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
 def motion_signature(v: CycleView, ion: str) -> str:
     """What one ion does in this cycle, as the waveform it needs: the class and, hop by
     hop, the direction -- along a named path as `L0:+1`, on a spur as `spur:inward` /
-    `spur:outward`, and anywhere else as the lab-frame axis `+x`, `-y`, `+x+y`.
+    `spur:outward`, and anywhere else as the lab-frame direction: `+x`, `-y` along an
+    axis, `+x+y@30` off one (see `direction_label`).
 
     Two ions with the same signature ride the same waveform; two with different ones
     need two cycles under broadcast control.  The compiler's uniformising pass and R22
@@ -961,9 +977,72 @@ def loop_node_set(dev) -> frozenset[str]:
     return frozenset(out)
 
 
+def conveyor_nodes(dev) -> frozenset[str]:
+    """Every node of a CLOSED loop -- a conveyor, whose slots ride one moving potential --
+    which the split/merge price asks about (`replay.move_entails`): a hop from one to a dead
+    end is a dock.  Closed as the RAILS say: as many rails carry the loop's id as it has nodes
+    (an open path of k nodes has k - 1).  Read off the rails rather than `Loop.closed`, because
+    the browser is handed the loops as bare node lists and the rails with their `loop`, and it
+    must decide this exactly as the replay does (`_conveyorNodes` in engine.js)."""
+    count = Counter(s.loop for s in dev.segments.values() if s.loop is not None)
+    out: set[str] = set()
+    for lid, lp in dev.loops.items():
+        if len(lp.nodes) > 2 and count.get(lid, 0) >= len(lp.nodes):
+            out.update(lp.nodes)
+    return frozenset(out)
+
+
+def rails_to_loop(dev, on_loop, node: str) -> int:
+    """How many rails join `node` to a node on a named path.
+
+    A spur is a dead end, so its off-path end has exactly ONE: a dock, or the first trap
+    of a longer spur.  A trap with two is a chord -- both its ends are on the path, as on
+    a loop declared through junctions -- and an ion crossing it is translated, not
+    docked.  R22 (`hop_label`) and R4d (`spur_actions`) both ask this, so they agree on
+    what a spur is.
+    """
+    return sum(1 for sid in dev.incidence[node] if dev.segments[sid].other(node) in on_loop)
+
+
+#: Added before `direction_label` rounds an angle to whole degrees, so that a rail at
+#: exactly x.5 degrees (a chord of an 8-site circle runs at 112.5) rounds the same way in
+#: Python, OCaml and JavaScript.  Their `atan2` can come from different libms (V8 ships
+#: its own) and may differ in the last bit; without the nudge
+#: `floor(112.49999999999999 + 0.5)` and `floor(112.5 + 0.5)` would label one hop 112 in
+#: the verifier and 113 in the router.  A last-bit difference is ~1e-14 degrees, far
+#: inside the nudge, and no rail anyone draws sits 1e-9 degrees below a half degree.
+HOP_ANGLE_TIE = 1e-9
+
+
+def direction_label(dx: float, dy: float) -> str:
+    """A hop's lab-frame direction, as R22 labels a hop that has no path or spur to be
+    labelled by: `+x`, `-y` (or `0`) along an axis, and off an axis the signs AND the
+    angle, `+x+y@30` -- whole degrees counter-clockwise from +x, in [0, 360).
+
+    The signs alone were the label until 2026-10 (issue #19), and they are too coarse:
+    rails at 30 and 60 degrees both read `+x+y`, so R22 let one broadcast waveform drive
+    two hops in two directions.  Only PARALLEL hops share a waveform, so the angle is
+    part of the label.  Whole degrees, so that a 60-degree rail a generator stored as
+    59.99998 is still parallel to one stored as 60.0; `floor(x + 0.5)` rather than
+    `round`, whose half-to-even has no twin in OCaml or JavaScript.  The signs stay in
+    front so that an axis-aligned hop -- every hop on a grid, a ladder or a rectangular
+    ring -- keeps its old label byte for byte; and a hop at 45 degrees is `+x+y@45` like
+    any other.
+    """
+    sx = "+x" if dx > RAIL_EPS else "-x" if dx < -RAIL_EPS else ""
+    sy = "+y" if dy > RAIL_EPS else "-y" if dy < -RAIL_EPS else ""
+    if not (sx and sy):
+        return (sx + sy) or "0"
+    deg = math.degrees(math.atan2(dy, dx))
+    if deg < 0.0:
+        deg += 360.0
+    return f"{sx}{sy}@{math.floor(deg + 0.5 + HOP_ANGLE_TIE) % 360}"
+
+
 def hop_label(dev, on_loop, src: str, dst: str, seg) -> str:
     """One hop's motion label, the unit R22's signature is made of: `L0:+1` along a
-    named path, `spur:inward` / `spur:outward` on a spur, else the lab-frame axis."""
+    named path, `spur:inward` / `spur:outward` on a spur, else the lab-frame direction
+    (`direction_label`)."""
     loop = seg.loop
     # CLOSED loops only.  A rotation is one waveform whose ions move in different lab-frame
     # directions, so the loop-relative step is the honest label there.  An open path's `+1`
@@ -977,13 +1056,17 @@ def hop_label(dev, on_loop, src: str, dst: str, seg) -> str:
             d = (seq.index(dst) - seq.index(src)) % k
             d = d if d <= k // 2 else d - k
             return action_label(loop, d)
+    # A spur is labelled by which way it is taken, not by where it points: one waveform
+    # on symmetric spur electrodes docks the riders above a rail and below it alike.
+    # That holds only for a DEAD END, whose off-path end has one rail to the path.  A trap
+    # between two path nodes is a chord, and labelling it this way gave J1->T->J2 and
+    # J2->T->J1 the same signature `spur:inward,spur:outward` -- two opposite
+    # translations on one waveform (issue #18).  A chord is labelled by direction.
     if loop is None and (src in on_loop) != (dst in on_loop):
-        return "spur:inward" if src in on_loop else "spur:outward"
+        if rails_to_loop(dev, on_loop, dst if src in on_loop else src) == 1:
+            return "spur:inward" if src in on_loop else "spur:outward"
     a, b = _xy(dev.nodes[src].pos), _xy(dev.nodes[dst].pos)
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    label = ("+x" if dx > RAIL_EPS else "-x" if dx < -RAIL_EPS else "") + \
-            ("+y" if dy > RAIL_EPS else "-y" if dy < -RAIL_EPS else "")
-    return label or "0"
+    return direction_label(b[0] - a[0], b[1] - a[1])
 
 
 def r22_uniform_motion(v: CycleView) -> list[Violation]:

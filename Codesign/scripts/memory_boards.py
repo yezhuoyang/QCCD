@@ -2,6 +2,11 @@
 
     rep5_mem       repetition code, distance 5, five rounds
     surface3_mem   rotated surface code, distance 3, three rounds
+    surface5xz_mem two rotated surface-code patches, distance 5, a Z and an X memory in lockstep
+                   (98 ions), under qccd-noise@2 and its cited physics: Goal 1's board
+
+A board with physics of its own (`qccd-physics@2`) is entered by every design with that physics
+(`qccd.workspace.tasks.board_device`), and its times come from the release's own tables.
 
 Each board's memory experiment (the release's own circuit and detectors) is compiled onto
 every shipped device and onto small members of the study's families with the REFERENCE
@@ -47,7 +52,42 @@ from qccd.ir.tsir import TSIR  # noqa: E402
 OUT = ROOT / "MemoryBoard"
 TASKS = ROOT / "tasks"
 BOARDS = {"rep5_mem": {"order": 6, "short": "rep-5 memory"},
-          "surface3_mem": {"order": 7, "short": "surface-3 memory"}}
+          "surface3_mem": {"order": 7, "short": "surface-3 memory"},
+          "surface5xz_mem": {"order": 8, "short": "surface-5 X+Z memory"},
+          "surface3xz_mem": {"order": 9, "short": "surface-3 X+Z memory"},
+          "surface7xz_mem": {"order": 10, "short": "surface-7 X+Z memory"}}
+#: a release table -> the tag its time is reported under (`T_<tag>`)
+TABLE_TAGS = {"qccdsim_jones": "jones", "transport_excitation": "transport"}
+
+
+def entered(doc: dict, release) -> dict:
+    """A device as this board grades it.  A design takes the board's physics unless it set its own
+    (`board_device`); the study's devices are the board's entries, so on a board with physics of
+    its own (qccd-physics@2) they carry it even where a generator wrote slightly different
+    blocks (random16's).  On a board whose physics is the template's, as before."""
+    from qccd.api import _template_doc
+    from qccd.workspace.tasks import FIXED_BLOCKS, board_device, physics_mismatch
+    out = board_device(doc, release)
+    ref = release.physics()
+    own = physics_mismatch({b: _template_doc(None).get(b) for b in FIXED_BLOCKS}, release)
+    if own and physics_mismatch(out, release):
+        out = {**out, **{b: ref[b] for b in FIXED_BLOCKS if b in ref}}
+    return out
+
+
+def board_release(board: str):
+    """The release a board is built from: its task's (tasks/<board>/task.json `release`), so a
+    board follows its task to a new release; a board with no task yet starts at `@1`."""
+    from qccd.workspace.tasks import find_release
+    tj = TASKS / board / "task.json"
+    rid = json.loads(tj.read_text(encoding="utf-8")).get("release") if tj.is_file() else None
+    return find_release(rid or board + "@1")
+
+
+def time_key(release) -> str:
+    """The number a board's round time is reported under: its rank table's."""
+    table = release.manifest["physics"].get("rank_table", "qccdsim_jones")
+    return "T_" + TABLE_TAGS.get(table, table)
 SCALE = 1e4          # the index shows rates in units of 1e-4
 WORK_NEW = "work.new"  # where a run grades; it replaces `work` only when the run is kept
 
@@ -74,7 +114,9 @@ def devices(release) -> list[dict]:
     if st.get("generator"):
         m = getattr(Machine, st["generator"])(**st.get("params", {}), name=st.get("name") or "starter")
         p = ", ".join(f"{k} {v}" for k, v in sorted(st.get("params", {}).items()))
-        out.append({"key": st.get("name") or "starter", "family": "ring + docks",
+        family = {"ring": "ring + docks", "grid": "lattice", "ladder": "rails + highways", "chain": "line",
+                  "racetrack": "junction-free loop", "dual_loop": "two loops"}.get(st["generator"], st["generator"])
+        out.append({"key": st.get("name") or "starter", "family": family,
                     "title": f"{st.get('name') or 'starter'} — the board's starter ({st['generator']}: {p})",
                     "claim": "the design a new workspace starts from on this board",
                     "doc": m.arch.to_json()})
@@ -87,7 +129,7 @@ def devices(release) -> list[dict]:
         ("grid9x9", "lattice", "grid9x9 — the baseline lattice", "traps on the wires of a 9x9 junction grid"),
         ("deck_unit_cell", "lattice", "deck_unit_cell — the same lattice, broadcast-wired", "grid9x9 with the 32-channel WISE control block"),
         ("chain", "line", "chain — a line of traps", "one linear trap"),
-        ("stationary_chain", "line", "stationary_chain — no transport at all", "one trap holding everything: no heating from transport, one long chain"),
+        ("stationary_chain", "line", "stationary_chain — two traps, one rail", "two traps joined by one rail: little heating from transport, long chains"),
     ]
     out += [{"key": k, "family": f, "title": t, "claim": c, "arch": SC.ARCH / f"{k}.arch.json"} for k, f, t, c in shipped]
     out += [
@@ -107,7 +149,21 @@ def devices(release) -> list[dict]:
          "claim": "32 traps on a random expander: short paths, no drawing",
          "doc": SC.random_doc("random16", 16, 7)},
     ]
-    return out
+    # a starter named like a shipped device (surface5xz_mem's grid9x9) is that device: one row
+    seen: set = set()
+    out = [d for d in out if not (d["key"] in seen or seen.add(d["key"]))]
+    # a device this code cannot load (a generator that is not committed: cylinder6x4's) is no
+    # entry of a board built from it
+    from qccd.arch.device import Architecture
+    keep = []
+    for d in out:
+        try:
+            Architecture.from_json(d["doc"] if "doc" in d else json.loads(Path(d["arch"]).read_text(encoding="utf-8")))
+        except Exception as exc:  # noqa: BLE001
+            print(f"   {d['key']:18s} left out: this code cannot load it ({type(exc).__name__})", flush=True)
+            continue
+        keep.append(d)
+    return keep
 
 
 def grade_point(out: Path, release, exp, dev: dict) -> dict:
@@ -118,15 +174,26 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     # a run that fails in the old folder would take the last good program with it
     work = out / WORK_NEW / dev["key"]
     work.mkdir(parents=True, exist_ok=True)
+    # every design is entered on the board, so it carries the board's physics (unchanged on a
+    # board whose physics is the template's, as every board before qccd-physics@2)
     if "doc" in dev:
         arch_p = out / f"{dev['key']}.arch.json"
-        arch_p.write_text(json.dumps(dev["doc"], indent=1), encoding="utf-8")
+        arch_p.write_text(json.dumps(entered(dev["doc"], release), indent=1), encoding="utf-8")
     else:
-        arch_p = Path(dev["arch"])
+        src = json.loads(Path(dev["arch"]).read_text(encoding="utf-8"))
+        doc = entered(src, release)
+        if doc == src:
+            arch_p = Path(dev["arch"])
+        else:
+            arch_p = out / f"{dev['key']}.arch.json"
+            arch_p.write_text(json.dumps(doc, indent=1), encoding="utf-8")
     row["arch"] = str(arch_p)
     t0 = time.time()
     try:
-        cooled, cert_p = compile_with_qccdc(release.circuit_text(), arch_p, work, timeout=900)
+        # a board's own compile limit when it allows more (surface7xz_mem: a 194-ion compile)
+        timeout = max(900, int((release.manifest.get("limits") or {}).get("compile_timeout_s", 0)))
+        cooled, cert_p = compile_with_qccdc(release.circuit_text(), arch_p, work, timeout=timeout,
+                                            table=release.manifest["physics"].get("rank_table", "qccdsim_jones"))
     except CompileFailed as exc:
         return {**row, "status": "refused", "reason": f"{exc}"[:300]}
     except Exception as exc:  # noqa: BLE001 -- a device the tools cannot load is a refusal too
@@ -144,13 +211,25 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     arch = load(str(arch_p)); prog = TSIR.load(str(cooled))
     numbers: dict = {}
     transport_us = 0.0
-    for table, tag in (("qccdsim_jones", "jones"), ("transport_excitation", "transport")):
+    rank_table = release.manifest["physics"].get("rank_table", "qccdsim_jones")
+    for table in release.manifest["physics"].get("tables") or [rank_table]:
         try:
             s = score(arch, prog, table=table)
         except Exception:  # noqa: BLE001
+            # the campaign's scorer needs code that is not committed; the round's time is then the
+            # grader's own metric (`compute_metrics` -> `replay_time`), the number a submission gets
+            try:
+                from qccd.workspace.metrics import replay_time
+                ms, res = replay_time(arch, prog, table)
+            except Exception:  # noqa: BLE001
+                continue
+            numbers[f"T_{TABLE_TAGS.get(table, table)}"] = round(ms, 3)
+            if table == rank_table:
+                transport_us = sum(us for k, us in (getattr(res, "us_by_class", {}) or {}).items()
+                                   if k not in ("gate", "measure", "reset", "cool"))
             continue
-        numbers[f"T_{tag}"] = round(s["T_round_ms"], 3)
-        if tag == "jones":
+        numbers[f"T_{TABLE_TAGS.get(table, table)}"] = round(s["T_round_ms"], 3)
+        if table == rank_table:
             numbers["p_eff_vs_threshold"] = round(s["p_eff_vs_threshold"], 3)
             transport_us = sum(us for k, us in s["us_by_class"].items() if k not in ("gate", "measure", "reset", "cool"))
     bc = broadcast_use(arch, prog)
@@ -348,9 +427,11 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
     sound = [r for r in ok if not r.get("rules_failed_replay")]
     # ties are real on a board whose code is too good for its shot budget (zero errors in
     # every shot): they break on the interval's upper end, then on the round's time
+    tk = time_key(release)
+
     def rank(r):
         n = r.get("numbers", {})
-        return (n.get("ler_per_round", 1e9), n.get("ler_round_hi_1e4", 1e9), n.get("T_jones", 1e9))
+        return (n.get("ler_per_round", 1e9), n.get("ler_round_hi_1e4", 1e9), n.get(tk, 1e9))
     # no design is singled out when the leaders are statistically tied
     few = bool(sound) and max(r["ler"]["errors"] for r in sound) < 20
     best = min(sound, key=rank) if (sound and not few) else None
@@ -392,9 +473,13 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
                  + (" At this budget the designs give at most a few logical errors each, so their 95% intervals "
                     "overlap: the order among them is not significant." if few else ""))
     s = idx.read_text(encoding="utf-8")
-    for a, b in (("var METRICS = [\n", "var METRICS = [\n" + LER_METRICS),
+    # a board timed on another table (qccd-physics@2: "quantinuum") names that time too
+    extra = ("" if tk in ("T_jones", "T_transport") else
+             f" {{k:'{tk}', name:'Total running time — {tk[2:]} table', unit:'ms', better:'low', log:true}},\n")
+    for a, b in (("var METRICS = [\n", "var METRICS = [\n" + LER_METRICS + extra),
                  (": 'T_jones'; xsel.value", ": 'ler_round_1e4'; xsel.value"),
-                 ("var cols=['T_jones',", "var cols=['ler_round_1e4','ler_round_lo_1e4','ler_round_hi_1e4','noise_heating','nbar_max','T_jones',")):
+                 ("var cols=['T_jones',", "var cols=['ler_round_1e4','ler_round_lo_1e4','ler_round_hi_1e4','noise_heating','nbar_max',"
+                                         f"'{tk}',")):
         assert s.count(a) == 1, a
         s = s.replace(a, b)
     idx.write_text(s, encoding="utf-8")
@@ -409,8 +494,10 @@ def write_task(board: str, release, exp) -> None:
            "title": release.title, "short": BOARDS[board]["short"],
            "description": release.manifest.get("description", ""), "circuit": "circuit.qasm",
            "n_data": exp.summary()["n_data"],
-           "physics": {"model": "corrected", "tables": ["qccdsim_jones", "qccdsim_transport"]},
-           "metrics": ["ler_per_round", "ler", "T_jones", "ions_per_instruction", "dacs", "area_mm2", "buildable"],
+           "physics": ({"model": "corrected", "tables": ["qccdsim_jones", "qccdsim_transport"]}
+                       if time_key(release) == "T_jones" else
+                       {"model": "corrected", "tables": list(release.manifest["physics"].get("tables") or [])}),
+           "metrics": ["ler_per_round", "ler", time_key(release), "ions_per_instruction", "dacs", "area_mm2", "buildable"],
            "rank_by": "ler_per_round", "release": release.id,
            "qec": {"experiment": q.get("experiment"), "noise": q["noise"], "ler": q["ler"]},
            "seed": f"MemoryBoard/{board}"}
@@ -419,7 +506,6 @@ def write_task(board: str, release, exp) -> None:
 
 def main(argv=None) -> int:
     from qccd.qec import MemoryExperiment
-    from qccd.workspace.tasks import find_release
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--board", default=None)
     ap.add_argument("--device", default=None)
@@ -453,12 +539,17 @@ def main(argv=None) -> int:
     for board in BOARDS:
         if a.board and board != a.board:
             continue
-        release = find_release(board + "@1")
+        release = board_release(board)
         exp = MemoryExperiment.from_spec(release.detectors(), release.circuit_text())
         out = OUT / board
-        out.mkdir(parents=True, exist_ok=True)
         rj = out / "rows.json"
-        if a.pages_only and rj.exists():
+        if a.pages_only and not rj.exists():
+            # --pages-only redraws saved results; a board never run has none, and running it here
+            # (surface7xz: hours of compiles) is not what a page rebuild asked for
+            print(f"== {board}: no rows.json, so no pages to rebuild (run it without --pages-only)", flush=True)
+            continue
+        out.mkdir(parents=True, exist_ok=True)
+        if a.pages_only:
             rows = json.loads(rj.read_text(encoding="utf-8"))
         else:
             rows = []
@@ -472,7 +563,7 @@ def main(argv=None) -> int:
                 if r["status"] == "ok":
                     n = r["numbers"]
                     print(f"   {dev['key']:18s} LER/round {n['ler_per_round']:.2e}  n-bar max {n['nbar_max']:6.3f}  "
-                          f"{n.get('T_jones', 0):8.2f} ms  rules {'ok' if not r['rules_failed_replay'] else 'FAIL ' + str(r['rules_failed_replay'])}"
+                          f"{n.get(time_key(release), 0):8.2f} ms  rules {'ok' if not r['rules_failed_replay'] else 'FAIL ' + str(r['rules_failed_replay'])}"
                           f"  R10 {n.get('r10')}  ({r['compile_seconds']:.0f}s, {r['compiler_mode']})", flush=True)
                 else:
                     print(f"   {dev['key']:18s} refused: {r.get('reason', '')[:110]}", flush=True)
@@ -490,8 +581,10 @@ def main(argv=None) -> int:
                 continue
             rows = _keep_work(out, rows, a.device)
             rj.write_text(json.dumps(rows, indent=1, default=str), encoding="utf-8")
-        pages(board, release, exp, rows, out)
+        # the task first: the pages read it (bb_studio.release_of decides which release's budget
+        # judges a device, through tasks/*/task.json)
         write_task(board, release, exp)
+        pages(board, release, exp, rows, out)
     return 1 if failed else 0
 
 

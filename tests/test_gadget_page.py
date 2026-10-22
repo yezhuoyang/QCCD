@@ -53,6 +53,24 @@ def test_the_build_writes_a_self_contained_page(built):
         assert (out / rel).exists()
 
 
+def test_a_leaf_file_carries_no_path_of_the_machine_that_built_it(built):
+    """The leaf files go on the website as they are written.  Each program's provenance log
+    is thinned (`qccd.ir.provenance.thin`): no absolute `root`, no repository file, line or
+    quoted source -- only which pass emitted an instruction, as on a studio page."""
+    import re
+    out, _ = built
+    leaks = re.compile(r"[A-Za-z]:(?:\\\\|\\|/)+Users|/home/|\"root\":|\"file\": \"qccd/|\.py\"")
+    assert leaks.search('{"root": "C:\\\\Users\\\\x", "file": "qccd/compile/cooling.py"}')
+    files = list((out / "leaf").iterdir())
+    assert files
+    thinned = 0
+    for leaf_file in files:
+        text = leaf_file.read_text(encoding="utf-8")
+        assert not leaks.search(text), f"{leaf_file.name}: {leaks.search(text).group(0)}"
+        thinned += text.count('"level": "sites"')
+    assert thinned, "no provenance log was found to thin; the check would pass on anything"
+
+
 @requires_node
 def test_the_page_replays_every_leaf_program_exactly_as_the_verifier(built):
     out, _ = built

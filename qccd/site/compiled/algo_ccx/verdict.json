@@ -1,0 +1,15 @@
+{
+ "program": "circuit",
+ "arch": "grid2x3",
+ "circuit_sha256": "19ae3c7f2d779f9569ee69eb90de5e776e17bd1815d1cd061c83cf200479089b",
+ "binding": "ok",
+ "o1_transport": "ok",
+ "order": "ok",
+ "lean": "accepted",
+ "unrealised_ops": 0,
+ "readout": "ok: 0 measurement(s)/reset(s) compared in place, final measurements at the end",
+ "o2_semantics": "ok (max entry error 1.12e-15)",
+ "method": "exact 8x8 unitary, built from the emitted pulses, against the source QASM; global phase -1.5708",
+ "R10": "passed",
+ "R10_reason": "O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by exact 8x8 unitary, built from the emitted pulses, against the source QASM; global phase -1.5708"
+}

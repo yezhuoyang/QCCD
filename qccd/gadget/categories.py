@@ -11,6 +11,7 @@ reads it from the library JSON).
 `shape` names a silhouette the page knows how to draw:
 
     vault     rectangle with a double wall               logical zone
+    ward      a block with a raised centre and a cross   logical memory (corrects what it holds)
     octagon   cut corners                                syndrome extraction
     house     pitched roof                               preparation
     stadium   rounded ends                               readout
@@ -42,6 +43,13 @@ CATEGORIES: dict[str, dict] = {
         "stroke": "#3730a3", "fill": "#e0e7ff",
         "job": "Holds logical blocks between operations.  No lasers: blocks check in, "
                "rest, and check out in the order they arrived.",
+    },
+    "memory": {
+        "title": "Logical Memory", "place": "Ward", "shape": "ward", "glyph": "MEM",
+        "stroke": "#7c2d12", "fill": "#ffedd5",
+        "job": "Holds a logical block for as long as the program needs it, and corrects it "
+               "while it rests: resident ancillas run a syndrome round whenever the block's "
+               "coherence budget asks for one.",
     },
     "se": {
         "title": "Syndrome Extraction", "place": "Clinic", "shape": "octagon", "glyph": "SE",
@@ -124,7 +132,7 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "operation", "surgery", "readout", "factory", "injection",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "readout", "factory", "injection",
          "decoder", "archive", "depot", "road", "wire"]
 
 #: categories that hold no ions: they run on bits

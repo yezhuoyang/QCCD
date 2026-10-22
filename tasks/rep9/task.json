@@ -1,0 +1,39 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "rep9",
+ "order": 2,
+ "title": "Repetition code, distance 9",
+ "short": "rep9",
+ "description": "One syndrome-extraction round of the distance-9 repetition code: 8 weight-2 Z checks.",
+ "circuit": "circuit.qasm",
+ "n_data": 9,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "qccdsim_jones",
+   "qccdsim_transport"
+  ]
+ },
+ "metrics": [
+  "T_jones",
+  "T_transport",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable",
+  "p_eff_vs_threshold"
+ ],
+ "rank_by": "T_jones",
+ "seed": "SmallCode/repetition",
+ "stabilizers": [
+  "ZZIIIIIII",
+  "IZZIIIIII",
+  "IIZZIIIII",
+  "IIIZZIIII",
+  "IIIIZZIII",
+  "IIIIIZZII",
+  "IIIIIIZZI",
+  "IIIIIIIZZ"
+ ]
+}

@@ -40,6 +40,12 @@ faults.
   rotation and pass.  It is an approximation to revisit: the readout's transport, its
   duration beyond one measurement and its effect on the schedule are not charged.
 
+**Both bases at once.**  A Z-basis memory cannot see dephasing: a Z error flips no Z logical,
+and dephasing is what a trapped-ion machine accrues while it idles and shuttles.  So
+`rotated_surface_xz` runs two patches in lockstep in one circuit, one a Z memory and one an X
+memory, with one observable each; a shot fails when either does (`decode.estimate_ler`).  Its
+`basis` is "XZ" and its readout says each data qubit's basis (`readout_basis`).
+
 `ideal_stim` turns an experiment into the stim circuit of its source (plus the appended
 readout), with optional uniform circuit-level noise: the reference an extracted hardware
 circuit is compared with, and the thing whose circuit distance the tests measure.
@@ -61,6 +67,13 @@ __all__ = [
     "SPEC_KIND",
     "repetition",
     "rotated_surface",
+    "rotated_surface_xz",
+    "logical_qubits",
+    "css_memory_xz",
+    "css_memory_seq",
+    "shor_code",
+    "repetition_code",
+    "bb_code",
     "steane",
     "steane_code",
     "css_memory",
@@ -94,6 +107,14 @@ class MemoryExperiment:
     readout: str = "program"
     #: with an appended readout: (data qubit, the classical bit its readout writes)
     readout_bits: tuple[tuple[int, int], ...] = ()
+    #: the basis each `readout_bits` entry is read in, when they differ ("XZ" experiments);
+    #: empty means every data qubit is read in `basis`
+    readout_basis: tuple[str, ...] = ()
+
+    def readout_plan(self) -> list[tuple[int, int, str]]:
+        """(data qubit, classical bit, basis) for each appended readout, in order."""
+        bases = self.readout_basis or (self.basis,) * len(self.readout_bits)
+        return [(q, b, s) for (q, b), s in zip(self.readout_bits, bases)]
 
     def spec(self) -> dict:
         """The detector declaration, JSON-safe; with the QASM it is the whole experiment."""
@@ -112,6 +133,9 @@ class MemoryExperiment:
             "readout": self.readout,
             **({"readout_bits": {str(q): b for q, b in self.readout_bits}}
                if self.readout == "appended" else {}),
+            **({"readout_basis": {str(q): s for (q, _), s in zip(self.readout_bits,
+                                                                  self.readout_basis)}}
+               if self.readout == "appended" and self.readout_basis else {}),
         }
 
     @classmethod
@@ -131,6 +155,11 @@ class MemoryExperiment:
         bits = spec.get("readout_bits") or {}
         if readout == "appended" and not bits:
             raise ValueError("an appended readout needs `readout_bits`")
+        rb = sorted((int(q), int(b)) for q, b in bits.items())
+        bases = spec.get("readout_basis") or {}
+        if bases and (set(bases) != {str(q) for q, _ in rb}
+                      or not set(bases.values()) <= {"X", "Z"}):
+            raise ValueError("`readout_basis` must name X or Z for every data qubit of `readout_bits`")
         return cls(
             name=str(spec["experiment"]),
             code=str(spec.get("code", "")),
@@ -143,7 +172,8 @@ class MemoryExperiment:
             detectors=tuple(tuple(int(b) for b in d) for d in spec["detectors"]),
             observables=tuple(tuple(int(b) for b in o) for o in spec["observables"]),
             readout=readout,
-            readout_bits=tuple(sorted((int(q), int(b)) for q, b in bits.items())),
+            readout_bits=tuple(rb),
+            readout_basis=tuple(str(bases[str(q)]) for q, _ in rb) if bases else (),
         )
 
     @property
@@ -164,13 +194,27 @@ class MemoryExperiment:
                 uses[b] = uses.get(b, 0) + 1
         return max(uses.values(), default=0) <= 2
 
+    @property
+    def logical_qubits(self) -> int:
+        """k, the logical qubits the experiment tests.  A two-basis ("XZ") experiment tests each
+        one twice, a copy of the code per basis, so it is half its observables."""
+        n = len(self.observables)
+        return max(1, n // 2) if self.basis == "XZ" else max(1, n)
+
     def summary(self) -> dict:
         """What a report names the experiment by: the spec without its bit lists."""
         return {"experiment": self.name, "code": self.code, "distance": self.distance,
                 "rounds": self.rounds, "basis": self.basis, "n_data": self.n_data,
                 "n_ancilla": self.n_ancilla, "detectors": len(self.detectors),
                 "observables": len(self.observables), "matchable": self.matchable,
-                "readout": self.readout}
+                "readout": self.readout, "logical_qubits": self.logical_qubits,
+                "ions": self.n_data + self.n_ancilla}
+
+
+def logical_qubits(exp: MemoryExperiment) -> int:
+    """k of an experiment (`MemoryExperiment.logical_qubits`): what Goal 1's leaderboard divides a
+    logical error rate per round by, so that codes encoding more qubits are compared fairly."""
+    return exp.logical_qubits
 
 
 # ------------------------------------------------------------------ the builder
@@ -187,21 +231,34 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
             logicals: Sequence[Sequence[int]], rounds: int, basis: str, *,
             layered: bool, flags: bool = False, note: str = "",
             readout: str = "appended") -> MemoryExperiment:
-    """The one construction every generator shares (see the module docstring)."""
-    if basis not in ("X", "Z"):
-        raise ValueError(f"basis must be 'X' or 'Z', got {basis!r}")
+    """The one construction every generator shares (see the module docstring).
+
+    `basis` is "X" or "Z", or one of them per data qubit (patches side by side); each check
+    then belongs to the basis of its data, which must all be in one basis.
+    """
+    dbasis = [basis] * n_data if isinstance(basis, str) else [str(b) for b in basis]
+    if len(dbasis) != n_data or not set(dbasis) <= {"X", "Z"}:
+        raise ValueError(f"basis must be 'X' or 'Z' (or one per data qubit), got {basis!r}")
+    mixed = len(set(dbasis)) > 1
+    home: list[str] = []
+    for c in checks:
+        on = {dbasis[d] for d in c.support}
+        if len(on) != 1:
+            raise ValueError(f"a check spans data of both bases: {c.support}")
+        home.append(on.pop())
+    label = "".join(sorted(set(dbasis)))
     if readout not in READOUTS:
         raise ValueError(f"readout must be one of {READOUTS}, not {readout!r}")
     if rounds < 1:
         raise ValueError("a memory experiment needs at least one round")
     if layered and flags:
         raise ValueError("a layered schedule is hook-safe by construction; it takes no flags")
-    other = "X" if basis == "Z" else "Z"
     m = len(checks)
     anc = [n_data + k for k in range(m)]
-    # a hook on a check of the OTHER type spreads the error type that flips the observable
+    # a hook on a check of the OTHER type (than its own patch's memory) spreads the error type
+    # that flips that patch's observable
     flagged = [k for k, c in enumerate(checks)
-               if flags and c.basis == other and len(c.support) >= 4]
+               if flags and c.basis != home[k] and len(c.support) >= 4]
     flag_of = {k: n_data + m + j for j, k in enumerate(flagged)}
     nf = len(flagged)
     per_round = m + nf
@@ -216,13 +273,12 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
         return r * per_round + m + j
 
     out = ['OPENQASM 2.0;', 'include "qelib1.inc";',
-           f"// {name}: {code} memory in the {basis} basis, {rounds} round(s); "
+           f"// {name}: {code} memory in the {label} basis, {rounds} round(s); "
            f"data q[0..{n_data - 1}], ancillas q[{n_data}..{n_q - 1}]" + (f"; {note}" if note else "")
            + (f"; data readout c[{D}..{n_bits - 1}] appended by the grader"
               if readout == "appended" else ""),
            f"qreg q[{n_q}];", f"creg c[{n_bits}];"]
-    if basis == "X":
-        out += [f"h q[{d}];" for d in range(n_data)]
+    out += [f"h q[{d}];" for d in range(n_data) if dbasis[d] == "X"]
 
     def contact(c: _Check, a: int, d: int) -> str:
         return f"cx q[{a}],q[{d}];" if c.basis == "X" else f"cx q[{d}],q[{a}];"
@@ -266,30 +322,31 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
                         out.append(f"h q[{f}];")
                     out.append(f"measure q[{f}] -> c[{fbit(r, flagged.index(k))}];")
     if readout == "program":
-        if basis == "X":
-            out += [f"h q[{d}];" for d in range(n_data)]
+        out += [f"h q[{d}];" for d in range(n_data) if dbasis[d] == "X"]
         out += [f"measure q[{d}] -> c[{D + d}];" for d in range(n_data)]
 
     dets: list[tuple[int, ...]] = []
     for r in range(rounds):
         for k, c in enumerate(checks):
             if r == 0:
-                if c.basis == basis:
+                if c.basis == home[k]:
                     dets.append((bit(0, k),))
             else:
                 dets.append((bit(r, k), bit(r - 1, k)))
         for j in range(nf):
             dets.append((fbit(r, j),))
     for k, c in enumerate(checks):
-        if c.basis == basis:
+        if c.basis == home[k]:
             dets.append((bit(rounds - 1, k),) + tuple(D + d for d in sorted(c.support)))
     obs = tuple(tuple(D + d for d in sorted(lg)) for lg in logicals)
     return MemoryExperiment(name=name, code=code, distance=distance, rounds=rounds,
-                            basis=basis, n_data=n_data, n_ancilla=m + nf,
+                            basis=label, n_data=n_data, n_ancilla=m + nf,
                             qasm="\n".join(out) + "\n", detectors=tuple(dets),
                             observables=obs, readout=readout,
                             readout_bits=(tuple((d, D + d) for d in range(n_data))
-                                          if readout == "appended" else ()))
+                                          if readout == "appended" else ()),
+                            readout_basis=(tuple(dbasis) if mixed and readout == "appended"
+                                           else ()))
 
 
 # ------------------------------------------------------------------ generators
@@ -319,6 +376,102 @@ def rotated_surface(d: int, rounds: int | None = None, basis: str = "Z", *,
               for c in sorted(p.checks, key=lambda c: (c.basis != "X", int(c.name[1:])))]
     return _memory(f"surface{d}_r{r}_{basis.lower()}", f"rotated_surface_d{d}", d, p.n,
                    checks, [p.logical(basis)], r, basis, layered=True, readout=readout)
+
+
+def rotated_surface_xz(d: int, rounds: int | None = None, *,
+                       readout: str = "appended") -> MemoryExperiment:
+    """Two rotated surface patches in lockstep: a Z memory on data 0..n-1 and an X memory on
+    n..2n-1, every round measuring both patches' checks layer by layer (see the module).
+    Observable 0 is the Z patch's logical Z, observable 1 the X patch's logical X."""
+    r = d if rounds is None else rounds
+    p = patch(d, d, name=f"surface_d{d}")
+    one = sorted(p.checks, key=lambda c: (c.basis != "X", int(c.name[1:])))
+    n = p.n
+    checks = [_Check(c.basis, tuple(q + off for q in c.support), tuple(c.layers))
+              for off in (0, n) for c in one]
+    logicals = [list(p.logical("Z")), [q + n for q in p.logical("X")]]
+    return _memory(f"surface{d}xz_r{r}", f"rotated_surface_d{d}_x2", d, 2 * n, checks,
+                   logicals, r, ["Z"] * n + ["X"] * n, layered=True, readout=readout)
+
+
+def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
+                  distance: int | None = None, flags: bool = False,
+                  readout: str = "appended") -> MemoryExperiment:
+    """Two copies of a CSS code side by side, a Z memory on data 0..n-1 and an X memory on
+    n..2n-1 (the construction of `rotated_surface_xz`, checks one after another as
+    `css_memory` measures them).  Observables: the code's k Z logicals, then its k X logicals."""
+    if distance is None:
+        declared = code.params.get("declared")
+        if not declared:
+            raise ValueError(f"{code.name}: pass `distance`; the code declares none")
+        distance = int(declared[2])
+    lx, lz = code.logical_basis
+    n = code.n
+    one = ([_Check("X", tuple(gf2.support(h))) for h in code.hx]
+           + [_Check("Z", tuple(gf2.support(h))) for h in code.hz])
+    checks = [_Check(c.basis, tuple(q + off for q in c.support)) for off in (0, n) for c in one]
+    logicals = ([list(gf2.support(row)) for row in lz]
+                + [[q + n for q in gf2.support(row)] for row in lx])
+    return _memory(name or f"{code.name}xz_r{rounds}", f"{code.name}_x2", distance, 2 * n, checks,
+                   logicals, rounds, ["Z"] * n + ["X"] * n, layered=False, flags=flags,
+                   note="flagged" if flags else "", readout=readout)
+
+
+def css_memory_seq(code: CSSCode, rounds: int, name: str | None = None, *,
+                   distance: int | None = None, flags: bool = False) -> MemoryExperiment:
+    """ONE block of a CSS code, a Z memory and then an X memory on the same ions: for a code whose
+    two copies would not fit the ions it is measured on (bb72's 144, bb90's 180, under Goal 1's
+    200).  Phase 1 reads its data out IN the program (Z); every ion is then reset and phase 2
+    prepares |+> and is read out by the grader (X).  The 2k observables are phase 1's Z logicals
+    and phase 2's X logicals, so `basis` is "XZ" and `logical_qubits` k, as for two copies; a
+    round is one phase's, so the rate per round compares with a two-copy experiment's."""
+    zm = css_memory(code, rounds, basis="Z", distance=distance, flags=flags, readout="program")
+    xm = css_memory(code, rounds, basis="X", distance=distance, flags=flags, readout="appended")
+    zl, xl = zm.qasm.splitlines(), xm.qasm.splitlines()
+    nq = zm.n_data + zm.n_ancilla
+    bz = parse_qasm(zm.qasm).n_bits
+    bx = parse_qasm(xm.qasm).n_bits
+
+    def body(lines: list) -> list:
+        return [ln for ln in lines if ln and not ln.startswith(("OPENQASM", "include", "//", "qreg", "creg"))]
+
+    import re
+    shift = [re.sub(r"c\[(\d+)\]", lambda mm: f"c[{int(mm.group(1)) + bz}]", ln) for ln in body(xl)]
+    nm = name or f"{code.name}seq_r{rounds}"
+    out = (['OPENQASM 2.0;', 'include "qelib1.inc";',
+            f"// {nm}: {code.name} memory, one block: a Z memory of {rounds} round(s) read out in the "
+            f"program, every ion reset, then an X memory of {rounds} round(s); data q[0..{zm.n_data - 1}]; "
+            f"X readout c[{bz + bx - zm.n_data}..{bz + bx - 1}] appended by the grader",
+            f"qreg q[{nq}];", f"creg c[{bz + bx}];"]
+           + body(zl) + [f"reset q[{j}];" for j in range(nq)] + shift)
+    off = lambda bits: tuple(b + bz for b in bits)  # noqa: E731
+    return MemoryExperiment(
+        name=nm, code=f"{code.name}_seq", distance=zm.distance, rounds=rounds, basis="XZ",
+        n_data=zm.n_data, n_ancilla=zm.n_ancilla, qasm="\n".join(out) + "\n",
+        detectors=zm.detectors + tuple(off(d) for d in xm.detectors),
+        observables=zm.observables + tuple(off(o) for o in xm.observables),
+        readout="appended", readout_bits=tuple((q, b + bz) for q, b in xm.readout_bits),
+        readout_basis=("X",) * len(xm.readout_bits))
+
+
+def shor_code() -> CSSCode:
+    """Shor's [[9,1,3]]: Z checks on neighbours within each block of three, X checks across blocks."""
+    rows = lambda sets: tuple(sum(1 << q for q in s) for s in sets)  # noqa: E731
+    return CSSCode(name="shor", n=9, hx=rows(((0, 1, 2, 3, 4, 5), (3, 4, 5, 6, 7, 8))),
+                   hz=rows(((0, 1), (1, 2), (3, 4), (4, 5), (6, 7), (7, 8))), family="shor",
+                   params={"declared": [9, 1, 3]})
+
+
+def repetition_code(d: int) -> CSSCode:
+    """The bit-flip repetition code as a CSS code: Z checks only.  In both bases it protects bit
+    flips to distance d and phase flips not at all (distance 1)."""
+    return CSSCode(name=f"rep{d}", n=d, hx=(), hz=tuple((1 << i) | (1 << (i + 1)) for i in range(d - 1)),
+                   family="repetition", params={"declared": [d, 1, 1]})
+
+
+def bb_code(name: str) -> CSSCode:
+    l, m, a, b, (n, k, d) = TUTORIAL_BB[name]
+    return bivariate_bicycle(name, l, m, parse_poly(a, l, m), parse_poly(b, l, m), declared=(n, k, d))
 
 
 def steane_code() -> CSSCode:
@@ -390,6 +543,17 @@ EXPERIMENTS: dict[str, Callable[[], MemoryExperiment]] = {
     "rep9": lambda: repetition(9),
     "surface3": lambda: rotated_surface(3),
     "surface5": lambda: rotated_surface(5),
+    "surface3xz": lambda: rotated_surface_xz(3),
+    "surface5xz": lambda: rotated_surface_xz(5),
+    "surface7xz": lambda: rotated_surface_xz(7),
+    # Goal 1's other codes, both bases (two copies, or one block twice in a row)
+    "steanexz": lambda: css_memory_xz(steane_code(), 3, "steanexz_r3", distance=3, flags=True),
+    "shorxz": lambda: css_memory_xz(shor_code(), 3, "shorxz_r3", distance=2, flags=True),  # circuit distance 2
+    "rep3xz": lambda: css_memory_xz(repetition_code(3), 3, "rep3xz_r3", distance=1),
+    "rep5xz": lambda: css_memory_xz(repetition_code(5), 5, "rep5xz_r5", distance=1),
+    "bb18xz": lambda: css_memory_xz(bb_code("bb18"), 4, "bb18xz_r4", distance=4, flags=True),
+    "bb72seq": lambda: css_memory_seq(bb_code("bb72"), 3, "bb72seq_r3", distance=6),
+    "bb90seq": lambda: css_memory_seq(bb_code("bb90"), 3, "bb90seq_r3", distance=10),
     "steane": lambda: steane(3),
     "bb18": lambda: bb("bb18"),
     "bb72": lambda: bb("bb72", rounds=1),
@@ -413,7 +577,7 @@ def ideal_stim(exp: MemoryExperiment, p: float = 0.0):
     DEPOLARIZE1(p) after each one-qubit gate, X_ERROR(p) before each measurement and after
     each reset.  No noise on the initial |0> (the hardware extraction adds none either).
     An appended readout is added after the source, as `extract` adds it: a flip of
-    probability p, then a measurement in the memory's basis.
+    probability p, then a measurement in the data qubit's basis.
     """
     prog = parse_qasm(exp.qasm)
     c = StimText()
@@ -441,8 +605,8 @@ def ideal_stim(exp: MemoryExperiment, p: float = 0.0):
                 c.append(op.name, q)
             if p:
                 c.append("DEPOLARIZE1", q, p)
-    for q, b in exp.readout_bits:
-        append_readout(c, exp.basis, [q], p)
+    for q, b, basis in exp.readout_plan():
+        append_readout(c, basis, [q], p)
         meas_of_bit[b] = n_meas
         n_meas += 1
     declare(c, exp.detectors, exp.observables, meas_of_bit, n_meas)
