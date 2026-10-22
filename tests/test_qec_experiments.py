@@ -208,3 +208,12 @@ def test_one_block_in_both_bases_measures_z_then_x():
     assert exp.qasm.count("measure q[0]") == 1          # phase 1's data readout, in the program
     assert noiseless_check(ideal_stim(exp, 0.0)).ok
     assert circuit_distance(exp) == 3
+
+
+@pytest.mark.parametrize("key,k,ions", [("bb72seq", 12, 144), ("bb90seq", 8, 180)])
+def test_the_large_bivariate_bicycle_codes_fit_goal_one_in_one_block(key, k, ions):
+    """What the bb72seq / bb90seq boards are ranked on: k logical qubits, both bases, under 200 ions."""
+    exp = get_experiment(key)
+    s = exp.summary()
+    assert exp.basis == "XZ" and exp.logical_qubits == k and len(exp.observables) == 2 * k
+    assert s["ions"] == ions <= 200 and s["logical_qubits"] == k

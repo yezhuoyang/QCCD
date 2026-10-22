@@ -137,8 +137,29 @@ MEMORY_2 += [
      _GRID(9), "ler_per_round_per_logical",
      {"decoder": "bposd", "max_shots": 20000, "max_errors": 400, "seed": 20261021, "bp_max_iter": 30}),
 ]
-#: what a 194-ion compile and its certificate need: about 15 minutes of split rounds
-LIMITS_2 = {"surface7xz_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600}}
+# The bivariate-bicycle codes whose two copies would not fit in 200 ions: one block, a Z memory and
+# then an X memory on the same ions (experiments.css_memory_seq).  Measured 2026-10-21 with qccdc
+# c774b87b677f: bb72seq compiles on grid12x12 in 17 minutes, passes every rule, 8.4e-4 per round per
+# logical (9 errors in 300 shots); BP-OSD decodes a shot in 0.53 s, so the budget is shots, not errors,
+# in batches small enough (estimate_ler stops only between batches) that a poor design stops early.
+# The official grader allows 3600 s a grade and decodes 1.3-1.5x slower than the desktop measured here,
+# so bb72seq's 3000 shots keep its sampling under about 2400 s.
+_BB_SEQ = ("Two copies would need {two} ions, over Goal 1's 200, so the two bases are measured one after "
+           "the other on the same ions; a round is one memory's. ")
+MEMORY_2 += [
+    ("bb72seq_mem", 16, "bb72seq", "Bivariate bicycle code [[72,12,6]] memory, both bases",
+     "Three rounds of one bivariate-bicycle [[72,12,6]] block as a Z memory, read out in the program; "
+     "every ion reset; then three rounds as an X memory, read out by the grader (144 ions: 72 data and 72 "
+     "check ancillas; 12 logical qubits). " + _BB_SEQ.format(two=288) + "Circuit distance 6 with bare "
+     "checks; decoded with BP-OSD, its belief propagation capped at 30 iterations. " + NOISE,
+     _GRID(12), "ler_per_round_per_logical",
+     {"decoder": "bposd", "max_shots": 3000, "max_errors": 100, "batch": 250, "seed": 20261021,
+      "bp_max_iter": 30}),
+]
+#: what a 194-ion compile and its certificate need: about 15 minutes of split rounds.  bb72seq's took
+#: 17 minutes alone and 40 on a loaded desktop (the end-to-end run, qccdc b4a003dbb4ae)
+LIMITS_2 = {"surface7xz_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600},
+            "bb72seq_mem": {"compile_timeout_s": 3600, "lean_timeout_s": 3600}}
 PER_LOGICAL = {"name": "ler_per_round_per_logical", "unit": "per round per logical qubit", "better": "low",
                "about": "logical error rate per round divided by the logical qubits the experiment tests "
                         "(qccd.qec.experiments.logical_qubits): what Goal 1 ranks every code by"}
