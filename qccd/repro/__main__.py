@@ -223,7 +223,7 @@ def check_ours(paper: dict, o: dict, by: dict) -> dict:
         prof = ours_profile(name)
         rep = check(sched, prof, duration=law, circuit=circ, observers=observers, strict=True)
         rules = judge_by_rules(RULESETS[name], sched, law=law, circ=circ, strict=True, ours=True)
-        profiles[prof.name] = {"checks": rep.checks, "ok": rep.ok, "rules": rules,
+        profiles[prof.name] = {"checks": rep.checks, "ok": rep.ok and rules["ok"], "rules": rules,
                                          "violations": rep.summary()["violations"],
                                          "first_violations": rep.summary()["first"]}
         measured = {"makespan_us": rep.metrics["makespan_us"],
@@ -298,11 +298,22 @@ def check_paper(key: str) -> dict:
             row.update(_verdict(ours, float(q["paper"][0]), "paper"), where=q["paper"][1])
             row["ours"] = ours
         ratios.append(row)
-    ours = [check_ours(p, o, by) for o in catalog.OURS.get(key, {}).get("runs", [])
-            if (ROOT / key / o["file"]).exists()]
+    ours_spec = catalog.OURS.get(key, {})
+
+    def ours_rows(specs):
+        return [check_ours(p, o, by) for o in specs if (ROOT / key / o["file"]).exists()]
+
+    ours = ours_rows(ours_spec.get("runs", []))
+    boxes = []
+    for spec in ours_spec.get("boxes", []):
+        box_runs = ours_rows(spec["runs"])
+        boxes.append({**{k: spec[k] for k in ("id", "title", "how", "found")},
+                      "count": len(box_runs), "runs": box_runs})
     out = {"paper": {k: p[k] for k in ("key", "short", "title", "authors", "venue", "year",
                                          "arxiv", "artifact", "what")},
            "runs": rows, "ratios": ratios, "ours": ours}
+    if boxes:
+        out["ours_boxes"] = boxes
     dest = ROOT / key / "results.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
@@ -331,7 +342,8 @@ def main(argv=None) -> int:
             flag = "ok " if r["ok"] else "BAD"
             bad += 0 if r["ok"] else 1
             print(f"{key:18} {r['id']:36} {flag} {cmp}  {r['violations'] or ''}")
-        for o in out.get("ours", []):
+        ours_rows = out.get("ours", []) + [r for box in out.get("ours_boxes", []) for r in box["runs"]]
+        for o in ours_rows:
             m, t = o["measured"], o["theirs"]
             flag = "ok " if o["ok"] else "BAD"
             bad += 0 if o["ok"] else 1

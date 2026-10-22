@@ -44,7 +44,7 @@ for d in 2 3 6 12; do
       .venv/bin/python tools/order.py "Reproduce/jones2025/ours/grid_rot_d${d}_c2_${kind}.schedule.json.gz" "Reproduce/jones2025/circuits/rotated_memory_${basis}_d${d}_r1.stim"
     done
   done
- done
+done
 .venv/bin/python -m qccd.repro check jones2025
 ```
 
@@ -90,3 +90,24 @@ a move delayed by 5 µs, a uniformly mislabelled cycle, a missing idle-site
 switch, a gate concurrent with transport, and double junction occupancy are
 all rejected by the rule tests. The older timed checker still trusts class
 labels; its geometry-gap tests remain strict expected failures.
+
+## Separate box for the website
+
+The smallest added catalog shape is `OURS["jones2025"]["boxes"]`, a list
+of independent boxes with `id`, `title`, `how`, `found`, and `runs`.
+The existing parent `runs` now contains only John's four Ours schedules.
+The one new box has `id: "wise"` and `title: "Ours, WISE control"`, its own
+explanation/results text, and the four split schedules.
+
+`check_paper` keeps the existing four result objects in `results.ours` and
+emits the extra boxes as `results.ours_boxes`. Each box preserves its four
+metadata fields and has `count: 4` and `runs`, containing the same full
+checked result objects (including per-rule verdicts) as before. The renderer
+can keep its current Ours box/count from `ours`, then iterate `ours_boxes`
+to render each box's own title, how/found text, count, and runs. Nothing is
+double-counted. No site-renderer changes are made on this branch.
+
+An Ours row is only `ok` if both its strict timed profile and its rule set
+pass; geometry/label failures cannot be hidden by the timed checker's gap.
+The final reproduction check has all four `_ours` and four `_wise` rows ok;
+it still exits 1 for the paper artifact's four pre-existing circuit failures.

@@ -166,3 +166,41 @@ def test_wise_other_grid_artifacts(distance, mode, suffix):
     assert sched.claims["broadcast_cycles"] == (72 if mode == "split" else 48)
     with gzip.open(stim.parents[1] / f"ours/grid_rot_d{distance}_c2_wise{suffix}.schedule.json.gz", "rt") as f:
         assert sched.to_json() == json.load(f)
+
+
+def test_wise_box_is_separate_and_metadata_survives_check_paper(tmp_path, monkeypatch):
+    from qccd.repro import __main__ as repro, catalog
+    spec = catalog.OURS["jones2025"]
+    box = spec["boxes"][0]
+    assert len(spec["runs"]) == len(box["runs"]) == 4
+    for run in spec["runs"] + box["runs"]:
+        path = tmp_path / "jones2025" / run["file"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    monkeypatch.setattr(repro, "ROOT", tmp_path)
+    monkeypatch.setattr(repro, "check_run", lambda paper, run: {"id": run["id"], "measured": {}})
+    monkeypatch.setattr(repro, "check_ours", lambda paper, run, by: {"id": run["id"], "ok": True})
+    result = repro.check_paper("jones2025")
+    assert {r["id"] for r in result["ours"]} == {r["id"] for r in spec["runs"]}
+    saved = result["ours_boxes"][0]
+    assert saved["count"] == 4
+    assert {r["id"] for r in saved["runs"]} == {r["id"] for r in box["runs"]}
+    for key in ("id", "title", "how", "found"):
+        assert saved[key] == box[key]
+    assert json.loads((tmp_path / "jones2025/results.json").read_text()) == result
+
+
+def test_uniform_false_label_cannot_be_ok_on_reproduce_page(monkeypatch):
+    from qccd.repro import __main__ as repro, catalog
+    dev, chains, qubits, stim = _source()
+    sched = build(dev, chains, qubits, stim)
+    start = next(e.t0 for e in sched.events if e.kind == "split")
+    broken = replace(sched, events=[replace(e, meta={**e.meta, "class": "split:S"})
+                                    if e.kind == "split" and e.t0 == start else e for e in sched.events])
+    monkeypatch.setattr(TimedSchedule, "load", classmethod(lambda cls, path: broken))
+    run = catalog.OURS["jones2025"]["boxes"][0]["runs"][1]
+    row = repro.check_ours(catalog.paper("jones2025"), run, {})
+    assert not row["ok"]
+    profile = row["profiles"]["jones-wise"]
+    assert not profile["ok"] and not profile["violations"]
+    assert not profile["rules"]["ok"]
