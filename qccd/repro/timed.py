@@ -455,7 +455,7 @@ def check(
                    for t, ch in before.items()):
                 v("positions", f"reconfigure {e.id}: observed input chains disagree with replay", e.id)
                 continue
-            for t in before:
+            for t in dev.sites:
                 if profile.trap_serial:
                     trap_ops.add(t, e.t0, e.t1, e.id)
             for i in e.ions:
@@ -595,6 +595,16 @@ def check(
         else:
             v("structure", f"event {e.id}: unknown kind {e.kind!r}", e.id)
 
+    # A global hold excludes every operation, including moves on untouched ions
+    # and empty components. It is not extra ion occupancy (which would falsify capacity).
+    if profile.allow_reconfigure:
+        for a in events:
+            if a.kind == "reconfigure":
+                for b in events:
+                    if a.id != b.id and a.t0 < b.t1 - tol and b.t0 < a.t1 - tol:
+                        v("global_hold", f"reconfigure {a.id} holds the whole device while event {b.id} runs",
+                          a.id, b.id)
+
     # -- close open residencies at +inf --------------------------------------------
     for ion, (kind, where) in loc.items():
         if kind == "site":
@@ -664,6 +674,8 @@ def check(
 
     # -- verdicts ------------------------------------------------------------------------
     names = ["structure", "positions", "capacity", "ion_serial"]
+    if counts["reconfigure"] and profile.allow_reconfigure:
+        names.append("global_hold")
     for name, on, why in (("segment_mutex", profile.segment_mutex, "the profile allows sharing"),
                           ("junction_mutex", profile.junction_mutex, "the profile allows sharing"),
                           ("trap_serial", bool(profile.trap_serial), "the profile lets a trap overlap"),

@@ -399,7 +399,9 @@ def import_jones(path: str | Path, *, name: str | None = None) -> TimedSchedule:
             before = {f"T{t}": [str(i) for i in ions] for t, ions in e["chains_before"].items()}
             after = {f"T{t}": [str(i) for i in ions] for t, ions in e["chains_after"].items()}
             ions = tuple(str(i) for i in e["reconfigured_ions"])
-            held = locks + [f"trap:{t[1:]}" for t in set(before) | set(after)]
+            held = locks + [f"trap:{t[1:]}" for t in dev.sites]
+            held += [f"segment:{s[1:]}" for s in dev.segments]
+            held += [f"junction:{n[1:]}" for n in dev.nodes]
             held += [f"ion:{i}" for i in ions]
             meta.update(locks=sorted(set(held)), chains_before=before, chains_after=after,
                         recorded_duration_us=float(e["operationTime"]) * 1e6,

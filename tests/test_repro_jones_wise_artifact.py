@@ -131,3 +131,32 @@ def test_ordinary_profiles_reject_global_reconfiguration(profile, strict, tmp_pa
     rep = check(replace(sched, events=[event]), profile, duration=jones_duration, strict=strict)
     assert not rep.ok
     assert any("does not allow reconfigure" in v.message for v in rep.failed("structure"))
+
+
+def _junction_overlap_schedule():
+    from qccd.repro.timed import PortGraph, TimedSchedule
+    dev = PortGraph({"A": {"capacity": 1, "ports": {"s": "R"}},
+                     "B": {"capacity": 1, "ports": {"t": "L"}},
+                     "C": {"capacity": 1}}, {"J": {}},
+                    {"s": ("A", "J"), "t": ("J", "B")})
+    events = [Event(0, "split", 0, 80, ("traveller",), at="A", seg="s"),
+              Event(1, "reconfigure", 80, 200, ("held",), meta={
+                  "chains_before": {"C": ["held"]}, "chains_after": {"C": ["held"]}}),
+              Event(2, "j_enter", 85, 135, ("traveller",), src="s", via="J"),
+              Event(3, "j_exit", 135, 185, ("traveller",), dst="t", via="J"),
+              Event(4, "merge", 200, 280, ("traveller",), at="B", seg="t")]
+    return TimedSchedule("global junction exclusion", dev,
+                         {"A": ["traveller"], "B": [], "C": ["held"]}, events)
+
+
+def test_global_hold_excludes_junction_crossing_by_an_unaffected_ion():
+    sched = _junction_overlap_schedule()
+    rep = check(sched, JONES_WISE_ARTIFACT, duration=jones_duration)
+    assert rep.failed("global_hold")
+    assert {v.events for v in rep.failed("global_hold")} == {(1, 2), (1, 3)}
+    # Without the global hold this is an otherwise valid traversal; touching
+    # boundaries at 80/200 us are allowed, and no shared-ion lock detects it.
+    assert not rep.failed("ion_serial")
+    assert not rep.failed("positions")
+    assert check(replace(sched, events=[e for e in sched.events if e.kind != "reconfigure"]),
+                 JONES, duration=jones_duration).ok
