@@ -48,6 +48,7 @@ import small_codes as SC  # noqa: E402
 from q06_campaign import broadcast_use, buildability, score  # noqa: E402
 from qccd.arch import load  # noqa: E402
 from qccd.ir.tsir import TSIR  # noqa: E402
+from qccd.repo_paths import resolve, to_repo  # noqa: E402
 
 OUT = ROOT / "MemoryBoard"
 TASKS = ROOT / "tasks"
@@ -460,7 +461,8 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
             m["bytes"] = page.stat().st_size
         manifest.append(m)
         print(f"   page {m['key']:26s} {m['status']}", flush=True)
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=1, default=str), encoding="utf-8")
+    # repo-relative: a committed manifest must not spell out the disk it was built on
+    (out / "manifest.json").write_text(json.dumps(to_repo(manifest), indent=1, default=str), encoding="utf-8")
     q = release.manifest["qec"]["ler"]
     title = f"{release.title} on QCCD — every design, ranked"
     idx = B.write_index(
@@ -550,7 +552,7 @@ def main(argv=None) -> int:
             continue
         out.mkdir(parents=True, exist_ok=True)
         if a.pages_only:
-            rows = json.loads(rj.read_text(encoding="utf-8"))
+            rows = resolve(json.loads(rj.read_text(encoding="utf-8")))
         else:
             rows = []
             shutil.rmtree(out / WORK_NEW, ignore_errors=True)
@@ -569,7 +571,7 @@ def main(argv=None) -> int:
                     print(f"   {dev['key']:18s} refused: {r.get('reason', '')[:110]}", flush=True)
             ran = list(rows)
             if a.device and rj.exists():
-                rows = [r for r in json.loads(rj.read_text(encoding="utf-8")) if r["device"] != a.device] + rows
+                rows = [r for r in resolve(json.loads(rj.read_text(encoding="utf-8"))) if r["device"] != a.device] + rows
             # A run in which NOTHING compiled is a broken run, not a result: every design
             # cannot have become unroutable at once.  The saved results and pages stay.
             if not any(r["status"] == "ok" for r in ran) and not a.force:
@@ -580,7 +582,7 @@ def main(argv=None) -> int:
                 shutil.rmtree(out / WORK_NEW, ignore_errors=True)
                 continue
             rows = _keep_work(out, rows, a.device)
-            rj.write_text(json.dumps(rows, indent=1, default=str), encoding="utf-8")
+            rj.write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
         # the task first: the pages read it (bb_studio.release_of decides which release's budget
         # judges a device, through tasks/*/task.json)
         write_task(board, release, exp)

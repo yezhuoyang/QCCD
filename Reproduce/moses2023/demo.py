@@ -77,7 +77,8 @@ def main(argv: list[str]) -> int:
     rounds = sum(1 for i in ins if i.get("type") == "gate" and any(len(p) == 2 for p in (i.get("pairs") or [])))
     OUT.mkdir(exist_ok=True)
     (OUT / "ghz32.qasm").write_text(qasm, encoding="utf-8", newline="\n")
-    (OUT / "ghz32.tsir.json").write_text(json.dumps(doc), encoding="utf-8", newline="\n")
+    from qccd.ir.provenance import blank_root      # shipped: no checkout path in it
+    (OUT / "ghz32.tsir.json").write_text(json.dumps(blank_root(doc)), encoding="utf-8", newline="\n")
     # the certificate, so the page can join each instruction to its circuit statement
     (OUT / "ghz32.qcert.json").write_text(Path(cert_path).read_text(encoding="utf-8"),
                                           encoding="utf-8", newline="\n")

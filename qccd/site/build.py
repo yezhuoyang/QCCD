@@ -619,17 +619,20 @@ def lessons() -> tuple[list[dict], list[dict]]:
 _ABS_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:home|Users|root|tmp|c)/|\\\\)")
 
 
-def public_paths(obj):
-    """A board's record as it is published: every absolute path in it -- `arch`, `prefix`,
-    `qasm`, or a `Path` that `default=str` would spell out -- becomes the file's own name.
-    The name says which artifact a row came from; the path would say whose disk it was on."""
+def public_paths(obj, _key: str | None = None):
+    """A board's record as it is published: every absolute path in it, every value of a path
+    key (`arch`, `prefix`, `qasm`, `cooled` -- repo-relative in the records since
+    `qccd.repo_paths`), and a `Path` that `default=str` would spell out, becomes the file's
+    own name.  The name says which artifact a row came from; the path would say whose disk
+    it was on, or where in a tree the reader does not have."""
+    from ..repo_paths import PATH_KEYS
     if isinstance(obj, dict):
-        return {k: public_paths(v) for k, v in obj.items()}
+        return {k: public_paths(v, k) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [public_paths(v) for v in obj]
+        return [public_paths(v, _key) for v in obj]
     if isinstance(obj, Path):
         return obj.name
-    if isinstance(obj, str) and _ABS_PATH.match(obj):
+    if isinstance(obj, str) and (_ABS_PATH.match(obj) or (_key in PATH_KEYS and re.search(r"[\\/]", obj))):
         return re.split(r"[\\/]+", obj.rstrip("\\/"))[-1]
     return obj
 

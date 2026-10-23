@@ -38,6 +38,7 @@ from typing import Any, Mapping, Sequence
 __all__ = [
     "PROV_KEY", "CALL_KEY", "LEVELS", "SCHEMA_VERSION", "REPO_ROOT",
     "CallLog", "capture_site", "invalidate", "attach", "note", "tag", "thin",
+    "blank_root", "blank_root_file",
     "stamp",
     "log_of", "call_of", "site_of", "resolve", "calls_to_instructions",
     "index_by_line", "listing_rows",
@@ -348,6 +349,35 @@ def thin(log: Mapping | None, level: str = "sites") -> dict | None:
         calls.append(d)
     return {"version": log.get("version", SCHEMA_VERSION), "level": level,
             "sites": sites, "calls": calls}
+
+
+def blank_root(doc: dict) -> dict:
+    """A program document about to be COMMITTED or uploaded, with `meta.prov.root` blanked.
+
+    `root` is the absolute path of the checkout that built the program -- this machine's user
+    folder, in a file the public repository ships or a leaderboard serves.  Every other field
+    of the log is relative to it already.  In place; returns `doc`."""
+    log = (doc.get("meta") or {}).get(PROV_KEY)
+    if isinstance(log, dict) and log.get("root"):
+        log["root"] = ""
+    return doc
+
+
+def blank_root_file(path) -> bool:
+    """`blank_root` on a program file written by another tool, keeping its bytes otherwise:
+    the one `"root"` value is replaced in the text, so the writer's layout survives."""
+    import json
+    import re
+    p = Path(path)
+    text = p.read_bytes().decode("utf-8")          # bytes: line endings stay the writer's
+    log = (json.loads(text).get("meta") or {}).get(PROV_KEY)
+    if not (isinstance(log, Mapping) and log.get("root")):
+        return False
+    pat = re.compile(r'("root"\s*:\s*)"(?:[^"\\]|\\.)*"')
+    if len(pat.findall(text)) != 1:
+        raise ValueError(f"{p}: expected one \"root\" in the provenance log")
+    p.write_bytes(pat.sub(r'\1""', text).encode("utf-8"))
+    return True
 
 
 # ------------------------------------------------------------------- reading

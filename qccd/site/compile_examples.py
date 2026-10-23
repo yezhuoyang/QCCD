@@ -153,6 +153,9 @@ def compile_one(gid: str, body: str, title: str, note: str, arch: Path, exp: Pat
     rc, clog, _ = sh([sys.executable, BRIDGE / "insert_cooling.py", d / "prog.tsir.json", "--arch", arch, "-o", cooled])
     if rc != 0:
         raise SystemExit(f"{gid}: cooling failed:\n{clog[-800:]}")
+    # the repository ships this file: its provenance must not name this machine's checkout
+    from qccd.ir.provenance import blank_root_file
+    blank_root_file(cooled)
     rc, rlog, _ = sh([sys.executable, BRIDGE / "check_tsir.py", cooled, "--arch", arch, "--model", "corrected", "--json"])
     rules = json.loads(rlog[rlog.index("{"):]) if "{" in rlog else {"error": rlog[-400:]}
     (d / "rules.json").write_text(json.dumps(rules, indent=1) + "\n", encoding="utf-8", newline="\n")

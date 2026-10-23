@@ -90,11 +90,16 @@ def test_a_board_record_is_published_without_the_paths_of_the_machine_that_built
     assert {k: got[k] for k in ("key", "page", "numbers", "note")} == {k: row[k] for k in ("key", "page", "numbers", "note")}
     # the pattern sees a planted path, so its silence below means something
     assert re.search(ABSOLUTE, json.dumps(row, default=str))
-    # and the records the build publishes today carry none, though their seeds do
-    seen = 0
+    # a seed written since `qccd.repo_paths` names its files relative to the repository;
+    # published, those are file names too
+    rel = build.public_paths([{"arch": "arch/ring144_24v.arch.json", "cooled": "SmallCode/steane/x.cooled.tsir.json",
+                               "note": "arch/ring144_24v.arch.json is the device"}])[0]
+    assert rel == {"arch": "ring144_24v.arch.json", "cooled": "x.cooled.tsir.json",
+                   "note": "arch/ring144_24v.arch.json is the device"}
+    # and the records the build publishes today carry no path above a file name
     for t in build.tasks():
-        raw = json.dumps(t["rows"], default=str)
-        seen += bool(re.search(ABSOLUTE, raw))
-        assert not re.search(ABSOLUTE, json.dumps(build.public_paths(t["rows"]), default=str)), t["id"]
-    if not seen:
-        pytest.skip("no seed record in this tree names an absolute path; only the planted one was checked")
+        pub = build.public_paths(t["rows"])
+        assert not re.search(ABSOLUTE, json.dumps(pub, default=str)), t["id"]
+        for r in pub:
+            for k in ("arch", "prefix", "qasm", "cooled"):
+                assert not re.search(r"[\\/]", str(r.get(k) or "")), (t["id"], k, r.get(k))

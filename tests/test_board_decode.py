@@ -57,7 +57,8 @@ def _entry():
         man = ROOT / "SmallCode" / fam / "manifest.json"
         if not man.exists():
             continue
-        for e in json.loads(man.read_text(encoding="utf-8")):
+        from qccd.repo_paths import resolve
+        for e in resolve(json.loads(man.read_text(encoding="utf-8"))):
             if e.get("status") != "ok" or not e.get("prefix") or (e.get("sites") or 0) < 4:
                 continue
             if not Path(str(e["prefix"]) + ".cooled.tsir.json").exists():

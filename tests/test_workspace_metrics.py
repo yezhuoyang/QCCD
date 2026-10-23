@@ -37,13 +37,14 @@ def _cases():
         man = REPO / "SmallCode" / code / "manifest.json"
         if not man.exists():
             continue
-        for m in json.loads(man.read_text(encoding="utf-8")):
+        from qccd.repo_paths import resolve
+        for m in resolve(json.loads(man.read_text(encoding="utf-8"))):
             nums = m.get("numbers") or {}
             cooled = Path(str(m.get("prefix", "")) + ".cooled.tsir.json")
-            # IN THIS CHECKOUT.  The manifest names its artifacts by absolute path, so a
-            # second checkout on the same machine found the FIRST checkout's (newer)
-            # artifacts and held them to its own (older) manifest: twelve reds that were a
-            # comparison between two trees.
+            # IN THIS CHECKOUT.  The manifest names its artifacts relative to the repository
+            # (`qccd.repo_paths`); an older one named them by absolute path, and a second
+            # checkout on the same machine then found the FIRST checkout's (newer)
+            # artifacts and held them to its own (older) manifest.
             if not (_inside(cooled) and _inside(Path(m["arch"]))):
                 continue
             if nums.get("T_source") == "replay" and "T_jones" in nums and cooled.exists() and Path(m["arch"]).exists():

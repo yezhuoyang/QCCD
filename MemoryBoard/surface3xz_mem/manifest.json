@@ -3,13 +3,13 @@
   "key": "01_grid9x9",
   "family": "lattice",
   "title": "Surface code memory, distance 3, both bases on grid9x9 \u2014 the baseline lattice",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\grid9x9.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/grid9x9.arch.json",
   "claim": "traps on the wires of a 9x9 junction grid. LER per round 2.22e-04, 95% interval 2.0e-04 to 2.5e-04 (400 errors in 600,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": true,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid9x9\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid9x9\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/grid9x9/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/grid9x9/circuit.qasm",
   "numbers": {
    "T_quantinuum": 87.68,
    "ions_per_instruction": 2.2,
@@ -81,7 +81,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2142148,
+  "bytes": 2145082,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -122,13 +122,13 @@
   "key": "02_deck_unit_cell",
   "family": "lattice",
   "title": "Surface code memory, distance 3, both bases on deck_unit_cell \u2014 the same lattice, broadcast-wired",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\deck_unit_cell.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/deck_unit_cell.arch.json",
   "claim": "grid9x9 with the 32-channel WISE control block. LER per round 2.22e-04, 95% interval 2.0e-04 to 2.5e-04 (400 errors in 600,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\deck_unit_cell\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\deck_unit_cell\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
    "T_quantinuum": 87.68,
    "ions_per_instruction": 2.2,
@@ -200,7 +200,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2147641,
+  "bytes": 2150575,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -239,13 +239,13 @@
   "key": "03_grid5x5",
   "family": "lattice",
   "title": "Surface code memory, distance 3, both bases on grid5x5 \u2014 the board's starter (grid: a 5, b 5)",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\grid5x5.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/grid5x5.arch.json",
   "claim": "the design a new workspace starts from on this board. LER per round 2.57e-04, 95% interval 2.3e-04 to 2.8e-04 (408 errors in 530,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid5x5",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid5x5\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid5x5\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/grid5x5/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/grid5x5/circuit.qasm",
   "numbers": {
    "T_quantinuum": 117.456,
    "ions_per_instruction": 1.85,
@@ -317,7 +317,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2097547,
+  "bytes": 2100278,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
@@ -356,13 +356,13 @@
   "key": "04_cyclone_base",
   "family": "junction-free loop",
   "title": "Surface code memory, distance 3, both bases on cyclone_base \u2014 a loop with no junctions",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\cyclone_base.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/cyclone_base.arch.json",
   "claim": "Cyclone's base: rotation on a loop without spurs. LER per round 2.60e-04, 95% interval 2.4e-04 to 2.9e-04 (405 errors in 520,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\cyclone_base\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\cyclone_base\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/cyclone_base/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
    "T_quantinuum": 131.66,
    "ions_per_instruction": 1.93,
@@ -442,7 +442,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2187789,
+  "bytes": 2190723,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -481,13 +481,13 @@
   "key": "05_ladder_2x72",
   "family": "rails + highways",
   "title": "Surface code memory, distance 3, both bases on ladder_2x72 \u2014 rails and highways",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ladder_2x72.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ladder_2x72.arch.json",
   "claim": "two rails joined by rungs. LER per round 3.71e-04, 95% interval 3.4e-04 to 4.1e-04 (401 errors in 360,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ladder_2x72",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ladder_2x72\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ladder_2x72\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/ladder_2x72/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/ladder_2x72/circuit.qasm",
   "numbers": {
    "T_quantinuum": 287.41,
    "ions_per_instruction": 1.29,
@@ -559,7 +559,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2642032,
+  "bytes": 2644949,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -598,13 +598,13 @@
   "key": "06_ring144_24v",
   "family": "ring + docks",
   "title": "Surface code memory, distance 3, both bases on ring144_24v \u2014 the shipped ring, 24 docks",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ring144_24v.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ring144_24v.arch.json",
   "claim": "the study's shipped conveyor: rigid rotation with dock spurs. LER per round 4.37e-04, 95% interval 4.0e-04 to 4.8e-04 (406 errors in 310,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring144_24v",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ring144_24v\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ring144_24v\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/ring144_24v/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/ring144_24v/circuit.qasm",
   "numbers": {
    "T_quantinuum": 412.906,
    "ions_per_instruction": 2.46,
@@ -684,7 +684,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3504389,
+  "bytes": 3507309,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -723,13 +723,13 @@
   "key": "07_h2_racetrack",
   "family": "junction-free loop",
   "title": "Surface code memory, distance 3, both bases on h2_racetrack \u2014 Quantinuum's H2 loop",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\h2_racetrack.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/h2_racetrack.arch.json",
   "claim": "one continuous racetrack, no junctions. LER per round 5.06e-04, 95% interval 4.6e-04 to 5.6e-04 (410 errors in 270,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "h2_racetrack",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\h2_racetrack\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\h2_racetrack\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/h2_racetrack/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/h2_racetrack/circuit.qasm",
   "numbers": {
    "T_quantinuum": 416.178,
    "ions_per_instruction": 1.14,
@@ -809,7 +809,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2883740,
+  "bytes": 2886674,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -848,13 +848,13 @@
   "key": "08_torus4x4",
   "family": "torus",
   "title": "Surface code memory, distance 3, both bases on torus 4x4 \u2014 a periodic lattice",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\torus4x4.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/torus4x4.arch.json",
   "claim": "every row and column a closed loop, 32 traps. LER per round 2.64e-04, 95% interval 2.4e-04 to 2.9e-04 (404 errors in 510,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "torus4x4",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\torus4x4\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\torus4x4\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/torus4x4/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/torus4x4/circuit.qasm",
   "numbers": {
    "T_quantinuum": 129.12,
    "ions_per_instruction": 1.75,
@@ -945,7 +945,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2117871,
+  "bytes": 2120554,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -986,13 +986,13 @@
   "key": "09_random16",
   "family": "random graph",
   "title": "Surface code memory, distance 3, both bases on random 4-regular graph, 16 junctions",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\random16.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/random16.arch.json",
   "claim": "32 traps on a random expander: short paths, no drawing. LER per round 2.92e-04, 95% interval 2.6e-04 to 3.2e-04 (403 errors in 460,000 shots)",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "random16",
   "answer": false,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\random16\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\random16\\circuit.qasm",
+  "prefix": "MemoryBoard/surface3xz_mem/work/random16/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/random16/circuit.qasm",
   "numbers": {
    "T_quantinuum": 160.496,
    "ions_per_instruction": 1.0,
@@ -1064,7 +1064,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2170441,
+  "bytes": 2173125,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1105,7 +1105,7 @@
   "key": "10_cyclone_dual_loop",
   "family": "two loops",
   "title": "Surface code memory, distance 3, both bases on cyclone_dual_loop \u2014 data loop and ancilla loop",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\cyclone_dual_loop.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/cyclone_dual_loop.arch.json",
   "claim": "two loops, the ancilla loop rotating",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_dual_loop",
@@ -1121,7 +1121,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1618841,
+  "bytes": 1621758,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1132,7 +1132,7 @@
   "key": "11_chain",
   "family": "line",
   "title": "Surface code memory, distance 3, both bases on chain \u2014 a line of traps",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\chain.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/chain.arch.json",
   "claim": "one linear trap",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "chain",
@@ -1148,7 +1148,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1572464,
+  "bytes": 1575195,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -1161,7 +1161,7 @@
   "key": "12_stationary_chain",
   "family": "line",
   "title": "Surface code memory, distance 3, both bases on stationary_chain \u2014 two traps, one rail",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\stationary_chain.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/stationary_chain.arch.json",
   "claim": "two traps joined by one rail: little heating from transport, long chains",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "stationary_chain",
@@ -1177,7 +1177,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1530469,
+  "bytes": 1533420,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -1188,7 +1188,7 @@
   "key": "13_ring24_8",
   "family": "ring + docks",
   "title": "Surface code memory, distance 3, both bases on ring(12, 2, 8) \u2014 a small ring with 8 docks",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ring24_8.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ring24_8.arch.json",
   "claim": "24 slots, 8 dock spurs",
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring24_8",
@@ -1204,7 +1204,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1561254,
+  "bytes": 1563968,
   "r10": null,
   "over_budget": [],
   "sites": 32,

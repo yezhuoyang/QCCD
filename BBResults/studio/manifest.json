@@ -4,15 +4,21 @@
   "family": "ring + docks",
   "title": "ring144_24v, stride layout",
   "gif": "01_baseline_stride.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\ring144_24v.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_stride",
+  "arch": "arch/ring144_24v.arch.json",
+  "prefix": "Compiler/build/q06/ring144_24v_a24_stride",
   "profile": "ring144_24v a24 (stride)",
   "e3": null,
-  "r10": true,
-  "claim": "the study's starting point: the rotation pass laying riders out by stride. 546 batches of 1.6 contacts each is why it takes 520 ms.",
+  "recompiled": {
+   "compiler": "f88754a2fa71",
+   "date": "2026-10-20",
+   "batches": 824,
+   "hops": 7586,
+   "rotations": 824
+  },
+  "claim": "the study's starting point: the rotation pass laying riders out by stride, recompiled on 2026-10-20 with a compiler that keeps every qubit's gates in order: 824 batches of 1.05 contacts each, which is why it takes 1.42 s. The study's 546 batches and 520 ms came from a compiler that reordered a qubit's gates, which the checker now refuses.",
   "status": "ok",
   "page": "01_baseline_stride.html",
-  "instructions": 5388,
+  "instructions": 7932,
   "rules_failed": [],
   "rules_passed": 25,
   "disqualified": false,
@@ -29,14 +35,14 @@
     "frame": 6,
     "step": 7,
     "id": 6,
-    "label": "batch 1 of 546 / a 1-contact batch (292 of 546)",
-    "note": "a dock: 1 riders pull into their spurs at once. Each batch pays dock + undock + one forced cool (about 725 us) whatever its size; mean fill here is 1.6 contacts of 5 possible.  ALSO: one rider docks alone, and the batch still pays its full overhead: 292 such batches cost about 213.2 ms for 33.8% of the contacts.",
+    "label": "batch 1 of 824 / a 1-contact batch (786 of 824)",
+    "note": "a dock: 1 riders pull into their spurs at once. Each batch pays dock + undock + one forced cool (about 725 us) whatever its size; mean fill here is 1.0 contacts of 3 possible.  ALSO: one rider docks alone, and the batch still pays its full overhead: 786 such batches cost about 573.8 ms for 91.0% of the contacts.",
     "kind": "warn"
    },
    {
     "frame": 8,
     "step": 9,
-    "id": 4836,
+    "id": 7101,
     "label": "forced cool",
     "note": "300 us, once per batch: an ion that has crossed a junction carries 3 quanta against a 1-quantum gate budget, so the cool is structural, not a policy. It is about a quarter of the round.",
     "kind": "note"
@@ -58,36 +64,42 @@
     "kind": "note"
    },
    {
-    "frame": 1059,
-    "step": 1060,
-    "id": 956,
-    "label": "the fullest batch (5 contacts)",
+    "frame": 1500,
+    "step": 1501,
+    "id": 1346,
+    "label": "the fullest batch (3 contacts)",
     "note": "every ancilla in use at once: this is what the lockstep placement is engineered to make happen, and the per-batch overhead is amortised best here.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 522.05,
-   "T_transport": 416.672,
-   "ions_per_instruction": 49.05,
-   "transport_instructions": 1638,
-   "pairs_per_gate": 1.58,
-   "us_per_ion": 2.73,
+   "T_jones": 1419.13,
+   "T_transport": 1260.098,
+   "ions_per_instruction": 48.7,
+   "transport_instructions": 2472,
+   "pairs_per_gate": null,
+   "us_per_ion": 1.01,
    "dacs": 46,
    "area_mm2": 11.432,
    "pads_per_trap": 5.04,
    "buildable": false,
    "drc_clean": false,
-   "p_eff_vs_threshold": 0.333,
+   "p_eff_vs_threshold": 0.364,
    "drc": {
     "min_width": 0,
     "min_gap": 0,
     "rf_dc_clearance": 44
    },
+   "batches": 824,
+   "hops": 7586,
+   "recompiled": "recompiled 2026-10-20 with qccdc f88754a2fa71",
    "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3520238,
+  "bytes": 4221055,
+  "r10": true,
+  "over_budget": [],
   "sites": 168,
   "junctions": 24,
   "loops": 1
@@ -97,12 +109,11 @@
   "family": "ring + docks",
   "title": "ring144_24v, code-aware schedule",
   "gif": "02_shipped_ring_code_aware.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\arch\\ring144_24v.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_bridge_structured_xz",
+  "arch": "arch/ring144_24v.arch.json",
+  "prefix": "Compiler/build/q06/ring144_24v_a24_bridge_structured_xz",
   "profile": "ring144_24v a24 (code-aware)",
   "e3": null,
-  "r10": true,
-  "claim": "the same device and circuit with the code-aware placer and binder: 55 batches instead of 546. The compilation axis alone is 7.5x.",
+  "claim": "the same device and circuit with the code-aware placer and binder: 55 batches instead of the stride layout's 824, 70 ms instead of 1.42 s. The compilation axis alone is 20x.",
   "status": "ok",
   "page": "02_shipped_ring_code_aware.html",
   "instructions": 545,
@@ -170,9 +181,12 @@
     "rf_dc_clearance": 44
    },
    "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2176997,
+  "bytes": 2191862,
+  "r10": true,
+  "over_budget": [],
   "sites": 168,
   "junctions": 24,
   "loops": 1
@@ -182,13 +196,12 @@
   "family": "ring + docks",
   "title": "ring(95, 3, 24), 192 slots, 24 ancillas",
   "gif": "03_h3_v24_192.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring192_h3_v24_o2_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring192_h3_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring192_h3_v24_o2_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring192_h3_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
   "e3": [
    "ring192_h3_v24_o2_noswitch",
    24
   ],
-  "r10": false,
   "claim": "the first buildable answer: DRC clean with wells, 22.8 mm2.",
   "status": "ok",
   "page": "03_h3_v24_192.html",
@@ -270,10 +283,13 @@
     "24": 6
    },
    "T_transport": 74.722,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2261266,
+  "bytes": 2276069,
+  "r10": true,
+  "over_budget": [],
   "sites": 216,
   "junctions": 24,
   "loops": 1
@@ -283,13 +299,12 @@
   "family": "ring + docks",
   "title": "ring(106, 4, 24), 216 slots, 24 ancillas",
   "gif": "04_h4_v24_216.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring216_h4_v24_o2_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring216_h4_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring216_h4_v24_o2_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring216_h4_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
   "e3": [
    "ring216_h4_v24_o2_noswitch",
    24
   ],
-  "r10": false,
   "claim": "height 4: buildable only after the electrode builder's keep-out was corrected.",
   "status": "ok",
   "page": "04_h4_v24_216.html",
@@ -363,10 +378,13 @@
     "24": 17
    },
    "T_transport": 61.099,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2247554,
+  "bytes": 2262357,
+  "r10": true,
+  "over_budget": [],
   "sites": 240,
   "junctions": 24,
   "loops": 1
@@ -377,14 +395,13 @@
   "answer": true,
   "title": "ring(143, 3, 36), 288 slots, 36 ancillas -- the recommended design",
   "gif": "05_h3_v36_288_ANSWER.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring288_h3_v36_o2_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring288_h3_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring288_h3_v36_o2_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring288_h3_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
   "profile": "ring(143,3,36) a36",
   "e3": [
    "ring288_h3_v36_o2_noswitch",
    36
   ],
-  "r10": true,
   "claim": "46 batches, 341 hops, R10 passed: the proved Lean checker and the tableau. Its rotation schedule is within 10.7% of its lower bound; its batches are 52% full.",
   "status": "ok",
   "page": "05_h3_v36_288_ANSWER.html",
@@ -474,9 +491,12 @@
     "36": 8
    },
    "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2290946,
+  "bytes": 2305718,
+  "r10": true,
+  "over_budget": [],
   "sites": 324,
   "junctions": 36,
   "loops": 1
@@ -486,13 +506,12 @@
   "family": "ring + docks",
   "title": "ring(177, 5, 36), 360 slots, 36 ancillas",
   "gif": "06_h5_v36_360.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring360_h5_v36_o2_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring360_h5_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring360_h5_v36_o2_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring360_h5_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
   "e3": [
    "ring360_h5_v36_o2_noswitch",
    36
   ],
-  "r10": false,
   "claim": "the same 36 ancillas on a taller, longer loop: the same clock for twice the die.",
   "status": "ok",
   "page": "06_h5_v36_360.html",
@@ -579,10 +598,13 @@
     "36": 8
    },
    "T_transport": 48.952,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2332298,
+  "bytes": 2347101,
+  "r10": true,
+  "over_budget": [],
   "sites": 396,
   "junctions": 36,
   "loops": 1
@@ -592,13 +614,12 @@
   "family": "ring + docks",
   "title": "ring(191, 3, 48), 384 slots, 48 ancillas",
   "gif": "07_h3_v48_384.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring384_h3_v48_o2_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring384_h3_v48_o2_noswitch_a48_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring384_h3_v48_o2_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring384_h3_v48_o2_noswitch_a48_bridge_structured_xz_dockall_transport-fastest",
   "e3": [
    "ring384_h3_v48_o2_noswitch",
    48
   ],
-  "r10": false,
   "claim": "48 docks lose to 36: 48 does not divide the placement's period, and the schedule sits 43% above its rotation bound where 36 sits at 11%.",
   "status": "ok",
   "page": "07_h3_v48_384.html",
@@ -673,10 +694,13 @@
     "36": 4
    },
    "T_transport": 55.182,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2366348,
+  "bytes": 2381151,
+  "r10": true,
+  "over_budget": [],
   "sites": 432,
   "junctions": 48,
   "loops": 1
@@ -686,13 +710,12 @@
   "family": "ring + docks",
   "title": "ring(178, 4, 72), 360 slots, 72 ancillas -- NOT buildable",
   "gif": "08_h4_v72_360_unbuildable.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring360_h4_v72_o0_noswitch.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06g\\ring360_h4_v72_o0_noswitch_a72_bridge_structured_xz_dockall_transport-fastest",
+  "arch": "Compiler/build/q06g/ring360_h4_v72_o0_noswitch.arch.json",
+  "prefix": "Compiler/build/q06g/ring360_h4_v72_o0_noswitch_a72_bridge_structured_xz_dockall_transport-fastest",
   "e3": [
    "ring360_h4_v72_o0_noswitch",
    72
   ],
-  "r10": false,
   "claim": "the model's optimum, 2.2x faster than the answer, and 36 design-rule violations. No 72-dock ring is buildable in this technology.",
   "status": "ok",
   "page": "08_h4_v72_360_unbuildable.html",
@@ -770,10 +793,13 @@
     "72": 5
    },
    "T_transport": 22.145,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2265005,
+  "bytes": 2279808,
+  "r10": true,
+  "over_budget": [],
   "sites": 432,
   "junctions": 72,
   "loops": 1
@@ -783,11 +809,10 @@
   "family": "lattice",
   "title": "grid13x13, 312 traps, direct-wired",
   "gif": "09_grid13x13.gif",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid13x13.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid13x13_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_stride.qasm",
+  "arch": "Compiler/build/q06h/grid13x13.arch.json",
+  "prefix": "Compiler/build/q06h/grid13x13_bb",
+  "qasm": "Compiler/build/q06/ring144_24v_a24_stride.qasm",
   "profile": "grid13x13 (direct)",
-  "r10": false,
   "claim": "the second family that runs the round. Its router issues one SIMD class of the 18 the device declares, 4.8 ions at a time.",
   "status": "ok",
   "page": "09_grid13x13.html",
@@ -822,8 +847,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 417.94,
-   "T_transport": 438.989,
+   "T_jones": 866.1,
+   "T_transport": 607.049,
    "ions_per_instruction": 4.8,
    "transport_instructions": 1319,
    "pairs_per_gate": 9.71,
@@ -839,10 +864,15 @@
     "min_gap": 0,
     "rf_dc_clearance": 0
    },
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3365053,
+  "bytes": 3381883,
+  "r10": true,
+  "over_budget": [
+   "dacs 12480 > max_dacs 128"
+  ],
   "sites": 312,
   "junctions": 165,
   "loops": 0
@@ -851,11 +881,10 @@
   "key": "10_grid11x11",
   "family": "lattice",
   "title": "grid11x11, 220 traps, as drawn -- no control electrodes survive",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid11x11.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid11x11_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_stride.qasm",
+  "arch": "Compiler/build/q06h/grid11x11.arch.json",
+  "prefix": "Compiler/build/q06h/grid11x11_bb",
+  "qasm": "Compiler/build/q06/ring144_24v_a24_stride.qasm",
   "profile": "grid11x11 (as drawn)",
-  "r10": false,
   "claim": "the fastest lattice, and a die with zero electrodes: every trap is 112.5 um from two junctions whose keep-outs reach 180 um.",
   "status": "ok",
   "page": "10_grid11x11.html",
@@ -890,8 +919,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 400.045,
-   "T_transport": 420.177,
+   "T_jones": 831.445,
+   "T_transport": 581.677,
    "ions_per_instruction": 4.95,
    "transport_instructions": 1208,
    "pairs_per_gate": 9.71,
@@ -907,10 +936,15 @@
     "min_gap": 0,
     "rf_dc_clearance": 0
    },
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3224986,
+  "bytes": 3241703,
+  "r10": true,
+  "over_budget": [
+   "dacs 8800 > max_dacs 128"
+  ],
   "sites": 220,
   "junctions": 117,
   "loops": 0
@@ -919,11 +953,10 @@
   "key": "11_grid11x11_s2_buildable",
   "family": "lattice",
   "title": "grid11x11 at junction pitch 2 -- the same programme, buildable",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06i\\grid11x11_s2.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid11x11_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_stride.qasm",
+  "arch": "Compiler/build/q06i/grid11x11_s2.arch.json",
+  "prefix": "Compiler/build/q06h/grid11x11_bb",
+  "qasm": "Compiler/build/q06/ring144_24v_a24_stride.qasm",
   "profile": "grid11x11_s2 (buildable)",
-  "r10": false,
   "claim": "node-for-node the same graph as 10, pulled apart to hold its electrodes: same 192 ms, same 20 rules, 35.6 mm2 instead of 9.4.",
   "status": "ok",
   "page": "11_grid11x11_s2_buildable.html",
@@ -958,8 +991,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 400.045,
-   "T_transport": 420.177,
+   "T_jones": 831.445,
+   "T_transport": 581.677,
    "ions_per_instruction": 4.95,
    "transport_instructions": 1208,
    "pairs_per_gate": 9.71,
@@ -975,10 +1008,15 @@
     "min_gap": 0,
     "rf_dc_clearance": 0
    },
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3225815,
+  "bytes": 3242532,
+  "r10": true,
+  "over_budget": [
+   "dacs 8800 > max_dacs 128"
+  ],
   "sites": 220,
   "junctions": 117,
   "loops": 0
@@ -987,11 +1025,10 @@
   "key": "12_grid13x13_broadcast",
   "family": "lattice",
   "title": "grid13x13 with the 32-channel broadcast block",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid13x13_bcast.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid13x13_bcast_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06\\ring144_24v_a24_stride.qasm",
+  "arch": "Compiler/build/q06h/grid13x13_bcast.arch.json",
+  "prefix": "Compiler/build/q06h/grid13x13_bcast_bb",
+  "qasm": "Compiler/build/q06/ring144_24v_a24_stride.qasm",
   "profile": "grid13x13 (broadcast)",
-  "r10": false,
   "claim": "byte-identical programme at 57 DACs. It passes R4: the worst instruction wants 8 directions and the device declares 32 channels.",
   "status": "ok",
   "page": "12_grid13x13_broadcast.html",
@@ -1026,8 +1063,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 417.94,
-   "T_transport": 438.989,
+   "T_jones": 866.1,
+   "T_transport": 607.049,
    "ions_per_instruction": 4.8,
    "transport_instructions": 1319,
    "pairs_per_gate": 9.71,
@@ -1043,10 +1080,13 @@
     "min_gap": 0,
     "rf_dc_clearance": 0
    },
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3375217,
+  "bytes": 3392047,
+  "r10": true,
+  "over_budget": [],
   "sites": 312,
   "junctions": 165,
   "loops": 0
@@ -1055,20 +1095,25 @@
   "key": "13_dual144_c24_R2",
   "family": "two loops",
   "title": "dual144, two concentric loops joined at 24 couplings -- fails R2",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06f\\dual144_c24.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06f\\dual144_c24_a24_bridge_structured_xz",
-  "r10": false,
-  "claim": "compiles, then fails R2 at instruction 5: a coupled ancilla site is degree 3, and a junction may hold one ion. It cannot both house an ancilla and receive a rider.",
+  "arch": "Compiler/build/q06f/dual144_c24.arch.json",
+  "prefix": "Compiler/build/q06f/dual144_c24_a24_bridge_structured_xz",
+  "recompiled": {
+   "compiler": "f88754a2fa71",
+   "date": "2026-10-20",
+   "batches": 183,
+   "hops": 335,
+   "rotations": 182
+  },
+  "claim": "compiles, then fails R2: a coupled ancilla site is degree 3, and a junction may hold one ion. It cannot both house an ancilla and receive a rider.",
   "status": "ok",
   "page": "13_dual144_c24_R2.html",
-  "instructions": 1824,
+  "instructions": 1904,
   "rules_failed": [
    "R2",
    "R20",
-   "R22",
    "R23"
   ],
-  "rules_passed": 21,
+  "rules_passed": 22,
   "disqualified": true,
   "marks": [
    {
@@ -1091,66 +1136,77 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R2 fails here / R22 fails here / batch 1 of 183",
-    "note": "junction AT0 (degree 3) holds 2 ions  ALSO: 12 ions move in 2 different ways in one cycle (dock -x-y and dock -y); one cycle is one waveform, so unlike motions need 2 cycles  ALSO: a dock: 12 riders pull into their spurs at once. Each batch pays dock + undock + one forced cool (about 725 us) whatever its size; mean fill here is 4.7 contacts of 18 possible.",
+    "label": "R2 fails here / batch 1 of 223",
+    "note": "junction AT6 (degree 3) holds 2 ions  ALSO: a dock: 12 riders pull into their spurs at once. Each batch pays dock + undock + one forced cool (about 725 us) whatever its size; mean fill here is 3.9 contacts of 18 possible.",
     "kind": "fail"
    },
    {
-    "frame": 7,
-    "step": 8,
-    "id": 1633,
+    "frame": 8,
+    "step": 9,
+    "id": 1713,
     "label": "forced cool",
     "note": "300 us, once per batch: an ion that has crossed a junction carries 3 quanta against a 1-quantum gate budget, so the cool is structural, not a policy. It is about a quarter of the round.",
     "kind": "note"
    },
    {
-    "frame": 8,
-    "step": 9,
-    "id": 7,
+    "frame": 9,
+    "step": 10,
+    "id": 8,
     "label": "contact gates (12 pairs at once)",
     "note": "the two-qubit gates of one batch, all in one instruction; each pair sits in its own dock. The Circuit pane shows which QASM statements this discharges.",
-    "kind": "note"
-   },
-   {
-    "frame": 12,
-    "step": 13,
-    "id": 11,
-    "label": "undock",
-    "note": "the riders leave their spurs. Entering the degree-3 rail node is charged as a junction crossing -- the price of the only mechanism a loop has.",
     "kind": "note"
    },
    {
     "frame": 13,
     "step": 14,
     "id": 12,
+    "label": "undock",
+    "note": "the riders leave their spurs. Entering the degree-3 rail node is charged as a junction crossing -- the price of the only mechanism a loop has.",
+    "kind": "note"
+   },
+   {
+    "frame": 15,
+    "step": 16,
+    "id": 14,
     "label": "rigid rotation",
     "note": "one loop_shift template turns the whole loop: every rider moves with one waveform. This is the broadcast primitive the ring is built around, and the reason it moves 72 ions per transport instruction.",
     "kind": "note"
    },
    {
-    "frame": 237,
-    "step": 238,
-    "id": 213,
-    "label": "a 1-contact batch (39 of 183)",
+    "frame": 253,
+    "step": 254,
+    "id": 229,
+    "label": "a 1-contact batch (39 of 223)",
     "note": "one rider docks alone, and the batch still pays its full overhead: 39 such batches cost about 28.5 ms for 4.5% of the contacts.",
     "kind": "warn"
    },
    {
-    "frame": 920,
-    "step": 921,
-    "id": 829,
+    "frame": 952,
+    "step": 953,
+    "id": 861,
     "label": "the fullest batch (18 contacts)",
     "note": "every ancilla in use at once: this is what the lockstep placement is engineered to make happen, and the per-batch overhead is amortised best here.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "r10": false,
-   "T_jones": 200.725,
-   "T_transport": 164.125,
+   "p_eff_vs_threshold": 0.323,
+   "ions_per_instruction": 51.44,
+   "transport_instructions": 628,
+   "us_per_ion": 2.58,
+   "pairs_per_gate": null,
+   "batches": 183,
+   "hops": 335,
+   "recompiled": "recompiled 2026-10-20 with qccdc f88754a2fa71",
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "T_jones": 221.525,
+   "T_transport": 176.925,
    "T_source": "replay"
   },
-  "bytes": 2649998,
+  "bytes": 2685482,
+  "r10": true,
+  "over_budget": [],
   "sites": 288,
   "junctions": 48,
   "loops": 2
@@ -1159,7 +1215,7 @@
   "key": "14_racetrack240",
   "family": "junction-free loop",
   "title": "racetrack240: a closed loop, no junctions, no docks",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06i\\racetrack240.arch.json",
+  "arch": "Compiler/build/q06i/racetrack240.arch.json",
   "refusal": "rotation does not apply: the device has no closed loop with docks; then unroutable: q150 cannot reach S76 from S176 within 248 cycles. 70% occupancy.",
   "claim": "the cheapest transport in the study, unusable: rigid rotation preserves cyclic order so two riders never meet, and a loop has one route.",
   "status": "ok",
@@ -1170,9 +1226,13 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1660721,
+  "bytes": 1675493,
+  "r10": null,
+  "over_budget": [
+   "dacs 272 > max_dacs 128"
+  ],
   "sites": 240,
   "junctions": 0,
   "loops": 1
@@ -1181,7 +1241,7 @@
   "key": "15_racetrack480",
   "family": "junction-free loop",
   "title": "racetrack480: the same loop at 35% occupancy",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06i\\racetrack480.arch.json",
+  "arch": "Compiler/build/q06i/racetrack480.arch.json",
   "refusal": "did not finish in 30 minutes. 312 of 480 slots empty.",
   "claim": "free space is not the constraint: a lattice routes at 76% occupancy, this loop cannot at 35%.",
   "status": "ok",
@@ -1192,9 +1252,13 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1795087,
+  "bytes": 1809859,
+  "r10": null,
+  "over_budget": [
+   "dacs 512 > max_dacs 128"
+  ],
   "sites": 480,
   "junctions": 0,
   "loops": 1
@@ -1203,7 +1267,7 @@
   "key": "16_chain400",
   "family": "line",
   "title": "chain400: a line of 400 traps",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06i\\chain400.arch.json",
+  "arch": "Compiler/build/q06i/chain400.arch.json",
   "refusal": "unroutable: q156 cannot reach C202 from C233 within 806 cycles. 42% occupancy.",
   "claim": "a line has no closed loop for rotation and one route for the router.",
   "status": "ok",
@@ -1214,9 +1278,13 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1729420,
+  "bytes": 1744192,
+  "r10": null,
+  "over_budget": [
+   "dacs 9600 > max_dacs 128"
+  ],
   "sites": 400,
   "junctions": 0,
   "loops": 0
@@ -1225,7 +1293,7 @@
   "key": "17_dual240_c0",
   "family": "two loops",
   "title": "dual240 with no couplings",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06i\\dual240_c0.arch.json",
+  "arch": "Compiler/build/q06i/dual240_c0.arch.json",
   "refusal": "unroutable: q155 cannot reach AT16 from AT45 within 248 cycles.",
   "claim": "uncoupled, the data loop and the ancilla loop can never interact.",
   "status": "ok",
@@ -1236,9 +1304,11 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1808574,
+  "bytes": 1823346,
+  "r10": null,
+  "over_budget": [],
   "sites": 480,
   "junctions": 0,
   "loops": 2
@@ -1247,7 +1317,7 @@
   "key": "18_ladder144_r12",
   "family": "rails + highways",
   "title": "ladder144: 12 rails and highways, 576 sites",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\ladder144_r12.arch.json",
+  "arch": "Compiler/build/q06h/ladder144_r12.arch.json",
   "refusal": "did not finish in 20 minutes. 29% occupancy.",
   "claim": "open rails are not a closed loop, so rotation does not apply; the router did not finish.",
   "status": "ok",
@@ -1258,9 +1328,11 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1866995,
+  "bytes": 1881767,
+  "r10": null,
+  "over_budget": [],
   "sites": 576,
   "junctions": 46,
   "loops": 0
@@ -1269,7 +1341,7 @@
   "key": "19_grid9x9",
   "family": "lattice",
   "title": "grid9x9: 144 traps for 168 qubits",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06h\\grid9x9.arch.json",
+  "arch": "Compiler/build/q06h/grid9x9.arch.json",
   "refusal": "unroutable: 117% occupancy, no free destination. The device q01b's '8 of 9 cannot compile' was true of.",
   "claim": "genuinely too small -- the one lattice verdict that was right.",
   "status": "ok",
@@ -1280,9 +1352,13 @@
   "disqualified": false,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 1647171,
+  "bytes": 1661943,
+  "r10": null,
+  "over_budget": [
+   "dacs 5760 > max_dacs 128"
+  ],
   "sites": 144,
   "junctions": 77,
   "loops": 0
@@ -1291,21 +1367,19 @@
   "key": "20_torus12_own_a72",
   "family": "torus",
   "title": "torus 12x12, 288 traps, 72 ancillas -- the code's own shape",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\torus12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\torus12_own_a72_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06j/torus12x12.arch.json",
+  "prefix": "Compiler/build/q06j/torus12_own_a72_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06j": "torus12_own_a72",
-  "r10": true,
   "claim": "a periodic lattice, every row and column a closed loop, with one ancilla per check pair: 97 ms, half the planar grid's time at 24 ancillas. The wrap is worth 1.3x, the ancillas 1.7x.",
   "status": "ok",
   "page": "20_torus12_own_a72.html",
-  "instructions": 991,
+  "instructions": 2245,
   "rules_failed": [
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
@@ -1328,38 +1402,30 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R22 fails here",
-    "note": "6 ions move in 5 different ways in one cycle (shuttle +y,-x and shuttle -x,-x); one cycle is one waveform, so unlike motions need 5 cycles",
-    "kind": "fail"
-   },
-   {
-    "frame": 6,
-    "step": 7,
-    "id": 6,
     "label": "a typical shuttle",
     "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
-    "frame": 470,
-    "step": 471,
-    "id": 446,
-    "label": "14 directions at once",
-    "note": "ions moving 14 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 14 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 1349,
+    "step": 1350,
+    "id": 1320,
+    "label": "the busiest shuttle (26 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 3.8. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
     "kind": "note"
    },
    {
-    "frame": 546,
-    "step": 547,
-    "id": 517,
-    "label": "the busiest shuttle (48 ions)",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 8.7. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "frame": 1771,
+    "step": 1772,
+    "id": 1731,
+    "label": "4 directions at once",
+    "note": "ions moving 4 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 4 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 97.565,
-   "T_transport": 101.639,
+   "T_jones": 516.395,
+   "T_transport": 365.447,
    "ions_per_instruction": 8.73,
    "transport_instructions": 582,
    "us_per_ion": 14.32,
@@ -1371,9 +1437,14 @@
    "drc_clean": false,
    "rules_ok": true,
    "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2673147,
+  "bytes": 3004209,
+  "r10": true,
+  "over_budget": [
+   "dacs 11520 > max_dacs 128"
+  ],
   "sites": 288,
   "junctions": 144,
   "loops": 0
@@ -1382,21 +1453,19 @@
   "key": "21_torus12_code_a72",
   "family": "torus",
   "title": "torus 12x12 with the code-aware placement, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\torus12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\torus12_code_a72_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06j/torus12x12.arch.json",
+  "prefix": "Compiler/build/q06j/torus12_code_a72_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06j": "torus12_code_a72",
-  "r10": false,
   "claim": "the code's cell (i, j) laid at columns i, rows 2j and 2j+1 via --init-placement: no better than the compiler's own placer. The individual router, not the layout, is the ceiling at ~9 ions per instruction.",
   "status": "ok",
   "page": "21_torus12_code_a72.html",
-  "instructions": 1004,
+  "instructions": 2135,
   "rules_failed": [
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
@@ -1416,41 +1485,33 @@
     "kind": "note"
    },
    {
-    "frame": 5,
-    "step": 6,
-    "id": 5,
-    "label": "R22 fails here",
-    "note": "6 ions move in 2 different ways in one cycle (shuttle +x,+y and shuttle +x,-y); one cycle is one waveform, so unlike motions need 2 cycles",
-    "kind": "fail"
-   },
-   {
-    "frame": 7,
-    "step": 8,
-    "id": 7,
+    "frame": 6,
+    "step": 7,
+    "id": 6,
     "label": "a typical shuttle",
     "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
-    "frame": 310,
-    "step": 311,
-    "id": 292,
-    "label": "12 directions at once",
-    "note": "ions moving 12 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 12 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 81,
+    "step": 82,
+    "id": 78,
+    "label": "3 directions at once",
+    "note": "ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    },
    {
-    "frame": 531,
-    "step": 532,
-    "id": 502,
-    "label": "the busiest shuttle (43 ions)",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 9.5. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "frame": 1029,
+    "step": 1030,
+    "id": 1003,
+    "label": "the busiest shuttle (23 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 4.5. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 99.19,
-   "T_transport": 103.355,
+   "T_jones": 462.805,
+   "T_transport": 335.987,
    "ions_per_instruction": 9.5,
    "transport_instructions": 595,
    "us_per_ion": 13.16,
@@ -1461,10 +1522,15 @@
    "buildable": false,
    "drc_clean": false,
    "rules_ok": true,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2704931,
+  "bytes": 3014005,
+  "r10": true,
+  "over_budget": [
+   "dacs 11520 > max_dacs 128"
+  ],
   "sites": 288,
   "junctions": 144,
   "loops": 0
@@ -1473,11 +1539,10 @@
   "key": "22_planar12_own_a72",
   "family": "lattice",
   "title": "grid12x12, 264 traps, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\grid12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\planar12_own_a72_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06j/grid12x12.arch.json",
+  "prefix": "Compiler/build/q06j/planar12_own_a72_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06j": "planar12_own_a72",
-  "r10": false,
   "claim": "the same planar grid as q06h's lattices with 72 ancillas instead of 24: 122 ms instead of 205. The lattice family's earlier numbers were ancilla-starved.",
   "status": "ok",
   "page": "22_planar12_own_a72.html",
@@ -1512,8 +1577,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 305.695,
-   "T_transport": 321.515,
+   "T_jones": 648.075,
+   "T_transport": 449.645,
    "ions_per_instruction": 8.04,
    "transport_instructions": 786,
    "us_per_ion": 15.46,
@@ -1524,10 +1589,15 @@
    "buildable": false,
    "drc_clean": true,
    "rules_ok": true,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3089461,
+  "bytes": 3105473,
+  "r10": true,
+  "over_budget": [
+   "dacs 10560 > max_dacs 128"
+  ],
   "sites": 264,
   "junctions": 140,
   "loops": 0
@@ -1536,11 +1606,10 @@
   "key": "23_planar12_own_a24",
   "family": "lattice",
   "title": "grid12x12, 264 traps, 24 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\grid12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\planar12_own_a24_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a24.qasm",
+  "arch": "Compiler/build/q06j/grid12x12.arch.json",
+  "prefix": "Compiler/build/q06j/planar12_own_a24_bb",
+  "qasm": "Compiler/build/q06j/bb144_a24.qasm",
   "q06j": "planar12_own_a24",
-  "r10": false,
   "claim": "the control for the ancilla count: the q06h tier, 205 ms, 4.8 ions per instruction.",
   "status": "ok",
   "page": "23_planar12_own_a24.html",
@@ -1575,8 +1644,8 @@
    }
   ],
   "numbers": {
-   "T_jones": 419.465,
-   "T_transport": 440.633,
+   "T_jones": 869.865,
+   "T_transport": 609.433,
    "ions_per_instruction": 4.77,
    "transport_instructions": 1315,
    "us_per_ion": 26.11,
@@ -1587,10 +1656,15 @@
    "buildable": false,
    "drc_clean": true,
    "rules_ok": true,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3317025,
+  "bytes": 3333883,
+  "r10": true,
+  "over_budget": [
+   "dacs 10560 > max_dacs 128"
+  ],
   "sites": 264,
   "junctions": 140,
   "loops": 0
@@ -1599,15 +1673,14 @@
   "key": "24_cylinder12_own_a72",
   "family": "torus",
   "title": "cylinder 12x12 -- twelve concentric rings joined by spokes, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\cylinder12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\cylinder12_own_a72_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06j/cylinder12x12.arch.json",
+  "prefix": "Compiler/build/q06j/cylinder12_own_a72_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06j": "cylinder12_own_a72",
-  "r10": false,
   "claim": "the torus drawn as a chip with no crossings: each row a closed ring, the columns radial spokes. 106 ms -- it keeps most of the torus's 97 and beats the planar grid's 122, and it is a shape a die can carry.",
   "status": "ok",
   "page": "24_cylinder12_own_a72.html",
-  "instructions": 3253,
+  "instructions": 5294,
   "rules_failed": [],
   "rules_passed": 25,
   "disqualified": false,
@@ -1629,17 +1702,25 @@
     "kind": "note"
    },
    {
-    "frame": 1862,
-    "step": 1863,
-    "id": 1834,
-    "label": "the busiest shuttle (15 ions) / 15 directions at once",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.4. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 15 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 15 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 423,
+    "step": 424,
+    "id": 416,
+    "label": "4 directions at once",
+    "note": "ions moving 4 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 4 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "kind": "note"
+   },
+   {
+    "frame": 4747,
+    "step": 4748,
+    "id": 4707,
+    "label": "the busiest shuttle (6 ions)",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.1. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 379.355,
-   "T_transport": 399.263,
+   "T_jones": 1254.18,
+   "T_transport": 898.225,
    "ions_per_instruction": 8.31,
    "transport_instructions": 654,
    "us_per_ion": 15.01,
@@ -1650,10 +1731,15 @@
    "buildable": false,
    "drc_clean": true,
    "rules_ok": true,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 3169543,
+  "bytes": 3507117,
+  "r10": true,
+  "over_budget": [
+   "dacs 11040 > max_dacs 128"
+  ],
   "sites": 276,
   "junctions": 144,
   "loops": 0
@@ -1662,21 +1748,19 @@
   "key": "25_annulus12_own_a72",
   "family": "torus",
   "title": "annulus 12x12 -- the cylinder plus the y-wrap through 120 crossings, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\annulus12x12.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\annulus12_own_a72_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06j/annulus12x12.arch.json",
+  "prefix": "Compiler/build/q06j/annulus12_own_a72_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06j": "annulus12_own_a72",
-  "r10": false,
   "claim": "a true torus on a plane needs 120 crossings, and every one lands on a ring wire, so the x-hops pay for the y-wrap: 181 ms. The wrap is not worth its crossings.",
   "status": "ok",
   "page": "25_annulus12_own_a72.html",
-  "instructions": 850,
+  "instructions": 3847,
   "rules_failed": [
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
@@ -1699,30 +1783,22 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R22 fails here",
-    "note": "7 ions move in 7 different ways in one cycle (shuttle +x-y,-x-y,+x-y and shuttle +y,-x-y,+x-y); one cycle is one waveform, so unlike motions need 7 cycles",
-    "kind": "fail"
-   },
-   {
-    "frame": 7,
-    "step": 8,
-    "id": 7,
     "label": "a typical shuttle",
     "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
-    "frame": 504,
-    "step": 505,
-    "id": 474,
-    "label": "the busiest shuttle (42 ions) / 42 directions at once",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 9.1. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 42 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 42 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 282,
+    "step": 283,
+    "id": 276,
+    "label": "the busiest shuttle (3 ions) / 3 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 181.1,
-   "T_transport": 184.187,
+   "T_jones": 1489.525,
+   "T_transport": 1240.391,
    "ions_per_instruction": 9.07,
    "transport_instructions": 441,
    "us_per_ion": 39.06,
@@ -1733,10 +1809,16 @@
    "buildable": false,
    "drc_clean": true,
    "rules_ok": true,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2736069,
+  "bytes": 3283243,
+  "r10": true,
+  "over_budget": [
+   "dacs 11520 > max_dacs 128",
+   "junctions 264 > max_junctions 200"
+  ],
   "sites": 288,
   "junctions": 264,
   "loops": 0
@@ -1745,21 +1827,19 @@
   "key": "26_rewired_p0.1",
   "family": "random graph",
   "title": "torus 12x12 with 10% of its wires rewired at random, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\rewired_p0.1.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\rewired_p0.1_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06l/rewired_p0.1.arch.json",
+  "prefix": "Compiler/build/q06l/rewired_p0.1_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06l": "rewired_p0.1",
-  "r10": false,
   "claim": "28 random swaps take the torus from diameter 12 to 8 and the round from 97 to 82 ms. Distance is what the router pays for. Not drawable: every shortcut would be crossings on a chip.",
   "status": "ok",
   "page": "26_rewired_p0.1.html",
-  "instructions": 873,
+  "instructions": 4876,
   "rules_failed": [
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
@@ -1782,40 +1862,37 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R22 fails here",
-    "note": "6 ions move in 4 different ways in one cycle (shuttle +x-y,+x+y and shuttle -x+y,-x-y); one cycle is one waveform, so unlike motions need 4 cycles",
-    "kind": "fail"
-   },
-   {
-    "frame": 7,
-    "step": 8,
-    "id": 7,
     "label": "a typical shuttle",
     "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
-    "frame": 502,
-    "step": 503,
-    "id": 472,
-    "label": "the busiest shuttle (39 ions) / 39 directions at once",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 9.8. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 39 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 39 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 2600,
+    "step": 2601,
+    "id": 2574,
+    "label": "the busiest shuttle (2 ions) / 2 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 2 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 2 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 82.815,
-   "T_transport": 86.063,
+   "T_jones": 1125.51,
+   "T_transport": 817.829,
    "ions_per_instruction": 9.79,
    "transport_instructions": 464,
    "us_per_ion": 12.76,
    "p_eff_vs_threshold": 0.319,
    "rules_ok": true,
    "diameter": 8,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2874723,
+  "bytes": 3631420,
+  "r10": true,
+  "over_budget": [
+   "dacs 11520 > max_dacs 128"
+  ],
   "sites": 288,
   "junctions": 144,
   "loops": 0
@@ -1824,21 +1901,19 @@
   "key": "27_regular4",
   "family": "random graph",
   "title": "a random 4-regular graph on 144 junctions, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\regular4.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\regular4_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06l/regular4.arch.json",
+  "prefix": "Compiler/build/q06l/regular4_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06l": "regular4",
-  "r10": false,
   "claim": "the torus's degrees with none of its geometry: diameter 6, 82 ms. An expander beats every lattice on paper and has hundreds of crossings in practice.",
   "status": "ok",
   "page": "27_regular4.html",
-  "instructions": 872,
+  "instructions": 4732,
   "rules_failed": [
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
@@ -1861,32 +1936,37 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R22 fails here / a typical shuttle",
-    "note": "5 ions move in 5 different ways in one cycle (shuttle +x+y,-x+y and shuttle +x-y,+x-y); one cycle is one waveform, so unlike motions need 5 cycles  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
-    "kind": "fail"
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
    },
    {
-    "frame": 481,
-    "step": 482,
-    "id": 452,
-    "label": "the busiest shuttle (42 ions) / 42 directions at once",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 9.5. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 42 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 42 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 1867,
+    "step": 1868,
+    "id": 1845,
+    "label": "the busiest shuttle (2 ions) / 2 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 2 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 2 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 82.69,
-   "T_transport": 85.931,
+   "T_jones": 1036.07,
+   "T_transport": 772.031,
    "ions_per_instruction": 9.45,
    "transport_instructions": 463,
    "us_per_ion": 13.22,
    "p_eff_vs_threshold": 0.319,
    "rules_ok": true,
    "diameter": 6,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 2872754,
+  "bytes": 3598009,
+  "r10": true,
+  "over_budget": [
+   "dacs 11520 > max_dacs 128"
+  ],
   "sites": 288,
   "junctions": 144,
   "loops": 0
@@ -1895,22 +1975,20 @@
   "key": "28_tanner_own",
   "family": "random graph",
   "title": "the code's Tanner graph as the machine -- every contact one hop, 72 ancillas",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\tanner_own.arch.json",
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\tanner_own_bb",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06j\\bb144_a72.qasm",
+  "arch": "Compiler/build/q06l/tanner_own.arch.json",
+  "prefix": "Compiler/build/q06l/tanner_own_bb",
+  "qasm": "Compiler/build/q06j/bb144_a72.qasm",
   "q06l": "tanner_own",
-  "r10": false,
   "claim": "a hub per check and per data qubit, a contact trap on each of the 864 Tanner edges: no device makes the contacts shorter, and it runs in 79.5 ms -- the individual router's floor, 3 ms under a random expander.",
   "status": "ok",
   "page": "28_tanner_own.html",
-  "instructions": 850,
+  "instructions": 4108,
   "rules_failed": [
    "R19",
    "R20",
-   "R21",
-   "R22"
+   "R21"
   ],
-  "rules_passed": 21,
+  "rules_passed": 22,
   "disqualified": true,
   "marks": [
    {
@@ -1933,32 +2011,38 @@
     "frame": 5,
     "step": 6,
     "id": 5,
-    "label": "R22 fails here / a typical shuttle",
-    "note": "5 ions move in 4 different ways in one cycle (shuttle +x+y,+x+y and shuttle +x-y,-x+y); one cycle is one waveform, so unlike motions need 4 cycles  ALSO: a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
-    "kind": "fail"
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
+    "kind": "note"
    },
    {
-    "frame": 500,
-    "step": 501,
-    "id": 470,
-    "label": "the busiest shuttle (41 ions) / 41 directions at once",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 9.1. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 41 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 41 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "frame": 661,
+    "step": 662,
+    "id": 649,
+    "label": "the busiest shuttle (2 ions) / 2 directions at once",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.0. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.  ALSO: ions moving 2 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 2 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
     "kind": "note"
    }
   ],
   "numbers": {
-   "T_jones": 79.94,
-   "T_transport": 83.027,
+   "T_jones": 856.47,
+   "T_transport": 651.563,
    "ions_per_instruction": 9.1,
    "transport_instructions": 441,
    "us_per_ion": 13.74,
    "p_eff_vs_threshold": 0.319,
    "rules_ok": true,
    "diameter": null,
-   "r10": false,
+   "r10": true,
+   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
    "T_source": "replay"
   },
-  "bytes": 4344614,
+  "bytes": 4963806,
+  "r10": true,
+  "over_budget": [
+   "dacs 46080 > max_dacs 128",
+   "junctions 288 > max_junctions 200"
+  ],
   "sites": 1152,
   "junctions": 288,
   "loops": 0
@@ -1967,7 +2051,7 @@
   "key": "29_geometric",
   "family": "random graph",
   "title": "a random geometric graph: 139 points joined within a radius, mean degree 6",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\build\\q06l\\geometric.arch.json",
+  "arch": "Compiler/build/q06l/geometric.arch.json",
   "refusal": "unroutable: q145 cannot reach T150 from T316 within 40 cycles. Dead ends (four degree-1 vertices), diameter 25.",
   "claim": "random AND local, the way a die is: the worst of both. Locality without structure does not route.",
   "status": "ok",
@@ -1982,9 +2066,13 @@
   "disqualified": true,
   "marks": [],
   "numbers": {
-   "r10": false
+   "r10": null
   },
-  "bytes": 2219959,
+  "bytes": 2234731,
+  "r10": null,
+  "over_budget": [
+   "dacs 15160 > max_dacs 128"
+  ],
   "sites": 379,
   "junctions": 124,
   "loops": 0

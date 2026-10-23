@@ -5,7 +5,7 @@
   "family": "lattice",
   "title": "grid9x9 \u2014 the board's starter (grid: a 9, b 9)",
   "claim": "the design a new workspace starts from on this board",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\grid9x9.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/grid9x9.arch.json",
   "compile_seconds": 31.5,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -48,9 +48,9 @@
    "r10": true
   },
   "instructions": 1911,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\grid9x9\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\grid9x9\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\grid9x9\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface5xz_mem/work/grid9x9/prog",
+  "qasm": "MemoryBoard/surface5xz_mem/work/grid9x9/circuit.qasm",
+  "cooled": "MemoryBoard/surface5xz_mem/work/grid9x9/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.00026143790849673205,
    "lo": 0.0002370448553000813,
@@ -109,7 +109,7 @@
   "family": "ring + docks",
   "title": "ring144_24v \u2014 the shipped ring, 24 docks",
   "claim": "the study's shipped conveyor: rigid rotation with dock spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\ring144_24v.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/ring144_24v.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: 48 qubits need a dock but the device has 24 / unroutable: q94 cannot reach A54 from S137 within 130 cycles / split rounds do not complete either"
  },
@@ -119,7 +119,7 @@
   "family": "junction-free loop",
   "title": "cyclone_base \u2014 a loop with no junctions",
   "claim": "Cyclone's base: rotation on a loop without spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\cyclone_base.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/cyclone_base.arch.json",
   "compile_seconds": 33.3,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -162,9 +162,9 @@
    "r10": true
   },
   "instructions": 2482,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\cyclone_base\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\cyclone_base\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\cyclone_base\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface5xz_mem/work/cyclone_base/prog",
+  "qasm": "MemoryBoard/surface5xz_mem/work/cyclone_base/circuit.qasm",
+  "cooled": "MemoryBoard/surface5xz_mem/work/cyclone_base/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.00032419354838709676,
    "lo": 0.0002940176575127887,
@@ -223,7 +223,7 @@
   "family": "junction-free loop",
   "title": "h2_racetrack \u2014 Quantinuum's H2 loop",
   "claim": "one continuous racetrack, no junctions",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\h2_racetrack.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/h2_racetrack.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: the device has no closed loop with docks / h2_racetrack has 40 usable traps (80 ion slots) but the circuit needs 98"
  },
@@ -233,7 +233,7 @@
   "family": "two loops",
   "title": "cyclone_dual_loop \u2014 data loop and ancilla loop",
   "claim": "two loops, the ancilla loop rotating",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\cyclone_dual_loop.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/cyclone_dual_loop.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: the device has no closed loop with docks / unroutable: q70 cannot reach AT34 from AB17 within 80 cycles / split rounds do not complete either"
  },
@@ -243,7 +243,7 @@
   "family": "rails + highways",
   "title": "ladder_2x72 \u2014 rails and highways",
   "claim": "two rails joined by rungs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\ladder_2x72.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/ladder_2x72.arch.json",
   "status": "refused",
   "reason": "unroutable: q39 cannot reach HB40 from HT31 within 128 cycles / split rounds do not complete either"
  },
@@ -253,7 +253,7 @@
   "family": "lattice",
   "title": "deck_unit_cell \u2014 the same lattice, broadcast-wired",
   "claim": "grid9x9 with the 32-channel WISE control block",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\deck_unit_cell.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/deck_unit_cell.arch.json",
   "compile_seconds": 31.2,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -296,9 +296,9 @@
    "r10": true
   },
   "instructions": 1911,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\deck_unit_cell\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\deck_unit_cell\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\work\\deck_unit_cell\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/prog",
+  "qasm": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/circuit.qasm",
+  "cooled": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.00026143790849673205,
    "lo": 0.0002370448553000813,
@@ -357,7 +357,7 @@
   "family": "line",
   "title": "chain \u2014 a line of traps",
   "claim": "one linear trap",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\chain.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/chain.arch.json",
   "status": "refused",
   "reason": "unroutable: q70 cannot reach C0 from C18 within 150 cycles / split rounds do not complete either"
  },
@@ -367,7 +367,7 @@
   "family": "line",
   "title": "stationary_chain \u2014 two traps, one rail",
   "claim": "two traps joined by one rail: little heating from transport, long chains",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\stationary_chain.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/stationary_chain.arch.json",
   "status": "refused",
   "reason": "stationary_chain has 2 usable traps (30 ion slots) but the circuit needs 98"
  },
@@ -377,7 +377,7 @@
   "family": "ring + docks",
   "title": "ring(12, 2, 8) \u2014 a small ring with 8 docks",
   "claim": "24 slots, 8 dock spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\ring24_8.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/ring24_8.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: 48 qubits need a dock but the device has 8 / ring24_8 has 32 usable traps (56 ion slots) but the circuit needs 98"
  },
@@ -387,7 +387,7 @@
   "family": "torus",
   "title": "torus 4x4 \u2014 a periodic lattice",
   "claim": "every row and column a closed loop, 32 traps",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\torus4x4.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/torus4x4.arch.json",
   "status": "refused",
   "reason": "torus4x4 has 32 usable traps (64 ion slots) but the circuit needs 98"
  },
@@ -397,7 +397,7 @@
   "family": "lattice",
   "title": "grid5x5 \u2014 a small planar lattice",
   "claim": "40 traps on the wires of a 5x5 junction grid",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\grid5x5.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/grid5x5.arch.json",
   "status": "refused",
   "reason": "grid5x5 has 40 usable traps (80 ion slots) but the circuit needs 98"
  },
@@ -407,7 +407,7 @@
   "family": "random graph",
   "title": "random 4-regular graph, 16 junctions",
   "claim": "32 traps on a random expander: short paths, no drawing",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface5xz_mem\\random16.arch.json",
+  "arch": "MemoryBoard/surface5xz_mem/random16.arch.json",
   "status": "refused",
   "reason": "random16 has 32 usable traps (64 ion slots) but the circuit needs 98"
  }

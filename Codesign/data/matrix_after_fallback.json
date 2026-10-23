@@ -82,13 +82,13 @@
   "circuit": "bb144_esm",
   "device": "stationary_chain",
   "status": "too-small",
-  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: statio"
+  "detail": "Compiler/examples/bb144_esm.qasm: statio"
  },
  {
   "circuit": "bb144_esm",
   "device": "chain",
   "status": "too-small",
-  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: chain7"
+  "detail": "Compiler/examples/bb144_esm.qasm: chain7"
  },
  {
   "circuit": "bb144_esm",
@@ -133,7 +133,7 @@
   "circuit": "bb144_esm",
   "device": "h2_racetrack",
   "status": "too-small",
-  "detail": "C:\\Users\\yezhu\\Documents\\QCCD\\Compiler\\examples\\bb144_esm.qasm: h2_rac"
+  "detail": "Compiler/examples/bb144_esm.qasm: h2_rac"
  },
  {
   "circuit": "bell2",

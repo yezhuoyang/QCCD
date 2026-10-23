@@ -76,6 +76,23 @@ class Bundle:
         return {k: v["digest"] for k, v in self.manifest["files"].items()}
 
 
+def _publishable(doc: Mapping | None) -> Mapping | None:
+    """A program as a bundle carries it: its provenance log thinned the way a published page
+    thins it (`provenance.thin(log, "sites")`).  The log's `root` was the submitter's checkout
+    -- a user folder, served by the leaderboard at /submissions/<id>/files/ to anyone -- and
+    its `file`/`line`/`args` were paths into that tree.  What survives says which pass emitted
+    each instruction, which is all a reader or a grader uses it for."""
+    if doc is None:
+        return None
+    from ..ir.provenance import PROV_KEY, thin
+    meta = doc.get("meta") if isinstance(doc, Mapping) else None
+    if not (isinstance(meta, Mapping) and isinstance(meta.get(PROV_KEY), Mapping)):
+        return doc
+    out = dict(doc)
+    out["meta"] = {**meta, PROV_KEY: thin(meta[PROV_KEY], "sites")}
+    return out
+
+
 def write_bundle(out_dir: Path, *, task_id: str, task_digest: str, device: Mapping,
                  program: Mapping, certified_program: Mapping | None, certificate: Mapping | None,
                  presentation: Mapping | None = None, provenance: Mapping | None = None) -> Bundle:
@@ -83,7 +100,8 @@ def write_bundle(out_dir: Path, *, task_id: str, task_digest: str, device: Mappi
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=False)
     files: dict = {}
-    docs = {"device": device, "program": program, "certified_program": certified_program,
+    docs = {"device": device, "program": _publishable(program),
+            "certified_program": _publishable(certified_program),
             "certificate": certificate, "presentation": presentation}
     for role, doc in docs.items():
         if doc is None:

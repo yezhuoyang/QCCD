@@ -336,7 +336,7 @@ Context you need before touching anything:
   results are BBResults/studio/rows.json and SmallCode/<code>/rows.json (manifest.json
   beside each). The entry pages already exist under those directories.
 - The OCaml build needs the opam 4.14.1 switch on PATH:
-  export PATH="/c/Users/yezhu/AppData/Local/opam/4.14.1/bin:$PATH"; cd Compiler/ocaml; dune build
+  export PATH="/c/Users/$USERNAME/AppData/Local/opam/4.14.1/bin:$PATH"; cd Compiler/ocaml; dune build
 - The Lean checker is Compiler/lean (lake exe qcheck <input.json>); run one at a time, it
   needs 2 GB for BB-sized certificates.
 - Browser verification: headless Chrome via tests/studio.mjs and tests/drive.mjs (1 s per

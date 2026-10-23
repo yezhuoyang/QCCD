@@ -5,7 +5,7 @@
   "family": "lattice",
   "title": "grid5x5 \u2014 the board's starter (grid: a 5, b 5)",
   "claim": "the design a new workspace starts from on this board",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\grid5x5.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/grid5x5.arch.json",
   "compile_seconds": 1.4,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -48,9 +48,9 @@
    "r10": true
   },
   "instructions": 450,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid5x5\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid5x5\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid5x5\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/grid5x5/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/grid5x5/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/grid5x5/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.000769811320754717,
    "lo": 0.0006986742845025292,
@@ -109,7 +109,7 @@
   "family": "ring + docks",
   "title": "ring144_24v \u2014 the shipped ring, 24 docks",
   "claim": "the study's shipped conveyor: rigid rotation with dock spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ring144_24v.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ring144_24v.arch.json",
   "compile_seconds": 10.3,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -152,9 +152,9 @@
    "r10": true
   },
   "instructions": 2860,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ring144_24v\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ring144_24v\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ring144_24v\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/ring144_24v/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/ring144_24v/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/ring144_24v/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0013096774193548388,
    "lo": 0.0011883972346404318,
@@ -213,7 +213,7 @@
   "family": "junction-free loop",
   "title": "cyclone_base \u2014 a loop with no junctions",
   "claim": "Cyclone's base: rotation on a loop without spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\cyclone_base.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/cyclone_base.arch.json",
   "compile_seconds": 1.2,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -256,9 +256,9 @@
    "r10": true
   },
   "instructions": 642,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\cyclone_base\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\cyclone_base\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\cyclone_base\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/cyclone_base/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/cyclone_base/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/cyclone_base/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0007788461538461538,
    "lo": 0.000706621360974222,
@@ -317,7 +317,7 @@
   "family": "junction-free loop",
   "title": "h2_racetrack \u2014 Quantinuum's H2 loop",
   "claim": "one continuous racetrack, no junctions",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\h2_racetrack.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/h2_racetrack.arch.json",
   "compile_seconds": 5.6,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -360,9 +360,9 @@
    "r10": true
   },
   "instructions": 1973,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\h2_racetrack\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\h2_racetrack\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\h2_racetrack\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/h2_racetrack/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/h2_racetrack/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/h2_racetrack/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0015185185185185184,
    "lo": 0.0013785660877310478,
@@ -421,7 +421,7 @@
   "family": "two loops",
   "title": "cyclone_dual_loop \u2014 data loop and ancilla loop",
   "claim": "two loops, the ancilla loop rotating",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\cyclone_dual_loop.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/cyclone_dual_loop.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: the device has no closed loop with docks / unroutable: q33 cannot reach AB13 from AT11 within 80 cycles / split rounds do not complete either"
  },
@@ -431,7 +431,7 @@
   "family": "rails + highways",
   "title": "ladder_2x72 \u2014 rails and highways",
   "claim": "two rails joined by rungs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ladder_2x72.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ladder_2x72.arch.json",
   "compile_seconds": 142.4,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -474,9 +474,9 @@
    "r10": true
   },
   "instructions": 1209,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ladder_2x72\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ladder_2x72\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\ladder_2x72\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/ladder_2x72/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/ladder_2x72/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/ladder_2x72/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0011138888888888889,
    "lo": 0.0010101207492053358,
@@ -535,7 +535,7 @@
   "family": "lattice",
   "title": "grid9x9 \u2014 the baseline lattice",
   "claim": "traps on the wires of a 9x9 junction grid",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\grid9x9.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/grid9x9.arch.json",
   "compile_seconds": 2.3,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -578,9 +578,9 @@
    "r10": true
   },
   "instructions": 374,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid9x9\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid9x9\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\grid9x9\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/grid9x9/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/grid9x9/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/grid9x9/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0006666666666666666,
    "lo": 0.0006044752529961616,
@@ -639,7 +639,7 @@
   "family": "lattice",
   "title": "deck_unit_cell \u2014 the same lattice, broadcast-wired",
   "claim": "grid9x9 with the 32-channel WISE control block",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\deck_unit_cell.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/deck_unit_cell.arch.json",
   "compile_seconds": 2.2,
   "compiler_mode": "compile",
   "rules_failed_replay": [],
@@ -682,9 +682,9 @@
    "r10": true
   },
   "instructions": 374,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\deck_unit_cell\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\deck_unit_cell\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\deck_unit_cell\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0006666666666666666,
    "lo": 0.0006044752529961616,
@@ -743,7 +743,7 @@
   "family": "line",
   "title": "chain \u2014 a line of traps",
   "claim": "one linear trap",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\chain.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/chain.arch.json",
   "status": "refused",
   "reason": "unroutable: q0 cannot reach C39 from C27 within 150 cycles / split rounds do not complete either"
  },
@@ -753,7 +753,7 @@
   "family": "line",
   "title": "stationary_chain \u2014 two traps, one rail",
   "claim": "two traps joined by one rail: little heating from transport, long chains",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\stationary_chain.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/stationary_chain.arch.json",
   "status": "refused",
   "reason": "stationary_chain has 2 usable traps (30 ion slots) but the circuit needs 34"
  },
@@ -763,7 +763,7 @@
   "family": "ring + docks",
   "title": "ring(12, 2, 8) \u2014 a small ring with 8 docks",
   "claim": "24 slots, 8 dock spurs",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\ring24_8.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/ring24_8.arch.json",
   "status": "refused",
   "reason": "rotation does not apply: 16 qubits need a dock but the device has 8 / unroutable: q23 cannot reach A15 from S5 within 26 cycles / split rounds do not complete either"
  },
@@ -773,7 +773,7 @@
   "family": "torus",
   "title": "torus 4x4 \u2014 a periodic lattice",
   "claim": "every row and column a closed loop, 32 traps",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\torus4x4.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/torus4x4.arch.json",
   "compile_seconds": 0.9,
   "compiler_mode": "compile",
   "rules_failed_replay": [
@@ -819,9 +819,9 @@
    "r10": true
   },
   "instructions": 478,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\torus4x4\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\torus4x4\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\torus4x4\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/torus4x4/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/torus4x4/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/torus4x4/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.000792156862745098,
    "lo": 0.0007186117111298513,
@@ -883,7 +883,7 @@
   "family": "random graph",
   "title": "random 4-regular graph, 16 junctions",
   "claim": "32 traps on a random expander: short paths, no drawing",
-  "arch": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\random16.arch.json",
+  "arch": "MemoryBoard/surface3xz_mem/random16.arch.json",
   "compile_seconds": 0.8,
   "compiler_mode": "compile",
   "rules_failed_replay": [
@@ -918,9 +918,9 @@
    "r10": true
   },
   "instructions": 570,
-  "prefix": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\random16\\prog",
-  "qasm": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\random16\\circuit.qasm",
-  "cooled": "C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3xz_mem\\work\\random16\\prog.cooled.tsir.json",
+  "prefix": "MemoryBoard/surface3xz_mem/work/random16/prog",
+  "qasm": "MemoryBoard/surface3xz_mem/work/random16/circuit.qasm",
+  "cooled": "MemoryBoard/surface3xz_mem/work/random16/prog.cooled.tsir.json",
   "ler": {
    "ler": 0.0008760869565217391,
    "lo": 0.0007946566070933484,
