@@ -39,7 +39,17 @@ def test_no_committed_file_names_a_user_folder():
     r = subprocess.run(["git", "-C", str(REPO), "grep", "-a", "-l", "-E", MACHINE_ERE, "--", ".", ":!tests/"],
                        capture_output=True, text=True)
     assert r.returncode in (0, 1), r.stderr
-    assert r.stdout.strip() == "", r.stdout
+    found = set(r.stdout.split())
+    # ONE EXCEPTION, AND IT EXPIRES.  The published compiler is pinned to the git tree of the
+    # whole Compiler/ocaml folder (toolchain.json `source.tree`), and that folder's old
+    # ocamlenv.sh spells out one machine's opam folder: cleaning it changed the tree and broke
+    # the pin (test_workspace_toolchain).  It stays as released until the next qccdc release,
+    # and the moment the pin moves this exception stops applying -- clean it in that release
+    # (the portable script is ../ocamlenv.sh).
+    pinned = json.loads((REPO / "qccd" / "workspace" / "toolchain.json").read_text(encoding="utf-8"))
+    if pinned["qccdc_cli"]["source"]["tree"].startswith("b4a003dbb4ae"):
+        found.discard("Compiler/ocaml/ocamlenv.sh")
+    assert not found, sorted(found)
 
 
 def test_a_record_is_written_relative_and_read_back_absolute():
