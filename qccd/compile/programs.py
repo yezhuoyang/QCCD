@@ -20,6 +20,7 @@ from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
 from ..ir import provenance as prov
+from ..verify.rules import hop_label, loop_node_set
 from ..ir.import_deck import DEFAULT_HTML, import_schedule
 from ..ir.tsir import TSIR, Instruction, Participant, loop_shift
 from .oddeven import cyclic_shift_target, odd_even_sort_program
@@ -120,7 +121,12 @@ def walk(arch: Architecture, n_ions: int = 4, *, name: str | None = None) -> TSI
     """
     dev = arch.device
     path = longest_path(arch)
-    stops = [n for n in path if dev.nodes[n].kind == "site"]
+    # A stop is a trap that is not a crossing.  R23 (51a62aa) counts every node where three
+    # or more rails meet, whatever it was declared as -- the ring's rail slots with a dock
+    # spur on them (S66, S72) and the ladder's HB66 are SITES of degree 3, and walking
+    # "site to site" parked ions on all of them.  Such a node is crossed inside one move.
+    crossings = frozenset(dev.junction_nodes)
+    stops = [n for n in path if dev.nodes[n].kind == "site" and n not in crossings]
     if len(stops) < 2:
         raise ValueError(f"{arch.name}: no two trap sites are connected")
     idx = {n: i for i, n in enumerate(path)}
@@ -130,6 +136,7 @@ def walk(arch: Architecture, n_ions: int = 4, *, name: str | None = None) -> TSI
         vias.append(tuple(dev.segment_between(u, v).id for u, v in zip(hop, hop[1:])))
 
     n_ions = max(1, min(n_ions, len(stops) // 2))
+    on_loop = loop_node_set(dev)
     prog = TSIR(name=name or f"walk_{n_ions}", arch_spec=_spec(arch))
     prog.add(Instruction(
         type="init", id=prog.next_id(),
@@ -151,11 +158,34 @@ def walk(arch: Architecture, n_ions: int = 4, *, name: str | None = None) -> TSI
             break
         for ion, _, _, _ in movers:
             at[ion] += 1
-        prog.add(Instruction(
-            type="simd", id=prog.next_id(), cls="shuttle", mode="inter",
-            participants=tuple(Participant(i, a, b, via=v) for i, a, b, v in movers)))
+        # R22: one cycle is one waveform.  The movers are front-to-back along the path,
+        # so grouping consecutive movers by their motion signature keeps "vacate before
+        # arrive" and splits the batch only where the path turns
+        groups: list[tuple[str, list]] = []
+        for mv in movers:
+            sig = _signature(dev, on_loop, mv[1], mv[3])
+            if groups and groups[-1][0] == sig:
+                groups[-1][1].append(mv)
+            else:
+                groups.append((sig, [mv]))
+        for _, part in groups:
+            prog.add(Instruction(
+                type="simd", id=prog.next_id(), cls="shuttle", mode="inter",
+                participants=tuple(Participant(i, a, b, via=v) for i, a, b, v in part)))
     prov.stamp(prog, "programs.walk", arch=arch.name, n_ions=n_ions)
     return prog
+
+
+def _signature(dev, on_loop, src: str, via: tuple[str, ...]) -> str:
+    """The R22 motion signature of one trap-to-trap move, hop by hop along `via`."""
+    labels = []
+    at = src
+    for sid in via:
+        seg = dev.segments[sid]
+        nxt = seg.other(at)
+        labels.append(hop_label(dev, on_loop, at, nxt, seg))
+        at = nxt
+    return "shuttle " + ",".join(labels)
 
 
 # ------------------------------------------------------------------------- odd-even

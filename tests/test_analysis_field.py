@@ -289,7 +289,9 @@ def test_the_same_setup_gives_the_same_numbers():
 
 
 def test_registering_it_did_not_disturb_the_analyses_that_were_there():
-    assert sorted(ANALYSES) == ["budget", "field", "reach"]
+    # `cycle` (the QEC clock cycle, 24e9ad8) registered after this field did, and the
+    # two that were there before it are what this test is about
+    assert sorted(ANALYSES) == ["budget", "cycle", "field", "reach"]
     for key in ("reach", "budget"):
         d = ANALYSES[key].describe()
         assert d["data_labels"] and d["summary"]

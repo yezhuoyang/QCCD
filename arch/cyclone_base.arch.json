@@ -18,24 +18,12 @@
       "spam": false,
       "cool": true
     },
-    "ancilla": {
-      "capacity": 2,
-      "gate": true,
-      "spam": true,
-      "cool": true
-    },
     "trap": {
       "capacity": 4,
       "gate": true,
       "spam": true,
       "cool": true,
       "note": "general-purpose trap: gate, measure and cool all available"
-    },
-    "tfactory": {
-      "capacity": 4,
-      "gate": true,
-      "spam": true,
-      "cool": true
     },
     "load": {
       "capacity": 8,

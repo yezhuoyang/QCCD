@@ -9,7 +9,7 @@ Design a machine · compile a circuit for it · prove the result runs · derive 
 [![python](https://img.shields.io/badge/python-3.10%2B-3776ab.svg)](https://www.python.org/downloads/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![dependencies](https://img.shields.io/badge/dependencies-none-lightgrey.svg)](#install)
-[![rules](https://img.shields.io/badge/hardware%20rules-23-1e2761.svg)](docs/rules.md)
+[![rules](https://img.shields.io/badge/hardware%20rules-28-1e2761.svg)](docs/rules.md)
 [![verified](https://img.shields.io/badge/R10-Lean%20checker%20%2B%20tableau-e4572e.svg)](Compiler/)
 
 </div>
@@ -21,7 +21,7 @@ not be realisable at all. Which architecture wins is therefore not self-evident:
 jointly on the code, the transport schedule, and the wiring.
 
 **This is a platform for answering that quantitatively.** Describe a device declaratively,
-compile a circuit onto it, and the tool replays the result, checks twenty-three hardware
+compile a circuit onto it, and the tool replays the result, checks twenty-eight hardware
 rules, prices it, and derives the electrodes it would take to build.
 
 ## Install
@@ -50,7 +50,7 @@ qccd toolchain install
 
 ### Design a machine in the browser
 
-Drag a trap, draw a segment, and the cost model and all 23 rules re-evaluate as you go.
+Drag a trap, draw a segment, and the cost model and all 28 rules re-evaluate as you go.
 One parameter here — the number of vertical shuttling lines — trades ancillas against
 junctions.
 
@@ -144,7 +144,7 @@ different wiring — and the wiring is the whole cost.
 
 | | |
 |---|---|
-| [`qccd/`](qccd/README.md) | the platform: the language, the IR, the 23 rules, the cost model, the renderer |
+| [`qccd/`](qccd/README.md) | the platform: the language, the IR, the 28 rules, the cost model, the renderer |
 | [`Compiler/`](Compiler/README.md) | QASM → hardware instructions: OCaml search, Lean-verified checker |
 | [`arch/`](arch/README.md) | nine reference architectures |
 | [`examples/`](examples/) | runnable studies — routing benchmarks, heating budgets, `BB [[144,12,12]]` |

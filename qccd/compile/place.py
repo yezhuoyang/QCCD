@@ -29,7 +29,7 @@ from typing import Mapping, Sequence
 from ..codes.bb import BBCode, Check
 
 __all__ = ["Placement", "anneal", "refine", "interleaved_seed", "identity_seed",
-           "window", "lower_bound_revolutions"]
+           "structured_seeds", "window", "lower_bound_revolutions"]
 
 
 def window(slots: Sequence[int], capacity: int) -> int:
@@ -93,6 +93,46 @@ def interleaved_seed(code: BBCode) -> dict[int, int]:
     for v in range(half):
         out[v] = 2 * v
         out[half + v] = 2 * v + 1
+    return out
+
+
+def structured_seeds(code: BBCode, capacity: int) -> dict[str, dict[int, int]]:
+    """Every placement of the form `slot(i, j, side) = a*i + b*j + side (mod capacity)`.
+
+    A BB code is translation-invariant on `Z_l x Z_m`, and a rotating ring only ever
+    serves, at one offset, the checks whose anchors sit one dock spacing apart.  So the
+    checks that can share a batch are the translates of one another whose slot shift is
+    a multiple of the dock spacing -- and a placement that is a group homomorphism makes
+    that shift a *constant*, `a` per x-step and `b` per y-step.  The interleaved seed is
+    the member `(a, b) = (2m, 2)`, and it is the one that packs 24 docks at spacing 6 into
+    batches of 24 on `ring144_24v`.  At spacing 8 or 9 it packs almost nothing, because
+    12 and 2 are not multiples of 8 -- so the seed has to be chosen against the docks,
+    not fixed.  This returns the whole family (injective members only); the caller picks
+    by the true sweep, which costs a millisecond per member.
+    """
+    l, m, half = code.l, code.m, code.l * code.m
+    out: dict[str, dict[int, int]] = {}
+    for a in range(1, capacity):
+        for b in range(1, capacity):
+            slot_of: dict[int, int] = {}
+            used: set[int] = set()
+            ok = True
+            for i in range(l):
+                for j in range(m):
+                    v = i * m + j
+                    for side in (0, 1):
+                        s = (a * i + b * j + side) % capacity
+                        if s in used:
+                            ok = False
+                            break
+                        used.add(s)
+                        slot_of[side * half + v] = s
+                    if not ok:
+                        break
+                if not ok:
+                    break
+            if ok:
+                out[f"a{a}_b{b}"] = slot_of
     return out
 
 

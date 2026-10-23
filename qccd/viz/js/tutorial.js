@@ -315,14 +315,14 @@ var QCCD_TUTORIAL = {
         lowered: ['The text did not run: {have}', 'The Write tab names the line that failed.'],
         gateBetween: ['No CX between d0 and d1 yet. p.gate takes the gate name, then a list of pairs.', 'The gate must name both ions, and they must be in the same site when it fires.'],
         rulesPass: ['A rule still fails: {have}', 'Open Report and read the red badge. The cooling goes before the gate.'],
-        stepsAtMost: ['{have} steps; four is the goal. One p.simd would be three, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other.', 'Use p.shuttle("d0", ["S0", "S1"]) and p.shuttle("d1", ["S2", "S1"]), then p.cool(), then the gate.'],
+        stepsAtMost: ['{have} steps; five is the goal. One p.simd would be four, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other.', 'Use p.shuttle("d0", ["S0", "S1"]) and p.shuttle("d1", ["S2", "S1"]), then p.cool(), then the gate.'],
         ionAt: ['That ion ends at {have}. The gate fires at S1, so each ion walks one rail. Neither walks the whole way.', 'd0 goes from S0 to S1, d1 goes from S2 to S1, and the CX fires where they meet.'],
         'default': ['Not there yet. Press Evaluate, then Check.']
       },
       praise: 'That is a CNOT on real hardware: d1 walked to d0, was cooled, and CX fired at instruction {gateFrame}. Cost {cost}, {steps} steps, and all {rulesChecked} rules the page checks passed.',
       challenge: { exercise: 'Meet in the middle: fire the `CX` at `S1`, with `d0` and `d1` each walking one rail. You may want both moves in one `p.simd`. Try it, and see which rule fails: one set of electrodes pushes every ion on a rail the same way, so one instruction cannot move `d0` right and `d1` left ([[R22|rule:R22]]). Use two shuttles, then cool and fire.',
-                   check: ['all', ['gateBetween', 'd0', 'd1', 'CX'], ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S1'], ['stepsAtMost', 4]],
-                   praise: 'The CX fired at S1 in {steps} steps, with both ions moving. One p.simd would have been three steps, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other. That is why Part C turns a whole ring at once: moving every ion the same way is exactly what the electrodes can do.' },
+                   check: ['all', ['gateBetween', 'd0', 'd1', 'CX'], ['rulesPass'], ['ionAt', 'd0', 'S1'], ['ionAt', 'd1', 'S1'], ['stepsAtMost', 5]],
+                   praise: 'The CX fired at S1 in {steps} steps, with both ions moving. One p.simd would have been four steps, but R22 refuses it: one signal moves every ion the same way, and these two move towards each other. That is why Part C turns a whole ring at once: moving every ion the same way is exactly what the electrodes can do.' },
       solution: { stages: [
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.gate("CX", [["d0", "d1"]])\n']],
         [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S2"})\np.shuttle("d1", ["S2", "S1", "S0"])\np.cool()\np.gate("CX", [["d0", "d1"]])\n']]],

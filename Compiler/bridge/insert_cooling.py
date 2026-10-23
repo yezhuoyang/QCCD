@@ -37,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--arch", required=True)
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--table", default="qccdsim_jones")
+    ap.add_argument("--objective", default="fastest",
+                    choices=["fastest", "coolest", "balanced"],
+                    help="which point of each primitive's (us, quanta) curve to take")
     ap.add_argument("--max-gate-quanta", type=float, default=None,
                     help="override the architecture's R7 budget (a sweep axis)")
     args = ap.parse_args(argv)
@@ -44,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     arch_path = ROOT / args.arch if not Path(args.arch).is_absolute() else Path(args.arch)
     arch = Architecture.from_json(json.loads(arch_path.read_text(encoding="utf-8")))
     prog = TSIR.load(args.program)
-    model = corrected_model(args.table)
+    model = corrected_model(args.table, objective=args.objective)
 
     policy = CoolingPolicy()
     if args.max_gate_quanta is not None:

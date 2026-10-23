@@ -630,6 +630,12 @@ class Machine:
 
     def set_zone(self, zone: str, **fields) -> "Machine":
         """Change a zone type -- capacity, or what may happen there (R1, R6)."""
+        # A capacity below 1 was accepted and then did nothing: `resolve_capacities` skips a
+        # zero, so the zone said 0 while every site in it kept its old number, and the file
+        # still loaded.  Refused here, as `set_site_capacity` refuses it for one site.
+        cap = fields.get("capacity")
+        if isinstance(cap, (int, float)) and not isinstance(cap, bool) and cap < 1:
+            raise ValueError("a zone type must be able to hold at least one ion")
         zones = {k: dict(v) for k, v in self.arch.zone_types.items()}
         zones.setdefault(zone, {"capacity": 1})
         zones[zone].update(fields)
@@ -928,7 +934,7 @@ class Machine:
         Three gestures::
 
             m.add_site("S72b", 3.5, 0.0, zone="data", on="E3")      # split a rail in two
-            m.add_site("A99", 5.0, 1.0, zone="ancilla", to=["S5"])  # a dock on a spur
+            m.add_site("A99", 5.0, 1.0, zone="trap", to=["S5"])  # a dock on a spur
             m.add_site("F0", 9.0, 9.0, zone="data", capacity=4)     # free-standing
 
         `on=` is the only gesture that can put a node ON a transport loop, because it is
@@ -1270,7 +1276,7 @@ PROGRAM_METHODS: tuple[str, ...] = tuple(sorted(
 
 
 def _zone_block(zones) -> dict:
-    """`zones=["data", "ancilla"]` or a full mapping -> a zone_types block.
+    """`zones=["data", "trap"]` or a full mapping -> a zone_types block.
 
     A bare name becomes a placeholder `{"capacity": 1}` that a later `set_zone` fills
     in; it exists only so the geometry call may reference the zone.
@@ -1312,4 +1318,8 @@ def _template_doc(template) -> dict:
         for drop in ("geometry", "name", "description", "provenance"):
             doc.pop(drop, None)
         _TEMPLATE_CACHE[key] = doc
-    return dict(_TEMPLATE_CACHE[key])
+    # a deep copy: a shallow one shared the cached template's nested blocks with every
+    # machine built on it, so one machine's edit reached the next (qccd/arch/device.py)
+    import copy
+
+    return copy.deepcopy(_TEMPLATE_CACHE[key])

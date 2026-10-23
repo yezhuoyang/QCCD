@@ -28,7 +28,7 @@ a check.
 | R1 | checked | `occupancy(site) ≤ capacity` after every cycle |
 | R2 | checked | degree-≥3 nodes hold ≤ 1 ion, and ≤ 1 ion crosses one in a cycle |
 | R3 | checked | ≤ `segment.capacity` participants per segment per cycle |
-| R4 | checked | the movement class is declared; ≤ `max_simd_classes_per_cycle` per cycle |
+| R4 | checked | the movement class is declared; ≤ `max_simd_classes_per_cycle` per cycle. R4d (drivability), three frames: along a named loop every ion on a shared channel moves the same signed hop; on the spurs every acting dock moves the same way, and without per-site switches every spur on the channel must act; off any named path the instruction may not ask for more distinct lab-frame directions than the device declares channels. Which channel drives which site is NOT judged there: no device document partitions its sites across channels, and with a per-site switch the assignment is free (`Codesign/findings/q06i` §7). Two ions moving the SAME way in different places is still not judged either -- that is a layout question |
 | R4b | checked | a cycle has one mode, and never mixes transport with gates |
 | R5 | checked | no `(u→v)` together with `(v→u)` on one segment |
 | R6 | checked | gate/measure/cool only where the zone type allows, at the **replayed** site |
@@ -47,7 +47,37 @@ a check.
 | R16 | checked when the model models heating | gate error evaluated from the carried `n̄`, not a constant |
 | R17 | checked when the model models time | anomalous heating accrued per elapsed µs |
 | R18 | by construction | junction cost charged by the degree the expanded graph reports |
+| R19 | checked | no node joins more rails than `budget.max_junction_degree` (default 4: a 2D surface trap has T- and X-junctions and nothing denser; a 3D trap may declare 6) |
+| R20 | checked | at every node with two or more rails, any two of them subtend at least `budget.min_rail_angle_deg` (default 60°; a symmetric X-junction is 90°) |
+| R21 | checked | rails are planar: a rail passes through no node it does not end at, and two rails cross only at a node they share -- the drawing must be a surface trap |
+| R22 | checked | one transport cycle is one waveform: every ion that moves in a `simd` cycle has the same motion signature (class, and hop by hop the same path direction, spur direction or lab-frame axis); a site may opt out, never do something else. Skipped only when `control.model` is `direct` |
 | R23 | checked | a junction is crossed, not rested on: no ion ends a cycle on a node where three or more rails meet while the traps off the junctions have room for every ion. Not a violation: a slot of a loop or rail the programme moves as a conveyor, or a device with no such room |
+
+**R19-R21, the geometry rules (2026-09).** These three read the document alone: node
+positions and the segment list, no programme, no technology. They exist because a graph
+that is not a surface trap can still be replayed, priced and even verified against
+R1-R18 -- a Tanner graph laid out as rails, a torus whose wrap wires are drawn as chords
+across the die -- and every number such a page reports is a number about a machine that
+cannot be built. `geometry_violations(arch)` (`qccd/verify/rules.py`) files one violation
+per offending node (R19), per pair of rails (R20), and per rail-through-node or
+rail-crossing (R21), all at `instruction -1`; `Machine.violations()` reports them after
+every edit, and the browser mirrors them (`engine.js::geometryViolations`, a sibling of
+`architectureViolations` so each family keeps its own enumeration and its own parity
+diff). The two limits are document fields under `budget`, with the surface-trap defaults
+when absent.
+The ring generator used to draw its two corner docks ON the end-cap rail (a spur at 0° to
+the rail: R20 and R21 both fire); it now runs a corner spur outward, so every shipped
+ring passes. A periodic grid (`grid(..., periodic=True)`) cannot pass R21 on a plane and
+is not meant to: `cylinder` is the planar drawing of the same torus.
+
+**R22, one waveform (2026-09).** Broadcast control means one waveform per cycle, and the
+general router batched every hop that departed at the same time slot into one cycle
+whatever its direction, which R4d only counted against the number of channels. R22 asks
+the strict question the collaborator asked -- only the exact same operation may run
+simultaneously -- through `motion_signature(view, ion)`, which the compiler's
+uniformising pass (`qccd/compile/uniform.py`) shares, so a programme the pass emits is a
+programme R22 accepts by construction. Rigid rotation is uniform by construction; a dock
+batch is uniform when every rider docks the same way.
 
 **R23, junctions are crossed (2026-10).** R2 bounds how many ions a junction holds at an instant; it never said an ion may not stay, and a router that read it as a capacity parked ions there. On a hexagon lattice whose corners were declared as sites, a Steane round stopped an ion on a corner 77 times, once for 17 instructions, with empty traps on every side. R23 judges where an ion RESTS: a node where three or more rails meet (R18, whatever the node was declared as) may be crossed inside one move and may not be where a cycle leaves an ion. Two cases are excluded by name. A slot of a loop the programme rotates is part of a conveyor, which carries every ion through every slot, the dock slots of a ring included; so is a slot of a named open path that the programme moves with a shift class (every hop of the cycle along that one path), like the conveyor rails of a transversal-CNOT station, whose sites each have a rung to a gate trap and so meet three rails. And if the traps off the junctions cannot hold the programme's ions (capacity capped at R13's chain limit, as the compiler counts it), some ion must stand on a crossing and the rule does not apply. The general router leaves junction sites out of its trap graph under exactly this test, so a compiled programme passes by construction; each stay is reported once, at the cycle it begins.
 
@@ -115,6 +145,16 @@ the model is theirs.
 | split / merge | not modelled | 80 µs, 6 quanta each, on the classes that `entails` them |
 | heating | not modelled | per-ion `n̄`, by component |
 | wall clock | not modelled | microseconds, from the curves |
+
+**Shuttle speed and junction time as variables (2026-09).** The reviewers asked for the
+transport speed along a rail and the time to cross a junction to be variables rather than
+fixed per-hop numbers. The junction time already is one: the `junction_cross` curve point
+at the node's degree, declared per document. The shuttle time can now be derived from a
+speed: `corrected_model(shuttle_speed_m_s=..., pitch_um=...)` charges a rail hop
+`length_um / speed` microseconds, where `length_um = Segment.length * pitch_um` and
+`pitch_um` is what one lattice unit measures on the chip (the technology's
+`nm_per_unit`, 225 um on the ETH preset). Off by default, so every shipped number is
+unchanged until a study opts in; heating stays per hop.
 
 **Junction charging convention.** A junction is charged **on entry** to a degree-≥3 node,
 once per move. Charging both entry and exit would double-count every transit; charging

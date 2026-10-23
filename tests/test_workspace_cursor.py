@@ -376,7 +376,9 @@ def test_the_studio_chat_offers_cursor_and_talks_to_it(svc, tmp_path):
         {"eval": "document.getElementById('qcl-who').textContent + ' | ' + QCCD_LIVE.chat().cursor"},
     ], tmp_path, "cursor")
     assert st and all(x.get("ok", "error" not in x) for x in st), st
-    assert "New conversation with Cursor" in st[1]["value"] and "with Claude" not in st[1]["value"], st[1]
-    assert st[4]["value"] == "Cursor | true", st[4]
+    # `_chrome` puts its own pairing wait FIRST, so the steps above are st[1:]: the menu is
+    # st[2] and the header st[5] (these read st[1] and st[4], the wait before each)
+    assert "New conversation with Cursor" in st[2]["value"] and "with Claude" not in st[2]["value"], st[2]
+    assert st[5]["value"] == "Cursor | true", st[5]
     cursor = [s for s in service_request(info, "GET", "/api/sessions", token="owner")["sessions"] if s["client"] == "cursor"]
     assert len(cursor) == 1 and _calls(log)[0]["session"] == cursor[0]["id"]

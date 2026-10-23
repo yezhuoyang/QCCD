@@ -83,7 +83,7 @@ An open loop (`closed: false`) is a linear register; asking it for a rigid shift
 
 | generator | parameters | produces |
 |---|---|---|
-| `ring` | `width, height, verticals` | `2W + 2H − 4` rail slots in one closed loop, plus `V` dock spurs to mid-line ancilla sites |
+| `ring` | `width, height, verticals, dock_offset` | `2W + 2H − 4` rail slots in one closed loop, plus `V` dock spurs to mid-line ancilla sites, the first at slot `dock_offset` |
 | `grid` | `a, b` | an `a × b` lattice of junctions with one trap in the middle of every wire: `2ab − a − b` traps, interior junctions degree 4, boundary 3, lattice corners 2 |
 | `chain` | `n` | `n` sites in a line; no loop, no junction, two degree-1 ends. `chain(1)` with a large capacity is the stationary-chain baseline |
 
@@ -92,6 +92,11 @@ row left to right, down the right end, bottom row right to left, up the left end
 slot ids in an imported schedule mean the same thing here.
 
 `ring(72, 2, 24)` puts docks at `{0, 6, …, 138}`; `verticals` must divide the slot count.
+`dock_offset` (default 0, less than one dock spacing) shifts them all: slot 0 is a corner,
+and on a loop of height 3 or more a corner dock's spur lies along the side rail and fails
+DRC, while a top and a bottom dock at the same `x` put two ancilla sites on one point.
+The offset costs nothing in the transport model; `Codesign/scripts/q06_campaign.py
+--rings` searches it together with the width for the layout the DRC accepts.
 
 ## Compact and expanded forms
 
@@ -217,3 +222,89 @@ run on every `load()`.
 One further check is program-level and lives in the verifier: every node the graph makes a
 junction must be **priceable** at that degree, or the architecture cannot charge for what
 it built. It is reported under R11.
+
+## Geometry limits (R19-R21)
+
+Two optional fields under `budget` bound the shape of the rail graph; the verifier's
+geometry rules read them (`qccd.verify.rules.geometry_limits`) and fall back to the
+surface-trap defaults when they are absent:
+
+| field | default | rule |
+|---|---|---|
+| `budget.max_junction_degree` | 4 | R19: no node joins more rails than this. A 2D surface trap has T- and X-junctions and nothing denser; a 3D trap may declare 6. |
+| `budget.min_rail_angle_deg` | 60 | R20: at every node with two or more rails, any two of them subtend at least this angle, measured from the declared node positions. A symmetric X-junction is 90 degrees. |
+
+R21 has no parameter: rails are planar, so a rail passes through no node it does not end
+at, and two rails cross only at a node they share. All three are judged from `pos` alone,
+which is why `pos` must be geometry and not a sketch: the ring generator's corner docks
+were drawn on the end-cap rail until 2026-09 and failed R20 and R21 on every ring; they
+now run outward. A periodic grid cannot pass R21 on a plane (its wrap wires are chords
+across the die); `cylinder` is the planar drawing of the same torus.
+
+## Sketching a shape (the studio's Sketch mode)
+
+The studio (`python -m qccd studio`) has two design modes, remembered under
+`qccd.studio.mode`. **Parts** is the element-at-a-time tool: place a site, place a
+junction, shift-drag a rail. **Sketch** is the default on a canvas with no device on it,
+and it is the one that speaks this language directly: arm a shape — rectangle, ellipse,
+line, polyline — drag it, and the release emits builder statements.
+
+A shape is turned into ADL by exactly the rule the generators use:
+
+* a trapping site every **one lattice unit** along the drawn path (`L.ux` / `L.uy`, the
+  step `qccd/viz/layout.py` measured, or 1 on an empty canvas), the first at the shape's
+  start. The last spacing on an edge may be short: the drawn extent is the authority and
+  the shape is never resized to make the arithmetic come out even;
+* every **vertex** is a site, so a 6 × 4 rectangle is 20 sites and 20 rails — the same
+  count `ring(7, 5)` gives for the lattice its corners span;
+* a **closed** shape also emits `d.loop(id, walk, closed=True, kind="ring")` and every
+  `d.segment` carries `loop=`, so `p.rotate` works on it the moment it lands; an **open**
+  shape emits the `kind="path"`, `closed=False` loop `chain()` declares for a linear
+  register;
+* the ellipse is polygonised at one side per unit of its drawn circumference (Ramanujan),
+  which makes R20 true by construction: a regular *n*-gon's rails meet at
+  `180 − 360/n` degrees.
+
+Everything lands in ONE transaction, namespaced by the component instantiator, so the
+whole shape is one selectable unit and one Ctrl+Z.
+
+### A corner is a bend, not a junction
+
+The obvious reading — "the shape has a corner, so put a junction there" — is wrong, and
+the geometry above says why. A corner of a drawn rail is a **degree-2 node**, and R18
+prices a degree-2 node as ordinary transport. The shipped ring has four corners and pays
+no junction charge at any of them; declaring them `kind: "junction"` would make the
+verifier charge `junction_cross` on every rigid hop through a turn the loop does contain
+as a *bend*, which is the single most expensive structural mistake this file can express.
+
+So a corner gets a **site**, and the studio says so in the drag readout:
+`corner: a bend (R18), not a junction`.
+
+A junction **is** added automatically, at the place a junction is — a real meeting of
+three or four rails:
+
+| what the shape meets | what is emitted |
+|---|---|
+| an existing **node**, at a vertex or along an edge | that node is reused; its zone and capacity are kept, and R18 makes it a junction by degree |
+| an existing **rail**, crossed or touched | a `kind: "junction"` node at the meeting point, and the crossed segment replaced by its two halves |
+
+Both keep R21 true (no rail crosses another without a shared node, and no rail passes
+through a node it does not end at), and both are checked against R19 and R20 *before* the
+release commits: a crossing that would push a node past `budget.max_junction_degree`, or
+a corner tighter than `budget.min_rail_angle_deg`, is refused under the pointer with the
+rule and the number in the readout. The commit re-runs the geometry pass afterwards and
+takes the whole shape back if it added a finding, so a sketched device is clean of
+R19/R20/R21 by construction.
+
+Two limits are worth stating rather than discovering:
+
+* **A sketch needs a builder.** `d.site` is hoisted above the seal, and a generator
+  device (`from_template`, `blank`) has none — nor is there any post-seal verb that
+  declares a loop (`qccd/arch/edit.py`'s op table is `add_site`, `add_junction`,
+  `add_segment`, `remove_node`, `remove_segment`). Sketching on one is refused with the
+  message that names the button which makes it explicit.
+* **A ring may not cross a ring.** Splitting a rail that already carries an orbit has to
+  go through `add_site(on=...)`, which is the only verb that re-walks a loop — and it
+  runs *after* the seal, where the new shape's own `d.loop` has already been written. One
+  junction can fix one of the two orbits, so a closed shape crossing a loop edge is
+  refused under R21 with what to do instead (meet the loop at one of its own sites).

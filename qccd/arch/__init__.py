@@ -19,6 +19,7 @@ from .device import Architecture, Device, ExpansionError, Loop, Node, Segment
 from .generators import (
     GENERATORS,
     chain,
+    cylinder,
     dual_loop,
     expand_generator,
     grid,
@@ -54,6 +55,7 @@ __all__ = [
     "GENERATORS",
     "chain",
     "check",
+    "cylinder",
     "dual_loop",
     "ladder",
     "racetrack",

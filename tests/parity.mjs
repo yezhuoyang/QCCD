@@ -197,9 +197,15 @@ for (const c of cases.generators || []) {
 // not lattice points.
 for (const c of cases.layouts || []) {
   let got, gotRaw;
+  // `c.opts` carries the TRUE SCALE pair (`true_scale`, `unit_nm`) for the cases that
+  // exercise it, and is absent for every case that does not -- so the same bucket proves
+  // both that the option mirrors and that its absence changes nothing.
+  const opt = c.opts || {};
   try {
-    got = Q.computeLayout(c.nodes, c.segments || []);
-    gotRaw = c.layout_raw ? Q.computeLayout(c.nodes, c.segments || [], { raw: true }) : null;
+    got = Q.computeLayout(c.nodes, c.segments || [], opt);
+    gotRaw = c.layout_raw
+      ? Q.computeLayout(c.nodes, c.segments || [], Object.assign({}, opt, { raw: true }))
+      : null;
   } catch (err) {
     compared++;
     note('layout', c.name, 'threw', null, err.message);
@@ -437,6 +443,24 @@ for (const c of cases.lint || []) {
   for (let i = 0; i < Math.max(py.length, js.length); i++) {
     compared++;
     if (py[i] !== js[i]) { note('lint', c.name, 'violation[' + i + ']', clip(py[i]), clip(js[i])); break; }
+  }
+
+  // THE SECOND STATE-FREE FAMILY: R19/R20/R21, `geometry_violations` mirrored. Kept in
+  // its own function on both sides and diffed as its own enumeration, so a mirror that
+  // folded the geometry rules into `architectureViolations` would be caught here rather
+  // than quietly doubling R11's count in the report.
+  if (c.geometry) {
+    let geo;
+    try { geo = Q.geometryViolations(r.ok) || []; }
+    catch (err) { compared++; note('lint', c.name, 'geometry threw', null, err.message); continue; }
+    const gpy = c.geometry.map(norm).sort();
+    const gjs = geo.map(norm).sort();
+    compared++;
+    if (gpy.length !== gjs.length) note('lint', c.name, 'geometry count', gpy.length, gjs.length);
+    for (let i = 0; i < Math.max(gpy.length, gjs.length); i++) {
+      compared++;
+      if (gpy[i] !== gjs[i]) { note('lint', c.name, 'geometry[' + i + ']', clip(gpy[i]), clip(gjs[i])); break; }
+    }
   }
 }
 

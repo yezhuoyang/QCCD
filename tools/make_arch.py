@@ -30,8 +30,16 @@ OUT = ROOT / "arch"
 
 ZONE_TYPES = {
     # PLAN §3, deck p.24.  `capacity` is the R1 bound; the capability flags are R6.
+    #
+    # A ZONE NAMES A CAPABILITY OF THE METAL, NEVER A ROLE IN A CODE.  This block used to
+    # carry `ancilla` and `tfactory` as well.  Neither described any hardware: `ancilla`
+    # was `trap`'s flags exactly (gate, spam, cool, capacity 2) under a name borrowed from
+    # error correction, and `tfactory` was declared by all nine architectures and used by
+    # ZERO nodes in any of them -- a magic-state factory is an algorithm's structure, and
+    # this platform models transport, traps and wiring.  The sites that were `ancilla` are
+    # `trap`, which is what they physically are; nothing in the cost model, the 23 rules or
+    # the compiler ever branched on a zone's name, so no price and no verdict moves.
     "data": {"capacity": 2, "gate": False, "spam": False, "cool": True},
-    "ancilla": {"capacity": 2, "gate": True, "spam": True, "cool": True},
     "trap": {
         "capacity": 2,
         "gate": True,
@@ -39,7 +47,6 @@ ZONE_TYPES = {
         "cool": True,
         "note": "general-purpose trap: gate, measure and cool all available",
     },
-    "tfactory": {"capacity": 4, "gate": True, "spam": True, "cool": True},
     "load": {
         "capacity": 8,
         "gate": False,
@@ -349,8 +356,8 @@ SORT_CLASSES = [
 def ring144_24v() -> dict:
     doc = base(
         "ring144_24v",
-        "The shipped 24-ancilla design: a 2x72 rectangular rotation loop of 144 slots "
-        "with 24 evenly spaced dock spurs to mid-line ancilla sites. The spurs are what "
+        "The shipped 24-dock design: a 2x72 rectangular rotation loop of 144 slots "
+        "with 24 evenly spaced dock spurs to mid-line traps. The spurs are what "
         "make 24 of the 144 rail nodes degree 3, putting a junction on every rigid hop.",
         {
             "artifact": "visualizer_24_ancillas_24_junctions_standalone.html",
@@ -381,7 +388,7 @@ def ring144_24v() -> dict:
                 "entails": ["split", "merge"],
                 "note": (
                     "lifts one ion out of the rail's potential and inserts it into the "
-                    "ancilla trap: split at the source, merge at the destination. A "
+                    "dock trap: split at the source, merge at the destination. A "
                     "conveyor-belt rotation entails neither -- the whole chain moves "
                     "with the potential (2305.03828)"
                 ),

@@ -7,9 +7,9 @@ object, not three things kept in step.
 
 **The bug this feature uncovered was already shipping.**  `pinNode` recovered which
 catalogue entry a placed instance came from by probing for `inst + '.' + pins[0].node` and
-taking the first match in `CMP`.  `ancilla_dock` and `trap_junction` both call that node
+taking the first match in `CMP`.  `spur_dock` and `trap_junction` both call that node
 `'j'`, and `CMP` is in sorted order -- so every pin of a placed `trap_junction` resolved
-against `ancilla_dock` and came back `no_pin`.  The component whose whole purpose is
+against `spur_dock` and came back `no_pin`.  The component whose whole purpose is
 "charged by degree, so attach all 4" could not be attached at all, and no test noticed
 because nothing had ever tried.
 
@@ -75,8 +75,8 @@ def drive(page: Path, tmp_path: Path, body: str, out: Path | None = None) -> dic
 
 def test_a_trap_junction_can_be_attached_at_all(studio, tmp_path):
     """It could not, on every version of this page that has ever shipped: `pinNode`
-    resolved it against `ancilla_dock`, which sorts first and shares the node name 'j'."""
-    assert (build("ancilla_dock").pins[0]["node"]
+    resolved it against `spur_dock`, which sorts first and shares the node name 'j'."""
+    assert (build("spur_dock").pins[0]["node"]
             == build("trap_junction").pins[0]["node"] == "j"), (
         "the collision this test is about no longer exists; rewrite the test")
 

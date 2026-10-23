@@ -346,6 +346,27 @@ function rebuild(opts) {
                    components: rep.components_after || null });
     }
   }
+  // THE SAME CLICK, ONE ANSWER.  A site placed on a blank canvas is a builder statement
+  // (`d.site`, hoisted above the seal), so it never passes through `edit.js` and never got
+  // the "wired to nothing" report an `add_site` on a shipped device gets: the first site
+  // on a new canvas read "0 problems" while the same site on grid9x9 read one.  For the
+  // builder's own nodes the warning is read off the device as it stands, so it clears the
+  // moment a segment reaches the node.
+  if (STATE.device) {
+    var held = builderHeldIds(), wired = {};
+    for (var gid in STATE.device.segments) {
+      if (!has(STATE.device.segments, gid)) continue;
+      wired[STATE.device.segments[gid].a] = true;
+      wired[STATE.device.segments[gid].b] = true;
+    }
+    for (var hid in held) {
+      if (has(held, hid) && has(STATE.device.nodes, hid) && !wired[hid]) {
+        LINTS.push({ rule: 'structure', severity: 'warn',
+                     message: hid + ' is wired to nothing; no ion can reach it until it gets a segment',
+                     components: null });
+      }
+    }
+  }
 
   // 0. THE SPATIAL INDEX IS DERIVED STATE, NOT CACHED STATE.  `buildIndex()` ran once,
   //    lazily, and nothing invalidated it -- the comment on `GRID` claimed `rebuild()`
@@ -6125,6 +6146,13 @@ function guideTick() {
 }
 // what a harness needs to make the gesture the guide asks for
 function guideState() {
+  // THE OVERLAY FIRST.  It is drawn on the lesson's tick, so between a step finishing and
+  // the next tick the four press-blocking panels still surround the OLD step's holes: the
+  // report below then named the new step and hit-tested the old overlay, and called the
+  // new target unreachable ("under it: guide:gdb") -- lesson A2's Check, after A1, on a
+  // page a few milliseconds slower.  The tick is idempotent (the draw keys on what it
+  // would draw), so bringing it up to date here costs nothing when it already is.
+  guideTick();
   if (!GUIDE) return { active: false, passed: !!LSTATE.passed };
   var now = guideNow(), st = now ? now.step : null, out = {
     active: true, id: GUIDE.id, stage: GUIDE.stage, finished: !!GUIDE.finished, passed: !!LSTATE.passed,

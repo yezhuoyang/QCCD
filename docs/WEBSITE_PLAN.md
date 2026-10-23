@@ -24,8 +24,8 @@ executing session (§12).
 |---|---|---|---|
 | The studio page: device editor, program pane, animation, pricing, Report pane, tools bar, search, hover hints, cheat sheet | `qccd/viz/render.py`, `qccd/viz/engine.js`, `qccd/viz/js/editor.js` (built by `python -m qccd studio`) | shipped; one self-contained HTML | the **Design** app and the **Learn** app |
 | The course: 31 lessons, Parts A/B/R/C/D, checks over page verdicts, progress in `localStorage` | `qccd/viz/js/tutorial.js`, Learn tab; plan in `docs/TUTORIAL_PLAN.md` | phase 0 shipped (Part A); B/R/C/D per that plan | the **Learn** tab, untouched |
-| Browser rule set: 21 of 27 rules with a differential parity test against Python | `BROWSER_SET` in `render.py`; `tests/test_engine_parity.py` | shipped | the v1 verifier's rule half |
-| Python verifier: all 27 rules, `qccd open` (the return leg for a `qccd.studio` artifact) | `qccd/verify/rules.py`, `qccd/__main__.py` | shipped | CI's re-check, and the parity oracle for the six rules still to port |
+| Browser rule set: 21 of 28 rules with a differential parity test against Python | `BROWSER_SET` in `render.py`; `tests/test_engine_parity.py` | shipped | the v1 verifier's rule half |
+| Python verifier: all 28 rules, `qccd open` (the return leg for a `qccd.studio` artifact) | `qccd/verify/rules.py`, `qccd/__main__.py` | shipped | CI's re-check, and the parity oracle for the six rules still to port |
 | The compiler: QASM → TSIR + certificate | `Compiler/ocaml` (5.3 k lines OCaml, yojson only; file I/O in `qasm.ml`, `cert.ml`, the CLI) | shipped as `qccdc_cli.exe` | compiled to JavaScript with js_of_ocaml (§4.3) |
 | The proved checker (R10) | `Compiler/lean` — `QCCDC.Cert.check`, `check_sound`; `qcheck` exe imports Lean core only | shipped; ~10 s for small codes, 15 min / 2 GB for BB | compiled to WebAssembly (§4.4); the soundness proof is checked once, in CI |
 | Checker input assembly, stim check, cost, buildability | `Compiler/bridge/mk_qcheck_input.py`, `check_cert.py`, `small_codes.py`, `q06_campaign.py` | shipped (Python) | ported where the browser needs them (§4.2), else CI |
@@ -177,7 +177,7 @@ is `write_index` — the plot, the metric pickers, the dots, the click-through �
 from a `rows.json`. Nothing about the page changes; what changes is where rows come from.
 
 **A row is a submission** (§7) that CI verified. The default ranking is total time on the
-jones table among entries whose 27 rules pass and whose R10 badge is Lean; the pickers
+jones table among entries whose 28 rules pass and whose R10 badge is Lean; the pickers
 still let a visitor rank by anything.
 
 **Contributing.** From the verdict card, **Contribute** writes one file,
@@ -295,7 +295,7 @@ in parallel sessions; 3 needs 1; 4 needs 2; 5 needs 4.
 2. **Submission channel.** Decided: issue form + Action-opened PR. A contributor needs a
    GitHub login and nothing else; the Action does the fork-free part.
 3. **R10 levels on the board.** Decided: three badges as in §5, all entries shown. The
-   default ranking is time on the jones table among entries with 27/27 rules and a badge of
+   default ranking is time on the jones table among entries with 28/28 rules and a badge of
    Lean checker or better; the others stay on the plot (hollow, as today) and in the table.
 4. **Compiler in the browser.** Confirmed: §4.3 supersedes `TUTORIAL_PLAN.md` §10 for
    Design; the course does not depend on it.
@@ -394,7 +394,7 @@ check_cert with qcheck), and live in `qccd/site/compiled/` (410 KB) so the site 
 toolchain. Two expert pages were added on request (2026-09-10): **Language** (`language/`), the hardware
 language in PL style — an EBNF of the Write pane's syntax, the machine state and its transitions,
 and every one of the twelve statements with its signature, meaning, cost, the rules that judge it,
-the IR it becomes, and a running example — and **Rules** (`rules/`), all 27 rules with the
+the IR it becomes, and a running example — and **Rules** (`rules/`), all 28 rules with the
 verifier's statement, what it checks, its sources, and a programme that passes and one that fails
 (or, for R7b, R10, R15 and R18, what the verifier honestly reports instead). Both live in
 `qccd/site/examples.py` as the records the Write pane produces, so the text shown is what ran;

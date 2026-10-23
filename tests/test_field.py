@@ -696,8 +696,27 @@ def test_the_engine_has_no_trigonometry_to_build_a_field_solver_out_of():
     uses `atan2` for pointer geometry, which no Python code recomputes.
     """
     src = (ROOT / "qccd/viz/engine.js").read_text(encoding="utf-8")
-    for banned in ("Math.atan2", "Math.atan", "Math.cos", "Math.sin", "Math.tan"):
-        assert banned not in src, (
+    # THREE CALLS, BY NAME, and nothing else.  R22 labels an off-axis hop by its angle in
+    # whole degrees (`_directionLabel`, ba3b7fc, issue #19: one `atan2`, nudged by
+    # `HOP_ANGLE_TIE` so the last bit never decides a label), and the `cylinder` generator
+    # puts traps on rings (6b96f71: one `cos` and one `sin`, each rounded to 6 places as
+    # Python's `round(x, 6)` is, so an ulp never reaches a coordinate).  Both are mirrored
+    # from Python and diffed at tolerance zero by the parity suite.  One angle per hop and
+    # one ring of points are not a field kernel; any further call is.
+    allowed = {"Math.atan2(": "function _directionLabel(",
+               "Math.cos(": "function cylinder(", "Math.sin(": "function cylinder("}
+    for call, home in allowed.items():
+        i = src.find(call)
+        assert src.count(call) == 1 and src.rfind("\nfunction ", 0, i) == src.rfind("\n" + home, 0, i), (
+            f"{call[:-1]} appeared in engine.js outside {home[9:-1]}; the mirrored half has "
+            f"acquired the transcendental arithmetic the field kernel is kept out of it to avoid")
+    assert "_pyRound6(r * Math.cos(th))" in src and "_pyRound6(r * Math.sin(th))" in src
+    rest = src
+    for call in allowed:
+        rest = rest.replace(call, "")
+    rest = rest.replace("`Math.atan2`", "")
+    for banned in ("Math.atan", "Math.cos", "Math.sin", "Math.tan"):
+        assert banned not in rest, (
             f"{banned} appeared in engine.js; the mirrored half has acquired the "
             f"transcendental arithmetic the field kernel is kept out of it to avoid")
 

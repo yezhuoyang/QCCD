@@ -365,3 +365,22 @@ def test_the_plane_reports_what_it_does_not_model():
     doc = mod.__doc__ or ""
     for absent in ("voltages", "waveform shapes", "sample rate"):
         assert absent in doc
+
+
+def test_editing_an_exported_document_changes_nothing_else():
+    """`to_json` and the template cache handed out SHARED nested blocks, so editing one
+    exported document rewired the architecture it came from and every machine built on the
+    same template afterwards -- found by the engine-parity suite disagreeing with the
+    browser on 213 cases in a full run and on none alone (this file's switchless test ran
+    first)."""
+    a = Machine.ring(8, 2, 0, name="alias").arch
+    doc = a.to_json(expanded=True)
+    doc["control"]["channels"]["switch_per_site"] = False
+    doc["zone_types"]["data"]["capacity"] = 99
+    assert a.control["channels"]["switch_per_site"] is True
+    assert a.zone_types["data"]["capacity"] != 99
+    fresh = Machine.ring(8, 2, 0, name="fresh").arch
+    assert fresh.control["channels"]["switch_per_site"] is True
+    b = load(str(Path(__file__).resolve().parents[1] / "arch" / "ring144_24v.arch.json"))
+    b.to_json(expanded=True)["control"]["channels"]["switch_per_site"] = False
+    assert b.control["channels"]["switch_per_site"] is True

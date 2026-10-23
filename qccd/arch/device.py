@@ -27,6 +27,7 @@ model in `qccd.cost` decides what to charge for it.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Iterable, Mapping, Sequence
@@ -719,19 +720,25 @@ class Architecture:
         }
         if self.description:
             doc["description"] = self.description
+        # DEEP copies.  `dict(self.control)` shared the nested `channels` and `classes`, so
+        # a caller that edited the returned document -- `doc["control"]["channels"]
+        # ["switch_per_site"] = False`, as tests/test_control_plane.py does -- silently
+        # rewired this architecture AND, through `from_json`, the cached template every
+        # later `Machine.ring(...)` / `from_device` is built on: the engine-parity suite
+        # then disagreed with the browser on 213 cases, in a full run only.
         if self.provenance:
-            doc["provenance"] = dict(self.provenance)
+            doc["provenance"] = deepcopy(dict(self.provenance))
         doc["geometry"] = geometry
-        doc["zone_types"] = {k: dict(v) for k, v in self.zone_types.items()}
+        doc["zone_types"] = {k: deepcopy(dict(v)) for k, v in self.zone_types.items()}
         if self.control:
-            doc["control"] = dict(self.control)
+            doc["control"] = deepcopy(dict(self.control))
         doc["primitives"] = self.primitives.to_json()
         if self.heating:
-            doc["heating"] = dict(self.heating)
+            doc["heating"] = deepcopy(dict(self.heating))
         if self.species:
-            doc["species"] = dict(self.species)
+            doc["species"] = deepcopy(dict(self.species))
         if self.budget:
-            doc["budget"] = dict(self.budget)
+            doc["budget"] = deepcopy(dict(self.budget))
         return doc
 
     @staticmethod
@@ -781,12 +788,14 @@ class Architecture:
             device=device,
             zone_types=zone_types,
             primitives=PrimitiveSet.from_json(doc["primitives"]),
-            control=dict(doc.get("control", {})),
-            heating=dict(doc.get("heating", {})),
-            species=dict(doc.get("species", {})),
-            budget=dict(doc.get("budget", {})),
+            # deep, for the reason `to_json` gives: the document is the caller's (often a
+            # cached template) and must not share mutable blocks with the architecture
+            control=deepcopy(dict(doc.get("control", {}))),
+            heating=deepcopy(dict(doc.get("heating", {}))),
+            species=deepcopy(dict(doc.get("species", {}))),
+            budget=deepcopy(dict(doc.get("budget", {}))),
             description=doc.get("description"),
-            provenance=dict(doc.get("provenance", {})),
+            provenance=deepcopy(dict(doc.get("provenance", {}))),
         )
 
 

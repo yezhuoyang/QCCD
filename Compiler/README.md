@@ -6,7 +6,7 @@ repository already replays, rule-checks and prices.
 **Read [`PLAN.md`](PLAN.md) first.** It states what is being built, why the trust architecture is
 shaped the way it is, and what each milestone has to prove.
 
-The one-sentence version: `qccd/verify` reported 22 of its 23 rules on any program and skipped
+The one-sentence version: `qccd/verify` reported 27 of its 28 rules on any program and skipped
 **R10 — "the compiled program implements the input circuit"** — because there was no QASM front end
 to check against. This directory is the front end, and **R10 now reports `passed`**, decided in
 two halves: a checker written in Lean and proved sound there (`QCCDC.Cert.check_sound`, axioms:
@@ -110,7 +110,7 @@ python bridge/check_cert.py build/out/bb144_rot --qasm build/bb144_esm.qasm \
 
 ## R10, the rule that was always skipped
 
-Of the [23 rules](../docs/rules.md), twenty-two are structural and the platform has always
+Of the [28 rules](../docs/rules.md), twenty-seven are structural and the platform has always
 checked them. R10 — *"the compiled program implements the input circuit"* — had only ever
 been reported **skipped**, never `passed`. Run the verifier on anything and it says so
 itself, and says why:
@@ -200,6 +200,45 @@ A round holds only gates on disjoint qubits, so each qubit keeps its gate order.
 * every rule passes, and R10 passes with the proved checker on grid9x9;
 * outputs the general router, rotation or the race track produced before are byte-identical.
 
+#### The schedule is decided upstream; the compiler certifies it
+
+546 batches is what rigid rotation does with a layout it chose by stride and a binding the
+QASM fixed round-robin. Neither knows it is compiling a code. `qccd/compile` does — it
+places the six members of every check close together and packs 144 check-arcs onto the
+docks — and reaches **55 batches** on the same device, but emits no certificate. The bridge
+is [`Codesign/scripts/bb_schedule.py`](../Codesign/scripts/bb_schedule.py): it runs the
+code-aware placer and binder, writes the binding and contact order into the QASM
+(`gen_bb144.py --schedule`) and the layout into a file `qccdc rotate --placement` reads, so
+the *same* rotation pass — same DAG rule, same readiness rule, same certificate, same proved
+checker — compiles the code-aware schedule:
+
+```bash
+python Codesign/scripts/bb_schedule.py --arch arch/ring144_24v.arch.json --ancillas 24 \
+    -o build/q06/ring24                         # .schedule.json + .placement.json
+python bridge/gen_bb144.py -o build/q06/bb.qasm --schedule build/q06/ring24.schedule.json \
+    --steady-state                              # a reset before every check
+python Codesign/scripts/esm_check.py build/q06/bb.qasm   # measures exactly the stabilizers?
+ocaml/_build/default/bin/qccdc_cli.exe rotate build/q06/bb.qasm \
+    --arch build/ring144_24v.expanded.json --placement build/q06/ring24.placement.json \
+    -o build/q06/bb_sched
+```
+
+| `bb144_esm` on `ring144_24v`, 24 ancillas | stride layout, round-robin | code-aware schedule via `--placement` |
+|---|---:|---:|
+| batches / rotate hops | 546 / 776 | **55 / 253** |
+| round time, corrected model, cooled, steady-state resets | 520.4 ms | **69.8 ms** |
+| 20 rules · R10 by the proved checker | passed · passed | passed · passed |
+
+A placement can only change how many batches the round takes, never whether the program
+is right: `--placement` is checked (every docked qubit names a dock that exists, every
+rider a slot, nothing named twice) and everything downstream is untouched. What R10 does
+*not* check is whether the QASM is a correct syndrome-extraction circuit — a scheduler
+that interleaves X and Z checks freely can emit one that measures the wrong operators,
+and three of four packings tried did. `esm_check.py` tests that in stim, upstream of R10;
+`bb_schedule.py --phases xz` (the default) finishes every X check before the first Z
+contact, which makes it true by construction. See
+[`Codesign/findings/q06`](../Codesign/findings/q06-compiler-axis.md).
+
 Two of those results are ones the checker found rather than testing: the first rotation
 compiler emitted the ancilla Hadamards as pulses but never *witnessed* them (invisible to a
 tableau, which composes from what was emitted), and its scheduler reordered commuting `cx`
@@ -242,7 +281,7 @@ bash Compiler/run_c1.sh
 bash Compiler/run_c2.sh
 
 # the C3 gate: compile 4 circuits onto 6 architectures, insert cooling, check all
-# 23 rules, and decide R10: the proved checker holds the program to its
+# 28 rules, and decide R10: the proved checker holds the program to its
 # certificate, and the tableau composes its pulses back into the circuit
 bash Compiler/run_c3.sh
 

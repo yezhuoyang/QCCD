@@ -37,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("program", help="a .tsir.json")
     ap.add_argument("--arch", default="arch/ring144_24v.arch.json")
     ap.add_argument("--model", default="deck", choices=sorted(MODELS))
+    ap.add_argument("--table", default="qccdsim_jones")
+    ap.add_argument("--objective", default="fastest",
+                    choices=["fastest", "coolest", "balanced"])
     ap.add_argument("--expect-cost", type=float, default=None)
     ap.add_argument("--expect-steps", type=int, default=None)
     ap.add_argument("--check-metrics", action="store_true",
@@ -57,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
 
     arch_path = ROOT / args.arch if not Path(args.arch).is_absolute() else Path(args.arch)
     arch = Architecture.from_json(json.loads(arch_path.read_text(encoding="utf-8")))
-    model = MODELS[args.model]()
+    model = (corrected_model(args.table, objective=args.objective)
+             if args.model == "corrected" else MODELS[args.model]())
 
     rep = verify(prog, arch, model, check_metrics=args.check_metrics)
     res, rules = rep.result, rep.rules.summary()

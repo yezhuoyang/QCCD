@@ -1,7 +1,7 @@
 {
   "name": "ring144_24v",
   "schema_version": "0.3",
-  "description": "The shipped 24-ancilla design: a 2x72 rectangular rotation loop of 144 slots with 24 evenly spaced dock spurs to mid-line ancilla sites. The spurs are what make 24 of the 144 rail nodes degree 3, putting a junction on every rigid hop.",
+  "description": "The shipped 24-dock design: a 2x72 rectangular rotation loop of 144 slots with 24 evenly spaced dock spurs to mid-line traps. The spurs are what make 24 of the 144 rail nodes degree 3, putting a junction on every rigid hop.",
   "provenance": {
     "artifact": "visualizer_24_ancillas_24_junctions_standalone.html",
     "geometry_label": "W72_H2",
@@ -18,24 +18,12 @@
       "spam": false,
       "cool": true
     },
-    "ancilla": {
-      "capacity": 2,
-      "gate": true,
-      "spam": true,
-      "cool": true
-    },
     "trap": {
       "capacity": 2,
       "gate": true,
       "spam": true,
       "cool": true,
       "note": "general-purpose trap: gate, measure and cool all available"
-    },
-    "tfactory": {
-      "capacity": 4,
-      "gate": true,
-      "spam": true,
-      "cool": true
     },
     "load": {
       "capacity": 8,
@@ -301,7 +289,7 @@
             "split",
             "merge"
           ],
-          "note": "lifts one ion out of the rail's potential and inserts it into the ancilla trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
+          "note": "lifts one ion out of the rail's potential and inserts it into the dock trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
         },
         {
           "id": "undock",

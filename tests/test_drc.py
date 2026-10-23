@@ -636,7 +636,7 @@ def test_rf_to_dc_now_measures_against_g_rf_and_not_the_mask_rule(surface):
 # ------------------------------------------------------- discipline: not a rule
 
 def test_nothing_here_became_a_verifier_rule():
-    """27 rules, mirrored in `engine.js` and diffed at tolerance zero over every arch file.
+    """28 rules (R23 since 51a62aa), 21 of them mirrored in `engine.js` and diffed at tolerance zero over every arch file.
 
     A Python-only rule firing there is an automatic red harness, and a design rule is a
     different kind of claim anyway: it is about a technology's fabrication limits, which
@@ -645,7 +645,7 @@ def test_nothing_here_became_a_verifier_rule():
     from qccd.verify import rules as R
     from qccd.viz.render import BROWSER_SET
 
-    assert len(R.RULE_STATEMENTS) == 27 and len(R.RULE_SOURCES) == 27
+    assert len(R.RULE_STATEMENTS) == 28 and len(R.RULE_SOURCES) == 28
     assert len(BROWSER_SET) == 21 and set(BROWSER_SET) <= set(R.RULE_STATEMENTS)
     for name in RULES:
         assert name not in R.RULE_STATEMENTS

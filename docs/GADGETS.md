@@ -36,7 +36,7 @@ python -m qccd.gadget build PROGRAM.lq --design edited.gadget.json   # a design 
 | standard cell, hard macro | **leaf gadget**: a device fragment plus one TSIR per operation | the layout exists once per master; every instance shares it |
 | cell abstract (LEF: size, pins) | footprint, ports (boundary node, side, direction, role, width) | a parent sees only the abstract |
 | timing library (Liberty arcs) | **op characterization**: duration, per-ion port crossing times, n̄ at the port, gate counts, rule report | a parent schedules against it |
-| characterization, SPICE → `.lib` | replay the op's TSIR under the cost model and run all 27 rules | numbers come from the verifier, never from a formula written beside it |
+| characterization, SPICE → `.lib` | replay the op's TSIR under the cost model and run all 28 rules | numbers come from the verifier, never from a formula written beside it |
 | testbench with ideal sources and loads | **port stubs**: ideal ion source/sink sites just outside the boundary | a leaf is verified in isolation |
 | structural module, netlist | **composite gadget**: instances, channels, exported ports | recursion to any depth |
 | bus, bit order | **ion bundle** crossing one port in a declared order | pairing two bundles is a bit-order check (G1) |
@@ -47,7 +47,7 @@ python -m qccd.gadget build PROGRAM.lq --design edited.gadget.json   # a design 
 | descend / return | double-click an instance / `Esc` | the navigation model |
 | HLS scheduling and binding | logical program → gadget schedule: bind, schedule, route | `synth` (§7) |
 | DRAM refresh | syndrome extraction: a block that stops cycling loses its contents | the refresh constraint (G8) |
-| hierarchical DRC/LVS, flat sign-off | G-rules on the composition; flatten + 27 rules on small designs | the abstraction is checked, not trusted (§9, planned) |
+| hierarchical DRC/LVS, flat sign-off | G-rules on the composition; flatten + 28 rules on small designs | the abstraction is checked, not trusted (§9, planned) |
 
 ---
 
@@ -272,7 +272,7 @@ The beta proves its gadgets are *runnable*; it does not prove they compute anyth
 syndrome round is a contact schedule with no H layers or CNOT orientation, and its parities
 are single-shot bare ancillas. This section is the rebuild around correctness. It fixes one
 code, the rotated surface code at d = 3, the textbook home of lattice surgery, and makes
-every gadget a **place** whose program is checked twice: as hardware (the 27 rules, §5) and
+every gadget a **place** whose program is checked twice: as hardware (the 28 rules, §5) and
 as logic (below). Code: `qccd/gadget/{categories,surface,town,city,place_checks,verified,
 svg}.py`, `leaves/{bay,places}.py`, `logic/`.
 
@@ -658,7 +658,7 @@ slate. Change the palette in `theme.py` and both tools move together.
   breadcrumb; `Esc` goes up. A leaf level is the ion-by-ion view: its device, its ions by
   role, the instruction running (`visit.X1 · instruction 30/35 · cool`), with the op's TSIR
   instruction ticks on the timeline. **Studio page** (with `--studio`) opens the full
-  studio debugger for that op, with every listing and all 27 rules.
+  studio debugger for that op, with every listing and all 28 rules.
 - **Library.** A datasheet per master: thumbnail, ports, and every op's status, duration,
   instruction count, CX count, cools and peak n̄, with the rule report on hover.
 - **Edit.** A copy of the library: place instances from a palette, drag them (channels

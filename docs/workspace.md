@@ -23,7 +23,7 @@ bundle.
 | architecture document | `qccd/arch/device.py` (`Architecture.to_json/from_json`), `qccd/arch/schema.py` (`SCHEMA_VERSION = "0.3"`) | validation runs on load only |
 | browser export | `editor.js::documentRecord` (`kind: qccd.studio`), `qccd/__main__.py::cmd_open` | `cmd_open` trusted the browser-serialised `arch` |
 | program | `qccd/ir/tsir.py` (TSIR, stable instruction ids), `qccd/api.py::Program.apply_calls` | |
-| rules, replay | `qccd/verify/` (27 rules; passed/failed/skipped/partial) | R10 is decided outside Python |
+| rules, replay | `qccd/verify/` (28 rules; passed/failed/skipped/partial) | R10 is decided outside Python |
 | compiler | `Compiler/ocaml` → `qccdc_cli` (compile/rotate/parse), `Compiler/bridge/*.py` | Python has no QASM compiler |
 | proved checker | `Compiler/lean` → `qcheck` (`QCCDC.Cert.check_sound`), `Compiler/bridge/check_cert.py` (O1 + O2) | the certificate's FNV hashes were never checked; `circuit_ops` came from the compiler |
 | boards | `Codesign/scripts/small_codes.py`, `bb_studio.py`, `qccd/site/build.py` | maintainer scripts; no submission path; `tasks/*/task.json` is mostly unread metadata |

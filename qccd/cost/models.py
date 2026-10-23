@@ -311,6 +311,14 @@ class CorrectedModel(CostModel):
     # heats per se.
     length_scaling: bool = False
     pitch: float = 1.0
+    # The reviewers' variables (2026-09): a shuttle's time may be derived from a speed
+    # and the rail's physical length instead of read off the per-hop curve.  Both are
+    # opt-in; `pitch_um` is what one lattice unit measures on the chip (the technology's
+    # `nm_per_unit`, 225 um on the ETH preset), and `shuttle_speed_m_s` the transport
+    # speed along a straight rail in metres per second.  A junction's time stays the
+    # `junction_cross` curve point at its degree, which is the other variable asked for.
+    shuttle_speed_m_s: float | None = None
+    pitch_um: float = 225.0
     junction_min_degree: int = 3
     include_anomalous: bool = True
     name: str = "corrected"
@@ -351,10 +359,16 @@ class CorrectedModel(CostModel):
             hops = max(1, round(seg.length / self.pitch))
         else:
             hops = 1
+        us = shuttle.us * hops
+        if self.shuttle_speed_m_s:
+            # 1 m/s is 1 um/us, so the time along the rail is its length in um over the
+            # speed in m/s; the heating stays per hop, since excitation is time-dominated
+            # but calibrated per pitch (see length_scaling above)
+            us = float(seg.length) * self.pitch_um / float(self.shuttle_speed_m_s)
         charge = Charge(
             cost=float(hops),
             depth=1,
-            us=shuttle.us * hops,
+            us=us,
             quanta={"shuttle": shuttle.quanta * hops},
         )
         jp = self.junction_point(arch, arch.device.degree(dst))
@@ -542,6 +556,8 @@ class CorrectedModel(CostModel):
                 "include_anomalous": self.include_anomalous,
                 "length_scaling": self.length_scaling,
                 "pitch": self.pitch,
+                "shuttle_speed_m_s": self.shuttle_speed_m_s,
+                "pitch_um": self.pitch_um,
             }
         )
         return d
@@ -551,5 +567,16 @@ def deck_model(**kw) -> DeckModel:
     return DeckModel(**kw)
 
 
-def corrected_model(table: str = "qccdsim_jones", **kw) -> CorrectedModel:
-    return CorrectedModel(policy=OperatingPointPolicy(table, "fastest"), **kw)
+def corrected_model(table: str = "qccdsim_jones", objective: str = "fastest",
+                    **kw) -> CorrectedModel:
+    """The corrected model at one operating point.
+
+    `objective` picks which point of each primitive's `(us, quanta)` curve is taken:
+    `fastest` (the default everywhere in this repository), `coolest`, or `balanced`.
+    It is a real design choice on a table that offers a trade -- `transport_excitation`
+    separates a 30 us / 1.0 quanta split from a 40 us / 0.1 quanta one -- and a slower,
+    colder primitive can be cheaper overall, because a split that stays under R7's gate
+    budget saves the 300 us cool the cooling pass would otherwise insert before every
+    gate (`Codesign/findings/q06e`).
+    """
+    return CorrectedModel(policy=OperatingPointPolicy(table, objective), **kw)

@@ -98,12 +98,16 @@ def transport_loop(width: int = 6, height: float = 1.0, zone: str = "data",
         blurb=f"a closed {2*width}-slot orbit -- what a rigid rotation rotates")
 
 
-def ancilla_dock(depth: float = 1.0, zone: str = "ancilla", capacity: int = 2,
-                 spur_capacity: int = 1) -> Component:
-    """One ancilla trap on a spur.  Joining its pin to a rail makes that rail degree 3 --
-    which is what puts a junction charge on every rigid hop through it (R18)."""
+def spur_dock(depth: float = 1.0, zone: str = "trap", capacity: int = 2,
+              spur_capacity: int = 1) -> Component:
+    """One trap on a spur.  Joining its pin to a rail makes that rail degree 3 --
+    which is what puts a junction charge on every rigid hop through it (R18).
+
+    Named for the shape, not for what a code would keep here: this was `ancilla_dock` in
+    the zone `ancilla`, and neither word described any hardware -- the zone's flags were
+    `trap`'s exactly.  A spur ending in a trap is what the metal is."""
     return Component(
-        "ancilla_dock",
+        "spur_dock",
         [_site("a", 0.0, -float(depth), zone=zone, cap=capacity),
          _site("j", 0.0, 0.0, zone=zone, cap=capacity),
          _seg("v", "j", "a", length=depth, cap=spur_capacity, labels=("spur",))],
@@ -111,7 +115,7 @@ def ancilla_dock(depth: float = 1.0, zone: str = "ancilla", capacity: int = 2,
                 "spur_capacity": spur_capacity},
         pins=[{"name": "rail", "node": "j", "dir": [0, 1], "kind": "rail"}],
         requires={"zones": (zone,)},
-        blurb="an ancilla on a spur -- a dock, and a degree-3 node on the rail")
+        blurb="a trap on a spur -- a dock, and a degree-3 node on the rail")
 
 
 def gate_zone(zone: str = "gate", capacity: int = 2) -> Component:
@@ -195,7 +199,7 @@ VARIANT_DOMAINS: Mapping[str, Mapping[str, list]] = {
     "transport_loop": {"width": list(range(2, 25))},
     "grid_tile": {"a": [1, 2, 3, 4], "b": [1, 2, 3, 4]},
     "trap_junction": {"arms": [3, 4, 6]},
-    "ancilla_dock": {},
+    "spur_dock": {},
     "gate_zone": {},
     "loading_zone": {},
 }
@@ -206,7 +210,7 @@ VARIANT_DOMAINS: Mapping[str, Mapping[str, list]] = {
 CATALOG: Mapping[str, Callable[..., Component]] = {
     "linear_register": linear_register,
     "transport_loop": transport_loop,
-    "ancilla_dock": ancilla_dock,
+    "spur_dock": spur_dock,
     "gate_zone": gate_zone,
     "loading_zone": loading_zone,
     "trap_junction": trap_junction,

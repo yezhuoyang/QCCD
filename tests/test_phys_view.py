@@ -215,7 +215,13 @@ def test_the_page_is_still_self_contained_with_metal_in_it(tech, tmp_path, devic
     """`render_html` refuses a page that would fetch anything; metal must not change that."""
     html, _v, _m = _page(device, tech, tmp_path)
     assert "http://" not in html.replace("http://www.w3.org", "")
-    assert "https://" not in html
+    # what reaches the network is `render.FORBIDDEN`, the list `render_html` itself and
+    # test_viz_and_devices hold a page to.  A bare "https://" was the proxy for it until the
+    # Learn tab named the course's later parts at qccd.academy (bf79c78): a link the reader
+    # may follow, which the page never loads.
+    from qccd.viz.render import FORBIDDEN
+    for bad in FORBIDDEN:
+        assert bad not in html, bad
 
 
 # ------------------------------------------------------------------- what it may not be

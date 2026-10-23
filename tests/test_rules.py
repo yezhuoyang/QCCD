@@ -121,7 +121,7 @@ def test_every_rule_the_verifier_claims_has_a_statement_and_a_source():
     stmts = rule_statements()
     for rule in ("R1", "R2", "R3", "R4", "R4b", "R5", "R6", "R6b", "R7", "R7b",
                  "R7c", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15",
-                 "R16", "R17", "R18"):
+                 "R16", "R17", "R18", "R19", "R20", "R21", "R22"):
         assert stmts[rule]["statement"]
         assert stmts[rule]["sources"]
 

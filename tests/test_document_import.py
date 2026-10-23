@@ -295,7 +295,7 @@ def test_a_design_survives_export_and_reopening(studio, tmp_path):
 E.newCanvas({ name:'mine', template:null }); E.setMode('edit');
 E.setComponentParam('linear_register', 'n', 7);
 E.stampComponent('linear_register', 0, 0, 0);
-E.stampComponent('ancilla_dock', 2, -2, 0);
+E.stampComponent('spur_dock', 2, -2, 0);
 const doc = E.exportJson();
 const before = { n: N(), doc: JSON.parse(doc) };
 E.newCanvas({ name:'blank', template:null }); E.setMode('edit');

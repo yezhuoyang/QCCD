@@ -60,6 +60,20 @@ def test_set_site_capacity_rejects_nonsense():
         m.set_site_capacity("nope", 3)
 
 
+def test_set_zone_rejects_a_zone_that_holds_nothing():
+    """`set_zone(capacity=0)` used to be accepted and inert: the zone recorded 0 while its
+    sites kept their old capacity (`resolve_capacities` skips a zero), and the file loaded."""
+    m = Machine.ring(8, 2, 2, name="cap")
+    before = m.capacity_of("S0")
+    for bad in (0, -1, 0.5):
+        with pytest.raises(ValueError, match="at least one ion"):
+            m.set_zone("data", capacity=bad)
+    assert m.capacity_of("S0") == before
+    assert m.arch.zone_types["data"]["capacity"] == before
+    m.set_zone("data", capacity=3)                       # a real retune still lands
+    assert m.capacity_of("S0") == 3
+
+
 def test_capacity_is_reported_per_site():
     m = Machine.ring(8, 2, 0, name="cap").set_site_capacity("S3", 9)
     assert m.summary()["capacity_histogram"] == {2: 15, 9: 1}
@@ -124,8 +138,13 @@ def test_one_cycle_moves_as_many_ions_as_there_are():
 
 
 def _two_rails(k: int):
-    """A ladder whose two rails can be driven independently, with k control pathways."""
-    m = Machine.ladder(12, rungs=4, highways=0, name="rails")
+    """A ladder whose two rails can be driven independently, with k control pathways.
+
+    Rungs only at the ends (spacing 12), so no rail node is a junction: every ion here
+    shifts one place, and with rungs every 4 (T4, B4, T8, B8 at degree 3) four of them came
+    to rest ON a junction, which R23 (51a62aa) refuses -- a junction is crossed in one move,
+    not stood on.  The rungs were never what these tests are about."""
+    m = Machine.ladder(12, rungs=12, highways=0, name="rails")
     m.declare_class("shift_right", type="shift", orbit="TOP", delta=1)
     m.declare_class("shift_left", type="shift", orbit="BOTTOM", delta=-1)
     ctl = dict(m.arch.control)

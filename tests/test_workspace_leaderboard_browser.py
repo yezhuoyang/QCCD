@@ -58,13 +58,15 @@ def world(tmp_path, monkeypatch):
     while not server.started:
         time.sleep(0.05)
     monkeypatch.setenv("QCCD_OFFICIAL_URL", f"http://127.0.0.1:{port}")
-    # an earlier entry by someone else, so the ranking has a row that is not ours
+    # an earlier entry by someone else, so the ranking has a row that is not ours -- and a
+    # SLOWER one, so ours ranks #1: the starter tests at 2.13 ms today, past the 1.95 ms
+    # this row used to carry
     now = time.time()
     svc.db.execute("INSERT INTO submissions(id, uploader, task, task_digest, bundle_digest, archive_sha256, visibility, "
                    "display_name, status, created_at, credit) VALUES('os_x','u_x','ghz4@1',?,'sha256:x','x','public',"
                    "'Racetrack 8','eligible',?, 'Grace Hopper')", (svc.releases["ghz4@1"].digest, now - 86400))
     svc.db.execute("INSERT INTO reports(id, submission, evaluator_version, evaluator_policy, report_digest, report, eligible, "
-                   "rank_value, created_at) VALUES('or_x','os_x','x',?,'d','{}',1,1.95,?)", (svc.evaluator_policy, now))
+                   "rank_value, created_at) VALUES('or_x','os_x','x',?,'d','{}',1,5.0,?)", (svc.evaluator_policy, now))
     stop = threading.Event()
 
     def site_and_worker():

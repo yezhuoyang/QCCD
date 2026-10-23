@@ -15,12 +15,12 @@ and will be *consumed*, not reimplemented:
 |---|---|---|
 | architecture graph + primitive curves | `qccd/arch/` | done, 9 devices, expands to explicit nodes/segments/loops |
 | **TSIR — the hardware instruction format** | `qccd/ir/tsir.py` | done, 7 instruction types, JSON round-trip |
-| replay + 23 rules | `qccd/verify/` | done, and adversarially reviewed |
+| replay + 28 rules | `qccd/verify/` | done, and adversarially reviewed |
 | cost models (combinatorial, µs, quanta) | `qccd/cost/` | done, two tables |
 | a compiler | `qccd/compile/pipeline.py` | **BB-code-only, closed-loop-only**, 7 passes |
 
 So the target instruction set is **already defined and already evaluable**. A compiled program is a
-`.tsir.json`; `qccd.verify.verify(prog, arch, model)` replays it, checks 23 hardware rules and
+`.tsir.json`; `qccd.verify.verify(prog, arch, model)` replays it, checks 28 hardware rules and
 prices it. That is the "Program that can be accepted by the Hardware and being evaluated" from the
 brief, and it exists.
 
@@ -544,7 +544,7 @@ Compiler/
     solve.py                   UNTRUSTED z3/pysat bridge: SMT-LIB/DIMACS in, model JSON out
   bridge/
     export_arch.py             expanded .arch.json for OCaml
-    check_tsir.py              run qccd.verify on emitted TSIR, report all 23 rules
+    check_tsir.py              run qccd.verify on emitted TSIR, report all 28 rules
   bench/
     *.qasm                     ghz, qft, bb144_esm, hgp225_esm, random Clifford
   docs/
@@ -854,7 +854,7 @@ also proved to implement its circuit.
 ## 11.85 The verification matrix
 
 `python Compiler/bridge/run_matrix.py` — every example on every shipped architecture,
-compiled, cooled, checked against all 23 rules, and R10 decided by the proved checker.
+compiled, cooled, checked against all 28 rules, and R10 decided by the proved checker.
 
 ```
 81 (circuit, architecture) pairs

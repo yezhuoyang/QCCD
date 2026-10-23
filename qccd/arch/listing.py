@@ -475,8 +475,13 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
     if mode in ("generator", "patch"):
         params = _nondefault_params(dev)
         sig = _kwd(params)
-        zone_refs = sorted({v for k, v in dev.params.items()
-                            if k.endswith("_zone") and isinstance(v, str)})
+        # EVERY zone type the architecture declares, in declaration order -- not only
+        # the ones the generator's `*_zone` parameters name.  The seal carries NAMES and
+        # `set_zone` retunes each one after it; a zone the seal did not name is one no
+        # site added later can be placed in (`d.site` is hoisted above the seal), which
+        # is what refused the studio's first click on "Trapping site" on every shipped
+        # page.  Same split as `engine.js::documentStatements`.
+        zone_refs = list(arch.zone_types)
         if tmpl:
             # `sig` is EMPTY when every generator parameter is at its default, and
             # `f"({sig}, name=...)"` would then emit `Machine.ring(, name=...)`, which
@@ -582,15 +587,28 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
                         "kwargs": {"closed": loop.closed, "kind": loop.kind,
                                    "note": loop.note}},
                   refs=loop.nodes, editable=True)
-        zone_refs = sorted({n.zone_type for n in dev.nodes.values() if n.zone_type})
+        # EVERY zone type, in declaration order -- not only the ones a node already uses.
+        # `d.site(..., zone=...)` is a builder statement hoisted ABOVE the seal, so a zone
+        # the seal does not name is one no site added later can use: with `zones=[]` the
+        # studio's first click on "Trapping site" was refused on every shipped page.  The
+        # seal carries NAMES; `set_zone` retunes each one after it, which is legal for a
+        # zone that already exists.  Same split as `engine.js::documentStatements`, and
+        # declaration order because `serialize` keeps it.
+        zone_refs = list(arch.zone_types)
         b.add("call", "geometry",
               (f"m = Machine.from_device(d.build(), name={_lit(arch.name)}, "
                f"template={_lit(tmpl)})") if tmpl else
               (f"m = Machine.blank_device(d.build(), name={_lit(arch.name)}, "
                f"zones={_lit(zone_refs)})"),
               target="device",
-              call={"method": "blank_device" if not tmpl else "from_device",
-                    "args": [], "kwargs": {"name": arch.name, "template": tmpl}})
+              # THE RECORD SAYS WHAT THE TEXT SAYS.  It used to carry `{name, template}`
+              # for both seals, so the browser replayed `blank_device` with no `zones`
+              # at all while the printed line declared five -- two representations of
+              # one truth, in the exact record the editor is built on (the same defect
+              # `args=[dev.generator]` above fixed for the generator seal).
+              call={"method": "from_device" if tmpl else "blank_device", "args": [],
+                    "kwargs": ({"name": arch.name, "template": tmpl} if tmpl
+                               else {"name": arch.name, "zones": zone_refs})})
     if arch.description or arch.provenance:
         prov = _kwd(arch.provenance) if arch.provenance else ""
         b.call("geometry", "describe",

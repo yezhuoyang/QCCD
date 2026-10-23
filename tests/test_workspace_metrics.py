@@ -21,6 +21,14 @@ from qccd.workspace.metrics import compute_metrics
 REPO = Path(__file__).resolve().parents[1]
 
 
+def _inside(p: Path) -> bool:
+    try:
+        Path(p).resolve().relative_to(REPO.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
 def _cases():
     """Every published entry whose device and cooled program are on disk (the manifest names
     both: `arch`, and `prefix` + `.cooled.tsir.json`)."""
@@ -32,6 +40,12 @@ def _cases():
         for m in json.loads(man.read_text(encoding="utf-8")):
             nums = m.get("numbers") or {}
             cooled = Path(str(m.get("prefix", "")) + ".cooled.tsir.json")
+            # IN THIS CHECKOUT.  The manifest names its artifacts by absolute path, so a
+            # second checkout on the same machine found the FIRST checkout's (newer)
+            # artifacts and held them to its own (older) manifest: twelve reds that were a
+            # comparison between two trees.
+            if not (_inside(cooled) and _inside(Path(m["arch"]))):
+                continue
             if nums.get("T_source") == "replay" and "T_jones" in nums and cooled.exists() and Path(m["arch"]).exists():
                 out.append(pytest.param({"arch": m["arch"], "cooled": str(cooled)}, nums, id=f"{code}:{m['key']}"))
     return out[:12]

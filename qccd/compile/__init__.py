@@ -1,7 +1,8 @@
 """Layer 5 -- the compilation pipeline.  PLAN §7.
 
-Implemented so far: pass 6, cooling insertion.  Placement, interaction order, routing,
-SIMD aggregation, operating-point selection and event scheduling are later milestones.
+Implemented so far: pass 6, cooling insertion, and the uniformising pass that makes
+every transport cycle one waveform (R22).  Placement, interaction order, routing, SIMD
+aggregation, operating-point selection and event scheduling are later milestones.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from .cooling import ION_LOSS_ROUND_TRIPS, CoolingPolicy, CoolingResult, insert_
 from .oddeven import odd_even_sort_program
 from .pipeline import CompilePolicy, CompileResult, compile_code
 from .programs import BUILDERS, build, from_deck, odd_even, rotate, walk
+from .uniform import SplitRecord, UniformReport, make_uniform
 
 __all__ = [
     "ION_LOSS_ROUND_TRIPS",
@@ -26,4 +28,7 @@ __all__ = [
     "odd_even",
     "rotate",
     "walk",
+    "SplitRecord",
+    "UniformReport",
+    "make_uniform",
 ]

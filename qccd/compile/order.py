@@ -132,6 +132,7 @@ def bind_dynamic(
     *,
     order: str = "widest_first",
     max_active: int | None = None,
+    t_start: int = 0,
 ) -> Binding:
     """Event-driven sweep: advance the rotation, start whatever can start.
 
@@ -139,6 +140,11 @@ def bind_dynamic(
     `active_contact_limit`, which is a real hardware bound on simultaneous contacts and
     not a scheduling preference. Setting it to 1 serializes the whole round, which is
     what makes it a usable knob for showing that a benchmark can tell good from bad.
+
+    ``t_start`` is the absolute offset the sweep begins at, so a second phase (the Z
+    checks after the X checks) can continue the same monotone rotation: alignment is a
+    property of the absolute offset modulo the loop, so a phase cannot simply be
+    shifted after the fact.
 
     Earliest-finish list scheduling is the wrong rule here, and measurably so -- it does
     worse than the fixed-wave baseline it is supposed to beat. The reason is the
@@ -166,8 +172,8 @@ def bind_dynamic(
     busy_until = {d: -1 for d in docks}
     limit = max_active if max_active else len(docks)
     out: list[Assignment] = []
-    t = 0
-    guard = capacity * (len(checks) + 2)
+    t = t_start
+    guard = t_start + capacity * (len(checks) + 2)
     while unassigned and t < guard:
         for d in docks:
             if busy_until[d] >= t or not unassigned:
@@ -220,18 +226,19 @@ def bind_fixed_waves(
     capacity: int,
     *,
     waves: int = 6,
+    t_start: int = 0,
 ) -> Binding:
     """The shipped rule: one dock per check for a whole wave, waves run in turn.
 
     Kept as the baseline the dynamic binding is measured against -- and because PLAN §7.1
     is explicit that a mismatched policy makes any architecture look bad, so the
-    comparison has to be able to run both.
+    comparison has to be able to run both.  ``t_start`` as in `bind_dynamic`.
     """
     groups: list[list[Check]] = [[] for _ in range(waves)]
     for i, c in enumerate(checks):
         groups[i % waves].append(c)
     out: list[Assignment] = []
-    cursor = 0
+    cursor = t_start
     for group in groups:
         wave_end = cursor
         for j, c in enumerate(group):

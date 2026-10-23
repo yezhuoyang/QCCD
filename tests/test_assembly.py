@@ -1,7 +1,7 @@
 """Placing parts is not assembling a machine.
 
 Two components dropped at neighbouring coordinates are two disconnected devices that
-happen to be drawn near each other.  What makes an `ancilla_dock` a dock is that its pin
+happen to be drawn near each other.  What makes a `spur_dock` a dock is that its pin
 is JOINED to a rail -- and the moment it is, that rail node becomes degree 3, which is
 what makes the cost model charge a junction on every rigid hop through it (R18).  The
 degree histogram is therefore the honest test of whether an assembly happened: parts
@@ -74,7 +74,7 @@ def test_attaching_a_dock_raises_the_rails_degree(studio, tmp_path):
     charges a junction crossing for it."""
     r = drive(studio, tmp_path, SETUP + """
 const before = DEG(loop.instance + '.t1');
-const a = E.attachComponent('ancilla_dock', 1, -1.5, 2, 'rail', loop.instance + '.t1');
+const a = E.attachComponent('spur_dock', 1, -1.5, 2, 'rail', loop.instance + '.t1');
 console.log(JSON.stringify({ ok: a.ok !== false, before: before,
   after: DEG(loop.instance + '.t1'), problems: E.problems().length }));
 """)
@@ -89,7 +89,7 @@ def test_a_failed_attach_leaves_nothing_behind(studio, tmp_path):
     version of this rollback left two thirds of a dock on the canvas."""
     r = drive(studio, tmp_path, SETUP + """
 const before = N();
-const bad = E.attachComponent('ancilla_dock', 5, 5, 0, 'rail', 'NO_SUCH_NODE');
+const bad = E.attachComponent('spur_dock', 5, 5, 0, 'rail', 'NO_SUCH_NODE');
 console.log(JSON.stringify({ refused: bad.ok === false, before: before, after: N(),
   codes: (bad.problems||[]).map(p => p.code) }));
 """)
@@ -104,7 +104,7 @@ def test_an_assembled_machine_loads_in_python_with_the_join_intact(studio, tmp_p
     what was built."""
     out = tmp_path / "asm.arch.json"
     drive(studio, tmp_path, SETUP + """
-E.attachComponent('ancilla_dock', 1, -1.5, 2, 'rail', loop.instance + '.t1');
+E.attachComponent('spur_dock', 1, -1.5, 2, 'rail', loop.instance + '.t1');
 fs.writeFileSync(process.argv[3], E.exportJson());
 console.log(JSON.stringify({ nodes: N() }));
 """, out=out)
@@ -125,7 +125,7 @@ def test_parts_placed_side_by_side_are_not_an_assembly(studio, tmp_path):
     components placed near each other and NOT joined leave every node at degree <= 2."""
     out = tmp_path / "loose.arch.json"
     drive(studio, tmp_path, SETUP + """
-E.stampComponent('ancilla_dock', 4, -1.5, 2);      // placed, never joined
+E.stampComponent('spur_dock', 4, -1.5, 2);      // placed, never joined
 fs.writeFileSync(process.argv[3], E.exportJson());
 console.log(JSON.stringify({ nodes: N() }));
 """, out=out)

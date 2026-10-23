@@ -184,13 +184,13 @@ def test_the_variant_label_carries_integers_only(name, blocks):
 
 
 def test_the_label_distinguishes_the_two_components_that_share_a_pin_node(blocks):
-    """`ancilla_dock` and `trap_junction` both have `pins[0].node == 'j'`. Recovering a
+    """`spur_dock` and `trap_junction` both have `pins[0].node == 'j'`. Recovering a
     placed instance's identity by probing for that node cannot tell them apart -- which
     is a bug the browser has today."""
-    a = V.variant_label("ancilla_dock", blocks["ancilla_dock"], {})
+    a = V.variant_label("spur_dock", blocks["spur_dock"], {})
     t = V.variant_label("trap_junction", blocks["trap_junction"], {"arms": 4})
     assert a != t
-    assert build("ancilla_dock").pins[0]["node"] == build("trap_junction").pins[0]["node"]
+    assert build("spur_dock").pins[0]["node"] == build("trap_junction").pins[0]["node"]
 
 
 # -- the shape of what gets shipped ----------------------------------------------------
