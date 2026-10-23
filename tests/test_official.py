@@ -200,6 +200,48 @@ def test_a_new_template_redraws_every_entry_page_without_grading_again(svc, loca
 
 
 @needs_toolchain
+def test_stored_bundles_lose_the_submitters_checkout_path_and_are_graded_again(svc, local, tmp_path):
+    """A bundle uploaded before c230f11 carried the submitter's checkout in its program's
+    provenance (`meta.prov.root`), served to anyone.  `thin_stored_provenance` stores it thinned
+    as a bundle is written today, under its new digest, deletes the old archive, and queues the
+    submission so its report names the bundle the server keeps (the user, 2026-10-23)."""
+    from starlette.testclient import TestClient
+    from qccd.workspace.bundle import BUNDLE_FILES, canonical_bytes, extract_archive
+    old = tmp_path / "old"
+    extract_archive(local["archive"], old)
+    prog = json.loads((old / BUNDLE_FILES["program"]).read_text(encoding="utf-8"))
+    prog.setdefault("meta", {}).setdefault("prov", {})["root"] = "C:\\Users\\someone\\QCCD-wt\\integ"
+    data = canonical_bytes(prog)
+    (old / BUNDLE_FILES["program"]).write_bytes(data)
+    man = json.loads((old / "manifest.json").read_text(encoding="utf-8"))
+    man["files"]["program"].update(digest="sha256:" + __import__("hashlib").sha256(data).hexdigest(), bytes=len(data))
+    (old / "manifest.json").write_bytes(canonical_bytes(man))
+    old_archive = archive_bundle(read_bundle(old))
+    up = svc.authenticate(svc.create_uploader("jo"), "10.0.0.1")
+    sid = svc.submit(up, old_archive, task="ghz4@1", visibility="public")["submission_id"]
+    assert process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR)
+    c = TestClient(create_app(svc))
+    assert b"someone" in c.get(f"/v1/submissions/{sid}/files/program.tsir.json").content
+    before = svc.db.one("SELECT bundle_digest, archive_sha256 FROM submissions WHERE id=?", (sid,))
+
+    assert [x["id"] for x in svc.thin_stored_provenance()["changed"]] == [sid]          # a dry run lists it
+    assert svc.db.one("SELECT bundle_digest FROM submissions WHERE id=?", (sid,))["bundle_digest"] == before["bundle_digest"]
+    r = svc.thin_stored_provenance(apply=True)
+    assert r["skipped"] == [] and [x["id"] for x in r["changed"]] == [sid]
+    after = svc.db.one("SELECT bundle_digest, archive_sha256 FROM submissions WHERE id=?", (sid,))
+    assert after["bundle_digest"] != before["bundle_digest"]
+    assert not (svc.artifacts / f"{before['archive_sha256']}.zip").exists()
+    assert b"someone" not in c.get(f"/v1/submissions/{sid}/files/program.tsir.json").content
+    assert b"Users" not in c.get(f"/v1/submissions/{sid}/files/program.tsir.json").content
+    # graded again: the current report is eligible and names the bundle the server keeps
+    while process_one(svc, tmp_path / "spool", inline=True, releases=RELEASES_DIR):
+        pass
+    rep = svc.report(sid, None)
+    assert rep["eligibility"]["eligible"] and rep["bundle"]["digest"] == after["bundle_digest"]
+    assert svc.thin_stored_provenance()["changed"] == []                                  # nothing left to thin
+
+
+@needs_toolchain
 def test_wrong_task_and_tampered_archives_are_refused(svc, local):
     up = svc.authenticate(svc.create_uploader("bob"), "10.0.0.1")
     z = zipfile.ZipFile(io.BytesIO(local["archive"]))

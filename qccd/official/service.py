@@ -35,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import tempfile
@@ -585,6 +586,62 @@ class OfficialService:
     def tasks(self) -> list:
         return [r.summary() for r in self.releases.values()]
 
+    #: a local path in a document a reader can download (a checkout's user folder)
+    _LOCAL_PATH = re.compile(r"[A-Za-z]:(?:\\\\|\\|/)(?:Users|home)(?:\\\\|\\|/)|/(?:Users|home)/")
+
+    def thin_stored_provenance(self, *, apply: bool = False) -> dict:
+        """Every stored design bundle with its programs' provenance thinned the way a bundle is
+        written today (`bundle._publishable`: no checkout path, no file/line/args, only which pass
+        emitted each instruction).  A bundle uploaded before c230f11 carried the submitter's
+        checkout as `meta.prov.root`, and `/files/program.tsir.json` served it to anyone (the
+        user, 2026-10-23: "I want them cleaned").  Nothing a grade reads changes; the bundle's
+        digest does.  With `apply`, each changed bundle is stored under its new digest, its
+        submission points at it, the old archive is deleted, and the submission is queued to be
+        graded again, so every report names the bundle the server keeps."""
+        from ..workspace.bundle import archive_bundle, extract_archive, read_bundle, write_bundle
+        out: dict = {"checked": 0, "changed": [], "skipped": []}
+        rows = self.db.all("SELECT id, uploader, task, bundle_digest, archive_sha256 FROM submissions "
+                           "ORDER BY created_at")
+        for r in rows:
+            src = self.artifacts / f"{r['archive_sha256']}.zip"
+            if self.is_suite(r["task"]) or not src.exists():
+                continue
+            out["checked"] += 1
+            with tempfile.TemporaryDirectory() as td:
+                extract_archive(src.read_bytes(), Path(td) / "old")
+                b = read_bundle(Path(td) / "old")
+                d = b.docs
+                nb = write_bundle(Path(td) / "new", task_id=b.manifest["task"]["id"],
+                                  task_digest=b.manifest["task"]["digest"], device=d["device"],
+                                  program=d["program"], certified_program=d.get("certified_program"),
+                                  certificate=d.get("certificate"), presentation=d.get("presentation"),
+                                  provenance=b.manifest.get("provenance"))
+                if nb.digest == b.digest:
+                    continue
+                entry = {"id": r["id"], "old": b.digest, "new": nb.digest}
+                left = [n for n in nb.manifest["files"].values()
+                        if self._LOCAL_PATH.search((nb.root / n["path"]).read_text(encoding="utf-8"))]
+                if left:
+                    out["skipped"].append({**entry, "why": f"a path is left in {left[0]['path']}"})
+                    continue
+                data = archive_bundle(nb)
+            clash = self.db.one("SELECT id FROM submissions WHERE uploader=? AND task=? AND bundle_digest=? AND id<>?",
+                                (r["uploader"], r["task"], entry["new"], r["id"]))
+            if clash:
+                out["skipped"].append({**entry, "why": f"the thinned bundle is {clash['id']}'s"})
+                continue
+            if apply:
+                sha = hashlib.sha256(data).hexdigest()
+                (self.artifacts / f"{sha}.zip").write_bytes(data)
+                self.db.execute("UPDATE submissions SET bundle_digest=?, archive_sha256=? WHERE id=?",
+                                (entry["new"], sha, r["id"]))
+                self.db.execute("INSERT INTO jobs(id, submission, status, attempts, created_at) "
+                                "VALUES(?,?, 'queued', 0, ?)", ("oj_" + secrets.token_hex(8), r["id"], _now()))
+                if not self.db.one("SELECT id FROM submissions WHERE archive_sha256=?", (r["archive_sha256"],)):
+                    src.unlink(missing_ok=True)
+            out["changed"].append(entry)
+        return out
+
     def regrade(self, task: str) -> int:
         """Queue every submission of `task` again (e.g. after an evaluator policy change).
         Old reports stay; they are superseded only when the new report is recorded."""
@@ -799,7 +856,7 @@ def main(argv=None) -> int:
     import uvicorn
     ap = argparse.ArgumentParser(prog="python -m qccd.official.service")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for n in ("serve", "add-uploader", "regrade"):
+    for n in ("serve", "add-uploader", "regrade", "thin-provenance"):
         p = sub.add_parser(n)
         p.add_argument("--db", default=os.environ.get("QCCD_OFFICIAL_DB", "sqlite:///official/official.db"))
         p.add_argument("--releases", default=os.environ.get("QCCD_OFFICIAL_RELEASES",
@@ -814,6 +871,9 @@ def main(argv=None) -> int:
             p.add_argument("--quota", type=int, default=50)
         if n == "regrade":
             p.add_argument("task")
+        if n == "thin-provenance":
+            p.add_argument("--apply", action="store_true",
+                           help="store the thinned bundles and queue them to be graded again (default: list them)")
     a = ap.parse_args(argv)
     svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(a.suites))
     if a.cmd == "add-uploader":
@@ -822,6 +882,11 @@ def main(argv=None) -> int:
     if a.cmd == "regrade":
         print(f"queued {svc.regrade(a.task)} regrade job(s)")
         return 0
+    if a.cmd == "thin-provenance":
+        r = svc.thin_stored_provenance(apply=a.apply)
+        print(json.dumps({"checked": r["checked"], "changed": len(r["changed"]), "skipped": r["skipped"],
+                          "applied": a.apply}))
+        return 0 if not r["skipped"] else 1
     if os.environ.get("QCCD_OFFICIAL_DEV") == "1" and a.host not in ("127.0.0.1", "localhost"):
         print("refusing: development mode binds to loopback only", flush=True)
         return 2
