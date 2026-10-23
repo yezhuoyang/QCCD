@@ -2043,8 +2043,11 @@ def build(out: Path) -> int:
     # the compiled companion Part D steps through.  A lesson with `page:` set runs on a
     # COMPILED page, and says so; it links to this one by bare file name, beside the
     # studio.  Built here from the shipped artifact because the browser cannot compile.
-    comp_tsir = ROOT / "Compiler" / "build" / "matrix" / "micro_grid9x9.cooled.tsir.json"
-    comp_qasm = ROOT / "Compiler" / "examples" / "micro.qasm"
+    # `Compiler/build/` is not in the repository; the copy under Compiler/examples/micro/ is
+    # the same program with its provenance root blanked (course.matrix_file).
+    from ..viz.course import MICRO_QASM, matrix_file
+    comp_tsir = matrix_file("micro_grid9x9.cooled.tsir.json")
+    comp_qasm = MICRO_QASM
     if comp_tsir.exists() and comp_qasm.exists():
         companion = out / "micro_grid9x9.html"
         qccd_main(["studio", "-o", str(companion),
