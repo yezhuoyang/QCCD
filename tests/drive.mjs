@@ -470,6 +470,11 @@ export const PAGE_HOOK = `
   ionMarks: () => { const o=[]; for(const i in IONP){ const c=IONP[i].c;
       if(!c || c.attrs.display==='none') continue; o.push([i,+c.attrs.cx,+c.attrs.cy,+c.attrs.r]); } return o; },
   drawAt: (f, ph) => { frame=f; phase=ph; draw(); },
+  // the hardware labels: the choice, what is drawn, and every label's text and display
+  hwLabels: () => ({ on: HWL, shown: HWL_SHOWN,
+    sites: Object.keys(HWT).map(id => [id, HWT[id].textContent, HWT[id].attrs.display !== 'none']),
+    ions: Object.keys(IONP).map(i => [i, IONP[i].h.textContent, IONP[i].h.attrs.display !== 'none']) }),
+  setHwLabels: (on) => setHwLabels(on),
   nframes: () => P.frames.length,
   // the Machine pane, so a test can check that the R1-R18 verdicts are honest after an
   // edit rather than left standing as a green tick for a check that did not run

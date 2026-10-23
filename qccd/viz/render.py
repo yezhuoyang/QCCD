@@ -1671,6 +1671,11 @@ textarea.src.out{min-height:120px;opacity:.85}
         <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
         <option value="role" selected>role</option>
         <option value="heat">heating</option></select>
+        <!-- HARDWARE LABELS: the names a hardware programme is written in, on the picture.
+             On by default and on every page (here, not in #etools, which the view-only
+             embeds hide); the choice is remembered (`qccd.studio.hwlabels`). -->
+        <button class="tgl on" id="tLabels" aria-pressed="true" data-hint="hwlabels"
+                title="the names a hardware program uses, beside every site, junction and ion">Labels</button>
       </div>
       <div class="ebar" id="ebar">
         <span class="etools" id="etools">
@@ -2421,15 +2426,58 @@ function buildStatic(S){
   // ON TOP OF EVERY NODE.  A figure past the bar's end lands where the next junction is
   // drawn, and junctions drawn later in the loop covered all of "13/16" but its first digit.
   for (const id in CAPTXT) gNode.append(CAPTXT[id]);
+  // HARDWARE LABELS: the stage's own scene only (`reg.HWT`), never a palette avatar.  A
+  // site's name sits across the bar from its ions, past its electrodes, on the side that
+  // reads downwards (or rightwards on an upright bar); a junction's below and right of
+  // its square.
+  const HWT_ = S.reg.HWT;
+  if(HWT_){
+    const fs = Math.min(12, Math.max(2.5, 0.18*L.g));
+    for (const n of A.nodes){
+      const x=px(n), y=py(n);
+      let tx, ty, anchor='middle';
+      if(n.kind==='junction' || (n.cap||0)===0){
+        tx = x + L.r_junc + 0.15*fs; ty = y + L.r_junc + 0.55*fs; anchor='start';
+      } else {
+        const ax=AXIS[n.id]||{ux:1,uy:0};
+        let nx=-ax.uy, ny=ax.ux;
+        if(ny < -1e-9 || (Math.abs(ny) <= 1e-9 && nx < 0)){ nx=-nx; ny=-ny; }
+        const d = Math.max(L.site_t/2, (L.pad_off||0) + (L.pad_t||0)/2) + 0.6*fs;
+        tx = x + nx*d; ty = y + ny*d;
+        if(Math.abs(nx) > 0.9){ anchor='start'; tx = x + nx*(d - 0.6*fs) + 0.2*fs; }
+      }
+      const t=el('text',{x:tx, y:ty, 'text-anchor':anchor, 'dominant-baseline':'central',
+        'font-size':fs, 'font-weight':650, fill:C.ink||'#1f2937', 'fill-opacity':0.82,
+        stroke:'#ffffff', 'stroke-width':fs*0.28, 'stroke-linejoin':'round',
+        'paint-order':'stroke', 'pointer-events':'none'});
+      t.textContent = n.id;
+      if(HWL_SHOWN === false) t.setAttribute('display','none');
+      gNode.append(t); HWT_[n.id]=t;
+    }
+  }
 }
 
 // The stage's own scene.  `A` and `L` are MUTATED IN PLACE by the editor's `rebuild()`
 // and never reassigned, so one object literal stays live across every edit -- which is
 // why nothing here is destructured at construction.
+// HARDWARE LABELS (the user, 2026-10-23): a hardware programme names sites, junctions and
+// ions -- `p.shuttle("d0", ["S0", "J0", "A0"])` -- and the picture showed none of those
+// names unless the pointer rested on the mark.  Every node's id now sits beside it and
+// every ion's name beside the ion, ON by default; `#tLabels` hides them (remembered).
+// `HWL` is the reader's choice, `HWL_SHOWN` what is drawn: a label too small to read at
+// this zoom (a 144-site ring at fit) steps aside until you zoom in.  Declared HERE, before
+// the first `buildStatic`, which reads them.
+let HWL = true;
+try { HWL = localStorage.getItem('qccd.studio.hwlabels') !== '0'; } catch(e) { HWL = true; }
+let HWL_SHOWN = null, HWL_LIVE = false;   // LIVE: the page has drawn once; until then nothing redraws
+const HWT = {};
+// the labels' size in user units: a fraction of the lattice step, so a label sits between
+// its own bar's electrodes (to 0.40 g) and the next row's (from 0.60 g)
+const hwlFont = () => Math.min(12, Math.max(2.5, 0.18*L.g));
 const STAGE = {A, L, AXIS, role:ROLE, px, py, byId:nodeById,
                into:{loop:gLoop, seg:gSeg, elec:gElec, node:gNode},
                reg:{SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
-                    NODEEL, CAPTXT}};
+                    NODEEL, CAPTXT, HWT}};
 buildStatic(STAGE);
 
 // slot offsets, in px along the trap axis, for k ions resting on one site
@@ -2703,10 +2751,17 @@ function ionMarks(ion){
         k: el('line',{'stroke-linecap':'round','pointer-events':'none', display:'none'}),
         c: el('circle',{stroke:C.ion_stroke, 'stroke-width':L.sw_halo}),
         t: el('text',{'text-anchor':'middle','dominant-baseline':'central',
-             fill:C.ion_stroke,'font-weight':700,'pointer-events':'none'}) };
+             fill:C.ion_stroke,'font-weight':700,'pointer-events':'none'}),
+        // the ion's HARDWARE LABEL: its whole name, as a programme writes it, beside it
+        // dark ink on a white halo: outside the ion, the ion's own white outline colour
+        // (which the number inside it uses) would be white on white
+        h: el('text',{'text-anchor':'middle','dominant-baseline':'central',
+             fill:C.ink||'#1f2937','font-weight':700,'pointer-events':'none', display:'none',
+             stroke:'#ffffff','stroke-linejoin':'round','paint-order':'stroke'}) };
     p.t.textContent = ion.replace(/^[da]/,'');
+    p.h.textContent = ion;
     gWell.append(p.w); gWell.append(p.s); gWell.append(p.k); gWell.append(p.l);
-    gIon.append(p.c); gTop.append(p.t);
+    gIon.append(p.c); gTop.append(p.t); gTop.append(p.h);
     IONP[ion]=p;
   }
   return p;
@@ -2760,7 +2815,7 @@ function clearTransients(){
 // programme and drawable on the current device.
 function drawInvalid(){
   clearTransients();
-  for(const ion in IONP){ const p=IONP[ion]; hide(p.w); hide(p.c); hide(p.t); }
+  for(const ion in IONP){ const p=IONP[ion]; hide(p.w); hide(p.c); hide(p.t); hide(p.h); }
   for(const c of HALO) hide(c);
   for(const id in CAPTXT) CAPTXT[id].textContent =
     '–/' + ((nodeById[id]||{}).cap ?? '?');
@@ -2924,7 +2979,7 @@ function draw(){
   // --- ions ----------------------------------------------------------------------
   const nMoving=Object.keys(flying).length;
   const wells = nMoving<=40;   // a 144-ion rigid rotation must not become one indigo slab
-  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);hide(p.s);hide(p.l);hide(p.k);} }
+  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);hide(p.h);hide(p.s);hide(p.l);hide(p.k);} }
   for(const ion in live){
     const pt=live[ion], p=ionMarks(ion);
     // WHO IS BEING ACTED ON.  `acts` carries every operand tuple; `pairs` is kept as the
@@ -3016,11 +3071,19 @@ function draw(){
       p.k.setAttribute('stroke-width',Math.max(1.3, r*0.55));
       p.k.setAttribute('opacity',0.5); show(p.k);
     } else hide(p.k);
-    if(showLabels && r >= 6){
+    if(HWL_SHOWN){
+      // the hardware label replaces the number inside the ion: one name, the whole name,
+      // just above it (its site's label is across the bar, below)
+      const fs=hwlFont();
+      p.h.setAttribute('x',pt.x); p.h.setAttribute('y',pt.y - r - 0.6*fs);
+      p.h.setAttribute('font-size',fs); p.h.setAttribute('stroke-width',fs*0.28);
+      show(p.h); hide(p.t);
+    } else if(showLabels && r >= 6){
+      hide(p.h);
       const fs=Math.min(0.66*r, 1.5*r/Math.max(2, p.t.textContent.length));
       p.t.setAttribute('x',pt.x); p.t.setAttribute('y',pt.y);
       p.t.setAttribute('font-size',fs); show(p.t);
-    } else hide(p.t);
+    } else { hide(p.t); hide(p.h); }
   }
 
   const c=cumAt(frame);
@@ -3210,8 +3273,41 @@ function placeScaleBar(){
 const applyVB=()=>{
   svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`);
   placeScaleBar();
+  hwlRefresh();
 };
+// HARDWARE LABELS, drawn or not: the reader's choice (`HWL`), and only while the label is
+// big enough on screen to read -- 7 css px, at this zoom and this box.  Called on every
+// view change; it redraws only when the answer flips.  Per-element `display`, never a
+// class, so the harness reads what the browser shows.
+function hwlLegible(){
+  const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  const w = (r && r.width) || svg.clientWidth || L.W, h = (r && r.height) || svg.clientHeight || L.H;
+  const k = Math.min(w/Math.max(1e-9, VB.w), h/Math.max(1e-9, VB.h));
+  return hwlFont()*k >= 7;
+}
+function hwlRefresh(force){
+  // a resize during start-up can arrive before the view box exists (`VB` is declared
+  // below its first callers); nothing is drawn yet then, and the initial call settles it
+  let on;
+  try { on = !!HWL && hwlLegible(); } catch(e) { return HWL_SHOWN; }
+  if(on === HWL_SHOWN && !force) return on;
+  HWL_SHOWN = on;
+  for(const id in HWT) (on ? show : hide)(HWT[id]);
+  const b = document.getElementById('tLabels');
+  if(b){ b.className = 'tgl' + (HWL ? ' on' : ''); b.setAttribute('aria-pressed', HWL ? 'true' : 'false'); }
+  if(HWL_LIVE) draw();
+  return on;
+}
+// the toggle's one verb: `setHwLabels()` flips, `setHwLabels(true|false)` sets
+function setHwLabels(on){
+  HWL = on === undefined ? !HWL : !!on;
+  try { localStorage.setItem('qccd.studio.hwlabels', HWL ? '1' : '0'); } catch(e) { /* no store */ }
+  hwlRefresh(true);
+  return {on: HWL, shown: HWL_SHOWN};
+}
+document.getElementById('tLabels').onclick = () => setHwLabels();
 placeScaleBar();
+hwlRefresh(true);
 // FIT never draws more than ~1.5 css px per user unit: a two-site canvas used to fill the
 // whole box, 141x47 px per pill.  Past that the viewBox widens around the device's centre
 // instead, and the device sits at a size a hand can still aim at.
@@ -3312,6 +3408,7 @@ function sizeStage(){
   // the bar and its caption are sized in SCREEN pixels, so a resize changes them even
   // though the viewBox has not moved
   placeScaleBar();
+  hwlRefresh();                  // the box changed size: a label may now fit, or not
   if(was!==showLabels) draw();
 }
 // THE ZOOM ITSELF, callable without an Event -- the same rule the editor's gestures
@@ -4871,6 +4968,7 @@ sizeLists();
 
 relayout();
 fit();
+HWL_LIVE = true;
 draw();
 </script>
 __EDITOR__

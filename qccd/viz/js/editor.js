@@ -492,7 +492,7 @@ function clearGroup(g) {
 function rebuildStatic() {
   clearGroup(gLoop); clearGroup(gSeg); clearGroup(gElec); clearGroup(gNode);
   var maps = [SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
-              NODEEL, CAPTXT];
+              NODEEL, CAPTXT, HWT];
   for (var m = 0; m < maps.length; m++) {
     for (var k in maps[m]) if (has(maps[m], k)) delete maps[m][k];
   }
@@ -518,6 +518,8 @@ function rebuildStatic() {
   // the bar is in user units and the viewBox just moved; and a "no rail between A and B"
   // badge is a claim about the device that was, so a new device clears it
   if (typeof placeScaleBar === 'function') placeScaleBar();
+  // the new nodes' hardware labels follow the reader's choice and this zoom
+  if (typeof hwlRefresh === 'function') hwlRefresh(true);
   if (typeof clearNoRail === 'function') clearNoRail();
   // A MEASUREMENT IS ABOUT A GEOMETRY.  Every path here is a geometry change -- an edit,
   // an undo, the true-scale toggle -- so the two picked points no longer mean what they
@@ -4548,6 +4550,7 @@ var HINTS = {
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
   'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
+  'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big device they step aside while too small to read, and come back as you zoom in.' },
   'truescale': { t: 'True scale', d: 'On (the default): one screen pixel is the same distance across and down, so an angle you measure on the screen is the angle on the chip. Off: a long thin device is stretched to fill the canvas \u2014 easier to see, and wrong about every angle. The bar at the bottom left of the canvas always says what a length on screen is worth.' },
   'scalebar': { t: 'Scale bar', d: 'The bracket is as long, on the chip, as the distance written beside it, at the zoom you are looking at, and it re-measures as you zoom. It sits under the picture so it never covers the device.' },
   'mode': { t: 'Sketch \u00b7 Parts', d: 'Two ways to design. Sketch: draw the shape the ions travel on \u00b7 a rectangle, a circle, a line, a polyline \u00b7 and the release fills it with trapping sites one lattice unit apart, declares the orbit if the shape closed, and adds a junction where the new rail meets an existing one. Parts: place a site, a junction or a rail one at a time, which is what the course teaches and what detail work needs. Remembered between visits; a canvas with nothing on it opens on Sketch.', k: 'd' },
