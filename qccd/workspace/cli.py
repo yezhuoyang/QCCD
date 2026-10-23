@@ -19,6 +19,7 @@
     qccd publish --submission SUB [--visibility public]   review + approve at this terminal
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
+    qccd export [--design NAME | --run ID]   save a design's (or a run's) files into exports/<name>/
     qccd ler --experiment surface3 [--design NAME] [--shots N]
                                              the logical error rate of a design (memory experiment,
                                              reference compiler, the device's noise model)
@@ -49,8 +50,8 @@ from pathlib import Path
 __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
-            "publish", "import", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login", "logout",
-            "grade")
+            "publish", "import", "export", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login",
+            "logout", "grade")
 
 
 def _root(args) -> Path:
@@ -484,6 +485,17 @@ def cmd_import(a) -> int:
     return 0
 
 
+def cmd_export(a) -> int:
+    """Save a design's (or a run's) files into exports/<name>/ of the workspace."""
+    info = _svc(a)
+    body = {"what": "run" if a.run else "design", "design": a.design, "run_id": a.run, "name": a.name}
+    r = _call(info, "POST", "/api/export", {k: v for k, v in body.items() if v})
+    print(r["note"] + ":")
+    for f in r["files"]:
+        print(f"  {f['file']}  ({f['about']})")
+    return 0
+
+
 def cmd_grade(a) -> int:
     """Grade a submission bundle here, with the reference evaluator the official server runs: a
     leaderboard entry's bundle.zip (or a bundle folder), checked again on your own computer.  It
@@ -815,7 +827,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", default="design")
     p.add_argument("--empty", action="store_true", help="start from a blank canvas, not the release's starter")
     for name, fn in (("studio", None), ("web", None), ("serve", None), ("status", None), ("stop", None), ("validate", None),
-                     ("compile", None), ("submit", None), ("publish", None), ("import", None), ("leaderboard", None)):
+                     ("compile", None), ("submit", None), ("publish", None), ("import", None), ("export", None),
+                     ("leaderboard", None)):
         q = sub.add_parser(name)
         q.add_argument("--root", default=None)
         if name == "studio":
@@ -852,6 +865,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             q.add_argument("path")
             q.add_argument("--preview", action="store_true")
+        if name == "export":
+            q.add_argument("--design", default=None, help="the design's name (default: the main design)")
+            q.add_argument("--run", default=None, help="a run instead: its id, as the chat's run card links it")
+            q.add_argument("--name", default=None, help="the folder's name under exports/ (default: the design's)")
     p = sub.add_parser("grade", help="grade a submission bundle (a leaderboard entry's bundle.zip) here, "
                                      "with the official reference evaluator")
     p.add_argument("bundle", help="the bundle .zip, or a bundle folder")
@@ -940,7 +957,7 @@ def main(argv=None) -> int:
           "status": cmd_status,
           "stop": cmd_stop,
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
-          "import": cmd_import, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
+          "import": cmd_import, "export": cmd_export, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench,
           "login": cmd_login, "logout": cmd_logout, "grade": cmd_grade}[a.cmd]
     from .core import WorkspaceError

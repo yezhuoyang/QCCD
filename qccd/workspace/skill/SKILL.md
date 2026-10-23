@@ -66,6 +66,21 @@ so neither of you can silently overwrite the other.
   side-by-side view in Studio (both designs animate on one clock). Summarise the verdict and
   the biggest difference in your answer.
 
+## Saving files for the person
+
+- **To save a design or a run as files, use `qccd_export`**: `what="design"` (the design by its
+  name, optionally a revision) writes `<name>.studio.json` (Studio opens it again with `qccd import`),
+  `<name>.arch.json` (the architecture file the compiler reads) and, when the design has a compiled
+  program, that program and its certificate; `what="run"` with the run's id writes its device,
+  circuit, compiled program, certificate, step times and performance report. Each export is a NEW
+  folder `exports/<name>/` in the workspace, with a README.txt; tell the person where it is.
+- Your own file tools and shell in Studio only READ, unless the person allowed more:
+  `qccd_get_context` -> `files.agent_may_write`. If they ask you to write other files and it is
+  off, say that they can turn on "Let the agent save files in this folder" in the chat's menu
+  (the ... button); never tell them to change Codex, Claude or Cursor settings. When it is on, you
+  may create and change files in the workspace folder, never in its `.qccd` folder (the
+  workspace's database), and the design still changes only through the QCCD tools.
+
 ## Website pages
 
 The person can open any qccd.academy page through the workspace (`qccd web`); every page has

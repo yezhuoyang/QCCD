@@ -164,7 +164,8 @@ class ClaudeBridge:
                 "how": "a new claude -p process" if fresh else "the kept-alive claude -p process"}
 
     def _key(self) -> tuple:
-        return (self.conversation, self.model, self.effort, str(self.state.ws.root))
+        return (self.conversation, self.model, self.effort, str(self.state.ws.root),
+                self.state.ws.settings()["agent_files"])
 
     def _ensure_proc(self) -> subprocess.Popen:
         """The running process, if it was started with what the conversation needs now; else a new one.
@@ -183,9 +184,10 @@ class ClaudeBridge:
         cfg.parent.mkdir(parents=True, exist_ok=True)
         cfg.write_text(json.dumps({"mcpServers": {"qccd": mcp_server_config(ws.root, "claude", session_id=self.sid)}}),
                        encoding="utf-8")
+        tools, allowed, denied = run_tools(ws.settings()["agent_files"])
         args = [self.exe, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                "--mcp-config", str(cfg), "--strict-mcp-config", "--tools", BUILTIN_TOOLS, "--disable-slash-commands",
-                "--permission-mode", "dontAsk", "--allowedTools", ALLOWED, "--disallowedTools", DENIED]
+                "--mcp-config", str(cfg), "--strict-mcp-config", "--tools", tools, "--disable-slash-commands",
+                "--permission-mode", "dontAsk", "--allowedTools", allowed, "--disallowedTools", denied]
         args += ["--resume", self.conversation] if self.started else ["--session-id", self.conversation]
         args += ["--append-system-prompt", SYSTEM_NOTE]
         if self.model:
@@ -400,6 +402,16 @@ class ClaudeBridge:
             self.state.worker.kick()
 
 
+def run_tools(agent_files: str) -> tuple[str, str, str]:
+    """`--tools`, `--allowedTools`, `--disallowedTools` for the person's file setting.  `write`
+    adds Claude Code's own file tools, for files in this folder only (relative to the run's cwd,
+    the workspace) and never the workspace's database (`.qccd/`); there is no shell either way."""
+    if agent_files != "write":
+        return BUILTIN_TOOLS, ALLOWED, DENIED
+    return (BUILTIN_TOOLS + ",Edit,Write", ALLOWED + " Edit(./**) Write(./**)",
+            " ".join(t for t in DENIED.split() if t not in ("Edit", "Write")) + " Edit(./.qccd/**) Write(./.qccd/**)")
+
+
 def connect_claude(state, body: dict) -> dict:
     """A NEW Claude Code conversation bound to this workspace (called for the person)."""
     from ..app import WorkspaceError, new_id
@@ -470,12 +482,15 @@ def _same_folder(a, b) -> bool | None:
         return None
 
 
-def reattach_claude_sessions(state) -> list:
-    """After a service restart: the same conversations go on (each run resumes by id)."""
+def reattach_claude_sessions(state, only: str | None = None) -> list:
+    """After a service restart: the same conversations go on (each run resumes by id).  `only`:
+    just that one (the person opened it from the chat's list); without it, idle ones stay idle."""
     out = []
     exe = find_claude()
     for s in state.ws.sessions():
         if s["client"] != "claude" or s["mode"] != "appserver" or s["id"] in state.bridges:
+            continue
+        if (only and s["id"] != only) or (not only and s["status"] in ("idle", "closed")):
             continue
         ra = (s.get("capabilities") or {}).get("reattach") or {}
         if not exe or not ra.get("conversation"):

@@ -357,7 +357,38 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/conversation", write=False)
     def conversation(request, actor, _):
+        # `session` (present, even empty): only that conversation, with its unsent draft
+        if "session" in request.query_params:
+            return ws.conversation(limit=q(request, "limit", 40, int), session_id=q(request, "session") or None,
+                                   scoped=True)
         return ws.conversation(limit=q(request, "limit", 40, int))
+
+    @route("GET", "/api/conversations", write=False)
+    def conversations(request, actor, _):
+        # `new_chat_draft`: the person was writing a first message in a new chat (a page opens on it)
+        d = ws.conversation_draft("new")
+        return {"conversations": ws.conversations(), "new_chat_draft": bool(d and d["text"].strip())}
+
+    # ------------------------------------------------------------------ settings, files
+
+    @route("GET", "/api/settings", write=False)
+    def get_settings(request, actor, _):
+        return ws.settings()
+
+    @route("POST", "/api/settings", human_only=True)
+    def set_settings(request, actor, b):
+        # every bridge reads it when it starts a turn: Codex as the turn's sandbox, Claude and
+        # Cursor as the tools their next run is given
+        return ws.set_settings(b, actor)
+
+    @route("POST", "/api/export")
+    def export(request, actor, b):
+        ws._check_actor_may_write(actor, b.get("origin_prompt_id"))
+        rev = b.get("revision")
+        if rev is not None and (not isinstance(rev, int) or isinstance(rev, bool)):
+            raise WorkspaceError("bad_request", "revision is a whole number", status=422)
+        return ws.export_files(str(b.get("what", "")), actor, design=b.get("design"), revision=rev,
+                               run_id=b.get("run_id"), name=b.get("name"))
 
     @route("GET", "/api/programs", write=False)
     def programs(request, actor, _):
@@ -633,7 +664,10 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("PATCH", "/api/views/{view_id}", human_only=True)
     def patch_view(request, actor, b):
+        prev = ws.view(request.path_params["view_id"]).get("target_session") if "target_session" in b else None
         v = ws.update_view(request.path_params["view_id"], b, actor)
+        if "target_session" in b:
+            _leave(state, prev, v.get("target_session"))
         if b.get("closed") is False or "target_session" in b:       # a page (re)opened, or it picked an agent
             _warm_for(state, v)
         return v
@@ -689,6 +723,45 @@ def create_app(state: ServiceState) -> FastAPI:
     @route("POST", "/api/sessions/{sid}/resume", human_only=True)
     def resume(request, actor, b):
         return ws.resume_session(request.path_params["sid"], actor)
+
+    @route("POST", "/api/sessions/{sid}/open", human_only=True)
+    def open_session(request, actor, b):
+        """The person opened a conversation from the chat's list: their page talks to it now, and a
+        conversation that was idle goes on, on the same thread (Codex) or conversation (Claude,
+        Cursor)."""
+        sid = request.path_params["sid"]
+        if ws.session(sid)["deleted"]:
+            raise WorkspaceError("deleted", "that conversation was deleted (restore it first)", status=409)
+        v = None
+        if b.get("view_id"):
+            prev = ws.view(str(b["view_id"])).get("target_session")
+            v = ws.update_view(str(b["view_id"]), {"target_session": sid}, actor)
+            _leave(state, prev, sid)
+        # the conversation is shown either way; its agent goes on when it can (and says why not)
+        try:
+            out = _resume_bridge(state, sid)
+        except WorkspaceError as exc:
+            out = {"resumed": False, "why": str(exc)}
+        if v is not None:
+            _warm_for(state, v)
+        return {"session": ws.session(sid), "view": v, **out}
+
+    @route("POST", "/api/sessions/{sid}/rename", human_only=True)
+    def rename_session(request, actor, b):
+        return {"session": ws.rename_session(request.path_params["sid"], str(b.get("title", "")), actor)}
+
+    @route("POST", "/api/sessions/{sid}/delete", human_only=True)
+    def delete_session(request, actor, b):
+        sid = request.path_params["sid"]
+        s = ws.delete_session(sid, actor)
+        br = state.bridges.pop(sid, None)
+        if br is not None:
+            br.close()                    # its process ends; Codex keeps the thread in its own history
+        return {"session": s}
+
+    @route("POST", "/api/sessions/{sid}/restore", human_only=True)
+    def restore_session(request, actor, b):
+        return {"session": ws.restore_session(request.path_params["sid"], actor)}
 
     @route("POST", "/api/sessions/codex/connect", human_only=True)
     def codex_connect(request, actor, b):
@@ -1086,6 +1159,55 @@ def _kick(state: ServiceState) -> None:
     w = getattr(state, "worker", None)
     if w is not None:
         w.kick()
+
+
+def _leave(state: ServiceState, prev: str | None, now: str | None) -> None:
+    """A page stopped talking to `prev`.  When no other open page talks to it and it is not in
+    the middle of a turn, it goes idle and its runtime stops -- a Codex conversation is an app
+    server process of its own, and a chat's list may hold dozens -- until it is opened again."""
+    if not prev or prev == now:
+        return
+    ws = state.ws
+    try:
+        s = ws.session(prev)
+    except Exception:
+        return
+    if s["mode"] != "appserver" or s["status"] != "connected" or s["deleted"]:
+        return
+    if any(v.get("target_session") == prev for v in ws.views()):
+        return
+    br = state.bridges.get(prev)
+    if br is not None and getattr(br, "active_turn", None):
+        return                             # it finishes this turn; it is idled the next time it is left
+    ws.idle_session(prev)
+    br = state.bridges.pop(prev, None)
+    if br is not None:
+        br.close()
+
+
+def _resume_bridge(state: ServiceState, sid: str) -> dict:
+    """Start the runtime of a conversation that has none here (idle, or after a restart)."""
+    br = state.bridges.get(sid)
+    if br is not None and br.connected:
+        return {"resumed": False}
+    s = state.ws.session(sid)
+    if s["mode"] != "appserver":
+        return {"resumed": False, "note": "this conversation's agent runs outside Studio"}
+    if s["client"] == "codex":
+        from .agents.codex import reattach_codex_sessions as again
+    elif s["client"] == "claude":
+        from .agents.claude import reattach_claude_sessions as again
+    elif s["client"] == "cursor":
+        from .agents.cursor import reattach_cursor_sessions as again
+    else:
+        return {"resumed": False}
+    r = (again(state, only=sid) or [{}])[0]
+    if not r.get("reattached"):
+        raise WorkspaceError("cannot_resume", f"this conversation cannot go on here: {r.get('why') or 'its agent is not available'}",
+                             status=409)
+    if getattr(state, "worker", None):
+        state.worker.kick()
+    return {"resumed": True}
 
 
 def _warm_for(state: ServiceState, view: dict | None) -> None:

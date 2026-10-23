@@ -51,7 +51,21 @@ _TRANSITIONS = {
 }
 
 _TEXT_LIMIT = 8000
+#: what the agent may do with files in the workspace folder (`settings()["agent_files"]`)
+AGENT_FILES = ("read", "write")
 _SMALL = Limits(max_bytes=512 * 1024, max_depth=24, max_items=20000, max_string=_TEXT_LIMIT)
+
+
+def _files_brief(ws) -> dict:
+    write = ws.settings()["agent_files"] == "write"
+    return {"exports": "exports", "agent_may_write": write,
+            "how": ("To save a design's or a run's files where the person can open them, use qccd_export: it writes "
+                    "them into the exports folder of this workspace. "
+                    + ("The person also lets your own file tools and shell create and change files in this folder."
+                       if write else
+                       "Your own file tools and shell may only read here. If the person wants you to write other "
+                       "files, they turn on 'Let the agent save files in this folder' in the chat's menu (the ⋯ "
+                       "button); do not tell them to change Codex, Claude or Cursor settings."))}
 
 
 def _now() -> float:
@@ -116,8 +130,8 @@ class CollabMixin:
             args.append(1 if patch["follow_agent"] else 0)
         if "target_session" in patch:
             sid = patch["target_session"]
-            if sid is not None:
-                self.session(sid)
+            if sid is not None and self.session(sid)["deleted"]:
+                raise WorkspaceError("deleted", "that conversation was deleted (restore it first)", status=409)
             sets.append("target_session=?")
             args.append(sid)
         if "branch" in patch:
@@ -219,11 +233,14 @@ class CollabMixin:
         d = dict(r)
         d["capabilities"] = loads(d["capabilities"])
         d["write_fence"] = bool(d["write_fence"])
+        d["deleted"] = d.get("deleted_at") is not None
         return d
 
-    def sessions(self) -> list:
-        return [self.session(r["id"]) for r in
-                self.store.all("SELECT id FROM sessions ORDER BY last_seen DESC")]
+    def sessions(self, *, include_deleted: bool = False) -> list:
+        """The agent sessions, most recently seen first; a conversation the person deleted is left
+        out (it stays in the database, so Undo can bring it back)."""
+        q = "SELECT id FROM sessions " + ("" if include_deleted else "WHERE deleted_at IS NULL ") + "ORDER BY last_seen DESC"
+        return [self.session(r["id"]) for r in self.store.all(q)]
 
     def session_status(self, session_id: str, status: str, *, detail: str = "",
                        runtime_ref: str | None = None, capabilities: Mapping | None = None) -> dict:
@@ -237,6 +254,135 @@ class CollabMixin:
                                                "detail": detail[:300], "client": s["client"],
                                                "mode": s["mode"]}, s["branch"])
         return self.session(session_id)
+
+    # ------------------------------------------------------------------ settings
+
+    def settings(self) -> dict:
+        """The person's choices for this workspace.  `agent_files`: `read` (the default: the agent
+        reads files, and saves them only through `qccd_export`, which writes into `exports/`) or
+        `write` (its own file tools and shell may also create and change files in this folder)."""
+        v = self.store.get_meta("agent_files")
+        return {"agent_files": v if v in AGENT_FILES else "read"}
+
+    def set_settings(self, patch: Mapping, actor: Mapping) -> dict:
+        from .core import WorkspaceError
+        if actor.get("kind") != "human":
+            raise WorkspaceError("forbidden", "only the person changes what the agent may do", status=403)
+        if "agent_files" in patch:
+            v = patch["agent_files"]
+            if v not in AGENT_FILES:
+                raise WorkspaceError("bad_request", f"agent_files is one of {', '.join(AGENT_FILES)}", status=422)
+            with self.store.tx() as db:
+                db.execute("INSERT INTO meta(key, value) VALUES('agent_files', ?) "
+                           "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (v,))
+                self._emit(db, "settings.updated", {"agent_files": v}, None)
+        return self.settings()
+
+    # ------------------------------------------------------------------ conversations
+    #
+    # A CONVERSATION IS ONE AGENT SESSION.  The chat shows the messages sent to the session its
+    # page talks to (`views.target_session`); the list shows every session that is not deleted,
+    # named by the person or by its first message.  A session the person moved away from goes
+    # `idle` -- its runtime is stopped (a Codex app server is a process per conversation) and it
+    # is resumed, on the same thread, when the person opens it again.
+
+    def conversations(self) -> list:
+        """The chat's list: every conversation, the most recently active first."""
+        stats = {}
+        for r in self.store.all(
+                "SELECT COALESCE(json_extract(body, '$.target_session'), '') AS sid, COUNT(DISTINCT id) AS n, "
+                "MIN(created_at) AS first_at, MAX(updated_at) AS last_at FROM notes "
+                "WHERE status IN ('sent', 'posted') AND kind IN ('prompt', 'comment') GROUP BY sid"):
+            stats[r["sid"]] = dict(r)
+        drafts = {r["sid"] for r in self.store.all(
+            "SELECT json_extract(body, '$.draft_for') AS sid FROM notes WHERE status='draft' "
+            "AND json_extract(body, '$.draft_for') IS NOT NULL AND json_extract(body, '$.text') != ''")}
+        working = {r["sid"] for r in self.store.all(
+            "SELECT DISTINCT COALESCE(json_extract(n.body, '$.target_session'), '') AS sid FROM work w "
+            "JOIN notes n ON n.id = w.prompt_id WHERE w.state IN ('pending', 'working') AND n.status='sent'")}
+        targeted = {}
+        for v in self.views():
+            if v.get("target_session") and not v.get("closed"):
+                targeted.setdefault(v["target_session"], []).append(v["id"])
+        out = []
+        for s in self.sessions():
+            st = stats.get(s["id"]) or {}
+            out.append({"session_id": s["id"], "client": s["client"], "mode": s["mode"], "label": s.get("label") or "",
+                        "title": s.get("title") or self._first_words(s["id"]) or "New chat",
+                        "named": bool(s.get("title")), "created_at": s["created_at"],
+                        "last_at": max(st.get("last_at") or 0, s["created_at"]),
+                        "messages": int(st.get("n") or 0), "status": s["status"],
+                        "working": s["id"] in working, "draft": s["id"] in drafts,
+                        "views": targeted.get(s["id"], [])})
+        # what was sent while no agent was connected: one conversation of its own, when there is any
+        if stats.get(""):
+            st = stats[""]
+            out.append({"session_id": None, "client": None, "mode": None, "label": "",
+                        "title": "Sent without an agent", "named": False, "created_at": st["first_at"],
+                        "last_at": st["last_at"], "messages": int(st["n"]), "status": "none",
+                        "working": "" in working, "draft": "" in drafts, "views": []})
+        out.sort(key=lambda c: c["last_at"], reverse=True)
+        return out
+
+    def _first_words(self, session_id: str) -> str:
+        r = self.store.one("SELECT body FROM notes WHERE status IN ('sent', 'posted') AND kind IN ('prompt', 'comment') "
+                           "AND json_extract(body, '$.target_session') = ? ORDER BY created_at LIMIT 1", (session_id,))
+        if r is None:
+            return ""
+        t = " ".join(str(loads(r["body"]).get("text") or "").split())
+        return t if len(t) <= 60 else t[:57].rstrip() + "..."
+
+    def conversation_draft(self, session_id: str | None) -> dict | None:
+        """The message the person was writing in this conversation and has not sent."""
+        r = self.store.one("SELECT id, version, body FROM notes WHERE status='draft' AND kind='prompt' "
+                           "AND json_extract(body, '$.draft_for') = ? ORDER BY updated_at DESC LIMIT 1",
+                           (session_id or "",))
+        if r is None:
+            return None
+        return {"prompt_id": r["id"], "version": r["version"], "text": loads(r["body"]).get("text", "")}
+
+    def rename_session(self, session_id: str, title: str, actor: Mapping) -> dict:
+        from .core import WorkspaceError
+        if actor.get("kind") != "human":
+            raise WorkspaceError("forbidden", "only a person names a conversation", status=403)
+        s = self.session(session_id)
+        t = " ".join(str(title or "").split())[:120]
+        with self.store.tx() as db:
+            db.execute("UPDATE sessions SET title=? WHERE id=?", (t or None, session_id))
+            self._emit(db, "session.updated", {"session_id": session_id, "status": s["status"], "title": t},
+                       s["branch"])
+        return self.session(session_id)
+
+    def delete_session(self, session_id: str, actor: Mapping) -> dict:
+        """The person deleted a conversation: it leaves the list and the chat, what it still had
+        queued is cancelled, and a page talking to it talks to none.  The designs it changed keep
+        their history (each change says who made it), and Undo (`restore_session`) brings it back."""
+        from .core import WorkspaceError
+        if actor.get("kind") != "human":
+            raise WorkspaceError("forbidden", "only a person deletes a conversation", status=403)
+        s = self.session(session_id)
+        now = _now()
+        with self.store.tx() as db:
+            db.execute("UPDATE sessions SET deleted_at=?, status='closed' WHERE id=?", (now, session_id))
+            db.execute("UPDATE deliveries SET state='cancelled', last_error='the conversation was deleted', "
+                       "updated_at=? WHERE session_id=? AND state IN ('queued', 'failed')", (now, session_id))
+            db.execute("UPDATE views SET target_session=NULL WHERE target_session=?", (session_id,))
+            self._emit(db, "session.deleted", {"session_id": session_id, "client": s["client"]}, s["branch"])
+        return self.session(session_id)
+
+    def restore_session(self, session_id: str, actor: Mapping) -> dict:
+        from .core import WorkspaceError
+        if actor.get("kind") != "human":
+            raise WorkspaceError("forbidden", "only a person restores a conversation", status=403)
+        s = self.session(session_id)
+        with self.store.tx() as db:
+            db.execute("UPDATE sessions SET deleted_at=NULL, status='idle' WHERE id=?", (session_id,))
+            self._emit(db, "session.updated", {"session_id": session_id, "status": "idle", "restored": True},
+                       s["branch"])
+        return self.session(session_id)
+
+    def idle_session(self, session_id: str, detail: str = "the person opened another conversation") -> dict:
+        return self.session_status(session_id, "idle", detail=detail)
 
     def heartbeat(self, session_id: str) -> None:
         with self.store.lock:
@@ -389,6 +535,11 @@ class CollabMixin:
         for k in ("demonstration", "correction_of", "steer", "title"):
             if k in body:
                 out[k] = copy.deepcopy(body[k])
+        if "draft_for" in body:                       # the conversation the chat's unsent message belongs to
+            df = body["draft_for"]
+            if df is not None and (not isinstance(df, str) or len(df) > 64):
+                raise WorkspaceError("bad_request", "draft_for names a conversation (a session id, or '')", status=422)
+            out["draft_for"] = df or ""
         return out
 
     def send_prompt(self, actor: Mapping, *, prompt_id: str | None = None, body: Mapping | None = None,
@@ -557,12 +708,23 @@ class CollabMixin:
                 "work": dict(work) if work else None, "deliveries": dels, "replies": replies,
                 "links": links}
 
-    def conversation(self, *, limit: int = 40) -> dict:
+    def conversation(self, *, limit: int = 40, session_id: str | None = None, scoped: bool = False) -> dict:
         """Studio's chat, as one chronological stream: the person's messages, the agent's
         messages, and what the agent DID for each (a change with its revision, a run with its
-        time, a side-by-side comparison), plus which requests are still being worked on."""
-        rows = self.store.all("SELECT id FROM notes WHERE kind IN ('prompt','comment') AND version=1 "
-                              "ORDER BY created_at DESC LIMIT ?", (max(1, min(int(limit), 200)),))
+        time, a side-by-side comparison), plus which requests are still being worked on.
+
+        `scoped`: only the conversation with `session_id` (None: what was sent with no agent),
+        with the message the person was writing there and had not sent (`draft`)."""
+        lim = max(1, min(int(limit), 200))
+        if scoped:
+            rows = self.store.all(
+                "SELECT n.id FROM notes n WHERE n.kind IN ('prompt','comment') AND n.version=1 AND EXISTS "
+                "(SELECT 1 FROM notes m WHERE m.id = n.id AND m.status IN ('sent', 'posted') "
+                "AND COALESCE(json_extract(m.body, '$.target_session'), '') = ?) "
+                "ORDER BY n.created_at DESC LIMIT ?", (session_id or "", lim))
+        else:
+            rows = self.store.all("SELECT id FROM notes WHERE kind IN ('prompt','comment') AND version=1 "
+                                  "ORDER BY created_at DESC LIMIT ?", (lim,))
         items, working = [], []
         for r in reversed(rows):
             p = self.prompt(r["id"])
@@ -592,7 +754,11 @@ class CollabMixin:
                 items.append({"type": "notice", "prompt_id": p["prompt_id"], "text": p["work"]["note"],
                               "at": p["work"]["updated_at"]})
         items.sort(key=lambda i: i["at"])
-        return {"items": items, "working": working}
+        out = {"items": items, "working": working}
+        if scoped:
+            out["session_id"] = session_id
+            out["draft"] = self.conversation_draft(session_id)
+        return out
 
     def _link_item(self, link: Mapping) -> dict | None:
         kind, ref, at = link["kind"], link["ref"], link["created_at"]
@@ -1051,6 +1217,8 @@ class CollabMixin:
                 "board": view["state"].get("board")},
             # who a submission to the official leaderboard would be credited to; only the person signs in
             "account": _account_brief(self),
+            # files: qccd_export always writes into exports/; the agent's own tools only when the person allows
+            "files": _files_brief(self),
             "pages": self.pages()[:10],
             "session": None if sess is None else {
                 "session_id": sess["id"], "client": sess["client"], "mode": sess["mode"],

@@ -344,6 +344,84 @@ def test_the_chat_is_one_conversation(live, tmp_path):
     assert not any(out.get("logs", {}).get("a", []))                  # no console errors
 
 
+def test_conversations_new_open_rename_delete_and_drafts(live, tmp_path):
+    """Each agent session is a conversation of its own (2026-10-23): the chat shows the one its page
+    talks to, Chats lists them all, one opens with its own messages and the words you had typed
+    there, a rename and a delete (with Undo) show at once, a new chat starts empty, and a reload
+    comes back to the new chat with its unsent first message.  The two "agents" are pull sessions
+    registered over HTTP -- the door an MCP client uses -- so no real agent runs."""
+    root, info = live
+    base = f"http://127.0.0.1:{info['port']}"
+    sid = {}
+    for k in ("A", "B"):
+        sid[k] = service_request(info, "POST", "/api/sessions", {"client": "generic", "mode": "pull",
+                                                                 "label": f"Agent {k}"}, token="owner")["id"]
+    code = service_request(info, "POST", "/api/pair-code", {}, token="owner")["code"]
+    ready = ("window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && QCCD_LIVE.state().rev !== null "
+             "&& document.querySelector('#qcl-dock.qcl-chat')")
+    said = "QCCD_LIVE.chat().items.filter(function(i){ return i.type === 'user'; }).map(function(i){ return i.text; })"
+    box = "document.getElementById('qcl-text').value"
+    rows = "document.querySelectorAll('.qcl-chat-row')"
+    titles = "[].map.call(" + rows + ", function(r){ return r.querySelector('.qcl-chat-t').textContent; })"
+    typing = ("(function(t){ var ta = document.getElementById('qcl-text'); ta.value = t; "
+              "ta.dispatchEvent(new Event('input')); return 'typed'; })")
+    A, B = sid["A"], sid["B"]
+    steps = [
+        {"wait": ready + " && QCCD_LIVE.chats().target === '" + B + "'", "timeout": 40000, "stopOnFail": True},   # 0
+        {"eval": "QCCD_LIVE.chatSend('hello B').then(function(d){ return !!d; })"},                                  # 1
+        {"wait": said + ".join('|') === 'hello B'", "timeout": 10000},                                              # 2
+        {"eval": "QCCD_LIVE.openChat('" + A + "').then(function(){ return QCCD_LIVE.chats().target; })"},           # 3
+        {"wait": "QCCD_LIVE.chats().target === '" + A + "' && " + said + ".length === 0", "timeout": 10000},        # 4
+        {"eval": "QCCD_LIVE.chatSend('hello A').then(function(d){ return !!d; })"},                                  # 5
+        {"wait": said + ".join('|') === 'hello A'", "timeout": 10000},                                              # 6
+        {"eval": typing + "('unsent words')"},                                                                      # 7
+        {"wait": "QCCD_LIVE.chats().draft !== null", "timeout": 8000},                                              # 8 saved as you type
+        {"eval": "QCCD_LIVE.openChat('" + B + "').then(function(){ return 1; })"},                                   # 9
+        {"wait": "QCCD_LIVE.chats().target === '" + B + "' && " + box + " === '' && " + said + ".join('|') === 'hello B'",
+         "timeout": 10000},                                                                                         # 10
+        {"eval": "QCCD_LIVE.openChat('" + A + "').then(function(){ return 1; })"},                                   # 11
+        {"wait": "QCCD_LIVE.chats().target === '" + A + "' && " + box + " === 'unsent words'", "timeout": 10000},   # 12
+        {"eval": "QCCD_LIVE.toggleChats(true).then(function(){ return 1; })"},                                       # 13
+        {"wait": rows + ".length === 2", "timeout": 10000},                                                          # 14
+        {"eval": "JSON.stringify({titles: " + titles + ", cur: [].map.call(" + rows + ", function(r){ return r.classList.contains('cur'); }), "
+                 "composer: getComputedStyle(document.querySelector('.qcl-composer')).display, "
+                 "meta: (" + rows + "[0].querySelector('.qcl-note') || {}).textContent})"},                       # 15
+        {"shot": str(tmp_path / "chats.png")},                                                                       # 16
+        {"eval": "QCCD_LIVE.renameChat('" + A + "', 'My A').then(function(){ return 1; })"},                         # 17
+        {"wait": titles + "[0] === 'My A'", "timeout": 10000},                                                       # 18
+        {"eval": "QCCD_LIVE.deleteChat('" + B + "').then(function(){ return 1; })"},                                 # 19
+        {"wait": rows + ".length === 1 && [].some.call(document.querySelectorAll('#qcl-notice button'), "
+                 "function(b){ return b.textContent === 'Undo'; })", "timeout": 10000},                              # 20
+        {"eval": "[].filter.call(document.querySelectorAll('#qcl-notice button'), function(b){ return b.textContent === 'Undo'; })[0].click(); 1"},
+        {"wait": rows + ".length === 2", "timeout": 10000},                                                          # 22
+        {"eval": "QCCD_LIVE.newChat().then(function(){ return 1; })"},                                               # 23
+        {"wait": "QCCD_LIVE.chats().newChat && !QCCD_LIVE.chats().open && " + said + ".length === 0 && " + box + " === ''",
+         "timeout": 10000},                                                                                         # 24
+        {"eval": typing + "('a first message for a new chat')"},                                                    # 25
+        {"wait": "QCCD_LIVE.chats().draft !== null", "timeout": 8000},                                              # 26
+        {"open": "b", "url": f"{base}/studio"},                                                                     # 27 a reload
+        {"page": "b", "wait": ready + " && QCCD_LIVE.chats().newChat && " + box + " === 'a first message for a new chat'",
+         "timeout": 40000},                                                                                         # 28
+        {"eval": "QCCD_LIVE.toggleFiles().then(function(s){ return s.agent_files; })"},                             # 29
+        {"eval": "document.getElementById('qcl-more').click(); [].map.call(document.querySelectorAll('#qcl-menu .qcl-mi'), "
+                 "function(b){ return b.textContent; }).filter(function(t){ return /save files/.test(t); })[0]"},   # 30
+    ]
+    out = _drive({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": steps}, tmp_path / "chats.json")
+    s = out["steps"]
+    for i, st in enumerate(s):
+        assert not st.get("error"), (i, st)
+        if "ok" in st:
+            assert st["ok"], (i, st)
+    listing = json.loads(s[15]["value"])
+    assert listing["titles"] == ["hello A", "hello B"] and listing["cur"] == [True, False]
+    assert listing["composer"] == "none" and "unsent draft" in listing["meta"]          # the list hides the box
+    assert s[29]["value"] == "write" and s[30]["value"].startswith("✓ ")
+    convs = service_request(info, "GET", "/api/conversations", token="owner")["conversations"]
+    assert [(c["session_id"], c["title"]) for c in convs][:2] == [(A, "My A"), (B, "hello B")]
+    assert service_request(info, "GET", "/api/settings", token="owner") == {"agent_files": "write"}
+    assert not any(out.get("logs", {}).get("a", [])) and not any(out.get("logs", {}).get("b", []))
+
+
 def _events(root: Path) -> list:
     """Read the event log without opening a second Workspace on a live database."""
     import sqlite3

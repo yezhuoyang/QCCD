@@ -27,13 +27,16 @@ from typing import Any, Iterable
 
 __all__ = ["Store", "SCHEMA_VERSION"]
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 #: what each schema version adds to the one before (applied in order to an older database)
 _MIGRATIONS = {
     # 2: general workspaces (2026-09-24) -- a design has a title its person chose; a snapshot and a
     # submission record the board (release id + digest) they were made for
     2: [("branches", "title", "TEXT"), ("snapshots", "task_release", "TEXT"), ("snapshots", "task_digest", "TEXT"),
         ("submissions", "task_digest", "TEXT")],
+    # 3: conversations (2026-10-23) -- an agent session is one conversation in the chat's list: the name
+    # the person gave it, and when they deleted it (kept, hidden, so Undo can bring it back)
+    3: [("sessions", "title", "TEXT"), ("sessions", "deleted_at", "REAL")],
 }
 
 _DDL = """
@@ -107,7 +110,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   runtime_ref TEXT, branch TEXT NOT NULL, view_id TEXT,
   capabilities TEXT NOT NULL, status TEXT NOT NULL,
   write_fence INTEGER NOT NULL DEFAULT 0, fence_reason TEXT,
-  created_at REAL NOT NULL, last_seen REAL NOT NULL
+  created_at REAL NOT NULL, last_seen REAL NOT NULL,
+  title TEXT,                         -- the conversation's name, when the person gave it one
+  deleted_at REAL                     -- the person deleted the conversation (hidden; Undo restores it)
 );
 CREATE TABLE IF NOT EXISTS deliveries (
   id TEXT PRIMARY KEY, prompt_id TEXT NOT NULL, prompt_version INTEGER NOT NULL,

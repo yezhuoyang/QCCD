@@ -562,6 +562,20 @@ FEATURES: tuple[Feature, ...] = (
                                                       "mode": a.get("mode", "apply")}),
         ("POST /api/import",), cli=("import",)),
     Feature(
+        "qccd_export",
+        "Save files where the person can open them, in a NEW folder exports/<name>/ of this workspace (never over an "
+        "earlier export; a README.txt there says what each file is). what='design': the design (default the current "
+        "one; design = its name, revision optional) as a Studio file <name>.studio.json (Studio opens it again with "
+        "qccd import) and as the architecture file the compiler reads, <name>.arch.json, plus its compiled program "
+        "and certificate when it has one. what='run' (run_id): the run's device, circuit (QASM), compiled program, "
+        "certificate, step times and performance report. Returns the folder and the files. This is how you save "
+        "files: unless the person allowed it (qccd_get_context -> files), your own file tools and shell only read.",
+        _obj({"what": {"type": "string", "enum": ["design", "run"]}, "design": _S, "revision": _I, "run_id": _S,
+              "name": _S, "origin_prompt_id": _S}, ["what"]),
+        lambda be, a: be.call("POST", "/api/export", {k: a[k] for k in ("what", "design", "revision", "run_id", "name",
+                                                                         "origin_prompt_id") if a.get(k) is not None}),
+        ("POST /api/export",), cli=("export",), group="runs"),
+    Feature(
         "qccd_estimate_ler",
         "The logical error rate of a design: compiles a QEC memory experiment onto the design with the reference "
         "compiler (qccdc + cooling), checks the program runs it (every detector deterministic with the circuit's "
@@ -609,6 +623,8 @@ INTERNAL_ROUTES: dict[str, str] = {
     "GET /api/history": "the Studio's history panel",
     "GET /api/boards": "the Studio's board picker; agents read boards through qccd_get_context and section 'boards'",
     "GET /api/conversation": "the chat panel's transcript",
+    "GET /api/conversations": "the chat's list of conversations (a person picks one); an agent works in its own",
+    "GET /api/settings": "the person's settings; an agent reads what concerns it in qccd_get_context (files)",
     "GET /api/runs": "the Studio's run list; agents follow their own runs by id",
     "GET /api/runs/{run_id}": "the run page loads its run",
     "GET /api/runs/{run_id}/program": "the run page loads its program",

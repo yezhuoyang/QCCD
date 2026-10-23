@@ -129,6 +129,27 @@
 .qcl-mi{border:0;background:none;text-align:left;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink,#182230)}
 .qcl-mi:hover{background:var(--soft,#eef2f6)}
 .qcl-sep{height:1px;background:var(--line,#d0d5dd);margin:4px 0}
+/* the conversations: Chats in the header opens the list in place of the transcript */
+#qcl-dock .qcl-chatsbtn{font-size:11.5px;padding:2px 8px;border-radius:99px;flex-shrink:0}
+/* with Chats in it the header is full at the dock's 400 px: the model and the design picker give way
+   (cut with an ellipsis), never the agent's name (up to 96 px) or the buttons */
+.qcl-chat .qcl-head b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;max-width:96px}
+#qcl-dock.qcl-chat .qcl-modelbtn{flex-shrink:1;min-width:48px}
+#qcl-dock.qcl-chat .qcl-draftsel{flex:0 1 auto;min-width:64px}
+#qcl-dock.qcl-chat .qcl-head .qcl-icon{flex-shrink:0}
+#qcl-dock .qcl-chatsbtn.on{background:var(--soft,#eef2f6);border-color:#98a2b3}
+#qcl-dock.qcl-chatlist .qcl-composer{display:none}
+.qcl-chats-h{display:flex;align-items:center;gap:6px;padding:0 2px 4px}
+.qcl-chats-h b{font-size:13px}
+.qcl-chat-row{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid var(--line,#d0d5dd);border-radius:10px;
+  cursor:pointer;background:var(--panel,#fff)}
+.qcl-chat-row:hover,.qcl-chat-row:focus{background:var(--soft,#eef2f6);outline:none}
+.qcl-chat-row.cur{border-color:#2a78d6;box-shadow:inset 3px 0 0 #2a78d6}
+.qcl-chat-main{flex:1;min-width:0}
+.qcl-chat-t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qcl-chat-main .qcl-note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qcl-chat-act{display:flex;gap:2px;visibility:hidden}
+.qcl-chat-row:hover .qcl-chat-act,.qcl-chat-row:focus-within .qcl-chat-act,.qcl-chat-row.cur .qcl-chat-act{visibility:visible}
 /* the chat moves and resizes */
 #qcl-dock.qcl-chat .qcl-head{cursor:move;user-select:none}
 #qcl-dock .qcl-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;z-index:3;

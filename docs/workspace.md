@@ -434,6 +434,52 @@ looking.
   the browser and used when one starts. `GET /api/agents/models` and
   `POST /api/sessions/{id}/settings` (a person only) are behind it. Checked: each Claude
   alias answers with `--effort low`, and Codex's list came from its app server.
+- **Conversations** (2026-10-23). Each agent session is one conversation, and the chat shows
+  the one its page talks to (`views.target_session`). **Chats** in the header opens the list,
+  most recent first. Each row shows the name the person gave the conversation, or else its
+  first message, with the agent, the number of messages, when it was last used, and whether it
+  is working or has an unsent draft. From the list the person can:
+  - start a **New chat**. It is empty, and its agent starts when the person begins to type;
+  - open an earlier conversation to go on with it;
+  - rename one;
+  - delete one, with **Undo** in the notice that follows.
+
+  The rest of the behaviour:
+  - **Delete** hides the conversation (`sessions.deleted_at`, store schema 3) and cancels
+    what it still had queued. A page talking to it then talks to none. The design changes it
+    made stay in the design history, and a Codex thread stays in Codex's own history.
+  - **Idle.** A conversation the person leaves goes `idle` when no other page talks to it and
+    it is not in a turn, and its runtime stops (each Codex conversation is an app server
+    process of its own). Opening it again (`POST /api/sessions/{id}/open`) resumes it on the
+    same Codex thread, or Claude or Cursor conversation. If that cannot happen here, the
+    transcript still shows and the notice says why. A start-up re-attaches only conversations
+    that were not idle.
+  - **Drafts.** The message being written is saved as you type, as a draft of its
+    conversation (`draft_for`), and comes back when the conversation does: after switching,
+    after a reload, or after a restart. A reload returns the tab to the conversation it was
+    in, a new chat included (remembered in the browser per workspace). A new page goes on
+    with the conversation used last.
+  - **Messages sent with no agent connected** form a conversation of their own in the list.
+  - **API:** `GET /api/conversations`, `GET /api/conversation?session=<id>` (with that
+    conversation's `draft`), and `POST /api/sessions/{id}/open|rename|delete|restore` (a
+    person only). The debug view still shows the whole stream.
+- **Files** (2026-10-23). The agent in Studio reads files, and saves them through
+  `qccd_export` (`qccd export` at a terminal, `exports.py`). The service writes a design
+  (`<name>.studio.json`, which `qccd import` opens again, `<name>.arch.json`, and its compiled
+  program and certificate when it has one) or a run (device, circuit, compiled program,
+  certificate, step times, performance report). Each export goes into a NEW folder
+  `exports/<name>/` with a README.txt, never over an earlier one and never outside the
+  workspace.
+  - **The switch.** ⋯ → "Let the agent save files in this folder" (`POST /api/settings
+    {"agent_files": "write"}`, a person only; off by default) gives the agent's own tools
+    write access to the workspace folder:
+    - Codex: its sandbox becomes `workspace-write` with no network, passed as each turn's
+      `sandboxPolicy`, so it applies from the next message;
+    - Claude Code: `Edit` and `Write` for `./**`, never `./.qccd/**`, and still no shell;
+    - Cursor: `Write(**)` except `.qccd/**`, and still no shell.
+  - **What the agent is told.** `qccd_get_context` -> `files` says whether the switch is on
+    and how to save, so a read-only agent points the person at the switch instead of at its
+    own settings.
 - **The trace** (`trace.py`, `web/trace.js`). Everything an agent does for a request is
   recorded in order, in `.qccd/traces/<session>.jsonl`:
   - the full text it was handed, and the person's own words;
@@ -759,9 +805,18 @@ Tests:
     for the agent.
   - A hostile page could still hide or cover the chat frame, or answer page actions falsely.
     It cannot read the conversation or act as the person.
-- **Agent scope.** The agent token can edit, comment, run jobs, submit locally and *prepare*
+- **Agent scope.** The agent token can edit, comment, run jobs, submit locally, save exports into `exports/` and *prepare*
   publication. It cannot send prompts, approve publication, stop or resume sessions, mint
   pairing codes, unprotect a person's lock, or shut the service down.
+- **Agent files.** By default the agents Studio starts write no files of their own:
+  - Codex runs read-only;
+  - Claude and Cursor have no write tools.
+
+  Files reach the folder only through `qccd_export`, which writes inside `exports/`. When the
+  person turns on "Let the agent save files in this folder", the agents may also write in the
+  workspace folder: Codex through its sandbox (the folder plus temp, no network), Claude and
+  Cursor through their file tools with `.qccd/` denied. Codex's sandbox cannot exclude
+  `.qccd/`, so with the switch on, a Codex shell could change the workspace's database.
 - **Residual risk.** Any process running as the user can read the runtime file. QCCD's
   guarantees apply to its own API surface and are not a sandbox against a local agent with a
   shell. `qccd publish --submission` approves only at an interactive terminal (it asks for

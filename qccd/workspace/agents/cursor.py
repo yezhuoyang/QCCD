@@ -108,6 +108,22 @@ def cli_state(root) -> dict:
     return {"state": "unknown", "cli": exe, "next": f"check that Cursor's CLI is signed in: {exe} status"}
 
 
+def permissions(agent_files: str) -> dict:
+    """`write`: the QCCD tools and file writes in this folder, never in its database (`.qccd/`),
+    and still no shell command."""
+    if agent_files != "write":
+        return PERMISSIONS
+    return {"allow": PERMISSIONS["allow"] + ["Write(**)"], "deny": ["Shell(*)", "Shell(**)", "Write(.qccd/**)"]}
+
+
+def chat_note(agent_files: str) -> str:
+    if agent_files != "write":
+        return CHAT_NOTE
+    return CHAT_NOTE.replace("You have no shell and cannot edit files: change the design only with the QCCD tools.",
+                             "You have no shell; you may create and change files in this folder (never in .qccd/), "
+                             "and you change the design only with the QCCD tools.")
+
+
 def config_dir(ws) -> Path:
     return Path(ws.root) / ".qccd" / "cursor"
 
@@ -126,7 +142,8 @@ def prepare(ws) -> Path:
     cur = cur if isinstance(cur, dict) else {}
     # `allowlist`: anything not allowed above needs an approval, which a headless run refuses; the sandbox
     # off, so no command runs in one without asking
-    want = dict(cur, version=1, permissions=PERMISSIONS, approvalMode="allowlist", autoAcceptWebSearch=False,
+    want = dict(cur, version=1, permissions=permissions(ws.settings()["agent_files"]), approvalMode="allowlist",
+                autoAcceptWebSearch=False,
                 sandbox=dict(cur.get("sandbox") if isinstance(cur.get("sandbox"), dict) else {}, mode="disabled"))
     if want != cur:
         p.write_text(json.dumps(want, indent=2) + "\n", encoding="utf-8")
@@ -189,7 +206,7 @@ class CursorBridge:
                                               "text": "(This workspace folder was renamed or moved, so Cursor starts "
                                                       "a new chat here. The earlier one stays with the old folder.)"})
                 self.chat, self.folder = None, str(ws.root)          # this run starts one, and names it
-            prompt = text + "\n\n" + CHAT_NOTE
+            prompt = text + "\n\n" + chat_note(ws.settings()["agent_files"])
             self.active_turn = turn
             self.turn_deliveries[turn] = delivery_id
             self._said[turn] = False
@@ -486,12 +503,15 @@ def connect_cursor(state, body: dict) -> dict:
             "note": "a NEW Cursor chat: the first message starts it in this workspace"}
 
 
-def reattach_cursor_sessions(state) -> list:
-    """After a service restart: the same chats go on (each run resumes by id)."""
+def reattach_cursor_sessions(state, only: str | None = None) -> list:
+    """After a service restart: the same chats go on (each run resumes by id).  `only`: just that
+    one (the person opened it from the chat's list); without it, idle ones stay idle."""
     out = []
     exe = find_cursor()
     for s in state.ws.sessions():
         if s["client"] != "cursor" or s["mode"] != "appserver" or s["id"] in state.bridges:
+            continue
+        if (only and s["id"] != only) or (not only and s["status"] in ("idle", "closed")):
             continue
         if not exe:
             out.append({"session_id": s["id"], "reattached": False, "why": "no cursor-agent executable"})

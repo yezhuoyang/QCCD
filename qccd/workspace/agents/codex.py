@@ -112,6 +112,9 @@ class CodexBridge:
         self.turn_overrides: dict = {}
         #: an app server this workspace started earlier and re-attached to after a restart
         self.owned_pid: int | None = None
+        #: Studio's chat: () -> the person's file setting ("read" | "write"), read for every turn's
+        #: sandbox; None for a thread whose sandbox the person chose themselves (a terminal attach)
+        self.files_setting = None
         #: (session id, Traces): the turn's items go into the session's trace (trace.py)
         self.tracer: tuple | None = None
 
@@ -322,8 +325,11 @@ class CodexBridge:
         if self.tracer is not None:
             self.tracer[1].delivered(self.tracer[0], delivery_id, text, how="turn/start",
                                      steer=False)
+        extra = {}
+        if self.files_setting is not None:
+            extra["sandboxPolicy"] = sandbox_policy(self.files_setting())
         r = self.request("turn/start", {"threadId": self.thread_id, "input": inp,
-                                        "clientUserMessageId": delivery_id, **self.turn_overrides})
+                                        "clientUserMessageId": delivery_id, **self.turn_overrides, **extra})
         turn = (r or {}).get("turn") or {}
         tid = turn.get("id")
         if tid:
@@ -356,6 +362,23 @@ class CodexBridge:
                 "thread_id": self.thread_id, "thread_status": self.thread_status,
                 "active_turn": self.active_turn, "last_error": self.last_error,
                 "capabilities": CAPABILITIES}
+
+
+def _files_setting(ws):
+    return lambda: ws.settings()["agent_files"]
+
+
+def _sandbox_now(ws) -> str:
+    """The thread's sandbox mode for the person's setting (`thread/start`, `thread/resume`)."""
+    return "workspace-write" if ws.settings()["agent_files"] == "write" else "read-only"
+
+
+def sandbox_policy(agent_files: str) -> dict:
+    """A turn's sandbox (`turn/start` `sandboxPolicy`) for the person's setting: read-only, or
+    writes in the workspace folder (the thread's cwd), never the network."""
+    if agent_files == "write":
+        return {"type": "workspaceWrite", "networkAccess": False}
+    return {"type": "readOnly"}
 
 
 def start_app_server(codex: str, port: int, cwd: Path, log: Path) -> subprocess.Popen:
@@ -433,10 +456,24 @@ def connect_codex(state, body: dict) -> dict:
         cfg["mcp_servers"] = servers
     ov = body.get("turn_overrides") or {}
     br.turn_overrides = {k: v for k, v in ov.items() if k in ("effort", "model", "summary", "serviceTier")}
+    # `files: "workspace"` (Studio's chat): what Codex's shell may write follows the person's
+    # setting -- read-only, or this folder -- and is passed with every turn, so a change applies
+    # from the next message.  Otherwise `sandbox` is the caller's own choice, as before.
+    follow = body.get("files") == "workspace"
+    if follow:
+        br.files_setting = _files_setting(ws)
+        if os.name == "nt":
+            # Windows: the UNELEVATED sandbox (a restricted token).  The elevated one runs commands as
+            # a separate sandbox user that needs a one-time setup as administrator; started headless
+            # here nobody can give it, and every write-mode command waited forever (measured on Codex
+            # 0.162, 2026-10-23: elevated hung, unelevated wrote in 8-10 s).  The person's own Codex
+            # settings are not touched: this is the thread's own config.
+            cfg.setdefault("windows", {"sandbox": "unelevated"})
+    sandbox = _sandbox_now(ws) if follow else body.get("sandbox")
     try:
         bound = br.bind(thread_id=thread_id, cwd=str(ws.root), start=start,
                         developer_instructions=body.get("developer_instructions"),
-                        config=cfg or None, sandbox=body.get("sandbox"),
+                        config=cfg or None, sandbox=sandbox,
                         approval_policy=body.get("approval_policy"))
     except RpcError as exc:
         br.close()
@@ -447,7 +484,7 @@ def connect_codex(state, body: dict) -> dict:
     # enough to re-attach after a service restart: the same thread, the same tools
     caps["reattach"] = {"url": url, "thread_id": bound["thread_id"], "owned": proc is not None,
                         "app_server_pid": proc.pid if proc is not None else None,
-                        "config": cfg or None, "sandbox": body.get("sandbox"),
+                        "config": cfg or None, "sandbox": sandbox, "files": "workspace" if follow else None,
                         "approval_policy": body.get("approval_policy"), "turn_overrides": br.turn_overrides}
     s = ws.register_session({"kind": "human", "id": "cli"}, client="codex", mode="appserver",
                             label=body.get("label") or ("Codex (new thread)" if bound["started"] else "Codex"),
@@ -479,17 +516,22 @@ def _here(cfg, ws, sid):
     return {**cfg, "mcp_servers": {**cfg["mcp_servers"], "qccd": entry}}
 
 
-def reattach_codex_sessions(state) -> list:
+def reattach_codex_sessions(state, only: str | None = None) -> list:
     """After a service (re)start: bind every Codex session that was connected before
     to its SAME thread again -- through its app server if that still runs, otherwise
     through a new one (threads persist in the user's Codex home, so `thread/resume` works
     on a fresh server).  Deliveries left `uncertain` by the restart are then reconciled
-    by the delivery worker before anything is resent."""
+    by the delivery worker before anything is resent.
+
+    `only`: just that session -- the person opened it from the chat's list, so it goes on even
+    when it was idle.  Without it, a conversation the person left (idle) stays stopped."""
     from ..runtime import free_port
     ws = state.ws
     out = []
     for s in ws.sessions():
         if s["client"] != "codex" or s["mode"] != "appserver" or s["id"] in state.bridges:
+            continue
+        if (only and s["id"] != only) or (not only and s["status"] in ("idle", "closed")):
             continue
         ra = (s.get("capabilities") or {}).get("reattach")
         if not ra or not ra.get("thread_id"):
@@ -529,11 +571,14 @@ def reattach_codex_sessions(state) -> list:
         if proc is None and ra.get("owned"):
             br.owned_pid = ra.get("app_server_pid")
         br.turn_overrides = dict(ra.get("turn_overrides") or {})
+        if ra.get("files") == "workspace":
+            br.files_setting = _files_setting(ws)
         if getattr(state, "traces", None) is not None:
             br.tracer = (s["id"], state.traces)
         try:
             br.bind(thread_id=ra["thread_id"], cwd=str(ws.root), start=False, config=_here(ra.get("config"), ws, s["id"]),
-                    sandbox=ra.get("sandbox"), approval_policy=ra.get("approval_policy"))
+                    sandbox=_sandbox_now(ws) if ra.get("files") == "workspace" else ra.get("sandbox"),
+                    approval_policy=ra.get("approval_policy"))
         except RpcError as exc:
             br.close()
             out.append({"session_id": s["id"], "reattached": False, "why": str(exc)})
@@ -545,7 +590,7 @@ def reattach_codex_sessions(state) -> list:
         ws.session_status(s["id"], "connected", detail=f"re-attached to thread {ra['thread_id']} after a restart",
                           capabilities=caps)
         out.append({"session_id": s["id"], "reattached": True, "url": url})
-    if state.worker:
+    if getattr(state, "worker", None):
         state.worker.kick()
     return out
 
@@ -631,7 +676,8 @@ def _on_codex_event(state, sid: str, method: str, params: dict) -> None:
             ws.emit("agent.message", {"session_id": sid, "turn_id": params.get("turnId"), "text": text})
             _store_message(state, sid, params.get("turnId"), text)
         elif method == "bridge/closed":
-            ws.session_status(sid, "disconnected", detail=str(params.get("error") or "connection closed"))
+            if ws.session(sid)["status"] not in ("idle", "closed"):
+                ws.session_status(sid, "disconnected", detail=str(params.get("error") or "connection closed"))
         elif method == "codex/server_request":
             ws.emit("agent.approval_requested", {"session_id": sid, **params})
     except Exception:

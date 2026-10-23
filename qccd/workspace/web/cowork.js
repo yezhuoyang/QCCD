@@ -53,6 +53,11 @@ var S = {
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
   conv: [], working: [], pending: null, codex: null, claude: null, cursorAgent: null, connecting: false, branches: [], convTimer: null,
   lastSel: '', selOff: false, convScrolled: false,
+  // conversations: the list is open (`chats`), a new chat not yet started (`newChat`), which
+  // conversation's draft the box holds (`convFor`), the unsent message saved as you type, and the
+  // person's settings (`agent_files`: may the agent write files in this folder)
+  chats: false, chatList: [], newChat: false, convFor: null, adopted: false, sending: false, switching: 0,
+  chatDraft: { key: null, id: null, timer: null }, settings: { agent_files: 'read' },
   // the page this chat is about (a website page, or Studio itself)
   page: PAGE ? { url: CFG.page || '/web/', site: CFG.site } : null, pageDoing: null
 };
@@ -334,7 +339,10 @@ function openEvents() {
       loadPrompts();
     });
   });
-  ['session.updated', 'session.stopped', 'view.updated', 'agent.turn'].forEach(function (t) { on(t, function () { loadSessions(); }); });
+  ['session.updated', 'session.stopped', 'session.deleted', 'view.updated', 'agent.turn'].forEach(function (t) {
+    on(t, function () { loadSessions(); });
+  });
+  on('settings.updated', function () { loadSettings(); });
   on('agent.message', function (e) {
     S.agentMsgs.push({ at: e.ts, text: (e.payload || {}).text, session: (e.payload || {}).session_id });
     if (S.agentMsgs.length > 30) S.agentMsgs.shift();
@@ -749,8 +757,25 @@ function loadSessions() {
     S.sessions = r.data.sessions || [];
     return api('GET', '/api/views').then(function (v) {
       var mine = ((v.data || {}).views || []).filter(function (x) { return x.id === S.view; })[0];
-      if (mine) { S.target = mine.target_session; S.follow = mine.follow_agent; }
+      // while the person switches conversation, their choice is the truth: a read that left before
+      // the switch reached the service would put the page back where it was
+      if (mine && !S.switching) {
+        if (mine.target_session) S.newChat = false;
+        S.target = mine.target_session; S.follow = mine.follow_agent;
+      }
       renderStatus(); if (S.tab === 'agent' || S.tab === 'compose') renderBody();
+      if (S.debug) return;
+      if (!S.adopted) {
+        // a reload comes back to the conversation this browser was in (a new chat included); a page
+        // with none goes on with the one used last
+        S.adopted = true;
+        var want = localGet(convMemo());
+        if (want === 'new') return newChat();
+        if (want && want !== S.target && S.sessions.some(function (x) { return x.id === want; })) return openChat(want);
+        if (!S.target) return adoptLatest();
+      }
+      if (convKey() !== S.convFor) loadConvSoon();
+      if (S.chats) loadChats();
     });
   });
 }
@@ -780,7 +805,8 @@ function loadResults() {
     if (S.tab === 'results') renderBody();
   });
 }
-function refreshAll() { loadSessions(); loadPrompts(); loadHistory(); loadResults(); }
+function refreshAll() { loadSessions(); loadPrompts(); loadHistory(); loadResults(); loadSettings(); }
+function loadSettings() { return api('GET', '/api/settings').then(function (r) { if (r.ok && r.data) S.settings = r.data; }); }
 function sessionLabel(sid) {
   var s = S.sessions.filter(function (x) { return x.id === sid; })[0];
   return s ? (s.label || s.client) : 'no agent';
@@ -1535,7 +1561,7 @@ function buildChat() {
                            'aria-label': 'message the agent' });
   ta.value = S.textCache || '';
   ta.addEventListener('input', function () {
-    S.textCache = ta.value; grow(ta); renderSendButton();
+    S.textCache = ta.value; grow(ta); renderSendButton(); chatDraftSoon();
     if (ta.value.trim()) warmOnTyping();
   });
   ta.addEventListener('keydown', function (e) {
@@ -1551,6 +1577,9 @@ function buildChat() {
       h('span', { cls: 'qcl-sp' }),
       PAGE ? null : h('select', { id: 'qcl-draft', cls: 'qcl-draftsel', title: 'the design you are working on',
                                   'aria-label': 'design', on: { change: onDraftPick } }),
+      h('button', { id: 'qcl-chats', cls: 'qcl-btn qcl-chatsbtn', text: 'Chats',
+                    title: 'your conversations: start a new one, go back to an earlier one, rename or delete',
+                    on: { click: function (e) { e.stopPropagation(); closeMenu(); toggleChats(); } } }),
       h('button', { id: 'qcl-more', cls: 'qcl-btn qcl-icon', text: '⋯', title: 'more',
                     on: { click: function (e) { e.stopPropagation(); toggleMenu('more'); } } }),
       h('button', { cls: 'qcl-btn qcl-icon', text: '–', title: 'minimise', on: { click: function () {
@@ -1648,10 +1677,11 @@ function toggleMenu(which) {
       [(animateRuns() ? '✓ ' : '') + 'Play runs as animations (off: open them at the result)', function () {
         localSet('qccd.runs.animate', animateRuns() ? '0' : '1');
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
-      S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
-      S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
-      S.cursorAgent ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
+      S.codex ? ['New conversation with Codex', function () { newChat('codex'); }] : null,
+      S.claude ? ['New conversation with Claude', function () { newChat('claude'); }] : null,
+      S.cursorAgent ? ['New conversation with Cursor', function () { newChat('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
+      filesItem(),
       null,
       ['Open your Studio (the design you work on)', function () { goTo('/studio'); }],
       ['Trace: what the agent did, step by step', openTrace],
@@ -1672,10 +1702,11 @@ function toggleMenu(which) {
       [(animateRuns() ? '✓ ' : '') + 'Play runs as animations (off: open them at the result)', function () {
         localSet('qccd.runs.animate', animateRuns() ? '0' : '1');
         notice(animateRuns() ? 'Runs open playing.' : 'Runs open at their result, without the animation.'); }],
-      S.codex ? ['New conversation with Codex', function () { localSet('qccd.agent', 'codex'); connectAgent('codex'); }] : null,
-      S.claude ? ['New conversation with Claude', function () { localSet('qccd.agent', 'claude'); connectAgent('claude'); }] : null,
-      S.cursorAgent ? ['New conversation with Cursor', function () { localSet('qccd.agent', 'cursor'); connectAgent('cursor'); }] : null,
+      S.codex ? ['New conversation with Codex', function () { newChat('codex'); }] : null,
+      S.claude ? ['New conversation with Claude', function () { newChat('claude'); }] : null,
+      S.cursorAgent ? ['New conversation with Cursor', function () { newChat('cursor'); }] : null,
       s ? ['Stop the agent', chatStop] : null,
+      filesItem(),
       null,
       CFG.web_url ? ['Open the website with this agent', function () { window.open(CFG.web_url, '_blank', 'noopener'); }] : null,
       CFG.mode === 'run' || CFG.mode === 'compare' ? ['Back to your Studio (the design)', function () { goTo('/studio'); }] : null,
@@ -1743,9 +1774,14 @@ function chatSend(textArg) {
   if (sel.length && !S.selOff) anchors.unshift(sel.length === 1 ? { kind: 'entity', key: sel[0] } : { kind: 'entity_group', keys: sel });
   if (PAGE && S.page && S.page.selection && !S.selOff) anchors.unshift({ kind: 'page', url: S.page.url, quote: S.page.selection });
   var wasWorking = isWorking();
-  S.pending = text;
+  // the saved draft of this message becomes the message itself
+  if (S.chatDraft.timer) { clearTimeout(S.chatDraft.timer); S.chatDraft.timer = null; }
+  var draft = { key: S.chatDraft.key, id: S.chatDraft.key === convKey() ? S.chatDraft.id : null };
+  S.chatDraft = { key: null, id: null, timer: null };
+  S.pending = text; S.sending = true;
   if (ta) { ta.value = ''; grow(ta); }
   S.textCache = '';
+  if (S.chats) toggleChats(false);
   renderConv(); renderSendButton();
   return (PAGE ? refreshPage() : Promise.resolve()).then(ensureAgent).then(function () {
     var s = agentSession();
@@ -1753,13 +1789,17 @@ function chatSend(textArg) {
   }).then(function () {
     var s = agentSession();
     S.steer = !!(wasWorking && s && s.mode === 'appserver' && s.client === 'codex');   // a Claude or Cursor run takes the next message after it
+    if (draft.id) S.draftId = draft.id;
     return send({ text: text, mode: 'apply', anchors: anchors });
   }).then(function (d) {
-    if (!d) { S.pending = null; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
+    S.sending = false;
+    if (!d) { S.pending = null; S.chatDraft = { key: draft.key, id: draft.id, timer: null }; if (ta) { ta.value = text; grow(ta); } renderConv(); return null; }
     S.selOff = false; renderChips();
     return loadConv().then(function () { return d; });
   }, function (e) {
     // the service restarting, the agent failing to start: never lose what the person typed
+    S.sending = false;
+    S.chatDraft = { key: draft.key, id: draft.id, timer: null };
     S.pending = null;
     if (ta && !ta.value) { ta.value = text; grow(ta); }
     renderConv(); renderSendButton();
@@ -1771,13 +1811,29 @@ function ensureAgent() {
   var s = agentSession();
   if (s && (s.status === 'connected' || s.mode === 'pull' || s.mode === 'channel')) return Promise.resolve(s);
   if (S.ensuring) return S.ensuring;            // one start at a time: typing began it, the send joins it
-  var live = S.sessions.filter(function (x) { return x.status === 'connected'; })[0];
-  var go = live ? api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions)
-    : (S.codex === null ? loadAgents() : Promise.resolve())
-        .then(function () { var k = agentChoice(); return k ? connectAgent(k) : null; });
+  var go;
+  if (s && s.mode === 'appserver') {
+    // this conversation's agent stopped (the person had left it, or the service restarted): it goes
+    // on, on the same thread; if it cannot, the message starts a new conversation and says so
+    go = api('POST', '/api/sessions/' + encodeURIComponent(s.id) + '/open', { view_id: S.view }).then(function (r) {
+      if (r.ok && r.data && r.data.resumed !== false) return loadSessions();
+      notice('That conversation could not go on here' + (r.data && r.data.why ? ' (' + r.data.why + ')' : '')
+             + ', so your message starts a new one.', 'bad');
+      S.newChat = true; S.target = null;
+      return startAgent();
+    });
+  } else {
+    var live = !S.newChat && !s ? S.sessions.filter(function (x) { return x.status === 'connected'; })[0] : null;
+    go = live ? api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: live.id }).then(loadSessions)
+      : startAgent();
+  }
   var done = function (x) { S.ensuring = null; return x; };
   S.ensuring = go.then(done, function (e) { S.ensuring = null; throw e; });
   return S.ensuring;
+}
+function startAgent() {
+  return (S.codex === null ? loadAgents() : Promise.resolve())
+    .then(function () { var k = agentChoice(); return k ? connectAgent(k) : null; });
 }
 // the person started typing and no agent is connected yet: start it now, so the message does not
 // wait for the agent's start-up (~9 s for Claude Code with the QCCD tools; typing takes longer)
@@ -1871,19 +1927,21 @@ function connectCodex() { return connectAgent('codex'); }
 function connectAgent(kind) {
   S.connecting = kind; renderChatHead(); renderConv();
   // nobody can answer an approval prompt from Studio: no agent is ever asked -- Codex runs with
-  // approval `never` and a read-only shell, Claude with `dontAsk` and no shell, Cursor headless
-  // (what needs an approval is refused) with the shell and file writes denied -- and each
-  // changes the design only through the QCCD tools
+  // approval `never`, Claude with `dontAsk` and no shell, Cursor headless (what needs an approval is
+  // refused) with no shell -- and each changes the design only through the QCCD tools.  Files: each
+  // only reads, unless the person turned on "Let the agent save files in this folder" (`files:
+  // 'workspace'`: Codex's sandbox follows that setting, turn by turn); qccd_export saves either way
   var pick = modelPref(kind);
   var req = kind === 'claude' ? api('POST', '/api/sessions/claude/connect', { label: 'Claude', model: pick.model || undefined,
                                                                              effort: pick.effort || undefined })
     : kind === 'cursor' ? api('POST', '/api/sessions/cursor/connect', { label: 'Cursor', model: pick.model || undefined })
     : api('POST', '/api/sessions/codex/connect', { start_thread: true, label: 'Codex', approval_policy: 'never',
-                                                   sandbox: 'read-only',
+                                                   files: 'workspace',
                                                    turn_overrides: { model: pick.model || undefined, effort: pick.effort || undefined } });
   return req.then(function (r) {
     S.connecting = false;
     if (!r.ok) { notice('Could not start ' + agentTitle(kind) + ': ' + ((r.error || {}).message || 'error'), 'bad'); renderChatHead(); return null; }
+    S.newChat = false;
     return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: r.data.session.id }).then(loadSessions);
   });
 }
@@ -1905,6 +1963,8 @@ function renderChatHead() {
       dot = document.getElementById('qcl-live');
   if (!who) return;
   who.textContent = s ? shortName(s.label || s.client) : 'Agent';
+  var cb = document.getElementById('qcl-chats');
+  if (cb) cb.classList.toggle('on', !!S.chats);
   var mb = document.getElementById('qcl-model'), kind = agentKind();
   if (mb) { mb.textContent = kind ? modelLabel(kind) + ' ▾' : ''; mb.style.display = kind ? '' : 'none'; }
   // a chosen model is named as its agent names it (the list comes once, on demand)
@@ -1991,20 +2051,205 @@ function loadConvSoon() {
   if (S.convTimer) clearTimeout(S.convTimer);
   S.convTimer = setTimeout(loadConv, 200);
 }
+// WHICH CONVERSATION THIS CHAT SHOWS: the session its page talks to; `new` before a new chat's
+// agent has started; '' for what was sent while no agent was connected
+function convKey() { return S.target || (S.newChat ? 'new' : ''); }
+function convMemo() { return 'qccd.conv.' + (CFG.workspace_id || ''); }
 function loadConv() {
-  return api('GET', '/api/conversation?limit=40').then(function (r) {
-    if (!r.ok) return;
+  // not before the page has decided which conversation it is in (`adopted`, in loadSessions): a new
+  // tab's view starts on the service's default, and showing that first would also remember it
+  if (!S.adopted) return Promise.resolve();
+  var key = convKey();
+  return api('GET', '/api/conversation?limit=40&session=' + encodeURIComponent(key)).then(function (r) {
+    if (!r.ok || convKey() !== key) return;
     S.conv = r.data.items || [];
     S.working = r.data.working || [];
-    S.pending = null;
+    if (!S.sending) S.pending = null;
+    if (S.convFor !== key) {
+      S.convFor = key; fillDraft(key, r.data.draft);
+      if (key) localSet(convMemo(), key);
+    }
     renderConv(); renderChatHead();
   });
+}
+
+// ------------------------------------------------------------------ conversations
+// The list (Chats in the header): a new chat, every earlier conversation by its name or its first
+// message, open one to go on with it, rename it, delete it (Undo brings it back).  What you were
+// writing stays with its conversation: saved as you type, there again when you come back.
+function loadChats() {
+  return api('GET', '/api/conversations').then(function (r) {
+    if (!r.ok) return;
+    S.chatList = r.data.conversations || [];
+    if (S.chats) renderConv();
+  });
+}
+function toggleChats(open) {
+  S.chats = open === undefined ? !S.chats : !!open;
+  var dock = document.getElementById('qcl-dock');
+  if (dock) dock.classList.toggle('qcl-chatlist', S.chats);
+  renderConv(); renderChatHead();
+  return S.chats ? loadChats() : Promise.resolve();
+}
+// a page opens on the conversation used last (a reload or a restart goes on with it), or on the new
+// chat whose first message the person was writing
+function adoptLatest() {
+  return api('GET', '/api/conversations').then(function (r) {
+    if (!r.ok) return loadConv();
+    S.chatList = r.data.conversations || [];
+    if (r.data.new_chat_draft) { S.newChat = true; return loadConv(); }
+    var last = S.chatList.filter(function (c) { return c.session_id && c.status !== 'closed'; })[0];
+    return last ? openChat(last.session_id) : loadConv();
+  });
+}
+function clearComposer() {
+  var ta = document.getElementById('qcl-text');
+  if (ta) { ta.value = ''; grow(ta); }
+  S.textCache = ''; S.chatDraft = { key: null, id: null, timer: null };
+  renderSendButton();
+}
+function leaveConv() {
+  return saveChatDraft().then(function () {
+    clearComposer();
+    S.conv = []; S.working = []; S.pending = null; S.convFor = null; S.warmed = false;
+    toggleChats(false);
+  });
+}
+function openChat(sid) {
+  if ((sid || '') === (S.target || '') && !S.newChat) return toggleChats(false);
+  S.switching++;
+  return leaveConv().then(function () {
+    S.newChat = false; S.target = sid || null;
+    renderConv(); renderChatHead();
+    var go = sid ? api('POST', '/api/sessions/' + encodeURIComponent(sid) + '/open', { view_id: S.view })
+                 : api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: null });
+    return go.then(function (r) {
+      S.switching--;
+      if (!r.ok) notice('Could not open that conversation: ' + ((r.error || {}).message || 'error'), 'bad');
+      else if (r.data && r.data.resumed === false && r.data.why) {
+        notice('You can read this conversation, but its agent cannot go on here (' + r.data.why + '). '
+               + 'Your next message starts a new one.', 'bad');
+      }
+      return loadSessions().then(loadConv);
+    });
+  });
+}
+function newChat(kind) {
+  if (kind) localSet('qccd.agent', kind);
+  S.switching++;
+  return leaveConv().then(function () {
+    S.newChat = true; S.target = null;
+    renderConv(); renderChatHead();
+    return api('PATCH', '/api/views/' + encodeURIComponent(S.view), { target_session: null })
+      .then(function () { S.switching--; return loadSessions(); }).then(loadConv)
+      .then(function () { var ta = document.getElementById('qcl-text'); if (ta) ta.focus(); });
+  });
+}
+function renameChat(c, title) {
+  var t = title !== undefined ? title : window.prompt('A name for this conversation:', c.title);
+  if (t === null || t === undefined) return Promise.resolve(null);
+  return api('POST', '/api/sessions/' + encodeURIComponent(c.session_id) + '/rename', { title: t }).then(function (r) {
+    if (!r.ok) notice('Not renamed: ' + ((r.error || {}).message || 'error'), 'bad');
+    return loadChats();
+  });
+}
+function deleteChat(c) {
+  var cur = c.session_id === S.target;
+  return api('POST', '/api/sessions/' + encodeURIComponent(c.session_id) + '/delete', {}).then(function (r) {
+    if (!r.ok) { notice('Not deleted: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
+    notice('Deleted "' + c.title + '".', null, { label: 'Undo', run: function () { restoreChat(c, cur); } });
+    if (cur) { clearComposer(); S.newChat = true; S.target = null; S.conv = []; S.working = []; S.convFor = null; S.warmed = false; }
+    return loadSessions().then(loadChats);
+  });
+}
+function restoreChat(c, reopen) {
+  return api('POST', '/api/sessions/' + encodeURIComponent(c.session_id) + '/restore', {}).then(function (r) {
+    if (!r.ok) { notice('Not restored: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
+    return reopen ? openChat(c.session_id) : loadChats();
+  });
+}
+function ago(ts) {
+  var s = Math.max(0, Date.now() / 1000 - (+ts || 0));
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  if (s < 7 * 86400) return Math.floor(s / 86400) + (s < 2 * 86400 ? ' day ago' : ' days ago');
+  return new Date(ts * 1000).toLocaleDateString();
+}
+function renderChats(box) {
+  box.appendChild(h('div', { cls: 'qcl-chats-h' }, [
+    h('b', { text: 'Conversations' }), h('span', { cls: 'qcl-sp' }),
+    h('button', { cls: 'qcl-btn pri', text: 'New chat', title: 'start a new conversation with the agent',
+                  on: { click: function () { newChat(); } } })]));
+  if (!S.chatList.length) box.appendChild(h('div', { cls: 'qcl-note', text: 'No conversations yet: your first message starts one.' }));
+  S.chatList.forEach(function (c) {
+    var cur = !S.newChat && (c.session_id || '') === (S.target || '');
+    var who = /^(codex|claude|cursor)$/.test(c.client || '') ? agentTitle(c.client) : (c.client ? shortName(c.label) : null);
+    var meta = [who, c.messages + (c.messages === 1 ? ' message' : ' messages'),
+                ago(c.last_at), c.working ? 'working' : null, c.draft ? 'unsent draft' : null].filter(Boolean).join(' · ');
+    var acts = c.session_id ? h('span', { cls: 'qcl-chat-act' }, [
+      h('button', { cls: 'qcl-btn qcl-link', text: 'Rename', on: { click: function (e) { e.stopPropagation(); renameChat(c); } } }),
+      h('button', { cls: 'qcl-btn qcl-link', text: 'Delete', on: { click: function (e) { e.stopPropagation(); deleteChat(c); } } })
+    ]) : null;
+    box.appendChild(h('div', { cls: 'qcl-chat-row' + (cur ? ' cur' : ''), role: 'button', tabindex: '0',
+                               title: cur ? 'the conversation you are in' : 'open this conversation and go on with it',
+                               on: { click: function () { openChat(c.session_id); },
+                                     keydown: function (e) { if (e.key === 'Enter') openChat(c.session_id); } } }, [
+      h('div', { cls: 'qcl-chat-main' }, [h('div', { cls: 'qcl-chat-t', text: c.title }), h('div', { cls: 'qcl-note', text: meta })]),
+      acts]));
+  });
+}
+
+// the message you are writing is kept with its conversation as you type
+function fillDraft(key, d) {
+  S.chatDraft = { key: key, id: d ? d.prompt_id : null, timer: null };
+  var ta = document.getElementById('qcl-text');
+  if (!ta || S.sending || !d || !d.text || ta.value.trim()) return;
+  ta.value = d.text; S.textCache = d.text; grow(ta); renderSendButton();
+}
+function chatDraftSoon() {
+  if (S.chatDraft.timer) clearTimeout(S.chatDraft.timer);
+  S.chatDraft.timer = setTimeout(function () { saveChatDraft(); }, 700);
+}
+function saveChatDraft(leaving) {
+  var d = S.chatDraft;
+  if (d.timer) { clearTimeout(d.timer); d.timer = null; }
+  var ta = document.getElementById('qcl-text'), text = ta ? ta.value : '', key = convKey();
+  if (d.key !== key) { d.key = key; d.id = null; }
+  if (S.debug || (!d.id && !text.trim())) return Promise.resolve();
+  var payload = { prompt_id: d.id || undefined, body: { text: text, draft_for: key } };
+  if (leaving) {                          // the page is going away: one request that outlives it
+    try { fetch('/api/prompts/draft', { method: 'POST', keepalive: true, credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-QCCD-CSRF': S.csrf, 'X-QCCD-View': S.view },
+                body: J(payload) }); } catch (e) { /* best effort */ }
+    return Promise.resolve();
+  }
+  return api('POST', '/api/prompts/draft', payload).then(function (r) {
+    if (r.ok && S.chatDraft === d && d.key === key) d.id = r.data.prompt_id;
+  });
+}
+
+// what the agent may do with files in this folder: read (and save into exports/ when asked), or write
+function toggleFiles() {
+  var next = S.settings.agent_files === 'write' ? 'read' : 'write';
+  return api('POST', '/api/settings', { agent_files: next }).then(function (r) {
+    if (!r.ok) { notice('Not changed: ' + ((r.error || {}).message || 'error'), 'bad'); return null; }
+    S.settings = r.data;
+    notice(next === 'write'
+      ? 'The agent may now create and change files in this workspace folder (never its database). From your next message.'
+      : 'The agent reads files only. When you ask, it still saves a design or a run into the exports folder.');
+    return r.data;
+  });
+}
+function filesItem() {
+  return [(S.settings.agent_files === 'write' ? '✓ ' : '') + 'Let the agent save files in this folder', toggleFiles];
 }
 function renderConv() {
   var box = document.getElementById('qcl-conv');
   if (!box) return;
   var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   while (box.firstChild) box.removeChild(box.firstChild);
+  if (S.chats) { renderChats(box); box.scrollTop = 0; return; }
   if (!S.conv.length && !S.pending && !S.connecting) { box.appendChild(emptyState()); return; }
   var lastWho = null, runs = {}, subs = {};
   S.conv.forEach(function (it) { if (it.type === 'run') runs[it.run_id] = true; });
@@ -2530,6 +2775,7 @@ function boot() {
     } catch (e) { console.error('qccd live tick', e); }
   }, 400);
   window.addEventListener('pagehide', function () {
+    if (S.view && S.csrf) saveChatDraft(true);
     if (S.view && S.csrf) {
       try { fetch('/api/views/' + encodeURIComponent(S.view), { method: 'PATCH', keepalive: true, credentials: 'same-origin',
              headers: { 'Content-Type': 'application/json', 'X-QCCD-CSRF': S.csrf, 'X-QCCD-View': S.view },
@@ -2560,6 +2806,13 @@ window.QCCD_LIVE = {
                                agent: (agentSession() || {}).id || null, codex: S.codex, claude: S.claude,
                                cursor: S.cursorAgent }; },
   chatSend: chatSend, loadConv: loadConv, setDebug: setDebug, switchDraft: switchDraft, saveAsDraft: saveAsDraft,
+  // conversations
+  chats: function () { return { open: S.chats, list: S.chatList.slice(), newChat: S.newChat, target: S.target,
+                                key: convKey(), draft: S.chatDraft.id, settings: S.settings }; },
+  toggleChats: toggleChats, loadChats: loadChats, newChat: newChat, openChat: openChat, saveChatDraft: saveChatDraft,
+  renameChat: function (sid, title) { return renameChat({ session_id: sid }, title); },
+  deleteChat: function (sid) { return deleteChat(S.chatList.filter(function (c) { return c.session_id === sid; })[0] || { session_id: sid, title: sid }); },
+  restoreChat: function (sid, reopen) { return restoreChat({ session_id: sid }, reopen); }, toggleFiles: toggleFiles,
   page: function () { return S.page; }, refreshPage: refreshPage,
   // the Leaderboard panel
   board: function () { return { open: B.open, board: B.board, data: B.data }; },

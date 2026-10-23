@@ -89,7 +89,7 @@ def test_an_old_pinned_workspace_and_an_old_database_still_open(tmp_path):
     c.commit()
     c.close()
     again = Workspace(tmp_path / "p")
-    assert again.store.get_meta("store_schema") == "2" and again.design_title(again.branch("main")) == "Main design"
+    assert again.store.get_meta("store_schema") == "3" and again.design_title(again.branch("main")) == "Main design"
     again.close()
 
 
