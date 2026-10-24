@@ -221,6 +221,19 @@ needs exactly one template.**
 > yielding `O(1)` DAC count at grid-competitive logical clock speed — provided the cooling schedule
 > that WISE demands (§0.4) does not eat the gain.
 
+> **Update (2026-10-23): read the 25× as one configuration's number, and price the demux.** The
+> 25× is 2510.23519's comparison of WISE under odd–even sort with direct control (§7.4, "up to 25X
+> longer … for logical error rates near 10⁻⁹"). Its first author has since treated multiplexed
+> control in depth in **WISER** (Jones, Yang and Murali, arXiv:2609.13546), which sweeps the
+> shim demultiplexing order M and charges each gate layer `t_sc = M · t_ec` for serialised
+> electrode charging (§4.2): at M = 16 it "keeps 98.5% of the unmultiplexed clock at 6.9% of its
+> power" (§6.2). Two things in this plan follow from that. The deck's 1:100 compensation demux is
+> not free — WISE's own 1:128 costs 384 µs of shim charging per reconfiguration, about 20 % of
+> its system time (2305.12773 §V B 3) — so the hardware report now prices it from the schedule
+> (`qccd/cost/waveforms.py`). And the deck's `12×2 + 4×2` broadcast DACs are one motion bank plus
+> one hold bank behind a per-site two-way switch (deck p. 19; WISE's "stay or swap", N_set = 2),
+> so a design that drops the switches cannot hold an ion while its channel moves another (R4d).
+
 That is a claim that can be *refuted*, it is what this project is uniquely positioned to test, and
 it makes the whole software stack instrumental rather than an end in itself. It becomes milestone
 **M4**, ahead of any general architecture sweep. `Knowledge: fd_project_thesis`, `q_rotation_beats_oddeven`.

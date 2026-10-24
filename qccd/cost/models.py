@@ -409,8 +409,9 @@ class CorrectedModel(CostModel):
         turns that on, normalised so the declared `us` is the duration **at `N_ref`** and
         nothing changes at the reference length.
 
-        **No shipped architecture declares it, deliberately.** `ms_gate` cites
-        2305.03828 for its duration and does not say which of AM/FM/PM the gate is, and
+        **No shipped architecture declares it, deliberately.** `ms_gate` takes its
+        duration from TrapSIMD's Table 1 (2504.17886) and its fidelity from H2 (2305.03828),
+        and neither says which of AM/FM/PM the gate is, and
         Murali's linear scaling is FM-specific. Asserting it for an unstated gate type
         would be inventing a number rather than refining one. The mechanism is here so a
         capacity sweep can turn it on for an architecture that *does* say -- and when it

@@ -78,6 +78,10 @@ table.rp td:first-child{min-width:170px}
 pre.assert{background:#f6f7fb;border:1px solid #dfe3ee;border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.5;white-space:pre-wrap;margin:6px 0}
 pre.assert a{color:#0b5cad;text-decoration:none}pre.assert .s{color:#8a3b12}
 a.rp-pill{text-decoration:none}
+.rp-took{border-left:3px solid #1b7f3b;background:#f3f9f4;padding:9px 13px;margin:10px 0}
+.rp-took b{display:block;margin-bottom:3px}.rp-took ul{margin:4px 0 0 18px;padding:0}.rp-took li{margin:3px 0}
+.rp-by{font-size:13.5px;color:#3a3936}h3.rp-group{margin:22px 0 4px}
+table.rp-index small.rp-tk{display:block;color:#6b6a66;margin-top:3px}
 """
 
 
@@ -178,8 +182,8 @@ def _rules_section(p: dict, res: dict | None) -> str:
     out = ['<h3 id="rules">The rules each run is judged by</h3>',
            f"<p>This paper's model is written as the rule set{plural} {names}. Every run above "
            "was replayed and each rule of the set evaluated on it. Our schedules are held to the "
-           "same rules, and also keep each qubit's gates in the circuit's exact order (R25): our "
-           "compiler may not reorder a circuit, even where its gates commute.</p>",
+           "same rules, and also keep each qubit's gates in the circuit's exact order (R25): we "
+           "may not reorder a circuit, even where its gates commute.</p>",
            '<div class="rp-wide"><table class="rp rp-rules"><tr><th>run</th>'
            + "".join(f'<th title="{_e(cat[i].title if i in cat else i)}">'
                      f'<a href="#rule-{_e(i)}">{_e(i)}</a></th>' for i in ids) + "</tr>"]
@@ -281,14 +285,16 @@ def _paper_section(p: dict, res: dict | None) -> str:
            + (f'their code: <a href="{_e(art["url"])}">{_e(art["url"].split("github.com/")[-1])}</a> '
               f'({_e(lic)})' if art.get("commit") else "their code: not published")
            + '</p>',
-           f'<p>{_e(p["what"])}</p>']
+           f'<p>{_e(p["what"])}</p>' + _took(p)]
     if art.get("note"):
         out.append(f'<p><small>{_e(art["note"])}</small></p>')
     out.append(_figures(p))
     metric = _metric_of(p)
-    rows = [r for r in (res or {}).get("runs", []) if "missing" not in r]
+    group_of = {x["id"]: x.get("group") for x in p["runs"]}
+    every = [r for r in (res or {}).get("runs", []) if "missing" not in r]
+    rows = [r for r in every if not group_of.get(r["id"])]
+    head = {"last_start_us": "start of the last step", "moves": "shuttles"}.get(metric, "time")
     if rows:
-        head = {"last_start_us": "start of the last step", "moves": "shuttles"}.get(metric, "time")
         out.append('<table class="rp"><tr><th>configuration</th>'
                    f'<th>{head}: their code</th><th>our replay</th><th>the paper</th>'
                    '<th>the paper\'s rules</th></tr>')
@@ -320,6 +326,22 @@ def _paper_section(p: dict, res: dict | None) -> str:
                        for q in ratios) + "</table>")
     for note in catalog.NOTES.get(key, []):
         out.append(f'<div class="rp-note"><b>{_e(note["title"])}</b>{_e(note["text"])}</div>')
+    # runs of a later version of the artifact (Jones: the authors' fix), after the notes
+    # that explain them and in a table of their own, so the paper's own rows stay its own
+    for gid, g in (p.get("groups") or {}).items():
+        grows = [r for r in every if group_of.get(r["id"]) == gid]
+        if not grows:
+            continue
+        out.append(f'<h3 class="rp-group">{_e(g["title"])}</h3><p>{_e(g["text"])}</p>')
+        out.append('<table class="rp"><tr><th>configuration</th>'
+                   f'<th>{head}: their code</th><th>our replay</th><th>the paper\'s rules</th></tr>')
+        for r in grows:
+            t, o, _ = _compare_cells(r, metric)
+            watch = (f'<br><a class="rp-watch" href="{_e(p["key"])}/{_e(r["id"])}.html">▶ watch it in the Studio</a>'
+                     + _timed_link(p, r["id"]))
+            out.append(f'<tr><td>{_e(r.get("label", r["id"]))}{watch}</td><td class="n">{t}</td>'
+                       f'<td class="n">{o}</td><td>{_rules_pill(r.get("rules")) or _checks(r)}</td></tr>')
+        out.append("</table>")
     out.append(_ours_box(p, res))
     out.append(_rules_section(p, res))
     note = _studio_note(p, res) or _clock_note(p, res)
@@ -478,13 +500,58 @@ def _ratio(theirs: float, ours: float, lower_better: bool = True) -> str:
     return f'<span class="{"rp-ok" if better else "rp-bad"}">{k:.2f}× {word}</span>'
 
 
+def _took_rules(p: dict) -> list[str]:
+    """The rules whose statement cites this paper, as the Rules page prints their sources."""
+    from ..ruleset import catalogue, rule_order
+    arx = p.get("arxiv")
+    if not arx:
+        return []
+    return sorted((r.id for r in catalogue().rules if f"arXiv:{arx}" in (r.source or "")),
+                  key=rule_order)
+
+
+def _took(p: dict) -> str:
+    """What this website takes from the paper: the rules that cite it (read off the rules
+    catalogue, so the list cannot drift from the Rules page) and the numbers, ideas and
+    designs in `catalog.TOOK`, each saying where it is used."""
+    ids = _took_rules(p)
+    items = []
+    if ids:
+        links = ", ".join(f'<a href="../../rules/#{_e(i)}">{_e(i)}</a>' for i in ids)
+        items.append(f"<li>{'Rules' if len(ids) > 1 else 'Rule'} {links} "
+                     f"{'cite' if len(ids) > 1 else 'cites'} it as a source.</li>")
+    items += [f"<li>{_e(t)}</li>" for t in catalog.TOOK.get(p["key"], [])]
+    if not items:
+        return ""
+    return ('<div class="rp-took"><b>What this website takes from this paper</b><ul>'
+            + "".join(items) + "</ul></div>")
+
+
+def _made_by(spec: dict) -> str:
+    """Which program made our schedules for this paper: a scheduler written for the paper's
+    model, not the compiler that compiles this website's leaderboard entries, and what it
+    keeps of the paper's own compilation and what it changes."""
+    tool = spec.get("tool")
+    if not tool:
+        return ""
+    path, kind = tool
+    # the scheduler by its name, never its path: a page says nothing about the tree it was
+    # built from (tests/_rendered_paths.mjs)
+    name = Path(path).stem
+    out = (f'<p class="rp-by">Made by <code>{_e(name)}</code>, {_e(kind)}; it is not the compiler '
+           "that compiles this website's leaderboard entries.")
+    if spec.get("keeps"):
+        out += f" It keeps {_e(spec['keeps'])}, and changes {_e(spec['changes'])}."
+    return out + "</p>"
+
+
 def _ours_box(p: dict, res: dict | None) -> str:
     """Our own schedules on the paper's machine, each checked like the paper's (strict
     durations, the paper's circuit), next to the paper's own run."""
     key = p["key"]
     spec = catalog.OURS.get(key)
     rows = [o for o in (res or {}).get("ours", []) if o.get("ok")]
-    head = '<div class="rp-ours"><b>Our compiler on the same machine, under the same rules</b>'
+    head = '<div class="rp-ours"><b>Our schedule on the same machine, under the same rules</b>'
     if not spec or not rows:
         return (head + "Not yet: no schedule of ours for this paper has been checked. Nothing "
                 "is shown here until one passes every rule the paper's own schedules are held to."
@@ -493,7 +560,7 @@ def _ours_box(p: dict, res: dict | None) -> str:
              "cyclone": "Cyclone's rules", "jones": "the paper's rules, its declared locks included",
              "tiscc": "TISCC's rules", "qccdsim (gates as a set)": "QCCDSim's rules, gates in any order the "
              "paper allows"}
-    out = [head + f"<p>{_e(spec['how'])} Each schedule below is replayed by the same checker "
+    out = [head + _made_by(spec) + f"<p>{_e(spec['how'])} Each schedule below is replayed by the same checker "
            "as the paper's, with the same timing law and circuit; an operation the paper's law "
            "does not price is refused.</p>"]
     moves_first = key == "saki2022"
@@ -502,9 +569,14 @@ def _ours_box(p: dict, res: dict | None) -> str:
     # a paper whose own runs include one that keeps the circuit's order (Moveless's
     # ancilla-only MAO) gets it beside ours: ours keep the order too, so that is the like-for-like
     in_order = not moves_first and any(o.get("also") for o in rows)
+    # further runs of the paper's shown beside ours (Jones: its fixed code with barriers, and the
+    # published code), one column pair each; ``against`` stays the like-for-like comparison
+    beside = list(spec.get("beside_labels", ())) if not moves_first else []
     cols = (["shuttles: QCCDSim", "Muzzle", "ours", "time: QCCDSim", "Muzzle", "ours"] if moves_first
-            else [("start of the last step: " if tm == "last_start_us" else "") + "their code", "ours", ""]
+            else [("start of the last step: " if tm == "last_start_us" else "")
+                  + spec.get("theirs_label", "their code"), "ours", ""]
             + (["their run in the circuit's order", ""] if in_order else [])
+            + [x for lab in beside for x in (lab, "")]
             + (["fidelity: theirs", "ours"] if fid else []))
     out.append('<table class="rp"><tr><th>configuration</th>'
                + "".join(f"<th>{_e(c)}</th>" for c in cols) + "<th>the paper's rules</th></tr>")
@@ -534,6 +606,13 @@ def _ours_box(p: dict, res: dict | None) -> str:
                 al = (o.get("also") or {}).get("measured", {})
                 cells += ([_num(al[tm], "makespan_us"), _ratio(al[tm], m[tm])] if tm in al
                           else ["–", ""])
+            for i in range(len(beside)):
+                b = (o.get("beside") or [])[i] if i < len(o.get("beside") or []) else {}
+                bm = b.get("measured", {})
+                mark = ("" if b.get("ok", True) else
+                        ' <span class="rp-bad" title="fails the paper&#39;s own rules; see the note above">*</span>')
+                cells += ([_num(bm[tm], "makespan_us") + mark, _ratio(bm[tm], m[tm])] if tm in bm
+                          else ["–", ""])
             if fid:
                 cells += [_num(t["fidelity"], "fidelity"),
                           f"<b>{_num(m['fidelity'], 'fidelity')}</b> "
@@ -543,6 +622,9 @@ def _ours_box(p: dict, res: dict | None) -> str:
         out.append(f'<tr><td>{_e(o["label"])}{vs_line}{watch}</td>'
                    + "".join(f'<td class="n">{c}</td>' for c in cells) + f"<td>{pill}</td></tr>")
     out.append("</table>")
+    if any(not b.get("ok", True) for o in rows for b in o.get("beside") or []):
+        out.append("<p><small>* that schedule fails the paper's own rules (see the note above), so "
+                   "it is shown for reference only.</small></p>")
     if moves_first:
         out.append("<p><small>* Muzzle's own schedule breaks trap capacity (see the note above); "
                    "its numbers are shown as its code printed them.</small></p>")
@@ -613,7 +695,7 @@ def _design_section(p: dict) -> str:
            f'<a href="https://arxiv.org/abs/{_e(p["arxiv"])}">arXiv:{_e(p["arxiv"])}</a> · '
            f'its circuits: <a href="{_e(p["artifact"]["url"])}">'
            f'{_e(p["artifact"]["url"].split("github.com/")[-1])}</a></p>',
-           f'<p>{_e(p["what"])}</p>',
+           f'<p>{_e(p["what"])}</p>' + _took(p),
            f'<p><small>{_e(p["artifact"]["note"])}</small></p>']
     m = Machine.load(ROOT / key / p["arch"])
     # THE GATE ZONES BY NAME.  Every disc of this machine is grey in the site palette, so the
@@ -952,6 +1034,11 @@ def _code(p: dict) -> str:
     return _e(art.get("license") or "no license")
 
 
+def _count_word(n: int) -> str:
+    return ("zero one two three four five six seven eight nine ten eleven twelve".split()[n]
+            if 0 <= n <= 12 else str(n))
+
+
 def page(PAGE: str, STYLE: str) -> str:
     """The index: one table, one row per paper; the details are a click away."""
     papers = _papers()
@@ -959,8 +1046,12 @@ def page(PAGE: str, STYLE: str) -> str:
             "<th>their numbers, replayed</th><th>ours on the same machine</th><th></th></tr>"]
     for p in papers:
         k = _e(p["key"])
+        n_rules = len(_took_rules(p))
+        tk = ", ".join(([f"{n_rules} rule{'s' if n_rules != 1 else ''}"] if n_rules else [])
+                       + list(catalog.TOOK_SHORT.get(p["key"], ())))
+        tk = f'<small class="rp-tk">we build on its {_e(tk)}</small>' if tk else ""
         rows.append(f'<tr class="rp-row" data-href="{k}/"><td><a href="{k}/"><b>{_e(p["short"])}</b></a>'
-                    f'<br><small>{_e(p["venue"])}</small></td><td><small>{_code(p)}</small></td>'
+                    f'<br><small>{_e(p["venue"])}</small>{tk}</td><td><small>{_code(p)}</small></td>'
                     f"<td>{_replayed(p)}</td><td>{_ours_summary(p)}</td>"
                     f'<td class="n"><a href="{k}/" aria-label="details">details →</a></td></tr>')
     rows.append("</table>")
@@ -968,8 +1059,12 @@ def page(PAGE: str, STYLE: str) -> str:
         "<h1>Reproducing the literature</h1>",
         f'<p class="rp-lead">{len(papers)} published QCCD papers. For each one we ran its own code '
         "and replayed every schedule in our checker, under the paper's own rules and clock, then "
-        "compiled the same circuits on the same machine with our compiler, under the same rules. "
-        "Open a paper for its machine, every run, what we found, and the animations.</p>",
+        "scheduled the same circuits on the same machine ourselves, under the same rules. For "
+        f"{_count_word(sum(1 for p in papers if p.get('kind') != 'design'))} of them that schedule "
+        "comes from a scheduler we wrote for the paper's own model; for "
+        + " and ".join(p["short"] for p in papers if p.get("kind") == "design")
+        + " it comes from this website's compiler. Open a paper for its machine, every "
+        "run, what we found, what this website takes from it, and the animations.</p>",
         '<div class="rp-wide">' + "".join(rows) + "</div>",
         '<p class="rp-more"><a href="method/">How a paper is checked, and which rules each '
         'paper\'s model has</a> · <a href="method/#considered">Papers we read and did not '
@@ -1002,9 +1097,12 @@ def _method_page(PAGE: str, STYLE: str) -> str:
         "every run against every rule.</li>"
         "<li><b>Compare three numbers.</b> What their code printed, what our replay measures (these "
         "must be identical), and what the paper reports.</li>"
-        "<li><b>Then compile it ourselves.</b> The same circuit on the same machine, checked by the "
+        "<li><b>Then schedule it ourselves.</b> The same circuit on the same machine, checked by the "
         "same checker under the same rules, more strictly: an operation the paper's timing law "
-        "does not price is refused.</li></ol>",
+        "does not price is refused, and every qubit keeps the circuit's gate order. The schedule "
+        "comes from a scheduler we wrote for that paper's model, each named on its page; only "
+        "H2's circuits are compiled by this website's own compiler, which works in our stricter "
+        "machine model.</li></ol>",
         "<p>The rules are each paper's, not ours. Our own machine model is stricter in "
         "places (one waveform per cycle, gates and transport never in the same cycle), and under "
         "it most of these schedules would not be legal at all; that is a different question, "
@@ -1438,7 +1536,7 @@ def _model_section(p: dict) -> str:
            f'<p class="rp-cite">{_e(authors)}. <i>{_e(p["title"])}</i>. {_e(p["venue"])}. '
            f'<a href="https://arxiv.org/abs/{_e(p["arxiv"])}">arXiv:{_e(p["arxiv"])}</a> · '
            "their code: not published</p>",
-           f'<p>{_e(p["what"])}</p>', f'<p><small>{_e(p["artifact"]["note"])}</small></p>']
+           f'<p>{_e(p["what"])}</p>' + _took(p), f'<p><small>{_e(p["artifact"]["note"])}</small></p>']
     ex = [r for r in runs if r.get("kind") == "example"]
     if ex:
         out.append("<p>The paper works two examples out to the microsecond (Figs. 6 and 7). Each is "
@@ -1460,7 +1558,10 @@ def _model_section(p: dict) -> str:
                    "all four fails the duration check.</p>")
     main = [r for r in runs if r.get("kind") == "ours" and r.get("compare", {}).get("paper")]
     if main:
-        out.append('<div class="rp-ours"><b>Our compiler on the same machine, under the same rules</b>'
+        out.append('<div class="rp-ours"><b>Our schedules on the same machine, under the same rules</b>'
+                   '<p class="rp-by">Made by <code>schedule_ours</code>, '
+                   "a scheduler we wrote for the paper's model; it is not the compiler that compiles this "
+                   "website's leaderboard entries.</p>"
                    "<p>The paper's results table (Table 3) gives, for four benchmarks on four grid "
                    "sizes and two trap lengths, the time of its compiler's schedule. With no code "
                    "or circuits published, this is a model-level comparison: the device, the "
@@ -1585,7 +1686,7 @@ def _ionshuttler_section(p: dict) -> str:
            f'<a href="https://arxiv.org/abs/{_e(p["also"]["arxiv"])}">arXiv:{_e(p["also"]["arxiv"])}</a> · '
            f'their code: <a href="{_e(art["url"])}">{_e(art["url"].split("github.com/")[-1])}</a> '
            f'({_e(art["license"])})</p>',
-           f'<p>{_e(p["what"])}</p>', f'<p><small>{_e(art["note"])}</small></p>']
+           f'<p>{_e(p["what"])}</p>' + _took(p), f'<p><small>{_e(art["note"])}</small></p>']
     first = next((r for r in res.get("runs", []) if r.get("config") == "sat_L4411_fra12"), None)
     if first:
         from ..api import Machine
@@ -1631,10 +1732,13 @@ def _ionshuttler_section(p: dict) -> str:
         out.append(f'<div class="rp-note"><b>{_e(note["title"])}</b>{_e(note["text"])}</div>')
     ours = res.get("ours", {})
     rows = [o for o in ours.get("runs", []) if o.get("ok")]
-    out.append('<div class="rp-ours"><b>Our compiler on the same machine, under the same rules</b>')
+    out.append('<div class="rp-ours"><b>Our schedules on the same machine, under the same rules</b>')
     if not rows:
         out.append("Not yet.</div>")
         return "\n".join(out)
+    out.append('<p class="rp-by">Made by <code>schedule_ours</code>, '
+               "a scheduler we wrote for this comparison; it is not the compiler that compiles this "
+               "website's leaderboard entries.</p>")
     out.append("<p>Our scheduler works in the heuristic's own model: its device, its processing "
                "zone and parking edge, the placement its run of each seed starts from, one edge per "
                "chain per step through one node, one gate at a time. The SAT tool's model differs "

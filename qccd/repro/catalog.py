@@ -198,9 +198,18 @@ PAPERS: list[dict] = [
         "authors": ["Scott Jones", "Prakash Murali"],
         "venue": "ASPLOS 2026", "year": 2026, "arxiv": "2510.23519",
         "artifact": {"url": "https://github.com/scottjones03/PartIIProject", "commit": "d235a22",
-                     "license": None,
-                     "note": "The README says MIT but the repository has no license file: we ran it "
-                             "locally and publish only the schedules it produced."},
+                     "license": "MIT",
+                     "note": "The paper's runs are from d235a22, the code behind its Table 2. The "
+                             "authors fixed the gate order of its grid schedules in afbd1b4 "
+                             "(2026-10-22), which also adds the MIT licence file the README "
+                             "already named; those runs are in their own table below."},
+        "groups": {"afbd1b4": {
+            "title": "The same grids with the authors' fix (afbd1b4, 2026-10-22)",
+            "text": "afbd1b4 hands the circuit's layer barriers to the router, so every qubit keeps "
+                    "the circuit's gate order; it also adds pass_barriers=False, which orders the "
+                    "same operations by the components' happens-before relation alone, without "
+                    "barriers. Both are run here at every distance, with the same driver as "
+                    "above. The operations, and each ion's route, are the same as at d235a22."}},
         "what": "A compiler for surface-code rounds on grid, linear and switch QCCD devices, and a "
                 "design-space study of trap capacity, wiring and logical error.",
         "model": {"profile": "JONES", "law": "jones"},
@@ -215,6 +224,16 @@ PAPERS: list[dict] = [
                         "paper": {"last_start_us": [paper_us, "Table 2", "printed"]}},
              "label": f"rotated surface code d={d}, one round, grid, capacity 2"}
             for d, paper_us in ((2, 4055), (3, 4085), (6, 4085), (12, 4085))
+        ] + [
+            {"id": f"grid_rot_d{d}_c2_afbd1b4{suffix}", "file": f"grid_rot_d{d}_c2_afbd1b4{suffix}.schedule.json.gz",
+             "importer": "jones", "profile": "JONES", "law": "jones", "group": "afbd1b4",
+             "circuit": {"kind": "stim", "file": f"rotated_memory_z_d{d}_r1.stim"},
+             "expect": {"tool": {"last_start_us": [
+                 "metrics", "time for operations (us) = max(parallelOpsMap.keys())*1e6 [start of last step]"]}},
+             "label": f"rotated surface code d={d}, one round, grid, capacity 2, {how}"}
+            for suffix, how in (("", "layer barriers (the default)"),
+                                ("_hb", "pass_barriers=False"))
+            for d in (2, 3, 6, 12)
         ] + [
             {"id": f"linear_rep_d3_c{c}", "file": f"linear_rep_d3_c{c}.schedule.json.gz",
              "importer": "jones", "profile": "JONES", "law": "jones",
@@ -351,17 +370,21 @@ NOTES: dict[str, list[dict]] = {
                  "again 80 µs later. The round time is not affected."},
     ],
     "jones2025": [
-        {"title": "Gate order on the data qubits",
-         "text": "The router keeps each ancilla's gates in circuit order but not each data qubit's. "
-                 "In the d = 3 schedule, data qubit 17 (the artifact's ion D70) meets X-check "
-                 "ancilla 25 (M80) in routing pass 2, before Z-check ancilla 18 (M61) in pass 3; "
-                 "the circuit has the opposite order. Rebuilt "
-                 "with the CX gates in the router's order, the noiseless circuit has "
-                 "non-deterministic Z detectors on the grid at d = 2, 3, 6 and 12, while the paper's "
-                 "circuit file's own order, rebuilt the same way, has none; the linear and switch schedules keep the "
-                 "circuit's order. The artifact's error-rate simulation follows the circuit's "
-                 "original order, so its logical error rates are for the circuit as written; the "
-                 "4,085 µs is the time of the reordered schedule."},
+        {"title": "Gate order on the data qubits, fixed by the authors",
+         "text": "In the code behind Table 2 (d235a22) the router works layer by layer, but the "
+                 "benchmark entry point did not hand it the layer barriers, so an ancilla deferred "
+                 "to a later routing pass could be overtaken on a shared data qubit. In the d = 3 "
+                 "schedule, data qubit 17 (the artifact's ion D70) meets X-check ancilla 25 (M80) "
+                 "in routing pass 2, before Z-check ancilla 18 (M61) in pass 3; the circuit has the "
+                 "opposite order. Rebuilt with the CX gates in that order, the noiseless circuit "
+                 "has non-deterministic Z detectors on the grid at d = 2, 3, 6 and 12; the linear "
+                 "and switch schedules keep the circuit's order. The artifact's error-rate "
+                 "simulation follows the circuit as written, so the paper's logical error rates "
+                 "are unaffected; only the timed grid schedules were of a reordered circuit. The "
+                 "authors confirmed this and fixed it in afbd1b4 (2026-10-22): every qubit now "
+                 "keeps the circuit's order, with the same operations and the same routes, in "
+                 "4,010 µs at every distance (3,405 to 3,415 µs without barriers). Those runs are "
+                 "replayed below and pass every rule, strict order included."},
         {"title": "Two timing models in Table 2",
          "text": "Table 2's switch row (5,325 µs at d = 3) comes out of the artifact only in its 2024 "
                  "version, where a junction entry or exit takes 100 µs; the current code, "
@@ -494,6 +517,7 @@ PAPERS.append({
 _Q = ("QCCDSIM", "QCCDSIM_PHYSICAL")
 OURS: dict[str, dict] = {
     "murali2020": {
+        "tool": ("qccd/repro/sched.py", "a list scheduler we wrote for the QCCDSim family's model"),
         "how": "A list scheduler of our own over QCCDSim's primitives: every candidate step is "
                "timed exactly before it is chosen, with look-ahead; the qubits are spread over all "
                "six traps; a gate swap is used only where the chain bookkeeping of QCCDSim and of "
@@ -515,6 +539,7 @@ OURS: dict[str, dict] = {
                  "ions have nowhere to go at these capacities.",
     },
     "saki2022": {
+        "tool": ("qccd/repro/sched.py", "a list scheduler we wrote for the QCCDSim family's model"),
         "how": "The same scheduler as for QCCDSim, on the paper's device. It minimises time, "
                "not shuttles, so it is compared on both.",
         "runs": [{"id": f"{b}_ours", "file": f"ours/{b}_ours.schedule.json.gz",
@@ -526,6 +551,7 @@ OURS: dict[str, dict] = {
                  "ahead of ours on every benchmark; ours is faster where it is faster.",
     },
     "bach2025": {
+        "tool": ("qccd/repro/sched.py", "a list scheduler we wrote for the QCCDSim family's model"),
         "how": "The same scheduler as for QCCDSim, on the paper's G2x3 device with QCCDSim's "
                "primitives. The paper's own compilers are not public, so they are compared by "
                "the numbers the paper prints, under the paper's model rather than this one.",
@@ -535,6 +561,7 @@ OURS: dict[str, dict] = {
                   "label": "QFT-20 on G2x3, capacity 5"}],
     },
     "khan2026cyclone": {
+        "tool": ("qccd/repro/opt_cyclone.py", "a placement search we wrote for Cyclone's ring and its cost model"),
         "how": "The same ring, the same traps, one ancilla per trap, Cyclone's own clock. Every qubit "
                "runs its CNOTs in exactly the circuit's order, even where two commute: each ancilla does "
                "its check's CNOTs in the listed order, each data qubit meets its checks in the listed "
@@ -563,6 +590,7 @@ OURS: dict[str, dict] = {
                  "search, so they are upper bounds, not optima.",
     },
     "khan2025moveless": {
+        "tool": ("qccd/repro/sched_moveless.py", "a scheduler we wrote for Moveless's one-ancilla benchmarks"),
         "how": "Every CNOT uses the one ancilla, so the CNOTs run one after another (100 µs each); what "
                "a compiler can save is the ancilla's travel. Ours runs them in exactly the order the "
                "benchmark file lists them, even where two commute: the order is the file's, not ours to "
@@ -588,6 +616,13 @@ OURS: dict[str, dict] = {
                  "their time, and the searched placement is 1.2-1.5x faster.",
     },
     "jones2025": {
+        "tool": ("qccd/repro/sched_jones.py", "a scheduler we wrote for this comparison"),
+        "keeps": "the paper's device, its placement of qubits in traps, its native decomposition of "
+                 "H and CNOT and its timing law",
+        "changes": "each ancilla's tour and the scheduling",
+        "theirs_label": "their code, fixed, without barriers",
+        # one header per entry of each run's `beside`, in order
+        "beside_labels": ["their code, fixed, with layer barriers", "as published (d235a22)"],
         "how": "The same grid, the same placement of qubits in traps, the paper's operation times and "
                "its rule that an operation holds every component it names (a split or merge also holds "
                "the junction at the far end of its segment, an entry or exit holds the junction and the "
@@ -600,19 +635,25 @@ OURS: dict[str, dict] = {
                "junction lets ions through in the order of the circuit's CNOT layers, and every ion ends "
                "in the trap it started in.",
         "runs": [{"id": f"grid_rot_d{d}_c2_ours", "file": f"ours/grid_rot_d{d}_c2_ours.schedule.json.gz",
-                  "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES",),
+                  "against": f"grid_rot_d{d}_c2_afbd1b4_hb", "same_ops": "sequence",
+                  "beside": [f"grid_rot_d{d}_c2_afbd1b4", f"grid_rot_d{d}_c2"], "profiles": ("JONES",),
                   "label": f"rotated surface code d={d}, one round, grid, capacity 2"}
                  for d in (2, 3, 6, 12)],
-        "found": "The paper's own grid schedules fail the circuit check: a data qubit meets two of its "
-                 "CNOTs in an order the circuit does not allow. Ours keep every qubit's CNOTs in exactly "
-                 "the circuit's order, with the same operations. In that order one kind of check ancilla "
-                 "meets both data qubits around one end of its trap and then both around the other (6 "
-                 "trips), while the other kind alternates ends (8 trips); those tours set the round's "
-                 "length, about the same at every distance. The table gives the start of the last "
-                 "operation, the time the paper reports; for both schedules it is a final reset, 50 µs "
-                 "before the end.",
+        "found": "Like for like, ours is compared with the authors' fixed code run without barriers "
+                 "(pass_barriers=False), which orders operations by the same happens-before discipline "
+                 "as ours: both keep every qubit's gates in the circuit's order, and each ion's own "
+                 "operations (gates, rotations, measurement, reset) are the same, with the same partners "
+                 "in the same order. The difference is the ancilla tours. Theirs sends each ancilla to "
+                 "one data qubit and back for every CNOT; ours visits its data in turn, with fewer "
+                 "splits, merges and junction crossings (42 of each against 48 at d = 3, 924 against "
+                 "1,056 at d = 12). In the circuit's order one kind of check ancilla meets both data "
+                 "qubits around one end of its trap and then both around the other (6 trips), while the "
+                 "other kind alternates ends (8 trips); those tours set the round's length, about the "
+                 "same at every distance. The table gives the start of the last operation, the time "
+                 "the paper reports; for every schedule here it is a final reset, 50 µs before the end.",
     },
     "leblond2023": {
+        "tool": ("qccd/repro/sched_tiscc.py", "a scheduler we wrote for TISCC's surface-code round"),
         "how": "TISCC's own operations for every ion, with the same partners in the same order "
                "(preparation, rotations, the ZZ gates, measurement), on TISCC's grid and clock. "
                "What changes is the transport: for each ZZ either the measure ion goes to the "
@@ -633,6 +674,75 @@ OURS: dict[str, dict] = {
                  "same layer at one junction, their crossings take turns (a search over who "
                  "travels, not a proof that nothing shorter exists).",
     },
+}
+
+#: What this website takes from each paper besides the rules that cite it (those are read off
+#: the rules catalogue, so they cannot drift from the Rules page): the numbers, ideas and
+#: designs, each saying where it is used.  Every entry was checked against the code and the
+#: paper; a number the paper does not contain is not credited to it.
+TOOK: dict[str, list[str]] = {
+    "murali2020": [
+        "The transport times of the default timing table: shuttle 5 µs, split and merge 80 µs, "
+        "junction crossing 100 µs and X-junction 120 µs are QCCDSim's, which Jones and Murali "
+        "carry over; the table is named qccdsim_jones after both.",
+        "The two-qubit gate's error growing with the chain length N in the gate zone as N/ln N, "
+        "in the default device and the noise model.",
+        "The grid generator and the grid baseline device, a QCCDSim-style grid.",
+    ],
+    "khan2026cyclone": [
+        "Rigid rotation of a ring with the data parked and the ancillas riding, half of the "
+        "question this project started from and the pass our compiler's rotate mode runs.",
+        "The base ring device (cyclone_base) and the cyclone timing table: move 10 µs, junction "
+        "crossings by degree, split and merge 80 µs.",
+        "Assigning checks to ancillas as they arrive, in the bivariate-bicycle schedules.",
+    ],
+    "jones2025": [
+        "The objective: runtime stands for idling noise and the number of routing operations "
+        "for heating, which this project's plan makes one objective.",
+        "That transport does not cause gate error directly but heats, and heating degrades the "
+        "next gate; and the heating bound of each transport primitive in its Table 1 (shuttle "
+        "below 0.1 quanta, split and merge below 6, junction entry or exit below 3), which the "
+        "default timing table, qccdsim_jones, carries with QCCDSim's times.",
+        "The default device's reset (50 µs, error 5×10⁻³), and reordering a chain with a gate "
+        "swap of three two-qubit gates.",
+        "The question this project started from: what broadcast (WISE) control costs in logical "
+        "clock speed, which it puts at up to 25× under odd–even sort. Its first author's WISER "
+        "(arXiv:2609.13546) treats multiplexed control in more depth; this website's accounting "
+        "of the compensation demultiplexer draws on its model of the multiplexing order.",
+        "Odd–even transposition sort as a reconfiguration scheme, and that cooling is mandatory "
+        "under broadcast wiring.",
+        "The leaderboards' time column, T_jones, is priced with the qccdsim_jones table.",
+    ],
+    "schoenberger2024": [
+        "The idea of an exact SAT search as an optimality oracle for small instances, which the "
+        "compiler's router uses.",
+    ],
+    "ruan2025": [
+        "The movement classes of JT-SIMD (12 shifts and 6 swaps on an X-junction grid): our "
+        "simd_classes control model, with one class per cycle and variable participation.",
+        "Event-scheduled instructions without barriers, and an objective that adds −ln F over "
+        "the operations.",
+        "The default device's gate and measurement times (25 µs two-qubit, 5 µs one-qubit, "
+        "120 µs measurement) and its 600 s coherence time, from its Table 1 and Sec. 6.1. Our "
+        "device files credit these to H2 and to Jones and Murali, which is wrong; those files "
+        "are pinned by the released boards, so the next physics release corrects them.",
+    ],
+    "moses2023": [
+        "The race-track device and its conveyor: a bend is not a junction, and a few broadcast "
+        "signals drive a conveyor's wells.",
+        "The default device's two-qubit, one-qubit and SPAM fidelities.",
+        "Global Doppler cooling by sheet beams, and the race-track pass of our compiler.",
+    ],
+}
+
+#: The same in a few words, for the index ("we build on its 7 rules, ...").
+TOOK_SHORT: dict[str, tuple[str, ...]] = {
+    "murali2020": ("transport times", "chain-length error", "grid baseline"),
+    "khan2026cyclone": ("rigid rotation", "ring device and timing table"),
+    "jones2025": ("objective", "transport heating bounds", "starting question"),
+    "schoenberger2024": ("SAT-oracle idea",),
+    "ruan2025": ("movement classes", "gate and measurement times"),
+    "moses2023": ("race-track device", "gate fidelities"),
 }
 
 #: Papers read in full and not reproduced, with the reason; the page lists them.

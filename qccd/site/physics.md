@@ -54,16 +54,16 @@ Not every graph is a surface trap, and three rules say which are. A junction is 
 
 ## Transport primitives, and what each one costs
 
-Transport is done by walking the DC voltages. The elementary moves are the **primitives**, and each is a curve of measured points trading speed against motional excitation: run it faster and the ion picks up more quanta. The physics of that trade is the driven oscillator: a well moved with acceleration `a(t)` drives the ion at its secular frequency, and the quanta left behind are the Fourier component of the acceleration at ω, `Δn̄ = (m / (2·ħ·ω)) · ‖∫ a(t)·e^{iωt} dt‖²`, so a slower, smoother waveform can leave almost nothing behind while a fast one leaves a lot. The table below is the default document's `qccdsim_jones` operating point, which comes from Jones and Murali's cost table; the `transport_excitation` table from Munoz and colleagues offers a slower, colder point for several of them, and the studio lets you choose which point a design runs at.
+Transport is done by walking the DC voltages. The elementary moves are the **primitives**, and each is a curve of measured points trading speed against motional excitation: run it faster and the ion picks up more quanta. The physics of that trade is the driven oscillator: a well moved with acceleration `a(t)` drives the ion at its secular frequency, and the quanta left behind are the Fourier component of the acceleration at ω, `Δn̄ = (m / (2·ħ·ω)) · ‖∫ a(t)·e^{iωt} dt‖²`, so a slower, smoother waveform can leave almost nothing behind while a fast one leaves a lot. The table below is the default document's operating point, and each row says where its numbers come from. The transport rows are the `qccdsim_jones` table: the times of the QCCDSim simulator of Murali and colleagues, with the heating bound Jones and Murali attach to each in their cost table. The other rows come from other papers. The `transport_excitation` table from Munoz and colleagues offers a slower, colder point for several of them, and the studio lets you choose which point a design runs at.
 
-| primitive | what it is | time | quanta |
-|---|---|---:|---:|
-| shuttle, one segment | the well slides one site along the RF null | 5 µs | 0.1 |
-| split or merge | one well is pinched into two, or two joined into one | 80 µs | 6.0 |
-| junction crossing | the ion passes a node where three axes meet | 100 µs | 3.0 |
-| ion swap | two ions in one well exchange order by rotating the crystal | 18 µs | 1.0 |
-| MS gate | the entangling gate | 25 µs | at most 1.0, by rule [R7](../rules/#R7) |
-| cool | global Doppler cooling, every ion at once | 300 µs | removes all |
+| primitive | what it is | time | quanta | from |
+|---|---|---:|---:|---|
+| shuttle, one segment | the well slides one site along the RF null | 5 µs | 0.1 | [Jones and Murali](https://arxiv.org/abs/2510.23519), Table 1 (time also [QCCDSim](https://arxiv.org/abs/2004.04706)) |
+| split or merge | one well is pinched into two, or two joined into one | 80 µs | 6.0 | [Jones and Murali](https://arxiv.org/abs/2510.23519), Table 1 (time also QCCDSim) |
+| junction crossing | the ion passes a node where three axes meet | 100 µs | 3.0 | [Jones and Murali](https://arxiv.org/abs/2510.23519), Table 1: their junction entry or exit, charged here once per crossing |
+| ion swap | two ions in one well exchange order by rotating the crystal | 18 µs | 1.0 | [Munoz and colleagues](https://arxiv.org/abs/2605.25118); Jones and Murali reorder with three gates instead |
+| MS gate | the entangling gate | 25 µs | at most 1.0, by rule [R7](../rules/#R7) | time: [TrapSIMD](https://arxiv.org/abs/2504.17886), Table 1 (Jones and Murali use 40 µs); error: [H2](https://arxiv.org/abs/2305.03828) |
+| cool | global Doppler cooling, every ion at once | 300 µs | removes all | [Helios](https://arxiv.org/abs/2511.05465) |
 
 Two of these deserve a word. Splitting a chain is sixty times as hot as a shuttle, because the well must be deformed through a point where the confinement along the axis nearly vanishes. And a junction is not simply a bend: where three or more RF nulls meet, the RF field cannot vanish smoothly, and residual **RF barriers** rise on the approaches; carrying an ion over them without excitation takes a carefully shaped waveform and still heats. A corner of the RF null, where two axes meet, has no such barrier, and rule [R18](../rules/#R18) says a bend is ordinary transport. Measured on an X-junction trap, an ion survived about 65 uncooled round trips at over 98% and was **lost** from the trap beyond about 85, so excitation is not only a fidelity problem but, past a point, a loss of the qubit.
 

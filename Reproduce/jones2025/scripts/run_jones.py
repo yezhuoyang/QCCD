@@ -12,6 +12,12 @@ functions from the outside to *observe* their inputs/outputs:
                                                            junction/segment occupancy after every op
                                                            (ops run during routing in allOps order)
 
+Two commits are run.  d235a22 is the code behind the paper's Table 2.  afbd1b4 (2026-10-22) is
+the authors' fix after our gate-order note: process_circuit now hands the parser's layer
+barriers to ionRouting, and gained `pass_barriers=False`, which schedules by the components'
+happens-before relation alone.  `--pass-barriers false` asks for that; the default call is the
+d235a22 call byte for byte, and at d235a22 `layerBarriers` is never passed.
+
 Recipes
   process_circuit : src.simulator.qccd_circuit.process_circuit(d, c, gate_improvements=[], num_shots=1)
                     (the driver used by experiments/trap_capacity_experiments.py; gate_improvements=[]
@@ -45,6 +51,8 @@ def main():
     ap.add_argument("--topology-note", default="")
     ap.add_argument("--command-line", default="")
     ap.add_argument("--commit", default="")
+    # ADAPTATION (afbd1b4): "default" = call process_circuit without the keyword
+    ap.add_argument("--pass-barriers", choices=["default", "false"], default="default")
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
@@ -156,13 +164,19 @@ def main():
 
     real_ionRouting = qc.ionRouting
 
-    def ionRouting(arch, instructions, trapCapacity):
+    def ionRouting(arch, instructions, trapCapacity, layerBarriers=None):
+        # ADAPTATION (afbd1b4): process_circuit now passes layerBarriers=...; pass it through
+        # unchanged. At d235a22 it is never passed, and the real call stays 3-argument.
         cap["device"] = snapshot_device(arch)
         cap["initial_layout"] = {str(t.idx): [i.idx for i in t.ions] for t in arch._manipulationTraps if t.ions}
         cap["ion_labels"] = {str(i.idx): i.label for i in arch.ions.values()}
         cap["instructions"] = list(instructions)
         cap["trapCapacity_arg"] = trapCapacity
-        allOps, barriers = real_ionRouting(arch, instructions, trapCapacity)
+        cap["layerBarriers_arg"] = list(layerBarriers) if layerBarriers is not None else None
+        if layerBarriers is None:
+            allOps, barriers = real_ionRouting(arch, instructions, trapCapacity)
+        else:
+            allOps, barriers = real_ionRouting(arch, instructions, trapCapacity, layerBarriers=layerBarriers)
         cap["allOps"] = list(allOps)
         cap["barriers"] = list(barriers)
         return allOps, barriers
@@ -177,6 +191,20 @@ def main():
         return m
 
     qc.paralleliseOperationsWithBarriers = paralleliseOperationsWithBarriers
+
+    # ADAPTATION (afbd1b4): with pass_barriers=False process_circuit calls
+    # paralleliseOperations(allOps) directly (the name in qccd_circuit's namespace; the barrier
+    # version calls its own module's copy, which this does not touch).
+    real_par_plain = getattr(qc, "paralleliseOperations", None)
+
+    def paralleliseOperations(ops):
+        m = real_par_plain(ops)
+        cap["parallelOpsMap"] = m
+        cap["scheduler"] = "paralleliseOperations (no barriers)"
+        return m
+
+    if real_par_plain is not None:
+        qc.paralleliseOperations = paralleliseOperations
 
     # ---------- run ----------
     d, c = args.distance, args.capacity
@@ -201,7 +229,12 @@ def main():
             circuit_holder["args"] = (a, k)
             return circ
         qc.QCCDCircuit.generated = generated
-        results = qc.process_circuit(d, c, [], 1)
+        # ADAPTATION (afbd1b4): pass_barriers is a keyword of process_circuit; pass it only when
+        # asked for False, so the default call is byte-for-byte the call made at d235a22.
+        if args.pass_barriers == "false":
+            results = qc.process_circuit(d, c, [], 1, pass_barriers=False)
+        else:
+            results = qc.process_circuit(d, c, [], 1)
         circuit = circuit_holder["c"]
         gen_args = circuit_holder["args"]
         print(results)
@@ -399,6 +432,9 @@ def main():
             "generated_args": [list(gen_args[0]), {k: (v if not isinstance(v, (list, tuple)) else list(v)) for k, v in gen_args[1].items()}],
             "gate_improvements": [] if args.recipe == "process_circuit" else None,
             "trapCapacity_passed_to_ionRouting": cap["trapCapacity_arg"],
+            "layerBarriers_passed_to_ionRouting": cap.get("layerBarriers_arg"),
+            "pass_barriers_arg": args.pass_barriers,
+            "scheduler": cap.get("scheduler", "paralleliseOperationsWithBarriers"),
         },
         "units": "seconds (t0, t1, operationTime); *_us fields are the same in microseconds",
         "circuit_file": circ_name,

@@ -240,6 +240,11 @@ def check_ours(paper: dict, o: dict, by: dict) -> dict:
     if o.get("also") and o["also"] in by:
         row["also"] = {"id": o["also"], "measured": by[o["also"]]["measured"],
                        "ok": by[o["also"]]["ok"]}
+    # more of the paper's runs shown beside ours (Jones: the fixed code with barriers, and the
+    # published code), each as replayed; ``against`` stays the like-for-like one
+    if o.get("beside"):
+        row["beside"] = [{"id": b, "measured": by[b]["measured"], "ok": by[b]["ok"]}
+                         for b in o["beside"] if b in by]
     if o.get("paper"):
         row["paper"] = o["paper"]
     return row

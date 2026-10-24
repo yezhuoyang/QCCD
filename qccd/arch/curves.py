@@ -13,8 +13,12 @@ measurable (PLAN §3.2, milestone M5).
 Tables in use
 -------------
 ``qccdsim_jones``
-    arXiv:2510.23519 §"reconfiguration" primitive table, as reproduced in PLAN §0.3.
-    shuttle 5 us / 0.1 quanta, split-merge 80 us / 6 quanta, junction 100 us / 3 quanta.
+    arXiv:2510.23519 §"reconfiguration" primitive table (Table 1), as reproduced in PLAN
+    §0.3: shuttle 5 us / 0.1 quanta, split-merge 80 us / 6 quanta, junction 100 us / 3
+    quanta.  The times are QCCDSim's (arXiv:2004.04706), which Jones & Murali carry over
+    with heating bounds attached, hence the name; the degree-4 point (120 us) is QCCDSim's
+    X-junction.  The table holds transport only: gate, measurement and cooling times are
+    not in it (see each primitive's own `source`).
 ``transport_excitation``
     arXiv:2605.25118 measured transport-excitation framework: merge/split 30 us at
     n~1 versus 40 us at n~0.1; swap 18/20 us; single-ion transport 12/14 us.
