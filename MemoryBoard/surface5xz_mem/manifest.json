@@ -61,15 +61,15 @@
     "step": 2,
     "id": 1,
     "label": "cool",
-    "note": "the lattice cools too; 13% of its round.",
+    "note": "the lattice cools too; 3% of its round.",
     "kind": "note"
    },
    {
     "frame": 2,
     "step": 3,
     "id": 2,
-    "label": "a typical shuttle / 1 directions at once",
-    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.  ALSO: ions moving 1 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 1 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 96% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
@@ -77,11 +77,11 @@
     "step": 1453,
     "id": 1407,
     "label": "the busiest shuttle (23 ions)",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.3. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.3. Every hop is the `shuttle` class, whatever its direction.",
     "kind": "note"
    }
   ],
-  "bytes": 4472106,
+  "bytes": 4478036,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -178,15 +178,15 @@
     "step": 2,
     "id": 1,
     "label": "cool",
-    "note": "the lattice cools too; 13% of its round.",
+    "note": "the lattice cools too; 3% of its round.",
     "kind": "note"
    },
    {
     "frame": 2,
     "step": 3,
     "id": 2,
-    "label": "a typical shuttle / 1 directions at once",
-    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.  ALSO: ions moving 1 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 1 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "label": "a typical shuttle",
+    "note": "a handful of ions, each on its own route: the 96% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
@@ -194,11 +194,11 @@
     "step": 1453,
     "id": 1407,
     "label": "the busiest shuttle (23 ions)",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.3. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 2.3. Every hop is the `shuttle` class, whatever its direction.",
     "kind": "note"
    }
   ],
-  "bytes": 4470678,
+  "bytes": 4476608,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -295,7 +295,7 @@
     "step": 2,
     "id": 1,
     "label": "cool",
-    "note": "the lattice cools too; 13% of its round.",
+    "note": "the lattice cools too; 2% of its round.",
     "kind": "note"
    },
    {
@@ -303,15 +303,7 @@
     "step": 81,
     "id": 80,
     "label": "a typical shuttle",
-    "note": "a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.",
-    "kind": "note"
-   },
-   {
-    "frame": 109,
-    "step": 110,
-    "id": 108,
-    "label": "4 directions at once",
-    "note": "ions moving 4 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 4 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.",
+    "note": "a handful of ions, each on its own route: the 97% of this round that is transport is made of instructions like this one.",
     "kind": "note"
    },
    {
@@ -319,11 +311,11 @@
     "step": 319,
     "id": 315,
     "label": "the busiest shuttle (29 ions)",
-    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 4.7. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.",
+    "note": "the most ions this router ever moves at once, against a ring rotation's 144. The mean is 4.7. Every hop is the `shuttle` class, whatever its direction.",
     "kind": "note"
    }
   ],
-  "bytes": 4858830,
+  "bytes": 4864702,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -378,7 +370,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1633041,
+  "bytes": 1639254,
   "r10": null,
   "over_budget": [],
   "sites": 168,
@@ -405,7 +397,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1560695,
+  "bytes": 1566908,
   "r10": null,
   "over_budget": [],
   "sites": 40,
@@ -432,7 +424,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1621758,
+  "bytes": 1627971,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -459,7 +451,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1711311,
+  "bytes": 1717524,
   "r10": null,
   "over_budget": [],
   "sites": 288,
@@ -486,7 +478,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1575195,
+  "bytes": 1581408,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -515,7 +507,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1533420,
+  "bytes": 1539633,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -542,7 +534,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1563941,
+  "bytes": 1570154,
   "r10": null,
   "over_budget": [],
   "sites": 32,
@@ -572,7 +564,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1586963,
+  "bytes": 1593176,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
@@ -601,7 +593,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1600160,
+  "bytes": 1606373,
   "r10": null,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
@@ -633,7 +625,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1630472,
+  "bytes": 1636685,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"

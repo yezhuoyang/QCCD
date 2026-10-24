@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="qccd-page" content="6b146b5df5b2ed77">
+<meta name="qccd-page" content="21e3c25d602fefeb">
 <title>cyclone_base - circuit+cooling</title>
 <style>
 :root{
@@ -868,6 +868,11 @@ textarea.src.out{min-height:120px;opacity:.85}
         <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
         <option value="role" selected>role</option>
         <option value="heat">heating</option></select>
+        <!-- HARDWARE LABELS: the names a hardware programme is written in, on the picture.
+             On by default and on every page (here, not in #etools, which the view-only
+             embeds hide); the choice is remembered (`qccd.studio.hwlabels`). -->
+        <button class="tgl on" id="tLabels" aria-pressed="true" data-hint="hwlabels"
+                title="the names a hardware program uses, beside every site, junction and ion">Labels</button>
       </div>
       <div class="ebar" id="ebar">
         <span class="etools" id="etools">
@@ -9051,15 +9056,58 @@ function buildStatic(S){
   // ON TOP OF EVERY NODE.  A figure past the bar's end lands where the next junction is
   // drawn, and junctions drawn later in the loop covered all of "13/16" but its first digit.
   for (const id in CAPTXT) gNode.append(CAPTXT[id]);
+  // HARDWARE LABELS: the stage's own scene only (`reg.HWT`), never a palette avatar.  A
+  // site's name sits across the bar from its ions, past its electrodes, on the side that
+  // reads downwards (or rightwards on an upright bar); a junction's below and right of
+  // its square.
+  const HWT_ = S.reg.HWT;
+  if(HWT_){
+    const fs = Math.min(12, Math.max(2.5, 0.18*L.g));
+    for (const n of A.nodes){
+      const x=px(n), y=py(n);
+      let tx, ty, anchor='middle';
+      if(n.kind==='junction' || (n.cap||0)===0){
+        tx = x + L.r_junc + 0.15*fs; ty = y + L.r_junc + 0.55*fs; anchor='start';
+      } else {
+        const ax=AXIS[n.id]||{ux:1,uy:0};
+        let nx=-ax.uy, ny=ax.ux;
+        if(ny < -1e-9 || (Math.abs(ny) <= 1e-9 && nx < 0)){ nx=-nx; ny=-ny; }
+        const d = Math.max(L.site_t/2, (L.pad_off||0) + (L.pad_t||0)/2) + 0.6*fs;
+        tx = x + nx*d; ty = y + ny*d;
+        if(Math.abs(nx) > 0.9){ anchor='start'; tx = x + nx*(d - 0.6*fs) + 0.2*fs; }
+      }
+      const t=el('text',{x:tx, y:ty, 'text-anchor':anchor, 'dominant-baseline':'central',
+        'font-size':fs, 'font-weight':650, fill:C.ink||'#1f2937', 'fill-opacity':0.82,
+        stroke:'#ffffff', 'stroke-width':fs*0.28, 'stroke-linejoin':'round',
+        'paint-order':'stroke', 'pointer-events':'none'});
+      t.textContent = n.id;
+      if(HWL_SHOWN === false) t.setAttribute('display','none');
+      gNode.append(t); HWT_[n.id]=t;
+    }
+  }
 }
 
 // The stage's own scene.  `A` and `L` are MUTATED IN PLACE by the editor's `rebuild()`
 // and never reassigned, so one object literal stays live across every edit -- which is
 // why nothing here is destructured at construction.
+// HARDWARE LABELS (the user, 2026-10-23): a hardware programme names sites, junctions and
+// ions -- `p.shuttle("d0", ["S0", "J0", "A0"])` -- and the picture showed none of those
+// names unless the pointer rested on the mark.  Every node's id now sits beside it and
+// every ion's name beside the ion, ON by default; `#tLabels` hides them (remembered).
+// `HWL` is the reader's choice, `HWL_SHOWN` what is drawn: a label too small to read at
+// this zoom (a 144-site ring at fit) steps aside until you zoom in.  Declared HERE, before
+// the first `buildStatic`, which reads them.
+let HWL = true;
+try { HWL = localStorage.getItem('qccd.studio.hwlabels') !== '0'; } catch(e) { HWL = true; }
+let HWL_SHOWN = null, HWL_LIVE = false;   // LIVE: the page has drawn once; until then nothing redraws
+const HWT = {};
+// the labels' size in user units: a fraction of the lattice step, so a label sits between
+// its own bar's electrodes (to 0.40 g) and the next row's (from 0.60 g)
+const hwlFont = () => Math.min(12, Math.max(2.5, 0.18*L.g));
 const STAGE = {A, L, AXIS, role:ROLE, px, py, byId:nodeById,
                into:{loop:gLoop, seg:gSeg, elec:gElec, node:gNode},
                reg:{SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
-                    NODEEL, CAPTXT}};
+                    NODEEL, CAPTXT, HWT}};
 buildStatic(STAGE);
 
 // slot offsets, in px along the trap axis, for k ions resting on one site
@@ -9333,10 +9381,17 @@ function ionMarks(ion){
         k: el('line',{'stroke-linecap':'round','pointer-events':'none', display:'none'}),
         c: el('circle',{stroke:C.ion_stroke, 'stroke-width':L.sw_halo}),
         t: el('text',{'text-anchor':'middle','dominant-baseline':'central',
-             fill:C.ion_stroke,'font-weight':700,'pointer-events':'none'}) };
+             fill:C.ion_stroke,'font-weight':700,'pointer-events':'none'}),
+        // the ion's HARDWARE LABEL: its whole name, as a programme writes it, beside it
+        // dark ink on a white halo: outside the ion, the ion's own white outline colour
+        // (which the number inside it uses) would be white on white
+        h: el('text',{'text-anchor':'middle','dominant-baseline':'central',
+             fill:C.ink||'#1f2937','font-weight':700,'pointer-events':'none', display:'none',
+             stroke:'#ffffff','stroke-linejoin':'round','paint-order':'stroke'}) };
     p.t.textContent = ion.replace(/^[da]/,'');
+    p.h.textContent = ion;
     gWell.append(p.w); gWell.append(p.s); gWell.append(p.k); gWell.append(p.l);
-    gIon.append(p.c); gTop.append(p.t);
+    gIon.append(p.c); gTop.append(p.t); gTop.append(p.h);
     IONP[ion]=p;
   }
   return p;
@@ -9390,7 +9445,7 @@ function clearTransients(){
 // programme and drawable on the current device.
 function drawInvalid(){
   clearTransients();
-  for(const ion in IONP){ const p=IONP[ion]; hide(p.w); hide(p.c); hide(p.t); }
+  for(const ion in IONP){ const p=IONP[ion]; hide(p.w); hide(p.c); hide(p.t); hide(p.h); }
   for(const c of HALO) hide(c);
   for(const id in CAPTXT) CAPTXT[id].textContent =
     '–/' + ((nodeById[id]||{}).cap ?? '?');
@@ -9554,7 +9609,7 @@ function draw(){
   // --- ions ----------------------------------------------------------------------
   const nMoving=Object.keys(flying).length;
   const wells = nMoving<=40;   // a 144-ion rigid rotation must not become one indigo slab
-  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);hide(p.s);hide(p.l);hide(p.k);} }
+  for(const ion in IONP){ if(!(ion in live)){const p=IONP[ion]; hide(p.w);hide(p.c);hide(p.t);hide(p.h);hide(p.s);hide(p.l);hide(p.k);} }
   for(const ion in live){
     const pt=live[ion], p=ionMarks(ion);
     // WHO IS BEING ACTED ON.  `acts` carries every operand tuple; `pairs` is kept as the
@@ -9646,11 +9701,19 @@ function draw(){
       p.k.setAttribute('stroke-width',Math.max(1.3, r*0.55));
       p.k.setAttribute('opacity',0.5); show(p.k);
     } else hide(p.k);
-    if(showLabels && r >= 6){
+    if(HWL_SHOWN){
+      // the hardware label replaces the number inside the ion: one name, the whole name,
+      // just above it (its site's label is across the bar, below)
+      const fs=hwlFont();
+      p.h.setAttribute('x',pt.x); p.h.setAttribute('y',pt.y - r - 0.6*fs);
+      p.h.setAttribute('font-size',fs); p.h.setAttribute('stroke-width',fs*0.28);
+      show(p.h); hide(p.t);
+    } else if(showLabels && r >= 6){
+      hide(p.h);
       const fs=Math.min(0.66*r, 1.5*r/Math.max(2, p.t.textContent.length));
       p.t.setAttribute('x',pt.x); p.t.setAttribute('y',pt.y);
       p.t.setAttribute('font-size',fs); show(p.t);
-    } else hide(p.t);
+    } else { hide(p.t); hide(p.h); }
   }
 
   const c=cumAt(frame);
@@ -9840,8 +9903,41 @@ function placeScaleBar(){
 const applyVB=()=>{
   svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`);
   placeScaleBar();
+  hwlRefresh();
 };
+// HARDWARE LABELS, drawn or not: the reader's choice (`HWL`), and only while the label is
+// big enough on screen to read -- 7 css px, at this zoom and this box.  Called on every
+// view change; it redraws only when the answer flips.  Per-element `display`, never a
+// class, so the harness reads what the browser shows.
+function hwlLegible(){
+  const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  const w = (r && r.width) || svg.clientWidth || L.W, h = (r && r.height) || svg.clientHeight || L.H;
+  const k = Math.min(w/Math.max(1e-9, VB.w), h/Math.max(1e-9, VB.h));
+  return hwlFont()*k >= 7;
+}
+function hwlRefresh(force){
+  // a resize during start-up can arrive before the view box exists (`VB` is declared
+  // below its first callers); nothing is drawn yet then, and the initial call settles it
+  let on;
+  try { on = !!HWL && hwlLegible(); } catch(e) { return HWL_SHOWN; }
+  if(on === HWL_SHOWN && !force) return on;
+  HWL_SHOWN = on;
+  for(const id in HWT) (on ? show : hide)(HWT[id]);
+  const b = document.getElementById('tLabels');
+  if(b){ b.className = 'tgl' + (HWL ? ' on' : ''); b.setAttribute('aria-pressed', HWL ? 'true' : 'false'); }
+  if(HWL_LIVE) draw();
+  return on;
+}
+// the toggle's one verb: `setHwLabels()` flips, `setHwLabels(true|false)` sets
+function setHwLabels(on){
+  HWL = on === undefined ? !HWL : !!on;
+  try { localStorage.setItem('qccd.studio.hwlabels', HWL ? '1' : '0'); } catch(e) { /* no store */ }
+  hwlRefresh(true);
+  return {on: HWL, shown: HWL_SHOWN};
+}
+document.getElementById('tLabels').onclick = () => setHwLabels();
 placeScaleBar();
+hwlRefresh(true);
 // FIT never draws more than ~1.5 css px per user unit: a two-site canvas used to fill the
 // whole box, 141x47 px per pill.  Past that the viewBox widens around the device's centre
 // instead, and the device sits at a size a hand can still aim at.
@@ -9942,6 +10038,7 @@ function sizeStage(){
   // the bar and its caption are sized in SCREEN pixels, so a resize changes them even
   // though the viewBox has not moved
   placeScaleBar();
+  hwlRefresh();                  // the box changed size: a label may now fit, or not
   if(was!==showLabels) draw();
 }
 // THE ZOOM ITSELF, callable without an Event -- the same rule the editor's gestures
@@ -11501,6 +11598,7 @@ sizeLists();
 
 relayout();
 fit();
+HWL_LIVE = true;
 draw();
 </script>
 <script>
@@ -11999,7 +12097,7 @@ function clearGroup(g) {
 function rebuildStatic() {
   clearGroup(gLoop); clearGroup(gSeg); clearGroup(gElec); clearGroup(gNode);
   var maps = [SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
-              NODEEL, CAPTXT];
+              NODEEL, CAPTXT, HWT];
   for (var m = 0; m < maps.length; m++) {
     for (var k in maps[m]) if (has(maps[m], k)) delete maps[m][k];
   }
@@ -12025,6 +12123,8 @@ function rebuildStatic() {
   // the bar is in user units and the viewBox just moved; and a "no rail between A and B"
   // badge is a claim about the device that was, so a new device clears it
   if (typeof placeScaleBar === 'function') placeScaleBar();
+  // the new nodes' hardware labels follow the reader's choice and this zoom
+  if (typeof hwlRefresh === 'function') hwlRefresh(true);
   if (typeof clearNoRail === 'function') clearNoRail();
   // A MEASUREMENT IS ABOUT A GEOMETRY.  Every path here is a geometry change -- an edit,
   // an undo, the true-scale toggle -- so the two picked points no longer mean what they
@@ -16055,6 +16155,7 @@ var HINTS = {
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
   'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
+  'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big device they step aside while too small to read, and come back as you zoom in.' },
   'truescale': { t: 'True scale', d: 'On (the default): one screen pixel is the same distance across and down, so an angle you measure on the screen is the angle on the chip. Off: a long thin device is stretched to fill the canvas \u2014 easier to see, and wrong about every angle. The bar at the bottom left of the canvas always says what a length on screen is worth.' },
   'scalebar': { t: 'Scale bar', d: 'The bracket is as long, on the chip, as the distance written beside it, at the zoom you are looking at, and it re-measures as you zoom. It sits under the picture so it never covers the device.' },
   'mode': { t: 'Sketch \u00b7 Parts', d: 'Two ways to design. Sketch: draw the shape the ions travel on \u00b7 a rectangle, a circle, a line, a polyline \u00b7 and the release fills it with trapping sites one lattice unit apart, declares the orbit if the shape closed, and adds a junction where the new rail meets an existing one. Parts: place a site, a junction or a rail one at a time, which is what the course teaches and what detail work needs. Remembered between visits; a canvas with nothing on it opens on Sketch.', k: 'd' },
@@ -24055,7 +24156,7 @@ if (typeof globalThis !== 'undefined' && globalThis.EDITOR && globalThis.EDITOR.
 #palElements h4{margin-top:0}
 #bbreopen:empty{display:none}
 #bbreopen button{background:#eef3fb;border:1px solid #b9c9ee;border-radius:999px;color:#1c2a4a;cursor:pointer;font:12px ui-sans-serif,system-ui,sans-serif;padding:2px 10px}
-</style><div id="bbnotes" data-open="0"><div class="bbhead" id="bbhead"><b>Study notes &middot; 04_cyclone_base</b><a href="index.html">index</a><button class="bbx" id="bbx" title="close the notes">&times;</button></div><div class="bbbody"><div class="t" style="color:#8b9ab5;margin-bottom:6px">131.7 ms (jones) / 131.7 ms (transport) · 1.9 ions per transport instruction · not buildable · R10: Lean checker + tableau</div><div style="margin-bottom:8px">Cyclone&#x27;s base: rotation on a loop without spurs. LER per round 2.60e-04, 95% interval 2.4e-04 to 2.9e-04 (405 errors in 520,000 shots)</div><div class="bbnow" id="bbnow2"></div><ul id="bblist"></ul><div class="bbnav"><button class="bbn" id="bbprev">&#9664; prev note</button><button class="bbn" id="bbnext">next note &#9654;</button><span style="color:#8b9ab5;align-self:center">or open <code>#step=N</code></span></div></div></div><button id="bbpill" data-open="0" title="the study's notes on this programme">Study notes</button><script>window.BB_MARKS=[{"frame":1,"step":2,"id":1,"label":"cool","note":"the lattice cools too; 13% of its round.","kind":"note"},{"frame":2,"step":3,"id":2,"label":"a typical shuttle","note":"a handful of ions, each on its own route: the 80% of this round that is transport is made of instructions like this one.","kind":"note"},{"frame":41,"step":42,"id":39,"label":"3 directions at once","note":"ions moving 3 different ways in one instruction. A ring rotation asks for one. On the 32-channel broadcast block this needs 3 channels -- legal, and the reason q06h's 'a lattice cannot use broadcast' was withdrawn.","kind":"note"},{"frame":160,"step":161,"id":156,"label":"the busiest shuttle (12 ions)","note":"the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.9. The device declares 18 SIMD classes (row and column shifts); the router issues only `shuttle`.","kind":"note"}];</script><script>
+</style><div id="bbnotes" data-open="0"><div class="bbhead" id="bbhead"><b>Study notes &middot; 04_cyclone_base</b><a href="index.html">index</a><button class="bbx" id="bbx" title="close the notes">&times;</button></div><div class="bbbody"><div class="t" style="color:#8b9ab5;margin-bottom:6px">131.7 ms (jones) / 131.7 ms (transport) · 1.9 ions per transport instruction · not buildable · R10: Lean checker + tableau</div><div style="margin-bottom:8px">Cyclone&#x27;s base: rotation on a loop without spurs. LER per round 2.60e-04, 95% interval 2.4e-04 to 2.9e-04 (405 errors in 520,000 shots)</div><div class="bbnow" id="bbnow2"></div><ul id="bblist"></ul><div class="bbnav"><button class="bbn" id="bbprev">&#9664; prev note</button><button class="bbn" id="bbnext">next note &#9654;</button><span style="color:#8b9ab5;align-self:center">or open <code>#step=N</code></span></div></div></div><button id="bbpill" data-open="0" title="the study's notes on this programme">Study notes</button><script>window.BB_MARKS=[{"frame":1,"step":2,"id":1,"label":"cool","note":"the lattice cools too; 5% of its round.","kind":"note"},{"frame":2,"step":3,"id":2,"label":"a typical shuttle","note":"a handful of ions, each on its own route: the 92% of this round that is transport is made of instructions like this one.","kind":"note"},{"frame":160,"step":161,"id":156,"label":"the busiest shuttle (12 ions)","note":"the most ions this router ever moves at once, against a ring rotation's 144. The mean is 1.9. Every hop is the `shuttle` class, whatever its direction.","kind":"note"}];</script><script>
 (function(){
   // The study's notes on this programme, a deep link, the executing instruction on the
   // stage, and the two programme listings side by side.  Everything goes through the
