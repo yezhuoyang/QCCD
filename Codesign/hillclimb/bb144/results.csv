@@ -1,0 +1,79 @@
+rank,T_jones_ms,T_jones_ms_at_search,eligible,audit_ok,dacs,traps,junctions,planar,agent,board_id,file,pick,note
+1,96.74,96.74,True,True,46,168,0,True,a03,1792360209-a03-c2b22c83,designs/01-a03-c2b22c83.arch.json,,a03: 96.85 (1792359851) + order hill-climb (o92)
+2,96.835,96.835,True,True,46,168,0,True,a09,1792360254-a09-801e4c71,designs/02-a09-801e4c71.arch.json,,a09: one more node/segment-order step on 1792360059
+3,96.84,96.84,True,True,46,168,0,True,a09,1792360059-a09-536edd26,designs/03-a09-536edd26.arch.json,,a09: a04's 1792359312 (168-cycle+L0 lineage) + short node/segment-order search
+4,96.85,96.85,True,True,46,168,0,True,a03,1792359851-a03-f80eb228,designs/04-a03-f80eb228.arch.json,,"a03: my 96.975 (1792358926, a09/a07 168-cycle+L0 lineage) + further node/segment-order hill-climb seed 82"
+5,96.85,96.85,True,True,46,168,0,True,a04,1792359927-a04-4b464e6a,designs/05-a04-4b464e6a.arch.json,,a04: further node/segment order swaps on 1792359312 (a07/a09/a02 168-cycle lineage)
+6,96.85,96.85,True,True,46,168,0,True,a08,1792360064-a08-b11a4f38,designs/06-a08-b11a4f38.arch.json,,"a08: a04's 96.86 cycle+L0, node+segment order hill-climb"
+7,96.86,96.86,True,True,46,168,0,True,a04,1792359312-a04-a66891d8,designs/07-a04-a66891d8.arch.json,,a04: a02's 1792358554 (a07/a09 168-cycle cap-15 loop lineage) + random node/segment document-order swaps
+8,96.93,96.93,True,True,46,168,0,True,a02,1792359460-a02-b68bf8aa,designs/08-a02-b68bf8aa.arch.json,,a02: continued node/segment-order search on 1792358554
+9,96.935,96.935,True,True,46,168,0,True,a09,1792359111-a09-76ccab10,designs/09-a09-76ccab10.arch.json,,a09: continued node+segment document-order search on a07's 168-cycle+L0 lineage (from my 1792357375)
+10,96.94,96.94,True,True,46,168,0,True,a02,1792358554-a02-8ab51a5d,designs/10-a02-8ab51a5d.arch.json,,a02: from a09's 1792357375 (a07 168-cycle+L0 lineage) + my node/segment-order search
+11,96.975,96.975,True,True,46,168,0,True,a03,1792358926-a03-fdb05942,,,"a03: a09's 97.13 168-cycle+L0 (1792357375, a07 lineage) + node/segment document-order hill-climb seed 71"
+12,96.98,96.98,True,True,46,168,0,True,a07,1792360234-a07-6f6a7b61,,,"a07: 168-cycle+L0, adjacent-swap order SA (last minutes)"
+13,96.985,96.985,True,True,46,168,0,True,a07,1792358870-a07-13af1ca6,,,a07: a09's 97.13 (my 168-cycle+L0 lineage) + adjacent-swap node/segment order SA
+14,96.985,96.985,True,True,46,168,0,True,a08,1792359051-a08-8c90fa09,,,"a08: a09's 97.13 cycle+L0, node+segment order hill-climb"
+15,97.055,97.055,True,True,46,168,0,True,a12,1792359415-a12-5562bb41,,,a12: a09's 97.13 168-cycle+L0 (a07 lineage) + my node/segment-order mutations
+16,97.13,97.13,True,True,46,168,0,True,a09,1792357375-a09-bf3059b5,,,"a09: a07's 168-cycle+L0 (1792355754-a07-df671c0a) + node AND segment document-order local search (fastc proxy, exact)"
+17,97.25,97.25,True,True,46,168,0,True,a10,1792360360-a10-beef1ad2,,,"a10: 168-cycle + loop L0, order hill-climb (final 97.25)"
+18,97.255,97.255,True,True,46,168,0,True,a10,1792360132-a10-42bb46f3,,,"a10: 168-cycle + loop L0, node/segment-order hill-climb from my 97.395"
+19,97.395,97.395,True,True,46,168,0,True,a10,1792359555-a10-10d9f201,,,"a10: 168-cycle + loop L0, node/segment-order hill-climb (final)"
+20,97.4,97.4,True,True,46,168,0,True,a10,1792358925-a10-2bd72a10,,,a10: a02's 98.56 (a07 168-cycle + a10 loop L0) + node/segment-order hill-climb
+21,97.49,97.49,True,True,46,168,0,True,a12,1792358420-a12-2605872e,,,a12: a07's 98.81 168-cycle+L0 + my node/segment-order mutation search (cont.)
+22,98.18,98.18,True,True,46,168,0,True,a12,1792357753-a12-a25e1357,,,a12: a07's 98.81 168-cycle+L0 + my node/segment-order mutation search
+23,98.43,98.43,True,True,46,168,0,True,a02,1792357238-a02-39997bc8,,,"a02: 168-cycle+L0 (a07 lineage 1792355754), node/segment-order search seed 11"
+24,98.48,98.48,True,True,46,168,0,True,a07,1792358316-a07-93d126aa,,,"a07: 168-trap junction-free cycle + loop L0, adjacent-swap order SA"
+25,98.49,98.49,True,True,46,168,0,True,a10,1792357971-a10-ad672071,,,a10: a02's 98.56 (168-cycle+L0) + node/segment-order hill-climb
+26,98.53,98.53,True,True,46,168,0,True,a08,1792358351-a08-876277ba,,,"a08: a02's 98.56 cycle+L0, node+segment order hill-climb"
+27,98.555,98.555,True,True,46,168,0,True,a02,1792357154-a02-1b769756,,,"a02: 168-cycle+L0 (a07 lineage), continued node/segment-order search"
+28,98.565,98.565,True,True,46,168,0,True,a02,1792356234-a02-5f005a13,,,a02: from a07's 1792355754 (168-cycle+L0) + further node/segment-order search (reversal/chunk moves)
+29,98.755,98.755,True,True,46,168,0,True,a07,1792357787-a07-cd414874,,,"a07: 168-trap junction-free cycle + loop L0, order SA with adjacent swaps"
+30,98.79,98.79,True,True,46,168,0,True,a01,1792358430-a01-ae9b894e,,,a01: a07's 98.81 168-cycle+L0 (1792355754) + neutral-drift node/segment-order local search
+31,98.815,98.815,True,True,46,168,0,True,a07,1792355754-a07-df671c0a,,,"a07: 168-trap junction-free cycle + loop L0, node/segment-order SA continued"
+32,99.055,99.055,True,True,46,168,0,True,a07,1792355349-a07-7d52bf3e,,,"a07: 168-trap junction-free cycle + loop L0, node-order SA (incl. segment order) from seed-100 data-first order"
+33,99.955,99.955,True,True,46,168,0,True,a01,1792356332-a01-d84c72c3,,,"a01: junction-free 168-trap cycle + closed loop L0 (a07/a02 idea), random-restart node order + data-trap-first reorder iteration"
+34,100.21,100.21,True,True,46,168,0,True,a12,1792355834-a12-66d6aa9d,,,"a12: node-order mutation search on a junction-free 168-cycle + L0 (from a10/a07), round 2"
+35,100.52,100.52,True,True,46,168,0,True,a03,1792355899-a03-e9af6b22,,,"a03: a07's 100.7 junction-free 168-trap cycle + L0 (1792355099), node/segment document-order hill-climb (seed 41)"
+36,100.59,100.59,True,True,46,168,0,True,a08,1792357066-a08-f173fe44,,,"a08: a07's 100.7 junction-free 168-cycle + L0, document-order hill-climb"
+37,100.705,100.705,True,True,46,168,0,True,a07,1792355099-a07-a0a84acc,,,"a07: 168-trap junction-free cycle + loop L0, random initial node order (seed 100) then data-first reorder x1"
+38,100.95,100.95,True,True,46,168,0,True,a12,1792355154-a12-09b00545,,,a12: a10's 103.13 cycle (a07 junction-free 168-trap + L0) + node-order mutation search (swap/move-front/block)
+39,101.35,101.35,True,True,46,168,0,True,a09,1792356221-a09-984da073,,,a09: a02's loop-labelled 168-trap junction-free cycle (1792353834-a02-812bc3b9) + further node-order local search (fastc proxy)
+40,101.47,101.47,True,True,46,168,0,True,a08,1792354869-a08-c139e92f,,,"a08: a02's 101.53 junction-free 168-cycle + L0, document-order hill-climb (random swap/insert/reverse)"
+41,101.525,101.525,True,True,46,168,0,True,a02,1792353834-a02-812bc3b9,,,a02: a07 168-trap junction-free cycle + declared loop L0 + node-order search (doc order tie-breaks Place)
+42,101.555,101.555,True,True,46,168,0,True,a10,1792355597-a10-89babf52,,,a10: junction-free 168-trap cycle + loop L0 (rob84L_i3) + node-order hill-climb
+43,101.74,101.74,True,True,46,168,0,True,a07,1792354383-a07-5e7060b5,,,"a07: 168-trap junction-free cycle + loop L0, node order SA from data-first order"
+44,102.205,102.205,True,True,46,170,0,True,a11,1792353933-a11-6d380580,,,"a11: junction-free cycle 170 traps (85x2 rect, cap 15) + closed loop L0 label (a10), node order = data traps first, iterated reorder x5 (a07 idea)"
+45,103.13,103.13,True,True,46,168,0,True,a10,1792353433-a10-b9ae8c52,,,a10: a07's reordered junction-free cycle rob84_i3 + closed loop L0 declared on the cycle (shared L0:+1 waveform label for all cw hops)
+46,106.275,106.275,True,True,46,168,0,True,a10,1792353312-a10-81477ae3,,,a10: a07's junction-free 168-trap cycle (1792353009) + segments declared as closed loop L0 so every cw hop shares one waveform label (L0:+1) regardless of row
+47,108.385,108.385,True,True,46,168,0,True,a09,1792354012-a09-069041ce,,,a09: a07's junction-free 168-trap cycle (1792353009-a07-e326af90) + node-order local search with exact compile proxy (general router meet tie-break / placement depend on document order)
+48,109.465,109.465,True,True,46,168,0,True,a01,1792353974-a01-ce19d96a,,,"a01: a07's junction-free 84x2 cycle of 168 cap-15 traps (general router), data-trap-first node order re-iterated 4x (my rebuild)"
+49,109.945,109.945,True,True,46,172,0,True,a11,1792353499-a11-21a5f495,,,"a11: a07's junction-free cycle at 172 traps (86x2 rect, cap 15), node order = data-holding traps first, reorder iterated (fast-eval search)"
+50,110.585,110.585,True,True,46,168,0,True,a07,1792353009-a07-e326af90,,,"a07: junction-free closed cycle of 168 traps (84x2 rectangle, cap 15, no loop label, 0 junctions), node order = traps of data qubits first (from the compiler's own placement, iterated 3x) so the gate meets at the data trap"
+51,160.085,160.085,True,True,34,18,9,False,a06,1792354367-a06-22c1d83f,,,a06: 3x3 torus cap 14 + a Hamiltonian junction cycle declared as closed loop L0 (loop hops share one R22 waveform label)
+52,174.775,174.775,True,True,34,16,8,False,a06,1792357964-a06-f443a88e,,,"a06: K4,4 junction graph (=circulant C8(1,3)), 16 traps cap 15, split into two Hamiltonian cycles as closed loops L0/L1, doc order searched; long chains"
+53,174.865,174.865,True,True,34,18,9,False,a06,1792356025-a06-c184d487,,,"a06: 3x3 torus cap 14, two Hamiltonian junction cycles as closed loops L0/L1 (all hops loop-relative), doc order searched; long chains"
+54,175.99,175.99,True,True,34,18,9,False,a06,1792355408-a06-4924e3a0,,,"a06: 3x3 torus cap 14, junction graph split into two Hamiltonian cycles declared as closed loops L0/L1 (every hop loop-relative), doc order searched; long chains"
+55,191.115,191.115,True,True,34,18,9,False,a07,1792351424-a07-64d0fdc1,,,"a07: periodic grid 3x3 (torus, 18 traps cap 14, 9 deg-4 junctions), node/segment order shuffled seed 3, general router"
+56,191.46,191.46,True,True,34,18,9,False,a06,1792354311-a06-54a74877,,,"a06: 3x3 periodic grid torus (explicit), 18 traps cap 14, document order searched (random restarts); long chains"
+57,192.085,192.085,True,True,34,18,9,False,a06,1792352697-a06-387cf381,,,"a06: 3x3 periodic grid torus (explicit), 18 traps cap 14, node/segment document order searched (compiler tie-breaks); long chains"
+58,204.71,204.71,True,True,34,18,9,False,a06,1792351993-a06-3ec80fa4,,,"a06: periodic Machine.grid(3,3) torus, 18 traps cap 14 (12 fill, 6 act as gate zones); long chains"
+59,204.71,204.71,True,True,34,18,9,False,a09,1792352272-a09-ad0c262c,,,"a09: general router (compile) reference: periodic 3x3 junction torus, 18 traps cap 14; best non-rotate so far (shuttle 162 ms through deg-4 junctions)"
+60,231.81,231.81,True,True,35,31,16,True,a06,1792350019-a06-66997aad,,,"a06: Machine.grid(4,5) with trap capacity 12 (big traps, 31 junctions); wins via long chains"
+61,232.585,232.585,True,True,34,17,8,True,a07,1792349894-a07-1f2d024d,,,"a07 grid(3,4) traps cap15, general router"
+62,889.37,119.69,True,True,46,168,24,True,a04,1792350054-a04-92399ef8,,,"a04: 144-slot racetrack, 24 docks on CONSECUTIVE rail slots 84..107 in ancilla order (lockstep conveyor: every ancilla meets the same check member at one offset)"
+63,894.68,125.48,True,True,46,168,24,True,a08,1792349859-a08-270f057a,,,"a08: ring 144 loop, 24 docks on consecutive rail slots 0..23 (code-aware: check j+1 = check j shifted by +1)"
+64,894.68,125.48,True,True,46,168,24,False,a02,1792349889-a02-a8d9d688,,,a02: 24 docks on consecutive rail slots 0..23 of 144-loop (ancilla a at rail a)
+65,896.28,118.57,True,True,46,168,24,True,a10,1792350040-a10-e48b8e8c,,,"a10: 144-slot ring, 24 contiguous docks rails 18..41, named D00..D23 so ancilla k -> rail 18+k (translation-aligned batches)"
+66,896.28,118.57,True,True,46,168,24,True,a08,1792350214-a08-8f86da1e,,,"a08: ring 144, 24 docks consecutive rail 18..41 (hops at per-ancilla floor 702)"
+67,896.28,118.57,True,True,46,168,24,True,a12,1792350392-a12-cc235817,,,"a12: 144-ring, 24 name-ordered contiguous docks at slots 18..41"
+68,896.28,118.57,True,True,46,168,24,True,a03,1792350741-a03-f3845273,,,a03: contiguous docks 18..41 (sim-optimal offset c over 0..143)
+69,896.28,118.57,True,True,46,168,24,True,a04,1792350797-a04-0040539f,,,"a04: 144-slot racetrack, 24 consecutive docks at rails 18..41 (D00..D23), lockstep conveyor; R0=18 minimises per-ancilla forward travel (702 hops = proven floor for Monotone sweep)"
+70,896.28,118.57,True,True,46,168,24,True,a09,1792351121-a09-60bde902,,,"a09: 144-ring, contiguous name-ordered docks at 18..41; hits exact per-ancilla hop floor 702"
+71,896.28,118.57,True,True,46,168,24,True,a02,1792351162-a02-153628d8,,,"a02: contiguous docks rails 18..41 (sim: 702 hops = per-ancilla floor, 60 batches)"
+72,896.28,118.57,True,True,46,168,24,True,a03,1792352262-a03-d60c4903,,,"a03: ring(70,4) 144-slot loop, 24 contiguous docks 18..41 on top straight, spur traps 0.5 inward (clear of other rails)"
+73,896.48,118.77,True,True,46,168,24,True,a03,1792349939-a03-4272d0fe,,,"a03: 24 docks contiguous at slots 20..43 in ancilla order (dock k -> ancilla k), ring 72x2"
+74,896.88,119.17,True,True,46,168,24,True,a12,1792350090-a12-a3746319,,,"a12: 144-slot ring, 24 docks on consecutive rail slots 24..47 ordered by name = ancilla index (code-aligned: all 24 ancillas align at one offset)"
+75,897.48,119.77,True,True,46,168,24,True,a09,1792349950-a09-90c9815c,,,"a09: ring 144 slots, 24 docks on consecutive rail slots 30..53, names sorted so dock k = ancilla k (synchronised offsets)"
+76,923.295,122.08,True,True,57,312,24,True,a03,1792352875-a03-281360be,,,"a03: 288-slot ring stride 2, 24 docks on even rails 36..82 (test: half the sub-steps avoid junction entry)"
+77,933.99,122.77,True,True,46,168,24,True,a01,1792349953-a01-dd2636f5,,,"a01: 144-loop, 24 contiguous docks at rail 60..83, names sorted so ancilla k -> rail 60+k"
+78,1645.91,689.65,True,True,67,432,72,False,a04,1792349710-a04-cc864343,,,"a04 baseline ring(178,4,72) off1"
