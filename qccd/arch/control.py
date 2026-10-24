@@ -25,7 +25,11 @@ channel. The deck gives every DC electrode a two-way switch (p.19, 48N switches)
 arXiv:2403.00756 achieves site-dependent operation from a fixed number of analog signals
 plus "one digital input per site". A switch buys *opting out*, not doing something else --
 which is exactly why JT-SIMD participation is variadic but a class still fixes one
-operation and one direction.
+operation and one direction.  Opting out is itself a waveform: the deck's two-way switch
+selects, per electrode, between a motion bank and a hold bank of DACs (WISE's N_set = 2,
+arXiv:2305.12773 Table I), which is why its broadcast channel count carries a x2.  So
+`banks` (channel sets per site) is how many different things a site can be told to do in
+one cycle, and a hold is one of them.
 
 So the drivability question has two halves:
 
@@ -110,6 +114,13 @@ class ControlPlane:
     n_junctions: int = 0
     declared: bool = False
     notes: list[str] = field(default_factory=list)
+    #: electrode role -> how many channels one bank gives that role (`roles` in the
+    #: document): the deck's array is {linear_h: 6, linear_v: 6, junction: 4}
+    role_counts: dict[str, int] = field(default_factory=dict)
+    #: how many banks of channels each role gets (`differential` in the document).  The
+    #: deck's x2 is its two-way switch -- one bank carries the motion waveform, the other
+    #: the hold waveform (WISE's N_set = 2) -- not a differential pair.
+    pair: int = 1
 
     # ------------------------------------------------------------- resources
 
@@ -117,6 +128,47 @@ class ControlPlane:
     def n_shared_channels(self) -> int:
         """Analog channels driving the transport electrodes."""
         return len(self.groups)
+
+    @property
+    def roles_per_site(self) -> int:
+        """Channels ONE motion needs at a site: one per electrode role (16 on the deck's
+        array).  A motion moves every electrode role of the cell, so `k` distinct
+        motions need `k` such sets, not `k` channels.  0 when undeclared."""
+        return sum(self.role_counts.values())
+
+    @cached_property
+    def banks(self) -> int:
+        """Channel SETS every driven site gets: how many different waveforms a site can
+        choose between in one cycle, its per-site switch selecting which (deck p.19's
+        two-way switch: a motion bank and a hold bank, WISE N_set = 2).
+
+        `min over sites of len(channels_of(s)) // roles_per_site`, over the sites some
+        channel drives; under `broadcast` it is the pair factor.  0 when undeclared."""
+        rps = self.roles_per_site
+        if not self.declared or not rps or not self._by_site:
+            return 0
+        return min(len(v) for v in self._by_site.values()) // rps
+
+    def banks_of(self, site: str) -> int:
+        """Channel sets that reach this one site (see `banks`)."""
+        rps = self.roles_per_site
+        return len(self.channels_of(site)) // rps if rps else 0
+
+    @cached_property
+    def bank_class(self) -> Mapping[str, tuple[int, int]]:
+        """site -> (index of the distinct channel set that reaches it, its `banks_of`).
+
+        Sites in one class see exactly the same channels, so they compete for the same
+        banks: `k` different motions among them need `k` channel sets of that class.
+        Under `broadcast` there is one class; under `row` one per line.  Built once, so a
+        rule asks it per mover in O(1) instead of hashing a 32-channel tuple."""
+        rps = self.roles_per_site
+        index: dict[tuple[str, ...], int] = {}
+        out: dict[str, tuple[int, int]] = {}
+        for s, chans in self._by_site.items():
+            k = index.setdefault(chans, len(index))
+            out[s] = (k, len(chans) // rps if rps else 0)
+        return out
 
     @property
     def n_compensation_channels(self) -> int:
@@ -217,6 +269,12 @@ class ControlPlane:
         Cached by the id-set: the same set recurs on every cycle of a program, so a
         whole replay pays for it once per distinct engagement shape.
         """
+        return len(self.covered(channel_ids))
+
+    def covered(self, channel_ids: Iterable[str]) -> frozenset[str]:
+        """The distinct sites on at least one of these channels, cached by the id-set
+        (see `covered_sites`).  What R4d's hold clause intersects with the loaded sites:
+        one C-level set operation per cycle instead of one per channel."""
         key = frozenset(channel_ids)
         cache = self.__dict__.setdefault("_covered", {})
         got = cache.get(key)
@@ -227,7 +285,7 @@ class ControlPlane:
                 g = by_id.get(cid)
                 if g is not None:
                     seen |= g.sites
-            got = cache[key] = len(seen)
+            got = cache[key] = frozenset(seen)
         return got
 
     # ------------------------------------------------------------ drivability
@@ -310,8 +368,14 @@ def build_control_plane(device, control: Mapping) -> ControlPlane:
 
     # `roles` is either a list (one channel each) or a mapping role -> how many channels
     # that role needs.  The deck's array is 6 horizontal + 6 vertical linear plus 4
-    # junction, and every electrode is driven as a differential pair, which is where its
-    # "12*2 = 24" and "4*2 = 8" come from (p.20).
+    # junction, and "every DC is wired through a two-way switch" (p.19): each electrode
+    # role gets TWO banks of DACs, one carrying the motion waveform and one the hold
+    # waveform, and the switch picks which a site follows.  That is where "12*2 = 24" and
+    # "4*2 = 8" come from (p.20), and it is WISE's N_set = 2, "stay or swap" (arXiv:
+    # 2305.12773, Table I; Sec. II A, "it suffices to use one DAC per waveform").  So a
+    # 32-channel broadcast plane plays ONE motion plus a hold per cycle, chosen per site by
+    # a 1-bit select.  The schema field is still called `differential` -- renaming it would
+    # break every document -- but what it counts is these banks, not a differential pair.
     raw_roles = spec.get("roles", ("linear",))
     if isinstance(raw_roles, Mapping):
         role_counts = {str(k): int(vv) for k, vv in raw_roles.items()}
@@ -319,6 +383,8 @@ def build_control_plane(device, control: Mapping) -> ControlPlane:
         n = int(spec.get("channels_per_role", 1))
         role_counts = {str(r): n for r in raw_roles}
     pair = int(spec.get("differential", 1))
+    plane.role_counts = dict(role_counts)
+    plane.pair = pair
     groups: list[ChannelGroup] = []
 
     def add(role: str, key: str, members: Iterable[str]) -> None:

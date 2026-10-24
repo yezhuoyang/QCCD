@@ -44,6 +44,7 @@ __all__ = [
     "geometry_violations",
     "geometry_limits",
     "motion_signature",
+    "motion_signatures",
     "hop_label",
     "direction_label",
     "rails_to_loop",
@@ -402,9 +403,11 @@ def spur_actions(v: CycleView) -> tuple[dict[str, str], frozenset[str]]:
     the schedules that win do so by docking a SUBSET of the docks in every batch (38 of
     55 batches on the code-aware BB round dock 12 of 24). That is drivable only where
     every spur site has its own switch; without switches every spur is all-or-nothing.
-    So the action is judged against the sites that HAVE a spur, not against the whole
-    channel: a rail slot with no spur cannot dock anything, and a waveform it ignores is
-    not a site idling while its channel-mates move.
+    So the spur ACTION is judged against the sites that HAVE a spur: a rail slot with no
+    spur cannot dock anything.  What that slot does instead, if it is loaded, is HOLD
+    while its channel carries the dock waveform -- and holding is not free without a
+    switch either: that is `r4_drivable`'s hold clause, which judges every loaded site of
+    an engaged channel, on a path or off it.
 
     A spur is what R22 calls one (`rails_to_loop`): a rail off every path whose off-path
     end has no other rail to a path.  A trap between two path sites is a chord, and a
@@ -451,6 +454,17 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     or translated -- a field solve over one device's geometry, which is exactly what
     PLAN §2 puts out of scope. Silence there is the honest answer, not a pass.
 
+    That argument is about two MOVING sites.  It does not cover a loaded site that does
+    nothing while its channel carries a motion waveform, and that case has a verdict
+    everywhere: without a per-site switch a channel's sites are all-or-nothing (the
+    module docstring of `qccd.arch.control`), so a loaded site on an engaged channel that
+    no move leaves, enters or passes through is told to move and does not.  The hold
+    clause below judges it on a path or off one -- a docked ancilla while the loop
+    rotates, a loop rider away from a dock while the riders beside docks dock.  A hold
+    is a waveform of its own: the deck's two-way switch selects it from a second bank of
+    DACs (p.19; WISE's N_set = 2, arXiv:2305.12773 Table I), and arXiv:2403.00756 does it
+    with one digital input per site.  A device with neither cannot hold a site still.
+
     An architecture that has not declared its channel map is not judged at all.
     """
     if v.instr.type != "simd" or not v.moves:
@@ -460,16 +474,18 @@ def r4_drivable(v: CycleView) -> list[Violation]:
         return []
     dev = v.arch.device
     occ = getattr(v, "occ_before", {}) or {}
+    #: loaded sites already named by a path or spur clause, so the hold clause does not
+    #: report the same site twice
+    reported: set[str] = set()
 
     def judge(where: str, labels: dict[str, str], must_act: set[str]) -> None:
         """Two failures, one channel at a time: two different things on one waveform
         (impossible with or without switches), and -- without switches -- a site in
         `must_act` idling while its channel-mates move.  `must_act` is the set the
-        all-or-nothing rule is judged over: the OCCUPIED sites of this path, or the
+        all-or-nothing rule is judged over HERE: the OCCUPIED sites of this path, or the
         riders standing beside a dock.  An empty slot under a waveform is not a site
-        idling, it is a site with nothing to move; and a site off this path gets no
-        verdict here, because whether one waveform moves a rail ion and a spur-end ion
-        alike is a field solve over the electrode layout (PLAN §2), not a rule."""
+        idling, it is a site with nothing to move.  A loaded site outside `must_act` is
+        the hold clause's, after every path and spur has been judged."""
         for e in plane.engagement(labels):
             g = e.group
             if len(e.actions) > 1:
@@ -482,6 +498,7 @@ def r4_drivable(v: CycleView) -> list[Violation]:
             elif not plane.switch_per_site:
                 idle = sorted((g.sites & must_act) - set(labels))
                 if idle:
+                    reported.update(idle)
                     out.append(Violation(
                         "R4", v.instr.id,
                         f"{where}: channel {g.id!r} has no per-site switch, so its "
@@ -516,29 +533,55 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     # with a per-site switch the assignment of sites to channels is free, so the document
     # simply does not say.
     #
-    # What the document does say is how many channels exist.  An instruction that asks for
-    # `k` distinct lab-frame directions needs `k` of them, whatever the layout and whatever
-    # the switch assignment -- so `k > len(groups)` is a real, layout-independent
-    # impossibility, and it is the only one available at this level of description.
+    # What the document does say is how many channels exist, and how many of them ONE
+    # motion takes: every electrode role of the cell (`roles_per_site`, 16 on the deck's
+    # array).  So `k` distinct motions need `k` channel SETS, not `k` channels -- the first
+    # version of this count compared `k` with all 32 channels of a WISE block, which is 16
+    # times too generous.  A set is a bank (`ControlPlane.banks`): the deck's 32 are two
+    # banks of 16, a motion bank and a hold bank selected per site by its two-way switch.
+    # Counted per class of sites that see exactly the same channels (`bank_class`), which
+    # under broadcast is one class with `banks` sets and under row wiring one per line:
+    # sites in one class compete for the same banks whatever the switch assignment, so
+    # `k > banks` there is a real, layout-independent impossibility.  The hold is NOT
+    # counted here: with a switch a site may simply disconnect (WISE fn. [46]), and the
+    # waveform census (`qccd.cost.waveforms`) reports the hold bank separately.  A `direct`
+    # plane gives every site channels of its own, so there is nothing shared to count.
     acts, spur_sites = spur_actions(v)
-    free = {}
-    for m in v.moves:
-        # a spur is the mirrored case, and it has its own clause below: a dock on the top
-        # rail moves an ion down while a dock on the bottom rail moves one up, and one
-        # waveform on symmetric spur electrodes does both.  In the lab frame those look
-        # like two directions, and judging them there would fail every ring ever compiled.
-        if (m.seg.loop is not None or dev.nodes[m.src].kind != "site"
-                or m.src in spur_sites or m.dst in spur_sites):
-            continue
-        a, b = dev.nodes[m.src].pos, dev.nodes[m.dst].pos
-        free[m.src] = f"dir:{round(b[0] - a[0], 6):+g},{round(b[1] - a[1], 6):+g}"
-    want = sorted(set(free.values()))
-    if len(want) > len(plane.groups):
-        out.append(Violation(
-            "R4", v.instr.id,
-            f"off any named path: {len(free)} ions are asked to move in {len(want)} "
-            f"different directions at once (e.g. {want[0]} and {want[1]}), but the "
-            f"device declares {len(plane.groups)} channels; that needs {len(want)}"))
+    if plane.grouping != "direct":
+        off: dict[str, str] = {}             # ion -> the site it leaves
+        for m in v.moves:
+            # a spur is the mirrored case, and it has its own clause below: a dock on the
+            # top rail moves an ion down while a dock on the bottom rail moves one up, and
+            # one waveform on symmetric spur electrodes does both.  In the lab frame those
+            # look like two directions, and judging them there would fail every ring ever
+            # compiled.
+            if (m.seg.loop is not None or dev.nodes[m.src].kind != "site"
+                    or m.src in spur_sites or m.dst in spur_sites):
+                continue
+            off.setdefault(m.ion, m.src)
+        if off:
+            sigs = motion_signatures(v, off)
+            classes = plane.bank_class
+            want: dict[int, set[str]] = {}
+            sets: dict[int, int] = {}
+            movers: Counter[int] = Counter()
+            for ion, site in off.items():
+                got = classes.get(site)
+                if got is None:
+                    continue                 # no channel reaches it: nothing to count
+                want.setdefault(got[0], set()).add(sigs[ion])
+                sets[got[0]] = got[1]
+                movers[got[0]] += 1
+            for k in sorted(want):
+                w = sorted(want[k])
+                if len(w) > max(1, sets[k]):
+                    out.append(Violation(
+                        "R4", v.instr.id,
+                        f"off any named path: {movers[k]} ions are asked to move in {len(w)} "
+                        f"different ways at once (e.g. {w[0]} and {w[1]}), but a site here "
+                        f"is reached by {sets[k]} channel set(s) of {plane.roles_per_site} "
+                        f"(one channel per electrode role); {len(w)} motions need {len(w)} "
+                        f"sets"))
 
     # the spurs: every acting spur must do the same thing, and without per-site switches
     # every rider standing beside a dock must dock (inward) and every docked rider must
@@ -553,6 +596,38 @@ def r4_drivable(v: CycleView) -> list[Violation]:
         else:
             must = {s for s in spur_sites if s not in on_loop and occ.get(s, 0) > 1}
         judge("on the spurs", acts, must)
+
+    # The hold clause: without per-site switches, every LOADED site of a channel that
+    # carries a waveform this cycle must follow it, on a path or off one.  A site acts if
+    # a move leaves it, enters it or passes through it; the channels engaged are those of
+    # the acting sites.  One set intersection over the union of the engaged channels'
+    # sites (cached per engagement shape by `covered`), then one violation per held site
+    # naming the first engaged channel that drives it -- O(acting x channels + held), so a
+    # 324-site broadcast replay pays nothing per channel per loaded site.
+    if not plane.switch_per_site:
+        acting: set[str] = set()
+        for m in v.moves:
+            acting.add(m.src)
+            acting.add(m.dst)
+        acting.update(v.transits or ())
+        engaged = plane.engagement(dict.fromkeys(acting, "move"))
+        if engaged:
+            held = plane.covered(e.group.id for e in engaged).intersection(occ)
+            held -= acting
+            held -= reported
+            if held:
+                by_id = {e.group.id: e for e in engaged}
+                for s in sorted(held):
+                    if occ.get(s, 0) <= 0:
+                        continue
+                    e = next((by_id[c] for c in plane.channels_of(s) if c in by_id), None)
+                    if e is None:
+                        continue
+                    out.append(Violation(
+                        "R4", v.instr.id,
+                        f"channel {e.group.id!r} has no per-site switch, so loaded site {s} "
+                        f"must follow its waveform; it holds while {e.acting} site(s) on it "
+                        f"move (a hold needs a switch, or a channel of its own)"))
     return out
 
 
@@ -967,6 +1042,40 @@ def motion_signature(v: CycleView, ion: str) -> str:
     on_loop = loop_node_set(dev)
     hops = [hop_label(dev, on_loop, m.src, m.dst, m.seg) for m in v.moves if m.ion == ion]
     return f"{v.instr.cls or 'shuttle'} {','.join(hops)}"
+
+
+def motion_signatures(v: CycleView, ions=None,
+                      cache: dict | None = None) -> dict[str, str]:
+    """`motion_signature` for every mover (or for `ions`), in ONE pass over the moves.
+
+    Byte-identical to calling `motion_signature(v, ion)` per ion -- the same hops, in the
+    same order, through the same `hop_label` -- but the loop-node set is built once and
+    the moves are walked once, where the per-ion call walks every move for every ion.  On
+    a 288-slot rotation that is 288 walks of 288 moves.  R4d's counting clause and the
+    waveform census (`qccd.cost.waveforms`) ask it every transport cycle.
+
+    `cache`, when given, memoises `hop_label` by `(src, dst, segment id)` -- a pure
+    function of the device and the hop -- so a caller replaying one device for a whole
+    programme pays for each distinct hop once (`hop_label` scans the loop's node list,
+    which on a 288-slot ring is most of a rotation's cost).  It must not be shared
+    between devices."""
+    dev = v.arch.device
+    on_loop = None
+    hops: dict[str, list[str]] = {}
+    for m in v.moves:
+        if ions is not None and m.ion not in ions:
+            continue
+        key = (m.src, m.dst, m.seg.id)
+        label = cache.get(key) if cache is not None else None
+        if label is None:
+            if on_loop is None:
+                on_loop = loop_node_set(dev)
+            label = hop_label(dev, on_loop, m.src, m.dst, m.seg)
+            if cache is not None:
+                cache[key] = label
+        hops.setdefault(m.ion, []).append(label)
+    cls = v.instr.cls or "shuttle"
+    return {ion: f"{cls} {','.join(h)}" for ion, h in hops.items()}
 
 
 def loop_node_set(dev) -> frozenset[str]:

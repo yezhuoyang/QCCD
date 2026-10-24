@@ -28,7 +28,7 @@ a check.
 | R1 | checked | `occupancy(site) ≤ capacity` after every cycle |
 | R2 | checked | degree-≥3 nodes hold ≤ 1 ion, and ≤ 1 ion crosses one in a cycle |
 | R3 | checked | ≤ `segment.capacity` participants per segment per cycle |
-| R4 | checked | the movement class is declared; ≤ `max_simd_classes_per_cycle` per cycle. R4d (drivability), three frames: along a named loop every ion on a shared channel moves the same signed hop; on the spurs every acting dock moves the same way, and without per-site switches every spur on the channel must act; off any named path the instruction may not ask for more distinct lab-frame directions than the device declares channels. Which channel drives which site is NOT judged there: no device document partitions its sites across channels, and with a per-site switch the assignment is free (`Codesign/findings/q06i` §7). Two ions moving the SAME way in different places is still not judged either -- that is a layout question |
+| R4 | checked | the movement class is declared; ≤ `max_simd_classes_per_cycle` per cycle. R4d (drivability), three frames and a hold clause: along a named loop every ion on a shared channel moves the same signed hop; on the spurs every acting dock moves the same way, and without per-site switches every spur on the channel must act; off any named path the instruction may not ask for more distinct motions (`motion_signature`) than a site has channel SETS -- one channel per electrode role, so the deck's 32 channels are 2 sets of 16 -- counted per class of sites that see the same channels. Which channel drives which site is NOT judged there: no device document partitions its sites across channels, and with a per-site switch the assignment is free (`Codesign/findings/q06i` §7). Two ions moving the SAME way in different places is still not judged either -- that is a layout question. Hold clause: without per-site switches, every LOADED site of a channel that carries a waveform must follow it, on a path or off one; a site no move leaves, enters or passes through is holding, and a hold needs a switch |
 | R4b | checked | a cycle has one mode, and never mixes transport with gates |
 | R5 | checked | no `(u→v)` together with `(v→u)` on one segment |
 | R6 | checked | gate/measure/cool only where the zone type allows, at the **replayed** site |
@@ -78,6 +78,36 @@ simultaneously -- through `motion_signature(view, ion)`, which the compiler's
 uniformising pass (`qccd/compile/uniform.py`) shares, so a programme the pass emits is a
 programme R22 accepts by construction. Rigid rotation is uniform by construction; a dock
 batch is uniform when every rider docks the same way.
+
+**R4d, holding still and counting sets (2026-10).** An author of the WISE/WISER line of
+work pointed out two gaps in how R4d read the wiring, and both were real. The
+deck's broadcast count `12*2 + 4*2` is not a differential pair: "every DC is wired through
+a two-way switch" (deck p.19), so each electrode role has two banks of DACs, one carrying
+the motion waveform and one the hold waveform, and a site's switch selects which it
+follows. That is WISE's N_set = 2, "stay or swap" (arXiv:2305.12773, Table I; Sec. II A:
+"it suffices to use one DAC per waveform"), and arXiv:2403.00756 gets the same selection
+from "one digital input per site". So a 32-channel broadcast plane plays ONE motion plus a
+hold per cycle. First gap: a HOLD is a waveform too. R4d judged a loaded site that sat out
+a cycle only on the path that moved (or beside a dock), so on a switchless ring a docked
+ancilla took the rotation's waveform with nothing asking whether it could stay put, and a
+loop rider away from a dock took the dock waveform likewise. The hold clause now asks it
+everywhere: without a per-site switch, a loaded site on an engaged channel that no move
+leaves, enters or passes through is a violation, reported once per site and never again
+for a site the path or spur clause already named. Every shipped device declares
+`switch_per_site: true` and is unaffected; the switchless ring designs of
+`Compiler/build/q06g/*_noswitch` now fail on their compiled programmes (docked ancillas
+during rotations, idle riders during dock and undock) and pass on the same programmes with
+the switch. The argument that keeps R4d silent ACROSS paths -- whether one waveform moves
+two ions alike is a field solve -- is about two moving sites, and it stays. Second gap: a
+motion drives every electrode role of its cell, so `k` distinct motions need `k` channel
+SETS (`ControlPlane.banks`, channels per site / roles), not `k` channels; the off-path count
+compared `k` with all 32. The hold is not counted there, because with a switch a site may
+simply disconnect (WISE fn. [46]). What a programme asks of the banks -- motions plus the
+hold per cycle, the `ceil(log2 k)` select bits a switched plane loads (WISE Table I), and the
+shim demultiplexer's charging time `t_sc = M x t_ec`, t_ec = 3 µs (WISE Sec. V B 3; its
+design is 1:128 with N_se/(M - 1) shim DACs, the deck's 1:100 being its rounded figure) --
+is a census of the programme, not a rule: `qccd.cost.waveforms.waveform_census` and
+`hardware_report(arch, census=...)`.
 
 **R23, junctions are crossed (2026-10).** R2 bounds how many ions a junction holds at an instant; it never said an ion may not stay, and a router that read it as a capacity parked ions there. On a hexagon lattice whose corners were declared as sites, a Steane round stopped an ion on a corner 77 times, once for 17 instructions, with empty traps on every side. R23 judges where an ion RESTS: a node where three or more rails meet (R18, whatever the node was declared as) may be crossed inside one move and may not be where a cycle leaves an ion. Two cases are excluded by name. A slot of a loop the programme rotates is part of a conveyor, which carries every ion through every slot, the dock slots of a ring included; so is a slot of a named open path that the programme moves with a shift class (every hop of the cycle along that one path), like the conveyor rails of a transversal-CNOT station, whose sites each have a rung to a gate trap and so meet three rails. And if the traps off the junctions cannot hold the programme's ions (capacity capped at R13's chain limit, as the compiler counts it), some ion must stand on a crossing and the rule does not apply. The general router leaves junction sites out of its trap graph under exactly this test, so a compiled programme passes by construction; each stay is reported once, at the cycle it begins.
 

@@ -540,11 +540,23 @@ def test_dedicated_ancillas_dock_without_a_placement(switches, tmp_path):
     "reset acts on q4, which rides the loop" (BB[[144,12,12]] with 144 dedicated ancillas on
     a 144-dock ring, 2026-10-21).  It now docks the side that acts alone.  On a ring whose
     spurs share one waveform (no per-site switch) it also docks every rider in every batch,
-    unasked: anything else breaks R4."""
+    unasked: anything else breaks R4's spur clause.
+
+    Without switches that is no longer enough, and this test used to say it was.  R4d's
+    hold clause (2026-10, the WISE/WISER review) judges every LOADED site of an engaged
+    channel, not only the sites of the path that moves: on a broadcast plane the docked
+    ancillas receive the rotation's waveform and must hold while it plays, and a hold is a
+    second waveform that only a per-site switch selects (deck p.19; WISE N_set = 2).  So
+    the switchless round fails R4 -- on the hold clause and on nothing else -- until the
+    compiler stops parking ions in docks while the loop turns."""
     doc = Machine.ring(8, 2, verticals=4, name="dedicated").arch.to_json()
     doc["control"]["channels"]["switch_per_site"] = switches
     (tmp_path / "c.qasm").write_text(_dedicated(4), encoding="utf-8")
     raw, arch, bad = _compile(doc, None, tmp_path, mode="rotate", qasm=tmp_path / "c.qasm")
+    if not switches:
+        held = [v for v in bad if v.rule == "R4" and "a hold needs a switch" in v.message]
+        assert held, "docked ancillas hold while the loop rotates: the hold clause must see it"
+        bad = [v for v in bad if v not in held]
     assert not bad, f"{dict(Counter(v.rule for v in bad))}; first: {bad[0]}"
     cert = json.loads((tmp_path / "prog.qcert.json").read_text(encoding="utf-8"))
     on_loop = {n for lp in arch.device.loops.values() if lp.closed for n in lp.nodes}

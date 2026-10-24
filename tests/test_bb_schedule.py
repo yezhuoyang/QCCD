@@ -181,13 +181,44 @@ def test_partial_dock_is_drivable_with_switches_and_not_without(tmp_path):
     assert "R4" in _r4_verdict(without, prog)["failed"]
 
 
-def test_full_dock_and_full_rotation_are_drivable_without_switches(tmp_path):
-    """Every rider beside a dock docks, and every loaded loop site rotates: nothing on the
-    path idles, so a switchless channel drives it -- the ancilla sites off the loop get no
-    verdict, by the rule's own scope."""
+def test_full_dock_and_full_rotation_still_hold_sites_still_without_switches(tmp_path):
+    """Every rider beside a dock docks, and every loaded loop site rotates: nothing ON THE
+    PATH idles.  This test used to assert that a switchless channel therefore drives the
+    round, because "the ancilla sites off the loop get no verdict, by the rule's own
+    scope".  That scope was the gap (2026-10, the WISE/WISER review): on a broadcast plane
+    every channel drives every site, so the 24 ancillas parked in the docks receive the
+    rotation's waveform and must HOLD while it plays -- and a hold is a second waveform,
+    the deck's hold bank behind its two-way switch (p.19; WISE N_set = 2).  The dock is
+    the same: the 120 loop riders away from a dock hold while 24 riders dock.  R4d's hold
+    clause now fails both cycles; with the switch the same programme passes, and without
+    it a rotation with nothing parked off the loop still does."""
+    from collections import Counter
+
+    from qccd.cost import corrected_model
+    from qccd.ir.tsir import TSIR, Instruction, loop_shift
+    from qccd.verify import verify
+
     without = _noswitch_arch(tmp_path)
     prog = _round(without, list(range(0, 144, 6)))  # all 24 docks act
-    assert "R4" not in _r4_verdict(without, prog)["failed"]
+    rep = verify(prog, without, corrected_model(), check_metrics=False)
+    holds = Counter(v.instr_id for v in rep.rules.violations
+                    if v.rule == "R4" and "must follow its waveform" in v.message)
+    rotate, dock = (i.id for i in prog.instructions if i.type == "simd")
+    assert holds == {rotate: 24, dock: 120}, holds
+    assert all("a hold needs a switch" in v.message for v in rep.rules.violations
+               if v.rule == "R4"), "nothing else in this round is undrivable"
+
+    with_sw = load(str(ROOT / "arch" / "ring144_24v.arch.json"))
+    assert "R4" not in _r4_verdict(with_sw, prog)["failed"]
+
+    bare = TSIR(name="t", arch_spec="arch/ring144_24v.arch.json")
+    placement = {f"d{s}": f"S{s}" for s in range(144)}
+    bare.add(Instruction(type="init", id=bare.next_id(), placement=placement,
+                         quanta={k: 0.0 for k in placement}))
+    bare.add(Instruction(type="simd", id=bare.next_id(), cls="rotate_cw", mode="inter",
+                         template=loop_shift("L0", 1), holds=("L0",)))
+    assert "R4" not in _r4_verdict(without, bare)["failed"], \
+        "every loaded site moves, so a switchless channel drives the rotation"
 
 
 def test_a_lattice_move_needs_a_channel_per_direction(tmp_path):

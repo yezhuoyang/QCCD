@@ -19,6 +19,16 @@ Each of the `N = a·b` unit cells carries 24 DC electrodes in three control clas
     total DACs        12x2 + 4x2 + 8N/100 = 24 + 8 + 8N/100
     trapping zones    N - b
 
+The x2 on the broadcast terms is the two-way switch, not a differential pair: "every DC
+is wired through a two-way switch" (p.19), so each electrode role has two banks of DACs,
+one carrying the motion waveform and one the hold waveform, and a site's switch picks
+which it follows.  That is WISE's N_set = 2, "stay or swap" (arXiv:2305.12773, Table I;
+Sec. II A, "it suffices to use one DAC per waveform"): 32 broadcast DACs play ONE motion
+plus a hold per cycle, selected per site by one bit.  The 1:100 demultiplexer is WISE's
+rounded figure (its Fig. 2); its design is 1:128, with N_se/(M - 1) shim DACs because one
+demux state disconnects (Sec. V B 3).  Shims are charged one at a time through it, so the
+demux costs time as well as saving DACs: t_sc = M x t_ec, t_ec = 3 us.
+
 **The scaling win is that only the compensation term grows with N.**  Linear and junction
 control are broadcast, so their DAC count is constant in array size -- which is what makes
 the whole WISE family worth the serialization penalty it costs (PLAN §1).
@@ -26,17 +36,35 @@ the whole WISE family worth the serialization penalty it costs (PLAN §1).
 For an architecture that does not declare unit cells, the same accounting is applied to
 the expanded graph: traps and junctions each carry their declared electrode count, and
 the wiring scheme decides whether those electrodes share DACs or not.
+
+What a programme asks of those DACs
+-----------------------------------
+The counts above are what the device HAS.  Pass `census=` (a `qccd.cost.waveforms`
+`WaveformCensus` of a compiled programme) and the report also says what the programme
+NEEDS of them: the banks it plays at once (motions plus the hold), the select bits a
+switched broadcast plane must load per cycle and at what rate, and the time the shim
+demultiplexer charges between transport and gates (`demux_tradeoff` for other M).
+Without a census nothing changes, byte for byte -- the grader calls it without one.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping, Sequence
 
 from ..arch import Architecture
 
-__all__ = ["HardwareReport", "hardware_report", "deck_unit_cell_report", "WIRING_FLOORS"]
+if TYPE_CHECKING:  # pragma: no cover
+    from .waveforms import WaveformCensus
+
+__all__ = ["HardwareReport", "hardware_report", "deck_unit_cell_report", "WIRING_FLOORS",
+           "demux_tradeoff", "DECK_ROLES", "SHIM_CHARGE_US"]
+
+#: electrode roles one motion drives on the deck's array: 6 linear_h + 6 linear_v + 4 junction
+DECK_ROLES = 6 + 6 + 4
+#: t_ec, the time to charge one shim through the demultiplexer (WISE Sec. V B 3: 3 us)
+SHIM_CHARGE_US = 3.0
 
 #: What a device may not declare for itself (#15).  HOW it is wired -- direct, broadcast, a
 #: channel map -- is a design choice and stays the device's.  How many electrodes a trap needs,
@@ -53,8 +81,11 @@ WIRING_FLOORS: Mapping[str, int] = {
     # together, the least the compensation term may count: 8 shims a trap through the deck's
     # 1:100 demultiplexer (a floor on the COUNT; see `compensation_floor`)
     "compensation_electrodes_per_trap": 8,
-    "max_shim_per_dac": 100,
-    "channels_per_site": 32,                # (6 + 6 + 4) electrode roles, each a differential pair
+    "max_shim_per_dac": 100,                # the deck's 1:100, WISE's rounded figure (design: 1:128)
+    # (6 + 6 + 4) electrode roles x 2 banks: p.19's two-way switch gives every role a motion
+    # DAC and a hold DAC (WISE N_set = 2) -- one motion plus a hold per cycle, not a
+    # differential pair
+    "channels_per_site": 32,
 }
 
 
@@ -80,12 +111,31 @@ class HardwareReport:
     budget: Mapping = field(default_factory=dict)
     over_budget: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # ---- only with a census (`hardware_report(..., census=...)`); None otherwise ----
+    #: the census itself, as a dict
+    waveforms: dict | None = None
+    #: does one channel drive many sites (broadcast / row / column / explicit, or the
+    #: wise / broadcast_groups scheme)?  Banks and select bits mean something only then.
+    shared_channels: bool | None = None
+    #: channels one bank needs: one per electrode role
+    roles_per_bank: int | None = None
+    #: banks played at once at the busiest cycle x roles: the hold bank counted
+    dacs_dynamic_required: int | None = None
+    select_bits_per_site: int | None = None
+    select_bits_per_cycle: int | None = None
+    #: select bits per cycle / the shortest transport cycle (bits per us = Mbit/s)
+    select_rate_mbit_s: float | None = None
+    demux_order: int | None = None
+    shim_charge_us_per_layer: float | None = None
+    shim_charge_total_us: float | None = None
+    shim_charge_total_us_every_layer: float | None = None
+    demux_tradeoff: list[dict] | None = None
 
     def ok(self) -> bool:
         return not self.over_budget
 
     def as_dict(self) -> dict:
-        return {
+        out = {
             "name": self.name,
             "scheme": self.scheme,
             "n_traps": self.n_traps,
@@ -103,15 +153,36 @@ class HardwareReport:
             "over_budget": list(self.over_budget),
             "notes": list(self.notes),
         }
+        if self.waveforms is not None:
+            # only with a census, so a report made without one is the dict it always was
+            out.update({
+                "waveforms": dict(self.waveforms),
+                "shared_channels": self.shared_channels,
+                "roles_per_bank": self.roles_per_bank,
+                "dacs_dynamic_required": self.dacs_dynamic_required,
+                "select_bits_per_site": self.select_bits_per_site,
+                "select_bits_per_cycle": self.select_bits_per_cycle,
+                "select_rate_mbit_s": self.select_rate_mbit_s,
+                "demux_order": self.demux_order,
+                "shim_charge_us_per_layer": self.shim_charge_us_per_layer,
+                "shim_charge_total_us": self.shim_charge_total_us,
+                "shim_charge_total_us_every_layer": self.shim_charge_total_us_every_layer,
+                "demux_tradeoff": [dict(r) for r in (self.demux_tradeoff or ())],
+            })
+        return out
 
 
 def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = None,
-                    budget: Mapping | None = None) -> HardwareReport:
+                    budget: Mapping | None = None,
+                    census: "WaveformCensus | None" = None) -> HardwareReport:
     """Electrode, switch and DAC counts for any architecture, from its expanded graph.
 
     `floors` (the grader passes `WIRING_FLOORS`) counts every number the device declares
     about its own wiring at no less than the physics allows, and says so in `notes`.
     `budget` judges the device against a budget other than its own -- the task release's.
+    `census` (`qccd.cost.waveforms.waveform_census` of a compiled programme) adds what
+    that programme needs of the wiring: banks played at once, select bits, and the shim
+    demultiplexer's charging time.  Without it the report is unchanged, byte for byte.
     """
     dev = arch.device
     wiring = dict(arch.control.get("wiring", {}) or {})
@@ -175,10 +246,11 @@ def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = No
         notes.extend(plane.notes)
         if floors is not None:
             # The map is counted, but how many channels drive one site is still declared: a
-            # map of ONE broadcast channel (roles ["linear"], no differential pair) passes R4d
-            # whenever each cycle moves its ions alike.  Moving an ion takes every electrode
-            # role of its cell, so a site driven by fewer than `channels_per_site` channels is
-            # under-declared, and the map is counted as if each of its channels were that many.
+            # map of ONE broadcast channel (roles ["linear"], one bank, no hold bank) passes
+            # R4d whenever each cycle moves its ions alike.  Moving an ion takes every
+            # electrode role of its cell, and holding one still takes the second bank, so a
+            # site driven by fewer than `channels_per_site` channels is under-declared, and
+            # the map is counted as if each of its channels were that many.
             least = int(floors["channels_per_site"])
             driven = [len(plane.channels_of(s)) for s in (n.id for n in traps)]
             driven = [k for k in driven if k > 0]
@@ -217,6 +289,15 @@ def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = No
         dacs = electrodes
         notes.append("direct wiring: one DAC per electrode, so DAC count is O(traps)")
 
+    extra: dict = {}
+    if census is not None:
+        extra = _census_accounting(arch, wiring, broadcast_scheme, len(traps),
+                                   compensation_per_cell, broadcast, census, notes)
+        if extra["dacs_dynamic_required"] is not None \
+                and extra["dacs_dynamic_required"] > broadcast:
+            broadcast = extra["dacs_dynamic_required"]
+            dacs = broadcast + comp_dacs
+
     over: list[str] = []
     if "max_dacs" in budget and dacs > int(budget["max_dacs"]):
         over.append(f"dacs {dacs} > max_dacs {budget['max_dacs']}")
@@ -245,7 +326,116 @@ def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = No
         budget=budget,
         over_budget=over,
         notes=notes,
+        **extra,
     )
+
+
+def _census_accounting(arch: Architecture, wiring: Mapping, broadcast_scheme: bool,
+                       n_traps: int, compensation_per_cell: int, counted: int,
+                       census: "WaveformCensus", notes: list[str]) -> dict:
+    """What a programme needs of the wiring, from its waveform census (module docstring,
+    "What a programme asks of those DACs").  Appends its notes; returns the report fields.
+    """
+    plane = arch.control_plane
+    shared = plane.grouping != "direct" if plane.declared else broadcast_scheme
+    k = int(census.max_concurrent)
+    out: dict = {"waveforms": census.as_dict(), "shared_channels": shared}
+
+    # ---- banks and select bits: meaningful only where one channel drives many sites
+    if shared:
+        roles = plane.roles_per_site if plane.declared and plane.roles_per_site else DECK_ROLES
+        if not (plane.declared and plane.roles_per_site):
+            notes.append(f"waveforms: no channel map declares the electrode roles, so a bank "
+                         f"is counted at the deck's {DECK_ROLES} (6 + 6 + 4)")
+        required = k * roles
+        out["roles_per_bank"] = roles
+        out["dacs_dynamic_required"] = required
+        motions = int(census.max_signatures)
+        hold = " + a hold" if k > motions else ""
+        if required > counted:
+            notes.append(
+                f"waveforms: the programme plays {k} bank(s) at once ({motions} motion(s)"
+                f"{hold}), {k} x {roles} roles = {required} broadcast DACs; the wiring counts "
+                f"{counted}, so they are counted at {required}")
+        else:
+            notes.append(
+                f"waveforms: the programme plays at most {k} bank(s) at once ({motions} "
+                f"motion(s){hold}), {k} x {roles} roles = {required} of the {counted} "
+                f"broadcast DACs counted (the deck's x2 is a motion bank and a hold bank, "
+                f"WISE N_set = 2)")
+        switched = plane.switch_per_site
+        bits = math.ceil(math.log2(k)) if switched and k >= 2 else 0
+        out["select_bits_per_site"] = bits
+        out["select_bits_per_cycle"] = bits * n_traps
+        t_min = float(census.min_cycle_us)
+        out["select_rate_mbit_s"] = (bits * n_traps / t_min) if t_min > 0 else 0.0
+        if bits:
+            notes.append(
+                f"select: {bits} bit(s) per site per transport cycle choose its bank "
+                f"(WISE Table I, N_sw = log2(N_set^N)); {bits * n_traps} bits a cycle over "
+                f"{n_traps} sites, {out['select_rate_mbit_s']:.3g} Mbit/s at the shortest "
+                f"cycle ({t_min:g} us)")
+        elif not switched and k >= 2:
+            notes.append(
+                f"select: the plane has no per-site switch, so it cannot choose between the "
+                f"{k} banks the programme plays at once (R4d fails such a cycle)")
+    else:
+        out.update(roles_per_bank=None, dacs_dynamic_required=None, select_bits_per_site=0,
+                   select_bits_per_cycle=0, select_rate_mbit_s=0.0)
+        notes.append("waveforms: every site has channels of its own, so no bank is shared "
+                     "and no select bit is needed")
+
+    # ---- the shim demultiplexer: DACs saved, time paid
+    m = int(wiring.get("shim_per_dac", 1) or 1)
+    t_ec = float(wiring.get("shim_charge_us", SHIM_CHARGE_US))
+    t_sc = m * t_ec
+    n_shims = (plane.n_sites * plane.compensation_per_site if plane.declared
+               else n_traps * compensation_per_cell)
+    out["demux_order"] = m
+    out["shim_charge_us_per_layer"] = t_sc
+    out["shim_charge_total_us"] = census.n_reconfigurations * t_sc
+    out["shim_charge_total_us_every_layer"] = census.n_gate_layers * t_sc
+    out["demux_tradeoff"] = demux_tradeoff(n_shims, census, t_ec=t_ec)
+    notes.append(
+        f"shims: {n_shims} compensation electrodes through a 1:{m} demultiplexer are charged "
+        f"one at a time, t_sc = {m} x {t_ec:g} us = {t_sc:g} us (WISE Sec. V B 3).  Following "
+        f"WISE they are re-set after each reconfiguration: {census.n_reconfigurations} x "
+        f"{t_sc:g} = {census.n_reconfigurations * t_sc:g} us; WISER (arXiv:2609.13546 §4.2) "
+        f"charges every gate layer: {census.n_gate_layers} x {t_sc:g} = "
+        f"{census.n_gate_layers * t_sc:g} us; the replayed programme runs "
+        f"{census.total_us:g} us")
+    return out
+
+
+def demux_tradeoff(n_shim_electrodes: int, census: "WaveformCensus | None" = None,
+                   Ms: Sequence[int] = (1, 16, 100, 128),
+                   t_ec: float = SHIM_CHARGE_US) -> list[dict]:
+    """The shim demultiplexer's trade, per order M: fewer DACs, longer charging.
+
+    WISE Sec. V B 3: "Increasing the multiplexing order M decreases the number of shim
+    DACs but increases the shim charging time t_sc", t_sc = M x t_ec.  Two DAC counts,
+    because the sources differ: the deck's ceil(n / M), and WISE's n / (M - 1) -- one of
+    the M demux states disconnects -- rounded up (WISER §5.4 counts 10N/(M - 1)).  At
+    M = 1 every shim has its own DAC and charging is one t_ec.  With a census, the
+    charging time over the programme both ways: once per reconfiguration (WISE) and once
+    per gate layer (WISER §4.2).
+    """
+    rows: list[dict] = []
+    n = int(n_shim_electrodes)
+    for m in Ms:
+        m = int(m)
+        t_sc = max(1, m) * t_ec
+        row = {
+            "M": m,
+            "shim_dacs": math.ceil(n / m) if m > 1 else n,
+            "shim_dacs_wise": math.ceil(n / (m - 1)) if m > 1 else n,
+            "t_sc_us": t_sc,
+        }
+        if census is not None:
+            row["charge_us_reconfigurations"] = census.n_reconfigurations * t_sc
+            row["charge_us_every_layer"] = census.n_gate_layers * t_sc
+        rows.append(row)
+    return rows
 
 
 def deck_unit_cell_report(a: int, b: int, *, shim_per_dac: int = 100) -> dict:
