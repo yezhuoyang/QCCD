@@ -109,13 +109,47 @@ docker run --rm -m 1g --network none -e HOME=/tmp -e QCCD_GRADER_MEM_MB=4096 \
   qccd-official:<tag> python -m qccd.official.worker redraw [--task <release>]
 ```
 
+A bundle uploaded before `c230f11` carries the submitter's checkout path in its programs' provenance.
+`thin-provenance` lists the stored bundles it would rewrite the way a bundle is written today;
+`--apply` stores them, points each submission at its new bundle and queues it to be graded again.
+Run it the same way, after the queue is empty and no redraw is running (`--apply` deletes the
+old archives):
+
+```bash
+docker run --rm -m 1g --network none -e HOME=/tmp \
+  -e QCCD_OFFICIAL_DB=sqlite:////data/official.db -e QCCD_OFFICIAL_ARTIFACTS=/artifacts \
+  -v qccd-official_data:/data -v qccd-official_artifacts:/artifacts \
+  qccd-official:<tag> python -m qccd.official.service thin-provenance [--apply]
+```
+
 **Rolling back.** Set `.env` to the previous tag and `up -d`. To take the service down
 completely: `docker compose -f docker-compose.prod.yml down` (volumes survive), then remove
 the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reload nginx`.
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-22, from commit `751d443` (pushed, also on `website/invitations`): the Program
+**Deployed** 2026-10-24 06:36 UTC, from commit `d41a6e5` (pushed, also on `website/invitations`):
+hardware labels on an entry's page (every site, junction and ion named on the canvas, on by default,
+the Labels button), `thin-provenance`, and arch files without a checkout path. Derived from
+`751d443` (`qccd/`, `arch/` and `Compiler/bridge` from `d41a6e5`; `Compiler/ocaml` is unchanged, so
+the image keeps qccdc `c774b87b677f`); 51 layers identical; rollback `*.bak-751d443`. The switch
+waited for a running `bb72seq_mem` grade to finish. Rehearsal: smoke passed, and `thin-provenance
+--apply` on a copy of an old production bundle regraded it eligible with no root served. Production:
+smoke passed (GHZ, private, 18 s); `worker redraw` drew all 68 entry pages (0 failed, 9 min); the
+dry run found 68 stored bundles, 67 to thin and none skipped, and `--apply` queued their 67
+regrades (about 3.2 h of grading; the worker takes them in turn, and an entry keeps its board row
+until its new report lands).
+
+A regrade judges the stored program under today's rules, not the ones it was first graded under.
+Twelve private deploy-smoke uploads (GHZ and BB144, 2026-09-23 to 10-20, compiled before strict
+gate order and the current timing model) are now ineligible: R7, or qcheck's strict order. No
+public entry changed. The worker was stopped after the first 16 regrades, when those flips showed,
+and ran the rest under a watchdog that compared each regraded public entry with its report from
+before (eligibility, rank value, every metric) and would have stopped it at the first difference;
+all 49 came out identical, 55 of the 67 overall, and the queue drained at 10:11 UTC. Afterwards no
+stored archive names a checkout path, and Goal 1 still lists 49 entries.
+
+**Before that** 2026-10-22, from commit `751d443` (pushed, also on `website/invitations`): the Program
 pane's Both view in two columns (hardware and circuit side by side on an entry's page) and `worker
 redraw`. Same derivation (`qccd/` from `751d443`); 47 layers identical; rollback `*.bak-6012b17`;
 rehearsal smoke passed and a rehearsal redraw drew its page. On production, `worker redraw` drew all
