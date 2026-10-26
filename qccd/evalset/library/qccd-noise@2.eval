@@ -1,0 +1,88 @@
+evaluation "qccd-noise@2"
+title "Pauli noise from published Helios-class measurements"
+about "What a schedule costs, so that two machines running one circuit get different logical error rates when they spend different time idle, in transport or beside a readout. Every number is a published measurement on trapped-ion QCCD hardware, or arithmetic on two of them; every channel is a Pauli channel stim samples directly: a coherent rotation enters as its Pauli twirl, leakage as the Pauli error the vendor's own stabilizer emulator charges it as. What the literature does not support is left out rather than given an invented number: no error per shuttle, junction, split or swap (transport costs its time and its heat, which the channels below charge), no ion loss, no two-ion-gate crosstalk."
+include "metrics"
+clock "quantinuum"
+
+# Helios (Quantinuum, 98 Ba-137 qubits) measures memory error growing linearly and
+# quadratically with idle time; the vendor's emulator fixes the two rates it uses for exactly
+# this, on idle and transport time alike.
+param memory_rate = 7.9e-3          # per second
+param coherent_rate = 0.058         # Hz: a coherent Z rotation of angle 2 pi f T over a wait T
+# Ground-state cooling leaves n-bar < 0.05 on the axial modes, not 0.
+param nbar_floor = 0.05
+# A mid-circuit measurement and reset disturbs the other ions: 2.1e-4 on each laser-adjacent
+# ion, 4.8e-5 averaged over all 97 spectators; a reset alone, 3.5e-6.
+param crosstalk_near = 2.1e-4
+param crosstalk_far = (97 * 4.8e-5 - 3 * 2.1e-4) / (97 - 3)
+param crosstalk_reset = 3.5e-6
+
+# the ions sharing a trap with an ion step k operates on, and every other ion it leaves alone
+define near(k) = {i for i in ions where position(i, start(k)) in {position(j, start(k)) for j in operated(k)}
+                                      and i not in operated(k)}
+define far(k) = {i for i in ions where i not in operated(k) and i not in near(k)}
+
+channel prepare "The first preparation"
+  about "Every ion starts in |0>, prepared as a reset is, with a reset's error."
+  source "Quantinuum Helios-1E emulator parameters (p_init); arXiv:2511.05465 Table II"
+  after p in preparations:
+    X_ERROR(min(1 / 2, primitive("reset", "error"))) on ions(p)
+
+channel memory_coherent "Coherent dephasing over a wait"
+  about "When an operation reaches an ion, the ion has waited since the last one: a coherent Z rotation of angle 2 pi f T over that wait T, entered as its Pauli twirl. It grows as T squared, so one long wait costs far more than many short ones."
+  source "arXiv:2511.05465 Table II (quadratic memory term, 7(2)e-5 per 55 ms layer squared); Quantinuum Helios-1E emulator parameters (quadratic_dephasing_rate)"
+  before o in qubit_operations, i in ions(o):
+    Z_ERROR(min(1 / 2, pow(sin(pi * coherent_rate * waited(i, o) * 1e-6), 2))) on i
+
+channel readout_z "A wrong readout"
+  about "The readout reports the wrong outcome with probability 1 - F: a flip the measurement then sees."
+  source "arXiv:2511.05465 Table II; Quantinuum Helios-1E emulator parameters (p_meas)"
+  before m in measurements where basis(m) = "Z":
+    X_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+
+channel readout_x "A wrong readout, in the X basis"
+  about "The same flip, for the experiment's own readout of an X memory."
+  before m in measurements where basis(m) = "X":
+    Z_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+
+channel ms "The two-ion gate"
+  about "The device's gate error law at the heat the pair meets (the hotter ion, plus what ground-state cooling leaves behind) and at the length of the chain in its trap."
+  source "arXiv:2511.05465 Table II; arXiv:0810.0670 Sec. 5.2 (the slope per quantum); arXiv:2004.04706 Eq. 1 (the chain factor); arXiv:2206.11888 Fig. 3 (the cooling floor)"
+  after g in two_qubit_gates:
+    DEPOLARIZE2(min(15 / 16, ms_error(gate_nbar(g) + nbar_floor, gate_chain(g)))) on ions(g)
+
+channel gate_1q "A one-ion pulse"
+  about "Every pulse R, and every abstract one-qubit Clifford, fails with the device's one-qubit infidelity. The frame change VZ is a phase update, not a pulse: it costs time, never this."
+  source "arXiv:2511.05465 Table II"
+  after g in single_qubit_gates where gate(g) != "VZ" and gate(g) != "I":
+    DEPOLARIZE1(min(3 / 4, 1 - primitive("1q_gate", "fidelity"))) on ions(g)
+
+channel reset "A wrong reset"
+  about "A reset leaves its ion in |1> instead of |0> with the device's reset error."
+  source "Quantinuum Helios-1E emulator parameters (p_init)"
+  after r in resets:
+    X_ERROR(min(1 / 2, primitive("reset", "error"))) on ions(r)
+
+channel crosstalk "Readout crosstalk in the trap"
+  about "A measurement disturbs the other ions of its trap."
+  source "arXiv:2511.05465 Sec. III B5 p.10, Fig. 10 (local crosstalk 2.1(1)e-4)"
+  after k in steps where kind(k) = "measure":
+    DEPOLARIZE1(min(3 / 4, crosstalk_near)) on near(k)
+
+channel crosstalk_global "Readout crosstalk elsewhere"
+  about "And, less, every ion in every other trap."
+  source "arXiv:2511.05465 Sec. III B5 p.10 (global crosstalk 4.8(1)e-5, the three adjacent ions taken out)"
+  after k in steps where kind(k) = "measure":
+    DEPOLARIZE1(min(3 / 4, crosstalk_far)) on far(k)
+
+channel crosstalk_reset "Reset crosstalk"
+  about "A reset disturbs the ions in the other traps far less."
+  source "Quantinuum Helios-1E emulator parameters (p_crosstalk_init)"
+  after k in steps where kind(k) = "reset":
+    DEPOLARIZE1(min(3 / 4, crosstalk_reset)) on far(k)
+
+channel memory "Memory error while the clock runs"
+  about "For as long as a step takes, every ion it does not operate on -- idling, riding a rotation, being carried -- dephases linearly in time. Most of the measured linear term is leakage, which the vendor's stabilizer emulator charges as Z, as here. The experiment's appended readout is not a step of the programme, so it is not charged."
+  source "arXiv:2511.05465 Table II and Sec. III B4 (linear memory term); Quantinuum Helios-1E emulator parameters (linear_dephasing_rate)"
+  after k in steps where duration(k) > 0:
+    Z_ERROR(min(1 / 2, memory_rate * duration(k) * 1e-6)) on {i for i in ions where i not in operated(k)}

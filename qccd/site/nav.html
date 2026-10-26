@@ -26,14 +26,40 @@
 #sitehits b{color:#0b0b0b;font-weight:600} #sitehits small{display:block;color:#8a8985;font-size:12px}
 #sitehits .sn-k{float:right;color:#8a8985;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
 #sitehits .sn-none{padding:8px 12px;color:#8a8985}
+/* Learn: the five reference pages in one menu (2026-10-26), so the bar holds fewer places.
+   The button is unset first: the studio styles every button, and this one must look like
+   the links beside it on every page. */
+#sitenav .sn-menu{position:relative;display:inline-flex;align-items:center;height:40px}
+#sitenav .sn-mbtn{all:unset;box-sizing:border-box;cursor:pointer;color:#52514e;padding:0 6px;height:40px;
+ display:inline-flex;align-items:center;gap:4px;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;
+ font:13.5px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#sitenav .sn-mbtn:hover,#sitenav .sn-menu[data-open="1"] .sn-mbtn{color:#0b0b0b}
+#sitenav .sn-mbtn:focus-visible{outline:2px solid #bcd4f2;outline-offset:-2px}
+#sitenav .sn-mbtn i{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;
+ border-top:4px solid currentColor;margin-top:1px}
+#sitenav .sn-menu[data-current="1"] .sn-mbtn{color:#0b0b0b;border-bottom-color:#2a78d6}
+#sitenav .sn-drop{display:none;position:absolute;top:39px;left:0;min-width:280px;background:#fff;border:1px solid #cfceca;
+ border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px 0;z-index:70}
+#sitenav .sn-menu[data-open="1"] .sn-drop{display:block}
+#sitenav .sn-menu .sn-drop a{display:block;height:auto;padding:8px 14px;border:0;margin:0;line-height:1.3;
+ white-space:normal;font-size:13.5px;color:#0b0b0b}
+#sitenav .sn-menu .sn-drop a small{display:block;color:#8a8985;font-size:12px;margin-top:2px}
+#sitenav .sn-menu .sn-drop a:hover,#sitenav .sn-menu .sn-drop a:focus{background:#eef3fb;outline:none}
+#sitenav .sn-menu .sn-drop a[aria-current="page"]{box-shadow:inset 3px 0 0 #2a78d6}
+#sitenav.qc-tight .sn-mbtn{padding:0 4px;font-size:12.5px}
+#sitenav.qc-tight2 .sn-mbtn{padding:0 3px;font-size:12px}
 </style>
 <nav id="sitenav" aria-label="site">
   <a class="sn-brand" href="__ROOT__">QCCD <span>studio</span></a>
-  <a href="__ROOT__learn/" data-part="learn">Learn</a>
-  <a href="__ROOT__physics/" data-part="physics">Physics</a>
-  <a href="__ROOT__language/" data-part="language">Language</a>
-  <a href="__ROOT__rules/" data-part="rules">Rules</a>
-  <a href="__ROOT__compilation/" data-part="compilation">Compilation</a>
+  <a href="__ROOT__learn/" data-part="learn">Tutorial</a>
+  <span class="sn-menu" data-open="0"><button class="sn-mbtn" type="button" aria-haspopup="true"
+    aria-expanded="false" data-hint="site:learn">Learn<i></i></button><span class="sn-drop" role="menu">
+    <a href="__ROOT__physics/" data-part="physics" role="menuitem">Physics<small>from one trapped ion to the noise</small></a>
+    <a href="__ROOT__language/" data-part="language" role="menuitem">Language<small>every statement a programme is written in</small></a>
+    <a href="__ROOT__rules/" data-part="rules" role="menuitem">Rules<small>every rule, as the assertion that decides it</small></a>
+    <a href="__ROOT__compilation/" data-part="compilation" role="menuitem">Compilation<small>from a circuit to a verified programme</small></a>
+    <a href="__ROOT__evaluation/" data-part="evaluation" role="menuitem">Evaluation<small>every metric, and the noisy circuit a run becomes</small></a>
+  </span></span>
   <a href="__ROOT__studio.html#design" data-part="design">Design</a>
   <a href="__ROOT__gadgets/" data-part="gadgets">Gadgets</a>
   <a href="__ROOT__board/" data-part="board">Leaderboard</a>
@@ -53,6 +79,26 @@
   if(!nav || !q || !hits) return;
   var links = nav.querySelectorAll('a[data-part]');
   for(var i = 0; i < links.length; i++) if(links[i].getAttribute('data-part') === ACTIVE) links[i].setAttribute('aria-current', 'page');
+  // the Learn menu: opens on hover and on a press, closes on Escape, on a press elsewhere, and
+  // when the pointer has been away from it for a moment
+  var menu = nav.querySelector('.sn-menu'), mbtn = menu && menu.querySelector('.sn-mbtn'), shut = 0;
+  if(menu && mbtn){
+    if(menu.querySelector('a[aria-current="page"]')) menu.setAttribute('data-current', '1');
+    var setOpen = function(on){ clearTimeout(shut); menu.setAttribute('data-open', on ? '1' : '0'); mbtn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+    var items = function(){ return menu.querySelectorAll('.sn-drop a'); };
+    mbtn.addEventListener('click', function(ev){ ev.stopPropagation(); setOpen(menu.getAttribute('data-open') !== '1'); });
+    mbtn.addEventListener('keydown', function(ev){
+      if(ev.key === 'ArrowDown'){ ev.preventDefault(); setOpen(true); var a = items(); if(a.length) a[0].focus(); } });
+    menu.addEventListener('keydown', function(ev){
+      var a = Array.prototype.slice.call(items()), k = a.indexOf(document.activeElement);
+      if(ev.key === 'Escape'){ setOpen(false); mbtn.focus(); }
+      else if(k >= 0 && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp')){ ev.preventDefault();
+        a[(k + (ev.key === 'ArrowDown' ? 1 : a.length - 1)) % a.length].focus(); } });
+    menu.addEventListener('mouseenter', function(){ if(window.matchMedia && matchMedia('(hover: hover)').matches) setOpen(true); });
+    menu.addEventListener('mouseleave', function(){ clearTimeout(shut); shut = setTimeout(function(){ setOpen(false); }, 250); });
+    menu.addEventListener('focusout', function(ev){ if(!menu.contains(ev.relatedTarget)) setOpen(false); });
+    document.addEventListener('click', function(ev){ if(!menu.contains(ev.target)) setOpen(false); });
+  }
   var HITS = [], SEL = 0;
   function score(it, words){
     var hay = (it.t + ' ' + (it.d || '') + ' ' + (it.k || '')).toLowerCase(), s = 0;
@@ -101,7 +147,8 @@
   }
   // what an agent may operate in this bar, in the page's hint table (docs/agent-interface.md)
   window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'site:search': { t: 'Search the site',
-    d: 'type words; the matching pages are listed under the box, and Enter opens the first' } });
+    d: 'type words; the matching pages are listed under the box, and Enter opens the first' },
+    'site:learn': { t: 'Learn', d: 'the reference pages: Physics, Language, Rules, Compilation and Evaluation; press to list them' } });
   window.SITENAV = { search: function(s){ q.value = s; search(); return HITS.slice(); }, index: INDEX };
 })();
 </script>

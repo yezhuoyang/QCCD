@@ -1,0 +1,31 @@
+evaluation "qccd-noise@1"
+title "Gate noise and dephasing, from the device's own physics"
+about "Deliberately simple: two-ion gates priced by the heat they meet and the chain they sit in, one-ion pulses, readout and reset by their infidelities, and every ion dephasing for as long as each step takes. The first preparation is noiseless, and nothing is charged for crosstalk or for the shape of an idle stretch."
+include "metrics"
+clock "qccdsim_jones"
+
+channel readout_z "A wrong readout"
+  before m in measurements where basis(m) = "Z":
+    X_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+
+channel readout_x "A wrong readout, in the X basis"
+  before m in measurements where basis(m) = "X":
+    Z_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+
+channel ms "The two-ion gate"
+  about "The device's gate error law at the heat the pair meets and the chain in its trap."
+  after g in two_qubit_gates:
+    DEPOLARIZE2(min(15 / 16, ms_error(gate_nbar(g), gate_chain(g)))) on ions(g)
+
+channel gate_1q "A one-ion pulse"
+  after g in single_qubit_gates where gate(g) != "VZ" and gate(g) != "I":
+    DEPOLARIZE1(min(3 / 4, 1 - primitive("1q_gate", "fidelity"))) on ions(g)
+
+channel reset "A wrong reset"
+  after r in resets:
+    X_ERROR(min(1 / 2, primitive("reset", "error"))) on ions(r)
+
+channel idle "Dephasing while the clock runs"
+  about "Pure dephasing of every ion over every step's duration, against the species' coherence time; the appended readout takes one measurement's time."
+  after k in steps + readout where duration(k) > 0 and coherence_time() != none:
+    Z_ERROR(min(1 / 2, (1 - exp(-duration(k) * 1e-6 / coherence_time())) / 2)) on ions

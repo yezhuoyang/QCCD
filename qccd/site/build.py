@@ -52,7 +52,7 @@ REPO = "https://github.com/yezhuoyang/QCCD"
 DOC_NAMES = ("adl", "tsir", "rules", "phys")
 MARKER = ".qccd-site"
 
-PARTS = (("learn", "Learn", "learn/", "the course, the reference docs, and worked examples"),
+PARTS = (("learn", "Tutorial", "learn/", "the course, the reference docs, and worked examples"),
          ("design", "Design", "studio.html#design", "build a device and program it, in the browser"),
          ("board", "Leaderboard", "board/", "devices and compilers, ranked: speed and logical error rate"),
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
@@ -759,7 +759,7 @@ def landing(ts: list[dict]) -> str:
 
 def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) -> str:
     from . import progress
-    body = ["<h1>Learn</h1>",
+    body = ["<h1>Tutorial</h1>",
             "<p class=\"sub\">One path: the tutorial, then the reference, then a real design stepped "
             "instruction by instruction. Its first parts open the design tool on an exercise and check "
             "your work against the page's own verdicts; its later parts are the verified compiler, in "
@@ -782,6 +782,8 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                 '<span>The verifier\'s own verdicts, runnable here.</span></a>')
     body.append('<a class="doc" href="../compilation/"><span class="tag">compilation</span><b>From QASM to hardware instructions, verified</b>'
                 '<span>The pipeline on a Bell pair, then every basic gate compiled, mapped, witnessed and checked.</span></a>')
+    body.append('<a class="doc" href="../evaluation/"><span class="tag">evaluation</span><b>Every metric, and the noisy circuit a run becomes</b>'
+                '<span>Speed, heat, hardware and the logical error rate, each a term of a language; the noise model as text; a Goal 1 entry recomputed.</span></a>')
     for name in DOC_NAMES:
         body.append(f'<a class="doc" href="../docs/{name}/"><span class="tag">{DOC_TAGS[name]}</span>'
                     f'<b>{html.escape(docs[name]["title"])}</b><span>{DOC_BLURBS[name]}</span></a>')
@@ -799,7 +801,7 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
                         f'<span style="color:#0b7a4b;font-weight:600">{_t(b):.2f} ms</span> '
                         f'<span style="color:var(--ink3)">&middot; {b.get("instructions")} instructions</span></li>')
     body.append("</ul>")
-    return PAGE.format(title="Learn - QCCD studio", style=STYLE, extra_css=progress.LEARN_CSS, body="\n".join(body))
+    return PAGE.format(title="Tutorial - QCCD studio", style=STYLE, extra_css=progress.LEARN_CSS, body="\n".join(body))
 
 
 def board_index(ts: list[dict]) -> str:
@@ -1565,7 +1567,7 @@ def build_compiled_pages(out: Path, put) -> list[dict]:
 
 
 def doc_page(name: str, d: dict) -> str:
-    body = (f'<p class="sub"><a href="../../learn/">Learn</a> &rsaquo; reference</p>'
+    body = (f'<p class="sub"><a href="../../learn/">Tutorial</a> &rsaquo; reference</p>'
             f'<ul class="toc">{d["toc"]}</ul>{d["body"]}')
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
@@ -1834,7 +1836,7 @@ def render_physics() -> dict:
 
 
 def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
-    body = (f'<p class="sub"><a href="../learn/">Learn</a> &rsaquo; background</p>'
+    body = (f'<p class="sub"><a href="../learn/">Tutorial</a> &rsaquo; background</p>'
             f'<ul class="toc">{d["toc"]}</ul>{_figures(d["body"], runs or {})}')
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
 
@@ -1991,6 +1993,9 @@ def build(out: Path) -> int:
     index += [{"t": text, "d": "Compilation · the algorithm", "u": f"compilation/#{hid}", "k": "page"}
               for hid, text in algorithm.HEADINGS]
     index.append({"t": "Compilation", "d": "from QASM to hardware instructions, and how R10 is decided", "u": "compilation/", "k": "page"})
+    # every metric, requirement and noise channel, written in the evaluation language (qccd/site/evaluation.py)
+    from . import evaluation
+    index += evaluation.index_entries()
     index.append({"t": "Physics background", "d": "from trapping one ion to the noise model, and how the website simulates it",
                   "u": "physics/", "k": "page"})
     index += [{"t": html.unescape(re.sub(r"<[^>]+>", "", text)), "d": "Physics background",
@@ -2105,6 +2110,11 @@ def build(out: Path) -> int:
     compiled = build_compiled_pages(out, put)
     put("compilation/index.html", compilation_page(compiled), 1, "compilation")
     print(f"  compilation  {len(compiled)} compiled examples")
+    put("evaluation/index.html", evaluation.page(PAGE, STYLE, device_svg=device_svg), 1, "evaluation")
+    for rel, blob in evaluation.files():
+        (out / rel).parent.mkdir(parents=True, exist_ok=True)
+        (out / rel).write_bytes(blob)
+    print("  evaluation   the metrics, the noise model and two Goal 1 entries, recomputed")
     from ..gadget.site import build_section as build_gadget_section
     build_gadget_section(out, put)
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")

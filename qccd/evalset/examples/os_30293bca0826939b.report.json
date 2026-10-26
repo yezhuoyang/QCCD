@@ -1,0 +1,445 @@
+{
+ "bundle": {
+  "digest": "sha256:a72d91ed46308115b48434ebfecfcb67ca793145bfad3d7f0010ac040c39aa58",
+  "files": {
+   "certificate": "sha256:093df42e72e20068147a6bfc6c83472eb0db4b5f0eb907142393642f5616655a",
+   "certified_program": "sha256:bd62ec394c94f1bb4fa798fadefd64faf28a088542e3a39168dfa59705e5856d",
+   "device": "sha256:8424768296a5fcca4908819c924041a2c97b118fe81c4dc85063542e68d40df3",
+   "presentation": "sha256:538acfda4fb916227fa14ce14af6606f4442bbe648f7580a7abca896133e0316",
+   "program": "sha256:b8a4947f0b77d3054f2149a384aae821ac3cbcb9da4f37b93eabc895c24d2488"
+  }
+ },
+ "cost_breakdown": {
+  "broadcast": {
+   "ion_moves": 46,
+   "ions_per_instruction": 1.4375,
+   "transport_instructions": 32
+  },
+  "quantinuum": {
+   "peak_quanta": 2.0456060000000003,
+   "total_cost": 98.0,
+   "total_steps": 173,
+   "total_us": 15161.0,
+   "us_by_class": {
+    "cool": 4200.0,
+    "gate": 1185.0,
+    "measure": 1440.0,
+    "reset": 80.0,
+    "shuttle": 8256.0
+   },
+   "us_by_type": {
+    "cool": 4200.0,
+    "gate": 1185.0,
+    "measure": 1440.0,
+    "reset": 80.0,
+    "simd": 8256.0
+   }
+  }
+ },
+ "diagnostics": [],
+ "eligibility": {
+  "eligible": true,
+  "policy": "every required check passed under the reference profile",
+  "reasons": [],
+  "required": [
+   "bundle",
+   "device",
+   "physics_lock",
+   "program",
+   "rules",
+   "certificate_binding",
+   "lean_certificate",
+   "semantics",
+   "correspondence",
+   "metrics",
+   "ler"
+  ]
+ },
+ "evaluator": {
+  "name": "qccd-reference-evaluator",
+  "source_digest": "sha256:50385a33083ccb2b59a387683a959b737ed6c5ee1fe0507d6eca9bd47e7502b5",
+  "toolchain": {
+   "bridge": "sha256:f9e7f5859ce16274c2818ebe5f4549a9bb3cb4b08754de5e642226b07f66f8d9",
+   "python": "3.14.7",
+   "qccdc": "sha256:ed8838c6a2ea36369157916d7e011e1dc858b613f9a8462e1bae7d55c8a8440a",
+   "qcheck": "sha256:923528c0ea2239f1195cf614bac0a819b7745f3842807cdb51771dfbb0e80ada"
+  },
+  "version": "1.0.0"
+ },
+ "input": {
+  "arch_digest": "sha256:999c524ecaab6860b5d5cb8358fb05cbde5e56972be1c3ace9c0dc428a6fded2",
+  "branch": "main",
+  "compiled_for": "sha256:999c524ecaab6860b5d5cb8358fb05cbde5e56972be1c3ace9c0dc428a6fded2",
+  "compiler": "compile",
+  "input_digest": "sha256:f2bc9e23406b2d5e58b0adaf0a493ceadbaad39430feb2682a81e38d002e686d",
+  "revision": 2,
+  "workspace_id": "ws_31871e51c5e1"
+ },
+ "kind": "qccd.evaluation_report",
+ "metrics": {
+  "T_quantinuum": {
+   "better": "low",
+   "ranked": false,
+   "unit": "ms",
+   "value": 15.161
+  },
+  "dacs": {
+   "better": "low",
+   "ranked": false,
+   "unit": "count",
+   "value": 33
+  },
+  "instructions": {
+   "better": "low",
+   "ranked": false,
+   "unit": "count",
+   "value": 133
+  },
+  "ions_per_instruction": {
+   "better": "high",
+   "ranked": false,
+   "unit": "ions",
+   "value": 1.4375
+  },
+  "ler": {
+   "better": "low",
+   "ranked": false,
+   "unit": "per experiment",
+   "value": 0.00934
+  },
+  "ler_per_round": {
+   "better": "low",
+   "ranked": false,
+   "unit": "per round",
+   "value": 0.003123076788202117
+  },
+  "ler_per_round_per_logical": {
+   "better": "low",
+   "ranked": true,
+   "unit": "per round per logical qubit",
+   "value": 0.003123076788202117
+  },
+  "transport_instructions": {
+   "better": null,
+   "ranked": false,
+   "unit": "count",
+   "value": 32
+  }
+ },
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "profile": "reference",
+ "rank_by": "ler_per_round_per_logical",
+ "run": {
+  "grader": "7ed70f42b17f",
+  "job_id": "oj_0784d294bf03bfb3"
+ },
+ "stages": [
+  {
+   "coverage": "manifest schema, member set, sha256 of every file, task id and digest",
+   "detail": {},
+   "diagnostics": [],
+   "id": "bundle",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "architecture schema, structure, declared zones, hardware budget",
+   "detail": {
+    "budget": {
+     "max_dacs": 128,
+     "max_junctions": 200
+    },
+    "dacs": 33,
+    "junctions": 0,
+    "loops": 1,
+    "nodes": 12,
+    "segments": 11,
+    "wiring_notes": []
+   },
+   "diagnostics": [],
+   "id": "device",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "fixed blocks primitives, heating, species, budget equal the release",
+   "detail": {},
+   "diagnostics": [],
+   "id": "physics_lock",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "TSIR shape and instruction types",
+   "detail": {
+    "instructions": 133
+   },
+   "diagnostics": [],
+   "id": "program",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "24 rules passed, 0 failed, 3 skipped, 1 partial",
+   "detail": {
+    "failed": [],
+    "model": "corrected/quantinuum",
+    "partial": {
+     "R15": "quanta are composed additively, which R15 says is an upper bound; the interference term needs a secular-phase model the corpus does not supply"
+    },
+    "passed": [
+     "R1",
+     "R11",
+     "R12",
+     "R13",
+     "R14",
+     "R16",
+     "R17",
+     "R18",
+     "R19",
+     "R2",
+     "R20",
+     "R21",
+     "R22",
+     "R23",
+     "R3",
+     "R4",
+     "R4b",
+     "R4d",
+     "R5",
+     "R6",
+     "R6b",
+     "R7",
+     "R7c",
+     "R8"
+    ],
+    "skipped": {
+     "R10": "needs symbolic permutation + Pauli-frame tracking against a QASM DAG",
+     "R7b": "no per-zone duty-cycle budget is declared by any architecture yet",
+     "R9": "check_metrics=False: the program's claims were not checked"
+    },
+    "total_cost": 98.0,
+    "total_steps": 173,
+    "total_us": 15161.0
+   },
+   "diagnostics": [],
+   "id": "rules",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "every certified instruction kept, in order, unchanged (ignoring the provenance index 'call'); 13 inserted ['cool'] instruction(s) with fresh ids",
+   "detail": {
+    "certified_instructions": 120,
+    "inserted": 13
+   },
+   "diagnostics": [],
+   "id": "correspondence",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "circuit ops are the release circuit op by op, composites as their lowering (check_cert.check_binding); every gate witness names a certified instruction with the same op stamp",
+   "detail": {
+    "ops": 47
+   },
+   "diagnostics": [],
+   "id": "certificate_binding",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "QCCDC.Cert.check (proved sound: check_sound) accepted the certificate against hop/gate-site facts re-derived from the submitted device",
+   "detail": {},
+   "diagnostics": [],
+   "id": "lean_certificate",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "O1 transport replay of the certificate; O2 stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "detail": {
+    "circuit_sha256": "bdd4f5af2cbc1cab95c34eb7b47eef461df043e80b383306e03cd0f9c38014b5",
+    "method": "stabilizer tableau, composed from the emitted pulses, against the source QASM",
+    "o1_transport": "ok",
+    "o2_semantics": "ok",
+    "order": "ok",
+    "unrealised_ops": 0
+   },
+   "diagnostics": [],
+   "id": "semantics",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "467 logical errors in 50000 shots (pymatching), noise qccd-noise@2",
+   "detail": {
+    "budget": {
+     "crosstalk": 0.0012600000000000003,
+     "crosstalk_global": 0.00460663829787234,
+     "gate_1q": 0.002475000000005223,
+     "measure": 1.8000000000517602e-05,
+     "memory": 0.0011549009999999992,
+     "memory_coherent": 1.2460284094450399e-05,
+     "ms_base": 0.018959999999998978,
+     "ms_chain": 0.0,
+     "ms_heating": 0.0011400000000000004,
+     "reset": 0.009000000000000003,
+     "total": 0.038626999581971515
+    },
+    "check": {
+     "nondeterministic": false,
+     "ok": true,
+     "random_detectors": [],
+     "random_observables": [],
+     "reason": "every detector and observable is deterministic and has the source's parity",
+     "stage": "noiseless",
+     "wrong_detectors": [],
+     "wrong_observables": []
+    },
+    "experiment": {
+     "basis": "XZ",
+     "code": "rep3_x2",
+     "detectors": 12,
+     "distance": 1,
+     "experiment": "rep3xz_r3",
+     "ions": 10,
+     "logical_qubits": 1,
+     "matchable": true,
+     "n_ancilla": 4,
+     "n_data": 6,
+     "observables": 2,
+     "readout": "appended",
+     "rounds": 3
+    },
+    "ler": {
+     "decoder": "pymatching",
+     "errors": 467,
+     "hi": 0.010221642270706158,
+     "ler": 0.00934,
+     "lo": 0.008533745944677814,
+     "per_round": 0.003123076788202117,
+     "per_round_hi": 0.0034188895752509385,
+     "per_round_lo": 0.002852712210086983,
+     "rounds": 3,
+     "seconds": 0.007,
+     "seed": 20261021,
+     "shots": 50000,
+     "stim_version": "1.15.0",
+     "stopped": "max_errors"
+    },
+    "noise": {
+     "id": "qccd-noise@2",
+     "params": {
+      "chain": true,
+      "coherent_dephasing_hz": 0.058,
+      "crosstalk_far": 4.2829787234042554e-05,
+      "crosstalk_local": 0.00021,
+      "crosstalk_reset": 3.5e-06,
+      "heating": true,
+      "id": "qccd-noise@2",
+      "idle": true,
+      "memory_rate_per_s": 0.0079,
+      "ms": {
+       "eps0": 0.0007899999999999574,
+       "error_vs_chain": "murali:2",
+       "error_vs_quanta": "linear:9.5e-4",
+       "max_quanta": 1
+      },
+      "nbar_floor": 0.05,
+      "p1": 2.5000000000052758e-05,
+      "pm": 1.0000000000287557e-06,
+      "pr": 0.0005,
+      "scale": 1.0,
+      "t2_s": null,
+      "t2_source": "replaced by the memory channels",
+      "table": "quantinuum"
+     },
+     "settings": {
+      "chain": true,
+      "coherent_dephasing_hz": 0.058,
+      "crosstalk_far": 4.2829787234042554e-05,
+      "crosstalk_local": 0.00021,
+      "crosstalk_reset": 3.5e-06,
+      "heating": true,
+      "id": "qccd-noise@2",
+      "idle": true,
+      "memory_rate_per_s": 0.0079,
+      "nbar_floor": 0.05,
+      "scale": 1.0,
+      "t2_s": null,
+      "table": "quantinuum"
+     }
+    },
+    "stats": {
+     "cert_crosscheck": "agrees",
+     "chain_max": 2,
+     "detectors": 12,
+     "ions": 10,
+     "n_1q": 99,
+     "n_cool": 14,
+     "n_instructions": 133,
+     "n_measure": 12,
+     "n_ms": 24,
+     "n_readout_appended": 6,
+     "n_reset": 8,
+     "n_vz": 3,
+     "nbar_max": 0.0,
+     "nbar_mean_at_ms": 0.0,
+     "observables": 2,
+     "qubit_map": "certificate",
+     "qubits": 10,
+     "rule_violations": {},
+     "rules_failed": [],
+     "t_readout_us": 120.0,
+     "t_us": 15161.0
+    },
+    "tools": {
+     "ldpc": "2.4.1",
+     "pymatching": "2.4.0",
+     "stim": "1.15.0"
+    }
+   },
+   "diagnostics": [],
+   "id": "ler",
+   "required": true,
+   "status": "passed"
+  },
+  {
+   "coverage": "replay under each task table; hardware report; broadcast use",
+   "detail": {},
+   "diagnostics": [],
+   "id": "metrics",
+   "required": true,
+   "status": "passed"
+  }
+ ],
+ "task": {
+  "digest": "sha256:14efdd9e79bbe4ef5cf6ba828d046bfe1936bf90d5817ece97beb468b637c78b",
+  "id": "rep3xz_mem@1"
+ },
+ "timing": {
+  "finished_at": 1792825528.8493323,
+  "stage_seconds": {
+   "bundle": 0.01,
+   "certificate_binding": 0.605,
+   "correspondence": 0.009,
+   "device": 0.002,
+   "lean_certificate": 0.681,
+   "ler": 0.732,
+   "metrics": 0.007,
+   "physics_lock": 0.001,
+   "program": 0.002,
+   "rules": 0.013,
+   "semantics": 1.211
+  },
+  "started_at": 1792825525.1112766,
+  "wall_seconds": 3.738
+ },
+ "version": 1
+}
