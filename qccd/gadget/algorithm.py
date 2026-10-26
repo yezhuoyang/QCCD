@@ -222,6 +222,8 @@ class Instr:
     #: (`line` stays the call site's), and the file that line is in ("" for the program)
     src_line: int | None = None
     src_origin: str = ""
+    #: `kind == "call"` only (a folded program, `qccd.gadget.fold`): the gate called
+    gate: str | None = None
 
     def runs(self, branch: dict[str, int]) -> bool:
         """Does this instruction run, given a value for every guard outcome?"""
@@ -266,6 +268,8 @@ class Instr:
             d["src"] = self.src_line
             if self.src_origin:
                 d["src_origin"] = self.src_origin
+        if self.gate is not None:
+            d["gate"] = self.gate
         return d
 
 

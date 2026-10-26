@@ -177,12 +177,57 @@ A deliberately wrong gate (one CX rotation measured as Z̄ instead of X̄, i.e. 
 - **Fault distance is shown, not gating.** FormalRV's d=3 `surfaceRound` has circuit distance 2 against Z-bar (its Z-check CNOTs run row-major; stim, 1 and 3 rounds). FormalRV's owner answered "We don't care about fault-tolerance", so "distance >= d" is QCCD's own rung: shown, and it gates nothing unless the user says otherwise.
 - **FormalRV's staged compiler and its VM can disagree.** On an 8-gate machine the compiler emitted a listing the VM refused (20 > 8 gate reservations). The profile has to be one the VM admits.
 
-### Next
+### Slice S5 (in progress, 2026-10-26): scale — a gadget is lowered, scheduled and checked once
 
-- **S5 (scale):** keep FormalRV's loops folded instead of unrolling them; make the schedule hierarchical
-  (GIR 0.3: a call tree with spans, a gadget scheduled once and reused by translation); make the page lazy,
-  so a many-day run seeks in milliseconds.
-- **Shor from FormalRV's modexp at small width** (N = 21), next to the hand-written Shor-15.
+**The workload.** FormalRV's own `Examples/Shor` at its witness (N = 3, 3 bits, 4 exponent bits, a = 2)
+compiles in 5 s to an 11,978-line `.qec` with its loops and gadgets folded. Unrolled, it is **576,651 town
+instructions**: 68,928 Pauli products, 45,683 |Ȳ⟩ and 23,268 T states, 137,856 decoder calls. Flat, at
+Shor-15's measured cost (8 ms per instruction to schedule, 10 s per 7,000 events to judge), that is hours
+of compute, and a page of gigabytes. So nothing is flattened.
+
+**S5a — lowering, once per call shape (done).** FormalRV's `.qec` gadgets name their scratch offsets
+(`rv_ancillabase`, `rv_logicalancillabase`, `rv_synbase`, `rv_recbase`). A call is lowered once per value
+of every *other* argument, with the offsets at zero, and every call of that shape shares the body. A body
+that names a logical ancilla it did not prepare is lowered exactly instead, so the sharing is never wrong.
+Readouts are decided body by body, in one pass. Up to its inverse QFT (whose rotations wait for S5d), the
+Shor witness lowers in 9.5 s to **19,154 `.alg` lines and 757 gates**; DJ and Shor-15 lower byte for byte
+as before. (The 576,651 above counts that part.)
+
+**S5b — schedule each gate once per context.** A gate call is a *macro*:
+- its body is scheduled once, in isolation, for each binding of its blocks to their **homes**
+  (every data block lives in one memory for its whole life, and a call returns it there);
+- the macro's **footprint** is every interval it reserves on a place, road, junction, the decoder and the
+  archive, relative to its start;
+- the caller places a call as one box: the earliest start at which every interval of the footprint is
+  free (a place keeps serving in issue order; junctions and classical places take any gap);
+- outcomes and frames are the macro's own, named per instance; a parameter's Pauli frame enters as a
+  symbol and leaves as a parity over it, substituted at the call.
+GIR 0.3 holds the macros and their instances, not their expansion. Expanding it gives GIR 0.2, so on
+Shor-15 and DJ every existing check runs on the expansion as a differential test.
+
+**S5b — done (`qccd/gadget/fold.py`).**
+- **Holds.** A block resting in its memory gets a syndrome round every 0.4 s, so G8's 1 s budget holds
+  even across a call's start. Those rounds are one **hold** row: block, memory, first round, period,
+  count. The memory is the block's own while it rests, and a round's decode (1 µs against a 13 ms round)
+  goes into the decoder's free time, which `expand` places and checks with every other row.
+- **Differential tests.** On Shor-15, DJ and a gate called three times, the expansion passes all 11
+  place checks and all 23 machine rules. The folded makespan is within 3–9 % of the flat one, from
+  returning blocks home. A frame left by a call composes correctly in its caller.
+- **FormalRV's Shor witness, up to its QFT, on a wide machine.**
+  - The machine (`fullstack_wide.floor`): 4 benches, 4 factories, 32 memories.
+  - 576,652 instructions as 757 macros (51 reused); scheduled in 135 s, 0 refused.
+  - **3.03 hours** of machine time.
+  - GIR 0.3: 176 MB (19 MB gzipped). The root is 2 MB; its 163,133 refresh rounds are 97 holds. Macros
+    are 89 KB at the median and 5.9 MB at most, so the page loads them as it needs them.
+
+**S5c — the page plays GIR 0.3** by expanding only the instances on screen, at the time on screen.
+
+**S5d — rotations.** FormalRV leaves `ppmrot(±π/2ᵏ)` as a synthesis stub (`tSynth[k]` magic states, no
+circuit). QCCD supplies its own: the angle π/8 is a T state from a factory; finer angles are injected
+rotation states consumed by a Pauli-product measurement, with the doubled-angle correction repeated until
+it reaches T (repeat-until-success). This is exact, so the distribution check still applies.
+
+- **Shor from FormalRV's own example**, unmodified, next to the hand-written Shor-15.
 - **The up-bridge:** derive the `.machine` from characterized macros.
 - **The Goal 2 board**, once an entry can be graded end to end.
 

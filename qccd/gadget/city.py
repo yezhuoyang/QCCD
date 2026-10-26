@@ -107,13 +107,19 @@ def outcome_of(event_id: int, flow: str):
     return (0, frozenset({(event_id, flow)}))
 
 
+def _source_key(x):
+    # an event id, or (in a folded schedule, `qccd.gadget.fold`) a named symbol: a parameter's
+    # frame on entry, an outer guard, an outcome of a call made inside
+    return (0, x[0], x[1]) if isinstance(x[0], int) else (1, str(x[0]), x[1])
+
+
 def expr_json(e) -> dict:
-    return {"const": e[0], "sources": sorted([list(x) for x in e[1]])}
+    return {"const": e[0], "sources": [list(x) for x in sorted(e[1], key=_source_key)]}
 
 
 def expr_text(e, names=None) -> str:
     parts = ([] if not e[0] else ["1"]) + [
-        (names or {}).get(x, f"m@{x[0]}") for x in sorted(e[1])]
+        (names or {}).get(x, f"m@{x[0]}") for x in sorted(e[1], key=_source_key)]
     return " ⊕ ".join(parts) if parts else "0"
 
 GIR_SCHEMA = "qccd.gir/0.2"
@@ -1230,7 +1236,8 @@ class City:
 
         def fix(expr):
             return {"const": expr["const"],
-                    "sources": [[remap[int(eid)], flow] for eid, flow in expr["sources"]]}
+                    "sources": [[remap[eid] if isinstance(eid, int) else eid, flow]
+                                for eid, flow in expr["sources"]]}
 
         for o in self.outcomes:
             for key in ("flip", "value"):
@@ -1251,8 +1258,9 @@ class City:
             if "delta" in f:
                 f["delta"]["ax"] = fix(f["delta"]["ax"])
                 f["delta"]["az"] = fix(f["delta"]["az"])
-        self.pf = {b: (( ax[0], frozenset((remap[int(e)], fl) for e, fl in ax[1])),
-                       ( az[0], frozenset((remap[int(e)], fl) for e, fl in az[1])))
+        def fix_set(s):
+            return frozenset((remap[e] if isinstance(e, int) else e, fl) for e, fl in s)
+        self.pf = {b: ((ax[0], fix_set(ax[1])), (az[0], fix_set(az[1])))
                    for b, (ax, az) in self.pf.items()}
         self.carries.sort(key=lambda c: c[4])
         for i, c in enumerate(self.carries):

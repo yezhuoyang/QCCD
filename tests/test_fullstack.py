@@ -344,6 +344,107 @@ def test_shor15_from_formalrv_is_signed_off_on_the_town(tmp_path):
                                                                        "010": 0.25, "011": 0.25}
 
 
+# ----------------------------------------------------------------------------- folded: a gate scheduled once
+
+
+def _folded_checks(alg_text: str):
+    """Schedule `alg_text` folded, expand it, and run every place check and machine rule on
+    the expansion."""
+    from qccd.gadget.floorplan import FLOORPLANS_DIR, load_file
+    from qccd.gadget.fold import expand, parse_folded, schedule_folded
+    from qccd.gadget.judge import judge_schedule
+    from qccd.gadget.library import LeafLibrary
+    from qccd.gadget.place_checks import check_places
+    leaves = LeafLibrary(CACHE, log=None)
+    alg = parse_folded(alg_text)
+    lib, fp = load_file(FLOORPLANS_DIR / f"{alg.floorplan or 'fullstack'}.floor", leaves)
+    g = schedule_folded(alg, lib, leaves)
+    x = expand(g)
+    return g, x, check_places(x, lib, leaves), judge_schedule(lib, leaves, x, regions=fp.regions)
+
+
+REUSE = """title a gate called twice on the same homes, once on others
+floorplan "fullstack"
+gate zzy p0 p1:
+  prep l0 Y
+  ppm Z p0 Z p1 Z l0 -> o1
+  decode p0 p1 l0
+  read l0 X -> o2
+  decode l0
+  if o1: z p0
+  if o1: z p1
+  if o2: z p0
+  if o2: z p1
+  x p0
+prep q0 Z
+prep q1 Z
+prep q2 Z
+zzy q0 q1
+zzy q0 q1
+zzy q1 q2
+read q0 Z -> r0
+read q1 Z -> r1
+read q2 Z -> r2
+decode q0 q1 q2
+"""
+
+
+def test_a_gate_is_scheduled_once_per_context_and_its_calls_never_overlap():
+    g, x, checks, rules = _folded_checks(REUSE)
+    assert g["schema"] == "qccd.gir/0.3" and not g["refused"]
+    # (q0, q1) twice: one macro, reused; (q1, q2): homes differ, a macro of its own
+    assert g["folded"]["macros"] == 2 and g["folded"]["reused"] == 1
+    a, b, c = g["calls"]
+    assert a["m"] == b["m"] != c["m"]
+    # the second call on q0, q1 starts once the first has given them back
+    assert b["t0"] >= a["t0"] + max(g["macros"][a["m"]]["free"]) - 1e-6
+    assert checks["failed"] == [] and rules["failed"] == []
+    # every instruction of every call is in the expansion, once
+    kinds = [i["kind"] for i in x["program"]["instructions"] if not i.get("refresh")]
+    assert kinds.count("ppm") == 3 and kinds.count("read") == 6
+    # the frame a call leaves is its caller's: X-bar lands on its first block each time, so
+    # q0 (first twice) reads unflipped, q1 (first once) flipped, q2 (never first) unflipped
+    flips = {o["cvar"]: o["flip"]["const"] for o in x["outcomes"] if o.get("cvar") in ("r0", "r1", "r2")}
+    assert flips == {"r0": 0, "r1": 1, "r2": 0}
+
+
+def test_folded_deutsch_jozsa_passes_every_check(dj):
+    *_, low = dj
+    g, x, checks, rules = _folded_checks(low.text)
+    assert g["folded"]["macros"] == 1 and not g["refused"]
+    assert checks["failed"] == [] and rules["failed"] == []
+
+
+def test_folded_shor15_passes_every_check():
+    from qccd.fullstack import qec2alg
+    low = qec2alg.lower(layers.read(SHOR / "shor15.qec", "qec"))
+    g, x, checks, rules = _folded_checks(low.text)
+    assert not g["refused"] and g["folded"]["macros"] == len(low.gates)
+    assert sum(1 for i in x["program"]["instructions"] if i["kind"] == "inject") == 15
+    assert checks["failed"] == [] and rules["failed"] == []
+
+
+@pytest.mark.skipif(not _pinned(), reason="needs the pinned FormalRV clone")
+def test_formalrvs_shor_lowers_once_per_call_shape(tmp_path):
+    """FormalRV's own Examples/Shor at its witness: the modular exponentiation (everything up to
+    the inverse QFT, whose rotations need synthesis) lowers to a few hundred gates, each
+    FormalRV gadget body once per shape, and half a million instructions when counted."""
+    import re as _re
+    from qccd.fullstack import formalrv, qec2alg
+    src = formalrv.root() / "FormalRV" / "Examples" / "Shor" / "Shor.prog"
+    formalrv.prog_to_qppm(src, tmp_path / "shor.qppm")
+    formalrv.qppm_to_qec(tmp_path / "shor.qppm", tmp_path / "shor.qec", "surface", 3,
+                         dict(m=4, bits=3, N=3, a=2, ainv=2, rec=19))
+    text = (tmp_path / "shor.qec").read_text(encoding="utf-8")
+    with pytest.raises(qec2alg.NotLowered, match="ppmrot"):
+        qec2alg.lower(layers.read(tmp_path / "shor.qec", "qec"))
+    cut = "\n".join(ln for ln in text.splitlines() if not _re.match(r"^\s+(qftInv|measurePhase)\(", ln))
+    (tmp_path / "modexp.qec").write_text(cut + "\n", encoding="utf-8")
+    low = qec2alg.lower(layers.read(tmp_path / "modexp.qec", "qec"))
+    assert 500 < len(low.gates) < 1000 and len(low.text.splitlines()) < 25000
+    assert any(name.startswith("ctl_modmulmcp") for name in low.gates)
+
+
 # ----------------------------------------------------------------------------- end to end
 
 def _toolchains_built() -> bool:

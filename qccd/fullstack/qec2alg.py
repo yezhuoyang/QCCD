@@ -62,10 +62,22 @@ class Item:
     role: str = "qec"
     #: a single-factor measurement this lowering may turn into a destructive readout
     single: tuple | None = None            # (letter, block, outcome)
+    #: a call lowered once for every call of the same shape: the shape (see `_Interp.call`)
+    memo: tuple | None = None
 
 
 _FACTOR = re.compile(r"([XYZ])\[(\w+)\[([^\]]+)\]\[0\]\]")
 _ARITH = re.compile(r"^[\w\s+\-*/%^()·]+$")
+
+#: the arguments FormalRV's `.qec` gadgets take only to place a call's own scratch -- where its
+#: ancillas, logical ancillas, syndromes and records start.  Every other argument (the data
+#: base, the gadget's own parameters, the block families) decides what the body does, so a
+#: call is lowered once per value of those, and every call of that shape reuses it.
+OFFSETS = ("rv_ancillabase", "rv_logicalancillabase", "rv_synbase", "rv_recbase")
+
+
+class _NeedsExact(Exception):
+    """A call's body names a logical ancilla it did not prepare: its offset is not scratch."""
 
 
 class _Interp:
@@ -75,6 +87,12 @@ class _Interp:
         self.gen: dict = {}                # LogicalAncilla index -> its current generation
         self.k = 0                         # outcomes named so far
         self.out = Lowered(text="", lines=[])
+        #: a call's shape -> its lowered body, shared by every call of that shape
+        self.memo: dict = {}
+        #: the logical ancillas each call being lowered once has prepared, innermost last
+        self.made: list = []
+        #: calls lowered, and calls that reused a body lowered before
+        self.calls = self.reused = 0
 
     # ---- expressions and statements -----------------------------------------------------
     def ev(self, text: str, env: dict, line: int) -> int:
@@ -105,6 +123,13 @@ class _Interp:
         if fam == "LogicData":
             return f"q{idx}"
         if fam == "LogicalAncilla":
+            if self.made:
+                # lowered once for every call of its shape: the body may only name the
+                # ancillas it prepares itself, whose indices are relative to its own offset
+                if new:
+                    self.made[-1].add(idx)
+                elif idx not in self.made[-1]:
+                    raise _NeedsExact(idx)
             if new:
                 self.gen[idx] = self.gen.get(idx, -1) + 1
             g = self.gen.get(idx, 0)
@@ -143,7 +168,7 @@ class _Interp:
                 self.absorb(s, f"a guard: the lines below run when {name} is 1")
                 continue
             t = self.inst(raw, env, s.line)
-            call = re.fullmatch(r"(\w+)\((.*)\)", t)
+            call = re.fullmatch(r"([\w!]+)\((.*)\)", t)
             if call and call[1] in self.gadgets:
                 items.append(self.call(call[1], split_top(call[2], ","), env, famap, s.line))
                 continue
@@ -201,8 +226,13 @@ class _Interp:
         return items
 
     def call(self, name: str, args: list, env: dict, famap: dict, line: int) -> Item:
+        """A gadget call.  Its body is lowered once per *shape* -- the gadget, the values of
+        every argument but the scratch offsets (`OFFSETS`), and the block families -- with the
+        offsets at zero, and every call of that shape shares it: a loop of a thousand adders
+        is one adder, lowered once.  If the body names a logical ancilla it did not prepare,
+        the offset was not scratch after all, and that call is lowered exactly."""
         g = self.gadgets[name]
-        m = re.match(r"gadget\s+\w+\[.*?\]\((.*)\):\s*$", g.header.text)
+        m = re.match(r"gadget\s+[\w!]+\[.*?\]\((.*)\):\s*$", g.header.text)
         formals = split_top(m[1], ",") if m else []
         if len(formals) != len(args):
             raise NotLowered(f".qec line {line}: {name} takes {len(formals)} arguments, given {len(args)}")
@@ -213,10 +243,41 @@ class _Interp:
                 famap2[parts[1]] = famap.get(a.strip(), a.strip())
             else:
                 env2[f.strip()] = self.ev(a, env, line)
+        self.calls += 1
+        shape = (name, tuple(sorted((k, v) for k, v in env2.items() if k not in OFFSETS)),
+                 tuple(sorted(famap2.items())))
+        if self.memo.get(shape) is not None:
+            self.reused += 1
+            return Item("call", name, line, self.memo[shape], memo=shape)
+        if shape not in self.memo and any(k in OFFSETS for k in env2):
+            self.made.append(set())
+            saved_gen, self.gen = self.gen, {}
+            try:
+                body = self.walk(g.body, {**env2, **{k: 0 for k in env2 if k in OFFSETS}}, famap2, [[]])
+            except _NeedsExact:
+                self.memo[shape] = None
+            else:
+                self.memo[shape] = body
+                return Item("call", name, line, body, memo=shape)
+            finally:
+                self.made.pop()
+                self.gen = saved_gen
+        if self.made:
+            # lowered exactly, inside a body lowered once: it may name that body's ancillas
+            # and its own, and nothing else
+            self.made.append(set(self.made[-1]))
+            try:
+                return Item("call", name, line, self.walk(g.body, env2, famap2, [[]]))
+            finally:
+                self.made.pop()
         return Item("call", name, line, self.walk(g.body, env2, famap2, [[]]))
 
     def band(self, text: str, reg: str):
         m = re.search(rf"\b{reg}\[(\d+),(\d+)\)", text)
+        if not m and "tablemax(" in text:
+            raise NotLowered("this gadget is laid out by FormalRV's rotation-synthesis tables "
+                             "(tablemax(synthBits, ...)): it synthesizes a rotation (ppmrot), "
+                             "which has no gadget yet")
         if not m:
             raise NotLowered(f"no {reg}[..) band in {text!r}")
         return (int(m[1]), int(m[2]))
@@ -245,24 +306,82 @@ def _flatten(items):
             yield from _flatten(it.children)
 
 
+def _seq(items):
+    """`items` in order, through guards but not into calls: one body's own lines."""
+    for it in items:
+        if it.kind == "guard":
+            yield from _seq(it.children)
+        else:
+            yield it
+
+
+def _blocks_of(text: str) -> set:
+    # a decode reads the block's syndromes, not its ions: a read-out block may be decoded
+    return set() if text.startswith("decode") else set(re.findall(r"\b[qa]\d+(?:_\d+)?\b", text))
+
+
+class _Reads:
+    """A single-factor measurement of a block nothing names afterwards is a readout.
+
+    Decided body by body, in one pass from the end: at the program's own level a call counts
+    as naming the blocks it is passed; inside a call's body only a block the body prepared
+    itself can be read out, since what was passed in may be named after the call returns.  A
+    body shared by every call of its shape is decided once."""
+
+    def __init__(self):
+        self.done: set = set()
+        self.uses: dict = {}
+
+    def passed(self, it) -> set:
+        """The blocks a call names that it did not prepare (its parameters)."""
+        key = id(it.children)
+        if key not in self.uses:
+            made, named = set(), set()
+            for x in _flatten(it.children):
+                w = x.text.split(":")[-1].split() if x.text.startswith("if ") else x.text.split()
+                if w and w[0] in ("prep", "inject") and len(w) > 1:
+                    made.add(w[1])
+                named |= set(re.findall(r"\b[qa]\d+(?:_\d+)?\b", x.text))
+            self.uses[key] = named - made
+        return self.uses[key]
+
+    def body(self, items, top: bool) -> None:
+        if id(items) in self.done:
+            return
+        self.done.add(id(items))
+        seq = list(_seq(items))
+        made = set()
+        if not top:
+            for x in seq:
+                w = x.text.split(":")[-1].split() if x.text.startswith("if ") else x.text.split()
+                if x.kind == "ins" and w and w[0] in ("prep", "inject") and len(w) > 1:
+                    made.add(w[1])
+        later: set = set()
+        for it in reversed(seq):
+            if it.kind == "call":
+                self.body(it.children, top=False)
+                later |= self.passed(it)
+                continue
+            if it.single:
+                p, b, name = it.single
+                if b not in later and (top or b in made):
+                    it.text = f"read {b} {p} -> {name}"
+            later |= _blocks_of(it.text)
+
+
 def _mark_reads(items) -> None:
-    """A single-factor measurement of a block nothing names afterwards is a readout."""
-    flat = list(_flatten(items))
-    for i, it in enumerate(flat):
-        if it.single:
-            p, b, name = it.single
-            # a decode reads the block's syndromes, not its ions: a read-out block may be decoded
-            if not any(re.search(rf"\b{re.escape(b)}\b", later.text) for later in flat[i + 1:]
-                       if not later.text.startswith("decode")):
-                it.text = f"read {b} {p} -> {name}"
+    _Reads().body(items, top=True)
 
 
 class _Writer:
-    def __init__(self, out: Lowered):
+    def __init__(self, out: Lowered, fresh: int = 0):
         self.out = out
         self.defs: list = []               # [(gate name, [(line text, qline)])], definition order
         self.bodies: dict = {}             # canonical body -> gate name
         self.count: dict = {}
+        #: a shared body -> what its calls are written as (the gate call, or its lines)
+        self.shared: dict = {}
+        self.fresh = fresh                 # names for the locals of a shared body written inline
 
     def lines(self, items) -> list:
         """[(text, qline)] for `items`, gates defined as they are met (inner ones first)."""
@@ -270,6 +389,15 @@ class _Writer:
         for it in items:
             if it.kind == "ins":
                 out.append((it.text, it.qline))
+            elif it.kind == "call" and it.memo is not None:
+                key = id(it.children)
+                if key not in self.shared:
+                    self.shared[key] = self.gate_call(it.text, self.lines(it.children), it.qline, guard=None)
+                got = self.shared[key]
+                if len(got) == 1 and got[0][0].split()[0] in self.out.gates:
+                    out.append((got[0][0], it.qline))
+                else:
+                    out += self.renamed(got)
             elif it.kind == "call":
                 out += self.gate_call(it.text, self.lines(it.children), it.qline, guard=None)
             elif it.kind == "guard":
@@ -280,6 +408,19 @@ class _Writer:
                 else:
                     out += self.gate_call(f"when_{it.text}", body, it.qline, guard=it.text)
         return out
+
+    def renamed(self, lines) -> list:
+        """A shared body that touches no block of its caller, written out once more: every
+        block and outcome it names gets a fresh name, so no two calls share one."""
+        ren: dict = {}
+
+        def one(m):
+            n = m[1]
+            if n not in ren:
+                self.fresh += 1
+                ren[n] = f"{'m' if n.startswith('m') else 'a'}{self.fresh}"
+            return ren[n]
+        return [(_NAME.sub(one, t), q) for t, q in lines]
 
     @staticmethod
     def _guard(name: str, text: str) -> str:
@@ -312,7 +453,8 @@ class _Writer:
         if name is None:
             k = self.count.get(gadget, 0)
             self.count[gadget] = k + 1
-            name = f"{gadget.lower()}" + (f"_{k + 1}" if k else "")
+            # FormalRV names a controlled gadget `!ctl!g`; an .alg gate name is a word
+            name = re.sub(r"\W+", "_", gadget).strip("_").lower() + (f"_{k + 1}" if k else "")
             self.bodies[(gadget, canon)] = name
             self.defs.append((name, [f"p{i}" for i in range(len(params))],
                               [(c, q) for c, (_, q) in zip(canon, body)]))
@@ -334,7 +476,7 @@ def lower(qec: layers.Stage, *, title: str = "", floorplan: str = "fullstack",
         it.out.blocks[f"q{i}"] = f"LogicData[{i}]"
     items += it.walk(prog.body, {}, {}, [[]])
     _mark_reads(items)
-    w = _Writer(it.out)
+    w = _Writer(it.out, fresh=10 ** 8)
     body = w.lines(items)
     out = it.out
     head = [f"title {title or 'a FormalRV program on the gadget town'}", f'floorplan "{floorplan}"']
