@@ -1,0 +1,9 @@
+# QCCD machine profile for FormalRV, slice S1 (PROVISIONAL, hand-written 2026-10-26 from qccd-physics@2;
+# the up-bridge will derive these from characterized QCCD macros). Timings in ns.
+#   gate1q 5 us, MS 70 us, measure 120 us, reset 10 us (physics@2 primitives)
+#   route: split 128 + 2 x 94 shuttle + merge 128 + cool 300 = 744 us (one in-tile move, conservative)
+#   decoder: link 5 + lookup 1 + write 0.1 + resolve 0.2 + decision 2 us (qccd/analysis/feedback.py)
+machine { qubits: 2000 total, decoders: 8 total, factories: 1 total, classical_data_bandwidth: 10000 bits/us, qubit_routing_bandwidth: 10000 qubits/us, ancilla_bandwidth: 10000 qubits/us, max_parallel_gates: 64 total, gate1q_ns: 5000 ns, gate2q_ns: 70000 ns, measure_ns: 120000 ns, reset_ns: 10000 ns, route_latency_ns: 744000 ns, decoder_latency_ns: 8300 ns, magic_state_latency_ns: 30000000 ns, pauli_frame_update_ns: 100 ns }
+
+spec factory:
+  resource { output_qubits: 9 total, workspace_qubits: 17 total, latency: 30000000 ns, gates: 1 total, decoders: 1 total, classical_data_bandwidth: 8 bits/us, qubit_routing_bandwidth: 2 qubits/us }

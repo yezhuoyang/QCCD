@@ -1,0 +1,34 @@
+{
+ "status": "RESOURCE_VALIDATED",
+ "peak_qubits_upper_bound": 70,
+ "runtime_upper_bound_ns": 268512000,
+ "dynamic_instruction_count": 2086,
+ "dynamic_call_count": 30,
+ "location": {
+  "opcode_counts": {
+   "H": 162,
+   "S": 0,
+   "X": 0,
+   "Z": 0,
+   "Sdg": 0,
+   "CNOT": 801,
+   "CZ": 45,
+   "CY": 0,
+   "measure": 282,
+   "request_ancilla": 255,
+   "release_ancilla": 258,
+   "route": 258,
+   "decode_syndrome": 12,
+   "request_magic": 3,
+   "pauli_frame_update": 10,
+   "parity": 0,
+   "magic |T>": 0,
+   "magic |CCZ>": 0,
+   "magic |AutoCCZ>": 0,
+   "decoded rounds": 36,
+   "magic |Y+>": 3,
+   "magic error ppq": 0
+  }
+ },
+ "note": "FormalRV OCaml VM (resource_vm.exe --json) at FormalRV df3a1427 on cnot.sysprog; fields the reader is checked against"
+}

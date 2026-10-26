@@ -1,0 +1,8 @@
+spec program:
+  ∀ v < 2 . ∀ w < 2 .
+    requires   1 < n  ∧  n ≤ dim
+    assumes    {{ |v⟩_q[0] ⊗ |w⟩_q[1] }}
+    ensures    {{ |v⟩_q[0] ⊗ |w ⊕ v⟩_q[1] }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 1, rot: 0, meas: 0,
+                 depth: 1, width: 1, ops: 1, qubits: 2 }

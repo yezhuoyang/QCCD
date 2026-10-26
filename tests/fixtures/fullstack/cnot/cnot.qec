@@ -1,0 +1,80 @@
+
+codes:
+  Surface [[9,1,3]]:
+    stab    X[1]X[2]
+    stab    X[0]X[1]X[3]X[4]
+    stab    X[4]X[5]X[7]X[8]
+    stab    X[6]X[7]
+    stab    Z[0]Z[3]
+    stab    Z[1]Z[2]Z[4]Z[5]
+    stab    Z[3]Z[4]Z[6]Z[7]
+    stab    Z[5]Z[8]
+    logX[0] X[0]X[3]X[6]
+    logZ[0] Z[0]Z[1]Z[2]
+  merged1 = canonical_product base=Surface factors=1 requires=commuting_factors(P) blocks=distinct(family,block) n=sum(n)+1 k=sum(k)-rank(P_mod_base_checks) distance=unclaimed ancillas=1 checks=(base_checks,P*X[a],X[a]) check_signs=decoded_outcomes check_scope=(P*X[a],X[a]) check_prepare=|+> check_read=X split=Z
+  merged2 = canonical_product base=Surface factors=2 requires=commuting_factors(P) blocks=distinct(family,block) n=sum(n)+1 k=sum(k)-rank(P_mod_base_checks) distance=unclaimed ancillas=1 checks=(base_checks,P*X[a],X[a]) check_signs=decoded_outcomes check_scope=(P*X[a],X[a]) check_prepare=|+> check_read=X split=Z
+  merged3 = canonical_product base=Surface factors=3 requires=commuting_factors(P) blocks=distinct(family,block) n=sum(n)+1 k=sum(k)-rank(P_mod_base_checks) distance=unclaimed ancillas=1 checks=(base_checks,P*X[a],X[a]) check_signs=decoded_outcomes check_scope=(P*X[a],X[a]) check_prepare=|+> check_read=X split=Z
+
+program[LogicData: 2, c: 240, ancilla: 282] (Surface[2] LogicData, Surface[3] LogicalAncilla):
+  alloc LogicalAncilla[0,1)
+  prepare |Y+> -> LogicalAncilla[0,1)
+  alloc ancilla[0,1)
+  prepare |+> -> ancilla[0,1)
+  alloc ancilla[1,7)
+  merged3 LogicDataMerged0 = merge Z[LogicData[0][0]] X[LogicData[1][0]] Z[LogicalAncilla[0][0]] with ancilla[0,1) checks ancilla[1,7) -> c[0,6) commuting=proved
+  extract LogicDataMerged0[0][0] rounds=3 using ancilla[7,79) -> syndrome[0,72)
+  decode rounds=3 syndrome[0,72)
+  decode rounds=3 c[0,6)
+  Z[LogicData[0][0]] X[LogicData[1][0]] Z[LogicalAncilla[0][0]] = split LogicDataMerged0
+  alloc ancilla[79,80)
+  prepare |+> -> ancilla[79,80)
+  alloc ancilla[80,86)
+  merged1 LogicDataMerged1 = merge X[LogicalAncilla[0][0]] with ancilla[79,80) checks ancilla[80,86) -> c[6,12) commuting=proved
+  extract LogicDataMerged1[0][0] rounds=3 using ancilla[86,110) -> syndrome[72,96)
+  decode rounds=3 syndrome[72,96)
+  decode rounds=3 c[6,12)
+  X[LogicalAncilla[0][0]] = split LogicDataMerged1
+  frame on c[4,6) Z[LogicData[0][0]] X[LogicData[1][0]]
+  frame on c[10,12) Z[LogicData[0][0]] X[LogicData[1][0]]
+  alloc LogicalAncilla[1,2)
+  prepare |Y+> -> LogicalAncilla[1,2)
+  alloc ancilla[110,111)
+  prepare |+> -> ancilla[110,111)
+  alloc ancilla[111,117)
+  merged2 LogicDataMerged2 = merge Z[LogicData[0][0]] Z[LogicalAncilla[1][0]] with ancilla[110,111) checks ancilla[111,117) -> c[12,18) commuting=proved
+  extract LogicDataMerged2[0][0] rounds=3 using ancilla[117,165) -> syndrome[96,144)
+  decode rounds=3 syndrome[96,144)
+  decode rounds=3 c[12,18)
+  Z[LogicData[0][0]] Z[LogicalAncilla[1][0]] = split LogicDataMerged2
+  alloc ancilla[165,166)
+  prepare |+> -> ancilla[165,166)
+  alloc ancilla[166,172)
+  merged1 LogicDataMerged3 = merge X[LogicalAncilla[1][0]] with ancilla[165,166) checks ancilla[166,172) -> c[18,24) commuting=proved
+  extract LogicDataMerged3[0][0] rounds=3 using ancilla[172,196) -> syndrome[144,168)
+  decode rounds=3 syndrome[144,168)
+  decode rounds=3 c[18,24)
+  X[LogicalAncilla[1][0]] = split LogicDataMerged3
+  frame on c[16,18) Z[LogicData[0][0]]
+  frame on c[22,24) Z[LogicData[0][0]]
+  frame Z[LogicData[0][0]]
+  alloc LogicalAncilla[2,3)
+  prepare |Y+> -> LogicalAncilla[2,3)
+  alloc ancilla[196,197)
+  prepare |+> -> ancilla[196,197)
+  alloc ancilla[197,203)
+  merged2 LogicDataMerged4 = merge X[LogicData[1][0]] Z[LogicalAncilla[2][0]] with ancilla[196,197) checks ancilla[197,203) -> c[24,30) commuting=proved
+  extract LogicDataMerged4[0][0] rounds=3 using ancilla[203,251) -> syndrome[168,216)
+  decode rounds=3 syndrome[168,216)
+  decode rounds=3 c[24,30)
+  X[LogicData[1][0]] Z[LogicalAncilla[2][0]] = split LogicDataMerged4
+  alloc ancilla[251,252)
+  prepare |+> -> ancilla[251,252)
+  alloc ancilla[252,258)
+  merged1 LogicDataMerged5 = merge X[LogicalAncilla[2][0]] with ancilla[251,252) checks ancilla[252,258) -> c[30,36) commuting=proved
+  extract LogicDataMerged5[0][0] rounds=3 using ancilla[258,282) -> syndrome[216,240)
+  decode rounds=3 syndrome[216,240)
+  decode rounds=3 c[30,36)
+  X[LogicalAncilla[2][0]] = split LogicDataMerged5
+  frame on c[28,30) X[LogicData[1][0]]
+  frame on c[34,36) X[LogicData[1][0]]
+  frame X[LogicData[1][0]]

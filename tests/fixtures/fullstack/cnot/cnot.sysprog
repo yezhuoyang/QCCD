@@ -1,0 +1,312 @@
+resource { gate1q: 26, gate2q: 90, measures: 34, allocs: 31, routes: 22, decodes: 12, magic: 3, frame_updates: 10, idle_extracts: 0, call_sites: 10, loops: 22, guards: 0, nodes: 563 }
+machine { qubits: 2000 total, decoders: 8 total, factories: 1 total, classical_data_bandwidth: 10000 bits/us, qubit_routing_bandwidth: 10000 qubits/us, ancilla_bandwidth: 10000 qubits/us, max_parallel_gates: 64 total, gate1q_ns: 5000 ns, gate2q_ns: 70000 ns, measure_ns: 120000 ns, reset_ns: 10000 ns, route_latency_ns: 744000 ns, decoder_latency_ns: 8300 ns, magic_state_latency_ns: 30000000 ns, pauli_frame_update_ns: 100 ns }
+spec surfaceRound:
+  resource { qubits: 64 total, runtime: 100000000000 ns, gates: 8 total, factories: 0 total, decoders: 1 total, classical_data_bandwidth: 100 bits/us, qubit_routing_bandwidth: 100 qubits/us, ancilla_bandwidth: 100 qubits/us }
+spec surfaceRoundLogicalAncilla:
+  resource { qubits: 64 total, runtime: 100000000000 ns, gates: 8 total, factories: 0 total, decoders: 1 total, classical_data_bandwidth: 100 bits/us, qubit_routing_bandwidth: 100 qubits/us, ancilla_bandwidth: 100 qubits/us }
+spec program:
+  resource { qubits_min: 0 total, qubits: 2000 total, runtime_min: 0 ns, runtime: 100000000000 ns }
+spec maintenance:
+  resource { block_qubits: 9 total, measure_qubits: 8 total, gates: 4 total, decoders: 1 total, classical_data_bandwidth: 1 bits/us, ancilla_bandwidth: 8 qubits/us, round: 5115000 ns }
+spec factory:
+  resource { output_qubits: 9 total, workspace_qubits: 17 total, latency: 30000000 ns, gates: 1 total, decoders: 1 total, classical_data_bandwidth: 8 bits/us, qubit_routing_bandwidth: 2 qubits/us }
+
+gadget surfaceRound[data: dbase + 9, ancilla: abase + 8, c: 0, syndrome: cbase + 8](dbase, abase, cbase) spans 5115000 ns:
+  @0 ns  request_ancilla  count=1  ancilla[abase]
+  @10000 ns  H  ancilla[abase]
+  @15000 ns  route  ancilla[abase], data[dbase + 1:dbase + 2]
+  @759000 ns  CNOT  ancilla[abase], data[dbase + 1]
+  @829000 ns  CNOT  ancilla[abase], data[dbase + 2]
+  @899000 ns  measure  basis=X  ancilla[abase]  -> syndrome[cbase]
+  @1019000 ns  release_ancilla  count=1  ancilla[abase]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 1]
+  @10000 ns  H  ancilla[abase + 1]
+  @899000 ns  route  ancilla[abase + 1], data[dbase:dbase + 1], data[dbase + 3:dbase + 4]
+  @1643000 ns  CNOT  ancilla[abase + 1], data[dbase]
+  @1713000 ns  CNOT  ancilla[abase + 1], data[dbase + 1]
+  @1783000 ns  CNOT  ancilla[abase + 1], data[dbase + 3]
+  @1853000 ns  CNOT  ancilla[abase + 1], data[dbase + 4]
+  @1923000 ns  measure  basis=X  ancilla[abase + 1]  -> syndrome[cbase + 1]
+  @2043000 ns  release_ancilla  count=1  ancilla[abase + 1]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 2]
+  @10000 ns  H  ancilla[abase + 2]
+  @1923000 ns  route  ancilla[abase + 2], data[dbase + 4:dbase + 5], data[dbase + 7:dbase + 8]
+  @2667000 ns  CNOT  ancilla[abase + 2], data[dbase + 4]
+  @2737000 ns  CNOT  ancilla[abase + 2], data[dbase + 5]
+  @2807000 ns  CNOT  ancilla[abase + 2], data[dbase + 7]
+  @2877000 ns  CNOT  ancilla[abase + 2], data[dbase + 8]
+  @2947000 ns  measure  basis=X  ancilla[abase + 2]  -> syndrome[cbase + 2]
+  @3067000 ns  release_ancilla  count=1  ancilla[abase + 2]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 3]
+  @10000 ns  H  ancilla[abase + 3]
+  @2947000 ns  route  ancilla[abase + 3], data[dbase + 6:dbase + 7]
+  @3691000 ns  CNOT  ancilla[abase + 3], data[dbase + 6]
+  @3761000 ns  CNOT  ancilla[abase + 3], data[dbase + 7]
+  @3831000 ns  measure  basis=X  ancilla[abase + 3]  -> syndrome[cbase + 3]
+  @3951000 ns  release_ancilla  count=1  ancilla[abase + 3]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 4]
+  @1923000 ns  route  data[dbase], ancilla[abase + 4], data[dbase + 3]
+  @2667000 ns  CNOT  data[dbase], ancilla[abase + 4]
+  @2737000 ns  CNOT  data[dbase + 3], ancilla[abase + 4]
+  @2807000 ns  measure  basis=Z  ancilla[abase + 4]  -> syndrome[cbase + 4]
+  @2927000 ns  release_ancilla  count=1  ancilla[abase + 4]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 5]
+  @2947000 ns  route  data[dbase + 1], ancilla[abase + 5], data[dbase + 2], data[dbase + 4:dbase + 5]
+  @3691000 ns  CNOT  data[dbase + 1], ancilla[abase + 5]
+  @3761000 ns  CNOT  data[dbase + 2], ancilla[abase + 5]
+  @3831000 ns  CNOT  data[dbase + 4], ancilla[abase + 5]
+  @3901000 ns  CNOT  data[dbase + 5], ancilla[abase + 5]
+  @3971000 ns  measure  basis=Z  ancilla[abase + 5]  -> syndrome[cbase + 5]
+  @4091000 ns  release_ancilla  count=1  ancilla[abase + 5]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 6]
+  @3971000 ns  route  data[dbase + 3], ancilla[abase + 6], data[dbase + 4], data[dbase + 6:dbase + 7]
+  @4715000 ns  CNOT  data[dbase + 3], ancilla[abase + 6]
+  @4785000 ns  CNOT  data[dbase + 4], ancilla[abase + 6]
+  @4855000 ns  CNOT  data[dbase + 6], ancilla[abase + 6]
+  @4925000 ns  CNOT  data[dbase + 7], ancilla[abase + 6]
+  @4995000 ns  measure  basis=Z  ancilla[abase + 6]  -> syndrome[cbase + 6]
+  @5115000 ns  release_ancilla  count=1  ancilla[abase + 6]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 7]
+  @3971000 ns  route  data[dbase + 5], ancilla[abase + 7], data[dbase + 8]
+  @4715000 ns  CNOT  data[dbase + 5], ancilla[abase + 7]
+  @4785000 ns  CNOT  data[dbase + 8], ancilla[abase + 7]
+  @4855000 ns  measure  basis=Z  ancilla[abase + 7]  -> syndrome[cbase + 7]
+  @4975000 ns  release_ancilla  count=1  ancilla[abase + 7]
+
+gadget surfaceRoundLogicalAncilla[data: 0, ancilla: abase + dbase + 17, c: 0, syndrome: cbase + 8](dbase, abase, cbase) spans 5115000 ns:
+  @0 ns  request_ancilla  count=1  ancilla[abase]
+  @10000 ns  H  ancilla[abase]
+  @15000 ns  route  ancilla[abase], ancilla[dbase + 1:dbase + 2]
+  @759000 ns  CNOT  ancilla[abase], ancilla[dbase + 1]
+  @829000 ns  CNOT  ancilla[abase], ancilla[dbase + 2]
+  @899000 ns  measure  basis=X  ancilla[abase]  -> syndrome[cbase]
+  @1019000 ns  release_ancilla  count=1  ancilla[abase]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 1]
+  @10000 ns  H  ancilla[abase + 1]
+  @899000 ns  route  ancilla[abase + 1], ancilla[dbase:dbase + 1], ancilla[dbase + 3:dbase + 4]
+  @1643000 ns  CNOT  ancilla[abase + 1], ancilla[dbase]
+  @1713000 ns  CNOT  ancilla[abase + 1], ancilla[dbase + 1]
+  @1783000 ns  CNOT  ancilla[abase + 1], ancilla[dbase + 3]
+  @1853000 ns  CNOT  ancilla[abase + 1], ancilla[dbase + 4]
+  @1923000 ns  measure  basis=X  ancilla[abase + 1]  -> syndrome[cbase + 1]
+  @2043000 ns  release_ancilla  count=1  ancilla[abase + 1]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 2]
+  @10000 ns  H  ancilla[abase + 2]
+  @1923000 ns  route  ancilla[abase + 2], ancilla[dbase + 4:dbase + 5], ancilla[dbase + 7:dbase + 8]
+  @2667000 ns  CNOT  ancilla[abase + 2], ancilla[dbase + 4]
+  @2737000 ns  CNOT  ancilla[abase + 2], ancilla[dbase + 5]
+  @2807000 ns  CNOT  ancilla[abase + 2], ancilla[dbase + 7]
+  @2877000 ns  CNOT  ancilla[abase + 2], ancilla[dbase + 8]
+  @2947000 ns  measure  basis=X  ancilla[abase + 2]  -> syndrome[cbase + 2]
+  @3067000 ns  release_ancilla  count=1  ancilla[abase + 2]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 3]
+  @10000 ns  H  ancilla[abase + 3]
+  @2947000 ns  route  ancilla[abase + 3], ancilla[dbase + 6:dbase + 7]
+  @3691000 ns  CNOT  ancilla[abase + 3], ancilla[dbase + 6]
+  @3761000 ns  CNOT  ancilla[abase + 3], ancilla[dbase + 7]
+  @3831000 ns  measure  basis=X  ancilla[abase + 3]  -> syndrome[cbase + 3]
+  @3951000 ns  release_ancilla  count=1  ancilla[abase + 3]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 4]
+  @1923000 ns  route  ancilla[dbase], ancilla[abase + 4], ancilla[dbase + 3]
+  @2667000 ns  CNOT  ancilla[dbase], ancilla[abase + 4]
+  @2737000 ns  CNOT  ancilla[dbase + 3], ancilla[abase + 4]
+  @2807000 ns  measure  basis=Z  ancilla[abase + 4]  -> syndrome[cbase + 4]
+  @2927000 ns  release_ancilla  count=1  ancilla[abase + 4]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 5]
+  @2947000 ns  route  ancilla[dbase + 1], ancilla[abase + 5], ancilla[dbase + 2], ancilla[dbase + 4:dbase + 5]
+  @3691000 ns  CNOT  ancilla[dbase + 1], ancilla[abase + 5]
+  @3761000 ns  CNOT  ancilla[dbase + 2], ancilla[abase + 5]
+  @3831000 ns  CNOT  ancilla[dbase + 4], ancilla[abase + 5]
+  @3901000 ns  CNOT  ancilla[dbase + 5], ancilla[abase + 5]
+  @3971000 ns  measure  basis=Z  ancilla[abase + 5]  -> syndrome[cbase + 5]
+  @4091000 ns  release_ancilla  count=1  ancilla[abase + 5]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 6]
+  @3971000 ns  route  ancilla[dbase + 3], ancilla[abase + 6], ancilla[dbase + 4], ancilla[dbase + 6:dbase + 7]
+  @4715000 ns  CNOT  ancilla[dbase + 3], ancilla[abase + 6]
+  @4785000 ns  CNOT  ancilla[dbase + 4], ancilla[abase + 6]
+  @4855000 ns  CNOT  ancilla[dbase + 6], ancilla[abase + 6]
+  @4925000 ns  CNOT  ancilla[dbase + 7], ancilla[abase + 6]
+  @4995000 ns  measure  basis=Z  ancilla[abase + 6]  -> syndrome[cbase + 6]
+  @5115000 ns  release_ancilla  count=1  ancilla[abase + 6]
+  @0 ns  request_ancilla  count=1  ancilla[abase + 7]
+  @3971000 ns  route  ancilla[dbase + 5], ancilla[abase + 7], ancilla[dbase + 8]
+  @4715000 ns  CNOT  ancilla[dbase + 5], ancilla[abase + 7]
+  @4785000 ns  CNOT  ancilla[dbase + 8], ancilla[abase + 7]
+  @4855000 ns  measure  basis=Z  ancilla[abase + 7]  -> syndrome[cbase + 7]
+  @4975000 ns  release_ancilla  count=1  ancilla[abase + 7]
+
+program[data: 18, ancilla: 360, c: 42, syndrome: 240]:
+  @0 ns  request_ancilla  count=9  patch  ancilla[0:8]
+  @10000 ns  ancilla[0:8] request_magic  state=|Y+>  with ancilla[9:25]
+  @30010000 ns  release_ancilla  count=17  ancilla[9:25]
+  @0 ns  request_ancilla  count=1  ancilla[26]
+  for 0 <= rv_plus4 < 1 every 5000 ns:
+    @30010000 ns  H  ancilla[rv_plus4 + 26]
+  @30015000 ns  request_ancilla  count=6  ancilla[27:32]
+  for 0 <= rv_s6 < 3 every 1639000 ns:
+    @30025000 ns  H  ancilla[2*rv_s6 + 27]
+    @30030000 ns  route  ancilla[2*rv_s6 + 27], data[0:2], data[9], data[12], data[15], ancilla[0:2], ancilla[26], ancilla[2*rv_s6 + 28]
+    @30774000 ns  CZ  ancilla[2*rv_s6 + 27], data[0]
+    @30844000 ns  CZ  ancilla[2*rv_s6 + 27], data[1]
+    @30914000 ns  CZ  ancilla[2*rv_s6 + 27], data[2]
+    @30984000 ns  CNOT  ancilla[2*rv_s6 + 27], data[9]
+    @31054000 ns  CNOT  ancilla[2*rv_s6 + 27], data[12]
+    @31124000 ns  CNOT  ancilla[2*rv_s6 + 27], data[15]
+    @31194000 ns  CZ  ancilla[2*rv_s6 + 27], ancilla[0]
+    @31264000 ns  CZ  ancilla[2*rv_s6 + 27], ancilla[1]
+    @31334000 ns  CZ  ancilla[2*rv_s6 + 27], ancilla[2]
+    @31404000 ns  CNOT  ancilla[2*rv_s6 + 27], ancilla[26]
+    @31474000 ns  measure  basis=X  ancilla[2*rv_s6 + 27]  -> c[2*rv_s6]
+    @30774000 ns  H  ancilla[2*rv_s6 + 28]
+    @31474000 ns  CNOT  ancilla[2*rv_s6 + 28], ancilla[26]
+    @31544000 ns  measure  basis=X  ancilla[2*rv_s6 + 28]  -> c[2*rv_s6 + 1]
+  @34942000 ns  release_ancilla  count=6  ancilla[27:32]
+  for 0 <= rv_r8 < 3 every 5115000 ns:
+    @34942000 ns  call surfaceRound(0, 8*rv_r8 + 33, 8*rv_r8)
+  for 0 <= rv_r9 < 3 every 5115000 ns:
+    @50287000 ns  call surfaceRound(9, 8*rv_r9 + 57, 8*rv_r9 + 24)
+  for 0 <= rv_r10 < 3 every 5115000 ns:
+    @65632000 ns  call surfaceRoundLogicalAncilla(0, 8*rv_r10 + 81, 8*rv_r10 + 48)
+  @81088700 ns  syndrome[0:71] -> decode_syndrome  rounds=3
+  @81088700 ns  c[0:5] -> decode_syndrome  rounds=3
+  @80977000 ns  measure  basis=Z  ancilla[26]  -> c[36]
+  @81097000 ns  release_ancilla  count=1  ancilla[26]
+  @80977000 ns  request_ancilla  count=1  ancilla[105]
+  for 0 <= rv_plus13 < 1 every 5000 ns:
+    @81097000 ns  H  ancilla[rv_plus13 + 105]
+  @81102000 ns  request_ancilla  count=6  ancilla[106:111]
+  for 0 <= rv_s15 < 3 every 1219000 ns:
+    @81112000 ns  H  ancilla[2*rv_s15 + 106]
+    @81117000 ns  route  ancilla[2*rv_s15 + 106], ancilla[0], ancilla[3], ancilla[6], ancilla[105], ancilla[2*rv_s15 + 107]
+    @81861000 ns  CNOT  ancilla[2*rv_s15 + 106], ancilla[0]
+    @81931000 ns  CNOT  ancilla[2*rv_s15 + 106], ancilla[3]
+    @82001000 ns  CNOT  ancilla[2*rv_s15 + 106], ancilla[6]
+    @82071000 ns  CNOT  ancilla[2*rv_s15 + 106], ancilla[105]
+    @82141000 ns  measure  basis=X  ancilla[2*rv_s15 + 106]  -> c[2*rv_s15 + 6]
+    @81861000 ns  H  ancilla[2*rv_s15 + 107]
+    @82141000 ns  CNOT  ancilla[2*rv_s15 + 107], ancilla[105]
+    @82211000 ns  measure  basis=X  ancilla[2*rv_s15 + 107]  -> c[2*rv_s15 + 7]
+  @84769000 ns  release_ancilla  count=6  ancilla[106:111]
+  for 0 <= rv_r17 < 3 every 5115000 ns:
+    @84769000 ns  call surfaceRoundLogicalAncilla(0, 8*rv_r17 + 112, 8*rv_r17 + 72)
+  @100114000 ns  release_ancilla  count=9  patch  ancilla[0:8]
+  @130115700 ns  syndrome[72:95] -> decode_syndrome  rounds=3
+  @100114000 ns  c[6:11] -> decode_syndrome  rounds=3
+  @100114000 ns  measure  basis=Z  ancilla[105]  -> c[37]
+  @100234000 ns  release_ancilla  count=1  ancilla[105]
+  @100114000 ns  c[4:5] -> pauli_frame_update  Z data[0:2]
+  @100114000 ns  c[4:5] -> pauli_frame_update  X data[9], X data[12], X data[15]
+  @100122300 ns  c[10:11] -> pauli_frame_update  Z data[0:2]
+  @100122300 ns  c[10:11] -> pauli_frame_update  X data[9], X data[12], X data[15]
+  @100114000 ns  request_ancilla  count=9  patch  ancilla[136:144]
+  @100124000 ns  ancilla[136:144] request_magic  state=|Y+>  with ancilla[145:161]
+  @130124000 ns  release_ancilla  count=17  ancilla[145:161]
+  @100114000 ns  request_ancilla  count=1  ancilla[162]
+  for 0 <= rv_plus22 < 1 every 5000 ns:
+    @130124000 ns  H  ancilla[rv_plus22 + 162]
+  @130129000 ns  request_ancilla  count=6  ancilla[163:168]
+  for 0 <= rv_s24 < 3 every 1429000 ns:
+    @130139000 ns  H  ancilla[2*rv_s24 + 163]
+    @130144000 ns  route  ancilla[2*rv_s24 + 163], data[0:2], ancilla[136:138], ancilla[162], ancilla[2*rv_s24 + 164]
+    @130888000 ns  CZ  ancilla[2*rv_s24 + 163], data[0]
+    @130958000 ns  CZ  ancilla[2*rv_s24 + 163], data[1]
+    @131028000 ns  CZ  ancilla[2*rv_s24 + 163], data[2]
+    @131098000 ns  CZ  ancilla[2*rv_s24 + 163], ancilla[136]
+    @131168000 ns  CZ  ancilla[2*rv_s24 + 163], ancilla[137]
+    @131238000 ns  CZ  ancilla[2*rv_s24 + 163], ancilla[138]
+    @131308000 ns  CNOT  ancilla[2*rv_s24 + 163], ancilla[162]
+    @131378000 ns  measure  basis=X  ancilla[2*rv_s24 + 163]  -> c[2*rv_s24 + 12]
+    @130888000 ns  H  ancilla[2*rv_s24 + 164]
+    @131378000 ns  CNOT  ancilla[2*rv_s24 + 164], ancilla[162]
+    @131448000 ns  measure  basis=X  ancilla[2*rv_s24 + 164]  -> c[2*rv_s24 + 13]
+  @134426000 ns  release_ancilla  count=6  ancilla[163:168]
+  for 0 <= rv_r26 < 3 every 5115000 ns:
+    @134426000 ns  call surfaceRound(0, 8*rv_r26 + 169, 8*rv_r26 + 96)
+  for 0 <= rv_r27 < 3 every 5115000 ns:
+    @149771000 ns  call surfaceRoundLogicalAncilla(136, 8*rv_r27 + 193, 8*rv_r27 + 120)
+  @165227700 ns  syndrome[96:143] -> decode_syndrome  rounds=3
+  @165227700 ns  c[12:17] -> decode_syndrome  rounds=3
+  @165116000 ns  measure  basis=Z  ancilla[162]  -> c[38]
+  @165236000 ns  release_ancilla  count=1  ancilla[162]
+  @165116000 ns  request_ancilla  count=1  ancilla[217]
+  for 0 <= rv_plus30 < 1 every 5000 ns:
+    @165236000 ns  H  ancilla[rv_plus30 + 217]
+  @165241000 ns  request_ancilla  count=6  ancilla[218:223]
+  for 0 <= rv_s32 < 3 every 1219000 ns:
+    @165251000 ns  H  ancilla[2*rv_s32 + 218]
+    @165256000 ns  route  ancilla[2*rv_s32 + 218], ancilla[136], ancilla[139], ancilla[142], ancilla[217], ancilla[2*rv_s32 + 219]
+    @166000000 ns  CNOT  ancilla[2*rv_s32 + 218], ancilla[136]
+    @166070000 ns  CNOT  ancilla[2*rv_s32 + 218], ancilla[139]
+    @166140000 ns  CNOT  ancilla[2*rv_s32 + 218], ancilla[142]
+    @166210000 ns  CNOT  ancilla[2*rv_s32 + 218], ancilla[217]
+    @166280000 ns  measure  basis=X  ancilla[2*rv_s32 + 218]  -> c[2*rv_s32 + 18]
+    @166000000 ns  H  ancilla[2*rv_s32 + 219]
+    @166280000 ns  CNOT  ancilla[2*rv_s32 + 219], ancilla[217]
+    @166350000 ns  measure  basis=X  ancilla[2*rv_s32 + 219]  -> c[2*rv_s32 + 19]
+  @168908000 ns  release_ancilla  count=6  ancilla[218:223]
+  for 0 <= rv_r34 < 3 every 5115000 ns:
+    @168908000 ns  call surfaceRoundLogicalAncilla(136, 8*rv_r34 + 224, 8*rv_r34 + 144)
+  @184253000 ns  release_ancilla  count=9  patch  ancilla[136:144]
+  @214254700 ns  syndrome[144:167] -> decode_syndrome  rounds=3
+  @184253000 ns  c[18:23] -> decode_syndrome  rounds=3
+  @184253000 ns  measure  basis=Z  ancilla[217]  -> c[39]
+  @184373000 ns  release_ancilla  count=1  ancilla[217]
+  @184253000 ns  c[16:17] -> pauli_frame_update  Z data[0:2]
+  @184261300 ns  c[22:23] -> pauli_frame_update  Z data[0:2]
+  @184261400 ns  pauli_frame_update  Z data[0:2]
+  @184253000 ns  request_ancilla  count=9  patch  ancilla[248:256]
+  @184263000 ns  ancilla[248:256] request_magic  state=|Y+>  with ancilla[257:273]
+  @214263000 ns  release_ancilla  count=17  ancilla[257:273]
+  @184253000 ns  request_ancilla  count=1  ancilla[274]
+  for 0 <= rv_plus39 < 1 every 5000 ns:
+    @214263000 ns  H  ancilla[rv_plus39 + 274]
+  @214268000 ns  request_ancilla  count=6  ancilla[275:280]
+  for 0 <= rv_s41 < 3 every 1429000 ns:
+    @214278000 ns  H  ancilla[2*rv_s41 + 275]
+    @214283000 ns  route  ancilla[2*rv_s41 + 275], data[9], data[12], data[15], ancilla[248:250], ancilla[274], ancilla[2*rv_s41 + 276]
+    @215027000 ns  CNOT  ancilla[2*rv_s41 + 275], data[9]
+    @215097000 ns  CNOT  ancilla[2*rv_s41 + 275], data[12]
+    @215167000 ns  CNOT  ancilla[2*rv_s41 + 275], data[15]
+    @215237000 ns  CZ  ancilla[2*rv_s41 + 275], ancilla[248]
+    @215307000 ns  CZ  ancilla[2*rv_s41 + 275], ancilla[249]
+    @215377000 ns  CZ  ancilla[2*rv_s41 + 275], ancilla[250]
+    @215447000 ns  CNOT  ancilla[2*rv_s41 + 275], ancilla[274]
+    @215517000 ns  measure  basis=X  ancilla[2*rv_s41 + 275]  -> c[2*rv_s41 + 24]
+    @215027000 ns  H  ancilla[2*rv_s41 + 276]
+    @215517000 ns  CNOT  ancilla[2*rv_s41 + 276], ancilla[274]
+    @215587000 ns  measure  basis=X  ancilla[2*rv_s41 + 276]  -> c[2*rv_s41 + 25]
+  @218565000 ns  release_ancilla  count=6  ancilla[275:280]
+  for 0 <= rv_r43 < 3 every 5115000 ns:
+    @218565000 ns  call surfaceRound(9, 8*rv_r43 + 281, 8*rv_r43 + 168)
+  for 0 <= rv_r44 < 3 every 5115000 ns:
+    @233910000 ns  call surfaceRoundLogicalAncilla(248, 8*rv_r44 + 305, 8*rv_r44 + 192)
+  @249366700 ns  syndrome[168:215] -> decode_syndrome  rounds=3
+  @249366700 ns  c[24:29] -> decode_syndrome  rounds=3
+  @249255000 ns  measure  basis=Z  ancilla[274]  -> c[40]
+  @249375000 ns  release_ancilla  count=1  ancilla[274]
+  @249255000 ns  request_ancilla  count=1  ancilla[329]
+  for 0 <= rv_plus47 < 1 every 5000 ns:
+    @249375000 ns  H  ancilla[rv_plus47 + 329]
+  @249380000 ns  request_ancilla  count=6  ancilla[330:335]
+  for 0 <= rv_s49 < 3 every 1219000 ns:
+    @249390000 ns  H  ancilla[2*rv_s49 + 330]
+    @249395000 ns  route  ancilla[2*rv_s49 + 330], ancilla[248], ancilla[251], ancilla[254], ancilla[329], ancilla[2*rv_s49 + 331]
+    @250139000 ns  CNOT  ancilla[2*rv_s49 + 330], ancilla[248]
+    @250209000 ns  CNOT  ancilla[2*rv_s49 + 330], ancilla[251]
+    @250279000 ns  CNOT  ancilla[2*rv_s49 + 330], ancilla[254]
+    @250349000 ns  CNOT  ancilla[2*rv_s49 + 330], ancilla[329]
+    @250419000 ns  measure  basis=X  ancilla[2*rv_s49 + 330]  -> c[2*rv_s49 + 30]
+    @250139000 ns  H  ancilla[2*rv_s49 + 331]
+    @250419000 ns  CNOT  ancilla[2*rv_s49 + 331], ancilla[329]
+    @250489000 ns  measure  basis=X  ancilla[2*rv_s49 + 331]  -> c[2*rv_s49 + 31]
+  @253047000 ns  release_ancilla  count=6  ancilla[330:335]
+  for 0 <= rv_r51 < 3 every 5115000 ns:
+    @253047000 ns  call surfaceRoundLogicalAncilla(248, 8*rv_r51 + 336, 8*rv_r51 + 216)
+  @268392000 ns  release_ancilla  count=9  patch  ancilla[248:256]
+  @268503700 ns  syndrome[216:239] -> decode_syndrome  rounds=3
+  @268392000 ns  c[30:35] -> decode_syndrome  rounds=3
+  @268392000 ns  measure  basis=Z  ancilla[329]  -> c[41]
+  @268512000 ns  release_ancilla  count=1  ancilla[329]
+  @268392000 ns  c[28:29] -> pauli_frame_update  X data[9], X data[12], X data[15]
+  @268400300 ns  c[34:35] -> pauli_frame_update  X data[9], X data[12], X data[15]
+  @268400400 ns  pauli_frame_update  X data[9], X data[12], X data[15]

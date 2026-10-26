@@ -1,0 +1,36 @@
+/* THE STACK VIEW (qccd/fullstack/web/stack.js): every layer of the full stack at the executing
+   instruction, a fourth view of the Program pane.  Only the Studio's own variables are used. */
+#pStack{display:none}
+#paneP[data-view="stack"] #pHw,#paneP[data-view="stack"] #paneQ{display:none}
+#paneP[data-view="stack"] #pStack{display:flex}
+#pStack{flex-direction:column;gap:8px;min-height:0;flex:1 1 0;overflow:auto}
+.row:not([data-layout="narrow"]) .progcol[data-view="stack"],
+.row:not([data-layout="narrow"]) .dock[data-view="stack"]{width:min(760px,46vw)}
+
+/* the caption: one row per layer, the user's words as the keys */
+.fs-cap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 9px;align-items:baseline;
+  background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:12px}
+.fs-k{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.fs-v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fs-v code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:var(--ink)}
+.fs-at{color:var(--muted);font-size:10.5px;margin-left:6px}
+.fs-how{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--line);border-radius:9px;
+  font-size:9.5px;color:var(--muted);letter-spacing:.03em;cursor:help}
+.fs-ctx{color:var(--accent);font-size:10.5px;margin-left:6px}
+.fs-mode{color:var(--muted);font-style:italic}
+
+/* the four listings, each a window around its current line */
+.fs-lay{border:1px solid var(--line);border-radius:7px;background:var(--panel);flex:0 0 auto}
+.fs-lay>header{display:flex;gap:8px;align-items:baseline;padding:5px 9px;border-bottom:1px solid var(--line)}
+.fs-lay>header h4{margin:0;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.fs-lay>header .fs-file{color:var(--muted);font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.fs-lines{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.5;
+  padding:3px 0;max-height:12.5em;overflow:auto;position:relative}
+.fs-ln{display:grid;grid-template-columns:3.4em minmax(0,1fr);white-space:pre;cursor:pointer;padding:0 9px 0 0}
+.fs-ln>span:first-child{color:var(--muted);text-align:right;padding-right:8px;user-select:none}
+.fs-ln>span:last-child{overflow:hidden;text-overflow:ellipsis}
+.fs-ln:hover{background:var(--soft)}
+.fs-ln.fs-cur{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.fs-ln.fs-cur>span:first-child{color:var(--accent);font-weight:700}
+.fs-ln.fs-none{cursor:default}
+.fs-foot{color:var(--muted);font-size:11px;line-height:1.5;padding:2px 2px 6px}

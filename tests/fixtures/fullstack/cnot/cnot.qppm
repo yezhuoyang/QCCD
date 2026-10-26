@@ -1,0 +1,36 @@
+code surface d=3
+
+params  n
+
+program[q: n, c: 0]:
+  prepare |Y+> -> anc[0+0]
+  measure Z q[0] X q[1] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[0] X q[1]
+  when m[1]:
+    frame Z q[0] X q[1]
+  prepare |Y+> -> anc[0+1]
+  measure Z q[0] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame Z q[0]
+  when m[3]:
+    frame Z q[0]
+  frame Z q[0]
+  prepare |Y+> -> anc[0+2]
+  measure X q[1] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[1]
+  when m[5]:
+    frame X q[1]
+  frame X q[1]
+
+spec program:
+  ∀ v < 2 . ∀ w < 2 .
+  requires   1 < n  ∧  n ≤ dim
+  assumes    {{ |v⟩_q[0] ⊗ |w⟩_q[1] }}
+  ensures    {{ |v⟩_q[0] ⊗ |w ⊕ v⟩_q[1] }}
+  outcomes   none
+  resource   { meas: 6, frame: 8, magicT: 0, synthEps: 0, bound: upper }

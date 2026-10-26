@@ -1,0 +1,154 @@
+"""The full stack on QCCD (qccd/fullstack): FormalRV's layers above, ions below, every link checked.
+
+Most tests read the slice-1 fixture (one logical CX on surface d=3, compiled by FormalRV at its
+pinned commit; tests/fixtures/fullstack/cnot) and need neither FormalRV nor the QCCD compiler.
+The end-to-end test runs the whole pipeline and is skipped where the pinned FormalRV clone or
+qccdc is not built.
+"""
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+
+import pytest
+
+from qccd.fullstack import devirt, layers, provenance, sysprog as sp
+
+REPO = Path(__file__).resolve().parents[1]
+FIX = REPO / "tests" / "fixtures" / "fullstack" / "cnot"
+PROG = REPO / "examples" / "fullstack" / "cnot.prog"
+
+
+@pytest.fixture(scope="module")
+def stages():
+    expansion = sp.expand(sp.read(FIX / "cnot.sysprog"))
+    return (layers.read(PROG, "prog"), layers.read(FIX / "cnot.qppm", "qppm"),
+            layers.read(FIX / "cnot.qec", "qec"), expansion)
+
+
+# ----------------------------------------------------------------------------- the reader
+
+def test_natural_arithmetic_is_the_listing_language():
+    ev = sp.evaluate
+    assert ev("5 - 7", {}) == 0                                   # truncated subtraction
+    assert ev("7 / 0", {}) == 0 and ev("7 % 0", {}) == 7          # natural division
+    assert ev("2 ^ 3 ^ 2", {}) == 512                             # right-associative power
+    delta = "24*(1 - (1 - (a - w + (w - a))))"                    # the compiler's a != w test
+    assert ev(delta, {"a": 3, "w": 3}) == 0 and ev(delta, {"a": 3, "w": 5}) == 24
+
+
+def test_expansion_agrees_with_formalrv_vm(stages):
+    *_, x = stages
+    vm = json.loads((FIX / "vm.json").read_text(encoding="utf-8"))
+    assert sp.vm_counts_agree(x, vm) == []
+    assert len(x.events) == vm["dynamic_instruction_count"] == 2086
+    assert len(x.calls) == vm["dynamic_call_count"]
+    assert x.end_ns == vm["runtime_upper_bound_ns"]
+
+
+def test_every_event_keeps_its_line_trip_and_call(stages):
+    *_, x = stages
+    inside = [e for e in x.events if e.frames and e.frames[-1].kind == "call"]
+    assert inside, "the extraction rounds run inside surfaceRound calls"
+    e = inside[0]
+    assert e.frames[-1].label in ("surfaceRound", "surfaceRoundLogicalAncilla")
+    assert e.frames[0].kind == "trip" and "=" in e.frames[0].label
+    assert x.listing.lines[e.node.line - 1].strip().startswith("@")
+
+
+def test_unsupported_constructs_are_refused_not_miscounted(tmp_path):
+    text = (FIX / "cnot.sysprog").read_text(encoding="utf-8").replace(
+        "  for 0 <= rv_r26 < 3 every 5115000 ns:", "  when c[0]:", 1)
+    p = tmp_path / "guarded.sysprog"
+    p.write_text(text, encoding="utf-8")
+    with pytest.raises(sp.ListingError, match="guards"):
+        sp.expand(sp.read(p))
+
+
+# ----------------------------------------------------------------------------- the links
+
+def test_every_program_line_is_linked_up_to_the_prog(stages):
+    prog, qppm, qec, x = stages
+    ch = provenance.link(prog, qppm, qec, x)
+    assert set(ch.sys_to_qec) == {n.line for n in x.listing.body}
+    assert set(ch.qec_to_qppm) == {s.line for s in qec.program.body}
+    assert set(ch.qppm_to_prog) == {s.line for s in qppm.program.statements()}
+    # each merge is anchored by its Pauli product, each frame by its record band
+    merges = [s for s in qec.program.body if " = merge " in s.text]
+    assert all(ch.qec_to_qppm[s.line].how == "pauli" for s in merges)
+    for e in x.events:
+        r = ch.resolve(e)
+        assert {"sysprog", "qec", "qppm", "prog"} <= set(r), (e.uid, e.kind, e.node.line)
+
+
+def test_a_record_band_that_does_not_match_is_refused(stages, tmp_path):
+    prog, qppm, qec, x = stages
+    text = (FIX / "cnot.qec").read_text(encoding="utf-8").replace("-> c[0,6) commuting", "-> c[0,7) commuting", 1)
+    p = tmp_path / "bad.qec"
+    p.write_text(text, encoding="utf-8")
+    with pytest.raises(provenance.Unlinked, match="c\\[0, 7\\]"):
+        provenance.link(prog, qppm, layers.read(p, "qec"), x)
+
+
+# ----------------------------------------------------------------------------- devirtualization
+
+def test_devirtualize_allocates_ions_by_lifetime(stages):
+    *_, qec, x = stages
+    d = devirt.devirtualize(x, devirt.code_from_qec(qec))
+    assert d.n_qubits == 36                               # FormalRV's VM peak is 70 (it counts workspace)
+    assert d.factory["workspace_granted"] == 17 and d.factory["workspace_used"] == 0
+    resets = sum(1 for o in d.ops if o.role == "reset")
+    requested = sum(e.arg for e in x.events if e.kind == "request_ancilla")
+    assert resets == requested                            # every requested cell becomes one reset
+    from qccd.qec.qasm import parse_qasm
+    q = parse_qasm(d.qasm.replace("creg syn[", "creg s[").replace("-> syn[", "-> s["))
+    assert q.n_qubits == 36
+    # every circuit op names the event it implements, and the event exists
+    assert all(0 <= o.event < len(x.events) for o in d.ops)
+
+
+def test_the_factory_makes_the_promised_state():
+    code = {"name": "Surface", "n": 9, "stabs": ["X[1]X[2]", "X[0]X[1]X[3]X[4]", "X[4]X[5]X[7]X[8]", "X[6]X[7]",
+                                                 "Z[0]Z[3]", "Z[1]Z[2]Z[4]Z[5]", "Z[3]Z[4]Z[6]Z[7]", "Z[5]Z[8]"],
+            "logX": "X[0]X[3]X[6]", "logZ": "Z[0]Z[1]Z[2]"}
+    gates, info = devirt.y_factory(code)
+    assert gates and "Y-bar" in info["check"]
+    bad = dict(code, logX="X[0]")                          # not a logical: anticommutes with Z0Z3
+    with pytest.raises(Exception):
+        devirt.y_factory(bad)
+
+
+# ----------------------------------------------------------------------------- end to end
+
+def _toolchains_built() -> bool:
+    try:
+        from qccd.fullstack import formalrv
+        formalrv.check_pin()
+        from qccd.qec import _toolchain
+        return _toolchain()[0] is not None
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _toolchains_built(), reason="needs the pinned FormalRV clone and qccdc")
+def test_one_logical_cnot_on_ions_every_layer_checked(tmp_path):
+    from qccd.fullstack import consistency, pipeline
+    ex = REPO / "examples" / "fullstack"
+    t = pipeline.run(PROG, machine=ex / "s1.machine", sysspec=ex / "cnot.sysspec",
+                     arch=REPO / "arch" / "grid9x9.arch.json", out=tmp_path / "run", specialize={"n": 2})
+    c = t["checks"]
+    assert t["abstract"]["vm_status"] == "RESOURCE_VALIDATED"
+    assert c["rules"]["failed"] == []
+    assert c["correspondence"]["ok"]
+    assert c["r10_semantic"]["o2_semantics"] == "ok" and c["r10_semantic"]["order"] == "ok"
+    assert c["r10_lean"]["status"] in ("accepted", "not run")
+    assert c["stack"]["ok"] and c["stack"]["instructions_checked"] > 5000
+    # move one .sysprog line's link to another PPM's extraction: the stack check must notice
+    tsir = json.loads((tmp_path / "run" / "hw" / "prog.tsir.json").read_text(encoding="utf-8"))
+    m = copy.deepcopy(t)
+    lines = m["layers"]["qec"]["lines"]
+    ext = sorted(int(k) for k in m["links"]["qec"] if lines[int(k) - 1].strip().startswith("extract"))
+    under_first = sorted(int(k) for k, v in m["links"]["sys"].items() if v[0] == ext[0])
+    m["links"]["sys"][str(under_first[1])] = [ext[2], "band"]
+    assert not consistency.check(m, tsir)["ok"]

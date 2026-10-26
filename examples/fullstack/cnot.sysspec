@@ -1,0 +1,6 @@
+spec program:
+  resource { qubits_min: 0 total, qubits: 2000 total, runtime_min: 0 ns, runtime: 100000000000 ns }
+spec surfaceRound:
+  resource { qubits: 64 total, runtime: 100000000000 ns, gates: 8 total, factories: 0 total, decoders: 1 total, classical_data_bandwidth: 100 bits/us, qubit_routing_bandwidth: 100 qubits/us, ancilla_bandwidth: 100 qubits/us }
+spec surfaceRoundLogicalAncilla:
+  resource { qubits: 64 total, runtime: 100000000000 ns, gates: 8 total, factories: 0 total, decoders: 1 total, classical_data_bandwidth: 100 bits/us, qubit_routing_bandwidth: 100 qubits/us, ancilla_bandwidth: 100 qubits/us }
