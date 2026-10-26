@@ -30,14 +30,93 @@ def _stage(st: layers.Stage) -> dict:
     return {"file": Path(st.path).name, "members": [[m, f, n] for m, f, n in st.members], "lines": st.lines}
 
 
-def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict) -> dict:
+def output_pairs(prog: layers.Stage, chain, low: qec2alg.Lowered, alg) -> list:
+    """The lowered program's outcomes that are the .prog's measurement results, in execution
+    order: the instructions whose .qec -> .qppm -> .prog chain ends at a `measure q ↦ c[i]`."""
+    import re
+    out = []
+    for ins in alg.instructions:
+        if not ins.cvar or ins.kind not in ("ppm", "read"):
+            continue
+        q = low.qec_of.get(ins.src_line or ins.line)
+        p = chain.qec_to_qppm.get(q) if q else None
+        g = chain.qppm_to_prog.get(p.stmt.line) if p else None
+        if g and re.match(r"measure\s+.+↦\s*c\[", g.stmt.text.strip()):
+            out.append(ins.cvar)
+    return out
+
+
+def distribution_check(prog: layers.Stage, chain, low: qec2alg.Lowered, params: dict) -> dict:
+    """The lowered program's results have exactly the .prog's distribution."""
+    import re
+    from ..gadget.algorithm import parse_algorithm
+    from ..gadget.logic.merged import TooManyBranches, distribution
+    from .progsim import NotSimulated, distribution as prog_distribution
+    m = re.search(r"\bc:\s*([^\]]+)\]", prog.program.header.text)
+    env = {k: int(v) for k, v in params.items()}
+    try:
+        recs = int(eval(m[1].replace("·", "*"), {"__builtins__": {}}, env)) if m else 0  # noqa: S307
+        order: list = []
+        pstates: dict = {}
+        ref = prog_distribution(prog, env, recs, order, pstates)
+    except (NotSimulated, Exception) as exc:                     # noqa: BLE001 -- say why
+        return {"checked": False, "why": f"the .prog could not be simulated: {exc}"}
+    alg = parse_algorithm(low.text)
+    outs = output_pairs(prog, chain, low, alg)
+    if len(order) != len(outs):
+        return {"checked": False, "why": f"{len(order)} .prog measurements, {len(outs)} lowered ones"}
+    try:
+        got = distribution(alg, outs)
+    except TooManyBranches as exc:
+        return {"checked": False, "why": str(exc)}
+    mine: dict = {}
+    for k, p in got["distribution"].items():
+        key = tuple(k[order.index(i)] if i in order else 0 for i in range(recs))
+        mine[key] = mine.get(key, 0.0) + p
+    keys = set(mine) | set(ref)
+    worst = max((abs(mine.get(k, 0.0) - ref.get(k, 0.0)) for k in keys), default=0.0)
+    # and, result by result, the state left on the qubits both programs still hold
+    from ..gadget.logic.contract import State
+    from ..gadget.logic.merged import _factor_out
+    fid, compared = 1.0, 0
+    for k, sts in got["states"].items():
+        ck = tuple(k[order.index(i)] if i in order else 0 for i in range(recs))
+        if ck not in pstates:
+            continue
+        n, amp = pstates[ck]
+        for g in sts:
+            ps = State()
+            ps.names = [f"q{i}" for i in range(n)]
+            ps.amp = dict(amp)
+            gs = g.copy()
+            common = set(ps.names) & set(gs.names)
+            ok = all(_factor_out(ps, q) for q in [q for q in list(ps.names) if q not in common])
+            ok = ok and all(_factor_out(gs, q) for q in [q for q in list(gs.names) if q not in common])
+            fid = min(fid, ps.overlap(gs) if ok else 0.0)
+            compared += 1
+    return {"checked": True, "kind": "distribution", "passed": worst < 1e-6 and fid > 1 - 1e-6,
+            "records": recs, "outcomes": outs, "worst_difference": worst,
+            "states_compared": compared, "worst_state_fidelity": round(fid, 9),
+            "prog": {"".join(map(str, k)): p for k, p in ref.items()},
+            "gadget": {"".join(map(str, k)): round(p, 9) for k, p in sorted(mine.items())},
+            "peak_branches": got["peak_branches"],
+            "method": "the .prog simulated as written; the gadget program simulated with branches "
+                      "merged once nothing reads their outcomes (exact)"}
+
+
+def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict, chain=None) -> dict:
     """What the lowered gadget program computes, against the .prog: a single gate as its
-    contract (every branch, state vector), or an outcome spec `Pr[ c[0,K) = E ] = 1` exactly
-    (every branch at once, symbolically).  Anything else is said to be unchecked."""
+    contract (every branch, state vector); otherwise the exact distribution of its results
+    against the .prog's own; and an outcome spec `Pr[ c[0,K) = E ] = 1` symbolically where the
+    program is Clifford.  Anything else is said to be unchecked."""
     import re
     rep = contract_check(prog, low)
     if rep.get("checked"):
         return rep
+    if chain is not None:
+        rep = distribution_check(prog, chain, low, params)
+        if rep.get("checked"):
+            return rep
     spec = next((u for u in prog.units if u.kind == "spec" and prog.program and u.name == prog.program.name), None)
     text = " ".join(s.text for s in spec.statements()) if spec else ""
     m = re.search(r"Pr\[\s*c\[0,\s*([^)\]]+)\)\s*=\s*([^\]]+?)\s*\]\s*=\s*1", text)
@@ -147,15 +226,20 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
     st_prog, st_qppm, st_qec = layers.read(prog, "prog"), layers.read(qppm_p, "qppm"), layers.read(qec_p, "qec")
     from . import structure
     templates = step("FormalRV's gate templates", lambda: structure.learn_templates())
-    chain = step("link .qec -> .qppm -> .prog", lambda: structure.link(st_prog, st_qppm, st_qec, templates))
+    chain = step("link .qec -> .qppm -> .prog", lambda: structure.link(st_prog, st_qppm, st_qec, templates,
+                                                                     prog_path=Path(prog), specialize=specialize))
     low = step("lower .qec -> .alg (QCCD)", lambda: qec2alg.lower(
         st_qec, title=title or f"{stem}: a FormalRV program on the gadget town", floorplan=floorplan))
     alg_p = out / f"{stem}.alg"
     alg_p.write_text(low.text, encoding="utf-8")
-    contract = step("what the .alg computes, against the .prog", lambda: semantic_check(st_prog, low, specialize or {}))
+    contract = step("what the .alg computes, against the .prog", lambda: semantic_check(st_prog, low, specialize or {}, chain))
     a_txt = (f"FormalRV's VM on its abstract machine: {abstract['runtime_ns'] / 1e6:.1f} ms, "
              f"{abstract['peak_qubits']} qubits. " if abstract and abstract.get("runtime_ns") else "")
-    if contract.get("passed") and contract.get("kind") == "outcome":
+    if contract.get("passed") and contract.get("kind") == "distribution":
+        c_txt = (f"The gadget program's results have exactly the .prog's distribution "
+                 f"({', '.join(f'{k}: {v:.3f}' for k, v in contract['prog'].items())}; every branch, "
+                 f"merged as outcomes stop being read: at most {contract['peak_branches']} live). ")
+    elif contract.get("passed") and contract.get("kind") == "outcome":
         c_txt = (f"The gadget program gives {contract['spec']} in every branch "
                  f"({contract['random_outcomes']} random outcomes; {contract['method']}). ")
     elif contract.get("passed"):
@@ -168,7 +252,8 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
     payload = stack_payload(st_prog, st_qppm, st_qec, chain, low, foot)
     site = out / "gadgets"
     r = step("schedule, check and sign off on the town", lambda: build_algorithm(
-        alg_p, out_dir=site, stack=payload, log=None))
+        alg_p, out_dir=site, stack=payload, log=None,
+        semantics=contract if contract.get("checked") and contract.get("kind") == "distribution" else None))
     s = r["stats"]
     reach = structure.reachable(st_qec)
     qec_lines = [s.line for u in st_qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)

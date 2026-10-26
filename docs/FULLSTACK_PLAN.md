@@ -129,6 +129,45 @@ and the Gadget row names the call it is inside. Inside the oracle the stack read
 `CX(i, n) ../Primer/primer.prog/djOracle.prog:4` → `DJ.qppm:484` → `DJ.qec:1282` →
 `ppm Z q0 Z djoracle1_l3` → its CZ → its TSIR.
 
+### Slice S4 (2026-10-26): T states — Shor for 15, written in FormalRV
+
+**The program.** `examples/fullstack/shor15.prog` is the order of 7 mod 15, the same circuit as the hand-written
+`shor15.alg`: three controls, two Toffolis, a semiclassical inverse QFT. It is written in **FormalRV's own
+`.prog` language** and compiled by FormalRV, unchanged.
+`python -m qccd.fullstack run examples/fullstack/shor15.prog -o DIR --specialize n=7` takes 30 s.
+
+**The result.**
+- 15 T states, 61 |Ȳ⟩ rotations, four-block products for the Toffolis' π/8 rotations;
+- 1,551 of 1,551 `.qec` lines linked; 0 refused; 8.94 s on the town; every rule holds; signed off
+  compositionally;
+- **its results and, result by result, the work register's state are exactly the `.prog`'s**: worst
+  state fidelity 1.0 over all four results, never more than 10 live branches.
+
+**What it took.**
+- **The bench takes four blocks** (`ppm.ZZZZ`: a Toffoli's Z̄Z̄Z̄ against a T block): 30 ops, all verified,
+  ranks complete up to 72.
+- **The machine gains two 15-to-1 factories, eight memories and a zone.**
+- **`.prog`→`.qppm` by prefix differencing.** FormalRV's `.prog` compiler optimises across gates
+  (adjacent rotations merge), so a gate has no fixed template. Every prefix of the program is compiled
+  with FormalRV's own `prepare_qppm` and aligned with the previous one, with ancilla slots and record
+  numbers blanked.
+  - A statement that appears when gate k is added is k's (`prefix`); one that changes is shared
+    (`merged`). Each Toffoli owns its 134 statements.
+  - The last prefix must reproduce FormalRV's `.qppm` exactly, or nothing is linked.
+- **Refresh keeps a block alive to the end of the program.** A register nothing reads again used to
+  wait more than 1 s at the tail (G8).
+- **Exact semantics with T states** (`qccd/gadget/logic/merged.py`): a state vector per branch, with
+  branches merged as soon as no later guard reads their outcome. `progsim.py` simulates the `.prog`
+  itself in **FormalRV's convention, `Rz q k` = exp(−iπ/2ᵏ) on |1⟩** (GateLang.lean).
+- **The sign-off records the full stack's verdict as its semantics part.**
+
+**What the state check caught.** It found two bugs in my own work that the distribution could not show,
+because a period-4 Shor's results are uniform either way:
+- the simulator used the opposite `Rz` sign;
+- the first `shor15.prog` therefore wrote S where it meant S†.
+
+A deliberately wrong gate (one CX rotation measured as Z̄ instead of X̄, i.e. a CZ) is caught.
+
 ### Differences from the plan as written
 
 - **The reader is QCCD's own.** It is not FormalRV's parser: the VM's parser is not a library, and the Python oracle lags the staged compiler (it refuses `spec maintenance`). It is held to FormalRV's VM instead, which must agree op by op on every listing.
@@ -140,9 +179,12 @@ and the Gadget row names the call it is inside. Inside the oracle the stack read
 
 ### Next
 
-- **S2 (scale):** compile each gadget once per tile class, reuse it by translation, and make GIR 0.3 hierarchical.
+- **S5 (scale):** keep FormalRV's loops folded instead of unrolling them; make the schedule hierarchical
+  (GIR 0.3: a call tree with spans, a gadget scheduled once and reused by translation); make the page lazy,
+  so a many-day run seeks in milliseconds.
+- **Shor from FormalRV's modexp at small width** (N = 21), next to the hand-written Shor-15.
 - **The up-bridge:** derive the `.machine` from characterized macros.
-- **DJ, then Shor from FormalRV's modexp at small width.**
+- **The Goal 2 board**, once an entry can be graded end to end.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which

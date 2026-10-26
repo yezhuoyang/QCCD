@@ -1,0 +1,552 @@
+code surface d=3
+
+params  n
+
+program[q: n, c: n+3]:
+  frame X q[3]
+  prepare |Y+> -> anc[0+0]
+  measure Z q[4] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[4]
+  when m[1]:
+    frame Z q[4]
+  prepare |Y+> -> anc[0+1]
+  measure X q[4] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame X q[4]
+  when m[3]:
+    frame X q[4]
+  frame Z q[4]
+  prepare |Y+> -> anc[0+2]
+  measure X q[4] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[4]
+  when m[5]:
+    frame X q[4]
+  prepare |Y+> -> anc[0+3]
+  measure Z q[4] Z anc[0+3] -> m[6]
+  measure X anc[0+3] -> m[7]
+  when m[6]:
+    frame Z q[4]
+  when m[7]:
+    frame Z q[4]
+  measure Z q[4] -> c[n+0]
+  prepare |Y+> -> anc[0+4+0]
+  measure Z q[5] Z anc[0+4+0] -> m[8]
+  measure X anc[0+4+0] -> m[9]
+  when m[8]:
+    frame Z q[5]
+  when m[9]:
+    frame Z q[5]
+  prepare |Y+> -> anc[0+4+1]
+  measure X q[5] Z anc[0+4+1] -> m[10]
+  measure X anc[0+4+1] -> m[11]
+  when m[10]:
+    frame X q[5]
+  when m[11]:
+    frame X q[5]
+  prepare |Y+> -> anc[0+4+2]
+  measure Z q[5] X q[0] Z anc[0+4+2] -> m[12]
+  measure X anc[0+4+2] -> m[13]
+  when m[12]:
+    frame Z q[5] X q[0]
+  when m[13]:
+    frame Z q[5] X q[0]
+  prepare |Y+> -> anc[0+4+3]
+  measure X q[0] Z anc[0+4+3] -> m[14]
+  measure X anc[0+4+3] -> m[15]
+  when m[14]:
+    frame X q[0]
+  when m[15]:
+    frame X q[0]
+  frame X q[0]
+  prepare |Y+> -> anc[0+4+4]
+  measure Z q[5] X q[2] Z anc[0+4+4] -> m[16]
+  measure X anc[0+4+4] -> m[17]
+  when m[16]:
+    frame Z q[5] X q[2]
+  when m[17]:
+    frame Z q[5] X q[2]
+  prepare |Y+> -> anc[0+4+5]
+  measure Z q[5] Z anc[0+4+5] -> m[18]
+  measure X anc[0+4+5] -> m[19]
+  when m[18]:
+    frame Z q[5]
+  when m[19]:
+    frame Z q[5]
+  frame Z q[5]
+  prepare |Y+> -> anc[0+4+6]
+  measure X q[2] Z anc[0+4+6] -> m[20]
+  measure X anc[0+4+6] -> m[21]
+  when m[20]:
+    frame X q[2]
+  when m[21]:
+    frame X q[2]
+  frame X q[2]
+  when c[n+0]:
+    prepare |Y+> -> anc[0+4+7+0]
+    measure Z q[5] Z anc[0+4+7+0] -> m[22]
+    measure X anc[0+4+7+0] -> m[23]
+    when m[22]:
+      frame Z q[5]
+    when m[23]:
+      frame Z q[5]
+    frame Z q[5]
+  prepare |Y+> -> anc[0+4+7+1+0]
+  measure Z q[5] Z anc[0+4+7+1+0] -> m[24]
+  measure X anc[0+4+7+1+0] -> m[25]
+  when m[24]:
+    frame Z q[5]
+  when m[25]:
+    frame Z q[5]
+  prepare |Y+> -> anc[0+4+7+1+1]
+  measure X q[5] Z anc[0+4+7+1+1] -> m[26]
+  measure X anc[0+4+7+1+1] -> m[27]
+  when m[26]:
+    frame X q[5]
+  when m[27]:
+    frame X q[5]
+  prepare |Y+> -> anc[0+4+7+1+2]
+  measure Z q[5] Z anc[0+4+7+1+2] -> m[28]
+  measure X anc[0+4+7+1+2] -> m[29]
+  when m[28]:
+    frame Z q[5]
+  when m[29]:
+    frame Z q[5]
+  measure Z q[5] -> c[n+1]
+  prepare |Y+> -> anc[0+4+7+1+3+0]
+  measure Z q[6] Z anc[0+4+7+1+3+0] -> m[30]
+  measure X anc[0+4+7+1+3+0] -> m[31]
+  when m[30]:
+    frame Z q[6]
+  when m[31]:
+    frame Z q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+1]
+  measure X q[6] Z anc[0+4+7+1+3+1] -> m[32]
+  measure X anc[0+4+7+1+3+1] -> m[33]
+  when m[32]:
+    frame X q[6]
+  when m[33]:
+    frame X q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+2]
+  measure Z q[3] X q[0] Z anc[0+4+7+1+3+2] -> m[34]
+  measure X anc[0+4+7+1+3+2] -> m[35]
+  when m[34]:
+    frame Z q[3] X q[0]
+  when m[35]:
+    frame Z q[3] X q[0]
+  prepare |Y+> -> anc[0+4+7+1+3+3]
+  measure X q[0] Z anc[0+4+7+1+3+3] -> m[36]
+  measure X anc[0+4+7+1+3+3] -> m[37]
+  when m[36]:
+    frame X q[0]
+  when m[37]:
+    frame X q[0]
+  frame X q[0]
+  prepare |Y+> -> anc[0+4+7+1+3+4]
+  measure X q[3] Z anc[0+4+7+1+3+4] -> m[38]
+  measure X anc[0+4+7+1+3+4] -> m[39]
+  when m[38]:
+    frame X q[3]
+  when m[39]:
+    frame X q[3]
+  frame Z q[3]
+  prepare |T> -> anc[0+4+7+1+3+5]
+  measure Z q[6] Z anc[0+4+7+1+3+5] -> m[40]
+  measure X anc[0+4+7+1+3+5] -> m[41]
+  when m[41]:
+    frame Z q[6]
+  when m[40]:
+    prepare |Y+> -> anc[0+4+7+1+3+5+1]
+    measure Z q[6] Z anc[0+4+7+1+3+5+1] -> m[42]
+    measure X anc[0+4+7+1+3+5+1] -> m[43]
+    when m[42]:
+      frame Z q[6]
+    when m[43]:
+      frame Z q[6]
+  prepare |T> -> anc[0+4+7+1+3+8]
+  measure Z q[0] Z anc[0+4+7+1+3+8] -> m[44]
+  measure X anc[0+4+7+1+3+8] -> m[45]
+  when m[45]:
+    frame Z q[0]
+  when m[44]:
+    prepare |Y+> -> anc[0+4+7+1+3+8+1]
+    measure Z q[0] Z anc[0+4+7+1+3+8+1] -> m[46]
+    measure X anc[0+4+7+1+3+8+1] -> m[47]
+    when m[46]:
+      frame Z q[0]
+    when m[47]:
+      frame Z q[0]
+  prepare |T> -> anc[0+4+7+1+3+11]
+  measure Z q[3] Z anc[0+4+7+1+3+11] -> m[48]
+  measure X anc[0+4+7+1+3+11] -> m[49]
+  when m[49]:
+    frame Z q[3]
+  when m[48]:
+    prepare |Y+> -> anc[0+4+7+1+3+11+1]
+    measure Z q[3] Z anc[0+4+7+1+3+11+1] -> m[50]
+    measure X anc[0+4+7+1+3+11+1] -> m[51]
+    when m[50]:
+      frame Z q[3]
+    when m[51]:
+      frame Z q[3]
+  prepare |T> -> anc[0+4+7+1+3+14]
+  measure Z q[6] Z q[0] Z anc[0+4+7+1+3+14] -> m[52]
+  measure X anc[0+4+7+1+3+14] -> m[53]
+  when m[53]:
+    frame Z q[6] Z q[0]
+  when m[52]:
+    prepare |Y+> -> anc[0+4+7+1+3+14+1]
+    measure Z q[6] Z q[0] Z anc[0+4+7+1+3+14+1] -> m[54]
+    measure X anc[0+4+7+1+3+14+1] -> m[55]
+    when m[54]:
+      frame Z q[6] Z q[0]
+    when m[55]:
+      frame Z q[6] Z q[0]
+  prepare |Y+> -> anc[0+4+7+1+3+14+2]
+  measure Z q[6] Z q[0] Z anc[0+4+7+1+3+14+2] -> m[56]
+  measure X anc[0+4+7+1+3+14+2] -> m[57]
+  when m[56]:
+    frame Z q[6] Z q[0]
+  when m[57]:
+    frame Z q[6] Z q[0]
+  frame Z q[6] Z q[0]
+  prepare |T> -> anc[0+4+7+1+3+17]
+  measure Z q[6] Z q[3] Z anc[0+4+7+1+3+17] -> m[58]
+  measure X anc[0+4+7+1+3+17] -> m[59]
+  when m[59]:
+    frame Z q[6] Z q[3]
+  when m[58]:
+    prepare |Y+> -> anc[0+4+7+1+3+17+1]
+    measure Z q[6] Z q[3] Z anc[0+4+7+1+3+17+1] -> m[60]
+    measure X anc[0+4+7+1+3+17+1] -> m[61]
+    when m[60]:
+      frame Z q[6] Z q[3]
+    when m[61]:
+      frame Z q[6] Z q[3]
+  prepare |Y+> -> anc[0+4+7+1+3+17+2]
+  measure Z q[6] Z q[3] Z anc[0+4+7+1+3+17+2] -> m[62]
+  measure X anc[0+4+7+1+3+17+2] -> m[63]
+  when m[62]:
+    frame Z q[6] Z q[3]
+  when m[63]:
+    frame Z q[6] Z q[3]
+  frame Z q[6] Z q[3]
+  prepare |T> -> anc[0+4+7+1+3+20]
+  measure Z q[0] Z q[3] Z anc[0+4+7+1+3+20] -> m[64]
+  measure X anc[0+4+7+1+3+20] -> m[65]
+  when m[65]:
+    frame Z q[0] Z q[3]
+  when m[64]:
+    prepare |Y+> -> anc[0+4+7+1+3+20+1]
+    measure Z q[0] Z q[3] Z anc[0+4+7+1+3+20+1] -> m[66]
+    measure X anc[0+4+7+1+3+20+1] -> m[67]
+    when m[66]:
+      frame Z q[0] Z q[3]
+    when m[67]:
+      frame Z q[0] Z q[3]
+  prepare |Y+> -> anc[0+4+7+1+3+20+2]
+  measure Z q[0] Z q[3] Z anc[0+4+7+1+3+20+2] -> m[68]
+  measure X anc[0+4+7+1+3+20+2] -> m[69]
+  when m[68]:
+    frame Z q[0] Z q[3]
+  when m[69]:
+    frame Z q[0] Z q[3]
+  frame Z q[0] Z q[3]
+  prepare |T> -> anc[0+4+7+1+3+23]
+  measure Z q[6] Z q[0] Z q[3] Z anc[0+4+7+1+3+23] -> m[70]
+  measure X anc[0+4+7+1+3+23] -> m[71]
+  when m[71]:
+    frame Z q[6] Z q[0] Z q[3]
+  when m[70]:
+    prepare |Y+> -> anc[0+4+7+1+3+23+1]
+    measure Z q[6] Z q[0] Z q[3] Z anc[0+4+7+1+3+23+1] -> m[72]
+    measure X anc[0+4+7+1+3+23+1] -> m[73]
+    when m[72]:
+      frame Z q[6] Z q[0] Z q[3]
+    when m[73]:
+      frame Z q[6] Z q[0] Z q[3]
+  prepare |Y+> -> anc[0+4+7+1+3+26]
+  measure X q[3] Z anc[0+4+7+1+3+26] -> m[74]
+  measure X anc[0+4+7+1+3+26] -> m[75]
+  when m[74]:
+    frame X q[3]
+  when m[75]:
+    frame X q[3]
+  prepare |Y+> -> anc[0+4+7+1+3+27]
+  measure Z q[3] X q[0] Z anc[0+4+7+1+3+27] -> m[76]
+  measure X anc[0+4+7+1+3+27] -> m[77]
+  when m[76]:
+    frame Z q[3] X q[0]
+  when m[77]:
+    frame Z q[3] X q[0]
+  frame X q[0]
+  prepare |Y+> -> anc[0+4+7+1+3+28]
+  measure Z q[2] X q[1] Z anc[0+4+7+1+3+28] -> m[78]
+  measure X anc[0+4+7+1+3+28] -> m[79]
+  when m[78]:
+    frame Z q[2] X q[1]
+  when m[79]:
+    frame Z q[2] X q[1]
+  prepare |Y+> -> anc[0+4+7+1+3+29]
+  measure X q[1] Z anc[0+4+7+1+3+29] -> m[80]
+  measure X anc[0+4+7+1+3+29] -> m[81]
+  when m[80]:
+    frame X q[1]
+  when m[81]:
+    frame X q[1]
+  frame X q[1]
+  prepare |Y+> -> anc[0+4+7+1+3+30]
+  measure X q[2] Z anc[0+4+7+1+3+30] -> m[82]
+  measure X anc[0+4+7+1+3+30] -> m[83]
+  when m[82]:
+    frame X q[2]
+  when m[83]:
+    frame X q[2]
+  frame Z q[2]
+  prepare |T> -> anc[0+4+7+1+3+31]
+  measure Z q[6] Z anc[0+4+7+1+3+31] -> m[84]
+  measure X anc[0+4+7+1+3+31] -> m[85]
+  when m[85]:
+    frame Z q[6]
+  when m[84]:
+    prepare |Y+> -> anc[0+4+7+1+3+31+1]
+    measure Z q[6] Z anc[0+4+7+1+3+31+1] -> m[86]
+    measure X anc[0+4+7+1+3+31+1] -> m[87]
+    when m[86]:
+      frame Z q[6]
+    when m[87]:
+      frame Z q[6]
+  prepare |T> -> anc[0+4+7+1+3+34]
+  measure Z q[1] Z anc[0+4+7+1+3+34] -> m[88]
+  measure X anc[0+4+7+1+3+34] -> m[89]
+  when m[89]:
+    frame Z q[1]
+  when m[88]:
+    prepare |Y+> -> anc[0+4+7+1+3+34+1]
+    measure Z q[1] Z anc[0+4+7+1+3+34+1] -> m[90]
+    measure X anc[0+4+7+1+3+34+1] -> m[91]
+    when m[90]:
+      frame Z q[1]
+    when m[91]:
+      frame Z q[1]
+  prepare |T> -> anc[0+4+7+1+3+37]
+  measure Z q[2] Z anc[0+4+7+1+3+37] -> m[92]
+  measure X anc[0+4+7+1+3+37] -> m[93]
+  when m[93]:
+    frame Z q[2]
+  when m[92]:
+    prepare |Y+> -> anc[0+4+7+1+3+37+1]
+    measure Z q[2] Z anc[0+4+7+1+3+37+1] -> m[94]
+    measure X anc[0+4+7+1+3+37+1] -> m[95]
+    when m[94]:
+      frame Z q[2]
+    when m[95]:
+      frame Z q[2]
+  prepare |T> -> anc[0+4+7+1+3+40]
+  measure Z q[6] Z q[1] Z anc[0+4+7+1+3+40] -> m[96]
+  measure X anc[0+4+7+1+3+40] -> m[97]
+  when m[97]:
+    frame Z q[6] Z q[1]
+  when m[96]:
+    prepare |Y+> -> anc[0+4+7+1+3+40+1]
+    measure Z q[6] Z q[1] Z anc[0+4+7+1+3+40+1] -> m[98]
+    measure X anc[0+4+7+1+3+40+1] -> m[99]
+    when m[98]:
+      frame Z q[6] Z q[1]
+    when m[99]:
+      frame Z q[6] Z q[1]
+  prepare |Y+> -> anc[0+4+7+1+3+40+2]
+  measure Z q[6] Z q[1] Z anc[0+4+7+1+3+40+2] -> m[100]
+  measure X anc[0+4+7+1+3+40+2] -> m[101]
+  when m[100]:
+    frame Z q[6] Z q[1]
+  when m[101]:
+    frame Z q[6] Z q[1]
+  frame Z q[6] Z q[1]
+  prepare |T> -> anc[0+4+7+1+3+43]
+  measure Z q[6] Z q[2] Z anc[0+4+7+1+3+43] -> m[102]
+  measure X anc[0+4+7+1+3+43] -> m[103]
+  when m[103]:
+    frame Z q[6] Z q[2]
+  when m[102]:
+    prepare |Y+> -> anc[0+4+7+1+3+43+1]
+    measure Z q[6] Z q[2] Z anc[0+4+7+1+3+43+1] -> m[104]
+    measure X anc[0+4+7+1+3+43+1] -> m[105]
+    when m[104]:
+      frame Z q[6] Z q[2]
+    when m[105]:
+      frame Z q[6] Z q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+43+2]
+  measure Z q[6] Z q[2] Z anc[0+4+7+1+3+43+2] -> m[106]
+  measure X anc[0+4+7+1+3+43+2] -> m[107]
+  when m[106]:
+    frame Z q[6] Z q[2]
+  when m[107]:
+    frame Z q[6] Z q[2]
+  frame Z q[6] Z q[2]
+  prepare |T> -> anc[0+4+7+1+3+46]
+  measure Z q[1] Z q[2] Z anc[0+4+7+1+3+46] -> m[108]
+  measure X anc[0+4+7+1+3+46] -> m[109]
+  when m[109]:
+    frame Z q[1] Z q[2]
+  when m[108]:
+    prepare |Y+> -> anc[0+4+7+1+3+46+1]
+    measure Z q[1] Z q[2] Z anc[0+4+7+1+3+46+1] -> m[110]
+    measure X anc[0+4+7+1+3+46+1] -> m[111]
+    when m[110]:
+      frame Z q[1] Z q[2]
+    when m[111]:
+      frame Z q[1] Z q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+46+2]
+  measure Z q[1] Z q[2] Z anc[0+4+7+1+3+46+2] -> m[112]
+  measure X anc[0+4+7+1+3+46+2] -> m[113]
+  when m[112]:
+    frame Z q[1] Z q[2]
+  when m[113]:
+    frame Z q[1] Z q[2]
+  frame Z q[1] Z q[2]
+  prepare |T> -> anc[0+4+7+1+3+49]
+  measure Z q[6] Z q[1] Z q[2] Z anc[0+4+7+1+3+49] -> m[114]
+  measure X anc[0+4+7+1+3+49] -> m[115]
+  when m[115]:
+    frame Z q[6] Z q[1] Z q[2]
+  when m[114]:
+    prepare |Y+> -> anc[0+4+7+1+3+49+1]
+    measure Z q[6] Z q[1] Z q[2] Z anc[0+4+7+1+3+49+1] -> m[116]
+    measure X anc[0+4+7+1+3+49+1] -> m[117]
+    when m[116]:
+      frame Z q[6] Z q[1] Z q[2]
+    when m[117]:
+      frame Z q[6] Z q[1] Z q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+52]
+  measure X q[2] Z anc[0+4+7+1+3+52] -> m[118]
+  measure X anc[0+4+7+1+3+52] -> m[119]
+  when m[118]:
+    frame X q[2]
+  when m[119]:
+    frame X q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+53]
+  measure Z q[2] X q[1] Z anc[0+4+7+1+3+53] -> m[120]
+  measure X anc[0+4+7+1+3+53] -> m[121]
+  when m[120]:
+    frame Z q[2] X q[1]
+  when m[121]:
+    frame Z q[2] X q[1]
+  frame X q[1]
+  prepare |Y+> -> anc[0+4+7+1+3+54]
+  measure Z q[6] X q[0] Z anc[0+4+7+1+3+54] -> m[122]
+  measure X anc[0+4+7+1+3+54] -> m[123]
+  when m[122]:
+    frame Z q[6] X q[0]
+  when m[123]:
+    frame Z q[6] X q[0]
+  prepare |Y+> -> anc[0+4+7+1+3+55]
+  measure Z q[6] X q[1] Z anc[0+4+7+1+3+55] -> m[124]
+  measure X anc[0+4+7+1+3+55] -> m[125]
+  when m[124]:
+    frame Z q[6] X q[1]
+  when m[125]:
+    frame Z q[6] X q[1]
+  frame Z q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+56]
+  measure Z q[6] X q[2] Z anc[0+4+7+1+3+56] -> m[126]
+  measure X anc[0+4+7+1+3+56] -> m[127]
+  when m[126]:
+    frame Z q[6] X q[2]
+  when m[127]:
+    frame Z q[6] X q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+57]
+  measure X q[2] Z anc[0+4+7+1+3+57] -> m[128]
+  measure X anc[0+4+7+1+3+57] -> m[129]
+  when m[128]:
+    frame X q[2]
+  when m[129]:
+    frame X q[2]
+  frame X q[2]
+  prepare |Y+> -> anc[0+4+7+1+3+58]
+  measure Z q[6] X q[3] Z anc[0+4+7+1+3+58] -> m[130]
+  measure X anc[0+4+7+1+3+58] -> m[131]
+  when m[130]:
+    frame Z q[6] X q[3]
+  when m[131]:
+    frame Z q[6] X q[3]
+  prepare |Y+> -> anc[0+4+7+1+3+59]
+  measure Z q[6] Z anc[0+4+7+1+3+59] -> m[132]
+  measure X anc[0+4+7+1+3+59] -> m[133]
+  when m[132]:
+    frame Z q[6]
+  when m[133]:
+    frame Z q[6]
+  frame Z q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+60]
+  measure X q[3] Z anc[0+4+7+1+3+60] -> m[134]
+  measure X anc[0+4+7+1+3+60] -> m[135]
+  when m[134]:
+    frame X q[3]
+  when m[135]:
+    frame X q[3]
+  frame X q[3]
+  when c[n+1]:
+    prepare |Y+> -> anc[0+4+7+1+3+61+0]
+    measure Z q[6] Z anc[0+4+7+1+3+61+0] -> m[136]
+    measure X anc[0+4+7+1+3+61+0] -> m[137]
+    when m[136]:
+      frame Z q[6]
+    when m[137]:
+      frame Z q[6]
+    frame Z q[6]
+  when c[n+0]:
+    prepare |T> -> anc[0+4+7+1+3+61+1+0+0]
+    measure Z q[6] Z anc[0+4+7+1+3+61+1+0+0] -> m[138]
+    measure X anc[0+4+7+1+3+61+1+0+0] -> m[139]
+    when m[139]:
+      frame Z q[6]
+    when m[138]:
+      prepare |Y+> -> anc[0+4+7+1+3+61+1+0+0+1]
+      measure Z q[6] Z anc[0+4+7+1+3+61+1+0+0+1] -> m[140]
+      measure X anc[0+4+7+1+3+61+1+0+0+1] -> m[141]
+      when m[140]:
+        frame Z q[6]
+      when m[141]:
+        frame Z q[6]
+    prepare |Y+> -> anc[0+4+7+1+3+61+1+0+0+2]
+    measure Z q[6] Z anc[0+4+7+1+3+61+1+0+0+2] -> m[142]
+    measure X anc[0+4+7+1+3+61+1+0+0+2] -> m[143]
+    when m[142]:
+      frame Z q[6]
+    when m[143]:
+      frame Z q[6]
+    frame Z q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+61+1+0+3+0]
+  measure Z q[6] Z anc[0+4+7+1+3+61+1+0+3+0] -> m[144]
+  measure X anc[0+4+7+1+3+61+1+0+3+0] -> m[145]
+  when m[144]:
+    frame Z q[6]
+  when m[145]:
+    frame Z q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+61+1+0+3+1]
+  measure X q[6] Z anc[0+4+7+1+3+61+1+0+3+1] -> m[146]
+  measure X anc[0+4+7+1+3+61+1+0+3+1] -> m[147]
+  when m[146]:
+    frame X q[6]
+  when m[147]:
+    frame X q[6]
+  prepare |Y+> -> anc[0+4+7+1+3+61+1+0+3+2]
+  measure Z q[6] Z anc[0+4+7+1+3+61+1+0+3+2] -> m[148]
+  measure X anc[0+4+7+1+3+61+1+0+3+2] -> m[149]
+  when m[148]:
+    frame Z q[6]
+  when m[149]:
+    frame Z q[6]
+  measure Z q[6] -> c[n+2]
+
+spec program:
+  requires   6 < n  ∧  n ≤ dim
+  assumes    {{ |0⟩_q[0, 7) }}
+  ensures    {{ |0⟩_q[0, 7) }}
+  outcomes   Pr[ c[0,1) = 0 ] = 1
+  resource   { meas: 153, frame: 159, magicT: 15, synthEps: 0, bound: upper }

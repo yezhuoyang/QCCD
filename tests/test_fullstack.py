@@ -143,9 +143,9 @@ def test_ppm_and_prep_y_are_instructions():
     assert a.instructions[2].op == "inject.Y"
     c, _, _, recs = a.ideal_circuit()
     assert len(recs) == 1
-    for bad in ("ppm Y q0 -> m", "ppm Z q0 Z q0 -> m", "ppm Z q0 X q1 Z a X b -> m", "ppm Z q0 X"):
+    for bad in ("ppm Y q0 -> m", "ppm Z q0 Z q0 -> m", "ppm Z q0 X q1 Z a X b Z c -> m", "ppm Z q0 X"):
         with pytest.raises(AlgorithmError):
-            parse_algorithm("prep q0 Z\nprep q1 Z\nprep a Y\nprep b Z\n" + bad + "\n")
+            parse_algorithm("prep q0 Z\nprep q1 Z\nprep a Y\nprep b Z\nprep c Z\n" + bad + "\n")
 
 
 @pytest.fixture(scope="module")
@@ -268,6 +268,80 @@ def test_deutsch_jozsa_runs_on_the_gadget_town(dj, tmp_path):
     sem = comp["parts"]["semantics"]
     assert sem["method"].startswith("symbolic") and sem["outcomes"]["m24"] == "1"
     assert any(g["gate"] == "djoracle" and g["contract"] is None for g in comp["parts"]["gates"]["rows"])
+
+
+# ----------------------------------------------------------------------------- T states: Shor for 15
+
+SHOR = REPO / "tests" / "fixtures" / "fullstack" / "shor15"
+
+
+def test_shor15_lowered_from_formalrv_has_the_right_distribution():
+    """FormalRV's own lowering of examples/fullstack/shor15.prog (15 T states, two Toffolis, a
+    semiclassical inverse QFT), lowered again by QCCD: the three control readouts give
+    c0 = 0 always and (c1, c2) uniform -- exactly, branches merged as their outcomes stop
+    being read, never more than a few live."""
+    from qccd.fullstack import qec2alg
+    from qccd.gadget.algorithm import parse_algorithm
+    from qccd.gadget.logic.merged import distribution
+    low = qec2alg.lower(layers.read(SHOR / "shor15.qec", "qec"))
+    alg = parse_algorithm(low.text)
+    assert sum(1 for i in alg.instructions if i.kind == "inject") == 15
+    assert any(i.kind == "ppm" and len(i.blocks) == 4 for i in alg.instructions)   # the Toffoli's ZZZ
+    outs = [next(i.cvar for i in alg.instructions if i.cvar and i.blocks == [q] and i.kind in ("read", "ppm")
+                 and (i.basis == "Z" or i.paulis == ["Z"])) for q in ("q4", "q5", "q6")]
+    got = distribution(alg, outs)
+    assert got["distribution"] == {(0, 0, 0): 0.25, (0, 0, 1): 0.25, (0, 1, 0): 0.25, (0, 1, 1): 0.25}
+    assert got["peak_branches"] <= 64
+    # every T inverted is still exactly a Toffoli (it is a real matrix): nothing may change
+    import re as _re
+    conj = "\n".join(ln for ln in low.text.split("\n") if not _re.fullmatch(r"x a\d+(_\d+)?", ln.strip()))
+    assert distribution(parse_algorithm(conj), outs)["distribution"] == got["distribution"]
+
+
+@pytest.mark.skipif(not (REPO / "examples" / "fullstack" / "shor15.prog").exists(), reason="no source")
+def test_a_wrong_gate_in_shor15_is_caught_by_the_state_check(tmp_path):
+    """The distribution of a period-4 Shor is uniform, which many wrong programs also give; the
+    state left on the work register, result by result, is what pins it down."""
+    import json as _json
+    from qccd.fullstack import qec2alg, structure, town
+    prog = layers.read(REPO / "examples" / "fullstack" / "shor15.prog", "prog")
+    qppm, qec = layers.read(SHOR / "shor15.qppm", "qppm"), layers.read(SHOR / "shor15.qec", "qec")
+    if not _pinned():
+        pytest.skip("linking .prog -> .qppm by prefix differencing needs FormalRV")
+    chain = structure.link(prog, qppm, qec, structure.learn_templates(),
+                           prog_path=REPO / "examples" / "fullstack" / "shor15.prog", specialize={"n": 7})
+    low = qec2alg.lower(qec)
+    good = town.distribution_check(prog, chain, low, {"n": 7})
+    assert good["passed"] and good["states_compared"] >= 4 and good["worst_state_fidelity"] > 0.999999
+    # the first CX(5, 0) rotation measured as Z-bar instead of X-bar: a CZ, not a CX
+    bad = _re_sub_first(low.text, r"ppm Z q5 X q0 ", "ppm Z q5 Z q0 ")
+    low.text = bad
+    assert not town.distribution_check(prog, chain, low, {"n": 7})["passed"]
+
+
+def _re_sub_first(text, a, b):
+    assert a in text
+    return text.replace(a, b, 1)
+
+
+def _pinned() -> bool:
+    try:
+        from qccd.fullstack import formalrv
+        formalrv.check_pin()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _pinned(), reason="needs the pinned FormalRV clone")
+def test_shor15_from_formalrv_is_signed_off_on_the_town(tmp_path):
+    from qccd.fullstack import town
+    r = town.run(REPO / "examples" / "fullstack" / "shor15.prog", out=tmp_path / "shor15", specialize={"n": 7})
+    assert r["linked"] == r["qec_statements"] == r["linked_up"]
+    assert r["concrete"]["refused"] == 0 and r["checks"]["signed_off"] == "compositional"
+    c = r["contract"]
+    assert c["kind"] == "distribution" and c["passed"] and c["prog"] == {"000": 0.25, "001": 0.25,
+                                                                       "010": 0.25, "011": 0.25}
 
 
 # ----------------------------------------------------------------------------- end to end

@@ -292,10 +292,160 @@ def learn_templates(gates=None, cache: Path = TEMPLATES, scratch: Path | None = 
     return mine
 
 
-def link(prog: layers.Stage, qppm: layers.Stage, qec: layers.Stage, templates: dict | None = None) -> Chain:
+# ----------------------------------------------------------------------------- prefix differencing
+
+PREFIX_CACHE = Path(__file__).resolve().parents[2] / "out" / "fullstack" / "prefix"
+
+
+def _preorder(body: list, depth: int = 0) -> list:
+    out = []
+    for s in body:
+        out.append((s, depth))
+        out += _preorder(s.children, depth + 1)
+    return out
+
+
+def _flat(stmts: list, depth: int = 0, *, exact: bool = False) -> list:
+    """A .qppm body, pre-order, as text (indentation is the nesting).  Unless `exact`, the
+    ancilla slots and measurement-record numbers are blanked: adding a gate renumbers every
+    later one, and that is bookkeeping, not a change in what the statement does."""
+    out = []
+    for s in stmts:
+        t = re.sub(r"\s+", " ", s.text.strip())
+        if not exact:
+            t = re.sub(r"\b(anc|m)\[[^\]]*\]", r"\1[_]", t)
+        out.append(("  " * depth) + t)
+        out += _flat(s.children, depth + 1, exact=exact)
+    return out
+
+
+def link_prog_qppm_by_prefix(prog_path: Path, prog: layers.Stage, qppm: layers.Stage,
+                             specialize: dict | None = None) -> dict:
+    """`.qppm` line -> Link(.prog statement) for the PROGRAM unit, by compiling every prefix of
+    it with FormalRV's own prepare_qppm and aligning consecutive outputs.
+
+    FormalRV's `.prog` compiler optimises across gates (adjacent rotations merge; two π/4 make a
+    Pauli frame), so a gate's `.qppm` is not a fixed template.  A statement that appears when
+    gate k is added is gate k's ('prefix'); one that CHANGES when gate k is added is shared by
+    the gate it came from and gate k ('merged', attributed to k, the later).  The last prefix
+    must reproduce the real `.qppm` program exactly, or nothing is linked (`Unlinked`)."""
+    import difflib
+    import hashlib
+    import shutil
+    from . import formalrv
+    unit = prog.program
+    if unit is None:
+        return {}
+    pre = _preorder(unit.body)
+    # where the program block lives: its member file, from its header to the member's end
+    member = unit.header.member
+    src_dir = Path(prog_path)
+    if not src_dir.is_dir():
+        raise Unlinked("prefix differencing needs a .prog stage folder")
+    key = hashlib.sha256((formalrv.PIN_COMMIT + "\n".join(prog.lines) + repr(sorted((specialize or {}).items()))
+                          ).encode()).hexdigest()[:16]
+    work = PREFIX_CACHE / key
+    work.mkdir(parents=True, exist_ok=True)
+    header = unit.header.text.rstrip()
+    member_text = (src_dir / member).read_text(encoding="utf-8-sig").split("\n")
+    # the program block is everything from its header to the member's end (programs stand last)
+    start = unit.header.mline - 1
+    flats: list = []
+    for k in range(1, len(pre) + 1):
+        keep = {id(s) for s, _ in pre[:k]}
+        # a block header whose children are all cut has no body: that prefix is the previous one
+        if pre[k - 1][0].children:
+            flats.append(None)
+            continue
+
+        def emit(stmts, depth):
+            lines = []
+            for s in stmts:
+                if id(s) not in keep:
+                    continue
+                lines.append("  " * (depth + 1) + s.text.strip())
+                lines += emit(s.children, depth + 1)
+            return lines
+        body = emit(unit.body, 0)
+        out_q = work / f"p{k}.qppm"
+        if not out_q.exists():
+            d = work / f"p{k}.prog"
+            if d.exists():
+                shutil.rmtree(d)
+            shutil.copytree(src_dir, d)
+            (d / member).write_text("\n".join(member_text[:start] + [header] + body) + "\n\n", encoding="utf-8")
+            try:
+                formalrv.prog_to_qppm(d, out_q)
+            except formalrv.ToolchainError as exc:
+                raise Unlinked(f"FormalRV refused the .prog prefix ending at line {pre[k - 1][0].line}: {exc}")
+        st = layers.read(out_q, "qppm")
+        flats.append(_flat(st.program.body) if st.program else [])
+    final = _flat(qppm.program.body)
+    last = next(f for f in reversed(flats) if f is not None)
+    last_exact = _flat(layers.read(work / f"p{max(i for i, f in enumerate(flats, 1) if f is not None)}.qppm",
+                                   "qppm").program.body, exact=True)
+    if last != final or last_exact != _flat(qppm.program.body, exact=True):
+        raise Unlinked("the last .prog prefix does not reproduce FormalRV's .qppm: prefix differencing refused")
+    # attribute, prefix by prefix
+    owner: list = []                         # per position of the current flat list: (prog stmt, how)
+    prev: list = []
+    for k, f in enumerate(flats, start=1):
+        if f is None:
+            continue
+        s = pre[k - 1][0]
+        sm = difflib.SequenceMatcher(a=prev, b=f, autojunk=False)
+        new_owner: list = [None] * len(f)
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag == "equal":
+                for d in range(i2 - i1):
+                    new_owner[j1 + d] = owner[i1 + d]
+            else:
+                how = "merged" if tag == "replace" else "prefix"
+                for j in range(j1, j2):
+                    new_owner[j] = (s, how)
+        owner, prev = new_owner, f
+    # final flat position -> .qppm line
+    lines_pre = [p for p, _ in _preorder(qppm.program.body)]
+    # a .qppm block header (`when c[..]:`, `for ...:`) belongs to the .prog block it came from,
+    # not to the first statement inside that block (the prefix that first showed it)
+    parent = {}
+    for s, _ in pre:
+        for c in s.children:
+            parent[id(c)] = s
+    out: dict = {}
+    for p, o in zip(lines_pre, owner):
+        if o is None:
+            continue
+        s, how = o
+        pt = p.text.strip()
+        h = parent.get(id(s))
+        if p.children and h is not None and pt.split()[0] == h.text.strip().split()[0]:
+            s, how = h, "prefix"
+        out[p.line] = Link(s, how)
+    return out
+
+
+def link(prog: layers.Stage, qppm: layers.Stage, qec: layers.Stage, templates: dict | None = None,
+         prog_path: Path | None = None, specialize: dict | None = None) -> Chain:
+    """The whole chain.  `.prog -> .qppm` uses FormalRV's per-gate templates; where its compiler
+    merged across gates (the templates do not fit), the program unit is linked by prefix
+    differencing instead (`prog_path` needed)."""
     if templates is None:
         templates = learn_templates()
     chain = Chain(prog, qppm, qec, None)
     chain.qec_to_qppm = link_qppm_qec(qppm, qec)
-    chain.qppm_to_prog = link_prog_qppm(prog, qppm, templates)
+    try:
+        chain.qppm_to_prog = link_prog_qppm(prog, qppm, templates)
+    except Unlinked:
+        if prog_path is None:
+            raise
+        out = {}
+        # the gadgets by their templates (FormalRV compiles a gadget on its own), the program
+        # by prefix differencing
+        for ug, up in _unit_pairs(prog, qppm):
+            if ug.kind == "gadget":
+                _match_prog(ug.body, up.body, out, templates, set(prog.gadgets()) | set(qppm.gadgets()),
+                            f"gadget {ug.name}")
+        out.update(link_prog_qppm_by_prefix(prog_path, prog, qppm, specialize))
+        chain.qppm_to_prog = out
     return chain

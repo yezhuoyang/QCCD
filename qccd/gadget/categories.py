@@ -87,7 +87,7 @@ CATEGORIES: dict[str, dict] = {
     "ppm": {
         "title": "Pauli Product Measurement", "place": "Observatory", "shape": "dome", "glyph": "PPM",
         "stroke": "#4d7c0f", "fill": "#ecfccb",
-        "job": "Up to three blocks come in; a resident probe ion measures the product of one "
+        "job": "Up to four blocks come in; a resident probe ion measures the product of one "
                "X̄ or Z̄ from each -- Z̄_A X̄_B Z̄_C, say -- without reading any of them alone: "
                "the operation a program written in Pauli-product measurements is made of.",
     },

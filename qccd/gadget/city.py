@@ -1010,7 +1010,7 @@ class City:
         elif kind == "ppm":
             # a product of one X̄ or Z̄ from each block, at a Pauli-product bench: each block
             # through its own door, in the order the instruction names them
-            tags = "abc"
+            tags = "abcd"
             blks = list(ins.blocks)
             B = self._choose("ppm", ins, ready=t0,
                              also=[((self.blocks[b].leaf, self.blocks[b].port), f"in_{tags[k]}")
@@ -1028,7 +1028,7 @@ class City:
             terms = [(b, 1 if p == "X" else 0, 1 if p == "Z" else 0)
                      for b, p in zip(blks, ins.paulis)]
             flip = self.flip_for(terms)
-            name = "".join(f"{p}̄_{'ABC'[k]}" for k, p in enumerate(ins.paulis)) + " measured"
+            name = "".join(f"{p}̄_{'ABCD'[k]}" for k, p in enumerate(ins.paulis)) + " measured"
             self.report(B, ins.op, row, ins.index, grp, blocks=blks, correct=terms,
                         outcome=(name, flip, ins.cvar))
         elif kind == "read":

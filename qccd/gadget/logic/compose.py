@@ -45,7 +45,10 @@ def _symbolic(alg) -> dict | None:
 
 
 def compositional_sign_off(alg, gir: dict, rules: dict, *, flat: dict | None = None,
-                           outcomes: list[str] | None = None) -> dict:
+                           outcomes: list[str] | None = None, semantics: dict | None = None) -> dict:
+    """`semantics`, when given, is a verdict the caller decided against the program's own
+    source (a program lowered from FormalRV is checked against its `.prog`: qccd/fullstack); it
+    replaces the semantics part, labelled as such."""
     used = {i.kind for i in alg.instructions}
     called = {c["gate"] for c in alg.calls}
     gadgets = [check_pi4(k) for k in ("s", "sx") if k in used]
@@ -58,7 +61,10 @@ def compositional_sign_off(alg, gir: dict, rules: dict, *, flat: dict | None = N
         gates.append({"gate": g, "contract": None, "passed": True,
                       "why": "names no contract (a gadget lowered from FormalRV): its calls are "
                              "expanded, and the program's semantics is decided on the expansion"})
-    if symbolic:
+    if semantics is not None:
+        sem_part = {**semantics, "passed": bool(semantics.get("passed")),
+                    "method": "decided against the program's source: " + str(semantics.get("method", ""))}
+    elif symbolic:
         sem_part = _symbolic(alg)
     else:
         sem = program_outcomes(alg, outcomes=outcomes)

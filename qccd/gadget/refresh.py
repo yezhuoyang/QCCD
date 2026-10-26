@@ -99,6 +99,11 @@ def schedule_with_refresh(alg: Algorithm, lib, leaves, *, budget_us: float = COH
                 while t < t_to - 1e-6:
                     u = next((i for i in order if start.get(i, float("inf")) >= t - 1e-6), None)
                     if u is None:
+                        # no later use: the block waits out the program (a register nothing reads
+                        # again) -- refresh it beside whatever the program runs next by then
+                        u = next((ins.index for ins in alg.instructions
+                                  if start.get(ins.index, float("inf")) >= t - 1e-6), None)
+                    if u is None:
                         break
                     adds.append((u, b, t))
                     t += limit

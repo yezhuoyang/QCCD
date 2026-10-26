@@ -8,7 +8,7 @@ one d = 3 surface-code logical qubit.
     se    q0 3                 syndrome rounds on a block (1 or 3)            -> a clinic
     cx    q0 q1                transversal CNOT, q0 controls                  -> a workshop
     zz    q0 q1 -> m           lattice surgery: measure Z̄Z̄ (xx: X̄X̄)         -> a bridge
-    ppm   Z q0 X q1 Z q2 -> m  any product of one X̄ or Z̄ from each of 1-3 blocks,
+    ppm   Z q0 X q1 Z q2 -> m  any product of one X̄ or Z̄ from each of 1-4 blocks,
                                  measured by a probe ion (non-destructive)     -> a Pauli-product bench
     prep  q0 Y                 a fresh block in |Ȳ⟩ (S|+⟩ injected; distance 1) -> an injection place
     read  q0 Z -> a            destructive readout in Z or X                  -> a post office
@@ -132,7 +132,7 @@ PRIMITIVES = ("prep", "inject", "s", "sx", "x", "y", "z", "se", "store", "cx", "
               "ppm", "decode", "read")
 
 #: the most blocks one Pauli-product measurement may name (the bench has three doors)
-PPM_MAX = 3
+PPM_MAX = 4
 
 
 class AlgorithmError(ValueError):

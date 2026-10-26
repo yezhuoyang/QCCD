@@ -41,7 +41,7 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
                     leaves: LeafLibrary | None = None, studio_dir=None, log=print,
                     floorplan=None, parallel: bool = True, refresh: bool = True,
                     inline: bool = False, focus: str | None = None,
-                    stack: dict | None = None) -> dict:
+                    stack: dict | None = None, semantics: dict | None = None) -> dict:
     """Schedule, check and sign off one algorithm on a floorplan (the town unless `floorplan`
     names a `.floor` file), and write its page.  With `studio_dir`, the studio page of every
     op the schedule uses is rendered there (shared by several builds) and linked from the
@@ -88,7 +88,7 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
         "circuit": {"qubits": 0, "ops": {}, "records": 0}}
     t_sign = time.time() - t0
     from .logic.compose import compositional_sign_off
-    compositional = compositional_sign_off(alg, gir, rules, flat=signoff)
+    compositional = compositional_sign_off(alg, gir, rules, flat=signoff, semantics=semantics)
     stats = {
         "ions": gir["n_ions"], "blocks": len(gir["blocks"]),
         "instructions": len(alg.instructions), "refused": len(gir["refused"]),

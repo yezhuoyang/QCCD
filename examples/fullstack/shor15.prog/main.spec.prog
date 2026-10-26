@@ -1,0 +1,6 @@
+spec shor15:
+  requires   6 < n  ∧  n ≤ dim
+  assumes    {{ |0⟩_q[0, 7) }}
+  ensures    {{ |0⟩_q[0, 7) }}
+  outcomes   Pr[ c[0,1) = 0 ] = 1
+  resource   { toffoli: 2, t: 0, clifford: 0, rot: 0, meas: 3, depth: 0, width: 0, ops: 0, qubits: 7 }

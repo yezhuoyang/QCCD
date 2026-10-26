@@ -3,10 +3,11 @@
 # and judged by the floorplan rules F1-F9 like any other.
 #
 #   compute  two Pauli-product benches (ppm_d3): every PPM of the program, any product of one
-#            X-bar or Z-bar from up to three blocks; a preparation place, a syndrome clinic and
+#            X-bar or Z-bar from up to four blocks; a preparation place, a syndrome clinic and
 #            two readouts
-#   factory  two pharmacies (inj_d3): the |Y> blocks a pi/4 rotation consumes
-#   memory   five memories: a block waiting between measurements rests corrected
+#   factory  two 15-to-1 factories (msf15), each beside a pharmacy (inj_d3): the T states a
+#            pi/8 rotation consumes, and the |Y> blocks a pi/4 rotation consumes
+#   memory   eight memories and a zone: a block waiting between measurements rests corrected
 #   supply   two depots
 #   control  the decoder and the classical memory, wired to every door that carries bits
 
@@ -15,26 +16,32 @@ code surface_d3
 
 region supply
 place depot1    depot9  at 0 11
-place depot2    depot9  at 51 63
+place depot2    depot9  at 94 63
 
 region compute
 place prep      prep_d3 at 14 10
 place clinic    se_d3   at 31 10
 place bench1    ppm_d3  at 48 10
-place post1     read_d3 at 75 10
-place bench2    ppm_d3  at 34 36
-place post2     read_d3 at 78 36
+place post1     read_d3 at 83 10
+place bench2    ppm_d3  at 49 36
+place post2     read_d3 at 101 36
 
 region memory
-place mem1      mem_d3  at 86 10
-place mem2      mem_d3  at 17 36
-place mem3      mem_d3  at 61 36
-place mem4      mem_d3  at 17 62
-place mem5      mem_d3  at 34 62
+place mem1      mem_d3  at 94 10
+place mem2      mem_d3  at 111 10
+place mem3      mem_d3  at 32 36
+place mem4      mem_d3  at 84 36
+place mem5      mem_d3  at 112 36
+place mem6      mem_d3  at 32 62
+place mem7      mem_d3  at 49 62
+place mem8      mem_d3  at 66 62
+place zone1     zone_d3 at 83 62
 
 region factory
 place pharmacy1 inj_d3  at 0 36
+place factory1  msf15   at 17 36
 place pharmacy2 inj_d3  at 0 62
+place factory2  msf15   at 17 62
 
 region control
 place decoder   dec_d3  at 2 98
@@ -50,44 +57,60 @@ junction j0_5 at 42 0
 junction j0_6 at 48 0
 junction j0_7 at 52 0
 junction j0_8 at 56 0
-junction j0_9 at 61 0
+junction j0_9 at 60 0
 junction j0_10 at 65 0
 junction j0_11 at 69 0
-junction j0_12 at 75 0
-junction j0_13 at 80 0
-junction j0_14 at 86 0
-junction j0_15 at 97 0
+junction j0_12 at 73 0
+junction j0_13 at 77 0
+junction j0_14 at 83 0
+junction j0_15 at 88 0
+junction j0_16 at 94 0
+junction j0_17 at 105 0
+junction j0_18 at 111 0
+junction j0_19 at 122 0
 junction w0 at -6 0
-junction e0 at 103 0
+junction e0 at 129 0
 junction j1_0 at 0 26
 junction j1_1 at 11 26
-junction j1_2 at 17 26
-junction j1_3 at 28 26
-junction j1_4 at 34 26
-junction j1_5 at 38 26
-junction j1_6 at 42 26
-junction j1_7 at 47 26
-junction j1_8 at 51 26
-junction j1_9 at 55 26
-junction j1_10 at 61 26
-junction j1_11 at 72 26
+junction j1_2 at 26 26
+junction j1_3 at 32 26
+junction j1_4 at 43 26
+junction j1_5 at 49 26
+junction j1_6 at 53 26
+junction j1_7 at 57 26
+junction j1_8 at 61 26
+junction j1_9 at 66 26
+junction j1_10 at 70 26
+junction j1_11 at 74 26
 junction j1_12 at 78 26
-junction j1_13 at 83 26
+junction j1_13 at 84 26
+junction j1_14 at 95 26
+junction j1_15 at 101 26
+junction j1_16 at 106 26
+junction j1_17 at 112 26
+junction j1_18 at 123 26
 junction w1 at -6 26
-junction e1 at 103 26
+junction e1 at 129 26
 junction j2_0 at 0 52
 junction j2_1 at 11 52
 junction j2_2 at 17 52
-junction j2_3 at 28 52
-junction j2_4 at 34 52
-junction j2_5 at 45 52
-junction j2_6 at 51 52
-junction j2_7 at 59 52
+junction j2_3 at 26 52
+junction j2_4 at 32 52
+junction j2_5 at 43 52
+junction j2_6 at 49 52
+junction j2_7 at 60 52
+junction j2_8 at 66 52
+junction j2_9 at 77 52
+junction j2_10 at 83 52
+junction j2_11 at 88 52
+junction j2_12 at 94 52
+junction j2_13 at 102 52
 junction w2 at -6 52
-junction e2 at 103 52
+junction e2 at 129 52
 junction j3_0 at 0 78
+junction j3_1 at 17 78
 junction w3 at -6 78
-junction e3 at 103 78
+junction e3 at 129 78
 
 # roads: conveyors between doors and junction arms
 road j0_0.s -- depot1.out as door_depot1_out
@@ -99,13 +122,17 @@ road j0_5.s -- clinic.out as door_clinic_out
 road j0_6.s -- bench1.in_a as door_bench1_in_a
 road j0_7.s -- bench1.in_b as door_bench1_in_b
 road j0_8.s -- bench1.in_c as door_bench1_in_c
-road j0_9.s -- bench1.out_c as door_bench1_out_c
-road j0_10.s -- bench1.out_b as door_bench1_out_b
-road j0_11.s -- bench1.out_a as door_bench1_out_a
-road j0_12.s -- post1.in as door_post1_in
-road j0_13.s -- post1.out as door_post1_out
-road j0_14.s -- mem1.in as door_mem1_in
-road j0_15.s -- mem1.out as door_mem1_out
+road j0_9.s -- bench1.in_d as door_bench1_in_d
+road j0_10.s -- bench1.out_d as door_bench1_out_d
+road j0_11.s -- bench1.out_c as door_bench1_out_c
+road j0_12.s -- bench1.out_b as door_bench1_out_b
+road j0_13.s -- bench1.out_a as door_bench1_out_a
+road j0_14.s -- post1.in as door_post1_in
+road j0_15.s -- post1.out as door_post1_out
+road j0_16.s -- mem1.in as door_mem1_in
+road j0_17.s -- mem1.out as door_mem1_out
+road j0_18.s -- mem2.in as door_mem2_in
+road j0_19.s -- mem2.out as door_mem2_out
 road w0.e -- j0_0.w as street0_w0_j0_0
 road j0_0.e -- j0_1.w as street0_j0_0_j0_1
 road j0_1.e -- j0_2.w as street0_j0_1_j0_2
@@ -122,21 +149,30 @@ road j0_11.e -- j0_12.w as street0_j0_11_j0_12
 road j0_12.e -- j0_13.w as street0_j0_12_j0_13
 road j0_13.e -- j0_14.w as street0_j0_13_j0_14
 road j0_14.e -- j0_15.w as street0_j0_14_j0_15
-road j0_15.e -- e0.w as street0_j0_15_e0
+road j0_15.e -- j0_16.w as street0_j0_15_j0_16
+road j0_16.e -- j0_17.w as street0_j0_16_j0_17
+road j0_17.e -- j0_18.w as street0_j0_17_j0_18
+road j0_18.e -- j0_19.w as street0_j0_18_j0_19
+road j0_19.e -- e0.w as street0_j0_19_e0
 road j1_0.s -- pharmacy1.in as door_pharmacy1_in
 road j1_1.s -- pharmacy1.out as door_pharmacy1_out
-road j1_2.s -- mem2.in as door_mem2_in
-road j1_3.s -- mem2.out as door_mem2_out
-road j1_4.s -- bench2.in_a as door_bench2_in_a
-road j1_5.s -- bench2.in_b as door_bench2_in_b
-road j1_6.s -- bench2.in_c as door_bench2_in_c
-road j1_7.s -- bench2.out_c as door_bench2_out_c
-road j1_8.s -- bench2.out_b as door_bench2_out_b
-road j1_9.s -- bench2.out_a as door_bench2_out_a
-road j1_10.s -- mem3.in as door_mem3_in
-road j1_11.s -- mem3.out as door_mem3_out
-road j1_12.s -- post2.in as door_post2_in
-road j1_13.s -- post2.out as door_post2_out
+road j1_2.s -- factory1.out as door_factory1_out
+road j1_3.s -- mem3.in as door_mem3_in
+road j1_4.s -- mem3.out as door_mem3_out
+road j1_5.s -- bench2.in_a as door_bench2_in_a
+road j1_6.s -- bench2.in_b as door_bench2_in_b
+road j1_7.s -- bench2.in_c as door_bench2_in_c
+road j1_8.s -- bench2.in_d as door_bench2_in_d
+road j1_9.s -- bench2.out_d as door_bench2_out_d
+road j1_10.s -- bench2.out_c as door_bench2_out_c
+road j1_11.s -- bench2.out_b as door_bench2_out_b
+road j1_12.s -- bench2.out_a as door_bench2_out_a
+road j1_13.s -- mem4.in as door_mem4_in
+road j1_14.s -- mem4.out as door_mem4_out
+road j1_15.s -- post2.in as door_post2_in
+road j1_16.s -- post2.out as door_post2_out
+road j1_17.s -- mem5.in as door_mem5_in
+road j1_18.s -- mem5.out as door_mem5_out
 road w1.e -- j1_0.w as street1_w1_j1_0
 road j1_0.e -- j1_1.w as street1_j1_0_j1_1
 road j1_1.e -- j1_2.w as street1_j1_1_j1_2
@@ -151,16 +187,27 @@ road j1_9.e -- j1_10.w as street1_j1_9_j1_10
 road j1_10.e -- j1_11.w as street1_j1_10_j1_11
 road j1_11.e -- j1_12.w as street1_j1_11_j1_12
 road j1_12.e -- j1_13.w as street1_j1_12_j1_13
-road j1_13.e -- e1.w as street1_j1_13_e1
+road j1_13.e -- j1_14.w as street1_j1_13_j1_14
+road j1_14.e -- j1_15.w as street1_j1_14_j1_15
+road j1_15.e -- j1_16.w as street1_j1_15_j1_16
+road j1_16.e -- j1_17.w as street1_j1_16_j1_17
+road j1_17.e -- j1_18.w as street1_j1_17_j1_18
+road j1_18.e -- e1.w as street1_j1_18_e1
 road j2_0.n -- pharmacy1.magic as door_pharmacy1_magic
 road j2_0.s -- pharmacy2.in as door_pharmacy2_in
 road j2_1.s -- pharmacy2.out as door_pharmacy2_out
-road j2_2.s -- mem4.in as door_mem4_in
-road j2_3.s -- mem4.out as door_mem4_out
-road j2_4.s -- mem5.in as door_mem5_in
-road j2_5.s -- mem5.out as door_mem5_out
-road j2_6.s -- depot2.out as door_depot2_out
-road j2_7.s -- depot2.in as door_depot2_in
+road j2_2.n -- factory1.in as door_factory1_in
+road j2_3.s -- factory2.out as door_factory2_out
+road j2_4.s -- mem6.in as door_mem6_in
+road j2_5.s -- mem6.out as door_mem6_out
+road j2_6.s -- mem7.in as door_mem7_in
+road j2_7.s -- mem7.out as door_mem7_out
+road j2_8.s -- mem8.in as door_mem8_in
+road j2_9.s -- mem8.out as door_mem8_out
+road j2_10.s -- zone1.in as door_zone1_in
+road j2_11.s -- zone1.out as door_zone1_out
+road j2_12.s -- depot2.out as door_depot2_out
+road j2_13.s -- depot2.in as door_depot2_in
 road w2.e -- j2_0.w as street2_w2_j2_0
 road j2_0.e -- j2_1.w as street2_j2_0_j2_1
 road j2_1.e -- j2_2.w as street2_j2_1_j2_2
@@ -169,10 +216,18 @@ road j2_3.e -- j2_4.w as street2_j2_3_j2_4
 road j2_4.e -- j2_5.w as street2_j2_4_j2_5
 road j2_5.e -- j2_6.w as street2_j2_5_j2_6
 road j2_6.e -- j2_7.w as street2_j2_6_j2_7
-road j2_7.e -- e2.w as street2_j2_7_e2
+road j2_7.e -- j2_8.w as street2_j2_7_j2_8
+road j2_8.e -- j2_9.w as street2_j2_8_j2_9
+road j2_9.e -- j2_10.w as street2_j2_9_j2_10
+road j2_10.e -- j2_11.w as street2_j2_10_j2_11
+road j2_11.e -- j2_12.w as street2_j2_11_j2_12
+road j2_12.e -- j2_13.w as street2_j2_12_j2_13
+road j2_13.e -- e2.w as street2_j2_13_e2
 road j3_0.n -- pharmacy2.magic as door_pharmacy2_magic
+road j3_1.n -- factory2.in as door_factory2_in
 road w3.e -- j3_0.w as street3_w3_j3_0
-road j3_0.e -- e3.w as street3_j3_0_e3
+road j3_0.e -- j3_1.w as street3_j3_0_j3_1
+road j3_1.e -- e3.w as street3_j3_1_e3
 road w0.s -- w1.n as west_0
 road e0.s -- e1.n as east_0
 road w1.s -- w2.n as west_1
@@ -183,25 +238,28 @@ road e2.s -- e3.n as east_2
 # wires: bits, never ions
 wire prep.syn -> decoder.syn latency 5 via 17.85 88, 2 88 as wire_prep_syn
 wire clinic.syn -> decoder.syn latency 5 via 34.85 88, 2 88 as wire_clinic_syn
-wire bench1.syn -> decoder.syn latency 5 via 55.35 88, 2 88 as wire_bench1_syn
-wire bench1.res -> archive.in latency 5 via 60.6 88, 24 88 as wire_bench1_res
-wire archive.ctl -> bench1.ctl latency 2 via 33 88, 65.85 88 as wire_bench1_ctl
-wire post1.syn -> decoder.syn latency 5 via 76.75 88, 2 88 as wire_post1_syn
-wire post1.res -> archive.in latency 5 via 78 88, 24 88 as wire_post1_res
-wire archive.ctl -> post1.ctl latency 2 via 33 88, 79.25 88 as wire_post1_ctl
-wire mem1.syn -> decoder.syn latency 5 via 89.85 88, 2 88 as wire_mem1_syn
+wire bench1.syn -> decoder.syn latency 5 via 58.15 88, 2 88 as wire_bench1_syn
+wire bench1.res -> archive.in latency 5 via 65.4 88, 24 88 as wire_bench1_res
+wire archive.ctl -> bench1.ctl latency 2 via 33 88, 72.65 88 as wire_bench1_ctl
+wire post1.syn -> decoder.syn latency 5 via 84.75 88, 2 88 as wire_post1_syn
+wire post1.res -> archive.in latency 5 via 86 88, 24 88 as wire_post1_res
+wire archive.ctl -> post1.ctl latency 2 via 33 88, 87.25 88 as wire_post1_ctl
+wire mem1.syn -> decoder.syn latency 5 via 97.85 88, 2 88 as wire_mem1_syn
+wire mem2.syn -> decoder.syn latency 5 via 114.85 88, 2 88 as wire_mem2_syn
 wire pharmacy1.syn -> decoder.syn latency 5 via 3.85 88, 2 88 as wire_pharmacy1_syn
 wire archive.ctl -> pharmacy1.ctl latency 2 via 33 88, 9.35 88 as wire_pharmacy1_ctl
-wire mem2.syn -> decoder.syn latency 5 via 20.85 88, 2 88 as wire_mem2_syn
-wire bench2.syn -> decoder.syn latency 5 via 41.35 88, 2 88 as wire_bench2_syn
-wire bench2.res -> archive.in latency 5 via 46.6 88, 24 88 as wire_bench2_res
-wire archive.ctl -> bench2.ctl latency 2 via 33 88, 51.85 88 as wire_bench2_ctl
-wire mem3.syn -> decoder.syn latency 5 via 64.85 88, 2 88 as wire_mem3_syn
-wire post2.syn -> decoder.syn latency 5 via 79.75 88, 2 88 as wire_post2_syn
-wire post2.res -> archive.in latency 5 via 81 88, 24 88 as wire_post2_res
-wire archive.ctl -> post2.ctl latency 2 via 33 88, 82.25 88 as wire_post2_ctl
+wire mem3.syn -> decoder.syn latency 5 via 35.85 88, 2 88 as wire_mem3_syn
+wire bench2.syn -> decoder.syn latency 5 via 59.15 88, 2 88 as wire_bench2_syn
+wire bench2.res -> archive.in latency 5 via 66.4 88, 24 88 as wire_bench2_res
+wire archive.ctl -> bench2.ctl latency 2 via 33 88, 73.65 88 as wire_bench2_ctl
+wire mem4.syn -> decoder.syn latency 5 via 87.85 88, 2 88 as wire_mem4_syn
+wire post2.syn -> decoder.syn latency 5 via 102.75 88, 2 88 as wire_post2_syn
+wire post2.res -> archive.in latency 5 via 104 88, 24 88 as wire_post2_res
+wire archive.ctl -> post2.ctl latency 2 via 33 88, 105.25 88 as wire_post2_ctl
+wire mem5.syn -> decoder.syn latency 5 via 115.85 88, 2 88 as wire_mem5_syn
 wire pharmacy2.syn -> decoder.syn latency 5 via 3.85 88, 2 88 as wire_pharmacy2_syn
 wire archive.ctl -> pharmacy2.ctl latency 2 via 33 88, 9.35 88 as wire_pharmacy2_ctl
-wire mem4.syn -> decoder.syn latency 5 via 20.85 88, 2 88 as wire_mem4_syn
-wire mem5.syn -> decoder.syn latency 5 via 37.85 88, 2 88 as wire_mem5_syn
+wire mem6.syn -> decoder.syn latency 5 via 35.85 88, 2 88 as wire_mem6_syn
+wire mem7.syn -> decoder.syn latency 5 via 52.85 88, 2 88 as wire_mem7_syn
+wire mem8.syn -> decoder.syn latency 5 via 69.85 88, 2 88 as wire_mem8_syn
 wire decoder.frame -> archive.frame latency 1 as wire_decoder_frame

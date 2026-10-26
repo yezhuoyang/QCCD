@@ -1565,12 +1565,28 @@
       h += row(parts.gates.passed, (parts.gates.rows.some((g) => g.contract === null)
         ? "every gate called is its contract in every branch, or is expanded: "
         : "every gate called is its contract in every branch: ") +
-        parts.gates.rows.map((g) => (g.contract === null
-          ? `${escapeHtml(g.gate)}: expanded, no contract (${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`
-          : `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} ` +
-          `(${(g.branches || []).length} branch${(g.branches || []).length === 1 ? "" : "es"}, ${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`)).join("; "));
+        (() => {
+          const named = parts.gates.rows.filter((g) => g.contract !== null);
+          const open = parts.gates.rows.filter((g) => g.contract === null);
+          const txt = named.map((g) => `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} ` +
+            `(${(g.branches || []).length} branch${(g.branches || []).length === 1 ? "" : "es"}, ${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`);
+          if (open.length > 3) {
+            const calls = open.reduce((n, g) => n + (parts.gates.calls[g.gate] || 0), 0);
+            txt.push(`${open.length} gates expanded, without contracts (${calls} calls: ${open.slice(0, 3).map((g) => escapeHtml(g.gate)).join(", ")} …)`);
+          } else {
+            for (const g of open) txt.push(`${escapeHtml(g.gate)}: expanded, no contract (${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`);
+          }
+          return txt.join("; ");
+        })());
     if (parts.composition) h += row(parts.composition.passed, `the floorplan and the schedule obey every machine rule (${(parts.composition.held || []).length} hold)`);
-    if (parts.semantics && parts.semantics.method && parts.semantics.method.startsWith("symbolic")) {
+    if (parts.semantics && parts.semantics.kind === "distribution") {
+      // decided against the program's own source: the FormalRV .prog, simulated as written
+      const s = parts.semantics;
+      const dist = Object.entries(s.gadget || {}).map(([k, v]) => `${escapeHtml(k)}: ${(+v).toFixed(3)}`).join(", ");
+      h += row(s.passed, s.passed
+        ? `its results have exactly the FormalRV .prog's distribution (${dist}), every branch: at most ${s.peak_branches} live at once`
+        : `its results differ from the .prog's (by ${(+s.worst_difference).toExponential(2)})`);
+    } else if (parts.semantics && parts.semantics.method && parts.semantics.method.startsWith("symbolic")) {
       // every outcome as an affine expression of the random ones: all branches at once
       const s = parts.semantics;
       const det = (s.deterministic || []).map((k) => `${escapeHtml(k)} = ${escapeHtml(s.outcomes[k])}`);

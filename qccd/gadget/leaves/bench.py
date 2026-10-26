@@ -1,4 +1,4 @@
-"""The Pauli-product bench: measure any product of logical X̄ and Z̄ over up to three blocks.
+"""The Pauli-product bench: measure any product of logical X̄ and Z̄ over up to four blocks.
 
 A fault-tolerant program written in Pauli-product measurements (Litinski's model, and
 FormalRV's `.qppm`) measures operators like Z̄_A X̄_B Z̄_C -- several blocks, mixed bases --
@@ -17,7 +17,7 @@ that commutes with P̄ flows through untouched, every anticommuting one does so 
 one fixed anticommuting reference, and P̄ is measured -- `18 K` independent flows on `9 K`
 data ions -- plus the logical flows composition reads.
 
-Doors: blocks enter on the top-left doors (`in_a`, `in_b`, `in_c`) and leave on the top-right
+Doors: blocks enter on the top-left doors (`in_a` … `in_d`) and leave on the top-right
 ones (`out_a` …), FIFO like every bay; ops are `ppm.<letters>`, one letter per block in door
 order (`ppm.ZXZ`: Z̄ on the block at `in_a`, X̄ at `in_b`, Z̄ at `in_c`).
 """
@@ -38,9 +38,11 @@ __all__ = ["bench", "PATTERNS", "EXTRA_PLACES"]
 D = 3
 ROUNDS = 3
 KEEP = ("rotate_cw", "rotate_ccw", "dock", "undock", "port_in", "port_out")
-PATTERNS = tuple("".join(p) for k in (1, 2, 3) for p in product("XZ", repeat=k))
-TAGS = ("a", "b", "c")
-PREFIX = ("d", "e", "f")
+#: the most blocks one product names: a Toffoli's pi/8 rotation of Z Z Z measured against a T block is four
+MAX_BLOCKS = 4
+PATTERNS = tuple("".join(p) for k in range(1, MAX_BLOCKS + 1) for p in product("XZ", repeat=k))
+TAGS = ("a", "b", "c", "d")
+PREFIX = ("d", "e", "f", "g")
 
 
 class DoorBay(Bay):
@@ -121,15 +123,16 @@ def bench(*, name: str = "ppm_d3", rounds: int = ROUNDS) -> LeafBuild:
     p = patch(D, D, name=f"surface_d{D}")
     code = p.code
     # doors four slots apart, so the junctions they hang from are spaced like a town street's
-    W = 22
-    doors = {"in_a": 0, "in_b": 4, "in_c": 8, "out_a": W - 1, "out_b": W - 5, "out_c": W - 9}
+    W = 30
+    doors = {**{f"in_{t}": 4 * k for k, t in enumerate(TAGS)},
+             **{f"out_{t}": W - 1 - 4 * k for k, t in enumerate(TAGS)}}
     dock = W + W // 2                              # the probe's dock, bottom row middle
     b = door_bay(name, W, [dock], doors, {k: 9 for k in doors})
     probe = "p0"
     home = {probe: f"A{dock}"}
-    blocks = [[f"{PREFIX[k]}{q}" for q in range(p.n)] for k in range(3)]
-    # each block on nine consecutive slots, the three blocks spread round the ring
-    homes = [[(W + 9 * k + q) % (2 * W) for q in range(p.n)] for k in range(3)]
+    blocks = [[f"{PREFIX[k]}{q}" for q in range(p.n)] for k in range(MAX_BLOCKS)]
+    # each block on nine consecutive slots, the blocks spread round the ring
+    homes = [[(W + 9 * k + q) % (2 * W) for q in range(p.n)] for k in range(MAX_BLOCKS)]
     build = LeafBuild(master=None, machine=b.machine, home=dict(home),
                       roles={probe: "ancilla", **{i: "data" for blk in blocks for i in blk}})
     for pat in PATTERNS:
@@ -166,7 +169,7 @@ def bench(*, name: str = "ppm_d3", rounds: int = ROUNDS) -> LeafBuild:
         from .places import _cooled
         build.programs[key] = _cooled(bp.prog, b.machine)
         build.expect_end[key] = {**home, **{i: f"X_out_{TAGS[k]}" for k in range(K) for i in mine[k]}}
-        names = "".join(f"{pat[k]}̄_{'ABC'[k]}" for k in range(K))
+        names = "".join(f"{pat[k]}̄_{'ABCD'[k]}" for k in range(K))
         build.titles[key] = f"measure {names} with a probe ion, {rounds} rounds"
         build.params[key] = {"rounds": rounds, "pattern": pat, "blocks": K, "contacts": len(contacts0)}
         build.notes[key] = [
@@ -195,30 +198,30 @@ def bench(*, name: str = "ppm_d3", rounds: int = ROUNDS) -> LeafBuild:
         flows.append(Flow(f"{names} measured", dict(P), {}, "measure", role="logical"))
         for k in range(K):
             L = _paulis(code, mine[k], pat[k])
-            flows.append(Flow(f"{pat[k]}̄_{'ABC'[k]} kept", L, dict(L), "exact", role="logical"))
+            flows.append(Flow(f"{pat[k]}̄_{'ABCD'[k]} kept", L, dict(L), "exact", role="logical"))
         others = [_paulis(code, mine[k], "Z" if pat[k] == "X" else "X") for k in range(K)]
         for k in range(K - 1):
             O = _mul(others[k], others[k + 1])
-            flows.append(Flow(f"{'Z' if pat[k] == 'X' else 'X'}̄_{'ABC'[k]}"
-                              f"{'Z' if pat[k + 1] == 'X' else 'X'}̄_{'ABC'[k + 1]} kept",
+            flows.append(Flow(f"{'Z' if pat[k] == 'X' else 'X'}̄_{'ABCD'[k]}"
+                              f"{'Z' if pat[k + 1] == 'X' else 'X'}̄_{'ABCD'[k + 1]} kept",
                               O, dict(O), "exact", role="logical"))
         build.specs[key] = Spec(f"measure {names}", data, data, flows)
     tidy(b.machine, build.programs.values(), keep_classes=KEEP)
     build.extra = {"homes": homes, "dock": dock, "doors": doors}
     ports = []
     for k, tag in enumerate(TAGS):
-        ports.append(Port(f"in_{tag}", "in", "data", 9, "W", 0.2 + 0.3 * k, node=b.trap(f"in_{tag}"),
+        ports.append(Port(f"in_{tag}", "in", "data", 9, "W", 0.15 + 0.23 * k, node=b.trap(f"in_{tag}"),
                           stub=b.stub(f"in_{tag}"), code=code.name))
     for k, tag in enumerate(TAGS):
-        ports.append(Port(f"out_{tag}", "out", "data", 9, "E", 0.2 + 0.3 * k, node=b.trap(f"out_{tag}"),
+        ports.append(Port(f"out_{tag}", "out", "data", 9, "E", 0.15 + 0.23 * k, node=b.trap(f"out_{tag}"),
                           stub=b.stub(f"out_{tag}"), code=code.name))
     from .places import _classical_ports
     ports += _classical_ports(syndrome=rounds, outcome=1, decision=True)
     build.master = Master(
         name=name, kind="leaf", family="ppm", title="Pauli-product bench (d=3)",
-        doc="one probe ion in a dock on a 44-slot ring; up to three blocks enter on the left, "
+        doc="one probe ion in a dock on a 60-slot ring; up to four blocks enter on the left, "
             "the probe measures the product of one logical X̄ or Z̄ from each, and they leave right",
-        size=b.size(), ports=ports, inventory={"ancilla": 1}, capacity=1 + 27,
+        size=b.size(), ports=ports, inventory={"ancilla": 1}, capacity=1 + 9 * MAX_BLOCKS,
         params={"code": code.summary(), "ring_slots": b.N, "rounds": rounds,
                 "patterns": list(PATTERNS)},
         device=name)

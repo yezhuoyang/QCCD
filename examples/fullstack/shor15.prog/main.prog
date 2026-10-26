@@ -1,0 +1,30 @@
+program shor15[q: n, c: 3]:
+  X(3)
+  H(4)
+  H(4)
+  measure 4 ↦ c[0]
+  H(5)
+  CX(5, 0)
+  CX(5, 2)
+  when c[0]:
+    Rz(5, 1)
+  H(5)
+  measure 5 ↦ c[1]
+  H(6)
+  CX(3, 0)
+  CCX(6, 0, 3)
+  CX(3, 0)
+  CX(2, 1)
+  CCX(6, 1, 2)
+  CX(2, 1)
+  CX(6, 0)
+  CX(6, 1)
+  CX(6, 2)
+  CX(6, 3)
+  when c[1]:
+    Rz(6, 1)
+  when c[0]:
+    Rz(6, 2)
+  H(6)
+  measure 6 ↦ c[2]
+
