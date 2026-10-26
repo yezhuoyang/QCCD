@@ -128,7 +128,15 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-24 06:36 UTC, from commit `d41a6e5` (pushed, also on `website/invitations`):
+**Deployed** 2026-10-26, from commit `20a23a0` (pushed, also on `website/invitations`): R4d's hold
+clause (a switchless channel cannot hold a loaded site) and the waveform census in `hardware_report`.
+Derived from `d41a6e5` (`qccd/`, `arch/` and `Compiler/bridge` from `20a23a0`; the 603 files equal
+the git archive); 55 layers identical; rollback `*.bak-d41a6e5`; the page template is unchanged, so
+no redraw. Before switching, the grader's device and rules stages were run over every stored bundle
+with both images (one-off containers, volumes read-only): byte-identical on all 71, so no entry's
+verdict depends on the change. Rehearsal and production smoke passed (GHZ, private).
+
+**Before that** 2026-10-24 06:36 UTC, from commit `d41a6e5` (pushed, also on `website/invitations`):
 hardware labels on an entry's page (every site, junction and ion named on the canvas, on by default,
 the Labels button), `thin-provenance`, and arch files without a checkout path. Derived from
 `751d443` (`qccd/`, `arch/` and `Compiler/bridge` from `d41a6e5`; `Compiler/ocaml` is unchanged, so
