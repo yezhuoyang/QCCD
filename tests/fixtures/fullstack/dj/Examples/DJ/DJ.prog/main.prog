@@ -1,0 +1,13 @@
+program dj[q: n + 1, c: n]:
+  for 0 ≤ i < n:
+    H(i)
+  X(n)
+  H(n)
+  djOracle(n, a) @ id()
+  for 0 ≤ i < n:
+    H(i)
+  for 0 ≤ i < n:
+    measure i ↦ c[i]
+    when c[i]:
+      X(i)
+

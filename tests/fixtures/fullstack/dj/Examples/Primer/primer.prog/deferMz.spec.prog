@@ -1,0 +1,9 @@
+spec deferMz:
+  ∀ v < 2 .
+    requires   a ≠ w  ∧  a < dim  ∧  w < dim
+    assumes    {{ |v⟩_q[a] ⊗ |0⟩_q[w] }}
+    ensures    {{ |0⟩_q[a] ⊗ |v⟩_q[w] }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 2, rot: 0, meas: 0,
+                 depth: 2, width: 1, ops: 2 }
+

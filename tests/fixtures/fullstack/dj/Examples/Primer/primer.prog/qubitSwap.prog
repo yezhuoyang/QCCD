@@ -1,0 +1,5 @@
+gadget qubitSwap[q: max(a, b) + 1](a, b):
+  CX(a, b)
+  CX(b, a)
+  CX(a, b)
+

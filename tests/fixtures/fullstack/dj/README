@@ -1,0 +1,4 @@
+FormalRV (df3a1427) inputs and outputs for the Deutsch-Jozsa full-stack tests:
+Examples/DJ/DJ.prog and Examples/Primer/primer.prog are FormalRV's own sources (the .prog uses the Primer);
+dj.qppm and dj.qec are what FormalRV's prepare_qppm and prepare_qec wrote at n=1, a=1 (surface d=3);
+templates.json is the per-gate .qppm statement count learned from FormalRV at that commit.

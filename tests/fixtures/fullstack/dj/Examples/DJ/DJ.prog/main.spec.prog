@@ -1,0 +1,8 @@
+spec dj:
+  requires   0 < n  ∧  n + 1 + n ≤ dim  ∧  12*n + 8 ≤ dim  ∧  a < 2^n
+  assumes    {{ |0⟩_q[0, n+1) }}
+  ensures    {{ |0⟩_q[0,n) ⊗ |−⟩_q[n] }}
+  outcomes   Pr[ c[0,n) = a ] = 1
+  resource   { toffoli: 0, t: 0, clifford: 3*n + 2 + popCountBelow(n, a), rot: 0, meas: n,
+               depth: djDepth(n, a), width: n + 1, ops: 4*n + 2 + popCountBelow(n, a),
+               qubits: n + 1 }

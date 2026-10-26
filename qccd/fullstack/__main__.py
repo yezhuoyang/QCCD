@@ -50,8 +50,12 @@ def main(argv=None) -> int:
         print(json.dumps({k: t[k] for k in ("qec_statements", "linked", "absorbed", "abstract", "concrete",
                                             "checks", "total_s")}, indent=1))
         c = t["contract"]
-        print("contract:", f"exactly {c['contract']} in all {c['branches']} branches" if c.get("passed")
-              else c.get("why", "FAILED"))
+        if c.get("passed") and c.get("kind") == "outcome":
+            print("semantics:", f"{c['spec']} in every branch ({c['random_outcomes']} random outcomes, symbolic)")
+        elif c.get("passed"):
+            print("semantics:", f"exactly {c['contract']} in all {c['branches']} branches")
+        else:
+            print("semantics:", c.get("why") or "FAILED: " + str(c.get("bits") or ""))
         print("page:", t["page"])
         return 0
     if not (a.machine and a.sysspec and a.arch):

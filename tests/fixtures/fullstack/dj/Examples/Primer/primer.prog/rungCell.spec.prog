@@ -1,0 +1,13 @@
+spec rungCell:
+  ∀ u < 2 . ∀ v < 2 .
+    requires   base + 1 + k < dim
+    assumes    {{ |u⟩_q[base+1+k] ⊗ |v⟩_q[base] }}
+    ensures    {{ ω(-(u * v), 2^(k+2)) * ( |u⟩_q[base+1+k] ⊗ |v⟩_q[base] ) }}
+    outcomes   none
+    resource   { toffoli: 0,
+                 t: (if k = 0 then 2 else 0),
+                 clifford: 2,
+                 rot: (if k = 0 then 0 else 2),
+                 meas: 0,
+                 depth: 4, width: 2, ops: 5 }
+

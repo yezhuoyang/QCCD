@@ -92,8 +92,32 @@ def locate(members: list, line: int) -> tuple[str, int]:
 _HEAD = re.compile(r"(program|gadget|spec)\b\s*([^\s\[(:]*)")
 
 
+def _with_uses(path: Path, lines: list, members: list, seen: set) -> tuple[list, list]:
+    """A `.prog` may `use` another stage (`use ../Primer/primer.prog`): its lines are appended,
+    each member named by its path relative to this stage, so every link still names a real
+    file and line."""
+    for raw in list(lines):
+        m = re.match(r"\s*use\s+(\S+)\s*$", raw)
+        if not m:
+            continue
+        other = (path.parent / m[1]).resolve()
+        if other in seen or not other.exists():
+            continue
+        seen.add(other)
+        olines, omem = read_stage_text(other)
+        olines, omem = _with_uses(other, olines, omem, seen)
+        base = len(lines)
+        rel = m[1].rstrip("/")
+        for name, first, n in omem:
+            members.append((f"{rel}/{name}" if name else rel, base + first, n))
+        lines = lines + olines
+    return lines, members
+
+
 def read(path: str | Path, layer: str) -> Stage:
     lines, members = read_stage_text(path)
+    if layer == "prog":
+        lines, members = _with_uses(Path(path), lines, members, {Path(path).resolve()})
     rows = []
     for i, raw in enumerate(lines, 1):
         s = raw.split("#", 1)[0].rstrip() if layer != "prog" else raw.rstrip()

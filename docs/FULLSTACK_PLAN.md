@@ -87,6 +87,48 @@ panel.
 **Where it lives.** The bench sits outside `places.py`, so no cached place is re-keyed. The full-stack
 tests are `tests/test_fullstack.py`: 14 tests, 13 of them without FormalRV.
 
+### Slice S3 (2026-10-26): gadgets, loops, branches and calls (Deutsch–Jozsa)
+
+`python -m qccd.fullstack run <FormalRV>/FormalRV/Examples/DJ/DJ.prog -o DIR --specialize n=1 --specialize a=1`
+takes 4 s. The result: 94 instructions, 942 ms on the town, 0 refused, and all checks hold. The spec
+**`Pr[c[0,1) = a] = 1` is proved in every branch at once** (24 random outcomes, symbolically).
+
+**The lowering** (`qec2alg.py`) is now an interpreter over the whole `.qec`.
+- It evaluates indices in the listing language's natural arithmetic and unrolls loops.
+- Each FormalRV gadget call becomes an **`.alg` gate**, one definition per distinct body, so the oracle
+  is `gate djoracle p0 p1:` called by name. The page's hierarchy and call frames show it.
+- A `when` body becomes guarded Paulis, or a gate called under the guard.
+- `magic |T>` becomes `inject` plus `x`.
+- A single-factor measurement of a block that is never used again becomes a destructive `read`.
+- All 259 reachable `.qec` lines are linked.
+
+**The links** (`structure.py`) are made per unit, statement by statement, in order. Each one is checked
+by what both sides must share:
+- Pauli letters and block families (`shape`);
+- the magic state (`order`);
+- the gadget name (`name`);
+- FormalRV's compile-time `if`, which it writes as a 0/1-trip `for rv_g…` loop (`branch`);
+- for `.prog` gates, `template`: the statement count FormalRV's own `prepare_qppm` writes for that gate
+  alone, learned once per commit (X 1, Z 1, H 15, CX 17, CZ 17, CCX 74).
+
+The `.prog` reader follows `use` includes. Only the units the program reaches are linked, since a
+library may hold gates the program never calls. DJ links completely: `.qec`→`.qppm` 259 of 260 (the
+one left is a `skip`), and `.qppm`→`.prog` 96 of 96.
+
+**Semantics without enumeration** (`qccd/gadget/logic/symbolic.py`).
+- **What it is.** A stabilizer simulation, one qubit per block. Every sign and outcome is an affine
+  GF(2) expression of the random outcomes, so all branches are decided in one polynomial run, where
+  branch enumeration would need 2²⁵ state vectors.
+- **Mutation controls behave as the physics says.** A correction that matters, removed, turns the
+  outcome into `1 ⊕ o1`. A Z on q0 while it is still |0⟩, removed, changes nothing, correctly.
+- **The compositional sign-off** uses it *only* when a called gate names no contract; every existing
+  program is checked exactly as before. The gadget suite passes, 200 of 200.
+
+**On the page,** an instruction expanded from a gate links through its own body line (`Instr.src_line`),
+and the Gadget row names the call it is inside. Inside the oracle the stack reads
+`CX(i, n) ../Primer/primer.prog/djOracle.prog:4` → `DJ.qppm:484` → `DJ.qec:1282` →
+`ppm Z q0 Z djoracle1_l3` → its CZ → its TSIR.
+
 ### Differences from the plan as written
 
 - **The reader is QCCD's own.** It is not FormalRV's parser: the VM's parser is not a library, and the Python oracle lags the staged compiler (it refuses `spec maintenance`). It is held to FormalRV's VM instead, which must agree op by op on every listing.

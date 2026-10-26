@@ -1,0 +1,10 @@
+gadget gadgetPaper[q: max(d + n, a + 1), c: cb + 1](d, a, n, cb):
+  for 0 ≤ i < n:
+    CX(d+i, a)
+  H(a)
+  measure a ↦ c[cb]
+  when c[cb]:
+    for 0 ≤ i < n:
+      Rz(d+i, 0)
+    X(a)
+

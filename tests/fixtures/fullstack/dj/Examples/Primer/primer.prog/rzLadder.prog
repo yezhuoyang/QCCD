@@ -1,0 +1,4 @@
+gadget rzLadder[q: q0 + 1](n, q0, j):
+  for 0 ≤ i < n:
+    Rz(q0, j)
+

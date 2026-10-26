@@ -218,6 +218,10 @@ class Instr:
     refresh: bool = False
     #: `ppm`: the Pauli letter on each block, in the order of `blocks`
     paulis: list = field(default_factory=list)
+    #: for an instruction a gate call expanded: the line of the gate BODY it came from
+    #: (`line` stays the call site's), and the file that line is in ("" for the program)
+    src_line: int | None = None
+    src_origin: str = ""
 
     def runs(self, branch: dict[str, int]) -> bool:
         """Does this instruction run, given a value for every guard outcome?"""
@@ -258,6 +262,10 @@ class Instr:
             d["not_before"] = self.not_before
         if self.paulis:
             d["paulis"] = list(self.paulis)
+        if self.src_line is not None:
+            d["src"] = self.src_line
+            if self.src_origin:
+                d["src_origin"] = self.src_origin
         return d
 
 
@@ -624,7 +632,7 @@ class _Parser:
             text = f"{('if ' + combined.text + ': ') if combined else ''}{word} " + \
                    " ".join(nargs) + (f" -> {ren(bcvar)}" if bcvar else "")
             self.emit(word, nargs, ren(bcvar) if bcvar else None, bat or at, combined,
-                      g_text is not None, lineno, text, call + [frame])
+                      g_text is not None, lineno, text, call + [dict(frame, body=bl)])
         self.alg.calls.append({"gate": gate.name, "call": tag, "line": lineno, "args": list(args),
                                "contract": gate.contract, "depth": len(call),
                                "first": first, "last": len(self.alg.instructions) - 1,
@@ -652,6 +660,11 @@ class _Parser:
                 guard = None             # a guarded call: what cannot be gated runs either way
         ins = Instr(index=len(self.alg.instructions), line=lineno, text=raw, kind=word, blocks=[],
                     cvar=cvar, at=at, call=list(call))
+        if call and call[-1].get("body") is not None:
+            # the body line this instruction came from: the innermost call's
+            ins.src_line = call[-1]["body"]
+            g = self.alg.gates.get(call[-1]["gate"])
+            ins.src_origin = g.source if g else ""
         if guard is not None:
             ins.cond, ins.guard = guard, guard.text
             if cvar and written:

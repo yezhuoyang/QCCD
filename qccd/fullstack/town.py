@@ -30,21 +30,52 @@ def _stage(st: layers.Stage) -> dict:
     return {"file": Path(st.path).name, "members": [[m, f, n] for m, f, n in st.members], "lines": st.lines}
 
 
+def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict) -> dict:
+    """What the lowered gadget program computes, against the .prog: a single gate as its
+    contract (every branch, state vector), or an outcome spec `Pr[ c[0,K) = E ] = 1` exactly
+    (every branch at once, symbolically).  Anything else is said to be unchecked."""
+    import re
+    rep = contract_check(prog, low)
+    if rep.get("checked"):
+        return rep
+    spec = next((u for u in prog.units if u.kind == "spec" and prog.program and u.name == prog.program.name), None)
+    text = " ".join(s.text for s in spec.statements()) if spec else ""
+    m = re.search(r"Pr\[\s*c\[0,\s*([^)\]]+)\)\s*=\s*([^\]]+?)\s*\]\s*=\s*1", text)
+    if not m:
+        return {"checked": False, "why": rep.get("why", "") + "; and the spec states no deterministic outcome"}
+    from ..gadget.algorithm import parse_algorithm
+    from .semantics import NotClifford, check_outcome_spec
+    from .sysprog import evaluate
+    env = {k: int(v) for k, v in params.items()}
+    try:
+        width, value = evaluate(m[1], env), evaluate(m[2], env)
+    except Exception as exc:                             # noqa: BLE001 -- say why, do not guess
+        return {"checked": False, "why": f"the outcome spec names {exc}"}
+    data = [f"q{i}" for i in range(width)]
+    try:
+        out = check_outcome_spec(parse_algorithm(low.text), data, value, width)
+    except NotClifford as exc:
+        return {"checked": False, "why": f"not Clifford: {exc}"}
+    out["spec_text"] = m[0]
+    return out
+
+
 def contract_check(prog: layers.Stage, low: qec2alg.Lowered) -> dict:
     """Is the lowered gadget program exactly the .prog's gate, in every branch?"""
     import re
-    from ..gadget.algorithm import Gate
+    from ..gadget.algorithm import Gate, parse_algorithm
     from ..gadget.logic.contract import check_gate
     body = prog.program.body if prog.program else []
     if len(body) != 1:
-        return {"checked": False, "why": "the .prog is not a single gate: general programs are checked "
-                                         "by the compositional sign-off only (next: a reference circuit)"}
+        return {"checked": False, "why": "the .prog is not a single gate"}
     m = re.fullmatch(r"(\w+)\(([^)]*)\)", body[0].text.strip())
     if not m or m[1].upper() not in PROG_GATES:
         return {"checked": False, "why": f"no contract for `{body[0].text.strip()}`"}
     U = PROG_GATES[m[1].upper()]
     qubits = [f"q{int(a)}" for a in m[2].split(",")]
-    lines = [(i, t) for i, (t, _, role) in enumerate(low.lines, 1) if role != "input"]
+    alg = parse_algorithm(low.text)
+    inputs = {f"prep {q} Z" for q in qubits}
+    lines = [(i.line, i.text) for i in alg.instructions if i.text.strip() not in inputs]
     rep = check_gate(Gate("prog", qubits, lines, U, 0, ""), {})
     br = rep.get("branches") or []
     out = {"checked": True, "contract": U, "on": qubits, "passed": bool(rep.get("passed")),
@@ -114,17 +145,24 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
         abstract = {"vm_status": vm.get("status"), "runtime_ns": vm.get("runtime_upper_bound_ns"),
                     "peak_qubits": vm.get("peak_qubits_upper_bound")}
     st_prog, st_qppm, st_qec = layers.read(prog, "prog"), layers.read(qppm_p, "qppm"), layers.read(qec_p, "qec")
-    chain = step("link .qec -> .qppm -> .prog", lambda: provenance.link_upper(st_prog, st_qppm, st_qec))
+    from . import structure
+    templates = step("FormalRV's gate templates", lambda: structure.learn_templates())
+    chain = step("link .qec -> .qppm -> .prog", lambda: structure.link(st_prog, st_qppm, st_qec, templates))
     low = step("lower .qec -> .alg (QCCD)", lambda: qec2alg.lower(
         st_qec, title=title or f"{stem}: a FormalRV program on the gadget town", floorplan=floorplan))
     alg_p = out / f"{stem}.alg"
     alg_p.write_text(low.text, encoding="utf-8")
-    contract = step("the .alg is the .prog? (contract)", lambda: contract_check(st_prog, low))
+    contract = step("what the .alg computes, against the .prog", lambda: semantic_check(st_prog, low, specialize or {}))
     a_txt = (f"FormalRV's VM on its abstract machine: {abstract['runtime_ns'] / 1e6:.1f} ms, "
              f"{abstract['peak_qubits']} qubits. " if abstract and abstract.get("runtime_ns") else "")
-    c_txt = (f"The gadget program is exactly {contract['contract']} in all {contract['branches']} branches "
-             f"(and is not {contract['control']['contract']}). " if contract.get("passed") else
-             f"Contract: {contract.get('why', 'FAILED')}. ")
+    if contract.get("passed") and contract.get("kind") == "outcome":
+        c_txt = (f"The gadget program gives {contract['spec']} in every branch "
+                 f"({contract['random_outcomes']} random outcomes; {contract['method']}). ")
+    elif contract.get("passed"):
+        c_txt = (f"The gadget program is exactly {contract['contract']} in all {contract['branches']} branches "
+                 f"(and is not {contract['control']['contract']}). ")
+    else:
+        c_txt = f"Semantics: {contract.get('why', 'FAILED')}. "
     foot = (a_txt + c_txt + "A badge says how a link between two layers was made; hover it. "
             "Click a line to jump to the first instruction that carries it.")
     payload = stack_payload(st_prog, st_qppm, st_qec, chain, low, foot)
@@ -132,9 +170,14 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
     r = step("schedule, check and sign off on the town", lambda: build_algorithm(
         alg_p, out_dir=site, stack=payload, log=None))
     s = r["stats"]
+    reach = structure.reachable(st_qec)
+    qec_lines = [s.line for u in st_qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)
+                 for s in u.statements() if s.text.strip() != "skip"]
     result = {
         "program": stem, "formalrv": formalrv.provenance(),
-        "alg": low.text, "qec_statements": len(st_qec.program.body), "linked": len(low.linked),
+        "alg": low.text, "qec_statements": len(qec_lines),
+        "linked": sum(1 for q in qec_lines if q in low.linked),
+        "linked_up": sum(1 for q in qec_lines if q in chain.qec_to_qppm),
         "absorbed": len(low.absorbed), "contract": contract, "abstract": abstract,
         "concrete": {"makespan_ms": s["makespan_ms"], "ions": s["ions"], "events": s["events"],
                      "instructions": s["instructions"], "refused": s["refused"]},

@@ -1,0 +1,9 @@
+spec kickbackCX:
+  ∀ v < 2 .
+    requires   ctl < dim  ∧  tgt < dim  ∧  ctl ≠ tgt
+    assumes    {{ |v⟩_q[ctl] ⊗ |−⟩_q[tgt] }}
+    ensures    {{ (-1)^v * ( |v⟩_q[ctl] ⊗ |−⟩_q[tgt] ) }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 1, rot: 0, meas: 0,
+                 depth: 1, width: 1, ops: 1 }
+

@@ -1,0 +1,14 @@
+spec gadgetPaper:
+  ∀α .
+    requires   (∀ i < n . d + i ≠ a)
+               ∧  (∀ i < n . d + i < dim)
+               ∧  a < dim
+               ∧  cb + 1 ≤ dim
+               ∧  (∀ i < n . d + i < cb)
+               ∧  a < cb
+    assumes    {{ Σ x < 2^n . α(x) * ( |x⟩_q[d,d+n) ⊗ |0⟩_q[a] ) }}
+    ensures    {{ Σ x < 2^n . α(x) * ( |x⟩_q[d,d+n) ⊗ |0⟩_q[a] ) }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 2*n + 2, rot: 0, meas: 1,
+                 ops: 2*n + 3 }
+

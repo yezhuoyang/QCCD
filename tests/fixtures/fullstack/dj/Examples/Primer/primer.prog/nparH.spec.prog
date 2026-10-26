@@ -1,0 +1,8 @@
+spec nparH:
+  requires   0 < n  ∧  base + n ≤ dim  ∧  base + 13*n + 1 ≤ dim
+  assumes    {{ |0⟩_q[base,base+n) }}
+  ensures    {{ Σ x < 2^n . (1 / sqrt(2^n)) * |x⟩_q[base,base+n) }}
+  outcomes   none
+  resource   { toffoli: 0, t: 0, clifford: n, rot: 0, meas: 0,
+               depth: 1, width: n, ops: n, qubits: n }
+

@@ -1,0 +1,9 @@
+spec djOracle:
+  ∀ x < 2^n .
+    requires   n + 1 ≤ dim
+    assumes    {{ |x⟩_q[0,n) ⊗ |−⟩_q[n] }}
+    ensures    {{ (-1)^(djF(n, a, x)) * ( |x⟩_q[0,n) ⊗ |−⟩_q[n] ) }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: popCountBelow(n, a), rot: 0, meas: 0,
+                 depth: popCountBelow(n, a), ops: popCountBelow(n, a),
+                 qubits: (if popCountBelow(n, a) = 0 then 0 else popCountBelow(n, a) + 1) }

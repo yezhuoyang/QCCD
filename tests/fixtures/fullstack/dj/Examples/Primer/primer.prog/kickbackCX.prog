@@ -1,0 +1,3 @@
+gadget kickbackCX[q: max(ctl, tgt) + 1](ctl, tgt):
+  CX(ctl, tgt)
+

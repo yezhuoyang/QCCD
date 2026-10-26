@@ -1562,11 +1562,23 @@
       h += row(parts.gadgets.passed, "the π/4 gadgets are their rotations in every branch: " +
         parts.gadgets.rows.map((g) => `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} (${escapeHtml(g.correction || "")})`).join("; "));
     if (parts.gates && parts.gates.rows.length)
-      h += row(parts.gates.passed, "every gate called is its contract in every branch: " +
-        parts.gates.rows.map((g) => `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} ` +
-          `(${(g.branches || []).length} branch${(g.branches || []).length === 1 ? "" : "es"}, ${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`).join("; "));
+      h += row(parts.gates.passed, (parts.gates.rows.some((g) => g.contract === null)
+        ? "every gate called is its contract in every branch, or is expanded: "
+        : "every gate called is its contract in every branch: ") +
+        parts.gates.rows.map((g) => (g.contract === null
+          ? `${escapeHtml(g.gate)}: expanded, no contract (${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`
+          : `${escapeHtml(g.gate)} = ${escapeHtml(g.contract)} ` +
+          `(${(g.branches || []).length} branch${(g.branches || []).length === 1 ? "" : "es"}, ${parts.gates.calls[g.gate] || 0} call${parts.gates.calls[g.gate] === 1 ? "" : "s"})`)).join("; "));
     if (parts.composition) h += row(parts.composition.passed, `the floorplan and the schedule obey every machine rule (${(parts.composition.held || []).length} hold)`);
-    if (parts.semantics) {
+    if (parts.semantics && parts.semantics.method && parts.semantics.method.startsWith("symbolic")) {
+      // every outcome as an affine expression of the random ones: all branches at once
+      const s = parts.semantics;
+      const det = (s.deterministic || []).map((k) => `${escapeHtml(k)} = ${escapeHtml(s.outcomes[k])}`);
+      h += row(s.passed, s.passed
+        ? `the program, decided symbolically on its expansion (every branch at once): ${s.random} random outcome${s.random === 1 ? "" : "s"}` +
+          (det.length ? `; deterministic: ${det.join(", ")}` : "")
+        : `the program's semantics was not decided: ${escapeHtml(s.why || "")}`);
+    } else if (parts.semantics) {
       const d = parts.semantics.distribution || [];
       h += row(parts.semantics.passed, `the program, every call as its contract, gives: ` +
         d.map((x) => `${Object.entries(x.outcomes).map(([k, v]) => `${escapeHtml(k)}=${v}`).join(" ")} with probability ${(+x.p).toFixed(3)}`).join("; "));
@@ -1815,12 +1827,12 @@
     $("prog").parentNode.insertBefore(sect, $("prog"));
     // the first instruction carrying each line of each layer: click a line, land there
     for (const ins of M.gir.program.instructions) {
-      const c = stkChain(ins.line);
+      const c = stkChain(ins.src || ins.line);
       for (const [k] of STK_LAYERS) {
         const ln = c[k] && c[k][0];
         if (ln && stkFirst[k][ln] === undefined) stkFirst[k][ln] = ins.id;
       }
-      for (const ql of ((STK.qec_absorbed_into || {})[ins.line] || [])) {
+      for (const ql of ((STK.qec_absorbed_into || {})[ins.src || ins.line] || [])) {
         if (stkFirst.qec[ql] === undefined) stkFirst.qec[ql] = ins.id;
       }
     }
@@ -1888,7 +1900,7 @@
     const el = $("stkNow");
     if (id === null || id === undefined) { el.innerHTML = `<span class="muted">nothing has run yet</span>`; return; }
     const ins = M.gir.program.instructions[id];
-    const c = stkChain(ins.line);
+    const c = stkChain(ins.src || ins.line);
     const row = (k, v) => `<span class="stk-k">${k}</span><span class="stk-v">${v}</span>`;
     let h = "";
     const isInput = (STK.input_lines || []).includes(ins.line);
@@ -1901,10 +1913,12 @@
       if (v) {
         let extra = "";
         if (k === "qec") {
-          const ab = ((STK.qec_absorbed_into || {})[ins.line] || []).filter((x) => x !== v[0]);
+          const ab = ((STK.qec_absorbed_into || {})[ins.src || ins.line] || []).filter((x) => x !== v[0]);
           if (ab.length) extra = ` <span class="muted" title="${escapeHtml(ab.map((x) => stkText("qec", x)).join("\n"))}">+${ab.length} absorbed</span>`;
         }
-        h += row(title, `<code>${escapeHtml(stkText(k, v[0]))}</code> <span class="muted">${escapeHtml(stkWhere(k, v[0]))}</span> ${stkHow(v[1])}${extra}`);
+        const full = stkText(k, v[0]);
+        const shown = full.length > 140 ? full.slice(0, 137) + "…" : full;
+        h += row(title, `<code title="${escapeHtml(full)}">${escapeHtml(shown)}</code> <span class="muted">${escapeHtml(stkWhere(k, v[0]))}</span> ${stkHow(v[1])}${extra}`);
       } else {
         const why = ins.refresh ? "a syndrome round QCCD added to keep a resting block alive (no FormalRV line)" :
           (STK.input_lines || []).includes(ins.line) ? "an input block, prepared before the program (no FormalRV line)" : "not linked";
@@ -1912,7 +1926,9 @@
       }
     }
     const op = stkOpNow(id);
-    h += row("Gadget", `<code>${escapeHtml(ins.text)}</code>` + (op ? ` <span class="muted">@ ${escapeHtml(op.place)} · ${escapeHtml(op.e[4])}</span>` : ""));
+    const inGate = (ins.call || []).map((f) => `${f.gate} (line ${f.line})`).join(" › ");
+    h += row("Gadget", `<code>${escapeHtml(ins.text)}</code>` + (op ? ` <span class="muted">@ ${escapeHtml(op.place)} · ${escapeHtml(op.e[4])}</span>` : "") +
+      (inGate ? `<br><span class="muted">inside gate ${escapeHtml(inGate)}, body line ${ins.src}</span>` : ""));
     if (op && op.ins) {
       const anyGate = op.circuit || M.leafData[op.master].programs[op.e[4]].instructions.some((x) => ["gate", "measure", "reset"].includes(x.type));
       h += row("Clifford", op.circuit ? `${op.towards ? '<span class="muted">bringing ions to</span> ' : ""}<code>${escapeHtml(stkInsText(op.circuit))}</code>` :

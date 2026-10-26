@@ -1,0 +1,9 @@
+spec hLayerCollapsed:
+  ∀ v < 2 .
+    requires   0 < n  ∧  base < dim
+    assumes    {{ |v⟩_q[base] }}
+    ensures    {{ Σ b < 2 . hIter(n, v, b) * |b⟩_q[base] }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: n, rot: 0, meas: 0,
+                 depth: n, width: 1, ops: n, qubits: 1 }
+

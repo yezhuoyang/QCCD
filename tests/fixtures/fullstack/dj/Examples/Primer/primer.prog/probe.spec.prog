@@ -1,0 +1,9 @@
+spec probe:
+  ∀ u < 2 . ∀ v < 2 .
+    requires   1 < dim
+    assumes    {{ |u⟩_q[0] ⊗ |v⟩_q[1] }}
+    ensures    {{ |u⟩_q[0] ⊗ |u ⊕ v⟩_q[1] }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 1, rot: 0, meas: 0,
+                 depth: 1, width: 1, ops: 1, qubits: 2 }
+

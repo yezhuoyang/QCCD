@@ -1,0 +1,4 @@
+gadget nparH[q: base + n](n, base):
+  for 0 ≤ i < n:
+    H(base+i)
+

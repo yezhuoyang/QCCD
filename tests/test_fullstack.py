@@ -177,8 +177,8 @@ def test_the_lowered_program_is_exactly_the_progs_gate(stages, lowered):
     assert rep["worst_fidelity"] == pytest.approx(1.0) and rep["control"]["passed"] is False
     # drop one Pauli frame: no longer CX in every branch
     broken = copy.deepcopy(low)
-    k = next(i for i, (t, _, _) in enumerate(broken.lines) if t.startswith("if m0: z"))
-    del broken.lines[k]
+    assert "\nif m0: z q0\n" in broken.text
+    broken.text = broken.text.replace("\nif m0: z q0\n", "\n", 1)
     assert not contract_check(prog, broken)["passed"]
 
 
@@ -202,6 +202,72 @@ def test_a_formalrv_program_runs_on_the_gadget_town(stages, lowered, tmp_path):
     assert set(data["stack"]["layers"]) == {"prog", "qppm", "qec"}
     assert all(int(k) in low.qec_of for k in data["stack"]["alg"])
     assert "fullstack-line" in html                     # the stack's control is declared
+
+
+# ----------------------------------------------------------------------------- gadgets, loops, branches: DJ
+
+DJ = REPO / "tests" / "fixtures" / "fullstack" / "dj"
+
+
+@pytest.fixture(scope="module")
+def dj():
+    import json as _json
+    from qccd.fullstack import qec2alg, structure
+    prog = layers.read(DJ / "Examples" / "DJ" / "DJ.prog", "prog")
+    qppm, qec = layers.read(DJ / "dj.qppm", "qppm"), layers.read(DJ / "dj.qec", "qec")
+    templates = next(iter(_json.loads((DJ / "templates.json").read_text(encoding="utf-8")).values()))
+    chain = structure.link(prog, qppm, qec, templates)
+    return prog, qppm, qec, chain, qec2alg.lower(qec, title="DJ")
+
+
+def test_a_gadget_becomes_one_gate_and_every_line_is_linked(dj):
+    from qccd.fullstack import structure
+    from qccd.gadget.algorithm import parse_algorithm
+    prog, qppm, qec, chain, low = dj
+    assert list(low.gates) == ["djoracle"]                  # FormalRV's djOracle, one definition
+    alg = parse_algorithm(low.text)
+    assert [c["gate"] for c in alg.calls] == ["djoracle"]
+    assert all(i.src_line for i in alg.instructions if i.call)   # expanded lines keep their body line
+    reach = structure.reachable(qec)
+    qlines = [s.line for u in qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)
+              for s in u.statements() if s.text.strip() != "skip"]
+    assert all(q in low.linked for q in qlines)
+    assert all(q in chain.qec_to_qppm for q in qlines)
+    preach = structure.reachable(qppm)
+    plines = [s.line for u in qppm.units if u.kind == "program" or (u.kind == "gadget" and u.name in preach)
+              for s in u.statements()]
+    assert all(p in chain.qppm_to_prog for p in plines)
+    # through the call: a merge inside the oracle reaches CX(i, n) inside djOracle.prog
+    inner = [l for l, lk in chain.qppm_to_prog.items() if lk.stmt.text.strip() == "CX(i, n)"]
+    assert inner and prog.lines[chain.qppm_to_prog[inner[0]].stmt.line - 1].strip() == "CX(i, n)"
+
+
+def test_deutsch_jozsa_gives_a_in_every_branch(dj):
+    from qccd.fullstack import semantics
+    from qccd.gadget.algorithm import parse_algorithm
+    *_, low = dj
+    alg = parse_algorithm(low.text)
+    ok = semantics.check_outcome_spec(alg, ["q0", "q1"], 1, 1)
+    assert ok["passed"] and ok["random_outcomes"] >= 20 and ok["bits"][0]["expression"] == "1"
+    assert not semantics.check_outcome_spec(alg, ["q0", "q1"], 0, 1)["passed"]
+    # a correction that matters, removed: the outcome is no longer a constant
+    broken = parse_algorithm(low.text.replace("  if o1: z p0\n", "", 1))
+    assert not semantics.check_outcome_spec(broken, ["q0", "q1"], 1, 1)["passed"]
+
+
+def test_deutsch_jozsa_runs_on_the_gadget_town(dj, tmp_path):
+    from qccd.fullstack.town import stack_payload
+    from qccd.gadget.verified import build_algorithm
+    prog, qppm, qec, chain, low = dj
+    alg = tmp_path / "dj.alg"
+    alg.write_text(low.text, encoding="utf-8")
+    r = build_algorithm(alg, out_dir=tmp_path / "site", cache_dir=CACHE, log=None,
+                        stack=stack_payload(prog, qppm, qec, chain, low, foot="test"))
+    s, comp = r["stats"], r["compositional"]
+    assert s["refused"] == 0 and s["rules"]["failed"] == [] and comp["passed"]
+    sem = comp["parts"]["semantics"]
+    assert sem["method"].startswith("symbolic") and sem["outcomes"]["m24"] == "1"
+    assert any(g["gate"] == "djoracle" and g["contract"] is None for g in comp["parts"]["gates"]["rows"])
 
 
 # ----------------------------------------------------------------------------- end to end

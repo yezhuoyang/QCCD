@@ -1,0 +1,5 @@
+gadget mz[q: q0 + 1, c: cb + 1](q0, cb):
+  measure q0 ↦ c[cb]
+  when c[cb]:
+    X(q0)
+

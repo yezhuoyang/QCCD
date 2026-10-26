@@ -1,0 +1,9 @@
+spec mz:
+  requires   q0 < dim  ∧  0 < phaseDen  ∧  cb + 2 ≤ dim  ∧  q0 + 1 ≤ cb
+  assumes    {{ (cos(theta) * |0⟩_q[q0])
+                + ((ω(phaseNum, phaseDen) * sin(theta)) * |1⟩_q[q0]) }}
+  ensures    {{ |0⟩_q[q0] }}
+  outcomes   Pr[ c[cb] = 0 ] = (cos(theta))^2  ∧  Pr[ c[cb] = 1 ] = (sin(theta))^2
+  resource   { toffoli: 0, t: 0, clifford: 1, rot: 0, meas: 1,
+               depth: 2, width: 1, ops: 2, qubits: 1 }
+

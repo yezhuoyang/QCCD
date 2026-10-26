@@ -1,0 +1,9 @@
+spec qubitSwap:
+  ∀ u < 2 . ∀ v < 2 .
+    requires   a ≠ b  ∧  a < dim  ∧  b < dim
+    assumes    {{ |u⟩_q[a] ⊗ |v⟩_q[b] }}
+    ensures    {{ |v⟩_q[a] ⊗ |u⟩_q[b] }}
+    outcomes   none
+    resource   { toffoli: 0, t: 0, clifford: 3, rot: 0, meas: 0,
+                 depth: 3, width: 1, ops: 3 }
+

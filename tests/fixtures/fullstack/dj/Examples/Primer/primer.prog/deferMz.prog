@@ -1,0 +1,4 @@
+gadget deferMz[q: max(a, w) + 1](a, w):
+  CX(a, w)
+  CX(w, a)
+

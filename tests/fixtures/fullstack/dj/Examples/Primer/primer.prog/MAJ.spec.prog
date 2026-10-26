@@ -1,0 +1,10 @@
+spec MAJ:
+  ∀ u < 2 . ∀ v < 2 . ∀ w < 2 .
+    requires   a ≠ b  ∧  a ≠ cin  ∧  b ≠ cin
+               ∧  a < dim  ∧  b < dim  ∧  cin < dim
+    assumes    {{ |u⟩_q[a] ⊗ |v⟩_q[b] ⊗ |w⟩_q[cin] }}
+    ensures    {{ |u ⊕ w⟩_q[a] ⊗ |v ⊕ w⟩_q[b] ⊗ |maj3(u, v, w)⟩_q[cin] }}
+    outcomes   none
+    resource   { toffoli: 1, t: 7, clifford: 2, rot: 0, meas: 0,
+                 depth: 3, toffdepth: 1, width: 1, ops: 3 }
+

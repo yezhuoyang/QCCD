@@ -1,0 +1,4 @@
+gadget rungCell[q: base + 1 + k + 1](base, k):
+  ctrl base+1+k:
+    Rz(base, k+1)
+

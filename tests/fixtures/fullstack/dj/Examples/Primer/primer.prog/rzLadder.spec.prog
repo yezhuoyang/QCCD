@@ -1,0 +1,8 @@
+spec rzLadder:
+  requires   q0 < dim  ∧  3 ≤ j
+  assumes    {{ |0⟩_q[q0] + |1⟩_q[q0] }}
+  ensures    {{ |0⟩_q[q0] + (ω(-n, 2^(j+1)) * |1⟩_q[q0]) }}
+  outcomes   none
+  resource   { toffoli: 0, t: 0, clifford: 0, rot: n, meas: 0,
+               depth: n, width: 1, ops: n, qubits: 1 }
+

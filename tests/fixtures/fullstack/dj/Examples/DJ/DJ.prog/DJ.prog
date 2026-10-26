@@ -1,0 +1,8 @@
+use ../Primer/primer.prog
+
+params  n, a
+
+map id()(i) = i
+
+define djDepth(n, a)       = if popCountBelow(n, a) = 0 then 4 else popCountBelow(n, a) + 5
+

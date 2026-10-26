@@ -1,0 +1,5 @@
+gadget djOracle[q: n+1](n, a):
+  for 0 ≤ i < n:
+    if (a >> i) % 2 = 1:
+      CX(i, n)
+

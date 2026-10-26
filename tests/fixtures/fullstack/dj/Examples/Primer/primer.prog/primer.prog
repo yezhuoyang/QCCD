@@ -1,0 +1,14 @@
+amps    α
+
+code surface d=3
+
+params  theta, phaseNum, phaseDen
+
+define bit(e, k)           = (e >> k) % 2
+define delta(x, y)         = if x = y then 1 else 0
+define popCountBelow(n, a) = Σ i < n . bit(a, i)
+define maj3(u, v, w)       = w ⊕ ((u ⊕ w) * (v ⊕ w))
+define hIter(n, v, b)      = ((1 - (n % 2)) * delta(b, v)) + ((n % 2) * ((-1)^(v * b) / sqrt(2)))
+define djF(0, a, x)        = 0
+define djF(k+1, a, x)      = (bit(a, k) * bit(x, k)) ⊕ djF(k, a, x)
+

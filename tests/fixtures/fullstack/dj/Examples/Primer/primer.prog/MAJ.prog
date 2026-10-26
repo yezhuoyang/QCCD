@@ -1,0 +1,5 @@
+gadget MAJ[q: max(a, max(b, cin)) + 1](a, b, cin):
+  CX(cin, b)
+  CX(cin, a)
+  CCX(a, b, cin)
+

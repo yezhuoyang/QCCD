@@ -1,0 +1,678 @@
+params  theta, phaseNum, phaseDen, n, a
+amps    α
+
+define bit(e, k)           = (e >> k) % 2
+define delta(x, y)         = if x = y then 1 else 0
+define popCountBelow(n, a) = Σ i < n . bit(a, i)
+define maj3(u, v, w)       = w ⊕ ((u ⊕ w) * (v ⊕ w))
+define hIter(n, v, b)      = ((1 - (n % 2)) * delta(b, v)) + ((n % 2) * ((-1)^(v * b) / sqrt(2)))
+define djF(0, a, x)        = 0
+define djF(k+1, a, x)      = (bit(a, k) * bit(x, k)) ⊕ djF(k, a, x)
+define djDepth(n, a)       = if popCountBelow(n, a) = 0 then 4 else popCountBelow(n, a) + 5
+
+gadget probe():
+  prepare |Y+> -> anc[0+0]
+  measure Z q[0] X q[1] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[0] X q[1]
+  when m[1]:
+    frame Z q[0] X q[1]
+  prepare |Y+> -> anc[0+1]
+  measure Z q[0] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame Z q[0]
+  when m[3]:
+    frame Z q[0]
+  frame Z q[0]
+  prepare |Y+> -> anc[0+2]
+  measure X q[1] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[1]
+  when m[5]:
+    frame X q[1]
+  frame X q[1]
+
+gadget kickbackCX(ctl, tgt):
+  prepare |Y+> -> anc[0+0]
+  measure Z q[ctl] X q[tgt] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[ctl] X q[tgt]
+  when m[1]:
+    frame Z q[ctl] X q[tgt]
+  prepare |Y+> -> anc[0+1]
+  measure Z q[ctl] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame Z q[ctl]
+  when m[3]:
+    frame Z q[ctl]
+  frame Z q[ctl]
+  prepare |Y+> -> anc[0+2]
+  measure X q[tgt] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[tgt]
+  when m[5]:
+    frame X q[tgt]
+  frame X q[tgt]
+
+gadget qubitSwap(a, b):
+  prepare |Y+> -> anc[0+0]
+  measure Z q[a] X q[b] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[a] X q[b]
+  when m[1]:
+    frame Z q[a] X q[b]
+  prepare |Y+> -> anc[0+1]
+  measure Z q[a] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame Z q[a]
+  when m[3]:
+    frame Z q[a]
+  frame Z q[a]
+  prepare |Y+> -> anc[0+2]
+  measure X q[b] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[b]
+  when m[5]:
+    frame X q[b]
+  frame X q[b]
+  prepare |Y+> -> anc[0+3]
+  measure Z q[b] X q[a] Z anc[0+3] -> m[6]
+  measure X anc[0+3] -> m[7]
+  when m[6]:
+    frame Z q[b] X q[a]
+  when m[7]:
+    frame Z q[b] X q[a]
+  prepare |Y+> -> anc[0+4]
+  measure Z q[b] Z anc[0+4] -> m[8]
+  measure X anc[0+4] -> m[9]
+  when m[8]:
+    frame Z q[b]
+  when m[9]:
+    frame Z q[b]
+  frame Z q[b]
+  prepare |Y+> -> anc[0+5]
+  measure X q[a] Z anc[0+5] -> m[10]
+  measure X anc[0+5] -> m[11]
+  when m[10]:
+    frame X q[a]
+  when m[11]:
+    frame X q[a]
+  frame X q[a]
+  prepare |Y+> -> anc[0+6]
+  measure Z q[a] X q[b] Z anc[0+6] -> m[12]
+  measure X anc[0+6] -> m[13]
+  when m[12]:
+    frame Z q[a] X q[b]
+  when m[13]:
+    frame Z q[a] X q[b]
+  prepare |Y+> -> anc[0+7]
+  measure Z q[a] Z anc[0+7] -> m[14]
+  measure X anc[0+7] -> m[15]
+  when m[14]:
+    frame Z q[a]
+  when m[15]:
+    frame Z q[a]
+  frame Z q[a]
+  prepare |Y+> -> anc[0+8]
+  measure X q[b] Z anc[0+8] -> m[16]
+  measure X anc[0+8] -> m[17]
+  when m[16]:
+    frame X q[b]
+  when m[17]:
+    frame X q[b]
+  frame X q[b]
+
+gadget nparH(n, base):
+  for 0 <= i < n:
+    prepare |Y+> -> anc[0+0+i·3+0]
+    measure Z q[base+i] Z anc[0+0+i·3+0] -> m[i·6]
+    measure X anc[0+0+i·3+0] -> m[i·6+1]
+    when m[i·6]:
+      frame Z q[base+i]
+    when m[i·6+1]:
+      frame Z q[base+i]
+    prepare |Y+> -> anc[0+0+i·3+1]
+    measure X q[base+i] Z anc[0+0+i·3+1] -> m[i·6+2]
+    measure X anc[0+0+i·3+1] -> m[i·6+2+1]
+    when m[i·6+2]:
+      frame X q[base+i]
+    when m[i·6+2+1]:
+      frame X q[base+i]
+    prepare |Y+> -> anc[0+0+i·3+2]
+    measure Z q[base+i] Z anc[0+0+i·3+2] -> m[i·6+4]
+    measure X anc[0+0+i·3+2] -> m[i·6+4+1]
+    when m[i·6+4]:
+      frame Z q[base+i]
+    when m[i·6+4+1]:
+      frame Z q[base+i]
+
+gadget hLayerCollapsed(n, base):
+  for 0 <= i < n:
+    prepare |Y+> -> anc[0+0+i·3+0]
+    measure Z q[base] Z anc[0+0+i·3+0] -> m[i·6]
+    measure X anc[0+0+i·3+0] -> m[i·6+1]
+    when m[i·6]:
+      frame Z q[base]
+    when m[i·6+1]:
+      frame Z q[base]
+    prepare |Y+> -> anc[0+0+i·3+1]
+    measure X q[base] Z anc[0+0+i·3+1] -> m[i·6+2]
+    measure X anc[0+0+i·3+1] -> m[i·6+2+1]
+    when m[i·6+2]:
+      frame X q[base]
+    when m[i·6+2+1]:
+      frame X q[base]
+    prepare |Y+> -> anc[0+0+i·3+2]
+    measure Z q[base] Z anc[0+0+i·3+2] -> m[i·6+4]
+    measure X anc[0+0+i·3+2] -> m[i·6+4+1]
+    when m[i·6+4]:
+      frame Z q[base]
+    when m[i·6+4+1]:
+      frame Z q[base]
+
+gadget rzLadder(n, q0, j):
+  for 0 <= i < n:
+    ppmrot(-pi/2^(j+1)) Z q[q0] with tSynth[j+1] magic states anc[0,synthAnc[j+1]) c[0,synthBits[j+1])
+
+gadget rungCell(base, k):
+  ppmrot(-pi/2^(k+1+2)) Z q[base+1+k] with tSynth[k+1+2] magic states anc[0,synthAnc[k+1+2]) c[0,synthBits[k+1+2])
+  ppmrot(-pi/2^(k+1+2)) Z q[base] with tSynth[k+1+2] magic states anc[0,synthAnc[k+1+2]) c[0,synthBits[k+1+2])
+  ppmrot(pi/2^(k+1+2)) Z q[base+1+k] Z q[base] with tSynth[k+1+2] magic states anc[0,synthAnc[k+1+2]) c[0,synthBits[k+1+2])
+
+gadget MAJ(a, b, cin):
+  prepare |Y+> -> anc[0+0]
+  measure Z q[cin] X q[b] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[cin] X q[b]
+  when m[1]:
+    frame Z q[cin] X q[b]
+  frame Z q[cin]
+  prepare |Y+> -> anc[0+1]
+  measure X q[b] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame X q[b]
+  when m[3]:
+    frame X q[b]
+  frame X q[b]
+  prepare |Y+> -> anc[0+2]
+  measure Z q[cin] X q[a] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame Z q[cin] X q[a]
+  when m[5]:
+    frame Z q[cin] X q[a]
+  prepare |Y+> -> anc[0+3]
+  measure X q[a] Z anc[0+3] -> m[6]
+  measure X anc[0+3] -> m[7]
+  when m[6]:
+    frame X q[a]
+  when m[7]:
+    frame X q[a]
+  frame X q[a]
+  prepare |Y+> -> anc[0+4]
+  measure Z q[cin] Z anc[0+4] -> m[8]
+  measure X anc[0+4] -> m[9]
+  when m[8]:
+    frame Z q[cin]
+  when m[9]:
+    frame Z q[cin]
+  prepare |Y+> -> anc[0+5]
+  measure X q[cin] Z anc[0+5] -> m[10]
+  measure X anc[0+5] -> m[11]
+  when m[10]:
+    frame X q[cin]
+  when m[11]:
+    frame X q[cin]
+  frame Z q[cin]
+  prepare |T> -> anc[0+6]
+  measure Z q[a] Z anc[0+6] -> m[12]
+  measure X anc[0+6] -> m[13]
+  when m[13]:
+    frame Z q[a]
+  when m[12]:
+    prepare |Y+> -> anc[0+6+1]
+    measure Z q[a] Z anc[0+6+1] -> m[14]
+    measure X anc[0+6+1] -> m[15]
+    when m[14]:
+      frame Z q[a]
+    when m[15]:
+      frame Z q[a]
+  prepare |T> -> anc[0+9]
+  measure Z q[b] Z anc[0+9] -> m[16]
+  measure X anc[0+9] -> m[17]
+  when m[17]:
+    frame Z q[b]
+  when m[16]:
+    prepare |Y+> -> anc[0+9+1]
+    measure Z q[b] Z anc[0+9+1] -> m[18]
+    measure X anc[0+9+1] -> m[19]
+    when m[18]:
+      frame Z q[b]
+    when m[19]:
+      frame Z q[b]
+  prepare |T> -> anc[0+12]
+  measure Z q[cin] Z anc[0+12] -> m[20]
+  measure X anc[0+12] -> m[21]
+  when m[21]:
+    frame Z q[cin]
+  when m[20]:
+    prepare |Y+> -> anc[0+12+1]
+    measure Z q[cin] Z anc[0+12+1] -> m[22]
+    measure X anc[0+12+1] -> m[23]
+    when m[22]:
+      frame Z q[cin]
+    when m[23]:
+      frame Z q[cin]
+  prepare |T> -> anc[0+15]
+  measure Z q[a] Z q[b] Z anc[0+15] -> m[24]
+  measure X anc[0+15] -> m[25]
+  when m[25]:
+    frame Z q[a] Z q[b]
+  when m[24]:
+    prepare |Y+> -> anc[0+15+1]
+    measure Z q[a] Z q[b] Z anc[0+15+1] -> m[26]
+    measure X anc[0+15+1] -> m[27]
+    when m[26]:
+      frame Z q[a] Z q[b]
+    when m[27]:
+      frame Z q[a] Z q[b]
+  prepare |Y+> -> anc[0+15+2]
+  measure Z q[a] Z q[b] Z anc[0+15+2] -> m[28]
+  measure X anc[0+15+2] -> m[29]
+  when m[28]:
+    frame Z q[a] Z q[b]
+  when m[29]:
+    frame Z q[a] Z q[b]
+  frame Z q[a] Z q[b]
+  prepare |T> -> anc[0+18]
+  measure Z q[a] Z q[cin] Z anc[0+18] -> m[30]
+  measure X anc[0+18] -> m[31]
+  when m[31]:
+    frame Z q[a] Z q[cin]
+  when m[30]:
+    prepare |Y+> -> anc[0+18+1]
+    measure Z q[a] Z q[cin] Z anc[0+18+1] -> m[32]
+    measure X anc[0+18+1] -> m[33]
+    when m[32]:
+      frame Z q[a] Z q[cin]
+    when m[33]:
+      frame Z q[a] Z q[cin]
+  prepare |Y+> -> anc[0+18+2]
+  measure Z q[a] Z q[cin] Z anc[0+18+2] -> m[34]
+  measure X anc[0+18+2] -> m[35]
+  when m[34]:
+    frame Z q[a] Z q[cin]
+  when m[35]:
+    frame Z q[a] Z q[cin]
+  frame Z q[a] Z q[cin]
+  prepare |T> -> anc[0+21]
+  measure Z q[b] Z q[cin] Z anc[0+21] -> m[36]
+  measure X anc[0+21] -> m[37]
+  when m[37]:
+    frame Z q[b] Z q[cin]
+  when m[36]:
+    prepare |Y+> -> anc[0+21+1]
+    measure Z q[b] Z q[cin] Z anc[0+21+1] -> m[38]
+    measure X anc[0+21+1] -> m[39]
+    when m[38]:
+      frame Z q[b] Z q[cin]
+    when m[39]:
+      frame Z q[b] Z q[cin]
+  prepare |Y+> -> anc[0+21+2]
+  measure Z q[b] Z q[cin] Z anc[0+21+2] -> m[40]
+  measure X anc[0+21+2] -> m[41]
+  when m[40]:
+    frame Z q[b] Z q[cin]
+  when m[41]:
+    frame Z q[b] Z q[cin]
+  frame Z q[b] Z q[cin]
+  prepare |T> -> anc[0+24]
+  measure Z q[a] Z q[b] Z q[cin] Z anc[0+24] -> m[42]
+  measure X anc[0+24] -> m[43]
+  when m[43]:
+    frame Z q[a] Z q[b] Z q[cin]
+  when m[42]:
+    prepare |Y+> -> anc[0+24+1]
+    measure Z q[a] Z q[b] Z q[cin] Z anc[0+24+1] -> m[44]
+    measure X anc[0+24+1] -> m[45]
+    when m[44]:
+      frame Z q[a] Z q[b] Z q[cin]
+    when m[45]:
+      frame Z q[a] Z q[b] Z q[cin]
+  prepare |Y+> -> anc[0+27]
+  measure X q[cin] Z anc[0+27] -> m[46]
+  measure X anc[0+27] -> m[47]
+  when m[46]:
+    frame X q[cin]
+  when m[47]:
+    frame X q[cin]
+  prepare |Y+> -> anc[0+28]
+  measure Z q[cin] Z anc[0+28] -> m[48]
+  measure X anc[0+28] -> m[49]
+  when m[48]:
+    frame Z q[cin]
+  when m[49]:
+    frame Z q[cin]
+
+gadget deferMz(a, w):
+  prepare |Y+> -> anc[0+0]
+  measure Z q[a] X q[w] Z anc[0+0] -> m[0]
+  measure X anc[0+0] -> m[1]
+  when m[0]:
+    frame Z q[a] X q[w]
+  when m[1]:
+    frame Z q[a] X q[w]
+  prepare |Y+> -> anc[0+1]
+  measure Z q[a] Z anc[0+1] -> m[2]
+  measure X anc[0+1] -> m[3]
+  when m[2]:
+    frame Z q[a]
+  when m[3]:
+    frame Z q[a]
+  frame Z q[a]
+  prepare |Y+> -> anc[0+2]
+  measure X q[w] Z anc[0+2] -> m[4]
+  measure X anc[0+2] -> m[5]
+  when m[4]:
+    frame X q[w]
+  when m[5]:
+    frame X q[w]
+  frame X q[w]
+  prepare |Y+> -> anc[0+3]
+  measure Z q[w] X q[a] Z anc[0+3] -> m[6]
+  measure X anc[0+3] -> m[7]
+  when m[6]:
+    frame Z q[w] X q[a]
+  when m[7]:
+    frame Z q[w] X q[a]
+  prepare |Y+> -> anc[0+4]
+  measure Z q[w] Z anc[0+4] -> m[8]
+  measure X anc[0+4] -> m[9]
+  when m[8]:
+    frame Z q[w]
+  when m[9]:
+    frame Z q[w]
+  frame Z q[w]
+  prepare |Y+> -> anc[0+5]
+  measure X q[a] Z anc[0+5] -> m[10]
+  measure X anc[0+5] -> m[11]
+  when m[10]:
+    frame X q[a]
+  when m[11]:
+    frame X q[a]
+  frame X q[a]
+
+gadget mz(q0, cb):
+  measure Z q[q0] -> c[cb]
+  when c[cb]:
+    frame X q[q0]
+
+gadget gadgetPaper(d, a, n, cb):
+  for 0 <= i < n:
+    prepare |Y+> -> anc[0+0+i·3+0]
+    measure Z q[d+i] X q[a] Z anc[0+0+i·3+0] -> m[i·6]
+    measure X anc[0+0+i·3+0] -> m[i·6+1]
+    when m[i·6]:
+      frame Z q[d+i] X q[a]
+    when m[i·6+1]:
+      frame Z q[d+i] X q[a]
+    prepare |Y+> -> anc[0+0+i·3+1]
+    measure Z q[d+i] Z anc[0+0+i·3+1] -> m[i·6+2]
+    measure X anc[0+0+i·3+1] -> m[i·6+2+1]
+    when m[i·6+2]:
+      frame Z q[d+i]
+    when m[i·6+2+1]:
+      frame Z q[d+i]
+    frame Z q[d+i]
+    prepare |Y+> -> anc[0+0+i·3+2]
+    measure X q[a] Z anc[0+0+i·3+2] -> m[i·6+4]
+    measure X anc[0+0+i·3+2] -> m[i·6+4+1]
+    when m[i·6+4]:
+      frame X q[a]
+    when m[i·6+4+1]:
+      frame X q[a]
+    frame X q[a]
+  prepare |Y+> -> anc[0+0+n·3+0]
+  measure Z q[a] Z anc[0+0+n·3+0] -> m[n·6]
+  measure X anc[0+0+n·3+0] -> m[n·6+1]
+  when m[n·6]:
+    frame Z q[a]
+  when m[n·6+1]:
+    frame Z q[a]
+  prepare |Y+> -> anc[0+0+n·3+1]
+  measure X q[a] Z anc[0+0+n·3+1] -> m[n·6+2]
+  measure X anc[0+0+n·3+1] -> m[n·6+2+1]
+  when m[n·6+2]:
+    frame X q[a]
+  when m[n·6+2+1]:
+    frame X q[a]
+  prepare |Y+> -> anc[0+0+n·3+2]
+  measure Z q[a] Z anc[0+0+n·3+2] -> m[n·6+4]
+  measure X anc[0+0+n·3+2] -> m[n·6+4+1]
+  when m[n·6+4]:
+    frame Z q[a]
+  when m[n·6+4+1]:
+    frame Z q[a]
+  measure Z q[a] -> c[cb]
+  when c[cb]:
+    for 0 <= i < n:
+      frame Z q[d+i]
+    frame X q[a]
+
+gadget djOracle(n, a):
+  for 0 <= i < n:
+    if (a >> i) % 2 = 1:
+      prepare |Y+> -> anc[0+0+i·3+0+0]
+      measure Z q[i] X q[n] Z anc[0+0+i·3+0+0] -> m[i·6]
+      measure X anc[0+0+i·3+0+0] -> m[i·6+1]
+      when m[i·6]:
+        frame Z q[i] X q[n]
+      when m[i·6+1]:
+        frame Z q[i] X q[n]
+      prepare |Y+> -> anc[0+0+i·3+0+1]
+      measure Z q[i] Z anc[0+0+i·3+0+1] -> m[i·6+2]
+      measure X anc[0+0+i·3+0+1] -> m[i·6+2+1]
+      when m[i·6+2]:
+        frame Z q[i]
+      when m[i·6+2+1]:
+        frame Z q[i]
+      frame Z q[i]
+      prepare |Y+> -> anc[0+0+i·3+0+2]
+      measure X q[n] Z anc[0+0+i·3+0+2] -> m[i·6+4]
+      measure X anc[0+0+i·3+0+2] -> m[i·6+4+1]
+      when m[i·6+4]:
+        frame X q[n]
+      when m[i·6+4+1]:
+        frame X q[n]
+      frame X q[n]
+
+program[q: n+1, c: n+1+n]:
+  for 0 <= i < n:
+    prepare |Y+> -> anc[0+0+i·3+0]
+    measure Z q[i] Z anc[0+0+i·3+0] -> m[i·6]
+    measure X anc[0+0+i·3+0] -> m[i·6+1]
+    when m[i·6]:
+      frame Z q[i]
+    when m[i·6+1]:
+      frame Z q[i]
+    prepare |Y+> -> anc[0+0+i·3+1]
+    measure X q[i] Z anc[0+0+i·3+1] -> m[i·6+2]
+    measure X anc[0+0+i·3+1] -> m[i·6+2+1]
+    when m[i·6+2]:
+      frame X q[i]
+    when m[i·6+2+1]:
+      frame X q[i]
+    prepare |Y+> -> anc[0+0+i·3+2]
+    measure Z q[i] Z anc[0+0+i·3+2] -> m[i·6+4]
+    measure X anc[0+0+i·3+2] -> m[i·6+4+1]
+    when m[i·6+4]:
+      frame Z q[i]
+    when m[i·6+4+1]:
+      frame Z q[i]
+  frame X q[n]
+  prepare |Y+> -> anc[0+0+n·3+0]
+  measure Z q[n] Z anc[0+0+n·3+0] -> m[n·6]
+  measure X anc[0+0+n·3+0] -> m[n·6+1]
+  when m[n·6]:
+    frame Z q[n]
+  when m[n·6+1]:
+    frame Z q[n]
+  prepare |Y+> -> anc[0+0+n·3+1]
+  measure X q[n] Z anc[0+0+n·3+1] -> m[n·6+2]
+  measure X anc[0+0+n·3+1] -> m[n·6+2+1]
+  when m[n·6+2]:
+    frame X q[n]
+  when m[n·6+2+1]:
+    frame X q[n]
+  prepare |Y+> -> anc[0+0+n·3+2]
+  measure Z q[n] Z anc[0+0+n·3+2] -> m[n·6+4]
+  measure X anc[0+0+n·3+2] -> m[n·6+4+1]
+  when m[n·6+4]:
+    frame Z q[n]
+  when m[n·6+4+1]:
+    frame Z q[n]
+  djOracle(n, a) @ id()
+  for 0 <= i < n:
+    prepare |Y+> -> anc[0+0+n·3+3+0+i·3+0]
+    measure Z q[i] Z anc[0+0+n·3+3+0+i·3+0] -> m[n·6+6+i·6]
+    measure X anc[0+0+n·3+3+0+i·3+0] -> m[n·6+6+i·6+1]
+    when m[n·6+6+i·6]:
+      frame Z q[i]
+    when m[n·6+6+i·6+1]:
+      frame Z q[i]
+    prepare |Y+> -> anc[0+0+n·3+3+0+i·3+1]
+    measure X q[i] Z anc[0+0+n·3+3+0+i·3+1] -> m[n·6+6+i·6+2]
+    measure X anc[0+0+n·3+3+0+i·3+1] -> m[n·6+6+i·6+2+1]
+    when m[n·6+6+i·6+2]:
+      frame X q[i]
+    when m[n·6+6+i·6+2+1]:
+      frame X q[i]
+    prepare |Y+> -> anc[0+0+n·3+3+0+i·3+2]
+    measure Z q[i] Z anc[0+0+n·3+3+0+i·3+2] -> m[n·6+6+i·6+4]
+    measure X anc[0+0+n·3+3+0+i·3+2] -> m[n·6+6+i·6+4+1]
+    when m[n·6+6+i·6+4]:
+      frame Z q[i]
+    when m[n·6+6+i·6+4+1]:
+      frame Z q[i]
+  for 0 <= i < n:
+    measure Z q[i] -> c[n+1+i]
+    when c[n+1+i]:
+      frame X q[i]
+
+spec probe:
+  ∀ u < 2 . ∀ v < 2 .
+  requires   1 < dim
+  assumes    {{ |u⟩_q[0] ⊗ |v⟩_q[1] }}
+  ensures    {{ |u⟩_q[0] ⊗ |u ⊕ v⟩_q[1] }}
+  outcomes   none
+  resource   { meas: 6, frame: 8, magicT: 0, synthEps: 0 }
+
+spec kickbackCX:
+  ∀ v < 2 .
+  requires   ctl < dim  ∧  tgt < dim  ∧  ctl ≠ tgt
+  assumes    {{ |v⟩_q[ctl] ⊗ |−⟩_q[tgt] }}
+  ensures    {{ (-1)^v * ( |v⟩_q[ctl] ⊗ |−⟩_q[tgt] ) }}
+  outcomes   none
+  resource   { meas: 6, frame: 8, magicT: 0, synthEps: 0 }
+
+spec qubitSwap:
+  ∀ u < 2 . ∀ v < 2 .
+  requires   a ≠ b  ∧  a < dim  ∧  b < dim
+  assumes    {{ |u⟩_q[a] ⊗ |v⟩_q[b] }}
+  ensures    {{ |v⟩_q[a] ⊗ |u⟩_q[b] }}
+  outcomes   none
+  resource   { meas: 18, frame: 24, magicT: 0, synthEps: 0 }
+
+spec nparH:
+  requires   0 < n  ∧  base + n ≤ dim  ∧  base + 13*n + 1 ≤ dim
+  assumes    {{ |0⟩_q[base,base+n) }}
+  ensures    {{ Σ x < 2^n . (1 / sqrt(2^n)) * |x⟩_q[base,base+n) }}
+  outcomes   none
+  resource   { meas: n·6, frame: n·6, magicT: 0, synthEps: 0 }
+
+spec hLayerCollapsed:
+  ∀ v < 2 .
+  requires   0 < n  ∧  base < dim
+  assumes    {{ |v⟩_q[base] }}
+  ensures    {{ Σ b < 2 . hIter(n, v, b) * |b⟩_q[base] }}
+  outcomes   none
+  resource   { meas: n·6, frame: n·6, magicT: 0, synthEps: 0 }
+
+spec rzLadder:
+  requires   q0 < dim  ∧  3 ≤ j
+  assumes    {{ |0⟩_q[q0] + |1⟩_q[q0] }}
+  ensures {{ |0⟩_q[q0] + (ω(-n, 2^(j+1)) * |1⟩_q[q0]) }}  within ||.|| <= (n·synthEps[j+1])
+  outcomes   none
+  resource   { meas: 0, frame: 0, magicT: n·tSynth[j+1], synthEps: n·synthEps[j+1] }
+
+spec rungCell:
+  ∀ u < 2 . ∀ v < 2 .
+  requires   base + 1 + k < dim
+  assumes    {{ |u⟩_q[base+1+k] ⊗ |v⟩_q[base] }}
+  ensures {{ ω(-(u * v), 2^(k+2)) * ( |u⟩_q[base+1+k] ⊗ |v⟩_q[base] ) }}  within ||.|| <= (synthEps[k+1+2]+(synthEps[k+1+2]+synthEps[k+1+2]))
+  outcomes   none
+  resource   { meas: 0, frame: 0, magicT: tSynth[k+1+2]+(tSynth[k+1+2]+tSynth[k+1+2]), synthEps: synthEps[k+1+2]+(synthEps[k+1+2]+synthEps[k+1+2]) }
+
+spec MAJ:
+  ∀ u < 2 . ∀ v < 2 . ∀ w < 2 .
+  requires   a ≠ b  ∧  a ≠ cin  ∧  b ≠ cin
+  ∧  a < dim  ∧  b < dim  ∧  cin < dim
+  assumes    {{ |u⟩_q[a] ⊗ |v⟩_q[b] ⊗ |w⟩_q[cin] }}
+  ensures    {{ |u ⊕ w⟩_q[a] ⊗ |v ⊕ w⟩_q[b] ⊗ |maj3(u, v, w)⟩_q[cin] }}
+  outcomes   none
+  resource   { meas: 50, frame: 50, magicT: 7, synthEps: 0 }
+
+spec deferMz:
+  ∀ v < 2 .
+  requires   a ≠ w  ∧  a < dim  ∧  w < dim
+  assumes    {{ |v⟩_q[a] ⊗ |0⟩_q[w] }}
+  ensures    {{ |0⟩_q[a] ⊗ |v⟩_q[w] }}
+  outcomes   none
+  resource   { meas: 12, frame: 16, magicT: 0, synthEps: 0 }
+
+spec mz:
+  requires   q0 < dim  ∧  0 < phaseDen  ∧  cb + 2 ≤ dim  ∧  q0 + 1 ≤ cb
+  assumes    {{ (cos(theta) * |0⟩_q[q0])
+  + ((ω(phaseNum, phaseDen) * sin(theta)) * |1⟩_q[q0]) }}
+  ensures    {{ |0⟩_q[q0] }}
+  outcomes   Pr[ c[cb] = 0 ] = (cos(theta))^2  ∧  Pr[ c[cb] = 1 ] = (sin(theta))^2
+  resource   { meas: 1, frame: 1, magicT: 0, synthEps: 0 }
+
+spec gadgetPaper:
+  ∀α .
+  requires   (∀ i < n . d + i ≠ a)
+  ∧  (∀ i < n . d + i < dim)
+  ∧  a < dim
+  ∧  cb + 1 ≤ dim
+  ∧  (∀ i < n . d + i < cb)
+  ∧  a < cb
+  assumes    {{ Σ x < 2^n . α(x) * ( |x⟩_q[d,d+n) ⊗ |0⟩_q[a] ) }}
+  ensures    {{ Σ x < 2^n . α(x) * ( |x⟩_q[d,d+n) ⊗ |0⟩_q[a] ) }}
+  outcomes   none
+  resource   { meas: n·6+7, frame: n·8+6+(n+1), magicT: 0, synthEps: 0 }
+
+spec djOracle:
+  ∀ x < 2^n .
+  requires   n + 1 ≤ dim
+  assumes    {{ |x⟩_q[0,n) ⊗ |−⟩_q[n] }}
+  ensures    {{ (-1)^(djF(n, a, x)) * ( |x⟩_q[0,n) ⊗ |−⟩_q[n] ) }}
+  outcomes   none
+  resource   { meas: n·6, frame: n·8, magicT: 0, synthEps: 0 }
+
+spec program:
+  requires   0 < n  ∧  n + 1 + n ≤ dim  ∧  12*n + 8 ≤ dim  ∧  a < 2^n
+  assumes    {{ |0⟩_q[0, n+1) }}
+  ensures    {{ |0⟩_q[0,n) ⊗ |−⟩_q[n] }}
+  outcomes   Pr[ c[0,n) = a ] = 1
+  resource   { meas: n·6+(6+n·6)+n·6+n, frame: n·6+(7+n·8)+n·6+n, magicT: 0, synthEps: 0, bound: upper }
