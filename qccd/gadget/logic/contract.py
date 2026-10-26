@@ -235,7 +235,7 @@ def _primitive(st: State, word: str, args: list[str], outcome: int | None = None
     probability; everything else returns None."""
     if word == "prep":
         q, basis = args[0], args[1].upper()
-        st.add(q, *((1, 0) if basis == "Z" else (_R2, _R2)))
+        st.add(q, *({"Z": (1, 0), "X": (_R2, _R2), "Y": Y_STATE}[basis]))
     elif word == "inject":
         st.add(args[0], *MAGIC_STATE)
     elif word == "s":
@@ -249,6 +249,8 @@ def _primitive(st: State, word: str, args: list[str], outcome: int | None = None
     elif word in ("zz", "xx"):
         p = "Z" if word == "zz" else "X"
         return st.measure_pauli({args[0]: p, args[1]: p}, outcome)
+    elif word == "ppm":
+        return st.measure_pauli({b: p.upper() for p, b in zip(args[0::2], args[1::2])}, outcome)
     elif word == "read":
         q, basis = args[0], args[1].upper()
         pr = st.measure_pauli({q: basis}, outcome)
@@ -264,7 +266,7 @@ def _primitive(st: State, word: str, args: list[str], outcome: int | None = None
     return None
 
 
-MEASURES = ("zz", "xx", "read")
+MEASURES = ("zz", "xx", "ppm", "read")
 
 
 def run_lines(lines: list[tuple[int, str]], start: State, gates: dict[str, Gate], *,

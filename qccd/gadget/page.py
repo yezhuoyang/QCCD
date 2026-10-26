@@ -32,7 +32,7 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
                 categories: dict | None = None, category_order: list | None = None,
                 machine_rules: dict | None = None, compositional: dict | None = None,
                 traffic: dict | None = None, floorplan: str | None = None,
-                focus: str | None = None) -> Path:
+                focus: str | None = None, stack: dict | None = None) -> Path:
     if categories is None:
         from .categories import CATEGORIES, ORDER
         categories, category_order = CATEGORIES, ORDER
@@ -64,6 +64,9 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
         "palette": dict(PALETTE),
         "geometry": dict(GEOMETRY),
     }
+    if stack:
+        # a program lowered from FormalRV (qccd/fullstack): the layers above it, linked
+        data["stack"] = stack
     html = (WEB / "page.html").read_text(encoding="utf-8")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__TITLE__", title or f"{gir['program']['name']} — QCCD gadgets")
@@ -75,6 +78,14 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
     html = html.replace("__CORE__", (WEB / "core.js").read_text(encoding="utf-8"))
     html = html.replace("__EDITOR__", (WEB / "editor.js").read_text(encoding="utf-8"))
     html = html.replace("__APP__", (WEB / "app.js").read_text(encoding="utf-8"))
+    if stack:
+        # every control the stack adds is declared for agents (docs/agent-interface.md)
+        hints = {"fullstack-line": {"t": "A line of one layer of the full stack",
+                                    "d": "Jump the animation to the first instruction that carries "
+                                         "this .prog, .qppm or .qec line."}}
+        at = html.rfind("</body>")
+        html = (html[:at] + "<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, "
+                + json.dumps(hints) + ");</script>\n" + html[at:])
     # the data goes in last: nothing after it is a template marker it could contain
     html = html.replace("__DATA__", _blob(data))
     out = Path(path)

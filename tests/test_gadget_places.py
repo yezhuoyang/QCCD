@@ -38,7 +38,9 @@ def places(leaves):
 def test_every_place_op_passes_hardware_and_logic(places):
     from qccd.gadget.leaves.classical import CLASSICAL
     from qccd.gadget.place_checks import CLASSICAL_FAMILIES
-    assert set(places) == set(PLACES) | set(CLASSICAL)
+    from qccd.gadget.library import all_places
+    assert set(places) == set(all_places()) | set(CLASSICAL)
+    assert set(PLACES) <= set(all_places())               # the bench and its kin live beside them
     bad = []
     for name, m in places.items():
         classical = m.family in CLASSICAL_FAMILIES

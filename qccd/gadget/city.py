@@ -875,7 +875,7 @@ class City:
         return D, gids, deps
 
     #: the instructions a guard can gate: a place that can be told (`ctl`), or the archive
-    GUARDABLE = ("cx", "zz", "xx", "read", "s", "sx", "x", "y", "z")
+    GUARDABLE = ("cx", "zz", "xx", "ppm", "read", "s", "sx", "x", "y", "z")
 
     def instruction(self, ins: Instr):
         grp = f"i{ins.index}"
@@ -893,7 +893,22 @@ class City:
                             f"run at a place that can be told whether to fire (a ctl port) "
                             f"or in the archive")
         produced: dict[str, Bundle] = {}
-        if kind == "prep":
+        if kind == "prep" and ins.basis == "Y":
+            # |Ȳ⟩ is made where S|+⟩ is injected: the pharmacy's own verified op (distance 1)
+            q = ins.blocks[0]
+            I = self._choose("injection", ins, ready=t0)
+            D1, g1, d1 = self._load(1, (I, "magic"), t0, ins.index, grp)
+            marr, mtrip = self.trip(g1, (D1, "out"), d1, (I, "magic"), t0, ins.index, grp)
+            D2, g8, d8 = self._load(8, (I, "in"), t0, ins.index, grp)
+            farr, ftrip = self.trip(g8, (D2, "out"), d8, (I, "in"), t0, ins.index, grp)
+            s, outs, row = self.op(I, "inject.Y", {"magic": (g1, marr, mtrip),
+                                                   "in": (g8, farr, ftrip)}, t0, ins.index, grp)
+            produced[q] = Bundle(q, outs["out"][0], I, "out", outs["out"][1])
+            self.block_info[q] = {"ions": outs["out"][0], "born": row[1], "born_at": I,
+                                  "code": "surface_d3", "n": 9, "k": 1, "resource": "|Ȳ⟩"}
+            self.pf[q] = (ZERO, ZERO)
+            self.report(I, "inject.Y", row, ins.index, grp, blocks=[q])
+        elif kind == "prep":
             P = self._choose("prep", ins, ready=t0)
             D, gids, deps = self._load(9, (P, "in"), t0, ins.index, grp)
             arr, trip = self.trip(gids, (D, "out"), deps, (P, "in"), t0, ins.index, grp)
@@ -992,6 +1007,30 @@ class City:
             flip = self.flip_for(terms)
             self.report(B, kind, row, ins.index, grp, blocks=[a, b_], correct=terms,
                         outcome=(f"{m}̄_A{m}̄_B measured", flip, ins.cvar))
+        elif kind == "ppm":
+            # a product of one X̄ or Z̄ from each block, at a Pauli-product bench: each block
+            # through its own door, in the order the instruction names them
+            tags = "abc"
+            blks = list(ins.blocks)
+            B = self._choose("ppm", ins, ready=t0,
+                             also=[((self.blocks[b].leaf, self.blocks[b].port), f"in_{tags[k]}")
+                                   for k, b in enumerate(blks)])
+            gd = self.guard_at(ins, grp, B)
+            inputs = {}
+            for k, b in enumerate(blks):
+                inputs[f"in_{tags[k]}"] = self.bring(self.blocks[b], (B, f"in_{tags[k]}"), t0,
+                                                     ins.index, grp)
+            s, outs, row = self.op(B, ins.op, inputs, max(t0, gd), ins.index, grp,
+                                   guard=self.guard_row(ins, gd))
+            for k, b in enumerate(blks):
+                port = f"out_{tags[k]}"
+                produced[b] = Bundle(b, outs[port][0], B, port, outs[port][1])
+            terms = [(b, 1 if p == "X" else 0, 1 if p == "Z" else 0)
+                     for b, p in zip(blks, ins.paulis)]
+            flip = self.flip_for(terms)
+            name = "".join(f"{p}̄_{'ABC'[k]}" for k, p in enumerate(ins.paulis)) + " measured"
+            self.report(B, ins.op, row, ins.index, grp, blocks=blks, correct=terms,
+                        outcome=(name, flip, ins.cvar))
         elif kind == "read":
             q = ins.blocks[0]
             R = self._choose("readout", ins, near=(self.blocks[q].leaf, self.blocks[q].port),

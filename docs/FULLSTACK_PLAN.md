@@ -52,6 +52,41 @@
 
 The Hardware, Gates and Both views and every other page are unchanged. Tests: `tests/test_fullstack.py`, 9 tests.
 
+### Slice S2 (2026-10-26): the gadget town is the default
+
+`python -m qccd.fullstack run examples/fullstack/cnot.prog -o DIR --specialize n=2 [--machine … --sysspec …]`
+takes 5 s. Its page is `DIR/gadgets/index.html`: the gadget design tool, with the stack above its Program
+panel.
+
+**What happens, in order.**
+- FormalRV's `.prog` goes through `.qppm` to `.qec`, unchanged.
+- **QCCD's own lowering** (`qccd/fullstack/qec2alg.py`) turns the `.qec` into a gadget program (`.alg`):
+  - `prepare |Y+>` becomes `prep a Y`;
+  - a merge group becomes `ppm P -> m` (or `read` when the block is never used again);
+  - `frame on c[..)` becomes `if m: <pauli>`.
+- All 62 `.qec` statements are linked: 23 to an instruction of their own, 39 absorbed into one, with the
+  reason stated.
+- The contract checker proves the gadget program is **exactly CX in all 64 branches** (not CZ; removing
+  one frame breaks it).
+- It is scheduled on the **full-stack machine** (`examples/gadgets/floorplans/fullstack.floor`, generated
+  by the town layout: two Pauli-product benches, two |Ȳ⟩ pharmacies, five memories, prep, clinic, two
+  readouts, two depots, decoder, archive).
+- Result: 0 refused, 298.8 ms. G1–G11 hold, 23/23 machine rules hold, and the program is signed off
+  compositionally. FormalRV's VM, on its abstract machine, says 268.5 ms.
+
+**New in the gadget library.**
+- **`ppm_d3`, the Pauli-product bench** (`qccd/gadget/leaves/bench.py`, category "Pauli Product
+  Measurement", a dome silhouette): a probe ion measures any product of one X̄ or Z̄ from up to three
+  blocks. It has 14 ops, all verified, each with a complete specification (rank 18K/18K). It is not
+  circuit-level fault-tolerant, by the user's decision.
+- **The language** gains `ppm P q … -> m` and `prep q Y`.
+- **The page shows the stack.** At the playhead it gives the Logical / PPM / QEC / Gadget / Clifford /
+  Hardware rows. Clifford and Hardware are the place op's own TSIR at its local time. The `.prog`,
+  `.qppm` and `.qec` listings light up as they run, and a click on a line seeks to it.
+
+**Where it lives.** The bench sits outside `places.py`, so no cached place is re-keyed. The full-stack
+tests are `tests/test_fullstack.py`: 14 tests, 13 of them without FormalRV.
+
 ### Differences from the plan as written
 
 - **The reader is QCCD's own.** It is not FormalRV's parser: the VM's parser is not a library, and the Python oracle lags the staged compiler (it refuses `spec maintenance`). It is held to FormalRV's VM instead, which must agree op by op on every listing.

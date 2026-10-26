@@ -40,7 +40,8 @@ def _load(alg) -> Algorithm:
 def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: bool = False,
                     leaves: LeafLibrary | None = None, studio_dir=None, log=print,
                     floorplan=None, parallel: bool = True, refresh: bool = True,
-                    inline: bool = False, focus: str | None = None) -> dict:
+                    inline: bool = False, focus: str | None = None,
+                    stack: dict | None = None) -> dict:
     """Schedule, check and sign off one algorithm on a floorplan (the town unless `floorplan`
     names a `.floor` file), and write its page.  With `studio_dir`, the studio page of every
     op the schedule uses is rendered there (shared by several builds) and linked from the
@@ -144,7 +145,7 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
                 machine_rules=rules, compositional=compositional, traffic=stats["traffic"],
                 floorplan=(Path(floorplan).read_text(encoding="utf-8") if floorplan else None),
                 title=f"{alg.title} — QCCD verified gadgets", signoff=signoff,
-                categories=CATEGORIES, category_order=ORDER)
+                categories=CATEGORIES, category_order=ORDER, stack=stack)
     stats["seconds"]["total"] = round(time.time() - t_start, 2)
     log(f"  {alg.name}: {stats['ions']} ions, {stats['events']} events, makespan "
         f"{stats['makespan_ms']} ms; G passed {len(checks['passed'])}/"

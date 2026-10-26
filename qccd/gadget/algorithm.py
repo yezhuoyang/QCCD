@@ -8,6 +8,9 @@ one d = 3 surface-code logical qubit.
     se    q0 3                 syndrome rounds on a block (1 or 3)            -> a clinic
     cx    q0 q1                transversal CNOT, q0 controls                  -> a workshop
     zz    q0 q1 -> m           lattice surgery: measure Z̄Z̄ (xx: X̄X̄)         -> a bridge
+    ppm   Z q0 X q1 Z q2 -> m  any product of one X̄ or Z̄ from each of 1-3 blocks,
+                                 measured by a probe ion (non-destructive)     -> a Pauli-product bench
+    prep  q0 Y                 a fresh block in |Ȳ⟩ (S|+⟩ injected; distance 1) -> an injection place
     read  q0 Z -> a            destructive readout in Z or X                  -> a post office
     inject t                   a block holding the factory's magic state      -> factory + injection
                                  (T†|+̄⟩: the factory's own verified output)
@@ -100,6 +103,7 @@ __all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_
 
 #: which place category an instruction needs
 CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "xx": "surgery",
+               "ppm": "ppm",
                "read": "readout", "inject": "injection", "store": "zone", "s": "injection",
                "sx": "injection", "x": "archive", "y": "archive", "z": "archive",
                "decode": "decoder"}
@@ -125,7 +129,10 @@ CONTRACT_ARITY = {"I": 1, "X": 1, "Y": 1, "Z": 1, "H": 1, "S": 1, "Sdg": 1, "SX"
                   "CSWAP": 3}
 
 PRIMITIVES = ("prep", "inject", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz", "xx",
-              "decode", "read")
+              "ppm", "decode", "read")
+
+#: the most blocks one Pauli-product measurement may name (the bench has three doors)
+PPM_MAX = 3
 
 
 class AlgorithmError(ValueError):
@@ -209,6 +216,8 @@ class Instr:
     #: this, in microseconds
     not_before: float | None = None
     refresh: bool = False
+    #: `ppm`: the Pauli letter on each block, in the order of `blocks`
+    paulis: list = field(default_factory=list)
 
     def runs(self, branch: dict[str, int]) -> bool:
         """Does this instruction run, given a value for every guard outcome?"""
@@ -216,8 +225,12 @@ class Instr:
 
     @property
     def op(self) -> str:
+        if self.kind == "prep" and self.basis == "Y":
+            return "inject.Y"
         if self.kind == "prep":
             return f"prep.{self.basis}"
+        if self.kind == "ppm":
+            return "ppm." + "".join(self.paulis)
         if self.kind == "read":
             return f"read.{self.basis}"
         if self.kind == "se":
@@ -243,6 +256,8 @@ class Instr:
         if self.refresh:
             d["refresh"] = True
             d["not_before"] = self.not_before
+        if self.paulis:
+            d["paulis"] = list(self.paulis)
         return d
 
 
@@ -360,8 +375,10 @@ class Algorithm:
                 continue
             if ins.kind == "prep":
                 c.add("R", [q[0]])
-                if ins.basis == "X":
+                if ins.basis in ("X", "Y"):
                     c.add("H", [q[0]])
+                if ins.basis == "Y":
+                    c.add("S", [q[0]])
                 alive.append(q[0])
             elif ins.kind == "inject":
                 inputs.append(q[0])
@@ -380,6 +397,8 @@ class Algorithm:
             elif ins.kind in ("zz", "xx"):
                 p = "Z" if ins.kind == "zz" else "X"
                 recs.append((ins.index, c.mpp({q[0]: p, q[1]: p}, label={"instruction": ins.index})))
+            elif ins.kind == "ppm":
+                recs.append((ins.index, c.mpp(dict(zip(q, ins.paulis)), label={"instruction": ins.index})))
             elif ins.kind == "read":
                 if ins.basis == "X":
                     c.add("H", [q[0]])
@@ -596,6 +615,9 @@ class _Parser:
                 nargs = [ren(nargs[0]), nargs[1]]
             elif word in ("prep", "read"):
                 nargs = [ren(nargs[0])] + nargs[1:] if nargs else nargs
+            elif word == "ppm":
+                # letters stay letters: rename only the blocks (every second argument)
+                nargs = [a if i % 2 == 0 else ren(a) for i, a in enumerate(nargs)]
             else:
                 nargs = [ren(a) for a in nargs]
             combined = (guard & inner) if guard is not None else inner
@@ -641,8 +663,8 @@ class _Parser:
                                      f"earlier instruction measured")
         if word == "prep":
             need(2)
-            if args[1].upper() not in ("Z", "X"):
-                raise AlgorithmError(lineno, raw, "prep basis is Z or X")
+            if args[1].upper() not in ("Z", "X", "Y"):
+                raise AlgorithmError(lineno, raw, "prep basis is Z, X or Y")
             if args[0] in self.born:
                 raise AlgorithmError(lineno, raw, f"block {args[0]} already exists")
             ins.blocks, ins.basis = [args[0]], args[1].upper()
@@ -666,6 +688,20 @@ class _Parser:
                 raise AlgorithmError(lineno, raw, f"'{word}' takes a block")
             alive(args[0])
             ins.blocks = [args[0]]
+        elif word == "ppm":
+            if not args or len(args) % 2 or not 1 <= len(args) // 2 <= PPM_MAX:
+                raise AlgorithmError(lineno, raw, f"write: ppm P q [P q ...] with 1 to {PPM_MAX} "
+                                     f"blocks, each P one of X, Z")
+            letters, blks = [a.upper() for a in args[0::2]], args[1::2]
+            bad = [p for p in letters if p not in ("X", "Z")]
+            if bad:
+                raise AlgorithmError(lineno, raw, f"{bad[0]} is not X or Z (the bench measures "
+                                     f"products of X̄ and Z̄)")
+            if len(set(blks)) != len(blks):
+                raise AlgorithmError(lineno, raw, "a block is named twice")
+            for b in blks:
+                alive(b)
+            ins.blocks, ins.paulis = list(blks), letters
         elif word in ("cx", "zz", "xx"):
             need(2)
             if args[0] == args[1]:

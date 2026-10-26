@@ -159,6 +159,15 @@ def link(prog: layers.Stage, qppm: layers.Stage, qec: layers.Stage, expansion: s
     return chain
 
 
+def link_upper(prog: layers.Stage, qppm: layers.Stage, qec: layers.Stage) -> Chain:
+    """The `.qec -> .qppm -> .prog` links alone: what QCCD's own lowering (`qec2alg`) needs,
+    with no `.sysprog` involved."""
+    chain = Chain(prog, qppm, qec, None)
+    _link_qppm_to_qec(chain)
+    _link_prog_to_qppm(chain)
+    return chain
+
+
 def _link_qec_to_sys(chain: Chain, expansion: sp.Expansion) -> None:
     qprog = chain.qec.program
     if qprog is None:

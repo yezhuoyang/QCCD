@@ -111,7 +111,8 @@ def test_a_verified_algorithm_page_draws_every_category_its_own_way(verified):
     _, seen = verified
     assert seen["ready"] and seen["errors"] == []
     town = seen["town"]
-    assert town["distinct"] == town["categories"] == 14          # one silhouette each
+    # one silhouette each (15 since the Pauli-product bench, qccd/gadget/leaves/bench.py)
+    assert town["distinct"] == town["categories"] == 15
     assert "Lattice Surgery" in town["legend"] and "Logical Preparation" in town["legend"]
     # the classical half is on the map too, and the bus is in the legend
     assert {"Decoder", "Classical Memory", "Classical Data Bus"} <= set(town["legend"])

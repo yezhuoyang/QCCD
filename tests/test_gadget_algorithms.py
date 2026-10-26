@@ -112,7 +112,7 @@ def test_overlapping_ops_fail_g5(runs, lib, leaves):
 
 
 def test_bad_programs_are_refused_with_the_line():
-    for src, why in (("se q0 1", "before prep"), ("prep q0 Y", "basis"),
+    for src, why in (("se q0 1", "before prep"), ("prep q0 W", "basis"),
                      ("prep q0 Z\nread q0 Z\nse q0 1", "already read"),
                      ("prep a Z\ncx a a", "two blocks"), ("frobnicate q0", "unknown")):
         with pytest.raises(AlgorithmError) as exc:

@@ -57,6 +57,18 @@ def _source_key(*parts: str) -> str:
     return h.hexdigest()[:12]
 
 
+def _extra_places() -> dict:
+    """Places built outside `leaves/places.py`, so adding one does not re-key every cached place."""
+    from .leaves.bench import EXTRA_PLACES
+    return EXTRA_PLACES
+
+
+def all_places() -> dict:
+    """Every place with a device: the verified library, then the places beside it."""
+    from .leaves.places import PLACES
+    return {**PLACES, **_extra_places()}
+
+
 def _code_key(code: CSSCode) -> str:
     h = hashlib.sha256()
     h.update(json.dumps([code.name, code.n, list(code.hx), list(code.hz)]).encode())
@@ -120,7 +132,7 @@ class LeafLibrary:
     def place(self, name: str) -> Master:
         """A place of the verified surface-code library, by master name."""
         from .leaves.classical import CLASSICAL
-        from .leaves.places import PLACES
+        PLACES = all_places()
         if name in CLASSICAL:
             return self.classical(name)
         if name not in PLACES:
@@ -128,8 +140,10 @@ class LeafLibrary:
                            f"(have: {', '.join(list(PLACES) + list(CLASSICAL))})")
         import inspect
         try:
-            src = inspect.getsource(PLACES[name])
-        except OSError:
+            # a place outside places.py is keyed by its whole module (its helpers live there)
+            src = inspect.getsource(inspect.getmodule(PLACES[name])) if name in _extra_places() \
+                else inspect.getsource(PLACES[name])
+        except (OSError, TypeError):
             src = name
         return self._get(name, f"place-{_source_key(name, src)}", PLACES[name])
 
@@ -165,8 +179,7 @@ class LeafLibrary:
 
     def places(self) -> dict[str, Master]:
         from .leaves.classical import CLASSICAL
-        from .leaves.places import PLACES
-        return {name: self.place(name) for name in list(PLACES) + list(CLASSICAL)}
+        return {name: self.place(name) for name in list(all_places()) + list(CLASSICAL)}
 
     # -- the beta leaves ---------------------------------------------------------
 

@@ -119,6 +119,91 @@ def test_the_factory_makes_the_promised_state():
         devirt.y_factory(bad)
 
 
+# ----------------------------------------------------------------------------- the gadget town
+
+CACHE = REPO / "out" / "gadgets" / "cache"
+
+
+def test_the_bench_measures_any_product_of_logicals():
+    from qccd.gadget.leaves.bench import PATTERNS
+    from qccd.gadget.library import LeafLibrary
+    m = LeafLibrary(CACHE, log=None).place("ppm_d3")
+    assert m.family == "ppm" and set(m.ops) == {f"ppm.{p}" for p in PATTERNS}
+    for name, op in m.ops.items():
+        fl = op.logic["flows"]
+        assert op.status == "verified", (name, op.notes)
+        assert fl["passed"] and fl["rank"] == fl["needed"] == 18 * len(name.split(".")[1]), name
+
+
+def test_ppm_and_prep_y_are_instructions():
+    from qccd.gadget.algorithm import AlgorithmError, parse_algorithm
+    a = parse_algorithm("prep q0 Z\nprep q1 Z\nprep a Y\nppm Z q0 X q1 Z a -> m\n")
+    ins = a.instructions[-1]
+    assert ins.kind == "ppm" and ins.blocks == ["q0", "q1", "a"] and ins.op == "ppm.ZXZ"
+    assert a.instructions[2].op == "inject.Y"
+    c, _, _, recs = a.ideal_circuit()
+    assert len(recs) == 1
+    for bad in ("ppm Y q0 -> m", "ppm Z q0 Z q0 -> m", "ppm Z q0 X q1 Z a X b -> m", "ppm Z q0 X"):
+        with pytest.raises(AlgorithmError):
+            parse_algorithm("prep q0 Z\nprep q1 Z\nprep a Y\nprep b Z\n" + bad + "\n")
+
+
+@pytest.fixture(scope="module")
+def lowered(stages):
+    from qccd.fullstack import qec2alg
+    prog, qppm, qec, _ = stages
+    return qec2alg.lower(qec, title="CX(0, 1) from FormalRV"), provenance.link_upper(prog, qppm, qec)
+
+
+def test_the_lowering_links_every_qec_statement(stages, lowered):
+    low, chain = lowered
+    _, _, qec, _ = stages
+    assert set(low.linked) == {s.line for s in qec.program.body}
+    assert set(low.qec_of.values()) | set(low.absorbed) == set(low.linked)
+    words = [t.split()[0] for t, _, role in low.lines if role != "input"]
+    assert words.count("ppm") == 3 and words.count("read") == 3 and words.count("prep") == 3
+    # every lowered instruction reaches the .prog line through the .qec and .qppm links
+    for al, ql in low.qec_of.items():
+        p = chain.qec_to_qppm[ql].stmt.line
+        assert chain.qppm_to_prog[p].stmt.text.strip() == "CX(0, 1)"
+
+
+def test_the_lowered_program_is_exactly_the_progs_gate(stages, lowered):
+    from qccd.fullstack.town import contract_check
+    low, _ = lowered
+    prog = stages[0]
+    rep = contract_check(prog, low)
+    assert rep["passed"] and rep["contract"] == "CX" and rep["branches"] == 64
+    assert rep["worst_fidelity"] == pytest.approx(1.0) and rep["control"]["passed"] is False
+    # drop one Pauli frame: no longer CX in every branch
+    broken = copy.deepcopy(low)
+    k = next(i for i, (t, _, _) in enumerate(broken.lines) if t.startswith("if m0: z"))
+    del broken.lines[k]
+    assert not contract_check(prog, broken)["passed"]
+
+
+def test_a_formalrv_program_runs_on_the_gadget_town(stages, lowered, tmp_path):
+    import json as _json
+    from qccd.fullstack.town import stack_payload
+    from qccd.gadget.verified import build_algorithm
+    low, chain = lowered
+    prog, qppm, qec, _ = stages
+    alg = tmp_path / "cnot.alg"
+    alg.write_text(low.text, encoding="utf-8")
+    payload = stack_payload(prog, qppm, qec, chain, low, foot="test")
+    r = build_algorithm(alg, out_dir=tmp_path / "site", cache_dir=CACHE, stack=payload, log=None)
+    s = r["stats"]
+    assert s["refused"] == 0 and not r["checks"].get("failed")
+    assert s["rules"]["failed"] == [] and s["signed_off"]
+    used = {r["gir"]["leaves"][e[3]][0] for e in r["gir"]["events"]}
+    assert {"ppm_d3", "inj_d3", "read_d3"} <= used
+    html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    data = _json.loads(html.split('<script id="gdata" type="application/json">', 1)[1].split("</script>", 1)[0])
+    assert set(data["stack"]["layers"]) == {"prog", "qppm", "qec"}
+    assert all(int(k) in low.qec_of for k in data["stack"]["alg"])
+    assert "fullstack-line" in html                     # the stack's control is declared
+
+
 # ----------------------------------------------------------------------------- end to end
 
 def _toolchains_built() -> bool:

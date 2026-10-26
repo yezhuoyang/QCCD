@@ -76,6 +76,12 @@
         }
         return d + `H${f(x)}Z`;
       }
+      case "dome": {
+        // a domed roof on a low building: the observatory, where a product is measured
+        const r = Math.min(w * 0.32, h * 0.42), cx = x + w / 2, wall = y + r;
+        return `M${f(x)} ${f(y + h)}V${f(wall)}H${f(cx - r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx + r)} ${f(wall)}` +
+               `H${f(x + w)}V${f(y + h)}Z`;
+      }
       case "sawtooth": {
         const n = Math.max(2, Math.min(6, Math.round(w / Math.max(1e-6, h) * 2)));
         const tw = w / n, th = Math.min(h * 0.28, tw * 0.7);
@@ -161,6 +167,7 @@
     return `<svg class="shp" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.4"/>${dd ? `<path d="${dd}" fill="none" stroke="${c.stroke}" stroke-width="1"/>` : ""}</svg>`;
   }
   const OP_CAT = [["prep.", "prep"], ["se.", "se"], ["check_", "zone"], ["zz", "surgery"], ["xx", "surgery"],
+                  ["ppm.", "ppm"],
                   ["read.", "readout"], ["inject", "injection"], ["produce", "factory"], ["load.", "depot"],
                   ["dump.", "depot"], ["pass.", "road"], ["decode", "decoder"], ["record", "archive"],
                   ["update", "archive"], ["resolve", "archive"]];
@@ -1391,7 +1398,7 @@
 
   function kindColor(kind) {
     const cat = { prep: "prep", se: "se", cx: "operation", zz: "surgery", xx: "surgery", read: "readout",
-                  inject: "injection", store: "zone", decode: "decoder" }[kind];
+                  inject: "injection", store: "zone", decode: "decoder", ppm: "ppm" }[kind];
     if (cat && CATS[cat]) return CATS[cat].stroke;
     return { ppm: COLOR.accent, tcnot_batch: COLOR.teal, transversal: COLOR.violet, pauli: COLOR.ink,
              magic: "#b42318" }[kind] || COLOR.muted;
@@ -1766,6 +1773,176 @@
       if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - 60;
     }
   }
+  // ------------------------------------------------------------------ the full stack
+  //
+  // A program lowered from FormalRV (qccd/fullstack/qec2alg.py) carries `D.stack`: the
+  // `.prog`, `.qppm` and `.qec` it came from and, for every line of this program, the `.qec`
+  // statement it implements, each link saying how it was made.  The Stack section answers,
+  // at the playhead, which logical operation, which PPM, which QEC operation, which gadget
+  // instruction, which Clifford circuit instruction and which hardware instruction is
+  // running -- the place op's own TSIR at its local time -- and never leaves a row blank
+  // without saying why.
+  const STK = D.stack || null;
+  const STK_LAYERS = [["prog", "Logical"], ["qppm", "PPM"], ["qec", "QEC"]];
+  const stkFirst = { prog: {}, qppm: {}, qec: {} };
+  function stkChain(algLine) {
+    const q = (STK.alg || {})[algLine];
+    if (!q) return {};
+    const p = (STK.qec_links || {})[q[0]];
+    const g = p ? (STK.qppm_links || {})[p[0]] : null;
+    return { qec: q, qppm: p || null, prog: g || null };
+  }
+  function stkWhere(layer, line) {
+    const L = STK.layers[layer];
+    for (const [m, first, n] of L.members) if (line >= first && line < first + n) return `${m || L.file}:${line - first + 1}`;
+    return `${L.file}:${line}`;
+  }
+  function stkText(layer, line) { return ((STK.layers[layer].lines[line - 1]) || "").trim(); }
+  function stkHow(h) {
+    return h ? `<span class="stk-how" title="${escapeHtml((STK.how || {})[h] || h)}">${escapeHtml(h)}</span>` : "";
+  }
+  function stkInit() {
+    if (!STK) return;
+    const sect = document.createElement("div");
+    sect.className = "sect";
+    sect.id = "stack";
+    let lays = "";
+    for (const [k, title] of STK_LAYERS) {
+      lays += `<details class="stk-lay" data-layer="${k}"><summary>${title} <span class="muted">${escapeHtml(STK.layers[k].file)}</span></summary><div class="stk-lines" data-layer="${k}"></div></details>`;
+    }
+    sect.innerHTML = `<h3>Full stack <span class="muted">FormalRV ${escapeHtml(STK.formalrv || "")}</span></h3>` +
+      `<div id="stkNow" class="stk-cap"></div>${lays}<div class="stk-foot muted">${STK.foot || ""}</div>`;
+    $("prog").parentNode.insertBefore(sect, $("prog"));
+    // the first instruction carrying each line of each layer: click a line, land there
+    for (const ins of M.gir.program.instructions) {
+      const c = stkChain(ins.line);
+      for (const [k] of STK_LAYERS) {
+        const ln = c[k] && c[k][0];
+        if (ln && stkFirst[k][ln] === undefined) stkFirst[k][ln] = ins.id;
+      }
+      for (const ql of ((STK.qec_absorbed_into || {})[ins.line] || [])) {
+        if (stkFirst.qec[ql] === undefined) stkFirst.qec[ql] = ins.id;
+      }
+    }
+    sect.addEventListener("toggle", () => stkUpdate(), true);
+    sect.addEventListener("click", (ev) => {
+      const r = ev.target.closest(".stk-ln");
+      if (!r) return;
+      const id = stkFirst[r.dataset.layer][+r.dataset.line];
+      const sp = id !== undefined ? M.insSpan[id] : null;
+      if (sp) { seek(sp[0]); focusInstruction(id); }
+    });
+  }
+  // the instruction the stack describes: the one selected, else the first running, else the
+  // last one finished
+  // what an op does that is not a block waiting or travelling: work at a place
+  const STK_IDLE = /^(store|release|check_in|check_out|load\.|dump\.|pass\.)/;
+  function stkFocus() {
+    if (S.sel && S.sel.kind === "ins") return S.sel.id;
+    const live = M.activeInstructions(S.t).filter((i) => !M.gir.program.instructions[i].refresh);
+    if (live.length) {
+      const working = live.filter((i) => M.gir.events.some((e) => e[6] === i && e[1] <= S.t && S.t < e[2] && !STK_IDLE.test(e[4])));
+      return Math.min(...(working.length ? working : live));
+    }
+    let best = null;
+    M.insSpan.forEach((s, i) => { if (s && s[1] <= S.t && (best === null || s[1] > M.insSpan[best][1])) best = i; });
+    return best;
+  }
+  // the place op of instruction `id` running at t (or its last), and its TSIR instruction now
+  function stkOpNow(id) {
+    const evs = M.gir.events.filter((e) => e[6] === id);
+    if (!evs.length) return null;
+    let e = evs.find((x) => x[1] <= S.t && S.t < x[2]);
+    if (!e) e = evs.filter((x) => x[1] <= S.t).pop() || evs[0];
+    const master = M.gir.leaves[e[3]][0];
+    const d = M.leafData[master];
+    const out = { e, master, place: e[3].split(".").pop() };
+    if (!d || !d.programs[e[4]]) return out;
+    const lt = M.localTime(e, Math.min(Math.max(S.t, e[1]), e[2]));
+    const times = d.times[e[4]] || [];
+    let k = lowerBound(times, lt.local + 1e-9, (x) => x[1]) - 1;
+    k = Math.max(0, Math.min(times.length - 1, k));
+    const ins = d.programs[e[4]].instructions;
+    out.k = k; out.ins = ins[k]; out.local = lt.local;
+    // the circuit instruction this one is, or the one it is bringing ions to
+    let c = k;
+    while (c < ins.length && !["gate", "measure", "reset"].includes(ins[c].type)) c++;
+    out.circuit = c < ins.length ? ins[c] : null;
+    out.towards = c !== k;
+    return out;
+  }
+  function stkInsText(I) {
+    if (!I) return "";
+    const meta = I.meta || {};
+    let s = I.type === "gate" ? (I.gate || "gate") : I.type;
+    if (I.type === "simd") s = `${I.cls || "move"}${meta.hops ? " " + meta.hops + " hops" : ""}`;
+    const ions = I.pairs ? I.pairs.map((p) => p.join("·")) : I.ions ? [...I.ions] :
+      I.participants ? I.participants.map((p) => `${p.ion} ${p.from}→${p.to}`) : [];
+    if (ions.length) s += "  " + ions.slice(0, 6).join(" ") + (ions.length > 6 ? " …" : "");
+    const tags = [meta.op, meta.round !== undefined ? `round ${meta.round + 1}` : "", meta.factor ? `factor ${meta.factor}` : ""].filter(Boolean);
+    return s + (tags.length ? `  (${tags.join(", ")})` : "");
+  }
+  function stkUpdate() {
+    if (!STK) return;
+    const id = stkFocus();
+    const el = $("stkNow");
+    if (id === null || id === undefined) { el.innerHTML = `<span class="muted">nothing has run yet</span>`; return; }
+    const ins = M.gir.program.instructions[id];
+    const c = stkChain(ins.line);
+    const row = (k, v) => `<span class="stk-k">${k}</span><span class="stk-v">${v}</span>`;
+    let h = "";
+    const isInput = (STK.input_lines || []).includes(ins.line);
+    if (isInput) {
+      h += row("Logical", `<span class="muted">an input of the program: block ${escapeHtml(ins.blocks[0])} is ` +
+               `prepared before it runs (the .prog takes its inputs as given; no FormalRV line)</span>`);
+    }
+    for (const [k, title] of isInput ? [] : STK_LAYERS) {
+      const v = c[k];
+      if (v) {
+        let extra = "";
+        if (k === "qec") {
+          const ab = ((STK.qec_absorbed_into || {})[ins.line] || []).filter((x) => x !== v[0]);
+          if (ab.length) extra = ` <span class="muted" title="${escapeHtml(ab.map((x) => stkText("qec", x)).join("\n"))}">+${ab.length} absorbed</span>`;
+        }
+        h += row(title, `<code>${escapeHtml(stkText(k, v[0]))}</code> <span class="muted">${escapeHtml(stkWhere(k, v[0]))}</span> ${stkHow(v[1])}${extra}`);
+      } else {
+        const why = ins.refresh ? "a syndrome round QCCD added to keep a resting block alive (no FormalRV line)" :
+          (STK.input_lines || []).includes(ins.line) ? "an input block, prepared before the program (no FormalRV line)" : "not linked";
+        h += row(title, `<span class="muted">${why}</span>`);
+      }
+    }
+    const op = stkOpNow(id);
+    h += row("Gadget", `<code>${escapeHtml(ins.text)}</code>` + (op ? ` <span class="muted">@ ${escapeHtml(op.place)} · ${escapeHtml(op.e[4])}</span>` : ""));
+    if (op && op.ins) {
+      const anyGate = op.circuit || M.leafData[op.master].programs[op.e[4]].instructions.some((x) => ["gate", "measure", "reset"].includes(x.type));
+      h += row("Clifford", op.circuit ? `${op.towards ? '<span class="muted">bringing ions to</span> ' : ""}<code>${escapeHtml(stkInsText(op.circuit))}</code>` :
+        `<span class="muted">${anyGate ? "every gate of this op has run; the ions are leaving" : "this op moves ions only: no gate"}</span>`);
+      h += row("Hardware", `<code>${escapeHtml(stkInsText(op.ins))}</code> <span class="muted">#${op.ins.id} · ${(op.local / 1000).toFixed(3)} ms into ${escapeHtml(op.e[4])}</span>`);
+    } else if (op) {
+      const cls = (CATS[(M.masters[op.master] || {}).family] || {}).title || op.master;
+      h += row("Clifford", `<span class="muted">no ions: ${escapeHtml(cls)} works on bits</span>`);
+      h += row("Hardware", `<span class="muted">${escapeHtml(op.e[4])} at ${escapeHtml(op.place)}</span>`);
+    } else {
+      h += row("Clifford", `<span class="muted">a Pauli kept in software: no ion is touched</span>`);
+      h += row("Hardware", `<span class="muted">a line in the classical memory</span>`);
+    }
+    el.innerHTML = h;
+    for (const [k] of STK_LAYERS) {
+      const box = document.querySelector(`.stk-lines[data-layer="${k}"]`);
+      if (!box || !box.parentNode.open) continue;
+      const cur = c[k] ? c[k][0] : 0;
+      const lines = STK.layers[k].lines;
+      let html = "";
+      for (let ln = 1; ln <= lines.length; ln++) {
+        const can = stkFirst[k][ln] !== undefined;
+        html += `<div class="stk-ln${ln === cur ? " cur" : ""}${can ? "" : " none"}" data-layer="${k}" data-line="${ln}" data-hint="fullstack-line"><span class="ln">${escapeHtml(stkWhere(k, ln).split(":").pop())}</span><span>${escapeHtml(lines[ln - 1] || " ")}</span></div>`;
+      }
+      box.innerHTML = html;
+      const cl = box.querySelector(".cur");
+      if (cl) box.scrollTop = Math.max(0, cl.offsetTop - box.offsetTop - box.clientHeight / 2);
+    }
+  }
+
   function focusInstruction(id) {
     const leaves = [...M.insLeaves[id]];
     if (!leaves.length) return;
@@ -2469,7 +2646,7 @@
       $("clock").innerHTML = `${fmtTime(S.t)} <small>/ ${fmtTime(M.makespan)}</small>`;
       decodeBadge();
       // the level and instance inspectors quote live counts, so they follow the clock too
-      if (now - lastPanel > 180) { updateProgram(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector(); lastPanel = now; panelDue = false; }
+      if (now - lastPanel > 180) { updateProgram(); stkUpdate(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector(); lastPanel = now; panelDue = false; }
       else panelDue = true;
       if (now - lastHash > 1000) { writeHash(); lastHash = now; }
       S.dirty = false; S.tlDirty = false;
@@ -2478,7 +2655,7 @@
     // clicking a `decode` just after anything else -- used to leave the Program pane showing
     // the first moment until something else moved the clock.
     if (panelDue && !S.dirty && now - lastPanel > 180) {
-      updateProgram(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector();
+      updateProgram(); stkUpdate(); updateTreeDots(); if (!S.sel || S.sel.kind === "inst") renderInspector();
       lastPanel = now; panelDue = false;
     }
     requestAnimationFrame(frame);
@@ -2499,6 +2676,8 @@
   renderTraffic();
   setupFloorplan();
   renderProgram();
+  stkInit();
+  stkUpdate();
   legend();
   go(S.path);
   fit();

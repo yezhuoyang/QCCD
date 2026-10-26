@@ -17,6 +17,7 @@ reads it from the library JSON).
     stadium   rounded ends                               readout
     hexagon   pointed left and right                     logical operation
     bridge    arch cut from the bottom edge              lattice surgery
+    dome      a domed roof (an observatory)              Pauli-product measurement
     sawtooth  factory roof                               magic-state factory
     chevron   pointed right, notched left                magic-state injection
     garage    trapezoid                                  ion depot
@@ -83,6 +84,13 @@ CATEGORIES: dict[str, dict] = {
                "split again: the product Z̄Z̄ or X̄X̄ is measured without touching either "
                "logical alone.",
     },
+    "ppm": {
+        "title": "Pauli Product Measurement", "place": "Observatory", "shape": "dome", "glyph": "PPM",
+        "stroke": "#4d7c0f", "fill": "#ecfccb",
+        "job": "Up to three blocks come in; a resident probe ion measures the product of one "
+               "X̄ or Z̄ from each -- Z̄_A X̄_B Z̄_C, say -- without reading any of them alone: "
+               "the operation a program written in Pauli-product measurements is made of.",
+    },
     "factory": {
         "title": "Magic State Factory", "place": "Factory", "shape": "sawtooth", "glyph": "MSF",
         "stroke": "#b91c1c", "fill": "#fee2e2",
@@ -132,7 +140,7 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "readout", "factory", "injection",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "injection",
          "decoder", "archive", "depot", "road", "wire"]
 
 #: categories that hold no ions: they run on bits
