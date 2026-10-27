@@ -128,7 +128,26 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
-**Deployed** 2026-10-26, from commit `20a23a0` (pushed, also on `website/invitations`): R4d's hold
+**Deployed** 2026-10-27 00:45 UTC, from commit `c0772fc` (pushed, also on `website/invitations`): the
+grader reads the evaluation texts -- the noisy circuit is written by the noise model's text
+(`qccd/evalset/library/qccd-noise@2.eval`), the metrics stage is `metrics.eval`, the device budget
+is `board.eval`'s B1 and B2 -- and every studio page carries the evaluation. Derived from
+`20a23a0` (`qccd/`, `arch/` and `Compiler/bridge` from `c0772fc`; the 625 files equal the git
+archive; 59 layers, `20a23a0`'s 55 plus four), and built ON THE DROPLET: the derivation is COPY
+only, and the desktop was at its commit limit, where Docker Desktop risks a hard reset. Rollback
+`*.bak-20a23a0`. Before switching, a census over every stored submission ran the new code in the
+current image (one-off container, volumes read-only, no network): on all 71, the device stage
+and every metric equal the stored report, and on the 54 with a memory experiment the circuit is
+the old extraction's qubit by qubit, every budget line to 1e-9 (`qccd/qec/legacy_extract.py` is
+`20a23a0`'s extraction, renamed). Rehearsal in the new image on two stored submissions: every stage
+and metric the same; a logical error rate is sampled again from the same circuit written in
+another line order (rep3xz: 457 -> 463 errors in 50,000 shots, inside the stored interval), so no
+stored report was regraded. Production smoke passed (GHZ, private, 38 s, no stage or metric
+difference); `worker redraw` drew all 72 entry pages (0 failed). The page stamp is now
+`62c6949104c61515` on the server and in every checkout (it hashes the text, line endings
+normalized).
+
+**Before that** 2026-10-26, from commit `20a23a0` (pushed, also on `website/invitations`): R4d's hold
 clause (a switchless channel cannot hold a loaded site) and the waveform census in `hardware_report`.
 Derived from `d41a6e5` (`qccd/`, `arch/` and `Compiler/bridge` from `20a23a0`; the 603 files equal
 the git archive); 55 layers identical; rollback `*.bak-d41a6e5`; the page template is unchanged, so
