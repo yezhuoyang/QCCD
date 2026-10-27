@@ -184,3 +184,31 @@ again = TSIR.load("out/deck24.tsir.json")
 
 `validate_program(prog)` shape-checks ids, types and required fields without needing an
 architecture.
+
+## Text
+
+The JSON is what passes read; the text (`qccd/ir/tsir_text.py`) is what a person reads, and
+what the gadget page lights line by line. They are the same program:
+`parse_program(program_text(p)) == p`, held for every leaf program of the gadget library
+(`tests/test_tsir_text.py`).
+
+```
+tsir msf15.produce+cooling          the program's name
+arch msf15                          its architecture
+id_seq 412                          the identity allocator's high-water mark
+meta {"derived_from": ...}          its own metadata (JSON), if any
+0 init f0@S0 f1@S1 | f0=0.1 f1=0.1  placement | n̄
+1 simd rotate_cw ~L0 +3             ; op=ring kind=rotate
+2 simd dock f3:S1->A1               ; op=ring
+3 gate CX f3:f12 @A1                ; src=rm15.circ:41
+4 gate H f0 f1 @A0 @A1              ; src=rm15.circ:32
+5 measure f4                        ; src=rm15.circ:131
+6 cool                              (alone: the broadcast cool)
+```
+
+A line starts with the instruction's id (an identity, not a position). After ` ; ` come
+`key=value` pairs: the instruction's metadata, and, with a leading dot, one of its own
+fields where it differs from what the line implies (`.mode=inter`, `.t0=12.5`). A value is
+a bare word or JSON. A simd line is either the rigid rotation `~LOOP ±k` or one
+`ion:from->to[via,...]` per participant; a gate line is pairs `a:b` or a batch of
+single-qubit gates on bare ions.
