@@ -294,21 +294,23 @@ class MacroCity(City):
 
     # -- resting: a block with a home rests there, any other in a free place no home is ----
 
-    def park(self, bundle: Bundle, t_min, ins, grp):
-        Z = self.home_of.get(bundle.name)
-        if Z is None:
+    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True):
+        Z = at if at is not None else self.home_of.get(bundle.name)
+        if at is not None:
+            pass                                     # a cooling stop on the way (City.bring)
+        elif Z is None:
             free = [p for p, h in self.zone_holder.items() if h is None and p not in self.no_rest]
             if not free:
                 raise FoldError(f"no free place for {bundle.name} to rest in: every memory and "
                                 f"zone is a block's home or taken")
             kind = "memory" if any(self.family(p) == "memory" for p in free) else "zone"
             Z = self._choose(kind, _ANY, near=(bundle.leaf, bundle.port), ready=t_min,
-                             free=lambda p: p in free)
+                             free=lambda p: p in free, gids=bundle.gids)
         elif self.zone_holder.get(Z) not in (None, bundle.name):
             raise FoldError(f"{bundle.name}'s home {Z} holds {self.zone_holder[Z]}")
         kind = self.family(Z)
         in_op = "store" if kind == "memory" else "check_in"
-        gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp)
+        gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp, stop_ok=stop_ok)
         s, _, row = self.op(Z, in_op, {"in": (gids, arr, trip)}, t_min, ins, grp)
         if kind == "memory":
             self.mem_last[Z] = row[2]
@@ -377,7 +379,7 @@ class MacroCity(City):
                        "update_us": self.leaf[self.archive].master.ops["update"].duration_us}
         return pats[M]
 
-    def bring(self, bundle: Bundle, dst, t_min, ins, grp):
+    def bring(self, bundle: Bundle, dst, t_min, ins, grp, *, stop_ok: bool = True):
         if bundle.resting and bundle.name in self.rest_since:
             Z = bundle.leaf
             t = t_min
@@ -387,7 +389,7 @@ class MacroCity(City):
                 t = max(t, busy - self._distance((Z, "out"), dst) - out_op.duration_us)
             self.cover(bundle.name, max(t, self.mem_last.get(Z, 0.0)), self.current)
             del self.rest_since[bundle.name]
-        return super().bring(bundle, dst, t_min, ins, grp)
+        return super().bring(bundle, dst, t_min, ins, grp, stop_ok=stop_ok)
 
     # -- instructions ---------------------------------------------------------------------
 
@@ -764,12 +766,8 @@ def build_folded(alg, *, out_dir, cache_dir="out/gadgets/cache", leaves=None, lo
         "rules": ({"passed": len(rules["passed"]), "failed": rules["failed"], "total": len(rules["rules"])}
                   if rules else None),
     }
-    leaf_files = {}
-    for name in lib.leaf_masters():
-        payload = _json.dumps(published(leaves.data[name])).replace("</", "<\\/")
-        (out / "leaf" / f"{name}.js").write_text(
-            f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
-        leaf_files[name] = f"leaf/{name}.js"
+    from .build import write_leaf_files
+    leaf_files, _ = write_leaf_files(out, lib, leaves, g)
     (out / f"{alg.name}.alg").write_text(alg.source, encoding="utf-8")
     render_page(out / "index.html", lib=lib, gir=root, checks=checks, leaf_files=leaf_files,
                 rules=PLACE_RULES, machine_rules=rules,

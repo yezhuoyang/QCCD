@@ -149,7 +149,9 @@ class BayProgram(TrackedProgram):
     def absorb(self, port: str, ions: list[str], homes: list[int], *,
                cool_every: int | None = None, **meta) -> None:
         """Take `ions` in through `port`, one at a time, each onto its home slot.  With
-        `cool_every`, the ions already inside are cooled every that-many arrivals."""
+        `cool_every`, the ions already inside are cooled every that-many arrivals, and all of
+        them once the last is in: a bundle arrives with its trip's heat (heat.py follows it),
+        and the last ions in would otherwise carry it until the op's first gate."""
         corner = self.bay.corner_slot(self.bay.ports[port])
         for j, (ion, h) in enumerate(zip(ions, homes)):
             if cool_every and j and j % cool_every == 0:
@@ -159,6 +161,8 @@ class BayProgram(TrackedProgram):
                 raise RuntimeError(f"{self.bay.name}: door slot S{corner} is occupied")
             self.move("port_in", [(ion, self.bay.trap(port))], door=port, **meta)
             self.move("undock", [(ion, f"S{corner}")], door=port, **meta)
+        if cool_every and ions:
+            self.cool_inside(door=port, **meta)
 
     def cool_inside(self, **meta) -> None:
         """Cool every ion still inside the bay, by name.  A broadcast cool is illegal while an

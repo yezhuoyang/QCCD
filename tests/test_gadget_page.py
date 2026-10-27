@@ -125,6 +125,9 @@ def _arch_of(data: dict, out: Path):
     if name.startswith("fac"):
         from qccd.gadget.leaves import factory
         return _cached_machine(name, lambda: factory.factory_t15()).arch
+    if name.startswith("chan"):
+        # a road: its conveyor, the device every carry on a road that long runs on
+        return _cached_machine(name, lambda: transport.channel(int(name[4:]), 1)).arch
     return _cached_machine(name, lambda: transport.junction()).arch
 
 

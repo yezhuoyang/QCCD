@@ -74,12 +74,14 @@ algorithm's ideal circuit.
 from __future__ import annotations
 
 import heapq
+from dataclasses import dataclass
 
 from .algorithm import Algorithm, Instr, rotation_basis
 from .library import LeafLibrary
 from .model import Library
 from .logic.decode import LATENCY
 from .synth import Calendar, SynthError, flatten, ion_order
+from .heat import op_heat, road_heat
 
 __all__ = ["schedule", "CityError"]
 
@@ -143,6 +145,21 @@ class Bundle:
         self.resting = False
 
 
+@dataclass
+class _Times:
+    times_us: list
+
+
+@dataclass
+class _Train:
+    op: str
+    name: str
+    each_us: float
+    duration_us: float
+    tin: _Times
+    tout: _Times
+
+
 class City:
     def __init__(self, alg: Algorithm, lib: Library, leaves: LeafLibrary, log=None,
                  parallel: bool = True):
@@ -203,6 +220,14 @@ class City:
         #: depends on a branch (see `certain`)
         self.guard_reads = set(alg.guard_cvars)
         self.branch_frames: list[dict] = []
+        #: every ion's n̄ as the schedule is made (heat.py): an op replayed from the n̄ its
+        #: ions arrive at, a road and a junction pass adding what their replay charges.  A
+        #: trip that would take a bundle past the ion-loss limit goes the coolest way, and a
+        #: bundle is sent only where it can arrive under it (G6).
+        self.heat: dict[int, float] = {}
+        from .checks import ION_LOSS_QUANTA
+        self.heat_limit = float(ION_LOSS_QUANTA)
+        self._entry_memo: dict = {}
         self._graph()
         self._control()
 
@@ -231,8 +256,8 @@ class City:
                 for a in li.master.ports:
                     for b in li.master.ports:
                         if a.name != b.name:
-                            op = li.master.ops[f"pass.{a.node}.{b.node}"]
-                            edge((path, a.name), (path, b.name), op.duration_us, "junction",
+                            op = li.master.ops[f"pass.{a.node}.{b.node}.1"]
+                            edge((path, a.name), (path, b.name), 9 * op.duration_us, "junction",
                                  (path, a.name, b.name, f"pass.{a.node}.{b.node}"))
 
     def _dijkstra(self, src):
@@ -268,8 +293,104 @@ class City:
         d = self._dijkstra(src).get(dst)
         return d[0] if d else float("inf")
 
+    # -- heat ---------------------------------------------------------------------------------
+
+    def _heat_through(self, path, opname, bind) -> None:
+        hs = op_heat(self.leaves, self.leaf[path].master, opname) if path in self.leaf else None
+        if not hs:
+            return
+        for name, gid in bind:
+            h = hs.get(name)
+            if h is not None and isinstance(gid, int):
+                self.heat[gid] = h.through(self.heat.get(gid, 0.0))[1]
+
+    def _bundle_heat(self, gids) -> float:
+        return max((self.heat.get(g, 0.0) for g in gids), default=0.0)
+
+    def _hop_heat(self, kind, info, n: int) -> float:
+        if kind == "net":
+            return road_heat(self.leaves, self.nets[info].length)
+        jpath, _a, _b, opname = info
+        hs = op_heat(self.leaves, self.leaf[jpath].master, f"{opname}.1")
+        return max((h.pre for h in hs.values() if h.enters), default=0.0) if hs else 0.0
+
+    def _entry_heat(self, dst) -> float:
+        """The most any op of place `dst[0]` taking ions in at door `dst[1]` heats one before
+        it cools it: what a bundle must still have room for when it arrives."""
+        if dst not in self._entry_memo:
+            li = self.leaf[dst[0]]
+            worst = 0.0
+            for name, O in li.master.ops.items():
+                if not any(t.dir == "in" and t.port == dst[1] for t in O.transfers):
+                    continue
+                hs = op_heat(self.leaves, li.master, name)
+                if hs:
+                    worst = max([worst] + [h.pre for h in hs.values() if h.enters])
+            self._entry_memo[dst] = worst
+        return self._entry_memo[dst]
+
+    def _route_heat(self, hops, n: int) -> float:
+        return sum(self._hop_heat(kind, info, n) for kind, info, _u, _v in hops)
+
+    def _coolest(self, src, dst, n: int):
+        """(the route from `src` to door `dst` that heats a bundle of `n` least, its heat).
+        A road's and a junction pass's heat are their replays': fixed, so each search from a
+        door is made once."""
+        memo = self.__dict__.setdefault("_coolest_memo", {})
+        dist = memo.get((src, n))
+        if dist is None:
+            dist = {src: (0.0, None)}
+            pq = [(0.0, 0, src)]
+            tie = 0
+            while pq:
+                d, _, u = heapq.heappop(pq)
+                if d > dist[u][0]:
+                    continue
+                if u != src and not self.leaf[u[0]].master.name.startswith("junc"):
+                    continue
+                for v, _w, kind, info in self.adj.get(u, ()):
+                    nd = d + self._hop_heat(kind, info, n)
+                    if v not in dist or nd < dist[v][0] - 1e-12:
+                        dist[v] = (nd, (u, kind, info))
+                        tie += 1
+                        heapq.heappush(pq, (nd, tie, v))
+            memo[(src, n)] = dist
+        if dst not in dist:
+            raise CityError(f"no road from {src[0]}.{src[1]} to {dst[0]}.{dst[1]}")
+        hops, v = [], dst
+        while dist[v][1] is not None:
+            u, kind, info = dist[v][1]
+            hops.append((kind, info, u, v))
+            v = u
+        return list(reversed(hops)), dist[dst][0]
+
+    def _plan(self, gids, src, dst):
+        """The route a bundle takes: the quickest, unless it would arrive too hot for the
+        place to take it under the ion-loss limit; then the coolest."""
+        hops = self._route(src, dst)
+        room = self.heat_limit - self._entry_heat(dst) - self._bundle_heat(gids)
+        if self._route_heat(hops, len(gids)) <= room + 1e-9:
+            return hops
+        cool, q = self._coolest(src, dst, len(gids))
+        return cool if q < self._route_heat(hops, len(gids)) else hops
+
+    def _reachable(self, cands, near, port, gids):
+        """The candidates a bundle at `near` can reach under the ion-loss limit (by its coolest
+        road), else the one it reaches coolest."""
+        if near is None or not gids or len(cands) < 2:
+            return cands
+        start = self._bundle_heat(gids)
+        cost = {}
+        for p in cands:
+            try:
+                cost[p] = start + self._coolest(near, (p, port), len(gids))[1] + self._entry_heat((p, port))
+            except CityError:
+                continue
+        ok = [p for p in cands if p in cost and cost[p] <= self.heat_limit + 1e-9]
+        return ok or ([min(cost, key=cost.get)] if cost else cands)
+
     def _choose(self, category: str, ins: Instr, near=None, port="in", free=None,
-                ready: float = 0.0, also=()):
+                ready: float = 0.0, also=(), gids=None):
         """Which place of `category` an instruction uses.  Sequential: the nearest to `near`.
         Parallel: the one where the op could start soonest -- when the place is free, or when
         the blocks could be there, whichever is later -- counting the travel of the blocks
@@ -283,6 +404,8 @@ class City:
         if not cands:
             raise CityError(f"the design has no {'free ' if free else ''}{category} place"
                             + (f" named {ins.at}" if ins.at else ""))
+        if gids is not None:
+            cands = self._reachable(cands, near, port, gids)
         if len(cands) == 1:
             return cands[0]
         if not self.parallel:
@@ -620,6 +743,7 @@ class City:
         # and `gir()` renumbers both together
         row = [len(self.events), round(t0, 3), round(t1, 3), path, op, 1, ins, group,
                bind or [], []]
+        self._heat_through(path, op, bind or [])
         if guard is not None:
             # element 10: this op is classically controlled.  The place is reserved either
             # way; `ready_us` is when the bit was at its door, which G11 checks.
@@ -632,6 +756,9 @@ class City:
         row = [0, net, src[0], src[1], round(t0, 3), [round(d - t0, 3) for d in deps],
                round(tau, 3), list(gids), role, ins, group, round(max(takes), 3),
                [round(k - t0, 3) for k in takes]]
+        q = road_heat(self.leaves, self.nets[net].length)
+        for g in gids:
+            self.heat[g] = self.heat.get(g, 0.0) + q
         self.carries.append(row)
         self.net_cal[net].reserve(t0, max(takes))
         return row
@@ -713,6 +840,27 @@ class City:
                                     if li.master.name.startswith("junc")}
         return js
 
+    def _train(self, jpath, a, b, opname, n: int):
+        """A bundle of `n` crossing junction `jpath` from arm `a` to arm `b`: one ion at a
+        time, each the junction's lone-ion pass (`pass.A.B.1`, its own TSIR), back to back as
+        the road in front delivers them -- the rest of the bundle waits on the road's sites,
+        never stacked on the arm's stub.  Returned as one op over the whole crossing, with
+        each ion's in and out time, which is what a trip schedules."""
+        O1 = self.leaf[jpath].master.ops.get(f"{opname}.1")
+        if O1 is None:
+            raise CityError(f"junction {jpath} has no lone-ion pass {opname}.1")
+        tin1, tout1 = O1.transfer(a, "in"), O1.transfer(b, "out")
+        d1 = O1.duration_us
+        return _Train(op=f"{opname}.1", name=tin1.ions[0], each_us=d1, duration_us=n * d1,
+                      tin=_Times([k * d1 + tin1.times_us[0] for k in range(n)]),
+                      tout=_Times([k * d1 + tout1.times_us[0] for k in range(n)]))
+
+    def _passes(self, jpath, O, s: float, gids, ins, grp) -> None:
+        """The train's events: one lone-ion pass per ion, back to back from `s`."""
+        for k, g in enumerate(gids):
+            t0 = s + k * O.each_us
+            self.event(jpath, O.op, t0, t0 + O.each_us, ins, grp, bind=[[O.name, g]])
+
     def trip(self, gids, src, deps, dst, t_min, ins, grp):
         """Take a bundle leaving `src` at `deps` to door `dst`: junction passes are scheduled
         on the way; returns (arrival times at `dst`, the last channel, still open)."""
@@ -721,26 +869,21 @@ class City:
         t_min = max(t_min, self.road_free)
         t = list(deps)
         trip = None
-        for kind, info, u, _v in self._route(src, dst):
+        for kind, info, u, _v in self._plan(gids, src, dst):
             if kind == "net":
                 tau = self.leaves.channel_timing(self.nets[info].length, 1)["transit_us"]
                 trip = (info, u, list(t), tau)
                 t = [d + tau for d in t]
             else:
                 jpath, a, b, opname = info
-                if len(gids) != 9:
-                    opname = f"{opname}.{len(gids)}"
-                O = self.leaf[jpath].master.ops.get(opname)
-                if O is None:
-                    raise CityError(f"junction {jpath} cannot pass a bundle of {len(gids)}")
-                tin, tout = O.transfer(a, "in"), O.transfer(b, "out")
+                O = self._train(jpath, a, b, opname, len(gids))
+                tin, tout = O.tin, O.tout
                 s = max(t_min, max(x - i for x, i in zip(t, tin.times_us)))
                 s = self.cal[jpath].earliest(s, O.duration_us)
                 net, usrc, udeps, tau = trip
                 self.carry(net, usrc, udeps, tau, gids, "data", ins, grp,
                            takes=[s + i for i in tin.times_us])
-                self.event(jpath, opname, s, s + O.duration_us, ins, grp,
-                           bind=[[nm, g] for nm, g in zip(tin.ions, gids)])
+                self._passes(jpath, O, s, gids, ins, grp)
                 t = [s + x for x in tout.times_us]
                 trip = None
         self.road_free = max([self.road_free] + list(t))
@@ -751,7 +894,7 @@ class City:
         may wait there; from the first junction on it never stops until the road in front of
         `dst`, where it may wait again.  Every junction and road between is leased to it for
         exactly the time it is there; if any is taken, the whole wave starts later."""
-        hops = self._route(src, dst)
+        hops = self._plan(gids, src, dst)
         nets = [h for h in hops if h[0] == "net"]
         juncs = [h for h in hops if h[0] == "junction"]
         taus = [self.leaves.channel_timing(self.nets[h[1]].length, 1)["transit_us"] for h in nets]
@@ -761,12 +904,8 @@ class City:
         passes = []
         for h in juncs:
             jpath, a, b, opname = h[1]
-            if len(gids) != 9:
-                opname = f"{opname}.{len(gids)}"
-            O = self.leaf[jpath].master.ops.get(opname)
-            if O is None:
-                raise CityError(f"junction {jpath} cannot pass a bundle of {len(gids)}")
-            passes.append((jpath, opname, O, O.transfer(a, "in"), O.transfer(b, "out")))
+            O = self._train(jpath, a, b, opname, len(gids))
+            passes.append((jpath, O.op, O, O.tin, O.tout))
         arr0 = [d + taus[0] for d in deps]
         s1 = max([t_min] + [x - i for x, i in zip(arr0, passes[0][3].times_us)])
         for _ in range(100000):
@@ -799,15 +938,16 @@ class City:
             net, usrc, udeps, tau = trip
             self.carry(net, usrc, udeps, tau, gids, "data", ins, grp,
                        takes=[starts[k] + i for i in tin.times_us])
-            self.event(jpath, opname, starts[k], starts[k] + O.duration_us, ins, grp,
-                       bind=[[nm, g] for nm, g in zip(tin.ions, gids)])
+            self._passes(jpath, O, starts[k], gids, ins, grp)
             outs = [starts[k] + x for x in tout.times_us]
             trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1])
             t = [o + taus[k + 1] for o in outs]
         return t, trip
 
-    def bring(self, bundle: Bundle, dst, t_min, ins, grp):
-        """A block to door `dst`: out of its zone first if it rests in one."""
+    def bring(self, bundle: Bundle, dst, t_min, ins, grp, *, stop_ok: bool = True):
+        """A block to door `dst`: out of its zone first if it rests in one.  If no road takes
+        it there under the ion-loss limit, it is recooled on the way: stored in a free memory
+        (whose lasers cool it) and released again -- a cooling stop (`_cooling_stop`)."""
         if bundle.resting:
             Z = bundle.leaf
             lease = getattr(bundle, "lease", None)
@@ -834,21 +974,72 @@ class City:
             bundle.leaf, bundle.port = Z, "out"
             bundle.resting = False
             self.zone_holder[Z] = None
+        if stop_ok and self._arrives_too_hot(bundle.gids, (bundle.leaf, bundle.port), dst):
+            M = self._cooling_stop(bundle, dst)
+            if M is not None and self.family(M) == "memory":
+                self.park(bundle, t_min, ins, grp, at=M, stop_ok=False)
+                return self.bring(bundle, dst, t_min, ins, grp, stop_ok=False)
+            if M is not None:
+                # a clinic: one syndrome round under its lasers, reported like any other
+                gids, arr, trip = self.bring(bundle, (M, "in"), t_min, ins, grp, stop_ok=False)
+                _s, outs, row = self.op(M, "se.1", {"in": (gids, arr, trip)}, t_min, ins, grp)
+                self.report(M, "se.1", row, ins, grp, blocks=[bundle.name])
+                bundle.gids, bundle.deps = outs["out"][0], outs["out"][1]
+                bundle.leaf, bundle.port = M, "out"
+                return self.bring(bundle, dst, t_min, ins, grp, stop_ok=False)
         arr, trip = self.trip(bundle.gids, (bundle.leaf, bundle.port), bundle.deps, dst,
                               t_min, ins, grp)
         return bundle.gids, arr, trip
 
-    def park(self, bundle: Bundle, t_min, ins, grp):
+    def _exit_heat(self, place, opname) -> float:
+        hs = op_heat(self.leaves, self.leaf[place].master, opname)
+        return max((h.out for h in hs.values() if h.leaves), default=0.0) if hs else 0.0
+
+    def _arrives_too_hot(self, gids, src, dst) -> bool:
+        hops = self._plan(gids, src, dst)
+        return (self._bundle_heat(gids) + self._route_heat(hops, len(gids)) + self._entry_heat(dst)
+                > self.heat_limit + 1e-9)
+
+    def _cooling_stop(self, bundle: Bundle, dst):
+        """Where to recool `bundle` on its way to `dst`: a free memory (stored and released,
+        its lasers cool it) or a clinic (one syndrome round), that it reaches under the
+        ion-loss limit and that sends it on to reach `dst` under it; the quickest such
+        detour.  None if there is none (the trip then goes as it is, and G6 says so)."""
+        src = (bundle.leaf, bundle.port)
+        n, start = len(bundle.gids), self._bundle_heat(bundle.gids)
+        best = None
+        stops = [(M, "release") for M, holder in self.zone_holder.items()
+                 if holder is None and self.family(M) == "memory" and M not in getattr(self, "no_rest", ())]
+        stops += [(C, "se.1") for C, li in self.leaf.items()
+                  if li.master.family == "se" and "se.1" in li.master.ops]
+        for M, out_op in stops:
+            try:
+                there = start + self._coolest(src, (M, "in"), n)[1] + self._entry_heat((M, "in"))
+                on = (self._exit_heat(M, out_op) + self._coolest((M, "out"), dst, n)[1]
+                      + self._entry_heat(dst))
+            except CityError:
+                continue
+            if there <= self.heat_limit + 1e-9 and on <= self.heat_limit + 1e-9:
+                key = (self._distance(src, (M, "in")) + self._distance((M, "out"), dst), M)
+                if best is None or key < best:
+                    best = key
+        return None if best is None else best[1]
+
+    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True):
         """Rest a block until its next use: in a free memory if the design has one (it will
-        be corrected while it rests), else in a free logical zone."""
+        be corrected while it rests), else in a free logical zone.  `at`: this memory (a
+        cooling stop)."""
         near = (bundle.leaf, bundle.port)
-        mems = [p for p, h in self.zone_holder.items()
-                if h is None and self.family(p) == "memory"]
-        kind = "memory" if mems else "zone"
-        Z = self._choose(kind, _ANY, near=near, ready=t_min,
-                         free=lambda p: self.zone_holder[p] is None)
+        if at is not None:
+            Z, kind = at, self.family(at)
+        else:
+            mems = [p for p, h in self.zone_holder.items()
+                    if h is None and self.family(p) == "memory"]
+            kind = "memory" if mems else "zone"
+            Z = self._choose(kind, _ANY, near=near, ready=t_min,
+                             free=lambda p: self.zone_holder[p] is None, gids=bundle.gids)
         in_op = "store" if kind == "memory" else "check_in"
-        gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp)
+        gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp, stop_ok=stop_ok)
         s, _, row = self.op(Z, in_op, {"in": (gids, arr, trip)}, t_min, ins, grp)
         if kind == "memory":
             self.mem_last[Z] = row[2]
@@ -1057,7 +1248,7 @@ class City:
                         outcome=(f"{ins.basis}̄ measured", flip, ins.cvar))
             self.pf.pop(q, None)
             used, deps = outs["out"]
-            D = self._choose("depot", _ANY, near=(R, "out"), port="in")
+            D = self._choose("depot", _ANY, near=(R, "out"), port="in", gids=used)
             arr, trip = self.trip(used, (R, "out"), deps, (D, "in"), t0, ins.index, grp)
             self.op(D, "dump.9", {"in": (used, arr, trip)}, t0, ins.index, grp)
             del self.blocks[q]
@@ -1213,7 +1404,7 @@ class City:
         self.block_info[y]["read"] = row[1]
         self.pf.pop(y, None)
         used, deps = outs["out"]
-        Dp = self._choose("depot", _ANY, near=(R, "out"), port="in")
+        Dp = self._choose("depot", _ANY, near=(R, "out"), port="in", gids=used)
         uarr, utrip = self.trip(used, (R, "out"), deps, (Dp, "in"), t0, ins.index, grp)
         self.op(Dp, "dump.9", {"in": (used, uarr, utrip)}, t0, ins.index, grp)
         cond = xor(m_pp or ZERO, m_r or ZERO)

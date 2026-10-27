@@ -253,9 +253,9 @@ nor keep them alive for seconds.
 |---|---|
 | instructions | 157 written (after `standard` expands) + 32 refresh rounds |
 | magic states / π/4 gadgets / surgeries | 15 / 29 / 44 |
-| events, carries | 4,435, 3,668 |
-| makespan | 11.16 s |
-| traffic | 313,727 ion-sites; 3,262 junction passes; longest wait on a road 0.23 s |
+| events, carries | 27,559, 3,736 (a junction passes one ion at a time: GADGETS.md §4.1) |
+| makespan | 11.11 s |
+| traffic | 325,888 ion-sites; 26,386 junction passes, one ion each; longest wait on a road 0.23 s; hottest ion n̄ = 204 (limit 510) |
 | machine rules | F1–F9 and G1–G14 hold; nothing refused |
 | flat sign-off | does not apply: 11 outcomes a guard reads are corrected by frames that are products of bits |
 | compositional sign-off | passed: places (G9), gadgets (S̄, √X̄), gates (sdg, h, t, tdg, ccx, cswap), composition (23 rules), semantics m1 = 0, (m2, m3) uniform |

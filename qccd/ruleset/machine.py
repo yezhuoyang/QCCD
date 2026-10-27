@@ -152,6 +152,7 @@ class MachineModel:
     messages: list = field(default_factory=list)
     event_by_id: dict = field(default_factory=dict)
     intakes: dict = field(default_factory=dict)        # Intake -> facts
+    taken: dict = field(default_factory=dict)          # id(carry) -> its ions as taken in
     handoffs: list = field(default_factory=list)       # (time, rank, gid, what, where, origin)
     handoff_instant: list = field(default_factory=list)
     residents: dict = field(default_factory=dict)      # Ion -> home Place
@@ -301,11 +302,17 @@ def _with_program(M: MachineModel, hw: Hardware, gir: dict, name: str) -> Execut
             last[b] = ins["id"]
     M.blocks = dict(gir["blocks"])
 
-    # ------------------------------------------------------------------ intakes (G1)
-    by_take: dict[tuple, list] = {}
+    # ------------------------------------------------------------------ intakes (G1, G12)
+    # ion by ion: an op takes each ion in at the time its replay says, and the carry that
+    # brings it says when it was taken off the road.  A place's op takes a whole bundle; a
+    # junction takes a bundle one ion at a time, each a lone pass of its own.
+    by_ion: dict[tuple, list] = {}
     for c in M.carries:
-        by_take.setdefault((c.facts["to"].id, c.facts["to_port"], c.facts["instruction"]),
-                           []).append(c)
+        row = c.facts["row"]
+        for k, g in enumerate(row[7]):
+            by_ion.setdefault((c.facts["to"].id, c.facts["to_port"], c.facts["instruction"], g),
+                              []).append((c, k))
+    shares: dict = {}
     for o in M.events:
         e = o.facts["row"]
         op = masters[e[3]].ops.get(e[4])
@@ -316,11 +323,22 @@ def _with_program(M: MachineModel, hw: Hardware, gir: dict, name: str) -> Execut
             if tr.dir != "in":
                 continue
             want = tuple(Ion(bound.get(nm)) for nm in tr.ions)
-            cands = [c for c in by_take.get((e[3], tr.port, e[6]), [])
-                     if abs(c.t0 + min(c.facts["row"][12]) - (e[1] + tr.t_first_us)) < 1.0]
+            carry, got = None, []
+            for nm, t in zip(tr.ions, tr.times_us):
+                g = bound.get(nm)
+                for c, k in by_ion.get((e[3], tr.port, e[6], g), []):
+                    if abs(c.t0 + c.facts["row"][12][k] - (e[1] + t)) < 1.0 and (carry is None or c is carry):
+                        carry = c
+                        got.append((k, Ion(g)))
+                        break
+            delivered = tuple(ion for _, ion in sorted(got, key=lambda x: x[0]))
             M.intakes[Intake((o.index, tr.port))] = {
                 "event": o, "port": tr.port, "expected": want,
-                "carry": cands[0] if cands else None}
+                "carry": carry, "delivered": delivered}
+            if carry is not None:
+                shares.setdefault(id(carry), []).append((min(k for k, _ in got), delivered))
+    M.taken = {id(c): tuple(ion for _, part in sorted(shares.get(id(c), []), key=lambda x: x[0])
+                            for ion in part) for c in M.carries}
 
     # ------------------------------------------------------------------ handoffs and state
     home: dict[int, str] = {}
@@ -738,6 +756,21 @@ def _expected(ctx: Ctx, k):
     return _prog(ctx, "intakes").intakes[k]["expected"]
 
 
+@term("delivered(k)", "a list of ions", "The ions intake k takes off its carry, each when "
+      "the carry says it was taken, in the order the carry brings them: the whole bundle "
+      "for a place's op, one ion for a junction's lone pass.", GROUP_M, kinds=K)
+def _delivered(ctx: Ctx, k):
+    return _prog(ctx, "intakes").intakes[k]["delivered"]
+
+
+@term("taken(c)", "a list of ions", "The ions of carry c as the ops at its far end take "
+      "them in, each op's share in turn: carry c's own order, if every ion is taken once.",
+      GROUP_M, kinds=K)
+def _taken(ctx: Ctx, c):
+    o = _activity(c, "taken")
+    return _prog(ctx, "intakes").taken.get(id(o), ())
+
+
 @term("order(c)", "a list of ions", "The ions of carry c in the order they travel.", GROUP_M,
       kinds=K)
 def _order(ctx: Ctx, c):
@@ -830,24 +863,41 @@ def _logic_failed(ctx: Ctx, e):
     return op is not None and (op.logic or {}).get("status") == "failed"
 
 
-@term("exit_heat(e)", "quanta", "The hottest a bundle leaves event e's place, as the op's "
-      "replay measured it (0 if no ion leaves).", GROUP_M, kinds=K)
+def _followed(M) -> dict:
+    """Every ion's n̄ followed through the whole schedule (qccd/gadget/heat.py), once."""
+    got = getattr(M, "_heat_followed", None)
+    if got is None:
+        from ..gadget.heat import follow
+        got = follow(M.gir, M.lib, M.leaves) if M.leaves is not None else {"events": {}}
+        M._heat_followed = got
+    return got
+
+
+@term("exit_heat(e)", "quanta", "The hottest a bundle leaves event e's place: the op replayed "
+      "from the n̄ its ions really arrive at, after every op, road and junction before it "
+      "(0 if no ion leaves).", GROUP_M, kinds=K)
 def _exit_heat(ctx: Ctx, e):
     M = _prog(ctx, "events")
     o = _activity(e, "exit_heat")
     op = M.leaf[o.facts["place"].id].master.ops.get(o.facts["op"])
     if op is None:
         return 0.0
-    return max([float(t.quanta) for t in op.transfers if t.dir == "out"] or [0.0])
+    cold = max([float(t.quanta) for t in op.transfers if t.dir == "out"] or [0.0])
+    hot = _followed(M)["events"].get(o.facts["row"][0], {}).get("exit", 0.0)
+    return max(cold, hot)
 
 
-@term("peak_heat(e)", "quanta", "The hottest any ion gets inside the op event e runs, as its "
-      "replay measured it.", GROUP_M, kinds=K)
+@term("peak_heat(e)", "quanta", "The hottest any ion gets inside the op event e runs: the op "
+      "replayed from the n̄ its ions really arrive at (heat followed across the town).",
+      GROUP_M, kinds=K)
 def _peak_heat(ctx: Ctx, e):
     M = _prog(ctx, "events")
     o = _activity(e, "peak_heat")
     op = M.leaf[o.facts["place"].id].master.ops.get(o.facts["op"])
-    return 0.0 if op is None else float(op.metrics.get("peak_quanta", 0.0))
+    if op is None:
+        return 0.0
+    hot = _followed(M)["events"].get(o.facts["row"][0], {}).get("peak", 0.0)
+    return max(float(op.metrics.get("peak_quanta", 0.0)), hot)
 
 
 @term("ion_loss_limit()", "quanta", "The hottest an ion may get before it is likely lost: about "

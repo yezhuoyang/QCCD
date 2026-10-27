@@ -122,18 +122,9 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
                                       encoding="utf-8")
     (out / f"{alg.name}.alg").write_text(alg.source, encoding="utf-8")
     # the leaves go on the website as written: provenance thinned, as build.py's are
-    from .build import published
-    leaf_files, inline_leaves = {}, {}
-    for name in lib.leaf_masters():
-        if inline:
-            # no file beside the page: the page alone is the figure
-            inline_leaves[name] = published(leaves.data[name])
-            leaf_files[name] = ""
-            continue
-        payload = json.dumps(published(leaves.data[name])).replace("</", "<\\/")
-        (out / "leaf" / f"{name}.js").write_text(
-            f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
-        leaf_files[name] = f"leaf/{name}.js"
+    # (inline: no file beside the page, the page alone is the figure)
+    from .build import write_leaf_files
+    leaf_files, inline_leaves = write_leaf_files(out, lib, leaves, gir, inline=inline)
     studio_pages = {}
     if studio_dir is not None:
         from .build import _studio_pages

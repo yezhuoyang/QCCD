@@ -681,7 +681,14 @@
       const sty = styleOf(cm);
       const busy = cm.kind === "leaf" ? M.eventAt(cpath, t) : null;
       if (cm.family === "road") {
-        // a junction is a point on a street: a dot, lit while it passes a bundle
+        // a junction is its own device -- a centre, four arms, four stubs -- and once the zoom
+        // gives it room it is drawn as one, its ions where its pass's TSIR has them
+        if (cm.kind === "leaf" && rw > 22 && M.leafData[cm.name]) {
+          drawLeafInterior(ctx, cpath, cx, cy, depth, rw);
+          if (depth === 0) hits.push([r[0], r[1], r[2], r[3], "inst", { path: cpath }]);
+          continue;
+        }
+        // farther out it is a point on a street: a dot, lit while it passes a bundle
         const b = cm.bbox && cm.bbox.length ? cm.bbox : [0, 0, 0, 0];
         const jx = X(cx + (b[0] + b[2]) / 2), jy = Y(cy + (b[1] + b[3]) / 2);
         const jr = Math.max(2.5, Math.min(7, S.cam.s * 0.9));
@@ -864,8 +871,10 @@
                    Math.max(X(ox + a[0]), X(ox + b[0])) + 4, Math.max(Y(oy + a[1]), Y(oy + b[1])) + 4,
                    "chan", { net, ch }]);
       }
-      const carries = M.carriesOn(net, S.t);
-      if (!carries.length) continue;
+      // A ROAD IS ITS OWN DEVICE: `chan<L>`, L sites one lattice unit apart along its path,
+      // a stub at each end on the doors it joins.  Its sites are drawn once the zoom puts
+      // them apart, and an ion on it is where that conveyor's TSIR has it at the ion's own
+      // local time -- the replay (`LeafSim`) that places an ion inside a place.
       const rec = M.gir.nets[net];
       const lengths = [];
       let total = 0;
@@ -874,20 +883,47 @@
         lengths.push(d);
         total += d;
       }
+      const at = (d) => {
+        let k = 0;
+        while (k < lengths.length - 1 && d > lengths[k]) { d -= lengths[k]; k++; }
+        const p0 = pts[k], p1 = pts[k + 1];
+        const u = lengths[k] > 0 ? Math.max(0, Math.min(1, d / lengths[k])) : 0;
+        return [X(ox + p0[0] + (p1[0] - p0[0]) * u), Y(oy + p0[1] + (p1[1] - p0[1]) * u)];
+      };
+      const L = rec ? Math.max(1, rec[4]) : 0;
+      const unit = L ? total / (L + 1) : 0;        // one site, in floor units (1 when the path is L + 1 long)
+      if (L && depth === 0 && S.cam.s * unit >= 7) {
+        const sr = Math.max(1.2, Math.min(3, S.cam.s * unit * 0.12));
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = COLOR.rail;
+        ctx.lineWidth = 1;
+        for (let k = 1; k <= L; k++) {
+          const [x, y] = at(k * unit);
+          ctx.beginPath(); ctx.rect(x - sr, y - sr, 2 * sr, 2 * sr); ctx.fill(); ctx.stroke();
+        }
+      }
+      const carries = M.carriesOn(net, S.t);
+      if (!carries.length) continue;
+      const sim = sims["chan" + L];
       for (const c of carries) {
         const forward = c[2] === rec[0];
         const radius = depth === 0 ? Math.max(2.2, Math.min(5, S.cam.s * 0.32)) : Math.max(1, Math.min(3, S.cam.s * 0.25));
-        for (const ion of M.carryIons(c, S.t, rec[4])) {
-          let f = forward ? ion.f : 1 - ion.f;
-          let d = f * total, k = 0;
-          while (k < lengths.length - 1 && d > lengths[k]) { d -= lengths[k]; k++; }
-          const p0 = pts[k], p1 = pts[k + 1];
-          const u = lengths[k] > 0 ? Math.min(1, d / lengths[k]) : 0;
-          const x = X(ox + p0[0] + (p1[0] - p0[0]) * u), y = Y(oy + p0[1] + (p1[1] - p0[1]) * u);
+        const queued = [];
+        const place = (ion, d) => {
+          const [x, y] = at(forward ? d : total - d);
           const col = S.follow === ion.gid ? "#000000" : (ROLE[c[8]] || COLOR.teal);
           mark(col, x, y, S.follow === ion.gid ? radius * 1.8 : radius);
           if (depth <= 1) hits.push([x - radius - 2, y - radius - 2, x + radius + 2, y + radius + 2, "ion", { gid: ion.gid, carry: c }]);
+        };
+        for (const ion of M.carryIons(c, S.t, L)) {
+          if (ion.queued) { queued.push(ion); continue; }
+          const local = S.t - (c[4] + c[5][ion.j]);
+          const st = sim ? sim.state("carry", local) : null;
+          // the conveyor's own ion: device x runs from the near stub (-1) to the far one (L)
+          place(ion, st ? (st.xy[0][0] + 1) * unit : ion.f * total);
         }
+        // arrived and waiting to be taken in: on the last sites, first taken nearest the end
+        queued.forEach((ion, q) => place(ion, Math.max(1, L - q) * unit));
       }
     }
   }

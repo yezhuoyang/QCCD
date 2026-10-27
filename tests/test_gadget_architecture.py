@@ -36,10 +36,12 @@ EXAMPLES = sorted(f for f in ALGS.glob("*.alg")
                   if "\nfloorplan " not in "\n" + f.read_text(encoding="utf-8"))
 
 #: GADGETS.md §9.3's makespans, from the sequential policy that measured them
-#: re-measured 2026-10-20, when split and merge became charged for what a move does (#16/#17)
-SEQUENTIAL_MS = {"bell_cnot": 194.6, "bell_surgery": 310.0, "ghz3": 217.7, "teleport": 591.4,
-                 "magic_state": 297.7, "magic_teleport": 817.2, "frames": 121.9,
-                 "s_gate": 549.4, "cond_cx": 161.0, "teleport_fix": 568.4, "t_gate": 728.7}
+#: re-measured 2026-10-20, when split and merge became charged for what a move does (#16/#17),
+#: and 2026-10-26, when heat was followed across the town (GADGETS.md §4.1): junctions pass a
+#: bundle one ion at a time, places with lasers cool what comes in, readouts recool
+SEQUENTIAL_MS = {"bell_cnot": 194.4, "bell_surgery": 309.3, "ghz3": 215.3, "teleport": 592.5,
+                 "magic_state": 295.1, "magic_teleport": 816.7, "frames": 121.8,
+                 "s_gate": 545.1, "cond_cx": 159.4, "teleport_fix": 568.2, "t_gate": 725.5}
 
 
 @pytest.fixture(scope="module")

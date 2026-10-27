@@ -26,7 +26,8 @@ PLACE_RULES = {
     "G3": "no place ever holds more ions than its capacity, or fewer than none",
     "G4": "a channel never holds more ions than it has sites, nor carries two ways at once",
     "G5": "a place runs one op at a time",
-    "G6": "no ion gets hotter than the ion-loss limit, inside a place or crossing a door",
+    "G6": "no ion gets hotter than the ion-loss limit, inside a place, crossing a door, or on its "
+          "way between places: its n̄ is followed through every op, road and junction",
     "G7": "every instruction is realised, and each block's instructions run in program order",
     "G8": "no block goes longer than its coherence budget without syndrome extraction",
     "G9": "every op the schedule uses is verified: hardware rules and logic (a classical "
@@ -92,9 +93,13 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
 
     # -- G1: structure, and each bundle's order at a door is the order the op binds --------
     g1 = list(lib.structure_violations())
-    by_take: dict[tuple, list] = {}
+    # ion by ion: each ion an op takes in is on a carry that ends at that door, taken off it
+    # when the op's replay takes it, and the op takes the carry's ions in the carry's order
+    # (a junction takes a bundle one ion at a time: one lone pass per ion)
+    by_ion: dict[tuple, list] = {}
     for c in carries:
-        by_take.setdefault((dst_of(c), dst_port(c), c[9]), []).append(c)
+        for k, g in enumerate(c[7]):
+            by_ion.setdefault((dst_of(c), dst_port(c), c[9], g), []).append((c, k))
     for e in events:
         op = masters[e[3]].ops.get(e[4])
         if op is None:
@@ -103,12 +108,15 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         for tr in op.transfers:
             if tr.dir != "in":
                 continue
-            want = [bound.get(nm) for nm in tr.ions]
-            cands = [c for c in by_take.get((e[3], tr.port, e[6]), [])
-                     if abs(c[4] + min(c[12]) - (e[1] + tr.t_first_us)) < 1.0]
-            if not cands:
+            got = []
+            for nm, t in zip(tr.ions, tr.times_us):
+                hit = [(c, k) for c, k in by_ion.get((e[3], tr.port, e[6], bound.get(nm)), [])
+                       if abs(c[4] + c[12][k] - (e[1] + t)) < 1.0]
+                if hit:
+                    got.append(hit[0])
+            if len(got) < len(tr.ions):
                 g1.append(f"{e[3]} {e[4]} (instruction {e[6]}): nothing arrives on {tr.port}")
-            elif cands[0][7] != want:
+            elif len({id(c) for c, _ in got}) > 1 or [k for _, k in got] != sorted(k for _, k in got):
                 g1.append(f"{e[3]} {e[4]} (instruction {e[6]}): the bundle on {tr.port} "
                           f"arrives in a different order than the op takes it")
     verdict("G1", g1)
@@ -244,6 +252,24 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
                       f"ion-loss limit {ION_LOSS_QUANTA:.0f}")
     out["metrics"]["hottest_door_crossing_quanta"] = round(hottest, 2)
     out["metrics"]["hottest_ion_quanta"] = round(peak, 2)
+    # ... and across the town: every ion's n̄ followed from op to road to junction to op, each
+    # op replayed per ion from the n̄ its ions really arrive at (heat.py).  An op alone, from
+    # cold, cannot see a bundle that crossed twenty junctions to reach it.
+    if leaves is not None:
+        from .heat import follow, op_heat
+        start = 0.0
+        for p in set(initial.values()):
+            hs = op_heat(leaves, masters[p], "refresh") if p in masters else None
+            if hs:
+                start = max(start, max(h.out for h in hs.values()))
+        followed = follow(gir, lib, leaves, initial_heat=start)
+        g6 += followed["violations"][:20] + (
+            [f"... {len(followed['violations']) - 20} more"] if len(followed["violations"]) > 20 else [])
+        out["metrics"]["heat"] = followed["metrics"]
+        out["metrics"]["hottest_ion_quanta"] = round(max(peak, followed["metrics"]["hottest_ion_quanta"]), 2)
+        hot_gates = followed["hot_gates"]
+    else:
+        hot_gates = []
     verdict("G6", g6)
 
     # -- G7 ----------------------------------------------------------------------------------
@@ -337,6 +363,9 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     out["metrics"]["ops_used"] = len(used)
     out["metrics"]["classical_ops_used"] = sum(
         1 for mname, _ in used if lib[mname].family in CLASSICAL_FAMILIES)
+    # an op is verified for ions that arrive cold; one whose two-qubit gate meets an ion still
+    # carrying its trip (no cool between) is not verified for the run it is in
+    g9 += hot_gates[:20]
     verdict("G9", g9)
 
     # -- G10: the classical half's causality --------------------------------------------------

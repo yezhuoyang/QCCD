@@ -29,7 +29,7 @@ rule G1 "Ports on a road agree, and every bundle arrives in the order its place 
   and (for all d in doors where role(d) != "any":
      count(r in roads where d in ends(r)) <= 1)
   and (for all k in intakes:
-     delivered_by(k) != none and order(delivered_by(k)) = expected(k))
+     delivered_by(k) != none and delivered(k) = expected(k))
 
 # ---------------------------------------------------------------- ownership and capacity
 
@@ -56,7 +56,7 @@ rule G5 "A place runs one op at a time" core
     not simultaneous(a, b)
 
 rule G6 "No ion gets hotter than the ion-loss limit"
-  about "Neither inside a place's op nor crossing one of its doors does an ion's motional energy pass the limit beyond which it is likely to be lost."
+  about "Neither inside a place's op, nor crossing one of its doors, nor on its way between places does an ion's motional energy pass the limit beyond which it is likely to be lost. Its n-bar is followed through every op, road and junction: a road and a junction pass add what their replay charges, and an op is replayed from the n-bar its ions arrive at, so a bundle that crossed twenty junctions is as hot as it is."
   source "arXiv:1210.3655"
   for all e in events:
     exit_heat(e) <= ion_loss_limit() and peak_heat(e) <= ion_loss_limit()
@@ -111,8 +111,8 @@ rule G11 "The decoder is called, and keeps up"
 # ---------------------------------------------------------------- parallel execution
 
 rule G12 "Every bundle that travels is taken in at the far end" core
-  about "No ion is left on a road: every carry ends with an op at its destination (a place's op, a junction's pass, a depot taking used ions back) taking its bundle in, and exactly one op does."
-  for all c in carries: count(k in intakes where delivered_by(k) = c) = 1
+  about "No ion is left on a road: every carry ends with the ops at its destination taking each of its ions in exactly once, in the order it travels -- one op for a whole bundle (a place's, a depot taking used ions back), or a junction's lone passes, one ion at a time, as the road delivers them."
+  for all c in carries: taken(c) = order(c)
 
 rule G13 "A road carries one bundle at a time" core
   about "A road is leased to one bundle from the moment its first ion enters until its last is taken off the far end; two bundles never share a road at once, so neither can block or overtake the other, whatever runs in parallel."

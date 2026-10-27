@@ -140,7 +140,7 @@ def clinic(*, name: str = "se_d3", rounds=(1, 3)) -> LeafBuild:
     for r in rounds:
         key = f"se.{r}"
         bp = BayProgram(b, f"{name}.{key}", {**home, **{d: "X_in" for d in data}})
-        bp.absorb("in", data, [ds[q] for q in range(p.n)], op="enter")
+        bp.absorb("in", data, [ds[q] for q in range(p.n)], cool_every=3, op="enter")
         bp.restore(op="enter")
         for k in range(r):
             bp.conveyor_round(p, dict(enumerate(data)), anc, ad, round_index=k)
@@ -195,7 +195,7 @@ def prep(*, name: str = "prep_d3") -> LeafBuild:
     for basis in ("Z", "X"):
         key = f"prep.{basis}"
         bp = BayProgram(b, f"{name}.{key}", {**home, **{d: "X_in" for d in data}})
-        bp.absorb("in", data, [ds[q] for q in range(p.n)], op="enter")
+        bp.absorb("in", data, [ds[q] for q in range(p.n)], cool_every=3, op="enter")
         bp.restore(op="enter")
 
         def init(batch, basis=basis):
@@ -252,7 +252,7 @@ def post_office(*, name: str = "read_d3") -> LeafBuild:
     for basis in ("Z", "X"):
         key = f"read.{basis}"
         bp = BayProgram(b, f"{name}.{key}", {d: "X_in" for d in data})
-        bp.absorb("in", data, homes, op="enter")
+        bp.absorb("in", data, homes, cool_every=3, op="enter")
         bp.restore(op="enter")
 
         def read(batch, basis=basis):
@@ -262,6 +262,10 @@ def post_office(*, name: str = "read_d3") -> LeafBuild:
 
         bp.at_docks(data, read, op="read")
         bp.restore(op="read")
+        # recool what was measured before sending it on: the ions arrived with their trip's
+        # heat and the reading added ~50 quanta more; uncooled, a bundle bound for a far
+        # depot would cross the ion-loss limit on its way (G6, heat followed across the town)
+        bp.cool_inside(op="recool")
         bp.emit("out", data, op="leave")
         build.programs[key] = _cooled(bp.prog, b.machine)
         build.titles[key] = f"measure every data ion in {basis}; Z̄ is the parity of a row" \
@@ -301,6 +305,7 @@ def zone(*, name: str = "zone_d3") -> LeafBuild:
     build = LeafBuild(master=None, machine=b.machine, home={}, roles={d: "data" for d in data})
     ident = [Flow(f"{s}({d})", {d: s}, {d: s}, "exact") for d in data for s in ("X", "Z")]
     bp = BayProgram(b, f"{name}.check_in", {d: "X_in" for d in data})
+    # no lasers here: a block rests as hot as it came (heat.py follows it out again)
     bp.absorb("in", data, homes, op="enter")
     bp.restore(op="enter")
     build.programs["check_in"] = _cooled(bp.prog, b.machine)
@@ -361,7 +366,7 @@ def memory(*, name: str = "mem_d3") -> LeafBuild:
                            LogicalFlow("Z̄", [("A", 0, "Z")], [("A", 0, "Z")])])
 
     bp = BayProgram(b, f"{name}.store", {**home, **{d: "X_in" for d in data}})
-    bp.absorb("in", data, [ds[q] for q in range(p.n)], op="enter")
+    bp.absorb("in", data, [ds[q] for q in range(p.n)], cool_every=3, op="enter")
     bp.restore(op="enter")
     bp.conveyor_round(p, dict(enumerate(data)), anc, ad, round_index=0)
     bp.restore(op="round")
@@ -790,7 +795,7 @@ def pharmacy(*, name: str = "inj_d3") -> LeafBuild:
         bp = BayProgram(b, f"{name}.{key}", {**home, "m0": "X_magic",
                                              **{d: "X_in" for d in fresh}})
         bp.absorb("magic", ["m0"], [ds[0]], op="enter")
-        bp.absorb("in", fresh, [ds[q] for q in range(1, p.n)], op="enter")
+        bp.absorb("in", fresh, [ds[q] for q in range(1, p.n)], cool_every=3, op="enter")
         bp.restore(op="enter")
 
         def init(batch, own=own):

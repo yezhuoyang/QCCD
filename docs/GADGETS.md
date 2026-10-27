@@ -129,6 +129,66 @@ leaf replays the master's TSIR for the op running at the global time, at local t
 `t − t0` (modulo the op inside `cycle × N`, and through the warp). Every level reads the
 same event list.
 
+### 4.1 Roads are devices; heat crosses the town
+
+A road is modeled the way a shuttle inside a place is. It is the conveyor `chan<L>`: L
+sites one lattice unit apart along the road's path, a stub at each end on the doors it
+joins. Every carry on the road runs that device's one-ion `carry` program. Its timing is
+that program's replay (`LeafLibrary.channel_timing`), and so is its heat. The page draws
+the road as its sites. An ion on the road is placed where that program has it at the ion's
+own local time (`LeafSim`, the replay that places ions inside a place), and it queues on
+the last sites until it is taken in. A junction is the device `junc9`: a centre, four arm
+traps and four stubs. Up close it is drawn as that device, with its ions inside while a
+pass runs.
+
+**A bundle crosses a junction one ion at a time** (user's decision, 2026-10-26). The rest
+of the bundle waits on the road's sites, and each ion makes the junction's lone-ion pass
+(`pass.A.B.1`, its own TSIR) as the road delivers it. The bundle is never stacked as one
+chain on the arm's stub. The stacked bundle pass (`pass.A.B`) is still in the library, but
+splitting that chain heats every waiting ion: 9.5 to 15.5 quanta each, against 3.4 for an
+ion crossing alone. Following heat across the town showed that stacking made trips between
+streets infeasible.
+
+A carry is therefore taken in ion by ion. Place check G1 and machine rules G1 and G12 read
+it that way:
+- each ion an op takes in is on a carry that ends at that door;
+- it is taken off the carry when the op's replay takes it;
+- each op takes its share in the order the carry brings it;
+- every ion of a carry is taken exactly once (`taken(c) = order(c)`).
+
+For a place taking a whole bundle, this is the same check as before.
+
+**Heat is followed across the town** (`qccd/gadget/heat.py`, 2026-10-26). An op is
+characterized from cold. Its replay adds what every move costs, and a cool sets the ions
+it cools to 0. One cold replay therefore says what any arrival does:
+- an ion the op cools peaks at its arrival plus what the op adds before the first cool,
+  and leaves at the op's own exit n̄;
+- an ion it never cools carries its arrival through.
+
+A road adds its conveyor's heat, and a junction pass adds its own (it cools no one): 3.4
+quanta per ion, each crossing alone. `follow(gir)` walks every ion, residents included,
+through its rows in the order it meets them.
+
+Place check G6 and machine rule G6 both read the followed heat: no ion may pass the
+ion-loss limit (510 quanta) anywhere on its way. A two-qubit gate that meets an ion still
+carrying its trip would fail G9; none does, because every op cools before its gates.
+
+Before the heat was followed, a used bundle bound for a far depot reached n̄ ≈ 630 on the
+Shor floorplan, after 27 stacked junction passes. Every op had seen it as cold. Four
+changes keep every run under the limit:
+- **junctions pass one ion at a time** (above);
+- the readout **recools** what it measured before sending it on, so it no longer adds
+  about 100 quanta to whatever the ions arrived with;
+- **a place with lasers cools a bundle as it comes in**: every three arrivals, and all of
+  it once the last is in. A zone has no lasers and stays as it was, so a block rests there
+  as hot as it came;
+- **the scheduler tracks every ion's n̄ as it plans**:
+  - a trip that would arrive too hot takes the coolest road instead of the quickest;
+  - a rest place or a dump depot is chosen among those the bundle can reach under the
+    limit;
+  - when no road is cool enough, the bundle makes a **cooling stop** on the way: a free
+    memory (stored, then released) or a clinic (one syndrome round).
+
 ---
 
 ## 5 · The beta library
@@ -402,19 +462,19 @@ decoders).
 
 | algorithm | blocks | ions | machine time | flat circuit | relation / flow | schedule distance |
 |---|---:|---:|---:|---|---|---|
-| `bell_cnot` | 2 | 79 | 194.6 ms | 34 ions, 50 records | Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (1,798 faults) |
-| `bell_surgery` | 2 | 79 | 310.0 ms | 49 ions, 97 records | m ⊕ Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (4,058) |
-| `ghz3` | 3 | 88 | 217.7 ms | 43 ions, 59 records | Z̄₀ ⊕ Z̄₁ = 0, Z̄₀ ⊕ Z̄₂ = 0 | ≥ 3 (1,951) |
-| `teleport` | 3 | 88 | 591.4 ms | 66 ions, 176 records | 1 → X̄_b ⊕ m₂ | ≥ 3 (8,116) |
-| `magic_state` | 1 | 70 | 297.7 ms | 25 ions, 32 records | X̄_t → X̄_t, Z̄_t → Z̄_t (from the magic ion) | injection: 1 by design |
-| `magic_teleport` | 3 | 88 | 817.2 ms | 74 ions, 192 records | X̄_t → X̄_b ⊕ m₂; Z̄_t → Z̄_b ⊕ m₁ ⊕ m₃ ⊕ m₄ | injection: 1 by design |
-| `frames` | 2 | 79 | 121.9 ms | 34 ions, 42 records | m = 1, n = 1 (both flipped by a frame the archive holds) | ≥ 3 (1,290) |
-| `s_gate` | 1 | 88 | 549.4 ms | 74 ions, 185 records | m = 1 (two S̄ gadgets make a Z̄) | injection: 1 by design |
-| `cond_cx` | 3 | 88 | 161.0 ms | 2 branches | `m=0`: u = 0 · `m=1`: u ⊕ v = 0 | ≥ 3 per branch |
-| `teleport_fix` | 3 | 88 | 568.4 ms | 2 branches | r = 0 in **both** branches | ≥ 3 per branch |
-| `t_gate` | 2 | 88 | 728.7 ms | 4 branches | X̄[t] → X̄[q0] / Ȳ[q0]; Z̄[t] → Z̄[q0], exactly | injection: 1 by design |
+| `bell_cnot` | 2 | 79 | 194.4 ms | 34 ions, 50 records | Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (1,798 faults) |
+| `bell_surgery` | 2 | 79 | 309.3 ms | 49 ions, 97 records | m ⊕ Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (4,058) |
+| `ghz3` | 3 | 88 | 215.3 ms | 43 ions, 59 records | Z̄₀ ⊕ Z̄₁ = 0, Z̄₀ ⊕ Z̄₂ = 0 | ≥ 3 (1,951) |
+| `teleport` | 3 | 88 | 592.5 ms | 66 ions, 176 records | 1 → X̄_b ⊕ m₂ | ≥ 3 (8,116) |
+| `magic_state` | 1 | 70 | 295.1 ms | 25 ions, 32 records | X̄_t → X̄_t, Z̄_t → Z̄_t (from the magic ion) | injection: 1 by design |
+| `magic_teleport` | 3 | 88 | 816.7 ms | 74 ions, 192 records | X̄_t → X̄_b ⊕ m₂; Z̄_t → Z̄_b ⊕ m₁ ⊕ m₃ ⊕ m₄ | injection: 1 by design |
+| `frames` | 2 | 79 | 121.8 ms | 34 ions, 42 records | m = 1, n = 1 (both flipped by a frame the archive holds) | ≥ 3 (1,290) |
+| `s_gate` | 1 | 88 | 545.1 ms | 74 ions, 185 records | m = 1 (two S̄ gadgets make a Z̄) | injection: 1 by design |
+| `cond_cx` | 3 | 88 | 159.4 ms | 2 branches | `m=0`: u = 0 · `m=1`: u ⊕ v = 0 | ≥ 3 per branch |
+| `teleport_fix` | 3 | 88 | 568.2 ms | 2 branches | r = 0 in **both** branches | ≥ 3 per branch |
+| `t_gate` | 2 | 88 | 725.5 ms | 4 branches | X̄[t] → X̄[q0] / Ȳ[q0]; Z̄[t] → Z̄[q0], exactly | injection: 1 by design |
 
-(Makespans are the sequential policy's, re-measured 2026-10-20 when split and merge became charged for what a move does rather than what its class is called; ARCHITECTURE.md §7 has the parallel one. `t_gate` now applies X̄ to the magic block first: the factory makes T†|+⟩, and without it the program was never T -- the contract checker found it, ARCHITECTURE.md §6.)
+(Makespans are the sequential policy's, re-measured 2026-10-20 when split and merge became charged for what a move does rather than what its class is called, and 2026-10-26 when heat was followed across the town (§4.1: junctions pass one ion at a time, places with lasers cool what comes in, readouts recool); ARCHITECTURE.md §7 has the parallel one. `t_gate` now applies X̄ to the magic block first: the factory makes T†|+⟩, and without it the program was never T -- the contract checker found it, ARCHITECTURE.md §6.)
 
 All pass G1–G11; scheduling, checks and sign-off take under 0.3 s each warm (a guarded
 program takes one sign-off pass per branch). The checks fail

@@ -267,6 +267,21 @@ class LeafLibrary:
     def channel_references(self) -> dict:
         return {f"{L}x{k}": v for (L, k), v in sorted(self._channel.items())}
 
+    def road_data(self, length: int) -> dict:
+        """A road of `length` sites as the page replays it: its conveyor `chan<L>` -- the
+        device every carry on such a road runs on -- and the one-ion `carry` whose replay
+        prices it (`channel_timing`).  The page draws an ion on a road where this program
+        has it, exactly as it draws one inside a place."""
+        key = max(1, int(length))
+        memo = self.__dict__.setdefault("_road_data", {})
+        if key not in memo:
+            from .characterize import leaf_data
+            from .leaves.transport import channel
+            build = channel(key, 1)
+            characterize(build)
+            memo[key] = leaf_data(build)
+        return memo[key]
+
 
 def transfer_times(t: Transfer) -> list[float]:
     return list(t.times_us)

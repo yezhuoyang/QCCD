@@ -26,7 +26,7 @@ from .library import LeafLibrary
 from .logicq import LogicalProgram, parse, parse_file
 from .synth import synthesize
 
-__all__ = ["build", "design_for", "published"]
+__all__ = ["build", "design_for", "published", "write_leaf_files"]
 
 
 def published(obj):
@@ -41,6 +41,31 @@ def published(obj):
     if isinstance(obj, list):
         return [published(v) for v in obj]
     return obj
+
+
+def write_leaf_files(out, lib, leaves, gir: dict | None = None, *, inline: bool = False):
+    """Every leaf the page replays, as `leaf/<master>.js` beside it (or inline): each place
+    master, and the conveyor `chan<L>` of every road length the schedule's roads have, so a
+    road is drawn as its sites with its ions where its own TSIR has them.  Returns
+    (leaf_files, inline_leaves)."""
+    import json as _json
+    from pathlib import Path as _Path
+    data = {name: leaves.data[name] for name in lib.leaf_masters()}
+    for L in sorted({int(v[4]) for v in ((gir or {}).get("nets") or {}).values() if len(v) > 4}):
+        d = leaves.road_data(L)
+        data.setdefault(d["master"], d)
+    leaf_files, inline_leaves = {}, {}
+    for name, d in data.items():
+        if inline:
+            inline_leaves[name] = published(d)
+            leaf_files[name] = ""
+            continue
+        payload = _json.dumps(published(d)).replace("</", "<\\/")
+        (_Path(out) / "leaf").mkdir(parents=True, exist_ok=True)
+        (_Path(out) / "leaf" / f"{name}.js").write_text(
+            f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
+        leaf_files[name] = f"leaf/{name}.js"
+    return leaf_files, inline_leaves
 
 
 def design_for(prog: LogicalProgram, rows: int | None = None,
@@ -109,12 +134,7 @@ def build(program, *, out_dir, rows: int | None = None, pairs: int | None = None
     (out / "gir.json").write_text(json.dumps(gir), encoding="utf-8")
     lib.save(out / "library.json")
     (out / "checks.json").write_text(json.dumps(verdict, indent=1), encoding="utf-8")
-    leaf_files = {}
-    for name in lib.leaf_masters():
-        payload = json.dumps(published(leaves.data[name])).replace("</", "<\\/")
-        (out / "leaf" / f"{name}.js").write_text(
-            f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
-        leaf_files[name] = f"leaf/{name}.js"
+    leaf_files, _ = write_leaf_files(out, lib, leaves, gir)
 
     studio_pages = {}
     if studio:

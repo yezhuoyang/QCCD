@@ -370,6 +370,23 @@ end
 - **The up-bridge:** derive the `.machine` from characterized macros.
 - **The Goal 2 board**, once an entry can be graded end to end.
 
+**Status (2026-10-26).**
+- **S6a, done (`70aed64`):** the factory compiles `rm15.circ` line by line.
+- **S6b, done (`9ba1e90`):** TSIR text.
+- **S6c, done (`83bbc5a`):** TSIR modules (`qccd/gadget/modules.py`). The round trip is
+  exact, FormalRV's Shor included. The page's Stack has a Module row.
+- **S6d (user: "the roads look too straight and standard; are they modeled like a
+  shuttle inside a gadget?"):** roads are drawn and replayed as their `chan<L>` devices,
+  and junctions as `junc9`. Heat is followed across the town (`heat.py`, GADGETS.md
+  §4.1). It found used ions bound for a far depot passing the ion-loss limit, unseen
+  because every op had assumed a cold arrival. The user decided that junctions pass a
+  bundle one ion at a time, with the queue on the road's sites. Places with lasers now cool
+  bundles as they come in, readouts recool, and the scheduler routes by heat and makes a
+  cooling stop when it must. Every ion road on today's floors is
+  straight, so `chan<L>` is its exact geometry. A bent road would still be priced as
+  straight: the corners are dropped in `synth.flatten`, and the cost model charges a
+  corner like a straight step. That is open.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.
@@ -425,7 +442,7 @@ and `route` is "mechanism-free by construction" (`FormalRV/System/SysProg.lean`)
 - **Programs and machines.** `.alg` is a logical program, `.floor` a floorplan, and `city.py` a parallel
   scheduler that writes flat GIR 0.2 events. The rule sets F1–F9/G1–G14 and the contract and
   compositional sign-offs check the result.
-- **Shor N=15** (`shor15.alg`, `shor.floor`): 157 + 32 instructions, 11.16 s, all 23 rules hold, signed off
+- **Shor N=15** (`shor15.alg`, `shor.floor`): 157 + 32 instructions, 11.11 s (11.16 s before heat was followed, 2026-10-26), all 23 rules hold, signed off
   compositionally. It is the target of today's "Goal 2" card (`qccd/site/boards.py::GOALS`).
 - **Limits:**
   - GIR is a flat event list: about 2 MB for Shor-15, all inlined into one page, with no streaming.
