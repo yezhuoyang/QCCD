@@ -29,13 +29,14 @@ Grammar (EBNF, extending the rule language's; `#` starts a comment):
               | "param" NAME "=" expr
               | "define" NAME [ "(" NAME { "," NAME } ")" ] "=" expr
               | metric | requirement | channel ;
-    metric    = "metric" NAME STRING { "unit" STRING | "better" ( "low" | "high" )
+    metric    = "metric" NAME STRING { "unit" STRING | "better" ( "low" | "high" ) | "clock" STRING
                                      | "group" STRING | "about" STRING | "source" STRING }
                 "=" expr ;
     requirement = "require" ID STRING { "about" STRING | "source" STRING } formula ;
     channel   = "channel" NAME STRING { "about" STRING | "source" STRING }
                 ( "before" | "after" ) binders [ "where" formula ] ":"
-                NOISE "(" expr ")" "on" expr ;
+                NOISE "(" expr ")" "on" expr [ "counted" "as" budget ] ;
+    budget    = NAME | NAME "=" expr { "," NAME "=" expr } ;
     NOISE     = "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "DEPOLARIZE2" ;
     primary   = ... the rule language's primaries ...
               | "if" formula "then" expr "else" expr ;
@@ -43,7 +44,10 @@ Grammar (EBNF, extending the rule language's; `#` starts a comment):
 A `define` names a term, with or without arguments; it may use earlier params, defines and
 metrics, never itself.  A `channel` is read as: at every binding of its variables that
 satisfies `where`, put the noise operation with that probability on those ions, just
-before (or just after) what the binding names.  `qccd.evalset.interp` gives every item its
+before (or just after) what the binding names.  Its expected faults -- the probability, per
+ion (per pair for DEPOLARIZE2) -- are booked under the channel's name, or under `counted as`
+a key; with several `key = term` they are shared out in proportion to the terms.  A metric
+with a `clock` of its own is evaluated on a replay under that operating-point table.  `qccd.evalset.interp` gives every item its
 meaning.
 """
 
@@ -99,6 +103,7 @@ class Metric:
     group: str = ""
     about: str = ""
     source: str = ""
+    clock: str = ""           # an operating-point table of its own, else the evaluation's
     text: str = ""
     line: int = 0
     origin: str = ""
@@ -131,6 +136,9 @@ class Channel:
     text: str = ""            # the clause as written, from before/after to the end
     line: int = 0
     origin: str = ""
+    #: `counted as`: the budget line(s) the channel's expected faults are booked under -- one
+    #: key, or several keys each with a term, the probability shared out in proportion
+    counted: tuple[tuple[str, Node | None], ...] = ()
 
 
 @dataclass
@@ -150,6 +158,16 @@ class EvaluationSource:
     metrics: list[Metric] = field(default_factory=list)
     requirements: list[Requirement] = field(default_factory=list)
     channels: list[Channel] = field(default_factory=list)
+
+
+def _table(s: str, line: int) -> str:
+    """A clock is an operating-point table the device format declares (`qccd.arch.curves.
+    TABLES`): a misspelt one would price every step on some other table, silently."""
+    from ..arch.curves import TABLES
+    if s not in TABLES:
+        raise EvalSyntaxError(f"line {line}: clock {s!r} is not an operating-point table "
+                              f"(one of {', '.join(TABLES)})")
+    return s
 
 
 class _EvalParser(_Parser):
@@ -204,7 +222,7 @@ class _EvalParser(_Parser):
                 elif word == "include":
                     ev.includes.append(s)
                 elif word == "clock":
-                    ev.clock = s
+                    ev.clock = _table(s, t.line)
                 else:
                     ev.rules = s
             elif word == "about":
@@ -260,6 +278,9 @@ class _EvalParser(_Parser):
             elif isinstance(item, Metric) and self.at_name("group"):
                 self.next()
                 item.group = self.string()
+            elif isinstance(item, Metric) and self.at_name("clock"):
+                line = self.next().line
+                item.clock = _table(self.string(), line)
             elif isinstance(item, Metric) and self.at_name("better"):
                 self.next()
                 b = self.ident()
@@ -335,6 +356,23 @@ class _EvalParser(_Parser):
         self.expect(")", f"to close {c.op}'s probability")
         self.expect_name("on", f"after {c.op}(...)")
         c.targets = self.sum()
+        if self.at_name("counted"):
+            self.next()
+            self.expect_name("as", "after `counted`")
+            parts = []
+            while True:
+                key = self.ident()
+                term = None
+                if self.at("="):
+                    self.next()
+                    term = self.sum()
+                parts.append((key, term))
+                if not self.at(","):
+                    break
+                self.next()
+            if len(parts) > 1 and any(t is None for _, t in parts):
+                self.fail(f"channel {name}: several budget lines each need a term (`key = term`)")
+            c.counted = tuple(parts)
         c.text = self.source_between(a, self.i)
         return c
 

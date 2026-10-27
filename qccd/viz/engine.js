@@ -2552,6 +2552,10 @@ function priceFrames(frames, loops, model, classes, opts) {
   // disagree, and the one that is wrong is the one nobody is testing.  `win` is REUSED
   // across cycles; retaining it is a bug.
   var onCycle = opts.onCycle || null;
+  // `onFrame(fi, frame, pos, occ, q)` is called at the START of every frame, before it is
+  // priced, with the live state (copy what you keep): what `replay(probe=...)` gives Python,
+  // and what js/evaluate.js reads each step's starting state from.
+  var onFrame = opts.onFrame || null;
   var w = opts.window || null;
   var pos = {}, q = {}, life = {}, occ = {};
   var over = {}, overJ = {};          // incremental over-capacity sets -- see _occSet
@@ -2573,11 +2577,13 @@ function priceFrames(frames, loops, model, classes, opts) {
   var loopRails = _spurRails(onLoop, model._segs || {});
 
   // Overwrite pool slot `i`, growing the pool only when a cycle is wider than any before.
-  function _pool(win, i, ion, src, dst, seg, ent) {
+  // `entails` is what R14 judges (the class's declaration); `priced` what the move is charged
+  // (`move_entails`' first half), which is what the evaluation's `entails(o)` reads.
+  function _pool(win, i, ion, src, dst, seg, ent, priced) {
     var m = win.moves[i];
-    if (m === undefined) { m = { ion: 0, src: 0, dst: 0, seg: 0, entails: null };
+    if (m === undefined) { m = { ion: 0, src: 0, dst: 0, seg: 0, entails: null, priced: null };
                            win.moves[i] = m; }
-    m.ion = ion; m.src = src; m.dst = dst; m.seg = seg; m.entails = ent;
+    m.ion = ion; m.src = src; m.dst = dst; m.seg = seg; m.entails = ent; m.priced = priced || null;
   }
 
   // ONE occupancy write, and the two over-sets follow it.  Python re-reports an
@@ -2623,6 +2629,7 @@ function priceFrames(frames, loops, model, classes, opts) {
     var f = frames[fi];
     var fid = f.id === undefined ? fi : f.id;
     var fc = 0, fd = 0, fus = 0;
+    if (onFrame) onFrame(fi, f, pos, occ, q);
     if (f.type === 'init') {
       for (var k in f.place) if (own(f.place, k)) {
         // a later `init` that re-places an ion must VACATE the node it was on, or the
@@ -2709,7 +2716,7 @@ function priceFrames(frames, loops, model, classes, opts) {
               _deposit(q, life, comp, ion, ch.q, peak);
               if (deg(model, dstNode) >= 3) transits++;
               if (onCycle) {
-                _pool(w, nmv++, ion, pos[ion], dstNode, segId, judgedI);
+                _pool(w, nmv++, ion, pos[ion], dstNode, segId, judgedI, entI);
                 wParts.push(ion);
                 pb[ion] = pos[ion];
                 if (ob[pos[ion]] === undefined) ob[pos[ion]] = occ[pos[ion]] || 0;
@@ -2783,7 +2790,7 @@ function priceFrames(frames, loops, model, classes, opts) {
             // segment; the two differ by a factor of three on the shipped ring.
             if (deg(model, path[pi]) >= 3) transits++;
             if (onCycle) {
-              _pool(w, nmv2++, ionb, path[pi - 1], path[pi], sid, judgedM);
+              _pool(w, nmv2++, ionb, path[pi - 1], path[pi], sid, judgedM, entM);
               // every node the path ENTERED except the last is passed THROUGH, and a site
               // with no room to spare there is a roadblock (R1)
               if (pi < path.length - 1) tr2[path[pi]] = (tr2[path[pi]] || 0) + 1;

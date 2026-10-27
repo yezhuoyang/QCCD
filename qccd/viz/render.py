@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 from typing import Sequence
@@ -121,6 +122,67 @@ def segment_role(labels) -> str:
     return "rail"
 
 
+#: The header's hardware numbers that are metrics of the evaluation: `hardware_report`'s field
+#: on the left, the metric of `qccd/evalset/library/metrics.eval` that defines it on the right.
+HARDWARE_METRICS = {"dacs": "dacs", "electrodes": "electrodes", "switches": "switches",
+                    "total_capacity": "places", "n_junctions": "n_junctions"}
+
+
+def _json_number(v):
+    """A value JSON can carry: `inf` and `nan` as their names (the page prints them)."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return str(v)
+    return v
+
+
+def evaluation_view(arch: Architecture, prog: TSIR, model: CostModel) -> dict:
+    """THE EVALUATION, as a studio page carries it.
+
+    The parse trees of what the page is judged by -- every board metric, the hardware budget
+    (`board.eval`) and the noise model of its clock, `qccd.evalset.for_page` -- for the
+    browser's interpreter (`js/evaluate.js`) to read after an edit, and the values the
+    grader's interpreter (`qccd.evalset`) gives them on the shipped device and programme, for
+    the page to show until then and to check itself against.  A metric that cannot be computed
+    on this page (no experiment, no sample, an empty programme) is in `missing` with why.
+    """
+    from ..evalset import Absent, EvalError, for_page, noise_for_clock
+    from ..evalset.ast_json import payload
+    from ..evalset.interp import noise_budget
+    from ..evalset.words import WordError
+
+    pol = getattr(model, "policy", None)
+    table = getattr(pol, "table", None) or "qccdsim_jones"
+    ev = for_page(table)
+    block: dict = {"payload": payload(ev), "clock": table, "noise": noise_for_clock(table),
+                   "model": str(getattr(model, "name", "") or "corrected"),
+                   "closed_loops": {lid: list(lp.nodes) for lid, lp in arch.device.loops.items()
+                                    if lp.closed}}
+    try:
+        run = ev.run(prog, arch, cost_model=model)
+        e = ev.evaluator(run)
+        values: dict = {}
+        missing: dict = {}
+        for m in ev.metrics_:
+            try:
+                values[m.name] = _json_number(e.value(m.name))
+            except (Absent, EvalError, WordError) as exc:
+                missing[m.name] = str(exc)
+        block["values"] = values
+        block["missing"] = missing
+        block["requirements"] = [{k: r[k] for k in ("id", "title", "verdict", "reason") if k in r}
+                                 for r in ev.requirements_check(run)]
+        try:
+            bud = noise_budget(e, ev.channels)
+            block["budget"] = {k: {"faults": v["faults"], "places": v["places"],
+                                   "channels": list(v["channels"])} for k, v in bud.items()}
+            block["budget_order"] = list(bud)
+        except (Absent, EvalError, WordError) as exc:
+            block["budget_error"] = str(exc)
+    except Exception as exc:  # noqa: BLE001 -- the page says so rather than not building
+        block["error"] = f"{type(exc).__name__}: {exc}"
+    return block
+
+
 def build_view_model(
     arch: Architecture,
     prog: TSIR,
@@ -139,6 +201,7 @@ def build_view_model(
     metal: dict | None = None,
     source: dict | None = None,
     tech=None,
+    evaluation: bool | dict = True,
 ) -> dict:
     """Everything the page needs, as plain JSON.
 
@@ -286,6 +349,20 @@ def build_view_model(
         pass
 
     hw = hardware_report(arch)
+    # THE EVALUATION (see `evaluation_view`), and the header's hardware numbers read from it:
+    # `hardware_report` keeps the scheme, the notes and the counts the metrics do not name,
+    # and every count the evaluation defines is the evaluation's -- the wiring floors
+    # included, as the grader counts them.
+    ev_block = (evaluation if isinstance(evaluation, dict)
+                else evaluation_view(arch, prog, model) if evaluation else None)
+    hw_view = hw.as_dict()
+    hw_view["report"] = {k: hw_view.get(k) for k in HARDWARE_METRICS}
+    for field_, metric in HARDWARE_METRICS.items():
+        v = ((ev_block or {}).get("values") or {}).get(metric)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            hw_view[field_] = v
+    if hw_view.get("trapping_zones"):
+        hw_view["dacs_per_trap"] = hw_view["dacs"] / hw_view["trapping_zones"]
     threshold = float(arch.primitives.scalar("ms_gate").get("max_quanta", 0) or 0) \
         if "ms_gate" in arch.primitives.scalars else 0.0
 
@@ -368,7 +445,7 @@ def build_view_model(
             "segments": segments,
             "loops": loops,
             "summary": dev.summary(),
-            "hardware": hw.as_dict(),
+            "hardware": hw_view,
             "zone_types": {k: dict(v) for k, v in arch.zone_types.items()},
             # the architecture AS A PROGRAM: one record per statement, each carrying
             # the namespaced id of what it declares, so the page can light the line
@@ -504,6 +581,7 @@ def build_view_model(
             "cooling_us": res.us_by_type.get("cool", 0.0),
         },
         "rules": res.rules.summary(),
+        **({"evaluation": ev_block} if ev_block is not None else {}),
         # THE EVIDENCE SETS, so the page can key its verdicts on the SIZE of the evidence
         # rather than on the presence of a key.  With `checksum == {}` the self-check's
         # `for (const ion in D.checksum)` loop never ran, `drift` stayed 0, and the page
@@ -565,7 +643,9 @@ _JS_DIR = Path(__file__).parent
 #: it depends on nothing (it is handed its geometry) and because the page's own script and
 #: the gadget Design canvas both call it: `qccd/gadget/page.py` inlines the same bytes.
 #: Two canvases, one rule -- see the header of that file for what having two of them cost.
-ENGINE_JS = ("js/transit.js", "js/edit.js", "engine.js")
+#: `js/evaluate.js` is the evaluation language's interpreter (`D.evaluation`); it reads the
+#: engine's replay, so it comes after `engine.js` and registers itself as `QCCD.evaluation`.
+ENGINE_JS = ("js/transit.js", "js/edit.js", "engine.js", "js/evaluate.js")
 #: `tutorial.js` is data -- the course's lessons -- and it registers itself with the editor
 #: at its last line, so it must come after `editor.js` and needs nothing else.
 EDITOR_JS = ("js/editor.js", "js/tutorial.js")
@@ -587,8 +667,12 @@ def page_stamp() -> str:
     """
     h = hashlib.sha256()
     h.update(_TEMPLATE.encode("utf-8"))
+    # THE TEXT, NOT THE CHECKOUT'S BYTES: a Windows checkout writes CRLF where git stores LF, so
+    # the same commit stamped 25cf9fac in a fresh clone and c1c41083 in a tree where one file
+    # had been written with LF -- every page built in the one failed the other's check.  The
+    # page inlines the text (`_js_block` reads it with universal newlines), and so does this.
     for name in ENGINE_JS + EDITOR_JS:
-        h.update((_JS_DIR / name).read_bytes())
+        h.update((_JS_DIR / name).read_bytes().replace(b"\r\n", b"\n"))
     return h.hexdigest()[:16]
 
 
@@ -3516,15 +3600,21 @@ document.getElementById('lede').textContent = D.lede || A.description || '';
 // window (the Report prints every one of them at every width).
 const TIER1 = ['cost','steps','runtime','DACs'];
 const chip = (l,v) => `<div class="m" data-hint="m:${esc(l)}" data-tier="${TIER1.indexOf(l)>=0?1:2}"><span>${esc(l)}</span><b>${esc(v)}</b></div>`;
+// EVERY CHIP IS A METRIC OF THE EVALUATION, by name (qccd/evalset/library/metrics.eval, the
+// website's Evaluation page): the value the grader's interpreter gave it when the page was
+// built.  A metric this page could not compute (an empty programme has no hottest ion) has
+// no chip, as a zero runtime never had one.
+const FV = (D.evaluation && D.evaluation.values) || {};
+const fv = k => (typeof FV[k] === 'number' ? FV[k] : null);
 const HEAD_SHIPPED = {
-  stepsOf: '/'+fmt(M.total_steps), costOf: '/'+fmt(M.total_cost),
-  metrics: [['cost',fmt(M.total_cost)],['steps',fmt(M.total_steps)],
-   M.runtime_us?['runtime',fmt(M.runtime_us/1000,2)+' ms']:null,
-   M.total_quanta?['quanta',fmt(M.total_quanta)]:null,
-   M.peak_quanta?['peak n̄',fmt(M.peak_quanta,1)]:null,
-   ['contacts',fmt(M.n_gate_pairs)],
-   M.n_cool?['cooling',fmt(M.cooling_us/1000,1)+' ms']:null,
-   ['DACs',fmt(hw.dacs)],['junctions',fmt(hw.n_junctions)]]
+  stepsOf: '/'+fmt(fv('depth')), costOf: '/'+fmt(fv('cost')),
+  metrics: [['cost',fmt(fv('cost'))],['steps',fmt(fv('depth'))],
+   fv('T')?['runtime',fmt(fv('T'),2)+' ms']:null,
+   fv('total_quanta')?['quanta',fmt(fv('total_quanta'))]:null,
+   fv('peak_nbar')?['peak n̄',fmt(fv('peak_nbar'),1)]:null,
+   ['contacts',fmt(fv('two_ion_gates'))],
+   fv('n_coolings')?['cooling',fmt(fv('time_cooling'),1)+' ms']:null,
+   ['DACs',fmt(fv('dacs'))],['junctions',fmt(fv('n_junctions'))]]
   .filter(Boolean).map(([l,v])=>chip(l,v)).join('')
 };
 document.getElementById('cStepsOf').textContent = HEAD_SHIPPED.stepsOf;

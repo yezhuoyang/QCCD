@@ -322,8 +322,9 @@ RULES: list[dict] = [
     {"id": "R9", "checks": "every claimed total, per-batch figure and per-instruction annotation equals what the replay computes.",
      "device": GRID, "model": "corrected", "check_metrics": True,
      "fail": {"program": _cold_gate() + [rec("claim", total_steps=3, total_cost=2)],
-              "why": "the programme claims 3 steps and cost 2; the replay finds 4 and 3."},
-     "pass": {"program": _cold_gate() + [rec("claim", total_steps=4, total_cost=3)],
+              "why": "the programme claims 3 steps and cost 2; the replay finds 5 and 4 (the walk is two rails, "
+                     "a junction and the merge into d1's trap)."},
+     "pass": {"program": _cold_gate() + [rec("claim", total_steps=5, total_cost=4)],
               "why": "the true totals."}},
     {"id": "R10", "checks": "the compiled programme implements the input circuit: every gate of the circuit placed once, in order per qubit, with both ions of each two-qubit gate together, and the emitted pulses composing to the circuit's unitary.",
      "device": CHAIN, "model": "corrected",

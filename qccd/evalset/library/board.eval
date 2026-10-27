@@ -1,0 +1,15 @@
+evaluation "board"
+title "A board's measure: the metrics, and the hardware a design may use"
+about "Every task release fixes a hardware budget with its physics: at most so many DACs and so many junctions. A design over it keeps its numbers, and is not ranked. The grader judges every entry's device by these two requirements, with the release's numbers."
+include "metrics"
+
+# the device's own budget block, unless the release sets these (the grader does)
+param max_dacs = budget("max_dacs", none)
+param max_junctions = budget("max_junctions", none)
+
+require B1 "The wiring fits the DAC budget"
+  about "The DACs the wiring needs, counted with the physics' floors, are at most the budget's."
+  max_dacs = none or dacs <= max_dacs
+
+require B2 "The device fits the junction budget"
+  max_junctions = none or n_junctions <= max_junctions

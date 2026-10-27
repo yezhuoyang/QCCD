@@ -36,6 +36,9 @@ OPERATED = ("gate1", "gate2", "measure", "reset")
 class Step:
     __slots__ = ("index", "instr", "kind", "cls", "t0", "t1", "dt", "ops", "pos0", "pos1", "occ0",
                  "occ1", "nbar0", "nbar1", "moves", "cost", "depth", "cycles", "in_programme")
+    #: `depth`: the machine steps the instruction takes -- per cycle, the longest route (one per
+    #: rail crossed, one per split or merge it is charged), summed over its cycles; 1 for any
+    #: other instruction that takes time, 0 for init and barrier
 
     def __init__(self, index: int, instr, kind: str):
         self.index = index
@@ -214,8 +217,24 @@ def _priced_entails(arch, views: dict) -> dict:
     return out
 
 
+def _cycle_depth(v, priced: dict) -> int:
+    """One transport cycle's depth: its longest route, a rail and each split or merge one deep."""
+    routes: dict[int, int] = {}
+    last: dict[str, tuple[int, str]] = {}
+    for m in v.moves:
+        prev = last.get(m.ion)
+        if prev is not None and prev[1] == m.src:
+            routes[prev[0]] += 1
+            last[m.ion] = (prev[0], m.dst)
+        else:
+            k = len(routes)
+            routes[k] = 1 + len(priced.get((id(v), m.ion), ()))
+            last[m.ion] = (k, m.dst)
+    return max(routes.values(), default=0)
+
+
 def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm: str | None = None,
-              qubit_map=None, cert: Mapping | None = None, cost_model=None) -> Run:
+              qubit_map=None, cert: Mapping | None = None, cost_model=None, rules: bool = False) -> Run:
     """Replay `prog` on `arch` under the clock (an operating-point table, at its fastest
     points) and build the run.  With an experiment, the run also carries its appended
     readout and the qubit -> ion map the circuit is read through."""
@@ -235,8 +254,15 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     def probe(instr, current) -> None:
         starts.setdefault(instr.id, dict(current))
 
-    res = replay(prog, arch, model, check_rules=False, keep_cycles=False, probe=probe,
-                 on_cycle=on_cycle)
+    verification = None
+    if rules:
+        # the rule verdicts too, from this same replay (what `qccd.verify.verify` reports)
+        from ..verify import verify
+        verification = verify(prog, arch, model, on_cycle=on_cycle, probe=probe)
+        res = verification.result
+    else:
+        res = replay(prog, arch, model, check_rules=False, keep_cycles=False, probe=probe,
+                     on_cycle=on_cycle)
     gamma = float(model.anomalous_per_us(arch))
     priced = _priced_entails(arch, views)
 
@@ -245,15 +271,25 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     ions: list[str] = []
     prep = Step(-1, None, "prepare")
     prep.in_programme = False
+    # A STATE IS NEVER COPIED, ONLY SHARED.  The views and the probe hand over dicts of their
+    # own, nothing writes to a step's state after this loop, and a state equal to the one
+    # before it is the same object -- so a 20,000-step programme keeps one dict per change of
+    # state rather than six per step (half a gigabyte, under the grader's memory limit).
     pos: dict[str, str] = {}
     occ: dict[str, int] = {}
+    last_nbar: dict[str, float] = {}
+
+    def same(d: dict, prev: dict) -> dict:
+        return prev if d == prev else d
+
     t = 0.0
     for k, ins in enumerate(prog.instructions):
         st = Step(k, ins, ins.type)
         vs = views.get(ins.id, [])
-        st.nbar0 = dict(starts.get(ins.id, {}))
+        st.nbar0 = last_nbar = same(starts.get(ins.id, {}), last_nbar)
         st.t0 = t
         if ins.type == "init":
+            pos, occ = dict(pos), dict(occ)      # the steps before keep theirs
             for ion, node in ins.placement.items():
                 if ion not in ions:
                     ions.append(ion)
@@ -265,9 +301,12 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
                 pos[ion] = node
                 occ[node] = occ.get(node, 0) + 1
         if vs:
-            st.pos0, st.occ0 = dict(vs[0].pos_before), dict(vs[0].occ_before)
-            st.pos1, st.occ1 = dict(vs[-1].pos_after), dict(vs[-1].occ_after)
-            pos, occ = dict(st.pos1), dict(st.occ1)
+            before_p, before_o = (steps[-1].pos1, steps[-1].occ1) if steps else ({}, {})
+            st.pos0 = same(vs[0].pos_before, before_p)
+            st.occ0 = same(vs[0].occ_before, before_o)
+            st.pos1 = same(vs[-1].pos_after, st.pos0)
+            st.occ1 = same(vs[-1].occ_after, st.occ0)
+            pos, occ = st.pos1, st.occ1
             # the clock adds cycle by cycle, as the replay's total does; the step's own
             # duration is the sum of its cycles, as the noise reads it
             t1, dt = t, 0.0
@@ -277,12 +316,16 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
             st.t1, st.dt = t1, dt
             st.moves = [m for v in vs for m in v.moves]
             st.cycles = len(vs)
+            if ins.type == "simd":
+                st.depth = sum(_cycle_depth(v, priced) for v in vs)
+            else:
+                st.depth = len(vs)
         else:
             if ins.type == "init":
-                st.pos0, st.occ0 = (dict(steps[-1].pos1), dict(steps[-1].occ1)) if steps else ({}, {})
+                st.pos0, st.occ0 = (steps[-1].pos1, steps[-1].occ1) if steps else ({}, {})
             else:
-                st.pos0, st.occ0 = dict(pos), dict(occ)
-            st.pos1, st.occ1 = dict(pos), dict(occ)
+                st.pos0, st.occ0 = pos, occ
+            st.pos1, st.occ1 = pos, occ
             st.t1 = t
         t = st.t1
         # -- the operations of the step
@@ -316,10 +359,10 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
         if st.kind == "cool":
             st.nbar1 = {i: st.nbar0.get(i, 0.0) + gamma * st.duration for i in st.pos0}
         else:
-            st.nbar1 = dict(nxt)
+            st.nbar1 = nxt
 
-    prep.pos0 = prep.pos1 = dict(steps[0].pos1) if steps and steps[0].kind == "init" else {}
-    prep.occ0 = prep.occ1 = dict(steps[0].occ1) if steps and steps[0].kind == "init" else {}
+    prep.pos0 = prep.pos1 = steps[0].pos1 if steps and steps[0].kind == "init" else {}
+    prep.occ0 = prep.occ1 = steps[0].occ1 if steps and steps[0].kind == "init" else {}
     prep.nbar0 = prep.nbar1 = {i: 0.0 for i in ions}
     prep_op = Op(len(ops), prep, "prepare", tuple(ions))
     prep.ops.append(prep_op)
@@ -328,6 +371,8 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     run = Run(arch=arch, prog=prog, clock=clock, cost_model=model, result=res, ions=ions,
               steps=steps, prepare=prep, readout=None, ops=ops, anomalous_per_us=gamma,
               experiment=experiment)
+    if verification is not None:
+        run.facts["verification"] = verification
 
     if experiment is not None:
         from ..qec.qasm import parse_qasm
@@ -344,9 +389,9 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
             ro.t0 = last.t1
             ro.dt = float(arch.primitives.scalar("measure").get("us", 0.0))
             ro.t1 = last.t1 + ro.dt
-            ro.pos0 = ro.pos1 = dict(last.pos1)
-            ro.occ0 = ro.occ1 = dict(last.occ1)
-            ro.nbar0 = ro.nbar1 = dict(last.nbar1)
+            ro.pos0 = ro.pos1 = last.pos1
+            ro.occ0 = ro.occ1 = last.occ1
+            ro.nbar0 = ro.nbar1 = last.nbar1
             for q, b, basis in experiment.readout_plan():
                 ion = run.qubit_map.get(q)
                 if ion is None:

@@ -951,6 +951,37 @@
    "kind": "read",
    "does": "the figures the head and the Report show (cost, steps, runtime, n-bar, DACs, ...)"
   },
+  "formal": {
+   "use": "agent",
+   "kind": "read",
+   "does": "one metric of the evaluation by its name on the Evaluation page (cost, depth, T, peak_nbar, dacs, ...): the shipped value, or the browser's on the page as it is now; null when this page cannot compute it",
+   "args": "name"
+  },
+  "formalWhy": {
+   "use": "agent",
+   "kind": "read",
+   "does": "why a metric of the evaluation has no value on this page (no experiment, no sample, an empty programme), or null",
+   "args": "name"
+  },
+  "evaluationView": {
+   "use": "agent",
+   "kind": "read",
+   "does": "everything the Report's evaluation section shows: every metric of the evaluation with its value, the budget's requirements (B1, B2) and the noise model's budget lines, and whose values they are (shipped or browser)"
+  },
+  "evaluationCheck": {
+   "use": "agent",
+   "kind": "read",
+   "does": "the evaluation's self-check: the browser's interpreter on the page as it shipped, against the values the grader's interpreter shipped (every metric, requirement and budget line)"
+  },
+  "evaluateEverything": {
+   "use": "agent",
+   "kind": "view",
+   "does": "evaluate the metrics on another clock and the noise budget too, after an edit to a long programme (each is another replay); returns what the Report then shows"
+  },
+  "evaluation": {
+   "use": "harness",
+   "does": "the browser's evaluation session of the page as it is now (null while the price is refused)"
+  },
   "refusedLine": {
    "use": "agent",
    "kind": "read",

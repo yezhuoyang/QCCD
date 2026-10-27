@@ -237,6 +237,7 @@ def verify(
     keep_cycles: bool = True,
     rule_config: Mapping[str, object] | None = None,
     on_cycle: Callable[[CycleView], None] | None = None,
+    probe: Callable | None = None,
 ) -> VerificationReport:
     """Replay, rule-check, and check the program's claims.  The one entry point.
 
@@ -252,7 +253,7 @@ def verify(
     """
     res = replay(
         prog, arch, model, check_rules=True, only_rules=only_rules,
-        keep_cycles=keep_cycles, rule_config=rule_config, on_cycle=on_cycle
+        keep_cycles=keep_cycles, rule_config=rule_config, on_cycle=on_cycle, probe=probe
     )
     rules = res.rules
     # only rules that HAVE an implementation and were actually run may be marked

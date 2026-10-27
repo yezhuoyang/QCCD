@@ -1,12 +1,12 @@
-"""The leaderboard metrics, computed from the toolchain's own functions.
+"""The leaderboard metrics: the evaluation text's, read by its interpreter.
 
-These are the numbers the boards publish, defined where the boards compute them
-(`Codesign/scripts/small_codes.py::compile_point` and `q06_campaign.py::broadcast_use`),
-restated here as a library so the evaluator does not import maintainer scripts.  Every
-value is a function of (architecture, final program, task physics) only -- never of the
-evaluator's wall-clock time, so a faster machine cannot improve a score.
-
-`tests/test_workspace_metrics.py` holds these equal to the published rows.
+Every number `compute_metrics` publishes is a `metric` of `qccd/evalset/library/metrics.eval`
+-- the definitions the Evaluation page prints -- so the grader, the workspace and the boards
+compute exactly what the text says.  Every value is a function of (architecture, final
+program, task physics) only, never of the evaluator's wall-clock time, so a faster machine
+cannot improve a score.  `replay_time` and `broadcast_use` remain for the callers that want
+the replay itself; `tests/test_workspace_metrics.py` holds the metrics equal to the
+published rows and `tests/test_evalset.py` to these functions.
 """
 
 from __future__ import annotations
@@ -71,28 +71,39 @@ def broadcast_use(arch: Architecture, prog: TSIR) -> dict:
             "ions_per_instruction": (sum(ions_per) / len(ions_per)) if ions_per else 0.0}
 
 
+#: The board metric a table's execution time is published under.
+TIME_METRIC = {"qccdsim_jones": "T_jones", "transport_excitation": "T_transport", "quantinuum": "T_quantinuum"}
+
+
 def compute_metrics(arch: Architecture, prog: TSIR, physics: Mapping) -> tuple:
-    """`(metrics, breakdown)` for one design under the task's physics tables."""
-    from ..cost.hardware import WIRING_FLOORS, hardware_report
+    """`(metrics, breakdown)` for one design under the task's physics tables.
+
+    Every value is a metric of the evaluation text `qccd/evalset/library/metrics.eval`, read
+    by its interpreter: the execution time under each table (`T_jones`, `T_transport`,
+    `T_quantinuum`, each with its own clock; any other table's as `T` on that clock),
+    `instructions`, `transport_instructions`, `ions_per_instruction` and `dacs` (counted with
+    the physics' floors, as the device stage judges the budget)."""
+    from ..evalset import load
 
     rank_table = physics.get("rank_table", "qccdsim_jones")
     tables = list(physics.get("tables") or [rank_table])
+    ev = load("metrics").with_clock(rank_table)
+    e = ev.evaluator(ev.run(prog, arch))
+    names = {m.name for m in ev.metrics_}
     out: dict = {}
     breakdown: dict = {}
     for table in tables:
-        ms, res = replay_time(arch, prog, table)
-        tag = {"qccdsim_jones": "T_jones", "transport_excitation": "T_transport"}.get(table, f"T_{table}")
-        out[tag] = ms
+        tag = TIME_METRIC.get(table, f"T_{table}")
+        sub = e.under(table)
+        out[tag] = e.value(tag) if tag in names else sub.value("T")
+        res = sub.run.result
         breakdown[table] = {"total_us": res.total_us, "total_cost": res.total_cost,
                             "total_steps": res.total_steps,
                             "us_by_type": dict(getattr(res, "us_by_type", {}) or {}),
                             "us_by_class": dict(getattr(res, "us_by_class", {}) or {}),
                             "peak_quanta": getattr(res, "peak_quanta", None)}
-    bc = broadcast_use(arch, prog)
-    out["ions_per_instruction"] = bc["ions_per_instruction"]
-    out["transport_instructions"] = bc["transport_instructions"]
-    out["instructions"] = len(prog)
-    # the count the device stage judged the budget with, not the device's own claim (#15)
-    out["dacs"] = hardware_report(arch, floors=WIRING_FLOORS).dacs
-    breakdown["broadcast"] = bc
+    for k in ("ions_per_instruction", "transport_instructions", "instructions", "dacs"):
+        out[k] = e.value(k)
+    breakdown["broadcast"] = broadcast_use(arch, prog)
+    breakdown["evaluation"] = {"name": ev.name, "digest": ev.digest()}
     return out, breakdown

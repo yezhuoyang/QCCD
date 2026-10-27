@@ -231,6 +231,7 @@ BUNDLE_FILES = (("device.arch.json", "device"), ("program.tsir.json", "program")
 CHART_CSS = """
 .dot.sub circle.mark{stroke:#fff}
 #tablewrap{overflow-x:auto}
+.detail a.def{font-size:11px;margin-left:4px;color:#56545e}
 #tablewrap .tbl td:nth-child(-n+4),#tablewrap .tbl th:nth-child(-n+4){text-align:left}
 #tablewrap .tbl td:first-child,#tablewrap .tbl th:first-child{text-align:right}
 .detail .repro{margin:14px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fafaf8}
@@ -268,6 +269,13 @@ CHART_SCRIPT = r"""
                T_quantinuum: 'Total running time — quantinuum table', T_jones: 'Total running time — jones table',
                T_transport: 'Total running time — transport table', dacs: 'Resource — DACs',
                ions_per_instruction: 'Parallelism — ions per transport instruction'};
+  // every official measure is a metric of the evaluation the grader reads (goal1.eval and what it
+  // includes): its definition, on the Evaluation page, by the metric's name there
+  var DEF = {ler_per_round_per_logical: 'ler_per_round_per_logical', ler_per_round: 'ler_per_round', ler: 'ler',
+             logical_qubits: 'n_logical', ions: 'n_ions', ions_per_logical_qubit: 'ions_per_logical_qubit',
+             instructions: 'instructions', transport_instructions: 'transport_instructions',
+             T_quantinuum: 'T_quantinuum', T_jones: 'T_jones', T_transport: 'T_transport', dacs: 'dacs',
+             ions_per_instruction: 'ions_per_instruction'};
   function key(name){ return SCALE[name] ? SCALE[name][0] : name; }
   function E(t, c, x){ var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
   function day(t){ return t ? new Date(t * 1000).toISOString().slice(0, 10) : '-'; }
@@ -307,6 +315,7 @@ CHART_SCRIPT = r"""
     (lb.metrics || []).forEach(function(m){
       var k = key(m.name); if (metric(k)) return;
       var M = {k: k, name: NAMES[m.name] || m.name.replace(/_/g, ' '), better: m.better === 'high' ? 'high' : 'low',
+               def: DEF[m.name] || null,
                unit: (SCALE[m.name] || SIZE.indexOf(m.name) >= 0 || !m.unit || m.unit === 'count') ? '' : m.unit};
       if (SCALE[m.name]) M.nd = 3; else if (m.unit === 'count' || m.name === 'logical_qubits' || m.name === 'ions') M.nd = 0;
       else if (m.name === 'ions_per_logical_qubit') M.nd = 1;
@@ -407,7 +416,16 @@ CHART_SCRIPT = r"""
           Math.floor(TARGET.ions / TARGET.logical_qubits) + ' or fewer)', d.exp.ions / d.exp.k <= TARGET.ions / TARGET.logical_qubits ? 'ok' : ''));
       }
       if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
-      METRICS.forEach(function(m){ if (val(d, m.k) != null && !(d.exp && SIZE.indexOf(m.k) >= 0)) tb.appendChild(row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m))); });
+      METRICS.forEach(function(m){
+        if (val(d, m.k) == null || (d.exp && SIZE.indexOf(m.k) >= 0)) return;
+        var tr = row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m));
+        if (m.def && tr.firstChild) {
+          var a = link('definition', '/evaluation/#m-' + encodeURIComponent(m.def), 'def');
+          a.title = 'how ' + m.def + ' is defined: the evaluation the grader reads';
+          tr.firstChild.appendChild(document.createTextNode(' ')); tr.firstChild.appendChild(a);
+        }
+        tb.appendChild(tr);
+      });
       right.appendChild(tb);
       el.appendChild(left); el.appendChild(right);
     };

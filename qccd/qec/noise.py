@@ -433,6 +433,39 @@ class NoiseModel2(NoiseModel):
 #: The published models.  `qccd-noise@1` is `NoiseModel()` with its defaults.
 MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2()}
 
+#: Which text a model's knobs set, knob by knob: (NoiseModel field, the text's parameter).
+_KNOBS = (("scale", "scale"), ("heating", "heating"), ("chain", "chain"), ("idle", "idle"),
+          ("t2_s", "t2"), ("memory_rate_per_s", "memory_rate"),
+          ("coherent_dephasing_hz", "coherent_rate"), ("nbar_floor", "nbar_floor"),
+          ("crosstalk_local", "crosstalk_near"), ("crosstalk_far", "crosstalk_far"),
+          ("crosstalk_reset", "crosstalk_reset"))
+
+
+def evaluation(model: "NoiseModel | str"):
+    """The evaluation text that IS this model (`qccd/evalset/library/<id>.eval`), with every
+    knob the model sets differently from the published one written onto the text's parameters,
+    and the model's operating-point table as its clock.  This is what writes the circuit: the
+    probability functions on the classes above are the hand-written model the text replaced,
+    kept for the tests that hold the two together."""
+    from ..evalset import load
+
+    nm = get(model) if isinstance(model, str) else model
+    base = "qccd-noise@2" if isinstance(nm, NoiseModel2) else "qccd-noise@1"
+    ev = load(base)
+    default = MODELS[base]
+    knobs = {}
+    for field_, param in _KNOBS:
+        if not hasattr(nm, field_) or param not in ev.params:
+            continue
+        v = getattr(nm, field_)
+        if v != getattr(default, field_):
+            knobs[param] = v
+    if knobs:
+        ev = ev.with_params(knobs)
+    if nm.table != (ev.clock or default.table):
+        ev = ev.with_clock(nm.table)
+    return ev
+
 
 def get(model_id: str) -> NoiseModel:
     try:
@@ -444,7 +477,13 @@ def get(model_id: str) -> NoiseModel:
 def describe(model_id: str = "qccd-noise@1") -> dict:
     """A model's settings and its channel table, JSON-safe: the `noise` reference section."""
     m = get(model_id)
+    ev = evaluation(m)
     return {"id": m.id, "settings": m.to_json(), "channels": [dict(c) for c in m.channels()],
+            # what writes the circuit: the model's evaluation text, and each channel as written
+            "text": ev.text(), "digest": ev.digest(), "clock": ev.clock,
+            "clauses": [{"channel": c.name, "title": c.title, "clause": c.text,
+                         "budget": [k for k, _ in c.counted] or [c.name], "about": c.about,
+                         "source": c.source} for c in ev.channels],
             "caps": dict(CAPS),
             "notes": ["probabilities are per operand: per pair for DEPOLARIZE2, per ion "
                       "otherwise",

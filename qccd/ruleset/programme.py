@@ -197,11 +197,21 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
         if ins.type == "simd":
             st["class_declared"] = not r4_simd_classes(v)
             st["drivable"] = not r4_drivable(v)
-            by_ion: dict[str, list] = {}
+            # one operation per participant: a participant's route is contiguous, so an ion's
+            # next hop that does not start where its last one ended is a second listing of
+            # the same ion in this step -- which R8 must see as two operations, not one walk
+            routes: list[tuple[str, list]] = []
+            last: dict[str, tuple[int, str]] = {}
             for m in v.moves:
-                by_ion.setdefault(m.ion, []).append(m)
+                prev = last.get(m.ion)
+                if prev is not None and prev[1] == m.src:
+                    routes[prev[0]][1].append(m)
+                    last[m.ion] = (prev[0], m.dst)
+                else:
+                    routes.append((m.ion, [m]))
+                    last[m.ion] = (len(routes) - 1, m.dst)
             paid = bool((ins.meta or {}).get("gate_swaps"))
-            for i, ms in by_ion.items():
+            for i, ms in routes:
                 path = [Site(ms[0].src)] + [Site(m.dst) for m in ms]
                 entails = ms[0].entails
                 src_occ = v.occ_before.get(ms[0].src, 0)

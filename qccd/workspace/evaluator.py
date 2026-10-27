@@ -260,17 +260,31 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         # physics (WIRING_FLOORS), so that declaring one electrode per trap buys nothing.
         # Grading continues: an over-budget device is a disqualified entry with numbers,
         # which the boards list apart, not an unreadable one.
+        # The budget is the evaluation text's: requirements B1 and B2 of
+        # qccd/evalset/library/board.eval, with the release's numbers.  The hardware report
+        # only says, in words, which declared numbers the physics' floors replaced.
         from ..cost.hardware import WIRING_FLOORS, hardware_report
-        hw = hardware_report(arch, floors=WIRING_FLOORS, budget=release.physics().get("budget") or {})
+        from ..evalset import load as load_evaluation
+        from ..ir.tsir import TSIR
+        budget = dict(release.physics().get("budget") or {})
+        board = load_evaluation("board").with_params(
+            {"max_dacs": budget.get("max_dacs"), "max_junctions": budget.get("max_junctions")})
+        empty = TSIR(name="device", arch_spec=arch.name, instructions=[])
+        brun = board.run(empty, arch)
+        bvals = board.metrics(brun, only=["dacs", "n_junctions"])
+        over = [r for r in board.requirements_check(brun) if r["verdict"] != "holds"]
+        hw = hardware_report(arch, floors=WIRING_FLOORS, budget=budget)
         ctx["hardware"] = hw
-        for o in hw.over_budget:
-            st.diag("DEVICE.OVER_BUDGET", f"the device needs {o}; the task's budget is fixed",
-                    pointer="/device/budget")
-        st.done("failed" if hw.over_budget else "passed",
+        for r in over:
+            what = {"B1": f"dacs {bvals['dacs']} > max_dacs {budget.get('max_dacs')}",
+                    "B2": f"junctions {bvals['n_junctions']} > max_junctions {budget.get('max_junctions')}"}
+            st.diag("DEVICE.OVER_BUDGET", f"the device needs {what.get(r['id'], r['title'])}; the task's "
+                    f"budget is fixed ({r['id']}: {r['text']})", pointer="/device/budget")
+        st.done("failed" if over else "passed",
                 "architecture schema, structure, declared zones, hardware budget", nodes=n_nodes,
-                segments=len(arch.device.segments), loops=len(arch.device.loops), dacs=hw.dacs,
-                junctions=hw.n_junctions, budget={k: hw.budget[k] for k in ("max_dacs", "max_junctions")
-                                                  if k in hw.budget},
+                segments=len(arch.device.segments), loops=len(arch.device.loops), dacs=bvals["dacs"],
+                junctions=bvals["n_junctions"], budget={k: budget[k] for k in ("max_dacs", "max_junctions")
+                                                        if k in budget},
                 wiring_notes=[n for n in hw.notes if "counted at" in n or "count as" in n])
     except (ValueError, KeyError, TypeError) as exc:
         st.diag("DEVICE.INVALID", f"the device does not load: {exc}", pointer="/device")

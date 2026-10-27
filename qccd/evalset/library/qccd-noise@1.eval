@@ -4,28 +4,42 @@ about "Deliberately simple: two-ion gates priced by the heat they meet and the c
 include "metrics"
 clock "qccdsim_jones"
 
+# The model's knobs.  The official model is scale 1 with heating, chain length and idling
+# priced against the species' own coherence time; a sweep may set them otherwise.
+param scale = 1                     # every probability is multiplied by this (0: noiseless)
+param heating = true                # price the n-bar a two-ion gate meets
+param chain = true                  # price the length of the chain in its trap
+param idle = true                   # dephase every ion for as long as each step takes
+param t2 = coherence_time()         # seconds; the species' T_coh unless a sweep sets it
+
+define gate_heat(g) = if heating then gate_nbar(g) else 0
+define gate_length(g) = if chain then gate_chain(g) else 2
+
 channel readout_z "A wrong readout"
   before m in measurements where basis(m) = "Z":
-    X_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+    X_ERROR(min(1 / 2, scale * (1 - primitive("measure", "fidelity")))) on ions(m) counted as measure
 
 channel readout_x "A wrong readout, in the X basis"
   before m in measurements where basis(m) = "X":
-    Z_ERROR(min(1 / 2, 1 - primitive("measure", "fidelity"))) on ions(m)
+    Z_ERROR(min(1 / 2, scale * (1 - primitive("measure", "fidelity")))) on ions(m) counted as measure
 
 channel ms "The two-ion gate"
   about "The device's gate error law at the heat the pair meets and the chain in its trap."
   after g in two_qubit_gates:
-    DEPOLARIZE2(min(15 / 16, ms_error(gate_nbar(g), gate_chain(g)))) on ions(g)
+    DEPOLARIZE2(min(15 / 16, scale * ms_error(gate_heat(g), gate_length(g)))) on ions(g)
+      counted as ms_base = ms_error(0, 2),
+                 ms_heating = ms_error(gate_heat(g), 2) - ms_error(0, 2),
+                 ms_chain = ms_error(gate_heat(g), gate_length(g)) - ms_error(gate_heat(g), 2)
 
 channel gate_1q "A one-ion pulse"
   after g in single_qubit_gates where gate(g) != "VZ" and gate(g) != "I":
-    DEPOLARIZE1(min(3 / 4, 1 - primitive("1q_gate", "fidelity"))) on ions(g)
+    DEPOLARIZE1(min(3 / 4, scale * (1 - primitive("1q_gate", "fidelity")))) on ions(g)
 
 channel reset "A wrong reset"
   after r in resets:
-    X_ERROR(min(1 / 2, primitive("reset", "error"))) on ions(r)
+    X_ERROR(min(1 / 2, scale * primitive("reset", "error"))) on ions(r)
 
 channel idle "Dephasing while the clock runs"
   about "Pure dephasing of every ion over every step's duration, against the species' coherence time; the appended readout takes one measurement's time."
-  after k in steps + readout where duration(k) > 0 and coherence_time() != none:
-    Z_ERROR(min(1 / 2, (1 - exp(-duration(k) * 1e-6 / coherence_time())) / 2)) on ions
+  after k in steps + readout where idle and duration(k) > 0 and t2 != none:
+    Z_ERROR(min(1 / 2, scale * ((1 - exp(-duration(k) * 1e-6 / t2)) / 2))) on ions

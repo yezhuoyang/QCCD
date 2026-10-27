@@ -27,25 +27,41 @@ metric T "Execution time" unit "ms" better low group "speed"
   about "How long the programme runs on the device's clock: its steps one after another, each as long as its slowest participant."
   = time(final()) / 1000
 
-metric T_transport "Transport time" unit "ms" better low group "speed"
+metric T_jones "Execution time, on QCCDSim's clock" unit "ms" better low group "speed" clock "qccdsim_jones"
+  about "The same execution time, priced at the operating points of the qccdsim_jones table: QCCDSim's durations with Jones and Murali's heating. The round-time boards rank by it."
+  = time(final()) / 1000
+
+metric T_transport "Execution time, on the transport-excitation clock" unit "ms" better low group "speed" clock "transport_excitation"
+  about "The execution time at the transport_excitation table's operating points (Munoz and colleagues): slower, colder transport."
+  = time(final()) / 1000
+
+metric T_quantinuum "Execution time, on Goal 1's clock" unit "ms" better low group "speed" clock "quantinuum"
+  about "The execution time at the quantinuum table's operating points, the cited Helios-class physics every Goal 1 release fixes."
+  = time(final()) / 1000
+
+metric time_transport "Transport time" unit "ms" better low group "speed"
   about "The part of the execution time spent carrying ions."
   = sum(duration(k) for k in steps where kind(k) = "simd") / 1000
 
-metric T_gates "Gate time" unit "ms" better low group "speed"
+metric time_gates "Gate time" unit "ms" better low group "speed"
   about "The part spent on laser gates, the frame changes VZ included."
   = sum(duration(k) for k in steps where kind(k) = "gate") / 1000
 
-metric T_cooling "Cooling time" unit "ms" better low group "speed"
+metric time_cooling "Cooling time" unit "ms" better low group "speed"
   about "The part spent cooling ions back toward their motional ground state."
   = sum(duration(k) for k in steps where kind(k) = "cool") / 1000
 
-metric T_spam "Readout and reset time" unit "ms" better low group "speed"
+metric time_spam "Readout and reset time" unit "ms" better low group "speed"
   about "The part spent measuring ions and preparing them in |0>."
   = sum(duration(k) for k in steps where kind(k) in {"measure", "reset"}) / 1000
 
 metric instructions "Instructions" unit "count" better low group "speed"
   about "How many instructions the programme has: one machine step each."
   = count(k in steps)
+
+metric two_ion_gates "Two-ion gates" unit "count" better low group "speed"
+  about "How many times two ions are brought into contact for an entangling gate: every pair of every MS or two-qubit gate."
+  = count(g in two_qubit_gates)
 
 # a transport instruction, as the leaderboard counts them: a rotation of a loop, or a step
 # that names the ions it moves
@@ -64,11 +80,15 @@ metric cost "Transport cost" unit "model cost units" better low group "speed"
   about "Every rail crossed, every junction entered and every split or merge, counted once each."
   = count(h in hops) + count(h in hops where degree(to(h)) >= 3) + sum(size(entails(o)) for o in moves)
 
+metric depth "Machine steps" unit "steps" better low group "speed"
+  about "The steps' depths added up: a transport cycle is as deep as its longest route, one for each rail it crosses and each split or merge it is charged; any other step that takes time is one deep."
+  = sum(depth(k) for k in steps)
+
 # ------------------------------------------------------------------ heat
 
 metric peak_nbar "Hottest any ion gets" unit "quanta" better low group "heat"
-  about "The most motional energy any ion carries at any moment of the execution, before a cooling takes it away."
-  = max(nbar(i, end(k)) for k in steps, i in ions)
+  about "The most motional energy any ion carries at any moment of the execution, before a cooling takes it away: the hottest ion at the end of each step, and the hottest of those."
+  = max(max(nbar(i, end(k)) for i in ions) for k in steps)
 
 metric gate_nbar_max "Hottest a two-ion gate starts" unit "quanta" better low group "heat"
   about "The hottest pair any two-ion gate meets; rule R7 caps it at the device's heat budget."
@@ -82,6 +102,15 @@ metric gate_nbar_mean "Mean heat at a two-ion gate" unit "quanta" better low gro
 metric junction_crossings "Junction crossings" unit "count" better low group "heat"
   about "How many times an ion is carried into a node where three or more rails meet."
   = count(h in hops where degree(to(h)) >= 3)
+
+metric transport_quanta "Heat put in by transport" unit "quanta" better low group "heat"
+  about "Every quantum the rails, junctions, splits and merges deposited, on every ion, before any cooling took it away."
+  = deposited("shuttle") + deposited("junction") + deposited("split_merge")
+
+metric total_quanta "All the heat put in" unit "quanta" better low group "heat"
+  about "The same, with the heat the gates deposit and the anomalous heating every ion accrues with the clock."
+  = deposited("shuttle") + deposited("junction") + deposited("split_merge") + deposited("gate")
+    + deposited("anomalous")
 
 metric n_coolings "Coolings" unit "count" better low group "heat"
   about "How many cooling operations the programme needs."

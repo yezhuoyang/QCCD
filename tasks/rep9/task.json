@@ -12,7 +12,7 @@
   "model": "corrected",
   "tables": [
    "qccdsim_jones",
-   "qccdsim_transport"
+   "transport_excitation"
   ]
  },
  "metrics": [

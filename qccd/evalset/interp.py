@@ -37,6 +37,8 @@ from .words import WORDS, Absent, Ctx, Hop, WordError
 
 __all__ = ["Evaluator", "EvalError", "Circuit", "emit_circuit", "TRANSLATION"]
 
+_MISS = object()
+
 #: Calls whose name is also a domain: `ions(o)` is the ions of o, `ions` every ion.
 CALL_ALIAS = {"ions": "ions_of", "move": "move_of"}
 
@@ -99,6 +101,17 @@ class Evaluator:
         self._memo: dict[tuple, Any] = {}
         self._free: dict[int, frozenset] = {}
         self._domains: dict[int, list] = {}
+        value_of = lambda n, env: n.value  # noqa: E731
+        self._dispatch = {
+            Num: value_of, Str: value_of, Const: value_of,
+            Name: lambda n, env: self.lookup(n.id, env),
+            Call: self.call,
+            BinOp: self._binop_node,
+            If: lambda n, env: self.term(n.then if self.truth(n.cond, env) else n.other, env),
+            Not: lambda n, env: not self.truth(n.arg, env),
+            SetLit: lambda n, env: frozenset(self.term(a, env) for a in n.items),
+            Gen: self.memo, Quant: self.memo,
+        }
 
     # ------------------------------------------------------------------ names
     def value(self, name: str) -> Any:
@@ -114,13 +127,39 @@ class Evaluator:
             elif name in self.defines and not self.defines[name].args:
                 v = self.term(self.defines[name].body, {})
             elif name in self.metrics:
-                v = self.term(self.metrics[name].body, {})
+                m = self.metrics[name]
+                if m.clock and m.clock != self.run.clock:
+                    v = self.under(m.clock).value(name)
+                else:
+                    v = self.term(m.body, {})
             else:
                 raise KeyError(name)
         finally:
             self._busy.discard(name)
         self._vals[name] = v
         return v
+
+    def term_call(self, word: str, *args) -> Any:
+        """A word of the vocabulary, called with values (not terms)."""
+        w = WORDS.get(CALL_ALIAS.get(word, word))
+        if w is None:
+            raise EvalError(f"the vocabulary has no word {word!r}")
+        return w.fn(self.ctx, *args)
+
+    def under(self, clock: str) -> "Evaluator":
+        """The same evaluation on a replay under another operating-point table (a metric that
+        names a clock of its own); each clock is replayed once per run.  A table the device
+        format does not declare is refused: `corrected_model` would price it on another."""
+        from ..arch.curves import TABLES
+        if clock not in TABLES:
+            raise EvalError(f"clock {clock!r} is not an operating-point table (one of {', '.join(TABLES)})")
+        runs = self.run.facts.setdefault("clocks", {})
+        r = runs.get(clock)
+        if r is None:
+            r = runs[clock] = build_run(self.run.prog, self.run.arch, clock,
+                                        experiment=self.run.experiment,
+                                        qubit_map=self.run.qubit_map or None)
+        return Evaluator(self.ev_, r, sample=self.ctx.sample, checks=self.ctx.checks)
 
     def known(self, name: str) -> bool:
         return (name in self.params or name in self.metrics
@@ -141,34 +180,20 @@ class Evaluator:
 
     # ------------------------------------------------------------------ terms
     def term(self, n: Node, env: dict) -> Any:
-        if isinstance(n, Num):
-            return n.value
-        if isinstance(n, Str):
-            return n.value
-        if isinstance(n, Const):
-            return n.value
-        if isinstance(n, Name):
-            return self.lookup(n.id, env)
-        if isinstance(n, If):
-            return self.term(n.then if self.truth(n.cond, env) else n.other, env)
-        if isinstance(n, Call):
-            return self.call(n, env)
-        if isinstance(n, BinOp):
-            op = n.op
-            if op == "and":
-                return self.truth(n.left, env) and self.truth(n.right, env)
-            if op == "or":
-                return self.truth(n.left, env) or self.truth(n.right, env)
-            if op == "implies":
-                return (not self.truth(n.left, env)) or self.truth(n.right, env)
-            return self.binop(op, self.term(n.left, env), self.term(n.right, env), n)
-        if isinstance(n, Not):
-            return not self.truth(n.arg, env)
-        if isinstance(n, SetLit):
-            return frozenset(self.term(a, env) for a in n.items)
-        if isinstance(n, (Gen, Quant)):
-            return self.memo(n, env)
-        raise EvalError(f"cannot evaluate {n!r}")
+        f = self._dispatch.get(type(n))
+        if f is None:
+            raise EvalError(f"cannot evaluate {n!r}")
+        return f(n, env)
+
+    def _binop_node(self, n: BinOp, env: dict) -> Any:
+        op = n.op
+        if op == "and":
+            return self.truth(n.left, env) and self.truth(n.right, env)
+        if op == "or":
+            return self.truth(n.left, env) or self.truth(n.right, env)
+        if op == "implies":
+            return (not self.truth(n.left, env)) or self.truth(n.right, env)
+        return self.binop(op, self.term(n.left, env), self.term(n.right, env), n)
 
     def truth(self, n: Node, env: dict) -> bool:
         return bool(self.term(n, env))
@@ -199,19 +224,35 @@ class Evaluator:
             if len(d.args) != len(n.args):
                 raise EvalError(f"{fn} takes {len(d.args)} argument(s), given {len(n.args)}")
             args = [self.term(a, env) for a in n.args]
+            # a define is a pure function of its arguments (its body sees nothing else but
+            # params, defines and metrics, which are fixed for the run): kept per argument tuple
+            key = ("define", fn, *args)
+            try:
+                hit = self._memo.get(key, _MISS)
+            except TypeError:
+                key, hit = None, _MISS
+            if hit is not _MISS:
+                return hit
             if fn in self._busy:
                 raise EvalError(f"{fn} is defined in terms of itself")
             self._busy.add(fn)
             try:
-                return self.term(d.body, dict(zip(d.args, args)))
+                v = self.term(d.body, dict(zip(d.args, args)))
             finally:
                 self._busy.discard(fn)
+            if key is not None:
+                self._memo[key] = v
+            return v
         if fn == "count" and len(n.args) == 1:
             return len(self.term(n.args[0], env))
         w = WORDS.get(CALL_ALIAS.get(fn, fn))
         if w is None:
             raise EvalError(f"the vocabulary has no word {fn!r}")
         args = [self.term(a, env) for a in n.args]
+        # A word is a pure function of its arguments too, but it is NOT kept per argument
+        # tuple: a word is a lookup (`nbar(i, t)` reads one number), the words that build
+        # something keep it on the run themselves (`Ctx.once`), and keeping every call
+        # cost one entry per (ion, instant) -- six million on a 20,000-step programme.
         try:
             return w.fn(self.ctx, *args)
         except (WordError, Absent):
@@ -269,8 +310,39 @@ class Evaluator:
         v = self.term(node, env)
         return list(v) if v is not None else []
 
+    def free(self, n: Node) -> frozenset:
+        fr = self._free.get(id(n))
+        if fr is None:
+            fr = self._free[id(n)] = _free(n)
+        return fr
+
     def bindings(self, binders: tuple[Binder, ...], where: Node | None, env: dict) -> Iterator[dict]:
         vars_ = [(nm, b.domain) for b in binders for nm in b.names]
+        if len(vars_) == 1 and where is not None:
+            # one variable, and a `where` that tests it for membership in a set that does not
+            # depend on it (`i not in operated(k)`): the set is computed once, not per element.
+            # Planning only: the bindings and their order are those of the plain walk.
+            nm, dom = vars_[0]
+            fast, rest = [], []
+            for c in _conjuncts(where):
+                if (isinstance(c, BinOp) and c.op in ("in", "notin") and isinstance(c.left, Name)
+                        and c.left.id == nm and nm not in self.free(c.right)):
+                    fast.append((c.op == "in", c.right))
+                else:
+                    rest.append(c)
+            if fast:
+                sets = []
+                for want, node in fast:
+                    v = self.term(node, env)
+                    sets.append((want, v if isinstance(v, (set, frozenset)) else
+                                 frozenset(v) if v is not None else frozenset()))
+                for x in self.domain(dom, env, {nm}):
+                    if all((x in S) == want for want, S in sets):
+                        e2 = dict(env)
+                        e2[nm] = x
+                        if all(self.truth(c, e2) for c in rest):
+                            yield e2
+                return
 
         def walk(i: int, e: dict) -> Iterator[dict]:
             if i == len(vars_):
@@ -288,7 +360,10 @@ class Evaluator:
     def aggregate(self, n: Gen, env: dict) -> Any:
         if n.kind == "count":
             return sum(1 for _ in self.bindings(n.binders, n.where, env))
-        vals = [self.term(n.expr, e) for e in self.bindings(n.binders, n.where, env)]
+        if len(n.binders) == 1 and len(n.binders[0].names) == 1 and n.where is None:
+            vals = self._values_over(n, env)
+        else:
+            vals = [self.term(n.expr, e) for e in self.bindings(n.binders, n.where, env)]
         if n.kind == "set":
             return frozenset(vals)
         if n.kind == "sum":
@@ -303,6 +378,40 @@ class Evaluator:
         if n.kind == "all_different":
             return len(set(vals)) == len(vals)
         raise EvalError(f"unknown aggregate {n.kind}")
+
+    def _values_over(self, n: Gen, env: dict) -> list:
+        """`expr for x in D`, one variable and no `where`: the same values in the same order as
+        the bindings' walk, without a fresh environment per element -- the aggregate reads
+        each value before the next binding, so one environment rebound in place is the walk.
+        When the term is a word whose only arguments that read x ARE x (`nbar(i, end(k))`
+        over i), the other arguments are evaluated once (they cannot change with x, and the
+        domain is not empty, so the walk would have evaluated them too)."""
+        nm = n.binders[0].names[0]
+        dom = self.domain(n.binders[0].domain, env, {nm})
+        expr = n.expr
+        if not dom:
+            return []
+        if isinstance(expr, Call) and expr.fn not in self.defines and expr.fn != "count":
+            w = WORDS.get(CALL_ALIAS.get(expr.fn, expr.fn))
+            free = [nm in self.free(a) for a in expr.args]
+            if w is not None and all(isinstance(a, Name) and a.id == nm
+                                     for a, f in zip(expr.args, free) if f):
+                fixed = [None if f else self.term(a, env) for a, f in zip(expr.args, free)]
+                fn, ctx, out = w.fn, self.ctx, []
+                try:
+                    for x in dom:
+                        out.append(fn(ctx, *[x if f else v for v, f in zip(fixed, free)]))
+                except (WordError, Absent):
+                    raise
+                except TypeError as exc:
+                    raise EvalError(f"{expr.fn}: {exc}") from None
+                return out
+        e = dict(env)
+        term, out = self.term, []
+        for x in dom:
+            e[nm] = x
+            out.append(term(expr, e))
+        return out
 
     def quant(self, q: Quant, env: dict) -> bool:
         for e in self.bindings(q.binders, q.where, env):
@@ -321,6 +430,12 @@ class Evaluator:
                 if len(out) >= limit:
                     break
         return out
+
+
+def _conjuncts(n: Node) -> list:
+    if isinstance(n, BinOp) and n.op == "and":
+        return _conjuncts(n.left) + _conjuncts(n.right)
+    return [n]
 
 
 def _same(a, b) -> bool:
@@ -387,6 +502,41 @@ TRANSLATION = (
 )
 
 
+def noise_budget(evaluator: Evaluator, channels: list[Channel]) -> dict[str, dict]:
+    """Each budget line's expected number of faults, and how many places it writes, without
+    writing the circuit: what a page with no memory experiment (the Design page) can still say
+    about its noise.  The same bookings `emit_circuit` makes, channel by channel; the sums can
+    differ from the circuit's in the last bits only, being added in another order."""
+    out: dict[str, dict] = {}
+    for ch in channels:
+        for key in ([k for k, _ in ch.counted] or [ch.name]):
+            out.setdefault(key, {"faults": 0.0, "places": 0, "channels": []})
+            if ch.name not in out[key]["channels"]:
+                out[key]["channels"].append(ch.name)
+    for ch in channels:
+        for e in evaluator.bindings(ch.binders, ch.where, {}):
+            p = evaluator.term(ch.prob, e)
+            if p is None or p <= 0:
+                continue
+            tg = evaluator.term(ch.targets, e)
+            targets = [tg] if isinstance(tg, str) else list(tg or ())
+            if not targets:
+                continue
+            amount = float(p) if ch.op == "DEPOLARIZE2" else float(p) * len(targets)
+            if not ch.counted:
+                lines = [(ch.name, amount)]
+            elif len(ch.counted) == 1 and ch.counted[0][1] is None:
+                lines = [(ch.counted[0][0], amount)]
+            else:
+                terms = [float(evaluator.term(t, e)) for _, t in ch.counted]
+                whole = sum(terms)
+                lines = [(k, amount * t / whole if whole else 0.0) for (k, _), t in zip(ch.counted, terms)]
+            for key, v in lines:
+                out[key]["faults"] += v
+                out[key]["places"] += 1
+    return out
+
+
 @dataclass
 class Circuit:
     """The noisy circuit, where every line came from, and its expected faults per channel."""
@@ -404,8 +554,9 @@ class Circuit:
         return stim.Circuit("\n".join(self.lines))
 
 
-def emit_circuit(evaluator: Evaluator, channels: list[Channel]) -> Circuit:
-    """Write the run's noisy circuit (see the module docstring for the order)."""
+def emit_circuit(evaluator: Evaluator, channels: list[Channel], explain=None) -> Circuit:
+    """Write the run's noisy circuit (see the module docstring for the order).  `explain(channel,
+    p, ions, binding, evaluator)` words why a noise line is there; by default its channel says."""
     from ..qec.stimtext import StimText, declare
 
     run = evaluator.run
@@ -455,11 +606,26 @@ def emit_circuit(evaluator: Evaluator, channels: list[Channel]) -> Circuit:
 
     c = StimText()
     origin: list[str] = []
-    budget = {ch.name: 0.0 for ch in channels}
+    budget: dict[str, float] = {}
+    for ch in channels:
+        for key in ([k for k, _ in ch.counted] or [ch.name]):
+            budget.setdefault(key, 0.0)
     trace: list[dict] = []
     meas_of_bit: dict[int, int] = {}
     count: dict[int, int] = defaultdict(int)
     n_meas = 0
+
+    def book(ch, amount: float, e: dict) -> None:
+        """The channel's expected faults, under its budget line(s) (`counted as`)."""
+        if not ch.counted:
+            budget[ch.name] += amount
+        elif len(ch.counted) == 1 and ch.counted[0][1] is None:
+            budget[ch.counted[0][0]] += amount
+        else:
+            terms = [float(evaluator.term(t, e)) for _, t in ch.counted]
+            whole = sum(terms)
+            for (key, _), t in zip(ch.counted, terms):
+                budget[key] += amount * t / whole if whole else 0.0
 
     def write(items, why: list[str]) -> None:
         for _, ch, p, targets, e in items:
@@ -468,12 +634,13 @@ def emit_circuit(evaluator: Evaluator, channels: list[Channel]) -> Circuit:
                 qs = [sq[i] for i in targets]
                 if len(qs) != 2:
                     raise EvalError(f"channel {ch.name}: DEPOLARIZE2 on {len(qs)} ion(s)")
-                budget[ch.name] += p
+                book(ch, p, e)
             else:
-                budget[ch.name] += p * len(qs)
+                book(ch, p * len(qs), e)
             c.append(ch.op, qs, p)
             origin.append(ch.name)
-            why.append(f"{ch.name}: {ch.op}({p:.3g}) on {len(qs)} ion(s)")
+            said = explain(ch, p, targets, e, evaluator) if explain else None
+            why.append(said or f"{ch.name}: {ch.op}({p:.3g}) on {len(qs)} ion(s)")
 
     for st in run.all_steps:
         a = len(c.lines)

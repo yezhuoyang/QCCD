@@ -124,6 +124,7 @@ function firstContact(p0, from, to, member) {
 function snapRound(v) { return Math.round(v * 1000) / 1000 || 0; }
 var DOWN = null, ARMED = null, GHOST = null, LASTPT = null;
 var HW = null, HW0 = null;
+var EVAL = null, EVAL_CHECK = null, EVAL_FULL = false;
 var READY = false, WHY_NOT = null;
 
 function ok() { return READY; }
@@ -604,6 +605,95 @@ function axisOf(nodes, segments, px, py, byId) {
   return AXIS;
 }
 
+// ------------------------------------------------------------------- the evaluation
+//
+// EVERY NUMBER THIS PAGE REPORTS IS A METRIC OF THE EVALUATION -- the texts of
+// qccd/evalset/library (`board.eval` and the clock's noise model), printed on the website's
+// Evaluation page and read by the grader.  `D.evaluation` carries their parse trees and the
+// values the grader's interpreter gave them on the shipped device and programme;
+// `js/evaluate.js` reads the same trees over the engine's replay with the same semantics
+// (`tests/test_eval_parity.py` holds the two interpreters to each other).  Until the page is
+// changed it shows the shipped values; after a change, the browser's, from the same text.
+// There is no third source: a number the evaluation does not define is not a metric here.
+function evalPayload() { return (D.evaluation && D.evaluation.payload) || null; }
+function evalState() {
+  return { control: STATE.control, budget: STATE.budget, primitives: STATE.primitives,
+           species: STATE.species };
+}
+function closedLoopsOf(dev) {
+  var out = {};
+  for (var lid in dev.loops) if (has(dev.loops, lid) && dev.loops[lid].closed) out[lid] = dev.loops[lid].nodes.slice();
+  return out;
+}
+// the page as it shipped: the values the grader's interpreter computed hold for it
+function evalShipped() {
+  return !EDITS.length && !PROG.length && !AUTHORED && shippedSeed() && programmeIsShipped() &&
+         !!(D.evaluation && D.evaluation.values);
+}
+// One metric, by name: the shipped value, or the browser's on the page as it is now; null
+// when this page cannot compute it (`formalWhy` says why).
+function formal(name) {
+  if (evalShipped()) {
+    var v = D.evaluation.values[name];
+    return v === undefined ? null : v;
+  }
+  if (!EVAL) return null;
+  var r = EVAL.value(name);
+  return has(r, 'value') ? r.value : null;
+}
+function formalWhy(name) {
+  if (evalShipped()) return ((D.evaluation.missing || {})[name]) || null;
+  return EVAL ? (EVAL.value(name).missing || null) : 'the programme was not priced';
+}
+// a number when the evaluation has one, else `fallback` -- which only a page built without
+// an evaluation (none since the evaluation language) can reach
+function F(name, fallback) {
+  if (!evalPayload()) return fallback;
+  var v = formal(name);
+  return typeof v === 'number' ? v : null;
+}
+// The pricing model of another clock, for a metric that names one (T_jones, T_transport):
+// the grader's (`qccd.evalset.Evaluator.under` replays under `corrected_model(clock)`).
+function clockModel(table) {
+  var dev = STATE.device;
+  var m = Q.makeModel(STATE.primitives, Q.degrees(dev), Q.cornerEndpoints(dev), dev.segments, {
+    kind: 'corrected', corner_hops: 1, junction_min_degree: PH.junction_min_degree || 3,
+    length_scaling: false, pitch: 1.0, include_anomalous: true,
+    anomalous_per_ms: PH.anomalous_per_ms || 0, policy: { table: table, objective: 'fastest' } });
+  m._pair = Q.pairIndex(dev);
+  return m;
+}
+// THE HARDWARE THE EVALUATION DEFINES, over the hardware report.  `Q.hardwareReport` keeps
+// what no metric names (the scheme, the notes, the per-kind counts); every count a metric
+// defines is the metric's -- the wiring floors included, as the grader counts -- and the
+// budget is B1 and B2 of `board.eval`.  `report` keeps the report's own counts beside them.
+var HARDWARE_METRICS = { dacs: 'dacs', electrodes: 'electrodes', switches: 'switches',
+                         total_capacity: 'places', n_junctions: 'n_junctions' };
+function formalHardware(hw, dev) {
+  var pl = evalPayload();
+  if (!hw || !pl || !Q.evaluation) return hw;
+  var s;
+  try { s = Q.evaluation.session(pl, null, null, null, {}, dev, evalState(), {}); }
+  catch (err) { return hw; }
+  hw.report = {};
+  for (var f in HARDWARE_METRICS) if (has(HARDWARE_METRICS, f)) {
+    hw.report[f] = hw[f];
+    var v = s.value(HARDWARE_METRICS[f]);
+    if (v && typeof v.value === 'number') hw[f] = v.value;
+  }
+  if (hw.trapping_zones) hw.dacs_per_trap = hw.dacs / hw.trapping_zones;
+  hw.requirements = s.requirements();
+  var b = STATE.budget || {}, over = [];
+  hw.requirements.forEach(function (r) {
+    if (r.verdict !== 'fails') return;
+    if (r.id === 'B1') over.push('dacs ' + hw.dacs + ' > max_dacs ' + String(b.max_dacs));
+    else if (r.id === 'B2') over.push('junctions ' + hw.n_junctions + ' > max_junctions ' + String(b.max_junctions));
+    else over.push(r.id + ': ' + r.title);
+  });
+  hw.over_budget = over;
+  return hw;
+}
+
 // ------------------------------------------------------------------- re-pricing
 //
 // This EXTENDS the page's own self-check rather than adding a second mechanism.  The page
@@ -623,6 +713,7 @@ function repriceNow() {
   // screen for a device it no longer describes -- a green tick for a check that did not
   // run, which is the one thing this surface must never show.
   RULES = null;
+  EVAL = null;
   if (!STATE) return;
   var dev = STATE.device;
   var classes = {};
@@ -632,7 +723,7 @@ function repriceNow() {
   // hardware ALWAYS reprices: it is pure counting over the graph and the wiring block, it
   // costs a couple of milliseconds, and it is the number the WISE argument lives in.
   try {
-    HW = Q.hardwareReport(dev, STATE.control, STATE.budget, STATE.name);
+    HW = formalHardware(Q.hardwareReport(dev, STATE.control, STATE.budget, STATE.name), dev);
   } catch (err) { HW = null; }
 
   // structural checks BEFORE pricing.  The last one matters most: `Architecture.entails`
@@ -686,8 +777,13 @@ function repriceNow() {
     return;
   }
   model._pair = Q.pairIndex(dev);
+  // the evaluation's run is recorded off THIS walk (`collector`: its hooks only watch), so
+  // evaluating the page costs no replay of its own; a page as it shipped shows the shipped
+  // values and records nothing
+  var col = (evalPayload() && Q.evaluation && !evalShipped()) ? Q.evaluation.collector(P.frames, dev) : null;
   try {
-    PRICE = Q.priceFrames(P.frames, A.loops, model, classes);
+    PRICE = col ? Q.priceFrames(P.frames, A.loops, model, classes, col.hooks)
+                : Q.priceFrames(P.frames, A.loops, model, classes);
   } catch (err) {
     PRICE = { blocked: [{ kind: 'price_error', message: err.message, count: 1 }] };
     PRICE_STATUS = 'blocked';
@@ -710,6 +806,16 @@ function repriceNow() {
   evaluateNow(model);
   PRICE.frameChecked = n;
   if (!n && P.frames.length) PRICE_STATUS = 'unoracled';
+  // THE EVALUATION OF THIS STATE, off the price walk above.  A metric on another clock
+  // replays under that clock when it is first read; the shipped page reads the shipped values.
+  if (col) {
+    try {
+      var est = evalState();
+      EVAL = Q.evaluation.session(evalPayload(), P.frames, A.loops, model, classes, dev, est,
+                                  { closedLoops: closedLoopsOf(dev), mk: clockModel,
+                                    run: col.finish(PRICE, model, A.loops, est, evalPayload().clock) });
+    } catch (err) { EVAL = null; }
+  }
 }
 var BASE_LOOPS = null;
 
@@ -2465,12 +2571,13 @@ function renderHead() {
 // one thing this surface must never show.
 function metricRows() {
   if (!PRICE || PRICE.blocked) return [];
+  // each row is a metric of the evaluation: cost, depth, T, peak_nbar, junction_crossings
   var rows = [
-    ['cost', fmt(PRICE.totals.cost)],
-    ['steps', fmt(PRICE.totals.steps)],
-    ['runtime', fmt(PRICE.totals.us / 1000, 2) + ' ms'],
-    ['peak n-bar', fmt(PRICE.peak, 3) + (PRICE.peakIon ? ' (' + PRICE.peakIon + ')' : '')],
-    ['junction transits', fmt(PRICE.transits)]];
+    ['cost', fmt(F('cost', PRICE.totals.cost))],
+    ['steps', fmt(F('depth', PRICE.totals.steps))],
+    ['runtime', fmt(F('T', PRICE.totals.us / 1000), 2) + ' ms'],
+    ['peak n-bar', fmt(F('peak_nbar', PRICE.peak), 3) + (PRICE.peakIon ? ' (' + PRICE.peakIon + ')' : '')],
+    ['junction transits', fmt(F('junction_crossings', PRICE.transits))]];
   if (HW) {
     rows.push(['DACs', fmt(HW.dacs)], ['electrodes', fmt(HW.electrodes)],
               ['switches', fmt(HW.switches)], ['ion capacity', fmt(HW.total_capacity)]);
@@ -2509,9 +2616,10 @@ function priceHead() {
   if (PRICE.blocked) return 'price unavailable · ' + breakMessage(PRICE.blocked[0]);
   var t = PRICE.totals;
   var same = !EDITS.length && !PROG.length;
-  var head = 'cost ' + fmt(t.cost) + ' · steps ' + fmt(t.steps) +
-             ' · runtime ' + fmt(t.us / 1000, 2) + ' ms · n̄ ' +
-             fmt(PRICE.comp.shuttle + PRICE.comp.junction + PRICE.comp.split_merge, 1);
+  // metrics of the evaluation: cost, depth, T and transport_quanta (and DACs, below)
+  var head = 'cost ' + fmt(F('cost', t.cost)) + ' · steps ' + fmt(F('depth', t.steps)) +
+             ' · runtime ' + fmt(F('T', t.us / 1000), 2) + ' ms · n̄ ' +
+             fmt(F('transport_quanta', PRICE.comp.shuttle + PRICE.comp.junction + PRICE.comp.split_merge), 1);
   if (HW) head += ' · ' + fmt(HW.dacs) + ' DACs';
   if (HW0 && HW && HW.dacs !== HW0.dacs) head += ' (' + (HW.dacs > HW0.dacs ? '+' : '') + fmt(HW.dacs - HW0.dacs) + ')';
   if (LENGTH_NOTE) head += ' · ' + LENGTH_NOTE;
@@ -4637,6 +4745,8 @@ var HINTS = {
   'follow': { t: 'Follow', d: 'Keep the executing instruction scrolled into view.', k: 'F' },
   'filter': { t: 'Filter', d: 'Show only the rows containing this text.', k: '/' },
   'evaluate': { t: 'Evaluate', d: 'Price the programme, check it against the rules, and play it.' },
+  'evalall': { t: 'Evaluate everything', d: 'Evaluate the metrics priced on another clock and the noise model’s budget too. On a long programme each is another replay, so the page waits to be asked.' },
+  'evalcheck': { t: 'Check the evaluation', d: 'Evaluate every metric, requirement and budget line again in the browser, from the same texts, and compare them with the values the grader computed for this page.' },
   'archview': { t: 'View', d: 'Program: the statements that build the device \u00b7 Device: every node and rail \u00b7 Source: edit it as text.' },
   // the legend
   'leg:segment': { t: 'Rail', d: 'A segment an ion can travel along.' },
@@ -6526,7 +6636,7 @@ function boot() {
   buildMaxOcc();
   buildIndex();
   initOverlay();
-  try { HW0 = Q.hardwareReport(STATE.device, STATE.control, STATE.budget, STATE.name); }
+  try { HW0 = formalHardware(Q.hardwareReport(STATE.device, STATE.control, STATE.budget, STATE.name), STATE.device); }
   catch (err) { HW0 = null; }
   READY = true;
   repriceNow();
@@ -11035,6 +11145,7 @@ function renderReport() {
     h += '<table>' +
       metricRows().map(function (r) { return row(r[0], esc2(r[1])); }).join('') +
       '</table>';
+    h += evaluationBlock();
     h += '<div class="mut">' + (
       PRICE.frameChecked
         ? 'per-frame self-check: ' + PRICE.frameChecked + ' frames compared against the ' +
@@ -11097,11 +11208,197 @@ function renderReport() {
        'python -m qccd run ' + esc2(stem) + '.arch.json --tsir ' + esc2(stem) +
        '.tsir.json --json report.json</code></div>';
   host.innerHTML = h;
+  var bc = $('rEvalCheck');
+  if (bc) bc.onclick = function () { evaluationCheck(); renderReport(); };
+  var ba = $('rEvalAll');
+  if (ba) ba.onclick = function () { evaluateEverything(); };
   var sc = $('rScope');
   if (sc) sc.textContent = 'scope: browser';
 }
 
 function row(k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; }
+
+// THE EVALUATION IN THE REPORT: every metric of the texts this page is judged by, the
+// budget's requirements and the noise each budget line of the noise model books, each name
+// linked to its definition on the website's Evaluation page.  Inside BACKED: these are the
+// numbers the page stands behind, and the line under the table says whose they are.
+var EVAL_SITE = 'https://qccd.academy/evaluation/';
+var EVAL_GROUPS = ['speed', 'heat', 'hardware', 'size', 'logical'];
+function evalNumber(v, unit) {
+  if (v === null || v === undefined) return '-';
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  if (typeof v !== 'number') return String(v);
+  var a = Math.abs(v), t;
+  if (Number.isInteger(v)) t = fmt(v);
+  else if (a >= 1000) t = fmt(v, 1);
+  else if (a >= 1) t = fmt(v, 3);
+  else if (a === 0) t = '0';
+  else t = v.toPrecision(3);
+  return t + (unit && unit !== 'count' ? ' ' + unit : '');
+}
+function evaluationView() {
+  var pl = evalPayload();
+  if (!pl) return null;
+  if (evalShipped()) {
+    var ev = D.evaluation, vals = ev.values || {}, miss = ev.missing || {};
+    return {
+      source: 'shipped',
+      metrics: pl.metrics.map(function (m) {
+        var r = { name: m.name, title: m.title, unit: m.unit, group: m.group, clock: m.clock };
+        if (has(vals, m.name)) r.value = vals[m.name]; else r.missing = miss[m.name] || ev.error || 'not computed';
+        return r;
+      }),
+      requirements: ev.requirements || [],
+      budget: ev.budget ? { lines: ev.budget, order: ev.budget_order || Object.keys(ev.budget) }
+                        : (ev.budget_error ? { error: ev.budget_error } : null),
+      error: ev.error || null
+    };
+  }
+  if (!EVAL) return null;
+  var page;
+  try { page = EVAL.page(!evalEverything()); }
+  catch (err) { return { source: 'browser', error: err.message, metrics: [], requirements: [] }; }
+  return { source: 'browser', metrics: page.metrics, requirements: page.requirements, budget: page.budget,
+           part: !!page.part };
+}
+// THE OTHER CLOCKS AND THE NOISE, after an edit: each clock of its own replays the whole
+// programme again and the budget walks every step and ion, so they are evaluated as soon as
+// the programme is small (under 20,000 steps and operations) and otherwise when asked
+// (`evalall`), which then holds for the rest of the visit.
+var EVAL_SMALL = 20000;
+function evalEverything() {
+  if (EVAL_FULL) return true;
+  var r = EVAL && EVAL.run();
+  return !r || (r.steps.length + r.ops.length) <= EVAL_SMALL;
+}
+function evaluationBlock() {
+  var pl = evalPayload(), v = evaluationView();
+  if (!pl || !v) return '';
+  var noise = (D.evaluation || {}).noise || 'the noise model';
+  var h = '<h3 style="margin-top:14px" id="rEval">Judged by the evaluation</h3>';
+  h += '<div class="mut">every number below is a metric of <a href="' + EVAL_SITE + '" target="_blank" rel="noopener">' +
+       'the Evaluation page</a>\'s texts: <code>board.eval</code> and <code>' + noise + '.eval</code>, on the <code>' +
+       esc2((D.evaluation || {}).clock || pl.clock || '') + '</code> clock (<code title="' + esc2(pl.digest || '') + '">' +
+       esc2(String(pl.digest || '').slice(0, 19)) + '</code>). ' +
+       (v.source === 'shipped'
+         ? 'Computed by the grader\'s interpreter when this page was built.'
+         : '<b>Re-evaluated in the browser</b> from the same texts, on the page as it is now.') + '</div>';
+  if (v.error) h += '<div class="mut"><span class="badge bad">not evaluated</span> ' + esc2(v.error) + '</div>';
+  var by = {};
+  v.metrics.forEach(function (m) { (by[m.group] || (by[m.group] = [])).push(m); });
+  var groups = EVAL_GROUPS.filter(function (g) { return has(by, g); })
+    .concat(Object.keys(by).filter(function (g) { return EVAL_GROUPS.indexOf(g) < 0; }));
+  h += '<table class="evt">';
+  groups.forEach(function (g) {
+    h += '<tr><td colspan="2" class="mut" style="padding-top:6px"><b>' + esc2(g) + '</b></td></tr>';
+    by[g].forEach(function (m) {
+      var name = '<a href="' + EVAL_SITE + '#m-' + encodeURIComponent(m.name) + '" target="_blank" rel="noopener" title="' +
+                 esc2(m.name) + (m.clock ? ' (on the ' + esc2(m.clock) + ' clock)' : '') + '">' + esc2(m.title) + '</a>';
+      var val = has(m, 'value') ? esc2(evalNumber(m.value, m.unit))
+              : m.deferred ? '<span class="mut" title="replays the programme on the ' + esc2(m.clock) + ' clock">not yet</span>'
+              : '<span class="mut" title="' + esc2(m.missing || '') + '">-</span>';
+      h += '<tr data-metric="' + esc2(m.name) + '"><td>' + name + '</td><td>' + val + '</td></tr>';
+    });
+  });
+  h += '</table>';
+  if (v.requirements && v.requirements.length) {
+    var cls = { holds: 'ok', fails: 'bad' };
+    h += '<div style="margin-top:6px">' + v.requirements.map(function (r) {
+      return '<span class="badge ' + (cls[r.verdict] || 'unchecked') + '" data-req="' + esc2(r.id) + '" title="' +
+             esc2(r.title + ': ' + r.verdict + (r.reason ? ' (' + r.reason + ')' : '')) + '">' + esc2(r.id) + ' ' + esc2(r.verdict) + '</span>';
+    }).join('') + '</div>';
+  }
+  if (v.budget && v.budget.lines) {
+    h += '<div class="mut" style="margin-top:8px">the noise each budget line of <code>' + noise + '</code> books over ' +
+         'this programme (expected faults, and where), without a memory experiment:</div><table class="evt">';
+    v.budget.order.forEach(function (k) {
+      var b = v.budget.lines[k];
+      if (!b) return;
+      var ch = (b.channels || [])[0];
+      h += '<tr data-budget="' + esc2(k) + '"><td>' + (ch ? '<a href="' + EVAL_SITE + '#c-' + encodeURIComponent(ch) +
+           '" target="_blank" rel="noopener">' + esc2(k) + '</a>' : esc2(k)) + '</td><td>' +
+           esc2(evalNumber(b.faults)) + ' <span class="mut">at ' + fmt(b.places) + '</span></td></tr>';
+    });
+    h += '</table>';
+  } else if (v.budget && v.budget.error) {
+    h += '<div class="mut">noise: ' + esc2(v.budget.error) + '</div>';
+  }
+  if (v.part) {
+    h += '<div style="margin-top:6px"><button class="p" id="rEvalAll" data-hint="evalall">evaluate the other ' +
+         'clocks and the noise</button> <span class="mut">a long programme: each is another replay</span></div>';
+  }
+  if (v.source === 'browser' && P.truncated) {
+    h += '<div class="mut"><span class="badge warn">truncated</span> this page carries the first ' +
+         fmt(P.frames.length) + ' instructions of ' + fmt(P.n_instructions) + ': the browser evaluates those, ' +
+         'not the whole programme.</div>';
+  }
+  if (EVAL_CHECK && EVAL_CHECK.truncated) {
+    h += '<div class="mut" style="margin-top:6px"><span class="badge unchecked">no self-check</span> the page ' +
+         'carries only the first instructions, so the browser cannot re-derive the shipped values.</div>';
+  } else if (!EVAL_CHECK && v.source === 'shipped' && !P.truncated) {
+    h += '<div style="margin-top:6px"><button class="p" id="rEvalCheck" data-hint="evalcheck">check it in the browser</button></div>';
+  } else if (EVAL_CHECK) {
+    h += '<div class="mut" style="margin-top:6px">' + (EVAL_CHECK.ok
+      ? '<span class="badge ok">self-check</span> the browser\'s interpreter gives all ' + EVAL_CHECK.n +
+        ' shipped metrics and ' + EVAL_CHECK.lines + ' budget lines the grader\'s values.'
+      : '<span class="badge bad">self-check FAILED</span> ' + esc2(EVAL_CHECK.diffs.slice(0, 4).join('; '))) + '</div>';
+  }
+  return h;
+}
+
+// THE SELF-CHECK OF THE EVALUATION: the browser's interpreter, on the page as it shipped,
+// against the values the grader's interpreter shipped with it -- every metric, every
+// requirement and every budget line, to the parity test's tolerance.  On demand (a replay
+// of the whole programme, and one per extra clock), from the Report or a harness.
+function evaluateEverything() { EVAL_FULL = true; renderReport(); return evaluationView(); }
+function evaluationCheck() {
+  var ev = D.evaluation, pl = evalPayload();
+  if (!ev || !pl || !ev.values || !STATE || !Q.evaluation || !evalShipped()) return null;
+  // a page that carries only the first instructions cannot re-derive the whole programme's
+  if (P.truncated) return (EVAL_CHECK = { ok: null, truncated: true, n: 0, lines: 0, diffs: [] });
+  var dev = STATE.device, classes = {};
+  var extra = ((STATE.control.classes || {}).extra) || [];
+  for (var i = 0; i < extra.length; i++) classes[extra[i].id] = extra[i];
+  var model = Q.makeModel(STATE.primitives, Q.degrees(dev), Q.cornerEndpoints(dev), dev.segments, {
+    kind: (D.model && D.model.name) === 'deck' ? 'deck' : 'corrected',
+    corner_hops: D.model ? D.model.corner_hops : 1,
+    junction_min_degree: PH.junction_min_degree || 3,
+    length_scaling: !!(D.model && D.model.length_scaling),
+    pitch: (D.model && D.model.pitch) || 1.0,
+    include_anomalous: !(D.model && D.model.include_anomalous === false),
+    anomalous_per_ms: PH.anomalous_per_ms || 0,
+    policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' } });
+  model._pair = Q.pairIndex(dev);
+  var page = Q.evaluation.session(pl, SHIPPED_FRAMES || P.frames, A.loops, model, classes, dev, evalState(),
+                                  { closedLoops: closedLoopsOf(dev), mk: clockModel }).page();
+  var close = function (a, b) {
+    if (typeof a === 'number' && typeof b === 'number') return a === b || Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b)) + 1e-14;
+    if (typeof b === 'string' && typeof a === 'number') return String(a).toLowerCase().indexOf(b.toLowerCase()) >= 0;
+    return a === b;
+  };
+  var diffs = [], n = 0, lines = 0;
+  page.metrics.forEach(function (m) {
+    if (!has(ev.values, m.name)) return;
+    n++;
+    if (!has(m, 'value') || !close(m.value, ev.values[m.name])) {
+      diffs.push(m.name + ': grader ' + ev.values[m.name] + ', browser ' + (has(m, 'value') ? m.value : m.missing));
+    }
+  });
+  (ev.requirements || []).forEach(function (r) {
+    var b = page.requirements.filter(function (x) { return x.id === r.id; })[0];
+    if (!b || b.verdict !== r.verdict) diffs.push(r.id + ': grader ' + r.verdict + ', browser ' + (b ? b.verdict : 'absent'));
+  });
+  var lb = (page.budget && page.budget.lines) || {};
+  for (var k in (ev.budget || {})) if (has(ev.budget, k)) {
+    lines++;
+    var a = ev.budget[k], c = lb[k];
+    if (!c || c.places !== a.places || !close(c.faults, a.faults)) {
+      diffs.push('budget ' + k + ': grader ' + a.faults + ' at ' + a.places + ', browser ' + (c ? c.faults + ' at ' + c.places : 'absent'));
+    }
+  }
+  EVAL_CHECK = { ok: !diffs.length, n: n, lines: lines, diffs: diffs };
+  return EVAL_CHECK;
+}
 
 var API = {
   // state
@@ -11246,6 +11543,10 @@ var API = {
   programErrors: lowerErrors, authored: function () { return AUTHORED; },
   parseErrors: function () { return PARSE_ERRS.slice(); },
   evaluateWrite: evaluateWrite, problemLine: problemLine, metricRows: metricRows,
+  // the evaluation: one metric by name, everything the Report shows, and the self-check
+  formal: formal, formalWhy: formalWhy, evaluationView: evaluationView,
+  evaluationCheck: evaluationCheck, evaluateEverything: evaluateEverything,
+  evaluation: function () { return EVAL; },
   refusedLine: refusedLine,
   testDrivePlan: testDrivePlan, testDrive: testDrive, pressTestDrive: pressTestDrive,
   programToTsir: programToTsir, exportPair: exportPair,

@@ -853,6 +853,11 @@ class Evaluator:
                         else f"{_brief(self, a)} {neg} {_brief(self, b)}")
             if isinstance(n, Not):
                 return f"{show(n.arg)} holds"
+            if isinstance(n, Call) and n.fn == "approx" and len(n.args) == 2:
+                a = self.ev(n.args[0], env)
+                b = self.ev(n.args[1], env)
+                return (f"{show(n.args[0])} is {_brief(self, a)} and {show(n.args[1])} is "
+                        f"{_brief(self, b)}")
         except (EvalError, NotApplicable):
             pass
         return f"{show(n)} is false"
@@ -928,4 +933,6 @@ def _brief(ev: Evaluator, v: Any) -> str:
         items = sorted(v, key=_order) if not isinstance(v, (list, tuple)) else list(v)
         s = ", ".join(_brief(ev, x) for x in items[:6])
         return "{" + s + (", ..." if len(items) > 6 else "") + "}"
+    if callable(getattr(v, "label", None)):
+        return v.label()          # a claim, or any other thing the vocabulary names in words
     return str(v)

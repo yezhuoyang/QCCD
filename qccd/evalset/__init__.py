@@ -67,10 +67,14 @@ class Evaluation:
 
     # ------------------------------------------------------------------ running it
     def run(self, prog, arch, *, experiment=None, qasm: str | None = None, qubit_map=None,
-            cert: Mapping | None = None) -> Run:
-        """Replay the programme on the device under this evaluation's clock."""
+            cert: Mapping | None = None, rules: bool = False, cost_model=None) -> Run:
+        """Replay the programme on the device under this evaluation's clock (with `rules`, the
+        verifier's rule verdicts from the same replay, in `run.facts["verification"]`).
+        `cost_model` replaces the clock's own model -- a studio page priced by another model
+        (`deck`) is evaluated on the replay it shows; the grader never passes one."""
         return build_run(prog, arch, self.clock or "qccdsim_jones", experiment=experiment,
-                         qasm=qasm, qubit_map=qubit_map, cert=cert)
+                         qasm=qasm, qubit_map=qubit_map, cert=cert, rules=rules,
+                         cost_model=cost_model)
 
     def evaluator(self, run: Run, sample=None, checks: Mapping | None = None) -> Evaluator:
         return Evaluator(self, run, sample=sample, checks=checks)
@@ -120,6 +124,64 @@ class Evaluation:
     def text(self) -> str:
         """The evaluation as written (its own file; includes are named, not inlined)."""
         return self.text_
+
+    def with_params(self, values: Mapping[str, Any]) -> "Evaluation":
+        """A copy with some parameters set to other values (a sweep, a model's knobs).  Only
+        parameters the evaluation has may be set: a misspelt knob is refused, not ignored."""
+        import copy
+        from ..ruleset.syntax import Const, Num, Str
+        unknown = sorted(set(values) - set(self.params))
+        if unknown:
+            raise KeyError(f"evaluation {self.name!r} has no parameter(s) {unknown}")
+        out = copy.copy(self)
+        out.params = dict(self.params)
+        out.param_text = dict(self.param_text)
+        for k, v in values.items():
+            if isinstance(v, bool) or v is None:
+                node, txt = Const(v), {True: "true", False: "false", None: "none"}[v]
+            elif isinstance(v, (int, float)):
+                node, txt = Num(v), repr(v)
+            else:
+                node, txt = Str(str(v)), '"' + str(v) + '"'
+            out.params[k] = node
+            out.param_text[k] = txt
+        return out
+
+    def with_clock(self, clock: str) -> "Evaluation":
+        """The same evaluation on another operating-point table; a name the device format does
+        not declare is refused (it would price every step on some other table, silently)."""
+        import copy
+        from ..arch.curves import TABLES
+        if clock not in TABLES:
+            raise ValueError(f"clock {clock!r} is not an operating-point table (one of {', '.join(TABLES)})")
+        out = copy.copy(self)
+        out.clock = clock
+        return out
+
+    def digest(self) -> str:
+        """sha256 of what this evaluation is: every parameter, define, metric, requirement and
+        channel as resolved (includes inlined), and its clock -- what a report names it by."""
+        import hashlib
+        parts = [f"clock {self.clock}", f"rules {self.rules}"]
+        parts += [f"param {k} = {self.param_text.get(k, '')}" for k in sorted(self.params)]
+        parts += [f"define {d.name}({','.join(d.args)}) = {d.text}" for d in self.defines]
+        parts += [f"metric {m.name} [{m.clock}] = {m.text}" for m in self.metrics_]
+        parts += [f"require {r.id} {r.text}" for r in self.requirements]
+        parts += [f"channel {c.name} {c.text}" for c in self.channels]
+        return "sha256:" + hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def noise_for_clock(clock: str) -> str:
+    """The noise model a design priced on this operating-point table is judged under: Goal 1's
+    cited physics (`quantinuum`) by qccd-noise@2, anything else by qccd-noise@1."""
+    return "qccd-noise@2" if clock == "quantinuum" else "qccd-noise@1"
+
+
+def for_page(clock: str) -> "Evaluation":
+    """What a studio page evaluates: every board metric, the hardware budget, and the noise
+    model of its clock, all on the page's own clock."""
+    return load(f'evaluation "studio"\ntitle "What the studio reports"\ninclude "board"\n'
+                f'include "{noise_for_clock(clock)}"\nclock "{clock}"\n')
 
 
 def names() -> list[str]:

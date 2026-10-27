@@ -39,7 +39,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.02442,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -81,7 +81,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2151012,
+  "bytes": 2237143,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -158,7 +158,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.02442,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -200,7 +200,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2156505,
+  "bytes": 2242632,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -275,7 +275,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.03332,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -317,7 +317,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2106208,
+  "bytes": 2192364,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
@@ -392,7 +392,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.03757,
    "nbar_max": 0.0,
    "chain_max": 4,
    "two_qubit_gates": 144,
@@ -434,7 +434,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2196598,
+  "bytes": 2283178,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -509,7 +509,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.08804,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -551,7 +551,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2650879,
+  "bytes": 2737050,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -626,7 +626,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.13489,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -668,7 +668,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3513181,
+  "bytes": 3600263,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -743,7 +743,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.14041,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -785,7 +785,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2892552,
+  "bytes": 2979892,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -860,7 +860,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.03672,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -913,7 +913,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2126429,
+  "bytes": 2212586,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -979,7 +979,7 @@
    "noise_ms": 0.1206,
    "noise_heating": 0.00684,
    "noise_chain": 0.0,
-   "noise_idle": 0.0,
+   "noise_idle": 0.04629,
    "nbar_max": 0.0,
    "chain_max": 2,
    "two_qubit_gates": 144,
@@ -1032,7 +1032,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2179055,
+  "bytes": 2265215,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1089,7 +1089,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1627971,
+  "bytes": 1713647,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1116,7 +1116,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1581408,
+  "bytes": 1666107,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -1145,7 +1145,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1539633,
+  "bytes": 1624316,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -1172,7 +1172,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1570181,
+  "bytes": 1655014,
   "r10": null,
   "over_budget": [],
   "sites": 32,

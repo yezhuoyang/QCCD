@@ -254,7 +254,7 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
         noise_total=round(bud.get("total", 0.0), 5),
         noise_ms=round(bud.get("ms_base", 0.0) + bud.get("ms_heating", 0.0) + bud.get("ms_chain", 0.0), 5),
         noise_heating=round(bud.get("ms_heating", 0.0), 5), noise_chain=round(bud.get("ms_chain", 0.0), 5),
-        noise_idle=round(bud.get("idle", 0.0), 5), nbar_max=round(float(stats.get("nbar_max", 0.0)), 3),
+        noise_idle=round(sum(bud.get(k, 0.0) for k in waiting_lines(q["noise"])), 5), nbar_max=round(float(stats.get("nbar_max", 0.0)), 3),
         chain_max=stats.get("chain_max"), two_qubit_gates=stats.get("n_ms"))
     # R10: the semantic checker and the proved Lean checker, on the certificate (small: seconds)
     prefix = work / "prog"
@@ -352,11 +352,44 @@ def _head(ins) -> str:
     return f"{what}{(' ' + str(g)) if g else ''}{(' · %d %s' % (n, unit)) if n and unit else ''}"
 
 
+def waiting_lines(noise_id: str) -> list[str]:
+    """The budget lines whose channels the noise model's text prices by elapsed time -- its
+    clause reads `duration(` or `waited(`: qccd-noise@1's `idle`, qccd-noise@2's `memory` and
+    `memory_coherent`.  Read off the text, so a model with other names is summed right."""
+    from qccd.qec import describe_noise
+    out: list[str] = []
+    for c in describe_noise(noise_id)["clauses"]:
+        if "duration(" in c["clause"] or "waited(" in c["clause"]:
+            out += [k for k in c["budget"] if k not in out]
+    return out
+
+
+def budget_rows(noise_id: str) -> dict:
+    """Each budget line of the noise model, as its text names it: the clauses that book it
+    (their titles), the stim operation each writes, and the clauses themselves for a tooltip."""
+    import re
+    from qccd.qec import describe_noise
+    out: dict = {}
+    for c in describe_noise(noise_id)["clauses"]:
+        m = re.search(r":\s*([A-Z][A-Z0-9_]*)\(", c["clause"])
+        op = m.group(1) if m else ""
+        for k in c["budget"]:
+            r = out.setdefault(k, {"titles": [], "ops": [], "clauses": [], "channels": []})
+            title = c["title"] + (f" ({k})" if len(c["budget"]) > 1 else "")
+            if title not in r["titles"]:
+                r["titles"].append(title)
+            if op and op not in r["ops"]:
+                r["ops"].append(op)
+            r["clauses"].append(c["clause"] + (f"  [{c['source']}]" if c.get("source") else ""))
+            r["channels"].append(c["channel"])
+    return out
+
+
 def noise_panel(row: dict, release, exp) -> str:
     """The panel for one entry: the LER, the error budget by channel, and the stim program
     block by block, each block one hardware instruction with what its noise was priced from."""
     from qccd.compile.decode import insert_decodes
-    from qccd.qec import describe_noise, extract
+    from qccd.qec import extract
     q = release.manifest["qec"]
     cert = json.loads(Path(row["prefix"] + ".qcert.json").read_text(encoding="utf-8"))
     ex = extract(row["cooled"], row["arch"], exp, noise=q["noise"], cert=cert)
@@ -374,15 +407,13 @@ def noise_panel(row: dict, release, exp) -> str:
                        "why": t["why"], "s": ex.lines[t["a"]:t["b"]]})
     est, bud = row["ler"], row["budget"]
     tot = bud.get("total") or 1.0
-    ch = {c["channel"]: c for c in describe_noise(q["noise"])["channels"]}
-    label = {"ms_base": "two-qubit gate, ground state", "ms_heating": "two-qubit gate, transport heating",
-             "ms_chain": "two-qubit gate, chain length", "gate_1q": "one-qubit gate", "measure": "readout",
-             "reset": "reset", "idle": "idling (every instruction takes time)"}
-    stim_of = {"ms_base": "DEPOLARIZE2", "ms_heating": "DEPOLARIZE2", "ms_chain": "DEPOLARIZE2",
-               "gate_1q": "DEPOLARIZE1", "measure": "X_ERROR before M", "reset": "X_ERROR after R", "idle": "Z_ERROR"}
+    # every row is a budget line of the noise model's TEXT (`counted as`), named by the clauses
+    # that book it and the stim operation they write -- read from the text, not restated here
+    lines = budget_rows(q["noise"])
     rows = "".join(
-        f'<tr title="{html.escape(ch.get(k, {}).get("formula", ""))} [{html.escape(ch.get(k, {}).get("source", ""))}]">'
-        f'<td>{html.escape(label.get(k, k))}</td><td><code>{html.escape(stim_of.get(k, ""))}</code></td>'
+        f'<tr title="{html.escape(chr(10).join(lines.get(k, {}).get("clauses", [])))}">'
+        f'<td>{html.escape(" + ".join(lines.get(k, {}).get("titles", [])) or k)}</td>'
+        f'<td><code>{html.escape(", ".join(lines.get(k, {}).get("ops", [])))}</code></td>'
         f'<td class="n">{v:.4f}</td><td class="n">{100 * v / tot:.0f}%</td></tr>'
         for k, v in bud.items() if k != "total")
     st = row["stats"]
@@ -395,7 +426,8 @@ def noise_panel(row: dict, release, exp) -> str:
         f'longest chain at a gate: {st.get("chain_max")}.</small>'
         f'<table><tr><th>where the error comes from</th><th>stim</th><th>expected errors</th><th>share</th></tr>{rows}'
         f'<tr><td><b>total</b></td><td></td><td class="n"><b>{tot:.4f}</b></td><td></td></tr></table>'
-        f'<small>Hover a row for its formula and the device parameter it reads; <a href="../noise/">the noise model, channel by channel</a>. '
+        f'<small>Hover a row for the clauses of the noise model\'s text that book it; <a href="../noise/">the noise model, clause by clause</a>, '
+        f'and every term it uses on <a href="../../evaluation/">the Evaluation page</a>. '
         f'Red lines below are noise. Each block is one hardware instruction: click it to move the animation there; '
         f'the block of the current step is highlighted as the program plays.</small>')
     data = json.dumps({"blocks": blocks}, separators=(",", ":")).replace("</", "<\\/")
@@ -419,12 +451,18 @@ LER_METRICS = (
     " {k:'noise_ms', name:'Noise — from two-qubit gates', unit:'', better:'low', nd:4},\n"
     " {k:'noise_heating', name:'Noise — from transport heating', unit:'', better:'low', nd:4},\n"
     " {k:'noise_chain', name:'Noise — from chain length', unit:'', better:'low', nd:4},\n"
-    " {k:'noise_idle', name:'Noise — from idling', unit:'', better:'low', nd:4},\n"
+    " {k:'noise_idle', name:'Noise — from waiting (the lines priced by elapsed time)', unit:'', better:'low', nd:4},\n"
     " {k:'nbar_max', name:'Heating — highest n̄ at a gate', unit:'quanta', better:'low', nd:3},\n")
 
 
 def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
     ok = [r for r in rows if r["status"] == "ok"]
+    # the waiting column is the noise text's time-priced lines, summed from the row's own
+    # budget: rows saved before it was read off the text summed a line @2 does not have
+    waiting = waiting_lines(release.manifest["qec"]["noise"])
+    for r in ok:
+        if r.get("budget") is not None and "numbers" in r:
+            r["numbers"]["noise_idle"] = round(sum(r["budget"].get(k, 0.0) for k in waiting), 5)
     sound = [r for r in ok if not r.get("rules_failed_replay")]
     # ties are real on a board whose code is too good for its shot budget (zero errors in
     # every shot): they break on the interval's upper end, then on the round's time
@@ -465,11 +503,17 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
     (out / "manifest.json").write_text(json.dumps(to_repo(manifest), indent=1, default=str), encoding="utf-8")
     q = release.manifest["qec"]["ler"]
     title = f"{release.title} on QCCD — every design, ranked"
+    from qccd.api import _template_doc
+    from qccd.workspace.tasks import FIXED_BLOCKS, physics_mismatch
+    own = physics_mismatch({b: _template_doc(None).get(b) for b in FIXED_BLOCKS}, release)
+    physics = ("the board's own physics, which every design is entered with" if own
+               else "each device's own physics")
     idx = B.write_index(
         manifest, out, title=title,
         subtitle=f"{release.manifest.get('description', '')} Every design ran the same experiment, compiled by the reference "
-                 f"compiler; its hardware program was turned into a noisy stim circuit under the noise model built from the "
-                 f"device's own physics, and sampled (up to {int(q['max_shots']):,} shots or {int(q['max_errors'])} logical "
+                 f"compiler; its hardware program was turned into a noisy stim circuit by the noise model "
+                 f"{release.manifest['qec']['noise']} (a text, on the Evaluation page) read over {physics}, and sampled "
+                 f"(up to {int(q['max_shots']):,} shots or {int(q['max_errors'])} logical "
                  f"errors, decoder {q['decoder']}, fixed seed). Ranked by the logical error rate per round, lower is better; "
                  f"click a dot to watch the ions and read the stim program that was sampled."
                  + (" At this budget the designs give at most a few logical errors each, so their 95% intervals "
@@ -496,7 +540,7 @@ def write_task(board: str, release, exp) -> None:
            "title": release.title, "short": BOARDS[board]["short"],
            "description": release.manifest.get("description", ""), "circuit": "circuit.qasm",
            "n_data": exp.summary()["n_data"],
-           "physics": ({"model": "corrected", "tables": ["qccdsim_jones", "qccdsim_transport"]}
+           "physics": ({"model": "corrected", "tables": ["qccdsim_jones", "transport_excitation"]}
                        if time_key(release) == "T_jones" else
                        {"model": "corrected", "tables": list(release.manifest["physics"].get("tables") or [])}),
            "metrics": ["ler_per_round", "ler", time_key(release), "ions_per_instruction", "dacs", "area_mm2", "buildable"],

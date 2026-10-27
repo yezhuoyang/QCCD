@@ -1,7 +1,7 @@
 evaluation "goal1"
 title "Goal 1: the best QEC memory under 200 ions"
 about "Every curated memory experiment under 200 ions, compiled for a design, run under qccd-noise@2 on the cited Helios-class physics, and ranked by its logical error rate per round per logical qubit."
-include "metrics"
+include "board"
 include "qccd-noise@2"
 clock "quantinuum"
 rules "standard"
@@ -16,15 +16,10 @@ require G1 "Every rule of the standard rule set holds"
   about "The programme is judged by the Rules page's standard set, rule by rule."
   rules_hold()
 
-require G2 "The wiring fits the DAC budget"
-  dacs <= max_dacs
-
-require G3 "The device fits the junction budget"
-  n_junctions <= max_junctions
-
-require G4 "No more than 200 ions"
+require G2 "No more than 200 ions"
+  about "The board's own filter: an entry over it is graded, and not listed."
   n_ions <= max_ions
 
-require G5 "With its noise taken out, the circuit is the experiment"
+require G3 "With its noise taken out, the circuit is the experiment"
   about "Every detector and every logical observable has a fixed value, and it is 0: the value the experiment's own circuit gives it."
   noiseless_ok()

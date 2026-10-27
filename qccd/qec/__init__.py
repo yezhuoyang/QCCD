@@ -2,7 +2,8 @@
 
     experiments  memory experiments: QASM + detectors on classical bits (compiler-independent)
     noise        named, versioned noise models built from the device's own physics
-    extract      TSIR + architecture + experiment -> noisy stim circuit + error budget
+    extract      TSIR + architecture + experiment -> noisy stim circuit + error budget, written
+                 by the noise model's evaluation text (qccd.evalset)
     check        the noiseless determinism-and-parity check of an extracted circuit
     decode       adaptive sampling, pymatching / BP-OSD, Wilson interval, LER per round
 
@@ -107,6 +108,8 @@ def evaluate_memory(prog, arch, exp: MemoryExperiment, *, noise_id: str = "qccd-
                            "wrong_observables": []}
         return report
     report["noise"]["params"] = ex.params
+    # the text that wrote the circuit (qccd/evalset/library/<id>.eval), by name and digest
+    report["noise"]["evaluation"] = dict(ex.evaluation)
     report["budget"] = {k: float(v) for k, v in ex.budget.items()}
     report["budget"]["total"] = float(sum(ex.budget.values()))
     report["stats"] = ex.stats

@@ -419,6 +419,20 @@ def _cycles(c: Ctx, k):
     return _step(k, "cycles").cycles
 
 
+@word("depth(k)", "machine steps", "How deep step k is: for each of its cycles, its longest route -- one "
+      "for every rail crossed and every split or merge the move is charged -- added up over the cycles; "
+      "1 for any other step that takes time, 0 for init and barrier.", "execution")
+def _depth(c: Ctx, k):
+    return _step(k, "depth").depth
+
+
+@word("deposited(c)", "quanta", "Every quantum the run deposited from source c, over every ion and the "
+      "whole execution, before any cooling took it away: \"shuttle\" (rails), \"junction\", "
+      "\"split_merge\", \"gate\" or \"anomalous\" (the clock).", "state")
+def _deposited(c: Ctx, comp):
+    return float(c.run.result.quanta_components.get(comp, 0.0))
+
+
 @word("movers(k)", "a number", "How many ions step k carries.", "execution")
 def _movers(c: Ctx, k):
     st = _step(k, "movers")

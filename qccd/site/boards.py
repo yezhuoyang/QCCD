@@ -51,6 +51,11 @@ details.lb-more-d{margin:8px 0;font-size:13.5px;color:#56545e}details.lb-more-d 
 .lb-m td.refused,.lb-m td.timeout,.lb-m td.crash{background:#f1f0ec;color:#8a8892}
 .lb-m th.dev{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;text-transform:none;letter-spacing:0}
 .lb-note{color:#56545e;font-size:14px}
+.lb-dim{color:#6b6a66;font-size:12.5px}
+pre.lb-clause{margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;background:#f6f7fb;border:1px solid #dfe3ee;
+ border-radius:6px;padding:6px 8px}
+pre.lb-clause b,pre.lb-clause .k{color:#0b6b54;font-weight:600}pre.lb-clause a{color:#0b5cad;text-decoration:none}
+pre.lb-clause .s{color:#8a3b12}pre.lb-clause .n{color:#7a1f8a;font-weight:600}
 .lb-rank{margin:12px 0 4px}.lb-rkh{color:#52514e;font-size:13px;margin:0 0 8px}
 .lb-bar{display:grid;grid-template-columns:22px minmax(110px,170px) 1fr auto;gap:10px;align-items:center;padding:5px 0;text-decoration:none;color:inherit}
 .lb-bar:hover .lb-nm{text-decoration:underline}.lb-rk{font-weight:600;color:#52514e;text-align:center}
@@ -382,11 +387,12 @@ def noise_page(PAGE: str, STYLE: str) -> str:
         "<h1>The noise models</h1>",
         '<p class="sub">How a compiled QCCD program becomes a logical error rate. The program is replayed on the '
         "device, which says where every ion is, how hot it is and how long everything takes. Each operation "
-        "becomes a gate of a stim circuit followed by the error channels below, and each channel's probability "
-        "comes from a parameter of the device. Every channel is a Pauli channel that stim samples directly. The "
-        "circuit's detectors come from the memory experiment's circuit, so an experiment means the same thing "
-        "whichever compiler compiled it. A board names its model; changing the physics makes a new model, never "
-        "an edit to an old one.</p>",
+        "becomes its gate in a stim circuit, and each clause of the model below puts its Pauli noise before or "
+        "after what it names, with the probability its term computes from the replay and the device's physics. "
+        "The model IS this text: the grader reads it, and the <a href=\"../../evaluation/#noise\">Evaluation</a> "
+        "page explains every word of it. The circuit's detectors come from the memory experiment's circuit, so an "
+        "experiment means the same thing whichever compiler compiled it. A board names its model; changing the "
+        "physics makes a new model, never an edit to an old one.</p>",
         '<nav class="lb-tabs">' + "".join(f'<a href="#{a}">{_e(m)}</a>' for m, a, _ in models)
         + '<a href="../#memory">The memory boards</a><a href="../../physics/">Physics background</a></nav>',
     ]
@@ -394,9 +400,13 @@ def noise_page(PAGE: str, STYLE: str) -> str:
         boards = used.get(mid, [])
         on = (" Used by " + ", ".join(f'<a href="../#{_e(b.manifest["task"])}">{_e(b.title)}</a>' for b in boards)
               + "." if boards else "")
-        rows = "".join(f'<tr><td><code>{_e(c["channel"])}</code></td><td>{_e(c["where"])}</td>'
-                       f'<td>{_e(c["formula"])}</td><td><code>{_e(c["stim"])}</code></td><td>{_e(c["source"])}</td></tr>'
-                       for c in n["channels"])
+        from .evaluation import hl
+        rows = "".join(f'<tr><td><code>{_e(c["channel"])}</code><br><span class="lb-dim">{_e(c["title"])}</span></td>'
+                       f'<td><pre class="lb-clause">{hl(c["clause"], base="../../evaluation/")}</pre>'
+                       + (f'<div class="lb-dim">{_e(c["about"])}</div>' if c.get("about") else "")
+                       + f'</td><td>{", ".join("<code>" + _e(k) + "</code>" for k in c["budget"])}</td>'
+                       f'<td class="lb-dim">{_e(c["source"])}</td></tr>'
+                       for c in n.get("clauses", []))
         body.append(f'<h2 id="{anchor}">{_e(mid)}</h2>')
         if mid == "qccd-noise@2":
             body.append(
@@ -411,9 +421,11 @@ def noise_page(PAGE: str, STYLE: str) -> str:
                 f"memory together.{on}</p>")
         else:
             body.append("<p>Gates, readout, reset and a T₂ dephasing on every ion, priced from the device's own "
-                        f"physics block.{on}</p>")
-        body.append(f'<div style="overflow-x:auto"><table class="lb-t"><thead><tr><th>channel</th><th>where</th>'
-                    f'<th>probability</th><th>in stim</th><th>from</th></tr></thead><tbody>{rows}</tbody></table></div>')
+                        f"physics block; the first preparation is noiseless, and no crosstalk is charged.{on}</p>")
+        body.append(f'<p>The clauses, as the text writes them (<a href="../../evaluation/{_e(mid)}.eval">the whole '
+                    f'text</a>; digest <code>{_e((n.get("digest") or "")[:19])}</code>):</p>'
+                    f'<div style="overflow-x:auto"><table class="lb-t"><thead><tr><th>channel</th><th>clause</th>'
+                    f'<th>booked under</th><th>from</th></tr></thead><tbody>{rows}</tbody></table></div>')
         if mid == "qccd-noise@2":
             prow = _physics2_rows()
             if prow:

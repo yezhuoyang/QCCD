@@ -18,6 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from ..evalset import GROUPS, WORDS, load
+from ..evalset.interp import CALL_ALIAS
 from ..evalset.syntax import ITEM_NAMES, NOISE_OPS, parse_term
 from ..ruleset.syntax import KEYWORDS
 
@@ -93,17 +94,27 @@ CSS = """
 # ============================================================================ text
 
 _ITEM_WORDS = set(ITEM_NAMES) | {"before", "after", "on", "unit", "better", "group", "about", "source",
-                                 "if", "then", "else", "low", "high"}
+                                 "if", "then", "else", "low", "high", "counted", "as"}
 
 
-def hl(text: str, names: dict[str, str] | None = None) -> str:
+def hl(text: str, names: dict[str, str] | None = None, base: str = "") -> str:
     """An evaluation's text as written: its own words in bold, the rule language's keywords
     in bold, noise operations marked, every word of the vocabulary linked to its definition
     and every metric, param and define linked to where it is written."""
     names = names or {}
     out = []
+    prev = ""                      # the last word: a name after `param`, `define` or `metric` is declared
     for m in re.finditer(r'#[^\n]*|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_@]*|\s+|.', text):
         t = m.group()
+        if not t.isspace():
+            was, prev = prev, t
+            decl = {"param": "p", "define": "d", "metric": "m"}.get(was)
+            if decl and re.match(r"[A-Za-z_]", t):
+                # marked, and made the anchor by `_anchor_declarations` where nothing else is
+                out.append(f'<span data-decl="{decl}-{t}">')
+                out.append(f'<a href="{names[t]}">{t}</a>' if t in names else html.escape(t))
+                out.append("</span>")
+                continue
         if t.startswith("#"):
             out.append(f'<span class="c">{html.escape(t)}</span>')
         elif t.startswith('"'):
@@ -116,12 +127,29 @@ def hl(text: str, names: dict[str, str] | None = None) -> str:
             out.append(f"<b>{t}</b>")
         elif t in names:
             out.append(f'<a href="{names[t]}">{t}</a>')
-        elif t in WORDS or t in ("ions", "move"):
-            w = WORDS.get(t) or WORDS.get({"move": "move_of"}.get(t, t))
-            out.append(f'<a href="#w-{t}" title="{html.escape(w.meaning) if w else ""}">{t}</a>')
+        elif t in WORDS or t in CALL_ALIAS:
+            # a call of `ions(o)` is a different word from the domain `ions`
+            key = CALL_ALIAS.get(t, t) if text[m.end():m.end() + 1] == "(" else t
+            w = WORDS.get(key) or WORDS.get(t)
+            out.append(f'<a href="{base}#w-{key if key in WORDS else t}" '
+                       f'title="{html.escape(w.meaning) if w else ""}">{t}</a>')
         else:
             out.append(html.escape(t))
     return "".join(out)
+
+
+def _anchor_declarations(body: str) -> str:
+    """Every `#p-`, `#d-` and `#m-` link of the page lands somewhere: a name that has no anchor
+    of its own (a card, a parameter row) gets one at the first place its text declares it."""
+    ids = set(re.findall(r'\bid="([^"]+)"', body))
+
+    def one(m):
+        key = m.group(1)
+        if key in ids:
+            return m.group(0)
+        ids.add(key)
+        return f'<span id="{key}" data-decl="{key}">'
+    return re.sub(r'<span data-decl="([^"]+)">', one, body)
 
 
 def _names(ev) -> dict[str, str]:
@@ -578,8 +606,13 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'design must meet to be ranked (<code>require</code>), and noise (<code>channel</code>): a clause that '
       'says which Pauli error goes where in the circuit a run becomes. The noisy circuit the '
       '<a href="../board/goal1/">Goal 1</a> board samples is the programme&rsquo;s stabilizer translation with '
-      'those clauses applied, and interpreting the text below reproduces the grader&rsquo;s circuit operation '
-      'for operation.</p>')
+      'those clauses applied. The grader reads these texts: every number it publishes &mdash; the metrics, the '
+      'hardware budget, the noisy circuit and its error budget &mdash; is computed by the interpreter of the '
+      'language from the text on this page, and the same interpreter runs in every workspace. The '
+      '<a href="../studio.html#design">Design page</a> reads the same texts in the browser with a second interpreter, '
+      'held to the first metric by metric: every number it shows (cost, steps, runtime, heat, DACs, the noise '
+      'each budget line books) is a metric of these texts, and its Report checks itself against the '
+      'grader&rsquo;s values.</p>')
     w('<div class="legend">'
       '<div class="ex"><b>exact</b>a function of the three texts: anyone recomputes it to the last digit</div>'
       '<div class="de"><b>decided</b>a formula that holds or fails, naming the values that make it fail</div>'
@@ -610,17 +643,19 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'the vocabulary reads the device, the programme, the run the replay produced, or a parameter written '
       'in <i>E</i>; the interpreter evaluates terms by structural recursion, with no clock, no random number '
       'and no file besides the three. &#8718;</p>'
-      '<p class="words">So the grader is one implementation of this function, not an authority: a second '
-      'implementation must agree with it, and where it does not, one of them is wrong in a way the text '
-      'decides.</p></div>')
+      '<p class="words">So the grader is an interpreter of the text, not an authority: a second interpreter '
+      'must agree with it, and where it does not, one of them is wrong in a way the text decides.</p></div>')
     if agree:
         rows = "".join(f'<tr><td><code>{html.escape(k)}</code></td><td class="r">{v["designs"]}</td>'
                        f'<td class="r">{v["same"]}</td><td class="r">{v["metrics_equal"]}</td></tr>'
                        for k, v in sorted(agree["by_release"].items()))
-        w(f'<div class="eg"><b>Checked</b><p>Every Goal 1 design we hold, {agree["designs"]} in all, from the '
-          f'10-ion repetition code to the 180-ion bivariate bicycle code: the circuit this page&rsquo;s text '
-          f'writes, against the grader&rsquo;s, qubit by qubit (<a href="#circuit">what &ldquo;the same&rdquo; '
-          f'means</a>); every channel of the error budget to 10<sup>−9</sup>; and every metric the board shows.'
+        w(f'<div class="eg"><b>Checked</b><p>Until 2026-10-26 the grader wrote its circuit with a '
+          f'hand-written extraction; since then it reads the text. The switch changed no circuit: on every Goal 1 '
+          f'design we hold, {agree["designs"]} in all, from the 10-ion repetition code to the 180-ion bivariate '
+          f'bicycle code, the circuit the text writes and the one the old extraction wrote are the same qubit by '
+          f'qubit (<a href="#circuit">what &ldquo;the same&rdquo; means</a>), every channel of the error budget '
+          f'agrees to 10<sup>−9</sup>, and so does every metric the board shows. Every logical error rate published '
+          f'before the switch is therefore a sample of the circuit on this page.'
           f'</p><div class="tw"><table class="t"><tr><th>release</th><th class="r">designs</th>'
           f'<th class="r">same circuit</th><th class="r">same metrics</th></tr>{rows}</table></div></div>')
 
@@ -637,11 +672,14 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<tr><th>item</th><th>what it says</th></tr>'
       '<tr><td><code>param n = term</code></td><td>a number the evaluation fixes, said once, with where it comes from</td></tr>'
       '<tr><td><code>define f(x, …) = term</code></td><td>a named term, with or without arguments; it may use earlier names, never itself</td></tr>'
-      '<tr><td><code>metric n "title" … = term</code></td><td>a number every design gets, with its unit and which way is better</td></tr>'
+      '<tr><td><code>metric n "title" … = term</code></td><td>a number every design gets, with its unit and which way is better; '
+      'with <code>clock "table"</code>, on a replay at that table&rsquo;s operating points</td></tr>'
       '<tr><td><code>require ID "title" formula</code></td><td>what must hold for a design to be ranked</td></tr>'
       '<tr><td><code>channel n "title" after x in D where C: OP(p) on S</code></td><td>noise: for every binding of <i>x</i> '
       'that satisfies <i>C</i>, the Pauli channel OP with probability <i>p</i> on the ions <i>S</i>, just after '
-      '(or <code>before</code>) what <i>x</i> names</td></tr>'
+      '(or <code>before</code>) what <i>x</i> names; <code>counted as k</code> books its expected faults under '
+      'the budget line <i>k</i>, and <code>counted as k₁ = t₁, k₂ = t₂</code> shares them out in proportion to '
+      'the terms</td></tr>'
       '<tr><td><code>include</code>, <code>clock</code>, <code>rules</code>, <code>rank</code></td><td>another '
       'evaluation&rsquo;s items; the operating-point table the replay prices at; the rule set the programme is '
       'judged by; the metric a board ranks by</td></tr></table></div>')
@@ -651,9 +689,10 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<i>q</i> being the qubits of the ions <i>S</i>, immediately after (for <code>before</code>, immediately '
       'before) the translation of what <i>x</i>₁ names; <i>x</i>₁ ranges over operations or over steps. A '
       'probability of 0, or no ions, writes nothing.</div>')
-    w('<div class="eg"><b>Example</b><p>Goal 1&rsquo;s evaluation, whole. It takes its metrics and its noise '
-      'from two other files (<a href="#speed">metrics</a>, <a href="#noise">qccd-noise@2</a>), sets the '
-      'release&rsquo;s budget and names five requirements. <a href="goal1.eval">Download it</a>, or '
+    w('<div class="eg"><b>Example</b><p>Goal 1&rsquo;s evaluation, whole. It takes the board&rsquo;s metrics '
+      'and hardware budget from <a href="#hardware">board.eval</a> and its noise from '
+      '<a href="#noise">qccd-noise@2</a>, sets the release&rsquo;s budget and adds three requirements of its own. '
+      '<a href="goal1.eval">Download it</a>, or <a href="board.eval">board.eval</a>, '
       '<a href="metrics.eval">metrics.eval</a>, <a href="qccd-noise@2.eval">qccd-noise@2.eval</a> and '
       '<a href="qccd-noise@1.eval">qccd-noise@1.eval</a>.</p>'
       f'<pre class="ev">{hl(goal.text(), names)}</pre></div>')
@@ -668,7 +707,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         ws = [x for x in WORDS.values() if x.group == g]
         if not ws:
             continue
-        rows = "".join(f'<tr id="w-{x.signature.split("(")[0]}"><td><code>{html.escape(x.signature)}</code></td>'
+        rows = "".join(f'<tr id="w-{x.name}"><td><code>{html.escape(x.signature)}</code></td>'
                        f'<td>{html.escape(x.meaning)}</td></tr>' for x in ws)
         w(f'<h3>{html.escape(label)}</h3><table class="vocab">{rows}</table>')
 
@@ -720,8 +759,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<p>Time is the first thing a design spends. Under <a href="#noise">qccd-noise@2</a> every '
       'microsecond an ion is not operated on is memory error, and the coherent part grows with the square of '
       'each wait, so a slow schedule pays twice. The speed metrics read the clock and the steps:</p>')
-    for n in ("T", "T_transport", "T_gates", "T_cooling", "T_spam", "instructions", "transport_instructions",
-              "ions_per_instruction", "cost"):
+    for n in ("T", "T_jones", "T_transport", "T_quantinuum", "time_transport", "time_gates", "time_cooling",
+              "time_spam", "instructions", "two_ion_gates", "transport_instructions", "ions_per_instruction",
+              "cost", "depth"):
         w(_metric_card(mets.metric(n), names))
     w(_define_block(mets, names, ["is_transport"]))
     w('<p><code>ions_per_instruction</code> is how much of the machine one waveform moves: on a broadcast-wired '
@@ -731,8 +771,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'pages, every value computed by the text above:</p>'
       + "".join(f'<p><b>{html.escape(x["key"])}</b> &mdash; {html.escape(x["what"])}, on '
                 f'{html.escape(x["device"])}:</p><pre class="ev">{html.escape(x["text"])}</pre>' for x in ex)
-      + _metric_table(ex, ["T", "T_transport", "T_gates", "T_cooling", "T_spam", "instructions",
-                           "transport_instructions", "ions_per_instruction", "cost"], mets)
+      + _metric_table(ex, ["T", "time_transport", "time_gates", "time_cooling", "time_spam", "instructions",
+                           "two_ion_gates", "transport_instructions", "ions_per_instruction", "cost", "depth"], mets)
       + '<p>The rotation moves all eight ions in each instruction: its <code>ions_per_instruction</code> is 8, '
         'against 2 for the pair and 1 for the walks.</p></div>')
 
@@ -748,14 +788,15 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'ε = (ε₀ − κ/2) + (κ/2)·r(N)·(2n̄ + 1), where r(N) is Murali&rsquo;s laser-instability factor N/ln N '
       'relative to the reference length (arXiv:2004.04706, Eq. 1): the two forms are the same function at '
       'the reference, and a longer chain is never better than it.</p>')
-    for n in ("peak_nbar", "gate_nbar_max", "gate_nbar_mean", "junction_crossings", "n_coolings", "gate_error_sum"):
+    for n in ("peak_nbar", "gate_nbar_max", "gate_nbar_mean", "junction_crossings", "transport_quanta",
+              "total_quanta", "n_coolings", "gate_error_sum"):
         w(_metric_card(mets.metric(n), names))
     w('<div class="eg"><b>Example</b><p>The same four programmes. Both walks end by joining a waiting ion, '
       'and on this clock the merge is the dear part, 6 quanta against a tenth for a rail; the walk through the '
       'T-junction pays 3 more for the junction. Each still reaches its gate cold, because the cooling comes '
       'between the walk and the gate; with the cooling first, R7 would refuse the junction walk&rsquo;s gate.</p>'
-      + _metric_table(ex, ["peak_nbar", "gate_nbar_max", "gate_nbar_mean", "junction_crossings", "n_coolings",
-                           "gate_error_sum"], mets) + '</div>')
+      + _metric_table(ex, ["peak_nbar", "gate_nbar_max", "gate_nbar_mean", "junction_crossings",
+                           "transport_quanta", "total_quanta", "n_coolings", "gate_error_sum"], mets) + '</div>')
 
     # ---------------------------------------------------------------- 7 hardware
     w('<h2 id="hardware">Hardware: electrodes, switches and DACs</h2>')
@@ -783,6 +824,12 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'broadcast DACs, <i>c</i> the shims per trap, <i>M</i> the demultiplexer&rsquo;s ratio, <i>B</i> and '
       '<i>C</i> the shared and compensation channels the map lists, and <i>b</i> the fewest channels driving '
       'any site.</p></div>')
+    board = load("board")
+    w('<div class="df"><b>The budget, as requirements</b><p>Every task release fixes a hardware budget with '
+      'its physics, and every board judges a design&rsquo;s device by two requirements of the same language. '
+      'The grader&rsquo;s device stage evaluates them with the release&rsquo;s numbers; a design over budget '
+      'keeps its numbers and is not ranked.</p>'
+      f'<pre class="ev">{hl(board.text(), _names(board))}</pre></div>')
     rows = "".join(f'<tr><td><code>{html.escape(r["name"])}</code>'
                    + (f' <span class="na">{html.escape(r["about"])}</span>' if r["about"] in ("shipped", "a Goal 1 entry") else "")
                    + f'</td><td>{html.escape(str(r["regime"]))}</td>'
@@ -793,11 +840,11 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
                    f'<td>{"<span class=ok>holds</span>" if r["dacs"] <= 128 else "<span class=bad>fails</span>"}</td></tr>'
                    for r in hw)
     w('<div class="eg"><b>Example</b><p>The small devices and the devices the repository ships, by the text '
-      'above; the last column is Goal 1&rsquo;s requirement G2, <code>dacs &lt;= max_dacs</code> with '
-      '<code>max_dacs = 128</code>. The same formulas are held to the grader&rsquo;s hardware report on every '
-      'shipped device.</p><div class="tw"><table class="t"><tr><th>device</th><th>wiring</th><th class="r">sites</th>'
+      'above; the last column is requirement B1 of every board, <code>dacs &lt;= max_dacs</code>, with Goal '
+      '1&rsquo;s <code>max_dacs = 128</code>. The grader&rsquo;s device stage evaluates exactly these two '
+      'requirements, with the release&rsquo;s numbers.</p><div class="tw"><table class="t"><tr><th>device</th><th>wiring</th><th class="r">sites</th>'
       '<th class="r">junctions</th><th class="r">electrodes</th><th class="r">switches</th>'
-      '<th class="r">shared + shim DACs</th><th class="r">DACs</th><th>G2</th></tr>' + rows + '</table></div>'
+      '<th class="r">shared + shim DACs</th><th class="r">DACs</th><th>B1</th></tr>' + rows + '</table></div>'
       + _hardware_caption(hw) + '</div>')
     w('<p class="note">Chip area is not a metric: no grader measures it, so no design is ranked by it.</p>')
 
@@ -864,8 +911,16 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'does not say is said in its <code>about</code>: no error per rail, junction, split or swap (transport '
       'pays in time and heat, which <code>memory</code>, <code>memory_coherent</code> and <code>ms</code> '
       'charge), no ion loss, no crosstalk from a two-ion gate.</p>')
+    # its one channel @2 does not have keeps a card of its own: a studio page priced on another
+    # clock than Goal 1's books under qccd-noise@1 and links each budget line here
+    n1only = [c for c in n1.channels if c.name not in {x.name for x in n2.channels}]
+    n1names = _names(n1)
     w('<details><summary>The older model, qccd-noise@1, which the first boards were graded under</summary>'
-      f'<p>{html.escape(n1.about)}</p><pre class="ev">{hl(n1.text(), _names(n1))}</pre></details>')
+      f'<p>{html.escape(n1.about)}</p><pre class="ev">{hl(n1.text(), n1names)}</pre>'
+      + "".join(f'<div class="item" id="c-{c.name}"><h4>{html.escape(c.title)}<code>{c.name}</code></h4>'
+                f'<pre class="ev">{hl("channel " + c.name + " " + chr(34) + c.title + chr(34) + chr(10) + "  " + c.text.replace(chr(10), chr(10) + "  "), n1names)}</pre>'
+                + (f'<p>{html.escape(c.about)}</p>' if c.about else "") + '</div>' for c in n1only)
+      + '</details>')
 
     # ---------------------------------------------------------------- 10 the entry
     w('<h2 id="entry">A Goal 1 entry, recomputed</h2>')
@@ -960,6 +1015,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'detectors, BP-OSD otherwise &mdash; and sampling stops at the release&rsquo;s number of failures or '
       'of shots. With <i>k</i> failures in <i>n</i> shots, LER ≈ <i>k</i>/<i>n</i>, inside Wilson&rsquo;s 95&nbsp;% '
       'interval, which stays honest at <i>k</i> = 0.</p></div>')
+    w('<pre class="ev">' + hl(f"param z95 = {mets.param_text['z95']}", names) + '</pre>')
     w(_define_block(mets, names, ["wilson_centre", "wilson_half", "wilson_lo", "wilson_hi", "per_round"]))
     for n in ("ler", "ler_per_round", "ler_per_round_per_logical", "ler_per_round_lo", "ler_per_round_hi"):
         w(_metric_card(mets.metric(n), names))
@@ -999,6 +1055,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<div class="tw"><table class="t"><tr><th>on the board</th><th>metric</th><th>what it is</th></tr>'
       + "".join(f'<tr><td>{html.escape(a)}</td><td>' + ", ".join(f'<a href="#m-{x.strip()}"><code>{x.strip()}</code></a>' for x in m_.split(","))
                 + f'</td><td>{html.escape(c)}</td></tr>' for a, m_, c in cols) + '</table></div>')
+    # the size of a code, which the table links: what a logical qubit costs in ions
+    for n in ("n_ions", "n_logical", "ions_per_logical_qubit"):
+        w(_metric_card(mets.metric(n), names))
     rrows = "".join(f'<tr><td><code>{html.escape(x["id"])}</code></td><td>{html.escape(x["code"] or "")}</td>'
                     f'<td class="r">{x["distance"]}</td><td class="r">{x["rounds"]}</td><td class="r">{x["ions"]}</td>'
                     f'<td class="r">{x["k"]}</td><td>{html.escape(str(x["decoder"]))}</td>'
@@ -1008,10 +1067,11 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<th>decoder</th><th class="r">at most shots</th><th class="r">stop at failures</th></tr>'
       + rrows + '</table></div></details>')
     w('<p>An entry is on the board only when it is <i>eligible</i> and places at most 200 ions. Five '
-      'conditions are requirements of the evaluation, decided on this page&rsquo;s terms: the rules hold, the '
-      'wiring fits 128 DACs, the device fits 200 junctions, the programme places at most 200 ions (the '
-      'board&rsquo;s own filter, not a stage of grading), and the noiseless check holds. The other stages are '
-      'about the submission itself, and the grader decides them before any number is computed:</p>'
+      'conditions are requirements of the evaluation, decided on this page&rsquo;s terms: the wiring fits 128 '
+      'DACs (B1) and the device 200 junctions (B2), the rules hold (G1), the programme places at most 200 ions '
+      '(G2, the board&rsquo;s own filter rather than a stage of grading), and the noiseless check holds (G3). '
+      'The other stages are about the submission itself, and the grader decides them before any number is '
+      'computed:</p>'
       '<div class="tw"><table class="t"><tr><th>stage</th><th>decides</th><th>how</th></tr>'
       '<tr><td>bundle</td><td>the files are the ones the manifest names, for this release</td><td class="na">sha-256 of every file</td></tr>'
       '<tr><td>physics lock</td><td>the device&rsquo;s gates, transport, heating and budget are the release&rsquo;s</td><td class="na">equality of four blocks</td></tr>'
@@ -1074,4 +1134,5 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         except Exception as exc:  # noqa: BLE001 -- the page says what went wrong rather than hiding the example
             w(f'<p class="note">The example could not be evaluated: {html.escape(str(exc))}</p>')
     w('</div>')
-    return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS, body="\n".join(b))
+    return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS,
+                       body=_anchor_declarations("\n".join(b)))
