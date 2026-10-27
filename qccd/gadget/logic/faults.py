@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .circuit import NON_CLIFFORD
 from .tableau import NotClifford, bits
 
 __all__ = ["Fault", "Propagation", "propagate", "signatures", "low_weight_logical"]
@@ -132,16 +133,16 @@ def propagate(circuit, *, custom=None) -> Propagation:
                         inject(b, pb, bit)
                         faults.append(Fault(k, "gate", (a, b), pa + pb))
                         f += 1
-        elif name in ("H", "S", "S_DAG", "X", "Y", "Z", "I", "T", "T_DAG"):
+        elif name in ("H", "S", "S_DAG", "X", "Y", "Z", "I") + NON_CLIFFORD:
             for q in t:
                 if name == "H":
                     fx[q], fz[q] = fz[q], fx[q]
                 elif name in ("S", "S_DAG"):
                     fz[q] ^= fx[q]
-                elif name in ("T", "T_DAG") and fx[q]:
-                    raise NotClifford("a fault with an X part reaches a T gate: its frame is "
-                                      "no longer a Pauli")
-                if live and name not in ("I", "T", "T_DAG"):
+                elif name in NON_CLIFFORD and fx[q]:
+                    raise NotClifford(f"a fault with an X part reaches a {name} gate: its frame "
+                                      f"is no longer a Pauli")
+                if live and name not in ("I",) + NON_CLIFFORD:
                     for p in _P1:
                         inject(q, p, 1 << f)
                         faults.append(Fault(k, "gate", (q,), p))

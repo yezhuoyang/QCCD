@@ -76,6 +76,35 @@ _ARITH = re.compile(r"^[\w\s+\-*/%^()·]+$")
 OFFSETS = ("rv_ancillabase", "rv_logicalancillabase", "rv_synbase", "rv_recbase")
 
 
+#: a rotation's resource blocks are `a<ROT_BASE + i>`: a name the gates read as a block this
+#: body makes, and no logical ancilla of FormalRV's has
+ROT_BASE = 9_000_000
+
+#: FormalRV lays out a rotation's synthesis stub by tables it leaves open (`tSynth`,
+#: `synthBits`, `synthAnc`: how many magic states, records and ancillas a rotation takes).
+#: QCCD's rotation (`_Interp.rotation`) names its own outcomes and blocks, so those offsets
+#: only have to keep FormalRV's bands apart -- read as 0, they do (a stub's band is empty).
+_TABLES = re.compile(r"\b(?:synthBits|synthAnc)\[[^\[\]]*\]")
+
+
+def _untable(text: str) -> str:
+    out, i = [], 0
+    while True:
+        j = text.find("tablemax(", i)
+        if j < 0:
+            out.append(text[i:])
+            break
+        depth, k = 0, j + len("tablemax")
+        while k < len(text):
+            depth += {"(": 1, ")": -1}.get(text[k], 0)
+            k += 1
+            if depth == 0:
+                break
+        out.append(text[i:j] + "0")
+        i = k
+    return _TABLES.sub("0", "".join(out))
+
+
 class _NeedsExact(Exception):
     """A call's body names a logical ancilla it did not prepare: its offset is not scratch."""
 
@@ -93,6 +122,8 @@ class _Interp:
         self.made: list = []
         #: calls lowered, and calls that reused a body lowered before
         self.calls = self.reused = 0
+        #: the rotations' own resource blocks, named apart from FormalRV's logical ancillas
+        self.rot = 0
 
     # ---- expressions and statements -----------------------------------------------------
     def ev(self, text: str, env: dict, line: int) -> int:
@@ -146,7 +177,7 @@ class _Interp:
         items: list[Item] = []
         current = None                     # the merge whose group we are in: (outcome, blocks)
         for s in body:
-            raw = s.text.strip()
+            raw = _untable(s.text.strip())
             if raw == "skip":
                 continue
             loop = re.fullmatch(r"for\s+(.+?)\s*(?:<=|≤)\s*(\w+)\s*<\s*(.+?):", raw)
@@ -220,10 +251,54 @@ class _Interp:
                 for p, b in self.factors(t, famap):
                     items.append(Item("ins", f"{p.lower()} {b}", s.line))
             elif t.startswith("ppmrot"):
-                raise NotLowered(f".qec line {s.line}: rotation synthesis (ppmrot) has no gadget yet")
+                m = re.match(r"ppmrot\((-?)\s*pi\s*/\s*2\^.*?\s+with\s+tSynth\[([^\]]+)\]", t)
+                if not m:
+                    raise NotLowered(f".qec line {s.line}: a rotation QCCD cannot read: {raw[:100]!r}")
+                fs = self.factors(t.split(" with ")[0], famap)
+                if not fs or any(p not in "XZ" for p, _ in fs):
+                    raise NotLowered(f".qec line {s.line}: a rotation of {fs}: the bench measures X̄ and Z̄")
+                items += self.rotation(fs, self.ev(m[2], env, s.line), -1 if m[1] else 1, s.line)
             else:
                 raise NotLowered(f".qec line {s.line}: no gadget lowering for {raw[:100]!r}")
         return items
+
+    def rotation(self, fs: list, k: int, sign: int, line: int) -> list:
+        """FormalRV's synthesis stub `ppmrot(±π/2^k) P`, as QCCD does it: exp(∓iπ/2^k P̄).
+
+        Measure P̄ ⊗ Z̄ against a block in RZ(2φ)|+⟩ (φ = ±π/2^k) and read that block in X:
+        the blocks have turned by exp(-iφP̄) up to P̄^r (a frame) when the product reads 0, and
+        by exp(+iφP̄) when it reads 1 -- which the doubled angle, the same rotation at k − 1,
+        puts right.  Repeat until success.  The resource is a |Ȳ⟩ at k = 2, the factory's T
+        state at k = 3, a rotation source's RZ(k−1)|+⟩ beyond; k = 1 is the Pauli P̄ itself, a
+        frame.  Exact in every branch (each sign, angle and outcome checked against
+        exp(-iφP̄) as matrices before this was written), so the program's distribution and
+        states are checked against the .prog's like everything else."""
+        letters = " ".join(f"{p} {b}" for p, b in fs)
+        blocks = " ".join(b for _, b in fs)
+
+        def frame(guard=None):
+            return [Item("ins", (f"if {guard}: " if guard else "") + f"{p.lower()} {b}", line)
+                    for p, b in fs]
+        if k <= 1:
+            return frame()
+        self.rot += 1
+        a = f"a{ROT_BASE + self.rot}"
+        if k == 2:
+            res = [Item("ins", f"prep {a} Y", line)] + ([] if sign > 0 else [Item("ins", f"z {a}", line)])
+        elif k == 3:
+            # the factory's T†|+⟩; X in software makes it T|+⟩
+            res = [Item("ins", f"inject {a}", line)] + ([Item("ins", f"x {a}", line)] if sign > 0 else [])
+        else:
+            res = [Item("ins", f"prep {a} R{k - 1}" + ("" if sign > 0 else "dg"), line)]
+        s_, r_ = f"m{self.k}", f"m{self.k + 1}"
+        self.k += 2
+        return (res
+                + [Item("ins", f"ppm {letters} Z {a} -> {s_}", line),
+                   Item("ins", f"decode {blocks} {a}", line),
+                   Item("ins", f"read {a} X -> {r_}", line),
+                   Item("ins", f"decode {a}", line)]
+                + frame(r_)
+                + [Item("guard", s_, line, self.rotation(fs, k - 1, sign, line))])
 
     def call(self, name: str, args: list, env: dict, famap: dict, line: int) -> Item:
         """A gadget call.  Its body is lowered once per *shape* -- the gadget, the values of
@@ -464,7 +539,9 @@ class _Writer:
 
 
 def lower(qec: layers.Stage, *, title: str = "", floorplan: str = "fullstack",
-          inputs: str = "Z") -> Lowered:
+          inputs: str = "Z", ones=()) -> Lowered:
+    """`ones`: the data qubits the program is given as |1⟩ (its spec's `assumes`, a basis
+    state): prepared in |0̄⟩ and flipped, by an X̄ kept in software, before it runs."""
     prog = qec.program
     if prog is None:
         raise NotLowered("the .qec has no program")
@@ -472,6 +549,7 @@ def lower(qec: layers.Stage, *, title: str = "", floorplan: str = "fullstack",
     m = re.search(r"\w+\[(\d+)\]\s+LogicData", prog.header.text)
     n_data = int(m[1]) if m else 0
     items = [Item("ins", f"prep q{i} {inputs}", 0, role="input") for i in range(n_data)]
+    items += [Item("ins", f"x q{int(i)}", 0, role="input") for i in sorted(int(i) for i in ones)]
     for i in range(n_data):
         it.out.blocks[f"q{i}"] = f"LogicData[{i}]"
     items += it.walk(prog.body, {}, {}, [[]])
@@ -494,7 +572,7 @@ def lower(qec: layers.Stage, *, title: str = "", floorplan: str = "fullstack",
         add(f"gate {name} {' '.join(params)}:", cline, "gate")
         for t, q in gbody:
             add("  " + t, q, "gate")
-    inputs_set = {f"prep q{i} {inputs}" for i in range(n_data)}
+    inputs_set = {f"prep q{i} {inputs}" for i in range(n_data)} | {f"x q{int(i)}" for i in ones}
     for t, q in body:
         role = "input" if (q == 0 and t in inputs_set) else "qec"
         add(t, q, role)

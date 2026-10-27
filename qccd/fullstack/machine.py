@@ -44,12 +44,17 @@ and judged by the floorplan rules F1-F9 like any other.
   control  the decoder and the classical memory, wired to every door that carries bits"""
 
 
-def wide_rows(memories: int = 32, benches: int = 4, factories: int = 4, per_row: int = 9) -> list:
+def wide_rows(memories: int = 32, benches: int = 4, factories: int = 4, rotations: int = 2,
+              per_row: int = 9) -> list:
     """Rows for a wider machine: a program that keeps many blocks alive across its gadgets
     (each lives in a memory of its own, `qccd.gadget.fold`) needs a memory per block, and
-    enough benches and factories to keep them busy.  Compute and supply first, then memories,
+    enough benches and factories to keep them busy; rotations finer than T need rotation
+    sources (`rot1`), whose ions a pharmacy encodes.  Compute and supply first, then memories,
     `per_row` places a row."""
-    head = [("depot1", "depot9"), ("prep", "prep_d3"), ("clinic", "se_d3")]
+    # (the rotation sources first: a small bay's doors sit close, and only the first row's
+    # street keeps their junctions apart -- `town` refuses the layouts that do not)
+    head = [(f"lens{k}", "rot1") for k in range(1, rotations + 1)]
+    head += [("depot1", "depot9"), ("prep", "prep_d3"), ("clinic", "se_d3")]
     for k in range(1, factories + 1):
         head += [(f"pharmacy{k}", "inj_d3"), (f"factory{k}", "msf15")]
     for k in range(1, benches + 1):
@@ -62,8 +67,9 @@ def wide_rows(memories: int = 32, benches: int = 4, factories: int = 4, per_row:
 WIDE_COMMENT = """\
 A wider full-stack machine (qccd/fullstack/machine.py, wide_rows): the same places as the
 full-stack machine, more of them -- {benches} Pauli-product benches, {factories} factories each
-beside a pharmacy, {memories} memories (one for every block a program keeps alive across its
-gadgets) -- in rows of {per_row} between streets, judged by F1-F9 like any other."""
+beside a pharmacy, {rotations} rotation sources (for rotations finer than T), {memories} memories
+(one for every block a program keeps alive across its gadgets) -- in rows of {per_row} between
+streets, judged by F1-F9 like any other."""
 
 
 def library(leaves, rows=None, name: str = "fullstack_d3"):
@@ -78,7 +84,7 @@ def write_floorplan(leaves, path: Path = FLOORPLAN, *, wide: dict | None = None)
         lib = library(leaves)
         text = write(lib, title="A machine for FormalRV programs (surface code, d = 3)", comment=COMMENT)
     else:
-        args = {"memories": 32, "benches": 4, "factories": 4, "per_row": 9, **wide}
+        args = {"memories": 32, "benches": 4, "factories": 4, "rotations": 2, "per_row": 9, **wide}
         lib = library(leaves, rows=wide_rows(**args), name="fullstack_wide_d3")
         text = write(lib, title=f"A wide machine for FormalRV programs (surface code, d = 3, "
                                 f"{args['memories']} memories)",

@@ -53,6 +53,10 @@ def shape_d(shape: str, x: float, y: float, w: float, h: float) -> str:
         for i in range(n):
             d += f"L{f(x + (i + 1) * tw)} {f(y)}V{f(y + th)}"
         return d + f"V{f(y + h)}Z"
+    if shape == "diamond":
+        q = min(w * 0.22, h * 0.6)
+        return (f"M{f(x + q)} {f(y)}H{f(x + w - q)}L{f(x + w)} {f(y + h / 2)}L{f(x + w - q)} {f(y + h)}"
+                f"H{f(x + q)}L{f(x)} {f(y + h / 2)}Z")
     if shape == "chevron":
         q = min(w * 0.18, h * 0.5)
         return (f"M{f(x)} {f(y)}H{f(x + w - q)}L{f(x + w)} {f(y + h / 2)}L{f(x + w - q)} {f(y + h)}"

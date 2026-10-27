@@ -39,7 +39,7 @@ import math
 from dataclasses import dataclass, field
 
 from ..algorithm import (CONTRACT_ARITY, Algorithm, Gate, _split, parse_algorithm,
-                         parse_guard)
+                         parse_guard, rotation_basis)
 
 __all__ = ["State", "Unitary", "UNITARIES", "check_gate", "check_gates", "check_pi4",
            "program_outcomes", "ContractError", "MAGIC_STATE"]
@@ -235,7 +235,13 @@ def _primitive(st: State, word: str, args: list[str], outcome: int | None = None
     probability; everything else returns None."""
     if word == "prep":
         q, basis = args[0], args[1].upper()
-        st.add(q, *({"Z": (1, 0), "X": (_R2, _R2), "Y": Y_STATE}[basis]))
+        rot = rotation_basis(basis)
+        if rot:
+            # a rotation source's ion, injected: RZn|+⟩ (or its inverse), qccd.gadget.leaves.rotation
+            n, dg = rot
+            st.add(q, _R2, _R2 * cmath.exp((-1j if dg else 1j) * math.pi / 2 ** n))
+        else:
+            st.add(q, *({"Z": (1, 0), "X": (_R2, _R2), "Y": Y_STATE}[basis]))
     elif word == "inject":
         st.add(args[0], *MAGIC_STATE)
     elif word == "s":

@@ -46,8 +46,10 @@ def output_pairs(prog: layers.Stage, chain, low: qec2alg.Lowered, alg) -> list:
     return out
 
 
-def distribution_check(prog: layers.Stage, chain, low: qec2alg.Lowered, params: dict) -> dict:
-    """The lowered program's results have exactly the .prog's distribution."""
+def distribution_check(prog: layers.Stage, chain, low: qec2alg.Lowered, params: dict,
+                       inputs: dict | None = None) -> dict:
+    """The lowered program's results have exactly the .prog's distribution (both from the
+    basis state `inputs`, {qubit: 1}, the spec assumes)."""
     import re
     from ..gadget.algorithm import parse_algorithm
     from ..gadget.logic.merged import TooManyBranches, distribution
@@ -58,7 +60,7 @@ def distribution_check(prog: layers.Stage, chain, low: qec2alg.Lowered, params: 
         recs = int(eval(m[1].replace("·", "*"), {"__builtins__": {}}, env)) if m else 0  # noqa: S307
         order: list = []
         pstates: dict = {}
-        ref = prog_distribution(prog, env, recs, order, pstates)
+        ref = prog_distribution(prog, env, recs, order, pstates, inputs=inputs)
     except (NotSimulated, Exception) as exc:                     # noqa: BLE001 -- say why
         return {"checked": False, "why": f"the .prog could not be simulated: {exc}"}
     alg = parse_algorithm(low.text)
@@ -104,7 +106,8 @@ def distribution_check(prog: layers.Stage, chain, low: qec2alg.Lowered, params: 
                       "merged once nothing reads their outcomes (exact)"}
 
 
-def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict, chain=None) -> dict:
+def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict, chain=None,
+                   inputs: dict | None = None) -> dict:
     """What the lowered gadget program computes, against the .prog: a single gate as its
     contract (every branch, state vector); otherwise the exact distribution of its results
     against the .prog's own; and an outcome spec `Pr[ c[0,K) = E ] = 1` symbolically where the
@@ -114,7 +117,7 @@ def semantic_check(prog: layers.Stage, low: qec2alg.Lowered, params: dict, chain
     if rep.get("checked"):
         return rep
     if chain is not None:
-        rep = distribution_check(prog, chain, low, params)
+        rep = distribution_check(prog, chain, low, params, inputs=inputs)
         if rep.get("checked"):
             return rep
     spec = next((u for u in prog.units if u.kind == "spec" and prog.program and u.name == prog.program.name), None)
@@ -195,9 +198,10 @@ def stack_payload(prog, qppm, qec, chain, low: qec2alg.Lowered, foot: str) -> di
 
 def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, specialize: dict | None = None,
         machine: Path | None = None, sysspec: Path | None = None, title: str = "",
-        floorplan: str = "fullstack", fold: bool = False) -> dict:
+        floorplan: str = "fullstack", fold: bool = False, inputs: dict | None = None) -> dict:
     """`fold`: schedule every gate once per context and keep the calls folded
-    (`qccd.gadget.fold`); the page plays it a window at a time."""
+    (`qccd.gadget.fold`); the page plays it a window at a time.  `inputs` {qubit: 1}: the
+    basis state the program is given (its spec's `assumes`), |0…0⟩ by default."""
     from ..gadget.verified import build_algorithm
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -231,10 +235,12 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
     chain = step("link .qec -> .qppm -> .prog", lambda: structure.link(st_prog, st_qppm, st_qec, templates,
                                                                      prog_path=Path(prog), specialize=specialize))
     low = step("lower .qec -> .alg (QCCD)", lambda: qec2alg.lower(
-        st_qec, title=title or f"{stem}: a FormalRV program on the gadget town", floorplan=floorplan))
+        st_qec, title=title or f"{stem}: a FormalRV program on the gadget town", floorplan=floorplan,
+        ones=[q for q, v in (inputs or {}).items() if v]))
     alg_p = out / f"{stem}.alg"
     alg_p.write_text(low.text, encoding="utf-8")
-    contract = step("what the .alg computes, against the .prog", lambda: semantic_check(st_prog, low, specialize or {}, chain))
+    contract = step("what the .alg computes, against the .prog", lambda: semantic_check(st_prog, low, specialize or {}, chain,
+                                                                                         inputs=inputs))
     a_txt = (f"FormalRV's VM on its abstract machine: {abstract['runtime_ns'] / 1e6:.1f} ms, "
              f"{abstract['peak_qubits']} qubits. " if abstract and abstract.get("runtime_ns") else "")
     if contract.get("passed") and contract.get("kind") == "distribution":

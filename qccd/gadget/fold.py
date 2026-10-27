@@ -480,7 +480,11 @@ class MacroCity(City):
                 got = cal.earliest(t + a, b - a)
                 if got == math.inf:
                     raise FoldError(f"{m.gate} needs {p}, which a resting block holds")
-                if got - (t + a) > shift:
+                # A CONFLICT IS ONE PAST THE TOLERANCE.  A rounding difference (1e-11 us) used
+                # to end the scan here, and the test below then took it for "no shift" and
+                # returned a start the rest of the footprint had not been checked at: the
+                # composition check (`check_composition`) found 15 such boxes in FormalRV's Shor.
+                if got - (t + a) > 1e-9:
                     shift = got - (t + a)
                     break
             if shift <= 1e-9:

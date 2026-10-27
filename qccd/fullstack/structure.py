@@ -55,7 +55,7 @@ def reachable(stage: layers.Stage) -> set:
     while todo:
         u = todo.pop()
         for s in u.statements():
-            m = re.match(r"\s*(\w+)\(", s.text)
+            m = re.match(r"\s*([\w!]+)\(", s.text)        # (FormalRV's `!ctl!g` included)
             if m and m[1] in gad and m[1] not in seen:
                 seen.add(m[1])
                 todo.append(gad[m[1]])
@@ -85,10 +85,28 @@ def link_qppm_qec(qppm: layers.Stage, qec: layers.Stage) -> dict:
     return out
 
 
+#: a loop of exactly one trip, `for A <= v < A + 1:` -- how FormalRV's `.qec` binds the
+#: variable of a descending `.qppm` loop (`for n > k >= 0` becomes `for 0 <= d < n` around one
+#: of these); it has no `.qppm` statement of its own
+_ONE_TRIP = re.compile(r"for\s+(.+?)\s*(?:<=|≤)\s*\w+\s*<\s*\1\s*\+\s*1\s*:")
+
+
 def _match_qec(qbody: list, pbody: list, out: dict, where: str) -> None:
     j = 0
     pending: list = []                     # group statements waiting for their merge
     last_measure = None
+    swapped = None                         # an `if` whose body is the next `rv_e` branch
+    # a one-trip binding loop is read through: its lines are matched where it stands, and it
+    # is linked with the first of them
+    binders: list = []
+    flat: list = []
+    for s in qbody:
+        if _ONE_TRIP.fullmatch(s.text.strip()):
+            binders.append(s)
+            flat += s.children
+        else:
+            flat.append(s)
+    qbody = flat
 
     def nxt(pred, what, s):
         nonlocal j
@@ -108,10 +126,15 @@ def _match_qec(qbody: list, pbody: list, out: dict, where: str) -> None:
             continue
         loop = re.fullmatch(r"for\s+.+?\s*(?:<=|≤)\s*(\w+)\s*<\s*.+?:", t)
         if loop and loop[1].startswith(("rv_g", "rv_e")):
+            empty = all(c.text.strip() == "skip" for c in s.children)
             if loop[1].startswith("rv_g"):
                 p = nxt(lambda p: p.text.strip().startswith("if "), "a compile-time branch (if)", s)
                 out[s.line] = Link(p, "branch")
-                _match_qec(s.children, p.children, out, where)
+                # under a negated condition (`if not c:`) FormalRV's `rv_g` branch is the EMPTY
+                # one, and the `if`'s body is the `rv_e` branch that follows
+                if not (empty and p.children):
+                    _match_qec(s.children, p.children, out, where)
+                swapped = p if (empty and p.children) else None
             else:
                 # the else branch: FormalRV's `if` had none, or its `else:` follows
                 if j < len(pbody) and pbody[j].text.strip() == "else:":
@@ -119,10 +142,14 @@ def _match_qec(qbody: list, pbody: list, out: dict, where: str) -> None:
                     j += 1
                     out[s.line] = Link(p, "branch")
                     _match_qec(s.children, p.children, out, where)
+                elif swapped is not None and not empty:
+                    out[s.line] = Link(swapped, "branch")
+                    _match_qec(s.children, swapped.children, out, where)
                 else:
                     prev = pbody[j - 1] if j else None
                     if prev is not None:
                         out[s.line] = Link(prev, "branch")
+                swapped = None
             continue
         if loop:
             p = nxt(lambda p: p.text.strip().startswith("for "), "a loop", s)
@@ -134,10 +161,11 @@ def _match_qec(qbody: list, pbody: list, out: dict, where: str) -> None:
             out[s.line] = Link(p, "loop")
             _match_qec(s.children, p.children, out, where)
             continue
-        call = re.fullmatch(r"(\w+)\(.*\)", t)
+        call = re.fullmatch(r"([\w!]+)\(.*\)", t)
         kd = _qec_kind(s)
         if call and kd == "other":
-            p = nxt(lambda p: re.match(rf"{call[1]}\(", p.text.strip()) is not None, f"a call of {call[1]}", s)
+            p = nxt(lambda p: re.match(rf"{re.escape(call[1])}\(", p.text.strip()) is not None,
+                    f"a call of {call[1]}", s)
             out[s.line] = Link(p, "name")
             continue
         magic = re.search(r"(?:prepare|magic)\s+(\|[^>]+>)\s*->\s*LogicalAncilla", t)
@@ -182,6 +210,10 @@ def _match_qec(qbody: list, pbody: list, out: dict, where: str) -> None:
             out[s.line] = Link(p, "order")
         else:
             raise Unlinked(f"{where}: .qec line {s.line}: no rule links {t[:80]!r}")
+    for b in binders:
+        first = next((c.line for c in b.children if c.line in out), None)
+        if first is not None:
+            out[b.line] = Link(out[first].stmt, "loop")
 
 
 # ----------------------------------------------------------------------------- .prog -> .qppm
@@ -320,9 +352,11 @@ def _flat(stmts: list, depth: int = 0, *, exact: bool = False) -> list:
 
 
 def link_prog_qppm_by_prefix(prog_path: Path, prog: layers.Stage, qppm: layers.Stage,
-                             specialize: dict | None = None) -> dict:
-    """`.qppm` line -> Link(.prog statement) for the PROGRAM unit, by compiling every prefix of
-    it with FormalRV's own prepare_qppm and aligning consecutive outputs.
+                             specialize: dict | None = None, unit=None, targets=None) -> dict:
+    """`.qppm` line -> Link(.prog statement) for the PROGRAM unit (or the gadget `unit`, whose
+    `.qppm` units `targets` -- the gadget's own and FormalRV's controlled copy `!ctl!g`), by
+    compiling every prefix of it with FormalRV's own prepare_qppm and aligning consecutive
+    outputs.
 
     FormalRV's `.prog` compiler optimises across gates (adjacent rotations merge; two π/4 make a
     Pauli frame), so a gate's `.qppm` is not a fixed template.  A statement that appears when
@@ -333,29 +367,41 @@ def link_prog_qppm_by_prefix(prog_path: Path, prog: layers.Stage, qppm: layers.S
     import hashlib
     import shutil
     from . import formalrv
-    unit = prog.program
+    unit = unit or prog.program
     if unit is None:
         return {}
+    # the .qppm units this one becomes: the program's, or a gadget's own and its controlled copy
+    names = [None] if unit.kind == "program" else list(targets or [unit.name])
+
+    def unit_of(st, name):
+        return st.program if name is None else st.gadgets().get(name)
     pre = _preorder(unit.body)
-    # where the program block lives: its member file, from its header to the member's end
+    # where the block lives: its member file, from its header to the next top-level line (a
+    # program stands last in its member)
     member = unit.header.member
     src_dir = Path(prog_path)
     if not src_dir.is_dir():
         raise Unlinked("prefix differencing needs a .prog stage folder")
     key = hashlib.sha256((formalrv.PIN_COMMIT + "\n".join(prog.lines) + repr(sorted((specialize or {}).items()))
+                          + (f"\0{unit.kind} {unit.name}" if unit.kind != "program" else "")
                           ).encode()).hexdigest()[:16]
     work = PREFIX_CACHE / key
     work.mkdir(parents=True, exist_ok=True)
     header = unit.header.text.rstrip()
     member_text = (src_dir / member).read_text(encoding="utf-8-sig").split("\n")
-    # the program block is everything from its header to the member's end (programs stand last)
     start = unit.header.mline - 1
-    flats: list = []
+    end = len(member_text)
+    if unit.kind != "program":
+        end = next((i for i in range(start + 1, len(member_text))
+                    if member_text[i].strip() and not member_text[i][:1].isspace()), len(member_text))
+    flats: dict = {n: [] for n in names}
+    last_k = None
     for k in range(1, len(pre) + 1):
         keep = {id(s) for s, _ in pre[:k]}
         # a block header whose children are all cut has no body: that prefix is the previous one
         if pre[k - 1][0].children:
-            flats.append(None)
+            for n in names:
+                flats[n].append(None)
             continue
 
         def emit(stmts, depth):
@@ -373,55 +419,64 @@ def link_prog_qppm_by_prefix(prog_path: Path, prog: layers.Stage, qppm: layers.S
             if d.exists():
                 shutil.rmtree(d)
             shutil.copytree(src_dir, d)
-            (d / member).write_text("\n".join(member_text[:start] + [header] + body) + "\n\n", encoding="utf-8")
+            (d / member).write_text("\n".join(member_text[:start] + [header] + body + [""] + member_text[end:])
+                                    + "\n\n", encoding="utf-8")
             try:
                 formalrv.prog_to_qppm(d, out_q)
             except formalrv.ToolchainError as exc:
                 raise Unlinked(f"FormalRV refused the .prog prefix ending at line {pre[k - 1][0].line}: {exc}")
         st = layers.read(out_q, "qppm")
-        flats.append(_flat(st.program.body) if st.program else [])
-    final = _flat(qppm.program.body)
-    last = next(f for f in reversed(flats) if f is not None)
-    last_exact = _flat(layers.read(work / f"p{max(i for i, f in enumerate(flats, 1) if f is not None)}.qppm",
-                                   "qppm").program.body, exact=True)
-    if last != final or last_exact != _flat(qppm.program.body, exact=True):
-        raise Unlinked("the last .prog prefix does not reproduce FormalRV's .qppm: prefix differencing refused")
-    # attribute, prefix by prefix
-    owner: list = []                         # per position of the current flat list: (prog stmt, how)
-    prev: list = []
-    for k, f in enumerate(flats, start=1):
-        if f is None:
-            continue
-        s = pre[k - 1][0]
-        sm = difflib.SequenceMatcher(a=prev, b=f, autojunk=False)
-        new_owner: list = [None] * len(f)
-        for tag, i1, i2, j1, j2 in sm.get_opcodes():
-            if tag == "equal":
-                for d in range(i2 - i1):
-                    new_owner[j1 + d] = owner[i1 + d]
-            else:
-                how = "merged" if tag == "replace" else "prefix"
-                for j in range(j1, j2):
-                    new_owner[j] = (s, how)
-        owner, prev = new_owner, f
-    # final flat position -> .qppm line
-    lines_pre = [p for p, _ in _preorder(qppm.program.body)]
-    # a .qppm block header (`when c[..]:`, `for ...:`) belongs to the .prog block it came from,
-    # not to the first statement inside that block (the prefix that first showed it)
+        for n in names:
+            u = unit_of(st, n)
+            flats[n].append(_flat(u.body) if u else [])
+        last_k = k
+    if last_k is None:
+        return {}
+    last_st = layers.read(work / f"p{last_k}.qppm", "qppm")
+    # a block header (`when c[..]:`, `for ...:`) belongs to the .prog block it came from, not
+    # to the first statement inside that block (the prefix that first showed it)
     parent = {}
     for s, _ in pre:
         for c in s.children:
             parent[id(c)] = s
     out: dict = {}
-    for p, o in zip(lines_pre, owner):
-        if o is None:
+    for n in names:
+        real = unit_of(qppm, n)
+        mine = unit_of(last_st, n)
+        if real is None or mine is None:
             continue
-        s, how = o
-        pt = p.text.strip()
-        h = parent.get(id(s))
-        if p.children and h is not None and pt.split()[0] == h.text.strip().split()[0]:
-            s, how = h, "prefix"
-        out[p.line] = Link(s, how)
+        if (next(f for f in reversed(flats[n]) if f is not None) != _flat(real.body)
+                or _flat(mine.body, exact=True) != _flat(real.body, exact=True)):
+            raise Unlinked(f"the last prefix of {unit.kind} {unit.name or ''} does not reproduce FormalRV's "
+                           f".qppm{' ' + n if n else ''}: prefix differencing refused")
+        # attribute, prefix by prefix
+        owner: list = []                     # per position of the current flat list: (prog stmt, how)
+        prev: list = []
+        for k, f in enumerate(flats[n], start=1):
+            if f is None:
+                continue
+            s = pre[k - 1][0]
+            sm = difflib.SequenceMatcher(a=prev, b=f, autojunk=False)
+            new_owner: list = [None] * len(f)
+            for tag, i1, i2, j1, j2 in sm.get_opcodes():
+                if tag == "equal":
+                    for d in range(i2 - i1):
+                        new_owner[j1 + d] = owner[i1 + d]
+                else:
+                    how = "merged" if tag == "replace" else "prefix"
+                    for j in range(j1, j2):
+                        new_owner[j] = (s, how)
+            owner, prev = new_owner, f
+        lines_pre = [p for p, _ in _preorder(real.body)]
+        for p, o in zip(lines_pre, owner):
+            if o is None:
+                continue
+            s, how = o
+            pt = p.text.strip()
+            h = parent.get(id(s))
+            if p.children and h is not None and pt.split()[0] == h.text.strip().split()[0]:
+                s, how = h, "prefix"
+            out[p.line] = Link(s, how)
     return out
 
 
@@ -434,18 +489,39 @@ def link(prog: layers.Stage, qppm: layers.Stage, qec: layers.Stage, templates: d
         templates = learn_templates()
     chain = Chain(prog, qppm, qec, None)
     chain.qec_to_qppm = link_qppm_qec(qppm, qec)
+    qg = qppm.gadgets()
+    controlled = [g for g in prog.gadgets() if f"!ctl!{g}" in qg]
     try:
+        if controlled:
+            raise Unlinked("FormalRV made controlled copies of gadgets: they are linked by prefix")
         chain.qppm_to_prog = link_prog_qppm(prog, qppm, templates)
     except Unlinked:
         if prog_path is None:
             raise
         out = {}
-        # the gadgets by their templates (FormalRV compiles a gadget on its own), the program
-        # by prefix differencing
+        gadgets = set(prog.gadgets()) | set(qg)
+        # a gadget by its templates where they fit (FormalRV compiles a gadget on its own),
+        # otherwise -- its compiler merged across gates, or it made a controlled copy
+        # (`!ctl!g`, under `ctrl`), which no template describes -- by prefix differencing
         for ug, up in _unit_pairs(prog, qppm):
-            if ug.kind == "gadget":
-                _match_prog(ug.body, up.body, out, templates, set(prog.gadgets()) | set(qppm.gadgets()),
-                            f"gadget {ug.name}")
+            if ug.kind != "gadget":
+                continue
+            part: dict = {}
+            try:
+                _match_prog(ug.body, up.body, part, templates, gadgets, f"gadget {ug.name}")
+                if ug.name in controlled:
+                    part.update(link_prog_qppm_by_prefix(prog_path, prog, qppm, specialize, unit=ug,
+                                                         targets=[f"!ctl!{ug.name}"]))
+            except Unlinked:
+                part = link_prog_qppm_by_prefix(prog_path, prog, qppm, specialize, unit=ug,
+                                                targets=[ug.name] + ([f"!ctl!{ug.name}"] if ug.name in controlled else []))
+            out.update(part)
+        # a gadget only its controlled copy is reached through (no plain call of it anywhere)
+        reached = {ug.name for ug, _ in _unit_pairs(prog, qppm) if ug.kind == "gadget"}
+        for g in controlled:
+            if g not in reached:
+                out.update(link_prog_qppm_by_prefix(prog_path, prog, qppm, specialize,
+                                                    unit=prog.gadgets()[g], targets=[f"!ctl!{g}"]))
         out.update(link_prog_qppm_by_prefix(prog_path, prog, qppm, specialize))
         chain.qppm_to_prog = out
     return chain

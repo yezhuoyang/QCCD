@@ -20,15 +20,34 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-__all__ = ["COp", "Circuit", "NotACircuit", "from_tsir", "GATE1", "GATE2", "CLIFFORD1"]
+__all__ = ["COp", "Circuit", "NotACircuit", "from_tsir", "GATE1", "GATE2", "CLIFFORD1",
+           "ROTATIONS", "NON_CLIFFORD", "rotation_phase"]
+
+#: the small rotations: `RZn` puts exp(i*pi/2^n) on |1>, `RZn_DAG` its inverse (by these
+#: numbers RZ1 is S and RZ2 is T, which are spelled S and T).  A rotation source prepares
+#: RZn|+> on one ion, and a Pauli-product measurement against it rotates a block by half that
+#: angle (`qccd.gadget.leaves.rotation`)
+ROTATIONS = tuple(f"RZ{n}{d}" for n in range(1, 17) for d in ("", "_DAG"))
+#: the gates that are not Clifford: the logic layer simulates them as state vectors only
+NON_CLIFFORD = ("T", "T_DAG") + ROTATIONS
 
 #: single-qubit gates the logic layer understands, by canonical name
-GATE1 = ("I", "X", "Y", "Z", "H", "S", "S_DAG", "T", "T_DAG")
+GATE1 = ("I", "X", "Y", "Z", "H", "S", "S_DAG", "T", "T_DAG") + ROTATIONS
 CLIFFORD1 = ("I", "X", "Y", "Z", "H", "S", "S_DAG")
 GATE2 = ("CX", "CZ")
 
 _ALIASES = {"CNOT": "CX", "SDG": "S_DAG", "SDAG": "S_DAG", "TDG": "T_DAG", "TDAG": "T_DAG",
             "ID": "I", "IDLE": "I"}
+
+
+def rotation_phase(name: str):
+    """The phase `RZn` (or `RZn_DAG`) puts on |1>, or None for another gate."""
+    import cmath
+    import math
+    if name not in ROTATIONS:
+        return None
+    n = int(name[2:].split("_")[0])
+    return cmath.exp((-1j if name.endswith("_DAG") else 1j) * math.pi / 2 ** n)
 
 
 class NotACircuit(ValueError):
@@ -140,7 +159,7 @@ class Circuit:
         return out
 
     def is_clifford(self) -> bool:
-        return not any(op.name in ("T", "T_DAG") for op in self.ops)
+        return not any(op.name in NON_CLIFFORD for op in self.ops)
 
     def to_stim(self, *, noise: float = 0.0) -> str:
         """Stim text (for cross-checks).  `noise` > 0 adds the fault model of `faults`."""

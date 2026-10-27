@@ -12,7 +12,7 @@ from __future__ import annotations
 import cmath
 import math
 
-from .circuit import Circuit
+from .circuit import Circuit, rotation_phase
 
 __all__ = ["SparseState", "run_postselected", "qubit_state"]
 
@@ -107,6 +107,9 @@ def run_postselected(circuit: Circuit, outcomes=None, *, inject=None) -> tuple[S
         elif name in _PHASES:
             for q in t:
                 st.phase(q, _PHASES[name])
+        elif rotation_phase(name) is not None:
+            for q in t:
+                st.phase(q, rotation_phase(name))
         elif name == "X":
             for q in t:
                 st.x(q)

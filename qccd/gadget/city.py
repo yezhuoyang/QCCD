@@ -75,7 +75,7 @@ from __future__ import annotations
 
 import heapq
 
-from .algorithm import Algorithm, Instr
+from .algorithm import Algorithm, Instr, rotation_basis
 from .library import LeafLibrary
 from .model import Library
 from .logic.decode import LATENCY
@@ -914,7 +914,7 @@ class City:
                                   "code": "surface_d3", "n": 9, "k": 1, "resource": "|Ȳ⟩"}
             self.pf[q] = (ZERO, ZERO)
             self.report(I, "inject.Y", row, ins.index, grp, blocks=[q])
-        elif kind == "prep":
+        elif kind == "prep" and not rotation_basis(ins.basis):
             P = self._choose("prep", ins, ready=t0)
             D, gids, deps = self._load(9, (P, "in"), t0, ins.index, grp)
             arr, trip = self.trip(gids, (D, "out"), deps, (P, "in"), t0, ins.index, grp)
@@ -924,12 +924,16 @@ class City:
                                               "born_at": P, "code": "surface_d3", "n": 9, "k": 1}
             self.pf[ins.blocks[0]] = (ZERO, ZERO)
             self.report(P, ins.op, row, ins.index, grp, blocks=[ins.blocks[0]])
-        elif kind == "inject":
-            F = self._choose("factory", ins, ready=t0)
+        elif kind == "inject" or (kind == "prep" and rotation_basis(ins.basis)):
+            # a magic block: one ion made in a state no Clifford makes -- T†|+⟩ by the factory's
+            # distillation, or RZn|+⟩ by a rotation source -- and encoded by a pharmacy
+            rot = rotation_basis(ins.basis) if kind == "prep" else None
+            F = self._choose("rotation" if rot else "factory", ins, ready=t0)
             I = self._choose("injection", ins, ready=t0, near=(F, "out"), port="magic")
             D1, g1, d1 = self._load(1, (F, "in"), t0, ins.index, grp)
             arr, trip = self.trip(g1, (D1, "out"), d1, (F, "in"), t0, ins.index, grp)
-            s, outs, _ = self.op(F, "produce", {"in": (g1, arr, trip)}, t0, ins.index, grp)
+            make = f"rz{rot[0]}{'dg' if rot[1] else ''}" if rot else "produce"
+            s, outs, _ = self.op(F, make, {"in": (g1, arr, trip)}, t0, ins.index, grp)
             mg, md = outs["out"]
             marr, mtrip = self.trip(mg, (F, "out"), md, (I, "magic"), t0, ins.index, grp)
             D2, g8, d8 = self._load(8, (I, "in"), t0, ins.index, grp)
@@ -940,6 +944,8 @@ class City:
             self.block_info[ins.blocks[0]] = {"ions": outs["out"][0], "born": row[1],
                                               "born_at": I, "code": "surface_d3", "n": 9, "k": 1,
                                               "magic_ion": mg[0]}
+            if rot:
+                self.block_info[ins.blocks[0]]["resource"] = f"RZ{rot[0]}{'†' if rot[1] else ''}|+⟩"
             self.pf[ins.blocks[0]] = (ZERO, ZERO)
             self.report(I, "inject", row, ins.index, grp, blocks=[ins.blocks[0]])
         elif kind in ("se", "store"):

@@ -40,6 +40,8 @@ def main(argv=None) -> int:
     r.add_argument("--fold", action="store_true",
                    help="schedule every gate once per context and keep its calls folded (qccd.gadget.fold)")
     r.add_argument("--floorplan", default="fullstack", help="the machine (examples/gadgets/floorplans/NAME.floor)")
+    r.add_argument("--input", action="append", default=[], metavar="Q=1",
+                   help="a data qubit the program is given as |1> (its spec's assumes)")
     m = sub.add_parser("machine", help="regenerate the full-stack machine's floorplan")
     m.add_argument("--wide", type=int, metavar="MEMORIES",
                    help="write fullstack_wide.floor instead: 4 benches, 4 factories, this many memories")
@@ -57,7 +59,8 @@ def main(argv=None) -> int:
     if not a.flat:
         from .town import run
         t = run(a.prog, out=a.out, code=a.code, distance=a.distance, specialize=spec,
-                machine=a.machine, sysspec=a.sysspec, title=a.title, fold=a.fold, floorplan=a.floorplan)
+                machine=a.machine, sysspec=a.sysspec, title=a.title, fold=a.fold, floorplan=a.floorplan,
+                inputs={int(k): int(v) for k, v in (x.split("=", 1) for x in a.input)})
         if not a.fold:
             print(t["alg"])
         print(json.dumps({k: t[k] for k in ("qec_statements", "linked", "absorbed", "abstract", "concrete",
@@ -65,6 +68,10 @@ def main(argv=None) -> int:
         c = t["contract"]
         if c.get("passed") and c.get("kind") == "outcome":
             print("semantics:", f"{c['spec']} in every branch ({c['random_outcomes']} random outcomes, symbolic)")
+        elif c.get("passed") and c.get("kind") == "distribution":
+            print("semantics:", f"the .prog's distribution exactly ({c['prog']}); {c['states_compared']} "
+                                f"result states, worst fidelity {c['worst_state_fidelity']}; "
+                                f"at most {c['peak_branches']} live branches")
         elif c.get("passed"):
             print("semantics:", f"exactly {c['contract']} in all {c['branches']} branches")
         else:

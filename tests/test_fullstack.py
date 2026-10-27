@@ -443,6 +443,21 @@ def test_each_gate_is_checked_once_and_the_composition_by_construction():
     assert "G8" in check_folded(bad, lib, leaves)["failed"]
 
 
+def test_a_box_is_fitted_past_every_conflict_not_just_the_first_resource():
+    """A call's footprint is fitted interval by interval.  A rounding difference on one
+    resource (1e-11 us late) once ended the scan and was then read as 'no shift', so a real
+    conflict on a later resource went unseen -- found by check_composition in FormalRV's Shor."""
+    from types import SimpleNamespace
+    from qccd.gadget.fold import FastCalendar, MacroCity
+    a, b = FastCalendar(), FastCalendar()
+    a.reserve(0.0, 100.0 + 1e-11)          # free from 100 us on, to a rounding
+    b.reserve(1500.0, 2000.0)              # busy where the box needs it
+    me = SimpleNamespace(cal={"A": a, "B": b}, net_cal={})
+    m = SimpleNamespace(gate="g", footprint={("leaf", "A"): [(0.0, 10.0)], ("leaf", "B"): [(1310.0, 3510.0)]})
+    t0 = MacroCity.fit(me, m, 100.0)
+    assert t0 + 1310.0 >= 2000.0 - 1e-9      # B is free from 2000 us: the box starts after that
+
+
 def test_folded_deutsch_jozsa_passes_every_check(dj):
     *_, low = dj
     g, x, checks, rules = _folded_checks(low.text)
@@ -494,25 +509,135 @@ def test_a_folded_run_plays_on_the_page_a_window_at_a_time(tmp_path):
     assert seen["played"]["t"] > 0.2 * seen["boot"]["makespan"] and seen["played"]["a"] > 0
 
 
+# ----------------------------------------------------------------------------- rotations finer than T
+
+
+def test_a_rotation_source_makes_its_state_and_is_verified():
+    from qccd.gadget.library import LeafLibrary
+    m = LeafLibrary(CACHE, log=None).place("rot1")
+    assert m.family == "rotation" and len(m.ops) == 16
+    for name, op in m.ops.items():
+        assert op.status == "verified" and op.logic["status"] == "verified", name
+        assert op.logic["check"]["fidelity"] == 1.0
+
+
+@pytest.mark.parametrize("letters", [("Z",), ("X",), ("Z", "Z"), ("Z", "X")])
+def test_a_rotation_is_exactly_its_angle_in_every_branch(letters):
+    """FormalRV's `ppmrot(±π/2^k) P`, as QCCD lowers it (repeat until success: a Pauli-product
+    measurement against RZ(k-1)|+⟩, the doubled angle on the other outcome): the blocks end in
+    exp(∓iπ/2^k P)|ψ⟩, exactly, whatever the outcomes -- for each k and sign, a product of one
+    or two blocks, Z̄ or X̄."""
+    import math
+    import numpy as np
+    from qccd.fullstack import qec2alg
+    from qccd.gadget.algorithm import parse_algorithm
+    from qccd.gadget.logic.contract import State, _primitive
+    from qccd.gadget.logic.merged import _factor_out, _words
+
+    def every_branch(alg):
+        """Each branch's final state (on the blocks still alive), all outcomes enumerated."""
+        brs = [(State(), {})]
+        for ins in alg.instructions:
+            word, args = _words(ins)
+            out = []
+            for st, oc in brs:
+                if ins.cond is not None and not ins.cond.holds(oc):
+                    out.append((st, oc))
+                elif ins.kind in ("ppm", "read"):
+                    for o in (0, 1):
+                        s2 = st.copy()
+                        if (_primitive(s2, word, args, o) or 0) > 1e-12:
+                            out.append((s2, {**oc, ins.cvar: o}))
+                elif ins.kind != "decode":
+                    s2 = st.copy()
+                    _primitive(s2, word, args)
+                    out.append((s2, oc))
+                else:
+                    out.append((st, oc))
+            brs = out
+        return [st for st, _ in brs]
+
+    class _Stage:
+        def gadgets(self):
+            return {}
+    blocks = [f"q{i}" for i in range(len(letters))]
+    # a state that is no eigenstate of anything measured: |+⟩, then |Ȳ⟩ on the second
+    prep = ["prep q0 X"] + (["prep q1 Y"] if len(blocks) > 1 else [])
+    psi = np.array([1.0 + 0j])
+    for i in range(len(blocks)):
+        psi = np.kron(np.array([1, 1j if i else 1]) / math.sqrt(2), psi)   # q0 the low bit
+    P = np.array([[1.0 + 0j]])
+    mats = {"X": np.array([[0, 1], [1, 0]]), "Z": np.diag([1, -1])}
+    for p in letters:
+        P = np.kron(mats[p], P)
+    for k in range(2, 7):
+        for sign in (1, -1):
+            it = qec2alg._Interp(_Stage())
+            items = it.rotation(list(zip(letters, blocks)), k, sign, 1)
+            w = qec2alg._Writer(it.out, fresh=10 ** 8)
+            body = w.lines(items)
+            gates = []
+            for name, params, gbody in w.defs:
+                gates.append(f"gate {name} {' '.join(params)}:")
+                gates += ["  " + t for t, _ in gbody]
+            alg = parse_algorithm("\n".join(gates + prep + [t for t, _ in body]) + "\n")
+            phi = sign * math.pi / 2 ** k
+            want = (math.cos(phi) * np.eye(len(psi)) - 1j * math.sin(phi) * P) @ psi
+            finals = every_branch(alg)
+            assert len(finals) >= 2 * (k - 1)           # every outcome of every level, enumerated
+            for st in finals:
+                for q in [q for q in list(st.names) if q not in blocks]:
+                    assert _factor_out(st, q)            # the resource blocks are gone, unentangled
+                v = np.zeros(len(psi), dtype=complex)
+                for b, a in st.amp.items():
+                    v[sum(((b >> st.names.index(q)) & 1) << i for i, q in enumerate(blocks))] += a
+                assert abs(abs(np.vdot(want, v)) - 1) < 1e-9, (letters, k, sign)
+            # and the resource it asks for is the one its angle needs
+            text = alg.source
+            if k >= 4:
+                assert f"R{k - 1}{'' if sign > 0 else 'dg'}" in text
+            elif k == 3:
+                assert "inject" in text
+
+
+@pytest.mark.skipif(not _pinned(), reason="needs the pinned FormalRV clone")
+def test_formalrvs_shor_simulates_from_the_input_its_spec_assumes():
+    """FormalRV's own Examples/Shor at its witness (a = 2, N = 3: order 2), simulated from its
+    .prog -- `ctrl` blocks, `@ shift(m)` maps, descending loops -- from the basis state its spec
+    assumes (|rev(bits, 1)⟩ on the work register): the phase register reads 0 or 8 (bit-reversed),
+    half each.  From |0…0⟩ instead (a·0 = 0: nothing kicks back) it always reads 0."""
+    from qccd.fullstack import formalrv, progsim
+    prog = layers.read(formalrv.root() / "FormalRV" / "Examples" / "Shor" / "Shor.prog", "prog")
+    sp = dict(m=4, bits=3, N=3, a=2, ainv=2, rec=19)
+    assert progsim.distribution(prog, sp, 4, inputs={6: 1}) == {(0, 0, 0, 0): 0.5, (1, 0, 0, 0): 0.5}
+    assert progsim.distribution(prog, sp, 4) == {(0, 0, 0, 0): 1.0}
+
+
 @pytest.mark.skipif(not _pinned(), reason="needs the pinned FormalRV clone")
 def test_formalrvs_shor_lowers_once_per_call_shape(tmp_path):
-    """FormalRV's own Examples/Shor at its witness: the modular exponentiation (everything up to
-    the inverse QFT, whose rotations need synthesis) lowers to a few hundred gates, each
-    FormalRV gadget body once per shape, and half a million instructions when counted."""
-    import re as _re
+    """FormalRV's own Examples/Shor at its witness, unmodified, inverse QFT included: a few
+    hundred gates, each FormalRV gadget body lowered once per shape, its controlled copies
+    (`!ctl!g`) and its rotations (`ppmrot`, as rotation-source states and repeat until
+    success) among them."""
     from qccd.fullstack import formalrv, qec2alg
     src = formalrv.root() / "FormalRV" / "Examples" / "Shor" / "Shor.prog"
     formalrv.prog_to_qppm(src, tmp_path / "shor.qppm")
     formalrv.qppm_to_qec(tmp_path / "shor.qppm", tmp_path / "shor.qec", "surface", 3,
                          dict(m=4, bits=3, N=3, a=2, ainv=2, rec=19))
-    text = (tmp_path / "shor.qec").read_text(encoding="utf-8")
-    with pytest.raises(qec2alg.NotLowered, match="ppmrot"):
-        qec2alg.lower(layers.read(tmp_path / "shor.qec", "qec"))
-    cut = "\n".join(ln for ln in text.splitlines() if not _re.match(r"^\s+(qftInv|measurePhase)\(", ln))
-    (tmp_path / "modexp.qec").write_text(cut + "\n", encoding="utf-8")
-    low = qec2alg.lower(layers.read(tmp_path / "modexp.qec", "qec"))
+    qec = layers.read(tmp_path / "shor.qec", "qec")
+    low = qec2alg.lower(qec)
     assert 500 < len(low.gates) < 1000 and len(low.text.splitlines()) < 25000
     assert any(name.startswith("ctl_modmulmcp") for name in low.gates)
+    assert " R3dg" in low.text and " R4" in low.text          # pi/16 and pi/32 rotations
+    # every .qec statement the program reaches links to its .qppm statement -- through the
+    # controlled copies, the one-trip loops that bind a descending loop, and `if not c:`, whose
+    # body FormalRV writes as the `rv_e` branch
+    from qccd.fullstack import structure
+    links = structure.link_qppm_qec(layers.read(tmp_path / "shor.qppm", "qppm"), qec)
+    reach = structure.reachable(qec)
+    stmts = [s for u in qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)
+             for s in u.statements() if s.text.strip() != "skip"]
+    assert len(stmts) > 9000 and all(s.line in links for s in stmts)
 
 
 # ----------------------------------------------------------------------------- end to end

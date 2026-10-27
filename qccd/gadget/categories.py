@@ -97,6 +97,14 @@ CATEGORIES: dict[str, dict] = {
         "job": "Fifteen noisy T gates in, one better T state out: the 15-to-1 Reed-Muller "
                "protocol on resident ions.",
     },
+    "rotation": {
+        "title": "Rotation Source", "place": "Lens shop", "shape": "diamond", "glyph": "ROT",
+        "stroke": "#7c3aed", "fill": "#ede9fe",
+        "job": "A fresh ion comes in and leaves in a small rotation state, RZn|+⟩; a pharmacy "
+               "encodes it, and a Pauli-product measurement against that block turns the "
+               "program's blocks by half the angle -- rotations finer than T, repeated until "
+               "they succeed.",
+    },
     "injection": {
         "title": "Magic State Injection", "place": "Pharmacy", "shape": "chevron",
         "glyph": "INJ", "stroke": "#be185d", "fill": "#fce7f3",
@@ -140,7 +148,8 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "injection",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "rotation",
+         "injection",
          "decoder", "archive", "depot", "road", "wire"]
 
 #: categories that hold no ions: they run on bits

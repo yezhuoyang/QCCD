@@ -11,6 +11,8 @@ one d = 3 surface-code logical qubit.
     ppm   Z q0 X q1 Z q2 -> m  any product of one X̄ or Z̄ from each of 1-4 blocks,
                                  measured by a probe ion (non-destructive)     -> a Pauli-product bench
     prep  q0 Y                 a fresh block in |Ȳ⟩ (S|+⟩ injected; distance 1) -> an injection place
+    prep  q0 R4                a fresh block in RZ4|+⟩ = (|0⟩ + e^{iπ/16}|1⟩)/√2 (R4dg: the
+                                 inverse): a rotation source's ion, injected  -> rotation + injection
     read  q0 Z -> a            destructive readout in Z or X                  -> a post office
     inject t                   a block holding the factory's magic state      -> factory + injection
                                  (T†|+̄⟩: the factory's own verified output)
@@ -99,7 +101,7 @@ from .logic.circuit import Circuit
 
 __all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_OF",
            "parse_condition", "parse_guard", "Guard", "Gate", "SOFTWARE", "CLASSICAL",
-           "UNGUARDABLE", "GATES_DIR", "CONTRACT_ARITY"]
+           "UNGUARDABLE", "GATES_DIR", "CONTRACT_ARITY", "ROTATION_N", "rotation_basis"]
 
 #: which place category an instruction needs
 CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "xx": "surgery",
@@ -133,6 +135,18 @@ PRIMITIVES = ("prep", "inject", "s", "sx", "x", "y", "z", "se", "store", "cx", "
 
 #: the most blocks one Pauli-product measurement may name (the bench has three doors)
 PPM_MAX = 4
+
+#: the rotation states a block can be prepared in: `prep q R<n>` is RZn|+⟩, `R<n>dg` its inverse
+#: (a rotation source makes them, `qccd.gadget.leaves.rotation`)
+ROTATION_N = tuple(range(3, 11))
+
+
+def rotation_basis(basis) -> tuple[int, bool] | None:
+    """`R4` -> (4, False), `R4DG` -> (4, True); anything else -> None."""
+    m = re.fullmatch(r"R(\d+)(DG)?", str(basis or "").upper())
+    if not m or int(m.group(1)) not in ROTATION_N:
+        return None
+    return int(m.group(1)), bool(m.group(2))
 
 
 class AlgorithmError(ValueError):
@@ -233,6 +247,8 @@ class Instr:
     def op(self) -> str:
         if self.kind == "prep" and self.basis == "Y":
             return "inject.Y"
+        if self.kind == "prep" and rotation_basis(self.basis):
+            return f"inject.{self.basis}"
         if self.kind == "prep":
             return f"prep.{self.basis}"
         if self.kind == "ppm":
@@ -385,7 +401,11 @@ class Algorithm:
             q = ins.blocks
             if ins.cond is not None and not ins.runs(branch or {}):
                 continue
-            if ins.kind == "prep":
+            if ins.kind == "prep" and rotation_basis(ins.basis):
+                # a small rotation state is not a stabilizer state: like `inject`, an input
+                inputs.append(q[0])
+                alive.append(q[0])
+            elif ins.kind == "prep":
                 c.add("R", [q[0]])
                 if ins.basis in ("X", "Y"):
                     c.add("H", [q[0]])
@@ -680,8 +700,9 @@ class _Parser:
                                      f"earlier instruction measured")
         if word == "prep":
             need(2)
-            if args[1].upper() not in ("Z", "X", "Y"):
-                raise AlgorithmError(lineno, raw, "prep basis is Z, X or Y")
+            if args[1].upper() not in ("Z", "X", "Y") and not rotation_basis(args[1]):
+                raise AlgorithmError(lineno, raw, "prep basis is Z, X, Y, or a rotation Rn / Rndg "
+                                     f"(n = {ROTATION_N[0]} to {ROTATION_N[-1]})")
             if args[0] in self.born:
                 raise AlgorithmError(lineno, raw, f"block {args[0]} already exists")
             ins.blocks, ins.basis = [args[0]], args[1].upper()

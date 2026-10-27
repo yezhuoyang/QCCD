@@ -86,14 +86,16 @@ def _factor_out(st: State, q: str) -> bool:
 def distribution(alg: Algorithm, keep: list[str], *, max_branches: int = 4096) -> dict:
     """{tuple of `keep` outcomes: probability}, exactly, for the expanded program `alg`."""
     ins_list = alg.instructions
-    n = len(ins_list)
-    # what each later instruction reads and names
-    reads_after: list[set] = [set() for _ in range(n + 1)]
-    names_after: list[set] = [set() for _ in range(n + 1)]
-    for i in range(n - 1, -1, -1):
-        ins = ins_list[i]
-        reads_after[i] = set(reads_after[i + 1]) | (set(ins.cond.names) if ins.cond else set())
-        names_after[i] = set(names_after[i + 1]) | set(ins.blocks)
+    # the last instruction that reads each outcome, and that names each block: after it, the
+    # outcome is forgotten and the block traced out (one pass -- a program of half a million
+    # instructions names tens of thousands of blocks, and a set per instruction would not fit)
+    last_read: dict = {}
+    last_name: dict = {}
+    for i, ins in enumerate(ins_list):
+        for x in (ins.cond.names if ins.cond else ()):
+            last_read[x] = i
+        for b in ins.blocks:
+            last_name[b] = i
     keep_set = set(keep)
     branches: list = [(State(), {}, 1.0)]
     peak = 1
@@ -118,12 +120,10 @@ def distribution(alg: Algorithm, keep: list[str], *, max_branches: int = 4096) -
                 _primitive(s2, word, args)
                 out.append((s2, oc, p))
         # forget, trace out, merge
-        live = reads_after[i + 1] | keep_set
-        later = names_after[i + 1]
         merged: dict = {}
         for st, oc, p in out:
-            oc = {k: v for k, v in oc.items() if k in live}
-            for q in [q for q in list(st.names) if q not in later]:
+            oc = {k: v for k, v in oc.items() if k in keep_set or last_read.get(k, -1) > i}
+            for q in [q for q in list(st.names) if last_name.get(q, -1) <= i]:
                 _factor_out(st, q)
             key = (tuple(sorted(oc.items())), _canon(st))
             if key in merged:
@@ -141,7 +141,7 @@ def distribution(alg: Algorithm, keep: list[str], *, max_branches: int = 4096) -
         dist[k] = dist.get(k, 0.0) + p
         states.setdefault(k, []).append(st)
     return {"outcomes": list(keep), "distribution": {k: round(v, 9) for k, v in sorted(dist.items())},
-            "peak_branches": peak, "instructions": n, "states": states}
+            "peak_branches": peak, "instructions": len(ins_list), "states": states}
 
 
 def _words(ins) -> tuple[str, list]:

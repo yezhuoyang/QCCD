@@ -66,7 +66,7 @@ REGIONS = {
 HOME_REGION = {
     "zone": "memory", "memory": "memory", "prep": "compute", "se": "compute", "operation": "compute",
     "surgery": "compute", "ppm": "compute", "readout": "compute", "factory": "factory",
-    "injection": "factory", "depot": "supply", "decoder": "control", "archive": "control",
+    "rotation": "factory", "injection": "factory", "depot": "supply", "decoder": "control", "archive": "control",
     "road": "traffic",
 }
 
@@ -74,7 +74,7 @@ HOME_REGION = {
 MASTER_OF = {
     "prep": "prep_d3", "se": "se_d3", "zone": "zone_d3", "memory": "mem_d3", "operation": "tcx_d3",
     "surgery": "ls_d3", "ppm": "ppm_d3", "readout": "read_d3", "factory": "msf15",
-    "injection": "inj_d3", "depot": "depot9", "decoder": "dec_d3", "archive": "arch1",
+    "rotation": "rot1", "injection": "inj_d3", "depot": "depot9", "decoder": "dec_d3", "archive": "arch1",
     "junction": "junc9",
 }
 for _m in list(MASTER_OF.values()):

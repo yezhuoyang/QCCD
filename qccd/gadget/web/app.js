@@ -102,6 +102,10 @@
         const q = Math.min(w * 0.18, h * 0.5);
         return `M${f(x)} ${f(y)}H${f(x + w - q)}L${f(x + w)} ${f(y + h / 2)}L${f(x + w - q)} ${f(y + h)}H${f(x)}L${f(x + q)} ${f(y + h / 2)}Z`;
       }
+      case "diamond": {                // a lozenge: both ends pointed
+        const q = Math.min(w * 0.22, h * 0.6);
+        return `M${f(x + q)} ${f(y)}H${f(x + w - q)}L${f(x + w)} ${f(y + h / 2)}L${f(x + w - q)} ${f(y + h)}H${f(x + q)}L${f(x)} ${f(y + h / 2)}Z`;
+      }
       case "garage": {
         const q = Math.min(w * 0.14, h * 0.45);
         return `M${f(x + q)} ${f(y)}H${f(x + w - q)}L${f(x + w)} ${f(y + h)}H${f(x)}Z`;

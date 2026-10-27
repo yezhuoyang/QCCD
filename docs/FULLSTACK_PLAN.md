@@ -256,6 +256,55 @@ circuit). QCCD supplies its own: the angle π/8 is a T state from a factory; fin
 rotation states consumed by a Pauli-product measurement, with the doubled-angle correction repeated until
 it reaches T (repeat-until-success). This is exact, so the distribution check still applies.
 
+**S5d — done.**
+- **The rotation source** (`qccd/gadget/leaves/rotation.py`, master `rot1`, category "Rotation
+  Source"):
+  - one fresh ion in, `reset · H · RZn` at the dock, one ion out holding `RZn|+⟩`, for n = 3…10 and the
+    inverses (16 ops);
+  - the pharmacy's flow-verified `inject` encodes it, as it does the factory's T state;
+  - each op is replayed as hardware and its circuit simulated as a state vector: fidelity 1.0;
+  - the circuit IR gained `RZn` / `RZn_DAG`, non-Clifford like T.
+- **`prep q Rn` / `prep q Rndg`** is a town instruction (rotation source → pharmacy).
+- **The lowering** of `ppmrot(±π/2ᵏ) P`:
+  - prepare `RZ(k−1)|+⟩` (a |Ȳ⟩ at k = 2, the factory's T state at k = 3), measure `P̄ ⊗ Z̄` against
+    it, read it in X, frame `P̄` on that outcome;
+  - on the product's outcome 1, the same rotation at k − 1;
+  - checked first as matrices over every branch, sign and k (P = Z, X, ZZ, ZX, XZZ), and now a test
+    on the town's own simulator;
+  - FormalRV's open synthesis tables (`tablemax(synthBits, …)`) only lay out the stub's records,
+    which QCCD names itself, so they read as 0.
+- **What FormalRV's own `Examples/Shor` needed besides:**
+  - the link rules read `!ctl!g` names and the one-trip loops by which the `.qec` binds a descending
+    loop's variable;
+  - a gadget whose gates FormalRV merged, or which it copied under `ctrl`, is linked by prefix
+    differencing like the program. All 3,401 reached `.qppm` statements link to a `.prog` line;
+  - the `.prog` simulator gained `ctrl`, qubit maps (`@ shift(m)`), descending loops, FormalRV's `^`,
+    and a sparse limit in place of a qubit limit. The witness simulates in 1 s;
+  - `--input Q=1`: the basis state the spec `assumes` (`|rev(bits, 1)⟩` on the work register). From
+    it the phase register reads 0000 or 1000, half each: order 2, as it should for a = 2, N = 3.
+- The wide machine gained two rotation sources.
+
+**FormalRV's own Shor, end to end, unmodified** (`Examples/Shor`, its witness a = 2, N = 3, 3 bits,
+4 exponent bits; `python -m qccd.fullstack run …/Shor.prog --fold --floorplan fullstack_wide --input
+6=1`, 846 s):
+- all 9,858 `.qec` statements lowered and linked to their `.qppm` statement, and every `.qppm`
+  statement to its `.prog` line;
+- 577,245 town instructions, 0 refused, **2.96 hours** of machine time;
+- **semantics:** the gadget program's results are exactly the `.prog`'s (0000 and 1000, half each)
+  and its states agree, fidelity 1.0, at most 7 live branches (549 s);
+- **checks:** all 11 place checks hold in every view, and the composition holds;
+- **the page:** a seek anywhere names the `.prog` gate (e.g. `CCX(a, b, cw)`, UMA.prog:2), its PPM,
+  its `.qec` merge, the gadget instruction and its eight-deep call chain, the Clifford step and the
+  hardware instruction (`move 7 hops … 37.876 ms into ppm.ZZZZ`).
+
+**What the composition check caught.** In this run it found 15 boxes overlapping their caller's own
+trips. The fitting stopped scanning a footprint at a rounding difference (1e-11 µs) and then took
+that for "no shift". Now a conflict must exceed the tolerance; there is a regression test.
+
+**What the scale caught.** `merged.distribution` precomputed, for every instruction, the set of all
+blocks named later: billions of entries here. Now it uses the last use of each block. The run was
+watched for memory, and stopped once before it got there.
+
 - **Shor from FormalRV's own example**, unmodified, next to the hand-written Shor-15.
 - **The up-bridge:** derive the `.machine` from characterized macros.
 - **The Goal 2 board**, once an entry can be graded end to end.
