@@ -198,10 +198,14 @@ def stack_payload(prog, qppm, qec, chain, low: qec2alg.Lowered, foot: str) -> di
 
 def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, specialize: dict | None = None,
         machine: Path | None = None, sysspec: Path | None = None, title: str = "",
-        floorplan: str = "fullstack", fold: bool = False, inputs: dict | None = None) -> dict:
+        floorplan: str = "fullstack", fold: bool = False, inputs: dict | None = None,
+        leaves=None, cache_dir="out/gadgets/cache", studio_dir=None, site_dir=None) -> dict:
     """`fold`: schedule every gate once per context and keep the calls folded
     (`qccd.gadget.fold`); the page plays it a window at a time.  `inputs` {qubit: 1}: the
-    basis state the program is given (its spec's `assumes`), |0…0⟩ by default."""
+    basis state the program is given (its spec's `assumes`), |0…0⟩ by default.
+
+    The page goes to `site_dir` (default `out/gadgets/`); the website builds every run into its
+    own section with one leaf library (`leaves`) and one folder of studio pages (`studio_dir`)."""
     from ..gadget.verified import build_algorithm
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -258,11 +262,11 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
     foot = (a_txt + c_txt + "A badge says how a link between two layers was made; hover it. "
             "Click a line to jump to the first instruction that carries it.")
     payload = stack_payload(st_prog, st_qppm, st_qec, chain, low, foot)
-    site = out / "gadgets"
+    site = Path(site_dir).resolve() if site_dir else out / "gadgets"
     if fold:
         from ..gadget.fold import build_folded
         r = step("schedule folded and check on the town", lambda: build_folded(
-            alg_p, out_dir=site, stack=payload, log=None))
+            alg_p, out_dir=site, stack=payload, log=None, leaves=leaves, cache_dir=cache_dir))
         fs = r["stats"]
         r["stats"] = {"makespan_ms": fs["makespan_ms"], "ions": fs["ions"], "events": None,
                       "instructions": fs["instructions"], "refused": fs["refused"],
@@ -271,14 +275,15 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
         r["checks"] = r["checks"] or {"passed": []}
     else:
         r = step("schedule, check and sign off on the town", lambda: build_algorithm(
-            alg_p, out_dir=site, stack=payload, log=None,
+            alg_p, out_dir=site, stack=payload, log=None, leaves=leaves, cache_dir=cache_dir,
+            studio_dir=studio_dir,
             semantics=contract if contract.get("checked") and contract.get("kind") == "distribution" else None))
     s = r["stats"]
     reach = structure.reachable(st_qec)
     qec_lines = [s.line for u in st_qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)
                  for s in u.statements() if s.text.strip() != "skip"]
     result = {
-        "program": stem, "formalrv": formalrv.provenance(),
+        "program": stem, "formalrv": formalrv.provenance(), "fold": fold, "floorplan": floorplan,
         "alg": low.text, "qec_statements": len(qec_lines),
         "linked": sum(1 for q in qec_lines if q in low.linked),
         "linked_up": sum(1 for q in qec_lines if q in chain.qec_to_qppm),
@@ -286,7 +291,11 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
         "concrete": {"makespan_ms": s["makespan_ms"], "ions": s["ions"], "events": s["events"],
                      "instructions": s["instructions"], "refused": s["refused"]},
         "checks": {"places": {"passed": len(r["checks"]["passed"]), "failed": r["checks"].get("failed")},
-                   "machine_rules": s["rules"], "signed_off": s["signed_off"]},
+                   "machine_rules": s["rules"], "signed_off": s["signed_off"],
+                   # a folded run too large to expand is checked view by view and by composition
+                   "checked": (r["checks"].get("metrics") or {}).get("checked"),
+                   "views": (r["checks"].get("metrics") or {}).get("views"),
+                   "composition_problems": (r["checks"].get("metrics") or {}).get("composition_problems")},
         "page": str(site / "index.html"), "steps": steps, "total_s": round(time.time() - t0, 1),
     }
     (out / "result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")

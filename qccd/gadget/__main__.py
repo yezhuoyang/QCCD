@@ -233,12 +233,14 @@ def _cmd_site(a) -> int:
         from .site import SECTION
         live = [row for row in live if not row["u"].startswith(f"{SECTION}/")]
         idx = json.dumps(live + index_entries(), separators=(",", ":"), ensure_ascii=False)
-    res = standalone(Path(a.out), idx, cache_dir=a.cache)
+    res = standalone(Path(a.out), idx, cache_dir=a.cache, fullstack=a.fullstack)
     # signed off flat, or compositionally where the flat check does not apply (shor15)
     ok_algs = all(r["stats"]["signed_off"] and not r["checks"]["failed"] and not r["rules"]["failed"]
                   for r in res["algorithms"].values())
     ok_beta = all(not r["checks"]["failed"] or k == "demo" for k, r in res["beta"].items())
-    return 0 if ok_algs and ok_beta else 1
+    from .site import stack_ok
+    ok_stack = all(stack_ok(r["result"]) for r in res["fullstack"].values())
+    return 0 if ok_algs and ok_beta and ok_stack else 1
 
 
 def _cmd_modules(a) -> int:
@@ -327,6 +329,8 @@ def main(argv=None) -> int:
     st.add_argument("-o", "--out", required=True, help="the section lands in OUT/gadgets/")
     st.add_argument("--index-from", help="a site page whose search index to carry (e.g. the "
                     "live site's index.html), so search from these pages finds the whole site")
+    st.add_argument("--fullstack", choices=("all", "small", "none"), default="all",
+                    help="the full-stack runs to build: all, all but the big ones, or none")
     common(st)
     a = ap.parse_args(argv)
     return {"build": _cmd_build, "parse": _cmd_parse, "library": _cmd_library,

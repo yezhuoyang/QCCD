@@ -1,6 +1,12 @@
 """The gadget tool as a section of the website: qccd.academy/gadgets/.  GADGETS.md §10.
 
-    gadgets/                   the verified places, category by category, and what was checked
+The section's theme is THE FULL STACK (docs/FULLSTACK_PLAN.md): a program written in FormalRV's
+language, taken through FormalRV's own compiler and QCCD's lowering to gadgets, scheduled on a
+machine of places and roads, down to the hardware program and the ions.
+
+    gadgets/                   the full stack: its runs, its layers, its machine
+    gadgets/fullstack/<key>/   one run: the design tool with the Stack, every layer at every instant
+    gadgets/places/            the verified places, category by category, and what was checked
     gadgets/algorithms/        Logical Algorithm: the town, and algorithms verified end to end
     gadgets/algorithms/<name>/ the design tool running one algorithm on the town
     gadgets/studio/            the full studio page for every op a build uses
@@ -41,6 +47,28 @@ ALGORITHMS = ROOT / "examples" / "gadgets" / "algorithms"
 #: the beta showcase: 8 rows of 6 pairs of tiles
 SHOWCASE = (8, 6)
 
+#: THE FULL STACK's runs (docs/FULLSTACK_PLAN.md S2-S7c): each a program in FormalRV's language,
+#: through every layer to the machine's ions.  `prog` is a path in this repository or, when it
+#: starts "FormalRV/", in the pinned FormalRV clone (`qccd.fullstack.formalrv`); a `big` run is
+#: left out of a quick build (`python -m qccd.gadget site --fullstack small`).
+FULLSTACK = (
+    {"key": "cnot", "title": "One logical CNOT", "prog": "examples/fullstack/cnot.prog",
+     "specialize": {"n": "2"}, "machine": "examples/fullstack/s1.machine",
+     "sysspec": "examples/fullstack/cnot.sysspec",
+     "about": "CX(0, 1): the smallest program that goes through every layer"},
+    {"key": "dj", "title": "Deutsch–Jozsa", "prog": "FormalRV/Examples/DJ/DJ.prog",
+     "specialize": {"n": "1", "a": "1"},
+     "about": "FormalRV's own example: loops, a branch, and an oracle that is a gadget called by name"},
+    {"key": "shor15", "title": "Shor's algorithm for 15", "prog": "examples/fullstack/shor15.prog",
+     "specialize": {"n": "7"},
+     "about": "the order of 7 mod 15, written in FormalRV's language: two Toffolis and a "
+              "semiclassical inverse QFT, with 15 T states"},
+    {"key": "shor", "title": "FormalRV's Shor example", "prog": "FormalRV/Examples/Shor/Shor.prog",
+     "fold": True, "floorplan": "fullstack_wide", "inputs": {6: 1}, "big": True,
+     "about": "FormalRV's own Shor, unmodified, at its witness N = 3, a = 2, on a machine with 32 "
+              "memories; every gate is scheduled once per context and called"},
+)
+
 
 def _render_plan():
     from ..site.md import Renderer, hints
@@ -77,9 +105,16 @@ def _algorithm_titles() -> list[tuple[str, str]]:
 def index_entries() -> list[dict]:
     """What the site's search finds in this section."""
     rows = [
+        {"t": "The full stack: a program down to ions", "d": "FormalRV programs through "
+         "Pauli-product measurements, QEC, gadgets and the hardware program to ions, every layer "
+         "linked and checked", "u": f"{SECTION}/", "k": "page"},
+    ]
+    rows += [{"t": f"{r['title']} (full stack)", "d": r["about"], "u": f"{SECTION}/fullstack/{r['key']}/",
+              "k": "gadgets"} for r in FULLSTACK]
+    rows += [
         {"t": "Logical gadgets: verified places", "d": "syndrome extraction, preparation, "
          "readout, transversal CNOT, lattice surgery, magic-state factory and injection, each "
-         "checked as hardware and as logic", "u": f"{SECTION}/", "k": "page"},
+         "checked as hardware and as logic", "u": f"{SECTION}/places/", "k": "page"},
         {"t": "Logical Algorithm", "d": "algorithms composed from verified places on a town of "
          "streets, each signed off end to end against its ideal circuit",
          "u": f"{SECTION}/algorithms/", "k": "page"},
@@ -91,15 +126,15 @@ def index_entries() -> list[dict]:
     for key in ORDER:
         c = CATEGORIES[key]
         rows.append({"t": f"{c['title']} ({c['place'].lower()})", "d": c["job"],
-                     "u": f"{SECTION}/#cat-{key}", "k": "gadgets"})
+                     "u": f"{SECTION}/places/#cat-{key}", "k": "gadgets"})
     rows.append({"t": "The classical half: decoder, memory, wires", "d": "syndromes to the "
                  "decoder, its Pauli-frame update into the classical memory, guards back to the "
                  "places; latencies, reaction time, causality checks",
-                 "u": f"{SECTION}/#classical", "k": "gadgets"})
+                 "u": f"{SECTION}/places/#classical", "k": "gadgets"})
     rows.append({"t": "Classically controlled execution (dynamic circuits)", "d": "if m: s q0 "
                  "— a guarded operation, its condition as a parity of measured outcomes, the "
                  "decision wire, worst-case reservation, and a sign-off per branch",
-                 "u": f"{SECTION}/#classical", "k": "gadgets"})
+                 "u": f"{SECTION}/places/#classical", "k": "gadgets"})
     for stem, title in _algorithm_titles():
         rows.append({"t": title, "d": "a logical algorithm on verified gadgets, signed off end "
                      "to end", "u": f"{SECTION}/algorithms/{stem}/", "k": "gadgets"})
@@ -110,15 +145,24 @@ def index_entries() -> list[dict]:
     return rows
 
 
-def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print) -> dict:
-    """Write `gadgets/` under the site directory `out` through the site's `put`."""
+def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
+                  fullstack: str = "all") -> dict:
+    """Write `gadgets/` under the site directory `out` through the site's `put`.  `fullstack`:
+    "all" runs every program of FULLSTACK, "small" leaves out the big ones, "none" none."""
     from ..site.build import HASH_JS, PAGE, STYLE
+    from .floorplan import FLOORPLANS_DIR, load_file
     from .library import LeafLibrary
     from .verified import build_algorithm
 
     base = Path(out) / SECTION
     studio = base / "studio"
     leaves = LeafLibrary(cache_dir, log=log)
+
+    # -- the full stack: FormalRV programs, every layer, on the machine ----------------------
+    runs = _build_fullstack(base, put, leaves=leaves, studio=studio, cache_dir=cache_dir, log=log,
+                            which=fullstack)
+    machines = {name: load_file(FLOORPLANS_DIR / f"{name}.floor", leaves)[0]
+                for name in ("fullstack", "fullstack_wide")}
 
     # -- Logical Algorithm: every example, on the town, signed off ---------------------------
     algs = {}
@@ -153,8 +197,11 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print) -
 
     town_lib = next(iter(algs.values()))["library"] if algs else None
     put(f"{SECTION}/index.html",
-        PAGE.format(title="Logical gadgets - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
-                    body=_landing(town_lib, algs, beta, studio)), 1, SECTION)
+        PAGE.format(title="Gadgets: the full stack - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
+                    body=_landing(runs, machines, town_lib, algs, beta)), 1, SECTION)
+    put(f"{SECTION}/places/index.html",
+        PAGE.format(title="Logical gadgets: the places - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
+                    body=_places_page(town_lib, algs, beta, studio, more=machines.values())), 2, SECTION)
     if algs:
         put(f"{SECTION}/algorithms/index.html",
             PAGE.format(title="Logical Algorithm - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
@@ -168,9 +215,58 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print) -
                              f'</p><ul class="toc">{toc}</ul>{body}'),
             2, SECTION)
     n_studio = len(list(studio.glob("*.html"))) if studio.exists() else 0
-    log(f"  gadgets      {len(algs)} verified algorithms, beta showcase "
-        f"{beta['showcase']['stats']['ions']} ions, {n_studio} studio pages")
-    return {"algorithms": algs, "beta": beta}
+    log(f"  gadgets      {len(runs)} full-stack runs, {len(algs)} verified algorithms, beta "
+        f"showcase {beta['showcase']['stats']['ions']} ions, {n_studio} studio pages")
+    return {"fullstack": runs, "algorithms": algs, "beta": beta}
+
+
+def _build_fullstack(base: Path, put, *, leaves, studio: Path, cache_dir, log, which: str) -> dict:
+    """Every run of FULLSTACK into `gadgets/fullstack/<key>/`: FormalRV's stages at its pinned
+    commit, QCCD's lowering and links, the schedule on the machine and every check, and the
+    page with its Stack.  The stages' own files are made in a scratch folder, not published."""
+    import shutil
+    import tempfile
+    from ..fullstack import formalrv, town
+
+    runs: dict = {}
+    if which == "none":
+        return runs
+    try:
+        formalrv.check_pin()
+    except formalrv.ToolchainError as e:
+        log(f"  full stack   skipped: {e}")
+        return runs
+    for spec in FULLSTACK:
+        if spec.get("big") and which != "all":
+            continue
+        prog = (formalrv.root() / spec["prog"] if spec["prog"].startswith("FormalRV/")
+                else ROOT / spec["prog"])
+        where = base / "fullstack" / spec["key"]
+        work = Path(tempfile.mkdtemp(prefix=f"qccd-fullstack-{spec['key']}-"))
+        try:
+            res = town.run(prog, out=work, specialize=spec.get("specialize"),
+                           machine=ROOT / spec["machine"] if spec.get("machine") else None,
+                           sysspec=ROOT / spec["sysspec"] if spec.get("sysspec") else None,
+                           title=spec["title"], fold=spec.get("fold", False),
+                           floorplan=spec.get("floorplan", "fullstack"), inputs=spec.get("inputs"),
+                           leaves=leaves, cache_dir=cache_dir, studio_dir=studio, site_dir=where)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        page = (where / "index.html").read_text(encoding="utf-8")
+        put(f"{SECTION}/fullstack/{spec['key']}/index.html", page, 3, SECTION, app=True)
+        runs[spec["key"]] = {**spec, "result": res}
+        c = res["concrete"]
+        log(f"  full stack   {spec['key']}: {c['instructions']:,} instructions, "
+            f"{_fmt_time(c['makespan_ms'])} on the machine, built in {res['total_s']} s")
+    return runs
+
+
+def stack_ok(res: dict) -> bool:
+    """A full-stack run holds: what it computes is the .prog's, nothing refused, every check."""
+    ck = res["checks"]
+    return bool(res["contract"].get("passed") and not res["concrete"]["refused"]
+                and not ck["places"].get("failed") and not (ck.get("machine_rules") or {}).get("failed")
+                and not ck.get("composition_problems"))
 
 
 EXTRA_CSS = """
@@ -241,9 +337,13 @@ def _logic_cells(op) -> str:
                  else f'{_pill(False)} d = {dist["distance"]}')
         else:
             d = _pill(False) + " " + html.escape(dist.get("error", ""))
-    elif ck:
+    elif ck and ck.get("undetected_3") is not None:
+        # a distillation: the 15-to-1 factory's T-error counts
         d = (f'{_pill(ck.get("passed"))} 1&ndash;2 T errors caught; '
-             f'{ck.get("undetected_3", "?")} triples: 35p³')
+             f'{ck["undetected_3"]} triples: 35p³')
+    elif ck:
+        # one physical ion in a state (the rotation source): nothing encoded, nothing distilled
+        d = f'{_pill(None, na="by design")} one ion, not encoded'
     else:
         d = '<span class="muted">&mdash;</span>'
     return f"<td>{'<br>'.join(parts)}</td><td>{d}</td>"
@@ -304,11 +404,27 @@ def _uses(algs: dict) -> dict:
     return out
 
 
-def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
+def _all_masters(libs) -> list:
+    """Every place master the given designs use, once each by name."""
+    seen: dict = {}
+    for lib in libs:
+        for m in (lib.masters.values() if lib is not None else []):
+            if m.kind == "leaf":
+                seen.setdefault(m.name, m)
+    return list(seen.values())
+
+
+def _places_page(lib, algs: dict, beta: dict, studio: Path, more=()) -> str:
+    """The places every machine is built from (the town and the full stack's machines, `more`),
+    category by category, and how each is checked (this was the section's landing before the
+    full stack became its theme)."""
     from .svg import design_svg, icon
 
+    pool = _all_masters([lib, *more])
+
     body = [
-        "<h1>Logical gadgets</h1>",
+        '<p class="sub"><a href="../">Gadgets</a> &rsaquo; the places</p>',
+        "<h1>The places</h1>",
         '<p class="sub">A fault-tolerant quantum computer on trapped ions is a town. Its places are '
         "where many ions go to get one job done: a logical block is born at a "
         "<b>preparation</b> place, rests in a <b>logical zone</b>, goes for a check-up at "
@@ -317,18 +433,18 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         "<b>factory</b> through an <b>injection</b> place. Ions travel between places on roads, "
         "the way people travel between a school, a hotel and a hospital.</p>",
         '<p class="sub">Every place below is verified twice. Its hardware program replays with no '
-        'hardware <a href="../rules/">rule</a> failing and ends where it promised. And the quantum '
+        'hardware <a href="../../rules/">rule</a> failing and ends where it promised. And the quantum '
         "circuit that program executes &mdash; read off its own gate, measurement and reset "
         "instructions &mdash; is checked, for every input state and every measurement outcome at "
-        "once, to compute exactly what the place promises, with fault distance 3 wherever a "
-        "distance-3 code can give it.</p>",
+        "once, to compute exactly what the place promises, and with fault distance 3 wherever "
+        "the place promises that too.</p>",
     ]
     if lib is not None:
         body.append(design_svg(lib))
         body.append('<p class="muted" style="font-size:12.5px;margin:0">The town the algorithms run '
                     'on: every verified place, two rows between three streets. '
-                    '<a href="algorithms/">Logical Algorithm &rarr;</a></p>')
-        leaves = [m for m in lib.masters.values() if m.kind == "leaf"]
+                    '<a href="../algorithms/">Logical Algorithm &rarr;</a></p>')
+        leaves = pool
         ops = [op for m in leaves for op in m.ops.values()]
         n_ok = sum(1 for op in ops if op.status == "verified")
         n_logic = sum(1 for op in ops if (op.logic or {}).get("status") == "verified")
@@ -346,8 +462,7 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
     uses = _uses(algs)
     for key in ORDER:
         c = CATEGORIES[key]
-        masters = sorted((m for m in (lib.masters.values() if lib else [])
-                          if m.kind == "leaf" and m.family == key), key=lambda m: m.name)
+        masters = sorted((m for m in pool if m.family == key), key=lambda m: m.name)
         body.append(f'<div class="cathead" id="cat-{key}">{icon(key, 20)}<h3>{html.escape(c["title"])}</h3>'
                     f'<span class="place">the {html.escape(c["place"].lower())}</span></div>'
                     f'<p class="sub" style="margin:2px 0 6px">{html.escape(c["job"])}</p>')
@@ -361,9 +476,9 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
                 links = []
                 if use:
                     stem, path, t = use
-                    links.append(f'<a href="algorithms/{stem}/#p={path}&amp;t={int(t)}">watch</a>')
+                    links.append(f'<a href="../algorithms/{stem}/#p={path}&amp;t={int(t)}">watch</a>')
                 if (studio / f"{m.name}.{op.name}.html").exists():
-                    links.append(f'<a href="studio/{m.name}.{op.name}.html">studio</a>')
+                    links.append(f'<a href="../studio/{m.name}.{op.name}.html">studio</a>')
                 rules = len(op.rules.get("passed", []))
                 hw = (f'<span class="pill na">modeled</span> latency from the literature'
                       if op.status == "modeled" else
@@ -434,10 +549,10 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
                     'algorithms: a program of logical instructions is scheduled on the town, blocks '
                     'travel from door to door, and the whole schedule &mdash; every ion, every '
                     'gate &mdash; is flattened and checked against the algorithm\'s ideal circuit. '
-                    '<a href="algorithms/">All algorithms, and how to write one &rarr;</a></p>'
+                    '<a href="../algorithms/">All algorithms, and how to write one &rarr;</a></p>'
                     '<div class="cards">')
         for stem, res in algs.items():
-            body.append(_algo_card(stem, res, prefix="algorithms/"))
+            body.append(_algo_card(stem, res, prefix="../algorithms/"))
         body.append("</div>")
 
     body.append(
@@ -469,7 +584,8 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         '<h2>What is established, and what is not</h2><ul class="steps">'
         "<li>Established: every place op above passes the hardware rules; every quantum op "
         "computes exactly its specification; every error-correcting op has fault distance 3 on "
-        "the d = 3 surface code, except injection, which by design does not; every algorithm in "
+        "the d = 3 surface code. Injection and the rotation source are not fault-tolerant by "
+        "design, and neither is the Pauli-product bench, whose distance is not computed. Every algorithm in "
         "the Logical Algorithm section computes its ideal circuit, and the Clifford ones keep "
         "distance 3 as a whole schedule.</li>"
         "<li>Not established: logical error <i>rates</i> (no noise is sampled; distance is "
@@ -482,8 +598,8 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
         body.append(
             f'<h2 id="beta">Beta at scale: hardware only</h2><div class="beta"><p>The first version '
             f'of this tool composed bivariate-bicycle blocks at scale: '
-            f'<a href="showcase/">{sc["ions"]:,} ions in {sc["blocks"]} blocks of [[72,12,6]]</a>, '
-            f'and a <a href="demo/">four-block demo</a>. Their operations pass the hardware rules, '
+            f'<a href="../showcase/">{sc["ions"]:,} ions in {sc["blocks"]} blocks of [[72,12,6]]</a>, '
+            f'and a <a href="../demo/">four-block demo</a>. Their operations pass the hardware rules, '
             f"but their logic is <b>not</b> verified: the syndrome rounds are contact schedules "
             f"without H layers or CNOT orientation, a parity is taken once by one bare ancilla, "
             f"and the T-gate correction is tracked classically. They stay to show the scale the "
@@ -493,8 +609,171 @@ def _landing(lib, algs: dict, beta: dict, studio: Path) -> str:
             f"stabilizers, so the synthesizer refuses the instruction &mdash; for the same reason "
             f"LogicQ's own checker refuses it &mdash; and G7 reports that one instruction of the "
             f"programme was never realised. A refused instruction is meant to be visible.</p></div>")
-    body.append('<p class="muted" style="margin-top:28px"><a href="plan/">The design document</a>'
+    body.append('<p class="muted" style="margin-top:28px"><a href="../plan/">The design document</a>'
                 " &middot; every place in this library is checked twice, as hardware and as logic.</p>")
+    return "".join(body)
+
+
+def _fmt_time(ms: float) -> str:
+    """A machine time, in the unit a reader thinks of it in."""
+    if ms < 1000:
+        return f"{ms:.1f} ms"
+    if ms < 120_000:
+        return f"{ms / 1000:.2f} s"
+    if ms < 7_200_000:
+        return f"{ms / 60_000:.1f} min"
+    return f"{ms / 3_600_000:.2f} h"
+
+
+def _computes(sem: dict) -> str:
+    """What a run's gadget program was shown to compute, against its .prog."""
+    if sem.get("passed") and sem.get("kind") == "distribution":
+        return (f"the <code>.prog</code>'s results with their probabilities, and result by result "
+                f"its state (fidelity {sem['worst_state_fidelity']:g})")
+    if sem.get("passed") and sem.get("kind") == "outcome":
+        return f"<code>{html.escape(sem['spec'])}</code> in every branch"
+    if sem.get("passed"):
+        return f"exactly {html.escape(sem['contract'])} in all {sem['branches']} branches"
+    return f'<span class="bad">not shown: {html.escape(str(sem.get("why") or "failed"))}</span>'
+
+
+def _stack_row(run: dict) -> str:
+    r = run["result"]
+    c, ck = r["concrete"], r["checks"]
+    mr = ck.get("machine_rules")
+    if mr:
+        checks = f"{ck['places']['passed']} place checks, {mr['passed']}/{mr['total']} machine rules"
+    else:
+        checks = (f"{ck['places']['passed']} place checks in each of {ck.get('views') or 0:,} views, "
+                  f"and their composition")
+    return (f'<tr><td><a href="fullstack/{run["key"]}/"><b>{html.escape(run["title"])}</b></a><br>'
+            f'<span class="muted">{html.escape(run["about"])}</span></td>'
+            f'<td>{r["linked"]:,} of {r["qec_statements"]:,}</td>'
+            f'<td>{c["instructions"]:,}</td>'
+            f'<td>{_fmt_time(c["makespan_ms"])}</td>'
+            f'<td>{_computes(r["contract"])}</td>'
+            f'<td>{_pill(stack_ok(r))} {checks}</td></tr>')
+
+
+def _counts(lib) -> dict:
+    from collections import Counter
+    top = lib[lib.top]
+    fam = Counter(lib[i.master].family for i in top.instances)
+    roads = sum(1 for ch in top.channels if getattr(ch, "kind", "road") != "wire")
+    return {"places": sum(n for f, n in fam.items() if f not in ("road", "decoder", "archive")),
+            "junctions": fam.get("road", 0), "roads": roads, "fam": fam}
+
+
+def _landing(runs: dict, machines: dict, town_lib, algs: dict, beta: dict) -> str:
+    """The section's front page: the full stack, its runs, its layers and its machine."""
+    from .svg import design_svg
+
+    body = [
+        "<h1>The full stack</h1>",
+        '<p class="sub">A fault-tolerant program on trapped ions, from the language it is written '
+        "in to the ions that run it. Every layer is a program, every line of a layer is linked to "
+        "the line it comes from, and every layer is checked.</p>",
+    ]
+    if runs:
+        body.append(
+            '<div class="tw"><table class="runs"><thead><tr><th>program</th>'
+            '<th><code>.qec</code> lines linked</th><th>gadget instructions</th>'
+            "<th>machine time</th><th>computes, against the <code>.prog</code></th><th>checks</th>"
+            "</tr></thead><tbody>" + "".join(_stack_row(r) for r in runs.values())
+            + "</tbody></table></div>")
+        cx = (runs.get("cnot") or {}).get("result") or {}
+        ab = cx.get("abstract") or {}
+        if ab.get("runtime_ns"):
+            body.append(
+                f'<p class="muted" style="font-size:13px">FormalRV\'s own VM puts the CNOT at '
+                f'{ab["runtime_ns"] / 1e6:.1f} ms on its abstract machine, where every qubit is '
+                f'virtual; here it takes {_fmt_time(cx["concrete"]["makespan_ms"])}, with every '
+                f'ion moved.</p>')
+    else:
+        body.append('<p class="muted">No run was built with this page: the FormalRV toolchain was '
+                    "not available.</p>")
+    body.append(
+        "<p>Open a run. Its page is the design tool, playing the program on the machine, ion by "
+        "ion. Pause anywhere and the <b>Stack</b> above the program names what is happening at "
+        "that instant, one line per layer: the line of the algorithm, its Pauli-product "
+        "measurement, the QEC statement, the gadget instruction, the Clifford step and the "
+        "hardware instruction, each with its file and line. Click a line of any layer to jump to "
+        "the first instruction that carries it.</p>")
+
+    body.append(
+        '<h2 id="layers">The layers</h2><ol class="steps">'
+        "<li><b>The algorithm</b> (<code>.prog</code>), in FormalRV's language, with its "
+        "specification: gates, loops, controlled gadgets, and the input its specification "
+        "assumes.</li>"
+        "<li><b>Pauli-product measurements</b> (<code>.qppm</code>) and <b>operations on code "
+        "blocks</b> (<code>.qec</code>, the distance-3 surface code), made by FormalRV's own "
+        "compiler at a pinned commit, unchanged. Every <code>.qec</code> statement is linked to "
+        "the <code>.qppm</code> statement it comes from, and that to its <code>.prog</code> line; "
+        "each link says how it was made.</li>"
+        "<li><b>The gadget program</b>: QCCD lowers the <code>.qec</code> to instructions of the "
+        "machine's places: prepare a block, measure a Pauli product at a bench, take a magic "
+        "state from a factory or a rotation source, read out, decode. A FormalRV gadget becomes "
+        "a gate, defined once for every shape it is called with. The gadget program is checked "
+        "against the <code>.prog</code>: the same operation in every branch, or the same results "
+        "with the same probabilities and, result by result, the same state.</li>"
+        "<li><b>The schedule</b>: the program runs on a machine of places joined by roads and "
+        "junctions. Blocks travel between places and rest in memories that keep correcting "
+        "them. The machine's rules judge the schedule. A program too large to unroll is "
+        "scheduled one gate at a time, once per context in which it is called, and checked "
+        "view by view and as a composition.</li>"
+        "<li><b>The hardware program</b> (TSIR): every instruction belongs to one gadget, either "
+        "a place's verified op on its own device or a road's carry, compiled with its whole "
+        "bundle onto its conveyor. Every one passes the same hardware "
+        '<a href="../rules/">rules</a>, R1&ndash;R23. Devices that share DACs or a laser take '
+        "turns.</li>"
+        "<li><b>The ions</b>: the page draws each one where that program puts it, at the time on "
+        "screen.</li></ol>")
+
+    std, wide = machines.get("fullstack"), machines.get("fullstack_wide")
+    if std is not None:
+        a = _counts(std)
+        b = _counts(wide) if wide is not None else None
+        body.append(
+            '<h2 id="machine">The machine</h2><p class="sub">The first three programs run on this '
+            f'machine: {a["places"]} places for ions, {a["junctions"]} junctions and '
+            f'{a["roads"]} roads, with a decoder and an archive on a control floor wired to every '
+            "place that measures.</p>" + design_svg(std)
+            + '<p class="muted" style="font-size:12.5px;margin:0">'
+            + (f'FormalRV\'s Shor runs on a wider one: {b["places"]} places '
+               f'({b["fam"].get("memory", 0)} memories, {b["fam"].get("ppm", 0)} benches, '
+               f'{b["fam"].get("factory", 0)} factories), {b["junctions"]} junctions and '
+               f'{b["roads"]} roads. ' if b else "")
+            + 'How a machine is built and judged: <a href="plan/">the design</a>.</p>')
+
+    body.append(
+        '<h2 id="checked">What is checked, and what is not</h2><ul class="steps">'
+        "<li>Checked: every link between two layers, by what both sides must share; what the "
+        "gadget program computes, against the <code>.prog</code>; the machine's rules on the "
+        "schedule; the hardware rules on every place op and on every road's own program; and "
+        'every place, as hardware and as logic (<a href="places/">the places</a>).</li>'
+        "<li>Not checked: logical error rates, since no noise is sampled; decoding, since the "
+        "decoder and the archive are classical places with latencies, not run; and the fault "
+        "distance of a whole run, which this stack does not require. The places that correct "
+        "errors have distance 3; the Pauli-product bench, by design, does not.</li></ul>")
+
+    leaves = _all_masters([town_lib, *machines.values()])
+    ops = [op for m in leaves for op in m.ops.values()]
+    rows = [
+        ("places/", "The places", f"every gadget the machines are built from, each verified as "
+         f"hardware and as logic: {len([m for m in leaves if m.family != 'road'])} places, "
+         f"{len(ops)} ops"),
+        ("algorithms/", "Logical Algorithm", f"{len(algs)} programs written directly as gadget "
+         "instructions, on the town, each signed off end to end"),
+        ("plan/", "The design", "the gadget system: places, roads and junctions, heat, the "
+         "machine's rules, shared planes"),
+    ]
+    if beta:
+        sc = beta["showcase"]["stats"]
+        rows.append(("showcase/", "Beta at scale", f"{sc['ions']:,} ions in {sc['blocks']} "
+                     "bivariate-bicycle blocks, and a demo: hardware only, logic not verified"))
+    body.append('<h2 id="below">Underneath</h2><div class="tw"><table><tbody>' + "".join(
+        f'<tr><td><a href="{u}">{html.escape(t)}</a></td><td class="muted">{d}</td></tr>'
+        for u, t, d in rows) + "</tbody></table></div>")
     return "".join(body)
 
 
@@ -556,7 +835,7 @@ def _algorithms_page(lib, algs: dict) -> str:
     from .svg import design_svg
 
     body = [
-        '<p class="sub"><a href="../">Logical gadgets</a> &rsaquo; Logical Algorithm</p>',
+        '<p class="sub"><a href="../">Gadgets</a> &rsaquo; Logical Algorithm</p>',
         "<h1>Logical Algorithm</h1>",
         '<p class="sub">A logical algorithm is a program over blocks. Each instruction names the '
         "kind of place it needs; the scheduler takes the blocks there along the roads of a "
@@ -612,7 +891,7 @@ def _algorithms_page(lib, algs: dict) -> str:
 
 
 def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadgets/cache",
-               log=print) -> dict:
+               log=print, fullstack: str = "all") -> dict:
     """Build only this section into `out/gadgets/`, wrapped exactly as the site wraps it.
 
     `index_json` is the search index every page carries; give the live site's (plus
@@ -631,7 +910,7 @@ def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadge
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
         p.write_text(page, encoding="utf-8", newline="")
 
-    return build_section(out, put, cache_dir=cache_dir, log=log)
+    return build_section(out, put, cache_dir=cache_dir, log=log, fullstack=fullstack)
 
 
 # -- figures ---------------------------------------------------------------------------------
