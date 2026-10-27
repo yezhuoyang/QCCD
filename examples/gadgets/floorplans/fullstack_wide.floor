@@ -1,4 +1,4 @@
-# A wider full-stack machine (qccd/fullstack/machine.py, wide_rows): the same places as the
+# A wider full-stack machine: the same places as the
 # full-stack machine, more of them -- 4 Pauli-product benches, 4 factories each
 # beside a pharmacy, 2 rotation sources (for rotations finer than T), 32 memories
 # (one for every block a program keeps alive across its gadgets) -- in rows of 9 between
