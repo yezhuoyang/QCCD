@@ -1905,6 +1905,54 @@
   function stkHow(h) {
     return h ? `<span class="stk-how" title="${escapeHtml((STK.how || {})[h] || h)}">${escapeHtml(h)}</span>` : "";
   }
+  // THE RUN AS TSIR MODULES.  A folded run is also written as modules (qccd/gadget/modules.py,
+  // `hw/` beside the page): the program, a file per gadget, a file per leaf master.  Every
+  // row of the run is one line of its gadget's module (`run 45 ... ppm_d3.ppm.ZZZ @bench1`),
+  // and the hardware instruction running in it one line of that leaf's TSIR.  A module is
+  // loaded the first time the Stack names it.
+  const HW = (D.gir && D.gir.hw) || null;
+  const hwMods = {};
+  window.__gadgetModule = function (rel, text) {
+    const lines = text.split("\n");
+    const at = {};
+    let leaf = null;
+    lines.forEach((s, i) => {
+      const w = s.trim().split(/\s+/);
+      if (w[0] === "leaf") { leaf = w[1]; return; }
+      if (leaf !== null) { if (/^\d+$/.test(w[0])) at[leaf + "#" + w[0]] = i + 1; return; }
+      if (w[0] === "run" || w[0] === "hold") at[w[0] + " " + w[1]] = i + 1;
+    });
+    hwMods[rel] = { lines, at };
+    stkUpdate();
+  };
+  function hwModule(rel) {
+    if (!HW || !rel) return null;
+    if (hwMods[rel]) return hwMods[rel];
+    if (hwMods[rel] === undefined) {
+      hwMods[rel] = false;
+      const s = document.createElement("script");
+      s.src = HW.dir + rel.replace(/\.tsir$/, ".js");
+      s.async = true;
+      document.head.appendChild(s);
+    }
+    return null;
+  }
+  // where a row of the window and the TSIR instruction running in it are written
+  function hwWhere(op) {
+    if (!HW || !op || !op.e.hw) return null;
+    const [mid, kind, id] = op.e.hw;
+    const rel = mid === null ? HW.program : HW.gadgets[mid];
+    const g = hwModule(rel);
+    const lrel = HW.leaves[op.master];
+    const l = op.ins ? hwModule(lrel) : null;
+    return { row: { rel, line: g ? g.at[kind + " " + id] : null },
+             leaf: { rel: lrel, line: l ? l.at[`${op.master}.${op.e[4]}#${op.ins.id}`] : null } };
+  }
+  function hwCite(w) {
+    if (!w.rel) return "";
+    return `<a href="${escapeHtml(HW.dir + w.rel)}" target="_blank" rel="noopener">${escapeHtml(w.rel)}${w.line ? ":" + w.line : ""}</a>`;
+  }
+  const HW_BOXES = [["hwrow", "Gadget module", "row"], ["hwleaf", "Leaf module", "leaf"]];
   function stkInit() {
     if (!STK) return;
     const sect = document.createElement("div");
@@ -1913,6 +1961,11 @@
     let lays = "";
     for (const [k, title] of STK_LAYERS) {
       lays += `<details class="stk-lay" data-layer="${k}"><summary>${title} <span class="muted">${escapeHtml(STK.layers[k].file)}</span></summary><div class="stk-lines" data-layer="${k}"></div></details>`;
+    }
+    if (HW) {
+      for (const [k, title] of HW_BOXES) {
+        lays += `<details class="stk-lay" data-layer="${k}"><summary>${title} <span class="muted" data-hw-file="${k}"></span></summary><div class="stk-lines hw" data-layer="${k}"></div></details>`;
+      }
     }
     sect.innerHTML = `<h3>Full stack <span class="muted">FormalRV ${escapeHtml(STK.formalrv || "")}</span></h3>` +
       `<div id="stkNow" class="stk-cap"></div>${lays}<div class="stk-foot muted">${STK.foot || ""}</div>`;
@@ -1947,7 +2000,7 @@
     sect.addEventListener("toggle", () => stkUpdate(), true);
     sect.addEventListener("click", (ev) => {
       const r = ev.target.closest(".stk-ln");
-      if (!r) return;
+      if (!r || !stkFirst[r.dataset.layer]) return;
       const id = stkFirst[r.dataset.layer][+r.dataset.line];
       if (FOLD) { if (id !== undefined) seek(id + 1e-3); return; }
       const sp = id !== undefined ? M.insSpan[id] : null;
@@ -2069,7 +2122,30 @@
       h += row("Clifford", `<span class="muted">a Pauli kept in software: no ion is touched</span>`);
       h += row("Hardware", `<span class="muted">a line in the classical memory</span>`);
     }
+    // the same instant in the run's TSIR modules: the gadget's row, the leaf's instruction
+    const where = op ? hwWhere(op) : null;
+    if (where) {
+      h += row("Module", `<span class="muted">row</span> ${hwCite(where.row)}` +
+        (op.ins ? ` <span class="muted">› instruction</span> ${hwCite(where.leaf)}` : ` <span class="muted">(${escapeHtml(op.master)} is classical: no TSIR)</span>`));
+    }
     el.innerHTML = h;
+    // the modules' lines around the row and the instruction, the current one lit
+    for (const [k, , which] of HW ? HW_BOXES : []) {
+      const box = document.querySelector(`.stk-lines[data-layer="${k}"]`);
+      const w = where && where[which];
+      const name = document.querySelector(`[data-hw-file="${k}"]`);
+      if (name) name.textContent = w && w.rel ? w.rel : "";
+      if (!box || !box.parentNode.open) continue;
+      const mod = w && w.rel ? hwModule(w.rel) : null;
+      if (!mod || !w.line) { box.innerHTML = `<div class="muted" style="padding:2px 10px">${w && w.rel ? "loading…" : "nothing here"}</div>`; continue; }
+      let html = "";
+      for (let ln = Math.max(1, w.line - 30); ln <= Math.min(mod.lines.length, w.line + 30); ln++) {
+        html += `<div class="stk-ln none${ln === w.line ? " cur" : ""}" data-layer="${k}"><span class="ln">${ln}</span><span>${escapeHtml(mod.lines[ln - 1] || " ")}</span></div>`;
+      }
+      box.innerHTML = html;
+      const cl = box.querySelector(".cur");
+      if (cl) box.scrollTop = Math.max(0, cl.offsetTop - box.offsetTop - box.clientHeight / 2);
+    }
     for (const [k] of STK_LAYERS) {
       const box = document.querySelector(`.stk-lines[data-layer="${k}"]`);
       if (!box || !box.parentNode.open) continue;

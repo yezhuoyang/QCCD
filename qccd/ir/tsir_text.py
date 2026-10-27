@@ -41,12 +41,13 @@ class TextError(ValueError):
     pass
 
 
-_BARE = re.compile(r"[A-Za-z_][\w.:/\-+†|]*")
+_BARE = re.compile(r"[A-Za-z_/][\w.:/\-+†|]*")
+_JSON_WORDS = ("true", "false", "null", "NaN", "Infinity")
 _DEFAULT_MODE = {"simd": "inter", "gate": "intra"}
 
 
 def _val(v) -> str:
-    if isinstance(v, str) and _BARE.fullmatch(v) and v not in ("true", "false", "null"):
+    if isinstance(v, str) and _BARE.fullmatch(v) and v not in _JSON_WORDS:
         return v
     return json.dumps(v, separators=(",", ":"), ensure_ascii=False)
 

@@ -61,6 +61,9 @@ const LOOK = `(() => { const G = window.GADGETS, M = G.M, w = M.gir.window || {}
   return { t: G.S.t, a: w.a, b: w.b, missing: w.missing, calls: w.calls, makespan: M.makespan,
     events: M.gir.events.length,
     running: M.gir.events.filter((e) => e[1] <= G.S.t && G.S.t < e[2]).length,
+    // every row knows the module line it is written on: [gadget or null, kind, id]
+    unplaced: M.gir.events.filter((e) => !e.hw || (e.hw[0] !== null && !(M.gir.hw || {}).gadgets[e.hw[0]])).length,
+    inGadgets: M.gir.events.filter((e) => e.hw && e.hw[0] !== null).length,
     focus: f ? { text: f.text, chain: (f.call || []).map((c) => c.gate), line: f.line, src: f.src || null } : null,
     lit: [...document.querySelectorAll("#progBody .pl.live")].length,
     stack: (document.getElementById("stkNow") || {}).innerText || "" };

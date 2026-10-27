@@ -212,3 +212,50 @@ fields where it differs from what the line implies (`.mode=inter`, `.t0=12.5`). 
 a bare word or JSON. A simd line is either the rigid rotation `~LOOP ±k` or one
 `ion:from->to[via,...]` per participant; a gate line is pairs `a:b` or a batch of
 single-qubit gates on bare ions.
+
+## Modules
+
+A whole run is too large to be one TSIR program, and most of it repeats. **TSIR modules**
+(`qccd/gadget/modules.py`) write it once, on the architecture it runs on. Every hardware
+instruction is then in exactly one gadget:
+
+```
+tsir modules 1
+architecture fullstack_d3                    the floor, instanced
+  place bench1 ppm_d3 48.0 12.0 16           a place: its master, where it is, its first resident ion
+  road /door_bench1_in_a j0_6.s -> bench1.in_a chan9
+  wire /wire_bench1_syn bench1.syn -> decoder.syn 5.0
+
+program shor15                               the program's own body
+  block q0 126..134 ; born=1265.0 born_at=prep code=surface_d3 n=9 k=1
+  ins 3 17 "zzy q0 q1" ; kind=call op=call blocks=["q0","q1"] gate=zzy
+    call c0 89875.0 m0 zzy q0 q1 ; gid=153 ...      a composite gadget, called
+
+gadget m0 zzy                                a composite gadget: one gate in one context
+  ins 1 3 "ppm Z arg0 Z arg1 Z zzy1_l0 -> zzy1_o1" ; kind=ppm op=ppm.ZZZ ...
+    run 45 42135.0 102850.0 ppm_d3.ppm.ZZZ @bench1 d0:arg0.0 ... f0:126 ...
+    carry 12 41105.0 chan9.carry /door_bench1_in_a j0_6.s arg0 ; dep=[...] ...
+    msg 3 121035.0 121040.0 /wire_bench1_syn bench1.syn -> decoder.syn 3 syndrome
+    hold 0 1300.0 413230.0 x4 mem_d3.refresh @mem13 arg1 aX0:18 ...
+
+leaf ppm_d3.ppm.ZZZ                          a leaf gadget: one op of one master, its TSIR
+  tsir ppm_d3.ppm.ZZZ+cooling
+  89 measure p0 ; op=ppm round=0 checks=["P0"]
+```
+
+- A `run` row names a leaf gadget (`master.op`) and the place it runs at. Its instruction
+  `#89` is line `89 ...` of `leaf ppm_d3.ppm.ZZZ`. A `carry` names its road's gadget, a
+  `hold` the memory's `refresh`. Only the decoder's and the archive's rows are classical:
+  a modeled latency, named, with no TSIR.
+- Rows sit under the logical instruction they carry out (`ins`), in time order. A
+  gadget's parameter blocks are its caller's, so their ions are symbols (`arg0.3`). A list
+  that is exactly one block's ions is written as the block's name.
+- **Modular:** a leaf gadget is written once per master op, a composite once per context
+  (the folded schedule's macro), and a call is one line. **Scalable:** FormalRV's
+  three-hour Shor is 827 files.
+- **The same program:** `read_modules(write_modules(g)) == g`, exactly (`tests/test_modules.py`;
+  FormalRV's Shor too: 687,690 rows). `python -m qccd.gadget modules DIR` reads modules and
+  checks what they say: every leaf module must be the library's characterized op, and the
+  place checks must hold per view (and on the expansion when it is small).
+- A folded page writes its run to `hw/` beside it. The Stack's **Module** row cites the
+  row and the instruction, `file:line`, and two boxes show those lines lit.

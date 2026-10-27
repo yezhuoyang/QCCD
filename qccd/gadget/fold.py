@@ -750,6 +750,12 @@ def build_folded(alg, *, out_dir, cache_dir="out/gadgets/cache", leaves=None, lo
     (out / "leaf").mkdir(parents=True, exist_ok=True)
     g["line_first"] = line_first(g)
     root, files = page_data(g, out)
+    # the run as TSIR modules beside the page (modules.py): what the Stack cites, file:line
+    from .modules import write_modules
+    hw = write_modules(g, out / "hw", leaves=leaves, scripts=True)
+    root["hw"] = {"dir": "hw/", "program": "program.tsir",
+                  "gadgets": {mid: f"gadget/{mid}.tsir" for mid in g["macros"]},
+                  "leaves": {f[5:-5]: f for f in hw["files"] if f.startswith("leaf/")}}
     root["stats"] = {
         "ions": g["n_ions"], "instructions": n, "makespan_ms": round(g["makespan_us"] / 1000, 3),
         "macros": g["folded"]["macros"], "reused": g["folded"]["reused"],
@@ -776,7 +782,7 @@ def build_folded(alg, *, out_dir, cache_dir="out/gadgets/cache", leaves=None, lo
         + (f"; G {len(checks['passed'])} passed, rules {len(rules['passed'])}/{len(rules['rules'])}"
            if rules else "; not expanded"))
     return {"out": str(out), "gir": g, "stats": root["stats"], "checks": checks, "rules": rules,
-            "expanded": expanded, "library": lib}
+            "expanded": expanded, "library": lib, "modules": hw["files"]}
 
 
 def page_data(g: dict, out_dir) -> tuple[dict, dict]:

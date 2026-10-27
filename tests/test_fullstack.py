@@ -502,6 +502,12 @@ def test_a_folded_run_plays_on_the_page_a_window_at_a_time(tmp_path):
     for s in seen["seeks"]:
         assert s["a"] <= s["t"] <= s["b"] and not s["missing"], s
         assert s["events"] > 0 and s["lit"] >= 1, s
+        # every row on screen is a line of the run's TSIR modules (hw/, beside the page)
+        assert s["unplaced"] == 0, s
+    assert any(s["inGadgets"] for s in seen["seeks"])
+    hw = tmp_path / "site" / "hw"
+    assert (hw / "program.tsir").is_file() and (hw / "program.js").is_file()
+    assert {f"gadget/{m}.tsir" for m in r["gir"]["macros"]} <= set(r["modules"])
     # somewhere a gate runs: its instruction names the gate and the line of the gate it is on
     inside = [s for s in seen["seeks"] if s["focus"] and s["focus"]["chain"]]
     assert inside, seen["seeks"]

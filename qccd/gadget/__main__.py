@@ -240,6 +240,25 @@ def _cmd_site(a) -> int:
     return 0 if ok_algs and ok_beta else 1
 
 
+def _cmd_modules(a) -> int:
+    from .modules import check_modules
+    r = check_modules(a.dir, cache=a.cache, floorplan=a.floorplan)
+    print(f"{a.dir}: {r['gadgets']} gadgets, {r['rows']:,} rows, {r['leaf_gadgets']} leaf gadgets "
+          f"({len(r['classical'])} classical: {', '.join(r['classical'])}) on {r['floorplan']}")
+    print("  leaf modules: " + ("each is the library's characterized op" if not r["leaves_differ"]
+                                else "DIFFER from the library: " + ", ".join(r["leaves_differ"])))
+    pv = r["per_view"]
+    print(f"  place checks per view: {len(pv['passed'])} hold" + (f", FAILED {pv['failed']}" if pv["failed"] else ""))
+    if r["expanded"]:
+        ex = r["expanded"]
+        print(f"  on the whole expansion: {len(ex['passed'])} hold" + (f", FAILED {ex['failed']}" if ex["failed"] else ""))
+    for k, v in r["violations"].items():
+        print(f"    {k}: {v}")
+    print(f"  composition: {r['composition']}")
+    print("  passed" if r["passed"] else "  NOT passed")
+    return 0 if r["passed"] else 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m qccd.gadget", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -299,6 +318,10 @@ def main(argv=None) -> int:
     s.add_argument("--studio", action="store_true")
     s.add_argument("-o", "--out")
     common(s)
+    md = sub.add_parser("modules", help="read a run's TSIR modules (hw/) and check what they say")
+    md.add_argument("dir", help="a directory write_modules wrote (a folded page's hw/), or one file")
+    md.add_argument("--floorplan", help="the machine (default: the program's own floorplan line)")
+    md.add_argument("--cache", default="out/gadgets/cache")
     st = sub.add_parser("site", help="build the website's gadgets/ section alone")
     st.add_argument("-o", "--out", required=True, help="the section lands in OUT/gadgets/")
     st.add_argument("--index-from", help="a site page whose search index to carry (e.g. the "
@@ -308,7 +331,7 @@ def main(argv=None) -> int:
     return {"build": _cmd_build, "parse": _cmd_parse, "library": _cmd_library,
             "showcase": _cmd_showcase, "site": _cmd_site, "places": _cmd_places,
             "algorithm": _cmd_algorithm, "floorplan": _cmd_floorplan,
-            "optimize": _cmd_optimize}[a.cmd](a)
+            "optimize": _cmd_optimize, "modules": _cmd_modules}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -110,7 +110,7 @@
     const W = { events: [], carries: [], messages: [], windows: [], frames: [], outcomes: [],
                 ins: [], insKey: {}, blocks: {}, missing: 0, calls: 0 };
     const ident = (x) => x;
-    this.body(g, 0, ident, ident, ident, "", [], a, b, W);
+    this.body(g, 0, ident, ident, ident, "", [], a, b, W, null);
     const out = {};
     for (const k in g) if (!(k in { macros: 1, calls: 1, holds: 1 })) out[k] = g[k];
     out.schema = "qccd.gir/0.2";
@@ -137,8 +137,10 @@
     return out;
   };
 
-  // one body's rows in [a, b), and the calls it makes that overlap it
-  Folded.prototype.body = function (body, t0, gm, names, cv, path, chain, a, b, W) {
+  // one body's rows in [a, b), and the calls it makes that overlap it.  `mid`: the gadget
+  // (macro) the body is, null for the program; every row keeps `hw = [mid, its own id]`, the
+  // row the TSIR modules write it as (modules.py), so the Stack can cite file:line.
+  Folded.prototype.body = function (body, t0, gm, names, cv, path, chain, a, b, W, mid) {
     const ix = indexBody(body);
     const need = {};
     const key = (id) => path + "#" + id;
@@ -151,6 +153,7 @@
       ne[6] = want(e[6]);
       ne[8] = (e[8] || []).map((pr) => [pr[0], gm(pr[1])]);
       if (ne.length > 10 && ne[10] && ne[10].ready_us !== undefined) ne[10] = Object.assign({}, ne[10], { ready_us: ne[10].ready_us + t0 });
+      ne.hw = [mid, "run", e[0]];
       W.events.push(ne);
     }
     for (let i = lowerBound(ix.ca, a - t0 - ix.caMax, (c) => c[4]); i < ix.ca.length && ix.ca[i][4] + t0 < b; i++) {
@@ -196,16 +199,18 @@
                                              instruction: want(o.instruction), event: null, recorded: null }));
     }
     // a hold: the refresh rounds that fall in the window
-    for (const h of body.holds || []) {
+    (body.holds || []).forEach((h, hk) => {
       const first = h.from + t0 + h.every - h.round_us;
       const k0 = Math.max(1, Math.floor((a - first) / h.every) + 1);
       for (let k = k0; k <= h.n; k++) {
         const s = h.from + t0 + k * h.every - h.round_us;
         if (s >= b) break;
         if (s + h.round_us <= a) continue;
-        W.events.push([0, s, s + h.round_us, h.place, "refresh", 1, want(h.ins), "", h.bind.map((pr) => [pr[0], gm(pr[1])]), []]);
+        const ev = [0, s, s + h.round_us, h.place, "refresh", 1, want(h.ins), "", h.bind.map((pr) => [pr[0], gm(pr[1])]), []];
+        ev.hw = [mid, "hold", hk, k];
+        W.events.push(ev);
       }
-    }
+    });
     for (const b_ in body.blocks || {}) {
       const info = body.blocks[b_];
       if (b_.startsWith("arg") && path) continue;
@@ -266,7 +271,7 @@
       const cgm = (gid) => (gid >= PARAM_GID ? argGids[gid] : gid < nRes ? gid : base + gid - nRes);
       const ins = ix.insById[c.ins] || {};
       const frame = { gate: c.gate, call: cid, line: ins.src || ins.line || c.line, guard: c.guard || null };
-      this.body(m, t0 + c.t0, cgm, nm, ncv, cid + "/", chain.concat([frame]), a, b, W);
+      this.body(m, t0 + c.t0, cgm, nm, ncv, cid + "/", chain.concat([frame]), a, b, W, c.m);
     }
   };
 
