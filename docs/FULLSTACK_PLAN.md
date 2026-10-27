@@ -285,8 +285,10 @@ it reaches T (repeat-until-success). This is exact, so the distribution check st
 - The wide machine gained two rotation sources.
 
 **FormalRV's own Shor, end to end, unmodified** (`Examples/Shor`, its witness a = 2, N = 3, 3 bits,
-4 exponent bits; `python -m qccd.fullstack run …/Shor.prog --fold --floorplan fullstack_wide --input
-6=1`, 846 s):
+4 exponent bits; `python -m qccd.fullstack run …/Shor.prog --specialize m=4 --specialize bits=3
+--specialize N=3 --specialize a=2 --specialize ainv=2 --specialize rec=19 --fold --floorplan
+fullstack_wide --input 6=1`, 846 s; without the six `--specialize`s the lowering stops at an unbound
+`m`):
 - all 9,858 `.qec` statements lowered and linked to their `.qppm` statement, and every `.qppm`
   statement to its `.prog` line;
 - 577,245 town instructions, 0 refused, **2.96 hours** of machine time;

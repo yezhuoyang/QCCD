@@ -64,6 +64,8 @@ FULLSTACK = (
      "about": "the order of 7 mod 15, written in FormalRV's language: two Toffolis and a "
               "semiclassical inverse QFT, with 15 T states"},
     {"key": "shor", "title": "FormalRV's Shor example", "prog": "FormalRV/Examples/Shor/Shor.prog",
+     # its witness: N = 3, a = 2 (a⁻¹ = 2), 3 bits, m = 4 exponent bits, 19 records
+     "specialize": {"m": "4", "bits": "3", "N": "3", "a": "2", "ainv": "2", "rec": "19"},
      "fold": True, "floorplan": "fullstack_wide", "inputs": {6: 1}, "big": True,
      "about": "FormalRV's own Shor, unmodified, at its witness N = 3, a = 2, on a machine with 32 "
               "memories; every gate is scheduled once per context and called"},
