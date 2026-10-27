@@ -402,6 +402,22 @@ end
     refresh rounds. Rule H2 judges the composed program, and the census counts a shared
     plane once (GADGETS.md §4.3). A bus of every road saves 55% of the town's DACs at
     7-20% more time.
+- **Published (user, 2026-10-27: "full stack should be the main purpose and theme for the
+  gadget page").** qccd.academy/gadgets/ opens on the full stack: its runs in one table, its
+  layers, its machine, what is and is not checked. `gadgets/fullstack/<key>/` is each run's
+  design page with its Stack, built by the site (`qccd/gadget/site.py`, `FULLSTACK`); the
+  place catalogue moved to `gadgets/places/`. The user approved publishing FormalRV's own
+  examples with their sources.
+
+  | run | `.qec` linked | gadget instructions | machine time | computes | checks |
+  |---|---|---|---|---|---|
+  | CX (`cnot.prog`) | 62/62 | 27 | 311.7 ms | exactly CX, 64 branches | 13 place, 25/25 machine |
+  | Deutsch–Jozsa (FormalRV's) | 259/259 | 94 | 1.01 s | distribution and states | 13 place, 25/25 machine |
+  | Shor for 15 (`shor15.prog`) | 1,551/1,551 | 650 | 9.02 s | distribution and states | 13 place, 25/25 machine |
+  | FormalRV's Shor (folded) | 9,858/9,858 | 577,245 | 2.92 h | distribution and states | 13 place in each of 792 views, composition |
+
+  The section build takes about 25 minutes, 14 of them FormalRV's Shor
+  (`python -m qccd.gadget site --fullstack small` leaves it out).
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
