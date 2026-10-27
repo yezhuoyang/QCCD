@@ -230,6 +230,25 @@ shape, and asks three things:
 Every shipped schedule passes. A schedule that takes an ion off a long road before the
 road can bring it fails, and so would the old per-ion pretence, under R22.
 
+**A road is its real geometry.** A road on a floor is a polyline. Its legs are its straight
+runs, each a whole number of sites, with a site at every corner (`leaves/transport.py::road`).
+A straight road of L sites is `chan<L>`, as before. A bent one is its own conveyor, named by
+its legs: `chan3R10` is three steps, a right turn, then ten. The schedule, heat, H1 and the
+modules all read the shape (`Net.shape`; a bent road's GIR row carries it as a sixth field).
+
+The rules then say what a corner costs. A hop along x and a hop along y are different
+electrode roles, hence different waveforms (R22). A rigid shift with ions on both sides of a
+corner is two cycles, the leg nearer the far end first (`split_shift`), and the road's
+program spends them. The cost model charges a corner hop like a straight one, so a single
+ion crossing a bent road takes as long as on a straight road of the same sites.
+
+**The page plays each carry's compiled program.** `roads.attach_runs` gives every body its
+carries' programs (`road_runs`, indices into the root's `road_programs`): each cycle's
+class, and which ion moves from which node to which. The page draws an ion where that
+program has it, from when the near op puts it on the stub until the far op takes it off, and
+draws a road's sites at its real nodes, corners included. It is the very program H1 judged,
+not the one-ion pretence.
+
 **The machine's wiring is counted** (`machine_census`): electrodes, switches and DACs for
 every device the floor holds, each driving its own plane as its master declares. On the
 town, the 60 roads and 32 junctions take 3,054 of the machine's 3,438 DACs. That is the

@@ -23,7 +23,8 @@ from ..model import Master, Port
 from .common import (LeafBuild, TrackedProgram, add_port_stub, declare_port_classes,
                      declare_port_zone, tidy)
 
-__all__ = ["station", "reservoir", "junction", "channel"]
+__all__ = ["station", "reservoir", "junction", "channel", "road", "shape_of", "parse_shape",
+           "shape_points"]
 
 
 def _machine(device, name: str) -> Machine:
@@ -47,7 +48,8 @@ def _size(m: Machine) -> list[float]:
 
 
 def _shift(tp: TrackedProgram, rail: list[str], step: int, **meta) -> None:
-    """One conveyor cycle: every ion on `rail` moves `step` (+1 / -1) along it."""
+    """One conveyor step: every ion on `rail` moves `step` (+1 / -1) along it -- one cycle a
+    lab-frame direction (`split_shift`)."""
     index = {n: i for i, n in enumerate(rail)}
     moves = []
     for ion, where in tp.pos.items():
@@ -55,7 +57,29 @@ def _shift(tp: TrackedProgram, rail: list[str], step: int, **meta) -> None:
             j = index[where] + step
             if 0 <= j < len(rail):
                 moves.append((ion, rail[j]))
-    tp.move("conveyor", moves, **meta)
+    for group in split_shift(tp.dev, rail, {i: tp.pos[i] for i, _ in moves}, moves):
+        tp.move("conveyor", group, **meta)
+
+
+def split_shift(dev, rail: list[str], src: dict, moves: list) -> list:
+    """A conveyor shift's moves as the cycles a broadcast plane can play: one lab-frame
+    direction a cycle (R22 -- a hop along x and one along y are different electrode roles,
+    so a rail that turns a corner shifts the ions on each side of it in cycles of their own),
+    the furthest along the rail first, so each leg moves into the room the next one made.
+    A straight rail is one cycle, as before."""
+    if not moves:
+        return []
+    index = {n: i for i, n in enumerate(rail)}
+
+    def direction(ion, dst):
+        a, b = dev.nodes[src[ion]].pos, dev.nodes[dst].pos
+        return (round(b[0] - a[0], 6) > 0) - (round(b[0] - a[0], 6) < 0),                (round(b[1] - a[1], 6) > 0) - (round(b[1] - a[1], 6) < 0)
+    groups: dict = {}
+    for ion, dst in moves:
+        groups.setdefault(direction(ion, dst), []).append((ion, dst))
+    if len(groups) == 1:
+        return [moves]
+    return sorted(groups.values(), key=lambda g: -max(index.get(d, -1) for _, d in g))
 
 
 # --------------------------------------------------------------------------- station
@@ -230,21 +254,103 @@ def junction(*, arm: int = 1, name: str | None = None) -> LeafBuild:
 # --------------------------------------------------------------------------- channel
 
 
-def channel(length: int, count: int = 1, *, name: str | None = None) -> LeafBuild:
+# A ROAD'S SHAPE.  A road on a floor is a polyline from one door to the other.  Its legs are
+# its straight runs, each `round(length)` sites long (at least one), and a corner between
+# two legs is a site where the rail turns 90 degrees (a bend, not a junction: R18, R20).  The
+# shape is written as the legs' steps with the turn between them -- "5L5" is five steps, a
+# left turn, five steps -- and a straight road as just its sites, "9", the `chan9` every
+# straight road of nine sites runs on.
+
+
+def _legs(points) -> list:
+    """The polyline's straight runs, collinear pieces merged: [(dx, dy, length)]."""
+    legs: list = []
+    for p, q in zip(points, points[1:]):
+        dx, dy = float(q[0]) - float(p[0]), float(q[1]) - float(p[1])
+        ln = (dx * dx + dy * dy) ** 0.5
+        if ln < 1e-9:
+            continue
+        if legs and abs(legs[-1][0] * dy - legs[-1][1] * dx) < 1e-9 and legs[-1][0] * dx + legs[-1][1] * dy > 0:
+            ox, oy, ol = legs[-1]
+            legs[-1] = (ox + dx, oy + dy, ol + ln)
+        else:
+            legs.append((dx, dy, ln))
+    return legs
+
+
+def shape_of(points) -> str:
+    """A road's shape from its polyline: "L" (sites) when it is straight, else its legs."""
+    legs = _legs(points)
+    if len(legs) <= 1:
+        ln = legs[0][2] if legs else 1.0
+        return str(max(1, int(round(ln)) - 1))
+    out = []
+    for i, (dx, dy, ln) in enumerate(legs):
+        out.append(str(max(1, int(round(ln)))))
+        if i + 1 < len(legs):
+            ndx, ndy, _ = legs[i + 1]
+            out.append("L" if dx * ndy - dy * ndx > 0 else "R")
+    return "".join(out)
+
+
+def parse_shape(shape) -> tuple[int, list]:
+    """(sites, [(steps, turn), ...]) of a shape; a straight road's legs are [(sites + 1, "")]."""
+    import re as _re
+    s = str(shape)
+    if s.isdigit():
+        return int(s), [(int(s) + 1, "")]
+    legs = [(int(n), t) for n, t in _re.findall(r"(\d+)([LR]?)", s)]
+    return sum(n for n, _ in legs) - 1, legs
+
+
+def shape_points(shape) -> list:
+    """The road's nodes in its own frame, from the near stub to the far one: [(x, y)]."""
+    _, legs = parse_shape(shape)
+    x, y, hx, hy = 0.0, 0.0, 1.0, 0.0
+    pts = [(x, y)]
+    for n, turn in legs:
+        for _ in range(n):
+            x, y = x + hx, y + hy
+            pts.append((x, y))
+        if turn == "L":
+            hx, hy = -hy, hx
+        elif turn == "R":
+            hx, hy = hy, -hx
+    return pts
+
+
+def road(shape, count: int = 1) -> LeafBuild:
+    """The conveyor of a road of this shape: `chan<L>` for a straight one, else `chan<shape>`,
+    its sites along its legs and a site at every corner."""
+    s = str(shape)
+    if s.isdigit():
+        return channel(int(s), count)
+    return channel(parse_shape(s)[0], count, name=f"chan{s}", shape=s)
+
+
+def channel(length: int, count: int = 1, *, name: str | None = None,
+            shape: str | None = None) -> LeafBuild:
     """`chan<L>`: L data sites in a row, a stub at each end; `carry` conveys `count` ions
-    from the west stub to the east stub, the whole row advancing one site per cycle."""
+    from the west stub to the east stub, the whole row advancing one site per cycle.  With a
+    bent `shape` the sites follow its legs (`road`)."""
     name = name or f"chan{length}"
     d = DeviceBuilder("explicit", shape="channel", n=length)
     rail = [f"C{i}" for i in range(length)]
+    if shape is None:
+        xy = [(-1.0, 0.0)] + [(float(i), 0.0) for i in range(length)] + [(float(length), 0.0)]
+    else:
+        xy = shape_points(shape)
+        if len(xy) != length + 2:
+            raise ValueError(f"shape {shape} has {len(xy) - 2} sites, not {length}")
     for i in range(length):
-        d.site(f"C{i}", float(i), 0.0, zone="data", labels=["rail", "channel"])
+        d.site(f"C{i}", xy[i + 1][0], xy[i + 1][1], zone="data", labels=["rail", "channel"])
     for i in range(length - 1):
         d.segment(f"EC{i}", f"C{i}", f"C{i + 1}", loop="LC", labels=["rail"])
     if length > 1:            # a path needs two nodes; a one-site channel is only a handoff
         d.loop("LC", rail, closed=False, kind="path")
     m = _machine(d.build(), name)
-    add_port_stub(m, "XW", (-1.0, 0.0), "C0", width=count, segment="SW")
-    add_port_stub(m, "XE", (float(length), 0.0), f"C{length - 1}", width=count, segment="SE")
+    add_port_stub(m, "XW", xy[0], "C0", width=count, segment="SW")
+    add_port_stub(m, "XE", xy[-1], f"C{length - 1}", width=count, segment="SE")
 
     ions = [f"i{j}" for j in range(count)]
     tp = TrackedProgram(m, f"{name}.carry", {ion: "XW" for ion in ions})
@@ -263,7 +369,7 @@ def channel(length: int, count: int = 1, *, name: str | None = None) -> LeafBuil
     b.programs["carry"] = tp.prog
     b.titles["carry"] = f"{count} ion(s) along {length} sites"
     b.expect_end["carry"] = {ion: "XE" for ion in ions}
-    b.params["carry"] = {"length": length, "count": count}
+    b.params["carry"] = {"length": length, "count": count, "shape": shape or str(length)}
     tidy(m, b.programs.values())
     b.master = Master(
         name=name, kind="leaf", family="channel", title=f"channel, {length} sites",
@@ -272,5 +378,6 @@ def channel(length: int, count: int = 1, *, name: str | None = None) -> LeafBuil
         ports=[Port("w", "inout", "any", width=count, side="W", at=0.5, node="C0", stub="XW"),
                Port("e", "inout", "any", width=count, side="E", at=0.5,
                     node=f"C{length - 1}", stub="XE")],
-        inventory={}, capacity=length, params={"length": length}, device=name)
+        inventory={}, capacity=length, params={"length": length, "shape": shape or str(length)},
+        device=name)
     return b

@@ -245,7 +245,7 @@ class City:
         #: (place, door) -> the road in front of it (a junction's arms are not doors)
         self.door_net: dict[tuple, str] = {}
         for n in self.nets.values():
-            w = self.leaves.channel_timing(n.length, 1)["transit_us"]
+            w = self.leaves.road_timing(n.conveyor, 1)["transit_us"]
             edge(n.a, n.b, w, "net", n.path)
             edge(n.b, n.a, w, "net", n.path)
             for end in (n.a, n.b):
@@ -309,7 +309,7 @@ class City:
 
     def _hop_heat(self, kind, info, n: int) -> float:
         if kind == "net":
-            return road_heat(self.leaves, self.nets[info].length)
+            return road_heat(self.leaves, self.nets[info].conveyor)
         jpath, _a, _b, opname = info
         hs = op_heat(self.leaves, self.leaf[jpath].master, f"{opname}.1")
         return max((h.pre for h in hs.values() if h.enters), default=0.0) if hs else 0.0
@@ -756,7 +756,7 @@ class City:
         row = [0, net, src[0], src[1], round(t0, 3), [round(d - t0, 3) for d in deps],
                round(tau, 3), list(gids), role, ins, group, round(max(takes), 3),
                [round(k - t0, 3) for k in takes]]
-        q = road_heat(self.leaves, self.nets[net].length)
+        q = road_heat(self.leaves, self.nets[net].conveyor)
         for g in gids:
             self.heat[g] = self.heat.get(g, 0.0) + q
         self.carries.append(row)
@@ -879,7 +879,7 @@ class City:
         The near side puts an ion on the stub at each `deps`; the road loads none while it
         does.  Memoized by shape."""
         from .roads import compile_carry, road_cycle_us
-        L = self.nets[net].length
+        L = self.nets[net].conveyor
         t0 = min(deps)
         rel = tuple(round(d - t0, 3) for d in deps)
         memo = self.__dict__.setdefault("_road_memo", {})
@@ -920,7 +920,7 @@ class City:
         trip = None
         for kind, info, u, _v in self._plan(gids, src, dst):
             if kind == "net":
-                tau = self.leaves.channel_timing(self.nets[info].length, 1)["transit_us"]
+                tau = self.leaves.road_timing(self.nets[info].conveyor, 1)["transit_us"]
                 trip = (info, u, list(t), tau)
                 t = self._road(info, t)
             else:
@@ -951,7 +951,7 @@ class City:
         hops = self._plan(gids, src, dst)
         nets = [h for h in hops if h[0] == "net"]
         juncs = [h for h in hops if h[0] == "junction"]
-        taus = [self.leaves.channel_timing(self.nets[h[1]].length, 1)["transit_us"] for h in nets]
+        taus = [self.leaves.road_timing(self.nets[h[1]].conveyor, 1)["transit_us"] for h in nets]
         if not juncs:
             net = nets[0][1]
             return self._road(net, deps), (net, nets[0][2], list(deps), taus[0])
@@ -1543,7 +1543,11 @@ class City:
             "ion_order": {m: ion_order(self.leaves, m) for m in
                           sorted({li.master.name for li in self.leaf.values()})},
             "leaves": {p: [li.master.name, li.x, li.y, li.first_id] for p, li in self.leaf.items()},
-            "nets": {p: [n.a[0], n.a[1], n.b[0], n.b[1], n.length] for p, n in self.nets.items()},
+            # a bent road also names its shape (its conveyor `chan<shape>`); a straight one's
+            # is its length
+            "nets": {p: [n.a[0], n.a[1], n.b[0], n.b[1], n.length]
+                     + ([n.shape] if n.shape and not n.shape.isdigit() else [])
+                     for p, n in self.nets.items()},
             "blocks": self.block_info,
             "program": {"name": self.alg.name, "title": self.alg.title, "source": self.alg.source,
                         "language": "places",

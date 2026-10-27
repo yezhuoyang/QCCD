@@ -892,40 +892,119 @@
       };
       const L = rec ? Math.max(1, rec[4]) : 0;
       const unit = L ? total / (L + 1) : 0;        // one site, in floor units (1 when the path is L + 1 long)
+      // the road's nodes, from the near end of its polyline: 0 a stub, 1..L its sites, L + 1
+      // the other stub -- each leg its own whole number of steps, a site at every corner
+      // (leaves/transport.py::road), so a bent road is drawn as the device it is
+      const nodes = L ? roadNodes(pts, rec, L, ox, oy) : [];
       if (L && depth === 0 && S.cam.s * unit >= 7) {
         const sr = Math.max(1.2, Math.min(3, S.cam.s * unit * 0.12));
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = COLOR.rail;
         ctx.lineWidth = 1;
         for (let k = 1; k <= L; k++) {
-          const [x, y] = at(k * unit);
+          const [x, y] = nodes[k];
           ctx.beginPath(); ctx.rect(x - sr, y - sr, 2 * sr, 2 * sr); ctx.fill(); ctx.stroke();
         }
       }
       const carries = M.carriesOn(net, S.t);
       if (!carries.length) continue;
-      const sim = sims["chan" + L];
+      const sim = sims["chan" + (rec && rec.length > 5 ? rec[5] : L)];
       for (const c of carries) {
         const forward = c[2] === rec[0];
         const radius = depth === 0 ? Math.max(2.2, Math.min(5, S.cam.s * 0.32)) : Math.max(1, Math.min(3, S.cam.s * 0.25));
+        const draw = (gid, x, y) => {
+          const col = S.follow === gid ? "#000000" : (ROLE[c[8]] || COLOR.teal);
+          mark(col, x, y, S.follow === gid ? radius * 1.8 : radius);
+          if (depth <= 1) hits.push([x - radius - 2, y - radius - 2, x + radius + 2, y + radius + 2, "ion", { gid, carry: c }]);
+        };
+        const nodeXY = (idx) => {
+          const i = forward ? idx : L + 1 - idx;
+          const a = Math.max(0, Math.min(L + 1, Math.floor(i))), b = Math.min(L + 1, a + 1), f = i - a;
+          return [nodes[a][0] + (nodes[b][0] - nodes[a][0]) * f, nodes[a][1] + (nodes[b][1] - nodes[a][1]) * f];
+        };
+        // THE ROAD'S OWN PROGRAM: the carry compiled with its whole bundle (roads.py, what H1
+        // judged) -- one class a cycle, blocked ions holding -- replayed at this instant
+        const run = c.run || (!FOLD && M.gir.road_runs && M.gir.road_programs ? M.gir.road_programs[M.gir.road_runs[c[0]]] : null);
+        if (run && nodes.length) {
+          for (const r of roadState(c, run, S.t)) {
+            const [x, y] = nodeXY(r.idx);
+            draw(r.gid, x, y);
+          }
+          continue;
+        }
+        // (a page built before the road programs: each ion by the conveyor's one-ion program)
         const queued = [];
         const place = (ion, d) => {
           const [x, y] = at(forward ? d : total - d);
-          const col = S.follow === ion.gid ? "#000000" : (ROLE[c[8]] || COLOR.teal);
-          mark(col, x, y, S.follow === ion.gid ? radius * 1.8 : radius);
-          if (depth <= 1) hits.push([x - radius - 2, y - radius - 2, x + radius + 2, y + radius + 2, "ion", { gid: ion.gid, carry: c }]);
+          draw(ion.gid, x, y);
         };
         for (const ion of M.carryIons(c, S.t, L)) {
           if (ion.queued) { queued.push(ion); continue; }
           const local = S.t - (c[4] + c[5][ion.j]);
           const st = sim ? sim.state("carry", local) : null;
-          // the conveyor's own ion: device x runs from the near stub (-1) to the far one (L)
           place(ion, st ? (st.xy[0][0] + 1) * unit : ion.f * total);
         }
-        // arrived and waiting to be taken in: on the last sites, first taken nearest the end
         queued.forEach((ion, q) => place(ion, Math.max(1, L - q) * unit));
       }
     }
+  }
+
+  // A road's nodes in canvas space, from the near end of its polyline (`pts`): each straight
+  // leg (collinear pieces merged) split into its steps, the steps the shape names (`rec[5]`,
+  // e.g. "3R10") or, for a straight road, its L + 1.  0 and L + 1 are the stubs at the doors.
+  function roadNodes(pts, rec, L, ox, oy) {
+    const legs = [];
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
+      if (Math.abs(dx) + Math.abs(dy) < 1e-9) continue;
+      const last = legs[legs.length - 1];
+      if (last && Math.abs(last.dx * dy - last.dy * dx) < 1e-9 && last.dx * dx + last.dy * dy > 0) {
+        last.dx += dx; last.dy += dy;
+      } else legs.push({ x: pts[i - 1][0], y: pts[i - 1][1], dx, dy });
+    }
+    let steps = rec && rec.length > 5 ? (String(rec[5]).match(/\d+/g) || []).map(Number) : [L + 1];
+    if (steps.length !== legs.length || steps.reduce((a, b) => a + b, 0) !== L + 1) {
+      // not the legs the shape names (a drawing edited since): even steps along the path
+      const all = legs.reduce((a, l) => a + Math.hypot(l.dx, l.dy), 0);
+      steps = legs.map((l) => Math.hypot(l.dx, l.dy) / all * (L + 1));
+    }
+    const out = [[X(ox + pts[0][0]), Y(oy + pts[0][1])]];
+    legs.forEach((l, i) => {
+      const n = steps[i];
+      for (let s = 1; s <= Math.round(n); s++) {
+        const f = s / Math.round(n);
+        out.push([X(ox + l.x + l.dx * f), Y(oy + l.y + l.dy * f)]);
+      }
+    });
+    while (out.length < L + 2) out.push(out[out.length - 1]);
+    return out.slice(0, L + 2);
+  }
+
+  // Every ion of carry `c` at time t on its road, from the road's compiled program `run`
+  // (`roads.run_json`): its node index (fractional while it moves), shown from when the op
+  // on the near side puts it on the stub until the far side takes it off.
+  function roadState(c, run, t) {
+    if (!run._st) {
+      const pos = new Array(run.n).fill(0);
+      run._st = run.cycles.map((cy) => { const before = pos.slice(); for (const [k, , b] of cy[3]) pos[k] = b; return before; });
+      run._end = pos.slice();
+    }
+    const tl = t - c[4];
+    const k = lowerBound(run.cycles, tl + 1e-9, (cy) => cy[0]) - 1;
+    const before = k < 0 ? new Array(run.n).fill(0) : run._st[k];
+    const cy = k >= 0 ? run.cycles[k] : null;
+    const moving = {};
+    if (cy && tl < cy[1]) {
+      const f = cy[1] > cy[0] ? Math.max(0, Math.min(1, (tl - cy[0]) / (cy[1] - cy[0]))) : 1;
+      for (const [ion, a, b] of cy[3]) moving[ion] = a + (b - a) * f;
+    }
+    const after = k >= 0 && cy && tl >= cy[1] ? (k + 1 < run._st.length ? run._st[k + 1] : run._end) : before;
+    const out = [];
+    for (let i = 0; i < run.n; i++) {
+      if (t < c[4] + c[5][i] || t >= c[4] + c[12][i]) continue;
+      out.push({ gid: c[7][i], idx: i in moving ? moving[i] : after[i] });
+    }
+    return out;
   }
 
   // A classical wire: dashed and dark, with a square packet per message crossing it now.

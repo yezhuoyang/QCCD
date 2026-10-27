@@ -94,7 +94,7 @@ def check(gir: dict, lib: Library, leaves: LeafLibrary) -> dict:
             home[first + k] = path
     moves = []
     for c in carries:
-        a_leaf, _, b_leaf, _, _ = nets[c[1]]
+        a_leaf, _, b_leaf, _, _ = nets[c[1]][:5]
         src = c[2]
         dst = b_leaf if src == a_leaf else a_leaf
         for gid, dep, take in zip(c[7], c[5], c[12]):
@@ -127,7 +127,7 @@ def check(gir: dict, lib: Library, leaves: LeafLibrary) -> dict:
     # -- G3 --------------------------------------------------------------------------------
     delta = defaultdict(list)
     for c in carries:
-        a_leaf, _, b_leaf, _, _ = nets[c[1]]
+        a_leaf, _, b_leaf, _, _ = nets[c[1]][:5]
         src = c[2]
         dst = b_leaf if src == a_leaf else a_leaf
         for dep, take in zip(c[5], c[12]):
@@ -260,7 +260,7 @@ def check(gir: dict, lib: Library, leaves: LeafLibrary) -> dict:
 
 
 def _net_of(nets: dict, leaf: str, port: str) -> str | None:
-    for path, (a, pa, b, pb, _) in nets.items():
+    for path, (a, pa, b, pb, _, *_shape) in nets.items():
         if (a, pa) == (leaf, port) or (b, pb) == (leaf, port):
             return path
     return None

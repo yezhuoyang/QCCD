@@ -124,6 +124,8 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
     # the leaves go on the website as written: provenance thinned, as build.py's are
     # (inline: no file beside the page, the page alone is the figure)
     from .build import write_leaf_files
+    from .roads import attach_runs
+    attach_runs(gir, lib, leaves)                 # every carry's road program, for the page
     leaf_files, inline_leaves = write_leaf_files(out, lib, leaves, gir, inline=inline)
     studio_pages = {}
     if studio_dir is not None:

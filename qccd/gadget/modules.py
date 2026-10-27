@@ -232,7 +232,8 @@ class _Writer:
                               f"not {g.get('schema')}")
         self.g = g
         self.places = {p: v[0] for p, v in (g.get("leaves") or {}).items()}
-        self.road = {n: v[4] for n, v in (g.get("nets") or {}).items() if len(v) >= 5}
+        self.road = {n: (v[5] if len(v) > 5 else v[4]) for n, v in (g.get("nets") or {}).items()
+                     if len(v) >= 5}
 
     # -- the architecture -------------------------------------------------------------------
     def architecture(self) -> list[str]:
@@ -244,8 +245,8 @@ class _Writer:
         for p, v in g["leaves"].items():
             L.append("  " + _line(["place", _v(p), _v(v[0])] + [_v(x) for x in v[1:]], []))
         for n, v in g["nets"].items():
-            if len(v) == 5:
-                L.append(f"  road {_v(n)} {_end(v[0], v[1])} -> {_end(v[2], v[3])} chan{v[4]}")
+            if len(v) == 5 or (len(v) == 6 and isinstance(v[5], str)):
+                L.append(f"  road {_v(n)} {_end(v[0], v[1])} -> {_end(v[2], v[3])} chan{v[-1]}")
             else:
                 L.append(f"  road {_v(n)} ; raw={_v(v)}")
         for w, v in g["wires"].items():
@@ -382,8 +383,8 @@ def _leaf_program(leaves, master: str, op: str):
         return None
     d = leaves.data.get(master)
     if d is None and master.startswith("chan") and op == "carry":
-        from .leaves.transport import channel
-        return TSIR.from_json(published(channel(int(master[4:]), 1).programs["carry"].to_json()))
+        from .leaves.transport import road
+        return TSIR.from_json(published(road(master[4:], 1).programs["carry"].to_json()))
     progs = (d or {}).get("programs") or {}
     if op in progs:
         return TSIR.from_json(published(progs[op]))
@@ -596,7 +597,12 @@ class _Reader:
                 b, bp = _unend(pos[3])
                 if not pos[4].startswith("chan"):
                     raise ModuleError(f"a road's gadget is chan<L>, not {pos[4]!r}")
-                A["nets"][_unval(pos[0])] = [a, ap, b, bp, int(pos[4][4:])]
+                shape = pos[4][4:]
+                if shape.isdigit():
+                    A["nets"][_unval(pos[0])] = [a, ap, b, bp, int(shape)]
+                else:
+                    from .leaves.transport import parse_shape
+                    A["nets"][_unval(pos[0])] = [a, ap, b, bp, parse_shape(shape)[0], shape]
         elif word == "wire":
             a, ap = _unend(pos[1])
             b, bp = _unend(pos[3])
@@ -660,8 +666,8 @@ class _Reader:
             cid, t0, gadget, net = int(pos[0]), _num(pos[1]), pos[2], _unval(pos[3])
             leaf, port = _unend(pos[4])
             road = self.arch.get("nets", {}).get(net)
-            if gadget != "-" and road is not None and len(road) == 5 and gadget != f"chan{road[4]}.carry":
-                raise ModuleError(f"{net} is chan{road[4]}; a carry on it is chan{road[4]}.carry, not {gadget}")
+            if gadget != "-" and road is not None and len(road) >= 5 and gadget != f"chan{road[-1]}.carry":
+                raise ModuleError(f"{net} is chan{road[-1]}; a carry on it is chan{road[-1]}.carry, not {gadget}")
             body["carries"].append([cid, net, leaf, port, t0, notes["dep"], notes["transit"], self.names(body).unions(pos[5]),
                                     notes["role"], ins_id, notes.get("grp", f"i{ins_id}"), notes["last"],
                                     notes["taken"]])

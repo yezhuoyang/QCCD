@@ -101,3 +101,84 @@ def test_the_machine_counts_the_dacs_of_its_roads_and_junctions(town):
     assert c["electrodes"] == sum(v["electrodes"] for v in fam.values())
     # every device drives its own plane: the roads and junctions are most of the machine's DACs
     assert fam["road"]["dacs"] + fam["junction"]["dacs"] > c["dacs"] / 2
+
+
+# ------------------------------------------------------------------------- a road's real geometry
+
+
+def test_a_bent_road_is_its_own_conveyor_with_a_site_at_every_corner():
+    from qccd.cost.models import corrected_model
+    from qccd.gadget.leaves.transport import parse_shape, road, shape_of, shape_points
+    from qccd.verify import verify
+    assert shape_of([[0, 0], [10, 0]]) == "9"                       # straight: chan9, as before
+    assert shape_of([[17, 1], [14, 1], [14, 11]]) == "3L10" or shape_of([[17, 1], [14, 1], [14, 11]]) == "3R10"
+    assert shape_of([[0, 0], [3, 0], [7, 0]]) == "6"               # collinear pieces are one leg
+    L, legs = parse_shape("3R10")
+    assert L == 12 and [n for n, _ in legs] == [3, 10]
+    pts = shape_points("3R10")
+    assert len(pts) == L + 2 and pts[3] == (3.0, 0.0) and pts[4][0] == 3.0   # the corner is a site
+    b = road("3R10", 2)
+    assert b.master.name == "chan3R10"
+    rep = verify(b.programs["carry"], b.machine.arch, corrected_model("qccdsim_jones"), check_metrics=False)
+    assert rep.rules.summary()["failed"] == []
+
+
+def _bent_town(leaves):
+    from qccd.gadget.floorplan import FLOORPLANS_DIR, load, parse_floorplan
+    text = (FLOORPLANS_DIR / "town.floor").read_text(encoding="utf-8")
+    # the prep's entrance junction three units along the street: its door road turns a corner
+    fp = parse_floorplan(text.replace("junction j0_2 at 14 0", "junction j0_2 at 17 0"), name="bent")
+    return load(fp, leaves), fp
+
+
+def test_a_schedule_on_a_bent_road_obeys_every_rule_and_round_trips():
+    import json
+    from qccd.gadget.algorithm import parse_algorithm_file
+    from qccd.gadget.city import schedule
+    from qccd.gadget.judge import judge_floorplan, judge_schedule
+    from qccd.gadget.library import LeafLibrary
+    from qccd.gadget.modules import modules_text, parse_modules
+    from qccd.gadget.place_checks import check_places
+    leaves = LeafLibrary(CACHE, log=None)
+    lib, fp = _bent_town(leaves)
+    assert judge_floorplan(lib, leaves, regions=fp.regions)["failed"] == []
+    gir = schedule(parse_algorithm_file(REPO / "examples" / "gadgets" / "algorithms" / "bell_cnot.alg"),
+                   lib, leaves)
+    bent = {n: v for n, v in gir["nets"].items() if len(v) > 5}
+    assert list(bent) == ["/door_prep_in"] and bent["/door_prep_in"][5] in ("3L10", "3R10")
+    assert any(c[1] == "/door_prep_in" for c in gir["carries"])
+    pc = check_places(gir, lib, leaves)
+    mr = judge_schedule(lib, leaves, gir, regions=fp.regions)
+    assert pc["failed"] == [] and mr["failed"] == [] and "H1" in mr["passed"]
+    # the module language names the bent road's own conveyor, and reads it back exactly
+    from qccd.gadget.fold import parse_folded, schedule_folded
+    src = (REPO / "examples" / "gadgets" / "algorithms" / "bell_cnot.alg").read_text(encoding="utf-8")
+    g = schedule_folded(parse_folded(src, name="bell_cnot"), lib, leaves)
+    text = modules_text(g, leaves)
+    assert "chan3R10" in text or "chan3L10" in text
+    assert parse_modules(text).gir == json.loads(json.dumps(g))
+
+
+def test_the_page_gets_every_carrys_compiled_program():
+    from qccd.gadget.algorithm import parse_algorithm_file
+    from qccd.gadget.city import schedule
+    from qccd.gadget.library import LeafLibrary
+    from qccd.gadget.roads import attach_runs
+    leaves = LeafLibrary(CACHE, log=None)
+    lib, _ = _bent_town(leaves)
+    gir = schedule(parse_algorithm_file(REPO / "examples" / "gadgets" / "algorithms" / "bell_cnot.alg"),
+                   lib, leaves)
+    attach_runs(gir, lib, leaves)
+    assert set(gir["road_runs"]) == {c[0] for c in gir["carries"]}
+    progs = gir["road_programs"]
+    c = next(c for c in gir["carries"] if c[1] == "/door_prep_in")
+    run = progs[gir["road_runs"][c[0]]]
+    assert run["n"] == len(c[7]) and run["cycles"][0][2] == "port_in"
+    # every ion ends on the far stub (node L + 1), one class a cycle
+    L = gir["nets"]["/door_prep_in"][4]
+    last = {}
+    for t0, t1, cls, moves in run["cycles"]:
+        assert cls in ("port_in", "conveyor", "port_out")
+        for ion, a, b in moves:
+            last[ion] = b
+    assert set(last.values()) == {L + 1}

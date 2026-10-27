@@ -116,6 +116,13 @@ class Net:
     b: tuple[str, str]
     length: int
     role: str = "any"
+    #: the road's shape on the floor: its sites when straight ("9"), else its legs ("5L5")
+    #: -- the conveyor it runs on is `chan<shape>` (leaves/transport.py::road)
+    shape: str = ""
+
+    @property
+    def conveyor(self) -> str:
+        return self.shape or str(self.length)
 
 
 @dataclass
@@ -166,7 +173,10 @@ def flatten(lib: Library, leaves: LeafLibrary, *, wires: dict | None = None):
                     wires[f"{path}/{ch.name}"] = Wire(f"{path}/{ch.name}", a, b,
                                                       float(ch.latency_us))
                 continue
-            nets[f"{path}/{ch.name}"] = Net(f"{path}/{ch.name}", a, b, ch.length, ch.role)
+            from .leaves.transport import shape_of
+            shape = shape_of(ch.points) if len(ch.points) > 2 else str(ch.length)
+            nets[f"{path}/{ch.name}"] = Net(f"{path}/{ch.name}", a, b, ch.length, ch.role,
+                                            shape=shape)
 
     walk(lib[lib.top], "", 0.0, 0.0)
     return leaf_insts, nets, next_id

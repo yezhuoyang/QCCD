@@ -88,11 +88,11 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     masters = {p: lib[v[0]] for p, v in gir["leaves"].items()}
 
     def dst_of(c):
-        a, _, b, _, _ = nets[c[1]]
+        a, _, b, _, _ = nets[c[1]][:5]
         return b if c[2] == a else a
 
     def dst_port(c):
-        a, pa, b, pb, _ = nets[c[1]]
+        a, pa, b, pb, _ = nets[c[1]][:5]
         return pb if c[2] == a else pa
 
     # -- G1: structure, and each bundle's order at a door is the order the op binds --------

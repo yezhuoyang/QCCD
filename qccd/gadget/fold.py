@@ -751,6 +751,9 @@ def build_folded(alg, *, out_dir, cache_dir="out/gadgets/cache", leaves=None, lo
     out = _Path(out_dir)
     (out / "leaf").mkdir(parents=True, exist_ok=True)
     g["line_first"] = line_first(g)
+    # every carry's compiled road program (the one H1 judged), for the page to replay
+    from .roads import attach_runs
+    attach_runs(g, lib, leaves)
     root, files = page_data(g, out)
     # the run as TSIR modules beside the page (modules.py): what the Stack cites, file:line
     from .modules import write_modules

@@ -163,6 +163,10 @@
       nc[4] = c[4] + t0; nc[11] = c[11] + t0;
       nc[7] = c[7].map(gm);
       nc[9] = want(c[9]);
+      // the carry's compiled road program (roads.py, what H1 judged), before the window
+      // renumbers its carries
+      const rp = (body.road_runs || {})[c[0]];
+      if (rp !== undefined && this.g.road_programs) nc.run = this.g.road_programs[rp];
       W.carries.push(nc);
     }
     for (let i = lowerBound(ix.me, a - t0 - ix.meMax, (m) => m[6]); i < ix.me.length && ix.me[i][6] + t0 < b; i++) {

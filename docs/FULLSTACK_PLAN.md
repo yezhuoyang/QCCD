@@ -385,16 +385,17 @@ end
   cooling stop when it must. Every ion road on today's floors is
   straight, so `chan<L>` is its exact geometry. A bent road would still be priced as
   straight: the corners are dropped in `synth.flatten`, and the cost model charges a
-  corner like a straight step. That is open.
+  corner like a straight step. (Closed by S7b, below.)
 - **S7 (user: "everything, especially the shuttling between gadgets, still follows the basic
   rules -- DACs, electrodes -- make sure the rules apply to the hardware program when there are
   gadgets").** Every carry is one program on its road's device, judged by R1-R23. A door's
   stub is driven by one side at a time. The schedule is timed by those programs. This is rule
-  H1, and the machine's DACs and electrodes are counted (GADGETS.md §4.2). Open:
-  - shared DAC planes between devices, which would cost fewer DACs but need lockstep
-    waveforms;
-  - the page replaying a carry's compiled program. The page still draws each ion by the
-    one-ion program, while H1 checks the real one.
+  H1, and the machine's DACs and electrodes are counted (GADGETS.md §4.2).
+- **S7b (user: "close the open gaps").**
+  - A road is its real geometry: a bent road is its own conveyor, with a site at every
+    corner. A corner splits a shift into one cycle per direction (R22).
+  - The page plays every carry's compiled program.
+  - Next: shared DAC/laser planes between devices.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which

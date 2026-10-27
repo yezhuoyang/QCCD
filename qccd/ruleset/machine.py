@@ -250,11 +250,11 @@ def _with_program(M: MachineModel, hw: Hardware, gir: dict, name: str) -> Execut
     nets = gir["nets"]
 
     def dst_of(c):
-        a, _, b, _, _ = nets[c[1]]
+        a, _, b, _, _ = nets[c[1]][:5]
         return b if c[2] == a else a
 
     def dst_port(c):
-        a, pa, b, pb, _ = nets[c[1]]
+        a, pa, b, pb, _ = nets[c[1]][:5]
         return pb if c[2] == a else pa
 
     for c in gir["carries"]:

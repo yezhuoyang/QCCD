@@ -64,6 +64,8 @@ const LOOK = `(() => { const G = window.GADGETS, M = G.M, w = M.gir.window || {}
     // every row knows the module line it is written on: [gadget or null, kind, id]
     unplaced: M.gir.events.filter((e) => !e.hw || (e.hw[0] !== null && !(M.gir.hw || {}).gadgets[e.hw[0]])).length,
     inGadgets: M.gir.events.filter((e) => e.hw && e.hw[0] !== null).length,
+    // every carry on screen is its road's own compiled program (roads.py), not a pretence
+    carriesNow: M.gir.carries.length, carriesWithRun: M.gir.carries.filter((c) => c.run).length,
     focus: f ? { text: f.text, chain: (f.call || []).map((c) => c.gate), line: f.line, src: f.src || null } : null,
     lit: [...document.querySelectorAll("#progBody .pl.live")].length,
     stack: (document.getElementById("stkNow") || {}).innerText || "" };

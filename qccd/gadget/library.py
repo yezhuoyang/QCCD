@@ -267,17 +267,35 @@ class LeafLibrary:
     def channel_references(self) -> dict:
         return {f"{L}x{k}": v for (L, k), v in sorted(self._channel.items())}
 
-    def road_data(self, length: int) -> dict:
+    def road_timing(self, shape, count: int = 1) -> dict:
+        """`channel_timing` for a road of any shape: a straight one is `chan<L>`'s, a bent one
+        its own conveyor's (leaves/transport.py::road), replayed the same way."""
+        s = str(shape)
+        if s.isdigit():
+            return self.channel_timing(int(s), count)
+        key = (s, max(1, int(count)))
+        memo = self.__dict__.setdefault("_bent", {})
+        if key not in memo:
+            from .leaves.transport import road
+            build = road(s, key[1])
+            op = characterize(build).ops["carry"]
+            din, dout = op.transfer("w", "in"), op.transfer("e", "out")
+            memo[key] = {"status": op.status, "duration_us": op.duration_us,
+                         "transit_us": max(o - i for i, o in zip(din.times_us, dout.times_us)),
+                         "quanta": dout.quanta, "rules_failed": op.rules["failed"]}
+        return memo[key]
+
+    def road_data(self, length) -> dict:
         """A road of `length` sites as the page replays it: its conveyor `chan<L>` -- the
         device every carry on such a road runs on -- and the one-ion `carry` whose replay
         prices it (`channel_timing`).  The page draws an ion on a road where this program
         has it, exactly as it draws one inside a place."""
-        key = max(1, int(length))
+        key = str(length) if not str(length).isdigit() else str(max(1, int(length)))
         memo = self.__dict__.setdefault("_road_data", {})
         if key not in memo:
             from .characterize import leaf_data
-            from .leaves.transport import channel
-            build = channel(key, 1)
+            from .leaves.transport import road
+            build = road(key, 1)
             characterize(build)
             memo[key] = leaf_data(build)
         return memo[key]

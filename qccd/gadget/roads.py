@@ -38,25 +38,26 @@ _CYCLE: dict = {}
 _RUNS: dict = {}
 
 
-def conveyor_machine(length: int, width: int):
-    """The device a carry of `width` ions on a road of `length` sites runs on: the road's
-    conveyor, its two stubs each holding the bundle (they are the doors' waiting places)."""
-    key = (max(1, int(length)), max(1, int(width)))
+def conveyor_machine(shape, width: int):
+    """The device a carry of `width` ions runs on, on a road of this shape (its sites when
+    straight, else its legs): the road's conveyor, its two stubs each holding the bundle
+    (they are the doors' waiting places)."""
+    key = (str(shape), max(1, int(width)))
     if key not in _MACHINES:
-        from .leaves.transport import channel
-        _MACHINES[key] = channel(*key).machine
+        from .leaves.transport import road
+        _MACHINES[key] = road(*key).machine
     return _MACHINES[key]
 
 
-def road_cycle_us(length: int) -> dict:
-    """How long each class's cycle takes on a road of `length` sites, from the replay of its
+def road_cycle_us(shape) -> dict:
+    """How long each class's cycle takes on a road of this shape, from the replay of its
     one-ion program under the cost model every leaf is priced by."""
-    L = max(1, int(length))
+    L = str(shape)
     if L not in _CYCLE:
         from ..cost.models import corrected_model
         from ..verify import verify
-        from .leaves.transport import channel
-        b = channel(L, 1)
+        from .leaves.transport import road
+        b = road(L, 1)
         prog = b.programs["carry"]
         rep = verify(prog, b.machine.arch, corrected_model("qccdsim_jones"), check_metrics=False)
         by_id = {i.id: i for i in prog.instructions}
@@ -99,10 +100,12 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
     from ..cost.models import corrected_model
     from ..verify import verify
     from .leaves.common import TrackedProgram
-    L = max(1, int(length))
+    from .leaves.transport import parse_shape
+    shape = str(length)
+    L = parse_shape(shape)[0]
     n = len(deps)
-    m = conveyor_machine(L, n)
-    d = road_cycle_us(L)
+    m = conveyor_machine(shape, n)
+    d = road_cycle_us(shape)
     d_in, d_shift, d_out = d.get("port_in", 5.0), d.get("conveyor", 5.0), d.get("port_out", 5.0)
     rail = [f"C{i}" for i in range(L)]
     ions = [f"i{j}" for j in range(n)]
@@ -144,7 +147,16 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
                     free.discard(rail[i + 1])
                     free.add(rail[i])
             if moves:
-                tp.move("conveyor", list(reversed(moves)), op="convey")
+                # one lab-frame direction a cycle: a bent road shifts each side of a corner
+                # in a cycle of its own (R22), the leg nearer the far end first
+                from .leaves.transport import split_shift
+                groups = split_shift(m.arch.device, rail, {i: tp.pos[i] for i, _ in moves},
+                                     list(reversed(moves)))
+                for gi, group in enumerate(groups):
+                    tp.move("conveyor", group, op="convey")
+                    if gi + 1 < len(groups):
+                        times.append([tp.prog.instructions[-1].id, round(t, 3), round(t + d_shift, 3)])
+                        t += d_shift
                 did = ("conveyor", d_shift)
         if did is None:
             # nothing can run now: wait for the next thing that frees something
@@ -213,13 +225,13 @@ def check_roads(gir: dict, lib, leaves) -> dict:
     and verified once."""
     out_w, in_w = _door_windows(gir, lib, leaves)
     nets = gir["nets"]
-    violations, n_prog, n_shapes, failed_rules, bad = [], 0, 0, set(), []
+    violations, n_prog, n_shapes, failed_rules, bad, runs = [], 0, 0, set(), [], {}
     late = 0
     for c in gir["carries"]:
         net = nets.get(c[1])
         if net is None:
             continue
-        L = net[4]
+        L = net[5] if len(net) > 5 else net[4]
         t0 = c[4]
         deps = [t0 + x for x in c[5]]
         takes = [t0 + x for x in c[12]]
@@ -243,14 +255,80 @@ def check_roads(gir: dict, lib, leaves) -> dict:
                                 far_busy=[(a - t0, b - t0) for a, b in farb],
                                 name=f"chan{L}.carry")
             _RUNS[key] = run
+        runs[c[0]] = run
         if run.violations:
             failed_rules.update(run.failed)
             late += len(run.late)
             bad.append(c[0])
             violations.append(f"carry {c[0]} on {c[1]} (instruction {c[9]}): " + "; ".join(run.violations[:2]))
-    return {"violations": violations, "bad": bad,
+    return {"violations": violations, "bad": bad, "runs": runs,
             "metrics": {"carries": n_prog, "programs": n_shapes, "late_deliveries": late,
                         "rules_broken": sorted(failed_rules)}}
+
+
+# --------------------------------------------------------------------------- the page
+
+
+def run_json(run: RoadRun) -> dict:
+    """A compiled carry as the page replays it: each cycle `[t0, t1, class, [[ion, from, to],
+    ...]]`, times from the carry's start, places as node indices along the road -- 0 the near
+    stub, 1..L its sites, L + 1 the far stub."""
+    def idx(node: str) -> int:
+        if node == "XW":
+            return 0
+        if node.startswith("C"):
+            return int(node[1:]) + 1
+        return -1                                   # XE: the far end, filled in below
+    ins = {i.id: i for i in run.prog.instructions}
+    L = 0
+    for i in run.prog.instructions[1:]:
+        for q in i.participants:
+            for nd in (q.src, q.dst):
+                if nd.startswith("C"):
+                    L = max(L, int(nd[1:]) + 1)
+    cycles = []
+    for iid, t0, t1 in run.times:
+        i = ins[iid]
+        moves = [[int(q.ion[1:]), idx(q.src), idx(q.dst)] for q in i.participants]
+        for mv in moves:
+            mv[1] = L + 1 if mv[1] < 0 else mv[1]
+            mv[2] = L + 1 if mv[2] < 0 else mv[2]
+        cycles.append([t0, t1, i.cls, moves])
+    return {"n": len(run.arrived), "cycles": cycles}
+
+
+def attach_runs(g: dict, lib, leaves) -> None:
+    """Give a schedule the compiled program of every carry, for the page to replay: the
+    root gets `road_programs` (each distinct program once) and every body (the root, and
+    each macro of a folded run) `road_runs`, its carry ids -> an index there.  The very
+    programs H1 judged (`check_roads`), on each body's own view."""
+    programs: list = []
+    index: dict = {}
+
+    def take(body_gir, target):
+        r = check_roads(body_gir, lib, leaves)
+        # a view renumbers its carries by time; a road carries one bundle at a time (G13),
+        # and an own view does not shift times, so (road, start) is the body's carry
+        own = {(c[1], round(c[4], 3)): c[0] for c in target["carries"]}
+        by_id = {c[0]: c for c in body_gir["carries"]}
+        out = {}
+        for cid, run in r["runs"].items():
+            c = by_id[cid]
+            k = id(run)
+            if k not in index:
+                index[k] = len(programs)
+                programs.append(run_json(run))
+            out[own.get((c[1], round(c[4], 3)), cid)] = index[k]
+        target["road_runs"] = out
+
+    if g.get("macros"):
+        from .fold import view
+        take(view(g, None), g)
+        for mid in g["macros"]:
+            take(view(g, mid), g["macros"][mid])
+    else:
+        take(g, g)
+    g["road_programs"] = programs
 
 
 # --------------------------------------------------------------------------- the machine's wiring
@@ -294,6 +372,7 @@ def machine_census(gir: dict, lib, leaves) -> dict:
             continue
         add(m.family if m.family != "road" else "junction", _report(("leaf", m.name), Architecture.from_json(d["arch"])))
     for net, v in gir["nets"].items():
-        L = int(v[4])
+        L = v[5] if len(v) > 5 else int(v[4])
         add("road", _report(("road", L), conveyor_machine(L, 9).arch))
+        # (a bent road is its own conveyor: its corners are sites like any other)
     return dict(tot, by_family=by_family)

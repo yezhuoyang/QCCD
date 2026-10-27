@@ -109,8 +109,14 @@ class Designer:
             route = sum(abs(p[0] - q[0]) + abs(p[1] - q[1]) for p, q in zip(pts, pts[1:]))
             for p in pts:
                 grow(*p)
+            length = max(1, int(round(route)) - 1)
+            if kind == "road" and len(pts) > 2:
+                # a bent road: each straight leg its own whole number of sites, a site at
+                # every corner (leaves/transport.py::shape_of) -- the device it runs on
+                from .leaves.transport import parse_shape, shape_of
+                length = parse_shape(shape_of(pts))[0]
             master.channels.append(Channel(name=cname, a=a, b=b,
-                                           length=max(1, int(round(route)) - 1),
+                                           length=length,
                                            points=pts, kind=kind, latency_us=latency))
         master.bbox = box
         master.size = [box[2] - box[0], box[3] - box[1]]

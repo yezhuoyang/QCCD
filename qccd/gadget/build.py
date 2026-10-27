@@ -51,7 +51,9 @@ def write_leaf_files(out, lib, leaves, gir: dict | None = None, *, inline: bool 
     import json as _json
     from pathlib import Path as _Path
     data = {name: leaves.data[name] for name in lib.leaf_masters()}
-    for L in sorted({int(v[4]) for v in ((gir or {}).get("nets") or {}).values() if len(v) > 4}):
+    shapes = {str(v[5] if len(v) > 5 else v[4]) for v in ((gir or {}).get("nets") or {}).values()
+              if len(v) > 4}
+    for L in sorted(shapes, key=lambda s: (not s.isdigit(), int(s) if s.isdigit() else 0, s)):
         d = leaves.road_data(L)
         data.setdefault(d["master"], d)
     leaf_files, inline_leaves = {}, {}
@@ -134,6 +136,8 @@ def build(program, *, out_dir, rows: int | None = None, pairs: int | None = None
     (out / "gir.json").write_text(json.dumps(gir), encoding="utf-8")
     lib.save(out / "library.json")
     (out / "checks.json").write_text(json.dumps(verdict, indent=1), encoding="utf-8")
+    from .roads import attach_runs
+    attach_runs(gir, lib, leaves)                 # every carry's road program, for the page
     leaf_files, _ = write_leaf_files(out, lib, leaves, gir)
 
     studio_pages = {}

@@ -128,12 +128,13 @@ def _replay_heat(prog, arch, model, replay) -> dict:
     return out
 
 
-def road_heat(leaves, length: int) -> float:
-    """n̄ one ion gains crossing a road of `length` sites: its conveyor's replay."""
-    L = max(1, int(length))
-    if L not in _ROAD_MEMO:
-        _ROAD_MEMO[L] = float(leaves.channel_timing(L, 1)["quanta"])
-    return _ROAD_MEMO[L]
+def road_heat(leaves, shape) -> float:
+    """n̄ one ion gains crossing a road of this shape (its sites, or its legs): its
+    conveyor's replay."""
+    key = str(shape)
+    if key not in _ROAD_MEMO:
+        _ROAD_MEMO[key] = float(leaves.road_timing(key, 1)["quanta"])
+    return _ROAD_MEMO[key]
 
 
 def follow(gir: dict, lib, leaves, *, limit: float | None = None, initial_heat: float = 0.0) -> dict:
@@ -165,7 +166,7 @@ def follow(gir: dict, lib, leaves, *, limit: float | None = None, initial_heat: 
                 rows[gid].append((e[1] + h.enter_us, 1, e, name, h))
     for c in gir["carries"]:
         net = gir["nets"].get(c[1])
-        q = road_heat(leaves, net[4]) if net else 0.0
+        q = road_heat(leaves, net[5] if len(net) > 5 else net[4]) if net else 0.0
         for k, gid in enumerate(c[7]):
             rows[gid].append((c[4] + (c[5][k] if k < len(c[5]) else 0.0), 0, c, None, q))
     ev: dict = {}
