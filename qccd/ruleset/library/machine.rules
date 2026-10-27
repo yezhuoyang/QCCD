@@ -121,3 +121,10 @@ rule G13 "A road carries one bundle at a time" core
 rule G14 "A road holds the ions on it"
   about "At no moment are more of a bundle's ions on a road -- travelling, or stopped at the far end until they are taken in -- than the road has sites. A whole bundle can stop only on a road as long as the bundle, the one in front of a door; a short street between junctions holds the few ions crossing it at once."
   for all c in carries: crowd(c) <= length(road(c))
+
+
+# ---------------------------------------------------------------- the hardware between gadgets
+
+rule H1 "The hardware between gadgets obeys the basic rules" core
+  about "A gadget is a box with doors, but the chip is one: what carries ions between the boxes is driven by DACs and electrodes like what moves them inside one. Every carry, compiled with its whole bundle onto its road's own device -- one class a cycle, a shift rigid, a blocked ion holding by its switch -- passes R1-R23; it delivers every ion before the far side takes it; and a door's stub is driven by one side at a time, the road never loading or delivering while the op there moves an ion on or off it."
+  for all c in carries: road_ok(c)

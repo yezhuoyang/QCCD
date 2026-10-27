@@ -5,7 +5,8 @@ magic states, 29 π/4 gadgets, scheduled in parallel on examples/gadgets/floorpl
 with memories that correct what they hold.  The whole run is checked in parts, because no
 flat simulation can enumerate its branches:
 
-* the floorplan passes F1-F9 and the schedule G1-G14, with nothing refused;
+* the floorplan passes F1-F9, the schedule G1-G14 and the hardware between gadgets H1, with
+  nothing refused;
 * no block waits past its coherence budget: the refresh pass adds the rounds that need it;
 * the flat sign-off says why it cannot run, rather than pass or fail;
 * the compositional sign-off holds -- places, gadgets, gates, composition, semantics -- and
@@ -130,9 +131,9 @@ def test_the_design_page_shows_the_machine_rules_the_sign_off_traffic_and_floorp
     assert seen["verdict"]["first"].startswith("✓ signed off in parts")
     assert seen["verdict"]["ticks"] == 5 and seen["verdict"]["crosses"] == 0
     assert "does not apply" in seen["verdict"]["note"]
-    want = [f"F{i}" for i in range(1, 10)] + [f"G{i}" for i in range(1, 15)]
+    want = [f"F{i}" for i in range(1, 10)] + [f"G{i}" for i in range(1, 15)] + ["H1"]
     assert seen["rules"]["ids"] == want and seen["rules"]["hold"] == want
-    assert seen["rules"]["count"] == "23 of 23 hold" and "✓" in seen["rules"]["badge"]
+    assert seen["rules"]["count"] == "24 of 24 hold" and "✓" in seen["rules"]["badge"]
     assert seen["opened"]["open"] and seen["opened"]["visible"]
     assert "road(c1) = road(c2)" in seen["opened"]["text"]
     assert any(t.startswith("ion-sites shuttled: ") for t in seen["traffic"])

@@ -425,7 +425,7 @@ def test_each_gate_is_checked_once_and_the_composition_by_construction():
     keep = {}
     g = schedule_folded(alg, lib, leaves, keep=keep)
     per = check_folded(g, lib, leaves)
-    assert per["failed"] == [] and len(per["passed"]) == 11 and per["metrics"]["views"] == 19
+    assert per["failed"] == [] and len(per["passed"]) == 12 and per["metrics"]["views"] == 19
     assert check_composition(g, keep["folder"]) == []
     # two calls moved onto one another: only the composition can see it
     bad = _copy.deepcopy(g)

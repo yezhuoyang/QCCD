@@ -38,6 +38,10 @@ PLACE_RULES = {
     "G11": "the decoder is called and keeps up: every syndrome the machine measures is "
            "decoded, no decoding job waits for another past the next syndrome, and nothing "
            "reads an outcome or a frame before the decoder has written it",
+    "H1": "the hardware between gadgets obeys the basic rules too: every carry is one program "
+          "on its road's own device (a cycle one waveform, ions holding by their switches), it "
+          "passes R1-R23, it delivers every ion before the far side takes it, and a door's stub "
+          "is driven by one side at a time",
 }
 
 #: the place families that hold no ions: their ops are modeled, not replayed
@@ -546,4 +550,17 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     out["metrics"]["undecoded_windows"] = sum(1 for w in windows if w.get("decoded_by") is None)
     verdict("G11", g11, skipped=None if (decoder or guarded)
             else "this design has no decoder and no conditional op")
+
+    # -- H1: the basic rules on the hardware between the gadgets -----------------------------
+    if leaves is not None:
+        # (a schedule with no carry -- a gate's view that only calls others -- has nothing on
+        # its roads to break the rules with: H1 holds there, as G4 does)
+        from .roads import check_roads, machine_census
+        roads = check_roads(gir, lib, leaves)
+        out["metrics"]["roads"] = roads["metrics"]
+        out["metrics"]["hardware"] = machine_census(gir, lib, leaves)
+        verdict("H1", roads["violations"][:20] + (
+            [f"... {len(roads['violations']) - 20} more"] if len(roads["violations"]) > 20 else []))
+    else:
+        verdict("H1", [], skipped="no leaf library to compile the roads with")
     return out

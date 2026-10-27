@@ -189,6 +189,54 @@ changes keep every run under the limit:
   - when no road is cool enough, the bundle makes a **cooling stop** on the way: a free
     memory (stored, then released) or a clinic (one syndrome round).
 
+### 4.2 The basic rules between gadgets (H1)
+
+A gadget looks like a higher level, but the chip is one. What carries ions between gadgets
+is driven by DACs and electrodes like what moves them inside one, and it obeys the same
+basic rules (`docs/rules.md`). That is what the user asked for on 2026-10-26: *the rules
+apply to the hardware program when there are gadgets.*
+
+Each place's op is verified on its own device against R1-R23: a cycle is one waveform of
+its plane (R4, R22), one class a cycle, holds by the per-site switches (R4d), and so on.
+Every leaf declares a broadcast plane: 32 shared channels (6 + 6 + 4 electrode roles,
+each with a motion bank and a hold bank), compensation channels, and a switch per site.
+Between the places, the schedule used to price a road by its conveyor's one-ion program,
+run once per ion. That is not a program a road can play:
+
+- two ions a cycle apart on a long road would ask its electrodes for a load and a shift
+  in the same cycle, which R22 refuses;
+- an ion reaching the far end while the one ahead waits would stack on the end stub.
+
+**Every carry is one program on its road's own device** (`qccd/gadget/roads.py`):
+- the device is the road's conveyor `chan<L>`, its stubs as wide as the bundle;
+- each cycle runs one class: a load off the near stub, a conveyor shift, or a delivery
+  onto the far stub;
+- a shift is rigid, and an ion blocked by the one ahead holds by its switch.
+
+**A door's stub is driven by one side at a time.** The road never loads while the op on
+the near side puts an ion on the stub. It never delivers while the op on the far side takes
+one off.
+
+**The schedule is timed by these programs.** `City._road` gives each ion's arrival from
+the road's compiled program, and `City._door_start` moves the receiving op until every take
+follows its delivery without overlapping another.
+
+**Rule H1** (place check and machine rule `road_ok(c)`) compiles every carry, memoized by
+shape, and asks three things:
+- the program passes R1-R23;
+- every ion reaches the far stub before the schedule takes it;
+- no door's stub is driven by both sides at once.
+
+Every shipped schedule passes. A schedule that takes an ion off a long road before the
+road can bring it fails, and so would the old per-ion pretence, under R22.
+
+**The machine's wiring is counted** (`machine_census`): electrodes, switches and DACs for
+every device the floor holds, each driving its own plane as its master declares. On the
+town, the 60 roads and 32 junctions take 3,054 of the machine's 3,438 DACs. That is the
+price of every road having its own plane. A design that shared a plane between roads would
+have to declare it, and its roads would then have to play the same waveform in the same
+cycle. That is open co-design.
+
 ---
 
 ## 5 · The beta library
@@ -465,9 +513,9 @@ decoders).
 | `bell_cnot` | 2 | 79 | 194.4 ms | 34 ions, 50 records | Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (1,798 faults) |
 | `bell_surgery` | 2 | 79 | 309.3 ms | 49 ions, 97 records | m ⊕ Z̄₀ ⊕ Z̄₁ = 0 | ≥ 3 (4,058) |
 | `ghz3` | 3 | 88 | 215.3 ms | 43 ions, 59 records | Z̄₀ ⊕ Z̄₁ = 0, Z̄₀ ⊕ Z̄₂ = 0 | ≥ 3 (1,951) |
-| `teleport` | 3 | 88 | 592.5 ms | 66 ions, 176 records | 1 → X̄_b ⊕ m₂ | ≥ 3 (8,116) |
+| `teleport` | 3 | 88 | 592.6 ms | 66 ions, 176 records | 1 → X̄_b ⊕ m₂ | ≥ 3 (8,116) |
 | `magic_state` | 1 | 70 | 295.1 ms | 25 ions, 32 records | X̄_t → X̄_t, Z̄_t → Z̄_t (from the magic ion) | injection: 1 by design |
-| `magic_teleport` | 3 | 88 | 816.7 ms | 74 ions, 192 records | X̄_t → X̄_b ⊕ m₂; Z̄_t → Z̄_b ⊕ m₁ ⊕ m₃ ⊕ m₄ | injection: 1 by design |
+| `magic_teleport` | 3 | 88 | 816.8 ms | 74 ions, 192 records | X̄_t → X̄_b ⊕ m₂; Z̄_t → Z̄_b ⊕ m₁ ⊕ m₃ ⊕ m₄ | injection: 1 by design |
 | `frames` | 2 | 79 | 121.8 ms | 34 ions, 42 records | m = 1, n = 1 (both flipped by a frame the archive holds) | ≥ 3 (1,290) |
 | `s_gate` | 1 | 88 | 545.1 ms | 74 ions, 185 records | m = 1 (two S̄ gadgets make a Z̄) | injection: 1 by design |
 | `cond_cx` | 3 | 88 | 159.4 ms | 2 branches | `m=0`: u = 0 · `m=1`: u ⊕ v = 0 | ≥ 3 per branch |

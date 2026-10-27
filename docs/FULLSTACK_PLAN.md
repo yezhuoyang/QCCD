@@ -386,6 +386,15 @@ end
   straight, so `chan<L>` is its exact geometry. A bent road would still be priced as
   straight: the corners are dropped in `synth.flatten`, and the cost model charges a
   corner like a straight step. That is open.
+- **S7 (user: "everything, especially the shuttling between gadgets, still follows the basic
+  rules -- DACs, electrodes -- make sure the rules apply to the hardware program when there are
+  gadgets").** Every carry is one program on its road's device, judged by R1-R23. A door's
+  stub is driven by one side at a time. The schedule is timed by those programs. This is rule
+  H1, and the machine's DACs and electrodes are counted (GADGETS.md §4.2). Open:
+  - shared DAC planes between devices, which would cost fewer DACs but need lockstep
+    waveforms;
+  - the page replaying a carry's compiled program. The page still draws each ion by the
+    one-ion program, while H1 checks the real one.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
@@ -442,7 +451,7 @@ and `route` is "mechanism-free by construction" (`FormalRV/System/SysProg.lean`)
 - **Programs and machines.** `.alg` is a logical program, `.floor` a floorplan, and `city.py` a parallel
   scheduler that writes flat GIR 0.2 events. The rule sets F1–F9/G1–G14 and the contract and
   compositional sign-offs check the result.
-- **Shor N=15** (`shor15.alg`, `shor.floor`): 157 + 32 instructions, 11.11 s (11.16 s before heat was followed, 2026-10-26), all 23 rules hold, signed off
+- **Shor N=15** (`shor15.alg`, `shor.floor`): 157 + 32 instructions, 11.11 s (11.16 s before heat was followed, 2026-10-26), all 24 rules hold (H1 added 2026-10-26), signed off
   compositionally. It is the target of today's "Goal 2" card (`qccd/site/boards.py::GOALS`).
 - **Limits:**
   - GIR is a flat event list: about 2 MB for Shor-15, all inlined into one page, with no streaming.

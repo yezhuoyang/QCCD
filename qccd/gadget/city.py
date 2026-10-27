@@ -782,15 +782,24 @@ class City:
                 raise CityError(f"{li.master.name}.{opname} takes "
                                 f"{tin.count if tin else 0} ions on {port}, not {len(gids)}")
             s = max(s, max(a - i for a, i in zip(arr, tin.times_us)))
-        if self.parallel:
-            # a place serves its instructions in the order they are issued, and sends a bundle
-            # out of a door only once the road in front of it is clear of the last one
-            for tr in O.transfers:
-                if tr.dir == "out" and (path, tr.port) in self.door_net:
-                    s = max(s, self.net_cal[self.door_net[(path, tr.port)]].end - tr.t_first_us)
-            s = self._start(path, s, O.duration_us)
-        else:
-            s = self.cal[path].earliest(s, O.duration_us)
+        for _ in range(100):
+            s0 = s
+            # a door's stub is driven by one side at a time: no ion is taken off it while the
+            # road delivers another onto it (the road's own program says when)
+            for port, (gids, arr, trip) in inputs.items():
+                if trip is not None:
+                    s = self._door_start(s, arr, O.transfer(port, "in").times_us)
+            if self.parallel:
+                # a place serves its instructions in the order they are issued, and sends a
+                # bundle out of a door only once the road in front of it is clear of the last
+                for tr in O.transfers:
+                    if tr.dir == "out" and (path, tr.port) in self.door_net:
+                        s = max(s, self.net_cal[self.door_net[(path, tr.port)]].end - tr.t_first_us)
+                s = self._start(path, s, O.duration_us)
+            else:
+                s = self.cal[path].earliest(s, O.duration_us)
+            if s <= s0 + 1e-9:
+                break
         local = dict(li.ids)
         visitors = []
         for name, gid in (resting or {}).items():
@@ -861,6 +870,46 @@ class City:
             t0 = s + k * O.each_us
             self.event(jpath, O.op, t0, t0 + O.each_us, ins, grp, bind=[[O.name, g]])
 
+    # -- a road's own program ---------------------------------------------------------------
+
+    def _road(self, net, deps) -> list:
+        """When each ion of a bundle put on road `net`'s near stub at `deps` reaches its far
+        stub: the road's own compiled program (`roads.compile_carry`), one class a cycle, the
+        bundle's ions sharing the conveyor -- not one ion's transit added to each departure.
+        The near side puts an ion on the stub at each `deps`; the road loads none while it
+        does.  Memoized by shape."""
+        from .roads import compile_carry, road_cycle_us
+        L = self.nets[net].length
+        t0 = min(deps)
+        rel = tuple(round(d - t0, 3) for d in deps)
+        memo = self.__dict__.setdefault("_road_memo", {})
+        if (L, rel) not in memo:
+            put = road_cycle_us(L).get("port_in", 5.0)
+            run = compile_carry(L, list(rel), [float("inf")] * len(rel),
+                                near_busy=[(d - put, d) for d in rel], verify_rules=False)
+            memo[(L, rel)] = run.arrived
+        return [t0 + a for a in memo[(L, rel)]]
+
+    def _door_start(self, s: float, arrived, tin) -> float:
+        """The earliest start no earlier than `s` at which an op taking a bundle in at
+        `s + tin[k]` takes every ion only once it is on its stub, and never while the road is
+        delivering another onto that stub: a door's stub is driven by one side at a time."""
+        from .roads import road_cycle_us
+        d = road_cycle_us(1).get("port_in", 5.0)
+        for _ in range(1000):
+            bump = s
+            for k, i in enumerate(tin):
+                take = s + i
+                if arrived[k] > take + 1e-9:
+                    bump = max(bump, arrived[k] - i)
+                for j, a in enumerate(arrived):
+                    if j != k and a - d < take + d - 1e-9 and take < a - 1e-9:
+                        bump = max(bump, a - i)
+            if bump <= s + 1e-9:
+                return s
+            s = bump
+        raise CityError("a door's two sides never agree on when to hand a bundle over")
+
     def trip(self, gids, src, deps, dst, t_min, ins, grp):
         """Take a bundle leaving `src` at `deps` to door `dst`: junction passes are scheduled
         on the way; returns (arrival times at `dst`, the last channel, still open)."""
@@ -873,13 +922,18 @@ class City:
             if kind == "net":
                 tau = self.leaves.channel_timing(self.nets[info].length, 1)["transit_us"]
                 trip = (info, u, list(t), tau)
-                t = [d + tau for d in t]
+                t = self._road(info, t)
             else:
                 jpath, a, b, opname = info
                 O = self._train(jpath, a, b, opname, len(gids))
                 tin, tout = O.tin, O.tout
                 s = max(t_min, max(x - i for x, i in zip(t, tin.times_us)))
-                s = self.cal[jpath].earliest(s, O.duration_us)
+                for _ in range(100):
+                    s0 = s
+                    s = self._door_start(s, t, tin.times_us)
+                    s = self.cal[jpath].earliest(s, O.duration_us)
+                    if s <= s0 + 1e-9:
+                        break
                 net, usrc, udeps, tau = trip
                 self.carry(net, usrc, udeps, tau, gids, "data", ins, grp,
                            takes=[s + i for i in tin.times_us])
@@ -900,19 +954,22 @@ class City:
         taus = [self.leaves.channel_timing(self.nets[h[1]].length, 1)["transit_us"] for h in nets]
         if not juncs:
             net = nets[0][1]
-            return [d + taus[0] for d in deps], (net, nets[0][2], list(deps), taus[0])
+            return self._road(net, deps), (net, nets[0][2], list(deps), taus[0])
         passes = []
         for h in juncs:
             jpath, a, b, opname = h[1]
             O = self._train(jpath, a, b, opname, len(gids))
             passes.append((jpath, O.op, O, O.tin, O.tout))
-        arr0 = [d + taus[0] for d in deps]
+        arr0 = self._road(nets[0][1], deps)
         s1 = max([t_min] + [x - i for x, i in zip(arr0, passes[0][3].times_us)])
+        s1 = self._door_start(s1, arr0, passes[0][3].times_us)
         for _ in range(100000):
             starts = [s1]
             for k in range(1, len(passes)):
                 outs = [starts[-1] + x for x in passes[k - 1][4].times_us]
-                starts.append(max(o + taus[k] - i for o, i in zip(outs, passes[k][3].times_us)))
+                arr = self._road(nets[k][1], outs)
+                tin_k = passes[k][3].times_us
+                starts.append(self._door_start(max(a - i for a, i in zip(arr, tin_k)), arr, tin_k))
             shift = 0.0
             for k, (jpath, _opname, O, _tin, tout) in enumerate(passes):
                 a = starts[k]
@@ -941,7 +998,7 @@ class City:
             self._passes(jpath, O, starts[k], gids, ins, grp)
             outs = [starts[k] + x for x in tout.times_us]
             trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1])
-            t = [o + taus[k + 1] for o in outs]
+            t = self._road(nets[k + 1][1], outs)
         return t, trip
 
     def bring(self, bundle: Bundle, dst, t_min, ins, grp, *, stop_ok: bool = True):

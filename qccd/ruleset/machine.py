@@ -900,6 +900,22 @@ def _peak_heat(ctx: Ctx, e):
     return max(float(op.metrics.get("peak_quanta", 0.0)), hot)
 
 
+@term("road_ok(c)", "true or false", "Whether carry c, compiled with its whole bundle onto "
+      "its road's own device (qccd/gadget/roads.py: one class a cycle, blocked ions holding by "
+      "their switches), passes the basic rules R1-R23, delivers every ion before the far side "
+      "takes it, and keeps off each door's stub while the op on that side drives it.",
+      GROUP_M, kinds=K)
+def _road_ok(ctx: Ctx, c):
+    M = _prog(ctx, "carries")
+    o = _activity(c, "road_ok")
+    bad = getattr(M, "_road_bad", None)
+    if bad is None:
+        from ..gadget.roads import check_roads
+        bad = set(check_roads(M.gir, M.lib, M.leaves)["bad"]) if M.leaves is not None else set()
+        M._road_bad = bad
+    return o.facts["row"][0] not in bad
+
+
 @term("ion_loss_limit()", "quanta", "The hottest an ion may get before it is likely lost: about "
       "85 uncooled junction round trips (arXiv:1210.3655), at 3 quanta a transit.", GROUP_M,
       kinds=K)

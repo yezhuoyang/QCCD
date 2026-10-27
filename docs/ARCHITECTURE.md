@@ -256,7 +256,7 @@ nor keep them alive for seconds.
 | events, carries | 27,559, 3,736 (a junction passes one ion at a time: GADGETS.md §4.1) |
 | makespan | 11.11 s |
 | traffic | 325,888 ion-sites; 26,386 junction passes, one ion each; longest wait on a road 0.23 s; hottest ion n̄ = 204 (limit 510) |
-| machine rules | F1–F9 and G1–G14 hold; nothing refused |
+| machine rules | F1–F9, G1–G14 and H1 (every road's own program, GADGETS.md §4.2) hold; nothing refused |
 | flat sign-off | does not apply: 11 outcomes a guard reads are corrected by frames that are products of bits |
 | compositional sign-off | passed: places (G9), gadgets (S̄, √X̄), gates (sdg, h, t, tdg, ccx, cswap), composition (23 rules), semantics m1 = 0, (m2, m3) uniform |
 

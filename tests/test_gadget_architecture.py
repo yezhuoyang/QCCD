@@ -38,9 +38,10 @@ EXAMPLES = sorted(f for f in ALGS.glob("*.alg")
 #: GADGETS.md §9.3's makespans, from the sequential policy that measured them
 #: re-measured 2026-10-20, when split and merge became charged for what a move does (#16/#17),
 #: and 2026-10-26, when heat was followed across the town (GADGETS.md §4.1): junctions pass a
-#: bundle one ion at a time, places with lasers cool what comes in, readouts recool
-SEQUENTIAL_MS = {"bell_cnot": 194.4, "bell_surgery": 309.3, "ghz3": 215.3, "teleport": 592.5,
-                 "magic_state": 295.1, "magic_teleport": 816.7, "frames": 121.8,
+#: bundle one ion at a time, places with lasers cool what comes in, readouts recool, and every
+#: road is timed by its own compiled program (GADGETS.md §4.2)
+SEQUENTIAL_MS = {"bell_cnot": 194.4, "bell_surgery": 309.3, "ghz3": 215.3, "teleport": 592.6,
+                 "magic_state": 295.1, "magic_teleport": 816.8, "frames": 121.8,
                  "s_gate": 545.1, "cond_cx": 159.4, "teleport_fix": 568.2, "t_gate": 725.5}
 
 
@@ -82,7 +83,8 @@ def ours(gir, lib, leaves) -> dict:
 def test_the_machine_rules_are_text_in_the_rule_language():
     rs = load_rules("machine")
     assert rs.level == "machine"
-    assert [r.id for r in rs.rules] == [f"G{i}" for i in range(1, 15)]
+    # G1-G14 on the schedule, H1 on the hardware between the gadgets (GADGETS.md §4.2)
+    assert [r.id for r in rs.rules] == [f"G{i}" for i in range(1, 15)] + ["H1"]
     assert "machine" in names("machine") and "floorplan" in names("machine")
     assert "machine" not in names()           # the device level's list is unchanged
     fp = load_rules("floorplan")

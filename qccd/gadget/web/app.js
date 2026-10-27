@@ -1717,11 +1717,12 @@
   }
 
   // The machine's rules, as the rule language decided them: F1-F9 on the floorplan, G1-G14
-  // on the schedule.  A rule opens to its own assertion, word for word, and what it found.
+  // on the schedule, H1 on the hardware between the gadgets (the basic rules on every road's
+  // own program).  A rule opens to its own assertion, word for word, and what it found.
   function renderMachineRules(mr) {
     const el = $("checksBody");
     el.textContent = "";
-    const groups = [["F", "the floorplan"], ["G", "the schedule"]];
+    const groups = [["F", "the floorplan"], ["G", "the schedule"], ["H", "the hardware between gadgets"]];
     for (const [pre, title] of groups) {
       const rows = (mr.rules || []).filter((r) => r.id.startsWith(pre));
       if (!rows.length) continue;
@@ -1743,6 +1744,20 @@
         div.onclick = () => div.classList.toggle("open");
         el.appendChild(div);
       }
+      // what the wiring costs: every device's own plane of DACs, counted as one device's is
+      const hw = pre === "H" && ((D.checks || {}).metrics || {}).hardware;
+      if (hw) {
+        const fam = hw.by_family || {};
+        const bus = ["road", "junction"].reduce((n, k) => n + ((fam[k] || {}).dacs || 0), 0);
+        const div = document.createElement("div");
+        div.className = "ck census";
+        div.innerHTML = `<span class="skip">∑</span><span>${hw.dacs.toLocaleString()} DACs, ${hw.electrodes.toLocaleString()} electrodes` +
+          ` <span class="muted">(${bus.toLocaleString()} DACs on the roads and junctions)</span></span>` +
+          `<div class="t"><div>Every device drives its own plane, as its master declares: ` +
+          Object.entries(fam).map(([k, v]) => `${escapeHtml(k)} ${v.devices}× · ${v.dacs} DACs`).join(", ") + `.</div></div>`;
+        div.onclick = () => div.classList.toggle("open");
+        el.appendChild(div);
+      }
     }
     const nf = (mr.failed || []).length;
     // a rule that does not apply (F9 on a floorplan without regions) is not one that failed
@@ -1750,9 +1765,9 @@
     $("checksCount").textContent = `${(mr.passed || []).length} of ${(mr.rules || []).length - na} hold` +
       (na ? ` · ${na} does not apply` : "");
     const b = $("checksBadge");
-    b.textContent = nf ? `${nf} rule${nf === 1 ? "" : "s"} failed` : "F1–F9 · G1–G14 ✓";
+    b.textContent = nf ? `${nf} rule${nf === 1 ? "" : "s"} failed` : "F1–F9 · G1–G14 · H1 ✓";
     b.className = nf ? "bad" : "ok";
-    b.title = "the machine's rules: the floorplan's (F) and the schedule's (G), each an assertion in the rule language";
+    b.title = "the machine's rules: the floorplan's (F), the schedule's (G) and the hardware between gadgets (H), each an assertion in the rule language";
   }
 
   function renderTraffic() {
