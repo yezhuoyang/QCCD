@@ -228,8 +228,44 @@ class City:
         from .checks import ION_LOSS_QUANTA
         self.heat_limit = float(ION_LOSS_QUANTA)
         self._entry_memo: dict = {}
+        #: carry row -> the time its road may first load (a trip over two roads of one shared
+        #: plane waits for the first to be done: store-and-forward); in the GIR as `road_holds`
+        self._holds: dict = {}
+        self._spans: dict = {}            # carry row -> (first load, last delivery), on a plane
         self._graph()
         self._control()
+        self._share_planes()
+
+    # -- shared planes (planes.py) --------------------------------------------------------------
+
+    def _share_planes(self) -> None:
+        """Devices a floorplan says share one plane of DACs, or one laser, take turns at
+        WORK: each group of planes (`planes.resolve`) has an activity calendar beside the
+        devices' own -- which also hold occupancy, a block resting in a zone, that plays no
+        waveform.  An op at a member place, a junction's train and a road's carry each fit
+        into it; within one trip, a member's activity starts once the trip's last one on the
+        same plane is done (store-and-forward)."""
+        from .planes import resolve
+        fams = {p: li.master.family for p, li in self.leaf.items()}
+        self.planes = resolve(self.lib, fams, self.nets)
+        self._net_group, self._place_group = {}, {}
+        kind = type(next(iter(self.cal.values()))) if self.cal else Calendar
+        self.plane_cal = {}
+        for name, pl in self.planes.items():
+            g = pl["group"]
+            self.plane_cal.setdefault(g, kind())
+            for p in pl["places"]:
+                self._place_group[p] = g
+            for n in pl["nets"]:
+                self._net_group[n] = g
+
+    def _plane_fit(self, g, t: float, dur: float) -> float:
+        """The earliest time from `t` at which plane group `g` is free for `dur`."""
+        return t if g is None else self.plane_cal[g].earliest(t, dur)
+
+    def _plane_take(self, g, t0: float, t1: float) -> None:
+        if g is not None and t1 > t0:
+            self.plane_cal[g].reserve(t0, t1)
 
     # -- the road network -----------------------------------------------------------------
 
@@ -751,7 +787,7 @@ class City:
         self.events.append(row)
         return row
 
-    def carry(self, net, src, deps, tau, gids, role, ins, group, takes):
+    def carry(self, net, src, deps, tau, gids, role, ins, group, takes, hold=None):
         t0 = min(deps)
         row = [0, net, src[0], src[1], round(t0, 3), [round(d - t0, 3) for d in deps],
                round(tau, 3), list(gids), role, ins, group, round(max(takes), 3),
@@ -759,6 +795,16 @@ class City:
         q = road_heat(self.leaves, self.nets[net].conveyor)
         for g in gids:
             self.heat[g] = self.heat.get(g, 0.0) + q
+        if hold is not None:
+            self._holds[id(row)] = hold
+        g = self._net_group.get(net)
+        if g is not None:
+            # the plane is the road's while it works: from its first load to its last
+            # delivery (its own compiled program); kept as `road_spans` for the composition
+            # check (fold.check_composition)
+            first, last = self._road_span(net, list(deps), hold)
+            self._plane_take(g, first, last)
+            self._spans[id(row)] = (round(first, 3), round(last, 3))
         self.carries.append(row)
         self.net_cal[net].reserve(t0, max(takes))
         return row
@@ -798,8 +844,10 @@ class City:
                 s = self._start(path, s, O.duration_us)
             else:
                 s = self.cal[path].earliest(s, O.duration_us)
+            s = self._plane_fit(self._place_group.get(path), s, O.duration_us)
             if s <= s0 + 1e-9:
                 break
+        self._plane_take(self._place_group.get(path), s, s + O.duration_us)
         local = dict(li.ids)
         visitors = []
         for name, gid in (resting or {}).items():
@@ -811,8 +859,8 @@ class City:
                 local[name] = gid
                 visitors.append([name, gid])
             if trip is not None:
-                net, src, deps, tau = trip
-                self.carry(net, src, deps, tau, gids, "data", ins, grp,
+                net, src, deps, tau, *hold = trip
+                self.carry(net, src, deps, tau, gids, "data", ins, grp, hold=(hold or [None])[0],
                            takes=[s + i for i in tin.times_us])
         outputs = {}
         for tr in O.transfers:
@@ -866,13 +914,20 @@ class City:
 
     def _passes(self, jpath, O, s: float, gids, ins, grp) -> None:
         """The train's events: one lone-ion pass per ion, back to back from `s`."""
+        self._plane_take(self._place_group.get(jpath), s, s + O.duration_us)
         for k, g in enumerate(gids):
             t0 = s + k * O.each_us
             self.event(jpath, O.op, t0, t0 + O.each_us, ins, grp, bind=[[O.name, g]])
 
     # -- a road's own program ---------------------------------------------------------------
 
-    def _road(self, net, deps) -> list:
+    def _road(self, net, deps, not_before=None) -> list:
+        return self._road_hold(net, deps, not_before)[0]
+
+    def _road_hold(self, net, deps, not_before=None) -> tuple:
+        """(arrivals, the hold it took): `_road`, and the time the road could first load
+        when it had to wait -- for this trip's last road on its plane, or for its plane to be
+        free -- which the carry records (`road_holds`) so H1 compiles the very same program."""
         """When each ion of a bundle put on road `net`'s near stub at `deps` reaches its far
         stub: the road's own compiled program (`roads.compile_carry`), one class a cycle, the
         bundle's ions sharing the conveyor -- not one ion's transit added to each departure.
@@ -883,12 +938,37 @@ class City:
         t0 = min(deps)
         rel = tuple(round(d - t0, 3) for d in deps)
         memo = self.__dict__.setdefault("_road_memo", {})
-        if (L, rel) not in memo:
-            put = road_cycle_us(L).get("port_in", 5.0)
-            run = compile_carry(L, list(rel), [float("inf")] * len(rel),
-                                near_busy=[(d - put, d) for d in rel], verify_rules=False)
-            memo[(L, rel)] = run.arrived
-        return [t0 + a for a in memo[(L, rel)]]
+        g = self._net_group.get(net)
+        for _ in range(1000):
+            nb = None if not_before is None or not_before <= t0 else round(not_before - t0, 3)
+            if (L, rel, nb) not in memo:
+                put = road_cycle_us(L).get("port_in", 5.0)
+                busy = [(d - put, d) for d in rel] + ([(-1e12, nb)] if nb is not None else [])
+                run = compile_carry(L, list(rel), [float("inf")] * len(rel),
+                                    near_busy=busy, verify_rules=False)
+                memo[(L, rel, nb)] = (run.arrived, run.loaded[0])
+            arrived, first = memo[(L, rel, nb)]
+            if g is None:
+                break
+            # on a shared plane the road works only while the plane is free: wait for a gap
+            a, z = t0 + first, t0 + max(arrived)
+            free = self._plane_fit(g, a, z - a)
+            if free <= a + 1e-9:
+                break
+            not_before = free
+        eff = None if not_before is None or not_before <= t0 + 1e-9 else round(not_before, 3)
+        return [t0 + a for a in arrived], eff
+
+    def _road_span(self, net, deps, not_before=None) -> tuple:
+        """(first load, last delivery) of a bundle on road `net`: what its plane holds."""
+        arrived = self._road(net, deps, not_before)
+        t0 = min(deps)
+        L = self.nets[net].conveyor
+        rel = tuple(round(d - t0, 3) for d in deps)
+        nb = None if not_before is None or not_before <= t0 else round(not_before - t0, 3)
+        hit = self._road_memo.get((L, rel, nb))
+        first = t0 + hit[1] if hit else max([t0] + ([not_before] if not_before else []))
+        return first, max(arrived)
 
     def _door_start(self, s: float, arrived, tin) -> float:
         """The earliest start no earlier than `s` at which an op taking a bundle in at
@@ -912,31 +992,51 @@ class City:
 
     def trip(self, gids, src, deps, dst, t_min, ins, grp):
         """Take a bundle leaving `src` at `deps` to door `dst`: junction passes are scheduled
-        on the way; returns (arrival times at `dst`, the last channel, still open)."""
+        on the way; returns (arrival times at `dst`, the last channel, still open).  The open
+        road is the plane's already (if it is on one), so the next trip planned -- before the
+        op at `dst` takes this bundle in -- sees it."""
+        t, trip = self._trip(gids, src, deps, dst, t_min, ins, grp)
+        if trip is not None and trip[0] in self._net_group:
+            first, last = self._road_span(trip[0], list(trip[2]), trip[4])
+            self._plane_take(self._net_group[trip[0]], first, last)
+        return t, trip
+
+    def _trip(self, gids, src, deps, dst, t_min, ins, grp):
         if self.parallel:
             return self._wave(gids, src, deps, dst, t_min, ins, grp)
         t_min = max(t_min, self.road_free)
         t = list(deps)
         trip = None
+        done: dict = {}           # a shared plane's group -> when this trip's last activity on it ends
         for kind, info, u, _v in self._plan(gids, src, dst):
             if kind == "net":
                 tau = self.leaves.road_timing(self.nets[info].conveyor, 1)["transit_us"]
-                trip = (info, u, list(t), tau)
-                t = self._road(info, t)
+                g = self._net_group.get(info)
+                deps0 = list(t)
+                t, nb = self._road_hold(info, t, not_before=done.get(g))
+                trip = (info, u, deps0, tau, nb)
+                if g is not None:
+                    done[g] = max(t)
             else:
                 jpath, a, b, opname = info
                 O = self._train(jpath, a, b, opname, len(gids))
                 tin, tout = O.tin, O.tout
                 s = max(t_min, max(x - i for x, i in zip(t, tin.times_us)))
+                gj = self._place_group.get(jpath)
+                if gj is not None and gj in done:
+                    s = max(s, done[gj])
                 for _ in range(100):
                     s0 = s
                     s = self._door_start(s, t, tin.times_us)
                     s = self.cal[jpath].earliest(s, O.duration_us)
+                    s = self._plane_fit(gj, s, O.duration_us)
                     if s <= s0 + 1e-9:
                         break
-                net, usrc, udeps, tau = trip
+                net, usrc, udeps, tau, nb = trip
                 self.carry(net, usrc, udeps, tau, gids, "data", ins, grp,
-                           takes=[s + i for i in tin.times_us])
+                           takes=[s + i for i in tin.times_us], hold=nb)
+                if gj is not None:
+                    done[gj] = s + O.duration_us
                 self._passes(jpath, O, s, gids, ins, grp)
                 t = [s + x for x in tout.times_us]
                 trip = None
@@ -954,26 +1054,54 @@ class City:
         taus = [self.leaves.road_timing(self.nets[h[1]].conveyor, 1)["transit_us"] for h in nets]
         if not juncs:
             net = nets[0][1]
-            return self._road(net, deps), (net, nets[0][2], list(deps), taus[0])
+            arr, nb = self._road_hold(net, deps)
+            return arr, (net, nets[0][2], list(deps), taus[0], nb)
         passes = []
         for h in juncs:
             jpath, a, b, opname = h[1]
             O = self._train(jpath, a, b, opname, len(gids))
             passes.append((jpath, O.op, O, O.tin, O.tout))
-        arr0 = self._road(nets[0][1], deps)
+        arr0, hold0 = self._road_hold(nets[0][1], deps)
         s1 = max([t_min] + [x - i for x, i in zip(arr0, passes[0][3].times_us)])
         s1 = self._door_start(s1, arr0, passes[0][3].times_us)
-        for _ in range(100000):
-            starts = [s1]
-            for k in range(1, len(passes)):
-                outs = [starts[-1] + x for x in passes[k - 1][4].times_us]
-                arr = self._road(nets[k][1], outs)
+        group = [self._net_group.get(h[1]) for h in nets]
+        jgroup = [self._place_group.get(p[0]) for p in passes]
+
+        def lay(s1):
+            """Every junction's start, every road's hold, from the first junction's start:
+            within this trip, an activity on a shared plane begins once the trip's last one on
+            that plane is over (store-and-forward), and every take follows its delivery."""
+            last: dict = {}
+            if group[0] is not None:
+                last[group[0]] = max(arr0)
+            holds = [hold0]
+            starts = []
+            arr = arr0
+            for k in range(len(passes)):
                 tin_k = passes[k][3].times_us
-                starts.append(self._door_start(max(a - i for a, i in zip(arr, tin_k)), arr, tin_k))
+                if k == 0:
+                    sk = s1
+                else:
+                    outs = [starts[-1] + x for x in passes[k - 1][4].times_us]
+                    arr, eff = self._road_hold(nets[k][1], outs, not_before=last.get(group[k]))
+                    holds.append(eff)
+                    if group[k] is not None:
+                        last[group[k]] = max(arr)
+                    sk = self._door_start(max(a - i for a, i in zip(arr, tin_k)), arr, tin_k)
+                if jgroup[k] is not None and jgroup[k] in last:
+                    sk = self._door_start(max(sk, last[jgroup[k]]), arr, tin_k)
+                starts.append(sk)
+                if jgroup[k] is not None:
+                    last[jgroup[k]] = sk + passes[k][2].duration_us
+            holds.append(last.get(group[len(passes)]))
+            return starts, holds
+        for _ in range(100000):
+            starts, holds = lay(s1)
             shift = 0.0
             for k, (jpath, _opname, O, _tin, tout) in enumerate(passes):
                 a = starts[k]
                 got = self.cal[jpath].earliest(a, O.duration_us)
+                got = max(got, self._plane_fit(jgroup[k], a, O.duration_us))
                 shift = max(shift, got - a)
                 if k + 1 < len(passes):
                     a = starts[k] + min(tout.times_us)
@@ -989,16 +1117,16 @@ class City:
             s1 += shift
         else:
             raise CityError(f"no time at which the road from {src[0]} to {dst[0]} is clear")
-        trip = (nets[0][1], nets[0][2], list(deps), taus[0])
+        trip = (nets[0][1], nets[0][2], list(deps), taus[0], holds[0])
         t = list(deps)
         for k, (jpath, opname, O, tin, tout) in enumerate(passes):
-            net, usrc, udeps, tau = trip
+            net, usrc, udeps, tau, nb = trip
             self.carry(net, usrc, udeps, tau, gids, "data", ins, grp,
-                       takes=[starts[k] + i for i in tin.times_us])
+                       takes=[starts[k] + i for i in tin.times_us], hold=nb)
             self._passes(jpath, O, starts[k], gids, ins, grp)
             outs = [starts[k] + x for x in tout.times_us]
-            trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1])
-            t = self._road(nets[k + 1][1], outs)
+            t, nb = self._road_hold(nets[k + 1][1], outs, not_before=holds[k + 1])
+            trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1], nb)
         return t, trip
 
     def bring(self, bundle: Bundle, dst, t_min, ins, grp, *, stop_ok: bool = True):
@@ -1516,6 +1644,8 @@ class City:
             return frozenset((remap[e] if isinstance(e, int) else e, fl) for e, fl in s)
         self.pf = {b: ((ax[0], fix_set(ax[1])), (az[0], fix_set(az[1])))
                    for b, (ax, az) in self.pf.items()}
+        holds = [[c[1], c[4], round(self._holds[id(c)], 3)] for c in self.carries if id(c) in self._holds]
+        spans = [[c[1], c[4], *self._spans[id(c)]] for c in self.carries if id(c) in self._spans]
         self.carries.sort(key=lambda c: c[4])
         for i, c in enumerate(self.carries):
             c[0] = i
@@ -1554,6 +1684,9 @@ class City:
                         "instructions": [i.to_json() for i in self.alg.instructions]},
             "events": self.events,
             "carries": self.carries,
+            **({"planes": self.planes} if self.planes else {}),
+            **({"road_holds": sorted(holds)} if holds else {}),
+            **({"road_spans": sorted(spans)} if spans else {}),
             "wires": {w.path: [w.a[0], w.a[1], w.b[0], w.b[1], w.latency_us]
                       for w in self.wires.values()},
             "messages": self.messages,

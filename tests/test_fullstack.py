@@ -425,7 +425,7 @@ def test_each_gate_is_checked_once_and_the_composition_by_construction():
     keep = {}
     g = schedule_folded(alg, lib, leaves, keep=keep)
     per = check_folded(g, lib, leaves)
-    assert per["failed"] == [] and len(per["passed"]) == 12 and per["metrics"]["views"] == 19
+    assert per["failed"] == [] and len(per["passed"]) == 13 and per["metrics"]["views"] == 19
     assert check_composition(g, keep["folder"]) == []
     # two calls moved onto one another: only the composition can see it
     bad = _copy.deepcopy(g)
@@ -452,7 +452,8 @@ def test_a_box_is_fitted_past_every_conflict_not_just_the_first_resource():
     a, b = FastCalendar(), FastCalendar()
     a.reserve(0.0, 100.0 + 1e-11)          # free from 100 us on, to a rounding
     b.reserve(1500.0, 2000.0)              # busy where the box needs it
-    me = SimpleNamespace(cal={"A": a, "B": b}, net_cal={})
+    me = SimpleNamespace(cal={"A": a, "B": b}, net_cal={}, plane_cal={})
+    me._resource = lambda kind, path: MacroCity._resource(me, kind, path)
     m = SimpleNamespace(gate="g", footprint={("leaf", "A"): [(0.0, 10.0)], ("leaf", "B"): [(1310.0, 3510.0)]})
     t0 = MacroCity.fit(me, m, 100.0)
     assert t0 + 1310.0 >= 2000.0 - 1e-9      # B is free from 2000 us: the box starts after that

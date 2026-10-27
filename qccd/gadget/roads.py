@@ -77,6 +77,7 @@ class RoadRun:
     arrived: list                    # when each ion reached the far stub
     late: list = field(default_factory=list)
     failed: list = field(default_factory=list)      # basic rules the program breaks
+    peak: int = 0                    # the most ions ever on the road's sites (not its stubs)
     violations: list = field(default_factory=list)
 
 
@@ -112,6 +113,7 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
     tp = TrackedProgram(m, name, {ion: "XW" for ion in ions})
     times, loaded, arrived = [], [None] * n, [None] * n
     nxt = 0                                   # the next ion to load
+    rail_set, peak = set(rail), 0
     t = min(deps) if deps else 0.0
     guard = 0
     while any(a is None for a in arrived):
@@ -171,7 +173,8 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
         cls, dur = did
         times.append([tp.prog.instructions[-1].id, round(t, 3), round(t + dur, 3)])
         t += dur
-    run = RoadRun(prog=tp.prog, times=times, loaded=loaded, arrived=arrived)
+        peak = max(peak, sum(1 for i in ions if tp.pos[i] in rail_set))
+    run = RoadRun(prog=tp.prog, times=times, loaded=loaded, arrived=arrived, peak=peak)
     for j, (a, k) in enumerate(zip(arrived, takes)):
         if a > k + 1e-6:
             run.late.append(j)
@@ -225,6 +228,8 @@ def check_roads(gir: dict, lib, leaves) -> dict:
     and verified once."""
     out_w, in_w = _door_windows(gir, lib, leaves)
     nets = gir["nets"]
+    # a road on a shared plane may wait for the plane (store-and-forward, City._road)
+    holds = {(n, round(c0, 3)): nb for n, c0, nb in gir.get("road_holds") or []}
     violations, n_prog, n_shapes, failed_rules, bad, runs = [], 0, 0, set(), [], {}
     late = 0
     for c in gir["carries"]:
@@ -243,6 +248,9 @@ def check_roads(gir: dict, lib, leaves) -> dict:
         # road is kept off the stub exactly while the op on that side drives it
         near = [w for w in out_w.get(src, []) if w[1] > lo and w[0] < hi]
         farb = [w for w in in_w.get(far, []) if w[1] > lo and w[0] < hi]
+        nb = holds.get((c[1], round(t0, 3)))
+        if nb is not None and nb > t0:
+            near.append((t0 - 1e12, nb))
         key = (L, tuple(round(x - t0, 3) for x in deps), tuple(round(x - t0, 3) for x in takes),
                tuple((round(a - t0, 3), round(b - t0, 3)) for a, b in near),
                tuple((round(a - t0, 3), round(b - t0, 3)) for a, b in farb))
@@ -375,4 +383,29 @@ def machine_census(gir: dict, lib, leaves) -> dict:
         L = v[5] if len(v) > 5 else int(v[4])
         add("road", _report(("road", L), conveyor_machine(L, 9).arch))
         # (a bent road is its own conveyor: its corners are sites like any other)
-    return dict(tot, by_family=by_family)
+    # a plane of DACs shared by several devices is one plane: its broadcast channels are
+    # counted once (the largest member's), each member keeping its own compensation channels
+    # and switches.  A shared laser is one beam.
+    shared = 0
+    planes = gir.get("planes") or {}
+    beams_saved = 0
+    for name, pl in planes.items():
+        members = []
+        for p in pl["places"]:
+            m = lib[gir["leaves"][p][0]]
+            d = leaves.data.get(m.name)
+            if d and "arch" in d:
+                members.append(_report(("leaf", m.name), Architecture.from_json(d["arch"])))
+        for n in pl["nets"]:
+            v = gir["nets"][n]
+            L = v[5] if len(v) > 5 else int(v[4])
+            members.append(_report(("road", L), conveyor_machine(L, 9).arch))
+        if pl["kind"] == "dacs" and len(members) > 1:
+            shared += sum(r.dacs_broadcast for r in members) - max(r.dacs_broadcast for r in members)
+        elif pl["kind"] == "lasers":
+            beams_saved += max(0, len(members) - 1)
+    tot["dacs"] -= shared
+    tot["dacs_broadcast"] -= shared
+    devices = sum(row["devices"] for row in by_family.values())
+    return dict(tot, by_family=by_family, dacs_shared_away=shared,
+                beams=devices - beams_saved, planes=len(planes))

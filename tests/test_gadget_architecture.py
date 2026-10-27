@@ -83,8 +83,8 @@ def ours(gir, lib, leaves) -> dict:
 def test_the_machine_rules_are_text_in_the_rule_language():
     rs = load_rules("machine")
     assert rs.level == "machine"
-    # G1-G14 on the schedule, H1 on the hardware between the gadgets (GADGETS.md §4.2)
-    assert [r.id for r in rs.rules] == [f"G{i}" for i in range(1, 15)] + ["H1"]
+    # G1-G14 on the schedule, H1-H2 on the hardware between the gadgets (GADGETS.md §4.2-4.3)
+    assert [r.id for r in rs.rules] == [f"G{i}" for i in range(1, 15)] + ["H1", "H2"]
     assert "machine" in names("machine") and "floorplan" in names("machine")
     assert "machine" not in names()           # the device level's list is unchanged
     fp = load_rules("floorplan")
@@ -158,10 +158,12 @@ def test_two_bundles_on_one_road_at_once_fail_g13(runs, lib, leaves):
 
 
 def test_g14_counts_the_ions_on_a_road_not_whether_one_stopped(runs, lib, leaves):
-    """A whole bundle held at the far end of a street breaks G14: nine ions on a few sites.
-    One ion stopping there briefly, while the rest are still on their way, does not -- the
-    street never holds more than a couple of the bundle at once (the old G14 refused that
-    too, on the theory that any stop is the whole bundle stopping)."""
+    """G14 counts the ions on a road's sites, as the road's own compiled program has them.
+    A whole bundle held at the far end of a street does not stop on the street: the road
+    delivers each ion to the far door's stub (the junction's arm, room for nine; R1 in the
+    road's program, H1) and it waits there -- what breaks is the junction, which passed ions
+    that had not been taken in yet (G1, G12).  One ion stopping briefly breaks nothing."""
+    from qccd.gadget.roads import check_roads
     _, par, _ = runs["bell_cnot"]
     i = next(k for k, c in enumerate(par["carries"]) if "street" in str(c[1]) and len(c[7]) == 9)
     held = copy.deepcopy(par)
@@ -169,7 +171,11 @@ def test_g14_counts_the_ions_on_a_road_not_whether_one_stopped(runs, lib, leaves
     last = max(c[5]) + c[6] + 1000.0             # every ion taken only after the last has arrived
     c[12] = [last + k for k in range(len(c[12]))]
     c[11] = c[4] + max(c[12])
-    assert ours(held, lib, leaves)["G14"] == "fails"
+    run = check_roads(held, lib, leaves)["runs"][i]
+    assert not run.violations and max(run.arrived) < min(c[12]) and run.peak < len(c[7])
+    v = ours(held, lib, leaves)
+    assert v["G14"] == "holds" and v["H1"] == "holds"
+    assert v["G1"] == "fails" and v["G12"] == "fails"
     brief = copy.deepcopy(par)
     c = brief["carries"][i]
     c[12] = [c[12][0] + 50.0] + list(c[12][1:])   # the first ion waits 50 us

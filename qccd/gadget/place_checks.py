@@ -42,6 +42,9 @@ PLACE_RULES = {
           "on its road's own device (a cycle one waveform, ions holding by their switches), it "
           "passes R1-R23, it delivers every ion before the far side takes it, and a door's stub "
           "is driven by one side at a time",
+    "H2": "devices that share a plane (of DACs, or a laser) never play two waveforms at once: "
+          "every cycle of every member -- each op's TSIR at its times, each road's compiled "
+          "program -- either has the plane to itself or is the very same cycle",
 }
 
 #: the place families that hold no ions: their ops are modeled, not replayed
@@ -197,6 +200,14 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     verdict("G3", g3)
 
     # -- G4 ----------------------------------------------------------------------------------
+    # the ions on a road's SITES, as its own compiled program has them (roads.py): an ion
+    # waiting on a door's stub -- for the far side to take it, or for a shared plane -- is on
+    # the stub, whose room is the bundle's.  Without a leaf library, the coarse count: every
+    # ion from when it is put on the near stub until it is taken off the far one.
+    roads = None
+    if leaves is not None and carries:
+        from .roads import check_roads
+        roads = check_roads(gir, lib, leaves)
     g4, worst = [], {}
     per_net = defaultdict(list)
     for c in carries:
@@ -205,6 +216,10 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         level = hi = 0
         ms = []
         for c in cs:
+            run = roads["runs"].get(c[0]) if roads else None
+            if run is not None:
+                hi = max(hi, run.peak)
+                continue
             for dep, take in zip(c[5], c[12]):
                 ms += [(c[4] + dep, 1), (c[4] + take, -1)]
         for _, d in sorted(ms, key=lambda x: (x[0], x[1])):
@@ -556,11 +571,22 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         # (a schedule with no carry -- a gate's view that only calls others -- has nothing on
         # its roads to break the rules with: H1 holds there, as G4 does)
         from .roads import check_roads, machine_census
-        roads = check_roads(gir, lib, leaves)
+        roads = roads or check_roads(gir, lib, leaves)
         out["metrics"]["roads"] = roads["metrics"]
         out["metrics"]["hardware"] = machine_census(gir, lib, leaves)
         verdict("H1", roads["violations"][:20] + (
             [f"... {len(roads['violations']) - 20} more"] if len(roads["violations"]) > 20 else []))
+        # -- H2: devices that share a plane take turns --------------------------------------
+        if gir.get("planes"):
+            from .planes import check_planes
+            pl = check_planes(gir, lib, leaves, runs=roads["runs"])
+            out["metrics"]["planes"] = pl["metrics"]
+            verdict("H2", pl["violations"])
+        else:
+            # no device shares a plane: each drives its own, one waveform at a time by its
+            # own program (H1, the leaves' checks) -- H2 holds there, as the machine rule says
+            verdict("H2", [])
     else:
         verdict("H1", [], skipped="no leaf library to compile the roads with")
+        verdict("H2", [], skipped="no leaf library to read the ops' cycles from")
     return out

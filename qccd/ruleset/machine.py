@@ -351,11 +351,43 @@ def _with_program(M: MachineModel, hw: Hardware, gir: dict, name: str) -> Execut
         if family(e[3]) == "depot" and e[4].startswith("load."):
             for _, gid in e[8]:
                 marks.append((float(e[1]), -1, gid, "born", Place(e[3]), None))
+    # an ion's way along a road, as the road's own compiled program has it (gadget/roads.py):
+    # put on the near door's stub, loaded onto the road's sites, delivered onto the far door's
+    # stub, taken in.  A stub is the door's, so an ion waiting there -- for the road to load
+    # it, or for the far side to take it -- is on neither the place nor the road.
+    runs = None
+    if M.leaves is not None and M.carries:
+        from ..gadget.roads import check_roads
+        r = check_roads(gir, M.lib, M.leaves)
+        runs = M._road_runs = r["runs"]
+        M._road_bad = set(r["bad"])
     for c in M.carries:
         row = c.facts["row"]
-        for gid, dep, take in zip(row[7], c.facts["deps"], c.facts["takes"]):
-            marks.append((dep, 1, gid, "leave", c.facts["road"], c.facts["from"]))
-            marks.append((take, 0, gid, "arrive", c.facts["to"], c.facts["road"]))
+        run = runs.get(row[0]) if runs else None
+        near = far = None
+        ends = M.road_ends.get(c.facts["road"]) if run is not None else None
+        if ends:
+            for d in ends:
+                if M.doors.get(d, (None,))[0] == row[2]:
+                    near = d
+                else:
+                    far = d
+        for k, (gid, dep, take) in enumerate(zip(row[7], c.facts["deps"], c.facts["takes"])):
+            if near is None or far is None:
+                marks.append((dep, 1, gid, "leave", c.facts["road"], c.facts["from"]))
+                marks.append((take, 0, gid, "arrive", c.facts["to"], c.facts["road"]))
+                continue
+            load, got = c.t0 + run.loaded[k], c.t0 + run.arrived[k]
+            if load > dep + 1e-6:
+                marks.append((dep, 1, gid, "leave", near, c.facts["from"]))
+                marks.append((load, 1, gid, "leave", c.facts["road"], near))
+            else:
+                marks.append((dep, 1, gid, "leave", c.facts["road"], c.facts["from"]))
+            if take > got + 1e-6:
+                marks.append((got, 1, gid, "leave", far, c.facts["road"]))
+                marks.append((take, 0, gid, "arrive", c.facts["to"], far))
+            else:
+                marks.append((take, 0, gid, "arrive", c.facts["to"], c.facts["road"]))
     marks.sort(key=lambda m: (m[0], m[1]))
 
     # every moment a rule may compare: activity bounds, and the classical half's times
@@ -911,9 +943,31 @@ def _road_ok(ctx: Ctx, c):
     bad = getattr(M, "_road_bad", None)
     if bad is None:
         from ..gadget.roads import check_roads
-        bad = set(check_roads(M.gir, M.lib, M.leaves)["bad"]) if M.leaves is not None else set()
-        M._road_bad = bad
+        r = check_roads(M.gir, M.lib, M.leaves) if M.leaves is not None else {"bad": [], "runs": {}}
+        bad = M._road_bad = set(r["bad"])
+        M._road_runs = r["runs"]
     return o.facts["row"][0] not in bad
+
+
+@term("plane_conflicts()", "a number", "How many times two devices that share a plane (of "
+      "DACs, or one laser: the floorplan's `plane`) play different cycles at once -- every op's "
+      "TSIR at its times, every road's compiled program (gadget/planes.py).  0 when nothing "
+      "shares a plane.", GROUP_M, kinds=K)
+def _plane_conflicts(ctx: Ctx):
+    M = _prog(ctx, "planes")
+    got = getattr(M, "_plane_conflicts", None)
+    if got is None:
+        got = 0
+        if M.gir.get("planes") and M.leaves is not None:
+            from ..gadget.planes import check_planes
+            runs = getattr(M, "_road_runs", None)
+            if runs is None:
+                from ..gadget.roads import check_roads
+                runs = M._road_runs = check_roads(M.gir, M.lib, M.leaves)["runs"]
+            r = check_planes(M.gir, M.lib, M.leaves, runs=runs)
+            got = len(r["violations"])
+        M._plane_conflicts = got
+    return got
 
 
 @term("ion_loss_limit()", "quanta", "The hottest an ion may get before it is likely lost: about "
@@ -1298,13 +1352,27 @@ def _waits(ctx: Ctx, c):
     return any(take - (dep + tau) > 1e-6 for dep, take in zip(o.facts["deps"], o.facts["takes"]))
 
 
-@term("crowd(c)", "ions", "The most ions of carry c on its road at one moment: each is on "
-      "it from when it leaves until it is taken in at the far end, travelling or stopped.",
+@term("crowd(c)", "ions", "The most ions of carry c on its road's sites at one moment, as "
+      "the road's compiled program has them (an ion waiting at a door is on its stub); "
+      "without one, each is on it from when it leaves until it is taken in at the far end.",
       GROUP_M, kinds=K)
 def _crowd(ctx: Ctx, c):
     o = _activity(c, "crowd")
     if o.kind != "carry":
         raise EvalError(f"{o.label()} is not a carry")
+    # the ions on the road's sites, as its own compiled program has them (roads.py): an ion
+    # waiting on a door's stub is on the stub, not the road
+    M = _prog(ctx, "carries")
+    if M.leaves is not None:
+        runs = getattr(M, "_road_runs", None)
+        if runs is None:
+            from ..gadget.roads import check_roads
+            r = check_roads(M.gir, M.lib, M.leaves)
+            runs = M._road_runs = r["runs"]
+            M._road_bad = set(r["bad"])
+        run = runs.get(o.facts["row"][0])
+        if run is not None:
+            return run.peak
     # an ion taken in at t is off the road before one that leaves at t is on it
     edges = sorted([(dep, 1) for dep in o.facts["deps"]] + [(take, -1) for take in o.facts["takes"]])
     n = most = 0

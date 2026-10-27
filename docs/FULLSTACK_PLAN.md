@@ -395,7 +395,11 @@ end
   - A road is its real geometry: a bent road is its own conveyor, with a site at every
     corner. A corner splits a shift into one cycle per direction (R22).
   - The page plays every carry's compiled program.
-  - Next: shared DAC/laser planes between devices.
+  - Shared planes: `plane NAME dacs|lasers MEMBERS` in the floorplan. Members take turns,
+    with a store-and-forward wait between a trip's roads on one plane, and turn-taking
+    refresh rounds. Rule H2 judges the composed program, and the census counts a shared
+    plane once (GADGETS.md §4.3). A bus of every road saves 55% of the town's DACs at
+    7-20% more time.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which

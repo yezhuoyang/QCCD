@@ -17,6 +17,8 @@ comment (docs/ARCHITECTURE.md §2):
     road prep.out -- j1_2 via 25 20      # a route: through these corners, in order
     wire prep.syn -> decoder.syn latency 5 via 17.85 62, 2 62
     wires auto bus 62                    # every classical port to the control places
+    plane mems dacs zone1 zone2 zone3    # these devices share one plane of DACs
+    plane beam lasers post bridge        # ... or one laser
 
 * A **place** is any verified place master (`prep_d3`, `se_d3`, `tcx_d3`, `ls_d3`,
   `read_d3`, `zone_d3`, `mem_d3`, `msf15`, `inj_d3`, `depot9`, `dec_d3`, `arch1`) or its
@@ -29,6 +31,12 @@ comment (docs/ARCHITECTURE.md §2):
   measure every composite uses (`designs.Designer`).  Without `via`, a road between two
   points not on one line takes one corner, horizontal first.
 * A **wire** carries bits, never ions, with one cost: its latency in microseconds.
+* A **plane** says that devices share one plane of control: `dacs`, their transport
+  electrodes' channels (one waveform a cycle for all of them), or `lasers`, their beam (one
+  pulse at a time).  Members are places, junctions and roads by name, `roads`, `junctions`,
+  or a family word.  Every device otherwise drives its own plane, as its master declares.
+  Members of a plane take turns, and rule H2 checks that no two ever play at once
+  (GADGETS.md §4.3).
 
 `load()` turns the text into the `Library` composite the scheduler runs on (the same object
 `town.town()` builds), with its regions; `write()` turns a composite back into text.  The
@@ -121,6 +129,8 @@ class Floorplan:
     junctions: list = field(default_factory=list)
     roads: list = field(default_factory=list)
     wires: list = field(default_factory=list)
+    #: (name, kind, [members], line): devices sharing one plane of DACs or one laser
+    planes: list = field(default_factory=list)
     auto_wires: bool = False
     bus_y: float | None = None
     source: str = ""
@@ -210,6 +220,13 @@ def parse_floorplan(source: str, name: str = "floorplan") -> Floorplan:
                                   float(m.group(3)) if m.group(3) else None,
                                   _points(m.group(4), lineno, raw) if m.group(4) else [],
                                   m.group(5), lineno))
+        elif word == "plane":
+            m = re.fullmatch(r"(\w+)\s+(dacs|lasers)\s+(.+)", rest)
+            if not m:
+                raise FloorplanError(lineno, raw, "write: plane NAME dacs|lasers MEMBER ...")
+            if any(q[0] == m.group(1) for q in fp.planes):
+                raise FloorplanError(lineno, raw, f"plane {m.group(1)} is declared twice")
+            fp.planes.append((m.group(1), m.group(2), m.group(3).split(), lineno))
         elif word == "wires":
             m = re.fullmatch(rf"auto(?:\s+bus\s+({_NUM}))?", rest)
             if not m:
@@ -218,7 +235,7 @@ def parse_floorplan(source: str, name: str = "floorplan") -> Floorplan:
             fp.bus_y = float(m.group(1)) if m.group(1) else None
         else:
             raise FloorplanError(lineno, raw, f"unknown item {word!r}: floorplan, code, region, "
-                                 f"place, junction, road, wire, wires")
+                                 f"place, junction, road, wire, wires, plane")
     if not fp.places:
         raise FloorplanError(0, "", "a floorplan places at least one place")
     return fp
@@ -326,7 +343,8 @@ def load(fp: Floorplan | str, leaves: LeafLibrary, *, name: str | None = None) -
                 instances=instances, links=links, ports=[],
                 params={"places": [p[0] for p in fp.places if p[4] != "control"],
                         "control": [p[0] for p in fp.places if p[4] == "control"],
-                        "code": fp.code, "regions": fp.regions, "floorplan": fp.source})
+                        "code": fp.code, "regions": fp.regions, "floorplan": fp.source,
+                        "planes": [[n, k, list(mm)] for n, k, mm, _ in fp.planes]})
     d.lib.top = fp.name
     return d.lib
 
@@ -427,4 +445,9 @@ def write(lib: Library, *, regions: dict[str, str] | None = None, title: str | N
             default = [] if (pa[0] == pb[0] or pa[1] == pb[1]) else [[pb[0], pa[1]]]
             v = "" if via == default else " via " + ", ".join(f"{_num(x)} {_num(y)}" for x, y in via)
             lines.append(f"wire {c.a} -> {c.b} latency {_num(c.latency_us)}{v} as {c.name}")
+    planes = top.params.get("planes") or []
+    if planes:
+        lines += ["", "# planes: devices that share their DACs or their laser"]
+        for name, kind, members in planes:
+            lines.append(f"plane {name} {kind} {' '.join(members)}")
     return "\n".join(lines).rstrip() + "\n"

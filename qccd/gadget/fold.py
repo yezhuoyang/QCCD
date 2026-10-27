@@ -253,6 +253,7 @@ class MacroCity(City):
         self.folder, self.depth = folder, depth
         self.cal = {p: FastCalendar() for p in self.leaf}
         self.net_cal = {p: FastCalendar() for p in self.nets}
+        self._share_planes()              # (the calendars are new: share them again)
         #: every block of this body that has a home, and the homes of the whole program,
         #: which no block of this body may rest in
         self.home_of: dict = dict(homes or {})
@@ -343,6 +344,40 @@ class MacroCity(City):
         M = b.leaf
         O = self.leaf[M].master.ops["refresh"]
         every = REFRESH_EVERY_US + O.duration_us
+        g = self._place_group.get(M)
+        if g is not None:
+            # a memory on a shared plane (planes.py): each round takes its turn on the plane --
+            # the first gap once REFRESH_EVERY_US has passed since the last ended -- and is a
+            # hold of one round, so no two members ever refresh over each other (H2)
+            rounds, t = [], since
+            while True:
+                s = self._plane_fit(g, t + REFRESH_EVERY_US, O.duration_us)
+                if s + O.duration_us > until + 1e-9:
+                    break
+                self._plane_take(g, s, s + O.duration_us)
+                rounds.append(s)
+                t = s + O.duration_us
+            if rounds:
+                names = self.leaf[M].master.ops["release"].transfer("out", "out").ions
+                ins = Instr(index=self.next_index, line=before.line if before else 0,
+                            text=f"se {q} 1    # refresh: {len(rounds)} round"
+                                 f"{'s' if len(rounds) > 1 else ''} in {M}, each when its plane is free",
+                            kind="se", blocks=[q], rounds=1,
+                            not_before=round(rounds[0], 3), refresh=True)
+                self.next_index += 1
+                self.extra.append((before.index if before else None, ins))
+                bind = ([[nm, gg] for nm, gg in self.leaf[M].ids.items()]
+                        + [[nm, gg] for nm, gg in zip(names, b.gids)])
+                for s in rounds:
+                    self.holds.append({"block": q, "place": M,
+                                       "from": round(s + O.duration_us - every, 3),
+                                       "every": round(every, 3), "n": 1, "round_us": O.duration_us,
+                                       "ins": ins.index, "bind": bind})
+                self.hold_pattern(M)
+                since = t
+                self.mem_last[M] = max(self.mem_last.get(M, 0.0), since)
+            self.rest_since[q] = since
+            return
         n = int((until - since) // every)
         if n >= 1:
             names = self.leaf[M].master.ops["release"].transfer("out", "out").ions
@@ -439,7 +474,7 @@ class MacroCity(City):
             t = max([t] + [self.decoded_by(n, "the call's guard") for n in ins.cond.names])
         t0 = self.fit(m, t)
         for (kind, path), ivs in m.footprint.items():
-            cal = self.cal[path] if kind == "leaf" else self.net_cal[path]
+            cal = self._resource(kind, path)
             for a, b in ivs:
                 cal.reserve(t0 + a, t0 + b)
         for b in args:
@@ -471,10 +506,18 @@ class MacroCity(City):
                 self.pf_guarded.setdefault(b, []).append({"text": f"inside {ins.gate}"})
         self.t_now = max(self.t_now, t0 + m.span)
 
+    def _resource(self, kind, path):
+        """A footprint's calendar: a place's or junction's, a road's, or a shared plane's."""
+        if kind == "leaf":
+            return self.cal[path]
+        if kind == "net":
+            return self.net_cal[path]
+        return self.plane_cal[path]
+
     def fit(self, m: Macro, t: float) -> float:
         """The first start, no earlier than `t`, at which every interval of the footprint is
         free on this body's calendars."""
-        items = [(self.cal[p] if k == "leaf" else self.net_cal[p], p, a, b)
+        items = [(self._resource(k, p), p, a, b)
                  for (k, p), ivs in m.footprint.items() for a, b in ivs]
         for _ in range(100_000):
             shift = 0.0
@@ -565,6 +608,12 @@ class MacroCity(City):
         for p, cal in self.net_cal.items():
             if cal.iv:
                 fp[("net", p)] = _merge(list(cal.iv))
+        # what the gate's work holds of each shared plane (a group of them): its calls never
+        # overlap another's there, nor the caller's own (planes.py)
+        for grp, cal in self.plane_cal.items():
+            ivs = [(a, b) for a, b in cal.iv if b != math.inf]
+            if ivs:
+                fp[("plane", grp)] = _merge(ivs)
         span = max([b for ivs in fp.values() for _, b in ivs]
                    + [gir["makespan_us"]] + [self.block_free.get(b, 0.0) for b in self.params]
                    + [self.mem_last.get(h, 0.0) for h in homes] + [0.0])
@@ -652,6 +701,8 @@ def _macro_json(m: Macro) -> dict:
             "messages": g["messages"], "windows": g["windows"], "frames": g["frames"],
             "outcomes": g["outcomes"], "blocks": g["blocks"], "refused": g["refused"],
             "holds": g["holds"], "calls": m.calls,
+            # a road's hold and its span on a shared plane (planes.py), when it has them
+            **{k: g[k] for k in ("road_holds", "road_spans") if g.get(k)},
             # what the macro holds, per resource, as one hull: the page's "busy" bars
             "uses": {f"{k}:{p}": [round(ivs[0][0], 3), round(ivs[-1][1], 3)]
                      for (k, p), ivs in m.footprint.items()}}
@@ -892,6 +943,9 @@ class _Expander:
     # -- pass 2: rows ---------------------------------------------------------------------
     def rows(self, body, calls, t0, gidmap, names, cv, path, env):
         imap = self.imaps[path]
+        # a road's hold (store-and-forward on a shared plane), at program time
+        for net, c0, nb in body.get("road_holds") or []:
+            self.rh.append([net, round(c0 + t0, 3), round(nb + t0, 3)])
 
         def ii(i):
             return imap.get(i, i)
@@ -1062,7 +1116,11 @@ class _Expander:
         ident = (lambda n: n)
         self.number(g["program"], g["calls"], ident, ident, "")
         self.blocks.update(g["blocks"])
+        self.rh: list = []
         self.rows(g, g["calls"], 0.0, ident, ident, ident, "", {})
+        out.pop("road_holds", None)
+        if self.rh:
+            out["road_holds"] = sorted(self.rh)
         self.unroll_holds()
         self.ev.sort(key=lambda e: (e[1], e[2], e[3]))
         eid = {e[0]: i for i, e in enumerate(self.ev)}
@@ -1138,6 +1196,7 @@ def view(g: dict, mid: str | None = None) -> dict:
     sub = {k: v for k, v in g.items() if k not in ("macros", "calls", "holds", "folded")}
     sub.update({k: body[k] for k in ("events", "carries", "messages", "windows", "frames",
                                      "outcomes", "blocks", "program")})
+    sub["road_holds"] = body.get("road_holds") or []
     sub["holds"] = body.get("holds") or []
     sub["calls"] = body.get("calls") or []
     sub["macros"] = g["macros"]
@@ -1208,6 +1267,18 @@ def check_composition(g: dict, folder: Folder) -> list:
                 per.setdefault(("leaf", e[3]), []).append((e[1], e[2], "own"))
         for c in body["carries"]:
             per.setdefault(("net", c[1]), []).append((c[4], c[11], "own"))
+        # a shared plane: the body's own work on its members (an op's span, a road's from its
+        # first load to its last delivery: `road_spans`), against its calls' plane footprints
+        planes = g.get("planes") or {}
+        if planes:
+            pgrp = {p: pl["group"] for pl in planes.values() for p in pl["places"]}
+            ngrp = {n: pl["group"] for pl in planes.values() for n in pl["nets"]}
+            for e in body["events"]:
+                if e[2] > e[1] and e[3] in pgrp:
+                    per.setdefault(("plane", pgrp[e[3]]), []).append((e[1], e[2], "own"))
+            for net, _c0, first, last in body.get("road_spans") or []:
+                if net in ngrp:
+                    per.setdefault(("plane", ngrp[net]), []).append((first, last, "own"))
         for c in body.get("calls") or []:
             for res, ivs in by_id[c["m"]].footprint.items():
                 for a, b in ivs:

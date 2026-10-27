@@ -252,9 +252,63 @@ not the one-ion pretence.
 **The machine's wiring is counted** (`machine_census`): electrodes, switches and DACs for
 every device the floor holds, each driving its own plane as its master declares. On the
 town, the 60 roads and 32 junctions take 3,054 of the machine's 3,438 DACs. That is the
-price of every road having its own plane. A design that shared a plane between roads would
-have to declare it, and its roads would then have to play the same waveform in the same
-cycle. That is open co-design.
+price of every road having its own plane. §4.3 lets a design share planes instead.
+
+### 4.3 Shared planes (H2)
+
+A floorplan may say that devices share one plane of DACs, or one laser:
+
+```
+plane bus  dacs   roads                  # every road on one set of channels
+plane mems dacs   memory                 # every memory (a family word)
+plane beam lasers post bridge clinic     # three places under one beam
+```
+
+Members are places, junctions and roads by name, `roads`, `junctions`, or a family word.
+A shared plane is one set of channels, so its rule is a single device's rule: one waveform
+at a time. Two members may play a cycle at once only if it is the very same cycle: the same
+class (or gate), the same lab directions, the same start and end.
+
+**The scheduler makes members take turns.** Each group of planes (planes that share a
+device form one group) has an activity calendar beside the devices' own. Those still hold
+occupancy, such as a block resting in a zone, which plays no waveform.
+- An op at a member place and a junction's train each fit into the group's calendar.
+- A road on a plane loads only once the plane is free. Within one trip, an activity on a
+  plane starts after the trip's previous one on that plane is over (store-and-forward): the
+  bundle waits on the door's stub between them. The road records that hold (`road_holds`),
+  so H1 compiles the very program the city timed.
+- A road holds its plane from its first load to its last delivery (`road_spans`).
+- In a folded run, a gate's plane activity is part of its footprint, so its calls never
+  overlap each other's on a plane, and the composition check reads the spans back.
+- A resting block's refresh rounds in a memory on a plane each take their turn: the first
+  gap once 0.4 s have passed since the last, a hold row of one round each.
+
+**Rule H2** (the place check, and the machine rule `plane_conflicts() = 0`) reads the
+composed program: every op's TSIR cycles at their real times, and every road's compiled
+program. It reports any instant at which two members play different cycles. A schedule
+made without the plane fails it.
+
+**G4 and `crowd`** now count the ions on a road's sites from its compiled program. An ion
+waiting on a door's stub, for the road or for the far side, is on the stub, whose room is
+the bundle's (R1 in the road's program). The machine model follows an ion through the near
+stub, the road and the far stub, by the same program.
+
+**What it buys** (`machine_census` counts a shared plane's broadcast channels once):
+
+| floor, program | planes | DACs | makespan |
+|---|---|---|---|
+| town, `bell_cnot` | none | 3,438 | 163.2 ms |
+| town, `bell_cnot` | `bus dacs roads` | 1,550 | 196.1 ms |
+| town, `teleport` | none | 3,438 | 536.3 ms |
+| town, `teleport` | `bus dacs roads` | 1,550 | 571.3 ms |
+| town, `teleport` | `mems dacs zone1 zone2 zone3` | 3,374 | 536.3 ms |
+| town, `teleport` | `beam lasers post bridge clinic` | 3,438 (101 beams, not 103) | 572.9 ms |
+| full stack, Shor-15 (folded) | none | 6,826 | 9.28 s |
+| full stack, Shor-15 (folded) | `bus dacs roads` | 2,986 | 11.00 s |
+| full stack, Shor-15 (folded) | `mems dacs memory` | 6,602 | 10.08 s |
+
+Every row holds every check. On the town, a bus of every road saves 55% of the DACs at
+7-20% more time. That is the co-design trade-off in numbers.
 
 ---
 
