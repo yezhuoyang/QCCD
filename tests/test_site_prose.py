@@ -37,6 +37,13 @@ def test_an_artifact_keeps_its_name_and_loses_its_folder():
     assert "arch/ring144_24v" not in got
 
 
+def test_a_call_keeps_its_parentheses_where_a_citation_loses_its_own():
+    got = prose.strip("Rule H2 (`plane_conflicts() = 0`) holds (`qccd/gadget/planes.py`), "
+                      "as `road_ok()` does (`qccd/gadget/roads.py`).")
+    assert "`plane_conflicts() = 0`" in got and "`road_ok()`" in got
+    assert "qccd/" not in got and "planes.py" not in got
+
+
 @pytest.mark.parametrize("doc", DOCS, ids=lambda p: p.name)
 def test_every_rendered_document_loses_the_repository(doc: Path):
     got = prose.strip(doc.read_text(encoding="utf-8"), doc.stem)

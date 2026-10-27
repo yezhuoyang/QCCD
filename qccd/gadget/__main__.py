@@ -234,7 +234,8 @@ def _cmd_site(a) -> int:
         live = [row for row in live if not row["u"].startswith(f"{SECTION}/")]
         idx = json.dumps(live + index_entries(), separators=(",", ":"), ensure_ascii=False)
     res = standalone(Path(a.out), idx, cache_dir=a.cache)
-    ok_algs = all(r["signoff"].get("passed") and not r["checks"]["failed"]
+    # signed off flat, or compositionally where the flat check does not apply (shor15)
+    ok_algs = all(r["stats"]["signed_off"] and not r["checks"]["failed"] and not r["rules"]["failed"]
                   for r in res["algorithms"].values())
     ok_beta = all(not r["checks"]["failed"] or k == "demo" for k, r in res["beta"].items())
     return 0 if ok_algs and ok_beta else 1

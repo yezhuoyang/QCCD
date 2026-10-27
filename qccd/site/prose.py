@@ -265,7 +265,8 @@ def _fences(src: str):
         yield fence, run
 
 
-_TIDY = ((r"\(\s*[,;]?\s*\)", ""), (r"\[\s*\]", ""), (r"\(\s*(?:and|or|see|in|at)\s*\)", ""),
+#: (an emptied parenthesis goes; a call's own `()`, right after its name, stays)
+_TIDY = ((r"(?<![A-Za-z0-9_])\(\s*[,;]?\s*\)", ""), (r"\[\s*\]", ""), (r"\(\s*(?:and|or|see|in|at)\s*\)", ""),
          (r"\s+([,.;:])", r"\1"), (r"([,;:])\s*\1", r"\1"), (r",\s*\)", ")"), (r"\(\s*,", "("),
          (r"\s{2,}", " "), (r"^\s*[,;]\s*", ""))
 
@@ -284,6 +285,9 @@ def _strip_line(line: str) -> str:
 
     def paren(m: re.Match) -> str:
         inner = m.group(1)
+        before = m.string[m.start() - 1] if m.start() else " "
+        if not inner.strip() and (before.isalnum() or before == "_"):
+            return m.group(0)                              # a call's own `()`, not a citation
         rest = PATH.sub("", inner.replace("`", ""))
         rest = re.sub(r"[\s,;:§0-9.·and\-]+", "", rest)
         return "" if not rest else m.group(0)              # a parenthesis of citations only
