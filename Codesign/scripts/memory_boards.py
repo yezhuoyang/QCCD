@@ -479,7 +479,9 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
     for i, r in enumerate(order):
         e = {"key": f"{i + 1:02d}_{r['device']}", "family": r["family"], "title": f"{release.title} on {r['title']}",
              "arch": Path(r["arch"]), "claim": r["claim"], "kicker": BOARDS[board]["short"].upper() + " · LOGICAL ERROR RATE",
-             "short": r["device"], "answer": best is not None and r is best}
+             "short": r["device"], "answer": best is not None and r is best,
+             # priced on the board's clock, so the page evaluates by the board's evaluation
+             "table": release.manifest["physics"].get("rank_table", "qccdsim_jones")}
         if r["status"] == "ok":
             n = r["numbers"]
             e.update(prefix=Path(r["prefix"]), qasm=Path(r["qasm"]), numbers=dict(n), r10=n.get("r10", False),

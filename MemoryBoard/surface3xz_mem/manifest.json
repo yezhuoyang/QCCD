@@ -8,6 +8,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": true,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/grid9x9/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/grid9x9/circuit.qasm",
   "numbers": {
@@ -81,7 +82,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2237143,
+  "bytes": 2239690,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -127,6 +128,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
@@ -200,7 +202,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2242632,
+  "bytes": 2245179,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -244,6 +246,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid5x5",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/grid5x5/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/grid5x5/circuit.qasm",
   "numbers": {
@@ -317,7 +320,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2192364,
+  "bytes": 2194911,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
@@ -361,6 +364,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/cyclone_base/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
@@ -434,7 +438,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2283178,
+  "bytes": 2285725,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -478,6 +482,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ladder_2x72",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/ladder_2x72/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/ladder_2x72/circuit.qasm",
   "numbers": {
@@ -551,7 +556,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2737050,
+  "bytes": 2739595,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -595,6 +600,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring144_24v",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/ring144_24v/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/ring144_24v/circuit.qasm",
   "numbers": {
@@ -668,7 +674,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3600263,
+  "bytes": 3602809,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -712,6 +718,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "h2_racetrack",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/h2_racetrack/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/h2_racetrack/circuit.qasm",
   "numbers": {
@@ -785,7 +792,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2979892,
+  "bytes": 2982424,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -829,6 +836,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "torus4x4",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/torus4x4/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/torus4x4/circuit.qasm",
   "numbers": {
@@ -913,7 +921,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2212586,
+  "bytes": 2215133,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -959,6 +967,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "random16",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface3xz_mem/work/random16/prog",
   "qasm": "MemoryBoard/surface3xz_mem/work/random16/circuit.qasm",
   "numbers": {
@@ -1032,7 +1041,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2265215,
+  "bytes": 2267760,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1078,6 +1087,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_dual_loop",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: the device has no closed loop with docks / unroutable: q33 cannot reach AB13 from AT11 within 80 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "10_cyclone_dual_loop.html",
@@ -1089,7 +1099,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1713647,
+  "bytes": 1716122,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1105,6 +1115,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "chain",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "unroutable: q0 cannot reach C39 from C27 within 150 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "11_chain.html",
@@ -1116,7 +1127,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1666107,
+  "bytes": 1668582,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -1134,6 +1145,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "stationary_chain",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "stationary_chain has 2 usable traps (30 ion slots) but the circuit needs 34",
   "status": "ok",
   "page": "12_stationary_chain.html",
@@ -1145,7 +1157,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1624316,
+  "bytes": 1626791,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -1161,6 +1173,7 @@
   "kicker": "SURFACE-3 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring24_8",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: 16 qubits need a dock but the device has 8 / unroutable: q23 cannot reach A15 from S5 within 26 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "13_ring24_8.html",
@@ -1172,7 +1185,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1655014,
+  "bytes": 1657489,
   "r10": null,
   "over_budget": [],
   "sites": 32,

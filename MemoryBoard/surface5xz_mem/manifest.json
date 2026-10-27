@@ -8,6 +8,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": true,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface5xz_mem/work/grid9x9/prog",
   "qasm": "MemoryBoard/surface5xz_mem/work/grid9x9/circuit.qasm",
   "numbers": {
@@ -81,7 +82,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 4565929,
+  "bytes": 4568459,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -125,6 +126,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/prog",
   "qasm": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
@@ -198,7 +200,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 4564501,
+  "bytes": 4567031,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -242,6 +244,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
+  "table": "quantinuum",
   "prefix": "MemoryBoard/surface5xz_mem/work/cyclone_base/prog",
   "qasm": "MemoryBoard/surface5xz_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
@@ -315,7 +318,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 4953069,
+  "bytes": 4955600,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -359,6 +362,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring144_24v",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: 48 qubits need a dock but the device has 24 / unroutable: q94 cannot reach A54 from S137 within 130 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "04_ring144_24v.html",
@@ -370,7 +374,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1724859,
+  "bytes": 1727334,
   "r10": null,
   "over_budget": [],
   "sites": 168,
@@ -386,6 +390,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "h2_racetrack",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: the device has no closed loop with docks / h2_racetrack has 40 usable traps (80 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "05_h2_racetrack.html",
@@ -397,7 +402,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1651833,
+  "bytes": 1654308,
   "r10": null,
   "over_budget": [],
   "sites": 40,
@@ -413,6 +418,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_dual_loop",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: the device has no closed loop with docks / unroutable: q70 cannot reach AT34 from AB17 within 80 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "06_cyclone_dual_loop.html",
@@ -424,7 +430,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1713647,
+  "bytes": 1716122,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -440,6 +446,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ladder_2x72",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "unroutable: q39 cannot reach HB40 from HT31 within 128 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "07_ladder_2x72.html",
@@ -451,7 +458,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1802225,
+  "bytes": 1804700,
   "r10": null,
   "over_budget": [],
   "sites": 288,
@@ -467,6 +474,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "chain",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "unroutable: q70 cannot reach C0 from C18 within 150 cycles / split rounds do not complete either",
   "status": "ok",
   "page": "08_chain.html",
@@ -478,7 +486,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1666107,
+  "bytes": 1668582,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -496,6 +504,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "stationary_chain",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "stationary_chain has 2 usable traps (30 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "09_stationary_chain.html",
@@ -507,7 +516,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1624316,
+  "bytes": 1626791,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -523,6 +532,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring24_8",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "rotation does not apply: 48 qubits need a dock but the device has 8 / ring24_8 has 32 usable traps (56 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "10_ring24_8.html",
@@ -534,7 +544,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1654987,
+  "bytes": 1657462,
   "r10": null,
   "over_budget": [],
   "sites": 32,
@@ -550,6 +560,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "torus4x4",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "torus4x4 has 32 usable traps (64 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "11_torus4x4.html",
@@ -564,7 +575,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1677875,
+  "bytes": 1680350,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
@@ -582,6 +593,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid5x5",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "grid5x5 has 40 usable traps (80 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "12_grid5x5.html",
@@ -593,7 +605,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1691072,
+  "bytes": 1693547,
   "r10": null,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
@@ -611,6 +623,7 @@
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "random16",
   "answer": false,
+  "table": "quantinuum",
   "refusal": "random16 has 32 usable traps (64 ion slots) but the circuit needs 98",
   "status": "ok",
   "page": "13_random16.html",
@@ -625,7 +638,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1721384,
+  "bytes": 1724137,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
