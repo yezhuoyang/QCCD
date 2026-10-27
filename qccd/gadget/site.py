@@ -161,8 +161,8 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     leaves = LeafLibrary(cache_dir, log=log)
 
     # -- the full stack: FormalRV programs, every layer, on the machine ----------------------
-    runs = _build_fullstack(base, put, leaves=leaves, studio=studio, cache_dir=cache_dir, log=log,
-                            which=fullstack)
+    stack = _build_fullstack(base, put, leaves=leaves, studio=studio, cache_dir=cache_dir, log=log,
+                             which=fullstack)
     machines = {name: load_file(FLOORPLANS_DIR / f"{name}.floor", leaves)[0]
                 for name in ("fullstack", "fullstack_wide")}
 
@@ -178,11 +178,11 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     # -- the beta builds, at the addresses they have always had ------------------------------
     beta = {}
     rows, pairs = SHOWCASE
-    runs = [("showcase", parse(showcase(rows * pairs * 2), name="showcase"),
+    betas = [("showcase", parse(showcase(rows * pairs * 2), name="showcase"),
              dict(rows=rows, pairs=pairs))]
     if DEMO.exists():
-        runs.append(("demo", parse_file(DEMO), {}))
-    for key, prog, size in runs:
+        betas.append(("demo", parse_file(DEMO), {}))
+    for key, prog, size in betas:
         where = base / key
         res = build(prog, out_dir=where, cache_dir=cache_dir, studio=True, studio_dir=studio,
                     log=log, **size)
@@ -200,7 +200,7 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     town_lib = next(iter(algs.values()))["library"] if algs else None
     put(f"{SECTION}/index.html",
         PAGE.format(title="Gadgets: the full stack - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
-                    body=_landing(runs, machines, town_lib, algs, beta)), 1, SECTION)
+                    body=_landing(stack, machines, town_lib, algs, beta)), 1, SECTION)
     put(f"{SECTION}/places/index.html",
         PAGE.format(title="Logical gadgets: the places - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
                     body=_places_page(town_lib, algs, beta, studio, more=machines.values())), 2, SECTION)
@@ -217,9 +217,9 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
                              f'</p><ul class="toc">{toc}</ul>{body}'),
             2, SECTION)
     n_studio = len(list(studio.glob("*.html"))) if studio.exists() else 0
-    log(f"  gadgets      {len(runs)} full-stack runs, {len(algs)} verified algorithms, beta "
+    log(f"  gadgets      {len(stack)} full-stack runs, {len(algs)} verified algorithms, beta "
         f"showcase {beta['showcase']['stats']['ions']} ions, {n_studio} studio pages")
-    return {"fullstack": runs, "algorithms": algs, "beta": beta}
+    return {"fullstack": stack, "algorithms": algs, "beta": beta}
 
 
 def _build_fullstack(base: Path, put, *, leaves, studio: Path, cache_dir, log, which: str) -> dict:
