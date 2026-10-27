@@ -306,6 +306,67 @@ blocks named later: billions of entries here. Now it uses the last use of each b
 watched for memory, and stopped once before it got there.
 
 - **Shor from FormalRV's own example**, unmodified, next to the hand-written Shor-15.
+
+### Slice S6 (user, 2026-10-26): nothing virtual; the hardware program is a language
+
+The user's two requirements:
+1. *Every single detail must be devirtualized, including how the magic state factory is compiled.*
+2. *Extend our hardware language (TSIR) to a program that works on a given architecture, where each
+   hardware instruction names the gadget it belongs to: modular and scalable.*
+
+**What is still virtual today.**
+
+| part | today | after S6 |
+|---|---|---|
+| a place's op (prep, bench, memory, junction, …) | TSIR on its device, verified | unchanged; each TSIR instruction says which step of the op it is |
+| **the factory** | TSIR from `ring_circuit` over a gate list that `rm15_circuit()` builds in code; no line of the TSIR says which gate of the protocol it is | the protocol is a **source program** (`rm15.circ`, one gate a line); the factory's compiler tags every gate, reset and measurement with its source line; a check pairs them in order (the factory keeps gate order) beside the state-vector check; the page names the protocol line |
+| the rotation source | TSIR, no source | the same: `rz<n>.circ` |
+| a road | a carry timed by replaying `chan<L>` | a call of the road's own leaf gadget `chan<L>.transit` (its TSIR) |
+| the decoder, the archive | modeled latencies | unchanged: classical, modeled, and called by name (not hardware) |
+
+**TSIR modules (the language).** TSIR stays one concurrent cycle per instruction. It gains modules,
+in a text form beside its JSON:
+
+```
+tsir modules 1
+architecture fullstack_wide                 # the .floor the program runs on
+
+leaf msf15.produce                          # a LEAF GADGET: one op of one place master
+  master msf15                              #   TSIR on that master's device, from its home placement
+  source rm15.circ                          #   the program it compiles
+  port in in m0                             #   doors, ions in crossing order
+  port out out m0
+  simd rotate_cw L0 +3
+  simd dock f3 S1->A1
+  gate CX f3 f12 @A1      ; rm15.circ:21    #   every gate names its source line
+  measure f4              ; rm15.circ:52
+  cool
+end
+
+gadget ctl_maj_3 (arg0 arg1 arg2 arg3)      # a COMPOSITE GADGET: what one gate of the program does
+  homes mem12 mem13 mem19 mem20             #   its blocks' memories (the context it was scheduled in)
+  ins 7 "ppm Z arg0 Z arg1 Z l3 -> o4"      #   the program instruction the rows below carry out
+    at 135.0 bench2 ppm.ZZZ  in_a=arg0 in_b=arg1 in_c=l3     # a leaf gadget at a place instance
+    at 140.5 street3 chan12.transit l3 bench2.out_c -> post1.in
+    at 160.2 decoder decode window 12        # classical
+  call 900.0 when_3 (arg0)                  #   a composite call: its own rows, shifted
+  hold arg1 mem13 from 1300 every 413230 n 4
+end
+
+program shor on fullstack_wide
+  call 0.0 ctl_modmulmcp (q18 q21 q4 …)
+end
+```
+
+- **Every hardware instruction is in exactly one gadget.** A leaf body is TSIR; every row above it
+  names a place instance and a gadget.
+- **Modular.** A leaf gadget is defined once per master op; a composite once per context (the folded
+  schedule's macro); a call is one line.
+- **Scalable.** FormalRV's 3-hour Shor is the same size as its folded schedule, one file a gadget,
+  loaded as the page needs it.
+- **It is the source of truth.** The writer turns a folded schedule into modules, and the reader turns
+  modules back into the schedule the checks read; the round trip is tested. The page's Program pane
+  gets a **Hardware** view, and the Stack's hardware row cites `file:line`.
 - **The up-bridge:** derive the `.machine` from characterized macros.
 - **The Goal 2 board**, once an entry can be graded end to end.
 

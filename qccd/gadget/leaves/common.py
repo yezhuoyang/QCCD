@@ -48,6 +48,9 @@ class LeafBuild:
     times: dict[str, list] = field(default_factory=dict)
     #: builder state an on-demand op needs later (a memory's ring order, its code)
     extra: dict = field(default_factory=dict)
+    #: per op, the source program it compiles (`{name, text}`): the factory's protocol, a
+    #: rotation source's three lines -- every TSIR operation it emits names a line of it
+    sources: dict = field(default_factory=dict)
     master_name: str = ""
     #: per op, the stabilizer-flow specification its circuit must meet (`logic.spec.Spec`)
     specs: dict = field(default_factory=dict)

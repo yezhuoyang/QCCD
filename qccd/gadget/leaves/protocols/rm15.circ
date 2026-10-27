@@ -1,0 +1,143 @@
+# 15-to-1 magic-state distillation (Bravyi & Kitaev 2005), on the [[15,1,3]] quantum
+# Reed-Muller code: the factory's protocol, one operation a line.  The msf15 place compiles
+# exactly this (qccd/gadget/leaves/factory.py, ring_circuit), every TSIR gate, reset and
+# measurement naming the line it realises; its logic check runs it as a state vector.
+#
+# qubits 0..14 are the code's 15 positions (column j of the code holds the binary digits
+# of j+1).  The |+> of the code is the uniform superposition over the classical [15,5] code
+# spanned by the all-ones word and the four bit rows; in row echelon form its pivots are
+# {0, 1, 2, 3, 7}.  Transversal T on the code is logical T-dagger.  All 14 outcomes 0 is the
+# post-selection; qubit 0 then holds T-dagger|+>.
+
+output 0
+
+# every ion fresh
+reset 0
+reset 1
+reset 2
+reset 3
+reset 4
+reset 5
+reset 6
+reset 7
+reset 8
+reset 9
+reset 10
+reset 11
+reset 12
+reset 13
+reset 14
+
+# the encoder: the pivots in |+>, fanned out over the code's rows
+H 0
+H 1
+H 2
+H 3
+H 7
+CX 0 5
+CX 0 6
+CX 0 9
+CX 0 10
+CX 0 11
+CX 0 12
+CX 1 4
+CX 1 6
+CX 1 8
+CX 1 10
+CX 1 11
+CX 1 13
+CX 2 4
+CX 2 5
+CX 2 8
+CX 2 9
+CX 2 11
+CX 2 14
+CX 3 4
+CX 3 5
+CX 3 6
+CX 3 11
+CX 3 12
+CX 3 13
+CX 3 14
+CX 7 8
+CX 7 9
+CX 7 10
+CX 7 11
+CX 7 12
+CX 7 13
+CX 7 14
+
+# transversal T: logical T-dagger on the code
+T 0
+T 1
+T 2
+T 3
+T 4
+T 5
+T 6
+T 7
+T 8
+T 9
+T 10
+T 11
+T 12
+T 13
+T 14
+
+# the encoder again, which is its own inverse (its CNOTs commute)
+CX 0 5
+CX 0 6
+CX 0 9
+CX 0 10
+CX 0 11
+CX 0 12
+CX 1 4
+CX 1 6
+CX 1 8
+CX 1 10
+CX 1 11
+CX 1 13
+CX 2 4
+CX 2 5
+CX 2 8
+CX 2 9
+CX 2 11
+CX 2 14
+CX 3 4
+CX 3 5
+CX 3 6
+CX 3 11
+CX 3 12
+CX 3 13
+CX 3 14
+CX 7 8
+CX 7 9
+CX 7 10
+CX 7 11
+CX 7 12
+CX 7 13
+CX 7 14
+
+# fold the phase onto the output: it sits on the parity of the first three pivots
+CX 1 0
+CX 2 0
+
+# read the syndromes: the other pivots in X, the non-pivots in Z
+H 1
+H 2
+H 3
+H 7
+measure 1
+measure 2
+measure 3
+measure 4
+measure 5
+measure 6
+measure 7
+measure 8
+measure 9
+measure 10
+measure 11
+measure 12
+measure 13
+measure 14

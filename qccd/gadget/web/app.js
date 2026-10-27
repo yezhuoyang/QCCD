@@ -2042,6 +2042,24 @@
       const anyGate = op.circuit || M.leafData[op.master].programs[op.e[4]].instructions.some((x) => ["gate", "measure", "reset"].includes(x.type));
       h += row("Clifford", op.circuit ? `${op.towards ? '<span class="muted">bringing ions to</span> ' : ""}<code>${escapeHtml(stkInsText(op.circuit))}</code>` :
         `<span class="muted">${anyGate ? "every gate of this op has run; the ions are leaving" : "this op moves ions only: no gate"}</span>`);
+      // AN OP THAT COMPILES A PROGRAM OF ITS OWN -- the factory's 15-to-1 protocol, a rotation
+      // source's three lines -- names, instruction by instruction, the line it carries out
+      const own = (op.ins.meta || {}).src;
+      const next = op.circuit && (op.circuit.meta || {}).src;
+      const src = own || next;
+      const so = src && ((M.leafData[op.master] || {}).sources || {})[op.e[4]];
+      if (src && so) {
+        const lines = so.text.split(/\r?\n/);
+        const lineOf = (s) => +s.slice(s.lastIndexOf(":") + 1);
+        const ln = lineOf(src);
+        let sect = "";
+        for (let k = ln - 2; k >= 0; k--) if (/^\s*#/.test(lines[k])) { sect = lines[k].replace(/^\s*#\s*/, ""); break; }
+        // an instruction tagged with an operation that has already happened is its clean-up
+        // (the ring put back after a gate): say so, and which line comes next
+        const after = own && next && own !== next && op.towards ?
+          ` · finishing it; next <code>${escapeHtml((lines[lineOf(next) - 1] || "").trim())}</code> (line ${lineOf(next)})` : "";
+        h += row("Protocol", `<code>${escapeHtml((lines[ln - 1] || "").trim())}</code> <span class="muted">${escapeHtml(src)}${sect ? " · " + escapeHtml(sect) : ""}${after}</span>`);
+      }
       h += row("Hardware", `<code>${escapeHtml(stkInsText(op.ins))}</code> <span class="muted">#${op.ins.id} · ${(op.local / 1000).toFixed(3)} ms into ${escapeHtml(op.e[4])}</span>`);
     } else if (op) {
       const cls = (CATS[(M.masters[op.master] || {}).family] || {}).title || op.master;

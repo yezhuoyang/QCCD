@@ -222,4 +222,6 @@ def leaf_data(build: LeafBuild) -> dict:
         "roles": dict(build.roles),
         "programs": {k: p.to_json() for k, p in build.programs.items()},
         "times": dict(getattr(build, "times", {})),
+        # the source program of each op that compiles one (TSIR `meta.src` names its lines)
+        "sources": dict(getattr(build, "sources", {})),
     }

@@ -46,11 +46,15 @@ def rotation_source(*, name: str = "rot1") -> LeafBuild:
             gate = f"RZ{n}" + ("_DAG" if dg else "")
             bp = BayProgram(b, f"{name}.{key}", {"m0": "X_in"})
             bp.absorb("in", ["m0"], [1], op="enter")
+            # its protocol, three lines; every TSIR operation names its line
+            src = f"{key}.circ"
+            build.sources[key] = {"name": src, "text": f"# RZ{n}{'†' if dg else ''}|+⟩ on one ion\n"
+                                                      f"reset 0\nH 0\n{gate} 0\n"}
 
-            def init(batch, gate=gate, bp=bp):
-                bp.reset(batch, op="init")
-                bp.gate1("H", batch, op="init")
-                bp.gate1(gate, batch, op="init")
+            def init(batch, gate=gate, bp=bp, src=src):
+                bp.reset(batch, op="init", src=f"{src}:2")
+                bp.gate1("H", batch, op="init", src=f"{src}:3")
+                bp.gate1(gate, batch, op="init", src=f"{src}:4")
 
             bp.at_docks(["m0"], init, op="init")
             bp.emit("out", ["m0"], op="leave")

@@ -33,6 +33,8 @@ gate site); it is also short, and its output is verified like everything else.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ...api import Machine
 from ...compile.cooling import CoolingPolicy, insert_cooling
 from ...cost.models import corrected_model
@@ -66,46 +68,98 @@ def rm15_circuit() -> tuple[list[tuple], int]:
     return gates, out
 
 
-def ring_circuit(rp: RingProgram, names: list[str], gates: list[tuple], *, slot: str,
-                 dock: str, **meta) -> None:
-    """Emit `gates` (on qubit indices into `names`) at one dock trap of a ring."""
+PROTOCOLS = Path(__file__).resolve().parent / "protocols"
 
-    def bring(ion):
-        rp.rotate(rp.delta_to(ion, slot), **meta)
+
+def read_circuit(path) -> tuple[list[tuple], list[int], int | None]:
+    """A protocol written one operation a line (`reset 0`, `H 3`, `CX 0 5`, `T 4`,
+    `measure 2`; `#` comments; `output q` names the qubit that holds the result): its
+    operations, the line each is on, and the output qubit."""
+    gates, lines, out = [], [], None
+    for n, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), start=1):
+        text = raw.split("#", 1)[0].split()
+        if not text:
+            continue
+        if text[0] == "output":
+            out = int(text[1])
+            continue
+        gates.append((text[0],) + tuple(int(q) for q in text[1:]))
+        lines.append(n)
+    return gates, lines, out
+
+
+def ring_circuit(rp: RingProgram, names: list[str], gates: list[tuple], *, slot: str,
+                 dock: str, source: str | None = None, lines: list[int] | None = None,
+                 **meta) -> None:
+    """Emit `gates` (on qubit indices into `names`) at one dock trap of a ring.
+
+    With `source` and `lines` (`read_circuit`), every instruction emitted for an operation --
+    the moves that bring its ions to the dock as well as the gate itself -- carries
+    `src = "<source>:<line>"`: the TSIR says, instruction by instruction, which line of the
+    protocol it carries out.  The compiler keeps the protocol's order exactly."""
+
+    def at(k):
+        return dict(meta, src=f"{source}:{lines[k]}") if source and lines else meta
+
+    def bring(ion, m):
+        rp.rotate(rp.delta_to(ion, slot), **m)
 
     i = 0
     while i < len(gates):
         g = gates[i]
         if g[0] != "CX":
             q = names[g[1]]
-            run = [g]
+            run = [(i, g)]
             while i + 1 < len(gates) and gates[i + 1][0] != "CX" and gates[i + 1][1] == g[1]:
                 i += 1
-                run.append(gates[i])
-            bring(q)
-            rp.move("dock", [(q, dock)], **meta)
-            for op in run:
+                run.append((i, gates[i]))
+            m0 = at(run[0][0])
+            bring(q, m0)
+            rp.move("dock", [(q, dock)], **m0)
+            for k, op in run:
                 if op[0] == "reset":
-                    rp.reset([q], **meta)
+                    rp.reset([q], **at(k))
                 elif op[0] == "measure":
-                    rp.measure([q], **meta)
+                    rp.measure([q], **at(k))
                 else:
-                    rp.gate1(op[0], [q], **meta)
-            rp.move("undock", [(q, slot)], **meta)
+                    rp.gate1(op[0], [q], **at(k))
+            rp.move("undock", [(q, slot)], **at(run[-1][0]))
         else:
+            m = at(i)
             c, t = names[g[1]], names[g[2]]
-            bring(c)
-            rp.move("dock", [(c, dock)], **meta)
+            bring(c, m)
+            rp.move("dock", [(c, dock)], **m)
             delta = rp.delta_to(t, slot)
-            rp.rotate(delta, **meta)
-            rp.move("dock", [(t, dock)], **meta)
-            rp.gate("CX", [(c, t)], **meta)
-            rp.move("undock", [(t, slot)], **meta)
+            rp.rotate(delta, **m)
+            rp.move("dock", [(t, dock)], **m)
+            rp.gate("CX", [(c, t)], **m)
+            rp.move("undock", [(t, slot)], **m)
             # undo the target's rotation: the control's own slot comes back under the dock,
             # so every gate leaves the ring a rigid rotation of what it was
-            rp.rotate(-delta, **meta)
-            rp.move("undock", [(c, slot)], **meta)
+            rp.rotate(-delta, **m)
+            rp.move("undock", [(c, slot)], **m)
         i += 1
+
+
+def source_order(circ, names: list[str], gates: list[tuple], lines: list[int], source: str) -> dict:
+    """Does the compiled op carry out its protocol, operation for operation, in order?  The
+    circuit read off the TSIR (resets, gates, measurements; the moves are not operations)
+    against the protocol's lines, each with the `src` it claims."""
+    kind = {"reset": "R", "measure": "M"}
+    want = [(kind.get(g[0], g[0]), tuple(names[q] for q in g[1:]), f"{source}:{n}")
+            for g, n in zip(gates, lines)]
+    # (the circuit read off a TSIR is its gates, resets (R) and measurements (M), one op per
+    # instruction: ring_circuit emits one operation an instruction)
+    got = [(op.name, tuple(circ.qubits[q] for q in op.targets), (op.meta or {}).get("src"))
+           for op in circ.ops]
+    bad = next((k for k, (a, b) in enumerate(zip(want, got)) if a != b), None)
+    ok = len(want) == len(got) and bad is None
+    return {"kind": "source order", "source": source, "operations": len(want), "compiled": len(got),
+            "passed": ok,
+            "first_difference": None if ok else {"at": bad, "want": want[bad] if bad is not None and bad < len(want) else None,
+                                                 "got": got[bad] if bad is not None and bad < len(got) else None},
+            "claim": (f"the TSIR carries out {source} operation for operation, in its order, every "
+                      f"one naming its line" if ok else f"the TSIR departs from {source}")}
 
 
 def factory_t15(*, name: str = "fac_t15") -> LeafBuild:

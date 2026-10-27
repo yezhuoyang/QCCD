@@ -39,7 +39,7 @@ from ..surface import merged_patch, patch
 from .bay import BayProgram, bay, place
 from .common import (LeafBuild, TrackedProgram, add_port_stub, declare_port_classes,
                      declare_port_zone, tidy)
-from .factory import ring_circuit, rm15_circuit
+from .factory import PROTOCOLS, read_circuit, ring_circuit, rm15_circuit, source_order
 
 __all__ = ["prep", "clinic", "zone", "memory", "workshop", "bridge", "post_office",
            "pharmacy", "factory", "depot", "junction9", "PLACES", "D"]
@@ -870,7 +870,11 @@ def factory(*, name: str = "msf15") -> LeafBuild:
 
     W = 10
     b = bay(name, W, [1], {"in": "BL", "out": "TR"}, {"in": 1, "out": 1})
-    gates, out = rm15_circuit()
+    # THE PROTOCOL IS A PROGRAM: protocols/rm15.circ, compiled here, every TSIR operation
+    # naming its line (the factory used to compile a gate list built in code, so nothing on the
+    # page could say which step of the distillation an ion was taking part in)
+    source = "rm15.circ"
+    gates, lines, out = read_circuit(PROTOCOLS / source)
     names = [f"s{i}" if i != out else "m0" for i in range(15)]
     staff = [nm for nm in names if nm != "m0"]
     slots = [s for s in range(2, 17)]
@@ -882,11 +886,12 @@ def factory(*, name: str = "msf15") -> LeafBuild:
     bp = BayProgram(b, f"{name}.{key}", {**home, "m0": "X_in"})
     bp.absorb("in", ["m0"], [m0_home], op="enter")
     bp.restore(op="enter")
-    ring_circuit(bp, names, gates, slot="S1", dock="A1", op="produce")
+    ring_circuit(bp, names, gates, slot="S1", dock="A1", op="produce", source=source, lines=lines)
     bp.restore(op="produce")
     bp.emit("out", ["m0"], op="leave")
     bp.restore(op="leave")                      # the residents ride the ring: bring them home
     build.programs[key] = _cooled(bp.prog, b.machine)
+    build.sources[key] = {"name": source, "text": (PROTOCOLS / source).read_text(encoding="utf-8")}
     build.titles[key] = "15-to-1 distillation; the visitor leaves holding the output state"
     build.expect_end[key] = {**home, "m0": "X_out"}
     n_cx = sum(1 for g in gates if g[0] == "CX")
@@ -943,11 +948,17 @@ def factory(*, name: str = "msf15") -> LeafBuild:
                         bad3 += 1 if bij ^ syn[k][1] else 0
         rep.update(t_gates=n, detected_1=w1, singles=n, detected_2=w2, pairs=n * (n - 1) // 2,
                    undetected_3=und3, logical_3=bad3, triples=n * (n - 1) * (n - 2) // 6)
+        # and that the hardware carries out the protocol as written, operation by operation
+        order = source_order(circ, names, gates, lines, source)
+        rep["source_order"] = order
         rep["passed"] = bool(abs(p_acc - 1) < 1e-9 and best and fid[best] > 1 - 1e-9
-                             and w1 == n and w2 == n * (n - 1) // 2 and bad3 == und3 == 35)
-        rep["claim"] = (f"accepts with probability {rep['accept']:.6g} and outputs {best} "
-                        f"exactly; every 1 or 2 T-gate Z errors detected; {und3} undetected "
-                        f"triples, all logical: output error {bad3}p³")
+                             and w1 == n and w2 == n * (n - 1) // 2 and bad3 == und3 == 35
+                             and order["passed"])
+        rep["claim"] = (f"carries out {source} operation by operation ({order['operations']} "
+                        f"operations, each naming its line); accepts with probability "
+                        f"{rep['accept']:.6g} and outputs {best} exactly; every 1 or 2 T-gate Z "
+                        f"errors detected; {und3} undetected triples, all logical: output error "
+                        f"{bad3}p³" if order["passed"] else order["claim"])
         return rep
 
     build.logic_checks[key] = check

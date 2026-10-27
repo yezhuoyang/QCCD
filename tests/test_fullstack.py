@@ -509,6 +509,44 @@ def test_a_folded_run_plays_on_the_page_a_window_at_a_time(tmp_path):
     assert seen["played"]["t"] > 0.2 * seen["boot"]["makespan"] and seen["played"]["a"] > 0
 
 
+# ----------------------------------------------------------------------------- nothing virtual: the factory
+
+
+def test_the_factory_compiles_its_protocol_line_by_line():
+    """The 15-to-1 factory's protocol is a program (protocols/rm15.circ), the derivation it
+    came from still gives it, and the factory's TSIR carries it out operation by operation,
+    every gate, reset and measurement naming its line -- beside the state-vector check that
+    it distills T†|+⟩.  A protocol the TSIR does not follow is caught."""
+    from qccd.gadget.leaves.factory import PROTOCOLS, read_circuit, rm15_circuit, source_order
+    from qccd.gadget.library import LeafLibrary
+    from qccd.gadget.logic.circuit import from_tsir
+    from qccd.ir.tsir import TSIR
+    gates, lines, out = read_circuit(PROTOCOLS / "rm15.circ")
+    assert (gates, out) == rm15_circuit()
+    leaves = LeafLibrary(CACHE, log=None)
+    op = leaves.place("msf15").ops["produce"]
+    ck = op.logic["check"]
+    assert op.status == "verified" and ck["passed"] and ck["output"] == "T†|+⟩"
+    assert ck["source_order"]["passed"] and ck["source_order"]["operations"] == 119
+    d = leaves.data["msf15"]
+    assert d["sources"]["produce"]["name"] == "rm15.circ"
+    ops = [i for i in d["programs"]["produce"]["instructions"] if i["type"] in ("gate", "reset", "measure")]
+    assert len(ops) == 119 and all((i.get("meta") or {}).get("src", "").startswith("rm15.circ:") for i in ops)
+    # the protocol with two operations swapped is not what the hardware does
+    circ = from_tsir(TSIR.from_json(d["programs"]["produce"]))
+    names = [f"s{i}" if i != out else "m0" for i in range(15)]
+    swapped = list(gates)
+    k = next(i for i, g in enumerate(gates) if g[0] == "CX")
+    swapped[k], swapped[k + 1] = swapped[k + 1], swapped[k]
+    assert not source_order(circ, names, swapped, lines, "rm15.circ")["passed"]
+    # a rotation source names its three lines too
+    leaves.place("rot1")
+    rot = leaves.data["rot1"]
+    assert rot["sources"]["rz4"]["text"].splitlines()[-1] == "RZ4 0"
+    assert all((i.get("meta") or {}).get("src", "").startswith("rz4.circ:")
+               for i in rot["programs"]["rz4"]["instructions"] if i["type"] in ("gate", "reset"))
+
+
 # ----------------------------------------------------------------------------- rotations finer than T
 
 
