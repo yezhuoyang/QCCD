@@ -23,10 +23,11 @@ is a maximum over end instants, and the n-bar a gate meets is its value at start
 
 from __future__ import annotations
 
+from collections.abc import Mapping as _AbcMapping
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-__all__ = ["Step", "Op", "Instant", "Run", "build_run", "OPERATED"]
+__all__ = ["Step", "Op", "Instant", "Run", "Heat", "build_run", "OPERATED"]
 
 #: The operation kinds that act on an ion's qubit (a gate pulse, a frame change, a readout,
 #: a preparation), as opposed to carrying it or cooling it.
@@ -188,49 +189,101 @@ def _gate_ops(ins) -> list[tuple[str, tuple[str, ...], tuple]]:
     return out
 
 
-def _priced_entails(arch, views: dict) -> dict:
-    """(cycle, ion) -> the splits and merges the clock charges that ion's move in that cycle,
+class Heat(_AbcMapping):
+    """Every ion's n-bar at one instant: one double per ion of the run, in the order the
+    programme places them, behind a mapping (`heat.get(ion, 0.0)`).  A dict per step was the
+    largest thing a run held (a 72,000-step programme kept 7 million floats as objects); the
+    values are the replay's own, copied when they are read."""
+
+    __slots__ = ("_ix", "_a")
+
+    def __init__(self, ix: dict, values):
+        from array import array
+        self._ix = ix
+        self._a = values if isinstance(values, array) else array("d", values)
+
+    def __getitem__(self, ion):
+        return self._a[self._ix[ion]]
+
+    def get(self, ion, default=None):
+        i = self._ix.get(ion)
+        return default if i is None else self._a[i]
+
+    def __iter__(self):
+        return iter(self._ix)
+
+    def __len__(self) -> int:
+        return len(self._ix)
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Heat) and other._ix is self._ix:
+            return self._a == other._a
+        return isinstance(other, _AbcMapping) and dict(self.items()) == dict(other.items())
+
+    __hash__ = None
+
+
+def _move_tables(arch):
+    """The replay's tables for `move_entails`: the conveyor nodes and each spur's rails."""
+    from ..verify.rules import conveyor_nodes, rails_to_loop
+
+    dev = arch.device
+    conveyor = conveyor_nodes(dev)
+    return conveyor, {n: rails_to_loop(dev, conveyor, n) for n in dev.nodes if n not in conveyor}
+
+
+def _view_entails(arch, v, tables) -> dict:
+    """ion -> the splits and merges the clock charges that ion's move in cycle `v`,
     recomputed with the replay's own rule (`qccd.verify.replay.move_entails`): the class's
     declaration, a spur off a conveyor, and the chains it leaves and joins."""
     from types import SimpleNamespace
 
     from ..verify.replay import move_entails
-    from ..verify.rules import conveyor_nodes, rails_to_loop
 
-    dev = arch.device
-    conveyor = conveyor_nodes(dev)
-    rails = {n: rails_to_loop(dev, conveyor, n) for n in dev.nodes if n not in conveyor}
-    out: dict = {}
-    for vs in views.values():
-        for v in vs:
-            if v.instr.type != "simd" or not v.moves:
-                continue
-            by_ion: dict[str, list] = {}
-            for m in v.moves:
-                by_ion.setdefault(m.ion, []).append(m)
-            sub = [SimpleNamespace(ion=i, src=ms[0].src, dst=ms[-1].dst) for i, ms in by_ion.items()]
-            routes = [[m.seg for m in ms] for ms in by_ion.values()]
-            declared = arch.entails(v.instr.cls) if v.instr.cls else ()
-            for p, (charged, _) in zip(sub, move_entails(declared, sub, v.occ_before, routes,
-                                                          conveyor, rails)):
-                out[(id(v), p.ion)] = tuple(charged)
-    return out
+    if v.instr.type != "simd" or not v.moves:
+        return {}
+    by_ion: dict[str, list] = {}
+    for m in v.moves:
+        by_ion.setdefault(m.ion, []).append(m)
+    sub = [SimpleNamespace(ion=i, src=ms[0].src, dst=ms[-1].dst) for i, ms in by_ion.items()]
+    routes = [[m.seg for m in ms] for ms in by_ion.values()]
+    declared = arch.entails(v.instr.cls) if v.instr.cls else ()
+    conveyor, rails = tables
+    return {p.ion: tuple(charged)
+            for p, (charged, _) in zip(sub, move_entails(declared, sub, v.occ_before, routes, conveyor, rails))}
 
 
-def _cycle_depth(v, priced: dict) -> int:
+def _cycle_depth(moves, charged: dict) -> int:
     """One transport cycle's depth: its longest route, a rail and each split or merge one deep."""
     routes: dict[int, int] = {}
     last: dict[str, tuple[int, str]] = {}
-    for m in v.moves:
+    for m in moves:
         prev = last.get(m.ion)
         if prev is not None and prev[1] == m.src:
             routes[prev[0]] += 1
             last[m.ion] = (prev[0], m.dst)
         else:
             k = len(routes)
-            routes[k] = 1 + len(priced.get((id(v), m.ion), ()))
+            routes[k] = 1 + len(charged.get(m.ion, ()))
             last[m.ion] = (k, m.dst)
     return max(routes.values(), default=0)
+
+
+class _Cycles:
+    """What one instruction's cycles leave the run: its first and last state, each cycle's
+    duration, every rail crossed, how deep it went, and the splits and merges each ion was
+    charged.  Made as the replay goes, so no cycle's view outlives its cycle."""
+
+    __slots__ = ("pos0", "occ0", "pos1", "occ1", "durs", "moves", "cycles", "depth", "entails")
+
+    def __init__(self, pos0, occ0):
+        self.pos0, self.occ0 = pos0, occ0
+        self.pos1, self.occ1 = pos0, occ0
+        self.durs: list[float] = []
+        self.moves: list = []
+        self.cycles = 0
+        self.depth = 0
+        self.entails: dict[str, list] = {}
 
 
 def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm: str | None = None,
@@ -245,14 +298,50 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     prog = load_program(prog)
     arch = load_arch(arch)
     model = cost_model or corrected_model(clock)
-    views: dict[int, list] = {}
-    starts: dict[int, dict[str, float]] = {}
+    # THE RUN IS COLLECTED AS THE REPLAY GOES.  Each cycle's view is read the moment it is
+    # made -- its moves, its duration, the splits and merges it charges, how deep it goes --
+    # and dropped; a state equal to the last one kept IS that one (the views hand over a copy
+    # of their own each cycle).  Keeping every view until the end held every cycle's four
+    # state dicts at once: 2.7 GB on a 72,000-instruction programme, under a 1 GB grader.
+    ion_order: list[str] = []
+    ion_ix: dict[str, int] = {}
+    for ins in prog.instructions:
+        if ins.type == "init":
+            for ion in ins.placement:
+                if ion not in ion_ix:
+                    ion_ix[ion] = len(ion_order)
+                    ion_order.append(ion)
+    tables = _move_tables(arch)
+    cyc: dict[int, _Cycles] = {}
+    starts: dict[int, Heat] = {}
+    kept = {"pos": {}, "occ": {}}
+
+    def keep(d: dict, kind: str) -> dict:
+        prev = kept[kind]
+        if d is prev or d == prev:
+            return prev
+        kept[kind] = d
+        return d
 
     def on_cycle(v) -> None:
-        views.setdefault(v.instr.id, []).append(v)
+        c = cyc.get(v.instr.id)
+        if c is None:
+            c = cyc[v.instr.id] = _Cycles(keep(v.pos_before, "pos"), keep(v.occ_before, "occ"))
+        c.pos1, c.occ1 = keep(v.pos_after, "pos"), keep(v.occ_after, "occ")
+        c.durs.append(float(v.duration_us))
+        c.moves.extend(v.moves)
+        c.cycles += 1
+        if v.instr.type == "simd":
+            charged = _view_entails(arch, v, tables)
+            for ion, ch in charged.items():
+                c.entails.setdefault(ion, []).extend(ch)
+            c.depth += _cycle_depth(v.moves, charged)
+        else:
+            c.depth += 1
 
     def probe(instr, current) -> None:
-        starts.setdefault(instr.id, dict(current))
+        if instr.id not in starts:
+            starts[instr.id] = Heat(ion_ix, [float(current.get(i, 0.0)) for i in ion_order])
 
     verification = None
     if rules:
@@ -264,7 +353,6 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
         res = replay(prog, arch, model, check_rules=False, keep_cycles=False, probe=probe,
                      on_cycle=on_cycle)
     gamma = float(model.anomalous_per_us(arch))
-    priced = _priced_entails(arch, views)
 
     steps: list[Step] = []
     ops: list[Op] = []
@@ -277,7 +365,7 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     # state rather than six per step (half a gigabyte, under the grader's memory limit).
     pos: dict[str, str] = {}
     occ: dict[str, int] = {}
-    last_nbar: dict[str, float] = {}
+    last_nbar: Mapping = {}
 
     def same(d: dict, prev: dict) -> dict:
         return prev if d == prev else d
@@ -285,8 +373,8 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     t = 0.0
     for k, ins in enumerate(prog.instructions):
         st = Step(k, ins, ins.type)
-        vs = views.get(ins.id, [])
-        st.nbar0 = last_nbar = same(starts.get(ins.id, {}), last_nbar)
+        c = cyc.pop(ins.id, None)
+        st.nbar0 = last_nbar = same(starts.pop(ins.id, {}), last_nbar)
         st.t0 = t
         if ins.type == "init":
             pos, occ = dict(pos), dict(occ)      # the steps before keep theirs
@@ -300,26 +388,23 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
                         del occ[prev]
                 pos[ion] = node
                 occ[node] = occ.get(node, 0) + 1
-        if vs:
+        if c is not None:
             before_p, before_o = (steps[-1].pos1, steps[-1].occ1) if steps else ({}, {})
-            st.pos0 = same(vs[0].pos_before, before_p)
-            st.occ0 = same(vs[0].occ_before, before_o)
-            st.pos1 = same(vs[-1].pos_after, st.pos0)
-            st.occ1 = same(vs[-1].occ_after, st.occ0)
+            st.pos0 = same(c.pos0, before_p)
+            st.occ0 = same(c.occ0, before_o)
+            st.pos1 = same(c.pos1, st.pos0)
+            st.occ1 = same(c.occ1, st.occ0)
             pos, occ = st.pos1, st.occ1
             # the clock adds cycle by cycle, as the replay's total does; the step's own
             # duration is the sum of its cycles, as the noise reads it
             t1, dt = t, 0.0
-            for v in vs:
-                t1 += float(v.duration_us)
-                dt += float(v.duration_us)
+            for d in c.durs:
+                t1 += d
+                dt += d
             st.t1, st.dt = t1, dt
-            st.moves = [m for v in vs for m in v.moves]
-            st.cycles = len(vs)
-            if ins.type == "simd":
-                st.depth = sum(_cycle_depth(v, priced) for v in vs)
-            else:
-                st.depth = len(vs)
+            st.moves = c.moves
+            st.cycles = c.cycles
+            st.depth = c.depth
         else:
             if ins.type == "init":
                 st.pos0, st.occ0 = (steps[-1].pos1, steps[-1].occ1) if steps else ({}, {})
@@ -336,7 +421,7 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
             for ion, ms in by_ion.items():
                 path = [ms[0].src] + [m.dst for m in ms]
                 ops.append(Op(len(ops), st, "move", (ion,), None, ins.cls, (), "Z", path))
-                ops[-1].entails = tuple(w for v in vs for w in priced.get((id(v), ion), ()))
+                ops[-1].entails = tuple(c.entails.get(ion, ())) if c is not None else ()
                 st.ops.append(ops[-1])
         elif ins.type == "gate":
             for kind, who, params in _gate_ops(ins):
@@ -357,7 +442,8 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     for k, st in enumerate(steps):
         nxt = steps[k + 1].nbar0 if k + 1 < len(steps) else dict(res.final_quanta)
         if st.kind == "cool":
-            st.nbar1 = {i: st.nbar0.get(i, 0.0) + gamma * st.duration for i in st.pos0}
+            st.nbar1 = Heat(ion_ix, [st.nbar0.get(i, 0.0) + gamma * st.duration if i in st.pos0 else 0.0
+                                     for i in ion_order])
         else:
             st.nbar1 = nxt
 

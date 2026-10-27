@@ -198,6 +198,16 @@ class Evaluator:
     def truth(self, n: Node, env: dict) -> bool:
         return bool(self.term(n, env))
 
+    def fresh(self, n: Node, env: dict) -> Any:
+        """A term read once per binding (a channel's targets): the same value as `term`, but an
+        aggregate at its top is not kept per binding -- the memory channel's per-step set of
+        idle ions, kept, was 156 MB on a 20,000-step programme."""
+        if isinstance(n, Gen):
+            return self.aggregate(n, env)
+        if isinstance(n, Quant):
+            return self.quant(n, env)
+        return self.term(n, env)
+
     def memo(self, n, env: dict) -> Any:
         """An aggregate or a quantifier depends only on the values of its free names, so its
         value is kept per binding of them: `{position(j, start(k)) for j in operated(k)}` is
@@ -518,7 +528,7 @@ def noise_budget(evaluator: Evaluator, channels: list[Channel]) -> dict[str, dic
             p = evaluator.term(ch.prob, e)
             if p is None or p <= 0:
                 continue
-            tg = evaluator.term(ch.targets, e)
+            tg = evaluator.fresh(ch.targets, e)
             targets = [tg] if isinstance(tg, str) else list(tg or ())
             if not targets:
                 continue
@@ -590,7 +600,7 @@ def emit_circuit(evaluator: Evaluator, channels: list[Channel], explain=None) ->
             p = evaluator.term(ch.prob, e)
             if p is None or p <= 0:
                 continue
-            tg = evaluator.term(ch.targets, e)
+            tg = evaluator.fresh(ch.targets, e)
             targets = [tg] if isinstance(tg, str) else list(tg or ())
             if not targets:
                 continue
