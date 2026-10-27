@@ -408,6 +408,41 @@ def test_a_gate_is_scheduled_once_per_context_and_its_calls_never_overlap():
     assert flips == {"r0": 0, "r1": 1, "r2": 0}
 
 
+def test_each_gate_is_checked_once_and_the_composition_by_construction():
+    """A run too large to expand is checked per view -- each body's own rows, the blocks it
+    was passed resting at their homes, its calls as boxes -- and by composition.  On a run
+    small enough to expand too, the two verdicts agree; and each of the three is shown to
+    catch what it is for."""
+    import copy as _copy
+    from qccd.gadget.floorplan import FLOORPLANS_DIR, load_file
+    from qccd.gadget.fold import check_composition, check_folded, parse_folded, schedule_folded
+    from qccd.gadget.library import LeafLibrary
+    from qccd.fullstack import qec2alg
+    leaves = LeafLibrary(CACHE, log=None)
+    low = qec2alg.lower(layers.read(SHOR / "shor15.qec", "qec"))
+    alg = parse_folded(low.text)
+    lib, _ = load_file(FLOORPLANS_DIR / "fullstack.floor", leaves)
+    keep = {}
+    g = schedule_folded(alg, lib, leaves, keep=keep)
+    per = check_folded(g, lib, leaves)
+    assert per["failed"] == [] and len(per["passed"]) == 11 and per["metrics"]["views"] == 19
+    assert check_composition(g, keep["folder"]) == []
+    # two calls moved onto one another: only the composition can see it
+    bad = _copy.deepcopy(g)
+    bad["calls"][1]["t0"] = bad["calls"][0]["t0"]
+    assert check_composition(bad, keep["folder"])
+    # a gate's block that does not come home: its own view's G2
+    bad = _copy.deepcopy(g)
+    mid = bad["calls"][0]["m"]
+    bad["macros"][mid]["homes"] = ["mem8"] * len(g["macros"][mid]["homes"])
+    assert "G2" in check_folded(bad, lib, leaves)["failed"]
+    # the holds that keep resting blocks refreshed, dropped from the program: G8
+    bad = _copy.deepcopy(g)
+    assert bad["holds"]
+    bad["holds"] = []
+    assert "G8" in check_folded(bad, lib, leaves)["failed"]
+
+
 def test_folded_deutsch_jozsa_passes_every_check(dj):
     *_, low = dj
     g, x, checks, rules = _folded_checks(low.text)
@@ -422,6 +457,41 @@ def test_folded_shor15_passes_every_check():
     assert not g["refused"] and g["folded"]["macros"] == len(low.gates)
     assert sum(1 for i in x["program"]["instructions"] if i["kind"] == "inject") == 15
     assert checks["failed"] == [] and rules["failed"] == []
+
+
+def test_a_folded_run_plays_on_the_page_a_window_at_a_time(tmp_path):
+    """Shor-15 folded, on the Design page: wherever the playhead goes, the page has the
+    macros it needs, draws the calls that run there, lights the program line, and says
+    which gate (and which line of it) an instruction is in."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is needed to look at the page")
+    from qccd.fullstack import qec2alg
+    from qccd.gadget.fold import build_folded
+    from qccd.gadget.library import LeafLibrary
+    low = qec2alg.lower(layers.read(SHOR / "shor15.qec", "qec"))
+    alg = tmp_path / "shor15.alg"
+    alg.write_text(low.text, encoding="utf-8")
+    r = build_folded(alg, out_dir=tmp_path / "site", leaves=LeafLibrary(CACHE, log=None), log=None)
+    assert r["checks"]["failed"] == [] and r["checks"]["metrics"]["per_view_agrees"]
+    assert len(list((tmp_path / "site" / "macro").glob("m*.js"))) == r["stats"]["macros"]
+    p = subprocess.run([node, str(REPO / "tests" / "gadget_fold_browser.mjs"), str(tmp_path / "site")],
+                       capture_output=True, text=True, encoding="utf-8", timeout=300)
+    if p.returncode == 2:
+        pytest.skip("Chrome is needed to look at the page")
+    assert p.returncode == 0, p.stderr
+    seen = json.loads(p.stdout.strip().splitlines()[-1])
+    assert seen["errors"] == [] and "fatal" not in seen, seen.get("fatal") or seen["errors"]
+    for s in seen["seeks"]:
+        assert s["a"] <= s["t"] <= s["b"] and not s["missing"], s
+        assert s["events"] > 0 and s["lit"] >= 1, s
+    # somewhere a gate runs: its instruction names the gate and the line of the gate it is on
+    inside = [s for s in seen["seeks"] if s["focus"] and s["focus"]["chain"]]
+    assert inside, seen["seeks"]
+    assert all(s["focus"]["src"] for s in inside)
+    assert seen["played"]["t"] > 0.2 * seen["boot"]["makespan"] and seen["played"]["a"] > 0
 
 
 @pytest.mark.skipif(not _pinned(), reason="needs the pinned FormalRV clone")

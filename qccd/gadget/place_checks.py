@@ -9,6 +9,7 @@ between the ops that extract syndromes.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections import defaultdict
 
 from .checks import ION_LOSS_QUANTA
@@ -49,7 +50,24 @@ COHERENCE_BUDGET_US = 1e6
 
 def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
                  budget_us: float = COHERENCE_BUDGET_US) -> dict:
+    """Every place check on one schedule.
+
+    A schedule may also be one gate's own rows in a folded run (`qccd.gadget.fold`, its
+    `view`), which says two more things, both absent from a whole program:
+
+    * `initial`: ions that are somewhere when it starts -- the blocks it was passed, resting
+      in their homes.  They start there (G2, G3) and must end there (G2).
+    * `boxes`: the calls it makes, `{ins, block, t0, t1, covered}`, each the stretch a block is
+      the call's (G7 orders it like an instruction) and, until `covered`, extracted by the
+      call (G8: the call's own view checks inside it).  A view's edge -- its start, for a
+      block passed in, or a call's start or end -- is shared with the view on the other side,
+      so a gap that touches one may be at most half the budget: the two halves add up to at
+      most one.
+    * `until` on a block: where this view stops answering for it (a block passed in, once it
+      is home again; its caller answers from there)."""
     out = {"passed": [], "failed": [], "skipped": {}, "violations": {}, "metrics": {}}
+    initial = {int(g): p for g, p in (gir.get("initial") or {}).items()}
+    boxes = gir.get("boxes") or []
 
     def verdict(rule, violations, skipped=None):
         if skipped:
@@ -101,6 +119,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         for k in range(len(gir["ion_order"][mname])):
             home[first + k] = path
     loc: dict[int, str | None] = dict(home)
+    loc.update(initial)
     marks = []
     for e in events:
         if masters[e[3]].family == "depot" and e[4].startswith("load."):
@@ -129,6 +148,10 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     away = sorted(g for g in home if loc.get(g) != home[g])
     if away:
         g2.append(f"{len(away)} resident ion(s) end away from home (e.g. ion {away[0]})")
+    strays = sorted(g for g in initial if loc.get(g) != initial[g])
+    if strays:
+        g2.append(f"{len(strays)} ion(s) of a block passed in end away from its home "
+                  f"(e.g. ion {strays[0]} at {loc.get(strays[0])}, not {initial[strays[0]]})")
     alive = {g for b in gir["blocks"].values() if "read" not in b for g in b["ions"]}
     for gid, where in loc.items():
         if gid in home or gid in alive:
@@ -145,10 +168,13 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             delta[c[2]].append((c[4] + dep, -1))
             delta[dst_of(c)].append((c[4] + take, +1))
     g3 = []
+    start_count = defaultdict(int)
+    for p in initial.values():
+        start_count[p] += 1
     for path, (mname, _, _, _) in gir["leaves"].items():
         if masters[path].family == "depot":
             continue
-        level = best = low = len(gir["ion_order"][mname])
+        level = best = low = len(gir["ion_order"][mname]) + start_count[path]
         for _, d in sorted(delta.get(path, []), key=lambda x: (x[0], -x[1])):
             level += d
             best, low = max(best, level), min(low, level)
@@ -234,34 +260,63 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         s[0], s[1] = min(s[0], e[1]), max(s[1], e[2])
     last: dict[str, tuple[int, float]] = {}
     realised = {e[6] for e in events}          # a software Pauli is realised in the archive
+    # a call is realised by its own view; here it is the stretch each block is the call's
+    box_of = {(x["ins"], x["block"]): (x["t0"], x["t1"]) for x in boxes}
+    realised |= {x["ins"] for x in boxes}
     for ins in gir["program"]["instructions"]:
         if ins["id"] not in realised and ins["id"] not in refused:
             g7.append(f"instruction {ins['id']} (line {ins['line']}) has no event")
-        if ins["id"] not in span:
+        if ins["id"] not in span and not any((ins["id"], b) in box_of for b in ins["blocks"]):
             continue
         for b in ins["blocks"]:
+            sp = box_of.get((ins["id"], b)) or span.get(ins["id"])
+            if sp is None:
+                continue
             prev = last.get(b)
-            if prev and span[ins["id"]][0] < prev[1] - 1e-6:
+            if prev and sp[0] < prev[1] - 1e-6:
                 g7.append(f"block {b}: instruction {ins['id']} starts before instruction "
                           f"{prev[0]} is done")
-            last[b] = (ins["id"], span[ins["id"]][1])
+            last[b] = (ins["id"], sp[1])
     verdict("G7", g7)
 
     # -- G8 ----------------------------------------------------------------------------------
     g8, longest = [], 0.0
+    covered = defaultdict(list)
+    for x in boxes:
+        covered[x["block"]].append((x["t0"], x["covered"]))
+    # every op that extracts syndromes, under each block whose ions it binds: one pass over
+    # the events, not one per block (a folded run's top view holds every round of its holds)
+    owner = defaultdict(list)
     for b, info in gir["blocks"].items():
-        ions = set(info["ions"])
-        times = sorted((e[1], e[2]) for e in events if e[4].startswith(SE_OPS)
-                       and any(isinstance(g, int) and g in ions for _, g in e[8]))
-        end = info.get("read", gir["makespan_us"])
-        t = times[0][1] if times else info["born"]
-        for a, z in times[1:] + [(end, end)]:
+        for g in info["ions"]:
+            owner[g].append(b)
+    se_of = defaultdict(list)
+    for e in events:
+        if not e[4].startswith(SE_OPS):
+            continue
+        hit = set()
+        for _, g in e[8]:
+            if isinstance(g, int):
+                hit.update(owner.get(g, ()))
+        for b in hit:
+            se_of[b].append((e[1], e[2], False))
+    for b, info in gir["blocks"].items():
+        # (start, end, an edge this view shares with another)
+        times = sorted(se_of.get(b, []) + [(a, z, True) for a, z in covered.get(b, [])])
+        end = info.get("until", info.get("read", gir["makespan_us"]))
+        passed_in = info.get("param") is not None
+        if passed_in:
+            times = [(0.0, 0.0, True)] + times
+        t, edge = (times[0][1], times[0][2]) if times else (info["born"], False)
+        for a, z, e2 in times[1:] + [(end, end, False)]:
             gap = a - t
             longest = max(longest, gap)
-            if gap > budget_us:
+            limit = budget_us / 2 if (edge or e2) else budget_us
+            if gap > limit:
                 g8.append(f"block {b} waits {gap / 1000:.1f} ms without syndrome extraction "
-                          f"(budget {budget_us / 1000:.0f} ms)")
-            t = max(t, z)
+                          f"(budget {limit / 1000:.0f} ms" + (", half of it at a call's edge)" if limit < budget_us else ")"))
+            if z >= t:
+                t, edge = z, e2
     out["metrics"]["longest_unprotected_us"] = round(longest, 3)
     out["metrics"]["coherence_budget_us"] = budget_us
     verdict("G8", g8)
@@ -292,11 +347,14 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     ends = {e[0]: e[2] for e in events}
     g10 = []
     if messages or wires:
-        by_leaf_class = defaultdict(list)
+        # a syndrome or a frame is consumed by a classical place; a guard is consumed by the
+        # classically controlled op at an ordinary place, so both are indexed: the latest
+        # start of anything that place runs in each instruction
+        last_start: dict = {}
         for e in events:
-            # a syndrome or a frame is consumed by a classical place; a guard is consumed by
-            # the classically controlled op at an ordinary place, so both are indexed
-            by_leaf_class[e[3]].append(e)
+            k = (e[3], e[6])
+            if e[1] > last_start.get(k, -1e300):
+                last_start[k] = e[1]
         for m in messages:
             mid, wire, sl, sp, dl, dp, t0, t1 = m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7]
             w = wires.get(wire)
@@ -320,8 +378,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
                     and masters[sl].family not in CLASSICAL_FAMILIES):
                 g10.append(f"message {mid} leaves {sl} at {t0:.1f} us, after its op ended "
                            f"({src[2]:.1f} us)")
-            got = [e for e in by_leaf_class.get(dl, []) if e[1] >= t1 - 1e-6 and e[6] == m[10]]
-            if not got:
+            if last_start.get((dl, m[10]), -1e300) < t1 - 1e-6:
                 g10.append(f"message {mid} arrives at {dl} at {t1:.1f} us, but nothing there "
                            f"runs after it in instruction {m[10]}")
         # a bit may be read only after the op that measured it began: the archive records an
@@ -331,12 +388,18 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         for f in gir.get("frames") or []:
             for key in ("ax", "az"):
                 for eid, _flow in (f.get(key) or {}).get("sources") or []:
+                    # (a gate's own view in a folded run also names its caller's frames and
+                    # its calls' outcomes: those are checked in the views they belong to)
+                    if isinstance(eid, str):
+                        continue
                     if starts.get(int(eid), 0.0) > f["t"] + 1e-6:
                         g10.append(f"frame row {f['id']} at {f['t']:.1f} us names an outcome "
                                    f"from event {eid}, which only starts at "
                                    f"{starts.get(int(eid), 0.0):.1f} us")
         for o in gir.get("outcomes") or []:
             for eid, _flow in ((o.get("value") or {}).get("sources") or []):
+                if isinstance(eid, str):
+                    continue
                 if starts.get(int(eid), 0.0) > (o.get("recorded_us") or 0.0) + 1e-6:
                     g10.append(f"outcome of instruction {o['instruction']} was recorded "
                                f"before the measurement it depends on (event {eid})")
@@ -369,7 +432,8 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             if e[1] < ready - 1e-6:
                 g11.append(f"decoding job at {e[1]:.1f} us starts before its syndrome "
                            f"arrived ({ready:.1f} us)")
-            later = [t for t in times if t > ready + 1e-6]
+            nxt = bisect_right(times, ready + 1e-6)
+            later = times[nxt:nxt + 1]
             if later and e[1] > later[0] + 1e-6:
                 g11.append(f"a decoding job waits from {ready:.1f} us to {e[1]:.1f} us, past "
                            f"the arrival of the next syndrome ({later[0]:.1f} us): the "
@@ -382,6 +446,10 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             + float(lat.get("write_us", 0)), 3)
     # a classically controlled op may not start before its guard is at the door
     guarded = 0
+    decisions = defaultdict(list)
+    for m in messages:
+        if m[9] == "decision":
+            decisions[(m[4], m[10])].append(m)
     for e in events:
         g = e[10] if len(e) > 10 else None
         if not g:
@@ -391,8 +459,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         if e[1] < ready - 1e-6:
             g11.append(f"{e[3]} {e[4]} is guarded by ({g.get('guard')}) but starts at "
                        f"{e[1]:.1f} us, before the guard reaches it ({ready:.1f} us)")
-        wanted = [m for m in messages if m[9] == "decision" and m[4] == e[3]
-                  and m[10] == e[6]]
+        wanted = decisions.get((e[3], e[6]), [])
         if not wanted:
             g11.append(f"{e[3]} {e[4]} is guarded by ({g.get('guard')}) but no decision "
                        f"wire tells it so")
@@ -405,6 +472,10 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     # before its syndrome has been: a logical outcome is a parity the decoder corrects
     windows = gir.get("windows") or []
     written = {}
+    carried = defaultdict(list)
+    for m in messages:
+        if m[9] == "syndrome" and len(m) > 13:
+            carried[(m[2], m[10], m[13])].append(m)
     for w in windows:
         if w.get("decoded_by") is None:
             g11.append(f"the syndrome {w['op']} measured at {w['place']} for "
@@ -412,8 +483,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
                        f"{w['instruction']}) is never decoded: the program must call "
                        f"`decode` on it")
             continue
-        sent = [m for m in messages if m[9] == "syndrome" and m[2] == w["place"]
-                and m[10] == w["decoded_by"] and len(m) > 13 and m[13] == w["event"]]
+        sent = carried.get((w["place"], w["decoded_by"], w["event"]), [])
         if not sent:
             g11.append(f"instruction {w['decoded_by']} decodes the syndrome {w['op']} left at "
                        f"{w['place']}, but no syndrome message carries it to the decoder")

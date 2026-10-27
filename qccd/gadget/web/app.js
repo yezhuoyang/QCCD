@@ -15,6 +15,15 @@
   "use strict";
   const { Model, LeafSim, lowerBound, naturalCmp, geomOf, ionRadius } = window.GadgetCore;
   const D = JSON.parse(document.getElementById("gdata").textContent);
+  // A FOLDED RUN (GIR 0.3, qccd/gadget/fold.py) is hours of machine time in a few megabytes:
+  // each gadget once, every call of it a box.  The page draws a WINDOW of it, expanded around
+  // the playhead (fold.js), and expands the next one when the playhead leaves it -- every
+  // view below reads `M`, which is that window.
+  let foldStale = false;
+  const FOLD = (D.gir && D.gir.schema === "qccd.gir/0.3" && window.GadgetFold)
+    ? new window.GadgetFold.Folded(D.gir, D.macroFiles, () => { foldStale = true; }) : null;
+  const FOLD_SPAN = 4e6;
+  if (FOLD) D.gir = FOLD.window(0, FOLD_SPAN);
   const M = new Model(D);
   const $ = (id) => document.getElementById(id);
   const css = getComputedStyle(document.documentElement);
@@ -196,8 +205,12 @@
   const FRAMES = M.gir.frames || [];
   const CONTROL = M.gir.control || {};
   const msgByWire = {};
-  for (const m of MSGS) (msgByWire[m[1]] || (msgByWire[m[1]] = [])).push(m);
-  for (const k in msgByWire) msgByWire[k].sort((a, b) => a[6] - b[6]);
+  function indexMessages() {
+    for (const k in msgByWire) delete msgByWire[k];
+    for (const m of MSGS) (msgByWire[m[1]] || (msgByWire[m[1]] = [])).push(m);
+    for (const k in msgByWire) msgByWire[k].sort((a, b) => a[6] - b[6]);
+  }
+  indexMessages();
   function messagesOn(wire, t) {
     const ms = msgByWire[wire];
     if (!ms) return [];
@@ -216,33 +229,38 @@
   // `DECODE_WALL_S` is how long one `decode` takes on screen; the clock says it is slowed.
   const DECODE_WALL_S = 2.5;
   const DECODES = [];
-  for (const ins of M.gir.program.instructions) {
-    if (ins.kind !== "decode") continue;
-    const ms = MSGS.filter((m) => m[10] === ins.id);
-    if (!ms.length) continue;
-    const sp = M.insSpan[ins.id] || [Infinity, -Infinity];
-    const d = {
-      id: ins.id, text: ins.text,
-      t0: Math.min(sp[0], ...ms.map((m) => m[6])), t1: Math.max(sp[1], ...ms.map((m) => m[7])),
-      nets: new Set(ms.map((m) => m[1])),
-      // the places at either end of a lit wire, and which of them are SENDING a syndrome
-      places: new Set(ms.flatMap((m) => [m[2], m[4]])),
-      senders: new Set(ms.filter((m) => m[9] === "syndrome").map((m) => m[2])),
-      // which way the bits go on each wire, from the first message on it
-      from: {},
-      windows: (M.gir.windows || []).filter((w) => w.decoded_by === ins.id),
-      bits: ms.filter((m) => m[9] === "syndrome").reduce((a, m) => a + (+m[8] || 0), 0),
-      // where to put the playhead to see it: the first syndromes half-way down their wires
-      show: 0,
-    };
-    for (const m of ms) if (!(m[1] in d.from)) d.from[m[1]] = m[2];
-    const first = ms.filter((m) => m[9] === "syndrome").sort((a, b) => a[6] - b[6])[0] || ms[0];
-    d.show = first[6] + 0.5 * (first[7] - first[6]);
-    DECODES.push(d);
-  }
-  DECODES.sort((a, b) => a.t0 - b.t0);
   const DECODE_OF = {};
-  for (const d of DECODES) DECODE_OF[d.id] = d;
+  function buildDecodes() {
+    DECODES.length = 0;
+    for (const k in DECODE_OF) delete DECODE_OF[k];
+    for (const ins of M.gir.program.instructions) {
+      if (ins.kind !== "decode") continue;
+      const ms = MSGS.filter((m) => m[10] === ins.id);
+      if (!ms.length) continue;
+      const sp = M.insSpan[ins.id] || [Infinity, -Infinity];
+      const d = {
+        id: ins.id, text: ins.text,
+        t0: Math.min(sp[0], ...ms.map((m) => m[6])), t1: Math.max(sp[1], ...ms.map((m) => m[7])),
+        nets: new Set(ms.map((m) => m[1])),
+        // the places at either end of a lit wire, and which of them are SENDING a syndrome
+        places: new Set(ms.flatMap((m) => [m[2], m[4]])),
+        senders: new Set(ms.filter((m) => m[9] === "syndrome").map((m) => m[2])),
+        // which way the bits go on each wire, from the first message on it
+        from: {},
+        windows: (M.gir.windows || []).filter((w) => w.decoded_by === ins.id),
+        bits: ms.filter((m) => m[9] === "syndrome").reduce((a, m) => a + (+m[8] || 0), 0),
+        // where to put the playhead to see it: the first syndromes half-way down their wires
+        show: 0,
+      };
+      for (const m of ms) if (!(m[1] in d.from)) d.from[m[1]] = m[2];
+      const first = ms.filter((m) => m[9] === "syndrome").sort((a, b) => a[6] - b[6])[0] || ms[0];
+      d.show = first[6] + 0.5 * (first[7] - first[6]);
+      DECODES.push(d);
+    }
+    DECODES.sort((a, b) => a.t0 - b.t0);
+    for (const d of DECODES) DECODE_OF[d.id] = d;
+  }
+  buildDecodes();
   // what is lit at time t: the union over the `decode` instructions running then
   function litAt(t) {
     const on = DECODES.filter((d) => d.t0 <= t && t <= d.t1);
@@ -1335,7 +1353,29 @@
     const y0 = TL.ruler + 2;
     ctx.fillStyle = COLOR.muted;
     ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText("program", 10, y0 + 14);
+    ctx.fillText(FOLD ? "program (folded)" : "program", 10, y0 + 14);
+    if (FOLD) {
+      // the whole run, at every zoom: each call the program makes is a box, named by its
+      // gate; the instructions drawn over it are the window's, the stretch under the ruler
+      ctx.save();
+      ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+      for (const c of FOLD.g.calls) {
+        const a = c.t0, b = c.t0 + FOLD.spanOf(c);
+        if (b < S.tl.t0 || a > S.tl.t1) continue;
+        const x = tx(a), x1 = Math.max(x + 1, tx(b));
+        ctx.fillStyle = "rgba(30, 39, 97, 0.10)";
+        ctx.fillRect(x, y0 + 1, x1 - x, TL.progH - 4);
+        ctx.fillStyle = "rgba(30, 39, 97, 0.45)";
+        ctx.fillRect(x, y0 + 1, 1, TL.progH - 4);
+        if (x1 - x > 60) { ctx.fillStyle = COLOR.navy; ctx.fillText(clip(ctx, c.gate, x1 - x - 6), x + 4, y0 + TL.progH - 6); }
+      }
+      const win = M.gir.window;
+      if (win) {
+        ctx.fillStyle = "rgba(15, 118, 110, 0.55)";
+        ctx.fillRect(tx(Math.max(win.a, S.tl.t0)), TL.ruler - 2, Math.max(1, tx(Math.min(win.b, S.tl.t1)) - tx(Math.max(win.a, S.tl.t0))), 2);
+      }
+      ctx.restore();
+    }
     const lanes = [];
     const laneH = 4;
     const insHits = [];
@@ -1741,6 +1781,15 @@
     const b = $("checksBadge");
     const nf = (ck.failed || []).length;
     const ids = Object.keys(rules);
+    // NO TICK FOR A CHECK THAT DID NOT RUN.  A folded run too large to expand here has every
+    // check skipped, each saying why; the badge says that, not "all passed".
+    const ran = (ck.passed || []).length + nf;
+    if (!ran && Object.keys(ck.skipped || {}).length) {
+      b.textContent = "G not run here";
+      b.className = "";
+      b.title = Object.values(ck.skipped)[0];
+      return;
+    }
     b.textContent = nf ? `G ${nf} failed` : `${ids[0] || "G1"}–${ids[ids.length - 1] || "G9"} ✓`;
     b.className = nf ? "bad" : "ok";
   }
@@ -1749,40 +1798,60 @@
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
-  // the LogicQ source, one element per line, lit by the instructions running now
+  // the LogicQ source, one element per line, lit by the instructions running now.  The lines
+  // are drawn once; which instructions each carries is bound again whenever a folded run's
+  // window moves (`bindProgram`), so a program of tens of thousands of lines is built once.
   const progLines = [];
+  const progDivs = [];
+  const progIds = {};
   function renderProgram() {
     const src = M.gir.program.source || "";
     $("progName").textContent = M.gir.program.name;
     const el = $("progBody");
     el.textContent = "";
-    const byLine = {};
-    for (const ins of M.gir.program.instructions) (byLine[ins.line] || (byLine[ins.line] = [])).push(ins.id);
+    progDivs.length = 0;
     src.split(/\r?\n/).forEach((text, i) => {
       const line = i + 1;
       const div = document.createElement("div");
-      const ids = byLine[line] || [];
       const trimmed = text.trim();
       div.className = "pl" + (trimmed.startsWith("code ") ? " decl" : trimmed.startsWith("//") ? " cm" : "");
+      div.innerHTML = `<span class="ln">${line}</span><span></span>`;
+      div.lastChild.textContent = text || " ";
+      div.dataset.ids = "";
+      div.onclick = () => {
+        const ids = progIds[line] || [];
+        if (!ids.length) return;
+        const sp = M.insSpan[ids[0]];
+        const dec = DECODE_OF[ids[0]];
+        if (sp) { seek(dec ? dec.show : sp[0]); focusInstruction(ids[0]); }
+      };
+      div.onmouseenter = () => { const ids = progIds[line] || []; if (ids.length) { S.hoverIns = ids[0]; S.tlDirty = true; } };
+      div.onmouseleave = () => { if (S.hoverIns !== null) { S.hoverIns = null; S.tlDirty = true; } };
+      el.appendChild(div);
+      progDivs.push(div);
+    });
+    bindProgram();
+  }
+  function bindProgram() {
+    for (const [div] of progLines) {
+      div.className = div.className.replace(/ (live|done|refused)/g, "");
+      div.title = "";
+      div.dataset.ids = "";
+    }
+    progLines.length = 0;
+    for (const k in progIds) delete progIds[k];
+    for (const ins of M.gir.program.instructions) (progIds[ins.line] || (progIds[ins.line] = [])).push(ins.id);
+    for (const line in progIds) {
+      const div = progDivs[line - 1];
+      if (!div) continue;
+      const ids = progIds[line];
       if (ids.some((id) => M.refused[id] !== undefined)) {
         div.className += " refused";
         div.title = ids.map((id) => M.refused[id]).filter(Boolean).join("\n");
       }
-      div.innerHTML = `<span class="ln">${line}</span><span></span>`;
-      div.lastChild.textContent = text || " ";
       div.dataset.ids = ids.join(",");
-      if (ids.length) {
-        div.onclick = () => {
-          const sp = M.insSpan[ids[0]];
-          const dec = DECODE_OF[ids[0]];
-          if (sp) { seek(dec ? dec.show : sp[0]); focusInstruction(ids[0]); }
-        };
-        div.onmouseenter = () => { S.hoverIns = ids[0]; S.tlDirty = true; };
-        div.onmouseleave = () => { S.hoverIns = null; S.tlDirty = true; };
-      }
-      el.appendChild(div);
-      progLines.push([div, ids]);
-    });
+      progLines.push([div, ids]);            // (integer keys come in order: line order)
+    }
   }
   function updateProgram() {
     const live = new Set(M.activeInstructions(S.t));
@@ -1795,7 +1864,10 @@
       if (cls !== div.className) div.className = cls;
       if (isLive && !first) first = div;
     }
-    if (first && S.playing) {
+    // (a folded program is tens of thousands of lines: after a seek too, or the line lit is
+    // somewhere nobody is looking)
+    if (first && (S.playing || (FOLD && S.progFollow))) {
+      S.progFollow = false;
       const box = $("progBody");
       const top = first.offsetTop - box.offsetTop;
       if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - 60;
@@ -1841,15 +1913,31 @@
     sect.innerHTML = `<h3>Full stack <span class="muted">FormalRV ${escapeHtml(STK.formalrv || "")}</span></h3>` +
       `<div id="stkNow" class="stk-cap"></div>${lays}<div class="stk-foot muted">${STK.foot || ""}</div>`;
     $("prog").parentNode.insertBefore(sect, $("prog"));
-    // the first instruction carrying each line of each layer: click a line, land there
-    for (const ins of M.gir.program.instructions) {
-      const c = stkChain(ins.src || ins.line);
-      for (const [k] of STK_LAYERS) {
-        const ln = c[k] && c[k][0];
-        if (ln && stkFirst[k][ln] === undefined) stkFirst[k][ln] = ins.id;
+    // the first instruction carrying each line of each layer: click a line, land there.  A
+    // folded run is not all on the page at once, so there it is the first TIME each line of
+    // the program runs (`line_first`, from fold.py), and the click seeks there.
+    if (FOLD) {
+      for (const al in FOLD.g.line_first || {}) {
+        const t = FOLD.g.line_first[al];
+        const c = stkChain(+al);
+        for (const [k] of STK_LAYERS) {
+          const ln = c[k] && c[k][0];
+          if (ln && !(stkFirst[k][ln] <= t)) stkFirst[k][ln] = t;
+        }
+        for (const ql of ((STK.qec_absorbed_into || {})[al] || [])) {
+          if (!(stkFirst.qec[ql] <= t)) stkFirst.qec[ql] = t;
+        }
       }
-      for (const ql of ((STK.qec_absorbed_into || {})[ins.src || ins.line] || [])) {
-        if (stkFirst.qec[ql] === undefined) stkFirst.qec[ql] = ins.id;
+    } else {
+      for (const ins of M.gir.program.instructions) {
+        const c = stkChain(ins.src || ins.line);
+        for (const [k] of STK_LAYERS) {
+          const ln = c[k] && c[k][0];
+          if (ln && stkFirst[k][ln] === undefined) stkFirst[k][ln] = ins.id;
+        }
+        for (const ql of ((STK.qec_absorbed_into || {})[ins.src || ins.line] || [])) {
+          if (stkFirst.qec[ql] === undefined) stkFirst.qec[ql] = ins.id;
+        }
       }
     }
     sect.addEventListener("toggle", () => stkUpdate(), true);
@@ -1857,6 +1945,7 @@
       const r = ev.target.closest(".stk-ln");
       if (!r) return;
       const id = stkFirst[r.dataset.layer][+r.dataset.line];
+      if (FOLD) { if (id !== undefined) seek(id + 1e-3); return; }
       const sp = id !== undefined ? M.insSpan[id] : null;
       if (sp) { seek(sp[0]); focusInstruction(id); }
     });
@@ -2356,11 +2445,34 @@
   }
   function seek(t) {
     S.t = Math.max(0, Math.min(M.makespan, t));
+    if (FOLD && outsideWindow(S.t)) refold(S.t);
+    if (FOLD) S.progFollow = true;
     if (S.t < S.tl.t0 || S.t > S.tl.t1) {
       const span = S.tl.t1 - S.tl.t0;
       S.tl.t0 = Math.max(0, S.t - span / 2);
       S.tl.t1 = S.tl.t0 + span;
     }
+    S.dirty = true;
+  }
+  // A folded run's window: expanded again once the playhead is in its last tenth (or before
+  // it), or once a macro it was waiting for has arrived.
+  function outsideWindow(t) {
+    const w = M.gir.window;
+    return !w || t < w.a || t > w.b - 0.1 * (w.b - w.a);
+  }
+  function refold(t) {
+    const a = Math.max(0, t - 0.25 * FOLD_SPAN);
+    const w = FOLD.window(a, a + FOLD_SPAN);
+    M.reload(w);
+    MSGS.length = 0;
+    for (const m of w.messages) MSGS.push(m);
+    FRAMES.length = 0;
+    for (const f of w.frames) FRAMES.push(f);
+    indexMessages();
+    buildDecodes();
+    bindProgram();
+    if (S.sel && S.sel.kind === "ins") S.sel = null;
+    foldStale = false;
     S.dirty = true;
   }
   function writeHash() {
@@ -2666,9 +2778,11 @@
       }
       S.t += step;
       if (S.t >= M.makespan) { S.t = M.makespan; S.playing = false; $("bPlay").textContent = "▶"; }
+      if (FOLD && outsideWindow(S.t)) refold(S.t);
       if (S.t > S.tl.t1) { const span = S.tl.t1 - S.tl.t0; S.tl.t0 = S.t - span * 0.1; S.tl.t1 = S.tl.t0 + span; }
       S.dirty = true;
     }
+    if (FOLD && foldStale) refold(S.t);
     if (S.dirty && editing()) {
       window.GADGET_EDITOR.draw();
       S.dirty = false;
@@ -2701,7 +2815,8 @@
   $("rate").value = String(S.rate);
   $("bIons").className = S.showIons ? "on" : "";
   $("bClassical").className = S.showClassical ? "on" : "";
-  S.tl = { t0: 0, t1: Math.max(1, M.makespan) };
+  // a folded run opens on its first window, not on hours squeezed into one canvas
+  S.tl = { t0: 0, t1: FOLD ? Math.min(M.makespan, FOLD_SPAN) : Math.max(1, M.makespan) };
   for (const p of M.ancestors(S.path)) treeOpen.add(p);
   renderChecks();
   renderSignoff();
@@ -2718,7 +2833,7 @@
   requestAnimationFrame(frame);
 
   // the handle a headless test drives
-  window.GADGETS = { M, S, D, go, seek, select, fit, leafIons, drawStage, drawTimeline,
+  window.GADGETS = { M, S, D, FOLD, go, seek, select, fit, leafIons, drawStage, drawTimeline,
     WIRES, MSGS, FRAMES, CONTROL, messagesOn, archiveAt, frameText, guardOf, guardText,
     DECODES, litAt, nextDecode, DECODE_WALL_S, WIRE_LIT, WIRE_GLOW,
     portXY, portCache, COLOR, FAMILY, ROLE, CATS, styleOf, shapeD, shapeSvg, roundRect, haloText, clip, sizeCanvas, stage, sctx,

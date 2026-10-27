@@ -32,7 +32,8 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
                 categories: dict | None = None, category_order: list | None = None,
                 machine_rules: dict | None = None, compositional: dict | None = None,
                 traffic: dict | None = None, floorplan: str | None = None,
-                focus: str | None = None, stack: dict | None = None) -> Path:
+                focus: str | None = None, stack: dict | None = None,
+                macro_files: dict | None = None) -> Path:
     if categories is None:
         from .categories import CATEGORIES, ORDER
         categories, category_order = CATEGORIES, ORDER
@@ -67,6 +68,10 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
     if stack:
         # a program lowered from FormalRV (qccd/fullstack): the layers above it, linked
         data["stack"] = stack
+    if macro_files:
+        # a folded run (GIR 0.3, qccd/gadget/fold.py): each macro in a file of its own,
+        # loaded when the time on screen needs it
+        data["macroFiles"] = macro_files
     html = (WEB / "page.html").read_text(encoding="utf-8")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__TITLE__", title or f"{gir['program']['name']} — QCCD gadgets")
@@ -76,6 +81,7 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
     # sampled instants with two ions through each other.  `core.js` needs it loaded first.
     html = html.replace("__TRANSIT__", TRANSIT_JS.read_text(encoding="utf-8"))
     html = html.replace("__CORE__", (WEB / "core.js").read_text(encoding="utf-8"))
+    html = html.replace("__FOLD__", (WEB / "fold.js").read_text(encoding="utf-8"))
     html = html.replace("__EDITOR__", (WEB / "editor.js").read_text(encoding="utf-8"))
     html = html.replace("__APP__", (WEB / "app.js").read_text(encoding="utf-8"))
     if stack:

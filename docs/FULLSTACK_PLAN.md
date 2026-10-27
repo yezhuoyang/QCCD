@@ -222,6 +222,35 @@ Shor-15 and DJ every existing check runs on the expansion as a differential test
 
 **S5c — the page plays GIR 0.3** by expanding only the instances on screen, at the time on screen.
 
+**S5c — done.**
+- **The page** (`qccd/gadget/web/fold.js`):
+  - It keeps the root inline and loads each macro from `macro/<id>.js` the first time the time on screen
+    needs it.
+  - It expands a 4 s window around the playhead into the GIR 0.2 the page already draws, and expands the
+    next one as the playhead leaves it.
+  - Every instruction carries its call chain. The program line lit is the outermost call's; the Stack
+    caption names each gate down to its body line, and a guard inside a call reads its caller's outcomes
+    by their names.
+  - The timeline draws every call of the run as a box, at every zoom.
+- **On the 3-hour modexp:**
+  - the page is 3.8 MB, plus 757 macro files;
+  - a seek anywhere in the three hours shows what runs there, seven gadgets deep
+    (`ctl_modmulmcp › ctl_modmulinplace › … › ctl_majinv_3`);
+  - a window takes 27 ms to expand once its macros are loaded, and 2–9 s the first time a region's
+    files are read.
+- **Checks at scale.** A run too large to expand is checked **per view**: each body's own rows, the
+  blocks it was passed resting in their homes, its calls as boxes. `check_places` gained `initial`,
+  `boxes` and `until`. A gap at a call's edge may take at most half the coherence budget, so the two
+  sides of every edge together keep within it.
+- **The composition** is checked from the rows and the macros' footprints, not from the calendars that
+  placed them: no two calls of a body, and no call and the body's own rows, hold one place at once.
+- **Agreement and mutations.** On Shor-15, DJ and the reuse program the per-view verdict is the
+  expansion's. Each check catches its own fault: overlapping calls (composition), a block that does not
+  come home (G2), dropped holds (G8).
+- **The 3-hour modexp, checked.** All 11 place checks hold in each of its 758 views (51 s), and the
+  composition holds (3.7 s). Four checks in G10/G11 used to scan every message or event per item:
+  quadratic, which no flat run had shown. They are indexed now, the same verdicts in 1/50 of the time.
+
 **S5d — rotations.** FormalRV leaves `ppmrot(±π/2ᵏ)` as a synthesis stub (`tSynth[k]` magic states, no
 circuit). QCCD supplies its own: the angle π/8 is a T state from a factory; finer angles are injected
 rotation states consumed by a Pauli-product measurement, with the doubled-angle correction repeated until

@@ -452,7 +452,9 @@ class MacroCity(City):
                            # what the call's symbols stand for: its blocks' frames and its
                            # guard's outcomes, as this body held them when it started
                            "pf_in": [self.frame(b) for b in args],
-                           "ext_in": [self.cvar_value[n] for n in names]})
+                           "ext_in": [self.cvar_value[n] for n in names],
+                           # and the names its guard's outcomes have here (`x0`, ... inside)
+                           "ext_names": names})
         self.next_gid += m.fresh
         self.n_instr += m.instructions
         for i, b in enumerate(args):
@@ -583,9 +585,13 @@ def _call_blocks(alg: Algorithm) -> list:
     return out
 
 
-def schedule_folded(alg: Algorithm, lib, leaves, *, log=None) -> dict:
-    """Schedule a folded program (`parse_folded`).  Returns GIR 0.3."""
+def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None) -> dict:
+    """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
+    macros themselves (their footprints, which GIR 0.3 does not carry) are left in
+    `keep["folder"]`, for `check_composition`."""
     folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None))
+    if keep is not None:
+        keep["folder"] = folder
     probe = MacroCity(alg, lib, leaves, folder=folder)
     rest = sorted((p for p, h in probe.zone_holder.items() if probe.family(p) == "memory"),
                   key=lambda p: (len(p), p))
@@ -648,6 +654,127 @@ def _macro_json(m: Macro) -> dict:
 # --------------------------------------------------------------------------- the page
 
 
+def line_first(g: dict) -> dict:
+    """Program line -> the first time an instruction written on it starts (a gate body's
+    line, for what a gate ran), over the whole run: the page's "click a line, land there"
+    for a run it never holds whole.  Per macro once, relative, then shifted up the calls."""
+    memo: dict = {}
+
+    def own(body):
+        start: dict = {}
+        for e in body["events"]:
+            start[e[6]] = min(start.get(e[6], math.inf), e[1])
+        out: dict = {}
+        for ins in body["program"]["instructions"]:
+            if ins["kind"] == "call" or ins["id"] not in start:
+                continue
+            key = ins.get("src") or ins["line"]
+            out[key] = min(out.get(key, math.inf), start[ins["id"]])
+        return out
+
+    def rel(mid):
+        if mid not in memo:
+            m = g["macros"][mid]
+            out = own(m)
+            for c in m["calls"]:
+                for k, t in rel(c["m"]).items():
+                    out[k] = min(out.get(k, math.inf), c["t0"] + t)
+            memo[mid] = out
+        return memo[mid]
+    out = own(g)
+    for c in g["calls"]:
+        for k, t in rel(c["m"]).items():
+            out[k] = min(out.get(k, math.inf), c["t0"] + t)
+    return {k: round(t, 3) for k, t in out.items()}
+
+
+def build_folded(alg, *, out_dir, cache_dir="out/gadgets/cache", leaves=None, log=print,
+                 floorplan=None, stack: dict | None = None, expand_limit: int = 30_000) -> dict:
+    """Schedule a program folded and write its page (`index.html`, `leaf/`, `macro/`).
+
+    A run of at most `expand_limit` instructions is also expanded, and every place check and
+    machine rule runs on the expansion; a larger one is not expanded here, and the page says
+    so."""
+    import json as _json
+    import time as _time
+    from pathlib import Path as _Path
+    from .build import published
+    from .categories import CATEGORIES, ORDER
+    from .floorplan import FLOORPLANS_DIR, load_file
+    from .judge import judge_schedule
+    from .library import LeafLibrary
+    from .page import render_page
+    from .place_checks import PLACE_RULES, check_places
+    log = log or (lambda *a, **k: None)
+    t_start = _time.time()
+    p = _Path(str(alg))
+    if not isinstance(alg, Algorithm):
+        alg = parse_folded(p.read_text(encoding="utf-8"), name=p.stem)
+    leaves = leaves or LeafLibrary(cache_dir, log=log)
+    floorplan = floorplan or FLOORPLANS_DIR / f"{alg.floorplan or 'fullstack'}.floor"
+    lib, fp = load_file(floorplan, leaves)
+    t0 = _time.time()
+    keep: dict = {}
+    g = schedule_folded(alg, lib, leaves, log=log, keep=keep)
+    t_sched = _time.time() - t0
+    n = g["folded"]["instructions"]
+    rules, expanded = None, None
+    t0 = _time.time()
+    # every body once, in its own view, and the composition from the rows and footprints
+    checks = check_folded(g, lib, leaves, log=log)
+    comp = check_composition(g, keep["folder"])
+    if comp:
+        if "G5" in checks["passed"]:
+            checks["passed"].remove("G5")
+            checks["failed"].append("G5")
+        checks["violations"].setdefault("G5", []).extend(f"composition: {p}" for p in comp)
+    checks["metrics"]["composition_problems"] = len(comp)
+    checks["metrics"]["checked"] = "per view"
+    if n <= expand_limit:
+        # small enough to expand as well: the whole schedule, every check and machine rule,
+        # and the per-view verdict must say the same
+        expanded = expand(g)
+        whole = check_places(expanded, lib, leaves)
+        rules = judge_schedule(lib, leaves, expanded, regions=fp.regions)
+        whole["metrics"].update(expanded_instructions=len(expanded["program"]["instructions"]),
+                                checked="expanded and per view",
+                                per_view_agrees=sorted(whole["failed"]) == sorted(checks["failed"]),
+                                views=checks["metrics"]["views"], composition_problems=len(comp))
+        checks = whole
+    t_check = _time.time() - t0
+    out = _Path(out_dir)
+    (out / "leaf").mkdir(parents=True, exist_ok=True)
+    g["line_first"] = line_first(g)
+    root, files = page_data(g, out)
+    root["stats"] = {
+        "ions": g["n_ions"], "instructions": n, "makespan_ms": round(g["makespan_us"] / 1000, 3),
+        "macros": g["folded"]["macros"], "reused": g["folded"]["reused"],
+        "refused": len(g["refused"]), "refreshes": g.get("refreshes", 0),
+        "seconds": {"schedule": round(t_sched, 2), "checks": round(t_check, 2)},
+        "rules": ({"passed": len(rules["passed"]), "failed": rules["failed"], "total": len(rules["rules"])}
+                  if rules else None),
+    }
+    leaf_files = {}
+    for name in lib.leaf_masters():
+        payload = _json.dumps(published(leaves.data[name])).replace("</", "<\\/")
+        (out / "leaf" / f"{name}.js").write_text(
+            f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
+        leaf_files[name] = f"leaf/{name}.js"
+    (out / f"{alg.name}.alg").write_text(alg.source, encoding="utf-8")
+    render_page(out / "index.html", lib=lib, gir=root, checks=checks, leaf_files=leaf_files,
+                rules=PLACE_RULES, machine_rules=rules,
+                floorplan=_Path(floorplan).read_text(encoding="utf-8"),
+                title=f"{alg.title} — QCCD verified gadgets (folded)",
+                categories=CATEGORIES, category_order=ORDER, stack=stack, macro_files=files)
+    root["stats"]["seconds"]["total"] = round(_time.time() - t_start, 2)
+    log(f"  {alg.name}: {n:,} instructions as {g['folded']['macros']} macros, makespan "
+        f"{g['makespan_us'] / 1e6:.2f} s, scheduled in {t_sched:.1f} s"
+        + (f"; G {len(checks['passed'])} passed, rules {len(rules['passed'])}/{len(rules['rules'])}"
+           if rules else "; not expanded"))
+    return {"out": str(out), "gir": g, "stats": root["stats"], "checks": checks, "rules": rules,
+            "expanded": expanded, "library": lib}
+
+
 def page_data(g: dict, out_dir) -> tuple[dict, dict]:
     """(the root as the page carries it inline, {macro id: its file}).  Each macro is written
     to `macro/<id>.js` beside the page, a script that hands it to the page
@@ -680,10 +807,12 @@ class _Expander:
     the call was), then every body's rows at its time, on its ions, its symbols replaced by
     what its caller held when it called."""
 
-    def __init__(self, g: dict):
+    def __init__(self, g: dict, *, own: bool = False):
         self.g = g
         self.macros = g["macros"]
         self.n_res = g["n_residents"]
+        #: one body's own rows only: its calls stay instructions, nothing is expanded (`view`)
+        self.own = own
         self.ins_out: list = []
         self.imaps: dict = {}              # body path -> {its instruction id: the program's}
         self.ev, self.ca, self.me, self.wi, self.fr, self.oc = [], [], [], [], [], []
@@ -697,11 +826,11 @@ class _Expander:
         imap = self.imaps.setdefault(path, {})
         by_ins = {c["ins"]: c for c in calls}
         for ins in prog["instructions"]:
-            if ins["kind"] == "call":
+            if ins["kind"] == "call" and not self.own:
                 c = by_ins[ins["id"]]
                 m = self.macros[c["m"]]
                 cid = f"{path}{c['id']}"
-                nm, ncv = self._names(c, names, cid)
+                nm, ncv = self._names(c, names, cid, cv)
                 frame = {"gate": c["gate"], "call": cid, "line": ins.get("src") or ins["line"],
                          "guard": c.get("guard")}
                 self.number(m["program"], m["calls"], nm, ncv, cid + "/", chain + (frame,))
@@ -709,11 +838,23 @@ class _Expander:
             k = len(self.ins_out)
             imap[ins["id"]] = k
             own = set(ins["blocks"])
+            outs = set((ins.get("cond") or {}).get("cvars") or []) | ({ins["cvar"]} if ins.get("cvar") else set())
+
+            def ren(text, own=own, outs=outs, names=names, cv=cv):
+                return _WORD.sub(lambda mm: names(mm[1]) if mm[1] in own else
+                                 cv(mm[1]) if mm[1] in outs else mm[1], text)
             new = dict(ins, id=k, blocks=[names(b) for b in ins["blocks"]])
-            new["text"] = _WORD.sub(lambda mm: names(mm[1]) if mm[1] in own else mm[1],
-                                    ins["text"])
+            new["text"] = ren(ins["text"])
             if ins.get("cvar"):
                 new["cvar"] = cv(ins["cvar"])
+            if ins.get("guard"):
+                new["guard"] = ren(ins["guard"])
+            if ins.get("cond"):
+                c = dict(ins["cond"], cvars=[cv(n) for n in ins["cond"]["cvars"]],
+                         text=ren(ins["cond"].get("text") or ""))
+                if "all" in c:
+                    c["all"] = [dict(p, cvars=[cv(n) for n in p["cvars"]]) for p in c["all"]]
+                new["cond"] = c
             if chain:
                 # as the flat parser writes it: the program line lit is the outermost call's,
                 # and each frame says where in its gate's body the next thing is
@@ -725,14 +866,17 @@ class _Expander:
             self.ins_out.append(new)
 
     @staticmethod
-    def _names(c, names, cid):
+    def _names(c, names, cid, cv):
+        """A call's names in the program: its blocks are its caller's (`arg0`, ...), its
+        outer guard's outcomes are its caller's (`x0`, ...), and its own are `cid.name`."""
         args = [names(a) for a in c["args"]]
+        ext = {f"x{k}": cv(n) for k, n in enumerate(c.get("ext_names") or [])}
 
         def nm(n):
             if n.startswith("arg") and n[3:].isdigit():
                 return args[int(n[3:])]
             return f"{cid}.{n}"
-        return nm, (lambda n: f"{cid}.{n}")
+        return nm, (lambda n: ext.get(n) or f"{cid}.{n}")
 
     # -- pass 2: rows ---------------------------------------------------------------------
     def rows(self, body, calls, t0, gidmap, names, cv, path, env):
@@ -751,7 +895,9 @@ class _Expander:
         def fx(expr):
             const, srcs = expr["const"], set()
             for s, f in expr["sources"]:
-                if isinstance(s, str) and (s.startswith("in:") or s.startswith("ext:")):
+                if isinstance(s, str) and (s.startswith("in:") or s.startswith("ext:")) and s not in env:
+                    srcs ^= {(s, f)}           # a body's own view: its caller's, as a symbol
+                elif isinstance(s, str) and (s.startswith("in:") or s.startswith("ext:")):
                     v = env[s][f] if s.startswith("in:") else env[s]
                     const ^= v[0]
                     srcs ^= v[1]
@@ -818,10 +964,10 @@ class _Expander:
         for h in body.get("holds") or []:
             self.holds.append(dict(h, t0=t0, ins=ii(h["ins"]), block=names(h["block"]),
                                    bind=[[n, gidmap(x)] for n, x in h["bind"]]))
-        for c in calls:
+        for c in ([] if self.own else calls):
             m = self.macros[c["m"]]
             cid = f"{path}{c['id']}"
-            nm, ncv = self._names(c, names, cid)
+            nm, ncv = self._names(c, names, cid, cv)
             arg_gids = {}
             for i, a in enumerate(c["args"]):
                 for j, gid in enumerate(body["blocks"][a]["ions"]):
@@ -913,11 +1059,16 @@ class _Expander:
             e[0] = eid[e[0]]
 
         def fe(x):
-            return eid[x] if x is not None and x != -1 else x
+            if x is None or x == -1:
+                return x
+            if x in eid:
+                return eid[x]
+            # an own view's symbol: a caller's frame, or an outcome of a call it makes
+            return x if isinstance(x, str) else f"{x[0]}{x[1]}"
 
         def fexpr(expr):
             return {"const": expr[0],
-                    "sources": sorted([[fe(k), f] for k, f in expr[1]])}
+                    "sources": sorted(([fe(k), f] for k, f in expr[1]), key=lambda s: (1, s[0], s[1]) if isinstance(s[0], str) else (0, s[0], s[1]))}
         for m_ in self.me:
             m_[13] = fe(m_[13])
         self.me.sort(key=lambda m_: (m_[6], m_[7]))
@@ -955,3 +1106,111 @@ def expand(g: dict) -> dict:
     call's blocks are named by the caller and its own blocks `c3.name` (`c3/c0.name` inside
     a call it makes); every instruction a call ran says which (`fold`)."""
     return _Expander(g).run()
+
+
+# --------------------------------------------------------------------------- checking, folded
+#
+# A folded run is checked the way it is scheduled: each body once, and the composition by
+# construction.  A body's own VIEW is its rows as a schedule of their own: its holds unrolled,
+# the blocks it was passed resting at their homes when it starts (`initial`), and each call it
+# makes a BOX, the stretch each of its blocks is the call's.  Every place check runs on every
+# view (`check_places` reads `initial`, `boxes` and `until`); what no view can see -- that two
+# calls, or a call and its caller's own rows, never share a place, road or junction at once --
+# is `check_composition`, from the rows and the macros' footprints, not from the calendars that
+# placed them.
+
+
+def view(g: dict, mid: str | None = None) -> dict:
+    """The own view of the root (`mid` None) or of macro `mid`, as GIR 0.2.  Its
+    instructions are the body's, in order, calls included (the k-th is the body's k-th)."""
+    body = g if mid is None else g["macros"][mid]
+    sub = {k: v for k, v in g.items() if k not in ("macros", "calls", "holds", "folded")}
+    sub.update({k: body[k] for k in ("events", "carries", "messages", "windows", "frames",
+                                     "outcomes", "blocks", "program")})
+    sub["holds"] = body.get("holds") or []
+    sub["calls"] = body.get("calls") or []
+    sub["macros"] = g["macros"]
+    x = _Expander(sub, own=True).run()
+    x["makespan_us"] = g["makespan_us"] if mid is None else body["span_us"]
+    new_id = {ins["id"]: k for k, ins in enumerate(body["program"]["instructions"])}
+    boxes = []
+    for c in sub["calls"]:
+        m = g["macros"][c["m"]]
+        for i, b in enumerate(c["args"]):
+            boxes.append({"ins": new_id[c["ins"]], "block": b, "t0": c["t0"],
+                          "t1": c["t0"] + m["free"][i], "covered": c["t0"] + m["mem_last"][i]})
+    x["boxes"] = boxes
+    if mid is not None:
+        initial = {}
+        for b, info in body["blocks"].items():
+            if info.get("param") is not None:
+                for gid in info["ions"]:
+                    initial[gid] = body["homes"][info["param"]]
+                x["blocks"][b] = dict(x["blocks"][b], until=body["mem_last"][info["param"]])
+        x["initial"] = initial
+    return x
+
+
+def check_folded(g: dict, lib, leaves, *, log=None) -> dict:
+    """Every place check on every view; a rule holds when it holds in all of them."""
+    from .place_checks import PLACE_RULES, check_places
+    log = log or (lambda *a, **k: None)
+    out = {"passed": [], "failed": [], "skipped": {}, "violations": {}, "metrics": {"views": 0}}
+    failed: dict = {}
+    skipped: dict = {}
+    for mid in [None] + list(g["macros"]):
+        r = check_places(view(g, mid), lib, leaves)
+        out["metrics"]["views"] += 1
+        who = "the program" if mid is None else f"{g['macros'][mid]['gate']} ({mid})"
+        for rule in r["failed"]:
+            failed.setdefault(rule, []).extend(f"{who}: {v}" for v in r["violations"].get(rule, [])[:5])
+        for rule, why in r["skipped"].items():
+            skipped.setdefault(rule, why)
+        for k, v in r["metrics"].items():
+            if isinstance(v, (int, float)) and k != "views":
+                out["metrics"][k] = max(out["metrics"].get(k, v), v)
+    for rule in PLACE_RULES:
+        if rule in failed:
+            out["failed"].append(rule)
+            out["violations"][rule] = failed[rule][:50]
+        elif rule in skipped:
+            out["skipped"][rule] = skipped[rule]
+        else:
+            out["passed"].append(rule)
+    log(f"  checked {out['metrics']['views']} views: {len(out['passed'])} rules hold"
+        + (f", {out['failed']} fail" if out["failed"] else ""))
+    return out
+
+
+def check_composition(g: dict, folder: Folder) -> list:
+    """No two calls of one body, and no call and that body's own rows, hold one place, road
+    or junction at the same time.  From the rows each body wrote and the footprint each
+    macro was placed by -- not from the calendars the scheduler kept -- body by body.
+    Returns what it found (nothing, when the composition holds)."""
+    by_id = {m.id: m for m in folder.macros.values()}
+    problems = []
+    for mid in [None] + list(g["macros"]):
+        body = g if mid is None else g["macros"][mid]
+        per: dict = {}
+        for e in body["events"]:
+            if e[2] > e[1]:
+                per.setdefault(("leaf", e[3]), []).append((e[1], e[2], "own"))
+        for c in body["carries"]:
+            per.setdefault(("net", c[1]), []).append((c[4], c[11], "own"))
+        for c in body.get("calls") or []:
+            for res, ivs in by_id[c["m"]].footprint.items():
+                for a, b in ivs:
+                    per.setdefault(res, []).append((c["t0"] + a, c["t0"] + b, c["id"]))
+        for res, ivs in per.items():
+            ivs.sort()
+            reach, who = -math.inf, None
+            for a, b, w in ivs:
+                # two of the body's own rows are the place checks' business (G5, G13)
+                if a < reach - 1e-6 and w != who:
+                    problems.append(f"{'the program' if mid is None else mid}: {res[1]} is held by "
+                                    f"{who} and {w} at once ({a:.1f} us)")
+                    if len(problems) >= 50:
+                        return problems
+                if b > reach:
+                    reach, who = b, w
+    return problems

@@ -8,8 +8,11 @@
     run PROG.prog -o DIR --flat --machine M --sysspec K --arch A
         the cross-check of slice 1: the .sysprog devirtualized and compiled flat onto one
         Studio device, every hardware instruction checked through every layer
-    machine
-        regenerate examples/gadgets/floorplans/fullstack.floor
+    run PROG.prog -o DIR --fold [--floorplan fullstack_wide]
+        every gate scheduled once per context, its calls kept folded (qccd.gadget.fold): a run of
+        hours is a page that plays a window at a time
+    machine [--wide MEMORIES]
+        regenerate examples/gadgets/floorplans/fullstack.floor (or fullstack_wide.floor)
 """
 from __future__ import annotations
 
@@ -34,19 +37,29 @@ def main(argv=None) -> int:
     r.add_argument("--specialize", action="append", default=[], help="NAME=VALUE (FormalRV --specialize)")
     r.add_argument("--physics", default="physics@2")
     r.add_argument("--title", default="")
-    sub.add_parser("machine", help="regenerate the full-stack machine's floorplan")
+    r.add_argument("--fold", action="store_true",
+                   help="schedule every gate once per context and keep its calls folded (qccd.gadget.fold)")
+    r.add_argument("--floorplan", default="fullstack", help="the machine (examples/gadgets/floorplans/NAME.floor)")
+    m = sub.add_parser("machine", help="regenerate the full-stack machine's floorplan")
+    m.add_argument("--wide", type=int, metavar="MEMORIES",
+                   help="write fullstack_wide.floor instead: 4 benches, 4 factories, this many memories")
     a = ap.parse_args(argv)
     if a.cmd == "machine":
         from ..gadget.library import LeafLibrary
-        from .machine import write_floorplan
-        print(write_floorplan(LeafLibrary("out/gadgets/cache")))
+        from .machine import FLOORPLAN, write_floorplan
+        if a.wide:
+            print(write_floorplan(LeafLibrary("out/gadgets/cache"), FLOORPLAN.with_name("fullstack_wide.floor"),
+                                  wide={"memories": a.wide}))
+        else:
+            print(write_floorplan(LeafLibrary("out/gadgets/cache")))
         return 0
     spec = dict(s.split("=", 1) for s in a.specialize)
     if not a.flat:
         from .town import run
         t = run(a.prog, out=a.out, code=a.code, distance=a.distance, specialize=spec,
-                machine=a.machine, sysspec=a.sysspec, title=a.title)
-        print(t["alg"])
+                machine=a.machine, sysspec=a.sysspec, title=a.title, fold=a.fold, floorplan=a.floorplan)
+        if not a.fold:
+            print(t["alg"])
         print(json.dumps({k: t[k] for k in ("qec_statements", "linked", "absorbed", "abstract", "concrete",
                                             "checks", "total_s")}, indent=1))
         c = t["contract"]

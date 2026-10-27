@@ -195,7 +195,9 @@ def stack_payload(prog, qppm, qec, chain, low: qec2alg.Lowered, foot: str) -> di
 
 def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, specialize: dict | None = None,
         machine: Path | None = None, sysspec: Path | None = None, title: str = "",
-        floorplan: str = "fullstack") -> dict:
+        floorplan: str = "fullstack", fold: bool = False) -> dict:
+    """`fold`: schedule every gate once per context and keep the calls folded
+    (`qccd.gadget.fold`); the page plays it a window at a time."""
     from ..gadget.verified import build_algorithm
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -251,9 +253,20 @@ def run(prog: Path, *, out: Path, code: str = "surface", distance: int = 3, spec
             "Click a line to jump to the first instruction that carries it.")
     payload = stack_payload(st_prog, st_qppm, st_qec, chain, low, foot)
     site = out / "gadgets"
-    r = step("schedule, check and sign off on the town", lambda: build_algorithm(
-        alg_p, out_dir=site, stack=payload, log=None,
-        semantics=contract if contract.get("checked") and contract.get("kind") == "distribution" else None))
+    if fold:
+        from ..gadget.fold import build_folded
+        r = step("schedule folded and check on the town", lambda: build_folded(
+            alg_p, out_dir=site, stack=payload, log=None))
+        fs = r["stats"]
+        r["stats"] = {"makespan_ms": fs["makespan_ms"], "ions": fs["ions"], "events": None,
+                      "instructions": fs["instructions"], "refused": fs["refused"],
+                      "rules": fs["rules"], "signed_off": None,
+                      "macros": fs["macros"], "reused": fs["reused"]}
+        r["checks"] = r["checks"] or {"passed": []}
+    else:
+        r = step("schedule, check and sign off on the town", lambda: build_algorithm(
+            alg_p, out_dir=site, stack=payload, log=None,
+            semantics=contract if contract.get("checked") and contract.get("kind") == "distribution" else None))
     s = r["stats"]
     reach = structure.reachable(st_qec)
     qec_lines = [s.line for u in st_qec.units if u.kind == "program" or (u.kind == "gadget" and u.name in reach)

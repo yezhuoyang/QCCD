@@ -71,6 +71,17 @@
     add("", this.top, this.top, null, 0, 0);
   };
 
+  // A folded run (fold.js) hands the model a new window of its schedule as the playhead
+  // moves: the same machine, other rows.
+  Model.prototype.reload = function (gir) {
+    this.gir = gir;
+    this._subtreeEvents = {};
+    this._homes = null;
+    this._indexEvents();
+    this._indexCarries();
+    this._indexProgram();
+  };
+
   Model.prototype.node = function (path) { return this.nodes[path]; };
   Model.prototype.master = function (path) { return this.masters[this.nodes[path].master]; };
 
