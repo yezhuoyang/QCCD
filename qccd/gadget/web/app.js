@@ -1943,16 +1943,19 @@
   function renderProgram() {
     const src = M.gir.program.source || "";
     $("progName").textContent = M.gir.program.name;
+    $("progTitle").textContent = STK ? "Gadget" : "Program";
     const el = $("progBody");
     el.textContent = "";
     progDivs.length = 0;
-    src.split(/\r?\n/).forEach((text, i) => {
+    const lines = src.split(/\r?\n/);
+    const calls = LANGS.defined("alg", lines);
+    colOf("alg").calls = calls;
+    lines.forEach((text, i) => {
       const line = i + 1;
       const div = document.createElement("div");
       const trimmed = text.trim();
-      div.className = "pl" + (trimmed.startsWith("code ") ? " decl" : trimmed.startsWith("//") ? " cm" : "");
-      div.innerHTML = `<span class="ln">${line}</span><span></span>`;
-      div.lastChild.textContent = text || " ";
+      div.className = "pl" + (trimmed.startsWith("code ") ? " decl" : "");
+      div.innerHTML = `<span class="ln">${line}</span>` + codeSpan("alg", text, calls);
       div.dataset.ids = "";
       div.onclick = () => {
         const ids = progIds[line] || [];
@@ -2002,12 +2005,27 @@
     }
     // (a folded program is tens of thousands of lines: after a seek too, or the line lit is
     // somewhere nobody is looking)
-    if (first && (S.playing || (FOLD && S.progFollow))) {
+    // the lit line kept in view when it changes, and after a seek
+    if (first && (first !== progLit || S.progFollow)) {
       S.progFollow = false;
-      const box = $("progBody");
-      const top = first.offsetTop - box.offsetTop;
-      if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - 60;
+      progLit = first;
+      if (!$("prog").hidden) inView($("progBody"), first);
     }
+  }
+  let progLit = null;
+  // one line of a program, coloured and explained (langs.js): its indentation kept, and a
+  // wrapped line's continuation indented under its own first word
+  function codeSpan(lang, text, calls) {
+    const t = text || "";
+    const body = t.replace(/^\s+/, "");
+    const ind = t.length - body.length;
+    return `<span class="tx" style="padding-left:${ind + 2}ch">${body ? LANGS.paint(lang, body, { calls }) : " "}</span>`;
+  }
+  // scroll a column so that a row is in view, a third of the way down, if it is not already
+  function inView(box, el) {
+    const top = el.offsetTop, h = box.clientHeight;
+    if (!h) return;
+    if (top < box.scrollTop + 4 || top + el.offsetHeight > box.scrollTop + h - 24) box.scrollTop = Math.max(0, top - h / 3);
   }
   // ------------------------------------------------------------------ the full stack
   //
@@ -2041,8 +2059,12 @@
   // `hw/` beside the page): the program, a file per gadget, a file per leaf master.  Every
   // row of the run is one line of its gadget's module (`run 45 ... ppm_d3.ppm.ZZZ @bench1`),
   // and the hardware instruction running in it one line of that leaf's TSIR.  A module is
-  // loaded the first time the Stack names it.
+  // loaded the first time the Stack names it.  A run that is not folded has no modules of its
+  // own, but each leaf's TSIR is written beside the page all the same, where a folded run keeps
+  // its leaf modules (`hw/leaf/<master>.js`, qccd/gadget/build.py), so its Hardware column reads
+  // the same text.
   const HW = (D.gir && D.gir.hw) || null;
+  const LEAF_TEXT = !HW && !!D.leafText;
   const hwMods = {};
   window.__gadgetModule = function (rel, text) {
     const lines = text.split("\n");
@@ -2058,16 +2080,24 @@
     stkUpdate();
   };
   function hwModule(rel) {
-    if (!HW || !rel) return null;
+    if (!(HW || LEAF_TEXT) || !rel) return null;
     if (hwMods[rel]) return hwMods[rel];
     if (hwMods[rel] === undefined) {
       hwMods[rel] = false;
       const s = document.createElement("script");
-      s.src = HW.dir + rel.replace(/\.tsir$/, ".js");
+      s.src = (HW ? HW.dir : "hw/") + rel.replace(/\.tsir$/, ".js");
       s.async = true;
       document.head.appendChild(s);
     }
     return null;
+  }
+  // where the hardware instruction running now is written: its leaf's TSIR, and the line
+  function leafWhere(op) {
+    if (!op || !op.ins) return null;
+    const rel = HW ? HW.leaves[op.master] : LEAF_TEXT ? `leaf/${op.master}.tsir` : null;
+    if (!rel) return null;
+    const m = hwModule(rel);
+    return { rel, line: m ? m.at[`${op.master}.${op.e[4]}#${op.ins.id}`] : null };
   }
   // where a row of the window and the TSIR instruction running in it are written
   function hwWhere(op) {
@@ -2084,24 +2114,17 @@
     if (!w.rel) return "";
     return `<a href="${escapeHtml(HW.dir + w.rel)}" target="_blank" rel="noopener">${escapeHtml(w.rel)}${w.line ? ":" + w.line : ""}</a>`;
   }
-  const HW_BOXES = [["hwrow", "Gadget module", "row"], ["hwleaf", "Leaf module", "leaf"]];
   function stkInit() {
     if (!STK) return;
+    // the caption: every layer at the playhead, in the right-hand panel; each layer's program
+    // is a column of its own (the columns, below)
     const sect = document.createElement("div");
     sect.className = "sect";
     sect.id = "stack";
-    let lays = "";
-    for (const [k, title] of STK_LAYERS) {
-      lays += `<details class="stk-lay" data-layer="${k}"><summary>${title} <span class="muted">${escapeHtml(STK.layers[k].file)}</span></summary><div class="stk-lines" data-layer="${k}"></div></details>`;
-    }
-    if (HW) {
-      for (const [k, title] of HW_BOXES) {
-        lays += `<details class="stk-lay" data-layer="${k}"><summary>${title} <span class="muted" data-hw-file="${k}"></span></summary><div class="stk-lines hw" data-layer="${k}"></div></details>`;
-      }
-    }
     sect.innerHTML = `<h3>Full stack <span class="muted">FormalRV ${escapeHtml(STK.formalrv || "")}</span></h3>` +
-      `<div id="stkNow" class="stk-cap"></div>${lays}<div class="stk-foot muted">${STK.foot || ""}</div>`;
-    $("prog").parentNode.insertBefore(sect, $("prog"));
+      `<div id="stkNow" class="stk-cap"></div><div class="stk-foot muted">${STK.foot || ""}</div>`;
+    $("right").appendChild(sect);
+    $("right").classList.add("withstack");
     // the first instruction carrying each line of each layer: click a line, land there.  A
     // folded run is not all on the page at once, so there it is the first TIME each line of
     // the program runs (`line_first`, from fold.py), and the click seeks there.
@@ -2129,15 +2152,13 @@
         }
       }
     }
-    sect.addEventListener("toggle", () => stkUpdate(), true);
-    sect.addEventListener("click", (ev) => {
-      const r = ev.target.closest(".stk-ln");
-      if (!r || !stkFirst[r.dataset.layer]) return;
-      const id = stkFirst[r.dataset.layer][+r.dataset.line];
-      if (FOLD) { if (id !== undefined) seek(id + 1e-3); return; }
-      const sp = id !== undefined ? M.insSpan[id] : null;
-      if (sp) { seek(sp[0]); focusInstruction(id); }
-    });
+  }
+  // a line of a layer, clicked: the animation goes to the first instruction carrying it
+  function stkJump(layer, line) {
+    const id = (stkFirst[layer] || {})[line];
+    if (FOLD) { if (id !== undefined) seek(id + 1e-3); return; }
+    const sp = id !== undefined ? M.insSpan[id] : null;
+    if (sp) { seek(sp[0]); focusInstruction(id); }
   }
   // the instruction the stack describes: the one selected, else the first running, else the
   // last one finished
@@ -2188,9 +2209,14 @@
     const tags = [meta.op, meta.round !== undefined ? `round ${meta.round + 1}` : "", meta.factor ? `factor ${meta.factor}` : ""].filter(Boolean);
     return s + (tags.length ? `  (${tags.join(", ")})` : "");
   }
+  // what the panels describe, at the playhead: the caption and every column
   function stkUpdate() {
-    if (!STK) return;
     const id = stkFocus();
+    const op = id === null || id === undefined ? null : stkOpNow(id);
+    if (STK) stkCaption(id, op);
+    colsUpdate(id, op);
+  }
+  function stkCaption(id, op) {
     const el = $("stkNow");
     if (id === null || id === undefined) { el.innerHTML = `<span class="muted">nothing has run yet</span>`; return; }
     const ins = M.gir.program.instructions[id];
@@ -2219,7 +2245,6 @@
         h += row(title, `<span class="muted">${why}</span>`);
       }
     }
-    const op = stkOpNow(id);
     const inGate = (ins.call || []).map((f) => `${f.gate} (line ${f.line})`).join(" › ");
     h += row("Gadget", `<code>${escapeHtml(ins.text)}</code>` + (op ? ` <span class="muted">@ ${escapeHtml(op.place)} · ${escapeHtml(op.e[4])}</span>` : "") +
       (inGate ? `<br><span class="muted">inside gate ${escapeHtml(inGate)}, body line ${ins.src}</span>` : ""));
@@ -2261,37 +2286,298 @@
         (op.ins ? ` <span class="muted">› instruction</span> ${hwCite(where.leaf)}` : ` <span class="muted">(${escapeHtml(op.master)} is classical: no TSIR)</span>`));
     }
     el.innerHTML = h;
-    // the modules' lines around the row and the instruction, the current one lit
-    for (const [k, , which] of HW ? HW_BOXES : []) {
-      const box = document.querySelector(`.stk-lines[data-layer="${k}"]`);
-      const w = where && where[which];
-      const name = document.querySelector(`[data-hw-file="${k}"]`);
-      if (name) name.textContent = w && w.rel ? w.rel : "";
-      if (!box || !box.parentNode.open) continue;
-      const mod = w && w.rel ? hwModule(w.rel) : null;
-      if (!mod || !w.line) { box.innerHTML = `<div class="muted" style="padding:2px 10px">${w && w.rel ? "loading…" : "nothing here"}</div>`; continue; }
-      let html = "";
-      for (let ln = Math.max(1, w.line - 30); ln <= Math.min(mod.lines.length, w.line + 30); ln++) {
-        html += `<div class="stk-ln none${ln === w.line ? " cur" : ""}" data-layer="${k}"><span class="ln">${ln}</span><span>${escapeHtml(mod.lines[ln - 1] || " ")}</span></div>`;
+  }
+
+  // ------------------------------------------------------------------ the columns
+  //
+  // EVERY PROGRAM IN A COLUMN OF ITS OWN.  A run is several programs, each lowered from the one
+  // above it: FormalRV's .prog, .qppm and .qec, the gadget program the town runs (.alg), the
+  // TSIR module its rows are written in, and the hardware program of the leaf at work.  Each
+  // stands in a full-height column beside the animation, the line running now lit and kept in
+  // view, its words coloured by what they do and explained on hover (langs.js).  The reader
+  // picks which columns stand there (the bar above them), how wide they are (the edge), and
+  // whether long lines wrap; the side panels fold away to give them room.  A column is drawn
+  // once; the playhead only moves its lit line.  A TSIR module is tens of thousands of lines,
+  // so a module column draws only the rows in view.
+  const LANGS = window.QCCD_LANGS;
+  const APP = $("app");
+  const COLS = [];
+  const colOf = (key) => COLS.find((c) => c.key === key) || {};
+  // a page held as a figure (the tutorial's <iframe>s) keeps its own choices, and opens with
+  // its programs folded: a figure is the picture first.  (It only asks whether it has a
+  // parent; a figure never reaches for the page around it.)
+  let IN_FRAME = false;
+  try { IN_FRAME = window.parent !== window; } catch (e) { IN_FRAME = true; }
+  const store = {
+    get(k) { try { return window.localStorage.getItem("qccd.gadget." + (IN_FRAME ? "frame." : "") + k); } catch (e) { return null; } },
+    set(k, v) { try { window.localStorage.setItem("qccd.gadget." + (IN_FRAME ? "frame." : "") + k, v); } catch (e) { /* not kept */ } },
+  };
+  function colsDefine() {
+    if (STK) for (const [k, title] of STK_LAYERS) COLS.push({ key: k, title, lang: k, kind: "layer", file: STK.layers[k].file });
+    COLS.push({ key: "alg", title: STK ? "Gadget" : "Program", lang: "alg", kind: "alg", el: $("prog"), body: $("progBody") });
+    if (HW) COLS.push({ key: "gmod", title: "Module", lang: "tsir", kind: "module", which: "row",
+                         about: "the TSIR module the running row is written in" });
+    if (HW || LEAF_TEXT) COLS.push({ key: "hw", title: "Hardware", lang: "tsir", kind: "module", which: "leaf",
+                                      about: "the TSIR of the leaf gadget at work" });
+  }
+  // the columns a page opens with: every layer and the gadget program on a full-stack run,
+  // the program alone elsewhere -- unless the reader chose otherwise on this kind of page
+  const COLS_KEY = "cols." + (STK ? "stack" : "plain");
+  function colsChosen() {
+    const s = store.get(COLS_KEY);
+    if (s !== null) { const on = new Set(s.split(",").filter(Boolean)); return (k) => on.has(k); }
+    return (k) => (STK ? ["prog", "qppm", "qec", "alg"] : ["alg"]).includes(k);
+  }
+  function colsInit() {
+    if (!COLS.length) colsDefine();
+    const row = $("colsRow"), chosen = colsChosen();
+    for (const col of COLS) {
+      if (!col.el) {
+        col.el = document.createElement("section");
+        col.el.className = "pcol";
+        col.el.dataset.col = col.key;
+        col.el.dataset.lang = col.lang;
+        col.el.innerHTML = `<h3><span class="pc-t">${escapeHtml(col.title)}</span><span class="muted pc-at">${escapeHtml(col.file || "")}</span>` +
+          `<button class="fold pc-x" data-hint="cols:close" title="hide this column">×</button></h3>` +
+          `<div class="pc-b"></div>`;
+        col.body = col.el.querySelector(".pc-b");
+        col.at = col.el.querySelector(".pc-at");
+        if (col.kind === "layer") row.insertBefore(col.el, $("prog"));
+        else row.appendChild(col.el);
       }
-      box.innerHTML = html;
-      const cl = box.querySelector(".cur");
-      if (cl) box.scrollTop = Math.max(0, cl.offsetTop - box.offsetTop - box.clientHeight / 2);
+      col.on = chosen(col.key);
+      col.el.querySelector(".pc-x").onclick = () => colsToggle(col.key, false);
+      if (col.kind === "layer") layerBuild(col);
+      if (col.kind === "module") vBuild(col);
     }
-    for (const [k] of STK_LAYERS) {
-      const box = document.querySelector(`.stk-lines[data-layer="${k}"]`);
-      if (!box || !box.parentNode.open) continue;
-      const cur = c[k] ? c[k][0] : 0;
-      const lines = STK.layers[k].lines;
-      let html = "";
-      for (let ln = 1; ln <= lines.length; ln++) {
-        const can = stkFirst[k][ln] !== undefined;
-        html += `<div class="stk-ln${ln === cur ? " cur" : ""}${can ? "" : " none"}" data-layer="${k}" data-line="${ln}" data-hint="fullstack-line"><span class="ln">${escapeHtml(stkWhere(k, ln).split(":").pop())}</span><span>${escapeHtml(lines[ln - 1] || " ")}</span></div>`;
+    // the bar: a button a column, then the line wrap and the fold
+    const bar = $("colsBar");
+    bar.innerHTML = `<span class="cb-l">Programs</span>` +
+      COLS.map((c) => `<button data-col="${c.key}" data-hint="cols:toggle" title="${escapeHtml(colTip(c))}">${escapeHtml(c.title)}</button>`).join("") +
+      `<span class="cb-sp"></span><button id="colsWrap" data-hint="cols:wrap" title="wrap long lines inside their column">Wrap</button>` +
+      `<button class="fold" id="colsHide" data-hint="cols:hide" title="fold the program columns away">›</button>`;
+    for (const b of bar.querySelectorAll("button[data-col]")) b.onclick = () => colsToggle(b.dataset.col);
+    const wrap = store.get("wrap") !== "0";
+    $("cols").classList.toggle("nowrap", !wrap);
+    $("colsWrap").className = wrap ? "on" : "";
+    $("colsWrap").onclick = () => {
+      const on = $("cols").classList.toggle("nowrap");
+      $("colsWrap").className = on ? "" : "on";
+      store.set("wrap", on ? "0" : "1");
+      colsFollow(true);
+    };
+    $("colsHide").onclick = () => { APP.classList.add("nocols"); store.set("hidden", "1"); colsApply(); };
+    $("colsRail").onclick = () => {
+      APP.classList.remove("nocols"); store.set("hidden", "0");
+      if (!COLS.some((c) => c.on)) for (const c of COLS) c.on = (STK ? ["prog", "qppm", "qec", "alg"] : ["alg"]).includes(c.key);
+      colsApply();
+    };
+    if ((store.get("hidden") || (IN_FRAME ? "1" : "0")) === "1") APP.classList.add("nocols");
+    // the side panels: a full-stack run gives its columns the room the hierarchy took, and on
+    // a narrower screen the inspector's too (each opens again from its bar)
+    const folded = (side, dflt) => { const s = store.get("fold." + side); return s === null ? dflt : s === "1"; };
+    APP.classList.toggle("noleft", folded("left", !!STK && window.innerWidth < 2200));
+    APP.classList.toggle("noright", folded("right", !!STK && window.innerWidth < 1500));
+    APP.classList.toggle("stack", !!STK);
+    const fold = (side) => () => { const on = APP.classList.toggle("no" + side); store.set("fold." + side, on ? "1" : "0"); colsApply(); };
+    $("leftFold").onclick = $("leftRail").onclick = fold("left");
+    $("rightFold").onclick = $("rightRail").onclick = fold("right");
+    colsSplitter();
+    $("cols").addEventListener("mouseover", colsTip);
+    $("cols").addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
+    APP.classList.add("hascols");
+    colsApply();
+  }
+  function colTip(c) {
+    if (c.kind === "layer") return `the ${c.title.toLowerCase()} program (${c.file})`;
+    if (c.kind === "alg") return "the gadget program the machine runs";
+    return c.about;
+  }
+  function colsToggle(key, on) {
+    const col = colOf(key);
+    if (!col.el) return;
+    col.on = on === undefined ? !col.on : on;
+    store.set(COLS_KEY, COLS.filter((c) => c.on).map((c) => c.key).join(","));
+    if (COLS.some((c) => c.on)) APP.classList.remove("nocols");
+    colsApply();
+  }
+  // the widths: a column is as wide as the reader made it, or shares what the stage leaves
+  function colsApply() {
+    const shown = APP.classList.contains("nocols") ? [] : COLS.filter((c) => c.on);
+    for (const c of COLS) c.el.hidden = !c.on;
+    for (const b of $("colsBar").querySelectorAll("button[data-col]")) b.className = colOf(b.dataset.col).on ? "on" : "";
+    if (!shown.length) APP.classList.add("nocols");
+    const W = window.innerWidth;
+    const side = (APP.classList.contains("noleft") ? 30 : 250) + (APP.classList.contains("noright") ? 30 : (STK ? 300 : 340));
+    const room = Math.max(200, W - side - 360);           // what the columns may take: the stage keeps 360 px
+    const asked = +store.get("colw") || 0;
+    const per = asked || Math.max(220, Math.min(480, Math.floor((W - side - 440) / Math.max(1, shown.length))));
+    const w = shown.length ? Math.min(room, per * shown.length) : 30;
+    APP.style.setProperty("--cols-w", w + "px");
+    S.dirty = true;
+    requestAnimationFrame(() => { fit(); colsFollow(true); });
+  }
+  function colsSplitter() {
+    const el = $("vsplit");
+    el.addEventListener("pointerdown", (ev) => {
+      el.setPointerCapture(ev.pointerId);
+      el.classList.add("on");
+      const right = $("cols").getBoundingClientRect().right;
+      const n = Math.max(1, COLS.filter((c) => c.on).length);
+      const move = (e) => {
+        const per = Math.max(160, Math.min(1200, Math.round((right - e.clientX) / n)));
+        store.set("colw", String(per));
+        APP.style.setProperty("--cols-w", Math.min(per * n, Math.max(200, window.innerWidth - 300)) + "px");
+        S.dirty = true;
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", () => { el.removeEventListener("pointermove", move); el.classList.remove("on"); fit(); colsFollow(true); }, { once: true });
+    });
+    el.addEventListener("dblclick", () => { store.set("colw", ""); colsApply(); });
+    window.addEventListener("resize", () => colsApply());
+  }
+  // a word with a note: the note, under it
+  function colsTip(ev) {
+    const tip = $("tip");
+    const w = ev.target.closest && ev.target.closest("[data-w]");
+    const pc = w && w.closest(".pcol");
+    const col = pc ? colOf(pc.dataset.col) : null;
+    const n = col ? LANGS.note(col.lang, w.dataset.w, col.calls) : null;
+    if (!n) { tip.style.display = "none"; return; }
+    tip.textContent = `${n[0]}\n${n[1]}`;
+    tip.style.display = "block";
+    const r = w.getBoundingClientRect();
+    tip.style.left = Math.max(4, Math.min(window.innerWidth - 370, r.left)) + "px";
+    tip.style.top = (r.bottom + 6 + 120 > window.innerHeight ? r.top - 8 - tip.offsetHeight : r.bottom + 6) + "px";
+  }
+
+  // A LAYER COLUMN: the whole file, drawn once; a program of several files says where each
+  // begins, and numbers its lines file by file, as FormalRV does
+  function layerBuild(col) {
+    const k = col.key, L = STK.layers[k];
+    col.calls = LANGS.defined(k, L.lines, (ln) => stkWhere(k, ln));
+    const parts = [];
+    let file = null;
+    for (let ln = 1; ln <= L.lines.length; ln++) {
+      const at = stkWhere(k, ln), c = at.lastIndexOf(":");
+      const f = at.slice(0, c);
+      if (L.members.length > 1 && f !== file) parts.push(`<div class="cl-file">${escapeHtml(f)}</div>`);
+      file = f;
+      const can = stkFirst[k][ln] !== undefined;
+      parts.push(`<div class="cl${can ? " can" : ""}" data-line="${ln}"${can ? ' data-hint="fullstack-line"' : ""}>` +
+        `<span class="ln">${at.slice(c + 1)}</span>${codeSpan(k, L.lines[ln - 1], col.calls)}</div>`);
+    }
+    col.body.innerHTML = parts.join("");
+    col.rows = col.body.querySelectorAll(".cl");
+    col.cur = 0;
+    col.marks = [];
+    col.body.addEventListener("click", (ev) => {
+      const r = ev.target.closest(".cl.can");
+      if (r) stkJump(k, +r.dataset.line);
+    });
+  }
+  function layerMark(col, line, also) {
+    if (line !== col.cur) {
+      for (const el of col.marks) el.classList.remove("cur", "abs");
+      col.marks = [];
+      col.cur = line;
+      const el = line ? col.rows[line - 1] : null;
+      if (el) { el.classList.add("cur"); col.marks.push(el); col.follow = true; }
+      for (const a of also || []) { const e = col.rows[a - 1]; if (e && a !== line) { e.classList.add("abs"); col.marks.push(e); } }
+      col.at.textContent = line ? stkWhere(col.key, line) : col.file;
+    }
+  }
+
+  // A MODULE COLUMN: a virtual list over the module's lines, one row of 18 px each
+  const VROW = 18;
+  function vBuild(col) {
+    col.body.innerHTML = `<div class="pc-none"></div><div class="vl"><div class="vw"></div></div>`;
+    col.msg = col.body.firstChild;
+    col.vl = col.body.querySelector(".vl");
+    col.vw = col.body.querySelector(".vw");
+    col.mod = null;
+    col.cur = 0;
+    col.drawn = -1;
+    col.body.addEventListener("scroll", () => vPaint(col, false));
+  }
+  function vShow(col, rel, line, why) {
+    const mod = rel ? hwModule(rel) : null;
+    col.at.innerHTML = rel ? (HW ? hwCite({ rel, line }) : escapeHtml(rel + (line ? ":" + line : ""))) : "";
+    if (!mod) {
+      col.msg.hidden = false;
+      col.msg.textContent = rel ? `loading ${rel}…` : why;
+      col.vl.hidden = true;
+      col.mod = null;
+      return;
+    }
+    col.msg.hidden = !!line;
+    col.msg.textContent = line ? "" : why;
+    col.vl.hidden = false;
+    if (col.mod !== mod) {
+      col.mod = mod;
+      let w = 0;
+      for (const s of mod.lines) if (s.length > w) w = s.length;
+      col.vl.style.height = mod.lines.length * VROW + "px";
+      col.vl.style.width = `calc(${Math.min(w, 400) + 2}ch + 54px)`;
+      col.cur = -1;
+    }
+    if (line !== col.cur) { col.cur = line || 0; col.follow = !!line; col.drawn = -1; }
+    if (!col.el.hidden) vPaint(col, true);
+  }
+  function vPaint(col, force) {
+    if (!col.mod || col.el.hidden) return;
+    const box = col.body, n = col.mod.lines.length;
+    if (col.follow && col.cur) {
+      const top = (col.cur - 1) * VROW + (col.msg.hidden ? 0 : col.msg.offsetHeight), h = box.clientHeight;
+      if (h && (top < box.scrollTop + 4 || top > box.scrollTop + h - 30)) box.scrollTop = Math.max(0, top - h / 3);
+      col.follow = false;
+    }
+    const first = Math.max(0, Math.floor(box.scrollTop / VROW) - 30);
+    if (!force && first === col.drawn) return;
+    col.drawn = first;
+    const last = Math.min(n, first + Math.ceil((box.clientHeight || 600) / VROW) + 60);
+    let h = "";
+    for (let i = first; i < last; i++) {
+      const s = col.mod.lines[i];
+      h += `<div class="cl${i + 1 === col.cur ? " cur" : ""}"><span class="ln">${i + 1}</span><span class="tx">` +
+        `${LANGS.paint("tsir", s.length > 400 ? s.slice(0, 400) : s)}${s.length > 400 ? ` <span class="tk-c">… ${(s.length - 400).toLocaleString()} more characters</span>` : ""}</span></div>`;
+    }
+    col.vw.style.top = first * VROW + "px";
+    col.vw.innerHTML = h;
+  }
+
+  // the playhead moved (or a module arrived): every column lights its line
+  function colsUpdate(id, op) {
+    if (!COLS.length) return;
+    let c = {}, also = [];
+    if (STK && id !== null && id !== undefined) {
+      const ins = M.gir.program.instructions[id];
+      if (!(STK.input_lines || []).includes(ins.line)) c = stkChain(ins.src || ins.line);
+      also = (STK.qec_absorbed_into || {})[ins.src || ins.line] || [];
+    }
+    for (const col of COLS) {
+      if (col.kind === "layer") layerMark(col, c[col.key] ? c[col.key][0] : 0, col.key === "qec" ? also : []);
+      else if (col.kind === "module" && col.on) {
+        if (col.which === "row") {
+          const w = op ? hwWhere(op) : null;
+          vShow(col, w && w.row.rel, w && w.row.line, op ? "this row is not in a module" : "nothing runs at a place now");
+        } else {
+          const w = leafWhere(op);
+          vShow(col, w && w.rel, w && w.line,
+                !op ? "nothing runs at a place now" : !op.ins ? `${op.master} works on bits: no hardware program` : "");
+        }
       }
-      box.innerHTML = html;
-      const cl = box.querySelector(".cur");
-      if (cl) box.scrollTop = Math.max(0, cl.offsetTop - box.offsetTop - box.clientHeight / 2);
     }
+    colsFollow(false);
+  }
+  // keep each shown column's lit line in view (after a layout change, `all`)
+  function colsFollow(all) {
+    for (const col of COLS) {
+      if (!col.on || APP.classList.contains("nocols")) continue;
+      if (col.kind === "layer" && col.cur && (col.follow || all)) { inView(col.body, col.rows[col.cur - 1]); col.follow = false; }
+      if (col.kind === "module" && all) { col.follow = true; vPaint(col, true); }
+    }
+    if (all) { const lit = $("progBody").querySelector(".pl.live"); if (lit) inView($("progBody"), lit); }
   }
 
   function focusInstruction(id) {
@@ -3052,8 +3338,10 @@
   renderSignoff();
   renderTraffic();
   setupFloorplan();
+  colsDefine();
   renderProgram();
   stkInit();
+  colsInit();
   stkUpdate();
   legend();
   go(S.path);
@@ -3069,7 +3357,14 @@
     portXY, portCache, COLOR, FAMILY, ROLE, CATS, styleOf, shapeD, shapeSvg, roundRect, haloText, clip, sizeCanvas, stage, sctx,
     X, Y, fmtTime, escapeHtml, renderLibrary, renderInspector, renderTree, crumbs,
     redraw: () => { S.dirty = true; },
-    ready: () => Object.keys(D.leafFiles || {}).every((m) => M.leafData[m]) };
+    ready: () => Object.keys(D.leafFiles || {}).every((m) => M.leafData[m]),
+    // the columns as they stand, and the hardware instruction the panels describe
+    cols: () => COLS.map((c) => ({ key: c.key, on: !!c.on && !APP.classList.contains("nocols"), cur: c.cur || 0,
+                                   rel: c.mod ? Object.keys(hwMods).find((r) => hwMods[r] === c.mod) : null })),
+    focusOp: () => {
+      const id = stkFocus(), op = id === null || id === undefined ? null : stkOpNow(id);
+      return op ? { id, master: op.master, op: op.e[4], ins: op.ins ? op.ins.id : null } : null;
+    } };
   if (window.GADGET_EDITOR) window.GADGET_EDITOR.attach(window.GADGETS);
   // the handle a page that embeds this one drives: `ready()` once every leaf is drawn,
   // `focus(id)` as `#f=`, `seek(us)` as `#t=`

@@ -43,10 +43,14 @@ def published(obj):
     return obj
 
 
-def write_leaf_files(out, lib, leaves, gir: dict | None = None, *, inline: bool = False):
+def write_leaf_files(out, lib, leaves, gir: dict | None = None, *, inline: bool = False,
+                     texts: bool = False):
     """Every leaf the page replays, as `leaf/<master>.js` beside it (or inline): each place
     master, and the conveyor `chan<L>` of every road length the schedule's roads have, so a
-    road is drawn as its sites with its ions where its own TSIR has them.  Returns
+    road is drawn as its sites with its ions where its own TSIR has them.  With `texts`, each
+    master the schedule runs also as its TSIR text, `hw/leaf/<master>.js` (the leaf module of
+    qccd/gadget/modules.py, handed to the page's `__gadgetModule`, where a folded run keeps
+    its own), which the page's Hardware column loads when it is shown.  Returns
     (leaf_files, inline_leaves)."""
     import json as _json
     from pathlib import Path as _Path
@@ -67,6 +71,15 @@ def write_leaf_files(out, lib, leaves, gir: dict | None = None, *, inline: bool 
         (_Path(out) / "leaf" / f"{name}.js").write_text(
             f"window.__gadgetLeaf&&window.__gadgetLeaf({payload});\n", encoding="utf-8")
         leaf_files[name] = f"leaf/{name}.js"
+    if texts and not inline:
+        from .modules import leaf_module_text
+        runs = {(gir or {}).get("leaves", {}).get(e[3], [None])[0] for e in (gir or {}).get("events", [])}
+        (_Path(out) / "hw" / "leaf").mkdir(parents=True, exist_ok=True)
+        for name in sorted(n for n in runs if n in data):
+            rel = f"leaf/{name}.tsir"
+            body = _json.dumps(leaf_module_text(name, data[name]), ensure_ascii=False).replace("</", "<\\/")
+            (_Path(out) / "hw" / "leaf" / f"{name}.js").write_text(
+                f"window.__gadgetModule&&window.__gadgetModule({_json.dumps(rel)},{body});\n", encoding="utf-8")
     return leaf_files, inline_leaves
 
 
@@ -138,7 +151,7 @@ def build(program, *, out_dir, rows: int | None = None, pairs: int | None = None
     (out / "checks.json").write_text(json.dumps(verdict, indent=1), encoding="utf-8")
     from .roads import attach_runs
     attach_runs(gir, lib, leaves)                 # every carry's road program, for the page
-    leaf_files, _ = write_leaf_files(out, lib, leaves, gir)
+    leaf_files, _ = write_leaf_files(out, lib, leaves, gir, texts=True)
 
     studio_pages = {}
     if studio:
@@ -147,7 +160,7 @@ def build(program, *, out_dir, rows: int | None = None, pairs: int | None = None
 
     from .page import render_page
     render_page(out / "index.html", lib=lib, gir=gir, checks=verdict, leaf_files=leaf_files,
-                studio_pages=studio_pages, rules=_rules())
+                studio_pages=studio_pages, rules=_rules(), leaf_text=True)
     stats["seconds"]["total"] = round(time.time() - t_start, 2)
     log(f"  {stats['ions']} ions, {stats['events']} events, {stats['carries']} carries, "
         f"makespan {stats['makespan_ms']} ms; G passed {verdict['passed']} "

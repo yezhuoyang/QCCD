@@ -113,3 +113,13 @@ def test_the_smallest_run_is_built_by_the_section(leaves, tmp_path):
     # the stages' scratch files are not published beside the page
     assert not list((tmp_path / "gadgets" / "fullstack" / "cnot").glob("*.qec"))
     assert json.dumps(res)  # a run's result is plain data
+    # every layer's program in a column of its own, the line running now lit in each
+    # (tests/test_gadget_columns.py says what that means)
+    from test_gadget_columns import CHROME, NODE, _probe, check_columns
+    if NODE and CHROME:
+        out = _probe(tmp_path / "gadgets" / "fullstack" / "cnot")
+        check_columns(out, ["prog", "qppm", "qec", "alg"])
+        assert "noleft" in out["app"]["cls"], "a full-stack run gives its columns the hierarchy's room"
+        lit = {c["key"]: c["lit"] for c in out["cols"]}
+        assert "CX(0, 1)" in lit["prog"]
+        assert "measure" in lit["qppm"] and "merge" in lit["qec"]

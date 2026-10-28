@@ -28,10 +28,82 @@ button:hover { border-color: #98a2b3; }
 button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
 button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* the programs stand in columns of their own between the stage and the right-hand panels,
+   from under the header to the bottom: one column a program (app.js, "the columns") */
 #app { display: grid; flex: 1 1 auto; min-height: 0; position: relative;
-       grid-template-columns: 250px minmax(0, 1fr) 340px;
+       grid-template-columns: var(--left-w, 250px) minmax(0, 1fr) var(--cols-w, 0px) var(--right-w, 340px);
        grid-template-rows: 46px minmax(0, 1fr) 6px var(--tl-h, 230px);
-       grid-template-areas: "head head head" "left stage right" "split split split" "tl tl tl"; }
+       grid-template-areas: "head head head head" "left stage cols right" "split split cols right" "tl tl cols right"; }
+#app.stack { --right-w: 300px; }
+#app.noleft { --left-w: 30px; }
+#app.noright { --right-w: 30px; }
+#app.noleft #left > .sect, #app.noright #right > .sect { display: none; }
+.rail { display: none; writing-mode: vertical-rl; border: 0; border-radius: 0; background: var(--panel);
+        color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+        padding: 10px 0; width: 100%; flex: 1; cursor: pointer; text-align: start; }
+.rail:hover { color: var(--navy); background: var(--soft); }
+#app.noleft #leftRail, #app.noright #rightRail { display: block; }
+.fold { border: 0; background: none; padding: 0 4px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.fold:hover { color: var(--navy); }
+
+#cols { grid-area: cols; display: none; flex-direction: column; min-width: 0; min-height: 0; position: relative;
+        background: var(--panel); border-left: 1px solid var(--line); }
+#app.hascols #cols { display: flex; }
+#colsBar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+#colsBar .cb-l { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-right: 4px; }
+#colsBar button { font-size: 11.5px; padding: 1px 8px; }
+#colsBar .cb-sp { flex: 1; }
+#colsRow { flex: 1; display: flex; min-height: 0; overflow-x: auto; }
+#colsRail { display: none; }
+#app.nocols #colsBar, #app.nocols #colsRow { display: none; }
+#app.nocols #colsRail { display: block; }
+#vsplit { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; }
+#vsplit:hover, #vsplit.on { background: rgba(152, 162, 179, .45); }
+#app.nocols #vsplit { display: none; }
+.pcol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.pcol:last-child { border-right: 0; }
+.pcol[hidden] { display: none; }
+.pcol > h3 { margin: 0; padding: 6px 8px 6px 10px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+             color: var(--muted); font-weight: 600; display: flex; gap: 6px; align-items: baseline; border-bottom: 1px solid var(--line);
+             white-space: nowrap; min-width: 0; }
+.pcol > h3 .pc-t { color: var(--navy); }
+.pcol > h3 .muted, .pcol > h3 a { text-transform: none; letter-spacing: 0; font-weight: 400; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.pcol > h3 a { color: var(--muted); }
+.pcol > .pc-b { flex: 1; min-height: 0; overflow: auto; position: relative; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; padding: 2px 0 12px; }
+.cl { display: grid; grid-template-columns: 38px minmax(0, 1fr); padding-right: 8px; }
+.cl .ln, .pl .ln { color: #98a2b3; text-align: right; padding-right: 8px; user-select: none; }
+.cl .tx, .pl .tx { white-space: pre-wrap; overflow-wrap: anywhere; text-indent: -2ch; }
+#cols.nowrap .cl .tx, #cols.nowrap .pl .tx { white-space: pre; overflow-wrap: normal; }
+#cols.nowrap .pc-b > .cl, #cols.nowrap .pc-b > .pl { width: max-content; min-width: 100%; }
+.cl.can { cursor: pointer; }
+.cl.can:hover { background: var(--soft); }
+.cl.cur { background: #fff4ed; box-shadow: inset 3px 0 var(--accent); }
+.cl.abs { background: #fbf7f2; }
+.cl-file { position: sticky; top: -2px; z-index: 1; background: #f3f5f8; color: var(--muted); font-family: var(--mono); font-size: 10.5px;
+           padding: 2px 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--soft); }
+.pc-none { padding: 8px 10px; color: var(--muted); font-family: inherit; font-size: 12px; }
+/* a TSIR module is tens of thousands of lines: only the rows in view are drawn, unwrapped */
+.vl { position: relative; }
+.vl > .vw { position: absolute; left: 0; top: 0; min-width: 100%; }
+.vl .cl { height: 18px; white-space: pre; grid-template-columns: 46px max-content; }
+.vl .cl .tx { white-space: pre; text-indent: 0; }
+
+/* the words of each language (langs.js): a statement's word is a tag in its kind's colour,
+   as the studio draws a hardware instruction; the same kind has the same colour in every column */
+.tg { display: inline-block; text-indent: 0; padding: 0 3px; border-radius: 3px; color: #fff; font-weight: 600; line-height: 1.3; }
+.t-prep { background: #0e7490; } .t-ppm { background: #4338ca; } .t-meas { background: #475467; }
+.t-gate { background: #0f766e; } .t-decode { background: #7c5bfa; } .t-frame { background: #b45309; }
+.t-move { background: #2563eb; } .t-cool { background: #3a9cc0; } .t-reset { background: #8792a6; } .t-run { background: #0f766e; }
+.tk-kw { color: #6d28d9; font-weight: 600; } .tk-fld { color: #7c3aed; } .tk-op { color: #6d28d9; }
+.tk-n { color: #b05a00; } .tk-s { color: #0b7a4b; } .tk-c { color: #8a8892; font-style: italic; }
+.tk-st { color: #0e7490; font-weight: 600; } .tk-call { color: var(--navy); font-weight: 600; }
+.tk-px { color: #0f766e; font-weight: 700; } .tk-pz { color: #b42318; font-weight: 700; } .tk-py { color: #7e22ce; font-weight: 700; }
+.tk-gn { color: #0f766e; font-weight: 700; } .tk-mk { color: #8792a6; } .tk-val { color: #475467; }
+.tk-mv { font-weight: 600; color: #4338ca; } .mv-rotate_ccw, .mv-sort_split { color: #7c5bfa; } .mv-dock { color: #b7791f; }
+.mv-undock { color: #e4572e; } .mv-shuttle { color: #c2410c; } .mv-conveyor { color: #2563eb; }
+[data-w] { cursor: help; }
+[data-w]:hover { text-decoration: underline dotted; text-underline-offset: 2px; }
+.tg[data-w]:hover { text-decoration: none; box-shadow: 0 0 0 2px rgba(24, 34, 48, .25); }
 
 header { grid-area: head; display: flex; align-items: center; gap: 12px; padding: 0 12px;
          background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
@@ -91,7 +163,9 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
 .ck.open .v { display: block; }
 .pass { color: var(--ok); } .fail { color: var(--bad); } .skip { color: var(--muted); }
 
-#stageWrap { grid-area: stage; position: relative; min-width: 0; min-height: 0; background: var(--bg); }
+#stageWrap { grid-area: stage; position: relative; min-width: 0; min-height: 0; background: var(--bg); container-type: inline-size; }
+/* a stage narrowed by the program columns: its caption goes under the buttons, not behind them */
+@container (max-width: 720px) { #stageWrap #hud { top: 44px; max-width: calc(100% - 20px); } #stageWrap #legend { display: none; } }
 #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
 #stage.dragging { cursor: grabbing; }
 #hud { position: absolute; left: 10px; top: 8px; pointer-events: none; display: flex; flex-direction: column; gap: 4px; max-width: 70%; }
@@ -116,7 +190,8 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
 #tip { position: fixed; pointer-events: none; background: #182230; color: #fff; font-size: 12px; padding: 5px 8px;
        border-radius: 6px; max-width: 360px; z-index: 30; display: none; white-space: pre-line; }
 
-#insp { flex: 0 0 auto; max-height: 55%; }
+#insp { flex: 1 1 auto; min-height: 0; }
+#right.withstack #insp { flex: 0 1 auto; max-height: 42%; }
 #inspBody { padding: 4px 10px 10px; font-size: 12.5px; }
 #inspBody h4 { margin: 4px 0 2px; font-size: 14px; color: var(--navy); }
 #inspBody .muted { color: var(--muted); }
@@ -132,10 +207,9 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
 .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 a.btn { display: inline-block; text-decoration: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; color: var(--ink); }
 
-/* the full stack (qccd/fullstack): FormalRV's layers above the program, at the playhead */
-/* its caption, layers and footnote scroll inside it: past 52 % of the column they used to
-   spill over the Program pane below */
-#stack { flex: 0 0 auto; max-height: 52%; display: flex; flex-direction: column; overflow: auto; }
+/* the full stack (qccd/fullstack): every layer at the playhead, in one caption; the layers'
+   programs are columns of their own (#cols) */
+#stack { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .stk-cap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; align-items: baseline;
   padding: 6px 10px; font-size: 12px; background: var(--soft); border-bottom: 1px solid var(--line); }
 .stk-k { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
@@ -143,23 +217,10 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
 .stk-v code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
 .stk-how { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-radius: 9px;
   font-size: 9.5px; color: var(--muted); cursor: help; }
-.stk-lay { border-bottom: 1px solid var(--soft); }
-.stk-lay > summary { cursor: pointer; padding: 4px 10px; font-size: 11px; color: var(--navy); }
-.stk-lines { font-family: var(--mono); font-size: 11px; max-height: 11em; overflow: auto; }
-.stk-ln { display: grid; grid-template-columns: 34px 1fr; white-space: pre; cursor: pointer; }
-.stk-ln .ln { color: #98a2b3; text-align: right; padding-right: 8px; user-select: none; }
-.stk-ln:hover { background: var(--soft); }
-.stk-ln.cur { background: #fff4ed; box-shadow: inset 3px 0 var(--accent); }
-.stk-ln.none { cursor: default; }
-.stk-lines.hw .stk-ln { grid-template-columns: 52px 1fr; }
 .stk-foot { font-size: 11px; padding: 4px 10px 6px; }
-#prog { flex: 1; min-height: 72px; }
-#progBody { font-family: var(--mono); font-size: 11.5px; padding: 2px 0 12px; }
-.pl { display: grid; grid-template-columns: 34px 1fr; padding: 0 8px 0 0; white-space: pre; cursor: pointer; }
+.pl { display: grid; grid-template-columns: 38px minmax(0, 1fr); padding: 0 8px 0 0; cursor: pointer; }
 .pl:hover { background: var(--soft); }
-.pl .ln { color: #98a2b3; text-align: right; padding-right: 8px; user-select: none; }
 .pl.decl { color: var(--muted); }
-.pl.cm { color: #98a2b3; }
 .pl.live { background: #fff4ed; box-shadow: inset 3px 0 var(--accent); }
 .pl.done { color: #475467; }
 .pl.refused .ln { color: var(--bad); font-weight: 700; }
@@ -186,8 +247,14 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
 .card .num { text-align: right; font-family: var(--mono); font-size: 11.5px; }
 
 @media (max-width: 900px) {
-  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) 6px 200px 260px;
-         grid-template-areas: "head" "stage" "split" "tl" "right"; }
+  #app, #app.noleft, #app.noright { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) 6px 200px 320px 260px;
+         grid-template-areas: "head" "stage" "split" "tl" "cols" "right"; }
+  #app:not(.hascols) { grid-template-rows: 46px minmax(0, 1fr) 6px 200px 0 260px; }
+  #app.nocols { grid-template-rows: 46px minmax(0, 1fr) 6px 200px 34px 260px; }
+  #app.nocols #colsRail { writing-mode: horizontal-tb; }
+  .pcol { min-width: 240px; }
+  #vsplit, .fold, .rail { display: none !important; }
+  #app.noright #right > .sect { display: flex; }
   #left { display: none; }
   .brand .title, #clock small { display: none; }
 }
@@ -214,7 +281,8 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
     </div>
   </header>
   <aside id="left">
-    <div class="sect" style="flex:1"><h3>Hierarchy <span id="treeCount" class="muted"></span></h3><div id="tree" class="scroll"></div></div>
+    <button class="rail" id="leftRail" data-hint="panel:left" title="show the hierarchy, the checks and the traffic">Hierarchy ›</button>
+    <div class="sect" style="flex:1"><h3><span>Hierarchy <span id="treeCount" class="muted"></span></span><button class="fold" id="leftFold" data-hint="panel:left" title="fold this panel away">‹</button></h3><div id="tree" class="scroll"></div></div>
     <div class="sect" id="checks"><h3>Checks <span id="checksCount" class="muted"></span></h3><div id="checksBody" class="scroll"></div></div>
     <div class="sect" id="traffic" hidden><h3>Traffic</h3><div id="trafficBody"></div></div>
   </aside>
@@ -224,10 +292,18 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
     <div id="stageTools"><button id="bEdit" title="edit this gadget's structure (E)">Edit</button><button id="bUp" title="up one level (Esc)">↑ Up</button><button id="bFit" title="fit (F)">Fit</button><button id="bIons" title="show every resting ion (I)">Ions</button><button id="bClassical" title="show the classical half: the decoder, the classical memory and the wires to them (C)">Classical</button></div>
     <div id="legend"></div>
   </div>
+  <div id="cols">
+    <div id="vsplit" data-hint="cols:width" title="drag to make the program columns wider or narrower"></div>
+    <button class="rail" id="colsRail" data-hint="cols:rail" title="show the programs again">‹ Programs</button>
+    <div id="colsBar"></div>
+    <div id="colsRow">
+      <section class="pcol" id="prog" data-col="alg" data-lang="alg"><h3><span class="pc-t" id="progTitle">Program</span><span id="progName" class="muted"></span><button class="fold pc-x" data-hint="cols:close" title="hide this column">×</button></h3><div id="progBody" class="pc-b"></div></section>
+    </div>
+  </div>
   <aside id="right">
-    <div class="sect" id="verif"><h3>Verification</h3><div id="verifBody" class="scroll"></div></div>
+    <button class="rail" id="rightRail" data-hint="panel:right" title="show the verification, the inspector and the stack">‹ Inspector</button>
+    <div class="sect" id="verif"><h3><span>Verification</span><button class="fold" id="rightFold" data-hint="panel:right" title="fold this panel away">›</button></h3><div id="verifBody" class="scroll"></div></div>
     <div class="sect" id="insp"><h3>Inspector</h3><div id="inspBody" class="scroll"></div></div>
-    <div class="sect" id="prog"><h3>Program <span id="progName" class="muted"></span></h3><div id="progBody" class="scroll"></div></div>
   </aside>
   <div id="split" title="drag to resize the timeline"></div>
   <div id="tlWrap"><canvas id="tl" aria-label="timeline"></canvas></div>
@@ -241,6 +317,9 @@ __TRANSIT__
 </script>
 <script>
 __CORE__
+</script>
+<script>
+__LANGS__
 </script>
 <script>
 __FOLD__

@@ -19,6 +19,25 @@ WEB = Path(__file__).parent / "web"
 #: The occupancy law, shared with the studio stage rather than copied into `web/`.
 TRANSIT_JS = Path(__file__).resolve().parents[1] / "viz" / "js" / "transit.js"
 
+#: The controls of the program columns and the folding panels, for agents (app.js, "the columns").
+COLUMN_HINTS = {
+    "cols:toggle": {"t": "Show or hide a program's column",
+                    "d": "Each program of the run has a full-height column of its own beside the animation: "
+                         "the logical program (.prog), its Pauli-product measurements (.qppm), its QEC "
+                         "operations (.qec), the gadget program the machine runs, the TSIR module and the "
+                         "hardware program. This button shows or hides one; the line running now is lit in each."},
+    "cols:close": {"t": "Hide this column", "d": "Hides this program's column; its button above the columns brings it back."},
+    "cols:wrap": {"t": "Wrap long lines",
+                  "d": "Long lines wrap inside their column (on), or run on and scroll sideways (off)."},
+    "cols:width": {"t": "Column width", "d": "Drag sideways to make the program columns wider or narrower."},
+    "cols:rail": {"t": "Show the programs", "d": "Brings back the program columns."},
+    "cols:hide": {"t": "Hide the programs", "d": "Folds every program column away, leaving the animation more room."},
+    "panel:left": {"t": "Fold the left panel",
+                   "d": "Folds the hierarchy, the checks and the traffic into a narrow bar, or opens them again."},
+    "panel:right": {"t": "Fold the right panel",
+                    "d": "Folds the verification, the inspector and the full-stack caption into a narrow bar, or opens them again."},
+}
+
 
 def _blob(obj) -> str:
     """JSON safe inside `<script type="application/json">`."""
@@ -33,7 +52,7 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
                 machine_rules: dict | None = None, compositional: dict | None = None,
                 traffic: dict | None = None, floorplan: str | None = None,
                 focus: str | None = None, stack: dict | None = None,
-                macro_files: dict | None = None) -> Path:
+                macro_files: dict | None = None, leaf_text: bool = False) -> Path:
     if categories is None:
         from .categories import CATEGORIES, ORDER
         categories, category_order = CATEGORIES, ORDER
@@ -72,6 +91,10 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
         # a folded run (GIR 0.3, qccd/gadget/fold.py): each macro in a file of its own,
         # loaded when the time on screen needs it
         data["macroFiles"] = macro_files
+    if leaf_text:
+        # each leaf's TSIR as text beside the page (`hw/leaf/<master>.js`, build.py): the
+        # Hardware column's program
+        data["leafText"] = True
     html = (WEB / "page.html").read_text(encoding="utf-8")
     html = html.replace("__CSSVARS__", css_vars())
     html = html.replace("__TITLE__", title or f"{gir['program']['name']} — QCCD gadgets")
@@ -81,17 +104,19 @@ def render_page(path, *, lib, gir, checks, leaf_files: dict, studio_pages: dict 
     # sampled instants with two ions through each other.  `core.js` needs it loaded first.
     html = html.replace("__TRANSIT__", TRANSIT_JS.read_text(encoding="utf-8"))
     html = html.replace("__CORE__", (WEB / "core.js").read_text(encoding="utf-8"))
+    html = html.replace("__LANGS__", (WEB / "langs.js").read_text(encoding="utf-8"))
     html = html.replace("__FOLD__", (WEB / "fold.js").read_text(encoding="utf-8"))
     html = html.replace("__EDITOR__", (WEB / "editor.js").read_text(encoding="utf-8"))
     html = html.replace("__APP__", (WEB / "app.js").read_text(encoding="utf-8"))
+    # every control the columns and the panels add is declared for agents (docs/agent-interface.md)
+    hints = dict(COLUMN_HINTS)
     if stack:
-        # every control the stack adds is declared for agents (docs/agent-interface.md)
-        hints = {"fullstack-line": {"t": "A line of one layer of the full stack",
-                                    "d": "Jump the animation to the first instruction that carries "
-                                         "this .prog, .qppm or .qec line."}}
-        at = html.rfind("</body>")
-        html = (html[:at] + "<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, "
-                + json.dumps(hints) + ");</script>\n" + html[at:])
+        hints["fullstack-line"] = {"t": "A line of one layer of the full stack",
+                                   "d": "Jump the animation to the first instruction that carries "
+                                        "this .prog, .qppm or .qec line."}
+    at = html.rfind("</body>")
+    html = (html[:at] + "<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, "
+            + json.dumps(hints) + ");</script>\n" + html[at:])
     # the data goes in last: nothing after it is a template marker it could contain
     html = html.replace("__DATA__", _blob(data))
     out = Path(path)

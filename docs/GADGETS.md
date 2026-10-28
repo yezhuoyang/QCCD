@@ -796,7 +796,8 @@ Clifford frame rather than a Pauli one) is not implemented.
 ## 11 · The design tool
 
 `index.html` in the build directory, plus `leaf/<master>.js` (one master's device and
-programs, loaded with a plain `<script>` so `file://` works) and, with `--studio`,
+programs, loaded with a plain `<script>` so `file://` works), `hw/leaf/<master>.js` (each
+master the run uses, as TSIR text, for the Hardware column) and, with `--studio`,
 `studio/<master>.<op>.html`. Canvas throughout; no network.
 
 **One visual language with the studio.** A trapping site, a junction, a rail and an ion are
@@ -824,6 +825,23 @@ slate. Change the palette in `theme.py` and both tools move together.
   clicking a line opens the smallest level holding everything it touches. The inspector
   shows the selected instance (ports, ops with status badges and notes), channel, port,
   instruction, or ion — and **follows an ion** across the whole program.
+- **Programs, a column each.** Every program of the run stands in a full-height column of
+  its own between the stage and the inspector: on a full-stack run FormalRV's `.prog`,
+  `.qppm` and `.qec`, then the gadget program; on every page the **Module** (the TSIR module
+  the running row is written in, on a folded run) and the **Hardware** program (the leaf's
+  TSIR, its instruction running now lit; a run that is not folded writes each leaf's TSIR
+  text as `hw/leaf/<master>.js` for it). The bar above them picks which stand there (a
+  full-stack run opens on its four layers, any other page on the program alone), the left
+  edge sets their width (double-click: back to sharing what the stage leaves), and **Wrap**
+  wraps long lines under their own first word. Each column lights the line running now and
+  keeps it in view; clicking a line of a FormalRV layer jumps to the first instruction it
+  carries. The words of every language are coloured by what they do and explained on hover
+  (`web/langs.js`): a statement's word is a tag, as the studio draws a hardware instruction,
+  and the same kind has the same colour in every column -- a preparation cyan, a
+  Pauli-product measurement (`measure` in the `.qppm`, `merge` in the `.qec`, `ppm` in the
+  program) indigo, a decode violet, a gate green, a frame update amber, a transport blue.
+  The hierarchy and the inspector fold to bars to give the columns room (a full-stack run
+  folds the hierarchy below 2200 px and the inspector below 1500 px).
 - **Decode.** While a `decode` instruction runs, the dashed wires it uses are lit -- the
   syndrome wire from each place that measured, and the frame wire from the decoder to the
   memory -- with the dashes marching the way the bits go, a packet per burst saying how

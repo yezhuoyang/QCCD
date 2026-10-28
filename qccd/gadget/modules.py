@@ -400,6 +400,16 @@ def _leaf_lines(master: str, op: str, prog, source: dict | None) -> list[str]:
     return L
 
 
+def leaf_module_text(master: str, data: dict) -> str:
+    """One master's leaf module -- every op it has, as `write_modules` writes `leaf/<master>.tsir`
+    -- from its leaf data alone: what a page that is not folded shows in its Hardware column."""
+    L = ["tsir modules 1"]
+    for op, prog in (data.get("programs") or {}).items():
+        src = (data.get("sources") or {}).get(op)
+        L += _leaf_lines(master, op, TSIR.from_json(published(prog)), src)
+    return "\n".join(L) + "\n"
+
+
 def modules_text(g: dict, leaves=None) -> str:
     """The whole run as one text: architecture, program, every gadget, every leaf it names."""
     w = _Writer(g)

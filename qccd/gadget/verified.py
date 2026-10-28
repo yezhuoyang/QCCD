@@ -126,14 +126,14 @@ def build_algorithm(alg, *, out_dir, cache_dir="out/gadgets/cache", rebuild: boo
     from .build import write_leaf_files
     from .roads import attach_runs
     attach_runs(gir, lib, leaves)                 # every carry's road program, for the page
-    leaf_files, inline_leaves = write_leaf_files(out, lib, leaves, gir, inline=inline)
+    leaf_files, inline_leaves = write_leaf_files(out, lib, leaves, gir, inline=inline, texts=True)
     studio_pages = {}
     if studio_dir is not None:
         from .build import _studio_pages
         studio_pages = _studio_pages(lib, leaves, gir, out, log, Path(studio_dir))
     from .page import render_page
     render_page(out / "index.html", lib=lib, gir=gir, checks=checks, leaf_files=leaf_files,
-                inline_leaves=inline_leaves, focus=focus,
+                inline_leaves=inline_leaves, focus=focus, leaf_text=not inline,
                 studio_pages=studio_pages, rules=PLACE_RULES,
                 machine_rules=rules, compositional=compositional, traffic=stats["traffic"],
                 floorplan=(Path(floorplan).read_text(encoding="utf-8") if floorplan else None),
