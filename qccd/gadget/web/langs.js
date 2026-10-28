@@ -156,6 +156,43 @@
   });
   delete QEC.measure;
 
+  // FormalRV's system program (.sysprog): each QEC operation as the Clifford circuit it is, with
+  // its timing -- `@1643000 ns  CNOT ancilla[abase + 1], data[dbase]` -- the statement word after
+  // the time, or after `->` for what is done with bits
+  const SYS = Object.assign({}, PAULI, {
+    machine: ["kw", "Machine profile", "The machine FormalRV's VM estimates against: its qubits, decoders, factories, bandwidths and latencies."],
+    resource: ["kw", "Resource", "What this program or gadget uses, or what a contract allows it: qubits, gates, measurements, routes, decodes, runtime."],
+    spec: ["kw", "System contract", "What a system gadget may use: qubits, runtime, gates, factories, decoders and bandwidth."],
+    gadget: ["kw", "System gadget", "One QEC operation as a Clifford circuit with its timing; `spans` says how long it takes."],
+    spans: ["kw", "spans", "How long the gadget takes, start to end."],
+    program: ["kw", "Program", "The whole system program: its registers, then every operation at its time."],
+    for: ["kw", "Loop", "A loop over a range; `every T` starts its iterations T apart."],
+    every: ["kw", "every", "The time between the starts of two iterations."],
+    call: ["kw", "Call", "Runs a system gadget here, with the offsets of its data, ancillas and bits."],
+    patch: ["kw", "patch", "A whole code patch, not single qubits."],
+    with: ["kw", "with", "The workspace qubits the request may use."],
+    request_ancilla: ["prep", "Request ancillas", "Takes ancilla qubits (or a whole patch) for an operation."],
+    release_ancilla: ["reset", "Release ancillas", "Gives ancilla qubits back once the operation is done."],
+    request_magic: ["prep", "Request a magic state", "Asks a factory for a state (`state=`) in these qubits, with the named workspace."],
+    route: ["move", "Route", "Brings qubits together so a two-qubit gate can act on them: on QCCD, ion transport."],
+    H: ["gate", "Hadamard", "H on each named qubit."],
+    S: ["gate", "S", "The phase gate √Z."],
+    CNOT: ["gate", "CNOT", "CNOT(control, target)."],
+    CX: ["gate", "CNOT", "CX(control, target)."],
+    CZ: ["gate", "CZ", "Controlled Z."],
+    measure: ["meas", "Measure", "Measures qubits in the named basis (`basis=`); the bits go to the register after ->."],
+    decode_syndrome: ["decode", "Decode", "Hands syndrome (or record) bits of r rounds to a decoder."],
+    pauli_frame_update: ["frame", "Pauli frame update", "Updates the Pauli frame from the named bits: no qubit is touched."],
+    basis: ["kw", "basis", "The basis the qubits are measured in."],
+    count: ["kw", "count", "How many qubits."],
+    rounds: ["kw", "rounds", "How many syndrome rounds the bits cover."],
+    state: ["kw", "state", "The state the factory is asked for."],
+    data: ["name", "data", "The data qubits of the code blocks."],
+    ancilla: ["name", "ancilla", "Ancilla qubits."],
+    syndrome: ["name", "syndrome", "Syndrome bits, for the decoder."],
+    c: ["name", "c", "Classical records."],
+  });
+
   const ALG = {
     title: ["kw", "Title", "The program's title, shown at the top of the page."],
     floorplan: ["kw", "Floorplan", "Names the machine the program runs on."],
@@ -258,7 +295,9 @@
   const LANGS = {
     prog: { words: PROG, comment: /^(\/\/|--)/ },
     qppm: { words: QPPM, comment: /^(\/\/|--)/ },
-    qec: { words: QEC, comment: /^(\/\/|--)/ },
+    qec: { words: QEC, comment: /^(\/\/|--)/, anywhere: true },
+    sys: { words: SYS, comment: /^(\/\/|--)/, anywhere: true,
+           sym: { "@": "starts at this time, from the start of its gadget", "->": "the bits go to" } },
     alg: { words: ALG, comment: /^#/, head: ALG_HEAD },
     tsir: { words: TSIR, comment: /^\/\//, meta: TSIR_META },
   };
@@ -330,8 +369,9 @@
           out += span("tk-call", tok, "call:" + w);
         } else if (e) {
           // a statement word that is not where a statement starts is drawn as text; in a
-          // .qec a merge or a split stands after `=`, and keeps its tag
-          const kind = TAG[e[0]] && !head && lang !== "qec" ? "kw" : e[0];
+          // .qec a merge or a split stands after `=`, in a .sysprog every word after the
+          // time, and they keep their tags
+          const kind = TAG[e[0]] && !head && !L.anywhere ? "kw" : e[0];
           out += span(wordCls(kind, w), tok, w);
         } else out += esc(tok);
         first = false;
@@ -359,7 +399,10 @@
   function note(lang, w, calls) {
     const L = LANGS[lang];
     if (!L || !w) return null;
-    if (w.startsWith("sym:")) { const s = SYM[w.slice(4)]; return s ? [w.slice(4), s] : null; }
+    if (w.startsWith("sym:")) {
+      const s = (L.sym || {})[w.slice(4)] || SYM[w.slice(4)];
+      return s ? [w.slice(4), s] : null;
+    }
     if (w.startsWith("state:")) return [w.slice(6), STATES[w.slice(6)]];
     if (w === "ket") return ["A basis state", "|v⟩_q[i]: the named qubit (or range of qubits) of register q holds the basis state v."];
     if (w === "merged") return ["Merged code", "A code declared under `codes:`: the patch lattice surgery makes when it measures a product of logical Paulis of that many blocks."];

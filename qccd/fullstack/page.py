@@ -3,9 +3,11 @@
 The page is the plain Studio render of the hardware program, joined to its circuit exactly as a
 leaderboard entry is (`qccd.ir.source_map`, checked against the certificate's witnesses).  The
 full stack rides in that join as `source.stack`, and one script (`web/stack.js`) adds it to the
-Program pane -- a fourth view, Stack, beside Hardware / Gates / Both -- and three lines to the
-pane's NOW strip.  Nothing floats over the canvas; the engine and template are untouched, so no
-other page changes (docs/FULLSTACK_PLAN.md §2.6, §2.6a).
+Program pane -- a fourth view, Stack, beside Hardware / Gates / Both, in which every layer stands in
+a full-height column of its own (and the Studio's hardware listing beside them, on request), its
+words coloured and explained by the gadget pages' own tables (`qccd/gadget/web/langs.js`).
+Nothing floats over the canvas; the engine and template are untouched, so no other page changes
+(docs/FULLSTACK_PLAN.md §2.6, §2.6a).
 
 At every instruction the reader sees, each with its line and how the link was made:
 
@@ -21,6 +23,7 @@ import json
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent / "web"
+LANGS_JS = Path(__file__).resolve().parents[1] / "gadget" / "web" / "langs.js"
 
 TITLES = (("prog", "Logical"), ("qppm", "PPM"), ("qec", "QEC"), ("sys", "Clifford"))
 HOW = {
@@ -99,6 +102,13 @@ def hints() -> dict:
                                 "the hardware instruction, each with how the link between layers was made."},
         "fullstack-line": {"t": "A line of one layer",
                            "d": "Jump the animation to the first hardware instruction that executes this line."},
+        "fullstack-col": {"t": "Show or hide a layer's column",
+                          "d": "Each layer of the stack -- the logical program, the PPMs, the QEC operations, the "
+                               "Clifford circuit -- and the hardware listing stands in a full-height column of its "
+                               "own; this button shows or hides one."},
+        "fullstack-close": {"t": "Hide this column", "d": "Hides this layer's column; its button above brings it back."},
+        "fullstack-wrap": {"t": "Wrap long lines",
+                           "d": "Long lines wrap inside their column (on), or run on and scroll sideways (off)."},
     }
 
 
@@ -135,8 +145,11 @@ def render(run_dir: Path, out: Path) -> Path:
     html = Path(page).read_text(encoding="utf-8")
     css = (WEB / "stack.css").read_text(encoding="utf-8")
     js = (WEB / "stack.js").read_text(encoding="utf-8")
+    # the languages' words and notes: the gadget pages' own tables, so the two tools colour and
+    # explain every layer alike
+    langs = LANGS_JS.read_text(encoding="utf-8")
     inject = (f"<style>{css}</style>\n<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {{}}, "
-              f"{json.dumps(hints())});</script>\n<script>{js}</script>\n")
+              f"{json.dumps(hints())});</script>\n<script>{langs}</script>\n<script>{js}</script>\n")
     if html.count("</body>") != 1:
         raise ValueError("the Studio page has no single </body> to add the stack before")
     html = html.replace("</body>", inject + "</body>")

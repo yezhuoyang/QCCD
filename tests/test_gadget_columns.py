@@ -68,9 +68,10 @@ def test_every_line_of_every_language_reads_as_written_and_every_marked_word_is_
     files += [("prog", p) for p in sorted((FIX / "dj" / "Examples").rglob("*.prog")) if p.is_file()]
     files += [("qppm", p) for p in sorted(FIX.glob("*/*.qppm"))]
     files += [("qec", p) for p in sorted(FIX.glob("*/*.qec"))]
+    files += [("sys", p) for p in sorted(FIX.glob("*/*.sysprog"))]
     files += [("alg", p) for p in sorted((ROOT / "examples" / "gadgets" / "algorithms").glob("*.alg"))]
     files += [("tsir", p) for p in sorted((page / "hw" / "leaf").glob("*.js"))]
-    assert {k for k, _ in files} == {"prog", "qppm", "qec", "alg", "tsir"}
+    assert {k for k, _ in files} == {"prog", "qppm", "qec", "sys", "alg", "tsir"}
     r = _langs(*files)
     assert r["changed"] == [], r["changed"][:5]
     assert r["unnoted"] == [], r["unnoted"][:5]
@@ -84,6 +85,7 @@ def test_every_line_of_every_language_reads_as_written_and_every_marked_word_is_
     assert {"CX", "H", "measure"} <= tagged["prog"]
     assert {"prepare", "measure", "frame"} <= tagged["qppm"]
     assert {"alloc", "merge", "split", "extract", "decode", "frame"} <= tagged["qec"]
+    assert {"request_ancilla", "route", "CNOT", "measure", "decode_syndrome", "pauli_frame_update"} <= tagged["sys"]
     assert {"prep", "cx", "read", "decode"} <= tagged["alg"]
     assert {"simd", "gate_", "cool", "init"} <= tagged["tsir"]
 

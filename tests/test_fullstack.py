@@ -719,3 +719,29 @@ def test_one_logical_cnot_on_ions_every_layer_checked(tmp_path):
     under_first = sorted(int(k) for k, v in m["links"]["sys"].items() if v[0] == ext[0])
     m["links"]["sys"][str(under_first[1])] = [ext[2], "band"]
     assert not consistency.check(m, tsir)["ok"]
+    # the Studio page of the run: every layer in a column of its own, the line the executing
+    # instruction carries lit in each (qccd/fullstack/web/stack.js)
+    import shutil
+    import subprocess
+    from qccd.fullstack.page import render
+    from chrome_path import CHROME
+    page = render(tmp_path / "run", tmp_path / "page" / "cnot_fullstack.html")
+    node = shutil.which("node")
+    if not (node and CHROME):
+        return
+    r = subprocess.run([node, str(REPO / "tests" / "fullstack_stack_browser.mjs"), str(page)],
+                       capture_output=True, text=True, encoding="utf-8", timeout=240)
+    out = json.loads(r.stdout)
+    assert out["errors"] == [] and "fatal" not in out, out
+    st = out["stack"]
+    assert st["view"] == "stack" and st["scrollW"] <= st["W"]
+    assert [c["key"] for c in st["cols"]] == ["prog", "qppm", "qec", "sys"]
+    for c in st["cols"]:
+        assert c["h"] >= 0.75 * st["paneH"], c          # the whole height, not a box under a caption
+        assert c["lit"] and c["inView"] and c["tags"], c
+    assert out["note"]["word"] and out["note"]["tip"].split("\n")[1]
+    hw = out["withHw"]["cols"][-1]
+    assert hw["key"] == "pHw" and hw["lit"] and hw["inView"]
+    assert out["views"]["both"]["home"] and out["views"]["hw"]["home"]
+    assert not out["views"]["stack"]["home"] and out["views"]["stack"]["shown"]
+    assert out["views"]["stackNoHw"]["home"] and not out["views"]["stackNoHw"]["shown"]
