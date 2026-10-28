@@ -2014,12 +2014,14 @@
   }
   let progLit = null;
   // one line of a program, coloured and explained (langs.js): its indentation kept, and a
-  // wrapped line's continuation indented under its own first word
+  // wrapped line's continuation indented under its own first word -- but never by more than
+  // 40% of the column, or a formula FormalRV aligns forty characters in is left one
+  // character wide in a narrow column
   function codeSpan(lang, text, calls) {
     const t = text || "";
     const body = t.replace(/^\s+/, "");
     const ind = t.length - body.length;
-    return `<span class="tx" style="padding-left:${ind + 2}ch">${body ? LANGS.paint(lang, body, { calls }) : " "}</span>`;
+    return `<span class="tx" style="padding-left:min(${ind + 2}ch, 40%)">${body ? LANGS.paint(lang, body, { calls }) : " "}</span>`;
   }
   // scroll a column so that a row is in view, a third of the way down, if it is not already
   function inView(box, el) {
