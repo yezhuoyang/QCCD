@@ -419,6 +419,85 @@ end
   The section build takes about 25 minutes, 14 of them FormalRV's Shor
   (`python -m qccd.gadget site --fullstack small` leaves it out).
 
+### Slice S8 (user, 2026-10-29): Shor at scale, toward RSA-2048
+
+The user's goal: *"make the Shor15 scale to larger size, eventually Shor2048 ... How to represent
+program in a symbolic compact way so it actually fit in the browser while still is correct, how to
+make the end to end compilation all the way from QEC stack to actual QCCD device scale. One very
+very key principle is make everything localized: there must be many many repeated structure, that
+you don't need to recompile, and don't need to store twice (magic factory / syndrome extraction /
+etc). ... If we don't immediately get to Shor2048, at least I want to know what is the largest
+scale that is achievable."*
+
+**Where the pipeline stood (measured 2026-10-29, FormalRV's own Shor, N = 2^(bits-1) - 1 style
+witnesses).** FormalRV's `.qec` is **the same 11,978 lines at every size**: its gadgets keep their
+loops and parameters. Everything that grows is QCCD's:
+
+| bits (N) | `.alg` lines | gate defs | lowering | folded schedule | per-view checks | macros (reused) | GIR | machine time |
+|---|---|---|---|---|---|---|---|---|
+| 3 (3) | 19,739 | 790 | 12 s | 400 s | 258 s | 791 (51) | 298 MB | 2.9 h |
+| 4 (7) | 37,737 | 1,545 | 13–20 s | 687 s | — | 1,547 (121) | 564 MB | 7.4 h |
+| 5 (15) | 65,259 | 2,716 | 34 s | — | — | — | — | — |
+
+Three things grow with the run: `qec2alg` unrolls every loop; it lowers a call once per value of
+*all* its arguments, the modular multiplier's constant included (61 `prepMasked` bodies at 5
+bits), and a repeat-until-success rotation becomes a `when_m<k>` gate per outcome (2,513 at 5
+bits); and the folded schedule keys a macro by its blocks' absolute memories, so almost nothing is
+reused. FormalRV's compiler itself stops at 64 bits (`int_of_string`: OCaml's 63-bit integers).
+**The largest Shor that compiles end to end on the device today is about N = 15 (5 bits).**
+
+**The design: the run is never written down; the program is.** Six layers, each the size of the
+program, not of its execution.
+
+1. **The symbolic program** (`qccd/fullstack/scale/program.py`, done). The `.qec` lowered once
+   per *structure*:
+   - a loop stays a loop;
+   - a gadget is keyed by its structural parameters only (those that set a trip count);
+   - a decision on data (`if bit b of cst`, which FormalRV writes as a 0-or-1-trip loop) is a
+     **slot**, reserved either way, so every gadget takes the same time whatever its constant;
+   - a straight run of statements is a **template** with its blocks as parameters, stored once;
+   - a rotation is one node.
+2. **The lane machine.** A town of repeated districts, one per register position: the data
+   memories, a bench, a pharmacy. The controls the program fans out (`__cw`, `__anc`, the flag)
+   ride a carriage along the adder's sweep, so every step of every adder has the same local
+   geometry.
+3. **Templates compiled once.** Each template, and each one-district move of the carriage, is
+   scheduled once by the town's own scheduler on a two-district fragment. It is checked there
+   once (G-rules, machine rules, heat), and becomes TSIR once. A call is a translation in space
+   and an offset in time.
+4. **Time as an address.** Instances run one after another, so an instant is a path of loop
+   indices, found by descending the tree: a loop whose body's duration does not depend on its
+   index divides, and an affine one is an arithmetic series. Integers in ns; RSA-2048 runs
+   longer than 2^53 µs.
+5. **Checks by induction.** Every template is checked once on its fragment; every loop's
+   interface (iteration k's end against k+1's start) once; the composition is sequential.
+   Expanded wholly at small sizes, the existing checks must agree.
+6. **The page resolves an instant.** It loads the tree and the templates (kilobytes) and
+   expands only the instance under the playhead.
+
+**Status of layer 1 (2026-10-29).** The symbolic program, from FormalRV's *generic* `Shor.qec`
+evaluated by QCCD with exact integers (a power under a remainder taken modulo), is
+**instruction for instruction** `qec2alg`'s lowering: 577,244 instructions at 3 bits, 1,499,128 at
+4, and 3,074,914 at 5 (Shor for 15). Those runs are lowered from the `.qec` FormalRV specialized
+itself; `tests/test_scale_symbolic.py` holds the 3-bit case. It is the same size at every key
+size:
+
+| instance | logical qubits | symbolic program | built in | instructions executed (counted, not expanded) |
+|---|---|---|---|---|
+| 3 bits (N = 3) | 23 | 9 templates, 25 gadget instances, 78 nodes | 0.15 s | 607,820 (slots reserved) |
+| 16 bits | 127 | same | 0.15 s | 1.24 × 10⁸ |
+| 256 bits | 2,047 | same | 0.15 s | 5.35 × 10¹¹ |
+| 1024 bits | 8,191 | same | 0.22 s | 3.43 × 10¹³ |
+| **RSA-2048** (2049-bit registers, m = 4096) | **16,391** | **same** | **0.23 s** | **2.75 × 10¹⁴** (3.3 × 10¹³ PPMs, 1.1 × 10¹³ T states) |
+
+The nine templates are FormalRV's controlled MAJ, UMA and MAJ⁻¹ steps (103 PPMs each), a
+controlled swap (61), a Toffoli (21), a CNOT, an H, a SWAP and the final readout. Every one of the
+10¹⁴ instructions is an instance of one of them, or of a rotation chain.
+
+**Found on the way:** the `.alg` parser tagged a call's locals by the gate's name followed by the
+call's number, so `when_m5822` call 1 and `when_m582` call 21 were one block. Every 4-bit run's
+expansion failed on it. A name ending in a digit now takes a separator.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.

@@ -618,7 +618,9 @@ class _Parser:
             raise AlgorithmError(lineno, raw, f"gate {gate.name} calls itself")
         k = self.calls.get(gate.name, 0) + 1
         self.calls[gate.name] = k
-        tag = f"{gate.name}{k}"
+        # (a name ending in a digit takes a separator: `when_m5822` call 1 and `when_m582`
+        # call 21 would both be `when_m58221`, and their locals one block)
+        tag = f"{gate.name}_{k}" if gate.name[-1:].isdigit() else f"{gate.name}{k}"
         frame = {"gate": gate.name, "call": tag, "line": lineno, "contract": gate.contract}
         rename = dict(zip(gate.params, args))
         first = len(self.alg.instructions)
