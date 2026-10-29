@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 from .. import layers
 from ..provenance import _qec_kind
-from ..qec2alg import NotLowered, ROT_BASE, _untable
+from ..qec2alg import NotLowered, ROT_BASE, _untable, rounds_of
 from ..sysprog import split_top
 from .expr import Expr, ExprError
 
@@ -105,6 +105,9 @@ class Loop:
     hi: Expr
     body: Body
     qline: int = 0
+    #: the iterations may run at once, on different districts: FormalRV says so (`__par`),
+    #: or they touch disjoint blocks (`independent`)
+    par: bool = False
 
 
 @dataclass
@@ -161,7 +164,7 @@ class Program:
         key = (call.gadget, keyvals, call.fam)
         b = self.bodies.get(key)
         if b is None:
-            rep = {f: e(env) for f, e in call.skeys + call.args}
+            rep = bind(call.skeys + call.args, env)
             self.builder.instance(call.gadget, keyvals, dict(call.fam), rep)
             b = self.bodies[key]
         return b
@@ -231,13 +234,17 @@ class Builder:
             self.prog.formals[name] = [f.strip() for f in formals if _family(f) is None]
         self.structural = self._structural()
         self.gen: dict = {}
+        self.cur: list = []              # the gadgets being lowered, innermost last
+        #: survey mode (`build(..., survey=True)`): a statement with no lowering is recorded
+        #: here, by kind, and skipped -- never in a program anyone runs
+        self.survey: dict | None = None
 
     def _structural(self) -> dict:
         """gadget -> its formals that set a loop's trip count, here or in what it calls."""
-        uses, passes = {}, {}
+        uses, passes, guards, calls = {}, {}, {}, {}
         for name, g in self.gadgets.items():
             fs = set(self.prog.formals[name])
-            b, p = set(), []
+            b, p, gd, cl = set(), [], set(), set()
 
             def scan(body):
                 for s in body:
@@ -245,14 +252,22 @@ class Builder:
                     lp = _LOOP.fullmatch(raw)
                     if lp and not _is_pred_var(lp[2]):
                         b.update((Expr(lp[1]).vars | Expr(lp[3]).vars) & fs)
+                    elif lp and not _reads_table(Expr(lp[3]).node):
+                        gd.update(Expr(lp[3]).vars & fs)
                     call = re.fullmatch(r"([\w!]+)\((.*)\)", raw)
                     if call and call[1] in self.gadgets:
+                        cl.add(call[1])
                         for f, a in zip(self.headers[call[1]], split_top(call[2], ",")):
                             if _family(f) is None:
                                 p.append((call[1], f.strip(), Expr(a).vars & fs))
                     scan(s.children)
             scan(g.body)
-            uses[name], passes[name] = b, p
+            uses[name], passes[name], guards[name], calls[name] = b, p, gd, cl
+        # A RECURSIVE gadget ends where a guard says so: the parameters its guards read (those
+        # that read no table: a depth, not a constant's bit) set its structure too, or the
+        # recursion would be one body calling itself
+        for name in _recursive(calls):
+            uses[name] |= guards[name]
         struct = {n: set(v) for n, v in uses.items()}
         changed = True
         while changed:
@@ -280,7 +295,11 @@ class Builder:
         key = (gadget, keyvals, tuple(sorted(famap.items())))
         if key not in self.prog.bodies:
             self.prog.bodies[key] = Body()             # (a recursion guard)
-            self.prog.bodies[key] = self.body(self.gadgets[gadget].body, rep, famap, [], top=False)
+            self.cur.append(gadget)
+            try:
+                self.prog.bodies[key] = self.body(self.gadgets[gadget].body, rep, famap, [], top=False)
+            finally:
+                self.cur.pop()
 
     # ---- a body ------------------------------------------------------------------------
     def body(self, stmts: list, rep: dict, famap: dict, scope: list, top: bool) -> Body:
@@ -303,22 +322,47 @@ class Builder:
             if guards:
                 raise NotLowered(f".qec line {s.line}: a loop under a guard")
             var, lo, hi = lp[2], Expr(lp[1]), Expr(lp[3])
-            self.close(S, top)
             if _is_pred_var(var):
                 if lo.text != "0":
                     raise NotLowered(f".qec line {s.line}: a guard loop from {lo.text}")
+                # a decision on STRUCTURE (a recursion's depth, the program's fixed parameters) is
+                # decided here, once per instance; only a decision on data is a slot
+                known = set(self.prog.params) | (self.structural.get(self.cur[-1], set()) if self.cur else set())
+                if hi.vars <= known:
+                    if hi(rep) >= 1:
+                        for c in s.children:
+                            self.stmt(c, S, {**rep, var: 0}, famap, top, guards)
+                    return
+                self.close(S, top)
                 S.nodes.append(Pred(hi, self.body(s.children, {**rep, var: 0}, famap, S.scope, top), s.line))
                 return
+            self.close(S, top)
             lo_v = lo(rep)
             if hi.text == f"{lo.text} + 1" or (not lo.vars and not hi.vars and hi(rep) - lo_v == 1):
                 S.nodes.append(Let(var, lo, self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top)))
                 return
-            S.nodes.append(Loop(var, lo, hi, self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top), s.line))
+            S.nodes.append(Loop(var, lo, hi, self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top), s.line,
+                                par=var.endswith("__par")))
             return
         if raw.startswith("when ") and raw.endswith(":"):
             out = self._owner(self._band(raw, rep, s.line), S, s.line)
+            if raw.startswith("when ¬") or raw.startswith("when !"):
+                if self.survey is None:
+                    raise NotLowered(f".qec line {s.line}: a guard on an outcome being 0")
+                self.survey.setdefault("when ¬", []).append((s.line, raw[:160]))
             for c in s.children:
                 self.stmt(c, S, rep, famap, top, guards + [out])
+            return
+        if raw.startswith("parity ") and "<-" in raw:
+            # a classical bit computed from outcomes (and a table's bits): the archive's work
+            if self.survey is None:
+                raise NotLowered(f".qec line {s.line}: a classical parity has no lowering yet")
+            self.survey.setdefault("parity", []).append((s.line, raw[:160]))
+            band = self._band(raw.split("<-")[0], rep, s.line)
+            o = _Out(len(S.outs))
+            S.outs.append(o)
+            S.scope[-1].append((band[0], band[1], o))
+            S.run.append((["parity", "->", o], s.line, None))
             return
         call = re.fullmatch(r"([\w!]+)\((.*)\)", raw)
         if call and call[1] in self.gadgets:
@@ -340,8 +384,14 @@ class Builder:
                 fam2[fam] = famap.get(a.strip(), a.strip())
                 continue
             e = Expr(a)
-            rep2[f.strip()] = e(rep)
-            (skeys if f.strip() in self.structural[name] else rest).append((f.strip(), e))
+            structural = f.strip() in self.structural[name]
+            try:
+                rep2[f.strip()] = e(rep)
+            except ExprError:
+                if structural:
+                    raise
+                # data from a table known only by its bounds: the body is lowered without it
+            (skeys if structural else rest).append((f.strip(), e))
         keyvals = tuple((f, rep2[f]) for f, _ in skeys)
         self.instance(name, keyvals, fam2, rep2)
         return Call(name, tuple(skeys), tuple(rest), tuple(sorted(fam2.items())), line)
@@ -371,6 +421,8 @@ class Builder:
         g = [("guard", o) for o in guards]
         if kd == "alloc_block":
             return
+        if raw.startswith("requires "):
+            return                       # a gadget's precondition: a contract, not an operation
         if kd == "magic" or re.match(r"\d+\s+magic\s+\|", raw):
             m = re.search(r"(\|[^>]+>)\s*->\s*(\w+)\[([^,\[\]]+),", raw)
             if not m:
@@ -382,20 +434,56 @@ class Builder:
                 # the factory makes T-dagger|+> (its verified output); X in software makes it T|+>
                 S.run.append((g + ["inject", b], q, None))
                 S.run.append((g + ["x", b], q, None))
+            elif self.survey is not None:
+                self.survey.setdefault(f"magic {m[1]}", []).append((q, raw[:160]))
+                S.run.append((g + ["inject", b], q, None))
             else:
                 raise NotLowered(f".qec line {q}: no gadget prepares {m[1]} yet")
             return
-        if kd in ("alloc", "prepare", "extract", "split"):
+        if kd == "extract":
+            # lattice surgery in full: the merged code's rounds, r on every patch of the merge
+            # (qec2alg, "extract")
+            if S.current is None:
+                raise NotLowered(f".qec line {q}: an extraction outside a merge group")
+            mr = re.search(r"rounds=(\d+)", raw)
+            for b in S.current[1]:
+                for k in rounds_of(int(mr[1]) if mr else 1):
+                    S.run.append((g + ["se", b, str(k)], q, ("se", S.current[0])))
+            return
+        if kd in ("alloc", "prepare", "split"):
             return
         if kd == "merge":
-            fs = self.factors(raw.split("= merge", 1)[1].split(" with ")[0], rep, famap)
+            prod = raw.split("= merge", 1)[1].split(" with ")[0]
+            if " PROD " in prod:
+                # a product over a register (GE2021's masked preparation): a Pauli product of up
+                # to n blocks, measured at once -- lattice surgery across districts, which no
+                # place does yet
+                if self.survey is None:
+                    raise NotLowered(f".qec line {q}: a Pauli product over a register (PROD) has no "
+                                     f"lattice-surgery service on the machine yet")
+                self.survey.setdefault("merge * PROD", []).append((q, raw[:160]))
+                prod = prod.split(" * PROD ", 1)[0]
+            fs = self.factors(prod, rep, famap)
             band = self._band(raw.split("->")[-1], rep, q)
             o = _Out(len(S.outs))
             S.outs.append(o)
             S.scope[-1].append((band[0], band[1], o))
             toks = g + ["ppm"] + [x for p, b in fs for x in (p, b)] + ["->", o]
-            S.run.append((toks, q, (fs[0][0], fs[0][1], o) if len(fs) == 1 else None))
+            S.run.append((toks, q, ("single", fs[0][0], fs[0][1], o) if len(fs) == 1 else None))
             S.current = (o, [b for _, b in fs], False)
+            return
+        if raw.startswith("measure ") and "->" in raw:
+            # a destructive measurement of one block (GE2021's unlookup and readout): a readout
+            # at a post office, its outcome the band later frames read
+            fs = self.factors(raw.split("->")[0], rep, famap)
+            if len(fs) != 1:
+                raise NotLowered(f".qec line {q}: a measurement of {len(fs)} blocks")
+            band = self._band(raw.split("->")[-1], rep, q)
+            o = _Out(len(S.outs))
+            S.outs.append(o)
+            S.scope[-1].append((band[0], band[1], o))
+            S.run.append((g + ["read", fs[0][1], fs[0][0], "->", o], q, None))
+            S.current = (o, [fs[0][1]], False)
             return
         if kd == "decode":
             if S.current is None:
@@ -425,20 +513,41 @@ class Builder:
             self.close(S, top)
             S.nodes.append(Rot(tuple((p, b.fam, b.idx) for p, b in fs), Expr(m[2]), -1 if m[1] else 1, q))
             return
+        if self.survey is not None:
+            self.survey.setdefault(raw.split()[0] if raw.split() else raw, []).append((q, raw[:160]))
+            return
         raise NotLowered(f".qec line {q}: no gadget lowering for {raw[:100]!r}")
 
     def _band(self, text: str, rep: dict, line: int) -> tuple:
-        m = _BAND.search(text)
-        if not m:
-            raise NotLowered(f".qec line {line}: no c[..) band in {text[:80]!r}")
-        lo, hi = split_top(m[1], ",")
-        return (Expr(lo)(rep), Expr(hi)(rep))
+        one = re.search(r"\bc\[([^\[\]]+)\]", text)      # one record: `c[i]` (its index may hold parentheses)
+        if one and len(split_top(one[1], ",")) == 1:
+            one = one
+        else:
+            one = None
+        m = None if one else _BAND.search(text)
+        if m:
+            lo, hi = split_top(m[1], ",")
+            return (Expr(lo)(rep), Expr(hi)(rep))
+        if one:
+            i = Expr(one[1])(rep)
+            if "source " in text and self.survey is not None:
+                self.survey.setdefault("guard on a source record", []).append((line, text[:160]))
+            return (i, i + 1)
+        raise NotLowered(f".qec line {line}: no c[..) band in {text[:80]!r}")
 
     def _owner(self, band, S: _State, line: int):
         for frame in reversed(S.scope):
             for lo, hi, ref in reversed(frame):
                 if lo <= band[0] and band[1] <= hi:
                     return ref
+        if self.survey is not None:
+            # a record another gadget call wrote (GE2021's runway trips): a global record
+            self.survey.setdefault("record of another call", []).append((line, f"c{list(band)}"))
+            o = _Out(len(S.outs))
+            S.outs.append(o)
+            S.scope[-1].append((band[0], band[1], o))
+            S.run.append((["record", "->", o], line, None))
+            return o
         raise NotLowered(f".qec line {line}: no merge in scope wrote c{list(band)}")
 
     # ---- closing a run into a template ---------------------------------------------------
@@ -455,17 +564,23 @@ class Builder:
         # a single-factor measurement of a block nothing names after it is a destructive
         # readout -- inside a gadget only of a block the run made (qec2alg's `_Reads`)
         later: set = set()
+        read: set = set()
         for i in range(len(S.run) - 1, -1, -1):
-            toks, q, single = S.run[i]
-            if single:
-                letter, b, o = single
+            toks, q, meta = S.run[i]
+            if meta and meta[0] == "se":
+                continue                 # a merge's own rounds are part of it, not a later use
+            if meta and meta[0] == "single":
+                _, letter, b, o = meta
                 if b.key() not in later and (top or b.key() in made):
                     gs = [t for t in toks if isinstance(t, tuple) and t[0] == "guard"]
                     S.run[i] = (gs + ["read", b, letter, "->", o], q, None)
                     toks = S.run[i][0]
+                    read.add(id(o))
             ops = [t for t in toks if not (isinstance(t, tuple) and t[0] == "guard")]
             if ops[0] != "decode":
                 later |= {t.key() for t in toks if isinstance(t, _Blk)}
+        # a block read out destructively is consumed: no rounds on it
+        S.run = [it for it in S.run if not (it[2] and it[2][0] == "se" and id(it[2][1]) in read)]
         params, plist, locs, llist, ext, elist = {}, [], {}, [], {}, []
         outs = {id(o): k for k, o in enumerate(S.outs)}
         lines, qlines = [], []
@@ -519,9 +634,49 @@ def _family(formal: str):
     return m[1] if m else None
 
 
+def bind(args, env: dict) -> dict:
+    """A call's arguments that can be evaluated here: an argument that reads a table FormalRV
+    gives only as bounds (data) stays unbound -- no count, time or structure depends on it."""
+    out = {}
+    for f, e in args:
+        try:
+            out[f] = e(env)
+        except ExprError:
+            pass
+    return out
+
+
+def _reads_table(node) -> bool:
+    if node[0] == "idx":
+        return True
+    if node[0] in ("n", "v"):
+        return False
+    if node[0] in ("min", "max"):
+        return any(_reads_table(a) for a in node[1])
+    return _reads_table(node[1]) or _reads_table(node[2])
+
+
+def _recursive(calls: dict) -> set:
+    """The gadgets on a cycle of the call graph (a gadget that calls itself, directly or not)."""
+    out = set()
+    for start in calls:
+        seen, todo = set(), list(calls[start])
+        while todo:
+            g = todo.pop()
+            if g == start:
+                out.add(start)
+                break
+            if g in seen or g not in calls:
+                continue
+            seen.add(g)
+            todo.extend(calls[g])
+    return out
+
+
 def _is_pred_var(v: str) -> bool:
-    """FormalRV writes `if c:` as `for 0 <= rv_g < [c]` and its else as `for 0 <= rv_e < ...`."""
-    return bool(re.fullmatch(r"rv_[ge]\d+", v))
+    """FormalRV writes `if c:` as `for 0 <= rv_g < [c]` and its else as `for 0 <= rv_e < ...`
+    (a fan-out's guard: `rv_fan_g`)."""
+    return bool(re.fullmatch(r"rv_(?:\w+_)?[ge]\d+", v))
 
 
 def build(qec: layers.Stage, params: dict | None = None) -> Program:
@@ -678,7 +833,7 @@ def canonical(seq: list) -> list:
     def r(n):
         if n is None:
             return None
-        if re.fullmatch(r"[A-Z]+\d*(dg)?|[XYZ]", n):
+        if re.fullmatch(r"[A-Z]+\d*(dg)?|[XYZ]|\d+", n):     # a basis, an angle, a round count
             return n
         if n not in ren:
             ren[n] = f"n{len(ren)}"
@@ -707,12 +862,60 @@ def count(prog: Program) -> Counter:
                  lambda k, sign, letters: _rot_count(k, sign, letters))
 
 
-def duration_ns(prog: Program, span_ns: dict, rot_ns) -> int:
-    """The run's time on the machine when every instance runs after the one before it:
-    `span_ns[tid]` a template's compiled duration, `rot_ns(k, sign, n_factors)` a rotation
-    chain's (every level reserved).  Exact integers: RSA-2048 runs past 2^53 microseconds."""
-    return total(prog, lambda tid: Counter(ns=span_ns[tid]),
-                 lambda k, sign, letters: Counter(ns=rot_ns(k, sign, len(letters))))["ns"]
+def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True) -> int:
+    """The run's time on the machine: `span_ns[tid]` a template's compiled duration,
+    `rot_ns(k, sign, n_factors)` a rotation chain's (every level reserved).  Every instance
+    runs after the one before it, except that the iterations of a parallel loop (`Loop.par`)
+    run at once, each on its own district -- the loop takes as long as its slowest iteration
+    (`parallel=False`: one after another).  Exact integers: RSA-2048 runs past 2^53 µs."""
+    memo: dict = {}
+
+    def body_ns(body: Body, env: dict) -> int:
+        return sum(node_ns(n, env) for n in body)
+
+    def node_ns(node, env) -> int:
+        if isinstance(node, Seg):
+            return span_ns[node.tid]
+        if isinstance(node, Pred):
+            return body_ns(node.body, env)                 # a slot: reserved either way
+        if isinstance(node, Let):
+            # (bound only when the time depends on it: a binding of a block index is not)
+            return body_ns(node.body, {**env, node.var: node.value(env)} if node.var in _deps(node.body) else env)
+        if isinstance(node, Rot):
+            return rot_ns(node.k(env), node.sign, len(node.factors))
+        if isinstance(node, Call):
+            key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
+            if key not in memo:
+                memo[key] = body_ns(prog.body_of(node, env), bind(node.skeys + node.args, env))
+            return memo[key]
+        if isinstance(node, Loop):
+            lo, hi = node.lo(env), node.hi(env)
+            n = hi - lo
+            if n <= 0:
+                return 0
+            at = lambda v: body_ns(node.body, {**env, node.var: v})  # noqa: E731
+            dep = node.var in _deps(node.body)
+            if node.par and parallel:
+                if not dep:
+                    return at(lo)
+                if n <= 4:
+                    return max(at(v) for v in range(lo, hi))
+                a, b, mid = at(lo), at(hi - 1), at(lo + n // 2)
+                d = at(lo + 1) - a
+                if mid == a + d * (n // 2) and b == a + d * (n - 1):
+                    return max(a, b)                       # affine: the largest is at an end
+                return max(at(v) for v in range(lo, hi))
+            if not dep:
+                return n * at(lo)
+            if n <= 4:
+                return sum(at(v) for v in range(lo, hi))
+            a, a1, mid, b = at(lo), at(lo + 1), at(lo + n // 2), at(hi - 1)
+            d = a1 - a
+            if mid == a + d * (n // 2) and b == a + d * (n - 1):
+                return n * a + d * n * (n - 1) // 2
+            return sum(at(v) for v in range(lo, hi))
+        return 0
+    return body_ns(prog.root, dict(prog.params))
 
 
 def total(prog: Program, seg_value, rot_value) -> Counter:
@@ -736,7 +939,7 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
         if isinstance(node, Pred):
             return body_count(node.body, env)
         if isinstance(node, Let):
-            return body_count(node.body, {**env, node.var: node.value(env)})
+            return body_count(node.body, {**env, node.var: node.value(env)} if node.var in _deps(node.body) else env)
         if isinstance(node, Loop):
             lo, hi = node.lo(env), node.hi(env)
             n = hi - lo
@@ -762,7 +965,7 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
         if isinstance(node, Call):
             key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
             if key not in memo:
-                memo[key] = body_count(prog.body_of(node, env), {f: e(env) for f, e in node.skeys})
+                memo[key] = body_count(prog.body_of(node, env), bind(node.skeys + node.args, env))
             return memo[key]
         if isinstance(node, Rot):
             return rot_value(node.k(env), node.sign, [p for p, _, _ in node.factors])

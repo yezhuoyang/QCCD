@@ -46,12 +46,12 @@ def test_every_template_is_a_program_the_parser_reads():
         alg = parse_folded(template_alg(t), name=t.tid)
         assert any(i.kind == "call" for i in alg.instructions)
     # the Toffoli's guarded corrections are gates called under their guard
-    toff = next(t for t in prog.templates.values() if len(t.lines) == 175)
+    toff = next(t for t in prog.templates.values() if len(t.lines) == 230)
     src = template_alg(toff)
     assert "gate tpl_w1 " in src and "if o4: tpl_w1 " in src.replace("  ", " ")
 
 
-@pytest.mark.parametrize("lines", [25, 175])
+@pytest.mark.parametrize("lines", [32, 230])
 def test_a_template_compiled_once_holds_every_place_rule(lines):
     from qccd.gadget.library import LeafLibrary
     prog = _prog()

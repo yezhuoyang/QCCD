@@ -672,7 +672,9 @@ def test_formalrvs_shor_lowers_once_per_call_shape(tmp_path):
                          dict(m=4, bits=3, N=3, a=2, ainv=2, rec=19))
     qec = layers.read(tmp_path / "shor.qec", "qec")
     low = qec2alg.lower(qec)
-    assert 500 < len(low.gates) < 1000 and len(low.text.splitlines()) < 25000
+    # (25,294 lines since every merge runs its extraction rounds: lattice surgery in full)
+    assert 500 < len(low.gates) < 1000 and len(low.text.splitlines()) < 30000
+    assert " se " in low.text
     assert any(name.startswith("ctl_modmulmcp") for name in low.gates)
     assert " R3dg" in low.text and " R4" in low.text          # pi/16 and pi/32 rotations
     # every .qec statement the program reaches links to its .qppm statement -- through the

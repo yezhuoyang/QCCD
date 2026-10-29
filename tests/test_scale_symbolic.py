@@ -17,7 +17,7 @@ templates stored once.  What is held here:
   FormalRV specialized itself (the toolchain is needed for that one);
 * its instruction count, taken without expanding, is the expansion's;
 * its size is the program's, not the run's: the same at 3 bits and at RSA-2048, where the
-  run executes 2.75 x 10^14 instructions.
+  run executes 3.6 x 10^14 instructions.
 """
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def test_the_arithmetic_is_formalrvs_and_a_power_under_a_remainder_is_taken_modu
 
 def test_the_symbolic_program_is_qec2algs_lowering_instruction_for_instruction(tmp_path):
     """FormalRV's generic Shor.qec, evaluated by QCCD at the witness, expanded, against
-    qec2alg's lowering of the .qec FormalRV specialized itself (577,244 instructions)."""
+    qec2alg's lowering of the .qec FormalRV specialized itself (758,494 instructions)."""
     from test_fullstack import _toolchains_built
     if not _toolchains_built():
         pytest.skip("needs the pinned FormalRV toolchain")
@@ -92,7 +92,7 @@ def test_the_symbolic_program_is_qec2algs_lowering_instruction_for_instruction(t
     prog = P.build(st, params=WITNESS)
     r = P.compare(prog, alg, data_ones=ones)
     assert r["same"], r
-    assert r["mine"] == 577_244
+    assert r["mine"] == 758_494          # with every merge's extraction rounds (lattice surgery in full)
     # and the same from the .qec FormalRV specialized: one program, two inputs
     r2 = P.compare(P.build(layers.read(tmp_path / "Shor.qec", "qec")), alg, data_ones=ones)
     assert r2["same"], r2
@@ -119,5 +119,5 @@ def test_the_program_is_as_large_as_its_gadgets_not_its_run():
     assert big.size()["templates"] < 20 and big.size()["nodes"] < 200
     assert big.n_data == 16_391                          # RSA-2048: 2049-bit registers, m = 4096
     # every instruction the run executes, every predicate taken (the schedule's view)
-    assert sum(c.values()) == 275_248_368_726_016
+    assert sum(c.values()) == 361_651_164_297_216
     assert c["ppm"] == 32_916_974_086_144 and c["inject"] == 11_075_549_313_024

@@ -63,6 +63,14 @@ def parse(text: str):
             pos += 1
             return (tok, tuple(args))
         if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9']*", tok):
+            if pos < len(tokens) and tokens[pos] == "[":
+                # a table read: `T[base + tOff]` (FormalRV's classical tables)
+                pos += 1
+                i = expr(0)
+                if pos >= len(tokens) or tokens[pos] != "]":
+                    raise ExprError(f"missing ']' in {text}")
+                pos += 1
+                return ("idx", tok, i)
             return ("v", tok)
         raise ExprError(f"unsupported token {tok!r} in {text!r}")
 
@@ -100,6 +108,14 @@ def ev(node, env: dict) -> int:
     if k in ("min", "max"):
         vals = [ev(a, env) for a in node[1]]
         return min(vals) if k == "min" else max(vals)
+    if k == "idx":
+        table = env.get(node[1])
+        if not isinstance(table, (list, tuple)) or (table and table[0] == "bound"):
+            # FormalRV gives some tables only as bounds (`bound[size, lo, hi]`): data the
+            # program reads, never a structure QCCD needs
+            raise ExprError(f"table {node[1]!r} has no contents here")
+        i = ev(node[2], env)
+        return table[i] if 0 <= i < len(table) else 0
     if k == "%":
         m = ev(node[2], env)
         return _mod(node[1], env, m) if m else ev(node[1], env)
@@ -142,6 +158,8 @@ def free(node) -> frozenset:
         return frozenset([node[1]])
     if k in ("min", "max"):
         return frozenset().union(*(free(a) for a in node[1]))
+    if k == "idx":
+        return frozenset([node[1]]) | free(node[2])
     return free(node[1]) | free(node[2])
 
 

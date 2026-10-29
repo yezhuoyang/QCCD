@@ -62,6 +62,8 @@ class Item:
     role: str = "qec"
     #: a single-factor measurement this lowering may turn into a destructive readout
     single: tuple | None = None            # (letter, block, outcome)
+    #: a merge's extraction round on one of its blocks: the merge's outcome
+    se_of: str | None = None
     #: a call lowered once for every call of the same shape: the shape (see `_Interp.call`)
     memo: tuple | None = None
 
@@ -232,7 +234,18 @@ class _Interp:
                 items.append(Item("ins", txt, s.line, single=(fs[0][0], fs[0][1], name) if len(fs) == 1 else None))
                 current = (name, [b for _, b in fs], s.line)
             elif kd == "extract":
-                self.absorb(s, "the merged patch's rounds are the bench's own rounds")
+                # LATTICE SURGERY IN FULL (the user, 2026-10-29: "all System call service --
+                # especially Lattice Surgery -- must now be compiled in details"): FormalRV's
+                # `extract M rounds=r` is the merged code's syndrome extraction, which its system
+                # layer writes as r rounds of every patch of the merge (surfaceRound per patch,
+                # after the product checks).  The bench measures the product; a clinic runs the
+                # rounds on each block, in the merge's order.
+                if current is None:
+                    raise NotLowered(f".qec line {s.line}: an extraction outside a merge group")
+                mr = re.search(r"rounds=(\d+)", t)
+                for b in current[1]:
+                    for k in rounds_of(int(mr[1]) if mr else 1):
+                        items.append(Item("ins", f"se {b} {k}", s.line, se_of=current[0]))
             elif kd == "decode":
                 if current is None:
                     raise NotLowered(f".qec line {s.line}: a decode outside a merge group")
@@ -406,6 +419,7 @@ class _Reads:
     def __init__(self):
         self.done: set = set()
         self.uses: dict = {}
+        self.dropped: list = []
 
     def passed(self, it) -> set:
         """The blocks a call names that it did not prepare (its parameters)."""
@@ -432,20 +446,46 @@ class _Reads:
                 if x.kind == "ins" and w and w[0] in ("prep", "inject") and len(w) > 1:
                     made.add(w[1])
         later: set = set()
+        read: set = set()
         for it in reversed(seq):
             if it.kind == "call":
                 self.body(it.children, top=False)
                 later |= self.passed(it)
                 continue
+            if it.se_of is not None:
+                continue                 # a merge's own rounds are part of it, not a later use
             if it.single:
                 p, b, name = it.single
                 if b not in later and (top or b in made):
                     it.text = f"read {b} {p} -> {name}"
+                    read.add(name)
             later |= _blocks_of(it.text)
+        if read:
+            # a block read out destructively is consumed: no rounds on it
+            self.dropped += _drop_rounds(items, read)
 
 
-def _mark_reads(items) -> None:
-    _Reads().body(items, top=True)
+def _drop_rounds(items, outs: set) -> list:
+    """Remove, in place, the extraction rounds of the merges in `outs`; return them."""
+    gone = [it for it in items if it.kind == "ins" and it.se_of in outs]
+    items[:] = [it for it in items if not (it.kind == "ins" and it.se_of in outs)]
+    for it in items:
+        if it.kind == "guard":
+            gone += _drop_rounds(it.children, outs)
+    return gone
+
+
+def rounds_of(r: int) -> list:
+    """r syndrome rounds as the clinic runs them: threes, then ones."""
+    return [3] * (r // 3) + [1] * (r % 3)
+
+
+def _mark_reads(items) -> list:
+    """Single-factor measurements nothing names afterwards become readouts; the rounds of
+    those merges are returned (they no longer run)."""
+    r = _Reads()
+    r.body(items, top=True)
+    return r.dropped
 
 
 class _Writer:
@@ -553,7 +593,8 @@ def lower(qec: layers.Stage, *, title: str = "", floorplan: str = "fullstack",
     for i in range(n_data):
         it.out.blocks[f"q{i}"] = f"LogicData[{i}]"
     items += it.walk(prog.body, {}, {}, [[]])
-    _mark_reads(items)
+    for gone in _mark_reads(items):
+        it.out.absorbed.setdefault(gone.qline, "the merge's one block is read out destructively: no rounds on it")
     w = _Writer(it.out, fresh=10 ** 8)
     body = w.lines(items)
     out = it.out

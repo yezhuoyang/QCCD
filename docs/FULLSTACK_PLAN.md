@@ -534,6 +534,41 @@ working at once, and a windowed program from FormalRV.
 - resolving an instant to its hardware instruction;
 - the page.
 
+**S8, second round (user, 2026-10-29: "We definitely need to support advanced Shor's algorithm
+and parallelism. ... all System call service (Especially Lattice Surgery) must now be compiled in
+details").**
+
+- **Lattice surgery in full.** FormalRV's system layer writes a merge as the product checks
+  (an ancilla against each patch's logical support, three times), then `rounds` rounds of every
+  patch of the merge (`surfaceRound` per patch), then decoding and frame updates. QCCD had kept
+  only the first part, the bench's probe, and absorbed `extract … rounds=r` as "the bench's own
+  rounds". Both lowerings now emit it: `qec2alg` (every published run) and the symbolic program,
+  still instruction for instruction the same. Each `extract` becomes `se b 3` at a clinic for
+  every block of the merge, in its order. A single-factor merge that becomes a destructive
+  readout drops its rounds, since the block is consumed.
+  - FormalRV's Shor at 3 bits is now 758,494 instructions (from 577,244); its `.alg` is 25,294
+    lines.
+  - The 9 templates still compile once and hold every rule.
+  - RSA-2048 (textbook) executes 3.6 × 10¹⁴ instructions.
+  - The published pages are NOT rebuilt yet.
+- **Parallel loops in the time model.** A loop FormalRV marks parallel (`__par`) runs its
+  iterations at once, each on its own district: it takes as long as its slowest iteration.
+- **The advanced Shor: FormalRV's Gidney–Ekerå 2021 audit at RSA-2048** (`GE2021.qec`,
+  distance 27, `Resource/Inputs/RuntimeGap/execution.inputs`; `tests/test_scale_ge2021.py`).
+  - **The builder grew to read it:** table reads (`T[...]`, contents optional);
+    destructive `measure`; structural guards decided when an instance is lowered; recursive
+    gadgets keyed by the depth their guards read (the unary lookup); and FormalRV's
+    fan-out guards (`rv_fan_g`).
+  - **Size and count:** 19 templates, 3,931 gadget instances and 23,010 nodes, built and
+    counted in about 13 s. The run executes 4.9 × 10¹² instructions and requests 4.89 × 10⁹
+    CCZ states (every data slot taken), against the paper's 2.7 × 10⁹ Toffolis.
+  - **Still to lower, in survey mode:**
+    - a Pauli product over a whole register (`merge … * PROD i …`, up to 2,049 blocks):
+      lattice surgery across many districts;
+    - |AutoCCZ⟩ states, which no place makes;
+    - classical parities, record copies into source slots, guards on both, and records written
+      by another call. These belong to the archive.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.
