@@ -36,26 +36,38 @@ def test_the_new_rules_have_statements_and_sources():
         assert RULE_STATEMENTS[r] and RULE_SOURCES[r]
 
 
-def test_defaults_are_the_surface_trap_limits():
+def test_defaults_are_six_rails_and_sixty_degrees():
+    """Six rails at a junction since October 2026 (a trap built in more than one layer has
+    them); a surface trap declares 4."""
     m = explicit({"A": (0, 0), "B": (1, 0)}, [("r", "A", "B")])
-    assert geometry_limits(m.arch) == (4, 60.0)
-    m = explicit({"A": (0, 0), "B": (1, 0)}, [("r", "A", "B")], max_junction_degree=6, min_rail_angle_deg=45)
-    assert geometry_limits(m.arch) == (6, 45.0)
+    assert geometry_limits(m.arch) == (6, 60.0)
+    m = explicit({"A": (0, 0), "B": (1, 0)}, [("r", "A", "B")], max_junction_degree=4, min_rail_angle_deg=45)
+    assert geometry_limits(m.arch) == (4, 45.0)
 
 
-def test_r19_refuses_a_fifth_rail_and_accepts_an_x_junction():
+def test_r19_refuses_a_fifth_rail_on_a_surface_trap_and_accepts_an_x_junction():
     star = explicit({"J": (0, 0), "N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0), "NE": (1, 1)},
-                    [("rN", "J", "N"), ("rS", "J", "S"), ("rE", "J", "E"), ("rW", "J", "W"), ("rNE", "J", "NE")])
+                    [("rN", "J", "N"), ("rS", "J", "S"), ("rE", "J", "E"), ("rW", "J", "W"), ("rNE", "J", "NE")],
+                    max_junction_degree=4)
     c = by_rule(geometry_violations(star.arch))
     assert c["R19"] == 1
     assert any("degree 5" in v.message and "at most 4" in v.message for v in geometry_violations(star.arch))
     cross = explicit({"J": (0, 0), "N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0)},
                      [("rN", "J", "N"), ("rS", "J", "S"), ("rE", "J", "E"), ("rW", "J", "W")])
     assert by_rule(geometry_violations(cross.arch))["R19"] == 0
-    # a 3D trap may declare 6
-    star6 = explicit(star.arch.device.nodes and {n: (p.pos[0], p.pos[1]) for n, p in star.arch.device.nodes.items()},
-                     [(s.id, s.ends[0], s.ends[1]) for s in star.arch.device.segments.values()], max_junction_degree=6)
+    # the same drawing on a document that declares nothing: six rails are allowed
+    star6 = explicit({n: (p.pos[0], p.pos[1]) for n, p in star.arch.device.nodes.items()},
+                     [(s.id, s.ends[0], s.ends[1]) for s in star.arch.device.segments.values()])
     assert by_rule(geometry_violations(star6.arch))["R19"] == 0
+
+
+def test_r19_refuses_a_seventh_rail_by_default():
+    import math
+    nodes = {"J": (0, 0)}
+    nodes.update({f"P{i}": (math.cos(2 * math.pi * i / 7), math.sin(2 * math.pi * i / 7)) for i in range(7)})
+    star7 = explicit(nodes, [(f"r{i}", "J", f"P{i}") for i in range(7)])
+    v = [x for x in geometry_violations(star7.arch) if x.rule == "R19"]
+    assert len(v) == 1 and "degree 7" in v[0].message and "at most 6" in v[0].message
 
 
 def test_r20_measures_the_angle_between_rails():

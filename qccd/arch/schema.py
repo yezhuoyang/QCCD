@@ -503,7 +503,7 @@ def export_consumers() -> dict:
         F("budget.max_area_mm2", "number", None,
           "qccd.cost.hardware.hardware_report (area_mm2 is always 0.0: no area model yet)"),
         F("budget.junction_electrode_multiplier", "number", None, None),
-        F("budget.max_junction_degree", "integer", 4, "qccd.verify.rules.geometry_limits (R19)"),
+        F("budget.max_junction_degree", "integer", 6, "qccd.verify.rules.geometry_limits (R19)"),
         F("budget.min_rail_angle_deg", "number", 60.0, "qccd.verify.rules.geometry_limits (R20)"),
         # -- curve points (closed, but the readers are not in the schema) --------------
         F("primitives.<curve>.points[].us", "number", None, "qccd.cost.models"),

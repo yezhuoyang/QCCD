@@ -835,20 +835,20 @@ def _geometry_shapes() -> list[tuple[str, list]]:
     The shipped corpus is clean geometry -- that is what shipping it means -- so without
     these the geometry half of the lint bucket would compare two empty lists on every
     case and call that agreement, which is exactly the failure mode this whole file
-    exists to refuse.  A generator cannot produce any of them: a fifth rail at one node,
+    exists to refuse.  A generator cannot produce any of them: a seventh rail at one node,
     two rails that cross in open space, and a fork at 10 degrees are all things only a
     hand-drawn device (or a drag) can create.
     """
     import math
 
     star = [_C("DeviceBuilder", "explicit"), _C("d.site", "S0", 0.0, 0.0, zone="data")]
-    for i in range(5):
-        a = 2 * math.pi * i / 5
+    for i in range(7):
+        a = 2 * math.pi * i / 7
         star.append(_C("d.site", f"L{i}", round(math.cos(a), 6), round(math.sin(a), 6),
                        zone="data"))
-    for i in range(5):
+    for i in range(7):
         star.append(_C("d.segment", f"R{i}", "S0", f"L{i}"))
-    star.append(_C("blank_device", name="star5", zones=["data"]))
+    star.append(_C("blank_device", name="star7", zones=["data"]))
 
     # an X with no shared node (R21) and a 10.3-degree fork (R20), in one document
     cross = [_C("DeviceBuilder", "explicit"),
@@ -874,7 +874,7 @@ def _geometry_shapes() -> list[tuple[str, list]]:
                _C("d.segment", "S0", "P0", "P1"),
                _C("d.segment", "S1", "P2", "P3"),
                _C("blank_device", name="onrail", zones=["data"])]
-    return [("star5", star), ("cross", cross), ("onrail", on_rail)]
+    return [("star7", star), ("cross", cross), ("onrail", on_rail)]
 
 
 def _lint_cases() -> list[dict]:

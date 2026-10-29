@@ -106,7 +106,10 @@ def _sources(src: str) -> str:
         elif tok == "deck_v3":
             out.append("the ion-transport deck (v3)")
         elif tok.startswith("collaborator review"):
-            out.append("collaborators' review, September 2026")
+            ym = re.search(r"(\d{4})-(\d{2})", tok)
+            month = ("January February March April May June July August September October "
+                     "November December").split()[int(ym.group(2)) - 1] if ym else "September"
+            out.append(f"collaborators' review, {month} {ym.group(1) if ym else '2026'}")
         elif tok.startswith("reader report"):
             out.append("a reader's report, September 2026")
         else:

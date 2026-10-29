@@ -256,6 +256,11 @@ def extract_legacy(prog, arch, exp_or_spec, qasm: str | None = None, *,
                         else:
                             emit_vz(c, sq[ion], _param(ins, k, len(ins.ions), 1)[0])
                             n["vz"] += 1
+                            p = nm.p_vz(params)
+                            if p:
+                                # `@2`: three pulses' error, booked with the pulses
+                                c.append("DEPOLARIZE1", [sq[ion]], p)
+                                budget["gate_1q"] += p
                 else:
                     key = canonical_abstract(g)
                     if key in ABSTRACT_2Q:

@@ -44,6 +44,10 @@ RACE = {"generator": "racetrack", "params": {"straight": 4}, "name": "race8",
 GRID = {"generator": "grid", "params": {"a": 2, "b": 3}, "name": "grid2x3",
         "about": "a 2×3 lattice: six lattice nodes, of which J0_1 and J1_1 are degree-3 T-junctions and the "
                  "other four degree-2 corners, with one trap site (T…) on every wire between them"}
+GRID3 = {"generator": "grid", "params": {"a": 3, "b": 3}, "name": "grid3x3",
+         "about": "a 3×3 lattice of junction nodes: the centre J1_1 is a degree-4 X-junction, the four edge "
+                  "midpoints degree-3 T-junctions and the four corners plain bends, with one trap site (T…) "
+                  "on every wire between them"}
 DUAL = {"generator": "dual_loop", "params": {"width": 3, "couplings": [1]}, "name": "dual3",
         "about": "two concentric loops: an inner data loop D (DT0–DT2, DB0–DB2; capacity 2, no gates) and an "
                  "outer trap loop A (AT0–AT2, AB0–AB2), joined at x = 1 where DT1 and AT1 are degree-3 junctions"}
@@ -69,6 +73,17 @@ def _explicit(name: str, about: str, nodes: dict, segments: list[tuple[str, str,
 STAR5 = _explicit("star5", "five rails meeting at one node J: a degree-5 junction, which no 2D surface trap has",
                   {"J": (0, 0), "N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0), "NE": (1, 1)},
                   [("rN", "J", "N"), ("rS", "J", "S"), ("rE", "J", "E"), ("rW", "J", "W"), ("rNE", "J", "NE")])
+def _star(name: str, about: str, k: int) -> dict:
+    """k rails leaving one node J at equal angles."""
+    import math
+    nodes = {"J": (0, 0)}
+    nodes.update({f"P{i}": (round(math.cos(2 * math.pi * i / k), 9), round(math.sin(2 * math.pi * i / k), 9))
+                  for i in range(k)})
+    return _explicit(name, about, nodes, [(f"r{i}", "J", f"P{i}") for i in range(k)])
+
+
+HEX6 = _star("hex6", "six rails meeting at one node J, 60 degrees apart: a junction of degree 6", 6)
+STAR7 = _star("star7", "seven rails meeting at one node J: a junction of degree 7", 7)
 CROSS4 = _explicit("cross4", "four rails meeting at one node J at right angles: an X-junction, degree 4",
                    {"J": (0, 0), "N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0)},
                    [("rN", "J", "N"), ("rS", "J", "S"), ("rE", "J", "E"), ("rW", "J", "W")])
@@ -85,7 +100,7 @@ PLANAR = _explicit("planar", "the same four sites joined through a junction J wh
                    {"A": (-1, 0), "B": (1, 0), "C": (0, -1), "D": (0, 1), "J": (0, 0)},
                    [("rA", "A", "J"), ("rB", "J", "B"), ("rC", "C", "J"), ("rD", "J", "D")])
 
-DEVICES = (CHAIN, RACE, GRID, DUAL, RING, CHAIN_BIG, RING_LOAD, RING_BIG,
+DEVICES = (CHAIN, RACE, GRID, GRID3, DUAL, RING, CHAIN_BIG, RING_LOAD, RING_BIG, HEX6, STAR7,
            STAR5, CROSS4, FORK30, FORK90, CROSSING, PLANAR)
 
 _MACHINES: dict[str, Machine] = {}
@@ -123,14 +138,19 @@ def machine(dev: dict) -> Machine:
 GRID_WALK = ["T0_0v", "J0_1", "T0_1h"]
 #: Its bend twin: through the corner J0_0 instead, which R18 prices as plain transport.
 GRID_BEND = ["T0_0v", "J0_0", "T0_0h"]
+#: The two ways through the 3x3 lattice's X-junction J1_1, as the rails they cross: along
+#: its row (T0_1h -> T1_1h) and along its column (T1_0v -> T1_1v).
+GRID3_ROW = ["T0_1h.b", "T1_1h.a"]
+GRID3_COLUMN = ["T1_0v.b", "T1_1v.a"]
 
 
 # ------------------------------------------------------------------- the language
 
 GRAMMAR = """programme  ::=  { statement NEWLINE }
 statement  ::=  "p." verb "(" [ arguments ] ")"
-verb       ::=  "init" | "fill" | "move" | "shuttle" | "simd" | "rotate"
-             |  "gate" | "cool" | "measure" | "reset" | "barrier" | "claim"
+verb       ::=  core | shorthand | "claim"
+core       ::=  "init" | "simd" | "gate" | "cool" | "measure" | "reset" | "barrier"
+shorthand  ::=  "move" | "shuttle" | "rotate" | "fill"
 arguments  ::=  argument { "," argument }
 argument   ::=  literal | name "=" literal            (keywords after positionals)
 literal    ::=  string | number | "True" | "False" | "None"
@@ -146,18 +166,24 @@ VERBS: list[dict] = [
      "state": "position := placement; n̄(ion) := 0, or the quanta given. Nothing moves.",
      "cost": "0 hops, 0 µs.", "rules": ["R1", "R2"], "ir": "init",
      "device": CHAIN, "example": [rec("init", {"d0": "C1", "d1": "C0"})]},
-    {"verb": "fill", "sig": 'p.fill(loop=None, prefix="d")',
+    {"verb": "fill", "sig": 'p.fill(loop=None, prefix="d")', "kind": "shorthand",
+     "means": 'one <code>p.init</code> that puts an ion on every site of the loop, in the loop&rsquo;s order: '
+              '<code>{"d0": its first site, "d1": its second, ...}</code>.',
      "what": "Places one ion on every slot of a loop, d0 on its first site and so on: the packed ring in one line.",
      "state": "position := every site of the loop, in order. Nothing moves.",
      "cost": "0 hops, 0 µs.", "rules": ["R1"], "ir": "init",
      "device": RACE, "example": [rec("fill")]},
-    {"verb": "move", "sig": 'p.move(ion, src, dst, via=None, cls="shuttle")',
+    {"verb": "move", "sig": 'p.move(ion, src, dst, via=None, cls="shuttle")', "kind": "shorthand",
+     "means": '<code>p.simd(cls, [[ion, src, dst]])</code>, or <code>[[ion, src, dst, via]]</code> when a via is given: '
+              'a cycle with one participant.',
      "what": "One ion, one hop, in its own cycle: the shortest form of a transport instruction.",
      "state": "position(ion) := dst; the segment between src and dst, or the segments in via, is crossed once; n̄ grows by the primitives crossed.",
      "cost": "the segment's hop, plus a junction_cross priced by the degree of any junction transited; duration from the device's curves.",
      "rules": ["R1", "R2", "R3", "R4", "R8"], "ir": "simd with one participant",
      "device": CHAIN, "example": [rec("init", {"d0": "C1"}), rec("move", "d0", "C1", "C2")]},
-    {"verb": "shuttle", "sig": 'p.shuttle(ion, [site, site, ...], cls="shuttle")',
+    {"verb": "shuttle", "sig": 'p.shuttle(ion, [site, site, ...], cls="shuttle")', "kind": "shorthand",
+     "means": 'one <code>p.simd(cls, [[ion, a, b, via]])</code> for each trap-to-trap step a &rarr; b of the path, '
+              'its via the rails through any junction between them.',
      "what": "Walks one ion along a path of site ids, one trap-to-trap step per cycle. Junctions on the way are transited, never rested on.",
      "state": "one cycle per step of the path; after each, position(ion) is the next site.",
      "cost": "the sum of the hops; here the walk from T0_0v to T0_1h transits the T-junction J0_1, and the crossing is charged at degree 3.",
@@ -169,12 +195,17 @@ VERBS: list[dict] = [
      "cost": "cost sums over the participants; depth and duration take the maximum, because the cycle waits for its slowest ion.",
      "rules": ["R1", "R2", "R3", "R4", "R4d", "R5", "R8", "R11"], "ir": "simd",
      "device": RACE, "example": [rec("init", {"d0": "S1", "d1": "S4"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S4", "S5"]])]},
-    {"verb": "rotate", "sig": 'p.rotate(delta, loop=None)',
-     "what": "Turns a closed loop: every ion on it moves delta slots forward (negative: back). One instruction, one movement template driven |delta| times.",
+    {"verb": "rotate", "sig": 'p.rotate(delta, loop=None)', "kind": "shorthand",
+     "means": '|delta| <code>p.simd</code> cycles, each moving every ion on the loop one slot forward (back when '
+              'delta is negative), in the loop&rsquo;s class <code>rotate_cw</code> (<code>rotate_ccw</code>). '
+              'What it adds is brevity, not meaning: a compiled programme turns a loop of 144 ions in one line, '
+              'and the IR keeps the turn as one instruction, so the number of movement templates a programme '
+              'uses can be counted.',
+     "what": "Turns a closed loop: every ion on it moves delta slots forward (negative: back), all of them together, as a conveyor belt does.",
      "state": "position(ion) := slot + delta (mod the loop) for every ion on the loop.",
-     "cost": "|delta| unit cycles, each the full loop's hops summed and the deepest edge as its depth.",
+     "cost": "|delta| unit cycles, each the hops of every ion on the loop summed and the deepest edge as its depth.",
      "rules": ["R4", "R11"], "ir": "simd with a loop_shift template",
-     "device": DUAL, "example": [rec("fill", loop="A", prefix="a"), rec("rotate", 1, loop="A")]},
+     "device": RACE, "example": [rec("init", {"d0": "S0", "d1": "S2", "d2": "S5"}), rec("rotate", 2)]},
     {"verb": "gate", "sig": 'p.gate(name, [[control, target], ...], sites=None)',
      "what": "A gate cycle. Two-qubit: every pair sits in one site whose zone allows gates, control first. Single-qubit: an empty pair list and the site named.",
      "state": "positions unchanged; the gate's error is evaluated from each ion's n̄ at gate time.",
@@ -199,12 +230,48 @@ VERBS: list[dict] = [
      "what": "A cycle in which nothing happens: an explicit synchronisation point, a marker between phases of a programme.",
      "state": "unchanged.", "cost": "0 hops, 0 µs.", "rules": [], "ir": "barrier",
      "device": RACE, "example": [rec("init", {"d0": "S0"}), rec("move", "d0", "S0", "S1"), rec("barrier"), rec("move", "d0", "S1", "S2")]},
-    {"verb": "claim", "sig": 'p.claim(total_cost=..., total_steps=..., ...)',
+    {"verb": "claim", "sig": 'p.claim(total_cost=..., total_steps=..., ...)', "kind": "annotation",
      "what": "Annotates the programme with the totals its author claims. Claims are not content: the replay recomputes everything and R9 rejects any claim it cannot reproduce.",
      "state": "unchanged; the claim is recorded on the programme.", "cost": "none.", "rules": ["R9"], "ir": "the programme's metrics",
      "device": CHAIN, "check_metrics": True,
      "example": [rec("init", {"d0": "C0"}), rec("move", "d0", "C0", "C1"), rec("claim", total_cost=1, total_steps=1)]},
 ]
+
+#: The page lists the core first, then the shorthands, then the one annotation.  A shorthand
+#: is defined as the core statements it stands for (`means`), and `core_form` writes any
+#: example out that way, so the page can show both and the build can hold them to one verdict.
+KINDS = ("core", "shorthand", "annotation")
+VERBS.sort(key=lambda v: KINDS.index(v.get("kind", "core")))
+
+
+def core_form(m: Machine, calls: list[dict]) -> list[dict]:
+    """The programme `calls` written in core statements only: read back from the IR it
+    builds, a `loop_shift` template unrolled into one `simd` per slot."""
+    prog = m.program("core", provenance="off").apply_calls(calls).build()
+    loops = m.arch.device.loops
+    where: dict[str, str] = {}
+    out: list[dict] = []
+    for ins in prog.instructions:
+        if ins.type == "init":
+            where = dict(ins.placement)
+            q = {k: v for k, v in (ins.quanta or {}).items() if v}
+            out.append(rec("init", dict(ins.placement), **({"quanta": q} if q else {})))
+        elif ins.type == "simd" and ins.template and ins.template.get("kind") == "loop_shift":
+            nodes = list(loops[ins.template["loop"]].nodes)
+            delta = int(ins.template["delta"])
+            for _ in range(abs(delta)):
+                parts = [[ion, at, nodes[(nodes.index(at) + (1 if delta > 0 else -1)) % len(nodes)]]
+                         for ion, at in where.items() if at in nodes]
+                out.append(rec("simd", ins.cls, parts))
+                where.update({ion: b for ion, _a, b in parts})
+        elif ins.type == "simd":
+            parts = [[p.ion, p.src, p.dst] + ([list(p.via)] if p.via else []) for p in ins.participants]
+            out.append(rec("simd", ins.cls, parts, **({} if ins.mode == "inter" else {"mode": ins.mode})))
+            where.update({p.ion: p.dst for p in ins.participants})
+        else:
+            raise ValueError(f"core_form: no shorthand becomes a {ins.type} instruction")
+    return out
+
 
 #: The IR beneath the text.
 IR_TABLE = [("init", "init", "placement, quanta"), ("fill", "init", "placement over a loop"),
@@ -251,11 +318,14 @@ RULES: list[dict] = [
      "pass": {"program": [rec("init", {"d0": "C2", "d2": "C1"}), rec("move", "d2", "C1", "C2")],
               "why": "the same hop into a site with room for it."}},
     {"id": "R2", "checks": "a junction (a node of degree 3 or more) holds at most one ion, and at most one ion crosses it in a cycle.",
-     "device": DUAL,
-     "fail": {"program": [rec("init", {"d0": "DT1", "d1": "DT0"}), rec("move", "d1", "DT0", "DT1")],
-              "why": "DT1 is where the coupling meets the inner loop, a degree-3 node; d0 is resting there when d1 arrives."},
-     "pass": {"program": [rec("init", {"d1": "DT0"}), rec("move", "d1", "DT0", "DT1")],
-              "why": "one ion at the junction."}},
+     "device": GRID3,
+     "fail": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_0v"}),
+                          rec("simd", "shuttle", [["d0", "T0_1h", "T1_1h", GRID3_ROW], ["d1", "T1_0v", "T1_1v", GRID3_COLUMN]])],
+              "why": "in one cycle d0 crosses the X-junction J1_1 along its row and d1 crosses it along its column: "
+                     "two ions in J1_1 at once. Two different motions in one cycle also break R22."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_0v"}),
+                          rec("shuttle", "d0", ["T0_1h", "J1_1", "T1_1h"]), rec("shuttle", "d1", ["T1_0v", "J1_1", "T1_1v"])],
+              "why": "the same two crossings, one cycle after the other: one ion in J1_1 at a time."}},
     {"id": "R3", "checks": "no segment carries more ions in one cycle than its capacity (1 on every shipped device).",
      "device": RACE,
      "fail": {"program": [rec("init", {"d0": "S1", "d1": "S1"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S1", "S2"]])],
@@ -280,12 +350,14 @@ RULES: list[dict] = [
      "fail": {"ir": _r4b_ir, "why": "one cycle that both shuttles d0 and fires a CX. The language has no statement for this: only the IR can write it, and R4b is what refuses it."},
      "pass": {"program": [rec("init", {"d0": "C0", "d1": "C0"}), rec("cool"), rec("move", "d0", "C0", "C1"), rec("move", "d0", "C1", "C0"), rec("gate", "CX", [["d0", "d1"]])],
               "why": "transport and the gate as separate cycles, which is all the language can say."}},
-    {"id": "R5", "checks": "no two ions exchange positions along one segment in one cycle.",
+    {"id": "R5", "checks": "no two ions travel one segment in opposite directions in one cycle: on the segment's single line they would have to pass through each other.",
      "device": CHAIN,
      "fail": {"program": [rec("init", {"d0": "C1", "d1": "C2"}), rec("simd", "shuttle", [["d0", "C1", "C2"], ["d1", "C2", "C1"]])],
-              "why": "d0 and d1 swap across the C1–C2 segment. An exchange also breaks R3 and the channel clause of R4: one segment, two ions, two directions, one waveform."},
+              "why": "d0 and d1 set off from the two ends of the C1–C2 segment in the same cycle, so they would meet head-on on it. An exchange also breaks R3 and the channel clause of R4: one segment, two ions, two directions, one waveform."},
      "pass": {"program": [rec("init", {"d0": "C1", "d1": "C2"}), rec("move", "d0", "C1", "C2"), rec("move", "d1", "C2", "C1")],
-              "why": "the same swap in two cycles, resting together at C2 in between."}},
+              "why": "the same exchange in two cycles: d0 joins d1 in the trap C2, and d1 leaves it in the next cycle. "
+                     "Inside the trap the two ions may trade places (on hardware an ion swap, which rotates the "
+                     "two-ion crystal); R5 is only about the rail between traps."}},
     {"id": "R6", "checks": "gates, measurement and cooling happen only in a site whose zone type has that capability, at the site the replay says the ion is in.",
      "device": DUAL,
      "fail": {"program": [rec("init", {"d0": "DT0", "d1": "DT0"}), rec("cool"), rec("gate", "CX", [["d0", "d1"]])],
@@ -378,13 +450,14 @@ RULES: list[dict] = [
               "why": "T0_0v → J0_1 → T0_1h transits J0_1, where three wires meet: a junction_cross charged at degree 3.", "expect": "any", "tag": "junction"},
      "pass": {"program": [rec("init", {"d0": "T0_0v"}), rec("shuttle", "d0", GRID_BEND)],
               "why": "T0_0v → J0_0 → T0_0h transits the corner J0_0, where only two wires meet: a bend, priced as plain transport.", "tag": "bend"}},
-    {"id": "R19", "checks": "no node joins more rails than budget.max_junction_degree (4 unless the document says otherwise): a 2D surface trap has T- and X-junctions and nothing denser.",
-     "device": CROSS4,
+    {"id": "R19", "checks": "no node joins more rails than budget.max_junction_degree (6 unless the document declares fewer; a surface trap declares 4).",
+     "device": HEX6,
      "note": "R19 is judged from the drawing, before any programme runs; the two examples are two devices, each shown with one resting ion.",
-     "fail": {"device": STAR5, "program": [rec("init", {"d0": "N"})],
-              "why": "J joins five rails. Where a fifth rail would go there is no room for its RF electrodes on a plane."},
-     "pass": {"device": CROSS4, "program": [rec("init", {"d0": "N"})],
-              "why": "J joins four rails at right angles: an X-junction."}},
+     "fail": {"device": STAR7, "program": [rec("init", {"d0": "P0"})],
+              "why": "J joins seven rails, one more than the limit. (Seven rails cannot all be 60 degrees apart, so R20 fails too.)"},
+     "pass": {"device": HEX6, "program": [rec("init", {"d0": "P0"})],
+              "why": "J joins six rails, 60 degrees apart: the most a junction may join. The device prices no "
+                     "crossing of a degree-6 junction, so R11 still refuses it until one is declared."}},
     {"id": "R20", "checks": "at every node with two or more rails, any two of them subtend at least budget.min_rail_angle_deg (60 degrees unless the document says otherwise), measured from the node positions.",
      "device": FORK90,
      "note": "60 degrees is the default the reviewers proposed as an example; a real junction is usually symmetric, so 90 degrees for an X. A document may declare its own minimum.",

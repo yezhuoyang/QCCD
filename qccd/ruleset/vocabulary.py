@@ -218,10 +218,10 @@ def _cross(ctx: Ctx, r1, r2):
 
 
 @term("max_junction_degree()", "a number", "The most rails a junction of this device may join, "
-      "as its document declares (4 when it says nothing: a surface trap has T- and "
-      "X-junctions).", "hardware", kinds=("programme",))
+      "as its document declares (6 when it says nothing: a junction of a trap built in more "
+      "than one layer joins up to six).", "hardware", kinds=("programme",))
 def _max_junction_degree(ctx: Ctx):
-    return ctx.hw.numbers.get("max_junction_degree", 4)
+    return ctx.hw.numbers.get("max_junction_degree", 6)
 
 
 @term("min_rail_angle()", "degrees", "The smallest angle two rails meeting at a node may make, as "

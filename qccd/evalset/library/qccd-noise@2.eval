@@ -64,10 +64,10 @@ channel ms "The two-ion gate"
                  ms_chain = ms_error(gate_heat(g), gate_length(g)) - ms_error(gate_heat(g), 2)
 
 channel gate_1q "A one-ion pulse"
-  about "Every pulse R, and every abstract one-qubit Clifford, fails with the device's one-qubit infidelity. The frame change VZ is a phase update, not a pulse: it costs time, never this."
+  about "Every pulse R, and every abstract one-qubit Clifford, fails with the device's one-qubit infidelity. A Z rotation VZ fails as three pulses do: the beams of a QCCD machine are shared, so a Z cannot be a frame update and is turned by three one-ion pulses, which is also the time the clock charges it."
   source "arXiv:2511.05465 Table II"
-  after g in single_qubit_gates where gate(g) != "VZ" and gate(g) != "I":
-    DEPOLARIZE1(min(3 / 4, scale * (1 - primitive("1q_gate", "fidelity")))) on ions(g)
+  after g in single_qubit_gates where gate(g) != "I":
+    DEPOLARIZE1(min(3 / 4, scale * (1 - pow(primitive("1q_gate", "fidelity"), if gate(g) = "VZ" then 3 else 1)))) on ions(g)
 
 channel reset "A wrong reset"
   about "A reset leaves its ion in |1> instead of |0> with the device's reset error."

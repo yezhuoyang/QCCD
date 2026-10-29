@@ -110,7 +110,7 @@ RULE_STATEMENTS: Mapping[str, str] = {
     "R16": "2Q gate error is a function of accumulated n-bar at gate time",
     "R17": "anomalous heating accrues with elapsed time whether or not an ion moves",
     "R18": "a node is a junction only if three or more trap axes meet at it",
-    "R19": "a junction joins at most max_junction_degree rails (4 on a 2D surface trap)",
+    "R19": "a junction joins at most max_junction_degree rails (6 unless the document declares fewer)",
     "R20": "two rails meeting at a node subtend at least min_rail_angle_deg (60 degrees)",
     "R21": "rails are planar: a rail meets only the nodes it ends at, and rails cross only at a shared node",
     "R22": "one transport cycle is one waveform: every moving ion performs the same motion; a site may only opt out",
@@ -888,8 +888,10 @@ def architecture_violations(arch: Architecture) -> list[Violation]:
 
 # ---------------------------------------------------------------- R19-R21: geometry
 
-#: The limits a document may declare in `budget`; these are the surface-trap defaults.
-DEFAULT_MAX_JUNCTION_DEGREE = 4
+#: The limits a document may declare in `budget`, and the defaults: a junction of up to six rails
+#: (a trap built in more than one layer has them; collaborators' review, October 2026) and
+#: 60 degrees between rails.
+DEFAULT_MAX_JUNCTION_DEGREE = 6
 DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0
 #: Coincidence tolerance for R21, in lattice units.  Positions are declared numbers, so
 #: a rail is "through" a node when the node is within this distance of the rail's axis.
@@ -903,7 +905,7 @@ R20_TOL_DEG = 1e-3
 
 def geometry_limits(arch: Architecture) -> tuple[int, float]:
     """`(max_junction_degree, min_rail_angle_deg)` from the document's `budget`, else the
-    surface-trap defaults (4 rails at a junction, 60 degrees between rails)."""
+    defaults (6 rails at a junction, 60 degrees between rails)."""
     b = arch.budget or {}
     return (int(b.get("max_junction_degree", DEFAULT_MAX_JUNCTION_DEGREE)),
             float(b.get("min_rail_angle_deg", DEFAULT_MIN_RAIL_ANGLE_DEG)))
@@ -958,7 +960,7 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
     positions alone.  These need no programme and no technology; they say whether the
     drawing is a surface trap at all.
 
-    R19  no node has more rails than `budget.max_junction_degree` (default 4)
+    R19  no node has more rails than `budget.max_junction_degree` (default 6)
     R20  at every node with two or more rails, any two of them subtend at least
          `budget.min_rail_angle_deg` (default 60)
     R21  rails are planar: no rail passes through a node it does not end at, and no

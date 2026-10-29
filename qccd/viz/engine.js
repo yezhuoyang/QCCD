@@ -3592,12 +3592,12 @@ function architectureViolations(st) {
 // would still agree -- but a different PAIRING would not, and `(segs[i], segs[j])` is
 // printed in the message.
 var RAIL_EPS = 1e-6;
-var DEFAULT_MAX_JUNCTION_DEGREE = 4;
+var DEFAULT_MAX_JUNCTION_DEGREE = 6;
 var DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0;
 //: `math.degrees(x)` is `x * radToDeg` with the constant folded once, not `x * 180 / pi`.
 var RAD_TO_DEG = 180.0 / Math.PI;
 
-// `geometry_limits`: the document's own numbers, else the surface-trap defaults.
+// `geometry_limits`: the document's own numbers, else the defaults (6 rails, 60 degrees).
 function geometryLimits(st) {
   var b = (st && st.budget) || {};
   return {

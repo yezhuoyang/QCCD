@@ -39,8 +39,8 @@ rule R24 "Every two-qubit gate of the circuit is performed, and no other" core
 # ---------------------------------------------------------------- transport
 
 rule R2 "A junction holds one ion at a time"
-  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through."
-  source "deck_v3; arXiv:2510.23519"
+  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses."
+  source "deck_v3; arXiv:2510.23519; arXiv:2206.11888"
   for all j in junctions, t in instants:
     occupancy(j, t) <= 1
 
@@ -66,8 +66,8 @@ rule R4b "A step either moves ions or gates them, never both"
   for all k in steps where is_transport(k):
     mode(k) in {"intra", "inter"} and not carries_gates(k)
 
-rule R5 "No two ions swap places along one rail in one step"
-  about "Two ions cannot pass each other on a rail."
+rule R5 "No two ions pass each other on a rail in one step"
+  about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it."
   source "deck_v3"
   for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b):
     not (from(a) = to(b) and to(a) = from(b))
@@ -145,7 +145,7 @@ rule R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
 # ---------------------------------------------------------------- heat
 
 rule R7 "A two-ion gate starts with cool enough ions"
-  about "Both ions' motional energy at the start of a two-qubit gate is within the device's budget; a cooling operation must come first otherwise."
+  about "Both ions' motional energy at the start of a two-qubit gate is within the device's budget; a cooling operation must come first otherwise. Below the budget the heat is not ignored: it is priced into the gate's error (R16, and the noise model behind every logical error rate). The budget is a hard limit because that error law describes the gate only while the ions stay in the Lamb-Dicke regime; a hotter gate is refused, not priced. A device that declares no budget leaves only the price."
   source "deck_v3; arXiv:2511.15910"
   for all g in two_qubit_gates, i in ions(g):
     heat(i, start(g)) <= heat_budget()
@@ -188,8 +188,8 @@ rule R18 "A junction is where three or more rails meet"
   for all n in nodes: (n in junctions) = (degree(n) >= 3)
 
 rule R19 "A junction joins at most max_junction_degree() rails"
-  about "A surface trap has T- and X-junctions and nothing denser, unless the device declares otherwise."
-  source "collaborator review 2026-09; arXiv:2201.12579"
+  about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the device declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails also needs a crossing time for that degree in the device's timing table (R11)."
+  source "collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579"
   for all n in nodes: degree(n) <= max_junction_degree()
 
 rule R20 "Rails meet at a wide enough angle"

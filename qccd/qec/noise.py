@@ -245,6 +245,10 @@ class NoiseModel:
     #: the time it is not being operated on, and coherently over each idle stretch.
     per_ion_memory = False
 
+    def p_vz(self, params: Mapping) -> float:
+        """The error of a frame change VZ: none under `@1` (its time reaches the idle channel)."""
+        return 0.0
+
     def memory_linear(self, params: Mapping, dt_us: float) -> float:
         return 0.0
 
@@ -306,6 +310,8 @@ def _channels_2() -> tuple[dict[str, str], ...]:
                        f"({COOLING_NBAR_FLOOR}, so no gate is ever at n̄ = 0)")
     heat["source"] = (heat["source"] + ", at the \"quantinuum\" table; the cooling floor from "
                       "arXiv:2206.11888 (Fig. 3's Ba-Yb experiment)")
+    keep["gate_1q"]["formula"] = ("1 − F₁, and 1 − F₁³ for a Z rotation VZ: the beams are shared, so a "
+                                  "Z is turned by three pulses, as the clock charges it")
     return (
         keep["ms_base"], heat, keep["ms_chain"], keep["gate_1q"], keep["measure"], keep["reset"],
         {
@@ -372,6 +378,11 @@ class NoiseModel2(NoiseModel):
     crosstalk_reset: float = CROSSTALK_RESET
 
     per_ion_memory = True
+
+    def p_vz(self, params: Mapping) -> float:
+        """A Z rotation fails as the three one-ion pulses that turn it (`CostModel.Z_AS_PULSES`):
+        the beams are shared, so there is no frame update, and the clock charges three pulses."""
+        return min(CAPS["DEPOLARIZE1"], self.scale * (1.0 - (1.0 - params["p1"]) ** 3))
 
     def resolve(self, arch) -> dict[str, Any]:
         # the operating-point policy falls back to another table's points when its own has none,

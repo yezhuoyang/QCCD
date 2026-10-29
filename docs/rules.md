@@ -47,7 +47,7 @@ a check.
 | R16 | checked when the model models heating | gate error evaluated from the carried `n̄`, not a constant |
 | R17 | checked when the model models time | anomalous heating accrued per elapsed µs |
 | R18 | by construction | junction cost charged by the degree the expanded graph reports |
-| R19 | checked | no node joins more rails than `budget.max_junction_degree` (default 4: a 2D surface trap has T- and X-junctions and nothing denser; a 3D trap may declare 6) |
+| R19 | checked | no node joins more rails than `budget.max_junction_degree` (default 6: a trap built in more than one layer has junctions of up to six rails; a 2D surface trap declares 4) |
 | R20 | checked | at every node with two or more rails, any two of them subtend at least `budget.min_rail_angle_deg` (default 60°; a symmetric X-junction is 90°) |
 | R21 | checked | rails are planar: a rail passes through no node it does not end at, and two rails cross only at a node they share -- the drawing must be a surface trap |
 | R22 | checked | one transport cycle is one waveform: every ion that moves in a `simd` cycle has the same motion signature (class, and hop by hop the same path direction, spur direction or lab-frame axis); a site may opt out, never do something else. Skipped only when `control.model` is `direct` |
