@@ -121,7 +121,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4313337,
+  "bytes": 4313360,
   "r10": true,
   "over_budget": [],
   "sites": 168,
@@ -239,7 +239,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2284149,
+  "bytes": 2284172,
   "r10": true,
   "over_budget": [],
   "sites": 168,
@@ -365,7 +365,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2369838,
+  "bytes": 2369861,
   "r10": true,
   "over_budget": [],
   "sites": 216,
@@ -483,7 +483,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2356090,
+  "bytes": 2356113,
   "r10": true,
   "over_budget": [],
   "sites": 240,
@@ -615,7 +615,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2400636,
+  "bytes": 2400659,
   "r10": true,
   "over_budget": [],
   "sites": 324,
@@ -746,7 +746,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2441867,
+  "bytes": 2441890,
   "r10": true,
   "over_budget": [],
   "sites": 396,
@@ -865,7 +865,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2475953,
+  "bytes": 2475976,
   "r10": true,
   "over_budget": [],
   "sites": 432,
@@ -987,7 +987,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2374534,
+  "bytes": 2374557,
   "r10": true,
   "over_budget": [],
   "sites": 432,
@@ -1096,7 +1096,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3062931,
+  "bytes": 3062954,
   "r10": true,
   "over_budget": [
    "dacs 12480 > max_dacs 128"
@@ -1207,7 +1207,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2938812,
+  "bytes": 2938835,
   "r10": true,
   "over_budget": [
    "dacs 8800 > max_dacs 128"
@@ -1318,7 +1318,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2939881,
+  "bytes": 2939904,
   "r10": true,
   "over_budget": [
    "dacs 8800 > max_dacs 128"
@@ -1416,7 +1416,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3483672,
+  "bytes": 3483695,
   "r10": true,
   "over_budget": [],
   "sites": 312,
@@ -1572,7 +1572,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 2778849,
+  "bytes": 2778872,
   "r10": true,
   "over_budget": [],
   "sites": 288,
@@ -1596,7 +1596,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1767979,
+  "bytes": 1768002,
   "r10": null,
   "over_budget": [
    "dacs 272 > max_dacs 128"
@@ -1622,7 +1622,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1904027,
+  "bytes": 1904050,
   "r10": null,
   "over_budget": [
    "dacs 512 > max_dacs 128"
@@ -1648,7 +1648,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1835108,
+  "bytes": 1835131,
   "r10": null,
   "over_budget": [
    "dacs 9600 > max_dacs 128"
@@ -1674,7 +1674,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1917671,
+  "bytes": 1917694,
   "r10": null,
   "over_budget": [],
   "sites": 480,
@@ -1698,7 +1698,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1972685,
+  "bytes": 1972708,
   "r10": null,
   "over_budget": [],
   "sites": 576,
@@ -1722,7 +1722,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1752861,
+  "bytes": 1752884,
   "r10": null,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
@@ -1831,7 +1831,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3095661,
+  "bytes": 3095684,
   "r10": true,
   "over_budget": [
    "dacs 11520 > max_dacs 128"
@@ -1940,7 +1940,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3105246,
+  "bytes": 3105269,
   "r10": true,
   "over_budget": [
    "dacs 11520 > max_dacs 128"
@@ -2038,7 +2038,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3196711,
+  "bytes": 3196734,
   "r10": true,
   "over_budget": [
    "dacs 10560 > max_dacs 128"
@@ -2136,7 +2136,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3425224,
+  "bytes": 3425247,
   "r10": true,
   "over_budget": [
    "dacs 10560 > max_dacs 128"
@@ -2234,7 +2234,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3598612,
+  "bytes": 3598635,
   "r10": true,
   "over_budget": [
    "dacs 11040 > max_dacs 128"
@@ -2343,7 +2343,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3374541,
+  "bytes": 3374564,
   "r10": true,
   "over_budget": [
    "dacs 11520 > max_dacs 128",
@@ -2444,7 +2444,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3722849,
+  "bytes": 3722872,
   "r10": true,
   "over_budget": [
    "dacs 11520 > max_dacs 128"
@@ -2544,7 +2544,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3689314,
+  "bytes": 3689337,
   "r10": true,
   "over_budget": [
    "dacs 11520 > max_dacs 128"
@@ -2578,7 +2578,7 @@
     "step": 1,
     "id": 0,
     "label": "R19 fails on this device / R20 fails on this device / R21 fails on this device",
-    "note": "node C0 has degree 7, but a junction on this device may join at most 4 rails (budget.max_junction_degree)  ALSO: rails K0_1.a and K0_2.a meet at C0 at 4.5 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K0_1.b (K0_1-D1) and K4_0.b (K4_0-D0) cross without a junction; rails may only cross at a node they share",
+    "note": "node C0 has degree 7, but a junction on this device may join at most 6 rails (budget.max_junction_degree)  ALSO: rails K0_1.a and K0_2.a meet at C0 at 4.5 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K0_1.b (K0_1-D1) and K4_0.b (K4_0-D0) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -2654,7 +2654,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 5055173,
+  "bytes": 5055196,
   "r10": true,
   "over_budget": [
    "dacs 46080 > max_dacs 128",
@@ -2685,7 +2685,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 2325655,
+  "bytes": 2325678,
   "r10": null,
   "over_budget": [
    "dacs 15160 > max_dacs 128"

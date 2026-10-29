@@ -57,7 +57,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1677259,
+  "bytes": 1677282,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -121,7 +121,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1738853,
+  "bytes": 1738876,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -187,7 +187,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1803223,
+  "bytes": 1803246,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -253,7 +253,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1808733,
+  "bytes": 1808756,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -325,7 +325,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1742156,
+  "bytes": 1742179,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -410,7 +410,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1726960,
+  "bytes": 1726983,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -456,19 +456,18 @@
   "page": "07_tanner.html",
   "instructions": 126,
   "rules_failed": [
-   "R19",
    "R20",
    "R21"
   ],
-  "rules_passed": 22,
+  "rules_passed": 23,
   "disqualified": true,
   "marks": [
    {
     "frame": 0,
     "step": 1,
     "id": 0,
-    "label": "R19 fails on this device / R20 fails on this device / R21 fails on this device",
-    "note": "node C10 has degree 5, but a junction on this device may join at most 4 rails (budget.max_junction_degree)  ALSO: rails K10_3.a and K10_4.a meet at C10 at 2.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K10_3.a (C10-K10_3) and K11_0.a (C11-K11_0) cross without a junction; rails may only cross at a node they share",
+    "label": "R20 fails on this device / R21 fails on this device",
+    "note": "rails K10_3.a and K10_4.a meet at C10 at 2.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K10_3.a (C10-K10_3) and K11_0.a (C11-K11_0) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -488,7 +487,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1787203,
+  "bytes": 1787073,
   "over_budget": [
    "dacs 1640 > max_dacs 128"
   ],
@@ -562,7 +561,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1731931,
+  "bytes": 1731954,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -634,7 +633,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1866763,
+  "bytes": 1866786,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -698,7 +697,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1770655,
+  "bytes": 1770678,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -764,7 +763,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1815142,
+  "bytes": 1815165,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -836,7 +835,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1741157,
+  "bytes": 1741180,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -900,7 +899,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1878186,
+  "bytes": 1878209,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -972,7 +971,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1728630,
+  "bytes": 1728653,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -998,7 +997,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1663930,
+  "bytes": 1663953,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"

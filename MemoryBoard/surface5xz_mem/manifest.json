@@ -4,7 +4,7 @@
   "family": "lattice",
   "title": "Surface code memory, distance 5, both bases on grid9x9 \u2014 the board's starter (grid: a 9, b 9)",
   "arch": "MemoryBoard/surface5xz_mem/grid9x9.arch.json",
-  "claim": "the design a new workspace starts from on this board. LER per round 5.23e-05, 95% interval 4.7e-05 to 5.8e-05 (400 errors in 1,530,000 shots)",
+  "claim": "the design a new workspace starts from on this board. LER per round 5.37e-05, 95% interval 4.9e-05 to 5.9e-05 (400 errors in 1,490,000 shots)",
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": true,
@@ -13,6 +13,7 @@
   "qasm": "MemoryBoard/surface5xz_mem/work/grid9x9/circuit.qasm",
   "numbers": {
    "T_quantinuum": 598.402,
+   "p_eff_vs_threshold": 0.138,
    "ions_per_instruction": 2.29,
    "transport_instructions": 1525,
    "us_per_ion": 164.59,
@@ -28,15 +29,15 @@
     "overlap": 0,
     "dc_pairs_per_site": 144
    },
-   "ler_round_1e4": 0.5229,
-   "ler_round_lo_1e4": 0.4741,
-   "ler_round_hi_1e4": 0.5767,
-   "ler_shot_1e4": 2.6144,
-   "ler_per_round": 5.22930505396646e-05,
-   "ler": 0.00026143790849673205,
-   "shots": 1530000,
+   "ler_round_1e4": 0.537,
+   "ler_round_lo_1e4": 0.4869,
+   "ler_round_hi_1e4": 0.5922,
+   "ler_shot_1e4": 2.6846,
+   "ler_per_round": 5.369704160274047e-05,
+   "ler": 0.00026845637583892615,
+   "shots": 1490000,
    "errors": 400,
-   "noise_total": 1.5763,
+   "noise_total": 1.59617,
    "noise_ms": 0.67,
    "noise_heating": 0.038,
    "noise_chain": 0.0,
@@ -82,23 +83,23 @@
     "kind": "note"
    }
   ],
-  "bytes": 4568459,
+  "bytes": 4578748,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
   "loops": 0,
   "ler": {
-   "ler": 0.00026143790849673205,
-   "lo": 0.0002370448553000813,
-   "hi": 0.0002883403999776123,
-   "shots": 1530000,
+   "ler": 0.00026845637583892615,
+   "lo": 0.00024340855139329116,
+   "hi": 0.0002960809696764502,
+   "shots": 1490000,
    "errors": 400,
-   "per_round": 5.22930505396646e-05,
-   "per_round_lo": 4.7413466920498415e-05,
-   "per_round_hi": 5.767473236129028e-05,
+   "per_round": 5.369704160274047e-05,
+   "per_round_lo": 4.868645078881517e-05,
+   "per_round_hi": 5.922320829665484e-05,
    "rounds": 5,
    "decoder": "pymatching",
-   "seconds": 2.836,
+   "seconds": 3.162,
    "seed": 20261021,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -107,14 +108,14 @@
    "ms_base": 0.6319999999999659,
    "ms_heating": 0.03799999999999958,
    "ms_chain": 0.0,
-   "gate_1q": 0.0866250000001828,
+   "gate_1q": 0.1064995031293614,
    "measure": 0.00029000000000833914,
-   "reset": 0.145,
+   "reset": 0.14500000000000007,
    "memory": 0.4619870703999951,
    "memory_coherent": 0.08600926457685128,
    "crosstalk": 0.03213,
    "crosstalk_global": 0.09425387234042555,
-   "total": 1.5762952073174286
+   "total": 1.5961697104466073
   }
  },
  {
@@ -122,7 +123,7 @@
   "family": "lattice",
   "title": "Surface code memory, distance 5, both bases on deck_unit_cell \u2014 the same lattice, broadcast-wired",
   "arch": "MemoryBoard/surface5xz_mem/deck_unit_cell.arch.json",
-  "claim": "grid9x9 with the 32-channel WISE control block. LER per round 5.23e-05, 95% interval 4.7e-05 to 5.8e-05 (400 errors in 1,530,000 shots)",
+  "claim": "grid9x9 with the 32-channel WISE control block. LER per round 5.37e-05, 95% interval 4.9e-05 to 5.9e-05 (400 errors in 1,490,000 shots)",
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
@@ -131,6 +132,7 @@
   "qasm": "MemoryBoard/surface5xz_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
    "T_quantinuum": 598.402,
+   "p_eff_vs_threshold": 0.138,
    "ions_per_instruction": 2.29,
    "transport_instructions": 1525,
    "us_per_ion": 164.59,
@@ -146,15 +148,15 @@
     "overlap": 0,
     "dc_pairs_per_site": 144
    },
-   "ler_round_1e4": 0.5229,
-   "ler_round_lo_1e4": 0.4741,
-   "ler_round_hi_1e4": 0.5767,
-   "ler_shot_1e4": 2.6144,
-   "ler_per_round": 5.22930505396646e-05,
-   "ler": 0.00026143790849673205,
-   "shots": 1530000,
+   "ler_round_1e4": 0.537,
+   "ler_round_lo_1e4": 0.4869,
+   "ler_round_hi_1e4": 0.5922,
+   "ler_shot_1e4": 2.6846,
+   "ler_per_round": 5.369704160274047e-05,
+   "ler": 0.00026845637583892615,
+   "shots": 1490000,
    "errors": 400,
-   "noise_total": 1.5763,
+   "noise_total": 1.59617,
    "noise_ms": 0.67,
    "noise_heating": 0.038,
    "noise_chain": 0.0,
@@ -200,23 +202,23 @@
     "kind": "note"
    }
   ],
-  "bytes": 4567031,
+  "bytes": 4577332,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
   "loops": 0,
   "ler": {
-   "ler": 0.00026143790849673205,
-   "lo": 0.0002370448553000813,
-   "hi": 0.0002883403999776123,
-   "shots": 1530000,
+   "ler": 0.00026845637583892615,
+   "lo": 0.00024340855139329116,
+   "hi": 0.0002960809696764502,
+   "shots": 1490000,
    "errors": 400,
-   "per_round": 5.22930505396646e-05,
-   "per_round_lo": 4.7413466920498415e-05,
-   "per_round_hi": 5.767473236129028e-05,
+   "per_round": 5.369704160274047e-05,
+   "per_round_lo": 4.868645078881517e-05,
+   "per_round_hi": 5.922320829665484e-05,
    "rounds": 5,
    "decoder": "pymatching",
-   "seconds": 2.282,
+   "seconds": 3.342,
    "seed": 20261021,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -225,14 +227,14 @@
    "ms_base": 0.6319999999999659,
    "ms_heating": 0.03799999999999958,
    "ms_chain": 0.0,
-   "gate_1q": 0.0866250000001828,
+   "gate_1q": 0.1064995031293614,
    "measure": 0.00029000000000833914,
-   "reset": 0.145,
+   "reset": 0.14500000000000007,
    "memory": 0.4619870703999951,
    "memory_coherent": 0.08600926457685128,
    "crosstalk": 0.03213,
    "crosstalk_global": 0.09425387234042555,
-   "total": 1.5762952073174286
+   "total": 1.5961697104466073
   }
  },
  {
@@ -240,7 +242,7 @@
   "family": "junction-free loop",
   "title": "Surface code memory, distance 5, both bases on cyclone_base \u2014 a loop with no junctions",
   "arch": "MemoryBoard/surface5xz_mem/cyclone_base.arch.json",
-  "claim": "Cyclone's base: rotation on a loop without spurs. LER per round 6.48e-05, 95% interval 5.9e-05 to 7.2e-05 (402 errors in 1,240,000 shots)",
+  "claim": "Cyclone's base: rotation on a loop without spurs. LER per round 6.32e-05, 95% interval 5.7e-05 to 7.0e-05 (401 errors in 1,270,000 shots)",
   "kicker": "SURFACE-5 X+Z MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
@@ -249,6 +251,7 @@
   "qasm": "MemoryBoard/surface5xz_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
    "T_quantinuum": 695.786,
+   "p_eff_vs_threshold": 0.147,
    "ions_per_instruction": 4.69,
    "transport_instructions": 2193,
    "us_per_ion": 65.85,
@@ -264,15 +267,15 @@
     "overlap": 0,
     "dc_pairs_per_site": 8
    },
-   "ler_round_1e4": 0.6485,
-   "ler_round_lo_1e4": 0.5881,
-   "ler_round_hi_1e4": 0.715,
-   "ler_shot_1e4": 3.2419,
-   "ler_per_round": 6.484711942988941e-05,
-   "ler": 0.00032419354838709676,
-   "shots": 1240000,
-   "errors": 402,
-   "noise_total": 1.70997,
+   "ler_round_1e4": 0.6316,
+   "ler_round_lo_1e4": 0.5727,
+   "ler_round_hi_1e4": 0.6965,
+   "ler_shot_1e4": 3.1575,
+   "ler_per_round": 6.315758355612822e-05,
+   "ler": 0.000315748031496063,
+   "shots": 1270000,
+   "errors": 401,
+   "noise_total": 1.72985,
    "noise_ms": 0.67,
    "noise_heating": 0.038,
    "noise_chain": 0.0,
@@ -318,23 +321,23 @@
     "kind": "note"
    }
   ],
-  "bytes": 4955600,
+  "bytes": 4965901,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
   "loops": 1,
   "ler": {
-   "ler": 0.00032419354838709676,
-   "lo": 0.0002940176575127887,
-   "hi": 0.00035746537166097354,
-   "shots": 1240000,
-   "errors": 402,
-   "per_round": 6.484711942988941e-05,
-   "per_round_lo": 5.881044843347727e-05,
-   "per_round_hi": 7.150329904459518e-05,
+   "ler": 0.000315748031496063,
+   "lo": 0.0002863233074625822,
+   "hi": 0.00034819560698026296,
+   "shots": 1270000,
+   "errors": 401,
+   "per_round": 6.315758355612822e-05,
+   "per_round_lo": 5.727122110232852e-05,
+   "per_round_hi": 6.964882263738037e-05,
    "rounds": 5,
    "decoder": "pymatching",
-   "seconds": 2.048,
+   "seconds": 3.096,
    "seed": 20261021,
    "stim_version": "1.15.0",
    "stopped": "max_errors"
@@ -343,14 +346,14 @@
    "ms_base": 0.6319999999999659,
    "ms_heating": 0.03799999999999958,
    "ms_chain": 0.0,
-   "gate_1q": 0.0866250000001828,
+   "gate_1q": 0.1064995031293614,
    "measure": 0.00029000000000833914,
-   "reset": 0.145,
+   "reset": 0.14500000000000007,
    "memory": 0.5373817631999865,
    "memory_coherent": 0.11070770857975906,
    "crosstalk": 0.0756,
    "crosstalk_global": 0.0843661063829787,
-   "total": 1.709970578162881
+   "total": 1.7298450812920596
   }
  },
  {
@@ -374,7 +377,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1727334,
+  "bytes": 1726276,
   "r10": null,
   "over_budget": [],
   "sites": 168,
@@ -402,7 +405,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1654308,
+  "bytes": 1653306,
   "r10": null,
   "over_budget": [],
   "sites": 40,
@@ -430,7 +433,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1716122,
+  "bytes": 1715120,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -458,7 +461,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1804700,
+  "bytes": 1803698,
   "r10": null,
   "over_budget": [],
   "sites": 288,
@@ -486,7 +489,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1668582,
+  "bytes": 1667580,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -516,7 +519,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1626791,
+  "bytes": 1625789,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -544,7 +547,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1657462,
+  "bytes": 1656448,
   "r10": null,
   "over_budget": [],
   "sites": 32,
@@ -575,7 +578,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1680350,
+  "bytes": 1680396,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
@@ -605,7 +608,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1693547,
+  "bytes": 1693593,
   "r10": null,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
@@ -638,7 +641,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1724137,
+  "bytes": 1706974,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"

@@ -57,7 +57,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1672568,
+  "bytes": 1672591,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -129,7 +129,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1719086,
+  "bytes": 1719109,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -193,7 +193,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1740136,
+  "bytes": 1740159,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -278,7 +278,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1728080,
+  "bytes": 1728103,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -352,7 +352,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1743189,
+  "bytes": 1743212,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -426,7 +426,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1805131,
+  "bytes": 1805154,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -500,7 +500,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1810624,
+  "bytes": 1810647,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -564,7 +564,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1769623,
+  "bytes": 1769646,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -621,8 +621,8 @@
     "frame": 0,
     "step": 1,
     "id": 0,
-    "label": "R19 fails on this device / R20 fails on this device / R21 fails on this device",
-    "note": "node C10 has degree 5, but a junction on this device may join at most 4 rails (budget.max_junction_degree)  ALSO: rails K10_4.a and K10_5.a meet at C10 at 15.0 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K10_3.b (K10_3-D3) and K11_1.a (C11-K11_1) cross without a junction; rails may only cross at a node they share",
+    "label": "R20 fails on this device / R19 fails on this device / R21 fails on this device",
+    "note": "rails K10_4.a and K10_5.a meet at C10 at 15.0 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: node D6 has degree 7, but a junction on this device may join at most 6 rails (budget.max_junction_degree)  ALSO: rails K10_3.b (K10_3-D3) and K11_1.a (C11-K11_1) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -642,7 +642,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1776908,
+  "bytes": 1776928,
   "over_budget": [
    "dacs 1480 > max_dacs 128"
   ],
@@ -716,7 +716,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1745595,
+  "bytes": 1745618,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -788,7 +788,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1852694,
+  "bytes": 1852717,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -860,7 +860,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1723135,
+  "bytes": 1723158,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -932,7 +932,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1878824,
+  "bytes": 1878847,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -996,7 +996,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1872838,
+  "bytes": 1872861,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1022,7 +1022,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1663911,
+  "bytes": 1663934,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"

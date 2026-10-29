@@ -8,6 +8,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "h2_racetrack",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/h2_racetrack/prog",
   "qasm": "MemoryBoard/rep5_mem/work/h2_racetrack/circuit.qasm",
   "numbers": {
@@ -73,7 +74,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1743834,
+  "bytes": 1743857,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -114,6 +115,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_dual_loop",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/cyclone_dual_loop/prog",
   "qasm": "MemoryBoard/rep5_mem/work/cyclone_dual_loop/circuit.qasm",
   "numbers": {
@@ -187,7 +189,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1811616,
+  "bytes": 1811639,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -228,6 +230,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ladder_2x72",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/ladder_2x72/prog",
   "qasm": "MemoryBoard/rep5_mem/work/ladder_2x72/circuit.qasm",
   "numbers": {
@@ -293,7 +296,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1905968,
+  "bytes": 1905991,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -334,6 +337,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/grid9x9/prog",
   "qasm": "MemoryBoard/rep5_mem/work/grid9x9/circuit.qasm",
   "numbers": {
@@ -407,7 +411,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1861629,
+  "bytes": 1861652,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -450,6 +454,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/deck_unit_cell/prog",
   "qasm": "MemoryBoard/rep5_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
@@ -523,7 +528,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1867166,
+  "bytes": 1867189,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -564,6 +569,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "stationary_chain",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/stationary_chain/prog",
   "qasm": "MemoryBoard/rep5_mem/work/stationary_chain/circuit.qasm",
   "numbers": {
@@ -629,7 +635,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1753957,
+  "bytes": 1753980,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -670,6 +676,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid5x5",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/grid5x5/prog",
   "qasm": "MemoryBoard/rep5_mem/work/grid5x5/circuit.qasm",
   "numbers": {
@@ -735,7 +742,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1805075,
+  "bytes": 1805098,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -778,6 +785,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cylinder6x4",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/cylinder6x4/prog",
   "qasm": "MemoryBoard/rep5_mem/work/cylinder6x4/circuit.qasm",
   "numbers": {
@@ -843,7 +851,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1816996,
+  "bytes": 1817019,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -886,6 +894,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring16",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/ring16/prog",
   "qasm": "MemoryBoard/rep5_mem/work/ring16/circuit.qasm",
   "numbers": {
@@ -975,7 +984,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1886134,
+  "bytes": 1886157,
   "over_budget": [],
   "sites": 24,
   "junctions": 8,
@@ -1016,6 +1025,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring24_8",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/ring24_8/prog",
   "qasm": "MemoryBoard/rep5_mem/work/ring24_8/circuit.qasm",
   "numbers": {
@@ -1105,7 +1115,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1891914,
+  "bytes": 1891937,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -1146,6 +1156,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring144_24v",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/ring144_24v/prog",
   "qasm": "MemoryBoard/rep5_mem/work/ring144_24v/circuit.qasm",
   "numbers": {
@@ -1235,7 +1246,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1962631,
+  "bytes": 1962654,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1276,6 +1287,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "chain",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/chain/prog",
   "qasm": "MemoryBoard/rep5_mem/work/chain/circuit.qasm",
   "numbers": {
@@ -1341,7 +1353,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1758989,
+  "bytes": 1759012,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
   ],
@@ -1384,6 +1396,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/cyclone_base/prog",
   "qasm": "MemoryBoard/rep5_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
@@ -1449,7 +1462,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1770881,
+  "bytes": 1770904,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -1490,6 +1503,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "torus4x4",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/torus4x4/prog",
   "qasm": "MemoryBoard/rep5_mem/work/torus4x4/circuit.qasm",
   "numbers": {
@@ -1566,7 +1580,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1788842,
+  "bytes": 1788865,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1609,6 +1623,7 @@
   "kicker": "REP-5 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "random16",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/rep5_mem/work/random16/prog",
   "qasm": "MemoryBoard/rep5_mem/work/random16/circuit.qasm",
   "numbers": {
@@ -1674,7 +1689,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1835297,
+  "bytes": 1835320,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],

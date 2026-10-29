@@ -8,6 +8,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid5x5",
   "answer": true,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/grid5x5/prog",
   "qasm": "MemoryBoard/surface3_mem/work/grid5x5/circuit.qasm",
   "numbers": {
@@ -81,7 +82,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1927066,
+  "bytes": 1927089,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -124,6 +125,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring24_8",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/ring24_8/prog",
   "qasm": "MemoryBoard/surface3_mem/work/ring24_8/circuit.qasm",
   "numbers": {
@@ -221,7 +223,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2083658,
+  "bytes": 2083681,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -262,6 +264,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ladder_2x72",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/ladder_2x72/prog",
   "qasm": "MemoryBoard/surface3_mem/work/ladder_2x72/circuit.qasm",
   "numbers": {
@@ -335,7 +338,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2194292,
+  "bytes": 2194315,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -376,6 +379,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring144_24v",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/ring144_24v/prog",
   "qasm": "MemoryBoard/surface3_mem/work/ring144_24v/circuit.qasm",
   "numbers": {
@@ -473,7 +477,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2164855,
+  "bytes": 2164878,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -514,6 +518,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_base",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/cyclone_base/prog",
   "qasm": "MemoryBoard/surface3_mem/work/cyclone_base/circuit.qasm",
   "numbers": {
@@ -587,7 +592,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1959581,
+  "bytes": 1959604,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -628,6 +633,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "ring16",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/ring16/prog",
   "qasm": "MemoryBoard/surface3_mem/work/ring16/circuit.qasm",
   "numbers": {
@@ -725,7 +731,7 @@
     "kind": "warn"
    }
   ],
-  "bytes": 2009573,
+  "bytes": 2009596,
   "over_budget": [],
   "sites": 24,
   "junctions": 8,
@@ -766,6 +772,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "h2_racetrack",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/h2_racetrack/prog",
   "qasm": "MemoryBoard/surface3_mem/work/h2_racetrack/circuit.qasm",
   "numbers": {
@@ -839,7 +846,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2130572,
+  "bytes": 2130595,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -880,6 +887,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "grid9x9",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/grid9x9/prog",
   "qasm": "MemoryBoard/surface3_mem/work/grid9x9/circuit.qasm",
   "numbers": {
@@ -953,7 +961,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1981446,
+  "bytes": 1981469,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -996,6 +1004,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "deck_unit_cell",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/deck_unit_cell/prog",
   "qasm": "MemoryBoard/surface3_mem/work/deck_unit_cell/circuit.qasm",
   "numbers": {
@@ -1069,7 +1078,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1986935,
+  "bytes": 1986958,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -1110,6 +1119,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cylinder6x4",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/cylinder6x4/prog",
   "qasm": "MemoryBoard/surface3_mem/work/cylinder6x4/circuit.qasm",
   "numbers": {
@@ -1183,7 +1193,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1934111,
+  "bytes": 1934134,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -1226,6 +1236,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "stationary_chain",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/stationary_chain/prog",
   "qasm": "MemoryBoard/surface3_mem/work/stationary_chain/circuit.qasm",
   "numbers": {
@@ -1291,7 +1302,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1905195,
+  "bytes": 1905218,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -1332,6 +1343,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "random16",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/random16/prog",
   "qasm": "MemoryBoard/surface3_mem/work/random16/circuit.qasm",
   "numbers": {
@@ -1397,7 +1409,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1955493,
+  "bytes": 1955516,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1440,6 +1452,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "torus4x4",
   "answer": false,
+  "table": "qccdsim_jones",
   "prefix": "MemoryBoard/surface3_mem/work/torus4x4/prog",
   "qasm": "MemoryBoard/surface3_mem/work/torus4x4/circuit.qasm",
   "numbers": {
@@ -1524,7 +1537,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1911610,
+  "bytes": 1911633,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1567,6 +1580,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "cyclone_dual_loop",
   "answer": false,
+  "table": "qccdsim_jones",
   "refusal": "rotation does not apply: the device has no closed loop with docks / unroutable: q11 cannot reach AB2 from AT0 within 80 cycles / the race track does not apply either: the device has 2 closed loops; this pass drives exactly one",
   "status": "ok",
   "page": "14_cyclone_dual_loop.html",
@@ -1578,7 +1592,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1711587,
+  "bytes": 1711610,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1594,6 +1608,7 @@
   "kicker": "SURFACE-3 MEMORY \u00b7 LOGICAL ERROR RATE",
   "short": "chain",
   "answer": false,
+  "table": "qccdsim_jones",
   "refusal": "unroutable: q0 cannot reach C39 from C27 within 150 cycles / the race track does not apply either: the device has no closed loop",
   "status": "ok",
   "page": "15_chain.html",
@@ -1605,7 +1620,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1664018,
+  "bytes": 1664041,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
