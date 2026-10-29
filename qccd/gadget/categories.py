@@ -91,6 +91,14 @@ CATEGORIES: dict[str, dict] = {
                "X̄ or Z̄ from each -- Z̄_A X̄_B Z̄_C, say -- without reading any of them alone: "
                "the operation a program written in Pauli-product measurements is made of.",
     },
+    "catbench": {
+        "title": "Cat Bench", "place": "Relay", "shape": "dome", "glyph": "CAT",
+        "stroke": "#0f766e", "fill": "#ccfbf1",
+        "job": "Lattice surgery over a whole register: every bench's probes are fused into cat "
+               "states with its neighbours' by links, all pairs at once; each probe then measures "
+               "its own block's X̄ or Z̄ against them, and the parity of all their readings is the "
+               "product.",
+    },
     "factory": {
         "title": "Magic State Factory", "place": "Factory", "shape": "sawtooth", "glyph": "MSF",
         "stroke": "#b91c1c", "fill": "#fee2e2",
@@ -156,7 +164,8 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "cczfactory",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "catbench", "readout", "factory",
+         "cczfactory",
          "rotation",
          "injection",
          "decoder", "archive", "depot", "road", "wire"]

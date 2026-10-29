@@ -331,8 +331,11 @@ def _sign_off_branch(alg: Algorithm, gir: dict, lib, leaves, branch: dict, *,
             outcome_recs[o["instruction"]] = refs_records(o["value"].get("sources"))
             outcome_const[o["instruction"]] = int(o["value"].get("const", 0))
             continue
-        f = _flow(lib, gir, o["event"], o["flow"])
-        recs = [record_of[(o["event"], r)] for r in f["records"]]
+        # (a product measured in parts -- a cat chain -- is the parity of every part's records)
+        recs = []
+        for eid, fl in (o.get("parts") or [(o["event"], o["flow"])]):
+            f = _flow(lib, gir, int(eid), fl)
+            recs += [record_of[(int(eid), r)] for r in f["records"]]
         const = 0
         for block, qx, qz in (o.get("correct") or ()):
             fr = frame_at(block, float(o.get("at", 0.0)))

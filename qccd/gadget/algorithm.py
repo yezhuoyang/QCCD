@@ -10,6 +10,9 @@ one d = 3 surface-code logical qubit.
     zz    q0 q1 -> m           lattice surgery: measure Z̄Z̄ (xx: X̄X̄)         -> a bridge
     ppm   Z q0 X q1 Z q2 -> m  any product of one X̄ or Z̄ from each of 1-4 blocks,
                                  measured by a probe ion (non-destructive)     -> a Pauli-product bench
+                               over more blocks: a cat chain -- a link ion joins the probes of
+                                 one cat bench per block into one cat state, and each probe
+                                 is coupled to its own block and read          -> cat benches + a depot
     prep  q0 Y                 a fresh block in |Ȳ⟩ (S|+⟩ injected; distance 1) -> an injection place
     prep  q0 R4                a fresh block in RZ4|+⟩ = (|0⟩ + e^{iπ/16}|1⟩)/√2 (R4dg: the
                                  inverse): a rotation source's ion, injected  -> rotation + injection
@@ -134,7 +137,8 @@ CONTRACT_ARITY = {"I": 1, "X": 1, "Y": 1, "Z": 1, "H": 1, "S": 1, "Sdg": 1, "SX"
 PRIMITIVES = ("prep", "inject", "autoccz", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz",
               "xx", "ppm", "decode", "read")
 
-#: the most blocks one Pauli-product measurement may name (the bench has three doors)
+#: the most blocks one Pauli-product bench measures (its four doors); a product over more
+#: blocks is measured by a cat chain across cat benches (`qccd.gadget.leaves.catbench`)
 PPM_MAX = 4
 
 #: the rotation states a block can be prepared in: `prep q R<n>` is RZn|+⟩, `R<n>dg` its inverse
@@ -741,9 +745,8 @@ class _Parser:
             alive(args[0])
             ins.blocks = [args[0]]
         elif word == "ppm":
-            if not args or len(args) % 2 or not 1 <= len(args) // 2 <= PPM_MAX:
-                raise AlgorithmError(lineno, raw, f"write: ppm P q [P q ...] with 1 to {PPM_MAX} "
-                                     f"blocks, each P one of X, Z")
+            if not args or len(args) % 2:
+                raise AlgorithmError(lineno, raw, "write: ppm P q [P q ...], each P one of X, Z")
             letters, blks = [a.upper() for a in args[0::2]], args[1::2]
             bad = [p for p in letters if p not in ("X", "Z")]
             if bad:

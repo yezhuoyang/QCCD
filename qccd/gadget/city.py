@@ -76,7 +76,7 @@ from __future__ import annotations
 import heapq
 from dataclasses import dataclass
 
-from .algorithm import Algorithm, Instr, rotation_basis
+from .algorithm import PPM_MAX, Algorithm, Instr, rotation_basis
 from .library import LeafLibrary
 from .model import Library
 from .logic.decode import LATENCY
@@ -533,11 +533,15 @@ class City:
             row["guard"] = dict(guard)
         self.frames.append(row)
 
-    def report(self, path, opname, row, ins, grp, *, blocks=(), outcome=None, correct=()):
+    def report(self, path, opname, row, ins, grp, *, blocks=(), outcome=None, correct=(),
+               parts=None):
         """Send an op's classical output where it goes: the syndrome to the decoder, whose
         frame update lands in the archive, and any logical outcome to the archive.
 
-        `outcome` is `(flow name, parity expression of the frame flip, cvar)`."""
+        `outcome` is `(flow name, parity expression of the frame flip, cvar)`.  `parts`, for a
+        product measured in pieces (a cat chain): `(path, opname, row, flow)` for every bit
+        whose parity it is; each place sends its own bit, and the archive records the
+        product when the last one is in."""
         li = self.leaf[path]
         t_meas = row[1] + self.last_measure_us(li.master.name, opname)
         ports = {p.signal: p for p in li.master.ports if p.kind == "classical"}
@@ -555,15 +559,28 @@ class City:
             res = ports.get("outcome")
             if res is None:
                 raise CityError(f"{li.master.name} has no outcome port to report {flow}")
-            t1, _ = self.message((path, "res"), t_meas, bits=1, signal="outcome", ins=ins,
-                                 grp=grp, label=cvar or flow, event=row[0])
+            if parts:
+                t1, raw = 0.0, ZERO
+                for ppath, pop, prow, pflow in parts:
+                    tm = prow[1] + self.last_measure_us(self.leaf[ppath].master.name, pop)
+                    nb = next((q.bits for q in self.leaf[ppath].master.ports
+                               if q.kind == "classical" and q.signal == "outcome"), 1)
+                    ta, _ = self.message((ppath, "res"), tm, bits=nb, signal="outcome", ins=ins,
+                                         grp=grp, label=f"{cvar or flow}: {pflow}", event=prow[0])
+                    t1, t_meas = max(t1, ta), max(t_meas, tm)
+                    raw = xor(raw, outcome_of(prow[0], pflow))
+            else:
+                t1, _ = self.message((path, "res"), t_meas, bits=1, signal="outcome", ins=ins,
+                                     grp=grp, label=cvar or flow, event=row[0])
+                raw = outcome_of(row[0], flow)
             _, t_rec, rec = self.classical(self.archive, "record", t1, ins, grp)
-            value = xor(outcome_of(row[0], flow), flip)
+            value = xor(raw, flip)
             self.values[(ins, flow)] = value
             self.outcomes.append({"instruction": ins, "event": row, "cvar": cvar,
                                   "flow": flow, "blocks": list(blocks),
                                   "flip": expr_json(flip), "value": expr_json(value),
                                   "correct": [list(c) for c in correct],
+                                  "parts": [(prow, pflow) for _, _, prow, pflow in parts or ()],
                                   "at": round(t_meas, 3),
                                   "recorded": rec[0], "recorded_us": round(t_rec, 3)})
             if cvar:
@@ -1249,8 +1266,116 @@ class City:
                 self.log(f"  instruction {ins.index} refused: {exc}")
         return self.gir()
 
+    def cat_merge(self, ins: Instr, grp: str, t0: float, produced: dict) -> None:
+        """A product of one X̄ or Z̄ from each of many blocks, by cat states (the user's
+        choice, 2026-10-29, for Gidney-Ekera's register-wide merges).
+
+        Every block goes to a cat bench of its own, the nearest free one.  The cats are made in
+        parallel, so the merge takes the same time over any number of blocks: every bench
+        opens its probes in |+> (`cat.open`), and each pair of neighbouring benches is fused by
+        a bundle of its own fresh links -- lent a copy of the left probes' Z (`cat.lend`), read
+        against the right ones' (`cat.check`), then back to a depot.  The probes, once fused,
+        take a controlled-P̄ with their own block and are read in X (`cat.couple.P`); the blocks
+        travel while the cats are made.  The product is the parity of round 0's probe bits
+        (rounds 1 and 2 agree with it unless a fault struck).  A check that read 1 left the
+        probes to its right flipped by an X, which their couplings carried onto their blocks as
+        a P̄: the archive writes it into those blocks' frames, and no one waits for it."""
+        from .leaves.catbench import ROUNDS, check_flow, probe_flow
+        blks, n = list(ins.blocks), len(ins.blocks)
+        if ins.cond is not None:
+            raise CityError("a product by cat states cannot be guarded (its benches have no "
+                            "skip branch)")
+        benches = [p for p in self.leaf if self.family(p) == "catbench"]
+        if n < 2 or len(benches) < n:
+            raise CityError(f"a product over {n} block{'s' if n != 1 else ''} needs "
+                            + ("a Pauli-product bench" if n < 2 else
+                               f"a Pauli-product bench (up to {PPM_MAX} blocks) or {n} cat "
+                               f"benches; the design has {len(benches)}"))
+        sinks = [p for p in self.leaf if self.family(p) == "depot"
+                 and f"dump.{ROUNDS}" in self.leaf[p].master.ops]
+        if not sinks:
+            raise CityError(f"cat states take their links from, and give them back to, a depot "
+                            f"that sends and takes {ROUNDS} ions (depot9x)")
+        bench_of: dict[str, str] = {}
+        for b in blks:
+            bench_of[b] = self._choose("catbench", ins, near=(self.blocks[b].leaf, self.blocks[b].port),
+                                       port="in_a", ready=t0,
+                                       free=lambda p: p not in bench_of.values())
+        # neighbours: each bench next to the nearest one not yet placed, from the first block's
+        left = [bench_of[b] for b in blks]
+        chain = [left.pop(0)]
+        while left:
+            nxt = min(left, key=lambda p: (self._distance((chain[-1], "out_l"), (p, "in_l")), p))
+            left.remove(nxt)
+            chain.append(nxt)
+        # every bench opens, then every left bench lends, then every right bench checks: each
+        # place serves in issue order, so issuing them in this order lets all pairs run at once
+        for B in chain:
+            self.op(B, "cat.open", {}, t0, ins.index, grp)
+        lent = []
+        for k in range(n - 1):
+            L = chain[k]
+            D, g, d = self._load(ROUNDS, (L, "in_l"), t0, ins.index, grp)
+            arr, trip = self.trip(g, (D, "out"), d, (L, "in_l"), t0, ins.index, grp)
+            _, outs, _ = self.op(L, "cat.lend", {"in_l": (g, arr, trip)}, t0, ins.index, grp)
+            lent.append(outs["out_l"])
+        z, t_bits = [], 0.0
+        for k in range(n - 1):
+            L, R = chain[k], chain[k + 1]
+            g, d = lent[k]
+            arr, trip = self.trip(g, (L, "out_l"), d, (R, "in_l"), t0, ins.index, grp)
+            _, outs, row = self.op(R, "cat.check", {"in_l": (g, arr, trip)}, t0, ins.index, grp)
+            z.append(xor(*(outcome_of(row[0], check_flow(r)) for r in range(ROUNDS))))
+            # the parity bits go to the archive, which keeps the flips they mean
+            tm = row[1] + self.last_measure_us(self.leaf[R].master.name, "cat.check")
+            if self.archive:
+                t1, _ = self.message((R, "res"), tm, bits=ROUNDS, signal="outcome", ins=ins.index,
+                                     grp=grp, label=f"cat parity {k}", event=row[0])
+                _, t_rec, _ = self.classical(self.archive, "record", t1, ins.index, grp)
+                t_bits = max(t_bits, t_rec)
+            g, d = outs["out_l"]
+            Dx = self._choose("depot", _ANY, near=(R, "out_l"), port="in", gids=g,
+                              free=lambda p: p in sinks)
+            arr, trip = self.trip(g, (R, "out_l"), d, (Dx, "in"), t0, ins.index, grp)
+            self.op(Dx, f"dump.{ROUNDS}", {"in": (g, arr, trip)}, t0, ins.index, grp)
+        terms = [(b, 1 if p == "X" else 0, 1 if p == "Z" else 0) for b, p in zip(blks, ins.paulis)]
+        flip = self.flip_for(terms)
+        parts, ends = [], {}
+        for b, p in zip(blks, ins.paulis):
+            B = bench_of[b]
+            gids, arr, trip = self.bring(self.blocks[b], (B, "in_a"), t0, ins.index, grp)
+            opname = f"cat.couple.{p}"
+            s, outs, row = self.op(B, opname, {"in_a": (gids, arr, trip)}, t0, ins.index, grp)
+            produced[b] = Bundle(b, outs["out_a"][0], B, "out_a", outs["out_a"][1])
+            parts.append((B, opname, row, probe_flow(0, p)))
+            ends[b] = row[2]
+        last = max(parts, key=lambda x: x[2][1])
+        self.report(last[0], last[1], last[2], ins.index, grp, blocks=blks, correct=terms,
+                    parts=parts,
+                    outcome=(" ".join(f"{p}̄_{b}" for b, p in zip(blks, ins.paulis))
+                             + " measured by cat states", flip, ins.cvar))
+        # the flips the checks left: the bench at place j of the chain is flipped by the parity
+        # of every check to its left, in every round, and its block takes that as a P̄
+        acc = ZERO
+        flipped = {}
+        for j, B in enumerate(chain):
+            flipped[B] = acc
+            if j < n - 1:
+                acc = xor(acc, z[j])
+        for b, p in zip(blks, ins.paulis):
+            x = flipped[bench_of[b]]
+            if x == ZERO:
+                continue
+            self.write_frame(b, max(ends[b], t_bits), ins=ins.index, grp=grp,
+                             dax=x if p == "X" else ZERO, daz=x if p == "Z" else ZERO,
+                             text=f"{p}̄ on {b} where the cat checks to its left read odd",
+                             why="a parity check that reads 1 fuses two cats up to an X on every "
+                                 "probe to its right; the probe's controlled-P̄ carries it onto "
+                                 "the block as P̄, a frame the archive keeps")
+
     def _load(self, k, near_door, t_min, ins, grp):
-        D = self._choose("depot", _ANY, near=near_door, port="out")
+        D = self._choose("depot", _ANY, near=near_door, port="out",
+                         free=lambda p: f"load.{k}" in self.leaf[p].master.ops)
         s, outs, row = self.op(D, f"load.{k}", {}, t_min, ins, grp)
         self.stock[D] += k
         gids, deps = outs["out"]
@@ -1416,6 +1541,9 @@ class City:
             flip = self.flip_for(terms)
             self.report(B, kind, row, ins.index, grp, blocks=[a, b_], correct=terms,
                         outcome=(f"{m}̄_A{m}̄_B measured", flip, ins.cvar))
+        elif kind == "ppm" and (len(ins.blocks) > PPM_MAX
+                                or not any(self.family(p) == "ppm" for p in self.leaf)):
+            self.cat_merge(ins, grp, t0, produced)
         elif kind == "ppm":
             # a product of one X̄ or Z̄ from each block, at a Pauli-product bench: each block
             # through its own door, in the order the instruction names them
@@ -1681,7 +1809,10 @@ class City:
                      "recorded_us": o.get("recorded_us"),
                      # what the archive corrects this outcome with, and when it was measured:
                      # in a branch where a conditional correction ran, the frame differs
-                     "correct": o.get("correct", []), "at": o.get("at")}
+                     "correct": o.get("correct", []), "at": o.get("at"),
+                     # a product measured in parts (a cat chain): every (event, flow) whose
+                     # records it is the parity of
+                     **({"parts": [[r[0], f] for r, f in o["parts"]]} if o.get("parts") else {})}
                     for o in self.outcomes]
         return {
             "schema": GIR_SCHEMA,

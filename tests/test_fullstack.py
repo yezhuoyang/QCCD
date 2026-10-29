@@ -143,9 +143,13 @@ def test_ppm_and_prep_y_are_instructions():
     assert a.instructions[2].op == "inject.Y"
     c, _, _, recs = a.ideal_circuit()
     assert len(recs) == 1
-    for bad in ("ppm Y q0 -> m", "ppm Z q0 Z q0 -> m", "ppm Z q0 X q1 Z a X b Z c -> m", "ppm Z q0 X"):
+    head = "prep q0 Z\nprep q1 Z\nprep a Y\nprep b Z\nprep c Z\n"
+    for bad in ("ppm Y q0 -> m", "ppm Z q0 Z q0 -> m", "ppm Z q0 X"):
         with pytest.raises(AlgorithmError):
-            parse_algorithm("prep q0 Z\nprep q1 Z\nprep a Y\nprep b Z\nprep c Z\n" + bad + "\n")
+            parse_algorithm(head + bad + "\n")
+    # over more than a bench's four blocks: a product by cat states (tests/test_gadget_cat.py)
+    wide = parse_algorithm(head + "ppm Z q0 X q1 Z a X b Z c -> m\n").instructions[-1]
+    assert wide.kind == "ppm" and len(wide.blocks) == 5
 
 
 @pytest.fixture(scope="module")

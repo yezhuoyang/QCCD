@@ -569,6 +569,57 @@ details").**
     - classical parities, record copies into source slots, guards on both, and records written
       by another call. These belong to the archive.
 
+**S8, third round (2026-10-29).**
+
+- **|AutoCCZ⟩ states: the CCZ factory** (`msccz`, `qccd/gadget/leaves/ccz.py`;
+  `tests/test_gadget_ccz.py`). The user chose a new factory. It runs 8T→CCZ on the [[8,3,2]]
+  cube code, then makes FormalRV's nine-site AutoCCZ state. It is verified as a place, and
+  FormalRV's own Toffoli consumption through it is CCX in all 4,096 branches. An `autoccz`
+  instruction runs it and encodes each of its nine outputs at a pharmacy.
+- **Lattice surgery over a register: cat states** (`catbench_d3` + `depot9x`,
+  `qccd/gadget/leaves/catbench.py`; `tests/test_gadget_cat.py`). The user chose "Cat chain".
+  - **How a merge runs.** A `ppm` over more blocks than a bench's four gives every block a cat
+    bench of its own. All benches open probes in |+⟩ (`cat.open`). Each pair of neighbouring
+    benches is fused by its own bundle of three links, all pairs at once: `cat.lend` copies Z
+    of the left probes, and `cat.check` reads it against the right ones. Each probe then
+    couples to its block and is read in X (`cat.couple.P`). Three cats are made at once, like
+    the bench's three rounds.
+  - **Outcome and frames.** The outcome is the parity of round 0's probe bits. A check that
+    reads 1 flips the probes to its right by X, and their couplings carry it onto their blocks
+    as P̄. The archive writes that into the blocks' frames, so nobody waits for it.
+  - **Parallel, measured.** A merge's ions take 37.6 / 39.7 / 40.0 / 40.7 ms over 2 / 3 / 4 / 5
+    blocks with one shared depot. With a depot beside each bench they take
+    35.3 / 36.0 / 37.2 / 37.2 ms: flat, where the first design, a sequential link walk, grew by
+    about 10 ms per block.
+  - **Signed off.** The flat sign-off proves the outcome is the product over five blocks. It
+    also proves the frames: X̄⁵ measured on |0̄⟩ blocks, then every Z̄ᵢZ̄ⱼ = 0. Dropping a bit or a
+    frame breaks it.
+  - **Circuit distance, which the user does not ask for.** The first program measures 2, the
+    four-door bench's own. The frame program measures 1: one probe holds a whole logical
+    operator of its block, so an X fault between fusion and coupling lands on the block as P̄.
+    Shor's construction would give every support ion its own probe.
+- **The symbolic program: a `Cat` node** for `merge … * PROD v … if cond . P[fam[idx]]`. It is
+  one node however many blocks it names; its factors' bits are data, and it carries its
+  extraction rounds on every block. Count: 5.19 × 10⁸ register-wide merges and
+  1.06 × 10¹² block couplings (every slot taken), almost all of them the unary lookup's.
+- **A lowering gap, fixed in both lowerings.** `prepare |+> -> LogicalAncilla[…]` and
+  `prepare |0> -> LogicData[i][0]` (after a readout) prepare logical blocks. Both lowerings had
+  taken every `prepare` for a merge's own probe ion and dropped it: 45 sites in 14 GE2021
+  gadgets, and CainXu2026 too. The textbook Shor never writes one.
+- **Semantics.** GE2021's own `cPrepMasked` (n = 4), with its `Cat` node and prepared
+  ancilla, is expanded and run in the ideal simulator. For all 16 constants and both control
+  values, the register reads the constant exactly when the control is 1.
+- **Still to lower:**
+  - **classical parities, 1,237 sites:**
+    - 899 are copies of one record;
+    - 336 are the AND of two;
+    - 4 are table-masked XORs over 2,048 source records;
+  - **source slots and the guards on them;**
+  - **records written by another call.**
+
+  Copies and ANDs fold into the guards that read them (`if a & b:`). Source slots and foreign
+  records need a global record table.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.

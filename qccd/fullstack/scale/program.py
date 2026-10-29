@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 from .. import layers
 from ..provenance import _qec_kind
-from ..qec2alg import NotLowered, ROT_BASE, _untable, rounds_of
+from ..qec2alg import _LOGICAL_PREP, NotLowered, ROT_BASE, _untable, logical_prepares, rounds_of
 from ..sysprog import split_top
 from .expr import Expr, ExprError
 
@@ -143,8 +143,33 @@ class Rot:
     qline: int = 0
 
 
-# An OutRef is (body sid, node index, outcome index): outcome o<i> of the Seg at that index
-# of that body, in the body's current run -- a frame reads a merge of its own gadget call.
+@dataclass
+class Cat:
+    """A Pauli product over a register, measured by cat states across districts
+    (qccd/gadget/leaves/catbench.py, `ppm` over more blocks than a bench takes): the explicit
+    `factors`, and `letter` on `fam[idx]` for every `var` in [lo, hi) where `cond` > 0 (a
+    decision on data -- a constant's bit, a table's).  Lattice surgery in full: `rounds`
+    syndrome rounds on every block of the merge.  The cats are made in parallel, a bench a
+    block, so its time does not grow with the register.  Its outcome is outcome 0 of its node:
+    an OutRef names it as it names a Seg's."""
+    factors: tuple       # ((letter, family, Expr), ...)
+    var: str
+    lo: Expr
+    hi: Expr
+    cond: Expr
+    letter: str
+    fam: str
+    idx: Expr
+    rounds: int = 1
+    qline: int = 0
+
+    def blocks(self, env: dict) -> int:
+        """The most blocks it names (every data slot taken)."""
+        return len(self.factors) + max(0, self.hi(env) - self.lo(env))
+
+
+# An OutRef is (body sid, node index, outcome index): outcome o<i> of the Seg (or Cat) at that
+# index of that body, in the body's current run -- a frame reads a merge of its own gadget call.
 
 
 @dataclass
@@ -403,7 +428,9 @@ class Builder:
         except ExprError as err:
             raise NotLowered(f"block index {idx_text!r}: {err}") from None
         if fam == "LogicData":
-            return _Blk(fam, e, 0, v)
+            if new:
+                self.gen[("d", v)] = self.gen.get(("d", v), -1) + 1
+            return _Blk(fam, e, self.gen.get(("d", v), 0), v)
         if fam == "LogicalAncilla":
             if new:
                 self.gen[v] = self.gen.get(v, -1) + 1
@@ -454,23 +481,47 @@ class Builder:
             if S.current is None:
                 raise NotLowered(f".qec line {q}: an extraction outside a merge group")
             mr = re.search(r"rounds=(\d+)", raw)
+            if isinstance(S.current[0], Cat):
+                S.current[0].rounds = int(mr[1]) if mr else 1      # every block's, in parallel
+                return
             for b in S.current[1]:
                 for k in rounds_of(int(mr[1]) if mr else 1):
                     S.run.append((g + ["se", b, str(k)], q, ("se", S.current[0])))
+            return
+        if kd == "prepare" and _LOGICAL_PREP.match(raw):
+            # a logical block prepared in |+> or |0> (a school's preparation), as qec2alg does
+            m = re.match(r"prepare\s+\|[+0]>\s*->\s*\w+\[(.*)$", raw.strip())
+            rest = m[1]
+            lo = split_top(rest[:-1], ",")[0] if rest.endswith(")") else rest[:-4]
+            lo_v = Expr(lo)(rep)
+            for (fam, v), basis in logical_prepares(raw, lambda e: Expr(e)(rep)):
+                b = self.blk(fam, f"({lo}) + {v - lo_v}", rep, famap, new=True)
+                S.run.append((g + ["prep", b, basis], q, None))
             return
         if kd in ("alloc", "prepare", "split"):
             return
         if kd == "merge":
             prod = raw.split("= merge", 1)[1].split(" with ")[0]
             if " PROD " in prod:
-                # a product over a register (GE2021's masked preparation): a Pauli product of up
-                # to n blocks, measured at once -- lattice surgery across districts, which no
-                # place does yet
-                if self.survey is None:
-                    raise NotLowered(f".qec line {q}: a Pauli product over a register (PROD) has no "
-                                     f"lattice-surgery service on the machine yet")
-                self.survey.setdefault("merge * PROD", []).append((q, raw[:160]))
-                prod = prod.split(" * PROD ", 1)[0]
+                # a product over a register (GE2021's masked preparation and unary lookup): up to
+                # 2,049 blocks, measured at once by cat states across districts -- one node
+                if guards:
+                    raise NotLowered(f".qec line {q}: a product over a register under a guard")
+                head, tail = prod.split(" * PROD ", 1)
+                m = _PROD.fullmatch(tail.strip())
+                if not m:
+                    raise NotLowered(f".qec line {q}: a product over a register QCCD cannot read: "
+                                     f"{tail[:100]!r}")
+                fs = self.factors(head, rep, famap)
+                band = self._band(raw.split("->")[-1], rep, q)
+                self.close(S, top)
+                node = Cat(tuple((p, b.fam, b.idx) for p, b in fs), m["var"], Expr(m["lo"]),
+                           Expr(m["hi"]), Expr(m["cond"]), m["letter"],
+                           famap.get(m["fam"], m["fam"]), Expr(m["idx"]), qline=q)
+                S.scope[-1].append((band[0], band[1], (S.nodes.sid, len(S.nodes), 0)))
+                S.nodes.append(node)
+                S.current = (node, [], True)       # its rounds and decoding are its own
+                return
             fs = self.factors(prod, rep, famap)
             band = self._band(raw.split("->")[-1], rep, q)
             o = _Out(len(S.outs))
@@ -641,6 +692,10 @@ class Builder:
         S.run, S.outs, S.current = [], [], None
 
 
+_PROD = re.compile(r"(?P<var>\w+) from (?P<lo>.+?) to (?P<hi>.+?) if (?P<cond>.+?) \. "
+                   r"(?P<letter>[XZ])\[(?P<fam>\w+)\[(?P<idx>.+)\]\[0\]\]")
+
+
 def _family(formal: str):
     """`Surface[m + rec] LogicData` -> 'LogicData' (a block family passed whole); else None."""
     m = _FAMILY.fullmatch(formal.strip())
@@ -761,6 +816,23 @@ class _Exp:
             elif isinstance(node, Rot):
                 fs = [(p, self.name(fam, idx, env)) for p, fam, idx in node.factors]
                 self.rotation(fs, node.k(env), node.sign, guard)
+            elif isinstance(node, Cat):
+                self.cat(node, body.sid, i, env, guard)
+
+    def cat(self, node: Cat, sid, pos, env, guard):
+        """One `ppm` over every factor whose bit is 1 (every one, reserved), then the merge's
+        rounds on each of its blocks -- as qec2alg lowers a merge."""
+        fs = [(p, self.name(fam, idx, env)) for p, fam, idx in node.factors]
+        for v in range(node.lo(env), node.hi(env)):
+            e = {**env, node.var: v}
+            if self.reserved or node.cond(e) > 0:
+                fs.append((node.letter, self.name(node.fam, node.idx, e)))
+        o = self.fresh()
+        self.emit("ppm", [x for p, b in fs for x in (p, b)], o, guard)
+        for _, b in fs:
+            for k in rounds_of(node.rounds):
+                self.emit("se", [b, str(k)], None, guard)
+        self.outs[(sid, pos)] = [o]
 
     def seg(self, node: Seg, sid, pos, env, guard):
         t = self.prog.templates[node.tid]
@@ -875,12 +947,13 @@ def count(prog: Program) -> Counter:
                  lambda k, sign, letters: _rot_count(k, sign, letters))
 
 
-def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True) -> int:
+def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, cat_ns=None) -> int:
     """The run's time on the machine: `span_ns[tid]` a template's compiled duration,
     `rot_ns(k, sign, n_factors)` a rotation chain's (every level reserved).  Every instance
     runs after the one before it, except that the iterations of a parallel loop (`Loop.par`)
     run at once, each on its own district -- the loop takes as long as its slowest iteration
-    (`parallel=False`: one after another).  Exact integers: RSA-2048 runs past 2^53 µs."""
+    (`parallel=False`: one after another).  A product over a register takes
+    `cat_ns(n_blocks, rounds)`.  Exact integers: RSA-2048 runs past 2^53 µs."""
     memo: dict = {}
 
     def body_ns(body: Body, env: dict) -> int:
@@ -896,6 +969,10 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True) 
             return body_ns(node.body, {**env, node.var: node.value(env)} if node.var in _deps(node.body) else env)
         if isinstance(node, Rot):
             return rot_ns(node.k(env), node.sign, len(node.factors))
+        if isinstance(node, Cat):
+            if cat_ns is None:
+                raise ValueError(f"a product over a register (line {node.qline}) and no time for one")
+            return cat_ns(node.blocks(env), node.rounds)
         if isinstance(node, Call):
             key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
             if key not in memo:
@@ -982,6 +1059,10 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
             return memo[key]
         if isinstance(node, Rot):
             return rot_value(node.k(env), node.sign, [p for p, _, _ in node.factors])
+        if isinstance(node, Cat):
+            # one product by cat states, every slot taken: a bench per block, each block's rounds
+            n = node.blocks(env)
+            return Counter({"ppm": 1, "cat": 1, "cat_blocks": n, "se": n * len(rounds_of(node.rounds))})
         return Counter()
     return body_count(prog.root, dict(prog.params))
 
@@ -1012,6 +1093,8 @@ def _deps(body: Body) -> frozenset:
                 out |= e.vars
         elif isinstance(n, Rot):
             out |= n.k.vars
+        elif isinstance(n, Cat):
+            out |= n.lo.vars | n.hi.vars
     _DEPS[body.sid] = frozenset(out)
     return _DEPS[body.sid]
 

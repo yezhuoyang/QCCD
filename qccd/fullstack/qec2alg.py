@@ -8,7 +8,9 @@ verified places.  This module is the bridge, and it is QCCD's (FormalRV is input
     .qec statement                                  .alg                              place
     alloc LogicalAncilla[j] + prepare |Y+> -> it    prep aJ Y                         pharmacy (inject.Y)
     N magic |T> -> LogicalAncilla[j]                inject aJ ; x aJ                  factory + pharmacy
-    alloc / prepare |+> / checks of a merge         (the bench's own probe ion)
+    prepare |+> -> LogicalAncilla[j,j+1)            prep aJ X                         school
+    prepare |0> -> LogicData[i][0]  (after a read)  prep qI Z                         school
+    alloc / prepare |+> -> ancilla / merge checks   (the bench's own probe ion)
     mergedK M = merge P with ... -> c[lo,hi)        ppm P -> mK                       Pauli-product bench
       ... single factor, block never used again     read B P -> mK                    post office
     extract M rounds=r                              (the bench's own rounds)
@@ -221,6 +223,10 @@ class _Interp:
                     items.append(Item("ins", f"x {b}", s.line))
                 else:
                     raise NotLowered(f".qec line {s.line}: no gadget prepares {m[1]} yet")
+            elif kd == "prepare" and _LOGICAL_PREP.match(t):
+                # a logical block prepared in |+> or |0>: a school's preparation
+                for b, basis in logical_prepares(t, lambda e: self.ev(e, env, s.line)):
+                    items.append(Item("ins", f"prep {self.block(b[0], b[1], famap, new=True)} {basis}", s.line))
             elif kd in ("alloc", "prepare"):
                 self.absorb(s, "the merge's ancillas and their |+> are the bench's own probe ion")
             elif kd == "merge":
@@ -473,6 +479,23 @@ def _drop_rounds(items, outs: set) -> list:
         if it.kind == "guard":
             gone += _drop_rounds(it.children, outs)
     return gone
+
+
+_LOGICAL_PREP = re.compile(r"prepare\s+\|[+0]>\s*->\s*(LogicalAncilla|LogicData)\[")
+
+
+def logical_prepares(text: str, value) -> list:
+    """`prepare |+> -> LogicalAncilla[lo,hi)` or `prepare |0> -> LogicData[i][0]`: ((family,
+    index), basis) for every block it prepares, `value` evaluating an index expression."""
+    m = re.match(r"prepare\s+\|([+0])>\s*->\s*(\w+)\[(.*)$", text.strip())
+    basis = "X" if m[1] == "+" else "Z"
+    rest = m[3]
+    if rest.endswith(")"):                               # a range: [lo,hi)
+        lo, hi = split_top(rest[:-1], ",")
+        return [((m[2], j), basis) for j in range(value(lo), value(hi))]
+    if rest.endswith("][0]"):                            # one block: [i][0]
+        return [((m[2], value(rest[:-4])), basis)]
+    raise NotLowered(f"a preparation QCCD cannot read: {text[:100]!r}")
 
 
 def rounds_of(r: int) -> list:

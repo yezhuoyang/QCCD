@@ -1022,6 +1022,8 @@ class _Expander:
             for k in ("flip", "value"):
                 if o.get(k) is not None:
                     no[k] = fx(o[k])
+            if o.get("parts"):
+                no["parts"] = [[(path, e), f] for e, f in o["parts"]]
             for k in ("recorded_us", "at"):
                 if no.get(k) is not None:
                     no[k] = round(no[k] + t0, 3)
@@ -1158,6 +1160,8 @@ class _Expander:
         for o in self.oc:
             o["event"] = fe(o["event"])
             o["recorded"] = fe(o.get("recorded"))
+            if o.get("parts"):
+                o["parts"] = [[fe(e), f] for e, f in o["parts"]]
             for k in ("flip", "value"):
                 if o.get(k) is not None:
                     o[k] = fexpr(o[k])
