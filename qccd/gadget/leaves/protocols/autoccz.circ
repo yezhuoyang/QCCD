@@ -1,0 +1,116 @@
+# |AutoCCZ>: one CCZ state distilled from 8 T states, with the three routing pairs that make
+# its Clifford fix-ups measurement bases (Gidney & Fowler 2019; the state FormalRV's Toffoli
+# lowering consumes: compiler/lib/prog_to_qppm/ppmc.ml, auto_ccx).  The msccz place compiles
+# exactly this (qccd/gadget/leaves/ccz.py, ring_circuit), every TSIR gate, reset and
+# measurement naming the line it realises; its logic check runs it as a state vector.
+#
+# DISTILLATION, 8T -> CCZ on the [[8,3,2]] cube code.  Qubit k (0..7) is the cube vertex whose
+# coordinates are the bits of k.  The code's |+++> is the uniform superposition over the
+# Reed-Muller code RM(1,3), spanned by the all-ones word and the three faces {v : v_i = 0}; in
+# row echelon form its pivots are {0, 1, 2, 4}.  T on the even vertices and T-dagger on the
+# odd ones is logical CCZ.  Decoding with the same CNOT fan leaves pivot 0 entangled with the
+# other three by X on all of them; three CNOTs from it undo that, and it is read in X.  The
+# five detectors (pivot 0 in X, the non-pivots 3, 5, 6, 7 in Z) all 0 is the post-selection;
+# any one T fault shows in them (distance 2: output error 28 p^2).  Qubits 1, 2, 4 then hold
+# CCZ|+++>.
+#
+# ROUTING, six more ions (8..13): one pair per CZ fix-up of the Toffoli it will serve --
+# (8, 9) for (b, t), (10, 11) for (a, t), (12, 13) for (a, b) -- each prepared as CZ|++> and
+# CNOT-linked from its two state qubits, the first state qubit into the first of the pair.
+# (Checked: FormalRV's own consumption of these nine sites is CCX(a, b, t) in all 4,096
+# branches; with the links crossed it is not.)
+#
+# The nine outputs, in FormalRV's site order x y z s3 s4 s5 s6 s7 s8:
+output 1 2 4 8 9 10 11 12 13
+
+# every ion fresh
+reset 0
+reset 1
+reset 2
+reset 3
+reset 4
+reset 5
+reset 6
+reset 7
+reset 8
+reset 9
+reset 10
+reset 11
+reset 12
+reset 13
+
+# encode |+++> in the cube code: the pivots in |+>, the fan of RM(1,3)'s echelon rows
+H 0
+H 1
+H 2
+H 4
+CX 0 3
+CX 0 5
+CX 0 6
+CX 1 3
+CX 1 5
+CX 1 7
+CX 2 3
+CX 2 6
+CX 2 7
+CX 4 5
+CX 4 6
+CX 4 7
+
+# transversal T on the even vertices, T-dagger on the odd: logical CCZ
+T 0
+T_DAG 1
+T_DAG 2
+T 3
+T_DAG 4
+T 5
+T 6
+T_DAG 7
+
+# decode with the same fan, in reverse
+CX 4 7
+CX 4 6
+CX 4 5
+CX 2 7
+CX 2 6
+CX 2 3
+CX 1 7
+CX 1 5
+CX 1 3
+CX 0 6
+CX 0 5
+CX 0 3
+
+# pivot 0 is entangled with the outputs by X on all three: undo it, read it in X
+CX 0 1
+CX 0 2
+CX 0 4
+H 0
+
+# the five detectors
+measure 0
+measure 3
+measure 5
+measure 6
+measure 7
+
+# routing pair (8, 9) for the fix-up (b, t): CZ|++>, linked from y = 2 and z = 4
+H 8
+CX 8 9
+H 9
+CX 2 8
+CX 4 9
+
+# routing pair (10, 11) for (a, t): linked from x = 1 and z = 4
+H 10
+CX 10 11
+H 11
+CX 1 10
+CX 4 11
+
+# routing pair (12, 13) for (a, b): linked from x = 1 and y = 2
+H 12
+CX 12 13
+H 13
+CX 1 12
+CX 2 13

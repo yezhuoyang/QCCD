@@ -96,7 +96,7 @@ def template_alg(t: Template, name: str = "tpl", floorplan: str = "fullstack") -
                 m = re.search(r"->\s*(o\d+)", op)
                 if m:
                     named.add(m[1])
-                read |= set(gs)
+                read |= {x.lstrip("!") for x in gs}
             params = [x for x in used if x not in made]
             foreign = read - named
             if foreign:

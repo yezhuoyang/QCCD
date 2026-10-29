@@ -347,9 +347,7 @@ class Builder:
         if raw.startswith("when ") and raw.endswith(":"):
             out = self._owner(self._band(raw, rep, s.line), S, s.line)
             if raw.startswith("when ¬") or raw.startswith("when !"):
-                if self.survey is None:
-                    raise NotLowered(f".qec line {s.line}: a guard on an outcome being 0")
-                self.survey.setdefault("when ¬", []).append((s.line, raw[:160]))
+                out = ("not", out)                 # the .alg's `if !m:`
             for c in s.children:
                 self.stmt(c, S, rep, famap, top, guards + [out])
             return
@@ -434,6 +432,16 @@ class Builder:
                 # the factory makes T-dagger|+> (its verified output); X in software makes it T|+>
                 S.run.append((g + ["inject", b], q, None))
                 S.run.append((g + ["x", b], q, None))
+            elif m[1] == "|AutoCCZ>":
+                # one |AutoCCZ> state on nine new blocks, in FormalRV's site order: the CCZ
+                # factory's (qccd/gadget/leaves/ccz.py, msccz)
+                rng = re.search(r"->\s*\w+\[([^,\[\]]+),([^\[\]]+)\)", raw)
+                lo, hi = Expr(rng[1]), Expr(rng[2])
+                if hi(rep) - lo(rep) != 9:
+                    raise NotLowered(f".qec line {q}: an |AutoCCZ> state is nine sites, not {hi(rep) - lo(rep)}")
+                self.gen[b.val] = self.gen.get(b.val, 0) - 1          # (b was counted above)
+                bs = [self.blk(m[2], f"{rng[1]} + {i}", rep, famap, new=True) for i in range(9)]
+                S.run.append((g + ["autoccz"] + bs, q, None))
             elif self.survey is not None:
                 self.survey.setdefault(f"magic {m[1]}", []).append((q, raw[:160]))
                 S.run.append((g + ["inject", b], q, None))
@@ -561,6 +569,8 @@ class Builder:
             ops = [t for t in toks if not (isinstance(t, tuple) and t[0] == "guard")]
             if ops[0] in ("prep", "inject"):
                 made.add(ops[1].key())
+            elif ops[0] == "autoccz":
+                made |= {t.key() for t in ops[1:]}
         # a single-factor measurement of a block nothing names after it is a destructive
         # readout -- inside a gadget only of a block the run made (qec2alg's `_Reads`)
         later: set = set()
@@ -589,15 +599,18 @@ class Builder:
             for t in toks:
                 if isinstance(t, tuple) and t[0] == "guard":
                     ref = t[1]
+                    neg = isinstance(ref, tuple) and len(ref) == 2 and ref[0] == "not"
+                    if neg:
+                        ref = ref[1]
                     if isinstance(ref, _Out):
                         if id(ref) not in outs:
                             raise NotLowered(f".qec line {q}: an outcome of an unclosed run")
-                        gs.append(f"o{outs[id(ref)]}")
+                        gs.append(("!" if neg else "") + f"o{outs[id(ref)]}")
                     else:
                         if ref not in ext:
                             ext[ref] = len(elist)
                             elist.append(ref)
-                        gs.append(f"e{ext[ref]}")
+                        gs.append(("!" if neg else "") + f"e{ext[ref]}")
                 elif isinstance(t, _Blk):
                     if t.key() in made:
                         if t.key() not in locs:

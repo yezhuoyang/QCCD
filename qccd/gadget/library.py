@@ -60,8 +60,9 @@ def _source_key(*parts: str) -> str:
 def _extra_places() -> dict:
     """Places built outside `leaves/places.py`, so adding one does not re-key every cached place."""
     from .leaves.bench import EXTRA_PLACES as BENCH
+    from .leaves.ccz import EXTRA_PLACES as CCZ
     from .leaves.rotation import EXTRA_PLACES as ROTATION
-    return {**BENCH, **ROTATION}
+    return {**BENCH, **ROTATION, **CCZ}
 
 
 def all_places() -> dict:

@@ -45,7 +45,7 @@ and judged by the floorplan rules F1-F9 like any other.
 
 
 def wide_rows(memories: int = 32, benches: int = 4, factories: int = 4, rotations: int = 2,
-              per_row: int = 9) -> list:
+              per_row: int = 9, ccz: int = 0) -> list:
     """Rows for a wider machine: a program that keeps many blocks alive across its gadgets
     (each lives in a memory of its own, `qccd.gadget.fold`) needs a memory per block, and
     enough benches and factories to keep them busy; rotations finer than T need rotation
@@ -57,6 +57,9 @@ def wide_rows(memories: int = 32, benches: int = 4, factories: int = 4, rotation
     head += [("depot1", "depot9"), ("prep", "prep_d3"), ("clinic", "se_d3")]
     for k in range(1, factories + 1):
         head += [(f"pharmacy{k}", "inj_d3"), (f"factory{k}", "msf15")]
+    # CCZ factories (|AutoCCZ> for Gidney-Ekera's Toffolis), each beside a pharmacy
+    for k in range(1, ccz + 1):
+        head += [(f"foundry{k}", "msccz"), (f"pharmacy{factories + k}", "inj_d3")]
     for k in range(1, benches + 1):
         head.append((f"bench{k}", "ppm_d3"))
     head += [("post1", "read_d3"), ("post2", "read_d3"), ("zone1", "zone_d3")]
@@ -84,7 +87,7 @@ def write_floorplan(leaves, path: Path = FLOORPLAN, *, wide: dict | None = None)
         lib = library(leaves)
         text = write(lib, title="A machine for FormalRV programs (surface code, d = 3)", comment=COMMENT)
     else:
-        args = {"memories": 32, "benches": 4, "factories": 4, "rotations": 2, "per_row": 9, **wide}
+        args = {"memories": 32, "benches": 4, "factories": 4, "rotations": 2, "per_row": 9, "ccz": 0, **wide}
         lib = library(leaves, rows=wide_rows(**args), name="fullstack_wide_d3")
         text = write(lib, title=f"A wide machine for FormalRV programs (surface code, d = 3, "
                                 f"{args['memories']} memories)",

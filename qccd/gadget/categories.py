@@ -97,6 +97,14 @@ CATEGORIES: dict[str, dict] = {
         "job": "Fifteen noisy T gates in, one better T state out: the 15-to-1 Reed-Muller "
                "protocol on resident ions.",
     },
+    "cczfactory": {
+        "title": "CCZ Factory", "place": "Foundry", "shape": "sawtooth", "glyph": "CCZ",
+        "stroke": "#9a3412", "fill": "#ffedd5",
+        "job": "Eight noisy T gates in, one CCZ state out (8T -> CCZ on the [[8,3,2]] code), "
+               "with three routing pairs that turn its Clifford fix-ups into measurement bases: "
+               "nine ions leave holding the |AutoCCZ> state one Toffoli of Gidney-Ekera's "
+               "Shor spends.",
+    },
     "rotation": {
         "title": "Rotation Source", "place": "Lens shop", "shape": "diamond", "glyph": "ROT",
         "stroke": "#7c3aed", "fill": "#ede9fe",
@@ -148,7 +156,8 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "rotation",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "readout", "factory", "cczfactory",
+         "rotation",
          "injection",
          "decoder", "archive", "depot", "road", "wire"]
 

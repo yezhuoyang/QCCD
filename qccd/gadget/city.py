@@ -1324,6 +1324,27 @@ class City:
                 self.block_info[ins.blocks[0]]["resource"] = f"RZ{rot[0]}{'†' if rot[1] else ''}|+⟩"
             self.pf[ins.blocks[0]] = (ZERO, ZERO)
             self.report(I, "inject", row, ins.index, grp, blocks=[ins.blocks[0]])
+        elif kind == "autoccz":
+            # one |AutoCCZ> state: nine fresh ions through the CCZ factory, then each of its
+            # nine output ions encoded by a pharmacy into its own block
+            F = self._choose("cczfactory", ins, ready=t0)
+            D1, g9, d9 = self._load(9, (F, "in"), t0, ins.index, grp)
+            arr, trip = self.trip(g9, (D1, "out"), d9, (F, "in"), t0, ins.index, grp)
+            s, outs, frow = self.op(F, "produce", {"in": (g9, arr, trip)}, t0, ins.index, grp)
+            mg, md = outs["out"]
+            for j, q in enumerate(ins.blocks):
+                I = self._choose("injection", ins, ready=t0, near=(F, "out"), port="magic")
+                marr, mtrip = self.trip([mg[j]], (F, "out"), [md[j]], (I, "magic"), t0, ins.index, grp)
+                D2, g8, d8 = self._load(8, (I, "in"), t0, ins.index, grp)
+                farr, ftrip = self.trip(g8, (D2, "out"), d8, (I, "in"), t0, ins.index, grp)
+                s, o2, row = self.op(I, "inject", {"magic": ([mg[j]], marr, mtrip),
+                                                    "in": (g8, farr, ftrip)}, t0, ins.index, grp)
+                produced[q] = Bundle(q, o2["out"][0], I, "out", o2["out"][1])
+                self.block_info[q] = {"ions": o2["out"][0], "born": row[1], "born_at": I,
+                                      "code": "surface_d3", "n": 9, "k": 1, "magic_ion": mg[j],
+                                      "resource": f"|AutoCCZ> site {j}"}
+                self.pf[q] = (ZERO, ZERO)
+                self.report(I, "inject", row, ins.index, grp, blocks=[q])
         elif kind in ("se", "store"):
             q = ins.blocks[0]
             b = self.blocks[q]

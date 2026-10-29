@@ -106,7 +106,8 @@ __all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_
 #: which place category an instruction needs
 CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "xx": "surgery",
                "ppm": "ppm",
-               "read": "readout", "inject": "injection", "store": "zone", "s": "injection",
+               "read": "readout", "inject": "injection", "autoccz": "cczfactory", "store": "zone",
+               "s": "injection",
                "sx": "injection", "x": "archive", "y": "archive", "z": "archive",
                "decode": "decoder"}
 
@@ -120,7 +121,7 @@ CLASSICAL = SOFTWARE + ("decode",)
 
 #: what no guard can gate: it creates, rests, checks or decodes, so in a guarded call it runs
 #: either way
-UNGUARDABLE = ("prep", "inject", "se", "store", "decode")
+UNGUARDABLE = ("prep", "inject", "autoccz", "se", "store", "decode")
 
 #: where `include "NAME"` finds NAME.alg
 GATES_DIR = Path(__file__).resolve().parent / "gates"
@@ -130,8 +131,8 @@ CONTRACT_ARITY = {"I": 1, "X": 1, "Y": 1, "Z": 1, "H": 1, "S": 1, "Sdg": 1, "SX"
                   "T": 1, "Tdg": 1, "CX": 2, "CZ": 2, "SWAP": 2, "CCX": 3, "CCZ": 3,
                   "CSWAP": 3}
 
-PRIMITIVES = ("prep", "inject", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz", "xx",
-              "ppm", "decode", "read")
+PRIMITIVES = ("prep", "inject", "autoccz", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz",
+              "xx", "ppm", "decode", "read")
 
 #: the most blocks one Pauli-product measurement may name (the bench has three doors)
 PPM_MAX = 4
@@ -715,6 +716,17 @@ class _Parser:
                 raise AlgorithmError(lineno, raw, f"block {args[0]} already exists")
             ins.blocks = [args[0]]
             self.born.add(args[0])
+        elif word == "autoccz":
+            # nine new blocks holding one |AutoCCZ> state, in FormalRV's site order: the CCZ
+            # state x y z and the routing pairs for the fix-ups (b,t), (a,t), (a,b)
+            need(9)
+            if len(set(args)) != 9:
+                raise AlgorithmError(lineno, raw, "autoccz names nine distinct blocks")
+            for a in args:
+                if a in self.born:
+                    raise AlgorithmError(lineno, raw, f"block {a} already exists")
+            ins.blocks = list(args)
+            self.born.update(args)
         elif word in ("s", "sx") or word in SOFTWARE:
             need(1)
             alive(args[0])

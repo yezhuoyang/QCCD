@@ -11,10 +11,12 @@ recorded by kind and stands as a placeholder.  What is held here:
 * it builds, the size of its gadgets (tens of templates, tens of thousands of nodes), and its
   run is counted in closed form: the CCZ states it requests are the order of the paper's
   Toffoli count (2.7 x 10^9; ours counts every data slot as taken, the schedule's view);
-* the constructs still to lower are exactly these, so a new one, or one lowered, shows:
-  a Pauli product over a register (lattice surgery across many districts), |AutoCCZ> states,
-  classical parities and guards on them, a record copied into a source slot (`source c[k] <-`)
-  and guards on one, and records another call wrote.
+* its |AutoCCZ> states are the CCZ factory's (`autoccz`, nine new blocks: qccd/gadget/leaves/
+  ccz.py) and its guards on an outcome being 0 are `.alg` guards (`if !m:`);
+* the constructs still to lower are exactly these, so a new one, or one lowered, shows: a
+  Pauli product over a register (lattice surgery across many districts), classical parities
+  and guards on them, a record copied into a source slot (`source c[k] <-`) and guards on one,
+  and records another call wrote.
 """
 from __future__ import annotations
 
@@ -75,7 +77,7 @@ def test_gidney_ekera_rsa2048_is_lowered_symbolically_and_counted():
     survey, prog, c = _in_thread(go)
     size = prog.size()
     assert size["templates"] < 40 and size["nodes"] < 50_000, size
-    assert 1e9 < c["inject"] < 1e10, c["inject"]          # CCZ requests: the paper's 2.7e9 Toffolis
+    assert 1e9 < c["autoccz"] < 1e10, c["autoccz"]        # |AutoCCZ> states: the paper's 2.7e9 Toffolis
     assert c["ppm"] > 1e10 and c["se"] > 1e11
-    assert set(survey) == {"merge * PROD", "magic |AutoCCZ>", "parity", "when ¬", "source",
+    assert set(survey) == {"merge * PROD", "parity", "source",
                            "guard on a source record", "record of another call"}, sorted(survey)
