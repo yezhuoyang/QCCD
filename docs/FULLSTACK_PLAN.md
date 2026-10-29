@@ -498,6 +498,42 @@ controlled swap (61), a Toffoli (21), a CNOT, an H, a SWAP and the final readout
 call's number, so `when_m5822` call 1 and `when_m582` call 21 were one block. Every 4-bit run's
 expansion failed on it. A name ending in a digit now takes a separator.
 
+**Status of layer 3 (2026-10-29): compiled once** (`qccd/fullstack/scale/compile.py`). Each
+template becomes a gate, with its guarded groups (a T gate's S correction) written as gates called
+under their guard, as `qec2alg` writes them. It is scheduled once by the folded scheduler on one
+district (`fullstack_wide.floor`) and checked there by the place and machine rules.
+
+- **Coverage:** all 9 templates and the 12 rotation heads (resource Y, T or a rotation source, ×
+  sign × one or two factors) hold **G1–G11, H1 and H2**.
+- **Cost:** about 2 minutes in all. The folded schedule took 400 s at 3 bits and 687 s at 4, and
+  grew with the run.
+- **Spans:** a controlled MAJ step takes 14.8 s on the machine, most of it waiting on T states (195 ms
+  per factory run, 35 per step); a Toffoli 2.8 s; a controlled swap 8.9 s; a CNOT 0.27 s.
+
+**The run's time, composed** (`program.duration_ns`: exact integers over the symbolic program, every
+instance after the one before it, every slot reserved). At 3 bits the folded schedule gave 2.92 h;
+the composition gives 2.87 h.
+
+| instance | machine time (one district, one gadget at a time) | composed in |
+|---|---|---|
+| 3 bits | 2.87 h | 0.00 s |
+| 5 bits (Shor for 15) | 15.6 h | 0.00 s |
+| 64 bits | 4.5 years | 0.01 s |
+| 256 bits | 288 years | 0.05 s |
+| 1024 bits | 18,489 years | 0.18 s |
+| RSA-2048 | 148,191 years | 0.36 s |
+
+That number is honest for *this* circuit on *this* hardware. FormalRV's textbook Shor executes 2 ×
+10¹² controlled Toffolis; Gidney's windowed arithmetic needs about 6.5 × 10⁹. One ion-trap
+Pauli-product measurement takes 22–64 ms and a T state 195 ms, and nothing here runs in
+parallel. The co-design levers are all visible in the composition: parallel factories, districts
+working at once, and a windowed program from FormalRV.
+
+**Not yet:**
+- moving blocks between districts: each template is compiled with all its blocks in one district;
+- resolving an instant to its hardware instruction;
+- the page.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.

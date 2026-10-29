@@ -43,7 +43,7 @@ from ..sysprog import split_top
 from .expr import Expr, ExprError
 
 __all__ = ["Program", "Builder", "build", "Seg", "Loop", "Pred", "Let", "Call", "Rot", "Template",
-           "expand", "count", "normalize_alg", "compare"]
+           "expand", "count", "total", "duration_ns", "normalize_alg", "compare"]
 
 _FACTOR = re.compile(r"([XYZ])\[(\w+)\[([^\[\]]+)\]\[0\]\]")
 _LOOP = re.compile(r"for\s+(.+?)\s*(?:<=|≤)\s*(\w+)\s*<\s*(.+?):\s*$")
@@ -701,12 +701,27 @@ def compare(prog: Program, alg, data_ones=()) -> dict:
 
 
 def count(prog: Program) -> Counter:
-    """Every instruction the run executes, by word, without expanding it.  A body is counted
-    once per distinct value of what its count depends on (`_deps`); a loop whose body's
-    count does not depend on its variable multiplies, and one whose count is affine in it
-    (a rotation chain as deep as the distance between two qubits) is an arithmetic series
-    (checked at four points, else summed term by term).  A slot is counted as reserved: the
-    schedule's view, every predicate taken."""
+    """Every instruction the run executes, by word, without expanding it.  A slot is
+    counted as reserved: the schedule's view, every predicate taken."""
+    return total(prog, lambda tid: prog.templates[tid].kinds,
+                 lambda k, sign, letters: _rot_count(k, sign, letters))
+
+
+def duration_ns(prog: Program, span_ns: dict, rot_ns) -> int:
+    """The run's time on the machine when every instance runs after the one before it:
+    `span_ns[tid]` a template's compiled duration, `rot_ns(k, sign, n_factors)` a rotation
+    chain's (every level reserved).  Exact integers: RSA-2048 runs past 2^53 microseconds."""
+    return total(prog, lambda tid: Counter(ns=span_ns[tid]),
+                 lambda k, sign, letters: Counter(ns=rot_ns(k, sign, len(letters))))["ns"]
+
+
+def total(prog: Program, seg_value, rot_value) -> Counter:
+    """A sum over every instance the run executes, without expanding it: `seg_value(tid)`
+    for a template's instance, `rot_value(k, sign, letters)` for a rotation chain.  A body is
+    summed once per distinct value of what its sum depends on (`_deps`); a loop whose body's
+    sum does not depend on its variable multiplies, and one whose sum is affine in it (a
+    rotation chain as deep as the distance between two qubits) is an arithmetic series
+    (checked at four points, else summed term by term)."""
     memo: dict = {}
 
     def body_count(body: Body, env: dict) -> Counter:
@@ -717,7 +732,7 @@ def count(prog: Program) -> Counter:
 
     def node_count(node, env) -> Counter:
         if isinstance(node, Seg):
-            return prog.templates[node.tid].kinds
+            return seg_value(node.tid)
         if isinstance(node, Pred):
             return body_count(node.body, env)
         if isinstance(node, Let):
@@ -750,7 +765,7 @@ def count(prog: Program) -> Counter:
                 memo[key] = body_count(prog.body_of(node, env), {f: e(env) for f, e in node.skeys})
             return memo[key]
         if isinstance(node, Rot):
-            return _rot_count(node.k(env), node.sign, [p for p, _, _ in node.factors])
+            return rot_value(node.k(env), node.sign, [p for p, _, _ in node.factors])
         return Counter()
     return body_count(prog.root, dict(prog.params))
 
