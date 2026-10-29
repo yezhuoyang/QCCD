@@ -510,6 +510,24 @@ PAPERS.append({
                "which the compiler does not have yet.",
 })
 
+#: How the results table's column "the paper" was made, for a paper that plots its numbers
+#: rather than printing them; shown under that table.  `{worst}` becomes the largest relative
+#: difference between a value in the column and our replay.  Every claim was checked against
+#: the figure files of the paper's arXiv source: all 24 values of QCCDSim's table are the
+#: plotted point rounded to four significant digits, and the unrounded points are within
+#: 0.02 % (2 µs) of the artifact's printed outputs.
+PAPER_COLUMN: dict[str, str] = {
+    "murali2020": (
+        "How the column “the paper” is made. The paper prints none of these numbers; it plots "
+        "them. Its figures are vector drawings in its arXiv source, so every plotted point is "
+        "stored as coordinates, to a thousandth of a typographic point or finer. Each value is "
+        "a point's height mapped through the labelled ticks of its axis and rounded to four "
+        "significant digits. Unrounded, the plotted points are their code's own outputs to "
+        "within 0.02 % (2 µs at most); the small differences from the column “their code” "
+        "are that rounding. “matches” means within 0.5 % of our replay, the precision allowed "
+        "for a number read from a plot; the largest difference here is {worst}."),
+}
+
 #: Our own schedules, per paper: each compared with one of the paper's runs (``against``) on
 #: the same device, under that run's law and circuit, every listed profile, strict
 #: durations (an operation the paper's law does not price is not allowed).  ``how`` says
@@ -682,9 +700,9 @@ OURS: dict[str, dict] = {
 #: paper; a number the paper does not contain is not credited to it.
 TOOK: dict[str, list[str]] = {
     "murali2020": [
-        "The transport times of the default timing table: shuttle 5 µs, split and merge 80 µs, "
-        "junction crossing 100 µs and X-junction 120 µs are QCCDSim's, which Jones and Murali "
-        "carry over; the table is named qccdsim_jones after both.",
+        "The transport times of the default timing table, from the paper's Table I: moving an "
+        "ion through one segment 5 µs, split and merge 80 µs each, crossing a Y-junction "
+        "100 µs and crossing an X-junction 120 µs.",
         "The two-qubit gate's error growing with the chain length N in the gate zone as N/ln N, "
         "in the default device and the noise model.",
         "The grid generator and the grid baseline device, a QCCDSim-style grid.",

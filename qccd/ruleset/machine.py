@@ -933,7 +933,7 @@ def _peak_heat(ctx: Ctx, e):
 
 
 @term("road_ok(c)", "true or false", "Whether carry c, compiled with its whole bundle onto "
-      "its road's own device (qccd/gadget/roads.py: one class a cycle, blocked ions holding by "
+      "its road's own device (one class a cycle, blocked ions holding by "
       "their switches), passes the basic rules R1-R23, delivers every ion before the far side "
       "takes it, and keeps off each door's stub while the op on that side drives it.",
       GROUP_M, kinds=K)
@@ -951,7 +951,7 @@ def _road_ok(ctx: Ctx, c):
 
 @term("plane_conflicts()", "a number", "How many times two devices that share a plane (of "
       "DACs, or one laser: the floorplan's `plane`) play different cycles at once -- every op's "
-      "TSIR at its times, every road's compiled program (gadget/planes.py).  0 when nothing "
+      "TSIR at its times, every road's compiled program.  0 when nothing "
       "shares a plane.", GROUP_M, kinds=K)
 def _plane_conflicts(ctx: Ctx):
     M = _prog(ctx, "planes")

@@ -547,6 +547,32 @@ def _steps_table(entry: dict, pick) -> str:
             '<th>the stim it becomes, and what wrote each line</th></tr>' + "".join(rows) + "</table></div>")
 
 
+def _quiet_frame_change(entry: dict, pick):
+    """The first shown step made of frame changes alone that takes time yet writes no noise on
+    their ions, with those ions' qubits; None when no shown step is one (then the page says
+    nothing about it)."""
+    circ = entry["r"].circuit
+    for tr in circ.trace:
+        st = tr["step"]
+        if st is None or not pick(st) or not st.ops or not st.duration:
+            continue
+        if not all(o.kind == "gate1" and o.gate == "VZ" for o in st.ops):
+            continue
+        qs = sorted({circ.qubit_of_ion[i] for o in st.ops for i in o.ions})
+        own = {str(q) for q in qs}
+        noisy = any(own & set(ln.split()[1:])
+                    for ln, who in zip(circ.lines[tr["a"]:tr["b"]], circ.origin[tr["a"]:tr["b"]])
+                    if who != "translation")
+        if not noisy:
+            return st, qs
+    return None
+
+
+def _and(xs) -> str:
+    xs = [str(x) for x in xs]
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
 def num6(v) -> str:
     return f"{v:.6g}" if isinstance(v, float) else num(v)
 
@@ -953,23 +979,37 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         first = {st.index for st in run.steps[:9]}
         firstmeas = next((st.index for st in run.steps if st.kind == "measure"), None)
         firstreset = next((st.index for st in run.steps if st.kind == "reset"), None)
-        w(_steps_table(entry, lambda st: st.kind in ("prepare", "readout") or st.index in first
-                       or st.index in (firstmeas, firstreset)))
+        def shown(st):
+            return st.kind in ("prepare", "readout") or st.index in first or st.index in (firstmeas, firstreset)
+        w(_steps_table(entry, shown))
+        vz = _quiet_frame_change(entry, shown)
+        frame = ""
+        if vz is not None:
+            st, qs = vz
+            dur = f"{st.duration:g}&nbsp;µs"
+            frame = (f' The frame change <code>VZ</code> writes its <code>S</code> gates and no noise on its own '
+                     f'ions (qubit{"s" if len(qs) > 1 else ""} {_and(qs)} above): <a href="#c-gate_1q"><code>gate_1q</code></a> '
+                     f'skips it, as a phase update rather than a pulse, and <a href="#c-memory"><code>memory</code></a> '
+                     f'skips its ions, as ions the step <a href="#w-operated">operates on</a>, so the step&rsquo;s '
+                     f'{dur} is charged to the other ions only. The {dur} is the clock&rsquo;s price of a Z: the '
+                     f'beams of a QCCD machine are shared, so a Z is turned by three one-ion pulses.')
         w('<p class="words">Reading it: the preparation resets every qubit and charges each a reset&rsquo;s '
           'error; a transport step writes no gate, only the memory error of everyone who waited through it; a '
           'pulse is its stim gate followed by its infidelity; a two-ion gate is <code>SQRT_XX</code> followed by '
           'the gate law at its heat; a readout is preceded by the coherent dephasing of each ion&rsquo;s wait and '
-          'the readout flip, and followed by the crosstalk on the ions beside and elsewhere.</p>')
+          'the readout flip, and followed by the crosstalk on the ions beside and elsewhere.' + frame + '</p>')
         budget = entry["ler"]["budget"]
-        groups = [("ms", ("ms",), ("ms_base", "ms_heating", "ms_chain")), ("gate_1q", ("gate_1q",), ("gate_1q",)),
-                  ("readout", ("readout_z", "readout_x"), ("measure",)), ("reset", ("prepare", "reset"), ("reset",)),
-                  ("memory", ("memory",), ("memory",)), ("memory_coherent", ("memory_coherent",), ("memory_coherent",)),
-                  ("crosstalk", ("crosstalk",), ("crosstalk",)),
-                  ("crosstalk elsewhere", ("crosstalk_global", "crosstalk_reset"), ("crosstalk_global",))]
+        # both sides are keyed by budget line, as each channel's `counted as` names it (ms is booked
+        # as ms_base + ms_heating + ms_chain, readout_z and readout_x as measure, prepare as reset,
+        # crosstalk_reset as crosstalk_global), never by channel name
+        groups = [("ms", ("ms_base", "ms_heating", "ms_chain")), ("gate_1q", ("gate_1q",)),
+                  ("readout", ("measure",)), ("reset", ("reset",)),
+                  ("memory", ("memory",)), ("memory_coherent", ("memory_coherent",)),
+                  ("crosstalk", ("crosstalk",)), ("crosstalk elsewhere", ("crosstalk_global",))]
         brow = []
-        for lab, ours, theirs in groups:
-            a = sum(circ.budget.get(x, 0.0) for x in ours)
-            t = sum(budget.get(x, 0.0) for x in theirs)
+        for lab, keys in groups:
+            a = sum(circ.budget.get(x, 0.0) for x in keys)
+            t = sum(budget.get(x, 0.0) for x in keys)
             brow.append(f'<tr><td>{html.escape(lab)}</td><td class="r">{num(a)}</td><td class="r">{num(t)}</td>'
                         f'<td>{_vs(a, t)}</td></tr>')
         w('<div class="eg"><b>The error budget</b><p>Each channel&rsquo;s expected number of faults: its '

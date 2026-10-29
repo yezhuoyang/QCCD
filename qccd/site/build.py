@@ -37,7 +37,7 @@ from pathlib import Path
 
 from .compile_examples import GATES, OUT as COMPILED, load_algo, load_compiled
 from . import algorithm
-from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, machine, rule_meta
+from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, core_form, judge, machine, rule_meta, text_of
 from .md import Renderer, hints, slug
 from . import prose
 from .people import GROUPS as PEOPLE_GROUPS, INSTITUTIONS, JOIN, PEOPLE
@@ -380,6 +380,18 @@ HASH_JS = """<script>
     try { if(typeof relayout === 'function') relayout(); } catch(e){}
     var autoplay = play;
     play = document.getElementById('play'); var reset = document.getElementById('reset'), slider = document.getElementById('slider');
+    if(play && !autoplay && !play.getAttribute('data-replay')){
+      play.setAttribute('data-replay', '1');
+      // a short example at the default 4x is over in a fifth of a second, too fast to see: it
+      // plays at 1x, a step every second or so
+      try { var sp = document.getElementById('speed');
+            if(sp && slider && +slider.max > 0 && +slider.max <= 8){ sp.value = '1'; sp.dispatchEvent(new Event('change')); } } catch(e){}
+      // and Play on the last frame plays it again from the start, as a player does, instead
+      // of doing nothing until Reset is pressed (a capture listener runs before the page's own)
+      play.addEventListener('click', function(){ try {
+        if(!play.disabled && play.textContent === 'Play' && slider && +slider.max > 0 && +slider.value >= +slider.max && reset) reset.click();
+      } catch(e){} }, true);
+    }
     if(looping || !play || !autoplay) return;
     looping = true;
     setTimeout(function(){ try { if(!play.disabled && play.textContent === 'Play') play.click(); } catch(e){} }, 400);
@@ -1066,7 +1078,7 @@ def _example_card(ex: dict, focus: str | None, root: str, device: str | None = N
 
 def language_page(built: dict) -> str:
     body = ["<h1>The hardware language</h1>",
-            "<p class=\"sub\">A programme is a list of statements over one device. Each statement is one instruction "
+            "<p class=\"sub\">A programme is a list of statements over one device. Each core statement is one instruction "
             "and one machine cycle: it says what moves where, or which ions a gate, a measurement or a cooling "
             "touches. It says nothing about cost. The replay computes the cost, the duration and the heating of "
             "every cycle from the device's own primitive tables, and the rules judge each cycle as a whole. "
@@ -1079,23 +1091,43 @@ def language_page(built: dict) -> str:
             "line-joining rule there is. Positional arguments come first, keywords after.</p>",
             "<h2 id=\"semantics\">Semantics</h2>",
             "<p class=\"sub\">The machine state is a map from ions to sites, a motional excitation n&#772; per ion, "
-            "and a clock. <code>init</code> and <code>fill</code> create the map; every other statement is a "
+            "and a clock. <code>init</code> creates the map; every other statement is a "
             "transition of it. Transport statements move ions along segments and through junctions; each "
             "crossing is priced from the device's curves and adds to n&#772;. Gates leave positions alone and "
             "read n&#772; to evaluate their error. Cooling lowers n&#772;. Instructions execute in order, each "
             "atomically; the next starts when the previous ends. Every cycle is then judged by the "
             "<a href=\"../rules/\">rules</a>, which is where a programme is refused.</p>",
-            "<h2 id=\"statements\">Statements</h2>",
-            "<ul class=\"toc2\">" + "".join(f'<li><a href="#{v["verb"]}"><code>p.{v["verb"]}</code></a></li>' for v in VERBS) + "</ul>"]
-    for v in VERBS:
-        ex = built[v["verb"]]
-        rules = ", ".join(f'<a href="../rules/#{r}">{r}</a>' for r in v["rules"]) or "&ndash;"
-        body.append(
-            f'<section class="verb" id="{v["verb"]}"><h3><code>{html.escape(v["sig"])}</code></h3>'
-            f'<div class="two"><div><p>{v["what"]}</p>'
-            f'<dl class="sem"><dt>state</dt><dd>{v["state"]}</dd><dt>cost</dt><dd>{v["cost"]}</dd>'
-            f'<dt>rules</dt><dd>{rules}</dd><dt>IR</dt><dd><code>{v["ir"]}</code></dd></dl></div>'
-            f'{_example_card(ex, None, "")}</div></section>')
+            "<p class=\"sub\">The language has seven <b>core</b> statements, and every programme means a list of "
+            "them. Four more are <b>shorthands</b>: each is defined as the core statements it stands for, is "
+            "judged exactly as they are, and is there only to keep a programme short. Each shorthand below shows "
+            "its example written out in core statements too, and the site is not built if the two are judged "
+            "differently in any figure or verdict. One <b>annotation</b>, <code>claim</code>, records the "
+            "totals an author claims.</p>"]
+    groups = (("core", "statements", "Core statements"), ("shorthand", "shorthands", "Shorthands"),
+              ("annotation", "annotation", "The annotation"))
+    body.append("<ul class=\"toc2\">" + "".join(
+        f'<li><a href="#{v["verb"]}"><code>p.{v["verb"]}</code></a></li>' for v in VERBS) + "</ul>")
+    for kind, anchor, title in groups:
+        body.append(f'<h2 id="{anchor}">{title}</h2>')
+        for v in VERBS:
+            if v.get("kind", "core") != kind:
+                continue
+            ex = built[v["verb"]]
+            rules = ", ".join(f'<a href="../rules/#{r}">{r}</a>' for r in v["rules"]) or "&ndash;"
+            means = f'<dt>stands for</dt><dd>{v["means"]}</dd>' if v.get("means") else ""
+            core = ""
+            if ex.get("core_text"):
+                s = ex["core_same"]
+                core = (f'<p class="coreq">The example on the right, written in core statements and judged the same: '
+                        f'cost {s["cost"]:g}, {s["steps"]} step{"s" if s["steps"] != 1 else ""}, {s["us"]:.0f} &micro;s, '
+                        f'peak n&#772; {s["peak_quanta"]:.2f}, {"no rule fails" if not s["failed"] else "fails " + ", ".join(s["failed"])}.</p>'
+                        f'<pre class="grammar"><code>{html.escape(ex["core_text"])}</code></pre>')
+            body.append(
+                f'<section class="verb" id="{v["verb"]}"><h3><code>{html.escape(v["sig"])}</code></h3>'
+                f'<div class="two"><div><p>{v["what"]}</p>'
+                f'<dl class="sem">{means}<dt>state</dt><dd>{v["state"]}</dd><dt>cost</dt><dd>{v["cost"]}</dd>'
+                f'<dt>rules</dt><dd>{rules}</dd><dt>IR</dt><dd><code>{v["ir"]}</code></dd></dl>{core}</div>'
+                f'{_example_card(ex, None, "")}</div></section>')
     body.append("<h2 id=\"ir\">Beneath the text: the IR</h2>"
                 "<p class=\"sub\">Every statement becomes one instruction of the control IR, the JSON the compiler "
                 "emits and the verifier replays. The Write pane and the compiler meet there.</p>"
@@ -1104,8 +1136,10 @@ def language_page(built: dict) -> str:
                 + "</tbody></table></div>"
                 "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the device language "
                 "the programmes run on is <a href=\"../docs/adl/\">the architecture description</a>.</p>")
-    return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}",
-                       body="\n".join(body))
+    # the examples are short: a taller stage, so the ions can be seen moving
+    css = ("main{max-width:1120px} .verb .runbox iframe.live{height:420px}"
+           " .coreq{font-size:13.5px;margin:14px 0 4px} .verb .two pre.grammar{white-space:pre-wrap;font-size:12.5px}")
+    return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css=css, body="\n".join(body))
 
 
 def _sources(src: str) -> str:
@@ -1151,6 +1185,17 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
                           headline=f'p.{v["verb"]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
         put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True, extra=HASH_JS)
         lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html"}
+        if v.get("kind") == "shorthand":
+            # the page says a shorthand is judged exactly as its core statements: hold it to that
+            core = core_form(m, v["example"])
+            same = judge(m, m.program("core", provenance="off").apply_calls(core).build(), "corrected", None, False)
+            keys = ("failed", "cost", "steps", "us", "peak_quanta")
+            def differ(a, b):
+                return abs(a - b) > 1e-9 * max(1.0, abs(a)) if isinstance(a, float) else a != b
+            if any(differ(same[k], r["verdict"][k]) for k in keys):
+                raise RuntimeError(f"p.{v['verb']}: the example and its core form are judged differently: "
+                                   f"{ {k: r['verdict'][k] for k in keys} } vs { {k: same[k] for k in keys} }")
+            lang[v["verb"]].update(core_text=text_of(core), core_same={k: same[k] for k in keys})
     rules: dict[str, dict] = {}
     for R in RULES:
         entry: dict = {"model": R.get("model", "corrected")}
@@ -1598,10 +1643,60 @@ ZONE_HEX = {"trap": "#2a78d6", "data": "#e8b940", "load": "#1baf7a", "big": "#4a
 _SVG_SEQ = [0]
 
 
+def _rails_in_the_way(nodes, segs) -> dict[str, str]:
+    """The segments whose straight chord would run THROUGH a node they do not touch, each with
+    the nearest such node: the studio's rule (`qccd/viz/layout.py::_bows`), a node that
+    projects onto the chord's interior within 0.55 of the nearest-neighbour pitch."""
+    import math
+    pts = sorted((n.pos[0], n.pos[1]) for n in nodes.values())
+    g = math.inf
+    for i, (px, py) in enumerate(pts):          # nearest neighbour, swept along x
+        for qx, qy in pts[i + 1:]:
+            if qx - px >= g:
+                break
+            d = math.hypot(qx - px, qy - py)
+            if 1e-9 < d < g:
+                g = d
+    if not math.isfinite(g):
+        return {}
+    lim = 0.55 * g
+    out = {}
+    for sid, s in segs.items():
+        (ax, ay), (bx, by) = nodes[s.ends[0]].pos[:2], nodes[s.ends[1]].pos[:2]
+        dx, dy = bx - ax, by - ay
+        l2 = dx * dx + dy * dy
+        if l2 < 1e-18:
+            continue
+        worst = None
+        for nid, n in nodes.items():
+            px, py = n.pos[0], n.pos[1]
+            if (nid in s.ends or not min(ax, bx) - lim < px < max(ax, bx) + lim
+                    or not min(ay, by) - lim < py < max(ay, by) + lim):
+                continue
+            u = ((px - ax) * dx + (py - ay) * dy) / l2
+            if u <= 1e-6 or u >= 1.0 - 1e-6:
+                continue
+            d = math.hypot(px - (ax + u * dx), py - (ay + u * dy))
+            if d < lim and (worst is None or d < worst[0]):
+                worst = (d, nid)
+        if worst is not None:
+            out[sid] = worst[1]
+    return out
+
+
+def _quad_span(p0: float, p1: float, p2: float) -> tuple[float, float]:
+    """The extent, on one axis, of the quadratic Bezier p0-p1-p2."""
+    vals = [p0, p2]
+    d = p0 - 2 * p1 + p2
+    if abs(d) > 1e-9 and 0 < (t := (p0 - p1) / d) < 1:
+        vals.append((1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t * t * p2)
+    return min(vals), max(vals)
+
+
 def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None = None,
                paths: list[dict] | None = None, marks: dict[str, tuple[str, str]] | None = None,
                hi: set[str] | None = None, crossed: set[str] | None = None,
-               hi_ions: set[str] | None = None) -> str:
+               hi_ions: set[str] | None = None, fit: tuple[float, float] | None = None) -> str:
     """The device as the system holds it: every node of the expanded graph at its position,
     every segment as a line.  Sites are discs coloured by zone, lattice junctions small dark
     squares, and a site where three or more axes meet gets a dark ring.  Drawn straight from
@@ -1609,7 +1704,9 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
     (site -> labels) draws the ions standing in a site as a dark pill above it; `hi_ions`
     names the pills to draw in green.  `paths` ({nodes, color, label, dashed}) draws arrows
     through node positions, `marks` (site -> (text, colour)) writes a note under a site,
-    `hi` rings a site in green and `crossed` strikes it out in red."""
+    `hi` rings a site in green and `crossed` strikes it out in red.  `fit` (width, height)
+    draws the device as large as it fits, centred, in a box of exactly that size, so the
+    figures of a row come out the same height with their labels the same size."""
     dev = m.arch.device
     nodes, segs = dev.nodes, dev.segments
     if not nodes:
@@ -1622,34 +1719,84 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
     ys = [n.pos[1] for n in nodes.values()]
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     w, h = max(x1 - x0, 0.5), max(y1 - y0, 0.2)
-    scale = min(150.0, 820.0 / w, 420.0 / h)
     if labels is None:
         labels = len(nodes) <= 40
-    r = max(3.5, min(11.0, scale * 0.13))
     pad = 34 if labels else 18
-    W, H = w * scale + 2 * pad, h * scale + 2 * pad + (14 if labels else 0)
-    X = lambda x: pad + (x - x0) * scale
-    Y = lambda y: pad + (y1 - y) * scale       # y up on the device, down on the screen
-    cx0, cy0 = X((x0 + x1) / 2), Y((y0 + y1) / 2)
-    # a small device is drawn at its natural size, centred; a big one fills the column
-    out = [f'<svg viewBox="0 0 {W:.0f} {H:.0f}" style="max-width:{W:.0f}px;margin:0 auto" xmlns="http://www.w3.org/2000/svg" '
-           f'font-family="ui-sans-serif,system-ui,sans-serif" role="img" aria-label="the device {html.escape(m.name)}">']
-    sw = max(2.0, r * 0.55)
-    for s in segs.values():
-        a, b = nodes[s.ends[0]], nodes[s.ends[1]]
-        ax, ay, bx, by = X(a.pos[0]), Y(a.pos[1]), X(b.pos[0]), Y(b.pos[1])
-        length = ((a.pos[0] - b.pos[0]) ** 2 + (a.pos[1] - b.pos[1]) ** 2) ** 0.5
-        if length > 1.5:
-            # a long segment (a loop closing on itself) is bowed away from the centre, so it
-            # is not drawn through the nodes that happen to lie between its ends
+    lab = 14 if labels else 0
+    # A rail is bowed only where drawn straight it would run THROUGH a node it does not touch,
+    # by the studio's rule.  It was every segment longer than 1.5, which bowed dual3's outer
+    # loop, whose sides pass no node, out of the drawing's box (reader comment, 2026-10-29).
+    way = _rails_in_the_way(nodes, segs)
+
+    def bows(X, Y, scale):
+        """segment id -> (ax, ay, qx, qy, bx, by): each bowed rail's quadratic, on the screen."""
+        cx0, cy0 = X((x0 + x1) / 2), Y((y0 + y1) / 2)
+        got = {}
+        for sid, nid in way.items():
+            a, b = nodes[segs[sid].ends[0]], nodes[segs[sid].ends[1]]
+            ax, ay, bx, by = X(a.pos[0]), Y(a.pos[1]), X(b.pos[0]), Y(b.pos[1])
+            length = ((a.pos[0] - b.pos[0]) ** 2 + (a.pos[1] - b.pos[1]) ** 2) ** 0.5
             mx, my = (ax + bx) / 2, (ay + by) / 2
             nx, ny = -(by - ay), (bx - ax)
             nl = (nx * nx + ny * ny) ** 0.5 or 1.0
             nx, ny = nx / nl, ny / nl
-            if (mx - cx0) * nx + (my - cy0) * ny < 0:
+            # away from the node in the way; one exactly on the chord: away from the centre
+            side = (X(nodes[nid].pos[0]) - ax) * nx + (Y(nodes[nid].pos[1]) - ay) * ny
+            if side > 1e-6 or (abs(side) <= 1e-6 and (mx - cx0) * nx + (my - cy0) * ny < 0):
                 nx, ny = -nx, -ny
             bow = min(0.45 * length * scale, 90.0)
-            out.append(f'<path d="M{ax:.1f} {ay:.1f}Q{mx + nx * bow:.1f} {my + ny * bow:.1f} {bx:.1f} {by:.1f}" fill="none" '
+            got[sid] = (ax, ay, mx + nx * bow, my + ny * bow, bx, by)
+        return got
+
+    def beyond(scale):
+        """How far the bowed rails' ink reaches past the nodes' box: left, right, top, bottom."""
+        X0 = lambda x: (x - x0) * scale
+        Y0 = lambda y: (y1 - y) * scale
+        half = max(2.0, max(3.5, min(11.0, scale * 0.13)) * 0.55) / 2 + 1
+        el = er = et = eb = 0.0
+        for ax, ay, qx, qy, bx, by in bows(X0, Y0, scale).values():
+            lo, hi_ = _quad_span(ax, qx, bx)
+            el, er = max(el, half - lo), max(er, hi_ + half - (x1 - x0) * scale)
+            lo, hi_ = _quad_span(ay, qy, by)
+            et, eb = max(et, half - lo), max(eb, hi_ + half - (y1 - y0) * scale)
+        return el, er, et, eb
+
+    if fit:
+        # as large as the box allows, the bowed rails included, centred in it
+        W, H = float(fit[0]), float(fit[1])
+        scale = min(150.0, (W - 2 * pad) / w, (H - 2 * pad - lab) / h)
+        for _ in range(8):
+            el, er, et, eb = beyond(scale)
+            bw = (x1 - x0) * scale + max(pad, el) + max(pad, er)
+            bh = (y1 - y0) * scale + max(pad, et) + max(pad + lab, eb)
+            k = min(W / bw, H / bh)
+            if k >= 1.0:
+                break
+            scale *= 0.995 * k
+        ox, oy = (W - bw) / 2 + max(pad, el), (H - bh) / 2 + max(pad, et)
+    else:
+        scale = min(150.0, 820.0 / w, 420.0 / h)
+        W, H = w * scale + 2 * pad, h * scale + 2 * pad + lab
+        # a bowed rail never leaves the box: the margin grows on the side it bows to
+        el, er, et, eb = beyond(scale)
+        ml, mr = max(0.0, el - pad), max(0.0, er - (W - pad - (x1 - x0) * scale))
+        mt, mb = max(0.0, et - pad), max(0.0, eb - (H - pad - (y1 - y0) * scale))
+        W, H = W + ml + mr, H + mt + mb
+        ox, oy = pad + ml, pad + mt
+    r = max(3.5, min(11.0, scale * 0.13))
+    X = lambda x: ox + (x - x0) * scale
+    Y = lambda y: oy + (y1 - y) * scale        # y up on the device, down on the screen
+    # a small device is drawn at its natural size, centred; a big one fills the column
+    out = [f'<svg viewBox="0 0 {W:.0f} {H:.0f}" style="max-width:{W:.0f}px;margin:0 auto" xmlns="http://www.w3.org/2000/svg" '
+           f'font-family="ui-sans-serif,system-ui,sans-serif" role="img" aria-label="the device {html.escape(m.name)}">']
+    sw = max(2.0, r * 0.55)
+    bowed = bows(X, Y, scale)
+    for sid, s in segs.items():
+        a, b = nodes[s.ends[0]], nodes[s.ends[1]]
+        ax, ay, bx, by = X(a.pos[0]), Y(a.pos[1]), X(b.pos[0]), Y(b.pos[1])
+        if sid in bowed:
+            _, _, qx, qy, _, _ = bowed[sid]
+            out.append(f'<path d="M{ax:.1f} {ay:.1f}Q{qx:.1f} {qy:.1f} {bx:.1f} {by:.1f}" fill="none" '
                        f'stroke="#cfceca" stroke-width="{sw:.1f}" stroke-linecap="round"/>')
         else:
             out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{bx:.1f}" y2="{by:.1f}" stroke="#cfceca" stroke-width="{sw:.1f}" stroke-linecap="round"/>')
@@ -1798,11 +1945,16 @@ def _figures(body: str, runs: dict[str, dict]) -> str:
                 f'<figcaption>{cap}</figcaption></figure>')
 
     def gallery(args):
+        # Two to a row, and every drawing fitted into the SAME box: a column's width (352 px
+        # inside the frame on a desktop) by 280, so the figures come out one height with their
+        # labels one size and the captions of a row start level.  Each device used to be drawn
+        # at its own natural size, so the tall dual3 stood 500 px high beside a 100 px chain4
+        # (reader comment, 2026-10-29).
         cells = []
         for name in args[0].split(","):
             name = name.strip()
             m = _arch_machine(name)
-            cells.append(f'<figure><div class="figsvg">{device_svg(m)}</div>'
+            cells.append(f'<figure><div class="figsvg">{device_svg(m, fit=(352, 280))}</div>'
                          f'<figcaption><b>{html.escape(name)}</b>: {html.escape(_about(name))}</figcaption></figure>')
         return f'<div class="gallery">{"".join(cells)}</div>'
 
@@ -1838,7 +1990,11 @@ def render_physics() -> dict:
 def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
     body = (f'<p class="sub"><a href="../learn/">Tutorial</a> &rsaquo; background</p>'
             f'<ul class="toc">{d["toc"]}</ul>{_figures(d["body"], runs or {})}')
-    return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css="", body=body)
+    # the device gallery two to a row (its drawings share one box, see `_figures`), one to a
+    # row on a phone; this page's own rule, so no other page changes
+    css = (".gallery{grid-template-columns:repeat(2,minmax(0,1fr))}"
+           "@media (max-width:640px){.gallery{grid-template-columns:minmax(0,1fr)}}")
+    return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css=css, body=body)
 
 
 def people_page() -> str:

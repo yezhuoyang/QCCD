@@ -36,3 +36,17 @@ def test_the_card_gets_the_verdict_it_says(rid, which):
         assert got["verdict"] in ("holds", "does not apply"), (rid, which, got)
     else:
         assert got["verdict"] == want, (rid, which, got)
+
+
+def test_the_junction_rule_is_shown_on_a_junction():
+    """R2 is about junctions, so both its examples carry ions through a node the device draws
+    as a junction -- not through a trap site where three rails happen to meet, which is what
+    the cards once used (reported on the page, 2026-10-20)."""
+    R = next(x for x in RULES if x["id"] == "R2")
+    m = machine(R["device"])
+    dev = m.arch.device
+    for which in ("pass", "fail"):
+        prog = m.program("example", provenance="off").apply_calls(R[which]["program"]).build()
+        crossed = {n for ins in prog.instructions for p in ins.participants
+                   for seg in p.via for n in dev.segments[seg].ends}
+        assert any(dev.nodes[n].kind == "junction" for n in crossed), (which, sorted(crossed))

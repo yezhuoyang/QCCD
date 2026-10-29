@@ -312,6 +312,11 @@ def _paper_section(p: dict, res: dict | None) -> str:
             out.append(f'<tr><td>{_e(r.get("label", r["id"]))}{watch}</td><td class="n">{t}</td>'
                        f'<td class="n">{o}</td><td class="n">{pp}</td><td>{_rules_pill(r.get("rules")) or _checks(r)}</td></tr>{fid}')
         out.append("</table>")
+        # a paper that plots its numbers: how the column "the paper" was read off its figures
+        rels = [v["rel"] for r in rows for v in r.get("compare", {}).get("paper", {}).values()]
+        if catalog.PAPER_COLUMN.get(key) and rels:
+            text = catalog.PAPER_COLUMN[key].format(worst=f"{max(rels) * 100:.2g} %")
+            out.append(f'<p class="rp-colnote"><small>{_e(text)}</small></p>')
     ratios = (res or {}).get("ratios", [])
     if ratios:
         out.append("<p>The paper reports speedups. Each is the ratio of two of the replayed "

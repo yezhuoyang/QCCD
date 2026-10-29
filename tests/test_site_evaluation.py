@@ -48,3 +48,28 @@ def test_the_leaderboard_links_only_to_definitions_that_exist(page_html):
     names = re.findall(r":\s*'([A-Za-z0-9_]+)'", block.group(1))
     ids = set(re.findall(r'\bid="([^"]+)"', page_html))
     assert names and not [n for n in names if f"m-{n}" not in ids]
+
+
+def test_the_recomputed_entry_agrees_with_its_report(page_html):
+    """Every number the page sets beside the official report equals it.  The error budget read
+    the page's side by channel name (ms, readout_z) while the circuit books each channel under
+    the lines its `counted as` names (ms_base + ms_heating + ms_chain, measure), and showed
+    0 against 0.0201."""
+    assert "the error budget" in page_html.lower()
+    assert 'class="bad"' not in page_html
+
+
+def test_a_frame_change_row_without_noise_is_explained(page_html):
+    """A shown VZ step writes S gates and, today, no noise on its own ions (gate_1q skips a
+    frame change, memory skips the ions a step operates on); a reader asked why.  Whenever such
+    a row is shown, the paragraph under the table says why."""
+    rows = re.findall(r'<td class="l">gate VZ [^<]*</td>.*?<pre class="stim">(.*?)</pre>', page_html, re.S)
+    quiet = []
+    for pre in rows:
+        lines = [ln.split("←") for ln in pre.splitlines()]
+        own = {q for txt, who in lines if who.strip() == "translation" for q in txt.split()[1:]}
+        if not any(own & set(txt.split()[1:]) for txt, who in lines if who.strip() != "translation"):
+            quiet.append(pre)
+    para = re.search(r'<p class="words">Reading it:(.*?)</p>', page_html, re.S)
+    assert para
+    assert ("frame change <code>VZ</code>" in para.group(1)) == bool(quiet)
