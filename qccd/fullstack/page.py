@@ -109,6 +109,12 @@ def hints() -> dict:
         "fullstack-close": {"t": "Hide this column", "d": "Hides this layer's column; its button above brings it back."},
         "fullstack-wrap": {"t": "Wrap long lines",
                            "d": "Long lines wrap inside their column (on), or run on and scroll sideways (off)."},
+        "fullstack-edge": {"t": "Boundary between two columns",
+                           "d": "Drag sideways: the column on the left and the one on the right share their room "
+                                "differently (widen a layer whose lines are long). A double click shares it evenly."},
+        "fullstack-width": {"t": "The columns' width",
+                            "d": "Drag sideways to make every column wider or narrower, in proportion; a double "
+                                 "click puts them back as they were."},
     }
 
 

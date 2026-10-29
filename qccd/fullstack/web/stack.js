@@ -164,14 +164,17 @@
   function seek(i) { stop(); frame = i; phase = 1; slider.value = String(frame); draw(); }
 
   // each layer's whole file, once: a program of several files says where each begins and
-  // numbers its lines file by file, as FormalRV does
+  // numbers its lines file by file, as FormalRV does.  Its specification (`main.spec.prog`, a
+  // `spec NAME:` block) is left out: the columns show what runs (the user, 2026-10-29)
   const ROWS = {}, CALLS = {}, CUR = {};
   for (const k of LAY) {
     const lines = S.layers[k].lines;
     CALLS[k] = LANGS ? LANGS.defined(k, lines, (ln) => where(k, ln).join(':')) : {};
+    const spec = LANGS && LANGS.spec ? LANGS.spec(k, lines, (ln) => where(k, ln).join(':')) : new Set();
     const parts = [];
     let file = null;
     for (let ln = 1; ln <= lines.length; ln++) {
+      if (spec.has(ln)) continue;
       const [m, l] = where(k, ln);
       if (S.layers[k].members.length > 1 && m !== file) parts.push('<div class="fs-fileh">' + esc2(m) + '</div>');
       file = m;
@@ -184,7 +187,8 @@
     }
     const box = block.querySelector('.fs-lines[data-layer="' + k + '"]');
     box.innerHTML = parts.join('');
-    ROWS[k] = box.querySelectorAll('.fs-ln');
+    ROWS[k] = {};
+    for (const r of box.querySelectorAll('.fs-ln')) ROWS[k][r.getAttribute('data-line')] = r;
     CUR[k] = 0;
   }
   block.addEventListener('click', (ev) => {
@@ -209,17 +213,23 @@
       const cur = lineOf(c, k);
       const box = block.querySelector('.fs-lines[data-layer="' + k + '"]');
       if (cur !== CUR[k]) {
-        const old = CUR[k] ? ROWS[k][CUR[k] - 1] : null;
+        const old = CUR[k] ? ROWS[k][CUR[k]] : null;
         if (old) old.classList.remove('fs-cur');
         CUR[k] = cur;
-        const el = cur ? ROWS[k][cur - 1] : null;
+        const el = cur ? ROWS[k][cur] : null;
         if (el) { el.classList.add('fs-cur'); if (chosen.has(k)) inView(box, el); }
-      } else if (follow && cur && chosen.has(k)) inView(box, ROWS[k][cur - 1]);
+      } else if (follow && ROWS[k][cur] && chosen.has(k)) inView(box, ROWS[k][cur]);
     }
   }
 
-  // which columns stand, and how wide the pane is: a listing's width each
+  // which columns stand, and how wide: each column as wide as the reader made it (250 px until
+  // then), the pane their sum.  EVERY BOUNDARY DRAGS (the user, 2026-10-29): between two
+  // columns (the two share their room), and the pane's own left edge (all of them, in
+  // proportion); a double click puts one back
   const home = pHw ? pHw.nextSibling : null;
+  const WID = (() => { try { return JSON.parse(store.get('colws') || '{}') || {}; } catch (e) { return {}; } })();
+  const colEl = (k) => (k === 'hw' ? pHw : block.querySelector('.fs-col[data-layer="' + k + '"]'));
+  const shownCols = () => COLS.filter((k) => chosen.has(k) && colEl(k) && colEl(k).parentNode === colsBox);
   function applyCols() {
     for (const k of LAY) block.querySelector('.fs-col[data-layer="' + k + '"]').hidden = !chosen.has(k);
     for (const b of block.querySelectorAll('.fs-bar button[data-col]'))
@@ -227,13 +237,94 @@
     // the hardware listing is the Studio's own; while the stack shows it, it stands in the row
     if (pHw) {
       const want = pane.getAttribute('data-view') === 'stack' && chosen.has('hw');
-      if (want && pHw.parentNode !== colsBox) { colsBox.appendChild(pHw); pHw.classList.add('fs-col'); }
-      if (!want && pHw.parentNode === colsBox) { pane.insertBefore(pHw, home); pHw.classList.remove('fs-col'); }
+      if (want && pHw.parentNode !== colsBox) { colsBox.appendChild(pHw); pHw.classList.add('fs-col'); pHw.prepend(hwEdge); }
+      if (!want && pHw.parentNode === colsBox) {
+        pane.insertBefore(pHw, home); pHw.classList.remove('fs-col'); pHw.style.flex = ''; hwEdge.remove();
+      }
     }
-    const n = Math.max(1, chosen.size);
-    const w = Math.min(n * 250 + 40, Math.round(window.innerWidth * 0.66)) + 'px';
+    const shown = shownCols();
+    shown.forEach((k, i) => {
+      colEl(k).style.flex = (WID[k] || 250) + ' 1 0px';
+      colEl(k).querySelector(':scope > .fs-edge').hidden = i === 0;
+    });
+    // (the pane is the columns and its own margins: what the last drag measured, else 40 px)
+    const sum = shown.reduce((a, k) => a + (WID[k] || 250), 0) || 250;
+    const w = Math.min(sum + (+store.get('fsx') || 40), Math.round(window.innerWidth * (store.get('colws') ? 0.8 : 0.66))) + 'px';
     for (const id of ['progcol', 'dock']) { const el = document.getElementById(id); if (el) el.style.setProperty('--fs-w', w); }
   }
+  // a drag along x: `start()` once, `move(dx, ctx)`, `end(ctx)`
+  function dragX(el, start, move, end) {
+    el.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      el.setPointerCapture(ev.pointerId);
+      el.classList.add('on');
+      document.body.classList.add('fs-dragx');
+      const x0 = ev.clientX, ctx = start();
+      const mv = (e) => move(e.clientX - x0, ctx);
+      const up = () => { el.removeEventListener('pointermove', mv); el.classList.remove('on'); document.body.classList.remove('fs-dragx'); end(ctx); };
+      el.addEventListener('pointermove', mv);
+      el.addEventListener('pointerup', up, {once: true});
+      el.addEventListener('pointercancel', up, {once: true});
+    });
+  }
+  const keepWidths = () => store.set('colws', JSON.stringify(WID));
+  // the boundary on a column's left: it and the column before share their room differently
+  function edgeFor(k) {
+    const e = document.createElement('div');
+    e.className = 'fs-edge';
+    e.setAttribute('data-hint', 'fullstack-edge');
+    e.title = 'drag to share the room between these two columns differently (double-click: evenly)';
+    const before = () => { const sh = shownCols(), i = sh.indexOf(k); return i > 0 ? sh[i - 1] : null; };
+    dragX(e, () => {
+      const a = before();
+      if (!a) return null;
+      // every column shown keeps the width it has now; these two then trade
+      for (const x of shownCols()) { WID[x] = colEl(x).getBoundingClientRect().width; colEl(x).style.flex = WID[x] + ' 1 0px'; }
+      return {a, pa: WID[a], pb: WID[k]};
+    }, (d, c) => {
+      if (!c) return;
+      const na = Math.max(120, Math.min(c.pa + c.pb - 120, c.pa + d));
+      WID[c.a] = na; WID[k] = c.pa + c.pb - na;
+      colEl(c.a).style.flex = WID[c.a] + ' 1 0px';
+      colEl(k).style.flex = WID[k] + ' 1 0px';
+    }, (c) => { if (c) { keepWidths(); syncCursor(true); } });
+    e.addEventListener('dblclick', () => {
+      const a = before();
+      if (!a) return;
+      for (const x of shownCols()) WID[x] = Math.round(colEl(x).getBoundingClientRect().width);
+      const both = WID[a] + WID[k];
+      WID[a] = Math.floor(both / 2); WID[k] = both - WID[a];
+      keepWidths(); applyCols();
+    });
+    return e;
+  }
+  for (const k of LAY) block.querySelector('.fs-col[data-layer="' + k + '"]').prepend(edgeFor(k));
+  const hwEdge = edgeFor('hw');
+  // the pane's own left edge: every column grows or shrinks in proportion
+  const paneEdge = document.createElement('div');
+  paneEdge.className = 'fs-edge fs-pane-edge';
+  paneEdge.setAttribute('data-hint', 'fullstack-width');
+  paneEdge.title = 'drag to make the columns wider or narrower (double-click: as they were)';
+  colsBox.before(paneEdge);
+  const holder = () => ['progcol', 'dock'].map((id) => document.getElementById(id)).find((el) => el && el.getAttribute('data-view') === 'stack');
+  dragX(paneEdge, () => {
+    const sh = shownCols(), h = holder();
+    if (!h) return null;
+    return {sh, px: sh.map((k) => colEl(k).getBoundingClientRect().width), total: colsBox.getBoundingClientRect().width,
+            fs0: h.getBoundingClientRect().width};
+  }, (d, c) => {
+    if (!c) return;
+    const T = Math.max(120 * c.sh.length, Math.min(window.innerWidth * 0.8 - (c.fs0 - c.total), c.total - d));
+    c.sh.forEach((k, i) => { WID[k] = Math.round(c.px[i] * T / c.total); colEl(k).style.flex = WID[k] + ' 1 0px'; });
+    for (const id of ['progcol', 'dock']) { const el = document.getElementById(id); if (el) el.style.setProperty('--fs-w', Math.round(c.fs0 + T - c.total) + 'px'); }
+    c.fsx = Math.round(c.fs0 - c.total);
+    sizeStage();
+  }, (c) => { if (c) { store.set('fsx', String(c.fsx || '')); keepWidths(); syncCursor(true); } });
+  paneEdge.addEventListener('dblclick', () => {
+    for (const k of COLS) delete WID[k];
+    store.set('colws', ''); store.set('fsx', ''); applyCols(); sizeStage(); syncCursor(true);
+  });
   function setCol(k, on) {
     if (on === undefined) on = !chosen.has(k);
     if (on) chosen.add(k); else chosen.delete(k);

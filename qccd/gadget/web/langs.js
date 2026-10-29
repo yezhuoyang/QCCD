@@ -429,7 +429,25 @@
     return out;
   }
 
-  const API = { paint, note, defined, LANGS, esc };
+  // the lines of a FormalRV program that are its specification, not its program: a file of
+  // its own (`main.spec.prog`), or a `spec NAME:` block -- the line and every indented or blank
+  // line under it.  The columns leave them out; the program's lines keep their numbers.
+  // `where(i)` names line i as "file:line" (a program of several files).
+  function spec(lang, lines, where) {
+    const out = new Set();
+    if (!["prog", "qppm", "qec", "sys"].includes(lang)) return out;
+    let inSpec = false;
+    lines.forEach((s, i) => {
+      const at = where ? where(i + 1) : "";
+      const file = at.slice(0, at.lastIndexOf(":"));
+      if (/^spec\b[^:]*:/.test(s)) inSpec = true;
+      else if (inSpec && s.trim() && !/^\s/.test(s)) inSpec = false;
+      if (inSpec || /\.spec\.[a-z]+$/.test(file)) out.add(i + 1);
+    });
+    return out;
+  }
+
+  const API = { paint, note, defined, spec, LANGS, esc };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.QCCD_LANGS = API;
 })(typeof window !== "undefined" ? window : this);

@@ -104,6 +104,30 @@ try {
   await evaluate(`window.FULLSTACK.setCol("hw", false)`);
   await sleep(250);
   out.views.stackNoHw = await evaluate(WHERE);
+  // the columns show what runs: no row of a specification (a `spec NAME:` block, a
+  // `*.spec.prog` file)
+  out.spec = await evaluate(`[...document.querySelectorAll("#pStack .fs-ln .fs-tx")].filter((r) => { const t = r.textContent.trim(); return t.startsWith("spec ") && t.includes(":"); }).length +
+    [...document.querySelectorAll("#pStack .fs-fileh")].filter((f) => f.textContent.includes(".spec.")).length`);
+  // every boundary dragged with the mouse: between the first two columns, and the pane's own
+  // left edge -- each column's width before and after
+  const dragBy = async (sel, dx) => {
+    const at = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e || e.hidden) return null;
+      const b = e.getBoundingClientRect(); return b.width && b.height ? [b.left + b.width / 2, b.top + b.height / 2] : null; })()`);
+    if (!at) return false;
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0], y: at[1] });
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: at[0], y: at[1], button: "left", buttons: 1, clickCount: 1 });
+    for (let k = 1; k <= 6; k++) await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0] + dx * k / 6, y: at[1], button: "left", buttons: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at[0] + dx, y: at[1], button: "left", buttons: 0, clickCount: 1 });
+    await sleep(350);
+    return true;
+  };
+  const WIDTHS = `[...document.querySelectorAll("#pStack .fs-cols > .fs-col:not([hidden])")].map((c) => Math.round(c.getBoundingClientRect().width))`;
+  out.drag = {};
+  let b0 = await evaluate(WIDTHS);
+  if (await dragBy("#pStack .fs-col:not([hidden]) ~ .fs-col:not([hidden]) > .fs-edge", 60)) out.drag.between = { before: b0, after: await evaluate(WIDTHS) };
+  b0 = await evaluate(WIDTHS);
+  if (await dragBy("#pStack > .fs-pane-edge", -100)) out.drag.pane = { before: b0, after: await evaluate(WIDTHS) };
+  out.afterDrag = await evaluate(LOOK);
   if (shot) {
     await evaluate(`window.FULLSTACK.setCol("hw", true)`);
     await sleep(400);

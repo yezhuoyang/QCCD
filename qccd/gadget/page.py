@@ -29,13 +29,24 @@ COLUMN_HINTS = {
     "cols:close": {"t": "Hide this column", "d": "Hides this program's column; its button above the columns brings it back."},
     "cols:wrap": {"t": "Wrap long lines",
                   "d": "Long lines wrap inside their column (on), or run on and scroll sideways (off)."},
-    "cols:width": {"t": "Column width", "d": "Drag sideways to make the program columns wider or narrower."},
+    "cols:width": {"t": "Columns' width",
+                   "d": "Drag sideways to make the program columns wider or narrower, each in proportion; "
+                        "a double click puts them back as they were."},
+    "cols:edge": {"t": "Boundary between two columns",
+                  "d": "Drag sideways: the column on the left and the one on the right share their room differently "
+                       "(widen a column whose lines are long). A double click shares it evenly."},
     "cols:rail": {"t": "Show the programs", "d": "Brings back the program columns."},
     "cols:hide": {"t": "Hide the programs", "d": "Folds every program column away, leaving the animation more room."},
     "panel:left": {"t": "Fold the left panel",
                    "d": "Folds the hierarchy, the checks and the traffic into a narrow bar, or opens them again."},
     "panel:right": {"t": "Fold the right panel",
-                    "d": "Folds the verification, the inspector and the full-stack caption into a narrow bar, or opens them again."},
+                    "d": "Folds the verification and the inspector into a narrow bar, or opens them again."},
+    "panel:width": {"t": "Side panel's edge",
+                    "d": "Drag sideways to make this side panel wider or narrower; a double click puts it back."},
+    "panel:height": {"t": "Boundary between two sections",
+                     "d": "Drag up or down to give this section of the panel more or less of its height; "
+                          "a double click puts it back."},
+    "panel:timeline": {"t": "Timeline's edge", "d": "Drag up or down to make the timeline taller or shorter."},
 }
 
 

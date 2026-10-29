@@ -12,6 +12,12 @@
 //              instruction the page says is running (the line must be that instruction's)
 //   wrap       the Wrap button: long lines stop wrapping, and wrap again
 //   fold       the right-hand panel folded and opened: the stage gains the room, and gives it back
+//   spec       rows of a layer column that are its specification (`spec NAME:`, `*.spec.prog`):
+//              there must be none
+//   drag       every boundary dragged with the mouse: between two columns, the stage's edge, the
+//              right panel's edge, a section of it, the timeline's edge, the left panel's edge --
+//              each the widths or heights before and after
+//   kept       the page reloaded: the columns and the right panel as the drags left them
 //   errors     console errors and uncaught exceptions (must be none)
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -68,6 +74,11 @@ const COLS = `(() => [...document.querySelectorAll(".pcol")].filter((c) => !c.hi
            none: (c.querySelector(".pc-none:not([hidden])") || {}).innerText || "" };
 }))()`;
 const STAGE_W = `Math.round(document.getElementById("stage").getBoundingClientRect().width)`;
+const WIDTHS = `[...document.querySelectorAll(".pcol")].filter((c) => !c.hidden).map((c) => Math.round(c.getBoundingClientRect().width))`;
+const SIZE = (sel) => `(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()`;
+// (string tests, not regexes: a backslash in this template is the template's, not the page's)
+const SPEC = `[...document.querySelectorAll(".pcol .cl .tx")].filter((r) => { const t = r.textContent.trim(); return t.startsWith("spec ") && t.includes(":"); }).length +
+  [...document.querySelectorAll(".pcol .cl-file")].filter((f) => f.textContent.includes(".spec.")).length`;
 const ROOM = `[${STAGE_W}, Math.round(document.getElementById("cols").getBoundingClientRect().width)]`;
 
 const out = { errors };
@@ -129,7 +140,13 @@ try {
   await evaluate(`document.getElementById("colsWrap").click()`);
   await sleep(100);
   out.wrap.on = !(await evaluate(`document.getElementById("cols").classList.contains("nowrap")`));
-  // the right-hand panel folded, then opened: [stage, columns] widths
+  out.spec = await evaluate(SPEC);
+  // the right-hand panel folded, then opened: [stage, columns] widths (a full-stack page opens
+  // with it folded: open it first)
+  if (await evaluate(`document.getElementById("app").classList.contains("noright")`)) {
+    await evaluate(`document.getElementById("rightRail").click()`);
+    await sleep(400);
+  }
   const before = await evaluate(ROOM);
   await evaluate(`document.getElementById("rightFold").click()`);
   await sleep(400);
@@ -137,6 +154,46 @@ try {
   await evaluate(`document.getElementById("rightRail").click()`);
   await sleep(400);
   out.fold = { before, folded, after: await evaluate(ROOM) };
+  // every boundary, dragged with the mouse
+  const dragBy = async (sel, dx, dy) => {
+    const at = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e || e.hidden) return null;
+      const b = e.getBoundingClientRect(); return b.width && b.height ? [b.left + b.width / 2, b.top + b.height / 2] : null; })()`);
+    if (!at) return false;
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0], y: at[1] });
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: at[0], y: at[1], button: "left", buttons: 1, clickCount: 1 });
+    for (let k = 1; k <= 6; k++) await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0] + dx * k / 6, y: at[1] + dy * k / 6, button: "left", buttons: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at[0] + dx, y: at[1] + dy, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(350);
+    return true;
+  };
+  out.drag = {};
+  const two = ".pcol:not([hidden]) ~ .pcol:not([hidden]) > .pc-edge";
+  let b0 = await evaluate(WIDTHS);
+  if (await dragBy(two, 80, 0)) out.drag.between = { before: b0, after: await evaluate(WIDTHS) };
+  b0 = [await evaluate(WIDTHS), await evaluate(ROOM)];
+  if (await dragBy("#vsplit", -100, 0)) out.drag.stage = { before: b0[0], after: await evaluate(WIDTHS), room: [b0[1], await evaluate(ROOM)] };
+  b0 = await evaluate(SIZE("#right"));
+  if (await dragBy("#rightEdge", -60, 0)) out.drag.right = { before: b0, after: await evaluate(SIZE("#right")) };
+  b0 = await evaluate(SIZE("#verif"));
+  if (await dragBy("#verif > .edge", 0, 40)) out.drag.section = { before: b0, after: await evaluate(SIZE("#verif")) };
+  b0 = await evaluate(SIZE("#tlWrap"));
+  if (await dragBy("#split", 0, -50)) out.drag.timeline = { before: b0, after: await evaluate(SIZE("#tlWrap")) };
+  if (await evaluate(`document.getElementById("app").classList.contains("noleft")`)) {
+    await evaluate(`document.getElementById("leftRail").click()`);
+    await sleep(400);
+  }
+  b0 = await evaluate(SIZE("#left"));
+  if (await dragBy("#leftEdge", 40, 0)) out.drag.left = { before: b0, after: await evaluate(SIZE("#left")) };
+  // kept: the page reloaded opens as the drags left it
+  const left = { cols: await evaluate(WIDTHS), right: await evaluate(SIZE("#right")), left: await evaluate(SIZE("#left")) };
+  await send("Page.reload", {});
+  let again = false;
+  for (let i = 0; i < 200 && !again; i++) {
+    await sleep(100);
+    try { again = await evaluate("!!(window.GADGETS && window.GADGETS.ready())"); } catch (e) { /* loading */ }
+  }
+  await sleep(600);
+  out.kept = { left, now: { cols: await evaluate(WIDTHS), right: await evaluate(SIZE("#right")), left: await evaluate(SIZE("#left")) } };
   if (shot) {
     await sleep(300);
     const png = await send("Page.captureScreenshot", { format: "png" });

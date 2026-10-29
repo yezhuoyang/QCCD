@@ -146,8 +146,11 @@ def test_every_control_the_columns_add_is_declared_for_agents():
     from qccd.gadget.page import COLUMN_HINTS
     used = set()
     for f in ("page.html", "app.js"):
-        used |= set(re.findall(r'data-hint="([^"$]+)"', (WEB / f).read_text(encoding="utf-8")))
+        text = (WEB / f).read_text(encoding="utf-8")
+        used |= set(re.findall(r'data-hint="([^"$]+)"', text))
+        used |= set(re.findall(r'dataset\.hint = "([^"]+)"', text))       # the edges app.js adds
     assert used, "no data-hint found: the pattern is wrong, not the page"
+    assert {"cols:edge", "panel:width", "panel:height", "panel:timeline"} <= used, "the pattern missed the edges"
     assert used - {"fullstack-line"} <= set(COLUMN_HINTS), used - set(COLUMN_HINTS)
     for k, h in COLUMN_HINTS.items():
         assert h["t"] and h["d"], k
@@ -180,8 +183,8 @@ def check_columns(out: dict, expect: list[str]) -> None:
         assert c["w"] >= 180, c
         assert c["lit"] and c["litInView"], c
         assert c["noted"] and c["tags"], c
-    xs = sorted(c["w"] for c in out["cols"])
-    assert xs[-1] - xs[0] <= 2, "the columns share the width"
+    # a column is as wide as its lines are long, within the room the stage leaves (440 px)
+    assert sum(c["w"] for c in out["cols"]) <= app["W"] - 440 + 4, out["cols"]
     for n in out["notes"]:
         assert n["word"] and n["tip"], n
         assert n["tip"].split("\n")[1], n
@@ -198,6 +201,27 @@ def check_columns(out: dict, expect: list[str]) -> None:
     assert sum(fold["folded"]) > sum(fold["before"]) + 250, fold
     assert fold["folded"][0] >= fold["before"][0] - 2 and fold["folded"][1] >= fold["before"][1] - 2, fold
     assert all(abs(a - b) <= 2 for a, b in zip(fold["after"], fold["before"])), fold
+    # the columns show what runs, not the specification (the user, 2026-10-29)
+    assert out["spec"] == 0, "a column shows its program's specification"
+    # EVERY BOUNDARY DRAGS (the user, 2026-10-29), and moves exactly what it divides
+    near = lambda a, b, tol=3: abs(a - b) <= tol  # noqa: E731
+    d = out["drag"]
+    if len(out["cols"]) > 1:
+        b, a = d["between"]["before"], d["between"]["after"]
+        assert near(a[0] - b[0], 80) and near(b[1] - a[1], 80), d["between"]
+        assert all(near(x, y, 2) for x, y in zip(a[2:], b[2:])), d["between"]
+    st = d["stage"]
+    assert near(st["room"][1][1] - st["room"][0][1], 100) and near(st["room"][0][0] - st["room"][1][0], 100), st
+    grow = sum(st["after"]) / sum(st["before"])
+    assert all(near(x, y * grow, 3) for x, y in zip(st["after"], st["before"])), st     # in proportion
+    assert near(d["right"]["after"][0] - d["right"]["before"][0], 60), d["right"]
+    assert near(d["section"]["after"][1] - d["section"]["before"][1], 40), d["section"]
+    assert near(d["timeline"]["after"][1] - d["timeline"]["before"][1], 50, 6), d["timeline"]
+    assert near(d["left"]["after"][0] - d["left"]["before"][0], 40), d["left"]
+    # and a page reloaded opens as the reader left it
+    k = out["kept"]
+    assert all(near(x, y, 2) for x, y in zip(k["now"]["cols"], k["left"]["cols"])) and len(k["now"]["cols"]) == len(k["left"]["cols"]), k
+    assert near(k["now"]["right"][0], k["left"]["right"][0], 2) and near(k["now"]["left"][0], k["left"]["left"][0], 2), k
 
 
 @pytest.mark.skipif(NODE is None or CHROME is None, reason="node and Chrome are needed")

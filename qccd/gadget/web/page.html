@@ -31,10 +31,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 /* the programs stand in columns of their own between the stage and the right-hand panels,
    from under the header to the bottom: one column a program (app.js, "the columns") */
 #app { display: grid; flex: 1 1 auto; min-height: 0; position: relative;
-       grid-template-columns: var(--left-w, 250px) minmax(0, 1fr) var(--cols-w, 0px) var(--right-w, 340px);
+       --left-w: var(--left-open, 250px); --right-w: var(--right-open, 340px);
+       grid-template-columns: var(--left-w) minmax(0, 1fr) var(--cols-w, 0px) var(--right-w);
        grid-template-rows: 46px minmax(0, 1fr) 6px var(--tl-h, 230px);
        grid-template-areas: "head head head head" "left stage cols right" "split split cols right" "tl tl cols right"; }
-#app.stack { --right-w: 300px; }
+#app.stack { --right-w: var(--right-open, 300px); }
 #app.noleft { --left-w: 30px; }
 #app.noright { --right-w: 30px; }
 #app.noleft #left > .sect, #app.noright #right > .sect { display: none; }
@@ -43,6 +44,17 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
         padding: 10px 0; width: 100%; flex: 1; cursor: pointer; text-align: start; }
 .rail:hover { color: var(--navy); background: var(--soft); }
 #app.noleft #leftRail, #app.noright #rightRail { display: block; }
+/* every boundary drags (app.js, "the widths"): a side panel's edge, a section's, a column's */
+.edge { position: absolute; z-index: 7; }
+.edge.e-r { right: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
+.edge.e-l { left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
+.edge.e-t { top: -3px; left: 0; right: 0; height: 6px; cursor: row-resize; }
+.edge.e-b { bottom: -3px; left: 0; right: 0; height: 6px; cursor: row-resize; }
+.edge:hover, .edge.on, .pc-edge:hover, .pc-edge.on { background: rgba(152, 162, 179, .45); }
+#app.noleft #left > .edge, #app.noright #right > .edge { display: none; }
+.pc-edge { position: absolute; left: -4px; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 6; }
+body.dragx, body.dragx * { cursor: col-resize !important; user-select: none; }
+body.dragy, body.dragy * { cursor: row-resize !important; user-select: none; }
 .fold { border: 0; background: none; padding: 0 4px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
 .fold:hover { color: var(--navy); }
 
@@ -60,7 +72,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 #vsplit { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; }
 #vsplit:hover, #vsplit.on { background: rgba(152, 162, 179, .45); }
 #app.nocols #vsplit { display: none; }
-.pcol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.pcol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); position: relative; }
 .pcol:last-child { border-right: 0; }
 .pcol[hidden] { display: none; }
 .pcol > h3 { margin: 0; padding: 6px 8px 6px 10px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
@@ -136,10 +148,10 @@ header { grid-area: head; display: flex; align-items: center; gap: 12px; padding
 #checksBadge.ok { background: var(--ok-soft); color: var(--ok); border-color: #abefc6; }
 #checksBadge.bad { background: var(--bad-soft); color: var(--bad); border-color: #fecdca; }
 
-aside { background: var(--panel); min-height: 0; display: flex; flex-direction: column; }
+aside { background: var(--panel); min-height: 0; display: flex; flex-direction: column; position: relative; }
 #left { grid-area: left; border-right: 1px solid var(--line); }
 #right { grid-area: right; border-left: 1px solid var(--line); }
-.sect { border-bottom: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.sect { border-bottom: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; position: relative; }
 .sect > h3 { margin: 0; padding: 7px 10px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
              color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
 .scroll { overflow: auto; min-height: 0; }
@@ -191,7 +203,6 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
        border-radius: 6px; max-width: 360px; z-index: 30; display: none; white-space: pre-line; }
 
 #insp { flex: 1 1 auto; min-height: 0; }
-#right.withstack #insp { flex: 0 1 auto; max-height: 42%; }
 #inspBody { padding: 4px 10px 10px; font-size: 12.5px; }
 #inspBody h4 { margin: 4px 0 2px; font-size: 14px; color: var(--navy); }
 #inspBody .muted { color: var(--muted); }
@@ -207,17 +218,9 @@ aside { background: var(--panel); min-height: 0; display: flex; flex-direction: 
 .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 a.btn { display: inline-block; text-decoration: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; color: var(--ink); }
 
-/* the full stack (qccd/fullstack): every layer at the playhead, in one caption; the layers'
-   programs are columns of their own (#cols) */
-#stack { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.stk-cap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; align-items: baseline;
-  padding: 6px 10px; font-size: 12px; background: var(--soft); border-bottom: 1px solid var(--line); }
-.stk-k { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.stk-v { min-width: 0; overflow-wrap: anywhere; }
-.stk-v code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+/* the full stack (qccd/fullstack): how a layer's line is linked to the one below, in its column's head */
 .stk-how { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-radius: 9px;
-  font-size: 9.5px; color: var(--muted); cursor: help; }
-.stk-foot { font-size: 11px; padding: 4px 10px 6px; }
+  font-size: 9.5px; color: var(--muted); cursor: help; text-transform: none; letter-spacing: 0; }
 .pl { display: grid; grid-template-columns: 38px minmax(0, 1fr); padding: 0 8px 0 0; cursor: pointer; }
 .pl:hover { background: var(--soft); }
 .pl.decl { color: var(--muted); }
@@ -253,7 +256,7 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
   #app.nocols { grid-template-rows: 46px minmax(0, 1fr) 6px 200px 34px 260px; }
   #app.nocols #colsRail { writing-mode: horizontal-tb; }
   .pcol { min-width: 240px; }
-  #vsplit, .fold, .rail { display: none !important; }
+  #vsplit, .fold, .rail, .edge, .pc-edge { display: none !important; }
   #app.noright #right > .sect { display: flex; }
   #left { display: none; }
   .brand .title, #clock small { display: none; }
@@ -293,7 +296,7 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
     <div id="legend"></div>
   </div>
   <div id="cols">
-    <div id="vsplit" data-hint="cols:width" title="drag to make the program columns wider or narrower"></div>
+    <div id="vsplit" data-hint="cols:width" title="drag to make the program columns wider or narrower (double-click: as they were)"></div>
     <button class="rail" id="colsRail" data-hint="cols:rail" title="show the programs again">‹ Programs</button>
     <div id="colsBar"></div>
     <div id="colsRow">
@@ -305,7 +308,7 @@ a.btn { display: inline-block; text-decoration: none; background: var(--panel); 
     <div class="sect" id="verif"><h3><span>Verification</span><button class="fold" id="rightFold" data-hint="panel:right" title="fold this panel away">›</button></h3><div id="verifBody" class="scroll"></div></div>
     <div class="sect" id="insp"><h3>Inspector</h3><div id="inspBody" class="scroll"></div></div>
   </aside>
-  <div id="split" title="drag to resize the timeline"></div>
+  <div id="split" data-hint="panel:timeline" title="drag to make the timeline taller or shorter"></div>
   <div id="tlWrap"><canvas id="tl" aria-label="timeline"></canvas></div>
   <div id="library"></div>
   <div id="floorView"><div class="fvHead"><b id="fvTitle">Floorplan</b><span class="muted">places, regions, junctions, roads and wires, as written -- the F-rules judge it before any program runs</span><a id="fvSave" download="floorplan.floor">Download</a><button id="fvClose">Close</button></div><pre id="fvText"></pre></div>

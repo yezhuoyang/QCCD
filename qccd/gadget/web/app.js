@@ -1950,6 +1950,7 @@
     const lines = src.split(/\r?\n/);
     const calls = LANGS.defined("alg", lines);
     colOf("alg").calls = calls;
+    colOf("alg").chars = lineChars(lines);
     lines.forEach((text, i) => {
       const line = i + 1;
       const div = document.createElement("div");
@@ -2053,7 +2054,6 @@
     for (const [m, first, n] of L.members) if (line >= first && line < first + n) return `${m || L.file}:${line - first + 1}`;
     return `${L.file}:${line}`;
   }
-  function stkText(layer, line) { return ((STK.layers[layer].lines[line - 1]) || "").trim(); }
   function stkHow(h) {
     return h ? `<span class="stk-how" title="${escapeHtml((STK.how || {})[h] || h)}">${escapeHtml(h)}</span>` : "";
   }
@@ -2118,15 +2118,10 @@
   }
   function stkInit() {
     if (!STK) return;
-    // the caption: every layer at the playhead, in the right-hand panel; each layer's program
-    // is a column of its own (the columns, below)
-    const sect = document.createElement("div");
-    sect.className = "sect";
-    sect.id = "stack";
-    sect.innerHTML = `<h3>Full stack <span class="muted">FormalRV ${escapeHtml(STK.formalrv || "")}</span></h3>` +
-      `<div id="stkNow" class="stk-cap"></div><div class="stk-foot muted">${STK.foot || ""}</div>`;
-    $("right").appendChild(sect);
-    $("right").classList.add("withstack");
+    // every layer's program is a column of its own (the columns, below), the line running
+    // now lit in each and its link to the layer above badged in the column's head; the
+    // hardware instruction is lit in the Hardware column.  (The page no longer repeats them in
+    // a caption: the user, 2026-10-29, "no need to show" it.)
     // the first instruction carrying each line of each layer: click a line, land there.  A
     // folded run is not all on the page at once, so there it is the first TIME each line of
     // the program runs (`line_first`, from fold.py), and the click seeks there.
@@ -2200,94 +2195,11 @@
     out.towards = c !== k;
     return out;
   }
-  function stkInsText(I) {
-    if (!I) return "";
-    const meta = I.meta || {};
-    let s = I.type === "gate" ? (I.gate || "gate") : I.type;
-    if (I.type === "simd") s = `${I.cls || "move"}${meta.hops ? " " + meta.hops + " hops" : ""}`;
-    const ions = I.pairs ? I.pairs.map((p) => p.join("·")) : I.ions ? [...I.ions] :
-      I.participants ? I.participants.map((p) => `${p.ion} ${p.from}→${p.to}`) : [];
-    if (ions.length) s += "  " + ions.slice(0, 6).join(" ") + (ions.length > 6 ? " …" : "");
-    const tags = [meta.op, meta.round !== undefined ? `round ${meta.round + 1}` : "", meta.factor ? `factor ${meta.factor}` : ""].filter(Boolean);
-    return s + (tags.length ? `  (${tags.join(", ")})` : "");
-  }
-  // what the panels describe, at the playhead: the caption and every column
+  // what the columns describe, at the playhead
   function stkUpdate() {
     const id = stkFocus();
     const op = id === null || id === undefined ? null : stkOpNow(id);
-    if (STK) stkCaption(id, op);
     colsUpdate(id, op);
-  }
-  function stkCaption(id, op) {
-    const el = $("stkNow");
-    if (id === null || id === undefined) { el.innerHTML = `<span class="muted">nothing has run yet</span>`; return; }
-    const ins = M.gir.program.instructions[id];
-    const c = stkChain(ins.src || ins.line);
-    const row = (k, v) => `<span class="stk-k">${k}</span><span class="stk-v">${v}</span>`;
-    let h = "";
-    const isInput = (STK.input_lines || []).includes(ins.line);
-    if (isInput) {
-      h += row("Logical", `<span class="muted">an input of the program: block ${escapeHtml(ins.blocks[0])} is ` +
-               `prepared before it runs (the .prog takes its inputs as given; no FormalRV line)</span>`);
-    }
-    for (const [k, title] of isInput ? [] : STK_LAYERS) {
-      const v = c[k];
-      if (v) {
-        let extra = "";
-        if (k === "qec") {
-          const ab = ((STK.qec_absorbed_into || {})[ins.src || ins.line] || []).filter((x) => x !== v[0]);
-          if (ab.length) extra = ` <span class="muted" title="${escapeHtml(ab.map((x) => stkText("qec", x)).join("\n"))}">+${ab.length} absorbed</span>`;
-        }
-        const full = stkText(k, v[0]);
-        const shown = full.length > 140 ? full.slice(0, 137) + "…" : full;
-        h += row(title, `<code title="${escapeHtml(full)}">${escapeHtml(shown)}</code> <span class="muted">${escapeHtml(stkWhere(k, v[0]))}</span> ${stkHow(v[1])}${extra}`);
-      } else {
-        const why = ins.refresh ? "a syndrome round QCCD added to keep a resting block alive (no FormalRV line)" :
-          (STK.input_lines || []).includes(ins.line) ? "an input block, prepared before the program (no FormalRV line)" : "not linked";
-        h += row(title, `<span class="muted">${why}</span>`);
-      }
-    }
-    const inGate = (ins.call || []).map((f) => `${f.gate} (line ${f.line})`).join(" › ");
-    h += row("Gadget", `<code>${escapeHtml(ins.text)}</code>` + (op ? ` <span class="muted">@ ${escapeHtml(op.place)} · ${escapeHtml(op.e[4])}</span>` : "") +
-      (inGate ? `<br><span class="muted">inside gate ${escapeHtml(inGate)}, body line ${ins.src}</span>` : ""));
-    if (op && op.ins) {
-      const anyGate = op.circuit || M.leafData[op.master].programs[op.e[4]].instructions.some((x) => ["gate", "measure", "reset"].includes(x.type));
-      h += row("Clifford", op.circuit ? `${op.towards ? '<span class="muted">bringing ions to</span> ' : ""}<code>${escapeHtml(stkInsText(op.circuit))}</code>` :
-        `<span class="muted">${anyGate ? "every gate of this op has run; the ions are leaving" : "this op moves ions only: no gate"}</span>`);
-      // AN OP THAT COMPILES A PROGRAM OF ITS OWN -- the factory's 15-to-1 protocol, a rotation
-      // source's three lines -- names, instruction by instruction, the line it carries out
-      const own = (op.ins.meta || {}).src;
-      const next = op.circuit && (op.circuit.meta || {}).src;
-      const src = own || next;
-      const so = src && ((M.leafData[op.master] || {}).sources || {})[op.e[4]];
-      if (src && so) {
-        const lines = so.text.split(/\r?\n/);
-        const lineOf = (s) => +s.slice(s.lastIndexOf(":") + 1);
-        const ln = lineOf(src);
-        let sect = "";
-        for (let k = ln - 2; k >= 0; k--) if (/^\s*#/.test(lines[k])) { sect = lines[k].replace(/^\s*#\s*/, ""); break; }
-        // an instruction tagged with an operation that has already happened is its clean-up
-        // (the ring put back after a gate): say so, and which line comes next
-        const after = own && next && own !== next && op.towards ?
-          ` · finishing it; next <code>${escapeHtml((lines[lineOf(next) - 1] || "").trim())}</code> (line ${lineOf(next)})` : "";
-        h += row("Protocol", `<code>${escapeHtml((lines[ln - 1] || "").trim())}</code> <span class="muted">${escapeHtml(src)}${sect ? " · " + escapeHtml(sect) : ""}${after}</span>`);
-      }
-      h += row("Hardware", `<code>${escapeHtml(stkInsText(op.ins))}</code> <span class="muted">#${op.ins.id} · ${(op.local / 1000).toFixed(3)} ms into ${escapeHtml(op.e[4])}</span>`);
-    } else if (op) {
-      const cls = (CATS[(M.masters[op.master] || {}).family] || {}).title || op.master;
-      h += row("Clifford", `<span class="muted">no ions: ${escapeHtml(cls)} works on bits</span>`);
-      h += row("Hardware", `<span class="muted">${escapeHtml(op.e[4])} at ${escapeHtml(op.place)}</span>`);
-    } else {
-      h += row("Clifford", `<span class="muted">a Pauli kept in software: no ion is touched</span>`);
-      h += row("Hardware", `<span class="muted">a line in the classical memory</span>`);
-    }
-    // the same instant in the run's TSIR modules: the gadget's row, the leaf's instruction
-    const where = op ? hwWhere(op) : null;
-    if (where) {
-      h += row("Module", `<span class="muted">row</span> ${hwCite(where.row)}` +
-        (op.ins ? ` <span class="muted">› instruction</span> ${hwCite(where.leaf)}` : ` <span class="muted">(${escapeHtml(op.master)} is classical: no TSIR)</span>`));
-    }
-    el.innerHTML = h;
   }
 
   // ------------------------------------------------------------------ the columns
@@ -2297,10 +2209,13 @@
   // TSIR module its rows are written in, and the hardware program of the leaf at work.  Each
   // stands in a full-height column beside the animation, the line running now lit and kept in
   // view, its words coloured by what they do and explained on hover (langs.js).  The reader
-  // picks which columns stand there (the bar above them), how wide they are (the edge), and
-  // whether long lines wrap; the side panels fold away to give them room.  A column is drawn
-  // once; the playhead only moves its lit line.  A TSIR module is tens of thousands of lines,
-  // so a module column draws only the rows in view.
+  // picks which columns stand there (the bar above them), how wide each one is, and whether
+  // long lines wrap; the side panels fold away to give them room.  EVERY BOUNDARY DRAGS (the
+  // user, 2026-10-29: "make all boundary dragable"): between two columns (the two share their
+  // room), between the stage and the columns, at each side panel's edge, between the stage
+  // and the timeline, and between the sections of a side panel; a double click puts one back.
+  // A column is drawn once; the playhead only moves its lit line.  A TSIR module is tens of
+  // thousands of lines, so a module column draws only the rows in view.
   const LANGS = window.QCCD_LANGS;
   const APP = $("app");
   const COLS = [];
@@ -2310,10 +2225,16 @@
   // parent; a figure never reaches for the page around it.)
   let IN_FRAME = false;
   try { IN_FRAME = window.parent !== window; } catch (e) { IN_FRAME = true; }
+  const lineChars = (lines) => {
+    const n = lines.map((x) => x.replace(/\s+$/, "").length).filter((x) => x > 0).sort((a, b) => a - b);
+    return n.length ? n[Math.floor(n.length * 0.9)] : 40;
+  };
   const store = {
     get(k) { try { return window.localStorage.getItem("qccd.gadget." + (IN_FRAME ? "frame." : "") + k); } catch (e) { return null; } },
     set(k, v) { try { window.localStorage.setItem("qccd.gadget." + (IN_FRAME ? "frame." : "") + k, v); } catch (e) { /* not kept */ } },
   };
+  // the layout's own keys: a full-stack page keeps its own (it opens differently)
+  const LK = (k) => (STK ? "fs." : "") + k;
   function colsDefine() {
     if (STK) for (const [k, title] of STK_LAYERS) COLS.push({ key: k, title, lang: k, kind: "layer", file: STK.layers[k].file });
     COLS.push({ key: "alg", title: STK ? "Gadget" : "Program", lang: "alg", kind: "alg", el: $("prog"), body: $("progBody") });
@@ -2322,13 +2243,16 @@
     if (HW || LEAF_TEXT) COLS.push({ key: "hw", title: "Hardware", lang: "tsir", kind: "module", which: "leaf",
                                       about: "the TSIR of the leaf gadget at work" });
   }
-  // the columns a page opens with: every layer and the gadget program on a full-stack run,
-  // the program alone elsewhere -- unless the reader chose otherwise on this kind of page
-  const COLS_KEY = "cols." + (STK ? "stack" : "plain");
+  // the columns a page opens with: on a full-stack run every layer and the hardware
+  // instructions running under them (the gadget program is a button away), the program alone
+  // elsewhere -- unless the reader chose otherwise on this kind of page
+  const COLS_KEY = STK ? LK("cols") : "cols.plain";
+  const colsDefault = () => STK ? ["prog", "qppm", "qec", colOf("hw").key ? "hw" : "alg"] : ["alg"];
   function colsChosen() {
     const s = store.get(COLS_KEY);
     if (s !== null) { const on = new Set(s.split(",").filter(Boolean)); return (k) => on.has(k); }
-    return (k) => (STK ? ["prog", "qppm", "qec", "alg"] : ["alg"]).includes(k);
+    const on = colsDefault();
+    return (k) => on.includes(k);
   }
   function colsInit() {
     if (!COLS.length) colsDefine();
@@ -2346,6 +2270,16 @@
         col.at = col.el.querySelector(".pc-at");
         if (col.kind === "layer") row.insertBefore(col.el, $("prog"));
         else row.appendChild(col.el);
+      }
+      // the boundary on a column's left: drag it, and this column and the one before share
+      // their room differently
+      if (!col.el.querySelector(":scope > .pc-edge")) {
+        const e = document.createElement("div");
+        e.className = "pc-edge";
+        e.dataset.hint = "cols:edge";
+        e.title = "drag to share the room between these two columns differently (double-click: evenly)";
+        col.el.prepend(e);
+        colEdge(e, col);
       }
       col.on = chosen(col.key);
       col.el.querySelector(".pc-x").onclick = () => colsToggle(col.key, false);
@@ -2370,21 +2304,24 @@
     };
     $("colsHide").onclick = () => { APP.classList.add("nocols"); store.set("hidden", "1"); colsApply(); };
     $("colsRail").onclick = () => {
-      APP.classList.remove("nocols"); store.set("hidden", "0");
-      if (!COLS.some((c) => c.on)) for (const c of COLS) c.on = (STK ? ["prog", "qppm", "qec", "alg"] : ["alg"]).includes(c.key);
+      APP.classList.remove("nocols"); store.set(LK("hidden"), "0");
+      if (!COLS.some((c) => c.on)) { const on = colsDefault(); for (const c of COLS) c.on = on.includes(c.key); }
       colsApply();
     };
-    if ((store.get("hidden") || (IN_FRAME ? "1" : "0")) === "1") APP.classList.add("nocols");
-    // the side panels: a full-stack run gives its columns the room the hierarchy took, and on
-    // a narrower screen the inspector's too (each opens again from its bar)
-    const folded = (side, dflt) => { const s = store.get("fold." + side); return s === null ? dflt : s === "1"; };
+    if ((store.get(LK("hidden")) || (IN_FRAME ? "1" : "0")) === "1") APP.classList.add("nocols");
+    // the side panels: a full-stack run gives its columns the room the hierarchy took (below
+    // 2200 px), and the right-hand panel's always -- its columns say what the verification,
+    // the inspector and the old caption said (the user, 10-29: "no need to show" them); each
+    // opens again from its bar
+    const folded = (side, dflt) => { const s = store.get(LK("fold." + side)); return s === null ? dflt : s === "1"; };
     APP.classList.toggle("noleft", folded("left", !!STK && window.innerWidth < 2200));
-    APP.classList.toggle("noright", folded("right", !!STK && window.innerWidth < 1500));
+    APP.classList.toggle("noright", folded("right", !!STK));
     APP.classList.toggle("stack", !!STK);
-    const fold = (side) => () => { const on = APP.classList.toggle("no" + side); store.set("fold." + side, on ? "1" : "0"); colsApply(); };
+    const fold = (side) => () => { const on = APP.classList.toggle("no" + side); store.set(LK("fold." + side), on ? "1" : "0"); colsApply(); };
     $("leftFold").onclick = $("leftRail").onclick = fold("left");
     $("rightFold").onclick = $("rightRail").onclick = fold("right");
     colsSplitter();
+    edgesInit();
     $("cols").addEventListener("mouseover", colsTip);
     $("cols").addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
     APP.classList.add("hascols");
@@ -2403,40 +2340,149 @@
     if (COLS.some((c) => c.on)) APP.classList.remove("nocols");
     colsApply();
   }
-  // the widths: a column is as wide as the reader made it, or shares what the stage leaves
+
+  // THE WIDTHS.  Every column has the width the reader gave it (px, kept), or shares what the
+  // stage leaves; the region is their sum, and when that is more than the screen has, they keep
+  // their proportions.  Each side panel has its own width too.
+  const COLW = (() => { try { return JSON.parse(store.get(LK("colws")) || "{}") || {}; } catch (e) { return {}; } })();
+  const keepWidths = () => store.set(LK("colws"), JSON.stringify(COLW));
+  const MIN_COL = 120;
+  function sidePx(side) {
+    if (APP.classList.contains("no" + side)) return 30;
+    return +store.get(LK(side + "w")) || (side === "left" ? 250 : STK ? 300 : 340);
+  }
+  // what the columns may take: the stage keeps 360 px
+  const colsRoom = () => Math.max(200, window.innerWidth - sidePx("left") - sidePx("right") - 360);
+  function colsShown() { return APP.classList.contains("nocols") ? [] : COLS.filter((c) => c.on); }
   function colsApply() {
-    const shown = APP.classList.contains("nocols") ? [] : COLS.filter((c) => c.on);
+    const shown = colsShown();
     for (const c of COLS) c.el.hidden = !c.on;
     for (const b of $("colsBar").querySelectorAll("button[data-col]")) b.className = colOf(b.dataset.col).on ? "on" : "";
     if (!shown.length) APP.classList.add("nocols");
-    const W = window.innerWidth;
-    const side = (APP.classList.contains("noleft") ? 30 : 250) + (APP.classList.contains("noright") ? 30 : (STK ? 300 : 340));
-    const room = Math.max(200, W - side - 360);           // what the columns may take: the stage keeps 360 px
-    const asked = +store.get("colw") || 0;
-    const per = asked || Math.max(220, Math.min(480, Math.floor((W - side - 440) / Math.max(1, shown.length))));
-    const w = shown.length ? Math.min(room, per * shown.length) : 30;
-    APP.style.setProperty("--cols-w", w + "px");
+    // the first column shown has no boundary on its left (that one is the stage's)
+    shown.forEach((c, i) => { c.el.querySelector(":scope > .pc-edge").hidden = i === 0; });
+    for (const side of ["left", "right"]) {
+      const w = +store.get(LK(side + "w"));
+      if (w) APP.style.setProperty(`--${side}-open`, w + "px"); else APP.style.removeProperty(`--${side}-open`);
+    }
+    // a column the reader never sized is as wide as its lines are long (QEC's run to a hundred
+    // characters, the logical program's to twenty), at least 200 px and at most 680 (480 for a
+    // column alone: the stage is the page then); together they leave the stage 440 px, the
+    // narrow ones keeping their 200 and the wide ones giving up the rest
+    const n = shown.length, budget = Math.max(200 * n, window.innerWidth - sidePx("left") - sidePx("right") - 440);
+    const want = shown.map((c) => Math.max(200, Math.min(n === 1 ? 480 : 680, (c.chars || 60) * 7 + 56)));
+    const sum = want.reduce((a, b) => a + b, 0);
+    const fitted = sum <= budget ? want : want.map((w) => 200 + (w - 200) * (budget - 200 * n) / (sum - 200 * n));
+    const ws = shown.map((c, i) => COLW[c.key] || Math.round(fitted[i]));
+    shown.forEach((c, i) => { c.el.style.flex = `${ws[i]} 1 0px`; });
+    const total = ws.reduce((a, b) => a + b, 0);
+    APP.style.setProperty("--cols-w", (shown.length ? Math.min(colsRoom(), total) : 30) + "px");
     S.dirty = true;
     requestAnimationFrame(() => { fit(); colsFollow(true); });
   }
-  function colsSplitter() {
-    const el = $("vsplit");
+  // a drag along one axis: `start()` once, `move(d)` with the pointer's travel since, `end()`
+  function dragEdge(el, axis, start, move, end) {
     el.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
       el.setPointerCapture(ev.pointerId);
       el.classList.add("on");
-      const right = $("cols").getBoundingClientRect().right;
-      const n = Math.max(1, COLS.filter((c) => c.on).length);
-      const move = (e) => {
-        const per = Math.max(160, Math.min(1200, Math.round((right - e.clientX) / n)));
-        store.set("colw", String(per));
-        APP.style.setProperty("--cols-w", Math.min(per * n, Math.max(200, window.innerWidth - 300)) + "px");
-        S.dirty = true;
+      document.body.classList.add(axis === "x" ? "dragx" : "dragy");
+      const x0 = ev.clientX, y0 = ev.clientY;
+      const ctx = start();
+      const mv = (e) => { move(axis === "x" ? e.clientX - x0 : e.clientY - y0, ctx); S.dirty = true; };
+      const up = () => {
+        el.removeEventListener("pointermove", mv);
+        el.classList.remove("on");
+        document.body.classList.remove("dragx", "dragy");
+        end(ctx);
       };
-      el.addEventListener("pointermove", move);
-      el.addEventListener("pointerup", () => { el.removeEventListener("pointermove", move); el.classList.remove("on"); fit(); colsFollow(true); }, { once: true });
+      el.addEventListener("pointermove", mv);
+      el.addEventListener("pointerup", up, { once: true });
+      el.addEventListener("pointercancel", up, { once: true });
     });
-    el.addEventListener("dblclick", () => { store.set("colw", ""); colsApply(); });
+  }
+  // the edge between the stage and the columns: every column grows or shrinks in proportion
+  function colsSplitter() {
+    const el = $("vsplit");
+    dragEdge(el, "x", () => {
+      const shown = colsShown();
+      return { shown, px: shown.map((c) => c.el.getBoundingClientRect().width), total: $("cols").getBoundingClientRect().width };
+    }, (d, c) => {
+      const T = Math.max(MIN_COL * c.shown.length, Math.min(window.innerWidth - sidePx("left") - sidePx("right") - 160, c.total - d));
+      c.shown.forEach((col, i) => { COLW[col.key] = Math.round(c.px[i] * T / c.total); col.el.style.flex = `${COLW[col.key]} 1 0px`; });
+      APP.style.setProperty("--cols-w", T + "px");
+    }, () => { keepWidths(); fit(); colsFollow(true); });
+    el.addEventListener("dblclick", () => { for (const c of colsShown()) delete COLW[c.key]; keepWidths(); colsApply(); });
     window.addEventListener("resize", () => colsApply());
+  }
+  // the edge between a column and the one before it: the two share their room differently
+  function colEdge(el, col) {
+    const before = () => { const shown = colsShown(), i = shown.indexOf(col); return i > 0 ? shown[i - 1] : null; };
+    dragEdge(el, "x", () => {
+      const a = before();
+      if (!a) return null;
+      // every column shown keeps the width it has now; these two then trade
+      for (const c of colsShown()) { COLW[c.key] = c.el.getBoundingClientRect().width; c.el.style.flex = `${COLW[c.key]} 1 0px`; }
+      return { a, pa: COLW[a.key], pb: COLW[col.key] };
+    }, (d, c) => {
+      if (!c) return;
+      const na = Math.max(MIN_COL, Math.min(c.pa + c.pb - MIN_COL, c.pa + d));
+      COLW[c.a.key] = na;
+      COLW[col.key] = c.pa + c.pb - na;
+      c.a.el.style.flex = `${COLW[c.a.key]} 1 0px`;
+      col.el.style.flex = `${COLW[col.key]} 1 0px`;
+    }, (c) => { if (c) { keepWidths(); colsFollow(true); } });
+    el.addEventListener("dblclick", () => {
+      const a = before();
+      if (!a) return;
+      const both = Math.round(a.el.getBoundingClientRect().width + col.el.getBoundingClientRect().width);
+      for (const c of colsShown()) COLW[c.key] = Math.round(c.el.getBoundingClientRect().width);
+      COLW[a.key] = Math.floor(both / 2);
+      COLW[col.key] = both - COLW[a.key];
+      keepWidths();
+      colsApply();
+    });
+  }
+  // the side panels' edges, and the boundaries between the sections of each
+  function edgesInit() {
+    const side = (name, sign) => {
+      const el = document.createElement("div");
+      el.className = "edge e-" + (sign > 0 ? "r" : "l");
+      el.id = name + "Edge";
+      el.dataset.hint = "panel:width";
+      el.title = "drag to make this panel wider or narrower (double-click: as it was)";
+      $(name).appendChild(el);
+      dragEdge(el, "x", () => $(name).getBoundingClientRect().width, (d, w0) => {
+        const w = Math.max(180, Math.min(Math.round(window.innerWidth * 0.45), Math.round(w0 + sign * d)));
+        store.set(LK(name + "w"), String(w));
+        APP.style.setProperty(`--${name}-open`, w + "px");
+      }, () => colsApply());
+      el.addEventListener("dblclick", () => { store.set(LK(name + "w"), ""); colsApply(); });
+    };
+    side("left", +1);
+    side("right", -1);
+    // a section's height: the hierarchy above the checks, the verification above the inspector
+    const sect = (id, sign) => {
+      const box = $(id);
+      const el = document.createElement("div");
+      el.className = "edge " + (sign > 0 ? "e-b" : "e-t");
+      el.dataset.hint = "panel:height";
+      el.title = "drag to give this section more or less of the panel (double-click: as it was)";
+      box.appendChild(el);
+      const set = (h) => {
+        if (h) { box.style.flex = `0 0 ${h}px`; box.style.maxHeight = "none"; } else { box.style.flex = ""; box.style.maxHeight = ""; }
+      };
+      set(+store.get(LK("h." + id)) || 0);
+      dragEdge(el, "y", () => box.getBoundingClientRect().height, (d, h0) => {
+        const h = Math.max(60, Math.min(box.parentNode.getBoundingClientRect().height - 120, Math.round(h0 + sign * d)));
+        set(h);
+        store.set(LK("h." + id), String(h));
+      }, () => {});
+      el.addEventListener("dblclick", () => { store.set(LK("h." + id), ""); set(0); });
+    };
+    sect("checks", -1);
+    sect("verif", +1);
   }
   // a word with a note: the note, under it
   function colsTip(ev) {
@@ -2455,12 +2501,16 @@
 
   // A LAYER COLUMN: the whole file, drawn once; a program of several files says where each
   // begins, and numbers its lines file by file, as FormalRV does
+  // (its specification -- `main.spec.prog`, a `.qppm`'s `spec NAME:` blocks -- left out: the
+  // columns show what runs; the user, 10-29, "no need to show the specification")
   function layerBuild(col) {
     const k = col.key, L = STK.layers[k];
     col.calls = LANGS.defined(k, L.lines, (ln) => stkWhere(k, ln));
+    const spec = LANGS.spec(k, L.lines, (ln) => stkWhere(k, ln));
     const parts = [];
     let file = null;
     for (let ln = 1; ln <= L.lines.length; ln++) {
+      if (spec.has(ln)) continue;
       const at = stkWhere(k, ln), c = at.lastIndexOf(":");
       const f = at.slice(0, c);
       if (L.members.length > 1 && f !== file) parts.push(`<div class="cl-file">${escapeHtml(f)}</div>`);
@@ -2470,7 +2520,9 @@
         `<span class="ln">${at.slice(c + 1)}</span>${codeSpan(k, L.lines[ln - 1], col.calls)}</div>`);
     }
     col.body.innerHTML = parts.join("");
-    col.rows = col.body.querySelectorAll(".cl");
+    col.chars = lineChars(L.lines.filter((x, i) => !spec.has(i + 1)));
+    col.rows = {};
+    for (const r of col.body.querySelectorAll(".cl")) col.rows[r.dataset.line] = r;
     col.cur = 0;
     col.marks = [];
     col.body.addEventListener("click", (ev) => {
@@ -2478,21 +2530,26 @@
       if (r) stkJump(k, +r.dataset.line);
     });
   }
-  function layerMark(col, line, also) {
-    if (line !== col.cur) {
+  // the line running now lit; the column's head says where it is written and how it is linked
+  // to the layer below (a badge, explained on hover) -- or why no line of this layer runs now
+  function layerMark(col, line, also, how, why) {
+    if (line !== col.cur || (!line && why !== col.why)) {
       for (const el of col.marks) el.classList.remove("cur", "abs");
       col.marks = [];
       col.cur = line;
-      const el = line ? col.rows[line - 1] : null;
+      col.why = why;
+      const el = line ? col.rows[line] : null;
       if (el) { el.classList.add("cur"); col.marks.push(el); col.follow = true; }
-      for (const a of also || []) { const e = col.rows[a - 1]; if (e && a !== line) { e.classList.add("abs"); col.marks.push(e); } }
-      col.at.textContent = line ? stkWhere(col.key, line) : col.file;
+      for (const a of also || []) { const e = col.rows[a]; if (e && a !== line) { e.classList.add("abs"); col.marks.push(e); } }
+      col.at.innerHTML = line ? `${escapeHtml(stkWhere(col.key, line))} ${stkHow(how)}` :
+        why ? `<span title="${escapeHtml(why)}">${escapeHtml(why)}</span>` : escapeHtml(col.file);
     }
   }
 
   // A MODULE COLUMN: a virtual list over the module's lines, one row of 18 px each
   const VROW = 18;
   function vBuild(col) {
+    col.chars = 90;                      // a TSIR line: an instruction and its ions, then its notes
     col.body.innerHTML = `<div class="pc-none"></div><div class="vl"><div class="vw"></div></div>`;
     col.msg = col.body.firstChild;
     col.vl = col.body.querySelector(".vl");
@@ -2551,14 +2608,17 @@
   // the playhead moved (or a module arrived): every column lights its line
   function colsUpdate(id, op) {
     if (!COLS.length) return;
-    let c = {}, also = [];
+    let c = {}, also = [], why = "";
     if (STK && id !== null && id !== undefined) {
       const ins = M.gir.program.instructions[id];
       if (!(STK.input_lines || []).includes(ins.line)) c = stkChain(ins.src || ins.line);
       also = (STK.qec_absorbed_into || {})[ins.src || ins.line] || [];
+      why = (STK.input_lines || []).includes(ins.line) ? "now: an input, prepared before the program runs" :
+        ins.refresh ? "now: a syndrome round QCCD added to keep a resting block alive" : "";
     }
     for (const col of COLS) {
-      if (col.kind === "layer") layerMark(col, c[col.key] ? c[col.key][0] : 0, col.key === "qec" ? also : []);
+      if (col.kind === "layer") layerMark(col, c[col.key] ? c[col.key][0] : 0, col.key === "qec" ? also : [],
+                                          c[col.key] ? c[col.key][1] : "", why);
       else if (col.kind === "module" && col.on) {
         if (col.which === "row") {
           const w = op ? hwWhere(op) : null;
@@ -2576,7 +2636,7 @@
   function colsFollow(all) {
     for (const col of COLS) {
       if (!col.on || APP.classList.contains("nocols")) continue;
-      if (col.kind === "layer" && col.cur && (col.follow || all)) { inView(col.body, col.rows[col.cur - 1]); col.follow = false; }
+      if (col.kind === "layer" && col.rows[col.cur] && (col.follow || all)) { inView(col.body, col.rows[col.cur]); col.follow = false; }
       if (col.kind === "module" && all) { col.follow = true; vPaint(col, true); }
     }
     if (all) { const lit = $("progBody").querySelector(".pl.live"); if (lit) inView($("progBody"), lit); }

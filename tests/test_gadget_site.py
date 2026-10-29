@@ -118,8 +118,14 @@ def test_the_smallest_run_is_built_by_the_section(leaves, tmp_path):
     from test_gadget_columns import CHROME, NODE, _probe, check_columns
     if NODE and CHROME:
         out = _probe(tmp_path / "gadgets" / "fullstack" / "cnot")
-        check_columns(out, ["prog", "qppm", "qec", "alg"])
+        # the layers and, under them, the hardware instructions -- not the gadget program (the
+        # user, 2026-10-29: it "should be concrete, detailed hardware instruction")
+        check_columns(out, ["prog", "qppm", "qec", "hw"])
         assert "noleft" in out["app"]["cls"], "a full-stack run gives its columns the hierarchy's room"
+        assert "noright" in out["app"]["cls"], "a full-stack run opens without the right-hand panel"
+        # QEC's long statements get the room the logical program's short lines do not need
+        w = {c["key"]: c["w"] for c in out["cols"]}
+        assert w["qec"] > w["prog"] + 60, w
         lit = {c["key"]: c["lit"] for c in out["cols"]}
         assert "CX(0, 1)" in lit["prog"]
         assert "measure" in lit["qppm"] and "merge" in lit["qec"]

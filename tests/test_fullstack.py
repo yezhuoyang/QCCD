@@ -745,3 +745,13 @@ def test_one_logical_cnot_on_ions_every_layer_checked(tmp_path):
     assert out["views"]["both"]["home"] and out["views"]["hw"]["home"]
     assert not out["views"]["stack"]["home"] and out["views"]["stack"]["shown"]
     assert out["views"]["stackNoHw"]["home"] and not out["views"]["stackNoHw"]["shown"]
+    # the columns show what runs, not the specification; and every boundary drags, moving
+    # exactly what it divides (the user, 2026-10-29)
+    assert out["spec"] == 0
+    near = lambda a, b, tol=3: abs(a - b) <= tol  # noqa: E731
+    b, a = out["drag"]["between"]["before"], out["drag"]["between"]["after"]
+    assert near(a[0] - b[0], 60) and near(b[1] - a[1], 60) and all(near(x, y) for x, y in zip(a[2:], b[2:])), out["drag"]
+    b, a = out["drag"]["pane"]["before"], out["drag"]["pane"]["after"]
+    assert near(sum(a) - sum(b), 100, 5) and all(near(x, y * sum(a) / sum(b)) for x, y in zip(a, b)), out["drag"]
+    st = out["afterDrag"]
+    assert st["scrollW"] <= st["W"] and all(c["lit"] and c["inView"] for c in st["cols"]), st

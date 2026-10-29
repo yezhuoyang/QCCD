@@ -831,17 +831,25 @@ slate. Change the palette in `theme.py` and both tools move together.
   the running row is written in, on a folded run) and the **Hardware** program (the leaf's
   TSIR, its instruction running now lit; a run that is not folded writes each leaf's TSIR
   text as `hw/leaf/<master>.js` for it). The bar above them picks which stand there (a
-  full-stack run opens on its four layers, any other page on the program alone), the left
-  edge sets their width (double-click: back to sharing what the stage leaves), and **Wrap**
-  wraps long lines under their own first word. Each column lights the line running now and
-  keeps it in view; clicking a line of a FormalRV layer jumps to the first instruction it
-  carries. The words of every language are coloured by what they do and explained on hover
+  full-stack run opens on its three layers and the Hardware program under them, the gadget
+  program a button away; any other page on the program alone), and **Wrap** wraps long
+  lines under their own first word. A FormalRV layer shows what runs: its specification
+  (`main.spec.prog`, a `spec NAME:` block) is left out, the other lines keeping their
+  numbers. Each column opens as wide as its lines are long (the logical program narrow, the
+  QEC operations and the hardware wide), and **every boundary drags**: between two columns
+  (the two share their room), between the stage and the columns (all of them, in
+  proportion), each side panel's edge, the timeline's, and the boundary between two sections
+  of a side panel; a double click puts one back, and the page remembers them. Each column
+  lights the line running now and keeps it in view, its head naming where that line is
+  written and badging how it is linked to the layer below; clicking a line of a FormalRV
+  layer jumps to the first instruction it carries. The words of every language are coloured by what they do and explained on hover
   (`web/langs.js`): a statement's word is a tag, as the studio draws a hardware instruction,
   and the same kind has the same colour in every column -- a preparation cyan, a
   Pauli-product measurement (`measure` in the `.qppm`, `merge` in the `.qec`, `ppm` in the
   program) indigo, a decode violet, a gate green, a frame update amber, a transport blue.
   The hierarchy and the inspector fold to bars to give the columns room (a full-stack run
-  folds the hierarchy below 2200 px and the inspector below 1500 px).
+  folds the hierarchy below 2200 px, and opens with the verification and the inspector
+  folded at every width: its columns say what they would).
 - **Decode.** While a `decode` instruction runs, the dashed wires it uses are lit -- the
   syndrome wire from each place that measured, and the frame wire from the decoder to the
   memory -- with the dashes marching the way the bits go, a packet per burst saying how

@@ -190,7 +190,7 @@ def stack_payload(prog, qppm, qec, chain, low: qec2alg.Lowered, foot: str) -> di
         "qec_links": {ln: [l.stmt.line, l.how] for ln, l in chain.qec_to_qppm.items()},
         "qppm_links": {ln: [l.stmt.line, l.how] for ln, l in chain.qppm_to_prog.items()},
         "input_lines": [al for al, r in low.role_of.items() if r == "input"],
-        "how": {**HOW, "lowered": "QCCD's own lowering of this .qec statement (qccd/fullstack/qec2alg.py)"},
+        "how": {**HOW, "lowered": "QCCD's own lowering of this .qec statement into the gadget program the machine runs"},
         "formalrv": _commit(),
         "foot": foot,
     }
