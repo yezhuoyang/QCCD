@@ -15,6 +15,10 @@
    "ions_per_instruction": 2.2,
    "transport_instructions": 210
   },
+  "evaluation": {
+   "digest": "sha256:37dd206099c10f68cf44ce268c9a311d71787dccd7243d11c5165be572509ff7",
+   "name": "metrics"
+  },
   "quantinuum": {
    "peak_quanta": 9.247782,
    "total_cost": 1895.0,
@@ -57,7 +61,7 @@
  },
  "evaluator": {
   "name": "qccd-reference-evaluator",
-  "source_digest": "sha256:50385a33083ccb2b59a387683a959b737ed6c5ee1fe0507d6eca9bd47e7502b5",
+  "source_digest": "sha256:62880d0a74d216bee061b15ce8d63ae23db0a33b26c59471be1d3dcbe5d2f291",
   "toolchain": {
    "bridge": "sha256:f9e7f5859ce16274c2818ebe5f4549a9bb3cb4b08754de5e642226b07f66f8d9",
    "python": "3.14.7",
@@ -105,19 +109,19 @@
    "better": "low",
    "ranked": false,
    "unit": "per experiment",
-   "value": 0.0006296875
+   "value": 0.0007140350877192982
   },
   "ler_per_round": {
    "better": "low",
    "ranked": false,
    "unit": "per round",
-   "value": 0.00020993990501272375
+   "value": 0.0002380683679565898
   },
   "ler_per_round_per_logical": {
    "better": "low",
    "ranked": true,
    "unit": "per round per logical qubit",
-   "value": 0.00020993990501272375
+   "value": 0.0002380683679565898
   },
   "transport_instructions": {
    "better": null,
@@ -135,8 +139,8 @@
  "profile": "reference",
  "rank_by": "ler_per_round_per_logical",
  "run": {
-  "grader": "7ed70f42b17f",
-  "job_id": "oj_5825e83cfc5d128e"
+  "grader": "07db8624122f",
+  "job_id": "oj_a9d2ea7e28c2d568"
  },
  "stages": [
   {
@@ -277,20 +281,20 @@
    "status": "passed"
   },
   {
-   "coverage": "403 logical errors in 640000 shots (pymatching), noise qccd-noise@2",
+   "coverage": "407 logical errors in 570000 shots (pymatching), noise qccd-noise@2",
    "detail": {
     "budget": {
      "crosstalk": 0.004620000000000001,
      "crosstalk_global": 0.018410893617021275,
-     "gate_1q": 0.015825000000033396,
+     "gate_1q": 0.02009989312593219,
      "measure": 6.600000000189787e-05,
      "memory": 0.023311794000000104,
      "memory_coherent": 0.001105730664069531,
      "ms_base": 0.11375999999999387,
      "ms_chain": 0.0,
      "ms_heating": 0.006839999999999981,
-     "reset": 0.03300000000000001,
-     "total": 0.21693941828112007
+     "reset": 0.033000000000000015,
+     "total": 0.22121431140701886
     },
     "check": {
      "nondeterministic": false,
@@ -319,21 +323,25 @@
     },
     "ler": {
      "decoder": "pymatching",
-     "errors": 403,
-     "hi": 0.0006942164743496041,
-     "ler": 0.0006296875,
-     "lo": 0.0005711532099553317,
-     "per_round": 0.00020993990501272375,
-     "per_round_hi": 0.00023145906061328159,
-     "per_round_lo": 0.00019042066104502098,
+     "errors": 407,
+     "hi": 0.0007868263387447727,
+     "ler": 0.0007140350877192982,
+     "lo": 0.0006479735684410777,
+     "per_round": 0.0002380683679565898,
+     "per_round_hi": 0.0002623442647429197,
+     "per_round_lo": 0.0002160378584756817,
      "rounds": 3,
-     "seconds": 0.341,
+     "seconds": 0.22,
      "seed": 20261021,
-     "shots": 640000,
+     "shots": 570000,
      "stim_version": "1.15.0",
      "stopped": "max_errors"
     },
     "noise": {
+     "evaluation": {
+      "digest": "sha256:a63c72a823b1e2ec60cb9f5eb57cffb0cb7f56f1a8b26222275bfbc57cfbda9a",
+      "name": "qccd-noise@2"
+     },
      "id": "qccd-noise@2",
      "params": {
       "chain": true,
@@ -424,22 +432,22 @@
   "id": "surface3xz_mem@1"
  },
  "timing": {
-  "finished_at": 1792825227.0310078,
+  "finished_at": 1793309357.7277203,
   "stage_seconds": {
-   "bundle": 0.05,
-   "certificate_binding": 0.641,
-   "correspondence": 0.056,
-   "device": 0.01,
-   "lean_certificate": 0.614,
-   "ler": 1.14,
-   "metrics": 0.053,
+   "bundle": 0.053,
+   "certificate_binding": 0.546,
+   "correspondence": 0.038,
+   "device": 0.251,
+   "lean_certificate": 0.619,
+   "ler": 0.965,
+   "metrics": 0.145,
    "physics_lock": 0.001,
-   "program": 0.012,
-   "rules": 0.157,
-   "semantics": 1.378
+   "program": 0.006,
+   "rules": 0.101,
+   "semantics": 1.211
   },
-  "started_at": 1792825222.4347553,
-  "wall_seconds": 4.596
+  "started_at": 1793309353.3229566,
+  "wall_seconds": 4.405
  },
  "version": 1
 }

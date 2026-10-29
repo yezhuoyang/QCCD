@@ -675,14 +675,18 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         rows = "".join(f'<tr><td><code>{html.escape(k)}</code></td><td class="r">{v["designs"]}</td>'
                        f'<td class="r">{v["same"]}</td><td class="r">{v["metrics_equal"]}</td></tr>'
                        for k, v in sorted(agree["by_release"].items()))
+        before = agree.get("before") or {}
         w(f'<div class="eg"><b>Checked</b><p>Until 2026-10-26 the grader wrote its circuit with a '
-          f'hand-written extraction; since then it reads the text. The switch changed no circuit: on every Goal 1 '
-          f'design we hold, {agree["designs"]} in all, from the 10-ion repetition code to the 180-ion bivariate '
-          f'bicycle code, the circuit the text writes and the one the old extraction wrote are the same qubit by '
-          f'qubit (<a href="#circuit">what &ldquo;the same&rdquo; means</a>), every channel of the error budget '
-          f'agrees to 10<sup>−9</sup>, and so does every metric the board shows. Every logical error rate published '
-          f'before the switch is therefore a sample of the circuit on this page.'
-          f'</p><div class="tw"><table class="t"><tr><th>release</th><th class="r">designs</th>'
+          f'hand-written extraction; since then it reads the text, and that switch changed no circuit '
+          f'({before.get("same", "every")} of {before.get("designs", "the")} Goal 1 designs the same). On '
+          f'{agree["date"]} the text changed once: a Z rotation <code>VZ</code> now fails as the three pulses the '
+          f'clock charges it, where before it wrote no noise on its ions. The hand-written extraction, kept as the '
+          f'reference, was given the same rule, and on every entry of the Goal 1 releases, {agree["designs"]} in '
+          f'all, from the 10-ion repetition code to the 180-ion bivariate bicycle code, the two write the same '
+          f'circuit qubit by qubit (<a href="#circuit">what &ldquo;the same&rdquo; means</a>), every channel of the '
+          f'error budget agrees to 10<sup>−9</sup>, and so does every metric the board shows. Every entry was then '
+          f'graded again, so every logical error rate the board publishes is a sample of the circuit on this page.'
+          f'</p><div class="tw"><table class="t"><tr><th>release</th><th class="r">entries</th>'
           f'<th class="r">same circuit</th><th class="r">same metrics</th></tr>{rows}</table></div></div>')
 
     # ---------------------------------------------------------------- 2 the language

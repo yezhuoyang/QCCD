@@ -15,6 +15,10 @@
    "ions_per_instruction": 1.4375,
    "transport_instructions": 32
   },
+  "evaluation": {
+   "digest": "sha256:37dd206099c10f68cf44ce268c9a311d71787dccd7243d11c5165be572509ff7",
+   "name": "metrics"
+  },
   "quantinuum": {
    "peak_quanta": 2.0456060000000003,
    "total_cost": 98.0,
@@ -57,7 +61,7 @@
  },
  "evaluator": {
   "name": "qccd-reference-evaluator",
-  "source_digest": "sha256:50385a33083ccb2b59a387683a959b737ed6c5ee1fe0507d6eca9bd47e7502b5",
+  "source_digest": "sha256:62880d0a74d216bee061b15ce8d63ae23db0a33b26c59471be1d3dcbe5d2f291",
   "toolchain": {
    "bridge": "sha256:f9e7f5859ce16274c2818ebe5f4549a9bb3cb4b08754de5e642226b07f66f8d9",
    "python": "3.14.7",
@@ -105,19 +109,19 @@
    "better": "low",
    "ranked": false,
    "unit": "per experiment",
-   "value": 0.00934
+   "value": 0.0093
   },
   "ler_per_round": {
    "better": "low",
    "ranked": false,
    "unit": "per round",
-   "value": 0.003123076788202117
+   "value": 0.0031096599616217135
   },
   "ler_per_round_per_logical": {
    "better": "low",
    "ranked": true,
    "unit": "per round per logical qubit",
-   "value": 0.003123076788202117
+   "value": 0.0031096599616217135
   },
   "transport_instructions": {
    "better": null,
@@ -135,8 +139,8 @@
  "profile": "reference",
  "rank_by": "ler_per_round_per_logical",
  "run": {
-  "grader": "7ed70f42b17f",
-  "job_id": "oj_0784d294bf03bfb3"
+  "grader": "07db8624122f",
+  "job_id": "oj_9195d311aa9d593a"
  },
  "stages": [
   {
@@ -277,12 +281,12 @@
    "status": "passed"
   },
   {
-   "coverage": "467 logical errors in 50000 shots (pymatching), noise qccd-noise@2",
+   "coverage": "465 logical errors in 50000 shots (pymatching), noise qccd-noise@2",
    "detail": {
     "budget": {
      "crosstalk": 0.0012600000000000003,
      "crosstalk_global": 0.00460663829787234,
-     "gate_1q": 0.002475000000005223,
+     "gate_1q": 0.002699994375052528,
      "measure": 1.8000000000517602e-05,
      "memory": 0.0011549009999999992,
      "memory_coherent": 1.2460284094450399e-05,
@@ -290,7 +294,7 @@
      "ms_chain": 0.0,
      "ms_heating": 0.0011400000000000004,
      "reset": 0.009000000000000003,
-     "total": 0.038626999581971515
+     "total": 0.03885199395701882
     },
     "check": {
      "nondeterministic": false,
@@ -319,21 +323,25 @@
     },
     "ler": {
      "decoder": "pymatching",
-     "errors": 467,
-     "hi": 0.010221642270706158,
-     "ler": 0.00934,
-     "lo": 0.008533745944677814,
-     "per_round": 0.003123076788202117,
-     "per_round_hi": 0.0034188895752509385,
-     "per_round_lo": 0.002852712210086983,
+     "errors": 465,
+     "hi": 0.010179856952872032,
+     "ler": 0.0093,
+     "lo": 0.00849553740837387,
+     "per_round": 0.0031096599616217135,
+     "per_round_hi": 0.0034048656030720714,
+     "per_round_lo": 0.0028399032184271977,
      "rounds": 3,
-     "seconds": 0.007,
+     "seconds": 0.013,
      "seed": 20261021,
      "shots": 50000,
      "stim_version": "1.15.0",
      "stopped": "max_errors"
     },
     "noise": {
+     "evaluation": {
+      "digest": "sha256:a63c72a823b1e2ec60cb9f5eb57cffb0cb7f56f1a8b26222275bfbc57cfbda9a",
+      "name": "qccd-noise@2"
+     },
      "id": "qccd-noise@2",
      "params": {
       "chain": true,
@@ -424,22 +432,22 @@
   "id": "rep3xz_mem@1"
  },
  "timing": {
-  "finished_at": 1792825528.8493323,
+  "finished_at": 1793309194.4635024,
   "stage_seconds": {
-   "bundle": 0.01,
-   "certificate_binding": 0.605,
-   "correspondence": 0.009,
-   "device": 0.002,
-   "lean_certificate": 0.681,
-   "ler": 0.732,
-   "metrics": 0.007,
+   "bundle": 0.022,
+   "certificate_binding": 0.876,
+   "correspondence": 0.021,
+   "device": 0.396,
+   "lean_certificate": 0.923,
+   "ler": 0.947,
+   "metrics": 0.051,
    "physics_lock": 0.001,
-   "program": 0.002,
-   "rules": 0.013,
-   "semantics": 1.211
+   "program": 0.005,
+   "rules": 0.026,
+   "semantics": 1.824
   },
-  "started_at": 1792825525.1112766,
-  "wall_seconds": 3.738
+  "started_at": 1793309188.6757421,
+  "wall_seconds": 5.788
  },
  "version": 1
 }

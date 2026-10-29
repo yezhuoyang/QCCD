@@ -1,156 +1,70 @@
 {
  "kind": "qccd.evalset_agreement",
- "date": "2026-10-26",
+ "date": "2026-10-29",
  "evaluation": "goal1",
- "against": "the grader's extraction (qccd-noise@2) and leaderboard metrics",
+ "against": "the grader's hand-written extraction (kept as the reference) with the same rule for a Z rotation",
  "compared": [
   "the noisy circuit, qubit by qubit",
   "the error budget, channel by channel (1e-9)",
-  "T, instructions, transport_instructions, ions_per_instruction, dacs",
-  "peak_nbar, cost, junction_crossings, gate_error_sum, gate_nbar_max against the replay"
+  "every metric the board shows, and the device stage"
  ],
- "designs": 71,
+ "designs": 54,
  "by_release": {
   "bb18xz_mem@1": {
-   "designs": 6,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "cyclone50",
-    "cyclone72",
-    "grid10x10",
-    "grid8x8",
-    "grid9x9",
-    "ring72_48d"
-   ]
+   "designs": 4,
+   "same": 4,
+   "metrics_equal": 4
   },
   "bb72seq_mem@1": {
-   "designs": 2,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "grid12x12",
-    "grid13x13"
-   ]
+   "designs": 3,
+   "same": 3,
+   "metrics_equal": 3
   },
   "bb90seq_mem@1": {
-   "designs": 1,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "grid14x14"
-   ]
+   "designs": 2,
+   "same": 2,
+   "metrics_equal": 2
   },
   "rep3xz_mem@1": {
-   "designs": 12,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "chain12",
-    "chain24",
-    "cyclone12",
-    "cyclone20",
-    "grid3x3",
-    "grid4x4",
-    "grid5x5",
-    "grid6x6",
-    "ladder16_r4",
-    "racetrack10",
-    "ring16_8d",
-    "ring24_12d"
-   ]
+   "designs": 3,
+   "same": 3,
+   "metrics_equal": 3
   },
   "rep5xz_mem@1": {
-   "designs": 11,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "chain24",
-    "cyclone12",
-    "cyclone20",
-    "grid3x3",
-    "grid4x4",
-    "grid5x5",
-    "grid6x6",
-    "ladder16_r4",
-    "racetrack10",
-    "ring16_8d",
-    "ring24_12d"
-   ]
+   "designs": 3,
+   "same": 3,
+   "metrics_equal": 3
   },
   "shorxz_mem@1": {
-   "designs": 5,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "cyclone20",
-    "grid5x5",
-    "grid6x6",
-    "ladder16_r4",
-    "ring24_12d"
-   ]
+   "designs": 3,
+   "same": 3,
+   "metrics_equal": 3
   },
   "steanexz_mem@1": {
-   "designs": 6,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "cyclone20",
-    "grid4x4",
-    "grid5x5",
-    "grid6x6",
-    "ladder16_r4",
-    "ring24_12d"
-   ]
+   "designs": 3,
+   "same": 3,
+   "metrics_equal": 3
   },
   "surface3xz_mem@1": {
-   "designs": 11,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "cyclone18",
-    "cyclone36",
-    "grid4x4",
-    "grid5x5",
-    "grid6x6",
-    "grid9x9",
-    "ladder24_r6",
-    "racetrack20",
-    "ring24_24d",
-    "ring32_16d",
-    "ring48_16d"
-   ]
+   "designs": 12,
+   "same": 12,
+   "metrics_equal": 12
   },
   "surface5xz_mem@1": {
    "designs": 14,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "cyclone50",
-    "cyclone72",
-    "grid10x10",
-    "grid11x11",
-    "grid12x12",
-    "grid8x12",
-    "grid8x8",
-    "grid9x9",
-    "grid9x9_wide",
-    "ring64_64d",
-    "ring72_48d",
-    "ring96_48d",
-    "torus10x10",
-    "torus8x8"
-   ]
+   "same": 14,
+   "metrics_equal": 14
   },
   "surface7xz_mem@1": {
-   "designs": 3,
-   "same": 0,
-   "metrics_equal": 0,
-   "devices": [
-    "grid12x12",
-    "grid13x13",
-    "grid14x14"
-   ]
+   "designs": 7,
+   "same": 7,
+   "metrics_equal": 7
   }
+ },
+ "before": {
+  "date": "2026-10-26",
+  "designs": 71,
+  "same": 71,
+  "note": "the switch from the hand-written extraction to the text: every circuit the same"
  }
 }
