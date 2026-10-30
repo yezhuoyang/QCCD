@@ -40,7 +40,8 @@ from typing import Iterator, Mapping
 from ..arch.c2lr import NotC2LR, Variation, declared, geometry, is_c2lr, variation_of
 from ..ir.tsir import C2LR_TEMPLATES, TSIR, Instruction, Participant, template_problems
 
-__all__ = ["C2LRStep", "C2LRTracker", "walk", "is_c2lr_class"]
+__all__ = ["C2LRStep", "C2LRTracker", "StepError", "walk", "tracker_for", "is_c2lr_class",
+           "why_not_c2lr"]
 
 
 @dataclass(frozen=True)
@@ -98,7 +99,7 @@ def is_c2lr_class(arch, cls: str | None) -> bool:
         return False
 
 
-class _Err(Exception):
+class StepError(Exception):
     """A step that cannot be executed; the caller re-raises it as its own error type."""
 
 
@@ -196,25 +197,21 @@ class C2LRTracker:
             self.near.pop(i, None)
             self.entered.pop(i, None)
         self._settle(after)
-        check = self.fresh
-        if instr is None:
-            self.fresh = True
-        else:
-            self.fresh = False
+        # a re-placement leaves a state no cycle has judged yet: the next cycle judges it
+        check, self.fresh = self.fresh, instr is None
         return C2LRStep(c1=tuple(c1), c2=tuple(c2), excepted_before=exc_before,
-                        excepted_after=self.excepted(after), check_before=check,
-                        stayers=tuple(sorted(after)), heated=frozenset())
+                        excepted_after=self.excepted(after), check_before=check)
 
     def init(self, before: Mapping[str, str], after: Mapping[str, str]) -> None:
         self.observe(before, after, None)
 
     def expand(self, instr: Instruction, pos: Mapping[str, str]) -> tuple[C2LRStep, dict[str, str]]:
         """Expand a C2LR template at positions `pos`: the step, and the positions after it.
-        Raises `_Err` for a step that cannot be executed."""
+        Raises `StepError` for a step that cannot be executed."""
         tpl = instr.template or {}
         bad = template_problems(tpl, instr.participants)
         if bad:
-            raise _Err(f"instruction {instr.id}: {bad[0]}")
+            raise StepError(f"instruction {instr.id}: {bad[0]}")
         kind = str(tpl["kind"])
         check, self.fresh = self.fresh, False
         exc_before = self.excepted(pos)
@@ -231,7 +228,7 @@ class C2LRTracker:
         try:
             pairs = self.geo.pairs(var)
         except NotC2LR as exc:
-            raise _Err(f"instruction {instr.id}: {exc}") from None
+            raise StepError(f"instruction {instr.id}: {exc}") from None
         offer = declared(self.arch)
         c6: list[str] = []
         if var.form == "diagonal" and var.diagonal not in offer["diagonals"]:
@@ -302,9 +299,9 @@ class C2LRTracker:
     def _in_leg(self, instr: Instruction, ion: str, pos: Mapping[str, str], what: str) -> str:
         site = pos.get(ion)
         if site is None:
-            raise _Err(f"instruction {instr.id}: {what} names {ion}, which is not placed")
+            raise StepError(f"instruction {instr.id}: {what} names {ion}, which is not placed")
         if site not in self.legs:
-            raise _Err(f"instruction {instr.id}: {what} names {ion}, which is at {site}, not "
+            raise StepError(f"instruction {instr.id}: {what} names {ion}, which is at {site}, not "
                        f"in a leg; a C2LR step shifts crystals in legs")
         return site
 
@@ -346,10 +343,10 @@ def walk(prog: TSIR, arch) -> Iterator[tuple[Instruction, C2LRStep | None, dict[
         if tpl.get("kind") in C2LR_TEMPLATES:
             if trk is None:
                 raise ValueError(f"instruction {ins.id}: a {tpl.get('kind')} step needs a C2LR "
-                                 f"device; {_why_not(arch)}")
+                                 f"device; {why_not_c2lr(arch)}")
             try:
                 step, pos = trk.expand(ins, pos)
-            except _Err as exc:
+            except StepError as exc:
                 raise ValueError(str(exc)) from None
             yield ins, step, dict(pos)
             continue
@@ -366,7 +363,7 @@ def walk(prog: TSIR, arch) -> Iterator[tuple[Instruction, C2LRStep | None, dict[
         yield ins, step, dict(pos)
 
 
-def _why_not(arch) -> str:
+def why_not_c2lr(arch) -> str:
     try:
         geometry(arch)
     except NotC2LR as exc:

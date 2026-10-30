@@ -29,7 +29,7 @@ from typing import Callable, Mapping, Sequence
 from ..arch import Architecture
 from ..cost.models import QUANTA_COMPONENTS, Charge, CostModel
 from ..ir.tsir import C2LR_TEMPLATES, TSIR, Instruction, Participant, iter_operands, iter_pairs
-from .c2lr import _Err as _C2LRError, _why_not as _not_c2lr, tracker_for
+from .c2lr import StepError as _C2LRError, tracker_for, why_not_c2lr as _not_c2lr
 from .rules import CycleView, ResolvedMove, RuleReport, check_cycle, conveyor_nodes, rails_to_loop
 
 __all__ = ["ReplayResult", "CycleRecord", "replay", "ReplayError"]
