@@ -141,14 +141,14 @@ function draw(){
   var W=1224, H=560, L=78, R=refused.length?150:28, T=26, B=52, pw=W-L-R, ph=H-T-B;
   var useLog = logbox.checked;
   var yv = rows.map(function(d){ return val(d,yk); }), ylo=Math.min.apply(null,yv), yhi=Math.max.apply(null,yv);
-  if (ylo===yhi){ ylo*=0.9; yhi*=1.1; }
+  if (ylo===yhi){ if (ylo===0){ yhi=1; } else { ylo*=0.9; yhi*=1.1; } }
   if (useLog && ylo<=0) useLog=false;
   var ypad = useLog ? 1 : (yhi-ylo)*0.1;
   var y0 = useLog ? ylo/1.4 : (ylo-ypad < 0 && ylo>=0 ? 0 : ylo-ypad), y1 = useLog ? yhi*1.4 : yhi+ypad;
   var Y = function(v){ return useLog ? T + ph - (Math.log(v)-Math.log(y0))/(Math.log(y1)-Math.log(y0))*ph : T + ph - (v-y0)/(y1-y0)*ph; };
   var X;
   if (!xm){ X = function(d,i){ return L + 24 + (rows.length>1 ? i/(rows.length-1) : 0.5)*(pw-48); }; }
-  else { var xv = rows.map(function(d){ return val(d,xk); }), xlo=Math.min.apply(null,xv), xhi=Math.max.apply(null,xv); if (xlo===xhi){ xlo*=0.9; xhi*=1.1; }
+  else { var xv = rows.map(function(d){ return val(d,xk); }), xlo=Math.min.apply(null,xv), xhi=Math.max.apply(null,xv); if (xlo===xhi){ if (xlo===0){ xhi=1; } else { xlo*=0.9; xhi*=1.1; } }
     var xlog = useLog && xlo>0; var x0 = xlog? xlo/1.4 : xlo-(xhi-xlo)*0.1, x1 = xlog? xhi*1.4 : xhi+(xhi-xlo)*0.1;
     X = function(d){ var v=val(d,xk); return xlog ? L + (Math.log(v)-Math.log(x0))/(Math.log(x1)-Math.log(x0))*pw : L + (v-x0)/(x1-x0)*pw; };
     var xt = ticks(xlo, xhi, xlog), gx = svgEl('g',{class:'axis'});
