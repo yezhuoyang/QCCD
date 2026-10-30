@@ -145,12 +145,12 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   The fault is still the compiler's: [r1_fault.py](r1_fault.py) reproduces it in about 7 minutes
   (grid11x11: 6 violations at sites T3_7h and T7_6v), and `results/separate/surface7.jsonl`
   records the six failed rows.
-- **BB72 on a grid: the reference compiler routes no size.** qccdc refuses the grids as
-  unroutable: an ion cannot reach its gate within the router's cycle limit. Six larger grids did
-  not finish within the sweep's first limit of 1800 s, so the sweep now gives every compile the
-  release's own limit (3600 s, what the grader gives a submitter). Given that time, 12x12, 13x13
-  and 14x13 finish and are refused the same way; 14x14 to 15x15, then WISE's sizes, are still
-  running. C2LR's router compiles every size. The Conveyor
+- **BB72 on a grid: the reference compiler routes no size.** qccdc refuses all 12 grids, 10x9
+  to 15x15, as unroutable: an ion cannot reach its gate within the router's cycle limit. WISE,
+  which runs the same program, is refused at the same 12 sizes. Six larger grids did not finish
+  within the sweep's first limit of 1800 s, so the sweep now gives every compile the release's
+  own limit (3600 s, what the grader gives a submitter). Given that time, they all finish and
+  are refused the same way. C2LR's router compiles every size. The Conveyor
   with a dock for every ion, `conveyor96_96d`, has the lowest LER: 3.6e-4 per round, five times
   below C2LR's best (1.9e-3). A Conveyor with 72 docks is refused, because half the ions then
   ride the loop, and on this device only a docked ion can gate. BB72's board therefore starts

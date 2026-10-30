@@ -6,8 +6,8 @@ Each family's best point by each measure (they can differ). Time per round under
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 0 of 9 | — | — | — | — |
-| WISE | 0 of 2 | — | — | — | — |
+| Grid | 0 of 12 | — | — | — | — |
+| WISE | 0 of 12 | — | — | — | — |
 | C2LR | 12 of 12 | c2lr15x14 | 291.7 | c2lr15x14 | 1.86e-03 [1.6e-03, 2.1e-03] |
 | Cyclone | 4 of 4 | cyclone75 | 5524.6 | cyclone83 | 7.29e-01 [6.8e-01, 7.7e-01] |
 | Conveyor | 2 of 4 | conveyor96_96d | 383.9 | conveyor96_96d | 3.64e-04 [3.2e-04, 4.2e-04] |
