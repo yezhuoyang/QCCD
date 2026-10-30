@@ -1,0 +1,139 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:6bfce4f2d0279fd2e7e6b5ca5968bd757e2832912dca44484ae8b20b5963afa9",
+  "file": "circuit.qasm"
+ },
+ "description": "The shuttle memory board's experiment, unchanged: three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and reused every round), then the data read out. Here it runs on a C2LR swap-or-stay lattice of Yb-Ba crystals (arXiv:2403.00756): one crystal is one qubit, crystals move only by swap-or-stay steps (one shared junction waveform, one direction bit per leg), and a two-qubit gate runs on the two crystals of one leg, merged and split again. Judged by the C2LR rule set; ranked by the logical error rate per round under the noise model built from the device's physics: the shuttle board's, plus the paper's step (400 us; 0.18 quanta to a crystal that moves, 0.165 to one that stays; reorder-or-not 93 us) and the platform's own merge and split.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 600,
+  "lean_timeout_s": 1800,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('qccdsim_jones')",
+   "better": "low",
+   "name": "T_jones",
+   "unit": "ms"
+  },
+  {
+   "about": "replayed round time under corrected_model('transport_excitation')",
+   "better": "low",
+   "name": "T_transport",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  },
+  {
+   "about": "logical error rate per syndrome round, 1-(1-LER)^(1/rounds), under the release's noise model",
+   "better": "low",
+   "name": "ler_per_round",
+   "unit": "per round"
+  },
+  {
+   "about": "logical error rate of the whole memory experiment (Monte Carlo, fixed seed, 95% interval in the report)",
+   "better": "low",
+   "name": "ler",
+   "unit": "per experiment"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 33,
+ "physics": {
+  "digest": "sha256:81fd23105ad67661c1b121073fe0681c675daf69e0d13e8209776e99dd4edab6",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "qccdsim_jones",
+  "tables": [
+   "qccdsim_jones",
+   "transport_excitation"
+  ]
+ },
+ "qec": {
+  "detectors": {
+   "digest": "sha256:212dcd47d3dc6cf526824ea0ba3d4e183d734b99fb9a6c76a125b718d0f83294",
+   "file": "detectors.json"
+  },
+  "experiment": "surface3_r3_z",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 200,
+   "max_shots": 200000,
+   "seed": 20260928
+  },
+  "noise": "qccd-noise@1"
+ },
+ "rank_by": "ler_per_round",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics",
+  "ler"
+ ],
+ "rules": "c2lr",
+ "starter": {
+  "generator": "c2lr_grid",
+  "name": "c2lr4x5",
+  "params": {
+   "a": 4,
+   "b": 5,
+   "species": "Yb-Ba"
+  }
+ },
+ "task": "c2lr_surface3_mem_ybba",
+ "title": "Surface code memory, distance 3, on C2LR (Yb-Ba)",
+ "track": "c2lr",
+ "version": 1
+}
