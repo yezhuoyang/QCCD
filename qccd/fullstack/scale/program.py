@@ -809,7 +809,14 @@ class Builder:
         """The bit `text` names: a source slot, or a record -- this body's merge, or by its
         address one another call wrote."""
         if re.search(r"\bsource\s+c\[", text):
-            return _Rec("src", Expr(self._band_text(text.split("source", 1)[1], line)[0]))
+            k = self._band_text(text.split("source", 1)[1], line)[0]
+            for w in reversed(S.writes):
+                if w[0] == "src" and w[1] == k:
+                    # written earlier in this same run (`source c[k] <- ...` then `when source
+                    # c[k]`, Gidney's measured uncompute): the bit just written, not the slot's
+                    # value before this run
+                    return w[3]
+            return _Rec("src", Expr(k))
         return self._owner(self._band(text, rep, line), S, line, self._band_text(text, line)[0])
 
     def _parity(self, src: str, rep: dict, S: _State, line: int) -> _F:

@@ -126,3 +126,27 @@ def test_a_decision_on_a_loop_variable_is_structure_not_data():
     structural = [p for b in prog.bodies.values() for n in b if isinstance(n, P.Loop)
                   for p in n.body if isinstance(p, P.Pred) and p.structural]
     assert structural and all(not P._reads_table(p.cond.node) for p in structural)
+
+
+def test_a_source_slot_written_and_read_in_one_run_reads_the_bit_just_written():
+    """Gidney's measured uncompute: `source c[k] <- c[523,525)` and then `when source c[k]:` --
+    the fix-up branches on the outcome this step just measured.  Read as the slot's value
+    before the step (fixed 2026-10-30), the branch read another step's bit, or none: the
+    expansion had no writer for it, and each template took it as decided."""
+    from collections import Counter
+    st, params = _gidney2025()
+
+    def go():
+        prog = P.Builder(st).build({k: v for k, v in params.items() if isinstance(v, (int, list, tuple))})
+        P.total(prog, lambda tid: Counter({tid: 1}), lambda *a: Counter())
+        return prog
+    prog = _in_thread(go)
+    for gadget in ("gidneyMeasInteriorRev", "gidneyMeasFirstRev"):
+        segs = [n for key, b in prog.bodies.items() if key[0] == gadget for n in b if isinstance(n, P.Seg)]
+        assert segs, gadget
+        for s in segs:
+            assert not s.ext, (gadget, s.ext)
+            (_, _, _, written), = [w for w in s.writes if w[0] == "src"]
+            t = prog.templates[s.tid]
+            guarded = [ln for ln in t.lines if ln.startswith(f"if {written}: ")]
+            assert any(" read " in f" {ln} " for ln in guarded), (gadget, written)
