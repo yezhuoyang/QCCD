@@ -357,9 +357,13 @@ _REPORTS: dict = {}
 
 
 def _report(key, arch):
+    """A device's hardware report, once per key.  `arch` may be a function that makes the
+    device: a leaf's document is then parsed only the first time (it was parsed, and its
+    schema walked, on every call -- six thousand times a view on a machine of two thousand
+    memories, the report itself already kept)."""
     if key not in _REPORTS:
         from ..cost.hardware import hardware_report
-        _REPORTS[key] = hardware_report(arch)
+        _REPORTS[key] = hardware_report(arch() if callable(arch) else arch)
     return _REPORTS[key]
 
 
@@ -389,7 +393,8 @@ def machine_census(gir: dict, lib, leaves) -> dict:
         d = leaves.data.get(m.name)
         if not d or "arch" not in d:
             continue
-        add(m.family if m.family != "road" else "junction", _report(("leaf", m.name), Architecture.from_json(d["arch"])))
+        add(m.family if m.family != "road" else "junction",
+            _report(("leaf", m.name), lambda d=d: Architecture.from_json(d["arch"])))
     for net, v in gir["nets"].items():
         L = v[5] if len(v) > 5 else int(v[4])
         add("road", _report(("road", L), conveyor_machine(L, 9).arch))
@@ -406,7 +411,7 @@ def machine_census(gir: dict, lib, leaves) -> dict:
             m = lib[gir["leaves"][p][0]]
             d = leaves.data.get(m.name)
             if d and "arch" in d:
-                members.append(_report(("leaf", m.name), Architecture.from_json(d["arch"])))
+                members.append(_report(("leaf", m.name), lambda d=d: Architecture.from_json(d["arch"])))
         for n in pl["nets"]:
             v = gir["nets"][n]
             L = v[5] if len(v) > 5 else int(v[4])

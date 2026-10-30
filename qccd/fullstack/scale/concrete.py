@@ -112,6 +112,8 @@ class _Items:
                 self._walk(node.body, env, guards + (g,), out)
             elif isinstance(node, P.Call):
                 out.append(("call", node, env, guards))
+            elif isinstance(node, P.Rot):
+                out.append(("rot", node, env, guards))
             else:
                 raise WriteError(f"{type(node).__name__} (line {getattr(node, 'qline', 0)}) is not "
                                  f"written concrete yet")
@@ -187,12 +189,19 @@ class Writer:
 
     # ---- summaries: the slots a call reads from outside, and writes ------------------------
     def summary(self, node: P.Call, env) -> tuple:
+        if node.gadget in self.reuse and ("reuse", node.gadget) in self.summ_memo:
+            # (every call of a reused gate as its first: what it reads and writes only matters
+            # where another call reads it, and nothing reads what Gidney 2025's primes write --
+            # tailAfterPrimes reads no slot from outside, and no prime reads another's)
+            return self.summ_memo[("reuse", node.gadget)]
         env2 = {**self.prog.params, **{f: e(env) for f, e in node.skeys + node.args}}
         key = (node.gadget, tuple((f, env2.get(f)) for f, _ in node.skeys + node.args))
         got = self.summ_memo.get(key)
         if got is None:
             got = self._summary_items(self.items.run(self.prog.body_of(node, env), env2))
             self.summ_memo[key] = got
+            if node.gadget in self.reuse:
+                self.summ_memo[("reuse", node.gadget)] = got
         return got
 
     def _item_rw(self, it) -> tuple:
@@ -276,6 +285,11 @@ class Writer:
                 G.guard_name[it[4]] = name
             elif kind == "seg":
                 self._seg(it, G, gens, gtxt)
+            elif kind == "rot":
+                node, env = it[1], it[2]
+                fs = [(p, G.block(self._bname(fam, idx, env, gens))) for p, fam, idx in node.factors]
+                self._rotation(G, fs, node.k(env), node.sign, list(gtxt))
+                self.stats["rotations"] += 1
             elif kind == "call":
                 r, w = rw[k]
                 child_live = frozenset(w & after[k])
@@ -309,6 +323,39 @@ class Writer:
             raise WriteError(f"{what}: hands back slots it never wrote: {missing[:4]}")
         body = _emit(G.lines, set(G.bname.values()) | G.locals, known={G.slot[a] for a in G.cin})
         return G, body, cout
+
+    def _rotation(self, G: _Gate, fs: list, k: int, sign: int, guard: list) -> None:
+        """exp(-+i pi/2^k P) as a repeat-until-success chain, instruction for instruction as the
+        expander writes it (`program._Exp.rotation`, after qec2alg): the ancilla's state, the
+        merge with it, its readout, the frame -- and, under the merge's outcome, the next level."""
+        def line(text, g):
+            G.lines.append((f"if {' & '.join(g)}: " if g else "") + text)
+
+        def frame(g):
+            for p, b in fs:
+                line(f"{p.lower()} {b}", g)
+        if k <= 1:
+            frame(guard)
+            return
+        a = G.fresh("T")
+        G.locals.add(a)
+        if k == 2:
+            line(f"prep {a} Y", guard)
+            if sign < 0:
+                line(f"z {a}", guard)
+        elif k == 3:
+            line(f"inject {a}", guard)
+            if sign > 0:
+                line(f"x {a}", guard)
+        else:
+            line(f"prep {a} R{k - 1}{'' if sign > 0 else 'dg'}", guard)
+        s, r = G.fresh("O"), G.fresh("O")
+        line(f"ppm {' '.join(x for p, b in fs for x in (p, b))} Z {a} -> {s}", guard)
+        line(f"decode {' '.join(b for _, b in fs)} {a}", guard)
+        line(f"read {a} X -> {r}", guard)
+        line(f"decode {a}", guard)
+        frame(guard + [r])
+        self._rotation(G, fs, k - 1, sign, guard + [s])
 
     def _rs(self, G: _Gate, a: int) -> str:
         """The name of slot `a`'s bit in gate `G`: its own, a constant 0 if nothing has written it
@@ -575,12 +622,12 @@ def write_program(prog, templates: dict, *, floorplan: str, title: str = "the pr
 
 
 def write(prog, gadget: str, keyvals: tuple, env: dict, templates: dict, *, floorplan: str,
-          title: str = "") -> tuple:
+          title: str = "", controller: bool = False) -> tuple:
     """One gadget call written out concrete: its gates (and their branch gates), every block it
     is passed prepared first, and the call.  Slots it reads from outside are bits the program
-    starts with (constants: this writes a call alone)."""
+    starts with (constants: this writes a call alone).  `controller`: see `Writer`."""
     _SUBGATES.clear()
-    w = Writer(prog, templates)
+    w = Writer(prog, templates, controller=controller)
     key = next(k for k in prog.bodies if k[0] == gadget and k[1] == keyvals)
     call = P.Call(gadget, tuple((f, P.Expr(str(v))) for f, v in keyvals),
                   tuple((f, P.Expr(str(env.get(f, 0)))) for f in prog.formals[gadget]

@@ -229,6 +229,22 @@ def verify_metrics(
     return report, violations
 
 
+#: id(architecture) -> (the architecture, its R11 violations, its geometry violations): the rules
+#: that read the device alone, judged once per device object -- a road's device verifies every
+#: carry on it (H1), tens of thousands on a large machine, and re-read its document each time
+_STATIC: dict = {}
+
+
+def _static_violations(arch: Architecture) -> tuple:
+    got = _STATIC.get(id(arch))
+    if got is None or got[0] is not arch:
+        got = (arch, list(architecture_violations(arch)), list(geometry_violations(arch)))
+        if len(_STATIC) > 4096:
+            _STATIC.clear()
+        _STATIC[id(arch)] = got
+    return got[1], got[2]
+
+
 def verify(
     prog: TSIR,
     arch: Architecture,
@@ -286,14 +302,15 @@ def verify(
                 rules.checked.add("C8")
         if res.assumed:
             rules.notes["assumed"] = list(res.assumed)
+    static = _static_violations(arch)
     if only_rules is None or "R11" in only_rules:
-        rules.extend(architecture_violations(arch))
+        rules.extend(static[0])
     # The geometry rules read the document alone, so they run whenever any of them is asked.
     # They were written (2026-09-14) and judged by the Studio and the boards, but never called
     # from here, so the grader passed a device whose rails meet at 23.6 degrees (#21).
     geometry = {"R19", "R20", "R21"} if only_rules is None else {"R19", "R20", "R21"} & set(only_rules)
     if geometry:
-        rules.extend([v for v in geometry_violations(arch) if v.rule in geometry])
+        rules.extend([v for v in static[1] if v.rule in geometry])
         rules.checked |= geometry
     if only_rules is None or "R4" in only_rules:
         rules.extend(concurrency_violations(arch, prog))

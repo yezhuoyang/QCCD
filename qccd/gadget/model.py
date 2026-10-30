@@ -191,10 +191,19 @@ class Master:
                        f"(have: {', '.join(p.name for p in self.ports)})")
 
     def instance(self, name: str) -> Instance:
-        for i in self.instances:
-            if i.name == name:
-                return i
-        raise KeyError(f"{self.name} has no instance {name!r}")
+        # (by an index: a machine of two thousand memories flattened by a scan per channel end
+        # spent most of a folded schedule here -- it is flattened once per gate)
+        idx = self.__dict__.get("_instance_index")
+        if idx is None or len(idx) != len(self.instances):
+            idx = {i.name: i for i in self.instances}
+            self.__dict__["_instance_index"] = idx
+        got = idx.get(name)
+        if got is None or got.name != name:
+            for i in self.instances:
+                if i.name == name:
+                    return i
+            raise KeyError(f"{self.name} has no instance {name!r}")
+        return got
 
     @property
     def ions_at_rest(self) -> int:

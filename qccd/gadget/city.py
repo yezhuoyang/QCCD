@@ -199,8 +199,15 @@ class City:
         #: when instructions run in parallel
         self.block_free: dict[str, float] = {}
         self.log = log or (lambda *a, **k: None)
-        self.wires: dict = {}
-        self.leaf, self.nets, self.n_residents = flatten(lib, leaves, wires=self.wires)
+        # the machine flattened: fixed for a floorplan and its leaves, and read-only here, so
+        # made once and shared by every scheduler on it (a folded run makes one per gate)
+        flat = lib.__dict__.get("_city_flat")
+        if flat is None or flat[0] is not leaves:
+            wires: dict = {}
+            leaf, nets, n_res = flatten(lib, leaves, wires=wires)
+            flat = (leaves, leaf, nets, n_res, wires)
+            lib.__dict__["_city_flat"] = flat
+        _, self.leaf, self.nets, self.n_residents, self.wires = flat
         self.next_gid = self.n_residents
         self.cal = {p: Calendar() for p in self.leaf}
         self.net_cal = {p: Calendar() for p in self.nets}
@@ -305,6 +312,15 @@ class City:
         return self.leaf[path].master.family
 
     def _graph(self):
+        made = self.lib.__dict__.get("_city_graph")
+        if made is not None and made[0] is self.leaves:
+            # (the road network, fixed for the machine: made once, shared, read-only)
+            self.adj, self.door_net = made[1], made[2]
+            return
+        self._graph_build()
+        self.lib.__dict__["_city_graph"] = (self.leaves, self.adj, self.door_net)
+
+    def _graph_build(self):
         self.adj: dict = {}
 
         def edge(u, v, w, kind, info):
@@ -328,7 +344,17 @@ class City:
                             edge((path, a.name), (path, b.name), 9 * op.duration_us, "junction",
                                  (path, a.name, b.name, f"pass.{a.node}.{b.node}"))
 
+    def _route_memo(self, kind: str) -> dict:
+        """A search's results, kept on the machine: its roads and their times are fixed, and
+        every scheduler on it (a folded run makes one per gate) asks the same questions -- on a
+        machine of two thousand memories, choosing a memory asked one full search per memory."""
+        return self.lib.__dict__.setdefault(f"_city_{kind}_memo", {})
+
     def _dijkstra(self, src):
+        memo = self._route_memo("dijkstra")
+        got = memo.get(src)
+        if got is not None:
+            return got
         dist = {src: (0.0, None)}
         pq = [(0.0, 0, src)]
         tie = 0
@@ -344,6 +370,7 @@ class City:
                     dist[v] = (nd, (u, kind, info))
                     tie += 1
                     heapq.heappush(pq, (nd, tie, v))
+        memo[src] = dist
         return dist
 
     def _route(self, src, dst):
@@ -404,7 +431,7 @@ class City:
         """(the route from `src` to door `dst` that heats a bundle of `n` least, its heat).
         A road's and a junction pass's heat are their replays': fixed, so each search from a
         door is made once."""
-        memo = self.__dict__.setdefault("_coolest_memo", {})
+        memo = self._route_memo("coolest")
         dist = memo.get((src, n))
         if dist is None:
             dist = {src: (0.0, None)}
@@ -449,11 +476,13 @@ class City:
             return cands
         start = self._bundle_heat(gids)
         cost = {}
+        self._coolest(near, near, len(gids))          # (the search from `near`, made once)
+        dist = self._route_memo("coolest")[(near, len(gids))]
         for p in cands:
-            try:
-                cost[p] = start + self._coolest(near, (p, port), len(gids))[1] + self._entry_heat((p, port))
-            except CityError:
-                continue
+            got = dist.get((p, port))
+            if got is None:
+                continue                              # (no road: as `_coolest` refuses it)
+            cost[p] = start + got[0] + self._entry_heat((p, port))
         ok = [p for p in cands if p in cost and cost[p] <= self.heat_limit + 1e-9]
         return ok or ([min(cost, key=cost.get)] if cost else cands)
 
