@@ -22,8 +22,8 @@ import html
 import json
 import re
 
-__all__ = ["memory_boards", "architecture_intro", "memory_section", "compiler_section", "compiler_page",
-           "noise_page", "declare_board_controls", "index_entries", "CSS"]
+__all__ = ["memory_boards", "architecture_intro", "memory_section", "c2lr_section", "compiler_section",
+           "compiler_page", "noise_page", "declare_board_controls", "index_entries", "CSS"]
 
 CSS = """
 .lb-tabs{display:flex;gap:10px;margin:14px 0 6px;flex-wrap:wrap}
@@ -112,6 +112,12 @@ def _goal1(b) -> bool:
 def _goal3(b) -> bool:
     """One of Goal 3's fixed codes: its boards are one page (board/goal3/), not cards."""
     return b.manifest.get("goal") == "goal3"
+
+
+def _c2lr(b) -> bool:
+    """A board of the C2LR track (OfficialService.TRACKS): ranked beside the shuttle boards, in a
+    section of its own (`c2lr_section`), never with them."""
+    return b.manifest.get("track") == "c2lr"
 
 
 def _suite():
@@ -210,7 +216,7 @@ def memory_section(ts: list | None = None) -> str:
     site's tasks; one whose `release` is a memory board carries that board's ranked designs.
     Goal 1's boards (the curated codes on qccd-noise@2) are not cards here: they are one table
     under the goals (leaderboard.goal_table) and one chart (board/goal1/)."""
-    boards = [b for b in memory_boards() if not _goal1(b) and not _goal3(b)]
+    boards = [b for b in memory_boards() if not _goal1(b) and not _goal3(b) and not _c2lr(b)]
     if not boards:
         return ""
     built = {t.get("release"): t for t in (ts or []) if t.get("rank_by") == "ler_per_round"}
@@ -229,6 +235,36 @@ def memory_section(ts: list | None = None) -> str:
             + _board_block(b.manifest["task"], b.title) + '</div>')
     how = "" if not noise else '<p class="lb-note"><a href="noise/">How the number is made &rarr;</a></p>'
     return ('<h2 id="memory">Memory boards: the logical error rate</h2>' + "".join(cards) + how)
+
+
+def c2lr_section(ts: list | None = None) -> str:
+    """The C2LR track: the memory boards' experiments on C2LR swap-or-stay lattices
+    (arXiv:2403.00756; docs/c2lr.md), each its own ranking by the logical error rate per round,
+    judged by the C2LR rule set and compiled for reference by the baseline C2LR router.  Cards as
+    the memory boards' are, apart from them: a lattice whose crystals move only by swap-or-stay
+    steps is not ranked against shuttling devices."""
+    boards = [b for b in memory_boards() if _c2lr(b)]
+    if not boards:
+        return ""
+    built = {t.get("release"): t for t in (ts or []) if t.get("rank_by") == "ler_per_round"}
+    cards = []
+    for b in boards:
+        q = b.manifest["qec"]
+        rules = b.manifest.get("rules") or "c2lr"
+        cards.append(
+            f'<div class="lb-card" id="{_e(b.manifest["task"])}"><h3>{_e(b.title)}</h3>'
+            f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
+            f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; '
+            f'<a href="../rules/#set-{_e(rules)}">rule set {_e(rules)}</a> &middot; up to '
+            f'{int(q["ler"].get("max_shots", 0)):,} shots</p>'
+            + (_ler_bars(built[b.id]) if b.id in built else "")
+            + _board_block(b.manifest["task"], b.title) + '</div>')
+    return ('<h2 id="c2lr">C2LR boards: swap-or-stay lattices</h2>'
+            '<p class="lb-note">The memory boards&rsquo; own experiments on C2LR lattices '
+            '(<a href="https://arxiv.org/abs/2403.00756">arXiv:2403.00756</a>), where crystals move only by '
+            'swap-or-stay steps: one shared junction waveform, one direction bit per leg. Ranked here, '
+            'board by board, and not against the shuttle boards; the reference entries are the baseline '
+            'C2LR router&rsquo;s.</p>' + "".join(cards))
 
 
 def compiler_section() -> str:
@@ -509,6 +545,10 @@ def index_entries() -> list:
         if _goal3(b):
             out.append({"t": b.title, "d": "Goal 3 · time and logical error rate per round, by architecture family",
                         "u": f"board/goal3/#{b.manifest['task']}", "k": "task"})
+            continue
+        if _c2lr(b):
+            out.append({"t": b.title, "d": "C2LR board · ranked by the logical error rate per round",
+                        "u": f"board/#{b.manifest['task']}", "k": "task"})
             continue
         out.append({"t": b.title, "d": ("Goal 1 · ranked by the logical error rate per round per logical qubit"
                                         if _goal1(b) else "memory board · ranked by the logical error rate per round"),

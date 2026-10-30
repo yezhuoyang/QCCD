@@ -500,7 +500,8 @@ def goal_info(goal: str = "goal1") -> dict | None:
     if g is None:
         return None
     boards = [(b.manifest["task"], b.id, b.title) for b in list_boards()
-              if (b.manifest.get("qec") or {}).get("noise") == g["noise"] and b.manifest.get("goal", "goal1") == goal]
+              if (b.manifest.get("qec") or {}).get("noise") == g["noise"] and b.manifest.get("goal", "goal1") == goal
+              and b.manifest.get("track") != "c2lr"]
     return {**g, "id": goal, "boards": boards}
 
 

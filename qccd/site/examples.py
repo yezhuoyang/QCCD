@@ -54,6 +54,15 @@ DUAL = {"generator": "dual_loop", "params": {"width": 3, "couplings": [1]}, "nam
 RING = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2}, "name": "ring6d",
         "about": "a six-site loop with dock spurs at S0 and S3; the spur ends A0 and A3 are trap "
                  "sites (gates, measurement, cooling; capacity 2), the loop sites hold 2 and cannot gate"}
+#: The C2LR lattice of arXiv:2403.00756 (docs/c2lr.md): 3 x 3 junctions, one leg on every wire,
+#: crystals moved only by swap-or-stay steps.  Under W-S, T0_1h pairs with T1_1v at J1_1 and
+#: T0_0h with T1_0v at J1_0; T0_0v, on the lattice's edge, has no partner.
+C2LR3 = {"generator": "c2lr_grid", "params": {"a": 3, "b": 3}, "name": "c2lr3x3", "template": "grid9x9",
+         "about": "a 3×3 C2LR swap-or-stay lattice of Ba-Sr crystals: one leg (a trap holding one crystal) on "
+                  "every wire, moved only by swap-or-stay steps, one shared waveform and one direction bit per leg"}
+C2LR3_YB = {"generator": "c2lr_grid", "params": {"a": 3, "b": 3, "species": "Yb-Ba"}, "name": "c2lr3x3yb",
+            "template": "grid9x9",
+            "about": "the same lattice of Yb-Ba crystals, the pair whose reorder-or-not the paper measures"}
 RING_LOAD = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2, "ancilla_zone": "load"},
              "name": "ring6load", "about": "the six-site ring with load-zone spur ends (capacity 8, no gates)"}
 RING_BIG = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2, "ancilla_zone": "big"},
@@ -101,7 +110,7 @@ PLANAR = _explicit("planar", "the same four sites joined through a junction J wh
                    [("rA", "A", "J"), ("rB", "J", "B"), ("rC", "C", "J"), ("rD", "J", "D")])
 
 DEVICES = (CHAIN, RACE, GRID, GRID3, DUAL, RING, CHAIN_BIG, RING_LOAD, RING_BIG, HEX6, STAR7,
-           STAR5, CROSS4, FORK30, FORK90, CROSSING, PLANAR)
+           STAR5, CROSS4, FORK30, FORK90, CROSSING, PLANAR, C2LR3, C2LR3_YB)
 
 _MACHINES: dict[str, Machine] = {}
 
@@ -115,6 +124,8 @@ def machine(dev: dict) -> Machine:
             template = copy.deepcopy(_template_doc(None))
             template["zone_types"]["big"] = {"capacity": 32, "gate": True, "spam": True, "cool": True,
                                              "note": "a wide trap for the crowding rules"}
+        elif dev.get("template"):
+            template = dev["template"]         # a named template (the C2LR lattice's grid9x9)
         if dev["generator"] == "explicit":
             from ..arch.device import Device, Node, Segment
             nodes = {nid: Node(id=nid, pos=(float(x), float(y)), kind="site", zone_type="trap", labels=("trap",))
@@ -149,7 +160,8 @@ GRID3_COLUMN = ["T1_0v.b", "T1_1v.a"]
 GRAMMAR = """programme  ::=  { statement NEWLINE }
 statement  ::=  "p." verb "(" [ arguments ] ")"
 verb       ::=  core | shorthand | "claim"
-core       ::=  "init" | "simd" | "gate" | "cool" | "measure" | "reset" | "barrier"
+core       ::=  "init" | "simd" | "swap_or_stay" | "reorder_or_not" | "gate" | "cool"
+             |  "measure" | "reset" | "barrier"
 shorthand  ::=  "move" | "shuttle" | "rotate" | "fill"
 arguments  ::=  argument { "," argument }
 argument   ::=  literal | name "=" literal            (keywords after positionals)
@@ -195,6 +207,29 @@ VERBS: list[dict] = [
      "cost": "cost sums over the participants; depth and duration take the maximum, because the cycle waits for its slowest ion.",
      "rules": ["R1", "R2", "R3", "R4", "R4d", "R5", "R8", "R11"], "ir": "simd",
      "device": RACE, "example": [rec("init", {"d0": "S1", "d1": "S4"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S4", "S5"]])]},
+    {"verb": "swap_or_stay", "sig": 'p.swap_or_stay(diagonal, [ion, ...], checkerboard=None)',
+     "what": "One C2LR swap-or-stay step (arXiv:2403.00756): every junction plays the same shared waveform for one "
+             "diagonal (W-S, W-N, E-S or E-N), and each crystal's only choice is its direction bit: shifted toward its "
+             "pair's junction (the listed ones) or away. The pairs are the device's; the programme names no route. "
+             "<code>checkerboard={\"parity\": 0, \"pairing\": \"P1\"}</code> pairs two diagonals at the junctions "
+             "of one colour instead: not demonstrated in the paper, allowed by the rule set <code>c2lr</code> and marked "
+             "<b>assumed</b> in every report.",
+     "state": "for each pair of legs, the crystal shifted toward the junction in one goes to the other: both toward is a "
+              "swap, both away a stay, toward into an occupied leg an enter (two crystals, C1), the entered one toward "
+              "again its exit back. Here d0 enters d1's leg, the two are gated there, and d0 leaves the way it came.",
+     "cost": "the primitive's one time per step however many crystals move (312.5 µs for Ba-Sr); every crystal is heated, "
+             "a mover by quanta_swap and every other by quanta_stay (C9); a gate on two crystals of one leg adds merge "
+             "and split.",
+     "rules": ["C1", "C2", "C5", "C6", "C7", "C9", "R4"], "ir": "simd with a swap_or_stay template",
+     "device": C2LR3, "example": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0"]),
+                                  rec("cool"), rec("gate", "CX", [["d0", "d1"]]), rec("swap_or_stay", "WS", ["d0"])]},
+    {"verb": "reorder_or_not", "sig": 'p.reorder_or_not([ion, ...])',
+     "what": "One C2LR reorder-or-not step: the listed crystals' two wells turn 180 degrees in place, every other "
+             "crystal holds. Priced only where the paper measures it (Yb-Ba, Fig. 5).",
+     "state": "positions unchanged; the listed crystals' ion order is reversed.",
+     "cost": "93 µs for Yb-Ba, and its heat to every crystal (C9).",
+     "rules": ["C9", "R4"], "ir": "simd with a reorder_or_not template",
+     "device": C2LR3_YB, "example": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("reorder_or_not", ["d0"])]},
     {"verb": "rotate", "sig": 'p.rotate(delta, loop=None)', "kind": "shorthand",
      "means": '|delta| <code>p.simd</code> cycles, each moving every ion on the loop one slot forward (back when '
               'delta is negative), in the loop&rsquo;s class <code>rotate_cw</code> (<code>rotate_ccw</code>). '
@@ -277,6 +312,8 @@ def core_form(m: Machine, calls: list[dict]) -> list[dict]:
 IR_TABLE = [("init", "init", "placement, quanta"), ("fill", "init", "placement over a loop"),
             ("move / shuttle / simd", "simd", "class, mode, participants (ion, from, to, via)"),
             ("rotate", "simd", "class, a loop_shift template, holds"),
+            ("swap_or_stay / reorder_or_not", "simd", "class, a C2LR template: the diagonal (or the "
+             "checkerboard) and the crystals shifted toward; no participants"),
             ("gate", "gate", "gate, pairs, sites"), ("cool", "cool", "broadcast or ions"),
             ("measure / reset", "measure / reset", "ions"), ("barrier", "barrier", "nothing"),
             ("claim", "metrics", "claimed totals, checked by R9")]
@@ -485,6 +522,45 @@ RULES: list[dict] = [
               "why": "d0 stops on S0, where the loop and the spur to A0 meet, with five empty traps around it."},
      "pass": {"program": [rec("init", {"d0": "S1"}), rec("simd", "shuttle", [["d0", "S1", "A0", ["E0", "V0"]]])],
               "why": "the same ion crosses S0 in one move and comes to rest in the dock A0."}},
+    # -- C2LR (docs/c2lr.md): judged by the rule set c2lr, on the lattice whose steps they are about
+    {"id": "C1", "checks": "a leg holds one crystal, or two between a swap-or-stay enter and the exit of the same step type, which only the crystal that entered may make.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0"]),
+                          rec("swap_or_stay", "WN", ["d0"])],
+              "why": "d0 enters d1's leg under W-S and is shifted out under W-N: a crystal leaves a leg by the step type it entered by."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0"]),
+                          rec("swap_or_stay", "WS", ["d0"])],
+              "why": "the same enter, and the exit back under W-S."}},
+    {"id": "C2", "checks": "a C2LR step's only per-leg choice is its direction bit: a step of a C2LR class that lists its own routes is refused.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}),
+                          rec("simd", "swap_or_stay", [["d0", "T0_1h", "T1_1v", ["T0_1h.b", "T1_1v.a"]],
+                                                       ["d1", "T1_1v", "T0_1h", ["T1_1v.a", "T0_1h.b"]]])],
+              "why": "the swap written as two routes under the class swap_or_stay: the routes are the programme's, so it is judged as plain moves, and breaks the junction and rail rules too."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "the same exchange as a swap-or-stay step: two direction bits, and the device's pairs."}},
+    {"id": "C5", "checks": "after every step each crystal rests at a leg centre, never on a junction or between legs.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"program": [rec("init", {"d0": "T0_1h"}), rec("simd", "swap_or_stay", [["d0", "T0_1h", "J1_1", ["T0_1h.b"]]])],
+              "why": "d0 is carried into the junction J1_1 and left there."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h"}), rec("swap_or_stay", "WS", ["d0"])],
+              "why": "d0 crosses J1_1 to the leg it pairs with, and rests there."}},
+    {"id": "C6", "checks": "a step pairs legs by the device's matching under a variation the device offers and the rule set allows: a crystal shifted toward a junction has a partner leg.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"program": [rec("init", {"d0": "T0_0v"}), rec("swap_or_stay", "WS", ["d0"])],
+              "why": "T0_0v is on the lattice's edge: under W-S its junction J0_0 has no W leg, so d0 has nowhere to go."},
+     "pass": {"program": [rec("init", {"d0": "T0_0h"}), rec("swap_or_stay", "WS", ["d0"])],
+              "why": "T0_0h pairs with T1_0v at J1_0, which is empty: d0 moves there."}},
+    {"id": "C7", "checks": "no crystal ends a step in a junction.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"program": [rec("init", {"d0": "T0_1h"}), rec("simd", "swap_or_stay", [["d0", "T0_1h", "J1_1", ["T0_1h.b"]]])],
+              "why": "d0 ends the step in J1_1."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "a swap through J1_1: both crystals pass it, and both rest in legs."}},
+    {"id": "C9", "checks": "every crystal is heated by every waveform: one that stays by the step's quanta_stay, one that moves by quanta_swap.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v", "d2": "T0_0v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "d0 and d1 swap and d2, on the edge, stays: all three are heated, d2 by the stay's 0.035 quanta."}},
 ]
 
 
@@ -555,7 +631,7 @@ def judge(m: Machine, prog: TSIR, model_name: str, focus: str | None = None,
 
 def build_example(ex: dict, m: Machine, model_name: str, page_path, *, kicker: str,
                   headline: str, lede: str, focus: str | None = None,
-                  check_metrics: bool = False) -> dict:
+                  check_metrics: bool = False, ruleset: str = "standard") -> dict:
     """Render one example's page and judge it.  Returns what the site page shows."""
     if ex.get("ir"):
         prog = ex["ir"](m)
@@ -567,14 +643,18 @@ def build_example(ex: dict, m: Machine, model_name: str, page_path, *, kicker: s
     m.render(prog, page_path, model=model, kicker=kicker, headline=headline, lede=lede, open_pane="R")
     return {"text": text, "ir": ir, "why": ex.get("why", ""), "expect": ex.get("expect"),
             "tag": ex.get("tag"), "verdict": judge(m, prog, model_name, focus, check_metrics),
-            "rules": judge_by_rules(m, prog, model, focus, check_metrics)}
+            "rules": judge_by_rules(m, prog, model, focus, check_metrics, ruleset)}
 
 
-def judge_by_rules(m: Machine, prog, model, focus: str | None, check_metrics: bool) -> dict:
-    """The example judged by the standard rule set, rule by rule: what the Rules page prints."""
-    from ..ruleset import check, load
+def judge_by_rules(m: Machine, prog, model, focus: str | None, check_metrics: bool,
+                   ruleset: str = "standard") -> dict:
+    """The example judged by a rule set, rule by rule: what the Rules page prints.  The standard
+    set, but for the C2LR rules' examples, which the set `c2lr` judges (`RULES[...]["ruleset"]`)."""
+    from ..ruleset import check, legacy_config, load
     from ..ruleset.programme import programme_execution
-    rep = check(load("standard"), programme_execution(prog, m.arch, model, check_metrics=check_metrics))
+    rs = load(ruleset)
+    rep = check(rs, programme_execution(prog, m.arch, model, check_metrics=check_metrics,
+                                        rule_config=legacy_config(rs) or None))
     res = {r.id: r for r in rep.results}
     out: dict = {"fails": [r.id for r in rep.results if r.verdict == "fails"]}
     f = res.get(focus) if focus else None

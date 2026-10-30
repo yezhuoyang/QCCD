@@ -27,6 +27,10 @@ SETS = (
     ("trapsimd", "TrapSIMD"),
     ("ionshuttler", "IonShuttler, exact router"),
     ("ionshuttler-heuristic", "IonShuttler, heuristic router"),
+    # the C2LR boards' rules (docs/c2lr.md): the checkerboard steps allowed and marked assumed,
+    # and refused in the second, which keeps to what arXiv:2403.00756 demonstrated
+    ("c2lr", "C2LR swap-or-stay"),
+    ("c2lr-demonstrated", "C2LR swap-or-stay, as demonstrated"),
 )
 
 #: The Reproduce papers that are not replays of an artifact's runs, and their rule sets.
@@ -38,6 +42,8 @@ PARAM_NOTES = {
     "max_chain": "the most ions a gate's chain may hold (R13)",
     "serial_kinds": "the operation kinds that hold their trap one at a time (R27), named as kind(o) names them",
     "single_ion_zones": "the zones single-ion operations may run in (R32)",
+    "c2lr_forms": ("how a C2LR step may pair legs (C6): \"diagonal\", one diagonal at every junction "
+                   "(demonstrated), and \"checkerboard\", two pairs at the junctions of one colour (assumed)"),
     "chain_order": ("how the order inside a chain is followed through a reorder before a split: "
                     "\"qccdsim\" lifts the departing ion out where it stood, \"physical\" moves the end "
                     "ion's state into its place (read by R14)"),
@@ -253,6 +259,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
                          + '</div>' for k, v in rs.param_text.items())
         users = papers_by_set.get(n, [])
         used = ("every programme this website compiles" if n == "standard" else
+                '<a href="../board/#c2lr">the C2LR boards</a>' if n == "c2lr" else
                 ", ".join(f'<a href="../reproduce/{k}/">{html.escape(s)}</a>' for k, s in users) or "&mdash;")
         b.append(f'<tr id="set-{n}"><td><b>{html.escape(label)}</b><div class="how">'
                  f'<a href="sets/{n}.rules" download>{n}.rules</a></div></td>'
@@ -263,8 +270,8 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     # -- every rule
     b.append(f'<h2 id="all">Every rule</h2><p class="sub">All {n_rules} rules the website knows, each with '
              'the assertion the checker evaluates. Where a rule has examples, one programme that keeps it and '
-             'one that breaks it are judged here by the standard rule set, and each opens as the page the '
-             'studio would open on it.</p>')
+             'one that breaks it are judged here by the standard rule set (the C2LR rules by the set c2lr, on '
+             'a C2LR lattice), and each opens as the page the studio would open on it.</p>')
     b.append('<ul class="toc2">' + "".join(f'<li><a href="#{r.id}">{r.id}</a></li>'
                                           for r in sorted(cat.rules, key=lambda r: rule_order(r.id))) + '</ul>')
     for r in sorted(cat.rules, key=lambda r: rule_order(r.id)):

@@ -73,6 +73,21 @@ A **docked** site off a loop is reached by a split at the loop and a merge at th
 
 {{run:dock|Docking on the six-site ring: d0 walks the loop to S0 and is docked into the trap A0 where d1 waits. The dock move entails a split and a merge, the cool brings both ions under the gate budget, and the CX follows.}}
 
+### Swap-or-stay: transport without routes
+
+A **C2LR** lattice ([Delaney and colleagues](https://arxiv.org/abs/2403.00756), Quantinuum) has one leg, a short trap, on every wire between its X-junctions, and each leg holds one crystal: a qubit ion with its coolant ion, one ion in this model. Nothing is routed. One shared waveform plays at every junction at once, for one diagonal (W-S, W-N, E-S or E-N), and the only choice each crystal has is one bit: shifted toward its pair's junction, or away. Both crystals of a pair toward swap; both away stay; one toward into an occupied leg enters it, so that two crystals share a leg for a gate, and leaves again the same way. The rules of such a machine are [C1 to C10](../rules/#C1), in the rule set [c2lr](../rules/#set-c2lr), and the [C2LR boards](../board/#c2lr) rank designs by them.
+
+| primitive | what it is | time | quanta | from |
+|---|---|---:|---:|---|
+| swap-or-stay, Ba-Sr | one step: both C2LR shifts and the shared junction waveform | 312.5 µs | 0.14 to a crystal that moves, 0.035 to one that stays | time: 1/Γ_swap, Γ = 3.2 kHz at 3.0 m/s ([arXiv:2403.00756](https://arxiv.org/abs/2403.00756) Sec. V); quanta derived from its Table II and Table III, the larger of the two readings |
+| swap-or-stay, Yb-Ba | the same, for the heavier pair | 400 µs | 0.18 / 0.165 | Γ = 2.5 kHz at 3.3 m/s; quanta as above |
+| reorder-or-not, Yb-Ba | a crystal's two wells turned 180 degrees in place | 93 µs | 0.0195 to every crystal | Fig. 5(a); measured for Yb-Ba only |
+| merge and split | a gate on the two crystals of one leg begins with a merge and ends with a split | 40 µs each | 0.1 each | not in the paper: the platform's own slow point ([Munoz and colleagues](https://arxiv.org/abs/2605.25118)) |
+
+Every crystal on the device plays every waveform, so a stay is not free ([C9](../rules/#C9)), and the step takes its full time however many crystals move. The control is 27 shared analog signals plus one digital input and one switch per leg, and two site-dependent shims per leg ([C10](../rules/#C10); p4 of the paper), which the DAC count reads as a broadcast bank and two compensation DACs a leg. The paper demonstrates the four single diagonals; the two-pair **checkerboard** steps, in which two diagonals cross one junction at the same time at the junctions of one colour, were not demonstrated: they are allowed and marked **assumed** in every report, and the rule set [c2lr-demonstrated](../rules/#set-c2lr-demonstrated) refuses them.
+
+{{run:c2lr|A swap-or-stay lattice: d0 enters d1's leg under the W-S diagonal while every other crystal stays, the two are gated there (a merge, the MS gate, a split), and d0 leaves the way it came. Open the Report pane: the step's heat is charged to every crystal, the stayers too.}}
+
 ## The control system
 
 Under the chip, each DC electrode is driven by a digital-to-analogue converter (DAC), and a transport is a set of voltage waveforms played on the electrodes along the path. The default document's traps have 24 electrodes each and its junctions 48, so a machine with hundreds of sites has tens of thousands of electrodes, and one DAC per electrode is the first thing that does not scale; the fanned leads in the racetrack photograph above are this problem made visible. This is the **control plane** in the studio, and it is what the DAC count on the report measures, against the budget the document declares: at most so many DACs, junctions and square millimetres of trap.

@@ -28,9 +28,9 @@ def test_the_card_gets_the_verdict_it_says(rid, which):
     m = machine(ex.get("device") or R["device"])
     prog = ex["ir"](m) if ex.get("ir") else m.program("example", provenance="off").apply_calls(ex["program"]).build()
     model = deck_model() if (ex.get("model") or R.get("model", "corrected")) == "deck" else corrected_model()
-    got = judge_by_rules(m, prog, model, rid, R.get("check_metrics", False)).get("focus")
+    got = judge_by_rules(m, prog, model, rid, R.get("check_metrics", False), R.get("ruleset", "standard")).get("focus")
     if got is None:
-        pytest.skip(f"{rid} is not in the standard rule set's verdicts")
+        pytest.skip(f"{rid} is not in the {R.get('ruleset', 'standard')} rule set's verdicts")
     want = EXPECT.get(ex.get("expect"), "holds" if which == "pass" else "fails")
     if want == "holds":
         assert got["verdict"] in ("holds", "does not apply"), (rid, which, got)

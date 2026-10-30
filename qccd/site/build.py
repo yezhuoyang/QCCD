@@ -880,8 +880,10 @@ def board_index(ts: list[dict]) -> str:
             '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
             "<p class=\"sub\">Devices, compiled by the reference compiler and judged by every "
             "<a href=\"../rules/#set-standard\">rule</a>. The three fastest verified designs per board; "
-            "<a href=\"#memory\">memory boards</a> rank by logical error rate.</p>" + legend + "".join(rows_html) +
-            boards.memory_section(ts) +
+            "<a href=\"#memory\">memory boards</a> rank by logical error rate"
+            + (", and the <a href=\"#c2lr\">C2LR boards</a> rank swap-or-stay lattices apart"
+               if boards.c2lr_section(ts) else "") + ".</p>" + legend + "".join(rows_html) +
+            boards.memory_section(ts) + boards.c2lr_section(ts) +
             qec_cycle.board_section(cycles) +
             # the official leaderboard, read live from /official (qccd/site/cowork.py)
             cowork.board_section() + "</section>" +
@@ -1208,7 +1210,8 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
             rel = f"rules/ex/{R['id']}_{which}.html"
             r = build_example(ex, m, model, out / rel, kicker=f"RULE {R['id']}",
                               headline=f"{R['id']}: {'passes' if which == 'pass' else 'fails'}" if not ex.get("expect") else f"{R['id']}: {ex.get('tag') or ex['expect']}",
-                              lede=R["checks"], focus=R["id"], check_metrics=R.get("check_metrics", False))
+                              lede=R["checks"], focus=R["id"], check_metrics=R.get("check_metrics", False),
+                              ruleset=R.get("ruleset", "standard"))
             put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True, extra=HASH_JS)
             entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model,
                             "device": (ex.get("device") or R["device"])["about"]}
@@ -1901,6 +1904,12 @@ PHYS_RUNS: dict[str, dict] = {
                "lede": "the outer trap loop is filled and rotated past the inner data loop: one instruction moves every ion on it",
                "program": [("init", [{"a0": "AT0", "a1": "AT1", "a2": "AT2", "a3": "AB2", "a4": "AB1", "a5": "AB0", "d0": "DT0", "d1": "DT2"}], {}),
                            ("rotate", [1], {"loop": "A"}), ("rotate", [1], {"loop": "A"}), ("rotate", [1], {"loop": "A"})]},
+    "c2lr": {"device": "c2lr3x3", "model": "corrected", "headline": "Swap-or-stay: an enter, a gate in one leg, the exit",
+             "lede": "d0 enters d1's leg under W-S while every other crystal stays; the two are gated there, and d0 leaves "
+                     "the way it came. Every crystal is heated by every step",
+             "program": [("init", [{"d0": "T0_1h", "d1": "T1_1v", "d2": "T0_0h", "d3": "T2_1v"}], {}),
+                         ("swap_or_stay", ["WS", ["d0"]], {}), ("cool", [], {}), ("gate", ["CX", [["d0", "d1"]]], {}),
+                         ("swap_or_stay", ["WS", ["d0"]], {})]},
     "budget": {"device": "chain4", "model": "corrected", "headline": "A walk, a cool, a gate: the report prices it",
                "lede": "d0 walks the register to d1; the Report pane lists the quanta by channel, the wall clock, and the gate error read off n-bar",
                "program": [("init", [{"d0": "C0", "d1": "C3"}], {}), ("shuttle", ["d0", ["C0", "C1", "C2", "C3"]], {}),

@@ -28,12 +28,15 @@ EXTRA = [
 CASES = [(f"p.{v['verb']}", v["device"], v["example"]) for v in SHORTHANDS] + EXTRA
 
 
-def test_the_page_names_four_shorthands_and_seven_core_statements():
+def test_the_page_names_four_shorthands_and_nine_core_statements():
     kinds = {}
     for v in VERBS:
         kinds.setdefault(v.get("kind", "core"), []).append(v["verb"])
     assert sorted(kinds["shorthand"]) == ["fill", "move", "rotate", "shuttle"]
-    assert sorted(kinds["core"]) == ["barrier", "cool", "gate", "init", "measure", "reset", "simd"]
+    # the two C2LR steps (docs/c2lr.md, 2026-10-30) are core statements: a template the
+    # replay expands from the device, which no other statement can write
+    assert sorted(kinds["core"]) == ["barrier", "cool", "gate", "init", "measure", "reorder_or_not", "reset",
+                                     "simd", "swap_or_stay"]
     assert all(v.get("means") for v in SHORTHANDS)
 
 
