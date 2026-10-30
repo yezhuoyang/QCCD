@@ -847,7 +847,7 @@ details").**
     |---|---|
     | Composed, sequential (sum of template spans) | 22.5 s |
     | Composed, parallel (dataflow over ports; 2.9 districts busy on average) | 7.77 s |
-    | **One concrete schedule on one machine: 649,000 events, 78,070 carries, G1–G11, H1, H2 all hold** | **19.29 s** |
+    | **One concrete schedule on one machine: 648,370 events, 78,000 carries, G1–G11, H1, H2 all hold** | **19.29 s** |
 
     The parallel composition is 2.5x optimistic for this adder. No place is saturated (the
     preparation bay 34%, the CCZ foundry 16%). The time goes to the carry chain and to moving
