@@ -508,8 +508,9 @@ def _op_set_final_program(ctx: _Ctx, op: Mapping, where: str) -> None:
             raise OperationError("bad_value", f"{where}: {k} must be a sha256:<hex> digest")
         out[k] = v
     if op.get("compiler") is not None:
-        if op["compiler"] not in ("compile", "rotate", "external"):
-            raise OperationError("bad_value", f"{where}: compiler must be compile, rotate or external")
+        if op["compiler"] not in ("compile", "rotate", "c2lr-router", "external"):
+            raise OperationError("bad_value", f"{where}: compiler must be compile, rotate, c2lr-router "
+                                              "or external")
         out["compiler"] = op["compiler"]
     if op.get("board") is not None:
         # the board whose circuit this program realises (a release id); submissions to another board

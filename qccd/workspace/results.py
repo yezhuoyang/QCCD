@@ -281,20 +281,55 @@ class ResultsMixin:
                                   float(limits.get("semantics_timeout_s", budget)))
         verification_memory = int(limits.get("lean_mem_mb", 12288))
         log, mode, cp, compilation = "", None, None, None
+
+        def finish(m: str):
+            """The staged acceptance of what compiler `m` wrote to `work/prog.*`: True when it is
+            accepted, False when it is rejected (the reason is logged), or the job's result."""
+            nonlocal compilation, log
+            self._progress(jid, "stages", "checking stage artifacts, timing, cooling and source semantics")
+            args = [tc.python, tc.bridge / "finish_staged.py", work / "prog", "--qasm", work / "circuit.qasm",
+                    "--arch", work / "device.arch.json", "--expanded-arch", work / "device.expanded.json",
+                    "--qccdc", tc.qccdc, "--table",
+                    (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones"),
+                    "--timeout", str(budget), "--semantic-timeout", str(verification_budget),
+                    "--semantic-mem-mb", str(verification_memory)]
+            if tc.qcheck is not None:
+                args += ["--qcheck", tc.qcheck]
+            co = run_limited(args, cwd=work, timeout=2 * budget + verification_budget + 600,
+                             mem_mb=max(8192, verification_memory), cancel=cancel)
+            if co.status in ("cancelled", "timeout"):
+                return {"_status": co.status, "summary": f"stage verification {co.status}", "log": log[-6000:]}
+            from ..compile.driver import validate_compilation_outputs
+            try:
+                if (work / "prog.compilation.json").exists():
+                    compilation = strict_loads((work / "prog.compilation.json").read_bytes(), PROGRAM_LIMITS)
+                if co.ok and isinstance(compilation, dict):
+                    validate_compilation_outputs(work / "prog", compilation)
+                    return True
+                if compilation is not None and not isinstance(compilation, dict):
+                    raise ValueError("compiler report must be an object")
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                compilation = {"accepted": False, "error": str(exc)}
+            reason = (compilation or {}).get("error") or (co.stderr or co.stdout)[-1600:]
+            log += f"\nstage verification rejected {m}: {reason}\n"
+            return False
+
         if is_c2lr(r.arch):
             # A C2LR lattice moves its crystals only by swap-or-stay steps, which qccdc does not
             # emit: its reference compile is the baseline C2LR router (docs/c2lr.md), in-process,
-            # writing what qccdc writes (the certified programme and its certificate)
-            from ..arch import Architecture
-            from ..compile.c2lr_router import COMPILER_NAME, Refused, compile_c2lr
+            # writing what qccdc writes -- the certified programme, its certificate and its native
+            # stages, which `qccd.compile.c2lr_stages` re-checks -- and accepted as qccdc's are
+            from ..compile.c2lr_router import COMPILER_NAME, Refused, compile_with_stages
             self._progress(jid, "compile", f"compiling {rel.title} with the C2LR router")
             modes = []
             try:
-                dev = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
-                prog, cert = compile_c2lr(rel.circuit_text(), dev, name=rel.manifest["task"])
-                prog.save(work / "prog.tsir.json", indent=None)
-                (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
-                mode, log = "c2lr-router", f"--- {COMPILER_NAME}: {len(prog)} instructions\n"
+                n = compile_with_stages(work, name=rel.manifest["task"])
+                log = f"--- {COMPILER_NAME}: {n} instructions\n"
+                got = finish("c2lr-router")
+                if isinstance(got, dict):
+                    return got
+                if got:
+                    mode = "c2lr-router"
             except Refused as exc:
                 log = f"--- {COMPILER_NAME}\n{exc}"
         for m in modes:
@@ -309,33 +344,12 @@ class ResultsMixin:
             if cp.status in ("cancelled", "timeout"):
                 return {"_status": cp.status, "summary": f"compile {cp.status}", "log": log[-6000:]}
             if cp.ok and (work / "prog.tsir.json").exists():
-                self._progress(jid, "stages", "checking stage artifacts, timing, cooling and source semantics")
-                args = [tc.python, tc.bridge / "finish_staged.py", work / "prog", "--qasm", work / "circuit.qasm",
-                        "--arch", work / "device.arch.json", "--expanded-arch", work / "device.expanded.json",
-                        "--qccdc", tc.qccdc, "--table",
-                        (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones"),
-                        "--timeout", str(budget), "--semantic-timeout", str(verification_budget),
-                        "--semantic-mem-mb", str(verification_memory)]
-                if tc.qcheck is not None:
-                    args += ["--qcheck", tc.qcheck]
-                co = run_limited(args, cwd=work, timeout=2 * budget + verification_budget + 600,
-                                 mem_mb=max(8192, verification_memory), cancel=cancel)
-                if co.status in ("cancelled", "timeout"):
-                    return {"_status": co.status, "summary": f"stage verification {co.status}", "log": log[-6000:]}
-                from ..compile.driver import validate_compilation_outputs
-                try:
-                    if (work / "prog.compilation.json").exists():
-                        compilation = strict_loads((work / "prog.compilation.json").read_bytes(), PROGRAM_LIMITS)
-                    if co.ok and isinstance(compilation, dict):
-                        validate_compilation_outputs(work / "prog", compilation)
-                        mode = m
-                        break
-                    if compilation is not None and not isinstance(compilation, dict):
-                        raise ValueError("compiler report must be an object")
-                except (OSError, ValueError, TypeError, KeyError) as exc:
-                    compilation = {"accepted": False, "error": str(exc)}
-                reason = (compilation or {}).get("error") or (co.stderr or co.stdout)[-1600:]
-                log += f"\nstage verification rejected {m}: {reason}\n"
+                got = finish(m)
+                if isinstance(got, dict):
+                    return got
+                if got:
+                    mode = m
+                    break
         log = log[-6000:]
         if mode is None:
             return {"_status": "failed", "summary": f"the compiler could not place {rel.title} on this design: "
@@ -380,7 +394,8 @@ class ResultsMixin:
         final_ref = {"artifact": d_cool, "certified": d_raw, "certificate": d_cert,
                      "compiled_for": r.arch_digest(), "compiler": mode,
                      "board": rel.id, "circuit_digest": rel.manifest["circuit"]["digest"], "compilation": d_compilation,
-                     "label": f"{rel.title}: qccdc {mode}, r{rev}, {n_instr} instructions"}
+                     "label": f"{rel.title}: {_compiler_label(mode)}, "
+                              f"r{rev}, {n_instr} instructions"}
         return {"summary": f"compiled {rel.title} at r{rev}: {n_instr} instructions; stage checks passed",
                 "final_program": final_ref, "log": log[-2000:],
                 "compilation": stage_ref,
@@ -619,7 +634,8 @@ class ResultsMixin:
                                   "ORDER BY created_at DESC LIMIT 20"):
             run = (self.job(row["id"]).get("result") or {}).get("run") or {}
             d, arts = run.get("design") or {}, run.get("artifacts") or {}
-            if d.get("draft") != branch or d.get("digest") != arch_digest or run.get("compiler") not in ("rotate", "compile"):
+            if d.get("draft") != branch or d.get("digest") != arch_digest or \
+                    run.get("compiler") not in ("rotate", "compile", "c2lr-router"):
                 continue
             # a run from before the compiler-fault check could have succeeded with an illegal program
             if ((run.get("performance") or {}).get("rules") or {}).get("failed"):
@@ -639,7 +655,7 @@ class ResultsMixin:
             ref = {"artifact": arts["program"], "certified": arts["certified"], "certificate": arts["certificate"],
                    "compiled_for": arch_digest, "compiler": run["compiler"], "board": rel.id,
                    "circuit_digest": rel.manifest["circuit"]["digest"],
-                   "label": f"{rel.title}: qccdc {run['compiler']}, r{revision}, {n_instr} instructions "
+                   "label": f"{rel.title}: {_compiler_label(run['compiler'])}, r{revision}, {n_instr} instructions "
                             f"(compiled by a run)"}
             ref["compilation"] = self.put_artifact(canonical_bytes({**stage_ref, "schema": "qccd.compilation.reference.v1"}),
                                                    "application/json", "accepted run compilation reference")
@@ -817,6 +833,11 @@ def _job_brief(j: Mapping) -> dict:
             "summary": res.get("summary"), "origin_prompt_id": j.get("origin_prompt_id"),
             "created_at": j["created_at"], "started_at": j.get("started_at"), "finished_at": j.get("finished_at"),
             "error": j.get("error"), "cancel_requested": j.get("cancel_requested")}
+
+
+def _compiler_label(mode: str) -> str:
+    """What compiled a final programme, in a label's words: qccdc's mode, or the C2LR router."""
+    return "the C2LR router" if mode == "c2lr-router" else f"qccdc {mode}"
 
 
 def _compiler_reason(log: str) -> str:

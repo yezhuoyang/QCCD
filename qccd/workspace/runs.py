@@ -215,6 +215,11 @@ class RunsMixin:
                     "summary": "exporting the design for the compiler failed", "log": (ex.stderr or ex.stdout)[-2000:]}
         mode = params["compiler"]
         modes = ([mode] if mode != "auto" else (["rotate", "compile"] if closed_loops(r.arch) else ["compile"]))
+        from ..arch.c2lr import is_c2lr
+        if is_c2lr(r.arch):
+            # a C2LR lattice moves only by swap-or-stay steps, which qccdc does not emit: the
+            # baseline router compiles it (docs/c2lr.md), and the same staged finishing accepts it
+            modes = ["c2lr-router"]
         limits = self.release.manifest.get("limits") or {}
         compile_budget = float(params.get("timeout_s") or limits.get("compile_timeout_s", 900))
         semantic_budget = max(compile_budget, float(limits.get("lean_timeout_s", 1800)),
@@ -227,15 +232,20 @@ class RunsMixin:
         verification_budget = 2 * compile_budget + semantic_budget + 600
         cp, log, used, compilation = None, "", None, None
         for m in modes:
-            self._progress(jid, "compile", f"compiling {name} ({q} qubits) with qccdc_cli {m}")
+            self._progress(jid, "compile", f"compiling {name} ({q} qubits) with "
+                                           f"{'the C2LR router' if m == 'c2lr-router' else 'qccdc_cli ' + m}")
             compilation = None
             for stale in ("prog.tsir.json", "prog.qcert.json", "prog.stages.json",
                           "prog.native.tsir.json", "prog.cooled.tsir.json", "prog.compilation.json"):
                 (work / stale).unlink(missing_ok=True)
-            cp = run_limited([tc.qccdc, m, work / "circuit.qasm", "--arch", work / "device.expanded.json",
-                              "-o", work / "prog"], cwd=work, timeout=compile_budget,
-                             mem_mb=8192, cancel=cancel)
-            log += f"--- qccdc_cli {m}\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
+            if m == "c2lr-router":
+                cp = _c2lr_compile(work, name)
+                log += f"--- {cp.stdout}\n{cp.stderr}"[-4000:]
+            else:
+                cp = run_limited([tc.qccdc, m, work / "circuit.qasm", "--arch", work / "device.expanded.json",
+                                  "-o", work / "prog"], cwd=work, timeout=compile_budget,
+                                 mem_mb=8192, cancel=cancel)
+                log += f"--- qccdc_cli {m}\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
             if cp.status in ("cancelled", "timeout"):
                 return {"_status": cp.status, "summary": f"compiling {cp.status}", "log": log[-6000:]}
             if cp.ok and (work / "prog.tsir.json").exists():
@@ -390,3 +400,17 @@ class RunsMixin:
         if a["program"]["name"] != b["program"]["name"]:
             out["warning"] = "the two runs ran DIFFERENT programs; their times are not comparable"
         return out
+
+
+def _c2lr_compile(work: Path, name: str):
+    """The C2LR router's native compile of `work`, as a `RunResult` the run job reads as it
+    reads qccdc's: ok with the programme's length, or nonzero with the router's refusal."""
+    import time
+    from ..compile.c2lr_router import COMPILER_NAME, Refused, compile_with_stages
+    from .procs import RunResult
+    t0 = time.time()
+    try:
+        n = compile_with_stages(work, name=name)
+    except Refused as exc:
+        return RunResult("nonzero", 4, COMPILER_NAME, str(exc), time.time() - t0)
+    return RunResult("ok", 0, f"{COMPILER_NAME}: {n} instructions", "", time.time() - t0)

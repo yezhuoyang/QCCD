@@ -21,6 +21,10 @@ from .physical_stages import ANNOTATIONS, finish_program, analyze_thermal, check
 from .stages import STAGE_IDS, StageCheck, StageRecorder, verify_manifest
 
 
+#: the C2LR router's stage engine (`qccd.compile.c2lr_router.STAGE_ENGINE`)
+C2LR_ENGINE = "c2lr-router"
+
+
 class CompilationRejected(ValueError):
     """The candidate has no complete, accepted chain of stage contracts."""
 
@@ -161,7 +165,8 @@ def finish_compilation(prefix, *, qasm, arch_path, expanded_arch_path, toolchain
                    "policy": {"schedule": "serial between instructions, SIMD within instructions",
                               "max_cooling_iterations": max_cooling_iterations},
                    "stage_implementation": {name: _sha(Path(__file__).with_name(name))
-                                            for name in ("driver.py", "physical_stages.py", "stages.py")}}
+                                            for name in ("driver.py", "physical_stages.py", "stages.py",
+                                                         "c2lr_stages.py")}}
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
         report = {"schema": "qccd.compilation.report.v1", "accepted": False,
                   "status": "rejected", "error": str(exc)}
@@ -196,14 +201,26 @@ def finish_compilation(prefix, *, qasm, arch_path, expanded_arch_path, toolchain
         stages = _load(file(".stages.json"))
         if stages.get("schema") != "qccd.compiler.stages.v1" or stages.get("accepted") is not True:
             raise CompilationRejected("compiler did not supply accepted native stage evidence; rebuild the compiler")
-        checked = run([toolchain.qccdc, "check-stages", file(".stages.json"),
-                       "--qasm", qasm, "--arch", expanded_arch_path,
-                       "--program", file(".native.tsir.json")])
+        # A C2LR router's swap-or-stay steps name no routes, so `qccdc check-stages` cannot replay
+        # them: its saved stages have their own re-check, and its verdicts are what is recorded
+        # (the router claims nothing about a boundary).  Every other engine is qccdc's.
+        c2lr = stages.get("engine") == C2LR_ENGINE
+        if c2lr:
+            checked = run([toolchain.python, toolchain.bridge / "check_c2lr_stages.py", file(".stages.json"),
+                           "--qasm", qasm, "--arch", arch_path, "--expanded-arch", expanded_arch_path,
+                           "--program", file(".native.tsir.json"), "--qccdc", toolchain.qccdc])
+        else:
+            checked = run([toolchain.qccdc, "check-stages", file(".stages.json"),
+                           "--qasm", qasm, "--arch", expanded_arch_path,
+                           "--program", file(".native.tsir.json")])
         native_verdict = _loads(checked.stdout)
         if not isinstance(native_verdict, dict) or native_verdict.get("accepted") is not True:
             raise CompilationRejected("saved native stage checker did not accept")
         report["native_check"] = native_verdict
         report["engine"] = stages.get("engine")
+        claims = native_verdict.get("stage_checks") if c2lr else None
+        if c2lr and (not isinstance(claims, list) or len(claims) != len(stages.get("stages", []))):
+            raise CompilationRejected("the C2LR stage checker returned no verdict for some stage")
         seen = set()
         for index, stage in enumerate(stages.get("stages", [])):
             sid = stage["id"]
@@ -213,7 +230,7 @@ def finish_compilation(prefix, *, qasm, arch_path, expanded_arch_path, toolchain
             if iteration is None and sid in STAGE_IDS[3:7]:
                 iteration = {"native_record": index}
             record = recorder.record(sid, stage["input"], stage["output"], stage["witness"],
-                                     _check(stage["check"]), iteration=iteration)
+                                     _check(claims[index] if c2lr else stage["check"]), iteration=iteration)
             if record["check"]["status"] not in ("passed", "not_applicable"):
                 raise CompilationRejected(f"{stage['name']} was not fully checked")
             seen.add(sid)

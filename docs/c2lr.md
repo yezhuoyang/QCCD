@@ -286,6 +286,57 @@ the full corpus).
   does not judge a step, the C rules do. Only the panel changes: `ControlPlane.declared`, which
   the evaluation and the DAC count read, is untouched.
 
+## 6d. The router in the staged pipeline (2026-10-30)
+
+The workspace's staged compiler (`qccd.compile.driver`, `Compiler/bridge/finish_staged.py`)
+accepts a native programme only when it comes with seven checked native stage boundaries.
+Those are circuit normalization, dependency analysis, initial placement, interaction
+placement, transport synthesis, native gate lowering and broadcast packing. The physical
+stages, cooling and the semantic checks then run on top. qccdc's own stages are re-checked by
+`qccdc check-stages`, which replays each motion from its written routes. A swap-or-stay step
+has none: the device's matching chooses them. Its exchanges are also the opposing junction
+transits a plain move may not make. So the router's programmes need a checker of their own.
+
+- **The router records its stages and claims nothing.**
+  - `compile_c2lr(stages=...)` and `compile_with_stages(work)` write `prog.stages.json`, in the
+    format qccdc uses (`qccd.compiler.stages.v1`), under the engine `c2lr-router`.
+  - The file is bound by SHA-256 to the circuit, the device (as written and expanded) and
+    `prog.tsir.json`.
+  - Every record's own check is `not_run`.
+  - Measurements now carry their classical bits, and the layers respect them. The programmes
+    and certificates of every C2LR board are byte-identical to before.
+- **`qccd.compile.c2lr_stages` re-checks the saved evidence and never runs the router.** Its
+  bridge script is `Compiler/bridge/check_c2lr_stages.py`. Each boundary is held to:
+  - **Circuit normalization:** the source as `qccdc parse` reads it, and unitaries from
+    `Compiler/bridge/unitary.py`.
+  - **Dependency analysis:** every wire's precedence, including classical bits and barrier
+    fences.
+  - **Initial placement:** a bijection onto crystals, one crystal per leg, equal to the
+    executable's `init`.
+  - **Interaction placement:** each site's capability and capacity, and the operands in order.
+  - **Transport synthesis:** every step re-derived by `qccd.verify.c2lr`, with nothing broken
+    and every crystal in a leg.
+  - **Native gate lowering:** the pulse products against each gate, up to phase, with the
+    operands present.
+  - **Broadcast packing:** every ion's ordered effects, and each command's provenance.
+
+  It then checks the evidence against the executable: the same commands, the same motions,
+  every command addressing its crystals where the executable's own replay puts them, and
+  source order on every wire.
+- **The driver picks the checker by engine.** For `c2lr-router` it records the checker's
+  per-stage verdicts, so the router claims nothing. Every other engine goes to qccdc as before.
+- **The workspace uses it.**
+  - A C2LR design's compile job (`results.py`) and Studio run (`runs.py`) compile with the
+    router. They then finish in the same staged pipeline as qccdc's modes, which share one
+    `finish` step.
+  - Adoption (`set_final_program`) accepts the compiler `c2lr-router`, and a run that used it
+    can be adopted.
+  - `tests/test_c2lr_stages.py` covers each boundary's forgery, executable mismatches, the
+    driver end to end, and a workspace compile, adopt and run.
+- **This rests on the staged pipeline, which is uncommitted.** The driver, the stages and the
+  workspace edits date from 2026-10-28. The router, the checker and its bridge script stand on
+  their own.
+
 ## 7. Boards
 
 C2LR designs are ranked on their own releases (the same circuits as the existing boards, with

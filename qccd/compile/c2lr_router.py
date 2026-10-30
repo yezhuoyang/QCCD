@@ -60,7 +60,7 @@ from ..arch.c2lr import DIAGONALS, NotC2LR, Variation, declared, geometry, is_c2
 from ..ir.tsir import TSIR, Instruction, swap_or_stay
 
 __all__ = ["Refused", "RouteError", "SourceOp", "parse_qasm", "compile_c2lr", "compile_with_router",
-           "COMPILER_NAME", "main"]
+           "compile_with_stages", "write_stages", "COMPILER_NAME", "STAGE_ENGINE", "main"]
 
 COMPILER_NAME = "c2lr-router (baseline)"
 PI = math.pi
@@ -93,10 +93,17 @@ class SourceOp:
     name: str
     qubits: tuple[int, ...]
     line: int
+    #: the classical bits a measurement writes, numbered across the `creg`s in declaration order
+    clbits: tuple[int, ...] = ()
 
     def to_json(self) -> dict:
         return {"i": self.i, "name": self.name, "qubits": list(self.qubits), "params": [],
                 "line": self.line}
+
+    def stage_json(self) -> dict:
+        """The op as the native stages' evidence names it (`qccd.compile.c2lr_stages`)."""
+        return {"i": self.i, "name": self.name, "qubits": list(self.qubits),
+                "clbits": list(self.clbits), "params": []}
 
 
 _DECL = re.compile(r"^(qreg|creg)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]$")
@@ -107,19 +114,25 @@ _ARG = re.compile(r"^([A-Za-z_]\w*)\s*(?:\[\s*(\d+)\s*\])?$")
 def parse_qasm(text: str) -> tuple[int, list[SourceOp]]:
     """`(qubits, ops)` of an OpenQASM 2.0 circuit in the supported set: `qreg`/`creg`, the
     gates of `U3` and `GATES_2Q`, `measure`, `reset`, `barrier`.  Qubits are numbered in
-    declaration order, which is how the certificate's map is written.  Raises `Refused`,
-    naming the statement, for anything else."""
-    qregs: dict[str, tuple[int, int]] = {}
-    nq = 0
+    declaration order, which is how the certificate's map is written; classical bits too.
+    Raises `Refused`, naming the statement, for anything else."""
+    return _parse(text)[:2]
+
+
+def _parse(text: str) -> tuple[int, list[SourceOp], int]:
+    """`parse_qasm`, and how many classical bits the circuit declares."""
+    regs: dict[str, dict[str, tuple[int, int]]] = {"qreg": {}, "creg": {}}
+    count = {"qreg": 0, "creg": 0}
     ops: list[SourceOp] = []
 
-    def qubits(args: str, line: int) -> list[int]:
+    def operands(kind: str, args: str, line: int) -> list[int]:
+        what = "qubit" if kind == "qreg" else "classical bit"
         out = []
         for a in (x.strip() for x in args.split(",")):
             m = _ARG.match(a)
-            if not m or m.group(1) not in qregs:
-                raise Refused(f"line {line}: operand {a!r} is not a declared qubit")
-            base, size = qregs[m.group(1)]
+            if not m or m.group(1) not in regs[kind]:
+                raise Refused(f"line {line}: operand {a!r} is not a declared {what}")
+            base, size = regs[kind][m.group(1)]
             if m.group(2) is None:
                 out += range(base, base + size)
             elif int(m.group(2)) < size:
@@ -128,20 +141,27 @@ def parse_qasm(text: str) -> tuple[int, list[SourceOp]]:
                 raise Refused(f"line {line}: {a} is outside {m.group(1)}[{size}]")
         return out
 
+    def qubits(args: str, line: int) -> list[int]:
+        return operands("qreg", args, line)
+
     for lineno, raw in enumerate(text.splitlines(), 1):
         body = raw.split("//", 1)[0].strip()
         for stmt in (s.strip() for s in body.split(";")):
-            if not stmt or stmt.startswith(("OPENQASM", "include", "creg")):
+            if not stmt or stmt.startswith(("OPENQASM", "include")):
                 continue
             m = _DECL.match(stmt)
             if m:
-                qregs[m.group(2)] = (nq, int(m.group(3)))
-                nq += int(m.group(3))
+                regs[m.group(1)][m.group(2)] = (count[m.group(1)], int(m.group(3)))
+                count[m.group(1)] += int(m.group(3))
                 continue
             m = _MEASURE.match(stmt)
             if m:
-                for q in qubits(m.group(1), lineno):
-                    ops.append(SourceOp(len(ops), "measure", (q,), lineno))
+                qs, cs = qubits(m.group(1), lineno), operands("creg", m.group(2), lineno)
+                if len(qs) != len(cs):
+                    raise Refused(f"line {lineno}: measure writes {len(qs)} qubit(s) into "
+                                  f"{len(cs)} classical bit(s)")
+                for q, c in zip(qs, cs):
+                    ops.append(SourceOp(len(ops), "measure", (q,), lineno, (c,)))
                 continue
             head, _, rest = stmt.partition(" ")
             if "(" in head:
@@ -160,7 +180,7 @@ def parse_qasm(text: str) -> tuple[int, list[SourceOp]]:
             else:
                 raise Refused(f"line {lineno}: {stmt!r} is not in the router's set (gates "
                               f"{', '.join(list(U3) + list(GATES_2Q))}, measure, reset, barrier)")
-    return nq, ops
+    return count["qreg"], ops, count["creg"]
 
 
 def pulses(op: SourceOp, ion: Mapping[int, str]) -> list[tuple[str, tuple[str, ...], tuple]]:
@@ -186,26 +206,40 @@ def pulses(op: SourceOp, ion: Mapping[int, str]) -> list[tuple[str, tuple[str, .
 
 def layers(ops: Sequence[SourceOp]) -> list[list[SourceOp]]:
     """The ops in layers, IN ORDER: each op joins the layer of the op before it, or a later
-    one -- the first after the last op on any of its qubits -- so no op ever runs before
-    one that precedes it in the circuit; an op is only delayed.  A barrier fences its qubits
-    at the latest of them.  On a circuit written in time steps (a syndrome round's CNOTs,
-    step by step) the layers are its steps."""
-    last: dict[int, int] = {}
+    one -- the first after the last op on any of its wires (its qubits, and the classical
+    bit a measurement writes) -- so no op ever runs before one that precedes it in the
+    circuit; an op is only delayed.  A barrier fences its qubits at the latest of them.  On
+    a circuit written in time steps (a syndrome round's CNOTs, step by step) the layers are
+    its steps."""
     out: list[list[SourceOp]] = []
-    k = 0
-    for op in ops:
-        at = max((last.get(q, -1) for q in op.qubits), default=-1)
+    for op, k in zip(ops, layer_of(ops)):
         if op.name == "barrier":
-            for q in op.qubits:
-                last[q] = at
             continue
-        k = max(k, at + 1)
         while len(out) <= k:
             out.append([])
         out[k].append(op)
-        for q in op.qubits:
-            last[q] = k
     return out
+
+
+def layer_of(ops: Sequence[SourceOp]) -> list[int]:
+    """Each op's layer, as `layers` places it; a barrier's is the fence it sets, the latest
+    layer on its qubits (-1 when none has run yet), which no later op on them may share."""
+    last: dict[tuple[str, int], int] = {}
+    got: list[int] = []
+    k = 0
+    for op in ops:
+        wires = [("q", q) for q in op.qubits] + [("c", c) for c in op.clbits]
+        at = max((last.get(w, -1) for w in wires), default=-1)
+        if op.name == "barrier":
+            for w in wires:
+                last[w] = at
+            got.append(at)
+            continue
+        k = max(k, at + 1)
+        got.append(k)
+        for w in wires:
+            last[w] = k
+    return got
 
 
 # ------------------------------------------------------------------ the lattice
@@ -343,6 +377,22 @@ def place(lat: Lattice, n: int, plan: Sequence[Sequence[SourceOp]], *, seed: int
 
 # ------------------------------------------------------------------ the router
 
+#: The native stages' evidence, in the form `qccdc` writes its own (`qccd.compiler.stages.v1`,
+#: Compiler/ocaml/lib/stages.ml) under an engine of its own: `qccdc check-stages` cannot read a
+#: swap-or-stay step, so `qccd.compile.c2lr_stages` re-checks these (docs/c2lr.md section 6d)
+STAGE_ENGINE = "c2lr-router"
+STAGE_NAMES = {
+    "circuit_normalization": "Circuit Normalization", "dependency_analysis": "Dependency Analysis",
+    "initial_placement": "Initial Placement", "interaction_placement": "Interaction Placement",
+    "transport_synthesis": "Transport Synthesis", "native_gate_lowering": "Native Gate Lowering",
+    "broadcast_packing": "Broadcast Packing",
+}
+#: what the router claims about each boundary: nothing -- the checker's verdicts are recorded
+UNCHECKED = {"status": "not_run", "method": "", "coverage": [],
+             "diagnostics": ["the router claims nothing here; qccd.compile.c2lr_stages re-checks "
+                             "the saved evidence"]}
+
+
 @dataclass
 class _Build:
     arch: Architecture
@@ -351,12 +401,51 @@ class _Build:
     pos: dict[str, str]
     moves: list[dict] = field(default_factory=list)
     gates: list[dict] = field(default_factory=list)
+    #: the native stages' records, when asked for (`compile_c2lr(stages=...)`)
+    stages: list[dict] | None = None
 
     def __post_init__(self) -> None:
         from ..verify.c2lr import C2LRTracker
         self.trk = C2LRTracker(self.arch)
         self.at = {leg: ion for ion, leg in self.pos.items()}
         self.cycle: dict[int, int] = {}          # instruction id -> its cycle (its position)
+        self._steps: list[dict] = []             # the steps since the last stage record
+        self._steps_from: dict[str, str] = {}
+
+    # -- the native stages' evidence: what each boundary produced, never a verdict on it
+
+    def record(self, stage_id: str, inp, out, witness) -> None:
+        if self.stages is not None:
+            self.stages.append({"id": stage_id, "name": STAGE_NAMES[stage_id], "input": inp,
+                                "output": out, "witness": witness, "check": dict(UNCHECKED)})
+
+    def flush(self) -> None:
+        """The steps played since the last record, as one transport stage."""
+        if self._steps:
+            self.record("transport_synthesis", {"positions": self._steps_from},
+                        {"steps": self._steps, "final_positions": dict(self.pos)}, {})
+            self._steps, self._steps_from = [], {}
+
+    def batch(self, ops: Sequence[SourceOp], ion: Mapping[int, str], play) -> None:
+        """One batch of ops where their crystals stand: where each runs (interaction
+        placement), its pulses (native lowering), and the commands `play` emits for them
+        (broadcast packing)."""
+        self.flush()
+        start = len(self.prog.instructions)
+        sited = [{"operation": op.stage_json(),
+                  "assignment": {"site": self.pos[ion[op.qubits[0]]], "ions": [ion[q] for q in op.qubits]}}
+                 for op in ops]
+        native = [{"operation": op.stage_json(), "site": s["assignment"]["site"],
+                   "ions": s["assignment"]["ions"],
+                   "pulses": [{"gate": g, "ions": list(o), "params": [float(x) for x in p]}
+                              for g, o, p in (pulses(op, ion) if op.name not in ("measure", "reset") else ())]}
+                  for op, s in zip(ops, sited)]
+        self.record("interaction_placement", {"positions": dict(self.pos),
+                                              "operations": [op.stage_json() for op in ops]},
+                    sited, {"sequential": False})
+        play()
+        self.record("native_gate_lowering", sited, native, {})
+        self.record("broadcast_packing", native, [i.to_json() for i in self.prog.instructions[start:]], {})
 
     # -- emission: every instruction goes through here, so the certificate is the replay's
 
@@ -366,6 +455,9 @@ class _Build:
         if ins.type == "init":
             self.trk.init({}, self.pos)
         elif ins.type == "simd":
+            if not self._steps:
+                self._steps_from = dict(self.pos)
+            self._steps.append({"class": ins.cls, "template": dict(ins.template or {})})
             step, after = self.trk.expand(ins, self.pos)
             broken = list(step.c1) + list(step.c2) + list(step.c6)
             if broken:
@@ -396,6 +488,9 @@ class _Build:
     def play(self, ops: Sequence[SourceOp], ion: Mapping[int, str]) -> None:
         """The gates' pulses, slot by slot: the k-th pulse of every op in one instruction per
         gate kind, so a layer's gates run together.  Each op's witness names its last pulse."""
+        self.batch(ops, ion, lambda: self._play(ops, ion))
+
+    def _play(self, ops: Sequence[SourceOp], ion: Mapping[int, str]) -> None:
         seqs = {op.i: pulses(op, ion) for op in ops}
         last: dict[int, Instruction] = {}
         for k in range(max((len(s) for s in seqs.values()), default=0)):
@@ -515,22 +610,30 @@ class _Build:
 
 
 def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
-                 seed: int = 0) -> tuple[TSIR, dict]:
+                 seed: int = 0, stages: list[dict] | None = None) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the C2LR device `arch`, uncooled: the
     certified programme (`compile_with_router` inserts the cooling).  Raises `Refused` for a
-    pair it cannot compile, `RouteError` if what it built does not replay cleanly."""
+    pair it cannot compile, `RouteError` if what it built does not replay cleanly.  A list
+    passed as `stages` receives the native stages' evidence (`write_stages` saves it)."""
     if not is_c2lr(arch):
         raise Refused(f"{arch.name} does not declare C2LR control; this router plays only "
                       f"swap-or-stay steps")
     lat = Lattice(arch)
-    n, ops = parse_qasm(qasm_text)
+    n, ops, n_clbits = _parse(qasm_text)
     plan = layers(ops)
     at = place(lat, n, plan, seed=seed)
     ion = {q: f"q{q}" for q in range(n)}
     placement = {ion[q]: at[q] for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    b = _Build(arch, lat, prog, dict(placement))
+    b = _Build(arch, lat, prog, dict(placement), stages=stages)
+    # the router's normalization is the parse: every op it accepts is one it lowers itself
+    circuit = {"n_qubits": n, "n_clbits": n_clbits, "ops": [o.stage_json() for o in ops]}
+    b.record("circuit_normalization", circuit, circuit,
+             {"source_op_by_normalized_op": [o.i for o in ops]})
+    b.record("dependency_analysis", circuit, {"layers": layer_of(ops)}, {})
+    b.record("initial_placement", circuit, {"placement": dict(placement)},
+             {"logical_to_ion": [ion[q] for q in range(n)]})
     b.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
            meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     b.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -541,12 +644,14 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
         for kind in ("measure", "reset"):
             group = [o for o in layer if o.name == kind]
             if group:
-                b.emit(type=kind, ions=tuple(ion[o.qubits[0]] for o in group),
-                       meta={"kind": "readout" if kind == "measure" else "reset",
-                             "op": [o.i for o in group]})
+                b.batch(group, ion, lambda kind=kind, group=group: b.emit(
+                    type=kind, ions=tuple(ion[o.qubits[0]] for o in group),
+                    meta={"kind": "readout" if kind == "measure" else "reset",
+                          "op": [o.i for o in group]}))
         two = [o for o in layer if o.name in GATES_2Q]
         if two:
             b.two_qubit(two, ion)
+    b.flush()
     cert = {
         "version": 1, "circuit": name, "arch": arch.name, "n_qubits": n,
         "circuit_ops": [o.to_json() for o in ops],
@@ -559,6 +664,43 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
         "compiler": COMPILER_NAME,
     }
     return prog, cert
+
+
+def write_stages(records: list[dict], prefix, *, circuit, arch, expanded) -> Path:
+    """Save the native stages' evidence as `<prefix>.stages.json`, bound by SHA-256 to the
+    circuit, the device (as written and expanded) and `<prefix>.tsir.json` it describes."""
+    import hashlib
+
+    def sha(p) -> str:
+        return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    out = Path(str(prefix) + ".stages.json")
+    doc = {"schema": "qccd.compiler.stages.v1", "engine": STAGE_ENGINE, "accepted": True,
+           "bindings": {"circuit_sha256": sha(circuit), "architecture_sha256": sha(arch),
+                        "expanded_architecture_sha256": sha(expanded),
+                        "output_tsir_sha256": sha(str(prefix) + ".tsir.json")},
+           "stages": records}
+    out.write_text(json.dumps(doc), encoding="utf-8")
+    return out
+
+
+def compile_with_stages(work, *, name: str = "circuit") -> int:
+    """The staged pipeline's native compile of `work/circuit.qasm` onto `work/device.arch.json`
+    (expanded beside it as `device.expanded.json`): writes `prog.tsir.json`, `prog.qcert.json`
+    and `prog.stages.json`, as `qccdc compile -o work/prog` does, for the staged driver
+    (`qccd.compile.driver`) to accept or reject.  Returns the programme's length."""
+    work = Path(work)
+    for stale in ("prog.tsir.json", "prog.qcert.json", "prog.stages.json", "prog.native.tsir.json",
+                  "prog.cooled.tsir.json", "prog.compilation.json"):
+        (work / stale).unlink(missing_ok=True)
+    arch = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
+    records: list[dict] = []
+    prog, cert = compile_c2lr((work / "circuit.qasm").read_text(encoding="utf-8"), arch, name=name,
+                              stages=records)
+    prog.save(str(work / "prog.tsir.json"), indent=None)
+    (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
+    write_stages(records, work / "prog", circuit=work / "circuit.qasm", arch=work / "device.arch.json",
+                 expanded=work / "device.expanded.json")
+    return len(prog.instructions)
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qccdsim_jones",

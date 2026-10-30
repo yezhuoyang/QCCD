@@ -52,6 +52,11 @@ Compiler/ocaml/_build/default/bin/qccdc_cli.exe check-stages build/prog.stages.j
   --qasm circuit.qasm --arch build/device.expanded.json --program build/prog.tsir.json
 ```
 
+A C2LR lattice is compiled by the C2LR router instead (`qccd.compile.c2lr_router`), whose stage
+file names the engine `c2lr-router`. Its swap-or-stay steps name no routes, so `check-stages`
+cannot replay them: `Compiler/bridge/check_c2lr_stages.py` re-checks those stages, and the
+driver picks the checker by engine (docs/c2lr.md, section 6d).
+
 After the usual architecture export and native compilation, run the remaining
 stages and final acceptance with:
 
