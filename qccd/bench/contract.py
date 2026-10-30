@@ -144,6 +144,17 @@ def _env(workdir: Path) -> dict:
             "QCCD_QCCDC", "QCCD_QCHECK", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS")
     env = {k: v for k, v in os.environ.items() if k in keep}
     env["HOME"] = str(workdir)
+    if os.name == "nt":
+        # Windows Python reads the home from USERPROFILE, never HOME: without it Path.home()
+        # raises "Could not determine home directory" in every child
+        env["USERPROFILE"] = str(workdir)
+    # the toolchain this process resolved: a `qccd toolchain install` lives under the REAL home,
+    # which the child's is not, so it would find no qccdc where the parent found one
+    from ..workspace.evaluator import Toolchain
+    tc = Toolchain.discover()
+    for key, exe in (("QCCD_QCCDC", tc.qccdc), ("QCCD_QCHECK", tc.qcheck)):
+        if exe is not None and key not in env:
+            env[key] = str(exe)
     env["PYTHONPATH"] = str(repo)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
