@@ -97,6 +97,8 @@ class TaskRelease:
         m = self.manifest
         out = {"title": self.title, "about": m.get("description"), "rank_by": m.get("rank_by"),
                "suggested_start": m.get("starter"), "id": self.id, "track": m.get("track")}
+        if m.get("rules"):
+            out["rules"] = m["rules"]
         if m.get("qec"):
             out["memory_experiment"] = {k: m["qec"].get(k) for k in ("experiment", "noise", "ler")}
         return out
@@ -111,7 +113,8 @@ class TaskRelease:
                 "design_variables": m.get("design_variables"),
                 "allowed_transformations": m.get("allowed_transformations"),
                 "starter": m.get("starter"), "order": m.get("order"), "description": m.get("description"),
-                "qec": ({k: m["qec"].get(k) for k in ("experiment", "noise", "ler")} if m.get("qec") else None)}
+                "qec": ({k: m["qec"].get(k) for k in ("experiment", "noise", "ler")} if m.get("qec") else None),
+                **({"rules": m["rules"]} if m.get("rules") else {})}
 
     def verify_files(self) -> None:
         """Every file the manifest pins must hash to its pinned digest."""
@@ -274,20 +277,25 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                   rank_by: str, starter: Mapping | None = None, stabilizers=None,
                   limits: Mapping | None = None, order: int | None = None,
                   qec: Mapping | None = None, rank_table: str = "qccdsim_jones",
-                  tables: list | None = None, goal: str | None = None) -> Path:
+                  tables: list | None = None, goal: str | None = None,
+                  track: str = "codesign-artifact", rules: str | None = None) -> Path:
     """Write a release directory (a maintainer tool; releases are immutable once published).
     `goal` names the leaderboard goal the release belongs to when it is not Goal 1's
-    (`OfficialService.GOALS`)."""
+    (`OfficialService.GOALS`).  `track` is the family of boards it is ranked beside (the C2LR
+    boards' own, `c2lr`); `rules` the rule set (`qccd/ruleset/library`) its entries are judged
+    by as well as by the replay's rules (the grader's rules stage)."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
     (d / "circuit.qasm").write_bytes(circuit_text.encode("utf-8"))
-    (d / "physics.json").write_text(
-        json.dumps(normalize_numbers(dict(physics)), indent=1, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8")
+    # every file is written with LF line ends, on Windows too: a release's files are pinned by
+    # digest, and served and compared byte for byte
+    (d / "physics.json").write_bytes(
+        (json.dumps(normalize_numbers(dict(physics)), indent=1, sort_keys=True, ensure_ascii=False)
+         + "\n").encode("utf-8"))
     man: dict[str, Any] = {
         "kind": "qccd.task_release", "version": 1,
         "task": task, "release": release, "title": title, "description": description,
-        "track": "codesign-artifact",
+        "track": str(track),
         "circuit": {"file": "circuit.qasm", "digest": _sha256_file(d / "circuit.qasm")},
         "physics": {"file": "physics.json", "digest": _sha256_file(d / "physics.json"),
                     "model": "corrected", "rank_table": rank_table,
@@ -313,6 +321,9 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
         man["order"] = int(order)
     if goal:
         man["goal"] = str(goal)
+    if rules:
+        from ..ruleset import load as load_rules
+        man["rules"] = load_rules(str(rules)).name       # refused here if no such set
     if starter:
         man["starter"] = dict(starter)
     if stabilizers:
@@ -320,8 +331,8 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
     if qec:
         # a MEMORY board: the circuit is a QEC memory experiment, graded by its logical error rate
         # under a named noise model (qccd.qec); `qec` = {experiment, detectors (the spec), noise, ler}
-        (d / "detectors.json").write_text(json.dumps(qec["detectors"], indent=1, sort_keys=True) + "\n",
-                                          encoding="utf-8")
+        (d / "detectors.json").write_bytes(
+            (json.dumps(qec["detectors"], indent=1, sort_keys=True) + "\n").encode("utf-8"))
         man["qec"] = {"experiment": qec["experiment"], "noise": qec["noise"], "ler": dict(qec["ler"]),
                       "detectors": {"file": "detectors.json", "digest": _sha256_file(d / "detectors.json")}}
         # Goal 1's leaderboard reads these: what a row's rate is divided by, and the ion count
@@ -329,6 +340,6 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
             if qec.get(key) is not None:
                 man["qec"][key] = int(qec[key])
         man["required_checks"].append("ler")
-    (d / "release.json").write_text(json.dumps(man, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
-                                    encoding="utf-8")
+    (d / "release.json").write_bytes(
+        (json.dumps(man, indent=1, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
     return d

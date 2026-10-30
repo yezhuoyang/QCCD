@@ -18,7 +18,9 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
   rules                replaying the final program on the device under the task model,
                        every rule the replay can check passes; rules it cannot check are
                        listed as skipped with the reason, and only the release's
-                       `allowed_skips` may be skipped.
+                       `allowed_skips` may be skipped.  A release that declares a rule set
+                       (`rules`: the C2LR boards' `c2lr`) is judged by that set as well,
+                       in the rule language, and the replay takes the set's parameters.
   correspondence       the final program is the certified program with only the release's
                        allowed transformations applied (inserted `cool` instructions),
                        instruction by instruction, ids included.
@@ -89,8 +91,10 @@ BRIDGE = REPO / "Compiler" / "bridge"
 #: not of the entry: R7b is uncheckable by design, R9 checks claims an entry need not
 #: make, R10 is decided by the certificate/semantics stages below.
 ALLOWED_SKIPS = {"R7b", "R9", "R10"}
-#: rules the replay only partially checks by construction
-ALLOWED_PARTIAL = {"R15"}
+#: rules the replay only partially checks by construction: R15's additive heat is an upper
+#: bound; C8 (a C2LR shift holds the COM frequency) is the primitive's property, recorded from
+#: it and not decided -- judged on C2LR devices only, so no other entry's verdict moves
+ALLOWED_PARTIAL = {"R15", "C8"}
 
 _EXE_CACHE: dict = {}
 
@@ -443,9 +447,36 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog) -> None:
     from ..cost.models import corrected_model
     from ..verify import verify
     table = release.manifest["physics"].get("rank_table", "qccdsim_jones")
-    rep = verify(prog, arch, corrected_model(table), check_metrics=False)
+    # A release that declares its rule set (the C2LR boards: `c2lr`) is judged by it as
+    # well: the legacy verifier with the set's parameters (C6's forms), and the set itself,
+    # in the rule language.  A release that declares none is judged exactly as it always was.
+    declared = release.manifest.get("rules")
+    rs, config = None, None
+    if declared:
+        from ..ruleset import load as load_rules, legacy_config
+        rs = load_rules(str(declared))
+        config = legacy_config(rs)
+    rep = verify(prog, arch, corrected_model(table), check_metrics=False,
+                 **({"rule_config": config} if rs is not None else {}))
     s = rep.rules.summary()
     failed = sorted(s.get("failed") or [])
+    language: dict = {}
+    if rs is not None:
+        from ..ruleset import check as check_rules
+        from ..ruleset.programme import programme_execution
+        lang = check_rules(rs, programme_execution(prog, arch, corrected_model(table), rule_config=config,
+                                                   check_metrics=False))
+        ls = lang.summary()
+        for r in lang.results:
+            if r.id in ls["fails"] and r.id not in failed:
+                st.diag(f"RULE.{r.id}", f"the release's rule set {rs.name!r}: {r.id} fails "
+                        f"({r.count} case(s))", rule=r.id,
+                        reference={"ruleset": rs.name, "release": release.id})
+        failed = sorted(set(failed) | set(ls["fails"]))
+        language = {"ruleset": rs.name, "ruleset_holds": ls["holds"], "ruleset_fails": sorted(ls["fails"]),
+                    "ruleset_could_not_check": ls["could_not_check"]}
+        if ls.get("assumed"):
+            language["assumed"] = ls["assumed"]
     skipped = dict(s.get("skipped") or {})
     partial = dict(s.get("partial") or {})
     passed = sorted(set(s.get("passed") or []) - set(partial))
@@ -462,6 +493,12 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog) -> None:
     detail = {"passed": passed, "failed": failed, "skipped": skipped, "partial": partial,
               "model": f"corrected/{table}", "total_us": rep.result.total_us,
               "total_cost": rep.result.total_cost, "total_steps": rep.result.total_steps}
+    if language:
+        detail.update(language)
+        cov += f"; rule set {rs.name!r}: {len(language['ruleset_holds'])} hold, " \
+               f"{len(language['ruleset_fails'])} fail"
+        if language.get("ruleset_could_not_check"):
+            bad_skips = sorted(set(bad_skips) | {f"{rs.name}:{r}" for r in language["ruleset_could_not_check"]})
     if failed:
         st.done("failed", cov, **detail)
     elif bad_skips or bad_partial:

@@ -33,7 +33,7 @@ from . import machine as _machine  # noqa: F401  (registers the machine-level wo
 __all__ = [
     "RuleSet", "RuleSyntaxError", "load", "names", "catalogue", "check", "check_programme",
     "check_schedule", "Report", "RuleResult", "HOLDS", "FAILS", "NOT_APPLICABLE", "UNCHECKED",
-    "TERMS", "rule_order", "keeping_order", "problems",
+    "TERMS", "rule_order", "keeping_order", "problems", "legacy_config", "LEGACY_PARAMS",
 ]
 
 LIBRARY = Path(__file__).parent / "library"
@@ -264,6 +264,31 @@ def check(ruleset: RuleSet, exe: Execution, *, only: Iterable[str] | None = None
     results = [ev.run(r) for r in ruleset.rules if want is None or r.id in want]
     return Report(ruleset=ruleset.name, title=ruleset.title, execution=exe.name, kind=exe.kind,
                   results=results, assumed=list(exe.facts.get("assumed", ())))
+
+
+#: The parameters the legacy verifier (`qccd.verify`) reads too, from its `rule_config`:
+#: C6's `c2lr_forms`, which `c2lr-demonstrated` narrows to the single diagonals.
+LEGACY_PARAMS = ("c2lr_forms",)
+
+
+def legacy_config(ruleset: RuleSet) -> dict:
+    """The rule set's `LEGACY_PARAMS`, as the values `qccd.verify.verify(rule_config=)` reads,
+    so both verifiers judge a programme by the same set.  Only a constant parameter (a name,
+    a number, a set of them) is carried; a parameter written as a term stays the language's."""
+    from .syntax import Const, Num, SetLit, Str
+
+    def value(node):
+        if isinstance(node, (Str, Const, Num)):
+            return node.value
+        if isinstance(node, SetLit):
+            items = [value(x) for x in node.items]
+            return None if any(x is None for x in items) else tuple(sorted(items, key=str))
+        return None
+    out = {}
+    for k in LEGACY_PARAMS:
+        if k in ruleset.params and value(ruleset.params[k]) is not None:
+            out[k] = value(ruleset.params[k])
+    return out
 
 
 def check_programme(ruleset: RuleSet | str, prog, arch, model, **kw) -> Report:
