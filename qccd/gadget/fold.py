@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from .algorithm import Algorithm, AlgorithmError, Instr, _Parser, parse_guard
@@ -56,6 +57,11 @@ MAX_INTERVALS = 256
 #: COHERENCE_BUDGET_US; a rest that spans a call is refreshed on both sides of the call's
 #: start, so each side keeps under half of 80 % of it)
 REFRESH_EVERY_US = 0.4 * 1e6
+#: how much earlier each block passed into a call has its rounds than the one before it: twice
+#: a decode, so the decoder takes the syndromes of blocks resting side by side one by one
+REFRESH_STAGGER_US = 2.0
+#: how far back, step by step, a round looks for a gap on a busy shared plane
+REFRESH_BACKOFF_US = 25_000.0
 
 
 class FoldError(CityError):
@@ -207,6 +213,11 @@ class Macro:
     own: int                               # instructions of its own body
     #: per block: the gate read it out (a destructive readout) -- it does not come back
     gone: list = field(default_factory=list)
+    #: per block: when the gate's last op at its home ends, relative (a block read out inside:
+    #: when the home is free again -- `mem_last` forgets a home its block is released from)
+    home_done: list = field(default_factory=list)
+    #: per block: when each ion the gate carries out of its home departs, relative
+    home_left: list = field(default_factory=list)
 
 
 @dataclass
@@ -283,6 +294,8 @@ class MacroCity(City):
         self.next_index = len(alg.instructions)
         #: block resting in a memory -> when its last syndrome round there ended
         self.rest_since: dict = {}
+        #: block -> the guards of the calls that read it out (an adaptive basis: one per branch)
+        self.gone_under: dict = {}
         self.current = None
         self.skipped: set = set()
         self.holds: list = []
@@ -305,7 +318,11 @@ class MacroCity(City):
             self.pf[name] = ((0, frozenset({(f"in:{i}", "x")})), (0, frozenset({(f"in:{i}", "z")})))
             self.params.append(name)
             if self.family(home) == "memory":
-                self.rest_since[name] = 0.0
+                # its rounds while it rests here count from the call's start, each block's a
+                # little earlier than the one before: every block passed in rests from the same
+                # instant, and rounds in step would send the one decoder all their syndromes
+                # at once (G11).  Early only -- a round sooner than due never hurts (G8)
+                self.rest_since[name] = -i * REFRESH_STAGGER_US
         for k, x in enumerate(ext):
             # the outer guard: decided before the call starts
             self.cvar_time[x] = 0.0
@@ -375,7 +392,16 @@ class MacroCity(City):
             # hold of one round, so no two members ever refresh over each other (H2)
             rounds, t = [], since
             while True:
-                s = self._plane_fit(g, t + REFRESH_EVERY_US, O.duration_us)
+                due = t + REFRESH_EVERY_US
+                s = self._plane_fit(g, due, O.duration_us)
+                back = 0.0
+                while s > due + 1e-9 and back < REFRESH_EVERY_US:
+                    # the plane is busy when the round is due: an earlier gap, if there is one
+                    # -- a round sooner than due never hurts, one later may break the budget (G8)
+                    back += REFRESH_BACKOFF_US
+                    s2 = self._plane_fit(g, max(t, due - back), O.duration_us)
+                    if s2 <= due + 1e-9:
+                        s = s2
                 if s + O.duration_us > until + 1e-9:
                     break
                 self._plane_take(g, s, s + O.duration_us)
@@ -524,19 +550,41 @@ class MacroCity(City):
             self.mem_last[h] = max(self.mem_last.get(h, 0.0), t0 + m.mem_last[i])
             if m.gone and m.gone[i] and ins.cond is not None:
                 # a guarded call may not fire: the block stays for the branch after it that
-                # reads it out the other way (an adaptive basis); both reserve their places
-                if self.family(h) == "memory":
-                    self.rest_since[b] = t0 + m.mem_last[i]
-                continue
+                # reads it out the other way (an adaptive basis); both reserve their places.
+                # Once a call under the guard's negation has read it out too, one of the two
+                # fired whatever the outcome: the block is no more, and its home is free
+                g = ins.guard.replace(" ", "")
+                other = g[1:] if g.startswith("!") else "!" + g
+                if other not in self.gone_under.get(b, ()):
+                    self.gone_under.setdefault(b, set()).add(g)
+                    if self.family(h) == "memory":
+                        self.rest_since[b] = t0 + m.mem_last[i]
+                    continue
+                self.gone_under.pop(b, None)
             if m.gone and m.gone[i]:
-                # read out inside: the block is no more, and its home is empty again
+                # read out inside: the block is no more, and its home is empty again -- its
+                # lease there (open-ended since it checked in) ends when the call is done with
+                # the home (its release there), or the next block to rest there could never
+                # check in
+                left = t0 + max(m.home_done[i], m.mem_last[i])
+                lease = getattr(self.blocks.get(b), "lease", None)
+                if lease is not None and lease in self.cal[h].iv:
+                    self.cal[h].iv.remove(lease)
+                    self.cal[h].reserve(lease[0], left)
                 for d in (self.blocks, self.pf, self.rest_since, self.home_of):
                     d.pop(b, None)
                 if self.zone_holder.get(h) == b:
                     self.zone_holder[h] = None
                 if b in self.block_info:
-                    # (read inside the call: its own view follows its ions to the depot)
+                    # (read inside the call: its own view follows its ions to the depot; this
+                    # one stops answering for it, ions and rounds, where the call is done with
+                    # its home -- `view` and G3/G8)
                     self.block_info[b]["read_in"] = inst
+                    self.block_info[b]["until"] = round(max(t0 + m.free[i], left), 3)
+                self.calls[-1].setdefault("gone", []).append(b)
+                # (and its ions, each when it departed: G3 counts them out of the home then)
+                self.calls[-1].setdefault("left", []).append(
+                    [round(t0 + d, 3) for d in m.home_left[i]] or [round(left, 3)])
                 continue
             if self.family(h) == "memory":
                 self.rest_since[b] = t0 + m.mem_last[i]
@@ -658,6 +706,14 @@ class MacroCity(City):
                    + [gir["makespan_us"]] + [self.block_free.get(b, 0.0) for b in self.params]
                    + [self.mem_last.get(h, 0.0) for h in homes] + [0.0])
         own = sum(1 for i in self.alg.instructions if i.kind != "call")
+        done: dict = {}
+        for e in gir["events"]:
+            if e[3] in homes_set:
+                done[e[3]] = max(done.get(e[3], 0.0), e[2])
+        left: dict = defaultdict(list)
+        for c in gir["carries"]:
+            if c[2] in homes_set:
+                left[c[2]].extend(c[4] + d for d in c[5])
         return Macro(id=mid, gate=gate, homes=list(homes), guard=guard, ext=list(ext), gir=gir,
                      calls=self.calls, footprint=fp, span=span,
                      free=[self.block_free.get(b, 0.0) for b in self.params],
@@ -665,6 +721,8 @@ class MacroCity(City):
                      out_pf=[self.pf.get(b) for b in self.params],
                      guarded=[bool(self.pf_guarded.get(b)) for b in self.params],
                      gone=[b not in self.blocks for b in self.params],
+                     home_done=[done.get(h, 0.0) for h in homes],
+                     home_left=[sorted(left.get(h, ())) for h in homes],
                      fresh=self.next_gid - self.n_residents, instructions=self.n_instr, own=own)
 
 
@@ -1259,7 +1317,10 @@ def view(g: dict, mid: str | None = None) -> dict:
         m = g["macros"][c["m"]]
         for i, b in enumerate(c["args"]):
             boxes.append({"ins": new_id[c["ins"]], "block": b, "t0": c["t0"],
-                          "t1": c["t0"] + m["free"][i], "covered": c["t0"] + m["mem_last"][i]})
+                          "t1": c["t0"] + m["free"][i], "covered": c["t0"] + m["mem_last"][i],
+                          # read out inside it: its ions have left `home` for good by `left` (G3)
+                          **({"gone": True, "home": m["homes"][i],
+                              "left": c["left"][c["gone"].index(b)]} if b in c.get("gone", ()) else {})})
     x["boxes"] = boxes
     if mid is not None:
         initial = {}

@@ -184,6 +184,13 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         for dep, take in zip(c[5], c[12]):
             delta[c[2]].append((c[4] + dep, -1))
             delta[dst_of(c)].append((c[4] + take, +1))
+    for x in boxes:
+        if x.get("gone"):
+            # a block a call read out: its ions left its home inside the call (the call's own
+            # view carries them), counted here as gone once the call is done with the home
+            n = len(gir["blocks"].get(x["block"], {}).get("ions", ()))
+            times = x["left"] if len(x["left"]) == n else [max(x["left"])] * n
+            delta[x["home"]] += [(t, -1) for t in times]
     g3 = []
     start_count = defaultdict(int)
     for p in initial.values():

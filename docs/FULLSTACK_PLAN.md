@@ -826,6 +826,63 @@ details").**
   - its 27 extraction rounds take 534 ms on each block, at that block's district's clinic,
     every block at once;
   - about 0.57 s in all, whatever the register's size.
+- **Eighth round (2026-10-30): one whole adder, concrete.** The user asked whether the time was
+  "fully compiled to trapped-ion movements, even the T factory", and then: "please do not cheat,
+  and everything should be concrete hardware instruction, there is no virtual qubit, virtual
+  system calls".
+  - **What the years above are.** Each template is compiled once to ions and checked, on a
+    district of its own. The CCZ factory is part of that: 109 ms of ion operations inside the
+    Toffoli template, then nine injections. The years are arithmetic over those templates:
+    instance counts times spans, or a dataflow over their ports. That dataflow gives every
+    instance a district of its own, with its blocks already in that district's memories and no
+    transport between districts. The whole run has never been one schedule.
+  - **The check.** Gidney 2025's 32-bit adder, as `gLoop1` calls it, written out as ONE `.alg`
+    program. It has 3,448 instructions on 95 data blocks; every ancilla is a block of its own
+    (717), and every outcome is one (1,367). Each forward step's bit, read by its uncompute,
+    is the archive's `bit` over the outcomes that wrote it. Every frame keeps its guard. It is
+    scheduled on one concrete machine: step I's district with 140 memories, so every block
+    has a home. Scratch: `concrete.py`, `adder_whole.py`, `adder_compile.py`.
+
+    | The same adder | Time |
+    |---|---|
+    | Composed, sequential (sum of template spans) | 22.5 s |
+    | Composed, parallel (dataflow over ports; 2.9 districts busy on average) | 7.77 s |
+    | **One concrete schedule on one machine: 649,000 events, 78,070 carries, G1–G11, H1, H2 all hold** | **19.29 s** |
+
+    The parallel composition is 2.5x optimistic for this adder. No place is saturated (the
+    preparation bay 34%, the CCZ foundry 16%). The time goes to the carry chain and to moving
+    blocks between their homes and the places: some road or junction is in use 57% of the
+    time, and some memory is storing 57% of the time.
+  - **What going concrete found, each fixed:**
+    - *Lowering* (`program.py`). Gidney's measured uncompute writes `source c[k]` from its own
+      measurement and branches on it at once. The builder read the slot as written by an
+      earlier call, so the fix-up's guard became an outside outcome. Each template took it as
+      decided, so the fix-up ran unconditionally, beside everything else. Now the uncompute
+      waits for its measurement: 204 → 244 ms and 191 → 231 ms
+      (`test_a_source_slot_written_and_read_in_one_run_reads_the_bit_just_written`).
+    - *Frames* (scratch writer). A gate reads only its own outcomes. A frame that reads both a
+      guarded branch's outcomes and outer ones is placed where all of them are measured, with
+      its whole guard. The template compile had dropped every frame's guard.
+    - *An adaptive basis* (`fold.py`). FormalRV reads each CCZ routing pair in Z or in X, by
+      an earlier outcome: two complementary guarded calls. After both, the block is gone.
+      It was kept for ever: six blocks a Toffoli, until no memory was left (refused at step 5).
+    - *A block read out inside a call* (`fold.py`, `place_checks.py`). Its memory's lease
+      never ended, so the next block to rest there was booked at time infinity (a NaN).
+      The caller's view now counts its ions out of the memory, each when it departed (G3),
+      and stops answering for the block there (G8).
+    - *Rounds in step* (`fold.py`). Every block passed into a call rested from one instant, so
+      95 blocks sent the one decoder their syndromes at once (G11). Each block's rounds now
+      come 2 µs before the previous block's (`REFRESH_STAGGER_US`); a round early never hurts.
+    - *A bug of the second round* (1d2766c, found by bisect). `se` on a resting block ran its
+      refresh without taking its turn on a shared plane (H2 failed in `test_planes`). It now
+      takes its turn. A refresh on a busy plane takes the latest gap before it falls due, not
+      the first one after (G8).
+    - `tests/test_gadget_fold_branches.py` holds the adaptive basis, the lease, the counts and
+      the stagger on a small program.
+  - **Next: the run itself, concrete.** A fixed machine of districts, each with its own
+    register memories and work places. Each adder shape is compiled once per district as one
+    schedule like the one above, and replayed by start time. Blocks that change districts ride
+    compiled transports. No district per instance, and no formula.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which

@@ -1784,7 +1784,10 @@ class City:
         keeps decoding what it measures."""
         M = b.leaf
         O = self.leaf[M].master.ops["refresh"]
-        s = max(t0, self.mem_last.get(M, 0.0))
+        # (a memory on a shared plane takes its turn there, as every other op does -- H2)
+        pg = self._place_group.get(M)
+        s = self._plane_fit(pg, max(t0, self.mem_last.get(M, 0.0)), O.duration_us)
+        self._plane_take(pg, s, s + O.duration_us)
         names = self.leaf[M].master.ops["release"].transfer("out", "out").ions
         visitors = [[n, g] for n, g in self.leaf[M].ids.items()] + \
                    [[n, g] for n, g in zip(names, b.gids)]
