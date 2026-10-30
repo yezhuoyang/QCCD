@@ -23,9 +23,15 @@ The device says it is C2LR in its control block:
 ```json
 "control": {"model": "c2lr",
             "c2lr": {"diagonals": ["WS", "WN", "ES", "EN"], "checkerboard": ["P1", "P2"],
-                     "assumed": ["checkerboard"]},
-            "classes": {"extra": ["swap_or_stay", "reorder_or_not"]}}
+                     "assumed": ["checkerboard"],
+                     "shared_signals": 27, "inputs_per_leg": 1, "switches_per_leg": 1},
+            "classes": {"extra": [{"id": "swap_or_stay", "type": "c2lr"},
+                                  {"id": "reorder_or_not", "type": "c2lr"}]}}
 ```
+
+(Phase 1: a class is an object with an `id`, as every other device's are --
+`Architecture.simd_classes` reads `extra[k]["id"]`, so bare names would not load. The three
+counts are what C10 reads; `Machine.c2lr_grid` writes them from p4.)
 
 and prices its steps as primitives (numbers per section 6, each with its source):
 
@@ -76,9 +82,9 @@ In the TSIR a step is one `simd` instruction with a template, as a rotation is t
 and the assumed form names `"checkerboard": {"parity": 0, "pairing": "P1"}` instead of
 `"diagonal"`.
 
-The replay expands it from the **device**, never from the programme: the active junctions, the
+The replay expands it from the **device**, never from the programme: the junctions in play, the
 pairs and each mover's route (leg -> junction -> partner leg) are computed from the geometry and
-the parity, and the programme supplies only the bits. That is what lets the rules below exempt a
+the variation, and the programme supplies only the bits. That is what lets the rules below exempt a
 swap without a programme being able to claim the exemption for anything else.
 
 **reorder-or-not** is `{"kind": "reorder_or_not", "reverse": [ions]}`: a 180-degree rotation of
@@ -106,8 +112,8 @@ plus C1-C10). In a C2LR step:
 | C2 | the step's only per-leg choice is the direction bit: the template has no other per-leg field |
 | C3 | horizontal and vertical legs choose independently in one step (by construction) |
 | C4/C5 | a step is C2LR -> shared waveform -> C2LR⁻¹ and ends with every crystal at a leg centre (by construction; C7) |
-| C6 | the pairs are the device's matching for the step's diagonal (or for the assumed checkerboard form), checked against the device |
-| C7 | no crystal ends a step in a junction (R2/R23, unchanged) |
+| C6 | the pairs are the device's matching under one variation it offers, and the rule set allows the variation's form (`c2lr_forms`): every crystal shifted toward has a partner leg |
+| C7 | no crystal ends a step in a junction (R23 without its room clause) |
 | C8 | the COM frequency is held during a shift (a property of the primitive; recorded, not decided) |
 | C9 | every crystal is heated by every waveform (the replay's charge) |
 | C10 | control is the fixed shared signals plus one input and one switch per leg (the wiring census) |
@@ -115,7 +121,7 @@ plus C1-C10). In a C2LR step:
 R2, R3, R5 and R22 are exempt for a swap-or-stay step **because** its routes are the device's
 matching (two crystals cross one junction in a swap, and a swap is an exchange on the two rails
 by design). R4 still requires the step's class to be declared. Checkerboard steps carry the
-device's `assumed` mark into the report; the rule set `c2lr-demonstrated` refuses them.
+`assumed` mark into the report; the rule set `c2lr-demonstrated` refuses them (C6).
 
 ## 5. The certificate
 
@@ -144,6 +150,51 @@ entries are final n̄ after a doubled operation with the 0.1-0.2 q left by cooli
 increments), Yb-Ba's C2LR excitation (18.5 mq is v1's; v2 gives 11.7 mq at 6 m/s, Table I), the
 shift (62.5 µm, not 63), and the pairings (all four single diagonals were demonstrated; its
 two-pair steps were not).
+
+## 6a. Phase 1: what the Python core decided (2026-10-30)
+
+Where this design left a choice open, phase 1 made it as follows (code in `qccd/arch/c2lr.py`,
+`qccd/verify/c2lr.py`; tests in `tests/test_c2lr.py`).
+
+- **Compass.** W is the smaller x, E the larger; N is the **smaller** y, because the studio draws
+  y down the page. A diagonal's name depends on this; which steps exist does not.
+- **What a lattice is.** A leg is a site with exactly two rails, each to a non-site node, on
+  opposite sides of it along one axis; every rail of a junction node ends at a leg. A degree-2
+  corner node is a junction of the lattice (E-S at the corner pairs through a bend). A
+  wrap-around wire (a periodic grid) is not a leg, so a periodic grid is not C2LR. The
+  checkerboard colour is `(r + c) mod 2` by the junction's ranks in x and y; a lattice on which
+  some leg joins two junctions of one colour offers no checkerboard.
+- **Template shape** (`qccd.ir.tsir.template_problems`): exactly one of `diagonal` and
+  `checkerboard {parity, pairing}`, a `toward` list, no other key, and no `participants` beside
+  the template (C2) -- refused by `validate_program` and before the replay runs.
+- **Two strengths of refusal.** A step that cannot execute raises `ReplayError`: the device is
+  not C2LR, a named crystal is unplaced or not in a leg, the shape is wrong, the device prices
+  no such step (a Ba-Sr device has no `reorder_or_not`: the paper measures it for Yb-Ba only).
+  A step that executes but breaks a rule runs as the exchange rule says and fails the rule: a
+  bit on a leg with no partner (C6; the crystal stays), a variation the device does not offer
+  (C6), a form the rule set does not allow (C6, `c2lr-demonstrated`), a bit on the crystal
+  further from the junction in a two-crystal leg (C1; it stays), an exit by another variation,
+  the resident leaving, or a third crystal (C1).
+- **"The same step type"** is the same variation: the diagonal, or the checkerboard's pairing
+  and parity. In a leg holding two, each crystal is near one end; only the one nearer the step's
+  junction can be shifted toward it.
+- **Price.** Mover `quanta_swap`, every other crystal `quanta_stay`, on a heat channel of its own,
+  `c2lr` (not added to the five shared channels, so nothing else's report changes). The step's
+  time is the primitive's even with no mover; its cost is one per mover. reorder-or-not heats
+  every crystal by `quanta` (or `quanta_reverse` / `quanta_stay` if given). A gate on two
+  crystals of one leg is merge + MS + split; the merge's heat lands before the gate's n-bar is
+  read, so R7 and R16 see what the MS gate sees. The device's merge and split curves carry the
+  40 µs / 0.1 q point only, so every operating-point policy reads it.
+- **The exemption** is R2's crossing half, R3, R5 and R22 on a template step, keyed on the
+  replay's own `CycleView.c2lr` (`qccd.verify.rules.device_exchange`); in the rule language,
+  `exchange(t)` / `exchange(a)` in R2, R3, R5 and R22.
+- **C rules.** C1 (occupancy and exits), C2 (a C2LR-class step with its own routes), C5 (every
+  resting crystal in a leg), C6, C7 and C10 (the document's census) decide; C3, C4 and C9 hold by
+  construction and are checked; C8 is recorded from the primitive's `com_mhz`. They judge C2LR
+  devices only and are marked checked only there. Their legacy one-line statements are
+  `qccd.verify.rules.C2LR_RULE_STATEMENTS`, apart from the 28 every page lists.
+- **Assumed** steps are listed under `assumed` in both verifiers' summaries, and only when
+  there is one.
 
 ## 7. Boards
 
