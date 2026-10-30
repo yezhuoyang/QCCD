@@ -459,7 +459,10 @@ LER_METRICS = (
     " {k:'nbar_max', name:'Heating — highest n̄ at a gate', unit:'quanta', better:'low', nd:3},\n")
 
 
-def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
+def pages(board: str, release, exp, rows: list[dict], out: Path, *,
+          compiled_by: str = "the reference compiler") -> None:
+    """The board's studio pages and its index; `compiled_by` names, in the index's words, what
+    compiled every design (a C2LR board's is the baseline C2LR router, not qccdc)."""
     ok = [r for r in rows if r["status"] == "ok"]
     # the waiting column is the noise text's time-priced lines, summed from the row's own
     # budget: rows saved before it was read off the text summed a line @2 does not have
@@ -516,8 +519,8 @@ def pages(board: str, release, exp, rows: list[dict], out: Path) -> None:
                else "each device's own physics")
     idx = B.write_index(
         manifest, out, title=title,
-        subtitle=f"{release.manifest.get('description', '')} Every design ran the same experiment, compiled by the reference "
-                 f"compiler; its hardware program was turned into a noisy stim circuit by the noise model "
+        subtitle=f"{release.manifest.get('description', '')} Every design ran the same experiment, compiled by "
+                 f"{compiled_by}; its hardware program was turned into a noisy stim circuit by the noise model "
                  f"{release.manifest['qec']['noise']} (a text, on the Evaluation page) read over {physics}, and sampled "
                  f"(up to {int(q['max_shots']):,} shots or {int(q['max_errors'])} logical "
                  f"errors, decoder {q['decoder']}, fixed seed). Ranked by the logical error rate per round, lower is better; "

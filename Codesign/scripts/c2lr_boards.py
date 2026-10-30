@@ -131,7 +131,7 @@ def main(argv=None) -> int:
             rows = MB._keep_work(out, rows, None)
             rj.write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
         MB.write_task(board, release, exp)
-        MB.pages(board, release, exp, rows, out)
+        MB.pages(board, release, exp, rows, out, compiled_by="the baseline C2LR router")
     return 0
 
 
