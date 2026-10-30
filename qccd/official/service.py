@@ -490,7 +490,7 @@ class OfficialService:
         g = self.GOALS[goal]
         return [r for r in self.releases.values()
                 if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]
-                and r.manifest.get("goal", "goal1") == goal]
+                and r.manifest.get("goal", "goal1") == goal and r.manifest.get("track") not in self.TRACKS]
 
     def goal_board(self, goal: str) -> dict:
         """One ranking across releases: every member release's entries, each with its release and
@@ -545,6 +545,38 @@ class OfficialService:
                               **size(r)} for r in rels],
                 "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],
                 "rows": rows}
+
+    # ------------------------------------------------------------------ the tracks: boards ranked apart
+
+    #: Boards ranked beside the others and never with them, each release saying `"track": <id>`
+    #: (qccd/site/boards.py lists them in a section of their own).  The C2LR boards (the user,
+    #: 2026-10-30; docs/c2lr.md section 7): the memory boards' experiments on C2LR swap-or-stay
+    #: lattices, judged by the C2LR rule set.  No goal ranks a track's releases.
+    TRACKS = {"c2lr": {"title": "C2LR swap-or-stay boards",
+                       "about": "The memory boards' own experiments on C2LR lattices (arXiv:2403.00756), "
+                                "where crystals move only by swap-or-stay steps; each board is ranked on its "
+                                "own, by the logical error rate per round."}}
+
+    def track_releases(self, track: str) -> list:
+        return sorted((r for r in self.releases.values()
+                       if not self.is_suite(r.id) and r.manifest.get("track") == track),
+                      key=lambda r: (int(r.manifest.get("order", 99)), r.title))
+
+    def track_board(self, track: str) -> dict:
+        """A track's boards, each its own ranking (`leaderboard`), in the Leaderboard's order,
+        with the rule set each declares."""
+        t = self.TRACKS.get(track)
+        if t is None:
+            raise OfficialError("unknown_track", f"no track {track!r} (have: {', '.join(self.TRACKS)})", 404)
+        boards = []
+        for rel in self.track_releases(track):
+            b = self.leaderboard(rel.id)
+            q = rel.manifest.get("qec") or {}
+            b.update(release=rel.id, rules=rel.manifest.get("rules"), noise=q.get("noise"),
+                     starter=rel.manifest.get("starter"))
+            boards.append(b)
+        return {"track": track, "title": t["title"], "about": t["about"],
+                "evaluator_policy": self.evaluator_policy, "boards": boards}
 
     #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py)
     GOAL3_FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor", "Other")
@@ -802,6 +834,13 @@ def create_app(svc: OfficialService):
     async def goal_board(goal: str):
         try:
             return svc.goal_board(goal)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/tracks/{track}")
+    async def track_board(track: str):
+        try:
+            return svc.track_board(track)
         except OfficialError as e:
             return err(e)
 
