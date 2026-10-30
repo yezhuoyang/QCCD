@@ -85,13 +85,14 @@ class _FoldParser(_Parser):
         if word not in self.alg.gates:
             return self.primitive(word, args, cvar, at, guard, written, lineno, raw, call)
         gate = self.alg.gates[word]
-        if cvar:
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} names no outcome")
-        if len(args) != len(gate.params):
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} takes {len(gate.params)} "
-                                 f"block(s): {' '.join(gate.params)}")
-        if len(set(args)) != len(args):
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} needs distinct blocks")
+        args, cin, cout = gate.split_call(list(args), cvar, lineno, raw)
+        unknown = [n for n in cin if n not in self.cvars]
+        if unknown:
+            raise AlgorithmError(lineno, raw, f"gate {gate.name} reads {unknown[0]}, which no "
+                                 f"earlier instruction measured")
+        if cout and guard is not None:
+            raise AlgorithmError(lineno, raw, "a guarded call cannot name outcomes for its caller: "
+                                 "later lines would depend on whether it ran")
         for b in args:
             if b not in self.born:
                 raise AlgorithmError(lineno, raw, f"block {b} is used before prep or inject")
@@ -103,12 +104,13 @@ class _FoldParser(_Parser):
                 raise AlgorithmError(lineno, raw, f"the condition reads {unknown[0]}, which no "
                                      f"earlier instruction measured")
         ins = Instr(index=len(self.alg.instructions), line=lineno, text=raw, kind="call",
-                    blocks=list(args), at=at, call=list(call), gate=gate.name)
+                    blocks=list(args), at=at, call=list(call), gate=gate.name, cin=cin, cout=cout)
         if call and call[-1].get("body") is not None:
             ins.src_line = call[-1]["body"]
         if guard is not None:
             ins.cond, ins.guard = guard, guard.text
         self.alg.instructions.append(ins)
+        self.cvars.update(cout)
 
 
 def parse_folded(source: str, name: str = "algorithm") -> Algorithm:
@@ -121,16 +123,19 @@ def parse_folded(source: str, name: str = "algorithm") -> Algorithm:
 
 
 def body_algorithm(top: Algorithm, gate: str, n: int, guard: str | None, ext: list) -> Algorithm:
-    """One call of `gate`, expanded one level: its blocks are `arg0..`, its outer guard reads
-    `ext` (outcomes measured before the call), and the calls in its body stay calls."""
+    """One call of `gate`, expanded one level: its blocks are `arg0..`, its outer guard and
+    its classical inputs read `ext` (outcomes measured before the call: the guard's first, then
+    the gate's inputs, `<- ...`), its outputs keep their own names, and the calls in its body
+    stay calls."""
     g = top.gates[gate]
     alg = Algorithm(name=gate, title=f"gate {gate}", source="")
     alg.gates = top.gates
     alg.floorplan = top.floorplan
     args = [f"arg{i}" for i in range(n)]
     p = _FoldParser(alg, born=args, cvars=ext)
-    p.expand(g, args, None, None, parse_guard(guard) if guard else None, g.line,
-             f"{gate} {' '.join(args)}", [])
+    words = args + (["<-"] + list(ext[len(ext) - len(g.cin):]) if g.cin else [])
+    p.expand(g, words, " ".join(g.cout) or None, None, parse_guard(guard) if guard else None, g.line,
+             f"{gate} {' '.join(words)}", [])
     # a macro decodes what it has left before it returns (skipped if nothing is waiting)
     alg.instructions.append(Instr(index=len(alg.instructions), line=0, text="decode",
                                   kind="decode", blocks=[], refresh=True))
@@ -220,6 +225,9 @@ class Macro:
     home_done: list = field(default_factory=list)
     #: per block: when each ion the gate carries out of its home departs, relative
     home_left: list = field(default_factory=list)
+    #: its classical outputs (`gate g b -> o:`), in order: o -> (when it was decoded, relative;
+    #: its value, a parity over the call's symbols and its own outcomes)
+    outputs: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -569,19 +577,21 @@ class MacroCity(City):
                 # a block of this body passed on: where it rests is its home for the call
                 self.home_of[b] = self.blocks[b].leaf
         homes = [self.blocks[b].leaf for b in args]
-        ext, guard = [], None
-        if ins.cond is not None:
-            names = list(ins.cond.names)
-            ext = [f"x{k}" for k in range(len(names))]
-            guard = ins.cond.rename(dict(zip(names, ext))).text
+        # the outcomes the call reads, as `x0`, ... inside it: its guard's, then its inputs'
+        gnames = list(ins.cond.names) if ins.cond is not None else []
+        names = gnames + list(ins.cin)
+        ext = [f"x{k}" for k in range(len(names))]
+        guard = ins.cond.rename(dict(zip(gnames, ext))).text if ins.cond is not None else None
         taken = sorted({p for p, h in self.zone_holder.items()
                         if h is not None and p not in homes and p not in self.folder.home_places}
                        | (self.taken - set(homes)))
         m = self.folder.macro(ins.gate, homes, guard, ext, taken, self.depth + 1)
         t = max([self.block_free.get(b, 0.0) for b in args]
                 + [self.mem_last.get(h, 0.0) for h in homes] + [0.0])
-        if ins.cond is not None:
-            t = max([t] + [self.decoded_by(n, "the call's guard") for n in ins.cond.names])
+        if names:
+            # (decided before it starts: a decoded outcome, its guard's or one it is given)
+            t = max([t] + [self.decoded_by(n, "the call's guard" if n in gnames else "the call")
+                           for n in names])
         t0 = self.fit(m, t)
         for (kind, path), ivs in m.footprint.items():
             cal = self._resource(kind, path)
@@ -592,18 +602,23 @@ class MacroCity(City):
             self.cover(b, t0, ins)
             self.rest_since.pop(b, None)
         inst = f"c{len(self.calls)}"
-        names = list(ins.cond.names) if ins.cond is not None else []
         self.calls.append({"id": inst, "m": m.id, "t0": round(t0, 3), "args": args,
                            "gid": self.next_gid, "ins": ins.index, "line": ins.line,
                            "guard": ins.guard, "gate": ins.gate,
                            # what the call's symbols stand for: its blocks' frames and its
-                           # guard's outcomes, as this body held them when it started
+                           # guard's and inputs' outcomes, as this body held them when it started
                            "pf_in": [self.frame(b) for b in args],
                            "ext_in": [self.cvar_value[n] for n in names],
-                           # and the names its guard's outcomes have here (`x0`, ... inside)
-                           "ext_names": names})
+                           # and the names those outcomes have here (`x0`, ... inside)
+                           "ext_names": names,
+                           # its outputs: (its name for one, this body's)
+                           **({"cout": [[o, r] for o, r in zip(m.outputs, ins.cout)]} if ins.cout else {})})
         self.next_gid += m.fresh
         self.n_instr += m.instructions
+        for (o, (t_rel, value)), r in zip(m.outputs.items(), ins.cout):
+            # an output is this body's outcome from when the call decoded it
+            self.cvar_time[r] = t0 + t_rel
+            self.cvar_value[r] = self.subst(value, inst, args, names)
         for i, b in enumerate(args):
             h = homes[i]
             self.block_free[b] = max(self.block_free.get(b, 0.0), t0 + m.free[i])
@@ -781,6 +796,8 @@ class MacroCity(City):
                      out_pf=[self.pf.get(b) for b in self.params],
                      guarded=[bool(self.pf_guarded.get(b)) for b in self.params],
                      gone=[b not in self.blocks for b in self.params],
+                     outputs={o: (self.decoded_by(o, f"gate {gate}'s output"), self.cvar_value[o])
+                              for o in self.folder.top.gates[gate].cout},
                      home_done=[done.get(h, 0.0) for h in homes],
                      home_left=[sorted(left.get(h, ())) for h in homes],
                      fresh=self.next_gid - self.n_residents, instructions=self.n_instr, own=own)
@@ -865,6 +882,7 @@ def _macro_json(m: Macro) -> dict:
             "outcomes": g["outcomes"], "blocks": g["blocks"], "refused": g["refused"],
             **({"noops": g["noops"]} if g.get("noops") else {}),
             "holds": g["holds"], "calls": m.calls,
+            **({"outputs": {o: round(t, 3) for o, (t, _) in m.outputs.items()}} if m.outputs else {}),
             # a road's hold and its span on a shared plane (planes.py), when it has them
             **{k: g[k] for k in ("road_holds", "road_spans") if g.get(k)},
             # what the macro holds, per resource, as one hull: the page's "busy" bars
@@ -1045,10 +1063,27 @@ class _Expander:
         self.blocks: dict = {}
         self.holds: list = []
 
+    def _out_name(self, mid, cid, o):
+        """The program's name for outcome `o` of macro `mid`'s body, called as `cid`: its own
+        (`cid.o`), or -- an output of a call in that body -- the one that call's body measured."""
+        for c2 in self.macros[mid].get("calls") or []:
+            for o2, r2 in c2.get("cout") or ():
+                if r2 == o:
+                    return self._out_name(c2["m"], f"{cid}/{c2['id']}", o2)
+        return f"{cid}.{o}"
+
+    def _aliased(self, calls, path, cv):
+        """`cv`, with this body's names for its calls' outputs (`g q -> r`) made the outcomes
+        their bodies measured."""
+        alias = {r: self._out_name(c["m"], f"{path}{c['id']}", o)
+                 for c in calls for o, r in c.get("cout") or ()}
+        return (lambda n, cv=cv: alias.get(n) or cv(n)) if alias else cv
+
     # -- pass 1: instructions --------------------------------------------------------------
     def number(self, prog, calls, names, cv, path, chain=()):
         """`chain`: the calls this body is inside, outermost first: `{gate, call, line}`,
         `line` the call's own line in the program file."""
+        cv = self._aliased(calls, path, cv)
         imap = self.imaps.setdefault(path, {})
         by_ins = {c["ins"]: c for c in calls}
         for ins in prog["instructions"]:
@@ -1106,6 +1141,7 @@ class _Expander:
 
     # -- pass 2: rows ---------------------------------------------------------------------
     def rows(self, body, calls, t0, gidmap, names, cv, path, env):
+        cv = self._aliased(calls, path, cv)
         imap = self.imaps[path]
         # a road's hold (store-and-forward on a shared plane), at program time
         for net, c0, nb in body.get("road_holds") or []:

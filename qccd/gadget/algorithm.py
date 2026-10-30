@@ -291,8 +291,11 @@ class Instr:
     #: (`line` stays the call site's), and the file that line is in ("" for the program)
     src_line: int | None = None
     src_origin: str = ""
-    #: `kind == "call"` only (a folded program, `qccd.gadget.fold`): the gate called
+    #: `kind == "call"` only (a folded program, `qccd.gadget.fold`): the gate called, the
+    #: outcomes it is given (`<- ...`) and the names its outputs take here (`-> ...`)
     gate: str | None = None
+    cin: list = field(default_factory=list)
+    cout: list = field(default_factory=list)
     #: `bit` only: its terms (`parse_bit`)
     formula: tuple = ()
 
@@ -356,11 +359,41 @@ class Gate:
     contract: str | None = None
     line: int = 0
     source: str = ""                       # the file it came from, or "" for the program
+    #: classical inputs (`gate g b <- c1 c2:`): outcomes its caller measured, which its body's
+    #: guards and bits may read -- a call waits until they are decoded
+    cin: list = field(default_factory=list)
+    #: classical outputs (`gate g b -> o1:`): outcomes its body measures that its caller names
+    #: (`g q -> r1`) and may read after the call
+    cout: list = field(default_factory=list)
 
     def to_json(self) -> dict:
         return {"name": self.name, "params": list(self.params), "contract": self.contract,
                 "line": self.line, "source": self.source,
+                **({"cin": list(self.cin)} if self.cin else {}),
+                **({"cout": list(self.cout)} if self.cout else {}),
                 "body": [t for _, t in self.body]}
+
+    def split_call(self, args: list, cvar: str | None, lineno: int, raw: str) -> tuple:
+        """A call's words, `g q1 q2 <- m1 -> r1`: (blocks, classical inputs, outputs)."""
+        if "<-" in args:
+            k = args.index("<-")
+            blocks, cin = list(args[:k]), list(args[k + 1:])
+        else:
+            blocks, cin = list(args), []
+        cout = cvar.split() if cvar else []
+        if len(blocks) != len(self.params):
+            raise AlgorithmError(lineno, raw, f"gate {self.name} takes {len(self.params)} "
+                                 f"block(s): {' '.join(self.params)}")
+        if len(set(blocks)) != len(blocks):
+            raise AlgorithmError(lineno, raw, f"gate {self.name} needs distinct blocks")
+        if len(cin) != len(self.cin):
+            raise AlgorithmError(lineno, raw, f"gate {self.name} reads {len(self.cin)} outcome(s) "
+                                 f"its caller measured (`<- {' '.join(self.cin) or '...'}`), given {len(cin)}")
+        if len(cout) != len(self.cout):
+            raise AlgorithmError(lineno, raw, f"gate {self.name} names {len(self.cout)} outcome(s) "
+                                 f"for its caller (`-> {' '.join(self.cout) or '...'}`), given {len(cout)}"
+                                 if self.cout else f"gate {self.name} names no outcome")
+        return blocks, cin, cout
 
 
 @dataclass
@@ -501,7 +534,7 @@ class Algorithm:
 
 _LINE = re.compile(r"^\s*(\w+)\s*(.*?)\s*(?:@\s*(\w+))?\s*$")
 _GUARD = re.compile(r"^\s*if\s+(.+?)\s*:\s*(.+)$", re.I)
-_GATE = re.compile(r"^gate\s+(\w+)((?:\s+\w+)*?)(?:\s+implements\s+(\w+))?\s*:\s*$")
+_GATE = re.compile(r"^gate\s+(\w+)((?:\s+(?:\w+|<-|->))*?)(?:\s+implements\s+(\w+))?\s*:\s*$")
 _INCLUDE = re.compile(r'^include\s+"([\w.-]+)"\s*$')
 _FLOORPLAN = re.compile(r'^floorplan\s+"([\w.-]+)"\s*$')
 
@@ -594,12 +627,25 @@ class _Parser:
                 g = _GATE.match(stripped)
                 if not g:
                     raise AlgorithmError(lineno, raw, "write: gate NAME PARAM ... [implements U]:")
-                name, params = g.group(1).lower(), g.group(2).split()
+                name, words = g.group(1).lower(), g.group(2).split()
                 if name in PRIMITIVES or name in ("title", "gate", "include", "if"):
                     raise AlgorithmError(lineno, raw, f"'{name}' is an instruction, not a gate name")
                 if name in self.alg.gates:
                     raise AlgorithmError(lineno, raw, f"gate {name} is already defined")
-                if len(set(params)) != len(params) or not params:
+                # gate NAME blocks... [<- outcomes it reads...] [-> outcomes it names...]:
+                cut = [k for k, w in enumerate(words) if w in ("<-", "->")]
+                params = words[:cut[0]] if cut else words
+                cin = cout = []
+                for k, w in zip(cut, cut[1:] + [len(words)]):
+                    if words[k] == "<-" and not cout and not cin:
+                        cin = words[k + 1:w]
+                    elif words[k] == "->" and not cout:
+                        cout = words[k + 1:w]
+                    else:
+                        raise AlgorithmError(lineno, raw, "write: gate NAME BLOCK ... [<- OUTCOME ...] "
+                                                          "[-> OUTCOME ...]:")
+                every = params + cin + cout
+                if len(set(every)) != len(every) or not params:
                     raise AlgorithmError(lineno, raw, "a gate takes one or more distinct blocks")
                 contract = g.group(3)
                 if contract is not None:
@@ -621,7 +667,8 @@ class _Parser:
                     i += 1
                 if not body:
                     raise AlgorithmError(lineno, raw, f"gate {name} has no body")
-                self.alg.gates[name] = Gate(name, params, body, contract, lineno, origin)
+                self.alg.gates[name] = Gate(name, params, body, contract, lineno, origin,
+                                            cin=list(cin), cout=list(cout))
                 continue
             if raw[:1].isspace() and not origin:
                 # an indented line outside a gate: the program is flat
@@ -666,13 +713,14 @@ class _Parser:
         return self.primitive(word, args, cvar, at, guard, written, lineno, raw, call)
 
     def expand(self, gate: Gate, args, cvar, at, guard, lineno, raw, call):
-        if cvar:
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} names no outcome")
-        if len(args) != len(gate.params):
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} takes {len(gate.params)} "
-                                 f"block(s): {' '.join(gate.params)}")
-        if len(set(args)) != len(args):
-            raise AlgorithmError(lineno, raw, f"gate {gate.name} needs distinct blocks")
+        args, cin, cout = gate.split_call(list(args), cvar, lineno, raw)
+        unknown = [n for n in cin if n not in self.cvars]
+        if unknown:
+            raise AlgorithmError(lineno, raw, f"gate {gate.name} reads {unknown[0]}, which no "
+                                 f"earlier instruction measured")
+        if cout and guard is not None:
+            raise AlgorithmError(lineno, raw, "a guarded call cannot name outcomes for its caller: "
+                                 "later lines would depend on whether it ran")
         if len(call) > 32:
             raise AlgorithmError(lineno, raw, f"gate {gate.name} calls itself")
         k = self.calls.get(gate.name, 0) + 1
@@ -681,7 +729,11 @@ class _Parser:
         # call 21 would both be `when_m58221`, and their locals one block)
         tag = f"{gate.name}_{k}" if gate.name[-1:].isdigit() else f"{gate.name}{k}"
         frame = {"gate": gate.name, "call": tag, "line": lineno, "contract": gate.contract}
+        # (its blocks are the caller's; so are the outcomes it reads, and the names it gives the
+        # outcomes it hands back)
         rename = dict(zip(gate.params, args))
+        rename.update(zip(gate.cin, cin))
+        rename.update(zip(gate.cout, cout))
         first = len(self.alg.instructions)
         for bl, btext in gate.body:
             try:
