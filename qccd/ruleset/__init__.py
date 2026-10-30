@@ -263,7 +263,7 @@ def check(ruleset: RuleSet, exe: Execution, *, only: Iterable[str] | None = None
     want = set(only) if only is not None else None
     results = [ev.run(r) for r in ruleset.rules if want is None or r.id in want]
     return Report(ruleset=ruleset.name, title=ruleset.title, execution=exe.name, kind=exe.kind,
-                  results=results)
+                  results=results, assumed=list(exe.facts.get("assumed", ())))
 
 
 def check_programme(ruleset: RuleSet | str, prog, arch, model, **kw) -> Report:

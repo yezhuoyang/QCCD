@@ -1,0 +1,10 @@
+# C2LR as the paper demonstrated it: the rule set `c2lr`, with the proposal's two-pair
+# checkerboard steps refused (C6), since arXiv:2403.00756 shows only one diagonal at a time.
+
+ruleset "c2lr-demonstrated"
+title "C2LR swap-or-stay, as demonstrated"
+about "The C2LR rule set with only what arXiv:2403.00756 demonstrated: every junction runs the same single diagonal (W-S, W-N, E-S or E-N). A step that pairs two diagonals at the junctions of one checkerboard colour breaks C6."
+
+include "c2lr"
+
+param c2lr_forms = {"diagonal"}

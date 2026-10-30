@@ -10,6 +10,9 @@ title "Every rule"
 
 param max_chain = 15
 param serial_kinds = {"gate2", "split", "merge"}
+# how a C2LR swap-or-stay step may pair its legs (C6): "diagonal" was demonstrated,
+# "checkerboard" is the proposal's and assumed
+param c2lr_forms = {"diagonal", "checkerboard"}
 
 # ---------------------------------------------------------------- what every model shares
 
@@ -39,15 +42,15 @@ rule R24 "Every two-qubit gate of the circuit is performed, and no other" core
 # ---------------------------------------------------------------- transport
 
 rule R2 "A junction holds one ion at a time"
-  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses."
-  source "deck_v3; arXiv:2510.23519; arXiv:2206.11888"
-  for all j in junctions, t in instants:
+  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses -- except during a swap-or-stay exchange on a C2LR device, where the shared junction waveform exchanges the two wells nearest it by design, and the routes are the device's own matching, never the programme's."
+  source "deck_v3; arXiv:2510.23519; arXiv:2206.11888; arXiv:2403.00756"
+  for all j in junctions, t in instants where not exchange(t):
     occupancy(j, t) <= 1
 
 rule R3 "A rail carries at most its capacity"
-  about "No more ions travel along one rail at once than the rail is built for (one, on most devices)."
+  about "No more ions travel along one rail at once than the rail is built for (one, on most devices). A swap-or-stay exchange on a C2LR device carries its two crystals along the junction's two rails by design, and is not judged here."
   source "deck_v3; arXiv:2510.23519"
-  for all r in rails, t in instants:
+  for all r in rails, t in instants where not exchange(t):
     occupancy(r, t) <= capacity(r)
 
 rule R4 "Every transport step uses a movement the device declares"
@@ -67,9 +70,9 @@ rule R4b "A step either moves ions or gates them, never both"
     mode(k) in {"intra", "inter"} and not carries_gates(k)
 
 rule R5 "No two ions pass each other on a rail in one step"
-  about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it."
+  about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it; nor does a swap-or-stay exchange on a C2LR device, whose two crystals pass each other through the junction's shared waveform by design."
   source "deck_v3"
-  for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b):
+  for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b) and not exchange(a):
     not (from(a) = to(b) and to(a) = from(b))
 
 rule R11 "Along a loop, every ion moves the same way in a step"
@@ -85,10 +88,10 @@ rule R14 "A split takes the ion at the end of its chain, or pays to reorder"
   for all m in splits: at_chain_end(m) or swap_paid(m)
 
 rule R22 "A transport step is one waveform"
-  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else."
+  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. A swap-or-stay step on a C2LR device is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules)."
   source "collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773"
   when control() != "direct":
-  for all a, b in transport where simultaneous(a, b):
+  for all a, b in transport where simultaneous(a, b) and not exchange(a):
     motion(a) = motion(b)
 
 rule R23 "A junction is crossed, not rested on"
@@ -97,6 +100,75 @@ rule R23 "A junction is crossed, not rested on"
   when count(ions) <= sum(min(capacity(s), max_chain) for s in sites where s not in junctions):
   for all i in ions, t in instants:
     position(i, t) in junctions implies rotated(position(i, t))
+
+# ---------------------------------------------------------------- C2LR swap-or-stay transport
+#
+# A lattice of junctions with one leg (a trap holding one two-ion crystal) on every wire, moved
+# by direction bits and one shared junction waveform (arXiv:2403.00756; docs/c2lr.md).  Each
+# rule applies only to such a device.  C3, C4 and C9 hold by construction of the replay, C8 is
+# recorded rather than decided, and the checkerboard steps C6 allows are assumed.
+
+rule C1 "A leg holds one crystal, or two between an enter and its exit"
+  about "A leg holds one crystal. It holds two only after a swap-or-stay step moved a crystal toward a junction into a partner leg whose crystal stayed (an enter), and until that crystal leaves again by the same step type it entered by (its exit): the crystal that entered is the one that leaves, and no other step type takes it out."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  (for all s in legs, t in instants: occupancy(s, t) <= 1 or entered(s, t))
+  and (for all k in steps: exits_as_entered(k))
+
+rule C2 "A C2LR step's only per-leg choice is its direction bit"
+  about "Every crystal shifts toward its pair's junction or away from it, and that is all a step chooses per leg: the step names the crystals shifted toward and nothing else, and its routes are the device's matching. A step of a C2LR class that writes its own routes is refused."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all k in steps where is_transport(k): bits_only(k)
+
+rule C3 "Horizontal and vertical legs choose independently"
+  about "In one step a crystal on a horizontal leg and one on a vertical leg set their direction bits independently: the step carries one bit per crystal and nothing per axis."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all k in steps where exchange(k): independent_axes(k)
+
+rule C4 "A step is C2LR, one shared waveform, C2LR back"
+  about "Every crystal shifts by its bit, one junction waveform shared by every junction exchanges the two wells nearest each junction in play, and the shift is undone: one waveform, whose time is the step's however many crystals move."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all k in steps where exchange(k): one_waveform(k)
+
+rule C5 "Every crystal ends a step at a leg centre"
+  about "After every step each crystal rests at the centre of a leg; a C2LR device has nowhere else to hold one."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all i in ions, t in instants where position(i, t) != none:
+    position(i, t) in legs
+
+rule C6 "A step pairs legs by the device's matching"
+  about "A swap-or-stay step pairs every leg with at most one other, at one junction, by one variation of the device: one diagonal at every junction (W-S, W-N, E-S or E-N, all four demonstrated), or two pairs at the junctions of one checkerboard colour (the proposal's, not demonstrated, so assumed). A crystal shifted toward a junction has a partner leg there, the device offers the variation, and the rule set allows its form (c2lr_forms)."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all k in steps where exchange(k): matched(k) and form(k) in c2lr_forms
+
+rule C7 "No crystal ends a step in a junction"
+  about "A crystal crosses a junction inside a step and never rests on one: where three or more rails meet, nothing is left standing when a step ends."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  for all i in ions, t in instants: position(i, t) not in junctions
+
+rule C8 "The trap frequency is held during a shift"
+  about "The C2LR shift moves a crystal by a sixth of the leg while holding its centre-of-mass frequency (1.85 MHz for Ba-Sr, 1.4 MHz for Yb-Ba). It is a property of the step's waveform, recorded with its primitive rather than decided from a programme."
+  source "arXiv:2403.00756"
+  when c2lr_device():
+  com_frequency_held()
+
+rule C9 "Every crystal is heated by every waveform"
+  about "The shared waveforms play on every leg, so a step heats every crystal on the device: one that moved by the step's swap heat, every other by its stay heat. A crystal that sat a step out is not cold."
+  source "arXiv:2403.00756"
+  when c2lr_device() and models_heating():
+  for all k in steps where c2lr_step(k): heats_every_crystal(k)
+
+rule C10 "Control is shared signals plus one input and one switch per leg"
+  about "A C2LR device is driven by a fixed set of shared analog signals (27 in the paper), plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive."
+  source "arXiv:2403.00756"
+  when control() = "c2lr":
+  c2lr_wiring()
 
 # ---------------------------------------------------------------- gates and their places
 

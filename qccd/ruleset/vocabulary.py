@@ -264,6 +264,40 @@ def _rotated(ctx: Ctx, n):
     return n in ctx.exe.facts.get("rotated_nodes", frozenset())
 
 
+# ------------------------------------------------------------------- C2LR (docs/c2lr.md)
+
+@term("legs", "a set of sites", "The legs of a C2LR lattice: the trap at the centre of every "
+      "wire between two junctions, each holding one two-ion crystal (one ion of this model).  "
+      "Empty on any other device.", "hardware", domain=True, kinds=("programme",))
+def _legs(ctx: Ctx):
+    return ctx.hw.numbers.get("c2lr_legs", [])
+
+
+@term("c2lr_device()", "true or false", "Whether the device is a C2LR swap-or-stay lattice: it "
+      "declares C2LR control, and its drawing is a lattice of junctions with one leg on every "
+      "wire (arXiv:2403.00756).", "hardware", kinds=("programme",))
+def _c2lr_device(ctx: Ctx):
+    return bool(ctx.hw.numbers.get("c2lr_device"))
+
+
+@term("c2lr_wiring()", "true or false", "Whether a device that declares C2LR control is driven "
+      "as C2LR is: a fixed number of shared analog signals, plus one digital input and one "
+      "switch per leg, over a lattice of legs.", "hardware", kinds=("programme",))
+def _c2lr_wiring(ctx: Ctx):
+    return not ctx.hw.numbers.get("c2lr_wiring_problems")
+
+
+@term("com_frequency_held()", "true or false", "Whether the device's swap-or-stay step records "
+      "the centre-of-mass frequency it holds a crystal at during a shift.  A property of the "
+      "waveform, recorded, not decided from a programme; a device that records none leaves the "
+      "rule unchecked.", "model", kinds=("programme",))
+def _com_held(ctx: Ctx):
+    com = ctx.hw.numbers.get("c2lr_com_mhz")
+    if com is None:
+        raise NotApplicable("the device's swap_or_stay primitive records no COM frequency")
+    return True
+
+
 # ============================================================================ execution
 
 @term("ions", "a set of ions", "Every ion of the execution.", "execution", domain=True)
@@ -574,6 +608,84 @@ def _drivable(ctx: Ctx, k):
     return bool(_stepfact(ctx, k, "drivable", "drivable"))
 
 
+@term("exchange(x)", "true or false", "Whether x -- a step, an instant, an operation or a hop -- "
+      "belongs to a C2LR swap-or-stay step, whose crystals exchange through the junctions by "
+      "the device's matching: the routes are derived from the device, never read from the "
+      "programme, so a programme cannot claim this for a move it wrote itself.", "execution",
+      programme="An instant is the one during such a step; an operation or hop is one of its "
+                "moves.",
+      schedule="Never: a paper's timed schedule has no swap-or-stay steps, so R2, R3, R5 and "
+               "R22 judge all of it.")
+def _exchange(ctx: Ctx, x):
+    if ctx.exe.kind != "programme":
+        return False
+    if isinstance(x, Step):
+        return bool(ctx.exe.steps[x.id].get("exchange"))
+    if isinstance(x, Instant):
+        return x.id in ctx.exe.facts.get("exchange_instants", frozenset())
+    if isinstance(x, (Op, Hop)):
+        return bool(_op(x, "exchange").facts.get("exchange"))
+    raise EvalError(f"exchange needs a step, an instant, an operation or a hop, got {_show(x)}")
+
+
+@term("c2lr_step(k)", "true or false", "Whether step k is a C2LR template step: a swap-or-stay "
+      "or a reorder-or-not, played by the device's shared waveforms.", "execution",
+      kinds=("programme",))
+def _c2lr_step(ctx: Ctx, k):
+    return bool(_stepfact(ctx, k, "c2lr_template", "c2lr_step"))
+
+
+@term("form(k)", "a name", "How swap-or-stay step k pairs the legs: \"diagonal\" (every junction "
+      "pairs the same two of its legs, as demonstrated) or \"checkerboard\" (two pairs at the "
+      "junctions of one colour, the proposal's, assumed).", "execution", kinds=("programme",))
+def _form(ctx: Ctx, k):
+    return _stepfact(ctx, k, "c2lr_form", "form")
+
+
+@term("matched(k)", "true or false", "Whether swap-or-stay step k is the device's matching: every "
+      "crystal it shifts toward a junction has a partner leg there under the step's variation, "
+      "and the device offers that variation.", "execution", kinds=("programme",))
+def _matched(ctx: Ctx, k):
+    return not _stepfact(ctx, k, "c6", "matched")
+
+
+@term("exits_as_entered(k)", "true or false", "Whether every crystal that leaves, in step k, a leg "
+      "holding two under C1's exception is the one that entered it, leaving by the step type it "
+      "entered by -- and whether every crystal step k shifts toward a junction could reach it.",
+      "execution", kinds=("programme",))
+def _exits_as_entered(ctx: Ctx, k):
+    return not _stepfact(ctx, k, "c1", "exits_as_entered")
+
+
+@term("bits_only(k)", "true or false", "Whether transport step k, if it is of a C2LR class, "
+      "chooses nothing per leg but the direction bit: it is the device's template, not routes "
+      "the programme wrote.", "execution", kinds=("programme",))
+def _bits_only(ctx: Ctx, k):
+    return not _stepfact(ctx, k, "c2", "bits_only")
+
+
+@term("independent_axes(k)", "true or false", "Whether, in swap-or-stay step k, a crystal on a "
+      "horizontal leg and one on a vertical leg set their bits independently: true of the "
+      "template, which carries one bit per crystal and no field per axis.", "execution",
+      kinds=("programme",))
+def _independent_axes(ctx: Ctx, k):
+    return bool(_stepfact(ctx, k, "exchange", "independent_axes"))
+
+
+@term("one_waveform(k)", "true or false", "Whether swap-or-stay step k is one shared waveform: "
+      "the replay prices it as one primitive, whose time is the step's however many crystals "
+      "move.", "execution", kinds=("programme",))
+def _one_waveform(ctx: Ctx, k):
+    return bool(_stepfact(ctx, k, "exchange", "one_waveform"))
+
+
+@term("heats_every_crystal(k)", "true or false", "Whether C2LR step k heats every crystal on the "
+      "device -- the ones that move and the ones that stay -- as every waveform plays on every "
+      "leg.", "execution", kinds=("programme",))
+def _heats_every(ctx: Ctx, k):
+    return not _stepfact(ctx, k, "c9", "heats_every_crystal")
+
+
 @term("swap_paid(o)", "true or false", "Whether the reordering that brings split o's ion to the "
       "end of its chain was paid for.", "execution",
       programme="The step records the gate swaps it pays.",
@@ -613,6 +725,16 @@ def _instants(ctx: Ctx):
                "has left, and on a rail or in a junction while it is there.")
 def _occupancy(ctx: Ctx, x, t):
     return ctx.exe.occupancy.at(x, _instant(ctx, t, "occupancy"))
+
+
+@term("entered(s, t)", "true or false", "Whether leg s holds two crystals at instant t under "
+      "C1's exception: one of them entered it by a swap-or-stay enter -- moved toward the "
+      "junction into a leg whose crystal stayed -- and has not left.", "time",
+      kinds=("programme",),
+      programme="During a step, it holds if it held before the step or holds after it.")
+def _entered(ctx: Ctx, s, t):
+    line = ctx.exe.timelines.get("entered")
+    return bool(line.at(s, _instant(ctx, t, "entered"))) if line is not None else False
 
 
 @term("final()", "an instant", "The last instant of the execution, when everything is over.",

@@ -110,6 +110,50 @@ def test_the_compiled_examples_get_the_verifiers_verdicts():
     assert n >= 10
 
 
+def _c2lr_matrix():
+    """C2LR programmes on a 3 x 3 lattice (docs/c2lr.md): a swap, an enter + gate + exit, the
+    same swap as plain moves, an exit by another diagonal, a bit on an edge leg, and a
+    checkerboard step -- each judged under `c2lr` and `c2lr-demonstrated`."""
+    from qccd.ir.tsir import TSIR, Instruction, Participant, swap_or_stay
+    place = {"q0": "T0_1h", "q1": "T1_1v", "q4": "T0_0v"}
+
+    def sos(d=None, toward=(), **kw):
+        return dict(type="simd", cls="swap_or_stay", mode="inter",
+                    template=swap_or_stay(d, toward, **kw))
+    plain = dict(type="simd", cls="swap_or_stay", mode="inter", participants=(
+        Participant("q0", "T0_1h", "T1_1v", ("T0_1h.b", "T1_1v.a")),
+        Participant("q1", "T1_1v", "T0_1h", ("T1_1v.a", "T0_1h.b"))))
+    gate = dict(type="gate", gate="MS", mode="intra", pairs=(("q0", "q1"),))
+    cases = {
+        "swap": [sos("WS", ["q0", "q1"])],
+        "enter gate exit": [sos("WS", ["q0"]), gate, sos("WS", ["q0"]), dict(type="cool", broadcast=True)],
+        "plain swap": [plain],
+        "exit by another diagonal": [sos("WS", ["q0"]), sos("WN", ["q0"])],
+        "edge leg": [sos("WS", ["q4"])],
+        "checkerboard": [sos(checkerboard={"parity": 0, "pairing": "P1"}, toward=["q0", "q1"])],
+    }
+    for name, steps in cases.items():
+        prog = TSIR(name, "c2lr3x3")
+        prog.add(Instruction(type="init", id=prog.next_id(), placement=dict(place)))
+        for s in steps:
+            prog.add(Instruction(id=prog.next_id(), **s))
+        yield name, prog
+
+
+@pytest.mark.parametrize("rs, forms", [("c2lr", None), ("c2lr-demonstrated", ("diagonal",))])
+def test_c2lr_programmes_get_the_verifiers_verdicts(rs, forms):
+    m = Machine.c2lr_grid(3, 3)
+    cfg = {"c2lr_forms": forms} if forms else None
+    seen = set()
+    for name, prog in _c2lr_matrix():
+        old = set(verify(prog, m.arch, corrected_model(), rule_config=cfg).rules.failed())
+        new = set(check(load(rs), programme_execution(prog, m.arch, corrected_model(),
+                                                     rule_config=cfg)).failed())
+        assert new == old, (name, old, new)
+        seen |= old
+    assert {"R2", "R3", "R5", "R22", "C1", "C2", "C6"} <= seen
+
+
 def test_capacity_and_its_counterexample():
     m = Machine.ring(3, 2, 2, name="ring6d")
     p = m.program("crowd", provenance="off")

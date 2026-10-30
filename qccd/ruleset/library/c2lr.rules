@@ -1,0 +1,12 @@
+# C2LR swap-or-stay transport (Delaney et al., arXiv:2403.00756; docs/c2lr.md): this website's
+# machine, and the rules of a lattice whose crystals move by direction bits and one shared
+# junction waveform.  The proposal's two-pair checkerboard steps are allowed and marked assumed.
+
+ruleset "c2lr"
+title "C2LR swap-or-stay"
+about "This website's machine on a C2LR lattice: every rule of the standard set, and C1-C10. A swap-or-stay step's routes are the device's matching, so the junction, rail, passing and one-waveform rules (R2, R3, R5, R22) do not judge its crossings; R4 still asks for its class. Both pairings are allowed: one diagonal at every junction (demonstrated) and the two-pair checkerboard steps (assumed, and marked so in every report)."
+
+include "standard"
+use C1, C2, C3, C4, C5, C6, C7, C8, C9, C10
+
+param c2lr_forms = {"diagonal", "checkerboard"}

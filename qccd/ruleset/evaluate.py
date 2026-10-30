@@ -77,6 +77,9 @@ class Report:
     execution: str
     kind: str
     results: list[RuleResult]
+    #: what the verdict rests on that its source did not demonstrate (a C2LR programme's
+    #: two-pair checkerboard steps), in words; empty, and absent from the summary, otherwise
+    assumed: list[str] = field(default_factory=list)
 
     def by_verdict(self, verdict: str) -> list[RuleResult]:
         return [r for r in self.results if r.verdict == verdict]
@@ -90,20 +93,34 @@ class Report:
         return [r.id for r in self.results if r.verdict == FAILS]
 
     def summary(self) -> dict:
-        return {"ruleset": self.ruleset, "execution": self.execution, "kind": self.kind,
-                "ok": self.ok,
-                "holds": [r.id for r in self.by_verdict(HOLDS)],
-                "fails": {r.id: r.count for r in self.by_verdict(FAILS)},
-                "does_not_apply": {r.id: r.reason for r in self.by_verdict(NOT_APPLICABLE)},
-                "could_not_check": {r.id: r.reason for r in self.by_verdict(UNCHECKED)}}
+        out = {"ruleset": self.ruleset, "execution": self.execution, "kind": self.kind,
+               "ok": self.ok,
+               "holds": [r.id for r in self.by_verdict(HOLDS)],
+               "fails": {r.id: r.count for r in self.by_verdict(FAILS)},
+               "does_not_apply": {r.id: r.reason for r in self.by_verdict(NOT_APPLICABLE)},
+               "could_not_check": {r.id: r.reason for r in self.by_verdict(UNCHECKED)}}
+        if self.assumed:
+            out["assumed"] = list(self.assumed)
+        return out
 
     def to_json(self) -> dict:
-        return {"ruleset": self.ruleset, "title": self.title, "execution": self.execution,
-                "kind": self.kind, "ok": self.ok, "rules": [r.to_json() for r in self.results]}
+        out = {"ruleset": self.ruleset, "title": self.title, "execution": self.execution,
+               "kind": self.kind, "ok": self.ok, "rules": [r.to_json() for r in self.results]}
+        if self.assumed:
+            out["assumed"] = list(self.assumed)
+        return out
 
 
 class _Stop(Exception):
     pass
+
+
+#: Words read off a per-key timeline of the execution, `f(x, t)`: the instants pruning judges
+#: an `(x, t)` pair only where x's value changed (`Evaluator._instants_pair`).
+TIMELINE_TERMS = ("occupancy", "position", "entered")
+#: Words true or false of an instant alone, `f(t)`, and the execution fact holding the set of
+#: instants where they are true; the pruning judges every x where one changes.
+INSTANT_FACTS = {"exchange": "exchange_instants"}
 
 
 def _split_and(n: Node | None) -> list[Node]:
@@ -437,6 +454,7 @@ class Evaluator:
         if not formulas:
             return None
         timelines: set[str] = set()
+        facts: set[str] = set()
         ok = True
 
         def scan(n: Node) -> None:
@@ -444,12 +462,16 @@ class Evaluator:
             if isinstance(n, Name) and n.id == t:
                 ok = False
             elif isinstance(n, Call):
-                if n.fn in ("occupancy", "position") and len(n.args) == 2 and \
+                if n.fn in TIMELINE_TERMS and len(n.args) == 2 and \
                         isinstance(n.args[1], Name) and n.args[1].id == t:
                     if isinstance(n.args[0], Name) and n.args[0].id == x:
                         timelines.add(n.fn)
                         return
                     ok = False
+                    return
+                if n.fn in INSTANT_FACTS and len(n.args) == 1 and \
+                        isinstance(n.args[0], Name) and n.args[0].id == t:
+                    facts.add(n.fn)
                     return
                 for a in n.args:
                     scan(a)
@@ -476,14 +498,22 @@ class Evaluator:
         if not ok or not timelines:
             return None
         exe = self.exe
-        lines = [exe.occupancy if tl == "occupancy" else exe.position for tl in timelines]
+        lines = [exe.occupancy if tl == "occupancy" else exe.position if tl == "position"
+                 else exe.timelines.get(tl) for tl in timelines]
+        lines = [ln for ln in lines if ln is not None]
+        # an instant-only fact (`exchange(t)`) can change the verdict at an x whose own
+        # timelines did not move, so at every instant where one changes, every x is judged
+        flips: set[int] = set()
+        for f in facts:
+            on = exe.facts.get(INSTANT_FACTS[f], frozenset())
+            flips |= {k for k in range(1, len(exe.instants)) if (k in on) != (k - 1 in on)}
 
         def gen(env):
             xs = self.domain(doms[xi], env, nameset)
             xset = frozenset(xs)
             insts = self.lookup("instants", {})
             for k, tv in enumerate(insts):
-                if k == 0:
+                if k == 0 or k in flips:
                     # the first instant judges every x; after it, only what changed
                     for xv in xs:
                         yield xv, tv

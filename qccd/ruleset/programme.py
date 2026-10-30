@@ -81,6 +81,19 @@ def hardware_of(arch) -> Hardware:
         priced = frozenset()
     from ..verify.rules import geometry_limits
     max_deg, min_angle = geometry_limits(arch)
+    numbers: dict[str, Any] = {}
+    from ..arch.c2lr import NotC2LR, geometry as c2lr_geometry, is_c2lr
+    if is_c2lr(arch):
+        # C2LR (docs/c2lr.md): the legs, and what C8 and C10 read off the document -- through
+        # the legacy verifier's own checks, so the two cannot read the device differently
+        from ..verify.rules import c2lr_document_violations
+        try:
+            numbers["c2lr_legs"] = [Site(n) for n in c2lr_geometry(arch).legs]
+            numbers["c2lr_device"] = True
+        except NotC2LR:
+            numbers["c2lr_legs"] = []
+        numbers["c2lr_wiring_problems"] = [v.message for v in c2lr_document_violations(arch)]
+        numbers["c2lr_com_mhz"] = arch.primitives.scalars.get("swap_or_stay", {}).get("com_mhz")
     return Hardware(
         name=arch.name, sites=sites, junctions=junctions, nodes=nodes, rails=rails,
         capacity=cap, degree={Site(n): dev.degree(n) for n in dev.nodes},
@@ -93,7 +106,8 @@ def hardware_of(arch) -> Hardware:
                  "max_simd_classes": arch.max_simd_classes(),
                  "control_model": str(arch.control.get("model", "simd_classes")),
                  "priced_degrees": priced,
-                 "duty_budget": arch.budget.get("duty_cycle") if isinstance(arch.budget, Mapping) else None},
+                 "duty_budget": arch.budget.get("duty_cycle") if isinstance(arch.budget, Mapping) else None,
+                 **numbers},
         arch=arch,
     )
 
@@ -139,10 +153,25 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
     cur_pos: dict[str, str] = dict(views[0].pos_before) if views else {}
     t = 0.0
     budget_known = None
+    # C2LR: C1's exception per leg (`entered`), and the instants during a swap-or-stay step
+    # (`exchange`), both read off the replay's own account of each cycle (`CycleView.c2lr`)
+    entered = Timeline(False)
+    cur_exc: set[str] = set()
+    exchange_instants: set[int] = set()
+
+    def excepted(i: int, legs) -> None:
+        nonlocal cur_exc
+        legs = set(legs)
+        for leg in legs ^ cur_exc:
+            entered.set(Site(leg), i, leg in legs)
+        cur_exc = legs
 
     for k, v in enumerate(views):
         ins = v.instr
         before = len(instants) - 1
+        c2 = v.c2lr
+        if c2 is not None and c2.check_before:
+            excepted(before, c2.excepted_before)
         # an `init` between steps re-places ions: the step's own view says where they are
         if v.occ_before != cur_occ:
             for n in set(cur_occ) | set(v.occ_before):
@@ -165,9 +194,15 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                 occ.set(Rail(sid), during, c)
             for m in v.moves:
                 pos.set(ion(m.ion), during, None)
+            if c2 is not None:
+                excepted(during, c2.excepted_before | c2.excepted_after)
+                if c2.exchange:
+                    exchange_instants.add(during)
         after = len(instants)
         instants.append(f"after step {k}")
         times.append(t1)
+        if c2 is not None:
+            excepted(after, c2.excepted_after)
         for n in set(v.occ_before) | set(v.occ_after) | set(v.transits or {}):
             occ.set(Site(n), after, v.occ_after.get(n, 0))
         if moving:
@@ -194,6 +229,12 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
         st: dict[str, Any] = {"index": k, "instr": ins.id, "type": ins.type, "cls": ins.cls,
                               "mode": ins.mode, "carries_gates": bool(ins.pairs or ins.gate)
                               if ins.type == "simd" else False}
+        if c2 is not None:
+            st["exchange"] = c2.exchange
+            st["c2lr_template"] = c2.template
+            st["c2lr_form"] = c2.variation.form if c2.variation is not None else None
+            st["c1"], st["c2"], st["c6"] = list(c2.c1), list(c2.c2), list(c2.c6)
+            st["c9"] = sorted(set(v.pos_before) - set(c2.heated)) if c2.template else []
         if ins.type == "simd":
             st["class_declared"] = not r4_simd_classes(v)
             st["drivable"] = not r4_drivable(v)
@@ -217,7 +258,8 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                 src_occ = v.occ_before.get(ms[0].src, 0)
                 o = mk("move", [i], None, motion=motion_signature(v, i),
                        split="split" in entails, merge="merge" in entails,
-                       swap_paid=paid, at_chain_end=src_occ <= 2)
+                       swap_paid=paid, at_chain_end=src_occ <= 2,
+                       exchange=bool(c2 is not None and c2.exchange))
                 o.path = tuple(path)
                 o.rails = tuple(Rail(m.seg.id) for m in ms)
                 o.text = f"move {i} {ms[0].src}→{ms[-1].dst}"
@@ -267,6 +309,10 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
     from ..verify.replay import conveyed_paths
     exe.facts["rotated_nodes"] = frozenset(
         Site(n) for lid in conveyed_paths(prog, arch) if lid in dev.loops for n in dev.loops[lid].nodes)
+    exe.facts["exchange_instants"] = frozenset(exchange_instants)
+    exe.facts["assumed"] = list(res.assumed)
+    if entered.keys():
+        exe.timelines["entered"] = entered
     exe.facts["heat_budget"] = budget_known if budget_known is not None else float("inf")
     exe.facts["models_heating"] = bool(getattr(model, "models_heating", False))
     exe.facts["computes_circuit"] = computes_circuit

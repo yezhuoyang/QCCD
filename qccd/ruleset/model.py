@@ -286,6 +286,9 @@ class Execution:
     facts: dict[str, Any] = field(default_factory=dict)
     settings: dict[str, Any] = field(default_factory=dict)
     name: str = ""
+    #: further per-key timelines a word reads, by word: `entered` (C1's exception, Site ->
+    #: bool) on a C2LR programme.  The instants pruning reads them like `occupancy`.
+    timelines: dict[str, "Timeline"] = field(default_factory=dict)
 
     # derived indexes, built on first use
     _by_kind: dict[str, list[Op]] | None = None
