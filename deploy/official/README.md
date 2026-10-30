@@ -128,6 +128,38 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-10-30 23:02 UTC, `qccd-official:a9e8621` (Goal 3's BB72 and HGP58 boards;
+commit `a9e8621`, pushed): `qccd-official:84f109c` plus the two releases
+`goal3_bb72_mem@1` and `goal3_hgp58_mem@1` (goals/goal3/boards.py), and no code change. Built
+ON THE DROPLET, COPY only (`/root/img_a9e8621`; every file in the image equals `ctx.sha`); 126
+layers, 84f109c's 122 plus four. No grader code changed, so there was no census. The rehearsal
+ran on a copy of the database (no network, volumes read-only): Goal 1, the 28 existing boards and
+Goal 3's six releases were identical to 84f109c's.
+
+The same switch raised the grader's limits. The BB72 starter bundle (`conveyor96_96d`, 13,761
+instructions) did not grade at 1 GB: the Lean checker alone peaks at 1.04 GiB and the whole
+grade at 1.595 GiB. The checker also aborts with "Stack overflow detected" under the default
+8 MB stack, on a certificate of 192,027 moves. The grader's `mem_limit` and `memswap_limit` are
+now 2g (the user approved 2g) and its `ulimits: stack` is 256 MB; the api, worker and sandbox
+are unchanged. The grader takes one job at a time, and the sandbox only runs a Compiler-board
+job the grader itself is grading, so a heavy grade and a sandbox job do not overlap. Under
+exactly those limits (a 2g container, a 256 MB stack, RLIMIT_AS 4 GB as a job gets), both
+starter bundles graded eligible in the image with every stage passed: HGP58 in 35 s, BB72 in
+3011 s. That is inside the grader's flat 3600 s job limit, but with only ~10 minutes to spare.
+`/root/img_a9e8621/grade_smoke_*_final.json` hold the reports. Rollback is `*.bak-84f109c`:
+the compose file's backup restores the 1g grader.
+
+**Goal 3's point pages** (2026-10-30). Every reference point on `board/goal3/` opens its own
+studio page at `board/goal3/p/<code>/<point>.html`. goals/goal3/pages.py builds the pages from
+the sweep's work folders. They are not in git: 207 pages, up to 390 MB of HTML each, 242 MB
+gzipped. They are stored on the droplet ONLY as `<page>.html.gz` and served by
+`/etc/nginx/snippets/qccd-goal3-pages.conf` (included from the site file):
+`location ^~ /board/goal3/p/ { gzip_static always; gunzip on; }`. A browser that takes gzip gets
+the stored file, and nginx unzips it for one that does not. The site file before the include
+is `/root/qccd.academy.nginx.bak-20261030-203302-goal3pages`. A site deploy that extracts over
+`/var/www/qccd.academy` keeps the pages; one that wipes `board/goal3/` drops them, and they are
+rebuilt with `pages.py --gzip` from the sweep's `work/` folders.
+
 **Deployed** 2026-10-30, `qccd-official:d89e184` (Goal 3; origin `fb83402`, the same change
 re-parented): `qccd-official:2ac7e33` plus three things from the commit, everything else
 unchanged. They are `qccd/official/service.py` (`GOALS["goal3"]`, `GET /v1/goals/goal3`: per fixed
@@ -455,7 +487,7 @@ flight). They are not backed up yet.
 |---|---|---|---|
 | `api` | accept authenticated uploads, serve status, reports, leaderboards | run the toolchain; accept client verdicts, scores or profiles | 256 MB, 0.5 CPU, loopback port |
 | `worker` | claim queued jobs, stage bundles into the spool, record reports | run the toolchain; reach any network | 256 MB, 0.5 CPU, no network |
-| `grader` | grade spooled bundles with the reference evaluator | reach any network; see any credential or the database | 1 GB, 1 CPU, no network, read-only root, 128 pids |
+| `grader` | grade spooled bundles with the reference evaluator | reach any network; see any credential or the database | 2 GB (1 GB until 2026-10-30), a 256 MB stack, 1 CPU, no network, read-only root, 128 pids |
 
 All three drop every capability and run with `no-new-privileges` as an unprivileged user.
 Inside the grader, the evaluator runs each external tool as a subprocess with its own
