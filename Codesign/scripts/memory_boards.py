@@ -167,9 +167,12 @@ def devices(release) -> list[dict]:
     return keep
 
 
-def grade_point(out: Path, release, exp, dev: dict) -> dict:
-    """Compile, replay, and grade one design as the evaluator's `ler` stage does."""
+def grade_point(out: Path, release, exp, dev: dict, compile=None) -> dict:
+    """Compile, replay, and grade one design as the evaluator's `ler` stage does.  `compile` is
+    the board's reference compile, `compile_with_qccdc` unless the board names its own (the
+    C2LR boards' router, c2lr_boards.py), called the same way and returning the same files."""
     from qccd.qec import CompileFailed, compile_with_qccdc, evaluate_memory
+    compile = compile or compile_with_qccdc
     row = {"key": dev["key"], "device": dev["key"], "family": dev["family"], "title": dev["title"], "claim": dev["claim"]}
     # graded in a FRESH folder: the compile clears its previous outputs before it starts, so
     # a run that fails in the old folder would take the last good program with it
@@ -193,8 +196,8 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
     try:
         # a board's own compile limit when it allows more (surface7xz_mem: a 194-ion compile)
         timeout = max(900, int((release.manifest.get("limits") or {}).get("compile_timeout_s", 0)))
-        cooled, cert_p = compile_with_qccdc(release.circuit_text(), arch_p, work, timeout=timeout,
-                                            table=release.manifest["physics"].get("rank_table", "qccdsim_jones"))
+        cooled, cert_p = compile(release.circuit_text(), arch_p, work, timeout=timeout,
+                                 table=release.manifest["physics"].get("rank_table", "qccdsim_jones"))
     except CompileFailed as exc:
         return {**row, "status": "refused", "reason": f"{exc}"[:300]}
     except Exception as exc:  # noqa: BLE001 -- a device the tools cannot load is a refusal too
@@ -258,7 +261,8 @@ def grade_point(out: Path, release, exp, dev: dict) -> dict:
         chain_max=stats.get("chain_max"), two_qubit_gates=stats.get("n_ms"))
     # R10: the semantic checker and the proved Lean checker, on the certificate (small: seconds)
     prefix = work / "prog"
-    if SC.QCHECK.exists():
+    # the tree's own build, or the published checker QCCD_QCHECK names (check_cert.py reads it too)
+    if SC.QCHECK.exists() or os.environ.get("QCCD_QCHECK"):
         qc = Path(str(prefix) + ".qcheck.json")
         SC.sh([sys.executable, SC.BRIDGE / "mk_qcheck_input.py", prefix, "--arch", work / "device.expanded.json", "-o", qc])
         try:

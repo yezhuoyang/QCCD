@@ -1,0 +1,40 @@
+{
+ "kind": "qccd.task",
+ "version": 1,
+ "id": "c2lr_rep5_mem_basr",
+ "order": 30,
+ "title": "Repetition code memory, distance 5, on C2LR (Ba-Sr)",
+ "short": "rep-5 memory on C2LR (Ba-Sr)",
+ "description": "The shuttle memory board's experiment, unchanged: five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out. Here it runs on a C2LR swap-or-stay lattice of Ba-Sr crystals (arXiv:2403.00756): one crystal is one qubit, crystals move only by swap-or-stay steps (one shared junction waveform, one direction bit per leg), and a two-qubit gate runs on the two crystals of one leg, merged and split again. Judged by the C2LR rule set; ranked by the logical error rate per round under the noise model built from the device's physics: the shuttle board's, plus the paper's step (312.5 us; 0.14 quanta to a crystal that moves, 0.035 to one that stays) and the platform's own merge and split.",
+ "circuit": "circuit.qasm",
+ "n_data": 5,
+ "physics": {
+  "model": "corrected",
+  "tables": [
+   "qccdsim_jones",
+   "transport_excitation"
+  ]
+ },
+ "metrics": [
+  "ler_per_round",
+  "ler",
+  "T_jones",
+  "ions_per_instruction",
+  "dacs",
+  "area_mm2",
+  "buildable"
+ ],
+ "rank_by": "ler_per_round",
+ "release": "c2lr_rep5_mem_basr@1",
+ "qec": {
+  "experiment": "rep5_r5_z",
+  "noise": "qccd-noise@1",
+  "ler": {
+   "decoder": "pymatching",
+   "max_errors": 200,
+   "max_shots": 200000,
+   "seed": 20260928
+  }
+ },
+ "seed": "MemoryBoard/c2lr_rep5_mem_basr"
+}

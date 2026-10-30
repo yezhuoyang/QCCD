@@ -39,11 +39,12 @@ from qccd.workspace.tasks import RELEASES_DIR, build_release, find_release  # no
 
 SPECIES = {"Ba-Sr": "basr", "Yb-Ba": "ybba"}
 #: (shuttle board, order of the first of its two C2LR boards, what the experiment is, lattice)
-#: The lattices, measured 2026-10-30 with the baseline router: the repetition code's chain lies
-#: on one row of legs of a 5 x 2 lattice, so each of its two CNOT layers pairs under one diagonal
-#: (20 swap-or-stay steps for five rounds); the surface code's patch on a 4 x 5, where every check
-#: is beside its data and a layer needs two diagonals, the X and Z checks going opposite ways
-#: (36 steps for three rounds).
+#: The lattices, measured 2026-10-30 with the baseline router, are the ones it needs fewest
+#: steps on: the repetition code's chain lies on one row of legs of a 5 x 2 lattice, so each of
+#: its two CNOT layers pairs under one diagonal (20 swap-or-stay steps for five rounds); the
+#: surface code's patch on a 4 x 5, where every check is beside its data and a layer needs two
+#: diagonals, the X and Z checks going opposite ways (36 steps for three rounds).  Their logical
+#: error rates are within the intervals of the other lattices tried (3 x 3 to 5 x 5).
 BOARDS = [
     ("rep5_mem", 30, "Repetition code memory, distance 5",
      "five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused "
