@@ -271,7 +271,12 @@ def inject(page: str, cfg: dict, contract: dict | None = None) -> str:
                         "api: api, describe: describe, resolveAnchor: resolve, reload: load, "
                         "me: function () { return ME; }, page: function () { return PAGE; }, "
                         "threads: function () { return THREADS; } }; };")
+    rules_layer = ""
+    if cfg.get("rules_categories"):
+        rules_layer = ("<style>\n" + (_WEB / "rules.css").read_text(encoding="utf-8") + "\n</style>\n"
+                       + "<script>\n" + (_WEB / "rules.js").read_text(encoding="utf-8") + "\n</script>\n")
     tail = (_HIDE_SITE_AGENT
+            + rules_layer
             + '<script id="qccd-mirror-config" type="application/json">'
             + json.dumps(cfg).replace("</", "<\\/") + "</script>\n"
             + ("<script>window.QCCD_INTERFACE=" + json.dumps(contract).replace("</", "<\\/") + ";</script>\n"
@@ -369,7 +374,13 @@ def create_mirror_app(state, mirror: SiteMirror | None = None):
             headers["X-QCCD-Mirror"] = "stale: the site could not be reached; this is the last copy"
         if page.ctype == "text/html":
             text = page.body.decode("utf-8", errors="replace")
-            here = dict(cfg, design_redirect=True) if path.strip("/") == "studio.html" else cfg
+            clean = path.strip("/").lower()
+            if clean == "studio.html":
+                here = dict(cfg, design_redirect=True)
+            elif clean in ("rules", "rules/index.html"):
+                here = dict(cfg, rules_categories=True)
+            else:
+                here = cfg
             return HTMLResponse(inject(text, here, contract()), headers=headers)
         return Response(page.body, media_type=page.ctype, headers=headers)
 
