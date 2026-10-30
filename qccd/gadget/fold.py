@@ -222,6 +222,10 @@ class Folder:
     log: object = None
     made: int = 0
     reused: int = 0
+    #: a gate may leave a block it made alive, resting in its memory when it returns (the
+    #: scale compile harness: a template whose ancilla the NEXT template of its gadget reads);
+    #: off, such a call is refused
+    outlive: bool = False
 
     @property
     def home_places(self) -> set:
@@ -500,6 +504,12 @@ class MacroCity(City):
             h = homes[i]
             self.block_free[b] = max(self.block_free.get(b, 0.0), t0 + m.free[i])
             self.mem_last[h] = max(self.mem_last.get(h, 0.0), t0 + m.mem_last[i])
+            if m.gone and m.gone[i] and ins.cond is not None:
+                # a guarded call may not fire: the block stays for the branch after it that
+                # reads it out the other way (an adaptive basis); both reserve their places
+                if self.family(h) == "memory":
+                    self.rest_since[b] = t0 + m.mem_last[i]
+                continue
             if m.gone and m.gone[i]:
                 # read out inside: the block is no more, and its home is empty again
                 for d in (self.blocks, self.pf, self.rest_since, self.home_of):
@@ -606,7 +616,7 @@ class MacroCity(City):
             raise FoldError(f"in gate {gate}, instruction {i} "
                             f"({self.alg.instructions[i].text.strip()}): {why}")
         alive = [b for b in self.blocks if b not in self.params]
-        if alive:
+        if alive and not self.folder.outlive:
             raise FoldError(f"gate {gate} leaves {', '.join(sorted(alive))} alive: a call may "
                             f"not outlive the blocks it makes")
         gir = self.gir()
@@ -653,11 +663,12 @@ def _call_blocks(alg: Algorithm) -> list:
     return out
 
 
-def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None) -> dict:
+def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None,
+                    outlive: bool = False) -> dict:
     """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
     macros themselves (their footprints, which GIR 0.3 does not carry) are left in
-    `keep["folder"]`, for `check_composition`."""
-    folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None))
+    `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`."""
+    folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None), outlive=outlive)
     if keep is not None:
         keep["folder"] = folder
     probe = MacroCity(alg, lib, leaves, folder=folder)

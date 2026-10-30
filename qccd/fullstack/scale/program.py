@@ -126,6 +126,17 @@ class Pred:
 
 
 @dataclass
+class When:
+    """A body that runs only when an outcome-made bit holds (`cond`, a formula over outcome
+    references): a gadget call or a loop under FormalRV's `when` (Gidney 2025's lookups).  It
+    reserves its places either way, as a guarded call does in the `.alg`; expanded, every
+    instruction of it carries the guard."""
+    cond: object
+    body: Body
+    qline: int = 0
+
+
+@dataclass
 class Let:
     var: str
     value: Expr
@@ -197,7 +208,7 @@ class Program:
         key = (call.gadget, keyvals, call.fam)
         b = self.bodies.get(key)
         if b is None:
-            rep = bind(call.skeys + call.args, env)
+            rep = {**self.params, **bind(call.skeys + call.args, env)}
             self.builder.instance(call.gadget, keyvals, dict(call.fam), rep)
             b = self.bodies[key]
         return b
@@ -355,6 +366,7 @@ class _State:
     def __init__(self, scope: list):
         self.nodes = Body()
         self.writes: list = []           # [(table, lo text, hi text, ref)]: records the archive writes
+        self.closed: dict = {}           # id(_Out) of a closed run -> its OutRef
         self.run: list = []              # [(tokens, qline, single)]
         self.outs: list = []             # the open run's outcomes
         self.scope = scope + [[]]        # per enclosing body: [(lo, hi, ref)]; ref an _Out or an OutRef
@@ -454,13 +466,24 @@ class Builder:
         return S.nodes
 
     def stmt(self, s, S: _State, rep: dict, famap: dict, top: bool, guards: list) -> None:
+        if self.survey is None:
+            return self._stmt(s, S, rep, famap, top, guards)
+        # survey mode: a statement with no lowering is recorded, by what stopped it, and skipped
+        try:
+            return self._stmt(s, S, rep, famap, top, guards)
+        except NotLowered as exc:
+            why = re.sub(r"^\.qec line \d+: ", "", str(exc))
+            self.survey.setdefault(re.sub(r"[\d']+.*$", "", why).strip()[:60] or why[:60], []).append(
+                (s.line, s.text.strip()[:160]))
+
+    def _stmt(self, s, S: _State, rep: dict, famap: dict, top: bool, guards: list) -> None:
         raw = _untable(s.text.strip())
         if raw == "skip":
             return
         lp = _LOOP.fullmatch(raw)
+        if lp and guards:
+            return self.when(s, S, rep, famap, top, guards)
         if lp:
-            if guards:
-                raise NotLowered(f".qec line {s.line}: a loop under a guard")
             var, lo, hi = lp[2], Expr(lp[1]), Expr(lp[3])
             if _is_pred_var(var):
                 if lo.text != "0":
@@ -516,17 +539,31 @@ class Builder:
         call = re.fullmatch(r"([\w!]+)\((.*)\)", raw)
         if call and call[1] in self.gadgets:
             if guards:
-                raise NotLowered(f".qec line {s.line}: a call under a guard")
+                return self.when(s, S, rep, famap, top, guards)
             self.close(S, top)
             S.nodes.append(self.call(call[1], split_top(call[2], ","), rep, famap, s.line))
             return
         self.leaf(s, raw, S, rep, famap, top, guards)
 
+    def when(self, s, S: _State, rep: dict, famap: dict, top: bool, guards: list) -> None:
+        """A call or a loop under guards: the run so far closes, and the statement becomes a
+        body of its own under the conjunction of the guards."""
+        f = _fand(guards)
+        if len(f.terms) != 1:
+            raise NotLowered(f".qec line {s.line}: a call or loop under a guard that is "
+                             f"{'never true' if not f.terms else 'a parity of conjunctions'}")
+        self.close(S, top)
+        # (outcomes of the run just closed are named by their place in this body now)
+        f = _F([tuple((c, tuple(S.closed.get(id(r), r) for r in rs)) for c, rs in t) for t in f.terms])
+        S.nodes.append(When(f, self.body([s], rep, famap, S.scope, top), s.line))
+
     def call(self, name: str, args: list, rep: dict, famap: dict, line: int) -> Call:
         formals = self.headers[name]
         if len(formals) != len(args):
             raise NotLowered(f".qec line {line}: {name} takes {len(formals)} arguments, given {len(args)}")
-        skeys, rest, fam2, rep2 = [], [], {}, {}
+        # (a gadget sees the program's parameters: FormalRV's are global -- Gidney 2025's
+        # gadgets read `accBase` and the rest without being passed them)
+        skeys, rest, fam2, rep2 = [], [], {}, dict(self.prog.params)
         for f, a in zip(formals, args):
             fam = _family(f)
             if fam is not None:
@@ -764,7 +801,10 @@ class Builder:
             refs, never = [], False
             for t in terms:
                 if re.search(r"\bc\[", t):
-                    refs.append(self._read(t, {**rep, var: v}, S, line))
+                    # (the address with this value of the parity's own variable written in: that
+                    # variable is bound nowhere when the record is read)
+                    tv = re.sub(rf"\b{re.escape(var)}\b", f"({v})", t)
+                    refs.append(self._read(tv, rep, S, line))
                     continue
                 try:
                     never = never or Expr(t)({**rep, var: v}) == 0
@@ -904,6 +944,8 @@ class Builder:
         S.nodes.append(Seg(tid, tuple(plist), tuple(llist), tuple(elist), bands, writes))
         # the run's outcomes, readable by later runs of this body and of those inside it
         here = lambda r: (S.nodes.sid, pos, outs[id(r)]) if isinstance(r, _Out) and id(r) in outs else r  # noqa: E731
+        for o in S.outs:
+            S.closed[id(o)] = here(o)
         for i, (lo, hi, ref) in enumerate(S.scope[-1]):
             if isinstance(ref, _F):
                 S.scope[-1][i] = (lo, hi, _F([tuple((c, tuple(here(r) for r in rs)) for c, rs in t)
@@ -1034,13 +1076,18 @@ class _Exp:
                 if c or self.reserved:
                     self.body(node.body, env, guard)
             elif isinstance(node, Call):
-                env2 = {f: e(env) for f, e in node.skeys + node.args}
+                env2 = {**self.prog.params, **{f: e(env) for f, e in node.skeys + node.args}}
                 self.body(self.prog.body_of(node, env), env2, guard)
             elif isinstance(node, Rot):
                 fs = [(p, self.name(fam, idx, env)) for p, fam, idx in node.factors]
                 self.rotation(fs, node.k(env), node.sign, guard)
             elif isinstance(node, Cat):
                 self.cat(node, body.sid, i, env, guard)
+            elif isinstance(node, When):
+                f = self.formula(node.cond, env)
+                if len(f) != 1:
+                    raise ValueError(f"a guarded body (line {node.qline}) under {len(f)} terms")
+                self.body(node.body, env, tuple(guard) + tuple(_guard_text(p) for p in f[0]))
 
     def cat(self, node: Cat, sid, pos, env, guard):
         """One `ppm` over every factor whose bit is 1 (every one, reserved), then the merge's
@@ -1079,6 +1126,14 @@ class _Exp:
             return _sop_xor(*fs)
         bsid, bpos, k = ref
         return [((0, (self.outs[(bsid, bpos)][k],)),)]
+
+    def formula(self, f, env) -> list:
+        """A lowering-time formula (over outcome references) as one over names here."""
+        out = []
+        for term in f.terms:
+            out = _sop_xor(out, _sop_and(*[_sop_xor(*[self.resolve(r, env) for r in rs], [()] if c else [])
+                                           for c, rs in term]))
+        return out
 
     def guard_of(self, text: str, vals: dict) -> list:
         """A template's guard (or a write's value, terms `;` apart), its o<i> / e<i> replaced by
@@ -1263,7 +1318,7 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, 
     def node_ns(node, env) -> int:
         if isinstance(node, Seg):
             return span_ns[node.tid] if prog.templates[node.tid].lines else 0
-        if isinstance(node, Pred):
+        if isinstance(node, (Pred, When)):
             return body_ns(node.body, env)                 # a slot: reserved either way
         if isinstance(node, Let):
             # (bound only when the time depends on it: a binding of a block index is not)
@@ -1277,7 +1332,7 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, 
         if isinstance(node, Call):
             key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
             if key not in memo:
-                memo[key] = body_ns(prog.body_of(node, env), bind(node.skeys + node.args, env))
+                memo[key] = body_ns(prog.body_of(node, env), {**prog.params, **bind(node.skeys + node.args, env)})
             return memo[key]
         if isinstance(node, Loop):
             lo, hi = node.lo(env), node.hi(env)
@@ -1327,7 +1382,7 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
     def node_count(node, env) -> Counter:
         if isinstance(node, Seg):
             return seg_value(node.tid)
-        if isinstance(node, Pred):
+        if isinstance(node, (Pred, When)):
             return body_count(node.body, env)
         if isinstance(node, Let):
             return body_count(node.body, {**env, node.var: node.value(env)} if node.var in _deps(node.body) else env)
@@ -1356,7 +1411,7 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
         if isinstance(node, Call):
             key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
             if key not in memo:
-                memo[key] = body_count(prog.body_of(node, env), bind(node.skeys + node.args, env))
+                memo[key] = body_count(prog.body_of(node, env), {**prog.params, **bind(node.skeys + node.args, env)})
             return memo[key]
         if isinstance(node, Rot):
             return rot_value(node.k(env), node.sign, [p for p, _, _ in node.factors])
@@ -1384,7 +1439,7 @@ def _deps(body: Body) -> frozenset:
     for n in body:
         if isinstance(n, Loop):
             out |= n.lo.vars | n.hi.vars | (_deps(n.body) - {n.var})
-        elif isinstance(n, Pred):
+        elif isinstance(n, (Pred, When)):
             out |= _deps(n.body)
         elif isinstance(n, Let):
             inner = _deps(n.body)

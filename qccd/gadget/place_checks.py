@@ -309,6 +309,9 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     realised = {e[6] for e in events}          # a software Pauli is realised in the archive
     # a call is realised by its own view; here it is the stretch each block is the call's
     box_of = {(x["ins"], x["block"]): (x["t0"], x["t1"]) for x in boxes}
+    # (where the call stopped touching the block's ions: a call may still owe it a Pauli
+    # frame, a line in the archive, after the block is home again)
+    held = {(x["ins"], x["block"]): x.get("covered", x["t1"]) for x in boxes}
     realised |= {x["ins"] for x in boxes}
     for ins in gir["program"]["instructions"]:
         if ins["id"] not in realised and ins["id"] not in refused:
@@ -320,10 +323,13 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             if sp is None:
                 continue
             prev = last.get(b)
-            if prev and sp[0] < prev[1] - 1e-6:
+            # a refresh round only extracts syndromes on a block at rest: it commutes with the
+            # Pauli frame a call still owes the block, so it need only wait for its ions
+            end = prev[2] if prev and ins.get("refresh") and prev[2] is not None else (prev[1] if prev else 0)
+            if prev and sp[0] < end - 1e-6:
                 g7.append(f"block {b}: instruction {ins['id']} starts before instruction "
                           f"{prev[0]} is done")
-            last[b] = (ins["id"], sp[1])
+            last[b] = (ins["id"], sp[1], held.get((ins["id"], b)))
     verdict("G7", g7)
 
     # -- G8 ----------------------------------------------------------------------------------
