@@ -448,12 +448,17 @@ def _rotation(c: Ctx, k):
 
 @word("loop_riders(k)", "a number", "How many ions a transport step k counts as moving, as the "
       "leaderboard counts it: for a rotation of a closed loop, every ion the programme placed on a "
-      "closed loop at its start; for any other transport step, its participants.", "execution")
+      "closed loop at its start; for a C2LR swap-or-stay step, the crystals it moves to another leg; "
+      "for any other transport step, its participants.", "execution")
 def _riders(c: Ctx, k):
     st = _step(k, "loop_riders")
     ins = st.instr
     if ins is None or ins.type != "simd":
         return 0
+    if (ins.template or {}).get("kind") in ("swap_or_stay", "reorder_or_not"):
+        # a C2LR step names no participants: its movers are the device's matching, as the
+        # replay expanded it (docs/c2lr.md; `metrics.broadcast_use` counts them the same way)
+        return len({m.ion for m in st.moves})
     if ins.cls and ins.cls.startswith("rotate"):
         def riders():
             loop_nodes = set()

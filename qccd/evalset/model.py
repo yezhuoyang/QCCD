@@ -242,6 +242,10 @@ def _view_entails(arch, v, tables) -> dict:
 
     if v.instr.type != "simd" or not v.moves:
         return {}
+    if v.c2lr is not None and v.c2lr.template:
+        # a C2LR step is one waveform priced by its own primitive: the replay charges its
+        # crystals no split or merge, an enter into an occupied leg included
+        return {}
     by_ion: dict[str, list] = {}
     for m in v.moves:
         by_ion.setdefault(m.ion, []).append(m)
@@ -291,6 +295,7 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     """Replay `prog` on `arch` under the clock (an operating-point table, at its fastest
     points) and build the run.  With an experiment, the run also carries its appended
     readout and the qubit -> ion map the circuit is read through."""
+    from ..arch.c2lr import is_c2lr
     from ..cost.models import corrected_model
     from ..qec.extract import load_arch, load_program, resolve_qubit_map
     from ..verify.replay import replay
@@ -314,6 +319,13 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     tables = _move_tables(arch)
     cyc: dict[int, _Cycles] = {}
     starts: dict[int, Heat] = {}
+    # On a C2LR device a gate on the two crystals of one leg is merge, MS, split, and the
+    # replay deposits the merge's heat BEFORE the MS gate reads n-bar (R7, R16).  The probe
+    # fires before the instruction, so its n-bar is the one before the merge; the gate's
+    # step starts instead with the n-bar its view gives the rules -- the one the MS gate
+    # meets.  Every other device's gates are read from the probe, as they always were.
+    c2lr_gates: dict[int, Heat] = {}
+    on_c2lr = is_c2lr(arch)
     kept = {"pos": {}, "occ": {}}
 
     def keep(d: dict, kind: str) -> dict:
@@ -338,6 +350,8 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
             c.depth += _cycle_depth(v.moves, charged)
         else:
             c.depth += 1
+            if on_c2lr and v.instr.type == "gate":
+                c2lr_gates[v.instr.id] = Heat(ion_ix, [float(v.quanta.get(i, 0.0)) for i in ion_order])
 
     def probe(instr, current) -> None:
         if instr.id not in starts:
@@ -374,7 +388,10 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     for k, ins in enumerate(prog.instructions):
         st = Step(k, ins, ins.type)
         c = cyc.pop(ins.id, None)
-        st.nbar0 = last_nbar = same(starts.pop(ins.id, {}), last_nbar)
+        start = starts.pop(ins.id, {})
+        if ins.id in c2lr_gates:
+            start = c2lr_gates.pop(ins.id)
+        st.nbar0 = last_nbar = same(start, last_nbar)
         st.t0 = t
         if ins.type == "init":
             pos, occ = dict(pos), dict(occ)      # the steps before keep theirs
