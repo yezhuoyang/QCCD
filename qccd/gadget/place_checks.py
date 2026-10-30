@@ -317,6 +317,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             s[0], s[1] = min(s[0], e[1]), max(s[1], e[2])
     last: dict[str, tuple[int, float]] = {}
     realised = {e[6] for e in events}          # a software Pauli is realised in the archive
+    realised |= {i for i, _ in gir.get("noops", ())}   # (and an instruction with nothing to do)
     # a call is realised by its own view; here it is the stretch each block is the call's
     box_of = {(x["ins"], x["block"]): (x["t0"], x["t1"]) for x in boxes}
     # (where the call stopped touching the block's ions: a call may still owe it a Pauli

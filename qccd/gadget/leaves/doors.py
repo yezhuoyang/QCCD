@@ -110,8 +110,32 @@ def search(patch, *, iterations: int = 30000, seed: int = 11, w_round: float = 1
 def memory_by_doors(*, name: str = "mem_d3f"):
     """`places.memory`, its ions resting at DATA/DOCKS instead of where `place()` puts them.
     (`places.py` is one of the sources every cached place is keyed by, so this place borrows
-    its builder rather than changing it.)"""
-    return _borrow("memory", name, DATA, DOCKS)
+    its builder rather than changing it.)  It also has `hold`: see `_add_hold`."""
+    build = _borrow("memory", name, DATA, DOCKS)
+    _add_hold(build, name)
+    return build
+
+
+def _add_hold(build, name: str) -> None:
+    """`hold`: the block checks in and rests on the ring, with no syndrome round -- `store`
+    without its round, for a scheduler that runs a resting block's rounds only when they are
+    due (`City(park_round=False)`, 2026-10-30: the user's "measure both, decide later")."""
+    from ..logic.spec import Flow, Spec
+    from .bay import Bay, BayProgram
+    from .places import _cooled
+    b = Bay(name, N // 2, RING_DOCKS, {"in": "TL", "out": "TR"}, build.machine, {"in": 9, "out": 9})
+    p, ds, rest = build.extra["patch"], build.extra["data_slots"], build.extra["rest"]
+    data = [f"d{q}" for q in range(p.n)]
+    bp = BayProgram(b, f"{name}.hold", {**build.home, **{d: "X_in" for d in data}})
+    bp.absorb("in", data, [ds[q] for q in range(p.n)], cool_every=3, op="enter")
+    bp.restore(op="enter")
+    bp.cool_inside(op="enter")
+    build.programs["hold"] = _cooled(bp.prog, b.machine)
+    build.titles["hold"] = "a block checks in and rests on the ring: no syndrome round"
+    build.expect_end["hold"] = {**build.home, **rest}
+    build.notes["hold"] = ["the block rests uncorrected until a refresh or its release"]
+    build.specs["hold"] = Spec("hold", data, data,
+                               [Flow(f"{s}({d})", {d: s}, {d: s}, "exact") for d in data for s in "XZ"])
 
 
 #: where the Hadamard bay's ions rest: in code order at the door in, the quarter turn's order at

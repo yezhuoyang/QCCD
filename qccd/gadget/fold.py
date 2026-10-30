@@ -232,6 +232,10 @@ class Folder:
     free_at: str = "instruction"
     #: a CNOT's resting operand starts out early (`City.prefetch`)
     prefetch: bool = False
+    #: a parked block's syndrome round, and how near a next use keeps it out (`City.park_round`,
+    #: `City.park_within`)
+    park_round: bool = True
+    park_within: int = 1
 
     @property
     def home_places(self) -> set:
@@ -262,7 +266,8 @@ class MacroCity(City):
     def __init__(self, alg, lib, leaves, *, folder: Folder, params=(), ext=(), taken=(),
                  depth: int = 0, homes: dict | None = None):
         super().__init__(alg, lib, leaves, log=folder.log, parallel=True, rounds_at=folder.rounds_at,
-                         free_at=folder.free_at, prefetch=folder.prefetch)
+                         free_at=folder.free_at, prefetch=folder.prefetch,
+                         park_round=folder.park_round, park_within=folder.park_within)
         self.folder, self.depth = folder, depth
         self.cal = {p: FastCalendar() for p in self.leaf}
         self.net_cal = {p: FastCalendar() for p in self.nets}
@@ -308,7 +313,8 @@ class MacroCity(City):
 
     # -- resting: a block with a home rests there, any other in a free place no home is ----
 
-    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True):
+    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True,
+             round_: bool | None = None):
         Z = at if at is not None else self.home_of.get(bundle.name)
         if at is not None:
             pass                                     # a cooling stop on the way (City.bring)
@@ -323,19 +329,24 @@ class MacroCity(City):
         elif self.zone_holder.get(Z) not in (None, bundle.name):
             raise FoldError(f"{bundle.name}'s home {Z} holds {self.zone_holder[Z]}")
         kind = self.family(Z)
-        in_op = "store" if kind == "memory" else "check_in"
+        in_op = "check_in"
+        if kind == "memory":
+            # (`City.park_round`: a parked block's round, or only its rest -- `hold`)
+            in_op = self.store_op(Z, bundle.name, t_min, round_)
         gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp, stop_ok=stop_ok)
         s, _, row = self.op(Z, in_op, {"in": (gids, arr, trip)}, t_min, ins, grp)
         if kind == "memory":
             self.mem_last[Z] = row[2]
-            self.report(Z, in_op, row, ins, grp, blocks=[bundle.name])
+            if in_op == "store":
+                self.report(Z, in_op, row, ins, grp, blocks=[bundle.name])
         bundle.leaf, bundle.port, bundle.deps = Z, "in", []
         bundle.resting = True
         self.zone_holder[Z] = bundle.name
         bundle.lease = (row[1], math.inf)
         self.cal[Z].reserve(*bundle.lease)
         if kind == "memory":
-            self.rest_since[bundle.name] = row[2]
+            # its rounds while it rests count from its last one: this store's, or before a hold
+            self.rest_since[bundle.name] = row[2] if in_op == "store" else self.last_round.get(bundle.name, 0.0)
         return row[2]
 
     # -- refresh: a block resting in a memory is held there, a syndrome round as often as G8 asks
@@ -672,12 +683,13 @@ def _call_blocks(alg: Algorithm) -> list:
 
 def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None,
                     outlive: bool = False, rounds_at: str = "clinic", free_at: str = "instruction",
-                    prefetch: bool = False) -> dict:
+                    prefetch: bool = False, park_round: bool = True, park_within: int = 1) -> dict:
     """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
     macros themselves (their footprints, which GIR 0.3 does not carry) are left in
     `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`."""
     folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None), outlive=outlive,
-                    rounds_at=rounds_at, free_at=free_at, prefetch=prefetch)
+                    rounds_at=rounds_at, free_at=free_at, prefetch=prefetch, park_round=park_round,
+                    park_within=park_within)
     if keep is not None:
         keep["folder"] = folder
     probe = MacroCity(alg, lib, leaves, folder=folder)
@@ -733,6 +745,7 @@ def _macro_json(m: Macro) -> dict:
             "program": g["program"], "events": g["events"], "carries": g["carries"],
             "messages": g["messages"], "windows": g["windows"], "frames": g["frames"],
             "outcomes": g["outcomes"], "blocks": g["blocks"], "refused": g["refused"],
+            **({"noops": g["noops"]} if g.get("noops") else {}),
             "holds": g["holds"], "calls": m.calls,
             # a road's hold and its span on a shared plane (planes.py), when it has them
             **{k: g[k] for k in ("road_holds", "road_spans") if g.get(k)},
@@ -1234,6 +1247,7 @@ def view(g: dict, mid: str | None = None) -> dict:
     sub.update({k: body[k] for k in ("events", "carries", "messages", "windows", "frames",
                                      "outcomes", "blocks", "program")})
     sub["road_holds"] = body.get("road_holds") or []
+    sub["noops"] = body.get("noops") or []
     sub["holds"] = body.get("holds") or []
     sub["calls"] = body.get("calls") or []
     sub["macros"] = g["macros"]

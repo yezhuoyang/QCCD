@@ -76,7 +76,7 @@ from __future__ import annotations
 import heapq
 from dataclasses import dataclass
 
-from .algorithm import PPM_MAX, Algorithm, Instr, rotation_basis
+from .algorithm import CLASSICAL, PPM_MAX, Algorithm, Instr, rotation_basis
 from .library import LeafLibrary
 from .model import Library
 from .logic.decode import LATENCY
@@ -126,6 +126,11 @@ def expr_text(e, names=None) -> str:
 
 GIR_SCHEMA = "qccd.gir/0.2"
 
+#: under `park_round=False`, how long after its last syndrome round a parked block takes one
+#: anyway: half the refresh period a resting block gets (fold.REFRESH_EVERY_US), so no block
+#: waits past the half of the coherence budget G8 allows it at a call's edge
+ROUND_DUE_US = 200_000.0
+
 
 class CityError(SynthError):
     pass
@@ -163,7 +168,7 @@ class _Train:
 class City:
     def __init__(self, alg: Algorithm, lib: Library, leaves: LeafLibrary, log=None,
                  parallel: bool = True, rounds_at: str = "clinic", free_at: str = "instruction",
-                 prefetch: bool = False):
+                 prefetch: bool = False, park_round: bool = True, park_within: int = 1):
         self.alg, self.lib, self.leaves = alg, lib, leaves
         self.parallel = parallel
         #: when a block an instruction acted on is free for the next: "instruction" (once all
@@ -175,6 +180,16 @@ class City:
         #: arrives with the other instead of after it (`bring`'s just-in-time rule still holds
         #: it back while the workshop is busy): the codesign choice of 2026-10-29
         self.prefetch = prefetch
+        #: whether a block parked in a memory between uses takes a syndrome round there (`store`)
+        #: or only rests (`hold`, where the memory has it), its rounds left to the refreshes its
+        #: coherence budget asks for; an `se` always gets its rounds.  And how near a block's
+        #: next use must be -- within `park_within` instructions that move ions -- for it to wait
+        #: where it is instead of parking (1: only the very next).  2026-10-30, the user: "measure
+        #: both, decide later"; the defaults are the rule as it was
+        self.park_round, self.park_within = park_round, park_within
+        #: block -> when its last syndrome round ended (`report`): under `hold` a parked block
+        #: still takes its round once ROUND_DUE_US has passed since then
+        self.last_round: dict[str, float] = {}
         #: where `se b k` runs its k syndrome rounds: "clinic" (a block goes to a syndrome
         #: clinic and back) or "memory" (the block rests in a memory and the memory runs the
         #: rounds in place, every block's at once -- the codesign choice of 2026-10-29: a
@@ -192,6 +207,8 @@ class City:
         self.events: list[list] = []
         self.carries: list[list] = []
         self.refused: list[list] = []
+        #: [instruction, why]: instructions that had nothing to do (a decode under `hold`)
+        self.noops: list[list] = []
         self.outcomes: list[dict] = []
         self.frames: list[dict] = []
         self.blocks: dict[str, Bundle] = {}
@@ -557,6 +574,8 @@ class City:
         product measured in pieces (a cat chain): `(path, opname, row, flow)` for every bit
         whose parity it is; each place sends its own bit, and the archive records the
         product when the last one is in."""
+        for b in blocks:
+            self.last_round[b] = max(self.last_round.get(b, 0.0), row[2])
         li = self.leaf[path]
         t_meas = row[1] + self.last_measure_us(li.master.name, opname)
         ports = {p.signal: p for p in li.master.ports if p.kind == "classical"}
@@ -632,6 +651,12 @@ class City:
                 want.add(y)
         todo = [w for w in self.windows if w["decoded_by"] is None
                 and (not ins.blocks or want & set(w["blocks"]))]
+        if not todo and (not self.park_round or self.park_within > 1):
+            # (a block that waited without a round -- `hold`, or not parked at all -- has no
+            # syndrome for a decode written for the round its store would have measured: nothing
+            # happens, and the GIR says so)
+            self.noops.append([ins.index, "nothing to decode: the parks it was written for took no round"])
+            return
         if not todo:
             said = " ".join(ins.blocks) or "the program"
             raise CityError(f"nothing to decode: every syndrome {said} has left is decoded "
@@ -1163,6 +1188,24 @@ class City:
             trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1], nb)
         return t, trip
 
+    def store_op(self, Z: str, q: str, t: float, round_: bool | None = None) -> str:
+        """How block `q` parks in memory `Z` at `t`: `store` (with a syndrome round) or, under
+        `park_round=False`, `hold` -- unless its last round is ROUND_DUE_US behind it."""
+        rounds = self.park_round if round_ is None else round_
+        if not rounds and t - self.last_round.get(q, 0.0) >= ROUND_DUE_US:
+            rounds = True
+        return "store" if rounds or "hold" not in self.leaf[Z].master.ops else "hold"
+
+    def _moves_between(self, a: int, b: int) -> int:
+        """How many instructions that move ions come strictly between instructions a and b."""
+        if not hasattr(self, "_qrank"):
+            self._qrank, r = {}, 0
+            for i in self.alg.instructions:
+                self._qrank[i.index] = r
+                if i.kind not in CLASSICAL:
+                    r += 1
+        return self._qrank[b] - self._qrank[a] - 1
+
     def _lead(self, q: str, t0: float) -> float:
         """When block `q` may start out for an op the other operands are ready for at `t0`:
         a block resting in a memory or a zone that early, less its release (`prefetch`)."""
@@ -1253,10 +1296,11 @@ class City:
                     best = key
         return None if best is None else best[1]
 
-    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True):
+    def park(self, bundle: Bundle, t_min, ins, grp, *, at=None, stop_ok: bool = True,
+             round_: bool | None = None):
         """Rest a block until its next use: in a free memory if the design has one (it will
         be corrected while it rests), else in a free logical zone.  `at`: this memory (a
-        cooling stop)."""
+        cooling stop).  `round_`: whether storing it takes a syndrome round (None: `park_round`)."""
         near = (bundle.leaf, bundle.port)
         if at is not None:
             Z, kind = at, self.family(at)
@@ -1266,12 +1310,15 @@ class City:
             kind = "memory" if mems else "zone"
             Z = self._choose(kind, _ANY, near=near, ready=t_min,
                              free=lambda p: self.zone_holder[p] is None, gids=bundle.gids)
-        in_op = "store" if kind == "memory" else "check_in"
+        in_op = "check_in"
+        if kind == "memory":
+            in_op = self.store_op(Z, bundle.name, t_min, round_)
         gids, arr, trip = self.bring(bundle, (Z, "in"), t_min, ins, grp, stop_ok=stop_ok)
         s, _, row = self.op(Z, in_op, {"in": (gids, arr, trip)}, t_min, ins, grp)
         if kind == "memory":
             self.mem_last[Z] = row[2]
-            self.report(Z, in_op, row, ins, grp, blocks=[bundle.name])
+            if in_op == "store":
+                self.report(Z, in_op, row, ins, grp, blocks=[bundle.name])
         bundle.leaf, bundle.port, bundle.deps = Z, "in", []
         bundle.resting = True
         self.zone_holder[Z] = bundle.name
@@ -1511,7 +1558,7 @@ class City:
                 # each refresh one more (no trip to a clinic, no queue behind other blocks)
                 n = ins.rounds
                 if not (b.resting and self.family(b.leaf) == "memory"):
-                    end = self.park(b, t0, ins.index, grp)
+                    end = self.park(b, t0, ins.index, grp, round_=True)
                     self.block_free[q] = max(self.block_free.get(q, 0.0), end)
                     n -= 1
                     b = self.blocks[q]
@@ -1528,7 +1575,7 @@ class City:
                             for p, h in self.zone_holder.items())):
                 # no clinic, but a free memory: storing a block there is a syndrome round,
                 # and it rests there, corrected, until its next use
-                end = self.park(b, t0, ins.index, grp)
+                end = self.park(b, t0, ins.index, grp, round_=True)
                 self.block_free[q] = max(self.block_free.get(q, 0.0), end)
                 return
             C = self._choose("se", ins, near=(b.leaf, b.port), ready=t0)
@@ -1696,7 +1743,7 @@ class City:
         # any `decode`, which reads syndromes out of places and never touches a block)
         for q, bundle in produced.items():
             nxt = self.next_use.get((ins.index, q))
-            if nxt is None or nxt != self.next_quantum.get(ins.index):
+            if nxt is None or self._moves_between(ins.index, nxt) >= self.park_within:
                 self.park(bundle, t0, ins.index, grp)
         if kind == "decode":
             # THE DECODER WORKS ALONGSIDE THE IONS.  A decode holds up nothing that does not
@@ -1940,6 +1987,7 @@ class City:
             "control": {"decoder": self.decoder, "archive": self.archive,
                         "latency_us": dict(LATENCY)},
             "refused": self.refused,
+            **({"noops": self.noops} if self.noops else {}),
             "branch_frames": self.branch_frames,
             "outcomes": outcomes,
             "stock": dict(self.stock),

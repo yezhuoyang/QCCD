@@ -794,6 +794,29 @@ details").**
   - **The rewrites are in the repository** (`qccd/fullstack/scale/codesign.py`,
     `tests/test_scale_codesign.py`): products, the H̄ triple, the CNOT idiom, the lookup fusion,
     and `exports` (which outcomes a call site hands on).
+  - **The critical path after them** (halve one template, read the parallel time again): the
+    interior holds about 37% of it and the uncompute about 31%. An adder step forward waits
+    172 ms, and backward 161 ms; about 47 ms of each forward step is parking a block in memory
+    (a store, with its syndrome round) between nearby uses. More preparation, readout and CNOT
+    places help the backward step (161 → 133 ms) and not the forward one.
+  - **How a block waits between uses: two opt-ins, the user's decision pending** (2026-10-30:
+    "measure both, decide later"). The defaults are the rule as it was.
+    `tests/test_gadget_park_policy.py`.
+    - `City(park_round=False)`: a parked block rests without a syndrome round (`hold` on
+      `mem_d3f`, 6.5 ms against a store's 18.2). It takes its round anyway once 200 ms have
+      passed since its last (`ROUND_DUE_US`), and its refreshes count from that round. A decode
+      written for the round a store would have measured is listed under the GIR's `noops`.
+    - `City(park_within=K)`: a block whose next use is among the next K instructions that move
+      ions waits where it is, instead of parking.
+    - On small programs that park between uses, every policy keeps the outcomes and a fault
+      distance of 3. The logical error rate, which fewer rounds raise, is not measured yet.
+
+    | Park policy (on the last row above) | Sequential | Parallel |
+    |---|---|---|
+    | A round at every park (the default) | 28.4 years | 4.31 years |
+    | `park_round=False`: a round only when due | 25.6 years | 3.79 years |
+    | `park_within=6`: no park when the next use is near | 27.0 years | 3.99 years |
+    | both | 24.8 years | 3.65 years |
   - **The doors are the bottleneck of every place.** Of a place op's time, the doors take 92%
     (H bay, 20.3 ms; the H gates 1.7 ms), 79% (transversal CNOT), 78% (readout), 45% of a
     memory store and all of a release. A ring takes an ion in with a ring turn (100 µs a slot

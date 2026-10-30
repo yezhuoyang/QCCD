@@ -31,12 +31,16 @@ def leaves():
 @pytest.mark.parametrize("old,new", [("mem_d3", "mem_d3f"), ("hbay_d3", "hbay_d3f"), ("prep_d3", "prep_d3f")])
 def test_each_door_aware_place_is_verified_and_faster(leaves, old, new):
     a, b = leaves.place(old), leaves.place(new)
-    assert set(b.ops) == set(a.ops)
+    # (the door-aware memory also has `hold`: store without its round -- City(park_round=False))
+    assert set(b.ops) - set(a.ops) == ({"hold"} if new == "mem_d3f" else set()) and set(a.ops) <= set(b.ops)
     assert b.family == a.family
     for k, op in b.ops.items():
         assert op.status == "verified", k
         assert op.logic["flows"]["complete"], k
-        assert op.duration_us < a.ops[k].duration_us, (k, op.duration_us, a.ops[k].duration_us)
+        if k in a.ops:
+            assert op.duration_us < a.ops[k].duration_us, (k, op.duration_us, a.ops[k].duration_us)
+    if new == "mem_d3f":
+        assert b.ops["hold"].duration_us < b.ops["store"].duration_us
 
 
 def test_its_placement_is_searched_and_cheaper():
