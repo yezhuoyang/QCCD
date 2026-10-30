@@ -34,7 +34,8 @@ circuit's own; the compiler never reorders it. The checks and the two fixes are 
 [families.py](families.py). Every family runs on qccd-physics@2. C2LR adds only its own steps:
 swap-or-stay at 400 µs and reorder-or-not at 93 µs, the paper's Yb-Ba row, because physics@2's
 crystal is Ba-Yb. Its merge and split stay physics@2's, because the C2LR paper does not measure
-them:
+them, and its DACs are counted from the paper's census (`c2lr_control(wiring=True)`). qccdc
+cannot compile it, so C2LR is compiled by the platform's baseline C2LR router:
 
 | family | device | sizes swept, for a code of N ions and A ancillas |
 |---|---|---|
@@ -97,15 +98,24 @@ The site page draws the same points live, with the official entries on each code
   scheduler, not the architecture: they are an upper bound on its time and LER until a Cyclone
   schedule (ancillas rotating past the data, as in Khan et al.) exists. This is the ion-shuttling
   part of the plan (John).
-- **C2LR has no router.** A C2LR device moves crystals only by swap-or-stay steps. The reference
-  compiler emits plain shuttles, which the device does not declare (R4), and it parks two
-  crystals in one leg outside a swap-or-stay enter (C1). So every C2LR size fails until a router
-  emits the steps. The proposal's c2lr-router is not available: its author has not been named or
-  sent it. Its quoted BB144 round of 160 ms also uses half the paper's step time (1/Γ). When a
-  router's programs arrive, they are graded by this same pipeline. Until 2026-10-30 the family
-  was a grid with C2LR wiring; those rows gave Grid's numbers exactly and are kept in
-  `results/provisional/`. The official server's release carries physics@2 without the C2LR
-  steps' price, so a C2LR entry needs a new release once a router exists.
+- **C2LR is compiled by a baseline router, and its merges are priced at physics@2.** A C2LR
+  device moves crystals only by swap-or-stay steps. qccdc emits plain shuttles, which the device
+  does not declare (R4), and it parks two crystals in one leg outside a swap-or-stay enter (C1),
+  so every size failed (`results/c2lr_qccdc/`). Since 2026-10-30 the platform's baseline router
+  (`qccd.compile.c2lr_router`) compiles every size of every code, within every rule and keeping
+  the gate order; it is a first router, not a tuned one (on surface d=3 the 5x4, 5x5 and 6x5
+  lattices give the same time and LER). Every two-qubit gate merges the two crystals of a leg and
+  splits them again (docs/c2lr.md section 6a): that is the device model, and no router avoids
+  it. Goal 3 prices each merge and split at physics@2's 128 µs and 1 quantum (arXiv:2003.01293
+  Table II's bound, used as the value), the price every other family pays when its ions
+  combine; the platform's curve for a C2LR leg is 40 µs and 0.1 quantum. Decided 2026-10-30:
+  the main figure keeps physics@2's price. C2LR is the fastest family on surface d=3, 5 and 7
+  and colour d=5, and its LER per round is 2 to 15 times Grid's best; that price is probably
+  most of the gap, and a run at the platform's price would measure it. Before 2026-10-30 the
+  family was a grid with C2LR wiring; those rows gave Grid's numbers exactly and are kept in
+  `results/provisional/`. A ranked C2LR entry needs a release whose physics includes the C2LR
+  steps, as the C2LR boards' releases do: on a goal3 release the physics lock marks a C2LR
+  device exploratory.
 - **WISE equals Grid today.** Its control block reaches the device (32 broadcast DACs), but the
   compiler emits the same program and the replay charges the same time. Even the DAC metric is
   computed from the geometry, not from the wiring block. Nothing enforces WISE's single

@@ -19,9 +19,10 @@ models, plus the plain grid as the baseline:
               `Machine.c2lr_grid`'s control (crystals move only by swap-or-stay steps, a
               direction bit per leg, 27 shared signals, the demonstrated diagonals only) and
               its steps' price (Yb-Ba, the paper's row for physics@2's Ba-Yb crystal: 400 us),
-              on the Goal's physics (sweep.device_doc).  The reference compiler emits plain
-              shuttles, which this device does not offer, so every size fails R4 and C1 until
-              a C2LR router emits the steps.
+              on the Goal's physics (sweep.device_doc), DACs counted from the paper's census.
+              qccdc's plain shuttles break R4 and C1 here, so the platform's baseline C2LR
+              router compiles it (qccd.compile.c2lr_router).  Every two-qubit gate merges and
+              splits its leg's pair, priced at physics@2's merge/split as every family's is.
 * Cyclone  -- one junction-free loop moved rigidly (Khan et al., HPCA 2026): `ring(W, 2, 0)`
               with trap sites, O(1) DACs.
 * Conveyor -- a loop of rail slots with dock spurs, the loop rotated rigidly and ions docked
@@ -58,8 +59,8 @@ FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor")
 #: what a family's points do not yet show; the figures print these under the panels
 CAVEATS = {
     "WISE": "same program and time as Grid until WISE's broadcast rules exist",
-    "C2LR": "the reference compiler moves ions by plain shuttles, which a swap-or-stay device does "
-            "not offer (R4, C1): every size fails until a C2LR router exists",
+    "C2LR": "compiled by the baseline C2LR router; every two-qubit gate merges and splits its pair, "
+            "priced at physics@2's 128 us and 1 quantum each, as every family's merge is",
     "Cyclone": "compiled without rigid rotation (qccdc has no Cyclone scheduler yet): an upper bound",
 }
 #: the plot's order and each family's colour (its best point; every other point is grey)

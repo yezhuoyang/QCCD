@@ -10,7 +10,8 @@ official grader grades a submission to it, minus the certificate chain:
 1. the device is the family's generator at that size, entered on the release
    (`board_device`: qccd-physics@2);
 2. the reference compile (`compile_with_qccdc`: the pinned qccdc, rotation first on a loop,
-   cooling under the "quantinuum" table);
+   cooling under the "quantinuum" table; on a C2LR device the platform's C2LR router,
+   `qccd.compile.c2lr_router.compile_with_router`, at the same table);
 3. the rules (`qccd.verify.verify` under corrected_model("quantinuum"), as the rules stage);
 4. the metrics (`compute_metrics`: T_quantinuum, instructions, dacs, ...);
 5. the logical error rate under qccd-noise@2 with the release's budget and seed
@@ -75,10 +76,11 @@ def device_doc(point: dict, rel) -> dict:
     if point.get("c2lr"):
         # Machine.c2lr_grid's control and its step's price, on the Goal's physics.  Merge and
         # split stay qccd-physics@2's: arXiv:2403.00756 does not measure them, and every other
-        # family pays physics@2's.
+        # family pays physics@2's.  The DACs are counted from the paper's census (`wiring`),
+        # not one per electrode.
         from qccd.arch.c2lr import c2lr_control, c2lr_primitives
         c = point["c2lr"]
-        doc["control"] = c2lr_control(checkerboard=c["checkerboard"])
+        doc["control"] = c2lr_control(checkerboard=c["checkerboard"], wiring=True)
         own = {k: v for k, v in c2lr_primitives(c["species"]).items() if k not in ("merge", "split")}
         doc["primitives"] = {**doc["primitives"], **own}
     return doc
@@ -86,6 +88,7 @@ def device_doc(point: dict, rel) -> dict:
 
 def grade(code: str, point: dict, work_root: str) -> dict:
     """One point: compile, rules, metrics, LER.  Never raises: a failure is a row."""
+    from qccd.compile.c2lr_router import Refused, compile_with_router
     from qccd.qec import CompileFailed, compile_with_qccdc, evaluate_memory
     rel = release(code)
     row = {"code": code, "release": rel.id, "family": point["family"], "point": point["name"],
@@ -102,10 +105,18 @@ def grade(code: str, point: dict, work_root: str) -> dict:
         arch_p.write_text(json.dumps(doc, indent=1), encoding="utf-8")
         row["ions"] = exp.n_data + exp.n_ancilla
         try:
-            cooled, cert_p = compile_with_qccdc(exp.qasm, arch_p, work, timeout=point.get("timeout", 1800),
-                                                table=TABLE)
+            if point.get("c2lr"):
+                # qccdc's plain shuttles break R4 and C1 on a swap-or-stay device: the platform's
+                # C2LR router emits the steps (and checks every rule before it returns)
+                cooled, cert_p = compile_with_router(exp.qasm, arch_p, work, table=TABLE)
+            else:
+                cooled, cert_p = compile_with_qccdc(exp.qasm, arch_p, work, timeout=point.get("timeout", 1800),
+                                                    table=TABLE)
         except CompileFailed as exc:
             return {**row, "status": "refused", "why": f"{exc.kind}: {exc}"[:400],
+                    "seconds": round(time.time() - t0, 1)}
+        except Refused as exc:
+            return {**row, "status": "refused", "why": f"c2lr-router: {exc}"[:400],
                     "seconds": round(time.time() - t0, 1)}
         row["compile_seconds"] = round(time.time() - t0, 1)
         row["compiler_mode"] = json.loads((work / "compile.json").read_text(encoding="utf-8")).get("mode")
