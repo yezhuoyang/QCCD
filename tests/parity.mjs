@@ -298,8 +298,11 @@ for (const c of cases.pricing || []) {
   const dev = r.ok.device;
   let priced;
   try {
+    // the device's C2LR context, as `editor.js` hands it over: a swap-or-stay step is
+    // expanded from the device, so a model without it cannot price one
     const model = Q.makeModel(r.ok.primitives, Q.degrees(dev), Q.cornerEndpoints(dev),
-                              dev.segments, c.model);
+                              dev.segments, { ...c.model,
+                                c2lr: Q.c2lrContext(dev, r.ok.control, r.ok.name, c.classes || {}) });
     model._pair = Q.pairIndex(dev);      // exactly what editor.js attaches before pricing
     priced = Q.priceFrames(c.frames, c.loops, model, c.classes || {});
   } catch (err) {
@@ -700,7 +703,8 @@ for (const c of cases.rules || []) {
       pitch: c.model.pitch || 1.0,
       include_anomalous: c.model.include_anomalous !== false,
       anomalous_per_ms: c.physics.anomalous_per_ms || 0,
-      policy: c.physics.policy });
+      policy: c.physics.policy,
+      c2lr: Q.c2lrContext(dev, st.control, st.name, c.classes || {}) });
   } catch (err) { note('rules', c.name, 'makeModel threw', '(a model)', err.message); continue; }
   model._pair = Q.pairIndex(dev);
   let rep;
@@ -708,7 +712,8 @@ for (const c of cases.rules || []) {
     rep = Q.checkFrames(dev, c.frames, c.loops, model, c.classes, {
       zone_types: c.zone_types, max_simd: c.max_simd,
       gate_threshold: c.physics.gate_threshold,
-      models_heating: c.models_heating, chain_limit: 15, state: st });
+      models_heating: c.models_heating, chain_limit: 15, state: st,
+      c2lr_forms: c.c2lr_forms || null });
   } catch (err) { note('rules', c.name, 'checkFrames threw', '(a report)', err.message); continue; }
   const got = {}, want = c.python || {};
   for (const [k, v] of Object.entries(rep.by_rule || {})) if (c.browser_set.includes(k)) got[k] = v;
@@ -761,7 +766,7 @@ for (const c of cases.prog || []) {
   let low;
   try {
     low = Q.lowerProgram(c.records.map(x => ({ ...x, lane: 'prog' })), dev, c.loops,
-                         { name: c.arch_name, classes: c.classes });
+                         { name: c.arch_name, classes: c.classes, control: r.ok.control });
   } catch (err) { note('prog', c.name, 'lowerProgram threw', '(a result)', err.message); continue; }
 
   if (c.error) {

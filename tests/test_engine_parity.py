@@ -73,7 +73,7 @@ from qccd.cost.hardware import hardware_report
 from qccd.cost.models import corrected_model, deck_model
 from qccd.verify import replay, verify
 from qccd.viz.layout import compute_layout, pad_tiling, site_length
-from qccd.viz.render import BROWSER_SET, build_view_model
+from qccd.viz.render import BROWSER_C2LR_SET, BROWSER_SET, build_view_model
 
 ROOT = Path(__file__).resolve().parent.parent
 ARCH_DIR = ROOT / "arch"
@@ -705,7 +705,7 @@ def _pricing_cases() -> list[dict]:
             "per_ion": {k: float(sum(v.values()))
                         for k, v in res.per_ion_quanta.items()},
         })
-    return out
+    return out + _c2lr_pricing_cases()
 
 
 #: The (architecture, program) pairs the pricing bucket already covers, reused so the rule
@@ -1829,7 +1829,7 @@ def _rule_cases() -> list[dict]:
                 "python": want,
                 "messages": msgs,
             })
-    return out + _rule_hand_cases()
+    return out + _rule_hand_cases() + _c2lr_rule_cases()
 
 # ---------------------------------------------------------------------- program cases
 
@@ -1984,7 +1984,7 @@ def _prog_refusals(arch):
 #: come from Python's replay and a browser-authored programme has none of them -- that is
 #: what `frameChecked === 0` means and the page says so rather than reporting drift zero.
 PROG_FRAME_FIELDS = ["type", "cls", "mode", "place", "shift", "moves", "pairs", "sites",
-                     "ions", "gate", "entails", "broadcast", "kind", "hops", "id"]
+                     "ions", "gate", "entails", "broadcast", "kind", "hops", "id", "c2lr"]
 
 
 def _prog_cases() -> list[dict]:
@@ -2052,7 +2052,7 @@ def _prog_cases() -> list[dict]:
                             "records": records, "loops": dev_loops, "classes": classes,
                             "arch_name": arch.name, "frames": None, "tsir": None,
                             "error": None, "accepted": True})
-    return out
+    return out + _c2lr_prog_cases()
 
 
 def _prog_text_cases() -> list[dict]:
@@ -2069,6 +2069,352 @@ def _prog_text_cases() -> list[dict]:
     for name, records in _prog_scripts(arch) + _prog_refusals(arch):
         out.append({"name": f"progtext:{name}", "records": records})
     return out
+
+# ---------------------------------------------------------------------- C2LR cases
+#
+# A C2LR device (docs/c2lr.md) is the one place the browser EXPANDS a step rather than
+# replaying the moves it was given: a swap-or-stay step names direction bits, and where
+# every crystal goes is the device's matching.  So it is compared in all three buckets that
+# a step passes through -- the lowerer (frames and TSIR, field by field), the re-pricer
+# (every total, every channel, every ion) and the rules (counts and messages, the C rules
+# included) -- on lattices built by `Machine.c2lr_grid`, because none ships in `arch/`.
+
+def _c2lr_machines():
+    from qccd.api import Machine
+    return [Machine.c2lr_grid(3, 3), Machine.c2lr_grid(4, 3, species="Yb-Ba"),
+            Machine.c2lr_grid(3, 3, checkerboard=False, name="c2lr3x3_nocb")]
+
+
+#: On the 3 x 3 lattice the W-S pairs are T0_0h-T1_0v (at J1_0), T0_1h-T1_1v (J1_1),
+#: T1_0h-T2_0v (J2_0) and T1_1h-T2_1v (J2_1); T0_0v, T0_1v, T0_2h and T1_2h are unpaired.
+_C2LR_PLACE = {"q0": "T0_1h", "q1": "T1_1v", "q2": "T0_0h", "q3": "T2_1v", "q4": "T0_0v"}
+
+
+def _c2lr_scripts(arch) -> list[tuple[str, list, dict | None]]:
+    """(name, records, rule config): every shape `tests/test_c2lr.py` judges, as the
+    records both lowerers take -- swap, stay, enter + gate + exit, a move into an empty leg,
+    a bit at the edge, every way C1's exit can be broken, the same exchange forged as plain
+    moves, a crystal resting on a junction, the checkerboard (and the rule set that refuses
+    it), and reorder-or-not where the device prices it."""
+    init = _P("init", dict(_C2LR_PLACE))
+    enter = [_P("swap_or_stay", "WS", ["q0", "q1"]), _P("swap_or_stay", "WS", ["q0"])]
+    swap = [["q0", "T0_1h", "T1_1v", ["T0_1h.b", "T1_1v.a"]],
+            ["q1", "T1_1v", "T0_1h", ["T1_1v.a", "T0_1h.b"]]]
+    out: list[tuple[str, list, dict | None]] = [
+        ("tour", [init, *enter, _P("gate", "MS", [["q0", "q1"]]),
+                  _P("swap_or_stay", "WS", ["q0"]), _P("swap_or_stay", "WS", ["q2"]),
+                  _P("cool")], None),
+        ("idle", [init, _P("swap_or_stay", "WS", [])], None),
+        ("edge-bit", [init, _P("swap_or_stay", "WS", ["q4"])], None),
+        ("exit-by-another-diagonal", [init, *enter, _P("swap_or_stay", "WN", ["q0"])], None),
+        ("exit-from-the-far-end", [init, *enter, _P("swap_or_stay", "ES", ["q0"])], None),
+        ("the-resident-leaves", [init, *enter, _P("swap_or_stay", "ES", ["q1"])], None),
+        ("a-plain-move-out", [init, *enter,
+                              _P("move", "q0", "T0_1h", "T1_1v", via=["T0_1h.b", "T1_1v.a"],
+                                 cls="swap_or_stay")], None),
+        ("the-exchange-forged", [init, _P("simd", "swap_or_stay", swap)], None),
+        ("the-exchange-as-shuttles", [init, _P("simd", "shuttle", swap)], None),
+        ("two-placed-in-a-leg", [_P("init", {"q0": "T0_1h", "q1": "T0_1h"}),
+                                 _P("swap_or_stay", "WS", [])], None),
+        ("a-third-crystal", [_P("init", {**_C2LR_PLACE, "q5": "T1_1v"}), *enter,
+                             _P("swap_or_stay", "WS", ["q5"])], None),
+        ("resting-on-a-junction", [init, _P("move", "q0", "T0_1h", "J1_1", via=["T0_1h.b"],
+                                            cls="swap_or_stay")], None),
+        ("checkerboard", [init, _P("swap_or_stay", toward=["q0", "q1"],
+                                   checkerboard={"parity": 0, "pairing": "P1"}),
+                          _P("swap_or_stay", "EN", ["q2"], cls="swap_or_stay")], None),
+        ("checkerboard-demonstrated", [init, _P("swap_or_stay", toward=["q0", "q1"],
+                                                checkerboard={"parity": 0, "pairing": "P1"})],
+         {"c2lr_forms": ["diagonal"]}),
+    ]
+    if "reorder_or_not" in arch.primitives.scalars:
+        out.append(("reorder", [init, _P("swap_or_stay", "WS", ["q0", "q1"]),
+                                _P("reorder_or_not", ["q3", "q0"]),
+                                _P("reorder_or_not", reverse=[])], None))
+    return out
+
+
+def _c2lr_model(vm, model) -> dict:
+    return {"kind": model.name,
+            "corner_hops": int(getattr(model, "corner_hops", 1)),
+            "junction_min_degree": int(getattr(model, "junction_min_degree", 3)),
+            "length_scaling": bool(getattr(model, "length_scaling", False)),
+            "pitch": float(getattr(model, "pitch", 1.0)),
+            "include_anomalous": bool(getattr(model, "include_anomalous", True)),
+            "anomalous_per_ms": float(vm["physics"].get("anomalous_per_ms", 0.0)),
+            "policy": {"table": getattr(getattr(model, "policy", None), "table",
+                                        "qccdsim_jones"),
+                       "objective": getattr(getattr(model, "policy", None),
+                                            "objective", "fastest")}}
+
+
+#: Every script runs on the first lattice; the others carry what is theirs to show -- Yb-Ba
+#: prices reorder-or-not and its own step, the lattice with no checkerboard refuses one --
+#: and the deck model, whose unit is one routing operation per mover, prices three of them.
+_C2LR_ON = {"c2lr3x3_BaSr": None, "c2lr4x3_YbBa": ("tour", "reorder", "builder"),
+            "c2lr3x3_nocb": ("checkerboard", "builder")}
+_C2LR_DECK = ("tour", "reorder", "builder")
+
+
+def _c2lr_programmes():
+    """(machine, name, TSIR, records or None, rule config) for every C2LR programme here:
+    the hand-written scripts and the `c2lr` builder, on each lattice."""
+    from qccd.compile.programs import build as build_prog
+    out = []
+    for m in _c2lr_machines():
+        keep = _C2LR_ON.get(m.arch.name)
+        for name, records, cfg in _c2lr_scripts(m.arch):
+            if keep is not None and name not in keep:
+                continue
+            p = m.program("bucket", provenance="off")
+            p.apply_calls(records)
+            out.append((m, name, p.build(), records, cfg))
+        out.append((m, "builder", build_prog(m.arch, "c2lr"), None, None))
+    return out
+
+
+#: (lattice, programme, model) -> (verification report, view model).  ONE verify and one
+#: view model serve the price, the rules and the lowerer: a view model costs seconds (its
+#: component registry and the course's measured cases), and the three buckets would
+#: otherwise build the same one three times.
+_C2LR_RUNS: dict = {}
+
+
+def _c2lr_runs():
+    """Yield (machine, name, prog, records, cfg, model, report, view model)."""
+    for m, name, prog, records, cfg in _c2lr_programmes():
+        models = [corrected_model("qccdsim_jones")]
+        if name in _C2LR_DECK:
+            models.append(deck_model())
+        for model in models:
+            key = (m.arch.name, name, model.name)
+            if key not in _C2LR_RUNS:
+                rep = verify(prog, m.arch, model, rule_config=cfg)
+                vm = build_view_model(m.arch, prog, rep.result, model, include_listing=False,
+                                      include_control=False, provenance="off")
+                _C2LR_RUNS[key] = (rep, vm)
+            rep, vm = _C2LR_RUNS[key]
+            yield m, name, prog, records, cfg, model, rep, vm
+
+
+def _c2lr_pricing_cases() -> list[dict]:
+    out = []
+    for m, name, prog, _, _, model, rep, vm in _c2lr_runs():
+        res = rep.result
+        out.append({
+            "name": f"price:{m.arch.name}:c2lr-{name}:{model.name}",
+            "calls": _calls_of(m.arch),
+            "frames": vm["program"]["frames"],
+            "loops": vm["arch"]["loops"],
+            "classes": vm.get("classes") or {},
+            "model": _c2lr_model(vm, model),
+            "totals": {"cost": res.total_cost, "steps": res.total_steps, "us": res.total_us},
+            "transits": sum(res.junction_transits.values()),
+            "peak": res.peak_quanta,
+            "comp": {k: float(v) for k, v in res.quanta_components.items()},
+            "per_ion": {k: float(sum(v.values())) for k, v in res.per_ion_quanta.items()},
+        })
+    return out
+
+
+def _c2lr_rule_cases() -> list[dict]:
+    want_set = list(BROWSER_SET) + list(BROWSER_C2LR_SET)
+    out = []
+    for m, name, prog, _, cfg, model, rep, vm in _c2lr_runs():
+        out.append({
+            "name": f"rules:{m.arch.name}:c2lr-{name}:{model.name}",
+            "calls": _calls_of(m.arch),
+            "frames": vm["program"]["frames"],
+            "loops": vm["arch"]["loops"],
+            "classes": vm["classes"],
+            "physics": vm["physics"],
+            "model": vm["model"],
+            "zone_types": vm["arch"]["zone_types"],
+            "max_simd": vm["program"]["max_simd_classes"],
+            "models_heating": bool(model.models_heating),
+            "browser_set": want_set,
+            "c2lr_forms": (cfg or {}).get("c2lr_forms"),
+            "python": {r: n for r, n in rep.rules.by_rule().items() if r in want_set},
+            "messages": sorted(v.message for v in rep.rules.violations if v.rule in want_set),
+        })
+    return out + _c2lr_document_cases(want_set)
+
+
+def _c2lr_document_cases(want_set) -> list[dict]:
+    """C10, the document's: a device that declares C2LR control and is not a lattice of legs
+    (a ring -- the not-a-lattice reason is the same sentence on both sides), and a lattice
+    whose census gives a leg two inputs and declares no shared signals."""
+    from qccd.api import Machine
+    ring = Machine.ring(3, 2, 2, name="ring_c2lr")
+    lattice = Machine.c2lr_grid(3, 3)
+    shapes = [
+        ("not-a-lattice", _calls_of(ring.arch)
+         + [{"method": "set_control", "args": [], "kwargs": {"model": "c2lr"}}],
+         [_P("init", {"d0": "S1"}), _P("rotate", 1), _P("cool")]),
+        ("a-wrong-census", _calls_of(lattice.arch)
+         + [{"method": "set_control", "args": [],
+             "kwargs": {"c2lr": {"inputs_per_leg": 2, "shared_signals": 0}}}],
+         [_P("init", dict(_C2LR_PLACE)), _P("swap_or_stay", "WS", ["q0", "q1"])]),
+    ]
+    out = []
+    model = corrected_model("qccdsim_jones")
+    for name, calls, records in shapes:
+        arch = _replay(calls).arch
+        p = Machine(arch).program("bucket", provenance="off")
+        p.apply_calls(records)
+        rep = verify(p.build(), arch, model)
+        vm = build_view_model(arch, p.build(), rep.result, model, include_listing=False,
+                              include_control=False, provenance="off")
+        out.append({
+            "name": f"rules:{arch.name}:c2lr-{name}",
+            "calls": calls,
+            "frames": vm["program"]["frames"],
+            "loops": vm["arch"]["loops"],
+            "classes": vm["classes"],
+            "physics": vm["physics"],
+            "model": vm["model"],
+            "zone_types": vm["arch"]["zone_types"],
+            "max_simd": vm["program"]["max_simd_classes"],
+            "models_heating": bool(model.models_heating),
+            "browser_set": want_set,
+            "c2lr_forms": None,
+            "python": {r: n for r, n in rep.rules.by_rule().items() if r in want_set},
+            "messages": sorted(v.message for v in rep.rules.violations if v.rule in want_set),
+        })
+    return out
+
+
+def _c2lr_prog_cases() -> list[dict]:
+    out = []
+    for m, name, prog, records, _, model, rep, vm in _c2lr_runs():
+        if records is None or model.name == "deck":
+            continue
+        arch = m.arch
+        out.append({
+            "name": f"prog:{arch.name}:c2lr-{name}",
+            "calls": _calls_of(arch), "records": records,
+            "loops": {lid: list(lp.nodes) for lid, lp in arch.device.loops.items()},
+            "classes": {cid: dict(arch.simd_class(cid) or {}) for cid in arch.simd_classes},
+            "arch_name": arch.name,
+            "frames": [{k: fr[k] for k in PROG_FRAME_FIELDS if k in fr}
+                       for fr in vm["program"]["frames"]],
+            "tsir": [i.to_json() for i in prog.instructions],
+            "error": None,
+        })
+    # what `Program` refuses before any replay, in its own words: the template's shape
+    m = _c2lr_machines()[0]
+    init = _P("init", dict(_C2LR_PLACE))
+    for name, rec in (
+            ("no-diagonal", _P("swap_or_stay", toward=["q0"])),
+            ("bad-diagonal", _P("swap_or_stay", "WE", ["q0"])),
+            ("bad-parity", _P("swap_or_stay", checkerboard={"parity": 2, "pairing": "P1"})),
+            ("bad-pairing", _P("swap_or_stay", checkerboard={"parity": 1, "pairing": "P3"})),
+            ("twice", _P("swap_or_stay", "WS", ["q0", "q0"])),
+            ("reverse-twice", _P("reorder_or_not", ["q3", "q3"]))):
+        p = m.program("bucket", provenance="off")
+        try:
+            p.apply_calls([init, rec])
+        except Exception as exc:                       # noqa: BLE001
+            msg = str(exc)
+            if "): " in msg:
+                msg = msg.split("): ", 1)[1]
+            out.append({"name": f"prog:{m.arch.name}:FAIL-c2lr-{name}",
+                        "calls": _calls_of(m.arch), "records": [init, rec],
+                        "loops": {}, "classes": {cid: dict(m.arch.simd_class(cid) or {})
+                                                 for cid in m.arch.simd_classes},
+                        "arch_name": m.arch.name, "frames": None, "tsir": None,
+                        "error": msg})
+        else:
+            raise AssertionError(f"Program accepted the ill-formed C2LR step {name!r}")
+    return out
+
+
+def c2lr_only_cases(engine: Path = ENGINE, edit_js: Path = EDIT_JS) -> dict:
+    """The C2LR cases of buckets 8, 15 and 16, so their guard costs one small corpus."""
+    return {
+        "engine": str(engine),
+        "edit_js": str(edit_js),
+        "schema_blob": export_schema(),
+        "schema_version": SCHEMA_VERSION,
+        "templates": _template_cases(),
+        "template_default": DEFAULT_TEMPLATE,
+        "pricing": _c2lr_pricing_cases(),
+        "rules": _c2lr_rule_cases(),
+        "prog": _c2lr_prog_cases(),
+        "prog_frame_fields": list(PROG_FRAME_FIELDS),
+    }
+
+
+@requires_node
+def test_the_c2lr_cases_are_bit_identical_and_not_vacuous(tmp_path):
+    """The browser's C2LR twin against `qccd.verify.c2lr`, on every C2LR programme here.
+
+    NOT VACUOUS, per bucket and per rule: the C rules Python reports must each be tripped
+    somewhere, and so must R2, R3, R5 and R22 -- by the same exchange written as plain
+    moves, which is what proves the template's exemption is keyed on where its routes came
+    from and not on what the programme calls its step."""
+    cases = c2lr_only_cases()
+    tot: dict[str, int] = {}
+    for c in cases["rules"]:
+        for r, n in c["python"].items():
+            tot[r] = tot.get(r, 0) + n
+    for rule in ("C1", "C2", "C5", "C6", "C7", "C10", "R2", "R3", "R5", "R22"):
+        assert tot.get(rule, 0) > 0, f"no C2LR case trips {rule}: {tot}"
+    assert any(c["comp"].get("c2lr", 0) > 0 for c in cases["pricing"])
+    assert any(c["comp"].get("split_merge", 0) > 0 for c in cases["pricing"]), (
+        "no case gates two crystals in one leg, so merge + MS + split is unpriced")
+    shifted = [f for c in cases["prog"] if c["frames"] for f in c["frames"]
+               if (f.get("c2lr") or {}).get("shift")]
+    assert any(1 in v for f in shifted for v in f["c2lr"]["shift"].values())
+    r = run_parity(cases, tmp_path, "c2lr")
+    assert r.get("mismatched") == 0, _report(r)
+    assert r["compared"] > 1000, r
+
+
+@requires_node
+def test_the_browser_c2lr_rule_set_is_derived_on_both_sides(tmp_path):
+    """`BROWSER_C2LR_SET` against `mirroredC2LRRules()`, which is derived from its dispatcher,
+    and both against the rules `qccd.verify.rules` defines."""
+    from qccd.verify.rules import C2LR_RULE_STATEMENTS
+    assert set(_js_eval(tmp_path, "QCCD.MIRRORED_C2LR_RULES")) == set(BROWSER_C2LR_SET)
+    assert set(BROWSER_C2LR_SET) == set(C2LR_RULE_STATEMENTS)
+    assert not set(BROWSER_C2LR_SET) & set(_js_eval(tmp_path, "QCCD.MIRRORED_RULES"))
+
+
+#: One plausible slip per half of the twin.  Each must be caught by the C2LR cases alone.
+_C2LR_MUTATIONS = [
+    ("        moved = num(spec.quanta_swap); stayed = num(spec.quanta_stay);",
+     "        moved = num(spec.quanta_stay); stayed = num(spec.quanta_swap);",
+     "the mover's and the stayer's heat, which every total but the per-ion one hides"),
+    ("      out[la] = [j, lb];\n      out[lb] = [j, la];",
+     "      out[la] = [j, la];\n      out[lb] = [j, lb];",
+     "the matching itself: each leg paired with itself, so nothing ever moves"),
+    ("function _c2lrExchange(w) { return !!(w.c2lr && w.c2lr.exchange); }",
+     "function _c2lrExchange(w) { return false; }",
+     "the R2/R3/R5/R22 exemption for a step whose routes are the device's"),
+    ("    } else if (v === null || rec[0] !== v.key) {",
+     "    } else if (v === null) {",
+     "C1's same-step-type exit: a crystal leaving by another diagonal"),
+    ("    if (j !== null) out[ion] = [j, own(toward, ion) ? 1 : -1];",
+     "    if (j !== null) out[ion] = [j, -1];",
+     "the drawing's shift direction for a toward bit that could not move"),
+    ("        if (mg) for (var lm = 0; lm < inLeg.length; lm++) _deposit(q, life, comp, inLeg[lm], mg[0].q, peak);",
+     "",
+     "the merge before a gate in one leg, whose heat R7 must see"),
+]
+
+
+@pytest.mark.parametrize("anchor,replacement,why", _C2LR_MUTATIONS)
+@requires_node
+def test_the_c2lr_cases_catch_a_planted_drift(tmp_path, anchor, replacement, why):
+    src = ENGINE.read_text(encoding="utf-8")
+    assert src.count(anchor) == 1, f"the mutation anchor moved: {why}"
+    hacked = tmp_path / "engine_broken.js"
+    hacked.write_text(src.replace(anchor, replacement, 1), encoding="utf-8")
+    r = run_parity(c2lr_only_cases(engine=hacked), tmp_path, "c2lrmut")
+    assert r.get("mismatched", 0) > 0, (
+        f"the C2LR cases did not notice a planted change to {why}; they guard nothing")
+
 
 def build_cases(seed: int = SEED, engine: Path = ENGINE) -> dict:
     rng = random.Random(seed)

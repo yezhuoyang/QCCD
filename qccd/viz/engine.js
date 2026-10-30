@@ -2650,8 +2650,9 @@ function priceFrames(frames, loops, model, classes, opts) {
     var facts = c2lrNow;
     c2lrNow = null;
     if (!onCycle) return;
-    w.c2lr = facts;
     w.f = f; w.id = fid; w.type = type; w.cls = cls; w.mode = mode;
+    // what this cycle did to a C2LR device's legs, or null: the C rules' and the exemption's
+    w.c2lr = facts;
     w.nmv = nmoves; w.participants = participants;
     w.posBefore = posBefore; w.pos = pos;
     w.added = added;
