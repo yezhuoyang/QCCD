@@ -234,6 +234,47 @@ the full corpus).
   to its junction (1/6 of the leg) and back. An enter and an exit are an arrival and a
   departure: the slot order already puts the entering crystal in the near well.
 
+## 6c. Phase 3: the router, the noise, the boards (2026-10-30)
+
+- **The baseline router** (`qccd.compile.c2lr_router`; `python -m qccd.compile.c2lr_router` is
+  the `qccd.compiler@1` contract, `qccd bench run --compiler c2lr`). The ops go into layers in
+  program order -- an op joins the layer of the op before it or a later one, never an earlier
+  one -- so nothing is reordered, commuting CNOTs included. A layer plays its one-qubit gates,
+  readouts and resets where the crystals stand, then its two-qubit gates: parallel swap-or-stay
+  steps (each the diagonal that brings the pairs closest), an ENTER per diagonal its pairs use
+  (one crystal of each pair toward), the pulses (MS between them: merge + MS + split), and the
+  EXIT by the same diagonal. Placement is annealed so each gate's crystals start in paired legs
+  and each layer pairs under as few diagonals as can be. Only the four single diagonals are
+  used: its programmes pass `c2lr-demonstrated` too. Pulses are qccdc's (u3 as one beam and one
+  frame change; CX as R, MS, R, R, R). The certificate's moves are the replay's own expansion,
+  its cycle clock the instruction's position, each witness the op's last pulse.
+- **What a layer costs.** Enter and exit are forced (C1: only the crystal that entered leaves,
+  by the variation it entered by), so a layer of gates is at least two steps. The repetition
+  code's chain fits one row of legs (5 x 2: one diagonal per layer, 4 steps a round); the surface
+  code's X and Z checks visit their data in opposite directions in its middle two steps, so a
+  layer needs two diagonals there (4 x 5: 12 steps a round). On a lattice that cannot hold the
+  layout the router routes, and a layer whose pairs cannot all be routed at once gates the
+  ready ones first.
+- **Heat in the noise.** The `c2lr` channel was always in the n-bar the noise reads (the probe
+  hands the evaluation the replay's total). What it missed was the merge a gate in one leg
+  begins with: the replay deposits it before R7 and R16 read n-bar, the probe fires before the
+  instruction. On a C2LR device a gate step now starts with the n-bar its rules see
+  (`qccd.evalset.model.build_run`); `entails(o)` charges a C2LR step no split or merge, as the
+  replay does; `loop_riders(k)` counts its movers. Every other device reads as before.
+- **Wiring.** `c2lr_control(wiring=True)` (the default of `Machine.c2lr_grid`) declares the
+  census as the wiring DACs are counted from (`C2LR_WIRING`: the 27 shared signals as the
+  broadcast bank, floored at the physics' 32; two shims a leg as their own DACs): 32 + 2 per leg,
+  so a lattice of up to 48 legs fits a 128-DAC budget. Without it a lattice is counted as wired
+  directly (528 DACs at 3 x 3). `c2lr_species` cites the paper as `pair_source`, so a species
+  block's own `source` keeps citing its other numbers.
+- **The boards** are the track `c2lr` (`tools/make_c2lr_releases.py`):
+  `c2lr_{rep5,surface3}_mem_{basr,ybba}@1`, each its shuttle board's circuit, detectors, noise
+  model (qccd-noise@1), budget, seed and metrics, its physics plus `c2lr_primitives` and
+  `c2lr_species`, and `"rules": "c2lr"`. The grader judges a release that declares a rule set
+  by it as well (the legacy verifier with the set's parameters, and the set in the rule
+  language); C8 is an allowed partial, as R15 is. The service lists the track at
+  `/v1/tracks/c2lr` and keeps it off every goal; the Leaderboard shows it as its own section.
+
 ## 7. Boards
 
 C2LR designs are ranked on their own releases (the same circuits as the existing boards, with
