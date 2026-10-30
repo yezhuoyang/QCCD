@@ -149,3 +149,20 @@ def test_textbook_shor_never_slower_in_parallel_and_exact(tmp_path):
                                ports, rot_us)["ns"] == par["ns"]
     finally:
         PAR.CAP = PAR_CAP
+
+
+def test_a_gadget_calls_ancillas_are_forgotten_when_it_returns():
+    """A logical ancilla is local to the gadget call that names it (FormalRV numbers ancillas per
+    gadget), so the run keeps nothing of it once the call returns: a loop of calls holds no
+    more ancillas than one call does (Gidney 2025 makes ~10^10 of them)."""
+    t = P.Template("tanc", ("prep l0 Z", "ppm Z p0 Z l0 -> o0", "read l0 Z -> o1"), (0, 0, 0), 1, 1, 2, 0)
+    seg = P.Seg("tanc", (("LogicData", Expr("k")),), (("LogicalAncilla", Expr("0")),), ())
+    gadget = P.Body([seg])
+    call = P.Call("g", (), (("k", Expr("k")),), ())
+    prog = P.Program(templates={"tanc": t}, root=P.Body([P.Loop("k", Expr("0"), Expr("500"), P.Body([call]))]),
+                     bodies={("g", (), ()): gadget})
+    ports = {"tanc": {"first": [0.0], "last": [30.0], "out": [10.0, 20.0], "need": {}, "span": 40.0}}
+    r = PAR._Run(prog, ports, lambda *a: 0, lambda *a: 0)
+    r.body(prog.root, {}, 0)
+    assert not [k for k in r.ready if k[0] == "a"] and not r.gen and not r.held
+    assert r.end == 40_000                      # 500 calls on 500 blocks, all at once

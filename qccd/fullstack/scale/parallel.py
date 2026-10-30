@@ -65,7 +65,8 @@ class _Run:
         self.rec: dict = {}            # record address -> when recorded
         self.src: dict = {}            # source slot -> when written
         self.outs: dict = {}           # (body sid, node index) -> [when each outcome is recorded]
-        self.gen: dict = {}            # (scope, ancilla index) -> its generation
+        self.gen: dict = {}            # scope -> {ancilla index: its generation}
+        self.held: dict = {}           # scope -> the ancilla keys written in it
         self.scope = 0
         self.end = 0
         self.work = 0                  # district-nanoseconds: every instance's span, summed
@@ -73,15 +74,19 @@ class _Run:
         self.floor = 0                 # nothing inside a guarded body starts before its guard is known
         self.undo: list = []           # per closed form being checked: (table, key, old value)
         self.stats = {"segs": 0, "extrapolated": 0, "checked": 0}
-        # records and source slots matter only if a template reads one by its address
-        self.records = any(isinstance(r, (_Rec, _MXor))
-                           for b in [prog.root, *prog.bodies.values()] for x in _segs(b) for r in x.ext)
+        # records, and source slots, matter only if some template reads one by its address
+        # (each table on its own: Gidney 2025 reads source slots and never a record)
+        reads = [r for b in [prog.root, *prog.bodies.values()] for x in _segs(b) for r in x.ext]
+        self.kept = {"r": any(isinstance(r, _Rec) and r.table == "rec" for r in reads),
+                     "s": any(isinstance(r, _MXor) or (isinstance(r, _Rec) and r.table == "src") for r in reads)}
 
     # ---- state, journaled for loops -----------------------------------------------------------
     def put(self, table: str, key, value: float) -> None:
-        if table in ("r", "s") and not self.records:
+        if table in ("r", "s") and not self.kept[table]:
             return
         d = getattr(self, {"b": "ready", "r": "rec", "s": "src", "o": "outs"}[table])
+        if table == "b" and key[0] == "a" and key not in d:
+            self.held.setdefault(key[1], []).append(key)
         if self.undo:
             self.undo[-1].append((d, key, d.get(key, _MISSING)))
         d[key] = value
@@ -92,10 +97,10 @@ class _Run:
         v = idx(env)
         if fam == "LogicData":
             return ("d", v)
-        k = (scope, v)
+        g = self.gen.setdefault(scope, {})
         if new:
-            self.gen[k] = self.gen.get(k, -1) + 1
-        return ("a", scope, v, self.gen.get(k, 0))
+            g[v] = g.get(v, -1) + 1
+        return ("a", scope, v, g.get(v, 0))
 
     def ext(self, ref, env) -> float:
         if isinstance(ref, _Rec):
@@ -130,8 +135,14 @@ class _Run:
                 self.floor = saved
             elif isinstance(node, Call):
                 self.scope += 1
+                sc = self.scope
                 self.body(self.prog.body_of(node, env), {**self.prog.params, **bind(node.skeys + node.args, env)},
-                          self.scope)
+                          sc)
+                # its ancillas are its own (FormalRV numbers them per gadget): nothing outside
+                # can name them, so they are forgotten when it returns
+                for k in self.held.pop(sc, ()):
+                    self.ready.pop(k, None)
+                self.gen.pop(sc, None)
             elif isinstance(node, Cat):
                 self.cat(node, body.sid, i, env, scope)
             elif isinstance(node, Rot):
