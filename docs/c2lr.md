@@ -274,6 +274,17 @@ the full corpus).
   by it as well (the legacy verifier with the set's parameters, and the set in the rule
   language); C8 is an allowed partial, as R15 is. The service lists the track at
   `/v1/tracks/c2lr` and keeps it off every goal; the Leaderboard shows it as its own section.
+- **Every C rule on the Rules page** (`qccd.site.examples.RULES`). C3 and C4 hold by construction,
+  so each shows one programme that keeps it. C8's other card is a lattice whose primitive records
+  no COM frequency, where it does not apply. C10's failing card is a lattice whose document gives
+  each leg two inputs. Both devices are the 3 x 3 lattice with a document `patch`.
+- **The control panel reads the census.** A C2LR device declares `control.c2lr`, not a channel
+  map. Before this, `qccd.verify.control` called every cycle "undeclared". Now a swap-or-stay or
+  reorder-or-not step is transport on every shared signal (27 of 27), its acting sites are the
+  crystals that change leg, and no switch elements are claimed: a stayer plays the waveform, it
+  is not held out. A gate is optical and init is idle. Drivability stays "not judged", because R4d
+  does not judge a step, the C rules do. Only the panel changes: `ControlPlane.declared`, which
+  the evaluation and the DAC count read, is untouched.
 
 ## 7. Boards
 

@@ -42,6 +42,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from ..arch.c2lr import declared as c2lr_declared, is_c2lr
 from ..arch.device import Architecture
 from ..ir.tsir import TSIR, Instruction
 from .replay import replay
@@ -73,9 +74,13 @@ NOTE_OPTICAL = ("the pathway that drives this cycle: the control plane models DC
                 "transport electrodes only, and R4b keeps the two pathways apart")
 NOTE_UNDECLARED = ("everything: {arch} declares no control.channels, so no claim is "
                    "made about what drives this cycle")
+NOTE_C2LR = ("which electrode carries what: {arch} declares C2LR's census (control.c2lr: "
+             "{n} shared analog signals, one digital input and one switch per leg; "
+             "arXiv:2403.00756, p4), not a channel map -- a step plays every shared signal, "
+             "each leg's input picks swap or stay, and the C rules judge it, not R4d")
 
 NOTES = (NOTE_SCOPE, NOTE_ROLES, NOTE_OFFPATH, NOTE_CROSS, NOTE_OPTICAL,
-         NOTE_UNDECLARED)
+         NOTE_UNDECLARED, NOTE_C2LR)
 
 
 # ------------------------------------------------------------------- the records
@@ -231,16 +236,37 @@ def control_record(view: CycleView, *, hop: int = 0, hops: int = 1,
             instr_id=instr.id, hop=hop, hops=hops, type=instr.type, cls=instr.cls,
             mode=instr.mode, driver=driver, action=action, action_spec=spec,
             banks=kw.pop("banks", ()), channels_engaged=kw.pop("channels_engaged", 0),
-            channels_total=plane.n_shared_channels,
+            channels_total=kw.pop("channels_total", plane.n_shared_channels),
             sites_acting=kw.pop("sites_acting", 0), sites_held=kw.pop("sites_held", 0),
             sites_total=plane.n_sites, switch_closed=kw.pop("switch_closed", 0),
             switch_elements=kw.pop("switch_elements", 0),
-            switch_elements_total=plane.n_switches,
+            switch_elements_total=kw.pop("switch_elements_total", plane.n_switches),
             feasible=kw.pop("feasible", None), problems=kw.pop("problems", ()),
             undetermined=kw.pop("undetermined", ()))
 
+    # ------------------------------------------------- a C2LR device (docs/c2lr.md)
+    # It declares the paper's census instead of a channel map, which is still enough to say
+    # what drives a step, and that a gate is optical
+    c2lr = is_c2lr(arch)
+    step = view.c2lr if c2lr else None
+    if step is not None and step.kind in ("swap_or_stay", "reorder_or_not"):
+        n = c2lr_declared(arch).get("shared_signals")
+        n = n if isinstance(n, int) and not isinstance(n, bool) else 0
+        if step.kind == "reorder_or_not":
+            action, acting = "reorder_or_not", len(step.reversed)
+        else:
+            action = f"swap_or_stay {step.variation.label}" + \
+                (" (assumed)" if step.variation.assumed else "")
+            acting = len(step.movers)
+        # a stayer is not held out by a switch -- it plays the waveform and comes back (C9)
+        # -- so the record claims no switch elements at all
+        return base("transport", action, channels_engaged=n, channels_total=n,
+                    sites_acting=acting, switch_elements_total=0,
+                    undetermined=(NOTE_SCOPE, NOTE_C2LR.format(arch=arch.name, n=n)))
+
     # ------------------------------------------------- no channel map declared
-    if not plane.declared or not plane.groups:
+    if (not plane.declared or not plane.groups) and \
+            not (c2lr and (instr.type != "simd" or not view.moves)):
         return base("undeclared", instr.cls or instr.type,
                     undetermined=(NOTE_SCOPE,
                                   NOTE_UNDECLARED.format(arch=arch.name)))
@@ -336,7 +362,7 @@ def idle_record(instr: Instruction, arch: Architecture) -> ControlRecord:
     """`init` / `barrier`: the replay builds no `CycleView`, so synthesize one record
     so that every instruction has exactly one and `frames[i].ctl` is always valid."""
     plane = arch.control_plane
-    declared = plane.declared and bool(plane.groups)
+    declared = (plane.declared and bool(plane.groups)) or is_c2lr(arch)
     return ControlRecord(
         instr_id=instr.id, hop=0, hops=1, type=instr.type, cls=instr.cls,
         mode=instr.mode, driver="idle" if declared else "undeclared",

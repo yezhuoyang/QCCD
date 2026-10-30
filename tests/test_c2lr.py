@@ -410,3 +410,24 @@ def test_the_text_form_listing_and_page_read_a_c2lr_programme():
     swap = next(f for f in vm["program"]["frames"] if f.get("c2lr"))
     assert sorted(m[0] for m in swap["moves"]) == ["q0", "q1"]
     assert swap["moves"][0][1] in (["T0_1h", "J1_1", "T1_1v"], ["T1_1v", "J1_1", "T0_1h"])
+
+
+def test_the_control_panel_reads_a_c2lr_step_off_the_census():
+    """A C2LR device declares the paper's census, not a channel map: its steps are transport
+    on every shared signal, its gates optical, its init idle -- never "undeclared"."""
+    from qccd.verify.control import control_trace
+    trace = control_trace(build(TOUR), BA_SR.arch, corrected_model())
+    got = [(r.type, r.driver, r.action) for r in trace.records]
+    assert got == [("init", "idle", "init"),
+                   ("simd", "transport", "swap_or_stay WS"),
+                   ("simd", "transport", "swap_or_stay WS"),
+                   ("gate", "optical", "MS"),
+                   ("simd", "transport", "swap_or_stay WS"),
+                   ("simd", "transport", "swap_or_stay WS"),
+                   ("cool", "optical", "COOL (broadcast)")]
+    swap = trace.records[1]
+    assert swap.channels_engaged == swap.channels_total == 27
+    assert swap.sites_acting == 2 and swap.sites_held == 0 and swap.switch_elements_total == 0
+    assert swap.feasible is None                   # the C rules judge it, not R4d
+    assert not any("declares no control.channels" in n for n in trace.notes)
+    assert any("27 shared analog signals" in n for n in trace.notes)

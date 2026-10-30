@@ -63,7 +63,14 @@ C2LR3 = {"generator": "c2lr_grid", "params": {"a": 3, "b": 3}, "name": "c2lr3x3"
 C2LR3_YB = {"generator": "c2lr_grid", "params": {"a": 3, "b": 3, "species": "Yb-Ba"}, "name": "c2lr3x3yb",
             "template": "grid9x9",
             "about": "the same lattice of Yb-Ba crystals, the pair whose reorder-or-not the paper measures"}
-RING_LOAD = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2, "ancilla_zone": "load"},
+#: Two lattices no generator makes, for the rules about the device's document: its census with
+#: two inputs a leg (C10 fails), and its swap-or-stay primitive with no COM frequency (C8 does
+#: not apply).  `patch` is merged into the document, None deleting a field.
+C2LR3_TWO_INPUTS = {**C2LR3, "name": "c2lr3x3_2in", "patch": {"control": {"c2lr": {"inputs_per_leg": 2}}},
+                    "about": "the same 3×3 Ba-Sr lattice, its document giving each leg two digital inputs"}
+C2LR3_NO_COM = {**C2LR3, "name": "c2lr3x3_nocom", "patch": {"primitives": {"swap_or_stay": {"com_mhz": None}}},
+                "about": "the same 3×3 Ba-Sr lattice, its swap-or-stay primitive recording no COM frequency"}
+RING_LOAD ={"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2, "ancilla_zone": "load"},
              "name": "ring6load", "about": "the six-site ring with load-zone spur ends (capacity 8, no gates)"}
 RING_BIG = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals": 2, "ancilla_zone": "big"},
             "name": "ring6big", "template": "big",
@@ -140,8 +147,24 @@ def machine(dev: dict) -> Machine:
             _MACHINES[dev["name"]] = Machine.from_device(device, name=dev["name"], template=template)
             return _MACHINES[dev["name"]]
         ctor = getattr(Machine, dev["generator"])
-        _MACHINES[dev["name"]] = ctor(**dev["params"], name=dev["name"], template=template)
+        m = ctor(**dev["params"], name=dev["name"], template=template)
+        if dev.get("patch"):
+            from ..arch import Architecture
+            doc = copy.deepcopy(m.arch.to_json(expanded=False))
+            _merge(doc, dev["patch"])
+            m = Machine(Architecture.from_json(doc))
+        _MACHINES[dev["name"]] = m
     return _MACHINES[dev["name"]]
+
+
+def _merge(doc: dict, patch: dict) -> None:
+    for k, v in patch.items():
+        if v is None:
+            doc.pop(k, None)
+        elif isinstance(v, dict) and isinstance(doc.get(k), dict):
+            _merge(doc[k], v)
+        else:
+            doc[k] = copy.deepcopy(v)
 
 
 #: The walk the lattice examples share: from the trap on the left column's lower wire,
@@ -539,6 +562,18 @@ RULES: list[dict] = [
               "why": "the swap written as two routes under the class swap_or_stay: the routes are the programme's, so it is judged as plain moves, and breaks the junction and rail rules too."},
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "the same exchange as a swap-or-stay step: two direction bits, and the device's pairs."}},
+    {"id": "C3", "checks": "in one step a crystal on a horizontal leg and one on a vertical leg set their direction bits independently: the step carries one bit per crystal and nothing per axis.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_0v"}), rec("swap_or_stay", "WS", ["d0"])],
+              "why": "in one step d0, on the horizontal leg T0_1h, shifts toward J1_1 and moves into the empty vertical leg "
+                     "T1_1v, while d1, on the vertical leg T1_0v, stays. No programme breaks C3: a step has no field per "
+                     "axis to set, so the replay holds it by construction."}},
+    {"id": "C4", "checks": "a step is C2LR, one junction waveform shared by every junction in play, and C2LR⁻¹: one waveform, whose time is the step's however many crystals move.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v", "d2": "T0_0h", "d3": "T1_0v"}),
+                          rec("swap_or_stay", "WS", ["d0", "d1", "d2", "d3"])],
+              "why": "two swaps in one step, at J1_1 and J1_0: one waveform, priced as one primitive, 312.5 µs, the same as "
+                     "a single swap. No programme breaks C4: the replay prices every step as one waveform."}},
     {"id": "C5", "checks": "after every step each crystal rests at a leg centre, never on a junction or between legs.",
      "device": C2LR3, "ruleset": "c2lr",
      "fail": {"program": [rec("init", {"d0": "T0_1h"}), rec("simd", "swap_or_stay", [["d0", "T0_1h", "J1_1", ["T0_1h.b"]]])],
@@ -557,10 +592,26 @@ RULES: list[dict] = [
               "why": "d0 ends the step in J1_1."},
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "a swap through J1_1: both crystals pass it, and both rest in legs."}},
+    {"id": "C8", "checks": "a shift holds the crystal's centre-of-mass frequency: a property of the step's waveform, recorded with its primitive rather than decided from a programme.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"device": C2LR3_NO_COM, "expect": "skipped",
+              "program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "the same swap on a lattice whose swap-or-stay primitive records no COM frequency: C8 does not "
+                     "apply, and says why. It is never a pass for want of a number."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "a swap on the Ba-Sr lattice, whose primitive records 1.85 MHz held during the shift (p4)."}},
     {"id": "C9", "checks": "every crystal is heated by every waveform: one that stays by the step's quanta_stay, one that moves by quanta_swap.",
      "device": C2LR3, "ruleset": "c2lr",
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v", "d2": "T0_0v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "d0 and d1 swap and d2, on the edge, stays: all three are heated, d2 by the stay's 0.035 quanta."}},
+    {"id": "C10", "checks": "a C2LR device is driven by a fixed set of shared analog signals plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive.",
+     "device": C2LR3, "ruleset": "c2lr",
+     "fail": {"device": C2LR3_TWO_INPUTS,
+              "program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "the same swap on a lattice whose document gives each leg two digital inputs: C2LR's per-leg "
+                     "control is one bit, so the device is not driven as C2LR is, whatever the programme does."},
+     "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
+              "why": "the lattice as the paper wires it: 27 shared analog signals, one input and one switch per leg (p4)."}},
 ]
 
 
