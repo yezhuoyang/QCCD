@@ -90,9 +90,7 @@ class _FoldParser(_Parser):
         if unknown:
             raise AlgorithmError(lineno, raw, f"gate {gate.name} reads {unknown[0]}, which no "
                                  f"earlier instruction measured")
-        if cout and guard is not None:
-            raise AlgorithmError(lineno, raw, "a guarded call cannot name outcomes for its caller: "
-                                 "later lines would depend on whether it ran")
+        # (a guarded call may name outcomes for its caller, who reads them under its guard)
         for b in args:
             if b not in self.born:
                 raise AlgorithmError(lineno, raw, f"block {b} is used before prep or inject")
@@ -818,10 +816,14 @@ def _call_blocks(alg: Algorithm) -> list:
 
 def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None,
                     outlive: bool = False, rounds_at: str = "clinic", free_at: str = "instruction",
-                    prefetch: bool = False, park_round: bool = True, park_within: int = 1) -> dict:
+                    prefetch: bool = False, park_round: bool = True, park_within: int = 1,
+                    home_order: list | None = None) -> dict:
     """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
     macros themselves (their footprints, which GIR 0.3 does not carry) are left in
-    `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`."""
+    `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`.
+    `home_order`: blocks that take the first memories (in the floorplan's order -- the ones
+    nearest the places, in a town built row by row), the most used first; the rest follow in
+    the order the program passes them."""
     folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None), outlive=outlive,
                     rounds_at=rounds_at, free_at=free_at, prefetch=prefetch, park_round=park_round,
                     park_within=park_within)
@@ -831,6 +833,11 @@ def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None 
     rest = sorted((p for p, h in probe.zone_holder.items() if probe.family(p) == "memory"),
                   key=lambda p: (len(p), p))
     need = _call_blocks(alg)
+    if home_order:
+        passed = set(need)
+        first = [b for b in dict.fromkeys(home_order) if b in passed]
+        taken_first = set(first)
+        need = first + [b for b in need if b not in taken_first]
     if len(need) > len(rest):
         raise FoldError(f"the program passes {len(need)} blocks to its gates, and each lives in a "
                         f"memory of its own; the machine has {len(rest)}")

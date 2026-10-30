@@ -718,9 +718,8 @@ class _Parser:
         if unknown:
             raise AlgorithmError(lineno, raw, f"gate {gate.name} reads {unknown[0]}, which no "
                                  f"earlier instruction measured")
-        if cout and guard is not None:
-            raise AlgorithmError(lineno, raw, "a guarded call cannot name outcomes for its caller: "
-                                 "later lines would depend on whether it ran")
+        # (a guarded call may name outcomes for its caller -- measured only when it fires, so its
+        # caller reads them under the same guard: `bit old ^ (g & (r ^ old)) -> s`)
         if len(call) > 32:
             raise AlgorithmError(lineno, raw, f"gate {gate.name} calls itself")
         k = self.calls.get(gate.name, 0) + 1
@@ -767,11 +766,14 @@ class _Parser:
                 # the outcome names inside the formula
                 nargs = [re.sub(r"[A-Za-z_]\w*", lambda mm: ren(mm[0]), " ".join(nargs))]
             else:
-                nargs = [ren(a) for a in nargs]
+                # (a gate call's `<-` stays a word; its blocks and the outcomes it reads are renamed)
+                nargs = [a if a == "<-" else ren(a) for a in nargs]
             combined = (guard & inner) if guard is not None else inner
+            # (a gate call may name several outcomes for its caller: each is renamed)
+            cv = " ".join(ren(x) for x in bcvar.split()) if bcvar else None
             text = f"{('if ' + combined.text + ': ') if combined else ''}{word} " + \
-                   " ".join(nargs) + (f" -> {ren(bcvar)}" if bcvar else "")
-            self.emit(word, nargs, ren(bcvar) if bcvar else None, bat or at, combined,
+                   " ".join(nargs) + (f" -> {cv}" if cv else "")
+            self.emit(word, nargs, cv, bat or at, combined,
                       g_text is not None, lineno, text, call + [dict(frame, body=bl)])
         self.alg.calls.append({"gate": gate.name, "call": tag, "line": lineno, "args": list(args),
                                "contract": gate.contract, "depth": len(call),
@@ -903,7 +905,19 @@ class _Parser:
                 raise AlgorithmError(lineno, raw, "read basis is Z or X")
             alive(args[0])
             ins.blocks, ins.basis = [args[0]], args[1].upper()
-            self.gone.add(args[0])
+            if guard is None:
+                self.gone.add(args[0])
+            else:
+                # read under a guard (an adaptive basis: `if m: read b Z` then `if !m: read b X`):
+                # the block is gone once it has been read under the guard and its negation --
+                # one of the two ran whatever `m` was (as the folded scheduler has it)
+                g = guard.text.replace(" ", "")
+                other = g[1:] if g.startswith("!") else "!" + g
+                seen = self.__dict__.setdefault("gone_under", {}).setdefault(args[0], set())
+                if other in seen:
+                    self.gone.add(args[0])
+                else:
+                    seen.add(g)
         if cvar:
             if cvar in self.cvars:
                 raise AlgorithmError(lineno, raw, f"the outcome {cvar} is already named")

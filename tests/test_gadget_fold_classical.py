@@ -70,10 +70,23 @@ def test_the_flat_program_reads_the_output_by_the_callers_name():
     assert read.cvar == "r" and cx.guard == "r"
 
 
+def test_a_call_inside_a_gate_passes_several_outcomes_each_way():
+    """Nested, a call's `<-` stays a word and each of several outputs takes its own name."""
+    from qccd.gadget.algorithm import parse_algorithm
+    src = ("gate mx2 b c -> o1 o2:\n  read b X -> o1\n  decode b\n  read c X -> o2\n  decode c\n"
+           "gate fix2 d <- c1 c2:\n  if c1 & c2: x d\n"
+           "gate outer a b d:\n  mx2 a b -> r1 r2\n  fix2 d <- r1 r2\n"
+           "prep a X\nprep b X\nprep d Z\nouter a b d\n")
+    alg = parse_algorithm(src)
+    reads = [i.cvar for i in alg.instructions if i.kind == "read"]
+    x = next(i for i in alg.instructions if i.kind == "x")
+    assert reads == ["outer1_r1", "outer1_r2"] and x.guard == "outer1_r1 & outer1_r2"
+
+
 def test_bad_calls_are_refused():
     from qccd.gadget.algorithm import AlgorithmError, parse_algorithm
     head = "gate mx b -> o:\n  read b X -> o\n  decode b\nprep a X\nprep c X\nread c X -> m\ndecode c\n"
-    for bad in ("mx a\n", "mx a -> r s\n", "if m: mx a -> r\n"):
+    for bad in ("mx a\n", "mx a -> r s\n"):
         with pytest.raises(AlgorithmError):
             parse_algorithm(head + bad)
     with pytest.raises(AlgorithmError):
