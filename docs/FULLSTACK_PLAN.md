@@ -659,6 +659,61 @@ details").**
   - **3 make a block that outlives the template.** An ancilla crosses into the next template
     when a register merge splits the run, and a gate returns only its parameters.
   - **5 read an outcome measured inside a guarded group** (the adaptive-basis readouts).
+- **S8, fifth round (2026-10-29): parallel time, the advanced audits, the first codesign.**
+  - **The model.** The run's parallel time is a dataflow over each compiled template's PORTS
+    (`qccd/fullstack/scale/parallel.py`; `tests/test_scale_parallel.py`). An instance starts as
+    soon as its blocks are free and its outcomes recorded, its schedule shifted whole. Loops
+    reach a closed form per key, in whole nanoseconds, checked in the middle and before last,
+    and undone when refuted. It is exact against full iteration on every size checked.
+  - **Textbook Shor** gains only 1.06× (one dependency chain).
+  - **The advanced audits.** GE2021 compiles completely. Gidney 2025 (FormalRV/Audit/Gidney2025,
+    paper machine) lowers completely: program parameters are global, and a call or loop under
+    a guard is a `When` body (`tests/test_scale_gidney2025.py`).
+  - **Gidney 2025 at RSA-2048, one district, sequential:**
+
+    | Design | Time |
+    |---|---|
+    | Baseline | 883 years |
+    | + syndrome rounds in each block's memory (`rounds_at="memory"`) | 597 years |
+    | + transversal CNOT for the lattice-surgery CNOT | 178 years |
+
+    - Rounds were at least 78% of the time, queued at the district's one clinic.
+    - The lattice-surgery CNOT template was 74.5% of the run. It is proved CX in every branch,
+      and takes 51 ms as a transversal CNOT against 0.89 s.
+  - **Next bottleneck:** the rounds of the templates that are a Hadamard (three |Ȳ⟩ merges), a
+    guarded CZ, and the Toffolis' AutoCCZ consumption. A transversal H̄ (transversal H plus a
+    relabelling of ions, which shuttling gives) is the candidate place.
+  - **Fixed since: the parallel run's memory.** A call's ancillas are dropped when it returns
+    (bac81b8). A record table is kept only if something reads it by address. A closed form's
+    records and source slots are strided runs, read by arithmetic (e15a05d).
+- **S8, sixth round (2026-10-29): the critical path, and codesign by Amdahl's law.**
+  - **The user's decisions.** Merges keep the paper's 25 rounds ("paper faithful"). Gadgets and
+    traffic may be redesigned, bottleneck first.
+  - **One-letter products by transversal CNOT.** A product of all-Z̄ or all-X̄ factors, over
+    one to four blocks, is measured by transversal CNOTs into a fresh ancilla block and that
+    block's destructive readout. That replaces the merge and its rounds.
+    - The identity is proved once per letter and size (exact state vector).
+    - Every Clifford template rewritten this way is also proved equal to its original, in
+      every branch.
+  - **Gidney 2025 at RSA-2048:**
+
+    | Design | Sequential, one district | Parallel, unlimited districts |
+    |---|---|---|
+    | As compiled | 883 years | 86.8 years |
+    | Rounds in memory + transversal CNOT + one-letter products | 125 years | 26.0 years |
+
+    - The codesigned parallel run averages 4.8 districts busy.
+  - **The critical path.** Each top template is halved in turn and the parallel time is read
+    again. The bulk templates (the CNOT copies, the power products) save 0.2–3%. Two templates
+    save 12–13% each, so each holds about a quarter of the critical path:
+    - `gidneyInterior`, the carry's Toffoli through |AutoCCZ⟩;
+    - `gidneyMeasInteriorRev`, its measurement-based uncompute.
+
+    The wall clock is the ripple-carry chain of Gidney's adder. Its steps still carry mixed
+    X̄Z̄ products, each a merge with 25 rounds on each block.
+  - **Next:** a transversal-Hadamard place (H on every ion plus a relabelling, done with the
+    bay's dock and ring). It makes every mixed product a one-letter product, and so takes those
+    merges off the carry chain.
 - **A register-wide merge, measured:**
   - its cat states take 35.3 / 36.0 / 37.2 / 37.2 ms over 2–5 blocks, with a depot per bench;
   - its 27 extraction rounds take 534 ms on each block, at that block's district's clinic,
