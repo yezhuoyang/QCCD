@@ -162,9 +162,14 @@ class _Train:
 
 class City:
     def __init__(self, alg: Algorithm, lib: Library, leaves: LeafLibrary, log=None,
-                 parallel: bool = True):
+                 parallel: bool = True, rounds_at: str = "clinic"):
         self.alg, self.lib, self.leaves = alg, lib, leaves
         self.parallel = parallel
+        #: where `se b k` runs its k syndrome rounds: "clinic" (a block goes to a syndrome
+        #: clinic and back) or "memory" (the block rests in a memory and the memory runs the
+        #: rounds in place, every block's at once -- the codesign choice of 2026-10-29: a
+        #: merge's rounds were most of Gidney 2025's machine time, queued at one clinic)
+        self.rounds_at = rounds_at
         #: block -> when the last instruction on it finished: the only barrier there is,
         #: when instructions run in parallel
         self.block_free: dict[str, float] = {}
@@ -1479,6 +1484,20 @@ class City:
                 end = self.park(b, t0, ins.index, grp)
                 self.t_now = max(self.t_now, end)
                 self.block_free[q] = max(self.block_free.get(q, 0.0), end)
+                return
+            if self.rounds_at == "memory":
+                # every round in the block's memory: storing it there is the first round, and
+                # each refresh one more (no trip to a clinic, no queue behind other blocks)
+                n = ins.rounds
+                if not (b.resting and self.family(b.leaf) == "memory"):
+                    end = self.park(b, t0, ins.index, grp)
+                    self.block_free[q] = max(self.block_free.get(q, 0.0), end)
+                    n -= 1
+                    b = self.blocks[q]
+                if not (b.resting and self.family(b.leaf) == "memory"):
+                    raise CityError(f"no memory free for {q} to take its syndrome rounds in")
+                for _ in range(n):
+                    self.refresh_in_place(ins, grp, t0, q, b)
                 return
             if b.resting and self.family(b.leaf) == "memory":
                 self.refresh_in_place(ins, grp, t0, q, b)
