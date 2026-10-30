@@ -1,14 +1,15 @@
-"""Goal 2's two figures per code: time per round, and logical error rate per round, across the
+"""Goal 3's two figures per code: time per round, and logical error rate per round, across the
 architecture families.  Each family's best point is drawn in the accent colour and labelled;
 every other size it was tried at is grey.  Sizes run left to right, smallest machine first.
 
-    python goals/goal2/plot.py [--code surface5 ...]      (needs matplotlib)
+    python goals/goal3/plot.py [--code surface5 ...]      (needs matplotlib)
 
-A point is a design that compiled, passed the rules and ran BOTH memories (Z and X):
-* time per round = the replayed program time under the "quantinuum" table / rounds, the mean
-  of its two memories;
-* LER per round = 1 - (1 - p_Z)(1 - p_X): a round fails when either memory does; the bar is
-  the same combination of the two 95% Wilson bounds.
+A point is a design that compiled and passed the rules on the code's release, which runs the Z
+memory and then the X memory on the same ions (boards.py):
+* time per round = the replayed program time under the "quantinuum" table / 2d, the rounds of
+  both memories;
+* LER per round = the grader's `ler_per_round`, 1 - (1 - p_Z)(1 - p_X): a round fails when
+  either memory does; the bar is its 95% Wilson interval.
 Writes figures/<code>.{png,pdf,svg}, figures/overview.{png,pdf} and figures/summary.md.
 """
 
@@ -44,28 +45,23 @@ def points(code: str) -> tuple[dict, dict]:
     for ln in f.read_text(encoding="utf-8").splitlines() if f.exists() else []:
         if ln.strip():
             r = json.loads(ln)
-            rows[(r["family"], r["point"])][r["basis"]] = r    # the last line of a point wins
+            rows[(r["family"], r["point"])] = r    # the last line of a point wins
     out: dict = defaultdict(list)
     counts: dict = defaultdict(lambda: {"tried": 0, "refused": 0, "rules": 0, "other": 0})
-    for (fam, name), by in rows.items():
+    for (fam, name), r in rows.items():
         c = counts[fam]
         c["tried"] += 1
-        sts = {r["status"] for r in by.values()}
-        if len(by) < 2 or sts != {"ok"}:
-            c["refused" if "refused" in sts else "rules" if "rules_failed" in sts else "other"] += 1
+        st = r["status"]
+        if st != "ok":
+            c["refused" if st == "refused" else "rules" if st == "rules_failed" else "other"] += 1
             continue
-        z, x = by["Z"], by["X"]
-        pz, px = z["ler"]["per_round"], x["ler"]["per_round"]
-        comb = lambda a, b: 1 - (1 - a) * (1 - b)  # noqa: E731
+        ler = r["ler"]
         out[fam].append({
-            "name": name, "family": fam, "size": size_key(z), "ions": z.get("ions"),
-            "T_round_ms": (z["T_round_ms"] + x["T_round_ms"]) / 2,
-            "ler": comb(pz, px),
-            "lo": comb(z["ler"]["per_round_lo"], x["ler"]["per_round_lo"]),
-            "hi": comb(z["ler"]["per_round_hi"], x["ler"]["per_round_hi"]),
-            "ler_z": pz, "ler_x": px, "shots": (z["ler"]["shots"], x["ler"]["shots"]),
-            "errors": (z["ler"]["errors"], x["ler"]["errors"]),
-            "dacs": (z.get("metrics") or {}).get("dacs"),
+            "name": name, "family": fam, "size": size_key(r), "ions": r.get("ions"),
+            "T_round_ms": r["T_round_ms"], "ler": ler["per_round"],
+            "lo": ler["per_round_lo"], "hi": ler["per_round_hi"],
+            "shots": ler["shots"], "errors": ler["errors"],
+            "dacs": (r.get("metrics") or {}).get("dacs"),
         })
     for fam in out:
         out[fam].sort(key=lambda p: p["size"])
@@ -138,7 +134,7 @@ def main() -> int:
     figs.mkdir(exist_ok=True)
     plt.rcParams.update({"font.family": "DejaVu Sans", "figure.facecolor": "#fcfcfb",
                          "axes.facecolor": "#fcfcfb", "savefig.facecolor": "#fcfcfb"})
-    table = ["# Goal 2 — best design per architecture family", "",
+    table = ["# Goal 3 — best design per architecture family", "",
              "Each family's best point by each measure (they can differ). Time per round under the "
              "`quantinuum` table; LER per round = 1-(1-p_Z)(1-p_X) under qccd-noise@2, 95% interval.", ""]
     good = []

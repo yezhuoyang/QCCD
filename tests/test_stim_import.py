@@ -66,6 +66,27 @@ def test_an_ancilla_read_after_the_last_gate_is_not_data():
     assert check_equivalent(src, exp) == []
 
 
+def test_a_z_then_x_memory_is_the_two_memories_side_by_side_in_time():
+    # memory_seq: every ion reset between the two, so a fault in one memory flips only its own
+    # detectors -- the error model is the Z memory's plus the X memory's, renumbered
+    from qccd.qec.stim_import import _cx_noise, _errors, memory_seq
+    one = {b: from_stim(stim.Circuit.generated(f"surface_code:rotated_memory_{b}", distance=3, rounds=3),
+                        name=f"s3{b}", code="surface", distance=3, rounds=3, basis=b.upper()) for b in "zx"}
+    seq = memory_seq(one["z"], one["x"], name="s3seq", code="surface_seq")
+    assert (seq.basis, seq.rounds, seq.n_data, seq.n_ancilla, seq.logical_qubits) == ("XZ", 3, 9, 8, 1)
+    assert parse_qasm(seq.qasm).n_qubits == 17
+    dem = lambda e: _errors(_cx_noise(ideal_stim(e, 0.0), 1e-3).detector_error_model())  # noqa: E731
+    z, x, both = dem(one["z"]), dem(one["x"]), dem(seq)
+    nd = len(one["z"].detectors)
+
+    def renumber(key):
+        return tuple(sorted(f"D{int(t[1:]) + nd}" if t[0] == "D" else f"L{int(t[1:]) + 1}" for t in key))
+    assert both == {**z, **{renumber(k): p for k, p in x.items()}}
+    assert len(ideal_stim(seq, 1e-3).shortest_graphlike_error()) == 3
+    with pytest.raises(StimImportError):
+        memory_seq(one["x"], one["z"], name="wrong", code="surface_seq")
+
+
 def test_untranslatable_instructions_are_refused():
     src = stim.Circuit("R 0 1\nCY 0 1\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]")
     with pytest.raises(StimImportError, match="CY"):

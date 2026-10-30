@@ -274,8 +274,10 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                   rank_by: str, starter: Mapping | None = None, stabilizers=None,
                   limits: Mapping | None = None, order: int | None = None,
                   qec: Mapping | None = None, rank_table: str = "qccdsim_jones",
-                  tables: list | None = None) -> Path:
-    """Write a release directory (a maintainer tool; releases are immutable once published)."""
+                  tables: list | None = None, goal: str | None = None) -> Path:
+    """Write a release directory (a maintainer tool; releases are immutable once published).
+    `goal` names the leaderboard goal the release belongs to when it is not Goal 1's
+    (`OfficialService.GOALS`)."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
     (d / "circuit.qasm").write_bytes(circuit_text.encode("utf-8"))
@@ -309,6 +311,8 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
         man["limits"].update(dict(limits))
     if order is not None:
         man["order"] = int(order)
+    if goal:
+        man["goal"] = str(goal)
     if starter:
         man["starter"] = dict(starter)
     if stabilizers:

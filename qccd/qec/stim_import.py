@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from .experiments import MemoryExperiment
 
-__all__ = ["StimImportError", "from_stim", "check_equivalent"]
+__all__ = ["StimImportError", "from_stim", "memory_seq", "check_equivalent"]
 
 _GATES = {"H": "h", "X": "x", "Y": "y", "Z": "z", "S": "s", "S_DAG": "sdg",
           "CX": "cx", "CNOT": "cx", "CZ": "cz", "SWAP": "swap", "I": "id"}
@@ -191,6 +191,49 @@ def from_stim(circuit, *, name: str, code: str, distance: int, rounds: int,
         detectors=dets, observables=obs, readout="appended",
         readout_bits=tuple(readout_bits),
         readout_basis=(tuple(data_basis[data[q]] for q, _ in readout_bits) if len(bases) > 1 else ()))
+
+
+def memory_seq(z: MemoryExperiment, x: MemoryExperiment, *, name: str, code: str) -> MemoryExperiment:
+    """A Z memory and then an X memory of one code on the same ions, as ONE experiment
+    (`experiments.css_memory_seq`, for imported circuits): the Z memory's data are read out in
+    the program, every ion is reset, and the X memory runs and is read out by the grader.  The
+    observables are the Z memory's and then the X memory's, so `basis` is "XZ"; a round is one
+    memory's, so a shot fails when either memory does and the rate per round is
+    1 - (1 - p_Z)(1 - p_X)."""
+    import re
+
+    if (z.basis, x.basis) != ("Z", "X"):
+        raise StimImportError(f"memory_seq takes a Z memory and an X memory, not {z.basis} and {x.basis}")
+    if (z.n_data, z.n_ancilla, z.rounds) != (x.n_data, x.n_ancilla, x.rounds):
+        raise StimImportError("the two memories must be the same code on the same ions, for the same rounds")
+    nq = z.n_data + z.n_ancilla
+
+    def bits(e: MemoryExperiment) -> int:
+        return int(re.search(r"^creg c\[(\d+)\];", e.qasm, re.M).group(1))
+
+    def body(e: MemoryExperiment) -> list[str]:
+        return [ln for ln in e.qasm.splitlines()
+                if ln and not ln.startswith(("OPENQASM", "include", "//", "qreg", "creg"))]
+
+    bz, bx = bits(z), bits(x)
+    if any(b != "Z" for b in z.readout_basis):
+        raise StimImportError("the Z memory must read its data in Z")
+    readout_z = [f"measure q[{q}] -> c[{b}];" for q, b in z.readout_bits]
+    shifted = [re.sub(r"c\[(\d+)\]", lambda m: f"c[{int(m.group(1)) + bz}]", ln) for ln in body(x)]
+    head = ['OPENQASM 2.0;', 'include "qelib1.inc";',
+            f"// {name}: {code} memory, one block: a Z memory of {z.rounds} round(s) read out in the "
+            f"program, every ion reset, then an X memory of {x.rounds} round(s); data q[0..{z.n_data - 1}]; "
+            f"X readout c[{bz + bx - x.n_data}..{bz + bx - 1}] appended by the grader",
+            f"qreg q[{nq}];", f"creg c[{bz + bx}];"]
+    off = lambda t: tuple(b + bz for b in t)  # noqa: E731
+    return MemoryExperiment(
+        name=name, code=code, distance=min(z.distance, x.distance), rounds=z.rounds, basis="XZ",
+        n_data=z.n_data, n_ancilla=z.n_ancilla,
+        qasm="\n".join(head + body(z) + readout_z + [f"reset q[{j}];" for j in range(nq)] + shifted) + "\n",
+        detectors=z.detectors + tuple(off(d) for d in x.detectors),
+        observables=z.observables + tuple(off(o) for o in x.observables),
+        readout="appended", readout_bits=tuple((q, b + bz) for q, b in x.readout_bits),
+        readout_basis=("X",) * len(x.readout_bits))
 
 
 def _cx_noise(circuit, p: float):

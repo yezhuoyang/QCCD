@@ -1,18 +1,24 @@
-# Goal 2: one code at a time, every architecture
+# Goal 3: one code at a time, every architecture
 
 **Question.** For each fixed QEC code, which trapped-ion architecture runs its memory experiment
 fastest, and which with the lowest logical error rate, when every architecture may take any
 size its rules allow?
 
 Goal 1 asked for the best design over every code and every machine at once, which leaves too
-many dimensions free to be a well-defined question. Goal 2 fixes the code and sweeps one axis,
-the architecture. It is Fig. 3 of the QCCD Studio paper.
+many dimensions free to be a well-defined question. Goal 3 fixes the code and sweeps one axis,
+the architecture. It is Fig. 3 of the QCCD Studio paper. (Goal 2, on the same Leaderboard, is the
+verified resource estimate for Shor's algorithm.)
+
+On qccd.academy it is the page `board/goal3/`, and each code is a board of the official server
+(`goal3_<code>_mem@1`, [boards.py](boards.py)), so anyone can submit a design for it.
 
 ## The fixed codes
 
-These are Alex's syndrome circuits, each measured in a Z memory and in an X memory for d rounds.
-The CNOT order is the circuit's own; the compiler never reorders it. The checks and the two fixes
-are in [CODES.md](CODES.md).
+These are Alex's syndrome circuits. A code's experiment is its Z memory for d rounds, read out
+in the program, every ion reset, then its X memory for d rounds, read out by the grader: one
+program, one submission, and a round fails when either memory does. The CNOT order is the
+circuit's own; the compiler never reorders it. The checks and the two fixes are in
+[CODES.md](CODES.md).
 
 | code | [[n,k,d]] | ions | schedule |
 |---|---|---|---|
@@ -40,19 +46,22 @@ them:
 
 ## A point, and what it is scored by
 
-A point is one (family, size), graded the way the grader grades a Goal 1 entry; only the Lean
-certificate step is left out ([sweep.py](sweep.py)):
+A point is one (family, size), graded on the code's release the way the official grader grades
+a submission to it; only the Lean certificate step is left out ([sweep.py](sweep.py)):
 
 1. qccd-physics@2 (Goal 1's cited Helios-class numbers);
 2. the pinned reference compiler, qccdc b4a003dbb4ae;
 3. the rules (`verify`);
-4. **time per round**: the replayed program under the `quantinuum` table, divided by the rounds,
-   averaged over the two memories;
-5. **LER per round**: qccd-noise@2 sampled by stim, matching for the surface code and BP-OSD
-   otherwise, combined as 1 − (1 − p_Z)(1 − p_X), with a 95% interval.
+4. **time per round**: the replayed program under the `quantinuum` table, divided by the 2d
+   rounds of both memories;
+5. **LER per round**: qccd-noise@2 sampled by stim with the release's budget and seed (matching
+   for the surface code, BP-OSD otherwise), the grader's `ler_per_round`, which is
+   1 − (1 − p_Z)(1 − p_X), with a 95% interval.
 
 A size the compiler refuses, or that breaks a rule, is recorded with its reason and counted
-under its family.
+under its family. Until 2026-10-30 the two memories were compiled and sampled apart; those rows
+are in `results/separate/`, and they agree with the one-program points within sampling error
+(surface d=3 on grid 5x5: the same 20.23 ms per round; 2.0e-4 and 2.2e-4 per round).
 
 ## The figure
 
@@ -62,10 +71,14 @@ labelled, and every other size is grey. Run [plot.py](plot.py) to get `figures/<
 `figures/overview.pdf` and `figures/summary.md` (the table behind the figure).
 
 ```
-python -I goals/goal2/make_codes.py --builders <Alex's builders, patched>   # stim, qLDPC, igraph
-QCCD_QCCDC=<pinned qccdc> python goals/goal2/sweep.py --code surface5 --workers 3
-python goals/goal2/plot.py                                                  # matplotlib
+python -I goals/goal3/make_codes.py --builders <Alex's builders, patched>   # stim, qLDPC, igraph
+python goals/goal3/boards.py                                                # the releases, once
+QCCD_QCCDC=<pinned qccdc> python goals/goal3/sweep.py --code surface5 --workers 3
+python goals/goal3/plot.py                                                  # matplotlib
 ```
+
+The site page draws the same points live, with the official entries on each code
+(`qccd/site/goal3.py`; the server's `GET /official/v1/goals/goal3`).
 
 ## Who does what (10/26 plan)
 
@@ -89,18 +102,21 @@ python goals/goal2/plot.py                                                  # ma
   crystals in one leg outside a swap-or-stay enter (C1). So every C2LR size fails until a router
   emits the steps. The proposal's c2lr-router is not available: its author has not been named or
   sent it. Its quoted BB144 round of 160 ms also uses half the paper's step time (1/Γ). When a
-  router's programs arrive, they are graded by this same pipeline. Until 2026-10-30 the family was a grid with C2LR wiring; those rows gave Grid's
-  numbers exactly and are kept in `results/provisional/`.
+  router's programs arrive, they are graded by this same pipeline. Until 2026-10-30 the family
+  was a grid with C2LR wiring; those rows gave Grid's numbers exactly and are kept in
+  `results/provisional/`. The official server's release carries physics@2 without the C2LR
+  steps' price, so a C2LR entry needs a new release once a router exists.
 - **WISE equals Grid today.** Its control block reaches the device (32 broadcast DACs), but the
   compiler emits the same program and the replay charges the same time. Even the DAC metric is
   computed from the geometry, not from the wiring block. Nothing enforces WISE's single
   broadcast class beyond rule R4. The difference has to come from Ke's broadcast rules, plus a
   scheduler that uses them.
 - **A compiler fault on the largest grids.** surface7's Z memory on 11x11, 12x11 and 12x12 (all
-  three lattice families) compiles with the pinned qccdc b4a003dbb4ae into a program that breaks
+  three lattice families) compiled with the pinned qccdc b4a003dbb4ae into a program that breaks
   R1: a trap holds 3 ions against a capacity of 2, six times. A rule-breaking program from the
   reference compiler is the compiler's fault. These sizes count as failed until it is fixed; the
-  reproduction case is `work/surface7/grid11x11/z/`.
+  separate-memory rows in `results/separate/surface7.jsonl` record it, and `sweep.py` reproduces
+  it under `work/surface7/grid11x11/`.
 - **HGP code:** pending from Alex.
 - **Colour-code decoder:** the sweep decodes the colour code with generic BP-OSD. A colour-code
   decoder (e.g. Chromobius) would be fairer before the codes are compared with each other

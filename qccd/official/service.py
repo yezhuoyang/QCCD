@@ -471,9 +471,14 @@ class OfficialService:
     #: noise model, whichever code it runs, by the logical error rate per round PER LOGICAL QUBIT
     #: (both bases measured).  The user's decisions of 2026-10-21: curated codes, each a vetted
     #: release; that normalisation.
+    #: Goal 3 (2026-10-29, goals/goal3/README.md) fixes the code and compares architectures: per
+    #: code, every entry's family, time per round and logical error rate per round.  Its releases
+    #: say `"goal": "goal3"`; a release that names no goal is Goal 1's.
     GOALS = {"goal1": {"title": "The best QEC design under 200 ions", "noise": "qccd-noise@2", "max_ions": 200,
                        "rank_by": "ler_per_round_per_logical", "better": "low",
-                       "unit": "per round per logical qubit"}}
+                       "unit": "per round per logical qubit"},
+             "goal3": {"title": "One code at a time, every architecture", "noise": "qccd-noise@2",
+                       "rank_by": "ler_per_round", "better": "low", "unit": "per round"}}
 
     #: a goal's measures of size, from the experiment each entry ran: (name, better, unit)
     GOAL_SIZE_MEASURES = (("logical_qubits", "high", "logical qubits"), ("ions", "low", "ions"),
@@ -484,12 +489,15 @@ class OfficialService:
     def goal_releases(self, goal: str) -> list:
         g = self.GOALS[goal]
         return [r for r in self.releases.values()
-                if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]]
+                if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]
+                and r.manifest.get("goal", "goal1") == goal]
 
     def goal_board(self, goal: str) -> dict:
         """One ranking across releases: every member release's entries, each with its release and
         the experiment it ran (code, distance, ions, logical qubits), ranked by the goal's
         measure.  An entry whose experiment exceeds the goal's ions is not on it."""
+        if goal == "goal3":
+            return self._goal3_board()
         g = self.GOALS.get(goal)
         if g is None:
             raise OfficialError("unknown_goal", f"no goal {goal!r}", 404)
@@ -537,6 +545,70 @@ class OfficialService:
                               **size(r)} for r in rels],
                 "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],
                 "rows": rows}
+
+    #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py)
+    GOAL3_FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor", "Other")
+
+    @staticmethod
+    def architecture_family(doc: dict) -> str:
+        """The Goal 3 family a device declares, read from its generator and its control block:
+        a lattice is C2LR under the swap-or-stay control, Grid when every electrode has its own
+        DAC ("direct" wiring) and WISE when its DACs are broadcast (the lattice template's own
+        wiring); one loop is Cyclone without docks and Conveyor with them.  A device drawn by
+        hand, or from any other generator, is Other."""
+        geo = doc.get("geometry") or {}
+        gen, p = geo.get("generator"), geo.get("params") or {}
+        ctl = doc.get("control") or {}
+        if gen == "grid":
+            if ctl.get("model") == "c2lr":
+                return "C2LR"
+            return "Grid" if (ctl.get("wiring") or {}).get("scheme") == "direct" else "WISE"
+        if gen == "ring":
+            return "Conveyor" if int(p.get("verticals") or 0) > 0 else "Cyclone"
+        return "Other"
+
+    def _goal3_board(self) -> dict:
+        """Goal 3, code by code: each release's public eligible entries with the family their
+        device declares, the time per round (`T_quantinuum` over every round the program runs:
+        a Z-then-X memory runs its rounds twice) and the logical error rate per round."""
+        g = self.GOALS["goal3"]
+        out = []
+        for rel in sorted(self.goal_releases("goal3"), key=lambda r: r.manifest.get("order", 0)):
+            spec = rel.detectors()
+            rounds = int(spec.get("rounds") or 1) * (2 if str(spec.get("code", "")).endswith("_seq") else 1)
+            rows, _ = self._ranked_rows(rel.id)
+            entries = []
+            for r in rows:
+                fam, dev = self._entry_family(r["id"])
+                T = r["metrics"].get("T_quantinuum")
+                entries.append({"id": r["id"], "by": r["by"], "display_name": r["display_name"],
+                                "created_at": r["created_at"], "family": fam, "device": dev,
+                                "T_round_ms": T / rounds if isinstance(T, (int, float)) else None,
+                                "ler_per_round": r["metrics"].get("ler_per_round"), "ler": r.get("ler"),
+                                "metrics": r["metrics"]})
+            q = rel.manifest.get("qec") or {}
+            out.append({"id": rel.id, "title": rel.title, "task": rel.manifest.get("task"), "task_digest": rel.digest,
+                        "code": spec.get("code"), "distance": spec.get("distance"), "rounds": rounds,
+                        "ions": q.get("n_ions"), "entries": entries})
+        return {"goal": "goal3", "title": g["title"], "evaluator_policy": self.evaluator_policy,
+                "noise": g["noise"], "families": list(self.GOAL3_FAMILIES), "releases": out}
+
+    def _entry_family(self, sid: str) -> tuple[str, str | None]:
+        """(Goal 3 family, device name) of a stored submission, read once from its bundle's
+        device (an archive is immutable, so the answer is kept by its digest)."""
+        import io
+        import zipfile
+        cache = self.__dict__.setdefault("_goal3_devices", {})
+        sha = (self.db.one("SELECT archive_sha256 FROM submissions WHERE id=?", (sid,)) or {}).get("archive_sha256")
+        if sha not in cache:
+            try:
+                with zipfile.ZipFile(io.BytesIO((self.artifacts / f"{sha}.zip").read_bytes())) as z:
+                    name = next(n for n in z.namelist() if Path(n).name == "device.arch.json")
+                    doc = json.loads(z.read(name))
+                cache[sha] = (self.architecture_family(doc), doc.get("name"))
+            except (OSError, StopIteration, ValueError, zipfile.BadZipFile):
+                cache[sha] = ("Other", None)
+        return cache[sha]
 
     # ------------------------------------------------------------------ what a reader can open
 

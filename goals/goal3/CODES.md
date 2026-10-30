@@ -1,4 +1,4 @@
-# Goal 2's fixed codes: what we checked in Alex's circuits
+# Goal 3's fixed codes: what we checked in Alex's circuits
 
 Source: `circuits.zip` from Alex (2026-10-29): `surface_code.py` (N-Z schedule), `bb_code.py`
 (Bravyi et al.'s depth-8 schedule, after gongaa/SlidingWindowDecoder), `color_code.py` (the
@@ -49,7 +49,7 @@ ancillas, steps 7-12 (X), MX", and the paper's title is *a single auxiliary per 
 reuse the Z ancilla: measure it after the Z half, re-prepare it in |+>, then run the X half. The
 record order is unchanged, so every detector index stays valid. That gives 10, 28 and 55 ions
 instead of 13, 37 and 73, with the same circuit distance. On trapped-ion hardware the ion count
-sets how large every architecture must be, so this matters for Goal 2.
+sets how large every architecture must be, so this matters for Goal 3.
 `build_circuit(..., shared=False)` gives back the two-ancilla circuit.
 
 **Minor issues:**

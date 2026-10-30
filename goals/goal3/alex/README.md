@@ -1,4 +1,4 @@
-# Alex's builders, as Goal 2 runs them
+# Alex's builders, as Goal 3 runs them
 
 From `circuits.zip` (sha256 fe93ec72b83fafb462d44cfb753eb51b5113d265a95aa33dbaeebd047b06d53a),
 shared by Alex on 2026-10-29. `surface_code.py` and `bb_code.py` are unchanged.
@@ -13,4 +13,4 @@ Third-party lineage, as the files themselves state:
 
 Each licence file is the upstream text, fetched on 2026-10-30.
 
-    python -I goals/goal2/make_codes.py --builders goals/goal2/alex
+    python -I goals/goal3/make_codes.py --builders goals/goal3/alex

@@ -103,8 +103,15 @@ def memory_boards() -> list:
 
 
 def _goal1(b) -> bool:
-    """A board on Goal 1's one ranking: a curated memory on the shared noise model."""
-    return (b.manifest.get("qec") or {}).get("noise") == "qccd-noise@2"
+    """A board on Goal 1's one ranking: a curated memory on the shared noise model that names
+    no other goal (OfficialService.goal_releases)."""
+    return ((b.manifest.get("qec") or {}).get("noise") == "qccd-noise@2"
+            and b.manifest.get("goal", "goal1") == "goal1")
+
+
+def _goal3(b) -> bool:
+    """One of Goal 3's fixed codes: its boards are one page (board/goal3/), not cards."""
+    return b.manifest.get("goal") == "goal3"
 
 
 def _suite():
@@ -134,10 +141,14 @@ GOALS = (
     ("Goal 2", "A verified resource estimate for Shor's algorithm",
      "Ions, time and machine, with every step compiled and checked.",
      "../gadgets/algorithms/shor15/", "Shor's algorithm for 15"),
+    # 2026-10-29: fix the code, sweep the architecture (goals/goal3/README.md)
+    ("Goal 3", "One code at a time, every architecture",
+     "For each fixed code, the fastest and the most reliable machine in each architecture family.",
+     "goal3/", "The Goal 3 figures"),
 )
 
 GOALS_CSS = """
-.lb-goals{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0 18px}
+.lb-goals{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:12px 0 18px}
 .lb-goal{border:1px solid var(--line,#e4e2db);border-left:3px solid var(--accent,#1f5bb5);border-radius:10px;
  background:var(--card,#fbfaf7);padding:14px 16px}
 .lb-goal .k{font:700 10.5px/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--accent,#1f5bb5)}
@@ -199,7 +210,7 @@ def memory_section(ts: list | None = None) -> str:
     site's tasks; one whose `release` is a memory board carries that board's ranked designs.
     Goal 1's boards (the curated codes on qccd-noise@2) are not cards here: they are one table
     under the goals (leaderboard.goal_table) and one chart (board/goal1/)."""
-    boards = [b for b in memory_boards() if not _goal1(b)]
+    boards = [b for b in memory_boards() if not _goal1(b) and not _goal3(b)]
     if not boards:
         return ""
     built = {t.get("release"): t for t in (ts or []) if t.get("rank_by") == "ler_per_round"}
@@ -483,6 +494,9 @@ def index_entries() -> list:
     out = [{"t": "Goal 1: the best QEC design under 200 ions",
             "d": "every implementation under 200 ions on one ranking, by logical error rate per logical qubit",
             "u": "board/goal1/", "k": "page"},
+           {"t": "Goal 3: one code at a time, every architecture",
+            "d": "for each fixed QEC code, time and logical error rate per round in each architecture family",
+            "u": "board/goal3/", "k": "page"},
            {"t": "Compiler benchmark", "d": "the Compiler leaderboard's suite, pair by pair, and how to submit a compiler",
             "u": "board/compiler/", "k": "page"},
            {"t": "The noise model", "d": "how a compiled program becomes a logical error rate, channel by channel",
@@ -492,6 +506,10 @@ def index_entries() -> list:
            {"t": "Compiler leaderboard", "d": "compilers ranked over every circuit and device of the suite",
             "u": "board/#compiler", "k": "page"}]
     for b in memory_boards():
+        if _goal3(b):
+            out.append({"t": b.title, "d": "Goal 3 · time and logical error rate per round, by architecture family",
+                        "u": f"board/goal3/#{b.manifest['task']}", "k": "task"})
+            continue
         out.append({"t": b.title, "d": ("Goal 1 · ranked by the logical error rate per round per logical qubit"
                                         if _goal1(b) else "memory board · ranked by the logical error rate per round"),
                     "u": f"board/goal1/?code={b.id}" if _goal1(b) else f"board/#{b.manifest['task']}", "k": "task"})

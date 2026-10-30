@@ -1,4 +1,4 @@
-"""Goal 2's architecture families and the sizes each is swept over.
+"""Goal 3's architecture families and the sizes each is swept over.
 
 A family is a generator, a control block and a rule for which sizes to try for a code of N ions
 with A ancillas.  The sizes start at the smallest the family can plausibly hold (the compiler

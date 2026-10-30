@@ -1,6 +1,6 @@
-"""Goal 2's fixed codes: Alex's syndrome circuits, checked, imported, written to `codes/`.
+"""Goal 3's fixed codes: Alex's syndrome circuits, checked, imported, written to `codes/`.
 
-    python -I goals/goal2/make_codes.py --builders <dir with surface_code.py, bb_code.py,
+    python -I goals/goal3/make_codes.py --builders <dir with surface_code.py, bb_code.py,
                                                       color_code.py> [--only surface5 ...]
 
 Each code is built in BOTH bases (a Z memory and an X memory, d rounds unless the table says

@@ -2328,6 +2328,12 @@ def build(out: Path) -> int:
     if goal:
         put("board/goal1/index.html", lb.declare_board_controls(goal), 2, "board", extra=FOOTER_BLOCK + BOARD_SKIN)
         print(f"  goal1        {len(g['boards'])} board(s): {', '.join(t for t, _, _ in g['boards'])}")
+    # Goal 3: per fixed code, every architecture family (qccd/site/goal3.py)
+    from . import goal3
+    g3 = goal3.page(PAGE, STYLE)
+    if g3:
+        put("board/goal3/index.html", g3, 2, "board")
+        print("  goal3        the reference sweep and the official entries, code by code")
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
     print(f"wrote {out}  ({n_pages} entry pages, {len(index)} search entries, {total / 1e6:.0f} MB)")
     return 0

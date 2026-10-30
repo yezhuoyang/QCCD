@@ -1,4 +1,4 @@
-# Goal 2 — best design per architecture family
+# Goal 3 — best design per architecture family
 
 Each family's best point by each measure (they can differ). Time per round under the `quantinuum` table; LER per round = 1-(1-p_Z)(1-p_X) under qccd-noise@2, 95% interval.
 
