@@ -62,6 +62,8 @@ REFRESH_EVERY_US = 0.4 * 1e6
 REFRESH_STAGGER_US = 2.0
 #: how far back, step by step, a round looks for a gap on a busy shared plane
 REFRESH_BACKOFF_US = 25_000.0
+#: a block leaving its memory with its last round this old takes one more as it leaves
+LEAVE_FRESH_US = 200_000.0
 
 
 class FoldError(CityError):
@@ -287,6 +289,9 @@ class MacroCity(City):
         #: which no block of this body may rest in
         self.home_of: dict = dict(homes or {})
         self.no_rest = set(folder.home_places) | set(params) | set(taken)
+        #: the rest places a block of a caller holds (this body's context): taken for its calls
+        #: too, or a call further down could rest a block there and not fit
+        self.taken = set(taken)
         self.calls: list = []
         self.n_instr = 0
         #: refresh rounds this body added: (the instruction they go before, or None, the round)
@@ -368,7 +373,7 @@ class MacroCity(City):
 
     # -- refresh: a block resting in a memory is held there, a syndrome round as often as G8 asks
 
-    def cover(self, q: str, until: float, before) -> None:
+    def cover(self, q: str, until: float, before, *, leaving: bool = False) -> None:
         """Hold `q` in its memory from its last round there until `until`: a syndrome round
         every REFRESH_EVERY_US.  One row, a **hold**, says so (block, memory, first, period,
         rounds) and one `se` instruction placed before `before` stands for all its rounds:
@@ -377,7 +382,61 @@ class MacroCity(City):
         The memory is the block's alone while it rests (its lease), so its rounds take nothing
         anyone else could; each round's syndrome is decoded in the decoder's free time (a
         decode is a microsecond, a round 13 ms), which `expand` places, and checks with every
-        other row."""
+        other row.
+
+        `leaving`: the block leaves its memory at `until`.  If its last round is LEAVE_FRESH_US
+        old or more, it takes one more, ending as it leaves: what it meets next -- a trip, a
+        queue at a clinic -- counts from a fresh round, not from one nearly a budget ago (G8)."""
+        self._cover(q, until, before)
+        since = self.rest_since.get(q)
+        if not leaving or since is None or until - since < LEAVE_FRESH_US:
+            return
+        M = self.blocks[q].leaf
+        O = self.leaf[M].master.ops["refresh"]
+        g = self._place_group.get(M)
+        # (blocks a call brings out together leave together: each memory's round a little
+        # earlier than the one numbered before it, so their syndromes reach the one decoder
+        # one by one -- G11)
+        k = re.search(r"\d+$", M)
+        s = max(since, until - O.duration_us - (int(k[0]) if k else 0) * REFRESH_STAGGER_US)
+        if g is not None:
+            # (its turn on a shared plane: the latest that ends by the time it leaves)
+            back, s0, s = 0.0, s, None
+            while back < until - since:
+                s2 = self._plane_fit(g, max(since, s0 - back), O.duration_us)
+                if s2 + O.duration_us <= until + 1e-9:
+                    s = s2
+                    break
+                back += REFRESH_BACKOFF_US
+            if s is None:
+                return
+            self._plane_take(g, s, s + O.duration_us)
+        self._rounds(q, [s], before, "as it leaves")
+        self.rest_since[q] = s + O.duration_us
+        self.mem_last[M] = max(self.mem_last.get(M, 0.0), s + O.duration_us)
+
+    def _rounds(self, q: str, starts: list, before, why: str) -> None:
+        """One `se` instruction before `before` and a hold of one round per start."""
+        b = self.blocks[q]
+        M = b.leaf
+        O = self.leaf[M].master.ops["refresh"]
+        every = REFRESH_EVERY_US + O.duration_us
+        names = self.leaf[M].master.ops["release"].transfer("out", "out").ions
+        ins = Instr(index=self.next_index, line=before.line if before else 0,
+                    text=f"se {q} 1    # refresh: {len(starts)} round{'s' if len(starts) > 1 else ''} "
+                         f"in {M}, {why}",
+                    kind="se", blocks=[q], rounds=1, not_before=round(starts[0], 3), refresh=True)
+        self.next_index += 1
+        self.extra.append((before.index if before else None, ins))
+        bind = ([[nm, gg] for nm, gg in self.leaf[M].ids.items()]
+                + [[nm, gg] for nm, gg in zip(names, b.gids)])
+        for s in starts:
+            self.holds.append({"block": q, "place": M, "from": round(s + O.duration_us - every, 3),
+                               "every": round(every, 3), "n": 1, "round_us": O.duration_us,
+                               "ins": ins.index, "bind": bind})
+        self.hold_pattern(M)
+
+    def _cover(self, q: str, until: float, before) -> None:
         since = self.rest_since.get(q)
         if since is None:
             return
@@ -472,7 +531,7 @@ class MacroCity(City):
                 out_op = self.leaf[Z].master.ops["release"]
                 busy = self.cal[dst[0]].end if dst[0] not in self.junction_paths else 0.0
                 t = max(t, busy - self._distance((Z, "out"), dst) - out_op.duration_us)
-            self.cover(bundle.name, max(t, self.mem_last.get(Z, 0.0)), self.current)
+            self.cover(bundle.name, max(t, self.mem_last.get(Z, 0.0)), self.current, leaving=True)
             del self.rest_since[bundle.name]
         return super().bring(bundle, dst, t_min, ins, grp, stop_ok=stop_ok)
 
@@ -515,8 +574,9 @@ class MacroCity(City):
             names = list(ins.cond.names)
             ext = [f"x{k}" for k in range(len(names))]
             guard = ins.cond.rename(dict(zip(names, ext))).text
-        taken = sorted(p for p, h in self.zone_holder.items()
-                       if h is not None and p not in homes and p not in self.folder.home_places)
+        taken = sorted({p for p, h in self.zone_holder.items()
+                        if h is not None and p not in homes and p not in self.folder.home_places}
+                       | (self.taken - set(homes)))
         m = self.folder.macro(ins.gate, homes, guard, ext, taken, self.depth + 1)
         t = max([self.block_free.get(b, 0.0) for b in args]
                 + [self.mem_last.get(h, 0.0) for h in homes] + [0.0])

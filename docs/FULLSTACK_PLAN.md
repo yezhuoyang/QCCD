@@ -879,6 +879,14 @@ details").**
       the first one after (G8).
     - `tests/test_gadget_fold_branches.py` holds the adaptive basis, the lease, the counts and
       the stagger on a small program.
+    - *Two more from the second round, found building FormalRV's full Shor for the site* (its
+      expansion stopped on `KeyError: 57`). A body passed its calls the rest places it held,
+      not the ones its own caller held. So a gate two levels down rested an ancilla in a
+      memory where the top level had a block, and the gate between could never fit: five calls
+      were refused. And a block left its memory with its last round at a call's start, then
+      queued for the clinic, and met its next round 520 ms after the call began. A block that
+      has rested `LEAVE_FRESH_US` (200 ms) or more now takes one round as it leaves, ending
+      at its release (`tests/test_gadget_fold_context.py`).
   - **Next: the run itself, concrete.** A fixed machine of districts, each with its own
     register memories and work places. Each adder shape is compiled once per district as one
     schedule like the one above, and replayed by start time. Blocks that change districts ride
