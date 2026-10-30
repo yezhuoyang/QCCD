@@ -55,10 +55,11 @@ from ..arch.schema import (
 )
 from ..api import DEFAULT_TEMPLATE
 from ..cost.hardware import hardware_report
-from ..cost.models import CostModel
+from ..arch.c2lr import is_c2lr
+from ..cost.models import C2LR_COMPONENT, CostModel
 from ..ir.listing import disassemble, to_page_model
 from ..ir.provenance import log_of, thin
-from ..ir.tsir import TSIR, iter_operands, iter_pairs
+from ..ir.tsir import C2LR_TEMPLATES, TSIR, iter_operands, iter_pairs
 from ..verify.control import ControlTrace, control_trace
 from ..verify.replay import ReplayResult
 from ..verify.rules import rule_statements
@@ -90,6 +91,12 @@ __all__ = ["render_html", "build_view_model"]
 BROWSER_SET = ("R1", "R2", "R3", "R4", "R4b", "R5", "R6", "R6b", "R7", "R7c",
                "R8", "R11", "R12", "R13", "R14", "R17", "R18", "R19", "R20",
                "R21", "R22")
+
+#: C2LR's rules as the browser checks them on a C2LR device (docs/c2lr.md section 4), apart
+#: from `BROWSER_SET` for the reason `qccd.verify.rules.C2LR_RULE_STATEMENTS` is apart from
+#: the 28: every page lists and badges those, and these judge one kind of device only.
+#: Asserted equal to `QCCD.MIRRORED_C2LR_RULES`, which is derived from its dispatcher.
+BROWSER_C2LR_SET = ("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10")
 
 #: A page that cannot resolve a click to a channel id is better than a page that ships
 #: 100 KB to do it.  `direct` wiring puts 4608 channels on 144 sites; above this budget
@@ -277,19 +284,16 @@ def build_view_model(
     # ---- frames: one entry per instruction, template-compressed --------------
     frames = []
     truncated = False
-    # A C2LR step names no participants; drawn as the moves the replay's expansion gives it
-    # (`qccd.verify.c2lr.walk`).  TODO(c2lr phase 2): engine.js has no twin of the expansion
-    # or its price yet, so the page animates these moves but its own replay does not know
-    # the step -- see docs/c2lr.md section 8.
-    c2lr_moves: dict = {}
-    if any((i.template or {}).get("kind") in ("swap_or_stay", "reorder_or_not")
-           for i in prog.instructions):
-        from ..verify.c2lr import walk
-        try:
-            c2lr_moves = {ins.id: step.participants for ins, step, _ in walk(prog, arch)
-                          if step is not None and step.template}
-        except ValueError:
-            c2lr_moves = {}
+    # A C2LR step names no participants.  Its frame carries the template as written (the
+    # bits: `engine.js` re-expands them from the device to price and judge the step, as the
+    # replay does) and the expansion it draws -- the movers as `moves`, leg -> junction ->
+    # partner leg, and each crystal that keeps a leg to itself as `c2lr.shift` -- from the
+    # replay's own expansion (`qccd.verify.c2lr.page_steps`), which `engine.js`'s lowerer
+    # re-derives for a programme written in the browser.
+    c2lr_steps: dict = {}
+    if any((i.template or {}).get("kind") in C2LR_TEMPLATES for i in prog.instructions):
+        from ..verify.c2lr import page_steps
+        c2lr_steps = page_steps(prog, arch)
     for instr in prog.instructions:
         if len(frames) >= max_frames:
             truncated = True
@@ -301,10 +305,13 @@ def build_view_model(
         elif instr.type == "simd":
             if instr.template and instr.template.get("kind") == "loop_shift":
                 f["shift"] = [str(instr.template["loop"]), int(instr.template["delta"])]
-            elif instr.id in c2lr_moves:
-                f["moves"] = [[p.ion, _node_path(arch, p)] for p in c2lr_moves[instr.id]]
+            elif instr.template and instr.template.get("kind") in C2LR_TEMPLATES:
+                from ..verify.c2lr import frame_view
+                step, was, now = c2lr_steps.get(instr.id, (None, {}, {}))
+                f["moves"] = ([[p.ion, _node_path(arch, p)] for p in step.participants]
+                              if step is not None else [])
                 f["entails"] = []
-                f["c2lr"] = str(instr.template.get("kind"))
+                f["c2lr"] = frame_view(instr.template, step, was, now, arch)
             else:
                 f["moves"] = [
                     [p.ion, _node_path(arch, p)] for p in instr.participants
@@ -388,7 +395,12 @@ def build_view_model(
     # so it cannot accumulate R17's elapsed-time term.  The checksum therefore covers
     # exactly the components the page models, and the page says which those are; a
     # checksum over terms the page never computes would fail every time and mean nothing.
-    checked_components = ("shuttle", "junction", "split_merge")
+    checked_components: tuple[str, ...] = ("shuttle", "junction", "split_merge")
+    # a C2LR device's steps heat on a channel of their own (`C2LR_COMPONENT`), every crystal
+    # of every step, and the page's `applyFrame` accrues it, so its checksum covers it; on
+    # every other device the channel never exists and nothing here changes
+    if is_c2lr(arch):
+        checked_components += (C2LR_COMPONENT,)
     checksum = {
         ion: round(sum(v.get(c, 0.0) for c in checked_components), 6)
         for ion, v in res.per_ion_quanta.items()
@@ -572,6 +584,10 @@ def build_view_model(
             "policy": {"table": getattr(getattr(model, "policy", None), "table", None),
                        "objective": getattr(getattr(model, "policy", None),
                                             "objective", "fastest")},
+            # a C2LR lattice (docs/c2lr.md): its steps heat every crystal and a gate on the
+            # two crystals of one leg is merge, MS, split -- what the page's `applyFrame`
+            # accrues.  Absent on every other device, whose pages are unchanged
+            **({"c2lr": True} if is_c2lr(arch) else {}),
         },
         # The layout constants live in `layout.py` and in `theme.GEOMETRY`; hard-coding
         # them a third time in JS would be a mirror the parity test could not protect,
@@ -2612,7 +2628,34 @@ function applyFrame(st, f) {
   if (f.type==='init'){ for(const k in f.place){ st.pos[k]=f.place[k]; st.q[k]=0; } return; }
   if (f.type==='cool'){ const ions=(f.ions&&f.ions.length)?f.ions:Object.keys(st.pos);
     for(const i of ions) st.q[i]=0; return; }
+  // C2LR (docs/c2lr.md): a two-qubit gate on the two crystals of one leg is merge, MS,
+  // split, and the merge and the split heat both of them (`replay.py`)
+  if (f.type==='gate' && PH.c2lr){
+    if((f.acts||[]).some(a=>a.length===1)) return;
+    const both={};
+    for(const [a,b] of (f.pairs||[])){ const s=st.pos[a];
+      if(s!==undefined && s===st.pos[b] && (nodeById[s]||{}).kind==='site'){ both[a]=1; both[b]=1; } }
+    for(const ion in both) st.q[ion]=(st.q[ion]||0)+mergeQ+splitQ;
+    return;
+  }
   if (f.type!=='simd') return;
+  if (f.c2lr){
+    // ONE WAVEFORM, every crystal on the device playing it: the movers (the device's
+    // expansion, `moves`) by the primitive's swap heat, every other crystal by its stay
+    // heat -- for reorder-or-not, the turned ones by its own.  Not a shuttle and not a
+    // crossing: those are inside the step's 1/Gamma, on the `c2lr` channel the checksum
+    // covers on this device
+    const sp=(PH.scalars||{})[f.c2lr.kind]||{}, has=k=>Object.prototype.hasOwnProperty.call(sp,k);
+    let moved, stayed;
+    if(f.c2lr.kind==='swap_or_stay'){ moved=+sp.quanta_swap||0; stayed=+sp.quanta_stay||0; }
+    else { const q0=+sp.quanta||0; moved=has('quanta_reverse')?+sp.quanta_reverse:q0;
+           stayed=has('quanta_stay')?+sp.quanta_stay:q0; }
+    const hot={};
+    for(const ion of (f.c2lr.reverse||[])) hot[ion]=1;
+    for(const [ion,path] of (f.moves||[])){ st.pos[ion]=path[path.length-1]; hot[ion]=1; }
+    for(const ion in st.pos) st.q[ion]=(st.q[ion]||0)+(hot[ion]?moved:stayed);
+    return;
+  }
   if (f.shift){
     const [loop,delta]=f.shift, seq=A.loops[loop]; if(!seq) return;
     const k=seq.length, step=delta>=0?1:-1, idx={}; seq.forEach((n,i)=>idx[n]=i);
@@ -2973,8 +3016,11 @@ function draw(){
   // the start state, this frame's for the end state, so the two agree at the seam AND
   // agree with each other.
   const ordEnd=SLOTS[frame]||{}, ordStart=(frame>0?SLOTS[frame-1]:null)||{};
+  // a C2LR step is drawn by its own rule (`transit.js`, part 5): swaps on two sides of their
+  // junction, every crystal that keeps its leg shifting and coming back
   const PL = TRANSIT.place({before: before[frame]||{}, pos: stt.pos, paths: paths,
-                            t: t, rest: !(phase<1), ordStart: ordStart, ordEnd: ordEnd});
+                            t: t, rest: !(phase<1), ordStart: ordStart, ordEnd: ordEnd,
+                            c2lr: f.c2lr || null});
   const live=PL.live, flying=PL.flying;
   const over={};
   for(const ion in flying){

@@ -41,7 +41,7 @@ from ..arch.c2lr import NotC2LR, Variation, declared, geometry, is_c2lr, variati
 from ..ir.tsir import C2LR_TEMPLATES, TSIR, Instruction, Participant, template_problems
 
 __all__ = ["C2LRStep", "C2LRTracker", "StepError", "walk", "tracker_for", "is_c2lr_class",
-           "why_not_c2lr"]
+           "why_not_c2lr", "page_steps", "frame_view"]
 
 
 @dataclass(frozen=True)
@@ -369,3 +369,59 @@ def why_not_c2lr(arch) -> str:
     except NotC2LR as exc:
         return str(exc)
     return "it is one"
+
+
+def page_steps(prog: TSIR, arch) -> dict[int, tuple[C2LRStep, dict, dict]]:
+    """instruction id -> (its C2LR step, positions before it, positions after it), for each
+    template the device can expand, in order, up to the first it cannot.
+
+    What the page draws a step from (`qccd.viz.render`) and what `engine.js`'s lowerer
+    re-derives for a programme written in the browser (`_c2lrLower`), so the two must stop
+    at the same place: a step that cannot execute is where the replay refuses the programme,
+    and nothing after it has a position to be drawn from."""
+    out: dict[int, tuple[C2LRStep, dict, dict]] = {}
+    if not any((i.template or {}).get("kind") in C2LR_TEMPLATES for i in prog.instructions):
+        return out
+    pos: dict[str, str] = {}
+    try:
+        for ins, step, after in walk(prog, arch):
+            if step is not None and step.template:
+                out[ins.id] = (step, pos, after)
+            pos = after
+    except ValueError:
+        pass
+    return out
+
+
+def frame_view(template: Mapping, step: C2LRStep | None, before: Mapping[str, str],
+               after: Mapping[str, str], arch) -> dict:
+    """The `c2lr` field of a page frame: the template as the programme wrote it, and for a
+    swap-or-stay step the device expanded, `shift` -- every crystal that keeps a leg to
+    itself through the step, as `[the junction its C2LR shift is measured from, +1 toward |
+    -1 away]`, in ion order.  The movers are the frame's `moves`; a crystal sharing its
+    leg sits in its own well at one end and is drawn by its slot, not by a shift."""
+    out = {k: (dict(v) if isinstance(v, Mapping) else list(v) if isinstance(v, (list, tuple))
+               else v) for k, v in template.items()}
+    if step is None or step.kind != "swap_or_stay" or step.variation is None:
+        return out
+    geo = geometry(arch)
+    legs = frozenset(geo.legs)
+    toward = {str(i) for i in template.get("toward", ())}
+    n_before: dict[str, int] = {}
+    n_after: dict[str, int] = {}
+    for s in before.values():
+        n_before[s] = n_before.get(s, 0) + 1
+    for s in after.values():
+        n_after[s] = n_after.get(s, 0) + 1
+    shift: dict[str, list] = {}
+    for ion in step.stayers:
+        leg = before.get(ion)
+        if leg not in legs or after.get(ion) != leg:
+            continue
+        if n_before.get(leg) != 1 or n_after.get(leg) != 1:
+            continue
+        j = geo.junction_of(leg, step.variation)
+        if j is not None:
+            shift[ion] = [j, 1 if ion in toward else -1]
+    out["shift"] = shift
+    return out

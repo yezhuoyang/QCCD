@@ -659,9 +659,16 @@ function clockModel(table) {
   var m = Q.makeModel(STATE.primitives, Q.degrees(dev), Q.cornerEndpoints(dev), dev.segments, {
     kind: 'corrected', corner_hops: 1, junction_min_degree: PH.junction_min_degree || 3,
     length_scaling: false, pitch: 1.0, include_anomalous: true,
-    anomalous_per_ms: PH.anomalous_per_ms || 0, policy: { table: table, objective: 'fastest' } });
+    anomalous_per_ms: PH.anomalous_per_ms || 0, policy: { table: table, objective: 'fastest' },
+    c2lr: c2lrOf(dev) });
   m._pair = Q.pairIndex(dev);
   return m;
+}
+// THE DEVICE'S C2LR CONTEXT, which every model of it carries: a swap-or-stay step is expanded
+// from the device's matching (`engine.js` section 7b), so a model without it cannot price one.
+// On any other device it says so and nothing reads it.
+function c2lrOf(dev) {
+  return Q.c2lrContext(dev, STATE.control, STATE.name, classTable());
 }
 // THE HARDWARE THE EVALUATION DEFINES, over the hardware report.  `Q.hardwareReport` keeps
 // what no metric names (the scheme, the notes, the per-kind counts); every count a metric
@@ -769,7 +776,8 @@ function repriceNow() {
       pitch: (D.model && D.model.pitch) || 1.0,
       include_anomalous: !(D.model && D.model.include_anomalous === false),
       anomalous_per_ms: PH.anomalous_per_ms || 0,
-      policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' }
+      policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' },
+      c2lr: c2lrOf(dev)
     });
   } catch (err) {
     PRICE = { blocked: [{ kind: 'no_curve', message: err.message, count: 1 }] };
@@ -7255,7 +7263,7 @@ function lowerNow() {
   var classes = classTable();
   try {
     LOWER = Q.lowerProgram(PROG, STATE.device, A.loops,
-                           { name: STATE.name, classes: classes });
+                           { name: STATE.name, classes: classes, control: STATE.control });
   } catch (err) {
     LOWER = { frames: [], prov: null, errors: [{ i: null, code: 'error', message: err.message }] };
   }
@@ -11367,7 +11375,8 @@ function evaluationCheck() {
     pitch: (D.model && D.model.pitch) || 1.0,
     include_anomalous: !(D.model && D.model.include_anomalous === false),
     anomalous_per_ms: PH.anomalous_per_ms || 0,
-    policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' } });
+    policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' },
+    c2lr: c2lrOf(dev) });
   model._pair = Q.pairIndex(dev);
   var page = Q.evaluation.session(pl, SHIPPED_FRAMES || P.frames, A.loops, model, classes, dev, evalState(),
                                   { closedLoops: closedLoopsOf(dev), mk: clockModel }).page();

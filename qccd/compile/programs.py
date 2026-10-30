@@ -12,6 +12,7 @@ examples, CLI, tests, the compiler -- goes through the same code and the same ve
     walk(arch, n)          point-to-point shuttling: the lowest common denominator
     odd_even(arch, k)      transposition sort: the scheme rotation is measured against
     from_deck(arch)        the shipped 24-ancilla schedule, imported from the artifact
+    swap_or_stay_tour(a)   every kind of C2LR step, on a C2LR lattice (docs/c2lr.md)
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ from ..ir.import_deck import DEFAULT_HTML, import_schedule
 from ..ir.tsir import TSIR, Instruction, Participant, loop_shift
 from .oddeven import cyclic_shift_target, odd_even_sort_program
 
-__all__ = ["rotate", "walk", "odd_even", "from_deck", "build", "BUILDERS", "closed_loops"]
+__all__ = ["rotate", "walk", "odd_even", "from_deck", "swap_or_stay_tour", "build", "BUILDERS",
+           "closed_loops"]
 
 
 def closed_loops(arch: Architecture) -> list[str]:
@@ -227,11 +229,75 @@ def from_deck(arch: Architecture, *, html_path=DEFAULT_HTML, **kw) -> TSIR:
     return prog
 
 
+# ----------------------------------------------------------------------------- C2LR
+
+
+def swap_or_stay_tour(arch: Architecture, *, name: str | None = None) -> TSIR:
+    """Every kind of C2LR step, on any C2LR lattice (docs/c2lr.md): swaps, a move into an
+    empty leg, crystals staying, an enter, a gate in one leg, the exit back, a step on a
+    second diagonal, and the cooling R7c asks for.
+
+    The crystals fill every leg but the far one of every third W-S pair, so the first step
+    swaps the full pairs and moves into the empty legs; then the first full pair's crystal
+    enters its partner's leg, the two are gated there (merge, MS, split), and it leaves the
+    way it came -- the only crystal that may (C1).  The bits are the programme's; where
+    each crystal goes is the device's matching, so this writes no route at all."""
+    from ..arch.c2lr import NotC2LR, Variation, geometry
+    from ..ir.tsir import swap_or_stay
+
+    try:
+        geo = geometry(arch)
+    except NotC2LR as exc:
+        raise ValueError(f"the swap-or-stay tour needs a C2LR lattice: {exc}") from None
+    ws = geo.pairs(Variation("diagonal", diagonal="WS"))
+    pairs = sorted({tuple(sorted((leg, partner))) for leg, (_, partner) in ws.items()})
+    if not pairs:
+        raise ValueError(f"{arch.name} pairs no legs under W-S")
+    empty = {b for k, (_, b) in enumerate(pairs) if k % 3 == 2}
+    place = {f"q{i}": leg for i, leg in enumerate(l for l in geo.legs if l not in empty)}
+    ion_at = {leg: ion for ion, leg in place.items()}
+    prog = TSIR(name=name or "swap_or_stay_tour", arch_spec=_spec(arch))
+    prog.add(Instruction(type="init", id=prog.next_id(), placement=dict(place),
+                         quanta={i: 0.0 for i in place}))
+
+    def step(diagonal: str, toward) -> None:
+        prog.add(Instruction(type="simd", id=prog.next_id(), cls="swap_or_stay", mode="inter",
+                             template=swap_or_stay(diagonal, sorted(toward))))
+
+    # 1: every W-S pair plays -- a swap where both legs hold a crystal, a move where one does
+    step("WS", [ion_at[l] for a, b in pairs for l in (a, b) if l in ion_at])
+    pos = dict(place)
+    for a, b in pairs:
+        if a in ion_at:
+            pos[ion_at[a]] = b
+        if b in ion_at:
+            pos[ion_at[b]] = a
+    here = {leg: ion for ion, leg in pos.items()}
+    full = [(a, b) for a, b in pairs if a in here and b in here]
+    if full:
+        a, b = full[0]
+        mover, resident = here[a], here[b]
+        step("WS", [mover])                                  # 2: enter b, where one stayed
+        prog.add(Instruction(type="gate", id=prog.next_id(), gate="MS", mode="intra",
+                             pairs=((mover, resident),)))    # 3: merge, MS, split
+        step("WS", [mover])                                  # 4: and exit the way it came
+    # 5: a second diagonal, swapping the first E-N pair that holds two crystals
+    en = geo.pairs(Variation("diagonal", diagonal="EN"))
+    for leg, (_, partner) in sorted(en.items()):
+        if leg in here and partner in here:
+            step("EN", [here[leg], here[partner]])
+            break
+    prog.add(Instruction(type="cool", id=prog.next_id(), broadcast=True))
+    prov.stamp(prog, "programs.swap_or_stay_tour", arch=arch.name)
+    return prog
+
+
 BUILDERS: Mapping[str, Callable[..., TSIR]] = {
     "rotate": rotate,
     "walk": walk,
     "oddeven": odd_even,
     "deck": from_deck,
+    "c2lr": swap_or_stay_tour,
 }
 
 

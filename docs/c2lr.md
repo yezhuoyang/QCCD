@@ -196,6 +196,44 @@ Where this design left a choice open, phase 1 made it as follows (code in `qccd/
 - **Assumed** steps are listed under `assumed` in both verifiers' summaries, and only when
   there is one.
 
+## 6b. Phase 2: what the browser does (2026-10-30)
+
+The page re-runs the replay client-side, so a C2LR step has a twin in `qccd/viz/engine.js`
+(section 7b), held to Python by `tests/test_engine_parity.py` (`c2lr_only_cases`, and inside
+the full corpus).
+
+- **Programme verbs.** `p.swap_or_stay(diagonal, toward)`, `p.swap_or_stay(toward=...,
+  checkerboard={"parity": p, "pairing": "P1"})` and `p.reorder_or_not(reverse)`, on `Program`
+  and as `PCALLS`; the template's shape is refused at the statement, in Python's words. The
+  `c2lr` builder (`qccd.compile.programs.swap_or_stay_tour`) plays every kind of step on any
+  lattice. A C2LR device's listing now carries `set_control(c2lr=...)`, so a replayed listing
+  offers what the document offers.
+- **The frame.** A step's frame carries `c2lr`: the template as written, plus `shift` --
+  each crystal that keeps a leg to itself, `[the junction its shift is measured from, +1
+  toward | -1 away]` -- and `moves`, the device's expansion (leg -> junction -> partner),
+  both from `qccd.verify.c2lr.page_steps`/`frame_view`. Expansion stops at the first step
+  that cannot execute, as the replay does. The lowerer re-derives both for a programme
+  written in the browser (`_c2lrLower`), walking positions and C1's state as `walk` does.
+- **Price and rules.** `priceFrames` expands every step itself from the template's bits and
+  the device (`C2LRTracker`), never from the frame's `moves`, so the R2/R3/R5/R22 exemption
+  (`_c2lrExchange`) is keyed on the walk's own expansion. Its price is the replay's: one
+  primitive per step, movers in leg order then every other crystal, merge + MS + split for a
+  gate in one leg (the merge before R7's snapshot). A model carries the device's context
+  (`makeModel(..., {c2lr: QCCD.c2lrContext(dev, control, name, classes)})`); without it a
+  C2LR step is refused, not priced as shuttles. The C rules are `BROWSER_C2LR_SET`
+  (`render.py`), all ten, dispatched on C2LR devices only and kept out of `BROWSER_SET` and
+  the 21 badges, for the reason `C2LR_RULE_STATEMENTS` is apart from the 28.
+- **The page's own replay** (`applyFrame`) heats a step's crystals by the primitive and a
+  gate in one leg by merge + split; on a C2LR device the checksum covers the `c2lr`
+  channel. (A page whose programme cools after heating reports a self-check drift on every
+  device; that predates C2LR.)
+- **The picture** (`js/transit.js` part 5, and its twin `qccd/viz/transit.py`): a pair that
+  swaps through a junction takes its own sides of it -- the naturally-first crystal cuts the
+  inside of the corner, the other goes round the outside, by 0.31 of the swap bow at the
+  junction and nothing at the legs -- and each crystal in `shift` moves a third of the way
+  to its junction (1/6 of the leg) and back. An enter and an exit are an arrival and a
+  departure: the slot order already puts the entering crystal in the near well.
+
 ## 7. Boards
 
 C2LR designs are ranked on their own releases (the same circuits as the existing boards, with

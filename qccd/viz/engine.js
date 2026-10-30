@@ -2487,6 +2487,31 @@ function makeModel(prims, deg, ce, segs, opts) {
     _anomalousPerUs: (opts.include_anomalous === false || kind === 'deck')
       ? 0 : (opts.anomalous_per_ms || 0) / 1000.0,
     nonTransport: nonTransport,
+    // the C2LR device this model prices (`c2lrContext`), or null: a swap-or-stay step is
+    // expanded from the device, so a model with no device cannot price one
+    _c2lr: opts.c2lr || null,
+    // `CostModel.c2lr_step` / `CorrectedModel.c2lr_step`: [mover, stayer] for one step.  ONE
+    // waveform, so its time is the primitive's however many move, on a channel of its own;
+    // the deck's unit is routing operations, one per mover, as the base class counts it
+    c2lrStep: function (step) {
+      if (kind === 'deck') return [_charge(1, 1, 0, {}), _charge(0, 1, 0, {})];
+      var spec = scalar(step), us = num(spec.us), moved, stayed;
+      if (step === 'swap_or_stay') {
+        moved = num(spec.quanta_swap); stayed = num(spec.quanta_stay);
+      } else {
+        var q0 = num(spec.quanta);
+        moved = own(spec, 'quanta_reverse') ? num(spec.quanta_reverse) : q0;
+        stayed = own(spec, 'quanta_stay') ? num(spec.quanta_stay) : q0;
+      }
+      return [_charge(1, 1, us, { c2lr: moved }), _charge(0, 1, us, { c2lr: stayed })];
+    },
+    // `c2lr_gate`: [merge, split] around a two-qubit gate on the two crystals of one leg
+    c2lrGate: function () {
+      if (kind === 'deck') return [_charge(0, 0, 0, {}), _charge(0, 0, 0, {})];
+      var m = pt('merge'), sp = pt('split');
+      return [_charge(1, 1, num(m.us), { split_merge: num(m.quanta) }),
+              _charge(1, 1, num(sp.us), { split_merge: num(sp.quanta) })];
+    },
     move: function (segId, src, dst, entails) {
       var corner = (ce.get(segId) || 0) === 2;
       if (kind === 'deck') {
@@ -2574,6 +2599,18 @@ function priceFrames(frames, loops, model, classes, opts) {
   // the conveyors and their dead ends, for `_moveEntails`' dock test (`conveyor_nodes`)
   var onLoop = _conveyorNodes(loops, model._segs || {});
   var loopRails = _spurRails(onLoop, model._segs || {});
+  // ON A C2LR DEVICE the two-crystal state of every leg is followed through the whole
+  // programme (C1), as `replay` follows it, and each cycle hands the rules its account of
+  // the legs (`w.c2lr`, the twin of `CycleView.c2lr`).  null on every other device, where
+  // nothing below changes.
+  var c2cx = model._c2lr || null;
+  var trk = (c2cx && c2cx.on && c2cx.geo) ? new C2LRTracker(c2cx) : null;
+  var c2lrNow = null, assumed = [];
+  function _observe(before, instr) {
+    if (!trk) return;
+    var st0 = trk.observe(before, pos, instr);
+    if (onCycle) c2lrNow = _c2lrFacts(trk, st0, before);
+  }
 
   // Overwrite pool slot `i`, growing the pool only when a cycle is wider than any before.
   // `entails` is what R14 judges (the class's declaration); `priced` what the move is charged
@@ -2610,7 +2647,10 @@ function priceFrames(frames, loops, model, classes, opts) {
   var NONE = [];
   function _fire(f, fid, type, cls, mode, nmoves, participants, posBefore, occBefore,
                  quanta, tr, added) {
+    var facts = c2lrNow;
+    c2lrNow = null;
     if (!onCycle) return;
+    w.c2lr = facts;
     w.f = f; w.id = fid; w.type = type; w.cls = cls; w.mode = mode;
     w.nmv = nmoves; w.participants = participants;
     w.posBefore = posBefore; w.pos = pos;
@@ -2630,6 +2670,7 @@ function priceFrames(frames, loops, model, classes, opts) {
     var fc = 0, fd = 0, fus = 0;
     if (onFrame) onFrame(fi, f, pos, occ, q);
     if (f.type === 'init') {
+      var placedBefore = trk ? _shallow(pos) : null;
       for (var k in f.place) if (own(f.place, k)) {
         // a later `init` that re-places an ion must VACATE the node it was on, or the
         // occupancy counters leak a phantom ion no later cycle can clear and R1/R2/R13
@@ -2638,6 +2679,7 @@ function priceFrames(frames, loops, model, classes, opts) {
         pos[k] = f.place[k]; q[k] = 0; life[k] = 0;
         _occSet(f.place[k], +1);
       }
+      if (trk) trk.init(placedBefore, pos);
       // NO CycleView: `replay.py` records an `init` cycle and `continue`s before the rule
       // pass, so a mirror that judged it would report violations Python never can.
     } else if (f.type === 'gate' || f.type === 'measure' || f.type === 'reset' ||
@@ -2646,6 +2688,26 @@ function priceFrames(frames, loops, model, classes, opts) {
       // and before its anomalous term, because R7 asks what the ions are at GATE TIME.
       // Reading `q` after `_anom` disagrees by one cycle's background heating -- invisible
       // in every total, and R7's budget is 1.0 against arrivals at 22.5.
+      // C2LR: the two crystals of a leg sit in two wells after an enter (C1), so a gate on
+      // them is merge, MS, split.  The merge's heat lands BEFORE the n-bar is read, because
+      // that is the n-bar the MS gate sees -- the one R7 bounds -- and the split's after it.
+      var inLeg = null, mg = null;
+      if (trk && f.type === 'gate' && !_singleQubit(f)) {
+        var lp = f.pairs || [], seenL = {};
+        inLeg = [];
+        for (var li = 0; li < lp.length; li++) {
+          var la0 = pos[lp[li][0]];
+          if (la0 === undefined || la0 !== pos[lp[li][1]] || !own(trk.legs, la0)) continue;
+          for (var lj = 0; lj < 2; lj++) {
+            if (!own(seenL, lp[li][lj])) { seenL[lp[li][lj]] = true; inLeg.push(lp[li][lj]); }
+          }
+        }
+        inLeg.sort(_cmpStr);
+        if (inLeg.length) {
+          try { mg = model.c2lrGate(); } catch (err) { mg = null; warnings.push(err.message); }
+        }
+        if (mg) for (var lm = 0; lm < inLeg.length; lm++) _deposit(q, life, comp, inLeg[lm], mg[0].q, peak);
+      }
       var qStart = null;
       if (onCycle && f.type === 'gate') {
         qStart = {};
@@ -2658,6 +2720,11 @@ function priceFrames(frames, loops, model, classes, opts) {
       var ch0;
       try { ch0 = model.nonTransport(f.type, f.gate, _singleQubit(f)); }
       catch (err) { ch0 = _charge(0, 1, 0, {}); warnings.push(err.message); }
+      if (mg) {
+        ch0 = _charge(mg[0].cost + ch0.cost + mg[1].cost, mg[0].depth + ch0.depth + mg[1].depth,
+                      mg[0].us + ch0.us + mg[1].us, ch0.q);
+        for (var ls = 0; ls < inLeg.length; ls++) _deposit(q, life, comp, inLeg[ls], mg[1].q, peak);
+      }
       fc += ch0.cost; fd += ch0.depth; fus += ch0.us;
       _anom(model, pos, q, life, comp, fus, peak);
       if (f.type === 'cool') {
@@ -2668,6 +2735,7 @@ function priceFrames(frames, loops, model, classes, opts) {
         for (var ci = 0; ci < ions.length; ci++) q[ions[ci]] = 0;
       }
       // NOTHING MOVED, so pos_before IS pos and occ_before IS occ.
+      _observe(pos, { id: fid, type: f.type, cls: f.cls, template: false });
       _fire(f, fid, f.type, f.cls === undefined ? null : f.cls,
             f.mode === undefined ? null : f.mode, 0, NONE, pos, occ,
             qStart === null ? q : qStart, EMPTY, NONE);
@@ -2678,13 +2746,77 @@ function priceFrames(frames, loops, model, classes, opts) {
       if (f.cls && classes && own(classes, f.cls) && classes[f.cls].entails) {
         ent = classes[f.cls].entails;
       }
-      if (f.shift) {
+      if (f.c2lr) {
+        // A C2LR STEP, expanded HERE from the template's bits and the device -- never from
+        // the frame's `moves`, which are what the stage draws -- and priced as one primitive
+        // per step: `replay.py`'s template branch, line for line.
+        var kindC = f.c2lr.kind;
+        if (!trk) {
+          throw new EngineError('instruction ' + fid + ': a ' + kindC + ' step needs a C2LR ' +
+                                'device; ' + (c2cx ? c2cx.why
+                                  : 'the page priced it with no device to expand it on'));
+        }
+        var cBefore = _shallow(pos), ex = trk.expand(fid, c2lrTemplate(f), pos), pr;
+        try { pr = model.c2lrStep(kindC); }
+        catch (err) {
+          throw new EngineError('instruction ' + fid + ': ' + err.message +
+                                '; the device prices no ' + kindC + ' step');
+        }
+        var mc = pr[0], sc = pr[1], cst = ex.step, cParts = cst.participants;
+        var cPb = {}, cOb = {}, cTr = {}, cWp = [], cN = 0, cCost = 0, ck;
+        if (cst.assumed) {
+          assumed.push('instruction ' + fid + ': swap-or-stay ' + cst.variation.label + ' -- two ' +
+                       'pairs crossing one junction at once, not demonstrated in ' +
+                       'arXiv:2403.00756 (assumed)');
+        }
+        for (ck = 0; ck < cParts.length; ck++) {
+          var cp = cParts[ck], cj = cp.junction;
+          cCost += mc.cost;
+          if (deg(model, cj) >= 3) transits++;
+          if (onCycle) {
+            _pool(w, cN++, cp.ion, cp.src, cj, cp.via[0], NONE, NONE);
+            _pool(w, cN++, cp.ion, cj, cp.dst, cp.via[1], NONE, NONE);
+            cTr[cj] = (cTr[cj] || 0) + 1;
+            cWp.push(cp.ion);
+            cPb[cp.ion] = cp.src;
+            var cNodes = [cp.src, cj, cp.dst];
+            for (var cq = 0; cq < 3; cq++) {
+              if (cOb[cNodes[cq]] === undefined) cOb[cNodes[cq]] = occ[cNodes[cq]] || 0;
+            }
+          }
+        }
+        // one waveform: the step lasts the primitive's time even if nothing moves, and
+        // every other crystal on the device plays it too (C9)
+        var cUs = Math.max(mc.us, sc.us), cD = Math.max(mc.depth, sc.depth);
+        if (kindC === 'reorder_or_not') cCost = mc.cost * cst.reversed.length;
+        for (ck = 0; ck < cParts.length; ck++) { _occSet(pos[cParts[ck].ion], -1); pos[cParts[ck].ion] = cParts[ck].dst; }
+        for (ck = 0; ck < cParts.length; ck++) _occSet(cParts[ck].dst, +1);
+        // the deposit order is `replay`'s `per_ion_charge`: the movers in leg order, then
+        // every other crystal in id order -- for reorder-or-not every crystal in id order,
+        // the turned ones charged the primitive's own number
+        if (kindC === 'reorder_or_not') {
+          var revd = _c2lrKeys(cst.reversed.reduce(function (o, x) { o[x] = 1; return o; }, {}));
+          for (ck = 0; ck < cst.stayers.length; ck++) {
+            _deposit(q, life, comp, cst.stayers[ck], own(revd, cst.stayers[ck]) ? mc.q : sc.q, peak);
+          }
+        } else {
+          for (ck = 0; ck < cParts.length; ck++) _deposit(q, life, comp, cParts[ck].ion, mc.q, peak);
+          for (ck = 0; ck < cst.stayers.length; ck++) _deposit(q, life, comp, cst.stayers[ck], sc.q, peak);
+        }
+        _anom(model, pos, q, life, comp, cUs, peak);
+        fc += cCost; fd += cD; fus += cUs;
+        work += cN + 1;
+        if (onCycle) c2lrNow = _c2lrFacts(trk, cst, cBefore);
+        _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
+              f.mode === undefined ? null : f.mode, cN, cWp, cPb, cOb, q, cTr, NONE);
+      } else if (f.shift) {
         var loop = f.shift[0], delta = f.shift[1], seq = loops[loop];
         if (!seq) { warnings.push('frame ' + fi + ' shifts unknown loop ' + loop); }
         else if (Number(delta) === 0) {
           // a zero-hop rotation is a real (if degenerate) cycle: Python returns one empty
           // sub-cycle so its claims are still exposed to the rules rather than waved
           // through by an instruction that produced no trace at all
+          _observe(pos, { id: fid, type: 'simd', cls: f.cls, template: true });
           _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
                 f.mode === undefined ? null : f.mode, 0, NONE, pos, occ, q, EMPTY, NONE);
         } else {
@@ -2693,6 +2825,7 @@ function priceFrames(frames, loops, model, classes, opts) {
           // |delta| = n is n SEPARATE CYCLES, each with its own max depth and duration.
           for (var h = 0; h < Math.abs(delta); h++) {
             var subC = 0, subD = 0, subUs = 0;
+            var subBefore = trk ? _shallow(pos) : null;
             var ionIds = Object.keys(pos).sort(_cmpStr);   // participants sorted by ion id
             var moved = {}, wParts = [], pb = {}, ob = {}, nmv = 0;
             // the cycle's participants first, so what each one splits and merges can be
@@ -2736,6 +2869,7 @@ function priceFrames(frames, loops, model, classes, opts) {
                 '); run `python -m qccd run` instead of reporting a number that was not computed');
             }
             // TRANSPORT reads POST-cycle quanta, unlike a gate.
+            _observe(subBefore, { id: fid, type: 'simd', cls: f.cls, template: true });
             _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
                   f.mode === undefined ? null : f.mode, nmv, wParts, pb, ob, q, EMPTY,
                   NONE);
@@ -2743,6 +2877,7 @@ function priceFrames(frames, loops, model, classes, opts) {
         }
       } else if (f.moves) {
         var wParts2 = [], pb2 = {}, ob2 = {}, tr2 = {}, nmv2 = 0;
+        var movBefore = trk ? _shallow(pos) : null;
         var origPos = {}, finalPos = {}, mv;
         // OCCUPANCY IS SNAPSHOTTED BEFORE ANYTHING MOVES and applied after everything
         // has: `replay.py` computes every charge, then decrements every source, then
@@ -2823,11 +2958,13 @@ function priceFrames(frames, loops, model, classes, opts) {
         }
         var added2 = [];
         for (var a2 in pb2) if (own(pb2, a2) && pb2[a2] === undefined) added2.push(a2);
+        _observe(movBefore, { id: fid, type: 'simd', cls: f.cls, template: false });
         _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
               f.mode === undefined ? null : f.mode, nmv2, wParts2, pb2, ob2, q, tr2,
               added2);
       } else {
         // a simd cycle with no template and no participants is still a cycle
+        _observe(pos, { id: fid, type: 'simd', cls: f.cls, template: false });
         _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
               f.mode === undefined ? null : f.mode, 0, NONE, pos, occ, q, EMPTY, NONE);
       }
@@ -2837,7 +2974,16 @@ function priceFrames(frames, loops, model, classes, opts) {
   }
   return { totals: totals, comp: comp, perFrame: perFrame, life: life, q: q,
            transits: transits, peak: peak.v, peakIon: peak.ion, warnings: warnings,
-           occ: occ, pos: pos };
+           occ: occ, pos: pos, assumed: assumed };
+}
+// What one cycle hands the C rules: the tracker's step, and the state before it in full
+// (`CycleView.pos_before` / `occ_before`, which C1, C5 and C7 judge when nothing judged it
+// yet).  Built only when the rules are listening.
+function _c2lrFacts(trk, s, before) {
+  var ob = {};
+  for (var ion in before) if (own(before, ion)) ob[before[ion]] = (ob[before[ion]] || 0) + 1;
+  s.posBefore = before; s.occBefore = ob; s.legs = trk.geo.legs; s.legSet = trk.legs;
+  return s;
 }
 // `peak` is the peak of the RUNNING n-bar -- the accumulator a cool ZEROES -- and NOT of
 // the lifetime deposit, which is what the checksum sums.  Two accumulators, and conflating
@@ -2969,6 +3115,711 @@ function pairIndex(dev) {
     out[s.b + '>' + s.a] = sid;
   }
   return out;
+}
+
+// =====================================================================================
+// 7b. C2LR SWAP-OR-STAY -- `qccd/arch/c2lr.py` and `qccd/verify/c2lr.py`, line for line
+// =====================================================================================
+//
+// A C2LR device (docs/c2lr.md, arXiv:2403.00756) moves its crystals by direction bits and
+// one shared junction waveform, so a step's routes are the DEVICE's matching and never the
+// programme's.  The browser has to expand a step itself, for three reasons: a programme
+// written here has no Python expansion to draw (`_c2lrLower`), the re-pricer charges one
+// primitive per step and has to know who moved (`priceFrames`), and R2/R3/R5/R22 exempt a
+// step only BECAUSE its routes came from the device.  A frame's `moves` are drawing data;
+// an exemption keyed on them would be one a programme could claim by writing them.  So the
+// twin expands from the template's bits and the device, as `C2LRTracker.expand` does, and
+// `tests/test_engine_parity.py` compares the two on every C2LR programme in its corpus.
+//
+// The legs' two-crystal state (C1) is a fact about the whole history, so the tracker is
+// carried through every frame of a walk, exactly as the replay carries its one.
+
+//: The four single diagonals the paper demonstrates, and the proposal's two-pair steps.
+var C2LR_DIAGONALS = ['WS', 'WN', 'ES', 'EN'];
+var C2LR_PAIRINGS = { P1: [['W', 'S'], ['N', 'E']], P2: [['W', 'N'], ['S', 'E']] };
+var C2LR_TEMPLATES = ['swap_or_stay', 'reorder_or_not'];
+//: `qccd.ir.tsir.TEMPLATE_KINDS`, for the refusal that names them
+var C2LR_TEMPLATE_KINDS = ['loop_shift', 'swap_or_stay', 'reorder_or_not'];
+var C2LR_OPPOSITE = { W: 'E', E: 'W', N: 'S', S: 'N' };
+var C2LR_EPS = 1e-6;
+
+// `NotC2LR`: the device is not a C2LR lattice, so a swap-or-stay step has no matching on it
+function NotC2LR(msg) { EngineError.call(this, msg); this.name = 'NotC2LR'; }
+NotC2LR.prototype = Object.create(EngineError.prototype);
+NotC2LR.prototype.constructor = NotC2LR;
+
+function _c2lrDir(dx, dy) {
+  if (Math.abs(dy) <= C2LR_EPS && Math.abs(dx) > C2LR_EPS) return dx > 0 ? 'E' : 'W';
+  // y grows down the page: N is the smaller y
+  if (Math.abs(dx) <= C2LR_EPS && Math.abs(dy) > C2LR_EPS) return dy > 0 ? 'S' : 'N';
+  return null;
+}
+
+// `variation_of`: the step type a template names, with C1's comparison key and its label
+function c2lrVariation(tpl) {
+  var v;
+  if (tpl.diagonal !== undefined && tpl.diagonal !== null) {
+    v = { form: 'diagonal', diagonal: String(tpl.diagonal), parity: null, pairing: null };
+  } else {
+    var cb = tpl.checkerboard || {};
+    v = { form: 'checkerboard', diagonal: null, parity: Math.trunc(Number(unbox(cb.parity))),
+          pairing: String(cb.pairing) };
+  }
+  v.key = v.form + '|' + v.diagonal + '|' + v.parity + '|' + v.pairing;
+  v.assumed = v.form === 'checkerboard';
+  v.label = v.form === 'diagonal' ? v.diagonal
+          : 'checkerboard ' + v.pairing + ' at parity ' + v.parity;
+  v.arms = v.form === 'diagonal' ? [[v.diagonal[0], v.diagonal[1]]]
+         : (C2LR_PAIRINGS[v.pairing] || []);
+  return v;
+}
+
+// `_build`: the lattice read off the device, or the reason it is not one -- the same
+// sentence `qccd.arch.c2lr` says, because the page's refusal says what Python would
+function _c2lrBuild(dev) {
+  var legs = [], junctions = [], nid, sid, i;
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    (dev.nodes[nid].kind === 'site' ? legs : junctions).push(nid);
+  }
+  legs.sort(_cmpStr); junctions.sort(_cmpStr);
+  if (!legs.length) throw new NotC2LR('the device has no legs: no site to hold a crystal');
+  var inc = {};
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) inc[nid] = [];
+  for (sid in dev.segments) if (own(dev.segments, sid)) {
+    var sg = dev.segments[sid];
+    inc[sg.a].push(sid); inc[sg.b].push(sid);
+  }
+  var pos = {};
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    var p = dev.nodes[nid].pos;
+    pos[nid] = [Number(p[0]), p.length > 1 ? Number(p[1]) : 0.0];
+  }
+  var arm = {}, ends = {}, rail = {};
+  for (i = 0; i < junctions.length; i++) arm[junctions[i]] = {};
+  for (i = 0; i < legs.length; i++) {
+    var leg = legs[i], segs = inc[leg];
+    if (segs.length !== 2) {
+      throw new NotC2LR('leg ' + leg + ' has ' + segs.length + " rails; a leg is a wire's " +
+                        'centre, joined to the two junctions it lies between');
+    }
+    var here = {}, order = [];
+    for (var k = 0; k < 2; k++) {
+      var s = dev.segments[segs[k]], j = s.a === leg ? s.b : s.a;
+      if (dev.nodes[j].kind === 'site') {
+        throw new NotC2LR('leg ' + leg + ' is joined to ' + j + ", another site; a leg's " +
+                          'rails end at junctions');
+      }
+      var d = _c2lrDir(pos[leg][0] - pos[j][0], pos[leg][1] - pos[j][1]);
+      if (d === null) throw new NotC2LR('leg ' + leg + ' is not on an axis through junction ' + j);
+      if (own(arm[j], d)) {
+        throw new NotC2LR('junction ' + j + ' has two ' + d + ' legs (' + arm[j][d] + ' and ' +
+                          leg + ')');
+      }
+      arm[j][d] = leg;
+      if (!own(here, j)) order.push(j);
+      here[j] = d;
+      rail[leg + '>' + j] = segs[k];
+    }
+    if (order.length !== 2 || C2LR_OPPOSITE[here[order[0]]] !== here[order[1]]) {
+      var j1 = order[0], j2 = order.length > 1 ? order[1] : order[0];
+      throw new NotC2LR('leg ' + leg + ' is not between its junctions ' + j1 + ' and ' + j2 +
+                        ': it is their ' + here[j1] + ' and ' + here[j2] + ' arm (a ' +
+                        'wrap-around wire is not a leg)');
+    }
+    ends[leg] = { order: order, arm: here };
+  }
+  for (i = 0; i < junctions.length; i++) {
+    var js = inc[junctions[i]];
+    for (var q = 0; q < js.length; q++) {
+      var t = dev.segments[js[q]], o = t.a === junctions[i] ? t.b : t.a;
+      if (dev.nodes[o].kind !== 'site') {
+        throw new NotC2LR('junction ' + junctions[i] + ' is joined straight to another ' +
+                          'junction; every wire of a C2LR lattice carries a leg');
+      }
+    }
+  }
+  // the checkerboard: (r + c) mod 2 by the junctions' ranks along each axis, and only if
+  // every leg then joins two colours
+  var xs = {}, ys = {}, xl = [], yl = [];
+  for (i = 0; i < junctions.length; i++) {
+    var x6 = _pyRound6(pos[junctions[i]][0]), y6 = _pyRound6(pos[junctions[i]][1]);
+    if (!own(xs, x6)) { xs[x6] = true; xl.push(x6); }
+    if (!own(ys, y6)) { ys[y6] = true; yl.push(y6); }
+  }
+  xl.sort(_cmpNum); yl.sort(_cmpNum);
+  var rx = {}, ry = {};
+  for (i = 0; i < xl.length; i++) rx[xl[i]] = i;
+  for (i = 0; i < yl.length; i++) ry[yl[i]] = i;
+  var colour = {};
+  for (i = 0; i < junctions.length; i++) {
+    var jn = junctions[i];
+    colour[jn] = (rx[_pyRound6(pos[jn][0])] + ry[_pyRound6(pos[jn][1])]) % 2;
+  }
+  for (i = 0; i < legs.length; i++) {
+    var e = ends[legs[i]].order;
+    if (colour[e[0]] === colour[e[1]]) { colour = null; break; }
+  }
+  var legSet = {};
+  for (i = 0; i < legs.length; i++) legSet[legs[i]] = true;
+  return { legs: legs, legSet: legSet, junctions: junctions, arm: arm, ends: ends,
+           rail: rail, colour: colour, _pairs: {} };
+}
+
+// `C2LRGeometry.pairs`: leg -> [the junction it is paired at, its partner leg] under `v`
+function c2lrPairs(geo, v) {
+  if (own(geo._pairs, v.key)) return geo._pairs[v.key];
+  if (v.form === 'checkerboard' && geo.colour === null) {
+    throw new NotC2LR('this lattice has no checkerboard colouring: some leg joins two ' +
+                      'junctions of the same colour');
+  }
+  var out = {};
+  for (var i = 0; i < geo.junctions.length; i++) {
+    var j = geo.junctions[i];
+    if (v.form === 'checkerboard' && geo.colour[j] !== v.parity) continue;
+    var arms = geo.arm[j] || {};
+    for (var k = 0; k < v.arms.length; k++) {
+      var la = arms[v.arms[k][0]], lb = arms[v.arms[k][1]];
+      if (la === undefined || lb === undefined) continue;
+      out[la] = [j, lb];
+      out[lb] = [j, la];
+    }
+  }
+  return (geo._pairs[v.key] = out);
+}
+
+// `C2LRGeometry.junction_of`: the end at which `leg` is one of the variation's arms -- what
+// the page draws a stayer's shift against
+function c2lrJunctionOf(geo, leg, v) {
+  if (v.form === 'checkerboard' && geo.colour === null) return null;
+  if (!own(geo.ends, leg)) return null;
+  var names = {};
+  for (var k = 0; k < v.arms.length; k++) { names[v.arms[k][0]] = true; names[v.arms[k][1]] = true; }
+  var e = geo.ends[leg];
+  for (var i = 0; i < e.order.length; i++) {
+    var j = e.order[i];
+    if (v.form === 'checkerboard' && geo.colour[j] !== v.parity) continue;
+    if (own(names, e.arm[j])) return j;
+  }
+  return null;
+}
+
+// `declared`: what the device's `control.c2lr` block offers
+function c2lrDeclared(control) {
+  var b = (control && control.c2lr) || {};
+  var list = function (v, dflt) { return (v === undefined ? dflt : v).map(function (x) { return String(x); }); };
+  return { diagonals: list(b.diagonals, C2LR_DIAGONALS), checkerboard: list(b.checkerboard, []),
+           assumed: list(b.assumed, ['checkerboard']),
+           shared_signals: b.shared_signals, inputs_per_leg: b.inputs_per_leg,
+           switches_per_leg: b.switches_per_leg };
+}
+
+function isC2LR(control) {
+  return !!control && own(control, 'model') && _pyStrOf(control.model) === 'c2lr';
+}
+
+// Everything a walk needs to know about one device, built once: whether it declares C2LR
+// control, its lattice (or why it has none), what it offers, and its class table.  `null`
+// geometry with a reason is a device that declares C2LR and is not a lattice.  Cached on
+// the device OBJECT, as `qccd.arch.c2lr` caches by identity: the editor re-derives the
+// device on every edit, so a stale entry can never be read.
+var _C2LR_CACHE = (typeof WeakMap === 'function') ? new WeakMap() : null;
+function c2lrContext(dev, control, name, classes) {
+  var label = pyRepr(name === undefined || name === null ? 'device' : String(name));
+  if (!isC2LR(control)) {
+    var model = control && own(control, 'model') ? _pyStrOf(control.model) : 'simd_classes';
+    return { on: false, geo: null, offer: null, classes: classes || {},
+             why: 'device ' + label + ' does not declare C2LR control (control.model is ' +
+                  pyRepr(model) + ", not 'c2lr')" };
+  }
+  var hit = _C2LR_CACHE ? _C2LR_CACHE.get(dev) : null;
+  if (!hit) {
+    try { hit = { geo: _c2lrBuild(dev), why: null }; }
+    catch (err) {
+      if (!(err instanceof NotC2LR)) throw err;
+      hit = { geo: null, why: err.message };
+    }
+    if (_C2LR_CACHE) _C2LR_CACHE.set(dev, hit);
+  }
+  return { on: true, geo: hit.geo, offer: c2lrDeclared(control), classes: classes || {},
+           why: hit.why === null ? 'it is one' : 'device ' + label + ': ' + hit.why };
+}
+
+// `template_problems`, for the two C2LR kinds: the template's SHAPE (C2)
+function c2lrShape(tpl, participants) {
+  var kind = tpl.kind;
+  if (C2LR_TEMPLATES.indexOf(kind) < 0) {
+    return ['unknown movement template kind ' + pyRepr(kind === undefined ? null : kind) +
+            ' (known: ' + C2LR_TEMPLATE_KINDS.join(', ') + ')'];
+  }
+  var out = [], allowed = kind === 'swap_or_stay'
+    ? { kind: 1, diagonal: 1, checkerboard: 1, toward: 1 } : { kind: 1, reverse: 1 };
+  var extra = [];
+  for (var k in tpl) if (own(tpl, k) && !own(allowed, k)) extra.push(k);
+  extra.sort(_cmpStr);
+  if (extra.length) {
+    out.push('a ' + kind + ' template carries ' + extra.map(pyRepr).join(', ') +
+             '; its only per-crystal choice is the list it names (C2)');
+  }
+  if (participants && participants.length) {
+    out.push('a ' + kind + " step lists its own participants; its routes are the device's " +
+             "matching, never the programme's (C2)");
+  }
+  var ions = function (v, what) {
+    if (!Array.isArray(v) || !v.every(function (x) { return typeof x === 'string'; })) {
+      return ['`' + what + '` must be a list of ion names'];
+    }
+    var dup = [];
+    for (var i = 0; i < v.length; i++) {
+      if (v.indexOf(v[i]) !== v.lastIndexOf(v[i]) && dup.indexOf(v[i]) < 0) dup.push(v[i]);
+    }
+    dup.sort(_cmpStr);
+    return dup.length ? ['`' + what + '` names ' + pyRepr(dup[0]) + ' twice'] : [];
+  };
+  if (kind === 'reorder_or_not') return out.concat(ions(tpl.reverse === undefined ? [] : tpl.reverse, 'reverse'));
+  var hasD = tpl.diagonal !== undefined && tpl.diagonal !== null;
+  var hasC = tpl.checkerboard !== undefined && tpl.checkerboard !== null;
+  if (hasD === hasC) {
+    out.push('a swap_or_stay template names exactly one of `diagonal` and `checkerboard`');
+  } else if (hasD && C2LR_DIAGONALS.indexOf(tpl.diagonal) < 0) {
+    out.push('diagonal ' + pyRepr(tpl.diagonal) + ' is not one of ' + C2LR_DIAGONALS.join(', '));
+  } else if (hasC) {
+    var cb = tpl.checkerboard, keys = _isPlainObject(cb) ? Object.keys(cb).sort(_cmpStr) : null;
+    if (!keys || keys.join(',') !== 'pairing,parity') {
+      out.push('`checkerboard` is {"parity": 0 | 1, "pairing": "P1" | "P2"}');
+    } else {
+      var par = unbox(cb.parity);
+      if (typeof par === 'boolean' || (par !== 0 && par !== 1)) {
+        out.push('checkerboard parity ' + pyRepr(cb.parity) + ' is not 0 or 1');
+      }
+      if (cb.pairing !== 'P1' && cb.pairing !== 'P2') {
+        out.push('checkerboard pairing ' + pyRepr(cb.pairing) + ' is not P1 or P2');
+      }
+    }
+  }
+  return out.concat(ions(tpl.toward === undefined ? [] : tpl.toward, 'toward'));
+}
+
+// The template a frame carries, without the drawing's `shift`: what the programme wrote.
+function c2lrTemplate(f) {
+  var t = {};
+  for (var k in f.c2lr) if (own(f.c2lr, k) && k !== 'shift') t[k] = _deep(f.c2lr[k]);
+  return t;
+}
+
+function _c2lrSorted(o) { return Object.keys(o).sort(_cmpStr); }
+function _c2lrKeys(o) {
+  var out = {};
+  for (var k in o) if (own(o, k)) out[k] = true;
+  return out;
+}
+
+// `C2LRTracker`: the two-crystal state of every leg, followed through a programme.
+//   near     crystal -> the junction it is nearer, for a crystal sharing its leg
+//   entered  crystal -> [variation key, junction, leg, label] of the enter that put it in
+function C2LRTracker(cx) {
+  this.cx = cx; this.geo = cx.geo; this.legs = cx.geo.legSet;
+  this.near = {}; this.entered = {}; this.fresh = true;
+}
+C2LRTracker.prototype.save = function () {
+  return { near: _shallow(this.near), entered: _shallow(this.entered), fresh: this.fresh };
+};
+C2LRTracker.prototype.restore = function (s) {
+  this.near = s.near; this.entered = s.entered; this.fresh = s.fresh;
+};
+C2LRTracker.prototype.contents = function (pos) {
+  var out = {};
+  for (var ion in pos) if (own(pos, ion)) {
+    var s = pos[ion];
+    if (own(this.legs, s)) (out[s] || (out[s] = [])).push(ion);
+  }
+  for (var l in out) if (own(out, l)) out[l].sort(_cmpStr);
+  return out;
+};
+// the legs C1's exception covers now: two crystals, exactly one of which entered by an enter
+C2LRTracker.prototype.excepted = function (pos) {
+  var c = this.contents(pos), out = {};
+  for (var leg in c) if (own(c, leg)) {
+    if (c[leg].length !== 2) continue;
+    var rec = 0;
+    for (var i = 0; i < 2; i++) {
+      var e = this.entered[c[leg][i]];
+      if (e && e[2] === leg) rec++;
+    }
+    if (rec === 1) out[leg] = true;
+  }
+  return out;
+};
+C2LRTracker.prototype.settle = function (pos) {
+  var c = this.contents(pos), ion, leg;
+  for (ion in this.near) if (own(this.near, ion)) {
+    leg = pos[ion];
+    if (!own(c, leg) || c[leg].length < 2) delete this.near[ion];
+  }
+  for (ion in this.entered) if (own(this.entered, ion)) {
+    leg = pos[ion];
+    if (this.entered[ion][2] !== leg || !own(c, leg) || c[leg].length < 2) delete this.entered[ion];
+  }
+};
+C2LRTracker.prototype.exitProblems = function (leaving, before, v, how) {
+  var out = [], exc = this.excepted(before), ions = _c2lrSorted(leaving);
+  for (var i = 0; i < ions.length; i++) {
+    var ion = ions[i], leg = leaving[ion];
+    if (!own(exc, leg)) continue;
+    var rec = this.entered[ion];
+    if (!rec || rec[2] !== leg) {
+      out.push(ion + ' leaves leg ' + leg + ' by ' + how + ', but ' + leg + ' holds two ' +
+               'crystals and ' + ion + ' is not the one that entered it: only the crystal ' +
+               'that entered may leave (C1)');
+    } else if (v === null || rec[0] !== v.key) {
+      out.push(ion + ' entered leg ' + leg + ' by ' + rec[3] + ' and leaves it by ' + how +
+               '; it must leave by the step type it entered by (C1)');
+    }
+  }
+  return out;
+};
+// `observe`: a cycle that is not a C2LR template.  `instr` is `{id, type, cls, template}`
+// (`template` true for a rotation) or null for a re-placement.
+C2LRTracker.prototype.observe = function (before, after, instr) {
+  var excB = this.excepted(before), moved = [], ion;
+  for (ion in before) if (own(before, ion) && after[ion] !== before[ion]) moved.push(ion);
+  var c1 = [], c2 = [];
+  if (instr) {
+    var what = 'a plain ' + (instr.cls ? instr.cls : 'move') + ' step', leaving = {};
+    for (var i = 0; i < moved.length; i++) {
+      if (own(this.legs, before[moved[i]])) leaving[moved[i]] = before[moved[i]];
+    }
+    c1 = this.exitProblems(leaving, before, null, what);
+    if (instr.type === 'simd' && !instr.template && _c2lrClass(this.cx, instr.cls)) {
+      c2.push('a ' + instr.cls + " step lists its own routes; a C2LR step's only per-leg " +
+              "choice is the direction bit, and its routes are the device's (C2)");
+    }
+  }
+  for (var m = 0; m < moved.length; m++) { delete this.near[moved[m]]; delete this.entered[moved[m]]; }
+  this.settle(after);
+  var check = this.fresh;
+  this.fresh = instr === null;
+  return _c2lrStep({ c1: c1, c2: c2, excBefore: excB, excAfter: this.excepted(after),
+                     checkBefore: check });
+};
+C2LRTracker.prototype.init = function (before, after) { this.observe(before, after, null); };
+
+function _c2lrClass(cx, cls) {
+  if (!cls) return false;
+  if (C2LR_TEMPLATES.indexOf(cls) >= 0) return true;
+  var c = cx.classes && own(cx.classes, cls) ? cx.classes[cls] : null;
+  return !!c && _pyStrOf(c.type === undefined ? null : c.type) === 'c2lr';
+}
+
+function _c2lrStep(o) {
+  var s = { kind: 'other', variation: null, participants: [], movers: [], stayers: [],
+            reversed: [], heated: null, c1: [], c2: [], c6: [], excBefore: {}, excAfter: {},
+            checkBefore: false };
+  for (var k in o) if (own(o, k)) s[k] = o[k];
+  s.exchange = s.kind === 'swap_or_stay';
+  s.template = C2LR_TEMPLATES.indexOf(s.kind) >= 0;
+  s.assumed = !!(s.variation && s.variation.assumed);
+  return s;
+}
+
+C2LRTracker.prototype._inLeg = function (id, ion, pos, what) {
+  if (!own(pos, ion)) {
+    throw new EngineError('instruction ' + id + ': ' + what + ' names ' + ion + ', which is not placed');
+  }
+  var site = pos[ion];
+  if (!own(this.legs, site)) {
+    throw new EngineError('instruction ' + id + ': ' + what + ' names ' + ion + ', which is at ' +
+                          site + ', not in a leg; a C2LR step shifts crystals in legs');
+  }
+  return site;
+};
+
+// `expand`: a C2LR template at positions `pos` -> `{step, after}`.  Throws EngineError,
+// worded as the replay's ReplayError, for a step that cannot execute.
+C2LRTracker.prototype.expand = function (id, tpl, pos) {
+  var bad = c2lrShape(tpl, []);
+  if (bad.length) throw new EngineError('instruction ' + id + ': ' + bad[0]);
+  var kind = tpl.kind, ion, i;
+  var check = this.fresh;
+  this.fresh = false;
+  var excB = this.excepted(pos);
+  if (kind === 'reorder_or_not') {
+    var rev = (tpl.reverse || []).map(String);
+    for (i = 0; i < rev.length; i++) this._inLeg(id, rev[i], pos, 'reorder_or_not');
+    return { step: _c2lrStep({ kind: kind, reversed: rev, stayers: _c2lrSorted(pos),
+                               heated: _c2lrKeys(pos), excBefore: excB, excAfter: excB,
+                               checkBefore: check }),
+             after: _shallow(pos) };
+  }
+  var v = c2lrVariation(tpl), pairs;
+  try { pairs = c2lrPairs(this.geo, v); }
+  catch (err) { throw new EngineError('instruction ' + id + ': ' + err.message); }
+  var offer = this.cx.offer, c6 = [], c1 = [];
+  if (v.form === 'diagonal' && offer.diagonals.indexOf(v.diagonal) < 0) {
+    c6.push('the device does not offer diagonal ' + v.diagonal + ' (it offers ' +
+            (offer.diagonals.join(', ') || 'none') + ') (C6)');
+  }
+  if (v.form === 'checkerboard' && offer.checkerboard.indexOf(v.pairing) < 0) {
+    c6.push('the device does not offer the checkerboard pairing ' + v.pairing + ' (it offers ' +
+            (offer.checkerboard.join(', ') || 'none') + ') (C6)');
+  }
+  var contents = this.contents(pos), toward = {}, bits = (tpl.toward || []).map(String);
+  for (i = 0; i < bits.length; i++) {
+    ion = bits[i];
+    var leg = this._inLeg(id, ion, pos, 'swap_or_stay'), pair = pairs[leg];
+    if (pair === undefined) {
+      c6.push(ion + ' is shifted toward a junction from leg ' + leg + ', which has no partner ' +
+              'under ' + v.label + " (the device's edge); a crystal there can only stay (C6)");
+      continue;
+    }
+    if ((contents[leg] || []).length > 1 && this.near[ion] !== pair[0]) {
+      c1.push(ion + ' cannot shift toward ' + pair[0] + ': leg ' + leg + ' holds two crystals ' +
+              'and the one nearer ' + pair[0] + ' is in the way (C1)');
+      continue;
+    }
+    toward[leg] = ion;
+  }
+  // the exchange: at every pair, the crystal toward the junction in one leg crosses to the
+  // other, leg -> junction -> partner leg, along the device's own two rails
+  var moves = [], where = {}, legs = _c2lrSorted(toward);
+  for (i = 0; i < legs.length; i++) {
+    var l = legs[i], who = toward[l], jp = pairs[l];
+    moves.push({ ion: who, src: l, dst: jp[1], junction: jp[0],
+                 via: [this.geo.rail[l + '>' + jp[0]], this.geo.rail[jp[1] + '>' + jp[0]]] });
+    where[who] = jp;
+  }
+  var after = _shallow(pos), leavers = {};
+  for (i = 0; i < moves.length; i++) { after[moves[i].ion] = moves[i].dst; leavers[moves[i].ion] = moves[i].src; }
+  c1 = c1.concat(this.exitProblems(leavers, pos, v, 'swap-or-stay ' + v.label));
+  var nc = this.contents(after);
+  for (i = 0; i < moves.length; i++) { delete this.near[moves[i].ion]; delete this.entered[moves[i].ion]; }
+  for (i = 0; i < moves.length; i++) {
+    var mv = moves[i], j = where[mv.ion][0], into = where[mv.ion][1], here = nc[into] || [];
+    if (here.length > 2) {
+      c1.push('leg ' + into + ' would hold ' + here.length + ' crystals after ' + mv.ion +
+              ' enters it (C1: at most two, and two only between an enter and its exit)');
+    } else if (here.length === 2) {
+      var other = here[0] === mv.ion ? here[1] : here[0];
+      this.near[mv.ion] = j;
+      if (!own(where, other)) {
+        // an ENTER: the crystal joins one that stayed
+        this.entered[mv.ion] = [v.key, j, into, 'swap-or-stay ' + v.label];
+        var e = this.geo.ends[into].order, far = e[0] !== j ? e[0] : e[1];
+        if (!own(this.near, other)) this.near[other] = far;
+      }
+    }
+  }
+  this.settle(after);
+  var movers = moves.map(function (x) { return x.ion; }).sort(_cmpStr), isMover = {}, stay = [];
+  for (i = 0; i < movers.length; i++) isMover[movers[i]] = true;
+  var all = _c2lrSorted(pos);
+  for (i = 0; i < all.length; i++) if (!own(isMover, all[i])) stay.push(all[i]);
+  return { step: _c2lrStep({ kind: kind, variation: v, participants: moves, movers: movers,
+                             stayers: stay, heated: _c2lrKeys(pos), c1: c1, c6: c6, excBefore: excB,
+                             excAfter: this.excepted(after), checkBefore: check }),
+           after: after };
+};
+
+// `frame_view`'s `shift`: every crystal that keeps a leg to itself through a swap-or-stay
+// step, as [the junction its C2LR shift is measured from, +1 toward | -1 away]
+function c2lrShift(geo, step, tpl, before, after) {
+  var out = {}, nb = {}, na = {}, ion, toward = {};
+  if (step.kind !== 'swap_or_stay' || !step.variation) return out;
+  for (ion in before) if (own(before, ion)) nb[before[ion]] = (nb[before[ion]] || 0) + 1;
+  for (ion in after) if (own(after, ion)) na[after[ion]] = (na[after[ion]] || 0) + 1;
+  var bits = tpl.toward || [];
+  for (var b = 0; b < bits.length; b++) toward[String(bits[b])] = true;
+  for (var i = 0; i < step.stayers.length; i++) {
+    ion = step.stayers[i];
+    var leg = before[ion];
+    if (!own(geo.legSet, leg) || after[ion] !== leg) continue;
+    if (nb[leg] !== 1 || na[leg] !== 1) continue;
+    var j = c2lrJunctionOf(geo, leg, step.variation);
+    if (j !== null) out[ion] = [j, own(toward, ion) ? 1 : -1];
+  }
+  return out;
+}
+
+// THE LOWERER'S WALK: `qccd.verify.c2lr.walk`, which `page_steps` draws a programme from.
+// Positions alone, through every frame the lowerer emits, so an authored swap-or-stay
+// frame carries the same `moves` and `shift` a Python-built page would.  Like
+// `page_steps`, it stops expanding at the first step that cannot execute: the replay
+// refuses the programme there and nothing after it has a position to be drawn from.
+function _c2lrWalker(ctx) {
+  var cx = ctx.c2lr;
+  if (!cx || !cx.on || !cx.geo) return null;
+  return ctx._walk || (ctx._walk = { pos: {}, trk: new C2LRTracker(cx), dead: false });
+}
+function _c2lrInit(ctx, place) {
+  var w = _c2lrWalker(ctx);
+  if (!w || w.dead) return;
+  var before = _shallow(w.pos);
+  for (var k in place) if (own(place, k)) w.pos[k] = place[k];
+  w.trk.init(before, w.pos);
+}
+function _c2lrRotate(ctx, loop, delta, cls) {
+  var w = _c2lrWalker(ctx);
+  if (!w || w.dead) return;
+  var before = _shallow(w.pos), lp = ctx.dev.loops[loop];
+  if (lp && delta) {
+    var seq = lp.nodes, k = seq.length, step = delta > 0 ? 1 : -1, idx = {}, i;
+    for (i = 0; i < k; i++) idx[seq[i]] = i;
+    for (var h = 0; h < Math.abs(delta); h++) {
+      var next = {};
+      for (var ion in w.pos) if (own(w.pos, ion)) {
+        var at = idx[w.pos[ion]];
+        next[ion] = at === undefined ? w.pos[ion] : seq[((at + step) % k + k) % k];
+      }
+      w.pos = next;
+    }
+  }
+  w.trk.observe(before, w.pos, { type: 'simd', cls: cls, template: true });
+}
+function _c2lrMoves(ctx, cls, moves) {
+  var w = _c2lrWalker(ctx);
+  if (!w || w.dead) return;
+  var before = _shallow(w.pos);
+  for (var i = 0; i < moves.length; i++) {
+    var path = moves[i][1];
+    w.pos[moves[i][0]] = path[path.length - 1];
+  }
+  w.trk.observe(before, w.pos, { type: 'simd', cls: cls, template: false });
+}
+// a swap-or-stay or reorder-or-not statement: its frame, expanded where the walk can
+function _c2lrLower(ctx, cls, tpl) {
+  var f = { type: 'simd', cls: cls, mode: 'inter', moves: [], entails: [], c2lr: _deep(tpl) };
+  var w = _c2lrWalker(ctx);
+  if (!w || w.dead) return f;
+  var before = w.pos, got;
+  try { got = w.trk.expand(ctx.idSeq, tpl, before); }
+  catch (err) { w.dead = true; return f; }
+  var parts = got.step.participants;
+  for (var i = 0; i < parts.length; i++) {
+    f.moves.push([parts[i].ion, [parts[i].src, parts[i].junction, parts[i].dst]]);
+  }
+  if (tpl.kind === 'swap_or_stay') f.c2lr.shift = c2lrShift(w.trk.geo, got.step, tpl, before, got.after);
+  w.pos = got.after;
+  return f;
+}
+
+// THE RULES THE BROWSER CHECKS ON A C2LR DEVICE, from the facts `priceFrames` put on the
+// window (`w.c2lr`, the twin of `CycleView.c2lr`).  Silent on every other device, where the
+// window carries none.  C3 and C4 hold by construction, and are run anyway, as in Python.
+function _c1(w) {
+  var s = w.c2lr;
+  if (!s) return [];
+  var legs = s.legs, out = [], i;
+  var judge = function (occ, ok, when) {
+    for (var k = 0; k < legs.length; k++) {
+      var n = occ[legs[k]] || 0;
+      if (n > 1 && !own(ok, legs[k])) {
+        out.push(_v('C1', w.id, 'leg ' + legs[k] + ' holds ' + n + ' crystals ' + when +
+                    ', but a leg holds one, or two only between a swap-or-stay enter and its exit'));
+      }
+    }
+  };
+  var ob = s.occBefore;
+  if (s.checkBefore) judge(ob, s.excBefore, 'before the step');
+  if (w.type === 'simd' && w.nmv) {
+    var during = {}, both = {};
+    for (i = 0; i < legs.length; i++) {
+      var l = legs[i];
+      during[l] = Math.max(ob[l] || 0, w.occ[l] || 0) + (w.transits[l] || 0);
+    }
+    for (var a in s.excBefore) if (own(s.excBefore, a)) both[a] = true;
+    for (var b in s.excAfter) if (own(s.excAfter, b)) both[b] = true;
+    judge(during, both, 'during the step');
+  }
+  judge(w.occ, s.excAfter, 'after the step');
+  for (i = 0; i < s.c1.length; i++) out.push(_v('C1', w.id, s.c1[i]));
+  return out;
+}
+function _c2(w) {
+  var s = w.c2lr;
+  return s ? s.c2.map(function (m) { return _v('C2', w.id, m); }) : [];
+}
+function _c3(w) { return []; }
+function _c4(w) { return []; }
+function _c2lrRest(w, rule, test, say) {
+  var s = w.c2lr, out = [];
+  if (!s) return out;
+  var states = s.checkBefore ? [[s.posBefore, 'before']] : [];
+  states.push([w.pos, 'after']);
+  for (var k = 0; k < states.length; k++) {
+    var pos = states[k][0], ions = _c2lrSorted(pos);
+    for (var i = 0; i < ions.length; i++) {
+      if (test(pos[ions[i]])) out.push(_v(rule, w.id, say(ions[i], pos[ions[i]], states[k][1])));
+    }
+  }
+  return out;
+}
+function _c5(w) {
+  var s = w.c2lr;
+  return _c2lrRest(w, 'C5', function (site) { return !own(s ? s.legSet : {}, site); },
+                   function (ion, site, when) {
+                     return 'crystal ' + ion + ' rests at ' + site + ' ' + when + ' the step, ' +
+                            'which is not a leg; every crystal ends a step at a leg centre'; });
+}
+function _c6(w) {
+  var s = w.c2lr;
+  if (!s || !s.exchange) return [];
+  var out = s.c6.map(function (m) { return _v('C6', w.id, m); });
+  var forms = w.c2lrForms;
+  if (forms && s.variation && forms.indexOf(s.variation.form) < 0) {
+    out.push(_v('C6', w.id, 'a ' + s.variation.form + ' step (' + s.variation.label + '), which ' +
+                'this rule set does not allow (it allows ' +
+                (forms.slice().sort(_cmpStr).join(', ') || 'none') + '): the two-pair ' +
+                'checkerboard steps were not demonstrated in arXiv:2403.00756'));
+  }
+  return out;
+}
+function _c7(w) {
+  return _c2lrRest(w, 'C7', function (site) { return w.deg(site) >= 3; },
+                   function (ion, site, when) {
+                     return 'crystal ' + ion + ' rests on junction ' + site + ' ' + when + ' the step'; });
+}
+function _c9(w) {
+  var s = w.c2lr;
+  if (!s || !s.template) return [];
+  var missed = [];
+  for (var ion in s.posBefore) if (own(s.posBefore, ion) && !own(s.heated, ion)) missed.push(ion);
+  if (!missed.length) return [];
+  missed.sort(_cmpStr);
+  return [_v('C9', w.id, missed.length + " crystal(s) not heated by the step's waveform (e.g. " +
+             pyRepr(missed.slice(0, 4)) + ')')];
+}
+
+// C10, once per programme: `c2lr_document_violations`
+function c2lrDocumentViolations(cx) {
+  if (!cx || !cx.on) return [];
+  if (!cx.geo) {
+    return [_v('C10', -1, 'the device declares C2LR control but is not a lattice of legs: ' + cx.why)];
+  }
+  var d = cx.offer, out = [], sig = unbox(d.shared_signals);
+  if (typeof sig === 'boolean' || typeof sig !== 'number' || !Number.isInteger(sig) || sig < 1) {
+    out.push(_v('C10', -1, "the device's control.c2lr declares no number of shared analog " +
+                           'signals (shared_signals)'));
+  }
+  var each = [['inputs_per_leg', 'digital input'], ['switches_per_leg', 'switch']];
+  for (var i = 0; i < each.length; i++) {
+    // `d.get(key) != 1`, where Python's True and 1.0 both equal 1
+    var v = unbox(d[each[i][0]]);
+    if (!(v === 1 || v === true)) {
+      out.push(_v('C10', -1, "the device's control.c2lr gives each leg " +
+                             pyRepr(d[each[i][0]]) + ' ' + each[i][1] +
+                             '(s) (' + each[i][0] + "); C2LR's per-leg control is exactly one"));
+    }
+  }
+  return out;
+}
+
+//: C2LR's rules as the browser checks them, apart from `RULE_FNS` on purpose: those are
+//: the 21 every page lists and badges, and these judge one kind of device only.  C8 is
+//: recorded from the primitive and C10 is the document's; `render.py::BROWSER_C2LR_SET`
+//: is asserted equal to this.
+var C2LR_RULE_FNS = { C1: _c1, C2: _c2, C3: _c3, C4: _c4, C5: _c5, C6: _c6, C7: _c7, C9: _c9 };
+var C2LR_RULE_CONSTRUCTED = ['C8', 'C10'];
+function mirroredC2LRRules() {
+  return Object.keys(C2LR_RULE_FNS).concat(C2LR_RULE_CONSTRUCTED).sort(_cmpStr);
 }
 
 // Structural checks that must run BEFORE pricing, because Python is silent on some of
@@ -3918,7 +4769,8 @@ function cornerEndpoints(dev) {
 var PCALLS = {
   init: _pInit, fill: _pFill, rotate: _pRotate, simd: _pSimd, move: _pMove,
   shuttle: _pShuttle, gate: _pGate, cool: _pCool, measure: _pMeasure, reset: _pReset,
-  barrier: _pBarrier, decode: _pDecode, claim: _pClaim
+  barrier: _pBarrier, decode: _pDecode, claim: _pClaim,
+  swap_or_stay: _pSwapOrStay, reorder_or_not: _pReorderOrNot
 };
 function programMethods() { return Object.keys(PCALLS).sort(_cmpStr); }
 
@@ -3938,7 +4790,11 @@ function _pctx(dev, loops, opts) {
     dev: dev, loops: loops || {}, name: opts.name || 'device',
     classes: opts.classes || {}, defaultLoop: opts.defaultLoop || null,
     pair: pairIndex(dev), frames: [], claims: {}, ids: [],
-    idSeq: opts.idSeq === undefined ? 0 : Math.trunc(Number(opts.idSeq)), call: 0
+    idSeq: opts.idSeq === undefined ? 0 : Math.trunc(Number(opts.idSeq)), call: 0,
+    // on a C2LR device, the device's lattice: a swap-or-stay statement is lowered to the
+    // moves the device's matching gives it, which needs where every crystal is (`_c2lrWalker`)
+    c2lr: opts.control === undefined || opts.control === null ? null
+        : c2lrContext(dev, opts.control, opts.name, opts.classes), _walk: null
   };
 }
 
@@ -3986,6 +4842,7 @@ function _pInit(ctx, args, kw) {
   var p = {};
   for (ion in place) if (own(place, ion)) p[ion] = String(place[ion]);
   _emitFrame(ctx, { type: 'init', cls: null, mode: null, place: p });
+  _c2lrInit(ctx, p);
 }
 
 function _pFill(ctx, args, kw) {
@@ -4020,6 +4877,7 @@ function _pRotate(ctx, args, kw) {
                                             : String(cls);
   _emitFrame(ctx, { type: 'simd', cls: cls, mode: 'inter', shift: [loop, delta],
                     kind: 'rotate', hops: Math.abs(delta) });
+  _c2lrRotate(ctx, loop, delta, cls);
 }
 
 // `via` (segment ids) -> the node path a frame carries.  `render.py::_node_path` walks
@@ -4066,6 +4924,38 @@ function _cycleFrame(ctx, cls, mode, items) {
   }
   _emitFrame(ctx, { type: 'simd', cls: String(cls), mode: mode, moves: moves,
                     entails: _entailsOf(ctx, String(cls)), _via: declared });
+  _c2lrMoves(ctx, String(cls), moves);
+}
+
+// `Program.swap_or_stay`: one C2LR step, the bits and nothing else.  The shape is refused
+// here, in Python's words; the expansion is the device's (`_c2lrLower`).
+function _pSwapOrStay(ctx, args, kw) {
+  var diagonal = args[0] === undefined ? (kw.diagonal === undefined ? null : kw.diagonal) : args[0];
+  var toward = args[1] === undefined ? (kw.toward === undefined ? [] : kw.toward) : args[1];
+  var cb = kw.checkerboard === undefined ? null : kw.checkerboard;
+  var cls = kw.cls === undefined ? 'swap_or_stay' : String(kw.cls);
+  var tpl = { kind: 'swap_or_stay' };
+  if (cb !== null) {
+    if (!own(cb, 'parity')) throw ProgError('parity', 'KeyError');
+    if (!own(cb, 'pairing')) throw ProgError('pairing', 'KeyError');
+    tpl.checkerboard = { parity: Math.trunc(Number(unbox(cb.parity))), pairing: _pyStrOf(cb.pairing) };
+  } else {
+    tpl.diagonal = diagonal === null ? null : unbox(diagonal);
+  }
+  tpl.toward = (toward || []).map(_pyStrOf);
+  var bad = c2lrShape(tpl, []);
+  if (bad.length) throw ProgError(bad[0]);
+  _emitFrame(ctx, _c2lrLower(ctx, cls, tpl));
+}
+
+// `Program.reorder_or_not`: the listed crystals' wells turn 180 degrees, in place
+function _pReorderOrNot(ctx, args, kw) {
+  var reverse = args[0] === undefined ? (kw.reverse === undefined ? [] : kw.reverse) : args[0];
+  var cls = kw.cls === undefined ? 'reorder_or_not' : String(kw.cls);
+  var tpl = { kind: 'reorder_or_not', reverse: (reverse || []).map(_pyStrOf) };
+  var bad = c2lrShape(tpl, []);
+  if (bad.length) throw ProgError(bad[0]);
+  _emitFrame(ctx, _c2lrLower(ctx, cls, tpl));
 }
 
 function _pSimd(ctx, args, kw) {
@@ -4215,7 +5105,8 @@ var PARG_NAMES = {
   rotate: ['delta', 'loop', 'cls'], simd: ['cls', 'moves', 'mode'],
   move: ['ion', 'src', 'dst', 'via', 'cls'], shuttle: ['ion', 'path', 'cls'],
   gate: ['name', 'pairs', 'sites'], cool: ['ions'], measure: ['ions'], reset: ['ions'],
-  barrier: [], decode: ['ions'], claim: []
+  barrier: [], decode: ['ions'], claim: [],
+  swap_or_stay: ['diagonal', 'toward'], reorder_or_not: ['reverse']
 };
 
 function lowerProgram(stmts, dev, loops, opts) {
@@ -4254,13 +5145,19 @@ function lowerProgram(stmts, dev, loops, opts) {
                       func: 'program' });
     prov.calls.push({ op: method, site: site, args: logged });
     var before = ctx.frames.length;
+    var walked = ctx._walk ? { pos: _shallow(ctx._walk.pos), trk: ctx._walk.trk.save(),
+                               dead: ctx._walk.dead } : null;
     try {
       PCALLS[method](ctx, args, kw);
     } catch (err) {
       // roll the statement's partial frames back: a refused statement must leave the
-      // programme as it was, exactly as a refused architecture edit does
+      // programme as it was, exactly as a refused architecture edit does -- the C2LR walk
+      // included, which a refused shuttle may already have advanced
       ctx.frames.length = before;
       ctx.ids.length = before;
+      if (walked) {
+        ctx._walk.pos = walked.pos; ctx._walk.trk.restore(walked.trk); ctx._walk.dead = walked.dead;
+      } else if (ctx._walk) ctx._walk = null;
       // `str(KeyError(x))` is `repr(x)`, not `x` -- Python's own message carries the
       // quotes, and an error strip that dropped them would print a sentence the toolchain
       // never says.
@@ -4308,7 +5205,10 @@ function framesToInstructions(frames, dev, classes) {
     if (f.shift) {
       d.template = { kind: 'loop_shift', loop: f.shift[0], delta: Math.trunc(Number(f.shift[1])) };
     }
-    if (f.moves && f.moves.length) {
+    // a C2LR step is its template and nothing else: its `moves` are the device's expansion,
+    // drawn, and a participant written back would be a route the replay refuses (C2)
+    if (f.c2lr) d.template = c2lrTemplate(f);
+    if (f.moves && f.moves.length && !f.c2lr) {
       var parts = [];
       for (var m = 0; m < f.moves.length; m++) {
         var ion = f.moves[m][0], path = f.moves[m][1], via = [];
@@ -4479,8 +5379,10 @@ function _r2(w) {
     out.push(_v('R2', w.id, 'junction ' + nid + ' (degree ' + w.deg(nid) + ') holds ' +
                 w.occ[nid] + ' ions'));
   }
+  // two ions entering one junction in a cycle is illegal too -- except in a swap-or-stay
+  // step, whose crossings are the device's exchange (`_c2lrExchange`)
   var entering = {};
-  for (i = 0; i < w.nmv; i++) {
+  for (i = 0; i < (_c2lrExchange(w) ? 0 : w.nmv); i++) {
     var m = w.moves[i];
     if (w.deg(m.dst) >= 3) entering[m.dst] = (entering[m.dst] || 0) + 1;
   }
@@ -4492,7 +5394,14 @@ function _r2(w) {
   return out;
 }
 
+// `device_exchange`: is this cycle a C2LR swap-or-stay step, whose routes THIS walk derived
+// from the device's matching?  R2's crossing half, R3, R5 and R22 do not judge it -- two
+// crystals cross one junction and pass on its two rails by design.  Keyed on `w.c2lr`,
+// which `priceFrames` alone sets, so the same exchange written as plain moves is judged.
+function _c2lrExchange(w) { return !!(w.c2lr && w.c2lr.exchange); }
+
 function _r3(w) {
+  if (_c2lrExchange(w)) return [];
   var use = {}, out = [], i;
   for (i = 0; i < w.nmv; i++) {
     var sid = w.moves[i].seg;
@@ -4541,6 +5450,7 @@ function _r5(w) {
   // fraction of the cost.  This runs once per move of every cycle: 648,000 evaluations on
   // the shipped deck programme, where the difference between building a string key and
   // OR-ing an integer is most of the rule pass.
+  if (_c2lrExchange(w)) return [];
   var dir = w._dir, out = [], i, m, sid;
   for (sid in dir) if (own(dir, sid)) delete dir[sid];
   for (i = 0; i < w.nmv; i++) {
@@ -4859,6 +5769,7 @@ function _hopLabel(w, m) {
 // order and filters by ion.
 function _r22(w) {
   if (w.type !== 'simd' || !w.nmv || w.directControl) return [];
+  if (_c2lrExchange(w)) return [];        // one waveform by construction; see `_c2lrExchange`
   var ions = [], hops = {}, i, ion;
   for (i = 0; i < w.nmv; i++) {
     ion = w.moves[i].ion;
@@ -4925,10 +5836,19 @@ function _makeChecker(dev, loops, classes, ctx) {
     // change inside one `evaluate`, so R22 walks the loops once rather than per cycle.
     _onLoop: null,
     // `rails_to_loop` per off-path node, built on first use for the same reason
-    _loopRails: null
+    _loopRails: null,
+    // on a C2LR device, what this cycle did to the legs (set by `priceFrames`), and the
+    // forms the rule set allows (`c2lr_forms`; `c2lr-demonstrated` allows the diagonals)
+    c2lr: null, c2lrForms: ctx.c2lr_forms || null
   };
   var violations = [], byRule = {}, only = ctx.rules || null;
-  var names = Object.keys(RULE_FNS);
+  var table = {}, r0;
+  for (r0 in RULE_FNS) if (own(RULE_FNS, r0)) table[r0] = RULE_FNS[r0];
+  // C2LR's rules judge one kind of device and are dispatched only there
+  if (ctx._c2lr && ctx._c2lr.on) {
+    for (r0 in C2LR_RULE_FNS) if (own(C2LR_RULE_FNS, r0)) table[r0] = C2LR_RULE_FNS[r0];
+  }
+  var names = Object.keys(table);
   if (only) names = names.filter(function (r) { return only.indexOf(r) >= 0; });
   return {
     window: w,
@@ -4936,7 +5856,7 @@ function _makeChecker(dev, loops, classes, ctx) {
     byRule: byRule,
     judge: function () {
       for (var i = 0; i < names.length; i++) {
-        var vs = RULE_FNS[names[i]](w);
+        var vs = table[names[i]](w);
         for (var j = 0; j < vs.length; j++) {
           violations.push(vs[j]);
           byRule[vs[j].rule] = (byRule[vs[j].rule] || 0) + 1;
@@ -4954,6 +5874,11 @@ var RULE_WORK_CAP = 40000000;
 
 function evaluate(dev, frames, loops, model, classes, ctx) {
   ctx = ctx || {};
+  // the device's C2LR context is the model's, so the rules and the price read one lattice
+  if (ctx._c2lr === undefined) {
+    ctx = _shallow(ctx);
+    ctx._c2lr = model._c2lr || null;
+  }
   var chk = _makeChecker(dev, loops, classes, ctx);
   var w = chk.window;
   w.deg = function (n) { return deg(model, n); };
@@ -5014,6 +5939,27 @@ function _report(chk, frames, priced, ctx, fatal) {
     violations.push(r7c[c]);
     byRule.R7c = (byRule.R7c || 0) + 1;
   }
+  // C2LR's rules, on a C2LR device only: checked there, C10 from the document, C8 recorded
+  // from the primitive -- `verify()`'s own treatment, in the same words
+  var notes = {};
+  if (ctx._c2lr && ctx._c2lr.on) {
+    checked = checked.concat(mirroredC2LRRules()).sort(_cmpStr);
+    var c10 = c2lrDocumentViolations(ctx._c2lr);
+    for (var c1i = 0; c1i < c10.length; c1i++) {
+      violations.push(c10[c1i]);
+      byRule.C10 = (byRule.C10 || 0) + 1;
+    }
+    var sos = ctx.state && ctx.state.primitives && ctx.state.primitives.scalars
+      ? ctx.state.primitives.scalars.swap_or_stay : null;
+    var com = sos && own(sos, 'com_mhz') ? sos.com_mhz : null;
+    if (com === null || com === undefined) {
+      skipped.C8 = "the device's swap_or_stay primitive records no COM frequency";
+    } else {
+      partial.C8 = 'recorded, not decided: the primitive holds the COM mode at ' +
+                   _pyFloatRepr(num(com)) + ' MHz during a shift';
+    }
+    if (priced && priced.assumed && priced.assumed.length) notes.assumed = priced.assumed.slice();
+  }
   if (ctx.models_heating === false) {
     skipped.R7c = 'cooling legality is only meaningful once heating is modelled';
     skipped.R17 = 'this cost model does not model elapsed time';
@@ -5051,7 +5997,7 @@ function _report(chk, frames, priced, ctx, fatal) {
     violations: violations.length, by_rule: byRule, messages: violations,
     checked: checked.slice(), vacuous: vacuous, scope: 'browser',
     warnings: priced ? (priced.warnings || []) : [],
-    fatal: fatal
+    fatal: fatal, notes: notes
   };
 }
 
@@ -5503,6 +6449,11 @@ var API = {
   classParticipants: classParticipants, zonesInUse: zonesInUse,
   // the browser rule set -- 21 of the 28, derived from the dispatcher and never listed
   get MIRRORED_RULES() { return mirroredRules(); },
+  // C2LR swap-or-stay -- the device's matching, the step, its rules (section 7b)
+  get MIRRORED_C2LR_RULES() { return mirroredC2LRRules(); },
+  c2lrContext: c2lrContext, c2lrVariation: c2lrVariation, c2lrPairs: c2lrPairs,
+  c2lrJunctionOf: c2lrJunctionOf, c2lrShape: c2lrShape, c2lrTemplate: c2lrTemplate,
+  C2LRTracker: C2LRTracker, isC2LR: isC2LR, C2LR_TEMPLATES: C2LR_TEMPLATES,
   checkFrames: checkFrames, evaluate: evaluate, RULE_WORK_CAP: RULE_WORK_CAP,
   // component variants -- the browser half of arch/variants.py
   resolveVariant: resolveVariant, variantRow: variantRow, variantGuard: variantGuard,
@@ -5513,7 +6464,8 @@ var API = {
   explicitStatements: explicitStatements,
   documentStatements: documentStatements,
   // errors
-  EngineError: EngineError, ExpansionError: ExpansionError, EditError: EditError
+  EngineError: EngineError, ExpansionError: ExpansionError, EditError: EditError,
+  NotC2LR: NotC2LR
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = API;

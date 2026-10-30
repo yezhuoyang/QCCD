@@ -156,6 +156,22 @@ class C2LRGeometry:
         self._pairs[var.key] = out
         return out
 
+    def junction_of(self, leg: str, var: Variation) -> str | None:
+        """The junction `leg` shifts toward or away from under `var`: the end at which it is
+        one of the variation's arms (of the step's colour, for a checkerboard), whether or
+        not its partner exists.  Unique on a lattice: a horizontal leg is the W arm only at
+        its east end, a vertical one the S arm only at its north end, and a leg touches one
+        junction of each colour.  What the page draws a stayer's shift against."""
+        if var.form == "checkerboard" and self.colour is None:
+            return None
+        names = {a for pair in var.arms() for a in pair}
+        for j, arm in self.ends.get(leg, {}).items():
+            if var.form == "checkerboard" and self.colour[j] != var.parity:  # type: ignore[index]
+                continue
+            if arm in names:
+                return j
+        return None
+
 
 def _build(dev) -> C2LRGeometry:
     """Read the lattice off the device, or say why it is not one."""

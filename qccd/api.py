@@ -75,7 +75,8 @@ from .cost.models import CostModel, corrected_model, deck_model
 from .cost.combinatorial import t1_metrics
 from .cost.physical import t2_metrics
 from .ir.provenance import CALL_KEY, PROV_KEY, CallLog, capture_site
-from .ir.tsir import TSIR, Instruction, Participant, loop_shift
+from .ir.tsir import (TSIR, Instruction, Participant, loop_shift, reorder_or_not,
+                      swap_or_stay, template_problems)
 from .verify import VerificationReport, verify
 
 __all__ = ["Machine", "Program", "Cycle", "RunResult", "DeviceBuilder",
@@ -315,6 +316,43 @@ class Program:
             hop = list(path[idx[a]:idx[b] + 1])
             via = [dev.segment_between(u, v).id for u, v in zip(hop, hop[1:])]
             self.move(ion, a, b, via=via, cls=cls, **meta)
+        return self
+
+    # -- C2LR (docs/c2lr.md) -------------------------------------------------
+
+    @_traced
+    def swap_or_stay(self, diagonal: str | None = None, toward: Sequence[str] = (), *,
+                     checkerboard: Mapping | None = None, cls: str = "swap_or_stay",
+                     **meta) -> "Program":
+        """One C2LR swap-or-stay step: every junction plays one `diagonal` ("WS", "WN",
+        "ES", "EN"), or -- assumed, not in arXiv:2403.00756 -- the two-pair
+        `checkerboard={"parity": 0 | 1, "pairing": "P1" | "P2"}`.
+
+        `toward` names the crystals shifted toward their pair's junction; every other one
+        shifts away.  That is the whole of what a programme says: which legs pair, and so
+        where each crystal goes, is the DEVICE's matching, so this writes no participants
+        and the replay expands the step (`qccd.verify.c2lr`).  The template's shape is
+        refused here, as a route that does not connect is refused by `move`."""
+        tpl = swap_or_stay(diagonal, toward, checkerboard=checkerboard)
+        bad = template_problems(tpl)
+        if bad:
+            raise ValueError(bad[0])
+        self._prog.add(Instruction(type="simd", id=self._prog.next_id(), cls=cls,
+                                   mode="inter", template=tpl, meta=self._meta(meta)))
+        return self
+
+    @_traced
+    def reorder_or_not(self, reverse: Sequence[str] = (), *, cls: str = "reorder_or_not",
+                       **meta) -> "Program":
+        """One C2LR reorder-or-not step: the listed crystals' wells turn 180 degrees in
+        place, every crystal heated (C9).  Priced only on a device whose physics measures
+        it (Yb-Ba in arXiv:2403.00756)."""
+        tpl = reorder_or_not(reverse)
+        bad = template_problems(tpl)
+        if bad:
+            raise ValueError(bad[0])
+        self._prog.add(Instruction(type="simd", id=self._prog.next_id(), cls=cls,
+                                   mode="inter", template=tpl, meta=self._meta(meta)))
         return self
 
     # -- gates, SPAM, cooling ------------------------------------------------

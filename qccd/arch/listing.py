@@ -728,6 +728,14 @@ def _emit_control(b, arch, dev, max_channel_lines) -> None:
     if arch.control.get("model"):
         b.call("control", "set_control", f"model={_lit(arch.control['model'])}",
                target="control.model", kwargs={"model": arch.control["model"]})
+    # a C2LR device's offer and census (docs/c2lr.md): which variations it plays, which are
+    # assumed, and the per-leg control C10 counts.  Without this line a replayed listing
+    # offers no checkerboard and fails C10, so the browser and a reload judge another device
+    c2lr = dict(arch.control.get("c2lr") or {})
+    if c2lr:
+        b.call("control", "set_control", f"c2lr={_lit(c2lr)}", target="control.c2lr",
+               kwargs={"c2lr": c2lr},
+               note="C2LR: the swap-or-stay variations offered and the per-leg control")
     wiring = dict(arch.control.get("wiring") or {})
     if wiring:
         b.call("control", "set_wiring", _kwd(wiring), target="control.wiring",
