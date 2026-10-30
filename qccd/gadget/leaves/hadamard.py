@@ -32,14 +32,16 @@ __all__ = ["hbay", "ROTATE", "EXTRA_PLACES"]
 ROTATE = (2, 5, 8, 1, 4, 7, 0, 3, 6)
 
 
-def hbay(*, name: str = "hbay_d3") -> LeafBuild:
+def hbay(*, name: str = "hbay_d3", data_slots: dict | None = None) -> LeafBuild:
+    """`data_slots` -- the ring slot each data ion rests at -- instead of `place()`'s (which
+    are chosen for a syndrome round this bay never runs): `hbay_d3f` (leaves/doors.py)."""
     from .places import KEEP, _classical_ports, _cooled, _master
     p = patch(3, 3, name="surface_d3")
     code = p.code
     W = 12
     docks = [1 + 3 * i for i in range(8)]
     b = bay(name, W, docks, {"in": "TL", "out": "TR"}, {"in": 9, "out": 9})
-    ds, _, _ = place(p, b.N, docks)
+    ds = dict(data_slots) if data_slots is not None else place(p, b.N, docks)[0]
     data = [f"d{q}" for q in range(p.n)]
     out = [None] * p.n
     for q in range(p.n):

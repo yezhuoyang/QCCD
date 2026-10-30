@@ -1,4 +1,4 @@
-"""The door-aware memory (`mem_d3f`, qccd/gadget/leaves/doors.py).
+"""The door-aware places (`mem_d3f`, `hbay_d3f`, `prep_d3f`, qccd/gadget/leaves/doors.py).
 
 Codesign, 2026-10-29 (the user: "optimize the gadget geometry ... even reconfigure gadget
 layout").  Inside Gidney 2025's carry chain a block goes back to its memory between nearby uses,
@@ -6,8 +6,9 @@ and `mem_d3`'s doors cost more than its round: the ring turns each ion's home to
 `place()` chose the homes for the round alone.  `mem_d3f` is the same ring, docks, ancillas and
 programs with the ions resting where the doors are short too.  What is held here:
 
-* it is built, compiled and verified like every place, every op's specification complete;
-* each of its ops is faster than `mem_d3`'s: store, refresh and release;
+* each is built, compiled and verified like every place, every op's specification complete,
+  and each op is faster than its original's (the Hadamard and preparation bays the same way:
+  their ions rest where their doors are short, the bay's for no round at all);
 * its placement is what `search` finds, and costs fewer slots a visit than `mem_d3`'s;
 * a block resting in it through syndrome rounds is signed off: outcome and distance 3.
 """
@@ -27,13 +28,15 @@ def leaves():
     return LeafLibrary(str(CACHE), log=None)
 
 
-def test_the_door_aware_memory_is_verified_and_faster(leaves):
-    old, new = leaves.place("mem_d3"), leaves.place("mem_d3f")
-    assert set(new.ops) == set(old.ops) == {"store", "refresh", "release"}
-    for k, op in new.ops.items():
+@pytest.mark.parametrize("old,new", [("mem_d3", "mem_d3f"), ("hbay_d3", "hbay_d3f"), ("prep_d3", "prep_d3f")])
+def test_each_door_aware_place_is_verified_and_faster(leaves, old, new):
+    a, b = leaves.place(old), leaves.place(new)
+    assert set(b.ops) == set(a.ops)
+    assert b.family == a.family
+    for k, op in b.ops.items():
         assert op.status == "verified", k
         assert op.logic["flows"]["complete"], k
-        assert op.duration_us < old.ops[k].duration_us, (k, op.duration_us, old.ops[k].duration_us)
+        assert op.duration_us < a.ops[k].duration_us, (k, op.duration_us, a.ops[k].duration_us)
 
 
 def test_its_placement_is_searched_and_cheaper():

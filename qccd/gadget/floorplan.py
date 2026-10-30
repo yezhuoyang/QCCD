@@ -89,8 +89,10 @@ for _m in list(MASTER_OF.values()):
     MASTER_OF[_m] = _m
 # a category's other masters: the depot that also sends and takes cat states' links, three at a time
 MASTER_OF["depot9x"] = "depot9x"
-# the memory whose ions rest where its doors are short too (leaves/doors.py)
+# the memory and the Hadamard bay whose ions rest where their doors are short too (leaves/doors.py)
 MASTER_OF["mem_d3f"] = "mem_d3f"
+MASTER_OF["hbay_d3f"] = "hbay_d3f"
+MASTER_OF["prep_d3f"] = "prep_d3f"
 
 JUNCTION = "junc9"
 

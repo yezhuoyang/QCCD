@@ -1,4 +1,11 @@
-"""`mem_d3f`: the logical memory with its ions resting where the doors are short too.
+"""Places whose ions rest where their doors are short too: `mem_d3f`, `hbay_d3f`, `prep_d3f`.
+
+    place      op        as built   door-aware
+    memory     store     24.1 ms    18.2 ms
+               refresh   13.2       12.0
+               release    9.4        5.5
+    H bay      h         20.3       12.3
+    prep       prep.Z/X  30.0       23.5
 
 Codesign, 2026-10-29 (the user: "optimize the gadget geometry ... even reconfigure gadget
 layout").  Inside Gidney 2025's carry chain a block goes back to its memory between nearby uses,
@@ -104,16 +111,43 @@ def memory_by_doors(*, name: str = "mem_d3f"):
     """`places.memory`, its ions resting at DATA/DOCKS instead of where `place()` puts them.
     (`places.py` is one of the sources every cached place is keyed by, so this place borrows
     its builder rather than changing it.)"""
+    return _borrow("memory", name, DATA, DOCKS)
+
+
+#: where the Hadamard bay's ions rest: in code order at the door in, the quarter turn's order at
+#: the door out, and beside the docks for the H (a search over door slots, the best of the
+#: candidates as built): 12.3 ms an `h` against `hbay_d3`'s 20.3, whose slots are `place()`'s
+#: -- chosen for a syndrome round the bay never runs
+HBAY_DATA = {0: 2, 1: 3, 2: 6, 3: 7, 4: 4, 5: 5, 6: 8, 7: 1, 8: 0}
+
+
+def hbay_by_doors(*, name: str = "hbay_d3f"):
+    from .hadamard import hbay
+    return hbay(name=name, data_slots=HBAY_DATA)
+
+
+#: where the preparation bay's ions rest: `search` (seed 17), the fastest of the candidates as
+#: built -- 23.5 ms a prep against `prep_d3`'s 30.0 (fresh ions in, reset, a round, the block out)
+PREP_DATA = {0: 15, 1: 14, 2: 12, 3: 11, 4: 8, 5: 5, 6: 3, 7: 2, 8: 23}
+PREP_DOCKS = {"X0": 13, "X1": 4, "X2": 1, "X3": 16, "Z0": 7, "Z1": 19, "Z2": 10, "Z3": 22}
+
+
+def _borrow(builder, name, ds, ad):
+    """A `places` builder with its ions resting at `ds`/`ad` (see `memory_by_doors`)."""
     from . import places
 
     def fixed(patch, n_slots, docks, **kw):
-        return dict(DATA), dict(DOCKS), dry_round(patch, DATA, DOCKS, n_slots)[0]
+        return dict(ds), dict(ad), dry_round(patch, ds, ad, n_slots)[0]
     saved = places.place
     places.place = fixed
     try:
-        return places.memory(name=name)
+        return getattr(places, builder)(name=name)
     finally:
         places.place = saved
 
 
-EXTRA_PLACES = {"mem_d3f": memory_by_doors}
+def prep_by_doors(*, name: str = "prep_d3f"):
+    return _borrow("prep", name, PREP_DATA, PREP_DOCKS)
+
+
+EXTRA_PLACES = {"mem_d3f": memory_by_doors, "hbay_d3f": hbay_by_doors, "prep_d3f": prep_by_doors}

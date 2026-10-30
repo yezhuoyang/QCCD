@@ -777,9 +777,23 @@ details").**
     | + prefetch | 50.2 years | 9.46 years |
     | + lookup rows as fan-out calls | 37.4 years | 9.47 years |
     | + door-aware memories, every template recompiled on them | 34.1 years | 8.69 years |
+    | + FormalRV's lattice-surgery CNOT recognized whole: a transversal `cx` | 29.4 years | 4.65 years |
+    | + door-aware preparation and Hadamard bays, everything recompiled | 28.4 years | 4.31 years |
 
     Fusing the lookups halves the work (5.3 → 4.0 districts busy) but leaves the wall clock
     where it was: the lookups are off the critical path.
+  - **The carry chain's CNOTs, whole.** The corrected interior template spent its second half
+    on two lattice-surgery CNOTs, each measured product by product (three ancilla preps, four
+    transversal CNOTs, three readouts). The idiom `prep L X; ZZ(c, L); XX(L, t..); read L Z` and
+    its frames is exactly `cx c t..`, proved for one target and two. On the carry chain the
+    interior goes 673 → 437 ms and the uncompute 505 → 229 ms, and `gidneyFirst` now holds G8.
+    Every rewrite without an |AutoCCZ⟩ state is proved equal to its template whole.
+  - **Door-aware preparation and Hadamard bays** (`prep_d3f`, `hbay_d3f`). The H bay's ions
+    rested where `place()` puts them, for a syndrome round the bay never runs: `h` is 20.3 →
+    12.3 ms. The prep bay is 30.0 → 23.5 ms.
+  - **The rewrites are in the repository** (`qccd/fullstack/scale/codesign.py`,
+    `tests/test_scale_codesign.py`): products, the H̄ triple, the CNOT idiom, the lookup fusion,
+    and `exports` (which outcomes a call site hands on).
   - **The doors are the bottleneck of every place.** Of a place op's time, the doors take 92%
     (H bay, 20.3 ms; the H gates 1.7 ms), 79% (transversal CNOT), 78% (readout), 45% of a
     memory store and all of a release. A ring takes an ion in with a ring turn (100 µs a slot
