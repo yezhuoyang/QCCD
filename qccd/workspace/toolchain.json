@@ -1,31 +1,23 @@
 {
   "qccdc_cli": {
-    "version": "b4a003dbb4ae",
+    "version": "9f687f80d564",
     "source": {
       "repository": "https://github.com/yezhuoyang/QCCD",
-      "commit": "f341f63186cb53f37781880426d6312c77d44016",
+      "commit": "68dfe54b5c84b93259ff2f38fe29ccc10d13ce0d",
       "path": "Compiler/ocaml",
-      "tree": "b4a003dbb4ae301758033249399a50f7439b4132"
+      "tree": "9f687f80d5642c7985f528b97b12e5611fa067ac"
     },
-    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one in ocaml/opam:debian-12-ocaml-5.3 (deploy/toolchain/Dockerfile.linux), the macOS one on a Mac in an opam switch made with MACOSX_DEPLOYMENT_TARGET=11.0 (minos 11.0), gzipped (deploy/toolchain/README.md)",
+    "build": "OCaml 5.3.0, yojson 2.2.2 (dune 3.19 on Windows, 3.23.1 on Linux): dune build bin/qccdc_cli.exe, from git archive of the commit; the Linux one is deploy/toolchain/Dockerfile.linux's ocaml stage in ocaml/opam:debian-12-ocaml-5.3, run with docker run (the build host has no buildx); no macOS build of this version yet (deploy/toolchain/README.md)",
     "assets": {
       "windows-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-windows-x86_64.exe",
-        "bytes": 5501327,
-        "sha256": "25fd38b107a70eaf88837b4b097014f6d829ebb79315737789b2073980b9693f"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/9f687f80d564/qccdc_cli-windows-x86_64.exe",
+        "bytes": 5721740,
+        "sha256": "169bf32f567b44cc3c9730d771e094e2660626072da11720d76d15212f5d3f83"
       },
       "linux-x86_64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-linux-x86_64",
-        "bytes": 5036952,
-        "sha256": "da01cc037f6a0cdc7a293107b3c6fce4e9b60fbebc66683d285668be7c09f16d"
-      },
-      "macos-arm64": {
-        "url": "https://qccd.academy/downloads/toolchain/qccdc/b4a003dbb4ae/qccdc_cli-macos-arm64.gz",
-        "encoding": "gzip",
-        "bytes": 983698,
-        "sha256": "f201b6b137ae4cdfa09a600801ec3235300db2024aa45771fac120ab5c26e821",
-        "unpacked_bytes": 2855776,
-        "unpacked_sha256": "b2c597670256eec28a592f1c35dd6c5ca76b48d8431af97065658f183a69c9d6"
+        "url": "https://qccd.academy/downloads/toolchain/qccdc/9f687f80d564/qccdc_cli-linux-x86_64",
+        "bytes": 5318048,
+        "sha256": "c3a80b79cec73ec2bc7232701595f1953b84e21dd1a2e9a1df2956e4fb194a61"
       }
     }
   },
