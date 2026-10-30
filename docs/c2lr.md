@@ -1,9 +1,11 @@
 # C2LR swap-or-stay transport
 
-Status: design, 2026-10-30. Decisions taken by the project owner on 2026-10-30: pairing P2 is
-allowed and marked assumed; C2LR designs are ranked on a separate track; the certificate writes
-swaps as plain moves (no change to the proved checker); every physical number is checked against
-the paper before it enters a physics file.
+Status: design, 2026-10-30. Decisions taken by the project owner on 2026-10-30: what the paper
+did not demonstrate is allowed and marked assumed (the proposal's two-pair "P1/P2" steps, below);
+C2LR designs are ranked on a separate track; the certificate writes swaps as plain moves (no
+change to the proved checker); every physical number is checked against the paper before it
+enters a physics file. The check (2026-10-30, arXiv v2 = Phys. Rev. X 14, 041028) corrected the
+proposal in five places; section 6 has them.
 
 Source: R. D. Delaney et al. (Quantinuum), *Scalable multispecies ion transport in a grid-based
 surface-electrode trap*, arXiv:2403.00756 (2024). Proposal: "support C2LR swap-or-stay transport
@@ -20,8 +22,9 @@ The device says it is C2LR in its control block:
 
 ```json
 "control": {"model": "c2lr",
-            "c2lr": {"pairings": ["P1", "P2"], "assumed": ["P2"]},
-            "classes": {"extra": ["swap_or_stay_p1", "swap_or_stay_p2", "reorder_or_not"]}}
+            "c2lr": {"diagonals": ["WS", "WN", "ES", "EN"], "checkerboard": ["P1", "P2"],
+                     "assumed": ["checkerboard"]},
+            "classes": {"extra": ["swap_or_stay", "reorder_or_not"]}}
 ```
 
 and prices its steps as primitives (numbers per section 6, each with its source):
@@ -33,17 +36,23 @@ and prices its steps as primitives (numbers per section 6, each with its source)
 
 ## 2. The step
 
-**Parity.** Colour the junctions like a checkerboard, `(r + c) mod 2`. Two adjacent junctions
-have different colours, so every leg touches exactly one junction of each colour. A step names
-one parity `p`; its junctions are *active*, and each leg is paired at its one active junction.
+**Variation (demonstrated).** The global waveforms are broadcast to every cell, so every
+junction runs the same variation: one diagonal pair of its legs, W-S, W-N, E-S or E-N (read off
+the positions). The paper demonstrates all four ("four swap or stay variations, each across a
+different diagonal", Sec. IV; Fig. 4(f)). Under one diagonal every leg is in exactly one pair:
+with W-S, a horizontal leg pairs at its east junction (where it is that junction's W leg) and a
+vertical leg at its north junction (where it is the S leg). A leg whose partner does not exist
+(the device's edge) is unpaired in that step. Every step is therefore a matching of legs.
 
-**Pairing.** At an active junction with legs W, E, N, S (read off the positions):
-P1 pairs W with S and N with E; P2 pairs W with N and S with E. A leg whose partner does not
-exist (the device's edge) is unpaired in that step. Every step is therefore a matching of legs.
+**Checkerboard (assumed, not in the paper).** The proposal's step pairs *two* diagonals at one
+junction (P1: W-S and N-E; P2: W-N and S-E) at the junctions of one checkerboard parity
+`(r + c) mod 2`, which is also a matching of every leg. Two pairs crossing one junction at once
+was neither demonstrated nor discussed. It is allowed, marked assumed in every report, and the
+rule set `c2lr-demonstrated` refuses it.
 
-**Direction bits.** Every crystal shifts toward its active junction or away from it (C2LR, the
+**Direction bits.** Every crystal shifts toward its pair's junction or away from it (C2LR, the
 per-leg switch). A step lists the crystals shifted **toward**; every other crystal shifts away.
-Then one shared junction waveform exchanges, at every active junction, the two wells nearest it
+Then the shared junction waveform exchanges, at every junction in play, the two wells nearest it
 (one in each paired leg), and C2LR⁻¹ brings every crystal back to a leg centre.
 
 So for each pair of legs (A, B) the crystal toward the junction in A goes to B, and the one in
@@ -60,9 +69,12 @@ B goes to A. That one rule covers every case:
 In the TSIR a step is one `simd` instruction with a template, as a rotation is today:
 
 ```json
-{"type": "simd", "class": "swap_or_stay_p1", "mode": "inter",
- "template": {"kind": "swap_or_stay", "parity": 0, "pairing": "P1", "toward": ["q3", "q17"]}}
+{"type": "simd", "class": "swap_or_stay", "mode": "inter",
+ "template": {"kind": "swap_or_stay", "diagonal": "WS", "toward": ["q3", "q17"]}}
 ```
+
+and the assumed form names `"checkerboard": {"parity": 0, "pairing": "P1"}` instead of
+`"diagonal"`.
 
 The replay expands it from the **device**, never from the programme: the active junctions, the
 pairs and each mover's route (leg -> junction -> partner leg) are computed from the geometry and
@@ -114,9 +126,24 @@ template with the device to compare it with the certificate.
 
 ## 6. Numbers
 
-Every number is checked against arXiv:2403.00756 and cited by figure or table; a number the
-paper does not give is marked as the proposer's derivation or left out. (To be filled from the
-check.)
+Checked against arXiv:2403.00756 v2 (2026-10-30). One crystal is one ion of this model, so one
+n̄ per crystal: the axial COM mode's (XCOM). The stretch mode is not modelled.
+
+| primitive | Ba-Sr | Yb-Ba | where |
+|---|---|---|---|
+| swap-or-stay step, time | 312.5 µs | 400 µs | 1/Γ_swap, Γ = 3.2 kHz at 3.0 m/s and 2.5 kHz at 3.3 m/s (Sec. V, p6). One 1/Γ is one swap-or-stay, both C2LR shifts, the 10 µs interpolations and (Yb-Ba) the rotations included; the "750 µm, twice the on-grid distance" is the summed well travel of one operation, so the proposal's 1/(2Γ) halves it |
+| heat per step, swap / stay | 0.14 / 0.035 q | 0.18 / 0.165 q | derived, the larger of two readings: Table II (measured at this rate: XCOM n̄ after a doubled operation, Ba-Sr 0.48 / 0.25, Yb-Ba 0.56 / 0.53) less the ≈ 0.2 q cooling leaves (p4), halved; and Table III's effective rates during slow transport (Ba-Sr 123 / 113 q/s, Yb-Ba 183 / 202 q/s) × 1/Γ = 0.038 / 0.035 and 0.073 / 0.081 q. The first is larger except for Ba-Sr's stay, where it gives 0.025 q, below what static heating alone adds |
+| reorder-or-not | -- | 93 µs, 0.0195 q | Fig. 5(a) and text, p7 (Yb-Ba only) |
+| C2LR shift | 62.5 µm | 62.5 µm | p4, "1/6 of the leg length" (inside the step above; not priced separately) |
+| COM frequency held | 1.85 MHz | 1.4 MHz | p4 (C8) |
+| shared analog signals | 27 | 27 | p4; plus N digital inputs and N switches, and two site-dependent shims per leg (C10) |
+| merge, split | 40 µs, 0.1 q each | same | not in the paper: the platform's own merge/split curves, slow point |
+
+What the proposal had wrong: the step time (1/(2Γ): half), the heat (Table II halved, but its
+entries are final n̄ after a doubled operation with the 0.1-0.2 q left by cooling, not
+increments), Yb-Ba's C2LR excitation (18.5 mq is v1's; v2 gives 11.7 mq at 6 m/s, Table I), the
+shift (62.5 µm, not 63), and the pairings (all four single diagonals were demonstrated; its
+two-pair steps were not).
 
 ## 7. Boards
 
