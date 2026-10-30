@@ -1,0 +1,26 @@
+{
+ "key": "color7_z",
+ "code": "color7",
+ "family": "6.6.6 colour code",
+ "nkd": [
+  37,
+  1,
+  7
+ ],
+ "basis": "Z",
+ "rounds": 7,
+ "ions": 55,
+ "n_data": 37,
+ "n_ancilla": 18,
+ "detectors": 144,
+ "observables": 1,
+ "logical_qubits": 1,
+ "two_qubit_gates": 1260,
+ "matchable": false,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": 6,
+ "import_differences": [],
+ "builder": "color",
+ "builder_sha256": "b49e6ad08da9f5ac00c20d763717c6f5bf42dc6ed3bd6b7d4a5e971af36d2cb9",
+ "seconds": 2.2
+}

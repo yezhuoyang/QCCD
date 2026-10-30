@@ -1,0 +1,26 @@
+{
+ "key": "bb72_z",
+ "code": "bb72",
+ "family": "bivariate bicycle code",
+ "nkd": [
+  72,
+  12,
+  6
+ ],
+ "basis": "Z",
+ "rounds": 6,
+ "ions": 144,
+ "n_data": 72,
+ "n_ancilla": 72,
+ "detectors": 252,
+ "observables": 12,
+ "logical_qubits": 12,
+ "two_qubit_gates": 2592,
+ "matchable": false,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": 6,
+ "import_differences": [],
+ "builder": "bb",
+ "builder_sha256": "57862fe8c04abef1dfb4d36d1c9b5117703ac868ecbda907076e3a9a7e8174b6",
+ "seconds": 3.6
+}

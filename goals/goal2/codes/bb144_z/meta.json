@@ -1,0 +1,26 @@
+{
+ "key": "bb144_z",
+ "code": "bb144",
+ "family": "bivariate bicycle code (gross)",
+ "nkd": [
+  144,
+  12,
+  12
+ ],
+ "basis": "Z",
+ "rounds": 12,
+ "ions": 288,
+ "n_data": 144,
+ "n_ancilla": 144,
+ "detectors": 936,
+ "observables": 12,
+ "logical_qubits": 12,
+ "two_qubit_gates": 10368,
+ "matchable": false,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": null,
+ "import_differences": [],
+ "builder": "bb",
+ "builder_sha256": "57862fe8c04abef1dfb4d36d1c9b5117703ac868ecbda907076e3a9a7e8174b6",
+ "seconds": 5.1
+}

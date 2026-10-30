@@ -1,0 +1,26 @@
+{
+ "key": "surface7_x",
+ "code": "surface7",
+ "family": "rotated surface code",
+ "nkd": [
+  49,
+  1,
+  7
+ ],
+ "basis": "X",
+ "rounds": 7,
+ "ions": 97,
+ "n_data": 49,
+ "n_ancilla": 48,
+ "detectors": 192,
+ "observables": 1,
+ "logical_qubits": 1,
+ "two_qubit_gates": 1176,
+ "matchable": true,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": 7,
+ "import_differences": [],
+ "builder": "surface",
+ "builder_sha256": "18236c87681c9411cb78f33ea240a3872cfe8220bc4f66d56dcb90c0256b7373",
+ "seconds": 0.7
+}

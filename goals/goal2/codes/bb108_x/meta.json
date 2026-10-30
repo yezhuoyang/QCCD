@@ -1,0 +1,26 @@
+{
+ "key": "bb108_x",
+ "code": "bb108",
+ "family": "bivariate bicycle code",
+ "nkd": [
+  108,
+  8,
+  10
+ ],
+ "basis": "X",
+ "rounds": 10,
+ "ions": 216,
+ "n_data": 108,
+ "n_ancilla": 108,
+ "detectors": 594,
+ "observables": 8,
+ "logical_qubits": 8,
+ "two_qubit_gates": 6480,
+ "matchable": false,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": null,
+ "import_differences": [],
+ "builder": "bb",
+ "builder_sha256": "57862fe8c04abef1dfb4d36d1c9b5117703ac868ecbda907076e3a9a7e8174b6",
+ "seconds": 3.5
+}

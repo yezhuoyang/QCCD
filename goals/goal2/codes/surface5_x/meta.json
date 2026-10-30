@@ -1,0 +1,26 @@
+{
+ "key": "surface5_x",
+ "code": "surface5",
+ "family": "rotated surface code",
+ "nkd": [
+  25,
+  1,
+  5
+ ],
+ "basis": "X",
+ "rounds": 5,
+ "ions": 49,
+ "n_data": 25,
+ "n_ancilla": 24,
+ "detectors": 72,
+ "observables": 1,
+ "logical_qubits": 1,
+ "two_qubit_gates": 400,
+ "matchable": true,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": 5,
+ "import_differences": [],
+ "builder": "surface",
+ "builder_sha256": "18236c87681c9411cb78f33ea240a3872cfe8220bc4f66d56dcb90c0256b7373",
+ "seconds": 0.3
+}

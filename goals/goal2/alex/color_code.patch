@@ -1,0 +1,120 @@
+--- alex_src/circuits/color_code.py	2026-10-28 07:05:11.000000000 -0700
++++ g2/fixed/color_code.py	2026-10-29 16:14:05.827147200 -0700
+@@ -172,7 +172,7 @@
+         return [self.observable]
+ 
+ def _build_parallel_circuit(
+-    d: int, rounds: int, schedule_config: dict, basis: PauliXZ
++    d: int, rounds: int, schedule_config: dict, basis: PauliXZ, shared: bool = True
+ ) -> tuple[stim.Circuit, np.ndarray]:
+     """
+     Build a parallelized color-code circuit from a schedule config.
+@@ -241,11 +241,17 @@
+                 # Z stabilizer: CX data -> ancilla
+                 cnots_by_timestep[timestep].append((data_qid, anc_qid))
+ 
++    # [QCCD patch] one auxiliary per plaquette (arXiv:2603.28852's title, and this file's own
++    # comments): the X check of a plaquette uses the Z check's ancilla, measured and re-prepared
++    # in |+> between the two halves.  shared=False keeps the original two ancillas per plaquette.
++    z_at = {(a["x"], a["y"]): a.index for a in anc_Z_qubits}
++    share = {a.index: (z_at[(a["x"], a["y"])] if shared else a.index) for a in anc_X_qubits}
++
+     # X stabilizers (time steps 7-12): reuse same ancillas as Z (same plaquette = same support)
+     for anc_qubit in anc_X_qubits:
+         color = anc_qubit["color"]
+         schedule = schedules_by_color[color]
+-        anc_qid = anc_qubit.index
++        anc_qid = share[anc_qubit.index]
+         for pos_idx, timestep in enumerate(schedule):
+             data_qid = get_data_qid(anc_qubit, pos_idx)
+             if data_qid is not None:
+@@ -255,7 +261,7 @@
+     # Qubit IDs: only data + Z ancillas (X ancillas are reused from Z ancillas)
+     data_qids = [dq["qid"] for dq in data_qubits]
+     z_anc_qids = [anc["qid"] for anc in anc_Z_qubits]
+-    x_anc_qids = [anc["qid"] for anc in anc_X_qubits]
++    x_anc_qids = [share[anc.index] for anc in anc_X_qubits]
+ 
+     num_anc = len(z_anc_qids) + len(x_anc_qids)
+     num_z_anc = len(z_anc_qids)
+@@ -271,11 +277,12 @@
+             circuit.append("QUBIT_COORDS", [v.index], [v["x"], v["y"]])
+ 
+     # Initialize data qubits and ancillas
++    own_x = [] if shared else x_anc_qids   # a shared ancilla is put in |+> mid-round
+     if basis == Pauli.X:
+-        x_reset_qids = x_anc_qids + data_qids
++        x_reset_qids = own_x + data_qids
+         z_reset_qids = z_anc_qids
+     else:
+-        x_reset_qids = x_anc_qids
++        x_reset_qids = own_x
+         z_reset_qids = z_anc_qids + data_qids
+     circuit.append("R", z_reset_qids)
+     circuit.append("RX", x_reset_qids)
+@@ -291,7 +298,14 @@
+             if cx_targets:
+                 circuit.append("CX", cx_targets)
+             circuit.append("TICK")
+-        
++
++        if shared:
++            # the Z half is read, and the same ancillas re-prepared in |+> for the X half
++            circuit.append("M", z_anc_qids)
++            circuit.append("TICK")
++            circuit.append("RX", x_anc_qids)
++            circuit.append("TICK")
++
+         # Steps 7-12: X stabilizer CNOTs (ancilla -> data), same ancilla qubits
+         for t in range(7, 13):
+             cx_targets = []
+@@ -302,7 +316,8 @@
+             circuit.append("TICK")
+ 
+         # Measure ancilla qubits
+-        circuit.append("M", z_anc_qids)
++        if not shared:
++            circuit.append("M", z_anc_qids)
+         circuit.append("MX", x_anc_qids)
+         circuit.append("TICK")
+ 
+@@ -324,7 +339,8 @@
+                 color_val = 0 if anc["color"] == "r" else (1 if anc["color"] == "g" else 2)
+                 coords = (anc["x"], anc["y"], 0, 0, color_val)
+                 targets = [stim.target_rec(-num_x_anc - num_z_anc + j)] if is_first else \
+-                          [stim.target_rec(-num_x_anc - num_z_anc + j - num_anc)]
++                          [stim.target_rec(-num_x_anc - num_z_anc + j),
++                           stim.target_rec(-num_x_anc - num_z_anc + j - num_anc)]
+                 
+                 circuit.append("DETECTOR", targets, coords)
+ 
+@@ -334,7 +350,8 @@
+         if not is_last:
+             # Reset ancillas for next round
+             circuit.append("R", z_anc_qids)
+-            circuit.append("RX", x_anc_qids)
++            if not shared:
++                circuit.append("RX", x_anc_qids)
+             circuit.append("TICK")
+ 
+     # First round (is last if only one round)
+@@ -387,8 +404,9 @@
+ 
+ def build_circuit(
+         distance: int, 
+-        num_rounds: int, 
+-        basis: PauliXZ
++        num_rounds: int,
++        basis: PauliXZ,
++        shared: bool = True
+     ) -> stim.Circuit:
+ 
+     schedule_config= { # schedules from Fig. 1 in the paper
+@@ -397,4 +415,4 @@
+         "b_schedule": [1, 5, 3, 6, 2, 4]
+     }
+     
+-    return _build_parallel_circuit(distance, num_rounds, schedule_config, basis)
+\ No newline at end of file
++    return _build_parallel_circuit(distance, num_rounds, schedule_config, basis, shared)
+\ No newline at end of file
