@@ -14,7 +14,7 @@ On qccd.academy it is the page `board/goal3/`, and each code is a board of the o
 
 ## The fixed codes
 
-These are Alex's syndrome circuits. A code's experiment is its Z memory for d rounds, read out
+These are Alex's syndrome circuits, plus one HGP code of ours (Alex had none yet). A code's experiment is its Z memory for d rounds, read out
 in the program, every ion reset, then its X memory for d rounds, read out by the grader: one
 program, one submission, and a round fails when either memory does. The CNOT order is the
 circuit's own; the compiler never reorders it. The checks and the two fixes are in
@@ -24,8 +24,11 @@ circuit's own; the compiler never reorders it. The checks and the two fixes are 
 |---|---|---|---|
 | surface 3 / 5 / 7 | [[d²,1,d]] | 17 / 49 / 97 | N-Z, hook-safe (circuit distance d) |
 | colour 3 / 5 / 7 | [[(3d²+1)/4,1,d]] | 10 / 28 / 55 | off-the-hook, one auxiliary per plaquette (distance d−⌊(d+3)/6⌋) |
-| BB 72 / 108 / 144 | [[72,12,6]] / [[108,8,10]] / [[144,12,12]] | 144 / 216 / 288 | Bravyi et al., depth 8 |
-| HGP | pending (Alex) | | |
+| BB 72 / 108 / 144 | [[72,12,6]] / [[108,8,10]] / [[144,12,12]] | 144 / 216 / 288 | Bravyi et al., depth 8 (circuit distance 6 for BB72) |
+| HGP 58 | [[58,16,3]], the Hamming [7,4,3] code's product with itself | 100 | Tremblay–Delfosse–Beverland coloration, X then Z, 7 layers each (circuit distance 3) |
+
+Every code but BB108 and BB144 is a board. Those two are checked but neither released nor swept;
+see "open".
 
 ## The architectures
 
@@ -81,6 +84,20 @@ python goals/goal3/plot.py                                                  # ma
 The site page draws the same points live, with the official entries on each code
 (`qccd/site/goal3.py`; the server's `GET /official/v1/goals/goal3`).
 
+**Every point opens its own page.** A reference point opens its studio page: the ions moving on
+its device, the program against the circuit, the rules, and the noise model's stim program
+block by block. An official entry opens its page on the server. A size whose program broke a
+rule has a page too, listed under "The sizes that failed". [pages.py](pages.py) builds the
+pages from the sweep's `work/` folders. Each page replays its program, and the replayed time
+must equal the results row. The pages are served at `board/goal3/p/<code>/<point>.html`.
+[pages.json](pages.json), their index, is committed; the pages themselves are not (up to 45 MB
+each). They are stored on the server only as `.html.gz` and served with nginx's `gzip_static`
+(`deploy/official/README.md`, "Goal 3's point pages").
+
+```
+python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' work> ...] --gzip
+```
+
 ## Who does what (10/26 plan)
 
 - architectures and their rules: Ke
@@ -128,13 +145,28 @@ The site page draws the same points live, with the official entries on each code
   The fault is still the compiler's: [r1_fault.py](r1_fault.py) reproduces it in about 7 minutes
   (grid11x11: 6 violations at sites T3_7h and T7_6v), and `results/separate/surface7.jsonl`
   records the six failed rows.
-- **HGP code:** pending from Alex.
+- **BB72 on a grid: the reference compiler routes no size.** qccdc refuses the grids as
+  unroutable: an ion cannot reach its gate within the router's cycle limit. Six larger grids did
+  not finish within the sweep's first limit of 1800 s, so the sweep now gives every compile the
+  release's own limit (3600 s, what the grader gives a submitter). Given that time, 12x12, 13x13
+  and 14x13 finish and are refused the same way; 14x14 to 15x15, then WISE's sizes, are still
+  running. C2LR's router compiles every size. The Conveyor
+  with a dock for every ion, `conveyor96_96d`, has the lowest LER: 3.6e-4 per round, five times
+  below C2LR's best (1.9e-3). A Conveyor with 72 docks is refused, because half the ions then
+  ride the loop, and on this device only a docked ion can gate. BB72's board therefore starts
+  from `conveyor96_96d`, not from a grid. BB108 and BB144 are checked but not swept: BB72's
+  points already take 7 to 50 minutes each.
+- **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took
+  the textbook one on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py),
+  [CODES.md](CODES.md)). It passes every check the other codes pass. Its CNOT order is the
+  schedule's, not a tuned one (Keyi), and Alex may replace the code.
 - **Colour-code decoder:** the sweep decodes the colour code with generic BP-OSD. A colour-code
   decoder (e.g. Chromobius) would be fairer before the codes are compared with each other
   (noise and decoding: Zhuangzhuang, Jaewon, Yuewen). Architectures are still compared fairly
   within a code.
 - **Code sizes for the target LER < 10⁻⁵:** under qccd-noise@2 only surface d=7 reaches it so
   far (Grid 12x11: 4.1e-6 per round, 95% interval up to 5.4e-6). Colour d=7's best is 1.2e-4,
-  so the colour code needs d > 7, or a colour-code decoder.
+  so the colour code needs d > 7, or a colour-code decoder. BB72's best is 3.6e-4 per round for
+  its 12 logical qubits, and HGP58's is 2.6e-2 for 16. Both are decoded with generic BP-OSD.
 - **Certificates:** the sweep skips the Lean step. A family's best point should be submitted
   through the full grader before the paper quotes it.

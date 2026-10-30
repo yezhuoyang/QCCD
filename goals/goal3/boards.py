@@ -41,7 +41,7 @@ _MATCH = {"decoder": "pymatching", "max_shots": 2_000_000, "max_errors": 200, "s
 _BPOSD = {"decoder": "bposd", "max_shots": 2_000_000, "max_errors": 200, "batch": 10_000, "seed": SEED,
           "bp_max_iter": 30}
 _LONG = {"compile_timeout_s": 3600, "lean_timeout_s": 3600}
-_ROUNDS = {3: "Three", 5: "Five", 7: "Seven"}
+_ROUNDS = {3: "Three", 5: "Five", 6: "Six", 7: "Seven", 10: "Ten", 12: "Twelve"}
 _NOISE = ("Goal 3 fixes this code and compares architectures by the time per round and the logical error "
           "rate per round (a round fails when either memory does) under qccd-noise@2, with Helios-class "
           "physics in which every number is cited.")
@@ -49,9 +49,17 @@ _SCHEDULE = {
     "surface": "the hook-safe N-Z schedule (circuit distance {d})",
     "color": "the off-the-hook schedule with one auxiliary per plaquette (circuit distance {cd}, "
              "arXiv:2603.28852)",
+    "bb": "Bravyi et al.'s depth-8 schedule (arXiv:2308.07915; circuit distance {cd})",
+    "hgp": "the coloration schedule of Tremblay, Delfosse and Beverland (arXiv:2109.14609, Algorithm 1: X "
+           "checks, then Z checks, seven layers each; circuit distance {cd}); the code is the product of "
+           "the [7,4,3] Hamming code with itself",
 }
 
-#: code, order on the Leaderboard, starter (the sweep's lowest-LER grid), limits
+#: the starter of a code no grid compiles: the lowest-LER design the reference compiler does
+#: compile (C2LR aside: on a Goal 3 release its own physics makes it exploratory)
+_BB72_START = {"generator": "ring", "name": "conveyor96_96d", "params": {"width": 96, "height": 2, "verticals": 96}}
+
+#: code, order on the Leaderboard, starter (the sweep's lowest-LER grid as (a, b), or a device), limits
 RELEASES = [
     ("surface3", 20, (5, 5), None),
     ("surface5", 21, (9, 8), None),
@@ -59,6 +67,8 @@ RELEASES = [
     ("color3", 23, (4, 3), None),
     ("color5", 24, (6, 5), None),
     ("color7", 25, (9, 8), _LONG),
+    ("bb72", 26, _BB72_START, _LONG),
+    ("hgp58", 27, (12, 12), _LONG),
 ]
 
 
@@ -80,7 +90,8 @@ def experiment(code: str) -> MemoryExperiment:
 def describe(code: str, exp: MemoryExperiment) -> tuple[str, str]:
     meta = json.loads((HERE / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
     n, k, d = meta["nkd"]
-    name = {"surface": "rotated surface code", "color": "6.6.6 colour code"}[meta["builder"]]
+    name = {"surface": "rotated surface code", "color": "6.6.6 colour code",
+            "bb": "bivariate bicycle code", "hgp": "hypergraph product code"}[meta["builder"]]
     title = f"Goal 3: {name}, distance {d}"
     words = _ROUNDS[exp.rounds]
     sched = _SCHEDULE[meta["builder"]].format(d=d, cd=meta["circuit_distance_upper_bound"])
@@ -94,7 +105,7 @@ def describe(code: str, exp: MemoryExperiment) -> tuple[str, str]:
 
 def main() -> int:
     physics = json.loads(PHYSICS_2.read_text(encoding="utf-8"))
-    for code, order, (a, b), limits in RELEASES:
+    for code, order, start, limits in RELEASES:
         task = task_id(code)
         if (RELEASES_DIR / f"{task}@1").exists():
             print(f"{task}@1 exists; left alone")
@@ -104,7 +115,8 @@ def main() -> int:
         budget = _MATCH if exp.matchable else _BPOSD
         d = build_release(task, "1", exp.qasm, physics, title=title, description=text, out_dir=RELEASES_DIR,
                           metrics=METRICS_2 + LER_METRICS + [PER_LOGICAL], rank_by="ler_per_round",
-                          starter={"generator": "grid", "name": f"grid{a}x{b}", "params": {"a": a, "b": b}},
+                          starter=start if isinstance(start, dict) else
+                          {"generator": "grid", "name": f"grid{start[0]}x{start[1]}", "params": {"a": start[0], "b": start[1]}},
                           order=order, rank_table="quantinuum", tables=["quantinuum"], limits=limits,
                           qec={"experiment": exp.name, "detectors": exp.spec(), "noise": "qccd-noise@2",
                                "ler": budget, "logical_qubits": exp.logical_qubits,

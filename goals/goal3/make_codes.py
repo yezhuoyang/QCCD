@@ -15,6 +15,7 @@ listed in `CODES.md` applied.  For each circuit:
 4. `codes/<key>_<b>/` gets `circuit.qasm`, `detectors.json` (the `qccd.detectors` spec),
    `source.stim` and `meta.json` (sizes, distances, the checks, the builder digests).
 
+The HGP code is built by this folder's `hgp_code.py` (qLDPC's circuit), not by Alex's builders.
 Needs stim, numpy, scipy, qLDPC 0.2.4 and igraph (Alex's requirements.txt); the repo itself
 does not, so this runs in its own environment.
 """
@@ -43,6 +44,7 @@ CODES = {
     "bb72": ("bb", 6, 6, "bivariate bicycle code", (72, 12, 6)),
     "bb108": ("bb", 10, 10, "bivariate bicycle code", (108, 8, 10)),
     "bb144": ("bb", 12, 12, "bivariate bicycle code (gross)", (144, 12, 12)),
+    "hgp58": ("hgp", 3, 3, "hypergraph product code (Hamming [7,4,3])", (58, 16, 3)),
 }
 #: circuit-distance searches above this many qubits are skipped (they take minutes)
 SEARCH_MAX_QUBITS = 150
@@ -92,18 +94,22 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=HERE / "codes")
     a = ap.parse_args()
     sys.path.insert(0, str(a.builders))
+    sys.path.insert(1, str(HERE))      # hgp_code.py
     import stim
     from qldpc.objects import Pauli
 
     import bb_code
     import color_code
+    import hgp_code
     import surface_code
     from qccd.qec.stim_import import check_equivalent, from_stim
 
     build = {"surface": surface_code.build_circuit, "bb": bb_code.build_circuit,
-             "color": color_code.build_circuit}
+             "color": color_code.build_circuit, "hgp": hgp_code.build_circuit}
     digests = {f: hashlib.sha256((a.builders / f).read_bytes()).hexdigest()
                for f in ("surface_code.py", "bb_code.py", "color_code.py")}
+    # the HGP builder is ours (qLDPC's circuit, CODES.md), not one of Alex's
+    digests["hgp_code.py"] = hashlib.sha256((HERE / "hgp_code.py").read_bytes()).hexdigest()
     ok = True
     for key, (b, d, rounds, family, nkd) in CODES.items():
         if a.only and key not in a.only:

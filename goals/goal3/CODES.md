@@ -4,7 +4,7 @@ Source: `circuits.zip` from Alex (2026-10-29): `surface_code.py` (N-Z schedule),
 (Bravyi et al.'s depth-8 schedule, after gongaa/SlidingWindowDecoder), `color_code.py` (the
 off-the-hook schedule of arXiv:2603.28852, after Classiq's library), `circuits.py`, and
 `requirements.txt`. Every circuit below is the builder's own output, with the two fixes listed
-under the colour code applied.
+under the colour code applied. The HGP code is not Alex's: see [The HGP code](#the-hgp-code).
 
 ## What we checked, for each code and both bases (Z memory, X memory)
 
@@ -28,6 +28,7 @@ under the colour code applied.
 | bb72 | bivariate bicycle [[72,12,6]] | 6 | 144 | 2592 | 6 | all pass |
 | bb108 | bivariate bicycle [[108,8,10]] | 10 | 216 | 6480 | not searched | all pass |
 | bb144 | bivariate bicycle [[144,12,12]] | 12 | 288 | 10368 | not searched | all pass |
+| hgp58 | hypergraph product [[58,16,3]] | 3 | 100 | 720 | 3 | all pass |
 
 The colour code's distances, 2, 4 and 6, are what arXiv:2603.28852 reports for a single
 auxiliary per plaquette: d − ⌊(d+3)/6⌋, the loss coming from "fractional hook errors" at the
@@ -65,10 +66,35 @@ in the port. We confirmed this by trying every rotation and reflection of the he
 numbering and every relabelling of the three colours: none of the 72 gives distance d with
 sequential Z-then-X halves.
 
+## The HGP code
+
+Alex had not found an explicit HGP construction, so on 2026-10-30 Goal 3 took the textbook one,
+built by [hgp_code.py](hgp_code.py) in the same interface as Alex's builders. The code is the
+hypergraph product of the [7,4,3] Hamming code with itself (Tillich and Zémor,
+arXiv:0903.0566), qLDPC's `HGPCode(HammingCode(3))`: [[58,16,3]], 58 data qubits, and 21 X and
+21 Z checks of weight 5 to 7, each with its own ancilla, so 100 ions.
+
+The circuit is qLDPC's memory experiment with the coloration schedule of Tremblay, Delfosse and
+Beverland (arXiv:2109.14609, Algorithm 1). The X checks' Tanner graph is edge-coloured, and its
+gates are applied one colour at a time; then the Z checks' graph is treated the same way. Every
+ancilla is prepared in |+> and read in the X basis, so an X check is CX(ancilla, data) and a Z
+check is CZ(ancilla, data). The greedy colouring uses 7 colours per graph, which is the graphs'
+largest degree, so no colouring is shallower.
+
+The builder changes one thing in qLDPC's circuit. qLDPC applies the colours back to back with
+no `TICK` between them, so check 2 above could not see the layers. `hgp_code.py` puts a `TICK`
+after each colour. Its gates are otherwise qLDPC's own, in qLDPC's order (compared gate by gate
+for both bases). The circuit is the same under qLDPC 0.2.4 with networkx 3.7 (Alex's
+requirements) and under qLDPC 0.2.6 with networkx 3.6.1.
+
+The CNOT order is the schedule's, not a hand-tuned one. It is Keyi's part of the plan to improve
+it, and Alex may replace the code.
+
 ## Still to come
 
-- **HGP:** Alex is still looking for an explicit construction. It also needs a CNOT order,
-  which is Keyi's part of the plan.
+- **Other HGP codes:** `hgp_code.CLASSICAL` maps a distance to the classical code whose product
+  is taken, so a larger code is one entry there. The product of a code with n bits and m checks
+  has n² + m² data qubits and 2nm checks.
 - **Distances past 7 for surface and colour:** the 10/26 plan sets the target at LER < 10^-5,
   and under qccd-noise@2 a d=7 surface patch is still above it (Goal 1: 3×10^-5 per round with
   both bases). `make_codes.py` takes any odd d.

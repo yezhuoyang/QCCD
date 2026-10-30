@@ -1,7 +1,8 @@
 """Goal 3 (goals/goal3/README.md): one code at a time, every architecture.
 
-* its six releases are the codes' Z-then-X memories, exactly what goals/goal3/boards.py builds,
+* its releases are the codes' Z-then-X memories, exactly what goals/goal3/boards.py builds,
   and they stay off Goal 1's ranking, which keeps every release that names no goal;
+* the HGP builder (ours, goals/goal3/hgp_code.py) still builds the committed HGP circuits;
 * every family's device is read back as that family (the official board sorts entries by it);
 * the official board gives each entry its family, its time per round over both memories' rounds
   and its logical error rate per round;
@@ -27,7 +28,7 @@ pytest.importorskip("stim")
 from qccd.official.service import OfficialService  # noqa: E402
 from qccd.workspace.tasks import RELEASES_DIR, find_release, list_boards  # noqa: E402
 
-CODES = ("surface3", "surface5", "surface7", "color3", "color5", "color7")
+CODES = ("surface3", "surface5", "surface7", "color3", "color5", "color7", "bb72", "hgp58")
 
 
 @pytest.fixture
@@ -46,6 +47,17 @@ def test_goal_3_releases_are_the_codes_z_then_x_memories():
         assert (spec["basis"], spec["rounds"], spec["code"]) == ("XZ", exp.rounds, exp.code)
         assert rel.manifest["qec"]["n_ions"] == exp.n_data + exp.n_ancilla
         assert "time_limit_s" not in rel.manifest["qec"]["ler"]     # a time limit is machine-dependent
+
+
+def test_the_hgp_builder_still_builds_the_committed_circuits():
+    pytest.importorskip("qldpc")
+    from qldpc.objects import Pauli
+
+    import hgp_code
+    for b, P in (("z", Pauli.Z), ("x", Pauli.X)):
+        meta = json.loads((GOAL / "codes" / f"hgp58_{b}" / "meta.json").read_text(encoding="utf-8"))
+        src = (GOAL / "codes" / f"hgp58_{b}" / "source.stim").read_text(encoding="utf-8")
+        assert str(hgp_code.build_circuit(3, meta["rounds"], P)) + "\n" == src.replace("\r\n", "\n")
 
 
 def test_goal_3_releases_stay_off_goal_1(svc):

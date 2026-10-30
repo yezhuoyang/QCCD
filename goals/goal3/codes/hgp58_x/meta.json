@@ -1,0 +1,26 @@
+{
+ "key": "hgp58_x",
+ "code": "hgp58",
+ "family": "hypergraph product code (Hamming [7,4,3])",
+ "nkd": [
+  58,
+  16,
+  3
+ ],
+ "basis": "X",
+ "rounds": 3,
+ "ions": 100,
+ "n_data": 58,
+ "n_ancilla": 42,
+ "detectors": 84,
+ "observables": 16,
+ "logical_qubits": 16,
+ "two_qubit_gates": 720,
+ "matchable": false,
+ "determinism": "deterministic",
+ "circuit_distance_upper_bound": 3,
+ "import_differences": [],
+ "builder": "hgp",
+ "builder_sha256": "975a6e3542dd981d2842fd6c2d90f42a24f64235e76175351c69fb5630939a8a",
+ "seconds": 0.6
+}

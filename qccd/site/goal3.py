@@ -51,6 +51,9 @@ def data() -> dict | None:
     if not rels:
         return None
     fams, caveats = _families()
+    # every point's own studio page (goals/goal3/pages.py), served under board/goal3/p/
+    pf = GOAL / "pages.json"
+    pages = json.loads(pf.read_text(encoding="utf-8")) if pf.exists() else {}
     codes = []
     for b in rels:
         task = b.manifest["task"]
@@ -63,28 +66,33 @@ def data() -> dict | None:
                 r = json.loads(ln)
                 rows[(r["family"], r["point"])] = r        # the last line of a point wins
         counts = {fam: {"tried": 0, "failed": 0} for fam in fams}
-        pts = []
+        pts, failed = [], []
+        mine = pages.get(code, {})
         for (fam, name), r in sorted(rows.items(), key=lambda kv: _size(kv[1])):
             c = counts.setdefault(fam, {"tried": 0, "failed": 0})
             c["tried"] += 1
+            u = {"u": "p/" + mine[name]["page"]} if name in mine else {}
             if r.get("status") != "ok":
                 c["failed"] += 1
+                why = ("breaks " + ", ".join(r["rules_failed"]) + ": " if r.get("rules_failed") else "") + (r.get("why") or "")
+                failed.append({"f": fam, "n": name, "why": why[:240], **u})
                 continue
             ler = r["ler"]
             pts.append({"f": fam, "n": name, "s": _size(r), "t": round(r["T_round_ms"], 4),
                         "l": ler["per_round"], "lo": ler["per_round_lo"], "hi": ler["per_round_hi"],
-                        "e": ler["errors"], "sh": ler["shots"]})
+                        "e": ler["errors"], "sh": ler["shots"], **u})
         name, short = b.title.removeprefix("Goal 3: "), _short(b.title)
         codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": b.manifest.get("description", ""),
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
-                      "counts": counts, "points": pts})
+                      "counts": counts, "points": pts, "failed": failed})
     return {"families": fams, "caveats": caveats, "codes": codes}
 
 
 def _short(title: str) -> str:
     t = title.removeprefix("Goal 3: ")
     d = t.rsplit("distance ", 1)[-1]
-    return ("Surface" if "surface" in t else "Colour" if "colour" in t else t.split(",")[0]) + f" d={d}"
+    kind = {"surface": "Surface", "colour": "Colour", "bicycle": "BB", "hypergraph": "HGP"}
+    return next((v for k, v in kind.items() if k in t), t.split(",")[0]) + f" d={d}"
 
 
 CSS = """
@@ -104,7 +112,9 @@ CSS = """
 .g3-panel text.lab{fill:var(--ink);font-size:11px;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
 .g3-panel text.fam{fill:var(--ink);font-weight:600;font-size:11.5px}
 .g3-panel .pt{cursor:default}
-.g3-panel .pt.sub{cursor:pointer}
+.g3-panel .pt.go{cursor:pointer}
+.g3-panel .pt.go:focus{outline:none}
+.g3-panel .pt.go:focus .hit{stroke:var(--accent);stroke-width:2}
 .g3-panel .hit{fill:transparent}
 .g3-key{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 2px 0;font:12.5px/1.4 var(--sans);color:var(--ink2)}
 .g3-key svg{vertical-align:-2px;margin-right:5px}
@@ -139,7 +149,9 @@ SCRIPT = r"""
   function sup(n){ var s = '⁰¹²³⁴⁵⁶⁷⁸⁹'; return String(n).replace('-', '⁻').replace(/\d/g, function(d){ return s[+d]; }); }
   function ms(v){ return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2); }
   function pts(c){ return c.points.map(function(p){ return {f: p.f, n: p.n, s: p.s, t: p.t, l: p.l, lo: p.lo, hi: p.hi,
-      e: p.e, sh: p.sh, ref: true}; }).concat(live[c.id] || []); }
+      e: p.e, sh: p.sh, u: p.u, ref: true}; }).concat(live[c.id] || []); }
+  // a point's own page: a reference size's studio page here, an entry's on the official server
+  function href(p){ return p.sid ? API + '/submissions/' + encodeURIComponent(p.sid) + '/page' : (p.u || null); }
   function famsOf(c, ps){ var have = {}; ps.forEach(function(p){ have[p.f] = 1; });
     return D.families.filter(function(f){ return (c.counts[f] && c.counts[f].tried) || have[f]; })
       .concat(have.Other && D.families.indexOf('Other') < 0 ? ['Other'] : []); }
@@ -184,7 +196,8 @@ SCRIPT = r"""
       var n = mine.length, span = Math.min(colW * 0.62, 18 * n);
       mine.forEach(function(p, j){
         var x = xc(i) + (n > 1 ? -span / 2 + span * j / (n - 1) : 0), yy = y(p[key]), on = p === best, col = on ? ACC : GREY;
-        var g = E('g', {'class': 'pt' + (p.ref ? '' : ' sub'), tabindex: p.ref ? -1 : 0});
+        var to = href(p), g = E('g', {'class': 'pt' + (to ? ' go' : ''), tabindex: to ? 0 : -1});
+        if (to) { g.setAttribute('role', 'link'); g.setAttribute('aria-label', p.n + ', ' + p.f + ': open its page'); }
         if (key === 'l' && p.hi > 0) g.appendChild(E('line', {x1: x, x2: x, y1: y(p.lo > 0 ? p.lo : p.l), y2: y(p.hi),
           stroke: col, 'stroke-width': on ? 2 : 1.5, 'stroke-linecap': 'round', opacity: on ? 1 : .7}));
         var r = on ? 6 : 4.5;
@@ -197,8 +210,8 @@ SCRIPT = r"""
         g.addEventListener('mouseleave', hide);
         g.addEventListener('focus', function(){ var b = g.getBoundingClientRect(); show({clientX: b.right, clientY: b.top}, p, c); });
         g.addEventListener('blur', hide);
-        if (!p.ref) {
-          var open = function(){ window.open(API + '/submissions/' + encodeURIComponent(p.sid) + '/page', '_blank', 'noopener'); };
+        if (to) {
+          var open = function(){ window.open(to, '_blank', 'noopener'); };
           g.addEventListener('click', open);
           g.addEventListener('keydown', function(ev){ if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
         }
@@ -217,7 +230,7 @@ SCRIPT = r"""
     tip.appendChild(H('div', null, ms(p.t) + ' ms per round'));
     tip.appendChild(H('div', null, sci(p.l) + ' per round' + (p.hi ? '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')' : '')));
     if (p.e != null) tip.appendChild(H('div', 'm', p.e + ' logical errors in ' + Number(p.sh).toLocaleString() + ' shots'));
-    if (!p.ref) tip.appendChild(H('div', 'm', 'Click to open its page.'));
+    if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.'));
     tip.style.display = 'block'; move(ev);
   }
   function move(ev){ var w = tip.offsetWidth, h = tip.offsetHeight, x = ev.clientX + 14, yy = ev.clientY + 14;
@@ -234,10 +247,24 @@ SCRIPT = r"""
       tr.appendChild(H('td', null, f));
       if (!mine.length) { ['none ran', '', '', ''].forEach(function(s){ tr.appendChild(H('td', null, s)); }); t.appendChild(tr); return; }
       var ft = mine.reduce(function(a, b){ return b.t < a.t ? b : a; }), fl = mine.reduce(function(a, b){ return b.l < a.l ? b : a; });
-      tr.appendChild(H('td', null, ft.n)); tr.appendChild(H('td', 'n', ms(ft.t)));
-      tr.appendChild(H('td', null, fl.n)); tr.appendChild(H('td', 'n', sci(fl.l) + '  (' + sci(fl.lo) + ' to ' + sci(fl.hi) + ')'));
+      tr.appendChild(named(ft)); tr.appendChild(H('td', 'n', ms(ft.t)));
+      tr.appendChild(named(fl)); tr.appendChild(H('td', 'n', sci(fl.l) + '  (' + sci(fl.lo) + ' to ' + sci(fl.hi) + ')'));
       t.appendChild(tr);
     });
+    tw.appendChild(t); host.appendChild(tw);
+  }
+  function named(p){ var td = H('td'), to = href(p);
+    if (!to) { td.textContent = p.n; return td; }
+    var a = H('a', null, p.n); a.href = to; a.target = '_blank'; a.rel = 'noopener'; td.appendChild(a); return td; }
+  // the sizes that failed, each with its reason; one whose program broke a rule opens its page
+  function failures(host, c){
+    var fs = c.failed || [];
+    host.parentNode.hidden = !fs.length;
+    if (!fs.length) return;
+    var tw = H('div', 'tw'), t = H('table'), hd = H('tr');
+    ['family', 'size', 'why'].forEach(function(s){ hd.appendChild(H('th', null, s)); }); t.appendChild(hd);
+    fs.forEach(function(p){ var tr = H('tr'); tr.appendChild(H('td', null, p.f)); tr.appendChild(named(p));
+      tr.appendChild(H('td', null, p.why)); t.appendChild(tr); });
     tw.appendChild(t); host.appendChild(tw);
   }
 
@@ -252,6 +279,7 @@ SCRIPT = r"""
     panel(pan, c, 't', 'Time per syndrome round');
     panel(pan, c, 'l', 'Logical error rate per round (Z and X memories)');
     var tb = document.getElementById('g3-table'); tb.textContent = ''; table(tb, c);
+    var fl = document.getElementById('g3-failed'); fl.textContent = ''; failures(fl, c);
     if (location.hash !== '#' + c.task) history.replaceState(null, '', '#' + c.task);
   }
   D.codes.forEach(function(c, i){
@@ -305,7 +333,9 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "<p>Every point is graded on qccd-physics@2 and qccd-noise@2, the physics and noise of Goal 1, with the "
         "<code>quantinuum</code> time table and every rule. The circles are the reference sweep: each family at every "
         "size, compiled by the pinned reference compiler (qccdc b4a003dbb4ae) and graded like an entry, without the "
-        "Lean certificate step. The diamonds are entries submitted to the official server, which ran every check.</p>"
+        "Lean certificate step. The diamonds are entries submitted to the official server, which ran every check. "
+        "Click any point to open its page: the ions moving on the device, the program against the circuit, the "
+        "rules, and the noise model&rsquo;s stim program block by block.</p>"
         f"<div class=\"tw\"><table><tr><th>family</th><th>the device</th></tr>{fams}</table></div></details>"
         '<div class="g3" id="g3">'
         '<div class="g3-tabs" id="g3-tabs" role="tablist" aria-label="Code"></div>'
@@ -316,9 +346,10 @@ def page(PAGE: str, STYLE: str) -> str | None:
         '<span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="#1f5bb5"/></svg>best in its family</span>'
         '<span><svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="#8f8e88"/></svg>every other size</span>'
         '<span><svg width="12" height="12"><path d="M6 0.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="#8f8e88"/></svg>'
-        "submitted entry (click to open)</span>"
-        "<span>Bars: 95% interval</span></div>"
+        "submitted entry</span>"
+        "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
+        '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
         f'<details><summary>What the starred families cannot show yet</summary><ul>{cav}</ul>'
         "<p>A size counts as failed when the reference compiler refused it or its program broke a rule.</p></details>"
         f"{tries}</div>"

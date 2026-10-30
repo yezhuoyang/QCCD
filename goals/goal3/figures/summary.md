@@ -2,6 +2,16 @@
 
 Each family's best point by each measure (they can differ). Time per round under the `quantinuum` table; LER per round = 1-(1-p_Z)(1-p_X) under qccd-noise@2, 95% interval.
 
+## bivariate bicycle code [[72,12,6]], 6 rounds, 144 ions
+
+| family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
+|---|---|---|---|---|---|
+| Grid | 0 of 9 | — | — | — | — |
+| WISE | 0 of 2 | — | — | — | — |
+| C2LR | 12 of 12 | c2lr15x14 | 291.7 | c2lr15x14 | 1.86e-03 [1.6e-03, 2.1e-03] |
+| Cyclone | 4 of 4 | cyclone75 | 5524.6 | cyclone83 | 7.29e-01 [6.8e-01, 7.7e-01] |
+| Conveyor | 2 of 4 | conveyor96_96d | 383.9 | conveyor96_96d | 3.64e-04 [3.2e-04, 4.2e-04] |
+
 ## 6.6.6 colour code [[7,1,3]], 3 rounds, 10 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
@@ -31,6 +41,16 @@ Each family's best point by each measure (they can differ). Time per round under
 | C2LR | 7 of 7 | c2lr9x9 | 100.9 | c2lr9x8 | 6.41e-04 [5.6e-04, 7.3e-04] |
 | Cyclone | 4 of 4 | cyclone29 | 1363.7 | cyclone29 | 1.70e-02 [1.6e-02, 1.8e-02] |
 | Conveyor | 4 of 4 | conveyor36_24d | 528.3 | conveyor36_24d | 7.19e-04 [6.3e-04, 8.3e-04] |
+
+## hypergraph product code (Hamming [7,4,3]) [[58,16,3]], 3 rounds, 100 ions
+
+| family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
+|---|---|---|---|---|---|
+| Grid | 7 of 10 | grid12x12 | 206.7 | grid12x12 | 2.60e-02 [2.4e-02, 2.8e-02] |
+| WISE | 7 of 10 | wise12x12 | 206.7 | wise12x12 | 2.60e-02 [2.4e-02, 2.8e-02] |
+| C2LR | 10 of 10 | c2lr13x12 | 160.2 | c2lr12x11 | 3.63e-02 [3.4e-02, 3.9e-02] |
+| Cyclone | 4 of 4 | cyclone52 | 3394.6 | cyclone75 | 9.54e-01 [9.2e-01, 9.7e-01] |
+| Conveyor | 2 of 2 | conveyor84_56d | 826.5 | conveyor84_56d | 1.09e-01 [1.0e-01, 1.1e-01] |
 
 ## rotated surface code [[9,1,3]], 3 rounds, 17 ions
 

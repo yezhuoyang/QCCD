@@ -1,0 +1,142 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:41251dedce044949349110e31179992c294d2c51b6316355bbffdcbb86173424",
+  "file": "circuit.qasm"
+ },
+ "description": "Six rounds of the [[72,12,6]] bivariate bicycle code as a Z memory, read out in the program; every ion reset; then six rounds as an X memory, read out by the grader (144 ions: 72 data, 72 ancillas, reset and reused every round). The circuit is Bravyi et al.'s depth-8 schedule (arXiv:2308.07915; circuit distance 6). Goal 3 fixes this code and compares architectures by the time per round and the logical error rate per round (a round fails when either memory does) under qccd-noise@2, with Helios-class physics in which every number is cited.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "goal": "goal3",
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 3600,
+  "lean_timeout_s": 3600,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('quantinuum')",
+   "better": "low",
+   "name": "T_quantinuum",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  },
+  {
+   "about": "logical error rate per syndrome round, 1-(1-LER)^(1/rounds), under the release's noise model",
+   "better": "low",
+   "name": "ler_per_round",
+   "unit": "per round"
+  },
+  {
+   "about": "logical error rate of the whole memory experiment (Monte Carlo, fixed seed, 95% interval in the report)",
+   "better": "low",
+   "name": "ler",
+   "unit": "per experiment"
+  },
+  {
+   "about": "logical error rate per round divided by the logical qubits the experiment tests (qccd.qec.experiments.logical_qubits): what Goal 1 ranks every code by",
+   "better": "low",
+   "name": "ler_per_round_per_logical",
+   "unit": "per round per logical qubit"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 26,
+ "physics": {
+  "digest": "sha256:90abdb19951e17c049bf9891798432b1e3ada1dc14c26af24a5944759ca0d5bc",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "quantinuum",
+  "tables": [
+   "quantinuum"
+  ]
+ },
+ "qec": {
+  "detectors": {
+   "digest": "sha256:0b732266ec568f55b95a6fd7e6642265e0350761653c2e7ecb44642d2dc917c3",
+   "file": "detectors.json"
+  },
+  "experiment": "bb72seq_r6",
+  "ler": {
+   "batch": 10000,
+   "bp_max_iter": 30,
+   "decoder": "bposd",
+   "max_errors": 200,
+   "max_shots": 2000000,
+   "seed": 20261029
+  },
+  "logical_qubits": 12,
+  "n_ions": 144,
+  "noise": "qccd-noise@2"
+ },
+ "rank_by": "ler_per_round",
+ "release": "1",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics",
+  "ler"
+ ],
+ "starter": {
+  "generator": "ring",
+  "name": "conveyor96_96d",
+  "params": {
+   "height": 2,
+   "verticals": 96,
+   "width": 96
+  }
+ },
+ "task": "goal3_bb72_mem",
+ "title": "Goal 3: bivariate bicycle code, distance 6",
+ "track": "codesign-artifact",
+ "version": 1
+}

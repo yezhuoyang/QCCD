@@ -1,0 +1,2100 @@
+{
+ "bb72": {
+  "c2lr10x10": {
+   "bytes": 45431802,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14909,
+   "page": "bb72/c2lr10x10.html",
+   "point": "c2lr10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr10x9": {
+   "bytes": 47563252,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 15752,
+   "page": "bb72/c2lr10x9.html",
+   "point": "c2lr10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x10": {
+   "bytes": 45798536,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14984,
+   "page": "bb72/c2lr11x10.html",
+   "point": "c2lr11x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x11": {
+   "bytes": 48690315,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 16006,
+   "page": "bb72/c2lr11x11.html",
+   "point": "c2lr11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x11": {
+   "bytes": 45825746,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 15008,
+   "page": "bb72/c2lr12x11.html",
+   "point": "c2lr12x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x12": {
+   "bytes": 45385603,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14745,
+   "page": "bb72/c2lr12x12.html",
+   "point": "c2lr12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr13x12": {
+   "bytes": 45482720,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14823,
+   "page": "bb72/c2lr13x12.html",
+   "point": "c2lr13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr13x13": {
+   "bytes": 44296804,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14166,
+   "page": "bb72/c2lr13x13.html",
+   "point": "c2lr13x13",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr14x13": {
+   "bytes": 47119914,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 15531,
+   "page": "bb72/c2lr14x13.html",
+   "point": "c2lr14x13",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr14x14": {
+   "bytes": 44660593,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14356,
+   "page": "bb72/c2lr14x14.html",
+   "point": "c2lr14x14",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr15x14": {
+   "bytes": 43367956,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 13684,
+   "page": "bb72/c2lr15x14.html",
+   "point": "c2lr15x14",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr15x15": {
+   "bytes": 46367117,
+   "code": "bb72",
+   "family": "C2LR",
+   "instructions": 14766,
+   "page": "bb72/c2lr15x15.html",
+   "point": "c2lr15x15",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor144_96d": {
+   "bytes": 41227804,
+   "code": "bb72",
+   "family": "Conveyor",
+   "instructions": 26013,
+   "page": "bb72/conveyor144_96d.html",
+   "point": "conveyor144_96d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor96_96d": {
+   "bytes": 28403577,
+   "code": "bb72",
+   "family": "Conveyor",
+   "instructions": 13773,
+   "page": "bb72/conveyor96_96d.html",
+   "point": "conveyor96_96d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone108": {
+   "bytes": 386679054,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 347432,
+   "page": "bb72/cyclone108.html",
+   "point": "cyclone108",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone75": {
+   "bytes": 340580804,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 304770,
+   "page": "bb72/cyclone75.html",
+   "point": "cyclone75",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone83": {
+   "bytes": 360982867,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 323824,
+   "page": "bb72/cyclone83.html",
+   "point": "cyclone83",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone94": {
+   "bytes": 379514994,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 340986,
+   "page": "bb72/cyclone94.html",
+   "point": "cyclone94",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "color3": {
+  "c2lr3x3": {
+   "bytes": 2444737,
+   "code": "color3",
+   "family": "C2LR",
+   "instructions": 1018,
+   "page": "color3/c2lr3x3.html",
+   "point": "c2lr3x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr4x3": {
+   "bytes": 2398075,
+   "code": "color3",
+   "family": "C2LR",
+   "instructions": 921,
+   "page": "color3/c2lr4x3.html",
+   "point": "c2lr4x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr4x4": {
+   "bytes": 2440069,
+   "code": "color3",
+   "family": "C2LR",
+   "instructions": 1000,
+   "page": "color3/c2lr4x4.html",
+   "point": "c2lr4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor8_4d": {
+   "bytes": 2643303,
+   "code": "color3",
+   "family": "Conveyor",
+   "instructions": 1496,
+   "page": "color3/conveyor8_4d.html",
+   "point": "conveyor8_4d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor9_3d": {
+   "bytes": 2598057,
+   "code": "color3",
+   "family": "Conveyor",
+   "instructions": 1390,
+   "page": "color3/conveyor9_3d.html",
+   "point": "conveyor9_3d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone6": {
+   "bytes": 2299170,
+   "code": "color3",
+   "family": "Cyclone",
+   "instructions": 740,
+   "page": "color3/cyclone6.html",
+   "point": "cyclone6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone7": {
+   "bytes": 2318264,
+   "code": "color3",
+   "family": "Cyclone",
+   "instructions": 779,
+   "page": "color3/cyclone7.html",
+   "point": "cyclone7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone8": {
+   "bytes": 2354347,
+   "code": "color3",
+   "family": "Cyclone",
+   "instructions": 861,
+   "page": "color3/cyclone8.html",
+   "point": "cyclone8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid3x3": {
+   "bytes": 2353827,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 790,
+   "page": "color3/grid3x3.html",
+   "point": "grid3x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid4x3": {
+   "bytes": 2337993,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 719,
+   "page": "color3/grid4x3.html",
+   "point": "grid4x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid4x4": {
+   "bytes": 2359666,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 719,
+   "page": "color3/grid4x4.html",
+   "point": "grid4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise3x3": {
+   "bytes": 2330196,
+   "code": "color3",
+   "family": "WISE",
+   "instructions": 790,
+   "page": "color3/wise3x3.html",
+   "point": "wise3x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise4x3": {
+   "bytes": 2303585,
+   "code": "color3",
+   "family": "WISE",
+   "instructions": 719,
+   "page": "color3/wise4x3.html",
+   "point": "wise4x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise4x4": {
+   "bytes": 2310112,
+   "code": "color3",
+   "family": "WISE",
+   "instructions": 719,
+   "page": "color3/wise4x4.html",
+   "point": "wise4x4",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "color5": {
+  "c2lr5x4": {
+   "bytes": 5580009,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 3599,
+   "page": "color5/c2lr5x4.html",
+   "point": "c2lr5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr5x5": {
+   "bytes": 5550170,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 3542,
+   "page": "color5/c2lr5x5.html",
+   "point": "c2lr5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr6x5": {
+   "bytes": 5396323,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 3345,
+   "page": "color5/c2lr6x5.html",
+   "point": "c2lr6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr6x6": {
+   "bytes": 5421351,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 3359,
+   "page": "color5/c2lr6x6.html",
+   "point": "c2lr6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x6": {
+   "bytes": 5516393,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 3449,
+   "page": "color5/c2lr7x6.html",
+   "point": "c2lr7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x7": {
+   "bytes": 4435459,
+   "code": "color5",
+   "family": "C2LR",
+   "instructions": 2121,
+   "page": "color5/c2lr7x7.html",
+   "point": "c2lr7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor24_12d": {
+   "bytes": 8815200,
+   "code": "color5",
+   "family": "Conveyor",
+   "instructions": 10826,
+   "page": "color5/conveyor24_12d.html",
+   "point": "conveyor24_12d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor27_9d": {
+   "bytes": 10008282,
+   "code": "color5",
+   "family": "Conveyor",
+   "instructions": 13147,
+   "page": "color5/conveyor27_9d.html",
+   "point": "conveyor27_9d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone15": {
+   "bytes": 10840633,
+   "code": "color5",
+   "family": "Cyclone",
+   "instructions": 15219,
+   "page": "color5/cyclone15.html",
+   "point": "cyclone15",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone17": {
+   "bytes": 11326314,
+   "code": "color5",
+   "family": "Cyclone",
+   "instructions": 16159,
+   "page": "color5/cyclone17.html",
+   "point": "cyclone17",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone19": {
+   "bytes": 11633784,
+   "code": "color5",
+   "family": "Cyclone",
+   "instructions": 16745,
+   "page": "color5/cyclone19.html",
+   "point": "cyclone19",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone21": {
+   "bytes": 12125919,
+   "code": "color5",
+   "family": "Cyclone",
+   "instructions": 17679,
+   "page": "color5/cyclone21.html",
+   "point": "cyclone21",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x4": {
+   "bytes": 4697120,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 3004,
+   "page": "color5/grid5x4.html",
+   "point": "grid5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x5": {
+   "bytes": 4708612,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 2997,
+   "page": "color5/grid5x5.html",
+   "point": "grid5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x5": {
+   "bytes": 4587374,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 2747,
+   "page": "color5/grid6x5.html",
+   "point": "grid6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x6": {
+   "bytes": 4642969,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 2807,
+   "page": "color5/grid6x6.html",
+   "point": "grid6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x6": {
+   "bytes": 4621974,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 2751,
+   "page": "color5/grid7x6.html",
+   "point": "grid7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x7": {
+   "bytes": 4634101,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 2736,
+   "page": "color5/grid7x7.html",
+   "point": "grid7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise5x4": {
+   "bytes": 4679873,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 3004,
+   "page": "color5/wise5x4.html",
+   "point": "wise5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise5x5": {
+   "bytes": 4685830,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 2997,
+   "page": "color5/wise5x5.html",
+   "point": "wise5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise6x5": {
+   "bytes": 4559168,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 2747,
+   "page": "color5/wise6x5.html",
+   "point": "wise6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise6x6": {
+   "bytes": 4608101,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 2807,
+   "page": "color5/wise6x6.html",
+   "point": "wise6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x6": {
+   "bytes": 4580435,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 2751,
+   "page": "color5/wise7x6.html",
+   "point": "wise7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x7": {
+   "bytes": 4584690,
+   "code": "color5",
+   "family": "WISE",
+   "instructions": 2736,
+   "page": "color5/wise7x7.html",
+   "point": "wise7x7",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "color7": {
+  "c2lr10x9": {
+   "bytes": 12699500,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 6928,
+   "page": "color7/c2lr10x9.html",
+   "point": "c2lr10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x6": {
+   "bytes": 12990911,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 7273,
+   "page": "color7/c2lr7x6.html",
+   "point": "c2lr7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x7": {
+   "bytes": 12543816,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 6906,
+   "page": "color7/c2lr7x7.html",
+   "point": "c2lr7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x7": {
+   "bytes": 12937472,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 7202,
+   "page": "color7/c2lr8x7.html",
+   "point": "c2lr8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x8": {
+   "bytes": 12393519,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 6797,
+   "page": "color7/c2lr8x8.html",
+   "point": "c2lr8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x8": {
+   "bytes": 12608462,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 6912,
+   "page": "color7/c2lr9x8.html",
+   "point": "c2lr9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x9": {
+   "bytes": 12143008,
+   "code": "color7",
+   "family": "C2LR",
+   "instructions": 6525,
+   "page": "color7/c2lr9x9.html",
+   "point": "c2lr9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor36_18d": {
+   "bytes": 22643368,
+   "code": "color7",
+   "family": "Conveyor",
+   "instructions": 30546,
+   "page": "color7/conveyor36_18d.html",
+   "point": "conveyor36_18d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor36_24d": {
+   "bytes": 20265172,
+   "code": "color7",
+   "family": "Conveyor",
+   "instructions": 24074,
+   "page": "color7/conveyor36_24d.html",
+   "point": "conveyor36_24d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor45_18d": {
+   "bytes": 27477127,
+   "code": "color7",
+   "family": "Conveyor",
+   "instructions": 41918,
+   "page": "color7/conveyor45_18d.html",
+   "point": "conveyor45_18d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor48_24d": {
+   "bytes": 23588093,
+   "code": "color7",
+   "family": "Conveyor",
+   "instructions": 32330,
+   "page": "color7/conveyor48_24d.html",
+   "point": "conveyor48_24d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone29": {
+   "bytes": 51106287,
+   "code": "color7",
+   "family": "Cyclone",
+   "instructions": 88379,
+   "page": "color7/cyclone29.html",
+   "point": "cyclone29",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone32": {
+   "bytes": 53814552,
+   "code": "color7",
+   "family": "Cyclone",
+   "instructions": 94008,
+   "page": "color7/cyclone32.html",
+   "point": "cyclone32",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone36": {
+   "bytes": 55411280,
+   "code": "color7",
+   "family": "Cyclone",
+   "instructions": 97349,
+   "page": "color7/cyclone36.html",
+   "point": "cyclone36",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone42": {
+   "bytes": 58274562,
+   "code": "color7",
+   "family": "Cyclone",
+   "instructions": 103231,
+   "page": "color7/cyclone42.html",
+   "point": "cyclone42",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid10x9": {
+   "bytes": 9371276,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 5653,
+   "page": "color7/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x6": {
+   "bytes": 9131677,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 5364,
+   "page": "color7/grid7x6.html",
+   "point": "grid7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x7": {
+   "bytes": 9103392,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 5266,
+   "page": "color7/grid7x7.html",
+   "point": "grid7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x7": {
+   "bytes": 9728292,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 6213,
+   "page": "color7/grid8x7.html",
+   "point": "grid8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 9857233,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 6426,
+   "page": "color7/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x8": {
+   "bytes": 8771714,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 4769,
+   "page": "color7/grid9x8.html",
+   "point": "grid9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x9": {
+   "bytes": 9342612,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 5648,
+   "page": "color7/grid9x9.html",
+   "point": "grid9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise10x9": {
+   "bytes": 9375853,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 5653,
+   "page": "color7/wise10x9.html",
+   "point": "wise10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x6": {
+   "bytes": 9090123,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 5364,
+   "page": "color7/wise7x6.html",
+   "point": "wise7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x7": {
+   "bytes": 9053957,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 5266,
+   "page": "color7/wise7x7.html",
+   "point": "wise7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x7": {
+   "bytes": 9670983,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 6213,
+   "page": "color7/wise8x7.html",
+   "point": "wise8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x8": {
+   "bytes": 9860877,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 6426,
+   "page": "color7/wise8x8.html",
+   "point": "wise8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x8": {
+   "bytes": 8775641,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 4769,
+   "page": "color7/wise9x8.html",
+   "point": "wise9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x9": {
+   "bytes": 9352880,
+   "code": "color7",
+   "family": "WISE",
+   "instructions": 5648,
+   "page": "color7/wise9x9.html",
+   "point": "wise9x9",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "hgp58": {
+  "c2lr10x10": {
+   "bytes": 12035193,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5028,
+   "page": "hgp58/c2lr10x10.html",
+   "point": "c2lr10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr10x9": {
+   "bytes": 12343572,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5192,
+   "page": "hgp58/c2lr10x9.html",
+   "point": "c2lr10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x10": {
+   "bytes": 12110890,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5069,
+   "page": "hgp58/c2lr11x10.html",
+   "point": "c2lr11x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x11": {
+   "bytes": 12259377,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5112,
+   "page": "hgp58/c2lr11x11.html",
+   "point": "c2lr11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x11": {
+   "bytes": 12055328,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 4952,
+   "page": "hgp58/c2lr12x11.html",
+   "point": "c2lr12x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x12": {
+   "bytes": 12253109,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5072,
+   "page": "hgp58/c2lr12x12.html",
+   "point": "c2lr12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr13x12": {
+   "bytes": 11893628,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 4894,
+   "page": "hgp58/c2lr13x12.html",
+   "point": "c2lr13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x8": {
+   "bytes": 12385452,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5253,
+   "page": "hgp58/c2lr8x8.html",
+   "point": "c2lr8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x8": {
+   "bytes": 11846947,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 4948,
+   "page": "hgp58/c2lr9x8.html",
+   "point": "c2lr9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x9": {
+   "bytes": 12278095,
+   "code": "hgp58",
+   "family": "C2LR",
+   "instructions": 5165,
+   "page": "hgp58/c2lr9x9.html",
+   "point": "c2lr9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor84_42d": {
+   "bytes": 23271184,
+   "code": "hgp58",
+   "family": "Conveyor",
+   "instructions": 24645,
+   "page": "hgp58/conveyor84_42d.html",
+   "point": "conveyor84_42d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor84_56d": {
+   "bytes": 19651786,
+   "code": "hgp58",
+   "family": "Conveyor",
+   "instructions": 18081,
+   "page": "hgp58/conveyor84_56d.html",
+   "point": "conveyor84_56d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone52": {
+   "bytes": 67222410,
+   "code": "hgp58",
+   "family": "Cyclone",
+   "instructions": 93335,
+   "page": "hgp58/cyclone52.html",
+   "point": "cyclone52",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone58": {
+   "bytes": 69707951,
+   "code": "hgp58",
+   "family": "Cyclone",
+   "instructions": 97219,
+   "page": "hgp58/cyclone58.html",
+   "point": "cyclone58",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone65": {
+   "bytes": 71449331,
+   "code": "hgp58",
+   "family": "Cyclone",
+   "instructions": 99927,
+   "page": "hgp58/cyclone65.html",
+   "point": "cyclone65",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone75": {
+   "bytes": 72901638,
+   "code": "hgp58",
+   "family": "Cyclone",
+   "instructions": 102107,
+   "page": "hgp58/cyclone75.html",
+   "point": "cyclone75",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid10x10": {
+   "bytes": 8332782,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4583,
+   "page": "hgp58/grid10x10.html",
+   "point": "grid10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid10x9": {
+   "bytes": 7890164,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 3976,
+   "page": "hgp58/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid11x10": {
+   "bytes": 4073018,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4076,
+   "page": "hgp58/grid11x10.html",
+   "point": "grid11x10",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "grid11x11": {
+   "bytes": 4094297,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4080,
+   "page": "hgp58/grid11x11.html",
+   "point": "grid11x11",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "grid12x11": {
+   "bytes": 4030616,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 3933,
+   "page": "hgp58/grid12x11.html",
+   "point": "grid12x11",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "grid12x12": {
+   "bytes": 7959912,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 3927,
+   "page": "hgp58/grid12x12.html",
+   "point": "grid12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid13x12": {
+   "bytes": 8030998,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4029,
+   "page": "hgp58/grid13x12.html",
+   "point": "grid13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 8534931,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4942,
+   "page": "hgp58/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x8": {
+   "bytes": 8577677,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 5022,
+   "page": "hgp58/grid9x8.html",
+   "point": "grid9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x9": {
+   "bytes": 8210292,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4513,
+   "page": "hgp58/grid9x9.html",
+   "point": "grid9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise10x10": {
+   "bytes": 8337628,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4583,
+   "page": "hgp58/wise10x10.html",
+   "point": "wise10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise10x9": {
+   "bytes": 7894647,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 3976,
+   "page": "hgp58/wise10x9.html",
+   "point": "wise10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise11x10": {
+   "bytes": 4078235,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4076,
+   "page": "hgp58/wise11x10.html",
+   "point": "wise11x10",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "wise11x11": {
+   "bytes": 4099924,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4080,
+   "page": "hgp58/wise11x11.html",
+   "point": "wise11x11",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "wise12x11": {
+   "bytes": 4036655,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 3933,
+   "page": "hgp58/wise12x11.html",
+   "point": "wise12x11",
+   "rules_failed": [
+    "R1"
+   ],
+   "status": "rules_failed"
+  },
+  "wise12x12": {
+   "bytes": 7966423,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 3927,
+   "page": "hgp58/wise12x12.html",
+   "point": "wise12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise13x12": {
+   "bytes": 8037963,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4029,
+   "page": "hgp58/wise13x12.html",
+   "point": "wise13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x8": {
+   "bytes": 8538477,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4942,
+   "page": "hgp58/wise8x8.html",
+   "point": "wise8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x8": {
+   "bytes": 8581505,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 5022,
+   "page": "hgp58/wise9x8.html",
+   "point": "wise9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x9": {
+   "bytes": 8220470,
+   "code": "hgp58",
+   "family": "WISE",
+   "instructions": 4513,
+   "page": "hgp58/wise9x9.html",
+   "point": "wise9x9",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "surface3": {
+  "c2lr4x4": {
+   "bytes": 2216726,
+   "code": "surface3",
+   "family": "C2LR",
+   "instructions": 455,
+   "page": "surface3/c2lr4x4.html",
+   "point": "c2lr4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr5x4": {
+   "bytes": 2151695,
+   "code": "surface3",
+   "family": "C2LR",
+   "instructions": 346,
+   "page": "surface3/c2lr5x4.html",
+   "point": "c2lr5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr5x5": {
+   "bytes": 2159771,
+   "code": "surface3",
+   "family": "C2LR",
+   "instructions": 346,
+   "page": "surface3/c2lr5x5.html",
+   "point": "c2lr5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr6x5": {
+   "bytes": 2167877,
+   "code": "surface3",
+   "family": "C2LR",
+   "instructions": 346,
+   "page": "surface3/c2lr6x5.html",
+   "point": "c2lr6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor12_8d": {
+   "bytes": 2678016,
+   "code": "surface3",
+   "family": "Conveyor",
+   "instructions": 1401,
+   "page": "surface3/conveyor12_8d.html",
+   "point": "conveyor12_8d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor16_8d": {
+   "bytes": 2873184,
+   "code": "surface3",
+   "family": "Conveyor",
+   "instructions": 1806,
+   "page": "surface3/conveyor16_8d.html",
+   "point": "conveyor16_8d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor22_11d": {
+   "bytes": 2847288,
+   "code": "surface3",
+   "family": "Conveyor",
+   "instructions": 1728,
+   "page": "surface3/conveyor22_11d.html",
+   "point": "conveyor22_11d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone10": {
+   "bytes": 2608728,
+   "code": "surface3",
+   "family": "Cyclone",
+   "instructions": 1386,
+   "page": "surface3/cyclone10.html",
+   "point": "cyclone10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone12": {
+   "bytes": 2643626,
+   "code": "surface3",
+   "family": "Cyclone",
+   "instructions": 1454,
+   "page": "surface3/cyclone12.html",
+   "point": "cyclone12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone13": {
+   "bytes": 2690220,
+   "code": "surface3",
+   "family": "Cyclone",
+   "instructions": 1548,
+   "page": "surface3/cyclone13.html",
+   "point": "cyclone13",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone9": {
+   "bytes": 2604103,
+   "code": "surface3",
+   "family": "Cyclone",
+   "instructions": 1377,
+   "page": "surface3/cyclone9.html",
+   "point": "cyclone9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid4x4": {
+   "bytes": 2352989,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 625,
+   "page": "surface3/grid4x4.html",
+   "point": "grid4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x4": {
+   "bytes": 2338387,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 650,
+   "page": "surface3/grid5x4.html",
+   "point": "grid5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x5": {
+   "bytes": 2354522,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 654,
+   "page": "surface3/grid5x5.html",
+   "point": "grid5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x5": {
+   "bytes": 2355790,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 627,
+   "page": "surface3/grid6x5.html",
+   "point": "grid6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise4x4": {
+   "bytes": 2303428,
+   "code": "surface3",
+   "family": "WISE",
+   "instructions": 625,
+   "page": "surface3/wise4x4.html",
+   "point": "wise4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise5x4": {
+   "bytes": 2321147,
+   "code": "surface3",
+   "family": "WISE",
+   "instructions": 650,
+   "page": "surface3/wise5x4.html",
+   "point": "wise5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise5x5": {
+   "bytes": 2331754,
+   "code": "surface3",
+   "family": "WISE",
+   "instructions": 654,
+   "page": "surface3/wise5x5.html",
+   "point": "wise5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise6x5": {
+   "bytes": 2327597,
+   "code": "surface3",
+   "family": "WISE",
+   "instructions": 627,
+   "page": "surface3/wise6x5.html",
+   "point": "wise6x5",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "surface5": {
+  "c2lr6x6": {
+   "bytes": 4944540,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1970,
+   "page": "surface5/c2lr6x6.html",
+   "point": "c2lr6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x6": {
+   "bytes": 4890128,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1951,
+   "page": "surface5/c2lr7x6.html",
+   "point": "c2lr7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr7x7": {
+   "bytes": 4615269,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1699,
+   "page": "surface5/c2lr7x7.html",
+   "point": "c2lr7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x7": {
+   "bytes": 4691519,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1740,
+   "page": "surface5/c2lr8x7.html",
+   "point": "c2lr8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x8": {
+   "bytes": 4668517,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1702,
+   "page": "surface5/c2lr8x8.html",
+   "point": "c2lr8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x8": {
+   "bytes": 4986075,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1981,
+   "page": "surface5/c2lr9x8.html",
+   "point": "c2lr9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x9": {
+   "bytes": 4859961,
+   "code": "surface5",
+   "family": "C2LR",
+   "instructions": 1844,
+   "page": "surface5/c2lr9x9.html",
+   "point": "c2lr9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor32_32d": {
+   "bytes": 5525394,
+   "code": "surface5",
+   "family": "Conveyor",
+   "instructions": 3658,
+   "page": "surface5/conveyor32_32d.html",
+   "point": "conveyor32_32d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor36_24d": {
+   "bytes": 8361264,
+   "code": "surface5",
+   "family": "Conveyor",
+   "instructions": 8497,
+   "page": "surface5/conveyor36_24d.html",
+   "point": "conveyor36_24d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor48_24d": {
+   "bytes": 9646243,
+   "code": "surface5",
+   "family": "Conveyor",
+   "instructions": 10340,
+   "page": "surface5/conveyor48_24d.html",
+   "point": "conveyor48_24d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor48_32d": {
+   "bytes": 7189939,
+   "code": "surface5",
+   "family": "Conveyor",
+   "instructions": 6257,
+   "page": "surface5/conveyor48_32d.html",
+   "point": "conveyor48_32d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone26": {
+   "bytes": 11740622,
+   "code": "surface5",
+   "family": "Cyclone",
+   "instructions": 13744,
+   "page": "surface5/cyclone26.html",
+   "point": "cyclone26",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone29": {
+   "bytes": 13571550,
+   "code": "surface5",
+   "family": "Cyclone",
+   "instructions": 16578,
+   "page": "surface5/cyclone29.html",
+   "point": "cyclone29",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone32": {
+   "bytes": 14198110,
+   "code": "surface5",
+   "family": "Cyclone",
+   "instructions": 17567,
+   "page": "surface5/cyclone32.html",
+   "point": "cyclone32",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone37": {
+   "bytes": 14893781,
+   "code": "surface5",
+   "family": "Cyclone",
+   "instructions": 18638,
+   "page": "surface5/cyclone37.html",
+   "point": "cyclone37",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x6": {
+   "bytes": 4288313,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1874,
+   "page": "surface5/grid6x6.html",
+   "point": "grid6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x6": {
+   "bytes": 4485724,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 2165,
+   "page": "surface5/grid7x6.html",
+   "point": "grid7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x7": {
+   "bytes": 4352677,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1898,
+   "page": "surface5/grid7x7.html",
+   "point": "grid7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x7": {
+   "bytes": 4363445,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1885,
+   "page": "surface5/grid8x7.html",
+   "point": "grid8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 4309346,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1873,
+   "page": "surface5/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x8": {
+   "bytes": 4265124,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1757,
+   "page": "surface5/grid9x8.html",
+   "point": "grid9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x9": {
+   "bytes": 4328048,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 1865,
+   "page": "surface5/grid9x9.html",
+   "point": "grid9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise6x6": {
+   "bytes": 4253401,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1874,
+   "page": "surface5/wise6x6.html",
+   "point": "wise6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x6": {
+   "bytes": 4444141,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 2165,
+   "page": "surface5/wise7x6.html",
+   "point": "wise7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise7x7": {
+   "bytes": 4303212,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1898,
+   "page": "surface5/wise7x7.html",
+   "point": "wise7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x7": {
+   "bytes": 4306104,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1885,
+   "page": "surface5/wise8x7.html",
+   "point": "wise8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x8": {
+   "bytes": 4312947,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1873,
+   "page": "surface5/wise8x8.html",
+   "point": "wise8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x8": {
+   "bytes": 4269020,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1757,
+   "page": "surface5/wise9x8.html",
+   "point": "wise9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x9": {
+   "bytes": 4338295,
+   "code": "surface5",
+   "family": "WISE",
+   "instructions": 1865,
+   "page": "surface5/wise9x9.html",
+   "point": "wise9x9",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ },
+ "surface7": {
+  "c2lr10x10": {
+   "bytes": 12176727,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 4343,
+   "page": "surface7/c2lr10x10.html",
+   "point": "c2lr10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr10x9": {
+   "bytes": 11625421,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 4072,
+   "page": "surface7/c2lr10x9.html",
+   "point": "c2lr10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x10": {
+   "bytes": 11394062,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3950,
+   "page": "surface7/c2lr11x10.html",
+   "point": "c2lr11x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr11x11": {
+   "bytes": 11456312,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3985,
+   "page": "surface7/c2lr11x11.html",
+   "point": "c2lr11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x11": {
+   "bytes": 11478665,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3970,
+   "page": "surface7/c2lr12x11.html",
+   "point": "c2lr12x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr12x12": {
+   "bytes": 11233652,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3825,
+   "page": "surface7/c2lr12x12.html",
+   "point": "c2lr12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr13x12": {
+   "bytes": 11605382,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3984,
+   "page": "surface7/c2lr13x12.html",
+   "point": "c2lr13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr8x8": {
+   "bytes": 12075688,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 4325,
+   "page": "surface7/c2lr8x8.html",
+   "point": "c2lr8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x8": {
+   "bytes": 11737500,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 4188,
+   "page": "surface7/c2lr9x8.html",
+   "point": "c2lr9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "c2lr9x9": {
+   "bytes": 11343357,
+   "code": "surface7",
+   "family": "C2LR",
+   "instructions": 3940,
+   "page": "surface7/c2lr9x9.html",
+   "point": "c2lr9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor64_64d": {
+   "bytes": 15362242,
+   "code": "surface7",
+   "family": "Conveyor",
+   "instructions": 11001,
+   "page": "surface7/conveyor64_64d.html",
+   "point": "conveyor64_64d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor72_48d": {
+   "bytes": 24074668,
+   "code": "surface7",
+   "family": "Conveyor",
+   "instructions": 23540,
+   "page": "surface7/conveyor72_48d.html",
+   "point": "conveyor72_48d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor96_48d": {
+   "bytes": 30364575,
+   "code": "surface7",
+   "family": "Conveyor",
+   "instructions": 34765,
+   "page": "surface7/conveyor96_48d.html",
+   "point": "conveyor96_48d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor96_64d": {
+   "bytes": 22284653,
+   "code": "surface7",
+   "family": "Conveyor",
+   "instructions": 18655,
+   "page": "surface7/conveyor96_64d.html",
+   "point": "conveyor96_64d",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone51": {
+   "bytes": 60570821,
+   "code": "surface7",
+   "family": "Cyclone",
+   "instructions": 70821,
+   "page": "surface7/cyclone51.html",
+   "point": "cyclone51",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone56": {
+   "bytes": 66039565,
+   "code": "surface7",
+   "family": "Cyclone",
+   "instructions": 78155,
+   "page": "surface7/cyclone56.html",
+   "point": "cyclone56",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone64": {
+   "bytes": 70962098,
+   "code": "surface7",
+   "family": "Cyclone",
+   "instructions": 84803,
+   "page": "surface7/cyclone64.html",
+   "point": "cyclone64",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone73": {
+   "bytes": 67086430,
+   "code": "surface7",
+   "family": "Cyclone",
+   "instructions": 79693,
+   "page": "surface7/cyclone73.html",
+   "point": "cyclone73",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid10x10": {
+   "bytes": 9903491,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 5310,
+   "page": "surface7/grid10x10.html",
+   "point": "grid10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid10x9": {
+   "bytes": 8986762,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 4181,
+   "page": "surface7/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid11x10": {
+   "bytes": 10313204,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 5915,
+   "page": "surface7/grid11x10.html",
+   "point": "grid11x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid11x11": {
+   "bytes": 11704930,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 7748,
+   "page": "surface7/grid11x11.html",
+   "point": "grid11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid12x11": {
+   "bytes": 8162329,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 2939,
+   "page": "surface7/grid12x11.html",
+   "point": "grid12x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid12x12": {
+   "bytes": 9384880,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 4501,
+   "page": "surface7/grid12x12.html",
+   "point": "grid12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid13x12": {
+   "bytes": 8871265,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 3864,
+   "page": "surface7/grid13x12.html",
+   "point": "grid13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 10794635,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 6645,
+   "page": "surface7/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x8": {
+   "bytes": 10138314,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 5778,
+   "page": "surface7/grid9x8.html",
+   "point": "grid9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x9": {
+   "bytes": 9398853,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 4728,
+   "page": "surface7/grid9x9.html",
+   "point": "grid9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise10x10": {
+   "bytes": 9908363,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 5310,
+   "page": "surface7/wise10x10.html",
+   "point": "wise10x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise10x9": {
+   "bytes": 8991275,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 4181,
+   "page": "surface7/wise10x9.html",
+   "point": "wise10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise11x10": {
+   "bytes": 10318447,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 5915,
+   "page": "surface7/wise11x10.html",
+   "point": "wise11x10",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise11x11": {
+   "bytes": 11710547,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 7748,
+   "page": "surface7/wise11x11.html",
+   "point": "wise11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise12x11": {
+   "bytes": 8168442,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 2939,
+   "page": "surface7/wise12x11.html",
+   "point": "wise12x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise12x12": {
+   "bytes": 9391438,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 4501,
+   "page": "surface7/wise12x12.html",
+   "point": "wise12x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise13x12": {
+   "bytes": 8878284,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 3864,
+   "page": "surface7/wise13x12.html",
+   "point": "wise13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise8x8": {
+   "bytes": 10798191,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 6645,
+   "page": "surface7/wise8x8.html",
+   "point": "wise8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x8": {
+   "bytes": 10142158,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 5778,
+   "page": "surface7/wise9x8.html",
+   "point": "wise9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "wise9x9": {
+   "bytes": 9409089,
+   "code": "surface7",
+   "family": "WISE",
+   "instructions": 4728,
+   "page": "surface7/wise9x9.html",
+   "point": "wise9x9",
+   "rules_failed": [],
+   "status": "ok"
+  }
+ }
+}

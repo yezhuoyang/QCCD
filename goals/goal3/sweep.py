@@ -110,7 +110,9 @@ def grade(code: str, point: dict, work_root: str) -> dict:
                 # C2LR router emits the steps (and checks every rule before it returns)
                 cooled, cert_p = compile_with_router(exp.qasm, arch_p, work, table=TABLE)
             else:
-                cooled, cert_p = compile_with_qccdc(exp.qasm, arch_p, work, timeout=point.get("timeout", 1800),
+                # the grader's limit for this release: a submitter's compile gets as long
+                limit = (rel.manifest.get("limits") or {}).get("compile_timeout_s", 1800)
+                cooled, cert_p = compile_with_qccdc(exp.qasm, arch_p, work, timeout=point.get("timeout", limit),
                                                     table=TABLE)
         except CompileFailed as exc:
             return {**row, "status": "refused", "why": f"{exc.kind}: {exc}"[:400],
