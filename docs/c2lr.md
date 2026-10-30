@@ -106,7 +106,7 @@ plus C1-C10). In a C2LR step:
 | C2 | the step's only per-leg choice is the direction bit: the template has no other per-leg field |
 | C3 | horizontal and vertical legs choose independently in one step (by construction) |
 | C4/C5 | a step is C2LR -> shared waveform -> C2LR⁻¹ and ends with every crystal at a leg centre (by construction; C7) |
-| C6 | the pairs are a matching under P1 or P2 at one parity (checked against the device) |
+| C6 | the pairs are the device's matching for the step's diagonal (or for the assumed checkerboard form), checked against the device |
 | C7 | no crystal ends a step in a junction (R2/R23, unchanged) |
 | C8 | the COM frequency is held during a shift (a property of the primitive; recorded, not decided) |
 | C9 | every crystal is heated by every waveform (the replay's charge) |
@@ -114,8 +114,8 @@ plus C1-C10). In a C2LR step:
 
 R2, R3, R5 and R22 are exempt for a swap-or-stay step **because** its routes are the device's
 matching (two crystals cross one junction in a swap, and a swap is an exchange on the two rails
-by design). R4 still requires the step's class to be declared. P2 steps carry the device's
-`assumed` mark into the report; the rule set `c2lr-demonstrated` drops P2.
+by design). R4 still requires the step's class to be declared. Checkerboard steps carry the
+device's `assumed` mark into the report; the rule set `c2lr-demonstrated` refuses them.
 
 ## 5. The certificate
 
