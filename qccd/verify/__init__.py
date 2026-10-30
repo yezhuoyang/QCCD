@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
+from ..arch.c2lr import is_c2lr
 from ..cost.models import CostModel
 from ..ir.tsir import TSIR
 from .control import ChannelBank, ControlRecord, ControlTrace, control_trace
@@ -18,6 +19,7 @@ from .replay import CycleRecord, ReplayError, ReplayResult, replay
 from .rules import (
     CYCLE_RULES,
     architecture_violations,
+    c2lr_document_violations,
     geometry_violations,
     concurrency_violations,
     CycleView,
@@ -58,7 +60,7 @@ UNCHECKABLE: Mapping[str, str] = {
 }
 
 #: Rules checked outside the per-cycle loop, so `only_rules` may legitimately name them.
-PROGRAM_RULES = ("R9", "R7c", "R18", "R19", "R20", "R21")
+PROGRAM_RULES = ("R9", "R7c", "R18", "R19", "R20", "R21", "C8", "C10")
 
 PARTIAL: Mapping[str, str] = {
     "R15": (
@@ -259,9 +261,31 @@ def verify(
     # only rules that HAVE an implementation and were actually run may be marked
     # checked; naming a rule in `only_rules` is a request, not a certificate
     requested = set(CYCLE_RULES) if only_rules is None else set(only_rules)
-    rules.checked |= requested & set(CYCLE_RULES)
+    # C2LR's rules judge one kind of device: on any other they ran and had nothing to see,
+    # and listing them as passed there would change every report for a rule that never applied
+    on_c2lr = is_c2lr(arch)
+    c_rules = {r for r in CYCLE_RULES if r.startswith("C")}
+    rules.checked |= requested & (set(CYCLE_RULES) - (set() if on_c2lr else c_rules))
     for unknown in sorted(requested - set(CYCLE_RULES) - set(PROGRAM_RULES)):
         rules.skipped[unknown] = "no per-cycle check is implemented for this rule"
+    if on_c2lr:
+        want = {"C8", "C10"} if only_rules is None else {"C8", "C10"} & set(only_rules)
+        if "C10" in want:
+            rules.extend(c2lr_document_violations(arch))
+            rules.checked.add("C10")
+        if "C8" in want:
+            try:
+                com = arch.primitives.scalar("swap_or_stay").get("com_mhz")
+            except KeyError:
+                com = None
+            if com is None:
+                rules.skipped["C8"] = "the device's swap_or_stay primitive records no COM frequency"
+            else:
+                rules.partial["C8"] = (f"recorded, not decided: the primitive holds the COM mode "
+                                       f"at {com} MHz during a shift")
+                rules.checked.add("C8")
+        if res.assumed:
+            rules.notes["assumed"] = list(res.assumed)
     if only_rules is None or "R11" in only_rules:
         rules.extend(architecture_violations(arch))
     # The geometry rules read the document alone, so they run whenever any of them is asked.

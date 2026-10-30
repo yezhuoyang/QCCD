@@ -43,6 +43,10 @@ __all__ = [
     "rule_statements",
     "geometry_violations",
     "geometry_limits",
+    "device_exchange",
+    "c2lr_document_violations",
+    "C2LR_RULE_STATEMENTS",
+    "C2LR_RULE_SOURCES",
     "motion_signature",
     "motion_signatures",
     "hop_label",
@@ -159,6 +163,9 @@ class CycleView:
     #: A multi-segment move enters every node on its path; only the last is a resting
     #: place, and the others are transits.
     transits: Mapping[str, int] = field(default_factory=dict)
+    #: On a C2LR device, what this cycle did to the legs (`qccd.verify.c2lr.C2LRStep`),
+    #: computed by the replay and never read from the programme; None on any other device.
+    c2lr: object = None
 
     def gate_sites(self) -> tuple[str, ...]:
         """Where the gates of this instruction actually happen.
@@ -227,7 +234,7 @@ class RuleReport:
         return not self.failed()
 
     def summary(self) -> dict:
-        return {
+        out = {
             "passed": self.passed(),
             "failed": sorted(self.failed()),
             "partial": dict(self.partial),
@@ -235,6 +242,12 @@ class RuleReport:
             "violations": len(self.violations),
             "by_rule": self.by_rule(),
         }
+        # what the verdict rests on that the source did not demonstrate (C2LR's two-pair
+        # checkerboard steps): present only when there is some, so every other summary is
+        # what it always was
+        if self.notes.get("assumed"):
+            out["assumed"] = list(self.notes["assumed"])
+        return out
 
 
 # --------------------------------------------------------------------------- rules
@@ -289,6 +302,20 @@ def r1_capacity(v: CycleView) -> list[Violation]:
     return out
 
 
+def device_exchange(v: CycleView) -> bool:
+    """Is this cycle a C2LR swap-or-stay step, whose routes the replay derived from the
+    device's own matching?
+
+    R2, R3, R5 and R22 do not judge its crossings: in a swap two crystals cross one junction
+    and pass each other on its two rails BY DESIGN -- the shared junction waveform exchanges
+    the two wells nearest it (arXiv:2403.00756) -- and every crystal's motion differs from its
+    partner's.  The exemption is earned by where the routes come from, not by what the
+    programme calls its step: `CycleView.c2lr` is set by the replay alone, so the same
+    exchange written as plain moves, even under the class `swap_or_stay`, is judged in full."""
+    step = v.c2lr
+    return step is not None and bool(getattr(step, "exchange", False))
+
+
 def r2_junction_exclusive(v: CycleView) -> list[Violation]:
     out = []
     dev = v.arch.device
@@ -301,10 +328,11 @@ def r2_junction_exclusive(v: CycleView) -> list[Violation]:
                     f"junction {node_id} (degree {dev.degree(node_id)}) holds {occ} ions",
                 )
             )
-    # two ions entering the same junction within one cycle is equally illegal
+    # two ions entering the same junction within one cycle is equally illegal -- except in
+    # a swap-or-stay step, whose crossings are the device's exchange (`device_exchange`)
     entering: Counter[str] = Counter(
         m.dst for m in v.moves if dev.degree(m.dst) >= 3
-    )
+    ) if not device_exchange(v) else Counter()
     for node_id, n in entering.items():
         if n > 1:
             out.append(
@@ -316,6 +344,8 @@ def r2_junction_exclusive(v: CycleView) -> list[Violation]:
 
 
 def r3_segment_capacity(v: CycleView) -> list[Violation]:
+    if device_exchange(v):
+        return []
     use: Counter[str] = Counter(m.seg.id for m in v.moves)
     return [
         Violation(
@@ -651,6 +681,8 @@ def r4b_intra_inter(v: CycleView) -> list[Violation]:
 
 
 def r5_no_exchange(v: CycleView) -> list[Violation]:
+    if device_exchange(v):
+        return []
     seen: dict[str, set[tuple[str, str]]] = defaultdict(set)
     out = []
     for m in v.moves:
@@ -1187,6 +1219,8 @@ def r22_uniform_motion(v: CycleView) -> list[Violation]:
         return []
     if str(v.arch.control.get("model", "simd_classes")) == "direct":
         return []
+    if device_exchange(v):
+        return []                # one waveform by construction; see `device_exchange`
     ions: list[str] = []
     for m in v.moves:
         if m.ion not in ions:
@@ -1251,6 +1285,182 @@ def r23_junctions_crossed(v: CycleView) -> list[Violation]:
         f"the traps off the junctions have room for all {len(v.pos_after)} ions "
         f"({room} places); a junction is crossed in one move, not stood on")
         for ion, s in new]
+
+
+# ---------------------------------------------------------------- C1-C10: C2LR swap-or-stay
+#
+# docs/c2lr.md section 4.  Every C rule judges a C2LR device only, from the facts the replay
+# put on the view (`CycleView.c2lr`, a `qccd.verify.c2lr.C2LRStep`); on any other device the
+# view carries none and they are silent.  C3, C4 and C9 hold by construction of the replay
+# and are checked anyway, so a regression in the expansion shows as a rule; C8 is recorded,
+# not decided, and C10 is a fact about the document (`qccd.verify.c2lr_document_violations`).
+
+def _c2lr_legs(v: CycleView) -> frozenset[str]:
+    from ..arch.c2lr import geometry
+    return frozenset(geometry(v.arch).legs)
+
+
+def c1_one_crystal(v: CycleView) -> list[Violation]:
+    """C1.  A leg holds one crystal, or two between an enter and the next exit of the same
+    step type.  Judged at the instants the rule language judges (`occupancy` and
+    `entered`): before the cycle when nothing judged that state yet, during a cycle that
+    moves (a leg counts the larger of before and after, plus what passes through), and
+    after; and every exit from a leg the exception covers is the entered crystal's, by the
+    variation it entered by."""
+    step = v.c2lr
+    if step is None:
+        return []
+    legs = _c2lr_legs(v)
+    out: list[Violation] = []
+
+    def judge(occ: Mapping[str, int], ok: frozenset[str], when: str) -> None:
+        for leg in sorted(legs):
+            n = occ.get(leg, 0)
+            if n > 1 and leg not in ok:
+                out.append(Violation("C1", v.instr.id,
+                                     f"leg {leg} holds {n} crystals {when}, but a leg holds one, "
+                                     f"or two only between a swap-or-stay enter and its exit"))
+
+    if step.check_before:
+        judge(v.occ_before, step.excepted_before, "before the step")
+    if v.instr.type == "simd" and v.moves:
+        during = {leg: max(v.occ_before.get(leg, 0), v.occ_after.get(leg, 0))
+                  + (v.transits or {}).get(leg, 0) for leg in legs}
+        judge(during, step.excepted_before | step.excepted_after, "during the step")
+    judge(v.occ_after, step.excepted_after, "after the step")
+    out += [Violation("C1", v.instr.id, m) for m in step.c1]
+    return out
+
+
+def c2_bits_only(v: CycleView) -> list[Violation]:
+    """C2.  A C2LR step's only per-leg choice is the direction bit.  A template with any
+    other per-crystal field is refused before it replays (`qccd.ir.tsir.template_problems`);
+    what is left to judge is a step of a C2LR class that writes its own routes."""
+    step = v.c2lr
+    return [] if step is None else [Violation("C2", v.instr.id, m) for m in step.c2]
+
+
+def c3_axes_independent(v: CycleView) -> list[Violation]:
+    """C3.  Horizontal and vertical legs choose independently in one step: the template
+    carries one bit per crystal and no field per axis, so there is nothing to tie them."""
+    return []
+
+
+def c4_one_waveform(v: CycleView) -> list[Violation]:
+    """C4.  A step is C2LR, the shared junction waveform, C2LR⁻¹: one primitive, priced
+    once whatever moves (`CostModel.c2lr_step`).  By construction of the replay."""
+    return []
+
+
+def c5_leg_centres(v: CycleView) -> list[Violation]:
+    """C5.  Every crystal at rest is at a leg centre: a C2LR device has nowhere else to hold
+    one.  A template step ends there by construction; a plain move or a placement may not."""
+    if v.c2lr is None:
+        return []
+    legs = _c2lr_legs(v)
+    out = []
+    states = [(v.pos_before, "before")] if v.c2lr.check_before else []
+    states.append((v.pos_after, "after"))
+    for pos, when in states:
+        for ion, s in sorted(pos.items()):
+            if s not in legs:
+                out.append(Violation("C5", v.instr.id,
+                                     f"crystal {ion} rests at {s} {when} the step, which is not a "
+                                     f"leg; every crystal ends a step at a leg centre"))
+    return out
+
+
+def c6_matching(v: CycleView) -> list[Violation]:
+    """C6.  A swap-or-stay step's pairs are the device's matching under one variation: every
+    crystal it shifts toward a junction has a partner leg there, the device offers the
+    variation, and the rule set allows its form (`c2lr_forms`: `c2lr-demonstrated` allows
+    the diagonals only)."""
+    step = v.c2lr
+    if step is None or not step.exchange:
+        return []
+    out = [Violation("C6", v.instr.id, m) for m in step.c6]
+    forms = v.config.get("c2lr_forms") if isinstance(v.config, Mapping) else None
+    if forms is not None and step.variation is not None and step.variation.form not in forms:
+        out.append(Violation(
+            "C6", v.instr.id,
+            f"a {step.variation.form} step ({step.variation.label}), which this rule set does "
+            f"not allow (it allows {', '.join(sorted(forms)) or 'none'}): the two-pair "
+            f"checkerboard steps were not demonstrated in arXiv:2403.00756"))
+    return out
+
+
+def c7_no_junction_rest(v: CycleView) -> list[Violation]:
+    """C7.  No crystal ends a step in a junction -- R23 without its room clause, because a
+    C2LR lattice has a leg for every crystal it can hold."""
+    if v.c2lr is None:
+        return []
+    js = frozenset(v.arch.device.junction_nodes)
+    out = []
+    states = [(v.pos_before, "before")] if v.c2lr.check_before else []
+    states.append((v.pos_after, "after"))
+    for pos, when in states:
+        for ion, s in sorted(pos.items()):
+            if s in js:
+                out.append(Violation("C7", v.instr.id,
+                                     f"crystal {ion} rests on junction {s} {when} the step"))
+    return out
+
+
+def c9_every_crystal_heated(v: CycleView) -> list[Violation]:
+    """C9.  Every crystal plays every waveform: a C2LR step heats every crystal on the device,
+    the ones that stay included (the replay's charge)."""
+    step = v.c2lr
+    if step is None or not step.template:
+        return []
+    missed = sorted(set(v.pos_before) - set(step.heated))
+    if not missed:
+        return []
+    return [Violation("C9", v.instr.id,
+                      f"{len(missed)} crystal(s) not heated by the step's waveform "
+                      f"(e.g. {missed[:4]})")]
+
+
+def c2lr_document_violations(arch: Architecture) -> list[Violation]:
+    """C10, once per programme: a C2LR device's control is a fixed set of shared signals plus
+    one digital input and one switch per leg (arXiv:2403.00756, p4: 27 shared analog
+    signals), so its document says so -- and its drawing is the lattice of legs those inputs
+    drive."""
+    from ..arch.c2lr import NotC2LR, declared, geometry
+    try:
+        geometry(arch)
+    except NotC2LR as exc:
+        return [Violation("C10", -1, f"the device declares C2LR control but is not a lattice of "
+                                     f"legs: {exc}")]
+    d = declared(arch)
+    out = []
+    sig = d.get("shared_signals")
+    if isinstance(sig, bool) or not isinstance(sig, int) or sig < 1:
+        out.append(Violation("C10", -1, "the device's control.c2lr declares no number of shared "
+                                        "analog signals (shared_signals)"))
+    for key, what in (("inputs_per_leg", "digital input"), ("switches_per_leg", "switch")):
+        if d.get(key) != 1:
+            out.append(Violation("C10", -1, f"the device's control.c2lr gives each leg "
+                                            f"{d.get(key)!r} {what}(s) ({key}); C2LR's per-leg "
+                                            f"control is exactly one"))
+    return out
+
+
+#: C2LR's rules, apart from `RULE_STATEMENTS` on purpose: those 28 are what every page and
+#: the browser's mirror list, and these judge one kind of device only.  The catalogue
+#: (`qccd/ruleset/library/catalogue.rules`) is where they are written in full.
+C2LR_RULE_STATEMENTS: Mapping[str, str] = {
+    "C1": "a leg holds one crystal, or two between an enter and the next exit of the same step type",
+    "C2": "a C2LR step's only per-leg choice is the direction bit",
+    "C3": "horizontal and vertical legs choose independently in one step",
+    "C4": "a step is C2LR, one shared junction waveform, C2LR⁻¹",
+    "C5": "every crystal ends a step at a leg centre",
+    "C6": "a step's pairs are the device's matching under one variation the rule set allows",
+    "C7": "no crystal ends a step in a junction",
+    "C8": "the COM frequency is held during a shift (recorded from the primitive, not decided)",
+    "C9": "every crystal is heated by every waveform",
+    "C10": "control is the fixed shared signals plus one input and one switch per leg",
+}
+C2LR_RULE_SOURCES: Mapping[str, str] = {r: "arXiv:2403.00756" for r in C2LR_RULE_STATEMENTS}
 
 
 def r12_intra_parallelism(v: CycleView) -> list[Violation]:
@@ -1329,6 +1539,15 @@ CYCLE_RULES: Mapping[str, Callable[[CycleView], list[Violation]]] = {
     "R14": r14_split_at_edge,
     "R22": r22_uniform_motion,
     "R23": r23_junctions_crossed,
+    # C2LR swap-or-stay (docs/c2lr.md section 4); silent on every other device
+    "C1": c1_one_crystal,
+    "C2": c2_bits_only,
+    "C3": c3_axes_independent,
+    "C4": c4_one_waveform,
+    "C5": c5_leg_centres,
+    "C6": c6_matching,
+    "C7": c7_no_junction_rest,
+    "C9": c9_every_crystal_heated,
 }
 
 

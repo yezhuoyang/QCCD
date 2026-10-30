@@ -47,6 +47,7 @@ __all__ = [
     "DeckModel",
     "CorrectedModel",
     "QUANTA_COMPONENTS",
+    "C2LR_COMPONENT",
     "deck_model",
     "corrected_model",
 ]
@@ -54,6 +55,11 @@ __all__ = [
 #: The named halves of the heating budget.  Keeping them separate is what lets M2 report
 #: "267 shuttling + 1336 junction + 144 dock/undock" instead of one opaque total.
 QUANTA_COMPONENTS = ("shuttle", "junction", "split_merge", "gate", "anomalous")
+#: The heat a C2LR step deposits (swap-or-stay, reorder-or-not; docs/c2lr.md section 3).  Not
+#: in `QUANTA_COMPONENTS`: a replay on any other device never has it, and every report keyed
+#: on those five (and the browser's mirror of them) stays byte for byte as it was.  The
+#: replay's books accept any channel, so a C2LR replay simply carries a sixth.
+C2LR_COMPONENT = "c2lr"
 
 
 def _chain_reference(spec: Mapping[str, object], key: str) -> int | None:
@@ -207,6 +213,24 @@ class CostModel:
 
     def reset(self, arch: Architecture) -> Charge:
         return Charge()
+
+    # -- C2LR (docs/c2lr.md section 3) ---------------------------------------
+
+    def c2lr_step(self, arch: Architecture, kind: str) -> tuple[Charge, Charge]:
+        """`(mover, stayer)`: what one C2LR step charges a crystal that changes leg (or, for
+        reorder-or-not, turns) and one that does not.
+
+        One step is ONE waveform, so its duration is the primitive's however many crystals
+        move, and every crystal on the device plays it (C9): the replay charges `stayer` to
+        each of them, not nothing.  A model that prices no time counts one routing operation
+        per moving crystal and one step, as a hop is counted."""
+        return Charge(cost=1.0, depth=1), Charge(depth=1)
+
+    def c2lr_gate(self, arch: Architecture) -> tuple[Charge, Charge]:
+        """`(merge, split)` around a two-qubit gate on the two crystals of one leg: they sit
+        in two wells after an enter (C1), so the gate is merge, MS, split.  Nothing in a model
+        that does not price split and merge."""
+        return Charge(), Charge()
 
     def anomalous_per_us(self, arch: Architecture) -> float:
         """R17: quanta accrued per microsecond of elapsed time, moving or not."""
@@ -457,6 +481,33 @@ class CorrectedModel(CostModel):
             return Charge(cost=0.0, depth=1, us=self.Z_AS_PULSES * float(spec["us"]))
         spec = arch.primitives.scalar("1q_gate")
         return Charge(cost=0.0, depth=1, us=float(spec["us"]))
+
+    def c2lr_step(self, arch: Architecture, kind: str) -> tuple[Charge, Charge]:
+        """The step's own primitive (`swap_or_stay`: `us`, `quanta_swap`, `quanta_stay`;
+        `reorder_or_not`: `us`, `quanta`, every crystal alike unless it says
+        `quanta_reverse` / `quanta_stay`), on its own heat channel, `c2lr`.
+
+        Not a shuttle and not a junction crossing: a crystal's two rails and the junction
+        between them are inside the step's 1/Gamma (arXiv:2403.00756 Sec. V), so pricing
+        them again would charge the waveform twice."""
+        spec = arch.primitives.scalar(kind)
+        us = float(spec["us"])
+        if kind == "swap_or_stay":
+            moved, stayed = float(spec["quanta_swap"]), float(spec["quanta_stay"])
+        else:
+            q = float(spec["quanta"])
+            moved = float(spec.get("quanta_reverse", q))
+            stayed = float(spec.get("quanta_stay", q))
+        return (Charge(cost=1.0, depth=1, us=us, quanta={C2LR_COMPONENT: moved}),
+                Charge(cost=0.0, depth=1, us=us, quanta={C2LR_COMPONENT: stayed}))
+
+    def c2lr_gate(self, arch: Architecture) -> tuple[Charge, Charge]:
+        """The device's own merge and split curves, at this model's operating point."""
+        out = []
+        for which in ("merge", "split"):
+            p = self._point(arch, which)
+            out.append(Charge(cost=1.0, depth=1, us=p.us, quanta={"split_merge": p.quanta}))
+        return out[0], out[1]
 
     def cool(self, arch: Architecture) -> Charge:
         spec = arch.primitives.scalar("cool")

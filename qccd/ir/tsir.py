@@ -36,7 +36,12 @@ __all__ = [
     "Instruction",
     "TSIR",
     "INSTRUCTION_TYPES",
+    "TEMPLATE_KINDS",
+    "C2LR_TEMPLATES",
     "loop_shift",
+    "swap_or_stay",
+    "reorder_or_not",
+    "template_problems",
 ]
 
 #: Every instruction type the verifier knows how to replay.
@@ -84,6 +89,90 @@ class Participant:
 def loop_shift(loop: str, delta: int) -> dict:
     """The rigid-rotation movement template."""
     return {"kind": "loop_shift", "loop": loop, "delta": int(delta)}
+
+
+#: The C2LR templates (docs/c2lr.md): a step the replay expands from the DEVICE, the
+#: programme supplying only one bit per crystal.
+C2LR_TEMPLATES = ("swap_or_stay", "reorder_or_not")
+#: Every movement template the replay can expand.
+TEMPLATE_KINDS = ("loop_shift",) + C2LR_TEMPLATES
+
+_DIAGONALS = ("WS", "WN", "ES", "EN")
+
+
+def swap_or_stay(diagonal: str | None = None, toward: Sequence[str] = (), *,
+                 checkerboard: Mapping | None = None) -> dict:
+    """One C2LR swap-or-stay step: every junction plays one `diagonal` ("WS", "WN", "ES",
+    "EN"; demonstrated), or -- assumed, not in arXiv:2403.00756 -- the two-pair
+    `checkerboard={"parity": p, "pairing": "P1" | "P2"}`.  `toward` names the crystals
+    shifted toward their pair's junction; every other crystal shifts away.  The pairs and
+    the routes are the device's (`qccd.arch.c2lr`), never the programme's."""
+    t: dict = {"kind": "swap_or_stay"}
+    if checkerboard is not None:
+        t["checkerboard"] = {"parity": int(checkerboard["parity"]),
+                             "pairing": str(checkerboard["pairing"])}
+    else:
+        t["diagonal"] = diagonal
+    t["toward"] = [str(i) for i in toward]
+    return t
+
+
+def reorder_or_not(reverse: Sequence[str] = ()) -> dict:
+    """One C2LR reorder-or-not step: the listed crystals' wells turn 180 degrees, in place."""
+    return {"kind": "reorder_or_not", "reverse": [str(i) for i in reverse]}
+
+
+def _ion_list(v, what: str) -> list[str]:
+    if not isinstance(v, (list, tuple)) or not all(isinstance(i, str) for i in v):
+        return [f"`{what}` must be a list of ion names"]
+    dup = sorted({i for i in v if list(v).count(i) > 1})
+    return [f"`{what}` names {dup[0]!r} twice"] if dup else []
+
+
+def template_problems(tpl: Mapping, participants: Sequence = ()) -> list[str]:
+    """What is wrong with a movement template's SHAPE, empty if nothing.
+
+    The C2LR templates are held tight on purpose (C2: a step's only per-leg choice is the
+    direction bit): no key beyond the ones below, and no participants beside the template,
+    because a route the programme wrote is exactly what the replay must not take from it."""
+    kind = tpl.get("kind")
+    if kind not in TEMPLATE_KINDS:
+        return [f"unknown movement template kind {kind!r} (known: {', '.join(TEMPLATE_KINDS)})"]
+    out: list[str] = []
+    if kind == "loop_shift":
+        if not isinstance(tpl.get("loop"), str):
+            out.append("a loop_shift template names no `loop`")
+        if isinstance(tpl.get("delta"), bool) or not isinstance(tpl.get("delta"), int):
+            out.append("a loop_shift template's `delta` must be a whole number")
+        return out
+    allowed = ({"kind", "diagonal", "checkerboard", "toward"} if kind == "swap_or_stay"
+               else {"kind", "reverse"})
+    extra = sorted(set(tpl) - allowed)
+    if extra:
+        out.append(f"a {kind} template carries {', '.join(map(repr, extra))}; its only "
+                   f"per-crystal choice is the list it names (C2)")
+    if participants:
+        out.append(f"a {kind} step lists its own participants; its routes are the device's "
+                   f"matching, never the programme's (C2)")
+    if kind == "reorder_or_not":
+        out += _ion_list(tpl.get("reverse", []), "reverse")
+        return out
+    has_d, has_c = tpl.get("diagonal") is not None, tpl.get("checkerboard") is not None
+    if has_d == has_c:
+        out.append("a swap_or_stay template names exactly one of `diagonal` and `checkerboard`")
+    elif has_d and tpl["diagonal"] not in _DIAGONALS:
+        out.append(f"diagonal {tpl['diagonal']!r} is not one of {', '.join(_DIAGONALS)}")
+    elif has_c:
+        cb = tpl["checkerboard"]
+        if not isinstance(cb, Mapping) or set(cb) != {"parity", "pairing"}:
+            out.append("`checkerboard` is {\"parity\": 0 | 1, \"pairing\": \"P1\" | \"P2\"}")
+        else:
+            if isinstance(cb["parity"], bool) or cb["parity"] not in (0, 1):
+                out.append(f"checkerboard parity {cb['parity']!r} is not 0 or 1")
+            if cb["pairing"] not in ("P1", "P2"):
+                out.append(f"checkerboard pairing {cb['pairing']!r} is not P1 or P2")
+    out += _ion_list(tpl.get("toward", []), "toward")
+    return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +388,15 @@ class TSIR:
                 sign = "+1" if delta > 0 else "-1"
                 key = f"loop_shift:{i.template['loop']}:{sign}"
                 out[key] = out.get(key, 0) + abs(delta)
+            elif i.template and i.template.get("kind") == "swap_or_stay":
+                # one waveform per variation, however the bits are set: the bits are the
+                # per-leg switch, not a different template (C2)
+                cb = i.template.get("checkerboard")
+                key = (f"swap_or_stay:{i.template.get('diagonal')}" if cb is None else
+                       f"swap_or_stay:checkerboard:{cb.get('pairing')}:{cb.get('parity')}")
+                out[key] = out.get(key, 0) + 1
+            elif i.template and i.template.get("kind") == "reorder_or_not":
+                out["reorder_or_not"] = out.get("reorder_or_not", 0) + 1
             else:
                 key = f"class:{i.cls}"
                 out[key] = out.get(key, 0) + 1
@@ -373,6 +471,9 @@ def validate_program(prog: TSIR) -> list[str]:
                 errors.append(f"{where}: simd has neither participants nor a template")
             if instr.mode not in ("intra", "inter"):
                 errors.append(f"{where}: simd mode must be 'intra' or 'inter' (R4b)")
+            if instr.template:
+                errors += [f"{where}: {p}"
+                           for p in template_problems(instr.template, instr.participants)]
         if instr.type == "gate":
             # A gate carries either `pairs` (many co-located two-qubit gates driven
             # together), exactly two `ions` (the other spelling of one pair), or exactly

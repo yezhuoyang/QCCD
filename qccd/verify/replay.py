@@ -28,7 +28,8 @@ from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
 from ..cost.models import QUANTA_COMPONENTS, Charge, CostModel
-from ..ir.tsir import TSIR, Instruction, Participant, iter_operands, iter_pairs
+from ..ir.tsir import C2LR_TEMPLATES, TSIR, Instruction, Participant, iter_operands, iter_pairs
+from .c2lr import _Err as _C2LRError, _why_not as _not_c2lr, tracker_for
 from .rules import CycleView, ResolvedMove, RuleReport, check_cycle, conveyor_nodes, rails_to_loop
 
 __all__ = ["ReplayResult", "CycleRecord", "replay", "ReplayError"]
@@ -95,6 +96,9 @@ class ReplayResult:
     #: per-ion n-bar as the program ends -- what a cool zeroed stays zeroed here,
     #: unlike `per_ion_quanta`, which is the lifetime deposit and never comes down
     final_quanta: dict[str, float] = field(default_factory=dict)
+    #: the steps whose physics the source did not demonstrate, in words -- on a C2LR device
+    #: the two-pair checkerboard swap-or-stay steps (docs/c2lr.md); empty everywhere else
+    assumed: list[str] = field(default_factory=list)
 
     # ---------------------------------------------------------------- views
 
@@ -136,6 +140,11 @@ def _resolve_participants(
     """
     if instr.template:
         kind = instr.template.get("kind")
+        if kind in C2LR_TEMPLATES:
+            # expanded from the device by `replay` itself (`qccd.verify.c2lr`), which needs the
+            # two-crystal state of every leg as well as the positions
+            raise ReplayError(f"instruction {instr.id}: a {kind} step is expanded by the replay "
+                              f"from the device's matching, not from positions alone")
         if kind != "loop_shift":
             raise ReplayError(f"unknown movement template kind {kind!r}")
         loop_id = str(instr.template["loop"])
@@ -372,6 +381,10 @@ def replay(
     # R23 exempts the slots of a loop the programme rotates, which is a fact about the whole
     # programme and has to be known before its first cycle is judged.
     rule_config.setdefault("rotated_loops", conveyed_paths(prog, arch))
+    # On a C2LR device the two-crystal state of every leg is followed through the whole
+    # programme (C1), and each cycle's account of it rides on its `CycleView`.  None on any
+    # other device, where nothing below changes.
+    c2lr = tracker_for(arch)
 
     def _bump(ion: str, component: str, value: float) -> None:
         if value == 0.0:
@@ -392,6 +405,7 @@ def replay(
 
         # ---------------------------------------------------------- init
         if instr.type == "init":
+            placed_before = dict(pos)
             for ion, node in instr.placement.items():
                 if node not in arch.device.nodes:
                     raise ReplayError(f"init places {ion} at unknown node {node!r}")
@@ -407,6 +421,8 @@ def replay(
                 occ[node] += 1
                 current[ion] = float(instr.quanta.get(ion, 0.0))
                 lifetime.setdefault(ion, {c: 0.0 for c in QUANTA_COMPONENTS})
+            if c2lr is not None:
+                c2lr.init(placed_before, pos)
             res.cycles.append(
                 CycleRecord(instr.id, "init", None, t0, t0, 0.0, 0, len(instr.placement),
                             instr.meta.get("batch"))
@@ -438,7 +454,33 @@ def replay(
         # ---------------------------------------------------------- transport
         if instr.type == "simd":
             declared = arch.entails(instr.cls) if instr.cls else ()
-            for sub in _resolve_participants(arch, instr, pos):
+            kind = (instr.template or {}).get("kind")
+            # A C2LR template is expanded HERE, from the device's matching and the legs' state
+            # (`qccd.verify.c2lr`): the programme supplies the bits, the device the routes.
+            # Its price is one primitive per step, not a shuttle and a crossing per rail.
+            c2lr_step = None
+            if kind in C2LR_TEMPLATES:
+                if c2lr is None:
+                    raise ReplayError(f"instruction {instr.id}: a {kind} step needs a C2LR "
+                                      f"device; {_not_c2lr(arch)}")
+                try:
+                    c2lr_step, _ = c2lr.expand(instr, pos)
+                except _C2LRError as exc:
+                    raise ReplayError(str(exc)) from None
+                try:
+                    mover_c, stayer_c = model.c2lr_step(arch, kind)
+                except KeyError as exc:
+                    raise ReplayError(f"instruction {instr.id}: {exc.args[0]}; the device "
+                                      f"prices no {kind} step") from None
+                subs = [list(c2lr_step.participants)]
+                if c2lr_step.assumed:
+                    res.assumed.append(
+                        f"instruction {instr.id}: swap-or-stay {c2lr_step.variation.label} -- "
+                        f"two pairs crossing one junction at once, not demonstrated in "
+                        f"arXiv:2403.00756 (assumed)")
+            else:
+                subs = _resolve_participants(arch, instr, pos)
+            for sub in subs:
                 pos_before = dict(pos)
                 occ_before = Counter(occ)
                 moves: list[ResolvedMove] = []
@@ -454,9 +496,10 @@ def replay(
                             f"but is at {pos.get(p.ion)}"
                         )
                 routes = [_segments_for(arch, p) for p in sub]
-                implied = move_entails(declared, sub, occ, routes, conveyor, rails)
+                implied = (move_entails(declared, sub, occ, routes, conveyor, rails)
+                           if c2lr_step is None else [((), ())] * len(sub))
                 for p, segs, (entails, judged) in zip(sub, routes, implied):
-                    charge = Charge()
+                    charge = Charge() if c2lr_step is None else mover_c
                     node = p.src
                     # `entails` (split at the source, merge at the destination; see
                     # `move_entails` for where they come from) belongs to the MOVE, not to
@@ -464,12 +507,13 @@ def replay(
                     # however long the spur is.  Charge it once, on the first segment.
                     for i, seg in enumerate(segs):
                         nxt = seg.other(node)
-                        charge = charge.then(
-                            model.move(
-                                arch, seg, node, nxt,
-                                entails=entails if i == 0 else (),
+                        if c2lr_step is None:
+                            charge = charge.then(
+                                model.move(
+                                    arch, seg, node, nxt,
+                                    entails=entails if i == 0 else (),
+                                )
                             )
-                        )
                         moves.append(
                             ResolvedMove(p.ion, node, nxt, seg, judged)
                         )
@@ -491,6 +535,17 @@ def replay(
                     cycle_depth = max(cycle_depth, charge.depth)
                     cycle_us = max(cycle_us, charge.us)
                     res.moves_per_ion[p.ion] += 1
+                if c2lr_step is not None:
+                    # one waveform: the step lasts the primitive's time even if nothing
+                    # moves, and every other crystal on the device plays it too (C9)
+                    cycle_us = max(mover_c.us, stayer_c.us)
+                    cycle_depth = max(mover_c.depth, stayer_c.depth)
+                    for ion in c2lr_step.stayers:
+                        per_ion_charge.setdefault(ion, stayer_c)
+                    if c2lr_step.kind == "reorder_or_not":
+                        for ion in c2lr_step.reversed:
+                            per_ion_charge[ion] = mover_c
+                        cycle_cost = mover_c.cost * len(c2lr_step.reversed)
 
                 # keyed by ion: a program that lists one ion twice in a cycle is
                 # illegal (R8 reports it), but it must not be able to corrupt the
@@ -522,6 +577,9 @@ def replay(
                 res.us_by_class[key] = res.us_by_class.get(key, 0.0) + cycle_us
                 res.us_by_type[instr.type] = res.us_by_type.get(instr.type, 0.0) + cycle_us
                 t1 = t0 + cycle_us
+                # every cycle on a C2LR device tells the tracker what it did, judged or not
+                facts = c2lr_step if c2lr_step is not None else (
+                    c2lr.observe(pos_before, pos, instr) if c2lr is not None else None)
                 if check_rules or on_cycle is not None:
                     view = CycleView(
                         arch=arch,
@@ -535,6 +593,7 @@ def replay(
                         duration_us=cycle_us,
                         config=rule_config,
                         transits=dict(transits),
+                        c2lr=facts,
                     )
                     if on_cycle is not None:
                         on_cycle(view)
@@ -555,6 +614,7 @@ def replay(
         occ_before = Counter(occ)
         charge = Charge()
         n_pairs = 0
+        split_after: tuple | None = None
         if instr.type == "gate":
             pairs = list(iter_pairs(instr))
             n_pairs = len(pairs)
@@ -577,6 +637,24 @@ def replay(
                 charge = (model.gate(arch, instr.gate or "MS", n_pairs, longest)
                           if takes_chain["gate"]
                           else model.gate(arch, instr.gate or "MS", n_pairs))
+                if c2lr is not None:
+                    # C2LR: the two crystals of a leg sit in two wells after an enter (C1), so
+                    # the gate is merge, MS, split.  The merge's heat is deposited BEFORE the
+                    # n-bar is read below, because that is the n-bar the MS gate sees -- the one
+                    # R7 bounds and R16 prices; the split's lands after the gate.
+                    in_leg = sorted({i for a, b in pairs
+                                     if pos_before.get(a) == pos_before.get(b)
+                                     and pos_before.get(a) in c2lr.legs for i in (a, b)})
+                    if in_leg:
+                        merge_c, split_c = model.c2lr_gate(arch)
+                        for ion in in_leg:
+                            for comp, val in merge_c.quanta.items():
+                                _bump(ion, comp, val)
+                        charge = Charge(cost=merge_c.cost + charge.cost + split_c.cost,
+                                        depth=merge_c.depth + charge.depth + split_c.depth,
+                                        us=merge_c.us + charge.us + split_c.us,
+                                        quanta=dict(charge.quanta))
+                        split_after = (split_c, in_leg)
             res.n_gates += 1
             res.n_gate_pairs += n_pairs
             for a, b in pairs:
@@ -639,6 +717,11 @@ def replay(
             for component, val in charge.quanta.items():
                 for ion in targets:
                     _bump(ion, component, val)
+        if split_after is not None:
+            split_c, in_leg = split_after
+            for ion in in_leg:
+                for comp, val in split_c.quanta.items():
+                    _bump(ion, comp, val)
         if anomalous_per_us and cycle_us:
             for ion in pos:
                 _bump(ion, "anomalous", anomalous_per_us * cycle_us)
@@ -658,6 +741,7 @@ def replay(
         res.us_by_type[instr.type] = res.us_by_type.get(instr.type, 0.0) + cycle_us
         res.us_by_class[instr.type] = res.us_by_class.get(instr.type, 0.0) + cycle_us
         t1 = t0 + cycle_us
+        facts = c2lr.observe(pos_before, pos, instr) if c2lr is not None else None
         if check_rules or on_cycle is not None:
             view = CycleView(
                 arch=arch,
@@ -670,6 +754,7 @@ def replay(
                 quanta=quanta_at_start,
                 duration_us=cycle_us,
                 config=rule_config,
+                c2lr=facts,
             )
             if on_cycle is not None:
                 on_cycle(view)
