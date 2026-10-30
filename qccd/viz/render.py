@@ -341,7 +341,8 @@ def build_view_model(
     try:
         dc = arch.primitives.degree_curve("junction_cross")
         pol = getattr(model, "policy", None)
-        for d in dc.degrees():
+        from ..arch.curves import FALLBACK_DEGREE
+        for d in sorted(set(dc.degrees()) | {k for k, v in FALLBACK_DEGREE.items() if v in dc.by_degree}):
             if pol is not None and d >= min_degree:
                 p = dc.get(d).pick(pol)
                 junction_q[str(d)] = {"us": p.us, "quanta": p.quanta}

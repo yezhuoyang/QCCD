@@ -2439,8 +2439,7 @@ function makeModel(prims, deg, ce, segs, opts) {
   function jpoint(d) {
     if (d < minDeg) return null;
     if (own(jcache, d)) return jcache[d];
-    var dc = prims.degree_curves.junction_cross;
-    var c = dc ? dc[d] : null;
+    var c = junctionCurveAt(prims.degree_curves.junction_cross, d);
     if (!c) {
       throw new EngineError('a degree-' + d + ' node is on a transport path but the ' +
                             'architecture prices no junction_cross at degree ' + d);
@@ -3561,7 +3560,7 @@ function architectureViolations(st) {
   var ids = junctionNodes(st.device);
   for (var i = 0; i < ids.length; i++) {
     var nid = ids[i], d = deg.get(nid);
-    if (!own(dc, d)) {
+    if (!junctionCurveAt(dc, d)) {
       out.push({ rule: 'R11', node: nid, degree: d,
                  message: 'node ' + nid + ' has degree ' + d + ' but the architecture ' +
                           'prices no junction_cross at degree ' + d });
@@ -3593,6 +3592,14 @@ function architectureViolations(st) {
 // printed in the message.
 var RAIL_EPS = 1e-6;
 var DEFAULT_MAX_JUNCTION_DEGREE = 6;
+// `curves.FALLBACK_DEGREE`: a junction of five or six rails the device does not price
+// crosses at the X-junction's price (no shipped table measures one)
+var JUNCTION_FALLBACK = { 5: 4, 6: 4 };
+function junctionCurveAt(dc, d) {
+  if (!dc) return null;
+  if (own(dc, d)) return dc[d];
+  return own(JUNCTION_FALLBACK, d) && own(dc, JUNCTION_FALLBACK[d]) ? dc[JUNCTION_FALLBACK[d]] : null;
+}
 var DEFAULT_MIN_RAIL_ANGLE_DEG = 60.0;
 //: `math.degrees(x)` is `x * radToDeg` with the constant folded once, not `x * 180 / pi`.
 var RAD_TO_DEG = 180.0 / Math.PI;

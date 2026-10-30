@@ -73,7 +73,7 @@ rule R5 "No two ions pass each other on a rail in one step"
     not (from(a) = to(b) and to(a) = from(b))
 
 rule R11 "Along a loop, every ion moves the same way in a step"
-  about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the device."
+  about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the device (a junction of five or six rails the device does not price crosses at the X-junction's time and heat, since no table measures one)."
   source "arXiv:2511.15910"
   (for all a, b in hops where simultaneous(a, b) and loop(a) = loop(b) and loop(a) != none:
      shift(a) = shift(b))
@@ -188,7 +188,7 @@ rule R18 "A junction is where three or more rails meet"
   for all n in nodes: (n in junctions) = (degree(n) >= 3)
 
 rule R19 "A junction joins at most max_junction_degree() rails"
-  about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the device declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails also needs a crossing time for that degree in the device's timing table (R11)."
+  about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the device declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails crosses at the X-junction's time and heat unless its device prices that degree itself: no shipped table measures one."
   source "collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579"
   for all n in nodes: degree(n) <= max_junction_degree()
 

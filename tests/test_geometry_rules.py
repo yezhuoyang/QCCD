@@ -198,3 +198,38 @@ def test_verify_judges_the_geometry_rules_without_being_asked():
     assert "R20" in s["failed"]
     assert {"R19", "R20", "R21"} <= rep.rules.checked
     assert by_rule(fork.violations())["R20"] == 1
+
+
+def _star(k: int) -> Machine:
+    import math
+    nodes = {"J": (0, 0)}
+    nodes.update({f"P{i}": (round(math.cos(2 * math.pi * i / k), 9), round(math.sin(2 * math.pi * i / k), 9))
+                  for i in range(k)})
+    return explicit(nodes, [(f"r{i}", "J", f"P{i}") for i in range(k)])
+
+
+def test_a_five_or_six_rail_crossing_the_device_does_not_price_is_the_x_junctions():
+    """No shipped table measures a crossing of five or six rails, so one the device does not
+    declare is priced as the X-junction (degree 4); seven is still unpriced (R11)."""
+    from qccd.verify.rules import architecture_violations
+    model = corrected_model()
+    for k in (5, 6):
+        m = _star(k)
+        dc = m.arch.primitives.degree_curve("junction_cross")
+        assert k not in dc.degrees() and 4 in dc.degrees()
+        assert model.junction_point(m.arch, k) == model.junction_point(m.arch, 4)
+        assert not [v for v in architecture_violations(m.arch) if v.rule == "R11"]
+        assert k not in {int(d) for d in dc.to_json()}          # declared prices stay as declared
+    assert [v for v in architecture_violations(_star(7).arch) if v.rule == "R11"]
+
+
+def test_a_device_that_prices_six_rails_is_charged_its_own_price():
+    from qccd.arch.curves import DegreeCurve
+    m = _star(6)
+    dc = m.arch.primitives.degree_curve("junction_cross")
+    four = dc.get(4)
+    import dataclasses
+    slow = dataclasses.replace(four, points=tuple(dataclasses.replace(p, us=p.us * 3) for p in four.points))
+    m.arch.primitives.degree_curves["junction_cross"] = DegreeCurve({**dc.by_degree, 6: slow})
+    model = corrected_model()
+    assert model.junction_point(m.arch, 6).us == 3 * model.junction_point(m.arch, 4).us

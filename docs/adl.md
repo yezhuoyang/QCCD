@@ -231,7 +231,7 @@ surface-trap defaults when they are absent:
 
 | field | default | rule |
 |---|---|---|
-| `budget.max_junction_degree` | 6 | R19: no node joins more rails than this. A trap built in more than one layer has junctions of up to six rails; a 2D surface trap, which has T- and X-junctions and nothing denser, declares 4. A junction of five or six rails also needs a crossing time for that degree (R11). |
+| `budget.max_junction_degree` | 6 | R19: no node joins more rails than this. A trap built in more than one layer has junctions of up to six rails; a 2D surface trap, which has T- and X-junctions and nothing denser, declares 4. A junction of five or six rails that `junction_cross` does not price crosses at the degree-4 (X-junction) price, since no shipped table measures one. |
 | `budget.min_rail_angle_deg` | 60 | R20: at every node with two or more rails, any two of them subtend at least this angle, measured from the declared node positions. A symmetric X-junction is 90 degrees. |
 
 R21 has no parameter: rails are planar, so a rail passes through no node it does not end

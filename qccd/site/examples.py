@@ -457,7 +457,7 @@ RULES: list[dict] = [
               "why": "J joins seven rails, one more than the limit. (Seven rails cannot all be 60 degrees apart, so R20 fails too.)"},
      "pass": {"device": HEX6, "program": [rec("init", {"d0": "P0"})],
               "why": "J joins six rails, 60 degrees apart: the most a junction may join. The device prices no "
-                     "crossing of a degree-6 junction, so R11 still refuses it until one is declared."}},
+                     "degree-6 crossing, so it crosses at the X-junction's price."}},
     {"id": "R20", "checks": "at every node with two or more rails, any two of them subtend at least budget.min_rail_angle_deg (60 degrees unless the document says otherwise), measured from the node positions.",
      "device": FORK90,
      "note": "60 degrees is the default the reviewers proposed as an example; a real junction is usually symmetric, so 90 degrees for an X. A document may declare its own minimum.",

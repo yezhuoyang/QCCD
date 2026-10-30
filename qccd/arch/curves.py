@@ -127,6 +127,13 @@ class Curve:
         return Curve(tuple(CurvePoint.from_json(p) for p in v))
 
 
+#: R19 allows a junction of up to six rails by default (October 2026), but no shipped table
+#: measures a crossing of five or six: one the device does not price is taken at the
+#: X-junction's time and heat, the densest junction the tables do measure.  `to_json` and
+#: `degrees` still say only what the device declares.
+FALLBACK_DEGREE = {5: 4, 6: 4}
+
+
 @dataclass(frozen=True, slots=True)
 class DegreeCurve:
     """A curve keyed by node degree -- the junction-crossing primitive.
@@ -141,7 +148,12 @@ class DegreeCurve:
     by_degree: Mapping[int, Curve]
 
     def get(self, degree: int) -> Curve | None:
-        return self.by_degree.get(degree)
+        """The curve at `degree`; a junction of five or six rails that the device does not
+        price crosses at the X-junction's (`FALLBACK_DEGREE`)."""
+        c = self.by_degree.get(degree)
+        if c is None and degree in FALLBACK_DEGREE:
+            c = self.by_degree.get(FALLBACK_DEGREE[degree])
+        return c
 
     def degrees(self) -> tuple[int, ...]:
         return tuple(sorted(self.by_degree))

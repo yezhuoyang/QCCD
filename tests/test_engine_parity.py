@@ -874,7 +874,19 @@ def _geometry_shapes() -> list[tuple[str, list]]:
                _C("d.segment", "S0", "P0", "P1"),
                _C("d.segment", "S1", "P2", "P3"),
                _C("blank_device", name="onrail", zones=["data"])]
-    return [("star7", star), ("cross", cross), ("onrail", on_rail)]
+    # six rails at 60 degrees: clean geometry at the default budget, and its crossing is priced
+    # only by the X-junction fallback (curves.FALLBACK_DEGREE), which both sides must apply
+    hex6 = [_C("DeviceBuilder", "explicit"), _C("d.site", "H", 0.0, 0.0, zone="data")]
+    for i in range(6):
+        a = 2 * math.pi * i / 6
+        hex6.append(_C("d.site", f"Q{i}", round(math.cos(a), 6), round(math.sin(a), 6), zone="data"))
+    for i in range(6):
+        hex6.append(_C("d.segment", f"H{i}", "H", f"Q{i}"))
+    hex6.append(_C("blank_device", name="hex6", zones=["data"]))
+    hex6.append(_C("set_degree_curve", "junction_cross", 4,
+                   [{"us": 120.0, "quanta": 3.0, "table": "qccdsim_jones", "source": "2004.04706",
+                     "label": "four-way junction crossing"}]))
+    return [("star7", star), ("cross", cross), ("onrail", on_rail), ("hex6", hex6)]
 
 
 def _lint_cases() -> list[dict]:

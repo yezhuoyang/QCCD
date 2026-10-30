@@ -70,6 +70,7 @@ table.sets td,table.sets th{border-top:1px solid #e3e7f0;padding:7px 8px;vertica
 .verdicts b{display:block}
 .verdicts .ok b{color:#0b7a4b}.verdicts .bad b{color:#c62828}.verdicts .na b{color:#666}
 .verdicts .unk b{color:#9a6700}
+.rule .runbox iframe.live{height:420px}
 """
 
 
