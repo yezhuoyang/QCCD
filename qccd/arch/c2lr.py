@@ -316,13 +316,28 @@ _MERGE_SPLIT = [{"us": 40.0, "quanta": 0.1, "table": "transport_excitation",
                  "label": "slow point; the platform's curve, not arXiv:2403.00756"}]
 
 
-def c2lr_control(*, checkerboard: bool = True) -> dict:
+#: The same census as a wiring block, which is what the DAC count (`hardware_report`, the
+#: `dacs` metric, a board's budget B1) reads: the 27 shared analog signals are the broadcast
+#: bank, and the two site-dependent shims of each leg its own compensation DACs, undivided.
+#: Without it a C2LR device is counted as wired directly, one DAC per electrode -- 528 on a
+#: 3 x 3 lattice, which no board's budget admits and which is not what the paper built.
+C2LR_WIRING: Mapping = {
+    "scheme": "broadcast_groups", "dacs_dynamic": 27, "compensation_electrodes_per_trap": 2,
+    "shim_per_dac": 1,
+    "note": f"{_PAPER}, p4: 27 shared analog signals drive every leg (the broadcast bank); two "
+            "site-dependent shims per leg, each its own DAC; the per-leg digital input and "
+            "switch are not DACs",
+}
+
+
+def c2lr_control(*, checkerboard: bool = True, wiring: bool = False) -> dict:
     """The control block of a C2LR device (docs/c2lr.md section 1).
 
     The census C10 reads: 27 shared analog signals, plus one digital input and one switch
     per leg (and two site-dependent shims, p4).  The checkerboard pairings are offered and
-    marked assumed; `checkerboard=False` offers the demonstrated diagonals only."""
-    return {
+    marked assumed; `checkerboard=False` offers the demonstrated diagonals only.  `wiring`
+    adds the census as the wiring block DACs are counted from (`C2LR_WIRING`)."""
+    out = {
         "model": "c2lr",
         "c2lr": {
             "diagonals": list(DIAGONALS),
@@ -343,6 +358,9 @@ def c2lr_control(*, checkerboard: bool = True) -> dict:
         "max_simd_classes_per_cycle": 1,
         "intra_inter_exclusive": True,
     }
+    if wiring:
+        out["wiring"] = dict(C2LR_WIRING)
+    return out
 
 
 def c2lr_primitives(species: str) -> dict:
@@ -360,4 +378,10 @@ def c2lr_primitives(species: str) -> dict:
 
 
 def c2lr_species(species: str) -> dict:
-    return dict(C2LR_PHYSICS[species]["species"])
+    """The species keys a C2LR device adds to its template's `species` block: the pair, its
+    qubit and coolant ions.  The paper is cited as `pair_source`, so the block's own `source`
+    keeps citing the numbers that are the template's (T_coh_s, coolant_fraction), not this
+    paper's."""
+    out = dict(C2LR_PHYSICS[species]["species"])
+    out["pair_source"] = out.pop("source")
+    return out

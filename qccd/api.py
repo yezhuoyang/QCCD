@@ -646,23 +646,26 @@ class Machine:
 
     @classmethod
     def c2lr_grid(cls, a, b, *, species="Ba-Sr", name=None, template="grid9x9",
-                  checkerboard=True) -> "Machine":
+                  checkerboard=True, wiring=True) -> "Machine":
         """An `a x b` C2LR swap-or-stay lattice (arXiv:2403.00756; docs/c2lr.md): the grid of
-        junctions with one leg on every wire, each leg a trap holding one two-ion crystal --
-        two, under C1, between an enter and its exit.
+        `a` columns and `b` rows of junctions with one leg on every wire (2ab - a - b legs),
+        each leg a trap holding one two-ion crystal -- two, under C1, between an enter and
+        its exit.
 
         Its control is C2LR's (`qccd.arch.c2lr.c2lr_control`): crystals move only by
         swap-or-stay steps, a direction bit each, so the device declares those classes and
         no other.  Its numbers are the paper's for `species` ("Ba-Sr" or "Yb-Ba"), each with
         its source; reorder-or-not is priced for Yb-Ba only, because the paper measures it
         for that pair alone.  `checkerboard=False` offers the demonstrated diagonals only.
-        Everything else -- zones, gates, measurement, cooling, the junction tables a plain
-        move would read -- is the template's."""
+        `wiring` declares the paper's control census as the wiring DACs are counted from
+        (`C2LR_WIRING`: 27 shared signals and two shims a leg); without it the device is
+        counted as wired directly.  Everything else -- zones, gates, measurement, cooling,
+        the junction tables a plain move would read -- is the template's."""
         from .arch.c2lr import c2lr_control, c2lr_primitives, c2lr_species
         doc = dict(_template_doc(template))
         doc["name"] = name or f"c2lr{a}x{b}_{species.replace('-', '')}"
         doc["geometry"] = {"generator": "grid", "params": {"a": a, "b": b}}
-        doc["control"] = c2lr_control(checkerboard=checkerboard)
+        doc["control"] = c2lr_control(checkerboard=checkerboard, wiring=wiring)
         prims = dict(doc.get("primitives", {}))
         prims.update(c2lr_primitives(species))
         doc["primitives"] = prims
