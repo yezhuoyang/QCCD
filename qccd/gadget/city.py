@@ -1592,6 +1592,23 @@ class City:
         elif kind == "decode":
             # no ion moves: the syndromes cross their wires and the decoder works
             self.decode(ins, grp, t0)
+        elif kind == "bit":
+            # a bit the archive computes from outcomes it holds: no ion, no place but the
+            # archive.  An XOR of single outcomes stays a parity of records; a product is a
+            # new symbol, the bit itself (no flat sign-off follows it: logic/flat.py)
+            names = sorted({n for t in ins.formula for _, n in t})
+            t = max([t0] + [self.decoded_by(n, "the bit") for n in names])
+            _, t_rec, row = self.classical(self.archive, "record", t, ins.index, grp)
+            if all(len(term) <= 1 for term in ins.formula):
+                value = ZERO
+                for term in ins.formula:
+                    value = xor(value, ONE) if not term else \
+                        xor(value, self.cvar_value[term[0][1]], ONE if term[0][0] else ZERO)
+            else:
+                value = (0, frozenset({(f"bit {ins.cvar}", "value")}))
+            self.cvars[(ins.index, ins.cvar)] = ins.cvar
+            self.cvar_value[ins.cvar] = value
+            self.cvar_time[ins.cvar] = t_rec
         elif kind in ("x", "y", "z"):
             # A logical Pauli costs nothing on the ions: it is a line in the archive
             # (Pauli-frame tracking), and every later readout is corrected by it.

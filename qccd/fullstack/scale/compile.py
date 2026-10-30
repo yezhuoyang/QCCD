@@ -11,6 +11,13 @@ A template's guarded groups that measure, prepare or decode (a T gate's S correc
 when the T injection read 1) are written the `.alg` way: a gate called under the guard, which
 reserves its places either way and fires only when the guard holds.  So every template takes
 the same time in every branch, and is compiled once for all of them.
+
+An outcome measured BEFORE the template (`e<i>`: an earlier merge, a record another call wrote)
+is decided by the time it starts, and a gate can read only its own outcomes; so here each is
+taken as decided -- a guard term on it is dropped, and in a `bit` the archive computes it is a
+constant.  The time is the same either way (a guarded group reserves its places in every
+branch, and the archive has the bit before the template begins); which branch fires is the
+symbolic program's business, checked where it is expanded.
 """
 from __future__ import annotations
 
@@ -23,6 +30,28 @@ from .program import Template
 __all__ = ["template_alg", "compile_template", "Compiled"]
 
 _PAULI = re.compile(r"[xyz] [pl]\d+$")
+_EXT = re.compile(r"!?\be\d+\b")
+
+
+def _decided(line: str) -> str | None:
+    """`line` with its outcomes measured before the template taken as decided (`None`: the
+    guard can never hold -- not written by the builder)."""
+    if line.startswith("bit "):
+        text, out = line[4:].split("->")
+        terms = []
+        for t in text.split("^"):
+            lits = [x for x in t.strip().strip("()").split("&") if not _EXT.fullmatch(x.strip())]
+            terms.append("(" + " & ".join(x.strip() for x in lits) + ")" if lits else "1")
+        return f"bit {' ^ '.join(terms)} -> {out.strip()}"
+    if not line.startswith("if "):
+        return line
+    cond, body = line[3:].split(": ", 1)
+    keep = []
+    for conj in cond.split("&"):
+        names = [n.strip() for n in conj.split("^") if not _EXT.fullmatch(n.strip())]
+        if names and names != ["1"]:
+            keep.append(" ^ ".join(names))
+    return f"if {' & '.join(keep)}: {body}" if keep else body
 _BLOCK = re.compile(r"\b[pl]\d+\b")
 _OUT = re.compile(r"\bo\d+\b")
 
@@ -96,7 +125,8 @@ def template_alg(t: Template, name: str = "tpl", floorplan: str = "fullstack") -
                 m = re.search(r"->\s*(o\d+)", op)
                 if m:
                     named.add(m[1])
-                read |= {x.lstrip("!") for x in gs}
+                read |= {n.strip().lstrip("!") for x in gs for n in x.split("^")
+                         if n.strip() not in ("0", "1")}
             params = [x for x in used if x not in made]
             foreign = read - named
             if foreign:
@@ -111,7 +141,7 @@ def template_alg(t: Template, name: str = "tpl", floorplan: str = "fullstack") -
 
     # (a guarded group is one gate called under its guard, as qec2alg writes it: what a
     # guarded call cannot gate -- a preparation, a decode -- runs either way inside it)
-    items = [_parse(ln) for ln in t.lines]
+    items = [_parse(_decided(ln)) for ln in t.lines]
     body = emit(_tree(items), name)
     params = [f"p{i}" for i in range(t.n_params)]
     out = [f"title template {t.tid}", f'floorplan "{floorplan}"']

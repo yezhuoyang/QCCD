@@ -18,9 +18,15 @@ recorded by kind and stands as a placeholder.  What is held here:
   nodes -- lattice surgery by cat states across districts (qccd/gadget/leaves/catbench.py,
   tests/test_gadget_cat.py), one node however many blocks, its factors' bits data -- and are
   counted with every slot taken;
-* the constructs still to lower are exactly these, so a new one, or one lowered, shows:
-  classical parities and guards on them, a record copied into a source slot (`source c[k] <-`)
-  and guards on one, and records another call wrote.
+* its classical layer is the archive's, no instruction: a parity that copies a record, ANDs
+  two, or XORs table-masked source slots is a formula the guards and frames that read it fold
+  in (a frame on an XOR of conjunctions is one frame per term); a record copied into a source
+  slot, and a record another call wrote (the spacelike adder's trips hand their outputs on),
+  are read through a table of records by FormalRV's own addresses (`rv_recbase` + index);
+* a readout whose basis is chosen by an XOR of conjunctions of earlier outcomes (the
+  spacelike adder's adaptive measurements) reads a `bit` the archive computes first
+  (tests/test_gadget_bit.py);
+* nothing is left in survey mode: every statement of GE2021 is lowered, so a new gap shows.
 """
 from __future__ import annotations
 
@@ -87,8 +93,10 @@ def test_gidney_ekera_rsa2048_is_lowered_symbolically_and_counted():
     assert set(cats) == {"cPrepMasked", "unaryQROMSegCoh"}, sorted(cats)
     assert all(n.rounds == 27 and n.letter == "X" for n in cats.values())
     assert c["cat"] > 1e8 and c["cat_blocks"] > 2000 * c["cat"]   # register-wide, every slot taken
-    assert set(survey) == {"parity", "source", "guard on a source record",
-                           "record of another call"}, sorted(survey)
+    assert survey == {}, sorted(survey)
+    bits = [ln for t in prog.templates.values() for ln in t.lines if ln.startswith("bit ")]
+    assert bits and all("&" in ln for ln in bits)            # products: the adder's carries
+    assert c["bit"] > 1e9
 
 
 def test_the_masked_preparation_through_cat_states_prepares_the_constant(tmp_path):

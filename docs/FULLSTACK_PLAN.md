@@ -620,6 +620,51 @@ details").**
   Copies and ANDs fold into the guards that read them (`if a & b:`). Source slots and foreign
   records need a global record table.
 
+**S8, fourth round (2026-10-29): GE2021 lowers completely.** Nothing is left in survey mode.
+
+- **The classical layer is the archive's, with no instruction.**
+  - A classical bit is an XOR of conjunctions of parities of outcomes. One term is an `.alg`
+    guard (`a ^ b & c`). A Pauli frame on several terms is that Pauli once per term:
+    P^(t₁ ⊕ t₂) = P^t₁ · P^t₂.
+  - FormalRV's `parity` (copies, ANDs, XORs over a loop, table-masked XORs over source slots),
+    `source c[k] <-`, guards on source slots, and frames on several records all lower to such
+    formulas.
+  - Records are read through a table keyed by FormalRV's own addresses: a call's records live
+    at its `rv_recbase` plus their index in it. That is how the spacelike adder hands trip k's
+    outputs (local 1411 and up) to trip k+1 (local 0 and up): 37 reads that are not local.
+  - Two silent gaps found on the way:
+    - 42 `frame on c[a), c[b)` lines read an XOR of two records, but the builder took only
+      the first;
+    - re-preparing a data block reused its first generation.
+- **`bit` (`.alg`): a bit the archive computes.** It is written `bit (a & !b) ^ c -> f`, and a
+  guard reads `f` like an outcome (`tests/test_gadget_bit.py`).
+  - The spacelike adder picks a readout basis by an XOR of conjunctions of earlier outcomes
+    (`when c: measure Z` / `when ¬c: measure X`); no guard can say that. The builder computes
+    such a guard as a bit first: 4 lines in 2 templates, 4.3 × 10⁹ evaluations at RSA-2048.
+  - Exact branch enumeration follows it. The symbolic simulator takes it when affine and
+    refuses a product by name. The town schedules it as an archive job after its outcomes are
+    decoded. The flat sign-off, which folds outcomes as parities, says it cannot follow a
+    product.
+- **Compiling GE2021's 20 templates once on a district (CCZ factory, 20 memories):**
+  - **The harness grew:**
+    - a template's outcomes measured before it are taken as decided (a guarded group reserves
+      its places either way);
+    - a gate may read out a block it was passed (`fold`: `Macro.gone`), and G2 accepts its
+      ions ending at a depot.
+  - **7 compile and hold all 13 rules.**
+  - **5 fail one rule:**
+    - G7 (3): a block's next instruction starts before the call holding it is done;
+    - G8 (2): a block idles 1,084 ms without extraction, against a 1,000 ms budget (the
+      compile path runs no refresh pass).
+  - **3 make a block that outlives the template.** An ancilla crosses into the next template
+    when a register merge splits the run, and a gate returns only its parameters.
+  - **5 read an outcome measured inside a guarded group** (the adaptive-basis readouts).
+- **A register-wide merge, measured:**
+  - its cat states take 35.3 / 36.0 / 37.2 / 37.2 ms over 2–5 blocks, with a depot per bench;
+  - its 27 extraction rounds take 534 ms on each block, at that block's district's clinic,
+    every block at once;
+  - about 0.57 s in all, whatever the register's size.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.

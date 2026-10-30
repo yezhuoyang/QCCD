@@ -202,6 +202,14 @@ def run(alg: Algorithm) -> dict:
                 out[ins.cvar] = v
             if k == "read":
                 st.discard(ins.blocks[0], ins.basis)
+        elif k == "bit":
+            # affine when every term reads at most one outcome
+            if any(len(t) > 1 for t in ins.formula):
+                raise NotClifford(f"line {ins.line}: a bit that is a product of outcomes is not affine")
+            v = ZERO
+            for t in ins.formula:
+                v = _xor(v, ONE) if not t else _xor(v, _xor(out[t[0][1]], ONE if t[0][0] else ZERO))
+            out[ins.cvar] = v
         elif k in ("decode", "se", "store"):
             pass
         elif k == "cx":

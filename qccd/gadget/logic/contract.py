@@ -304,6 +304,13 @@ def run_lines(lines: list[tuple[int, str]], start: State, gates: dict[str, Gate]
                 UNITARIES[g.contract].apply(br.state, args)
                 out.append(br)
                 continue
+            if word == "bit":
+                # a bit the archive computes: this branch's outcomes decide it
+                from ..algorithm import bit_value, parse_bit
+                oc = dict(br.outcomes)
+                oc[cvar] = bit_value(parse_bit(" ".join(args)), br.outcomes)
+                out.append(Branch(br.state, oc, br.prob, br.path))
+                continue
             if word in MEASURES:
                 for o in (0, 1):
                     st = br.state.copy()

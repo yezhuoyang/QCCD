@@ -40,6 +40,7 @@ from .. import layers
 from ..provenance import _qec_kind
 from ..qec2alg import _LOGICAL_PREP, NotLowered, ROT_BASE, _untable, logical_prepares, rounds_of
 from ..sysprog import split_top
+from ...gadget.algorithm import parse_bit
 from .expr import Expr, ExprError
 
 __all__ = ["Program", "Builder", "build", "Seg", "Loop", "Pred", "Let", "Call", "Rot", "Template",
@@ -52,7 +53,7 @@ _SID = itertools.count(1)
 _FAMILY = re.compile(r"\w+\[.*\]\s+(\w+)")
 
 #: what a guarded call cannot gate: it runs either way (qccd.gadget.algorithm.UNGUARDABLE)
-UNGUARDABLE = ("prep", "inject", "se", "store", "decode")
+UNGUARDABLE = ("prep", "inject", "se", "store", "decode", "bit")
 
 
 # --------------------------------------------------------------------------- the tree
@@ -95,7 +96,13 @@ class Seg:
     tid: str
     params: tuple        # ((family, Expr), ...) per p<i>
     locals: tuple        # ((family, Expr), ...) per l<i>
-    ext: tuple           # (OutRef, ...) per e<i>
+    ext: tuple           # (OutRef | _Rec | _MXor, ...) per e<i>
+    #: per o<i>, the records it fills, (lo, hi) in its call's own numbering (FormalRV addresses
+    #: a call's records at its `rv_recbase` plus that): later calls read them by address
+    bands: tuple = ()
+    #: records the archive writes and no instruction measures -- a copy, a conjunction, a
+    #: source slot: (table, lo, hi, guard text over o<i>/e<i>), table "rec" or "src"
+    writes: tuple = ()
 
 
 @dataclass
@@ -162,6 +169,7 @@ class Cat:
     idx: Expr
     rounds: int = 1
     qline: int = 0
+    band: tuple = None   # (lo, hi): the records its outcome fills
 
     def blocks(self, env: dict) -> int:
         """The most blocks it names (every data slot taken)."""
@@ -228,11 +236,117 @@ class _Blk:
 
 
 class _Out:
-    """An outcome of the open run."""
-    __slots__ = ("k",)
+    """An outcome of the open run, and the records it fills (texts, in its call's numbering)."""
+    __slots__ = ("k", "band")
 
-    def __init__(self, k):
-        self.k = k
+    def __init__(self, k, band=None):
+        self.k, self.band = k, band
+
+
+class _Rec:
+    """A record read by its address, not by the merge that wrote it: one another call wrote
+    (`table` "rec", `idx` in this call's own numbering -- its `rv_recbase` is added), or a
+    source slot (`table` "src", `idx` absolute).  Resolved when the program is expanded."""
+    __slots__ = ("table", "idx")
+
+    def __init__(self, table: str, idx: Expr):
+        self.table, self.idx = table, idx
+
+
+class _MXor:
+    """The parity of source slots `idx` for `var` < `n` where `cond` > 0 -- a mask of data
+    (GE2021's masked phase parity, the mask a table's bits)."""
+    __slots__ = ("var", "n", "idx", "cond")
+
+    def __init__(self, var: str, n: Expr, idx: Expr, cond: Expr):
+        self.var, self.n, self.idx, self.cond = var, n, idx, cond
+
+
+# A classical bit the archive computes is an XOR of conjunctions of parities of outcomes: a
+# list of terms, a term `((const, (atom, ...)), ...)` -- a parity holds when const plus its
+# atoms is odd, a term when all its parities do.  One term is an `.alg` guard (`a ^ b & c`); a
+# Pauli frame on several terms is that Pauli once per term (P^(t1 + t2) = P^t1 P^t2).  The
+# atoms are outcome references while lowering, outcome names when expanding.
+
+def _sop_norm(terms) -> list:
+    """The terms that are one parity merged into one; what never holds dropped; a term twice
+    cancelled."""
+    c, ns, multi = 0, [], []
+    for t in terms:
+        t = tuple(p for p in t if p != (1, ()))            # a parity that always holds
+        if any(p == (0, ()) for p in t):
+            continue                                       # one that never does: the term is 0
+        if not t:
+            c ^= 1                                         # the term always holds
+        elif len(t) == 1:
+            c ^= t[0][0]
+            for a in t[0][1]:
+                ns.remove(a) if a in ns else ns.append(a)
+        elif t in multi:
+            multi.remove(t)
+        else:
+            multi.append(t)
+    head = [((c, tuple(ns)),)] if ns else ([()] if c else [])
+    return head + multi
+
+
+def _sop_xor(*fs) -> list:
+    return _sop_norm([t for f in fs for t in f])
+
+
+def _sop_and(*fs) -> list:
+    out = [()]
+    for f in fs:
+        out = [a + b for a in out for b in f]
+    return _sop_norm(out)
+
+
+def _sop_not(f) -> list:
+    return _sop_xor(f, [()])
+
+
+def _sop_literals(f) -> list:
+    """The same bit as an XOR of conjunctions of atoms (each parity multiplied out): what an
+    `.alg` `bit` line writes.  Each conjunction a tuple of atoms, `()` the one of none."""
+    out: list = []
+    for term in f:
+        prods = [()]
+        for c, atoms in term:
+            alts = [(a,) for a in atoms] + ([()] if c else [])
+            prods = [p + tuple(a for a in alt if a not in p) for p in prods for alt in alts]
+        for p in prods:
+            out.remove(p) if p in out else out.append(p)
+    return out
+
+
+def _bit_text(f, name) -> str:
+    """`(a & b) ^ c ^ 1`, every atom written by `name`."""
+    lits = _sop_literals(f)
+    return " ^ ".join(("(" + " & ".join(name(a) for a in p) + ")") if p else "1" for p in lits) or "0"
+
+
+class _F:
+    """A classical bit while lowering: an XOR of conjunctions of parities of refs."""
+    __slots__ = ("terms",)
+
+    def __init__(self, terms):
+        self.terms = list(terms)
+
+
+def _formula(ref) -> _F:
+    if isinstance(ref, _F):
+        return ref
+    if isinstance(ref, tuple) and len(ref) == 2 and ref[0] == "not":
+        return _F(_sop_not(_formula(ref[1]).terms))
+    return _F([((0, (ref,)),)])
+
+
+def _fand(fs) -> _F:
+    return _F(_sop_and(*[_formula(f).terms for f in fs]))
+
+
+def _fxor(fs) -> _F:
+    return _F(_sop_xor(*[_formula(f).terms for f in fs]))
 
 
 class _State:
@@ -240,6 +354,7 @@ class _State:
 
     def __init__(self, scope: list):
         self.nodes = Body()
+        self.writes: list = []           # [(table, lo text, hi text, ref)]: records the archive writes
         self.run: list = []              # [(tokens, qline, single)]
         self.outs: list = []             # the open run's outcomes
         self.scope = scope + [[]]        # per enclosing body: [(lo, hi, ref)]; ref an _Out or an OutRef
@@ -370,22 +485,33 @@ class Builder:
                                 par=var.endswith("__par")))
             return
         if raw.startswith("when ") and raw.endswith(":"):
-            out = self._owner(self._band(raw, rep, s.line), S, s.line)
+            out = self._read(raw, rep, S, s.line)
             if raw.startswith("when ¬") or raw.startswith("when !"):
-                out = ("not", out)                 # the .alg's `if !m:`
+                out = _formula(("not", out))       # the .alg's `if !m:`
             for c in s.children:
                 self.stmt(c, S, rep, famap, top, guards + [out])
             return
         if raw.startswith("parity ") and "<-" in raw:
-            # a classical bit computed from outcomes (and a table's bits): the archive's work
-            if self.survey is None:
-                raise NotLowered(f".qec line {s.line}: a classical parity has no lowering yet")
-            self.survey.setdefault("parity", []).append((s.line, raw[:160]))
-            band = self._band(raw.split("<-")[0], rep, s.line)
-            o = _Out(len(S.outs))
-            S.outs.append(o)
-            S.scope[-1].append((band[0], band[1], o))
-            S.run.append((["parity", "->", o], s.line, None))
+            # a classical bit computed from outcomes (and a table's bits): the archive's work, no
+            # instruction -- a copy or a conjunction is folded into the guards that read it, and
+            # written into the table of records for the calls after this one
+            dst, src = raw.split("<-", 1)
+            try:
+                f = self._parity(src, rep, S, s.line)
+            except NotLowered:
+                if self.survey is None:
+                    raise
+                self.survey.setdefault("parity", []).append((s.line, raw[:160]))
+                return
+            band, (lo, hi) = self._band(dst, rep, s.line), self._band_text(dst, s.line)
+            S.scope[-1].append((band[0], band[1], f))
+            S.writes.append(("rec", lo, hi, f))
+            return
+        if raw.startswith("source ") and "<-" in raw:
+            # a record copied into a source slot, which later calls read by its number
+            dst, src = raw.split("<-", 1)
+            k = self._band_text(dst, s.line)[0]
+            S.writes.append(("src", k, f"({k}) + 1", self._read(src, rep, S, s.line)))
             return
         call = re.fullmatch(r"([\w!]+)\((.*)\)", raw)
         if call and call[1] in self.gadgets:
@@ -429,7 +555,8 @@ class Builder:
             raise NotLowered(f"block index {idx_text!r}: {err}") from None
         if fam == "LogicData":
             if new:
-                self.gen[("d", v)] = self.gen.get(("d", v), -1) + 1
+                # (a data block exists from the start, generation 0: a re-preparation is 1)
+                self.gen[("d", v)] = self.gen.get(("d", v), 0) + 1
             return _Blk(fam, e, self.gen.get(("d", v), 0), v)
         if fam == "LogicalAncilla":
             if new:
@@ -514,17 +641,19 @@ class Builder:
                                      f"{tail[:100]!r}")
                 fs = self.factors(head, rep, famap)
                 band = self._band(raw.split("->")[-1], rep, q)
+                lo_t, hi_t = self._band_text(raw.split("->")[-1], q)
                 self.close(S, top)
                 node = Cat(tuple((p, b.fam, b.idx) for p, b in fs), m["var"], Expr(m["lo"]),
                            Expr(m["hi"]), Expr(m["cond"]), m["letter"],
-                           famap.get(m["fam"], m["fam"]), Expr(m["idx"]), qline=q)
+                           famap.get(m["fam"], m["fam"]), Expr(m["idx"]), qline=q,
+                           band=(Expr(lo_t), Expr(hi_t)))
                 S.scope[-1].append((band[0], band[1], (S.nodes.sid, len(S.nodes), 0)))
                 S.nodes.append(node)
                 S.current = (node, [], True)       # its rounds and decoding are its own
                 return
             fs = self.factors(prod, rep, famap)
             band = self._band(raw.split("->")[-1], rep, q)
-            o = _Out(len(S.outs))
+            o = _Out(len(S.outs), self._band_text(raw.split("->")[-1], q))
             S.outs.append(o)
             S.scope[-1].append((band[0], band[1], o))
             toks = g + ["ppm"] + [x for p, b in fs for x in (p, b)] + ["->", o]
@@ -538,7 +667,7 @@ class Builder:
             if len(fs) != 1:
                 raise NotLowered(f".qec line {q}: a measurement of {len(fs)} blocks")
             band = self._band(raw.split("->")[-1], rep, q)
-            o = _Out(len(S.outs))
+            o = _Out(len(S.outs), self._band_text(raw.split("->")[-1], q))
             S.outs.append(o)
             S.scope[-1].append((band[0], band[1], o))
             S.run.append((g + ["read", fs[0][1], fs[0][0], "->", o], q, None))
@@ -552,7 +681,8 @@ class Builder:
                 S.current = (S.current[0], S.current[1], True)
             return
         if kd == "frame_on":
-            out = self._owner(self._band(raw, rep, q), S, q)
+            head = raw[:_FACTOR.search(raw).start()]
+            out = _fxor([self._read(part, rep, S, q) for part in split_top(head[len("frame on "):], ",")])
             for p, b in self.factors(raw, rep, famap):
                 S.run.append((g + [("guard", out), p.lower(), b], q, None))
             return
@@ -589,30 +719,76 @@ class Builder:
             return (Expr(lo)(rep), Expr(hi)(rep))
         if one:
             i = Expr(one[1])(rep)
-            if "source " in text and self.survey is not None:
-                self.survey.setdefault("guard on a source record", []).append((line, text[:160]))
             return (i, i + 1)
         raise NotLowered(f".qec line {line}: no c[..) band in {text[:80]!r}")
 
-    def _owner(self, band, S: _State, line: int):
+    def _band_text(self, text: str, line: int) -> tuple:
+        """The first `c[lo,hi)` (or `c[i]`) of `text`, as index texts."""
+        one = re.search(r"\bc\[([^\[\]]+)\]", text)
+        if one and len(split_top(one[1], ",")) == 1:
+            return one[1], f"({one[1]}) + 1"
+        m = _BAND.search(text)
+        if m:
+            lo, hi = split_top(m[1], ",")
+            return lo, hi
+        raise NotLowered(f".qec line {line}: no c[..) band in {text[:80]!r}")
+
+    def _read(self, text: str, rep: dict, S: _State, line: int):
+        """The bit `text` names: a source slot, or a record -- this body's merge, or by its
+        address one another call wrote."""
+        if re.search(r"\bsource\s+c\[", text):
+            return _Rec("src", Expr(self._band_text(text.split("source", 1)[1], line)[0]))
+        return self._owner(self._band(text, rep, line), S, line, self._band_text(text, line)[0])
+
+    def _parity(self, src: str, rep: dict, S: _State, line: int) -> _F:
+        """`⊕ v < n . (t ∧ t ...)`: a copy, a conjunction, or a parity of source slots masked
+        by data, as a formula."""
+        m = re.fullmatch(r"\s*⊕\s*(\w+)\s*<\s*(.+?)\s*\.\s*\((.*)\)\s*", src)
+        if not m:
+            raise NotLowered(f".qec line {line}: a parity QCCD cannot read: {src[:100]!r}")
+        var, terms = m[1], [t.strip() for t in split_top(m[3], "∧")]
+        n = Expr(m[2])(rep)
+        srcs = [t for t in terms if re.match(r"source\s+c\[", t)]
+        if srcs:
+            # ⊕ i < W . (source c[k + i] ∧ mask): the slots the data selects
+            rest = [t for t in terms if t not in srcs]
+            if len(srcs) != 1 or len(rest) != 1:
+                raise NotLowered(f".qec line {line}: a parity of {len(terms)} terms over {n} values")
+            k = self._band_text(srcs[0].split("source", 1)[1], line)[0]
+            return _formula(_MXor(var, Expr(m[2]), Expr(k), Expr(rest[0])))
+        if n > 64:
+            raise NotLowered(f".qec line {line}: a parity over {n} values")
+        fs = []
+        for v in range(n):
+            # one value of the loop: the conjunction of its records (a constant 0 drops it)
+            refs, never = [], False
+            for t in terms:
+                if re.search(r"\bc\[", t):
+                    refs.append(self._read(t, {**rep, var: v}, S, line))
+                    continue
+                try:
+                    never = never or Expr(t)({**rep, var: v}) == 0
+                except ExprError:
+                    raise NotLowered(f".qec line {line}: a parity term on data: {t!r}") from None
+            if not never:
+                fs.append(_fand(refs))
+        return fs[0] if len(fs) == 1 else _fxor(fs)
+
+    def _owner(self, band, S: _State, line: int, text: str | None = None):
         for frame in reversed(S.scope):
             for lo, hi, ref in reversed(frame):
                 if lo <= band[0] and band[1] <= hi:
                     return ref
-        if self.survey is not None:
-            # a record another gadget call wrote (GE2021's runway trips): a global record
-            self.survey.setdefault("record of another call", []).append((line, f"c{list(band)}"))
-            o = _Out(len(S.outs))
-            S.outs.append(o)
-            S.scope[-1].append((band[0], band[1], o))
-            S.run.append((["record", "->", o], line, None))
-            return o
+        if text is not None:
+            # a record another gadget call wrote (GE2021's spacelike trips: trip k's outputs are
+            # trip k+1's inputs): read by its address in the table of records
+            return _Rec("rec", Expr(text))
         raise NotLowered(f".qec line {line}: no merge in scope wrote c{list(band)}")
 
     # ---- closing a run into a template ---------------------------------------------------
     def close(self, S: _State, top: bool) -> None:
         """The open run becomes a `Seg`: its lines with every name made a parameter."""
-        if not S.run:
+        if not S.run and not S.writes:
             return
         pos = len(S.nodes)
         made = set()
@@ -645,51 +821,96 @@ class Builder:
         params, plist, locs, llist, ext, elist = {}, [], {}, [], {}, []
         outs = {id(o): k for k, o in enumerate(S.outs)}
         lines, qlines = [], []
+        def tok(ref, q):
+            if isinstance(ref, _Out):
+                if id(ref) not in outs:
+                    raise NotLowered(f".qec line {q}: an outcome of an unclosed run")
+                return f"o{outs[id(ref)]}"
+            if ref not in ext:
+                ext[ref] = len(elist)
+                elist.append(ref)
+            return f"e{ext[ref]}"
+
+        def term_text(term, q) -> str:
+            """One conjunction as an `.alg` guard over o<i> / e<i>."""
+            out = []
+            for c, rs in term:
+                names = [tok(r, q) for r in rs]
+                out.append(f"!{names[0]}" if len(names) == 1 and c else " ^ ".join(names + (["1"] if c else [])))
+            return " & ".join(out)
+
+        def sop_text(f, q) -> str:
+            # (a write's value: its terms, `;` between; "" never, "1" always)
+            return " ; ".join(term_text(t, q) or "1" for t in _formula(f).terms)
+
+        bits: dict = {}
         for toks, q, _ in S.run:
-            gs, body = [], []
-            for t in toks:
-                if isinstance(t, tuple) and t[0] == "guard":
-                    ref = t[1]
-                    neg = isinstance(ref, tuple) and len(ref) == 2 and ref[0] == "not"
-                    if neg:
-                        ref = ref[1]
-                    if isinstance(ref, _Out):
-                        if id(ref) not in outs:
-                            raise NotLowered(f".qec line {q}: an outcome of an unclosed run")
-                        gs.append(("!" if neg else "") + f"o{outs[id(ref)]}")
-                    else:
-                        if ref not in ext:
-                            ext[ref] = len(elist)
-                            elist.append(ref)
-                        gs.append(("!" if neg else "") + f"e{ext[ref]}")
-                elif isinstance(t, _Blk):
-                    if t.key() in made:
-                        if t.key() not in locs:
-                            locs[t.key()] = len(llist)
-                            llist.append((t.fam, t.idx))
-                        body.append(f"l{locs[t.key()]}")
-                    else:
-                        if t.key() not in params:
-                            params[t.key()] = len(plist)
-                            plist.append((t.fam, t.idx))
-                        body.append(f"p{params[t.key()]}")
-                elif isinstance(t, _Out):
-                    body.append(f"o{outs[id(t)]}")
+            gref = [t[1] for t in toks if isinstance(t, tuple) and t[0] == "guard"]
+            terms = _fand(gref).terms if gref else [()]
+            word = next(t for t in toks if not (isinstance(t, tuple) and t[0] == "guard"))
+            if len(terms) != 1 and word not in ("x", "y", "z"):
+                if not terms:
+                    raise NotLowered(f".qec line {q}: '{word}' under a guard that is never true")
+                # a guard that is an XOR of conjunctions (the spacelike adder's adaptive bases):
+                # the archive computes it first, as a bit the line's guard then reads
+                key = tuple(term_text(t, q) for t in terms)
+                if key not in bits:
+                    o = _Out(len(S.outs))
+                    S.outs.append(o)
+                    outs[id(o)] = o.k
+                    bits[key] = o
+                    bits[tuple(term_text(t, q) for t in _sop_not(terms))] = ("not", o)
+                    lines.append(f"bit {_bit_text(terms, lambda r: tok(r, q))} -> o{o.k}")
+                    qlines.append(q)
+                ref = bits[key]
+                terms = _formula(ref).terms
+            for term in terms:
+                self._line(toks, term_text(term, q), q, made, locs, llist, params, plist, outs,
+                           lines, qlines)
+        writes = tuple((table, Expr(lo), Expr(hi), sop_text(f, 0)) for table, lo, hi, f in S.writes)
+        bands = tuple((Expr(o.band[0]), Expr(o.band[1])) if o.band else None for o in S.outs)
+        self._close_rest(S, pos, outs, lines, qlines, plist, llist, elist, bands, writes)
+
+    def _line(self, toks, guard, q, made, locs, llist, params, plist, outs, lines, qlines):
+        """One `.alg` line of a template, every block a p<i> or l<i>."""
+        body = []
+        for t in toks:
+            if isinstance(t, tuple) and t[0] == "guard":
+                continue
+            if isinstance(t, _Blk):
+                if t.key() in made:
+                    if t.key() not in locs:
+                        locs[t.key()] = len(llist)
+                        llist.append((t.fam, t.idx))
+                    body.append(f"l{locs[t.key()]}")
                 else:
-                    body.append(t)
-            text = " ".join(body)
-            lines.append(f"if {' & '.join(gs)}: {text}" if gs else text)
-            qlines.append(q)
+                    if t.key() not in params:
+                        params[t.key()] = len(plist)
+                        plist.append((t.fam, t.idx))
+                    body.append(f"p{params[t.key()]}")
+            elif isinstance(t, _Out):
+                body.append(f"o{outs[id(t)]}")
+            else:
+                body.append(t)
+        text = " ".join(body)
+        lines.append(f"if {guard}: {text}" if guard else text)
+        qlines.append(q)
+
+    def _close_rest(self, S, pos, outs, lines, qlines, plist, llist, elist, bands, writes):
         tid = "t" + hashlib.sha1("\n".join(lines).encode()).hexdigest()[:12]
         if tid not in self.prog.templates:
             self.prog.templates[tid] = Template(tid, tuple(lines), tuple(qlines), len(plist), len(llist),
                                                 len(S.outs), len(elist))
-        S.nodes.append(Seg(tid, tuple(plist), tuple(llist), tuple(elist)))
+        S.nodes.append(Seg(tid, tuple(plist), tuple(llist), tuple(elist), bands, writes))
         # the run's outcomes, readable by later runs of this body and of those inside it
+        here = lambda r: (S.nodes.sid, pos, outs[id(r)]) if isinstance(r, _Out) and id(r) in outs else r  # noqa: E731
         for i, (lo, hi, ref) in enumerate(S.scope[-1]):
-            if isinstance(ref, _Out) and id(ref) in outs:
-                S.scope[-1][i] = (lo, hi, (S.nodes.sid, pos, outs[id(ref)]))
-        S.run, S.outs, S.current = [], [], None
+            if isinstance(ref, _F):
+                S.scope[-1][i] = (lo, hi, _F([tuple((c, tuple(here(r) for r in rs)) for c, rs in t)
+                                              for t in ref.terms]))
+            else:
+                S.scope[-1][i] = (lo, hi, here(ref))
+        S.run, S.outs, S.current, S.writes = [], [], None, []
 
 
 _PROD = re.compile(r"(?P<var>\w+) from (?P<lo>.+?) to (?P<hi>.+?) if (?P<cond>.+?) \. "
@@ -765,6 +986,8 @@ class _Exp:
         self.n = 0
         self.rot = 0
         self.outs: dict = {}               # (body sid, node index) -> [outcome names]
+        self.records: dict = {}            # record address -> its bit, as guard parities
+        self.sources: dict = {}            # source slot -> its bit
         self.out: list = []
         self.data_ones = data_ones
 
@@ -833,6 +1056,52 @@ class _Exp:
             for k in rounds_of(node.rounds):
                 self.emit("se", [b, str(k)], None, guard)
         self.outs[(sid, pos)] = [o]
+        if node.band is not None:
+            base = env.get("rv_recbase", 0)
+            for a in range(base + node.band[0](env), base + node.band[1](env)):
+                self.records[a] = [((0, (o,)),)]
+
+    def resolve(self, ref, env) -> tuple:
+        """An outcome a template reads from outside it, as guard parities over names."""
+        if isinstance(ref, _Rec):
+            table = self.sources if ref.table == "src" else self.records
+            a = ref.idx(env) + (0 if ref.table == "src" else env.get("rv_recbase", 0))
+            if a not in table:
+                raise KeyError(f"{'source slot' if ref.table == 'src' else 'record'} {a} "
+                               f"({ref.idx.text}) is read before anything wrote it")
+            return table[a]
+        if isinstance(ref, _MXor):
+            fs = []
+            for v in range(ref.n(env)):
+                e = {**env, ref.var: v}
+                if self.reserved or ref.cond(e) > 0:
+                    fs.append(self.sources[ref.idx(e)])
+            return _sop_xor(*fs)
+        bsid, bpos, k = ref
+        return [((0, (self.outs[(bsid, bpos)][k],)),)]
+
+    def guard_of(self, text: str, vals: dict) -> list:
+        """A template's guard (or a write's value, terms `;` apart), its o<i> / e<i> replaced by
+        what they are here: an XOR of conjunctions over names."""
+        if ";" in text:
+            return _sop_xor(*[self.guard_of(t, vals) for t in text.split(";")])
+        text = text.strip()
+        if not text:
+            return []
+        out = [()]
+        for conj in text.split("&"):
+            fs = []
+            for t in conj.split("^"):
+                t = t.strip()
+                if t in ("0", "1"):
+                    fs.append([()] if t == "1" else [])
+                    continue
+                if t.startswith("!"):
+                    fs.append([()])
+                    t = t[1:]
+                fs.append(vals[t])
+            out = _sop_and(out, _sop_xor(*fs))
+        return out
 
     def seg(self, node: Seg, sid, pos, env, guard):
         t = self.prog.templates[node.tid]
@@ -840,13 +1109,24 @@ class _Exp:
         locs = {f"l{i}": (fam, idx) for i, (fam, idx) in enumerate(node.locals)}
         outs = [self.fresh() for _ in range(t.n_out)]
         names.update({f"o{i}": o for i, o in enumerate(outs)})
-        for i, (bsid, bpos, k) in enumerate(node.ext):
-            names[f"e{i}"] = self.outs[(bsid, bpos)][k]
+        vals = {f"o{i}": [((0, (o,)),)] for i, o in enumerate(outs)}
+        for i, ref in enumerate(node.ext):
+            vals[f"e{i}"] = self.resolve(ref, env)
         for line in t.lines:
-            g = list(guard)
+            if line.startswith("bit "):
+                # the archive's bit: what its o<i> / e<i> are here, multiplied out over names
+                text, o = line[4:].split("->")
+                f = []
+                for term in parse_bit(text):
+                    f = _sop_xor(f, _sop_and(*[_sop_not(vals[n]) if neg else vals[n] for neg, n in term]))
+                name = names[o.strip()]
+                vals[o.strip()] = [((0, (name,)),)]
+                self.emit("bit", [_bit_text(f, str)], name, ())
+                continue
+            terms = [()]
             if line.startswith("if "):
                 cond, line = line[3:].split(": ", 1)
-                g += [names[c.strip()] for c in cond.split("&")]
+                terms = self.guard_of(cond, vals)
             w = line.split()
             word = w[0]
             if word in ("prep", "inject") and w[1] in locs:
@@ -857,8 +1137,21 @@ class _Exp:
             if "->" in w:
                 out = names[w[-1]]
                 args = args[:-1]
-            self.emit(word, args, out, tuple(g))
+            if len(terms) != 1 and word not in ("x", "y", "z"):
+                raise ValueError(f"'{line}' under a guard of {len(terms)} terms")
+            for term in terms:                       # (a frame: once per term)
+                self.emit(word, args, out, tuple(guard) + tuple(_guard_text(p) for p in term))
         self.outs[(sid, pos)] = outs
+        base = env.get("rv_recbase", 0)
+        for k, band in enumerate(node.bands):
+            if band is not None:
+                for a in range(base + band[0](env), base + band[1](env)):
+                    self.records[a] = [((0, (outs[k],)),)]
+        for table, lo, hi, text in node.writes:
+            val = self.guard_of(text, vals)
+            off = base if table == "rec" else 0
+            for a in range(off + lo(env), off + hi(env)):
+                (self.records if table == "rec" else self.sources)[a] = val
 
     def rotation(self, fs, k, sign, guard):
         """qec2alg._Interp.rotation, instruction for instruction."""
@@ -888,6 +1181,14 @@ class _Exp:
         self.emit("decode", [a], None, guard)
         frame(guard + (r_,))
         self.rotation(fs, k - 1, sign, guard + (s_,))
+
+
+def _guard_text(p) -> str:
+    """One guard parity as the `.alg` writes it: a name, `!name`, or `a ^ b ^ 1`."""
+    c, ns = p
+    if len(ns) == 1:
+        return ("!" if c else "") + ns[0]
+    return " ^ ".join(list(ns) + (["1"] if c else [])) or ("1" if c else "0")
 
 
 def expand(prog: Program, data_ones=(), reserved: bool = False) -> list:
@@ -961,7 +1262,7 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, 
 
     def node_ns(node, env) -> int:
         if isinstance(node, Seg):
-            return span_ns[node.tid]
+            return span_ns[node.tid] if prog.templates[node.tid].lines else 0
         if isinstance(node, Pred):
             return body_ns(node.body, env)                 # a slot: reserved either way
         if isinstance(node, Let):

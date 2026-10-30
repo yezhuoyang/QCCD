@@ -163,7 +163,9 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     away = sorted(g for g in home if loc.get(g) != home[g])
     if away:
         g2.append(f"{len(away)} resident ion(s) end away from home (e.g. ion {away[0]})")
-    strays = sorted(g for g in initial if loc.get(g) != initial[g])
+    # (a block passed in that the gate read out ends dumped, at a depot: a readout's ions do)
+    strays = sorted(g for g in initial if loc.get(g) != initial[g]
+                    and not (loc.get(g) is not None and masters[loc[g]].family == "depot"))
     if strays:
         g2.append(f"{len(strays)} ion(s) of a block passed in end away from its home "
                   f"(e.g. ion {strays[0]} at {loc.get(strays[0])}, not {initial[strays[0]]})")

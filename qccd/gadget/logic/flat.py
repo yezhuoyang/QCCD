@@ -175,6 +175,14 @@ def sign_off(alg: Algorithm, gir: dict, lib, leaves, *, distance: bool = True) -
                             f"frames as parities and cannot follow a product of bits, so this "
                             f"program is checked compositionally instead"),
                 "circuit": {"qubits": 0, "ops": {}, "records": 0}}
+    prod = next((i for i in alg.instructions if i.kind == "bit" and any(len(t) > 1 for t in i.formula)), None)
+    if prod is not None:
+        return {"kind": "flat", "passed": None, "relations": [], "flows": [], "why": [],
+                "skipped": (f"the archive computes {prod.cvar} as a product of outcomes (line "
+                            f"{prod.line}); the flat sign-off folds outcomes as parities and "
+                            f"cannot follow a product, so this program is checked "
+                            f"compositionally instead"),
+                "circuit": {"qubits": 0, "ops": {}, "records": 0}}
     branches = alg.branches()
     if len(branches) > MAX_BRANCHES:
         return {"kind": "flat", "passed": None, "relations": [], "flows": [], "why": [],

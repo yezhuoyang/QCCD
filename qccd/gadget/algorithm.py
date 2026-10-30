@@ -21,6 +21,8 @@ one d = 3 surface-code logical qubit.
                                  (T†|+̄⟩: the factory's own verified output)
     s     q0                   logical S̄ by consuming a |Ȳ⟩ block             -> injection + bridge + post
     sx    q0                   logical √X̄ the same way, by X̄X̄ surgery        -> injection + bridge + post
+    bit   (a & !b) ^ c -> f    a bit the archive computes from outcomes: an XOR of conjunctions
+                                 (a guard may read f like a measured outcome)  -> the archive
     x     q0                   a logical Pauli, kept in software              -> the archive
     z     q0                     (also `y`); no ion is touched
     store q0                   rest the block in a logical zone
@@ -102,7 +104,7 @@ from pathlib import Path
 
 from .logic.circuit import Circuit
 
-__all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_OF",
+__all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_OF", "parse_bit", "bit_value",
            "parse_condition", "parse_guard", "Guard", "Gate", "SOFTWARE", "CLASSICAL",
            "UNGUARDABLE", "GATES_DIR", "CONTRACT_ARITY", "ROTATION_N", "rotation_basis"]
 
@@ -111,7 +113,7 @@ CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "
                "ppm": "ppm",
                "read": "readout", "inject": "injection", "autoccz": "cczfactory", "store": "zone",
                "s": "injection",
-               "sx": "injection", "x": "archive", "y": "archive", "z": "archive",
+               "sx": "injection", "x": "archive", "y": "archive", "z": "archive", "bit": "archive",
                "decode": "decoder"}
 
 #: instructions that touch no ion at all: they are writes into the classical memory
@@ -120,11 +122,11 @@ SOFTWARE = ("x", "y", "z")
 #: instructions that run entirely in the classical half: no ion moves and no block is held
 #: at a door for them, so a block waiting for its next quantum instruction is not parked
 #: just because the decoder was called in between
-CLASSICAL = SOFTWARE + ("decode",)
+CLASSICAL = SOFTWARE + ("decode", "bit")
 
 #: what no guard can gate: it creates, rests, checks or decodes, so in a guarded call it runs
 #: either way
-UNGUARDABLE = ("prep", "inject", "autoccz", "se", "store", "decode")
+UNGUARDABLE = ("prep", "inject", "autoccz", "se", "store", "decode", "bit")
 
 #: where `include "NAME"` finds NAME.alg
 GATES_DIR = Path(__file__).resolve().parent / "gates"
@@ -135,7 +137,53 @@ CONTRACT_ARITY = {"I": 1, "X": 1, "Y": 1, "Z": 1, "H": 1, "S": 1, "Sdg": 1, "SX"
                   "CSWAP": 3}
 
 PRIMITIVES = ("prep", "inject", "autoccz", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz",
-              "xx", "ppm", "decode", "read")
+              "xx", "ppm", "decode", "read", "bit")
+
+
+def parse_bit(text: str) -> tuple:
+    """`(a & !b) ^ c ^ 1`: an XOR of conjunctions of outcome names (`!` negates one), `1`
+    the conjunction of none.  Returns the terms, each a tuple of (negated, name)."""
+    terms = []
+    for part in _split_xor(text):
+        part = part.strip()
+        while part.startswith("(") and part.endswith(")"):
+            part = part[1:-1].strip()
+        if part in ("1", ""):
+            if part == "":
+                raise ValueError("an empty term")
+            terms.append(())
+            continue
+        lits = []
+        for lit in part.split("&"):
+            lit = lit.strip()
+            neg = lit.startswith("!")
+            name = lit[1:].strip() if neg else lit
+            if not re.fullmatch(r"[A-Za-z_]\w*", name):
+                raise ValueError(f"{lit!r} is not an outcome name")
+            lits.append((neg, name))
+        terms.append(tuple(lits))
+    return tuple(terms)
+
+
+def _split_xor(text: str) -> list:
+    out, depth, cur = [], 0, ""
+    for ch in text:
+        depth += ch == "("
+        depth -= ch == ")"
+        if ch == "^" and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return out + [cur]
+
+
+def bit_value(terms: tuple, outcomes: dict) -> int:
+    """The bit, given a value for every outcome it reads."""
+    v = 0
+    for t in terms:
+        v ^= int(all((outcomes[n] & 1) ^ neg for neg, n in t))
+    return v
 
 #: the most blocks one Pauli-product bench measures (its four doors); a product over more
 #: blocks is measured by a cat chain across cat benches (`qccd.gadget.leaves.catbench`)
@@ -243,6 +291,8 @@ class Instr:
     src_origin: str = ""
     #: `kind == "call"` only (a folded program, `qccd.gadget.fold`): the gate called
     gate: str | None = None
+    #: `bit` only: its terms (`parse_bit`)
+    formula: tuple = ()
 
     def runs(self, branch: dict[str, int]) -> bool:
         """Does this instruction run, given a value for every guard outcome?"""
@@ -657,6 +707,9 @@ class _Parser:
             elif word == "ppm":
                 # letters stay letters: rename only the blocks (every second argument)
                 nargs = [a if i % 2 == 0 else ren(a) for i, a in enumerate(nargs)]
+            elif word == "bit":
+                # the outcome names inside the formula
+                nargs = [re.sub(r"[A-Za-z_]\w*", lambda mm: ren(mm[0]), " ".join(nargs))]
             else:
                 nargs = [ren(a) for a in nargs]
             combined = (guard & inner) if guard is not None else inner
@@ -777,6 +830,17 @@ class _Parser:
             # a block that has been read out may still be decoded: that is when its last
             # window, the readout's own, becomes a result
             ins.blocks = list(args)
+        elif word == "bit":
+            if not cvar:
+                raise AlgorithmError(lineno, raw, "write: bit (a & !b) ^ c -> f")
+            try:
+                ins.formula = parse_bit(" ".join(args))
+            except ValueError as exc:
+                raise AlgorithmError(lineno, raw, str(exc)) from None
+            unknown = [n for t in ins.formula for _, n in t if n not in self.cvars]
+            if unknown:
+                raise AlgorithmError(lineno, raw, f"the bit reads {unknown[0]}, which no earlier "
+                                     f"instruction measured")
         elif word == "read":
             need(2)
             if args[1].upper() not in ("Z", "X"):

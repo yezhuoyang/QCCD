@@ -205,6 +205,8 @@ class Macro:
     fresh: int                             # ions it loads, its calls' included
     instructions: int                      # instructions it runs, its calls' included
     own: int                               # instructions of its own body
+    #: per block: the gate read it out (a destructive readout) -- it does not come back
+    gone: list = field(default_factory=list)
 
 
 @dataclass
@@ -498,6 +500,16 @@ class MacroCity(City):
             h = homes[i]
             self.block_free[b] = max(self.block_free.get(b, 0.0), t0 + m.free[i])
             self.mem_last[h] = max(self.mem_last.get(h, 0.0), t0 + m.mem_last[i])
+            if m.gone and m.gone[i]:
+                # read out inside: the block is no more, and its home is empty again
+                for d in (self.blocks, self.pf, self.rest_since, self.home_of):
+                    d.pop(b, None)
+                if self.zone_holder.get(h) == b:
+                    self.zone_holder[h] = None
+                if b in self.block_info:
+                    # (read inside the call: its own view follows its ions to the depot)
+                    self.block_info[b]["read_in"] = inst
+                continue
             if self.family(h) == "memory":
                 self.rest_since[b] = t0 + m.mem_last[i]
             ax, az = m.out_pf[i]
@@ -622,8 +634,9 @@ class MacroCity(City):
                      calls=self.calls, footprint=fp, span=span,
                      free=[self.block_free.get(b, 0.0) for b in self.params],
                      mem_last=[self.mem_last.get(h, 0.0) for h in homes],
-                     out_pf=[self.pf[b] for b in self.params],
+                     out_pf=[self.pf.get(b) for b in self.params],
                      guarded=[bool(self.pf_guarded.get(b)) for b in self.params],
+                     gone=[b not in self.blocks for b in self.params],
                      fresh=self.next_gid - self.n_residents, instructions=self.n_instr, own=own)
 
 
