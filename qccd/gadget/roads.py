@@ -123,22 +123,29 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
         at = {tp.pos[i]: i for i in ions if tp.pos[i] in rail}
         head = at.get(rail[-1])
         did = None
+        blocked = []                          # the ends of the windows that held an action back
         # 1. deliver the head onto the far stub, unless the far side is driving it
         if head is not None:
             k = int(head[1:])
-            if _busy(far_busy, t, t + d_out) is None:
+            b = _busy(far_busy, t, t + d_out)
+            if b is None:
                 tp.move("port_out", [(head, "XE")], op="deliver")
                 did = ("port_out", d_out)
                 arrived[k] = t + d_out
+            else:
+                blocked.append(b)
         # 2. else load the next ion as soon as it is on the near stub and the near side is
         #    still: a load holds the rail for one cycle, a shift-first policy would hold the
         #    whole bundle behind the first ion until it left the road
         if did is None and nxt < n and deps[nxt] <= t + 1e-9 and rail[0] not in at:
-            if _busy(near_busy, t, t + d_in) is None:
+            b = _busy(near_busy, t, t + d_in)
+            if b is None:
                 tp.move("port_in", [(ions[nxt], rail[0])], op="load")
                 did = ("port_in", d_in)
                 loaded[nxt] = t
                 nxt += 1
+            else:
+                blocked.append(b)
         # 3. else shift every ion that can advance, the blocked ones holding
         if did is None:
             moves, free = [], set(rail) - set(at)
@@ -161,8 +168,12 @@ def compile_carry(length: int, deps: list, takes: list, *, near_busy=(), far_bus
                         t += d_shift
                 did = ("conveyor", d_shift)
         if did is None:
-            # nothing can run now: wait for the next thing that frees something
+            # nothing can run now: wait for the next thing that frees something -- the end of a
+            # window that held a delivery or a load back too (one that starts within the action,
+            # not only one already running: waiting for the next departure instead held an ion
+            # at the road's head for hundreds of microseconds, and H1 called it late)
             later = [x for x in ([deps[nxt]] if nxt < n else []) if x > t + 1e-9]
+            later += [b for b in blocked if b > t + 1e-9]
             later += [b for a, b in list(near_busy) + list(far_busy) if b > t + 1e-9 and a <= t + 1e-9]
             if not later:
                 later = [b for a, b in list(near_busy) + list(far_busy) if b > t + 1e-9]

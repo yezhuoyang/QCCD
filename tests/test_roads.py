@@ -71,6 +71,21 @@ def test_a_doors_stub_is_driven_by_one_side_at_a_time():
     assert late.late == [0] and "after the far side takes it" in late.violations[0]
 
 
+def test_a_held_delivery_waits_for_the_window_that_held_it_not_for_the_next_departure():
+    """A door-aware memory releases its ions unevenly and a junction takes them back to back
+    (Gidney's adder, folded, 2026-10-30).  Ion 7 reaches the road's head just as the far side
+    starts taking another ion off its stub: it is delivered when that 5 µs window ends -- it
+    waited for ion 8's departure, 400 µs on, and H1 called it late."""
+    from qccd.gadget.roads import compile_carry
+    deps = [0.0, 550.0, 1000.0, 1350.0, 1900.0, 2750.0, 3205.0, 3660.0, 4115.0]
+    takes = [3169.9 + 135.0 * k for k in range(9)]
+    far = [(t, t + 5.0) for t in takes]
+    near = [(d - 5.0, d) for d in deps]
+    run = compile_carry(9, deps, takes, near_busy=near, far_busy=far, verify_rules=False)
+    assert run.violations == [], run.violations
+    assert run.arrived[7] < 3800.0, run.arrived
+
+
 def test_every_carry_of_a_schedule_is_a_road_program_that_obeys_the_rules(town):
     import copy
     from qccd.gadget.judge import judge_schedule
