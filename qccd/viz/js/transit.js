@@ -48,6 +48,20 @@
 //      what it physically is: the two ions passing on opposite sides of the axis and
 //      arriving in each other's slot.
 //
+//   5. A C2LR STEP IS ITS OWN PICTURE (docs/c2lr.md).  On a swap-or-stay lattice one shared
+//      waveform plays at every junction, and `step.c2lr` says so.  Two crystals that swap
+//      exchange THROUGH their pair's junction, leg -> junction -> partner leg at once, and
+//      the bar-crossing detour above cannot draw that: they meet on the junction, where
+//      there is no bar to step across.  So each takes its own side of the junction -- the
+//      naturally-first one cuts the inside of the corner its pair turns, the other goes
+//      round the outside -- by an offset that is greatest on the junction and nothing at
+//      either leg centre.  Every crystal that keeps its leg is drawn shifting by the C2LR
+//      shift, toward or away from its junction (`step.c2lr.shift`), and back: 1/6 of the
+//      leg (62.5 of 375 um, arXiv:2403.00756 p4), which is a third of the way from the
+//      leg's centre to the junction.  An enter and an exit need nothing new: they are an
+//      arrival and a departure, and the slot order already puts the entering crystal in
+//      the well at the end it came in by.
+//
 // Nothing here knows about frames, instructions, SVG or canvas.  A `step` is four plain
 // objects -- where everything was, where everything ends up, the node path of each ion that
 // moves, and the two slot orders -- and `place` answers with a position per ion.
@@ -68,6 +82,38 @@
     for (var id in ord) {
       var L = ord[id], r = out[id] = {};
       for (var i = 0; i < L.length; i++) r[L[i]] = i;
+    }
+    return out;
+  }
+
+  // The C2LR shift as a fraction of the leg-centre-to-junction distance: 1/6 of the leg.
+  var C2LR_SHIFT = 1 / 3;
+
+  // THE JUNCTION EXCHANGES OF A C2LR STEP: two movers whose walks are A -> J -> B and
+  // B -> J -> A.  `{ion: {partner, side, n}}`: the naturally-first of a pair takes `side`
+  // +1, toward the inside of the corner (`n`, the bisector of J's two arms), the other -1.
+  function _c2lrExchanges(self, step) {
+    var out = {};
+    if (!step.c2lr) return out;
+    var paths = step.paths || {}, by = {}, ion;
+    for (ion in paths) {
+      var q = paths[ion];
+      if (q && q.length === 3) by[q[0] + "\u0000" + q[1] + "\u0000" + q[2]] = ion;
+    }
+    for (ion in paths) {
+      var w = paths[ion];
+      if (!w || w.length !== 3) continue;
+      var other = by[w[2] + "\u0000" + w[1] + "\u0000" + w[0]];
+      if (other === undefined || other === ion) continue;
+      var pa = self.pos(w[0]), pj = self.pos(w[1]), pb = self.pos(w[2]);
+      if (!pa || !pj || !pb) continue;
+      var la = Math.hypot(pa[0] - pj[0], pa[1] - pj[1]), lb = Math.hypot(pb[0] - pj[0], pb[1] - pj[1]);
+      if (!(la > 1e-12) || !(lb > 1e-12)) continue;
+      var ux = (pa[0] - pj[0]) / la + (pb[0] - pj[0]) / lb, uy = (pa[1] - pj[1]) / la + (pb[1] - pj[1]) / lb;
+      var ul = Math.hypot(ux, uy);
+      // two arms in line have no inside: the normal of the first one stands in
+      var n = ul > 1e-9 ? [ux / ul, uy / ul] : [-(pa[1] - pj[1]) / la, (pa[0] - pj[0]) / la];
+      out[ion] = { partner: other, side: naturalCmp(ion, other) < 0 ? 1 : -1, n: n };
     }
     return out;
   }
@@ -418,8 +464,11 @@
     // O(k^2) per mover -- 5,000 operations per ion in a trap of capacity 72, 144 movers,
     // and the single most expensive thing this file did.
     var rank = ranks || { start: _rankOf(ordStart), end: _rankOf(ordEnd) };
+    // a C2LR junction exchange is drawn by its own rule (part 5), not as a pass
+    var xc = _c2lrExchanges(self, step);
 
     function add(a, b, kind, at) {
+      if (xc[a] && xc[a].partner === b) return;
       var swap = naturalCmp(a, b) > 0;
       var lo = swap ? b : a, hi = swap ? a : b;
       var k = lo + "\u0000" + hi;
@@ -635,7 +684,7 @@
       (this._prepCache = (typeof WeakMap === "function") ? new WeakMap() : null);
     var m = cache ? (step.pos && cache.get(step.pos)) : this._memo;
     if (m && m.before === step.before && m.pos === step.pos && m.paths === step.paths &&
-        m.ordStart === step.ordStart && m.ordEnd === step.ordEnd) return m;
+        m.ordStart === step.ordStart && m.ordEnd === step.ordEnd && m.c2lr === step.c2lr) return m;
     var self = this;
     var pos = step.pos || {}, paths = step.paths || {};
     var ordStart = step.ordStart || {}, ordEnd = step.ordEnd || {};
@@ -703,7 +752,8 @@
 
     var rec = {
       before: step.before, pos: step.pos, paths: step.paths,
-      ordStart: step.ordStart, ordEnd: step.ordEnd,
+      ordStart: step.ordStart, ordEnd: step.ordEnd, c2lr: step.c2lr,
+      xc: _c2lrExchanges(self, step),
       srcOf: srcOf, dstOf: dstOf, occS: occS, occ: occ, A: A, B: B,
       pass: self.passes(step, { start: rS, end: rE }),
     };
@@ -831,6 +881,30 @@
                      fly: false, u: u1,
                      s0x: pa1[0] + A1.ox, s0y: pa1[1] + A1.oy,
                      s1x: pb1[0] + B1.ox, s1y: pb1[1] + B1.oy };
+      }
+    }
+    // PART 5: on a C2LR step, a pair exchanging through a junction takes its own sides of
+    // it, and a crystal keeping its leg makes its shift and comes back.  Both are zero at
+    // t = 0 and t = 1, so a frame boundary is exact; `rest` pins everyone as it always did.
+    if (step.c2lr && !rest) {
+      var r5 = 0.31 * bow0, sh = step.c2lr.shift || {};
+      for (var i5 in base) {
+        var b5 = base[i5], x5 = P.xc[i5];
+        if (b5.fly && x5) {
+          var w5 = paths[i5], H5 = self.hopLengths(w5), d5 = H5.total * t, g0 = H5.segs[0];
+          var off = d5 <= g0 ? (g0 > 1e-12 ? (g0 - d5) / g0 : 0)
+                             : (H5.segs[1] > 1e-12 ? (d5 - g0) / H5.segs[1] : 0);
+          if (off > 1) off = 1;
+          var k5 = x5.side * r5 * (1 - off * off);
+          b5.x += k5 * x5.n[0]; b5.y += k5 * x5.n[1];
+        } else if (!b5.fly && sh[i5]) {
+          var pn = self.pos(P.A[i5].node), pj5 = self.pos(sh[i5][0]);
+          var bump = Math.max(0, Math.min(1, 3 * t, 3 * (1 - t)));
+          if (pn && pj5 && bump > 0) {
+            var f5 = sh[i5][1] * C2LR_SHIFT * bump;
+            b5.x += f5 * (pj5[0] - pn[0]); b5.y += f5 * (pj5[1] - pn[1]);
+          }
+        }
       }
     }
     return base;
@@ -1034,7 +1108,8 @@
 
     for (var ion2 in base) {
       var me = base[ion2], A = P.A[ion2], B = P.B[ion2];
-      var mates = partners[ion2], up = lift[ion2];
+      var mates = partners[ion2], up = lift[ion2], xch = P.xc[ion2];
+      if (xch) mates = (mates || []).concat([xch.partner]);
       var bx = up ? up[0] : 0, by = up ? up[1] : 0, room = 0;
       // A MARK IS NEVER WIDER THAN HALF THE SPACE IT IS IN, and the space is measured
       // against every ion around it rather than only the ones `passes` calls partners,

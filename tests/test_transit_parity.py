@@ -15,6 +15,7 @@ sent round.  A change to one that is not made to the other fails here.
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,12 @@ BOW = 0.5
 
 def _line(n, spacing=1.0):
     return {f"N{i}": [i * spacing, 0.0] for i in range(n)}
+
+
+#: One C2LR junction and its legs, a leg at the centre of every wire (y grows down: N is up)
+_C2LR_CELL = {"J": [0.0, 0.0], "W": [-0.5, 0.0], "E": [0.5, 0.0], "N": [0.0, -0.5],
+              "S": [0.0, 0.5], "J2": [1.0, 0.0], "J1": [0.0, -1.0]}
+_C2LR_AXIS = {"W": [1.0, 0.0], "E": [1.0, 0.0], "N": [0.0, 1.0], "S": [0.0, 1.0]}
 
 
 #: One entry per shape of conflict the law has an opinion about.  They are deliberately
@@ -207,6 +214,42 @@ SCENARIOS: dict[str, dict] = {
         "steps": [{"before": {"a": "N0", "b": "N1"}, "pos": {"a": "N1", "b": "N0"},
                    "paths": {"a": ["N0", "N1"], "b": ["N1", "N0"]}}],
     },
+    # C2LR (docs/c2lr.md): one junction J with its four legs, and the junction east of it.
+    # Under W-S, W and S exchange THROUGH J -- each on its own side of it -- while E, whose
+    # pair is at J2, shifts away from J2 (toward J) and back, and N shifts toward J1 above
+    # it, where its bit was set but it had no partner
+    "c2lr_swap": {
+        "nodes": _C2LR_CELL,
+        "axis": _C2LR_AXIS, "span": 0.2, "across": 0.08, "rail": 0.02,
+        "steps": [{"before": {"a": "W", "b": "S", "c": "E", "d": "N"},
+                   "pos": {"a": "S", "b": "W", "c": "E", "d": "N"},
+                   "paths": {"a": ["W", "J", "S"], "b": ["S", "J", "W"]},
+                   "c2lr": {"kind": "swap_or_stay", "diagonal": "WS",
+                            "toward": ["a", "b", "d"],
+                            "shift": {"c": ["J2", -1], "d": ["J1", 1]}}}],
+    },
+    # an enter -- `a` joins `b` in S, the two side by side in two wells -- and its exit
+    "c2lr_enter_exit": {
+        "nodes": _C2LR_CELL,
+        "axis": _C2LR_AXIS, "span": 0.2, "across": 0.08, "rail": 0.02, "pitch": 0.15,
+        "steps": [{"before": {}, "pos": {"a": "W", "b": "S"}},
+                  {"before": {"a": "W", "b": "S"}, "pos": {"a": "S", "b": "S"},
+                   "paths": {"a": ["W", "J", "S"]},
+                   "c2lr": {"kind": "swap_or_stay", "diagonal": "WS", "toward": ["a"],
+                            "shift": {}}},
+                  {"before": {"a": "S", "b": "S"}, "pos": {"a": "W", "b": "S"},
+                   "paths": {"a": ["S", "J", "W"]},
+                   "c2lr": {"kind": "swap_or_stay", "diagonal": "WS", "toward": ["a"],
+                            "shift": {}}}],
+    },
+    # the E-N diagonal, so the inside of the corner points the other way
+    "c2lr_swap_en": {
+        "nodes": _C2LR_CELL, "axis": _C2LR_AXIS,
+        "steps": [{"before": {"a": "E", "b": "N"}, "pos": {"a": "N", "b": "E"},
+                   "paths": {"a": ["E", "J", "N"], "b": ["N", "J", "E"]},
+                   "c2lr": {"kind": "swap_or_stay", "diagonal": "EN", "toward": ["a", "b"],
+                            "shift": {}}}],
+    },
     # a vertical rail, so the axis is not the default
     "vertical": {
         "nodes": {"N0": [0.0, 0.0], "N1": [0.0, 1.0]},
@@ -239,7 +282,8 @@ def _python(scn: dict) -> dict:
         across=lambda _nid: scn.get("across", 0.0),
         rail=scn.get("rail", 0.0),
     ))
-    steps = [Step(before=s["before"], pos=s["pos"], paths=s.get("paths") or {})
+    steps = [Step(before=s["before"], pos=s["pos"], paths=s.get("paths") or {},
+                  c2lr=s.get("c2lr"))
              for s in scn["steps"]]
     order = scn.get("orders") or T.slot_order(steps)
     frames = []
@@ -301,3 +345,30 @@ def test_the_two_implementations_agree_about_who_must_pass_whom(name, tmp_path):
             f"{name} step {a['step']}: python found {a['passes']}, "
             f"javascript found {b['passes']}")
         assert a["side"] == b["side"], f"{name} step {a['step']}: sides differ"
+
+
+def test_a_c2lr_swap_passes_its_junction_on_two_sides_and_a_stayer_shifts_and_returns():
+    """What the C2LR picture says, measured on the Python twin (the JS one is held to it
+    above): the two crystals of a swap are never closer than the clearance two marks need,
+    least of all on the junction they exchange through; each lands exactly in the other's
+    leg; a stayer goes a third of the way to its junction (1/6 of the leg) and back, the
+    one whose bit was set toward it and the one shifted away alike."""
+    scn = SCENARIOS["c2lr_swap"]
+    nodes = {k: tuple(v) for k, v in scn["nodes"].items()}
+    T = Transit(Geometry(pos=nodes.get, bow=BOW))
+    s = scn["steps"][0]
+    st = Step(before=s["before"], pos=s["pos"], paths=s["paths"], c2lr=s["c2lr"])
+    closest, peak = 1e9, {"c": 0.0, "d": 0.0}
+    for k in range(201):
+        p = T.place(st, k / 200, {}, {})
+        closest = min(closest, math.dist((p["a"].x, p["a"].y), (p["b"].x, p["b"].y)))
+        peak["c"] = max(peak["c"], nodes["E"][0] - p["c"].x)      # toward J, its far end
+        peak["d"] = max(peak["d"], nodes["N"][1] - p["d"].y)      # toward J1, above it
+    assert closest >= 0.62 * BOW - 1e-9, closest
+    end = T.place(st, 1.0, {}, {})
+    assert (end["a"].x, end["a"].y) == nodes["S"] and (end["b"].x, end["b"].y) == nodes["W"]
+    assert (end["c"].x, end["c"].y) == nodes["E"]
+    assert peak["c"] == pytest.approx(0.5 / 3) and peak["d"] == pytest.approx(0.5 / 3)
+    # the inside of the W-S corner is south-west of J: the naturally-first crystal cuts it
+    mid = T.place(st, 0.5, {}, {})
+    assert mid["a"].x < 0 < mid["a"].y and mid["b"].x > 0 > mid["b"].y

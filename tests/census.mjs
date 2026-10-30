@@ -34,6 +34,9 @@ export function scan(probe, nframes, { maxFrames = Infinity, sub = 8,
   const N = Math.min(nframes, maxFrames);
   let probed = 0, overlapFrames = 0, worstOverlap = 0, worstPair = null;
   let worstSnap = 0, snapAt = null, probeErr = null;
+  // the smallest mark drawn: an overlap test passes a pair squeezed to specks, so a
+  // picture that keeps two ions apart by SHRINKING them needs this to be seen
+  let smallest = Infinity, smallestAt = null;
   let endOfPrev = null;
   // the three counters the stale-programme freeze is asserted on
   let ionsWhileInvalid = 0, ionsVisibleMax = 0, phantomIons = 0, phantomExample = null;
@@ -61,6 +64,9 @@ export function scan(probe, nframes, { maxFrames = Infinity, sub = 8,
         }
       }
 
+      for (const p of pts) {
+        if (isFinite(p[3]) && p[3] < smallest) { smallest = p[3]; smallestAt = { frame: f, phase: ph, ion: p[0] }; }
+      }
       let bad = false;
       for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
@@ -110,6 +116,8 @@ export function scan(probe, nframes, { maxFrames = Infinity, sub = 8,
     phantom_ions: phantomIons,
     phantom_example: phantomExample,
     probe_error: probeErr,
+    smallest_mark_px: isFinite(smallest) ? +smallest.toFixed(3) : null,
+    smallest_mark_at: smallestAt,
   };
 }
 

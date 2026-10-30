@@ -145,6 +145,51 @@ def test_two_ions_leaving_one_trap_do_not_pass_through_each_other(tmp_path):
         f"worst {r['worst_overlap_px']} px -- {r['worst_pair']}")
 
 
+@pytest.mark.parametrize("species", ["Ba-Sr", "Yb-Ba"])
+def test_a_c2lr_swap_or_stay_programme_draws_no_overlap_and_no_jump(tmp_path, species):
+    """C2LR (docs/c2lr.md): two crystals swapping through ONE junction at once, every other
+    crystal shifting toward or away from its junction and back, an enter leaving two
+    crystals in one leg's two wells, a gate there, and the exit.  The swap is the case the
+    bar-crossing detour cannot draw -- the pair meets on the junction, where there is no bar
+    to step across -- so `transit.js` gives each its own side of it; measured here on the
+    real page, with the hand-written tour and the `c2lr` builder on a larger lattice."""
+    m = Machine.c2lr_grid(3, 3, species=species)
+    p = m.program("c2lr", provenance="off")
+    p.init({"q0": "T0_1h", "q1": "T1_1v", "q2": "T0_0h", "q3": "T2_1v", "q4": "T0_0v",
+            "q5": "T1_1h"})
+    p.swap_or_stay("WS", ["q0", "q1"])           # a swap at J1_1, everyone else staying
+    p.swap_or_stay("WS", ["q0"])                 # q0 enters T0_1h, where q1 stayed
+    p.gate("MS", [["q0", "q1"]])                 # merge, MS, split in one leg
+    p.swap_or_stay("WS", ["q0"])                 # and the exit, the way it came
+    p.swap_or_stay("WS", ["q2"])                 # a move into an empty leg
+    p.swap_or_stay("EN", ["q5", "q2"])           # a swap on another diagonal
+    p.cool()
+    for name, prog in (("tour", p), ("builder", build(Machine.c2lr_grid(5, 4).arch, "c2lr"))):
+        dest = tmp_path / f"c2lr_{name}.html"
+        mm = m if name == "tour" else Machine.c2lr_grid(5, 4)
+        mm.render(prog, dest, model=corrected_model())
+        r = census(dest)
+        assert r.get("probe_error") is None, r["probe_error"]
+        assert r["probed"] > 0 and r["program_stale"] is None, r
+        assert r["overlap_frames"] == 0, (
+            f"{name}: {r['overlap_pct']}% of frames overlap, worst {r['worst_overlap_px']} px "
+            f"-- {r['worst_pair']}")
+        assert r["worst_boundary_snap_px"] == 0, (name, r["snap_at"])
+        # NOT AN OVERLAP TEST ALONE: the bar-crossing detour keeps the pair apart too, by
+        # squeezing both marks to specks on the junction (measured: 1.3 px against a 9.4 px
+        # resting mark).  So the same page is drawn with the stage's C2LR mark withdrawn,
+        # and the swap drawn as a swap must keep its marks several times that size.
+        if name == "tour":
+            html = dest.read_text(encoding="utf-8")
+            anchor = "c2lr: f.c2lr || null});"
+            assert html.count(anchor) == 1, "the stage's C2LR hand-off moved; update this probe"
+            bare = tmp_path / "c2lr_unmarked.html"
+            bare.write_text(html.replace(anchor, "c2lr: null});"), encoding="utf-8")
+            squeezed = census(bare)["smallest_mark_px"]
+            assert r["smallest_mark_px"] > 3 * squeezed, (r["smallest_mark_px"], squeezed,
+                                                          r["smallest_mark_at"])
+
+
 def test_a_one_dimensional_trap_is_drawn_at_a_readable_scale(tmp_path):
     """The page the user opened. A degenerate y axis used to contribute the literal 1 to
     a min-over-pixels-per-unit, collapsing 12 traps onto 11 pixels."""

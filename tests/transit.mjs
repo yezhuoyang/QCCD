@@ -43,7 +43,7 @@ for (let k = 0; k < S.steps.length; k++) {
   const st = S.steps[k];
   for (let s = 0; s <= NS; s++) {
     const PL = T.place({
-      before: st.before, pos: st.pos, paths: st.paths || {},
+      before: st.before, pos: st.pos, paths: st.paths || {}, c2lr: st.c2lr || null,
       t: s / NS, rest: false,
       ordStart: k > 0 ? ord[k - 1] : {}, ordEnd: ord[k],
     });

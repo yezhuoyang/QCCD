@@ -30,6 +30,10 @@ __all__ = ["Geometry", "Placed", "Step", "Transit", "natural_key"]
 
 _NUM = re.compile(r"(\d+)")
 
+#: The C2LR shift as a fraction of the leg-centre-to-junction distance: 1/6 of the leg
+#: (62.5 of 375 um, arXiv:2403.00756 p4) -- see part 5 of the JS twin's header.
+C2LR_SHIFT = 1 / 3
+
 
 def natural_key(name: str) -> tuple:
     """'d10' after 'd2', not before it.
@@ -103,6 +107,9 @@ class Step:
     before: Mapping[str, str]           # ion -> node at the start
     pos: Mapping[str, str]              # ion -> node at the end
     paths: Mapping[str, Sequence[str]]  # ion -> node walk, movers only
+    #: a C2LR swap-or-stay step's `c2lr` frame field (`shift`: crystal -> [junction, +1
+    #: toward | -1 away]), or None -- see part 5 of the JS twin's header
+    c2lr: Mapping | None = None
 
 
 @dataclass
@@ -357,6 +364,35 @@ class Transit:
 
     # ------------------------------------------------- who has to get past whom
 
+    def _c2lr_exchanges(self, step: Step) -> dict[str, dict]:
+        """The junction exchanges of a C2LR step: two movers walking A -> J -> B and
+        B -> J -> A.  `{ion: {partner, side, n}}`, the naturally-first of a pair on side +1,
+        toward the inside of the corner its pair turns -- see the JS twin."""
+        out: dict[str, dict] = {}
+        if not step.c2lr:
+            return out
+        by = {tuple(q): ion for ion, q in step.paths.items() if q and len(q) == 3}
+        for ion, w in step.paths.items():
+            if not w or len(w) != 3:
+                continue
+            other = by.get((w[2], w[1], w[0]))
+            if other is None or other == ion:
+                continue
+            pa, pj, pb = self._pos(w[0]), self._pos(w[1]), self._pos(w[2])
+            if pa is None or pj is None or pb is None:
+                continue
+            la = math.hypot(pa[0] - pj[0], pa[1] - pj[1])
+            lb = math.hypot(pb[0] - pj[0], pb[1] - pj[1])
+            if not la > 1e-12 or not lb > 1e-12:
+                continue
+            ux = (pa[0] - pj[0]) / la + (pb[0] - pj[0]) / lb
+            uy = (pa[1] - pj[1]) / la + (pb[1] - pj[1]) / lb
+            ul = math.hypot(ux, uy)
+            n = ((ux / ul, uy / ul) if ul > 1e-9
+                 else (-(pa[1] - pj[1]) / la, (pa[0] - pj[0]) / la))
+            out[ion] = {"partner": other, "side": 1 if _cmp(ion, other) < 0 else -1, "n": n}
+        return out
+
     def passes(self, step: Step, ord_start, ord_end) -> dict:
         """Every unordered pair of ions that cannot both hold a straight line, the node
         they meet in, and the side of the axis each one goes round on.  Five kinds:
@@ -364,8 +400,12 @@ class Transit:
         each means, and for the two (the middle of a bar, and `cross`) that were missing."""
         pairs: list[tuple[str, str, str, str]] = []
         seen: dict[tuple[str, str], str] = {}
+        # a C2LR junction exchange is drawn by its own rule, not as a pass
+        xc = self._c2lr_exchanges(step)
 
         def add(a: str, b: str, kind: str, at: str) -> None:
+            if a in xc and xc[a]["partner"] == b:
+                return
             key = (a, b) if _cmp(a, b) <= 0 else (b, a)
             if key in seen:
                 return
@@ -523,6 +563,7 @@ class Transit:
 
         pas = self.passes(step, ord_start, ord_end)
         bow0 = float(self.geom.bow or 0.0)
+        xc = self._c2lr_exchanges(step)
 
         # ---- pass one: where everyone is before anybody gets out of anybody's way, as a
         # function of the instant, because the side a pair goes round is read off the whole
@@ -577,6 +618,30 @@ class Transit:
                     base[ion] = dict(x=x0 + (x1 - x0) * u, y=y0 + (y1 - y0) * u, fly=False,
                                      q=None, u=u, pa=pa, pb=pb, a=a_node, b=b_node,
                                      ax=a_axis, bx=b_axis, ends=((x0, y0), (x1, y1)))
+            # a C2LR step: a junction exchange takes its own sides of the junction, and a
+            # crystal keeping its leg makes its shift and comes back -- see the JS twin
+            if step.c2lr and not rest:
+                r5, sh = 0.31 * bow0, step.c2lr.get("shift") or {}
+                for ion, b5 in base.items():
+                    x5 = xc.get(ion)
+                    if b5["fly"] and x5:
+                        segs, total = self._hops(step.paths[ion])
+                        d5, g0 = total * t, segs[0]
+                        if d5 <= g0:
+                            off = (g0 - d5) / g0 if g0 > 1e-12 else 0.0
+                        else:
+                            off = (d5 - g0) / segs[1] if segs[1] > 1e-12 else 0.0
+                        off = min(off, 1.0)
+                        k5 = x5["side"] * r5 * (1 - off * off)
+                        b5["x"] += k5 * x5["n"][0]
+                        b5["y"] += k5 * x5["n"][1]
+                    elif not b5["fly"] and sh.get(ion):
+                        pn, pj = self._pos(b5["a"]), self._pos(sh[ion][0])
+                        bump = max(0.0, min(1.0, 3 * t, 3 * (1 - t)))
+                        if pn is not None and pj is not None and bump > 0:
+                            f5 = sh[ion][1] * C2LR_SHIFT * bump
+                            b5["x"] += f5 * (pj[0] - pn[0])
+                            b5["y"] += f5 * (pj[1] - pn[1])
             return base
 
         base = base_at(t)
@@ -702,7 +767,9 @@ class Transit:
 
         out: dict[str, Placed] = {}
         for ion, me in base.items():
-            mates = partners.get(ion) or []
+            mates = list(partners.get(ion) or [])
+            if ion in xc:
+                mates.append(xc[ion]["partner"])
             up = lift.get(ion)
             dx, dy = (up[0], up[1]) if up else (0.0, 0.0)
             room = 0.0
