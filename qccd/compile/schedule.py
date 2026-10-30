@@ -69,6 +69,9 @@ def resources_of(
             res.add(loop)
             # a rigid shift moves every ion on the loop, so it holds all of them
             ions.update({"*loop:" + loop})
+        elif instr.template and instr.template.get("kind") in ("swap_or_stay", "reorder_or_not"):
+            # a C2LR step's waveforms play on every leg (C9): every crystal, moving or not
+            ions.add("*all")
     elif instr.type == "gate":
         res.add(OPTICS)
         res.update(instr.sites)

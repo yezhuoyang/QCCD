@@ -246,7 +246,7 @@ def check_witnesses(cert: dict, prog: TSIR) -> list[str]:
     return problems
 
 
-def check_program_transport(cert: dict, prog: TSIR) -> list[str]:
+def check_program_transport(cert: dict, prog: TSIR, arch: Architecture | None = None) -> list[str]:
     """Does the programme move ions exactly as its certificate says?  The problems, empty if so.
 
     The proved checker replays the CERTIFICATE's moves, and the witnesses are checked against
@@ -261,16 +261,35 @@ def check_program_transport(cert: dict, prog: TSIR) -> list[str]:
     k slots takes k cycles and one cycle may hold several instructions, so it is not an
     instruction number.  Where an ion is when it gates is held to the programme by the rules
     (R6b, at the replayed position) and to the certificate by O1.
+
+    A C2LR template (`swap_or_stay`, docs/c2lr.md section 5) names no moves: its movers are
+    the device's matching applied to the crystals' positions, so it is expanded here with the
+    DEVICE (`arch`), by the replay's own expansion (`qccd.verify.c2lr.walk`).  The compiler
+    writes each mover as an ordinary move, leg to partner leg through one junction, and the
+    crystals that stay write nothing -- which is what the proved checker already reads.
     """
     got: dict[str, list] = {}
     got_rot: list = []
+    c2lr = {"swap_or_stay", "reorder_or_not"}
+    expanded: dict[int, tuple] = {}
+    if any((i.template or {}).get("kind") in c2lr for i in prog.instructions if i.type == "simd"):
+        if arch is None:
+            return ["the programme has C2LR swap-or-stay steps, whose moves are the device's "
+                    "matching: they can be compared with the certificate only given the device"]
+        from qccd.verify.c2lr import walk
+        try:
+            for ins, step, _ in walk(prog, arch):
+                if step is not None and step.template:
+                    expanded[ins.id] = step.participants
+        except ValueError as exc:
+            return [f"the programme's C2LR steps cannot be expanded on this device: {exc}"]
     for ins in prog.instructions:
         if ins.type != "simd":
             continue
         tpl = ins.template or {}
         if tpl.get("kind") == "loop_shift":
             got_rot.append((str(tpl.get("loop")), int(tpl.get("delta", 0))))
-        for q in ins.participants:
+        for q in expanded.get(ins.id, ins.participants):
             got.setdefault(str(q.ion), []).append((str(q.src), str(q.dst), tuple(q.via or ())))
     want: dict[str, list] = {}
     for m in sorted(cert.get("moves", []), key=lambda m: int(m["t"])):
@@ -1004,7 +1023,7 @@ def main(argv: list[str] | None = None) -> int:
     verdict["binding"] = "ok" if not binding else binding[:6]
 
     # the certificate's moves are the programme's own: what O1 proves of the one holds of the other
-    transport = check_program_transport(cert, prog)
+    transport = check_program_transport(cert, prog, arch)
     verdict["transport"] = "ok" if not transport else transport[:6]
     o1 = check_o1(cert, arch) + check_witnesses(cert, prog) + [f"programme vs certificate: {x}" for x in transport]
     o1_all = [f"certificate vs QASM: {b}" for b in binding] + o1

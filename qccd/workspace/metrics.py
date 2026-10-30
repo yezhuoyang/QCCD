@@ -57,10 +57,20 @@ def broadcast_use(arch: Architecture, prog: TSIR) -> dict:
     riders = sum(1 for s in (init.placement.values() if init else ()) if s in loop_nodes)
     ions_per: list = []
     ion_moves = 0
+    # a C2LR step names no participants: its movers are the device's matching (docs/c2lr.md)
+    c2lr_movers: dict[int, int] = {}
+    if any((i.template or {}).get("kind") in ("swap_or_stay", "reorder_or_not")
+           for i in prog.instructions):
+        from ..verify.c2lr import walk
+        c2lr_movers = {ins.id: len(step.movers) for ins, step, _ in walk(prog, arch)
+                       if step is not None and step.template}
     for ins in prog.instructions:
         if ins.type != "simd":
             continue
-        if ins.cls and ins.cls.startswith("rotate"):
+        if ins.id in c2lr_movers:
+            ion_moves += c2lr_movers[ins.id]
+            ions_per.append(c2lr_movers[ins.id])
+        elif ins.cls and ins.cls.startswith("rotate"):
             delta = abs(int((ins.template or {}).get("delta", 1)))
             ion_moves += riders * delta
             ions_per.append(riders)

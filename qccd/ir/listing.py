@@ -416,6 +416,14 @@ def _movement(instr: Instruction, arch) -> Movement:
                         direction="cw" if delta >= 0 else "ccw",
                         orbit=decl.get("orbit"), hops=abs(delta) * n_loop,
                         entails=entails)
+    if instr.template and instr.template.get("kind") in ("swap_or_stay", "reorder_or_not"):
+        # a C2LR step (docs/c2lr.md): the direction is its variation; who moves is the
+        # replay's to say, from the device's matching
+        tpl = instr.template
+        cb = tpl.get("checkerboard") or {}
+        label = (tpl.get("diagonal") or
+                 (f"checkerboard {cb.get('pairing')}@{cb.get('parity')}" if cb else "reorder"))
+        return Movement(kind="template", direction=str(label), hops=0)
     hops = sum(len(p.via) or 1 for p in instr.participants)
     return Movement(kind="explicit", direction=decl.get("direction"),
                     orbit=decl.get("orbit"), hops=hops, entails=entails)
@@ -443,6 +451,14 @@ def _detail(instr: Instruction, arch, mv: Movement, n_from_replay: int,
         return txt, len(instr.placement), ops, note
 
     if instr.type == "simd":
+        kind = (instr.template or {}).get("kind")
+        if kind in ("swap_or_stay", "reorder_or_not"):
+            named = list(instr.template.get("toward" if kind == "swap_or_stay" else "reverse", ()))
+            verb = "toward" if kind == "swap_or_stay" else "reverse"
+            shown = f"{kind.replace('_', '-')} {mv.direction}: {verb} " + (
+                ", ".join(named[:4]) + (f", +{len(named) - 4}" if len(named) > 4 else "")
+                if named else "none")
+            return shown, len(named), tuple(Operand(ion=i) for i in named), note
         if mv.kind == "template":
             n = n_from_replay
             who = f"x{n} ions" if n else f"all of {mv.loop}"
@@ -516,6 +532,11 @@ def _opoints(instr: Instruction, arch, model, mv: Movement, width: int):
         if not getattr(model, "models_time", False):
             return (OpPoint("hop", None, None, getattr(model, "name", None),
                             "unit hop, deck model", None, mv.hops or None),)
+        kind = (instr.template or {}).get("kind")
+        if kind in ("swap_or_stay", "reorder_or_not"):
+            # one primitive per step, not shuttles and crossings (docs/c2lr.md section 3)
+            p = from_scalar(str(kind))
+            return (p,) if p else ()
         p = from_curve("shuttle_segment", mv.hops or None)
         if p:
             out.append(p)

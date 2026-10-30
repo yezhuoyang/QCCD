@@ -277,6 +277,19 @@ def build_view_model(
     # ---- frames: one entry per instruction, template-compressed --------------
     frames = []
     truncated = False
+    # A C2LR step names no participants; drawn as the moves the replay's expansion gives it
+    # (`qccd.verify.c2lr.walk`).  TODO(c2lr phase 2): engine.js has no twin of the expansion
+    # or its price yet, so the page animates these moves but its own replay does not know
+    # the step -- see docs/c2lr.md section 8.
+    c2lr_moves: dict = {}
+    if any((i.template or {}).get("kind") in ("swap_or_stay", "reorder_or_not")
+           for i in prog.instructions):
+        from ..verify.c2lr import walk
+        try:
+            c2lr_moves = {ins.id: step.participants for ins, step, _ in walk(prog, arch)
+                          if step is not None and step.template}
+        except ValueError:
+            c2lr_moves = {}
     for instr in prog.instructions:
         if len(frames) >= max_frames:
             truncated = True
@@ -288,6 +301,10 @@ def build_view_model(
         elif instr.type == "simd":
             if instr.template and instr.template.get("kind") == "loop_shift":
                 f["shift"] = [str(instr.template["loop"]), int(instr.template["delta"])]
+            elif instr.id in c2lr_moves:
+                f["moves"] = [[p.ion, _node_path(arch, p)] for p in c2lr_moves[instr.id]]
+                f["entails"] = []
+                f["c2lr"] = str(instr.template.get("kind"))
             else:
                 f["moves"] = [
                     [p.ion, _node_path(arch, p)] for p in instr.participants
