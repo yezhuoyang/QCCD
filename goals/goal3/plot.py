@@ -95,7 +95,7 @@ def panel(ax, pts: dict, counts: dict, key: str, label: str, err: bool) -> None:
         c = counts[f]
         ok = len(pts.get(f, []))
         bad = c["tried"] - ok
-        ticks.append(f"{f}{'*' if f in CAVEATS else ''}\n{ok} of {c['tried']} sizes"
+        ticks.append(f"{f}{'*' if f in CAVEATS else ''}\n{ok}/{c['tried']} sizes"
                      + (f"\n{bad} failed" if bad else ""))
     ax.set_xticks(range(len(fams)))
     ax.set_xticklabels(ticks, fontsize=8, color=INK2)

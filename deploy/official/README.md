@@ -128,6 +128,21 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-10-30, `qccd-official:d89e184` (Goal 3; origin `fb83402`, the same change
+re-parented): `qccd-official:2ac7e33` plus three things from the commit, everything else
+unchanged. They are `qccd/official/service.py` (`GOALS["goal3"]`, `GET /v1/goals/goal3`: per fixed
+code, each public entry's architecture family read from its device, its time per round over both
+memories and its logical error rate per round; a release that names no `goal` stays in Goal 1),
+`qccd/workspace/tasks.py` (`build_release(goal=)`) and the six releases
+`goal3_{surface,color}{3,5,7}_mem@1` (goals/goal3/boards.py). Built ON THE DROPLET, COPY only
+(`/root/img_d89e184`; every file in the image equals `ctx.sha`); 70 layers, `2ac7e33`'s 67 plus
+three. No grader code changed, so no census; the rehearsal ran both images on a copy of the
+database (no network, volumes read-only): Goal 1's board and all 18 earlier boards identical, and
+a Goal 3 bundle (surface d=3 on grid 5x5) graded eligible with every stage passed (LER per round
+2.31e-4 on Linux, 2.19e-4 on Windows, the same seed: the platforms sample differently). Production
+smoke passed with that bundle, private, by a quota-1 uploader whose token was deleted. Rollback
+`*.bak-2ac7e33`.
+
 **Deployed** 2026-10-27 00:45 UTC, from commit `c0772fc` (pushed, also on `website/invitations`): the
 grader reads the evaluation texts -- the noisy circuit is written by the noise model's text
 (`qccd/evalset/library/qccd-noise@2.eval`), the metrics stage is `metrics.eval`, the device budget

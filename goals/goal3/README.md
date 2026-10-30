@@ -111,17 +111,20 @@ The site page draws the same points live, with the official entries on each code
   computed from the geometry, not from the wiring block. Nothing enforces WISE's single
   broadcast class beyond rule R4. The difference has to come from Ke's broadcast rules, plus a
   scheduler that uses them.
-- **A compiler fault on the largest grids.** surface7's Z memory on 11x11, 12x11 and 12x12 (all
-  three lattice families) compiled with the pinned qccdc b4a003dbb4ae into a program that breaks
-  R1: a trap holds 3 ions against a capacity of 2, six times. A rule-breaking program from the
-  reference compiler is the compiler's fault. These sizes count as failed until it is fixed; the
-  separate-memory rows in `results/separate/surface7.jsonl` record it, and `sweep.py` reproduces
-  it under `work/surface7/grid11x11/`.
+- **A compiler fault on the largest grids.** surface7's Z memory compiled alone on 11x11, 12x11
+  and 12x12 (Grid and WISE) with the pinned qccdc b4a003dbb4ae gives a program that breaks R1: a
+  trap holds 3 ions against a capacity of 2, six times. The releases' one-program memory (Z then
+  X) compiles on the same three devices without breaking a rule, so the figure has these sizes.
+  The fault is still the compiler's: [r1_fault.py](r1_fault.py) reproduces it in about 7 minutes
+  (grid11x11: 6 violations at sites T3_7h and T7_6v), and `results/separate/surface7.jsonl`
+  records the six failed rows.
 - **HGP code:** pending from Alex.
 - **Colour-code decoder:** the sweep decodes the colour code with generic BP-OSD. A colour-code
   decoder (e.g. Chromobius) would be fairer before the codes are compared with each other
   (noise and decoding: Zhuangzhuang, Jaewon, Yuewen). Architectures are still compared fairly
   within a code.
-- **Code sizes for the target LER < 10⁻⁵:** surface and colour need d > 7 under qccd-noise@2.
+- **Code sizes for the target LER < 10⁻⁵:** under qccd-noise@2 only surface d=7 reaches it so
+  far (Grid 12x11: 4.1e-6 per round, 95% interval up to 5.4e-6). Colour d=7's best is 1.2e-4,
+  so the colour code needs d > 7, or a colour-code decoder.
 - **Certificates:** the sweep skips the Lean step. A family's best point should be submitted
   through the full grader before the paper quotes it.

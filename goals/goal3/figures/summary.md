@@ -6,59 +6,59 @@ Each family's best point by each measure (they can differ). Time per round under
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 3 of 3 | grid4x3 | 19.3 | grid4x3 | 7.70e-03 [6.8e-03, 8.8e-03] |
-| WISE | 3 of 3 | wise4x3 | 19.3 | wise4x3 | 7.70e-03 [6.8e-03, 8.8e-03] |
+| Grid | 3 of 3 | grid4x3 | 19.4 | grid4x3 | 7.35e-03 [6.4e-03, 8.4e-03] |
+| WISE | 3 of 3 | wise4x3 | 19.4 | wise4x3 | 7.35e-03 [6.4e-03, 8.4e-03] |
 | C2LR | 0 of 3 | — | — | — | — |
-| Cyclone | 3 of 3 | cyclone6 | 26.1 | cyclone6 | 8.22e-03 [7.3e-03, 9.3e-03] |
-| Conveyor | 2 of 2 | conveyor8_4d | 33.9 | conveyor8_4d | 7.78e-03 [6.8e-03, 8.8e-03] |
+| Cyclone | 3 of 3 | cyclone6 | 17.5 | cyclone8 | 7.32e-03 [6.4e-03, 8.4e-03] |
+| Conveyor | 2 of 2 | conveyor9_3d | 44.5 | conveyor9_3d | 8.27e-03 [7.3e-03, 9.4e-03] |
 
 ## 6.6.6 colour code [[19,1,5]], 5 rounds, 28 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 6 of 6 | grid7x6 | 61.3 | grid6x5 | 3.65e-04 [3.2e-04, 4.2e-04] |
-| WISE | 6 of 6 | wise7x6 | 61.3 | wise6x5 | 3.65e-04 [3.2e-04, 4.2e-04] |
+| Grid | 6 of 6 | grid7x6 | 61.7 | grid6x5 | 3.86e-04 [3.4e-04, 4.4e-04] |
+| WISE | 6 of 6 | wise7x6 | 61.7 | wise6x5 | 3.86e-04 [3.4e-04, 4.4e-04] |
 | C2LR | 0 of 6 | — | — | — | — |
-| Cyclone | 4 of 4 | cyclone15 | 301.4 | cyclone15 | 8.21e-04 [7.2e-04, 9.4e-04] |
-| Conveyor | 2 of 2 | conveyor24_12d | 186.8 | conveyor27_9d | 8.04e-04 [7.0e-04, 9.2e-04] |
+| Cyclone | 4 of 4 | cyclone15 | 313.9 | cyclone19 | 9.26e-04 [8.1e-04, 1.1e-03] |
+| Conveyor | 2 of 2 | conveyor24_12d | 272.5 | conveyor24_12d | 7.24e-04 [6.3e-04, 8.3e-04] |
 
 ## 6.6.6 colour code [[37,1,7]], 7 rounds, 55 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 7 of 7 | grid9x8 | 89.7 | grid9x8 | 1.13e-04 [9.9e-05, 1.3e-04] |
-| WISE | 7 of 7 | wise9x8 | 89.7 | wise9x8 | 1.13e-04 [9.9e-05, 1.3e-04] |
+| Grid | 7 of 7 | grid9x8 | 91.7 | grid7x7 | 1.20e-04 [1.0e-04, 1.4e-04] |
+| WISE | 7 of 7 | wise9x8 | 91.7 | wise7x7 | 1.20e-04 [1.0e-04, 1.4e-04] |
 | C2LR | 0 of 7 | — | — | — | — |
-| Cyclone | 4 of 4 | cyclone29 | 1361.0 | cyclone29 | 1.71e-02 [1.6e-02, 1.8e-02] |
-| Conveyor | 4 of 4 | conveyor36_24d | 387.8 | conveyor36_24d | 8.21e-04 [7.2e-04, 9.4e-04] |
+| Cyclone | 4 of 4 | cyclone29 | 1363.7 | cyclone29 | 1.70e-02 [1.6e-02, 1.8e-02] |
+| Conveyor | 4 of 4 | conveyor36_24d | 528.3 | conveyor36_24d | 7.19e-04 [6.3e-04, 8.3e-04] |
 
 ## rotated surface code [[9,1,3]], 3 rounds, 17 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 4 of 4 | grid4x4 | 19.6 | grid5x5 | 2.00e-04 [1.7e-04, 2.3e-04] |
-| WISE | 4 of 4 | wise4x4 | 19.6 | wise5x5 | 2.00e-04 [1.7e-04, 2.3e-04] |
+| Grid | 4 of 4 | grid6x5 | 19.3 | grid6x5 | 2.17e-04 [1.9e-04, 2.5e-04] |
+| WISE | 4 of 4 | wise6x5 | 19.3 | wise6x5 | 2.17e-04 [1.9e-04, 2.5e-04] |
 | C2LR | 0 of 4 | — | — | — | — |
-| Cyclone | 4 of 4 | cyclone10 | 37.5 | cyclone9 | 2.35e-04 [2.0e-04, 2.7e-04] |
-| Conveyor | 3 of 3 | conveyor12_8d | 38.8 | conveyor22_11d | 2.61e-04 [2.3e-04, 3.0e-04] |
+| Cyclone | 4 of 4 | cyclone10 | 42.0 | cyclone9 | 2.60e-04 [2.3e-04, 3.0e-04] |
+| Conveyor | 3 of 3 | conveyor22_11d | 50.1 | conveyor22_11d | 2.82e-04 [2.5e-04, 3.2e-04] |
 
 ## rotated surface code [[25,1,5]], 5 rounds, 49 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 7 of 7 | grid9x8 | 46.7 | grid9x8 | 2.52e-05 [2.1e-05, 3.0e-05] |
-| WISE | 7 of 7 | wise9x8 | 46.7 | wise9x8 | 2.52e-05 [2.1e-05, 3.0e-05] |
+| Grid | 7 of 7 | grid9x8 | 46.7 | grid8x8 | 2.67e-05 [2.3e-05, 3.1e-05] |
+| WISE | 7 of 7 | wise9x8 | 46.7 | wise8x8 | 2.67e-05 [2.3e-05, 3.1e-05] |
 | C2LR | 0 of 7 | — | — | — | — |
-| Cyclone | 4 of 4 | cyclone26 | 291.4 | cyclone26 | 2.54e-04 [2.2e-04, 2.9e-04] |
-| Conveyor | 4 of 4 | conveyor32_32d | 106.3 | conveyor32_32d | 5.26e-05 [4.6e-05, 6.1e-05] |
+| Cyclone | 4 of 4 | cyclone26 | 292.6 | cyclone26 | 2.29e-04 [2.0e-04, 2.6e-04] |
+| Conveyor | 4 of 4 | conveyor32_32d | 105.7 | conveyor32_32d | 5.32e-05 [4.6e-05, 6.1e-05] |
 
 ## rotated surface code [[49,1,7]], 7 rounds, 97 ions
 
 | family | sizes compiled | fastest | ms / round | lowest LER | LER / round [95%] |
 |---|---|---|---|---|---|
-| Grid | 7 of 10 | grid10x9 | 68.6 | grid10x9 | 3.57e-06 [2.5e-06, 5.2e-06] |
-| WISE | 7 of 10 | wise10x9 | 68.6 | wise10x9 | 3.57e-06 [2.5e-06, 5.2e-06] |
+| Grid | 10 of 10 | grid12x11 | 59.5 | grid12x11 | 4.14e-06 [3.2e-06, 5.4e-06] |
+| WISE | 10 of 10 | wise12x11 | 59.5 | wise12x11 | 4.14e-06 [3.2e-06, 5.4e-06] |
 | C2LR | 0 of 10 | — | — | — | — |
-| Cyclone | 4 of 4 | cyclone51 | 1083.7 | cyclone51 | 1.25e-02 [1.2e-02, 1.3e-02] |
-| Conveyor | 4 of 4 | conveyor64_64d | 267.8 | conveyor64_64d | 4.70e-05 [4.1e-05, 5.4e-05] |
+| Cyclone | 4 of 4 | cyclone51 | 1093.6 | cyclone51 | 1.26e-02 [1.2e-02, 1.4e-02] |
+| Conveyor | 4 of 4 | conveyor64_64d | 246.9 | conveyor64_64d | 3.76e-05 [3.3e-05, 4.3e-05] |
 
