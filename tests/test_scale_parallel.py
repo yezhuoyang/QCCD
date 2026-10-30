@@ -166,3 +166,27 @@ def test_a_gadget_calls_ancillas_are_forgotten_when_it_returns():
     r.body(prog.root, {}, 0)
     assert not [k for k in r.ready if k[0] == "a"] and not r.gen and not r.held
     assert r.end == 40_000                      # 500 calls on 500 blocks, all at once
+
+
+def test_source_slots_a_closed_form_writes_are_read_back_exactly(monkeypatch):
+    """A closed form's source slots are stored as one strided run each (Gidney 2025's top loop
+    writes ~8,000 a step, 21,640 steps), and a later read gets exactly what full iteration
+    gives: here loop A writes slot 1000 + k at 10k + 5 us, and loop B, each step on a block of
+    its own, waits for its slot -- so the run ends at the last slot's time plus B's 20 us."""
+    tw = P.Template("tw", ("ppm Z p0 Z p1 -> o0",), (0,), 2, 0, 1, 0)
+    tr = P.Template("tr", ("if e0: x p0",), (0,), 1, 0, 0, 1)
+    write = P.Seg("tw", (("LogicData", Expr("k")), ("LogicData", Expr("4000"))), (), (), (),
+                  (("src", Expr("1000 + k"), Expr("1001 + k"), "o0"),))
+    read = P.Seg("tr", (("LogicData", Expr("5000 + k")),), (), (P._Rec("src", Expr("1000 + k")),))
+    ports = {"tw": {"first": [0.0, 0.0], "last": [10.0, 10.0], "out": [5.0], "need": {}, "span": 10.0},
+             "tr": {"first": [0.0], "last": [20.0], "out": [], "need": {"0": 0.0}, "span": 20.0}}
+
+    def prog():
+        return P.Program(templates={"tw": tw, "tr": tr},
+                         root=P.Body([P.Loop("k", Expr("0"), Expr("3000"), P.Body([write])),
+                                      P.Loop("k", Expr("0"), Expr("3000"), P.Body([read]))]))
+    got = PAR.parallel_us(prog(), ports)
+    assert got["extrapolated"] > 5000
+    assert got["us"] == 10 * 2999 + 5 + 20
+    monkeypatch.setattr(PAR, "CAP", 10 ** 9)
+    assert PAR.parallel_us(prog(), ports)["ns"] == got["ns"]

@@ -79,6 +79,13 @@ class _Run:
         reads = [r for b in [prog.root, *prog.bodies.values()] for x in _segs(b) for r in x.ext]
         self.kept = {"r": any(isinstance(r, _Rec) and r.table == "rec" for r in reads),
                      "s": any(isinstance(r, _MXor) or (isinstance(r, _Rec) and r.table == "src") for r in reads)}
+        # a closed form's records and source slots are not written one by one (Gidney 2025's
+        # top loop would write 178 million): each strided key is ONE run, (first, count, time,
+        # slope), read by arithmetic; a direct write and a run each carry when they were made,
+        # and the later one is what a slot holds
+        self.runs = {"r": {}, "s": {}}  # table -> stride -> residue -> [[first, count, t, slope, seq]]
+        self.seqs = {"r": {}, "s": {}}  # table -> slot -> when it was written directly
+        self.seq = 0
 
     # ---- state, journaled for loops -----------------------------------------------------------
     def put(self, table: str, key, value: float) -> None:
@@ -89,7 +96,12 @@ class _Run:
             self.held.setdefault(key[1], []).append(key)
         if self.undo:
             self.undo[-1].append((d, key, d.get(key, _MISSING)))
+            if table in ("r", "s"):
+                self.undo[-1].append((self.seqs[table], key, self.seqs[table].get(key, _MISSING)))
         d[key] = value
+        if table in ("r", "s"):
+            self.seqs[table][key] = self.seq
+            self.seq += 1
         if self.journal is not None:
             self.journal.append((table, key, value))
 
@@ -102,15 +114,38 @@ class _Run:
             g[v] = g.get(v, -1) + 1
         return ("a", scope, v, g.get(v, 0))
 
+    def slot(self, table: str, key) -> int:
+        """When a record or source slot was written (0: before the run, or never)."""
+        d = self.rec if table == "r" else self.src
+        best, seq = d.get(key, 0), self.seqs[table].get(key, -1)
+        for stride, by in self.runs[table].items():
+            for first, n, t, slope, s in reversed(by.get(key % stride, ())):
+                j = (key - first) // stride
+                if 0 <= j < n and s > seq:
+                    best, seq = t + slope * j, s
+                    break
+        return best
+
+    def run(self, table: str, first, stride: int, n: int, t, slope) -> None:
+        """Slots first, first + stride, ... (n of them) written at t, t + slope, ..."""
+        if stride < 0:
+            first, t, slope, stride = first + stride * (n - 1), t + slope * (n - 1), -slope, -stride
+        lst = self.runs[table].setdefault(stride, {}).setdefault(first % stride, [])
+        item = [first, n, t, slope, self.seq]
+        self.seq += 1
+        lst.append(item)
+        if self.undo:
+            self.undo[-1].append((_RUN, lst, item))
+
     def ext(self, ref, env) -> float:
         if isinstance(ref, _Rec):
             if ref.table == "src":
-                return self.src.get(ref.idx(env), 0)
-            return self.rec.get(env.get("rv_recbase", 0) + ref.idx(env), 0)
+                return self.slot("s", ref.idx(env))
+            return self.slot("r", env.get("rv_recbase", 0) + ref.idx(env))
         if isinstance(ref, _MXor):
             t = 0
             for v in range(ref.n(env)):
-                t = max(t, self.src.get(ref.idx({**env, ref.var: v}), 0))
+                t = max(t, self.slot("s", ref.idx({**env, ref.var: v})))
             return t
         bsid, bpos, k = ref
         return self.outs.get((bsid, bpos), [0] * (k + 1))[k]
@@ -271,7 +306,9 @@ class _Run:
             if target != hi - 1 and not _same(d, _predict(form, target - done)):
                 # refuted: everything since the anchor is undone, and the rest run for real
                 for table, key, old in reversed(log):
-                    if old is _MISSING:
+                    if table is _RUN:
+                        key.remove(old)                     # (a run: its list, itself)
+                    elif old is _MISSING:
                         table.pop(key, None)
                     else:
                         table[key] = old
@@ -295,6 +332,11 @@ class _Run:
         if last < 1:
             return
         for (table, key), stride, val, slope in form:
+            if table in ("r", "s") and stride and self.journal is None:
+                if self.kept[table]:
+                    self.run(table, key + stride, stride, last, val + slope, slope)
+                self.end = max(self.end, _step(val, slope, 1), _step(val, slope, last))
+                continue
             for j in (range(1, last + 1) if stride else (last,)):
                 t = _step(val, slope, j)
                 self.put(table, _shift((table, key), stride, j)[1], t)
@@ -303,6 +345,7 @@ class _Run:
 
 
 _MISSING = object()
+_RUN = object()
 
 
 # A loop's pattern: per key written by an iteration, (key, stride, value, slope) -- iteration
