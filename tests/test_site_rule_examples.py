@@ -50,3 +50,17 @@ def test_the_junction_rule_is_shown_on_a_junction():
         crossed = {n for ins in prog.instructions for p in ins.participants
                    for seg in p.via for n in dev.segments[seg].ends}
         assert any(dev.nodes[n].kind == "junction" for n in crossed), (which, sorted(crossed))
+
+
+def test_every_rule_has_its_statement_and_says_which_cards_it_has():
+    """The site's search lists every rule by its statement. The C rules' statements are kept apart
+    from the standard ones, and a reader of the first table alone gave every C rule a blank title.
+    Every entry also promised "a passing and a failing programme", even a rule with one card."""
+    from qccd.site.examples import cards_phrase, rule_meta
+    for R in RULES:
+        assert rule_meta(R["id"])["statement"], R["id"]
+    by = {R["id"]: cards_phrase(R) for R in RULES}
+    assert by["C1"] == "a rule, with a passing and a failing programme"
+    assert by["C3"] == "a rule, with a programme that keeps it"
+    assert by["R10"] == "a rule, with an example programme"
+    assert by["C8"] == "a rule, with two example programmes"

@@ -24,7 +24,7 @@ from ..api import Machine, _template_doc
 from ..cost import corrected_model, deck_model
 from ..ir import TSIR, Instruction, Participant
 from ..verify import verify
-from ..verify.rules import RULE_SOURCES, RULE_STATEMENTS
+from ..verify.rules import C2LR_RULE_SOURCES, C2LR_RULE_STATEMENTS, RULE_SOURCES, RULE_STATEMENTS
 
 
 def rec(method: str, *args, **kwargs) -> dict:
@@ -716,4 +716,17 @@ def judge_by_rules(m: Machine, prog, model, focus: str | None, check_metrics: bo
 
 
 def rule_meta(rule: str) -> dict:
-    return {"statement": RULE_STATEMENTS.get(rule, ""), "sources": RULE_SOURCES.get(rule, "")}
+    """A rule's one-line statement and sources: the standard rules', else the C2LR rules' (kept
+    apart in `qccd.verify.rules`, so a C rule read only the first came out blank)."""
+    return {"statement": RULE_STATEMENTS.get(rule) or C2LR_RULE_STATEMENTS.get(rule, ""),
+            "sources": RULE_SOURCES.get(rule) or C2LR_RULE_SOURCES.get(rule, "")}
+
+
+def cards_phrase(R: dict) -> str:
+    """What a rule's search entry promises: the cards it really has."""
+    if "pass" in R and "fail" in R and not R["fail"].get("expect"):
+        return "a rule, with a passing and a failing programme"
+    if "pass" in R and "fail" not in R:
+        return ("a rule, with an example programme" if R["pass"].get("expect")
+                else "a rule, with a programme that keeps it")
+    return "a rule, with two example programmes"

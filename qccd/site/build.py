@@ -37,7 +37,8 @@ from pathlib import Path
 
 from .compile_examples import GATES, OUT as COMPILED, load_algo, load_compiled
 from . import algorithm
-from .examples import GRAMMAR, IR_TABLE, RULES, VERBS, build_example, core_form, judge, machine, rule_meta, text_of
+from .examples import (GRAMMAR, IR_TABLE, RULES, VERBS, build_example, cards_phrase, core_form, judge, machine,
+                       rule_meta, text_of)
 from .md import Renderer, hints, slug
 from . import prose
 from .people import GROUPS as PEOPLE_GROUPS, INSTITUTIONS, JOIN, PEOPLE
@@ -2152,7 +2153,7 @@ def build(out: Path) -> int:
             index.append({"t": html.unescape(re.sub(r"<[^>]+>", "", text)),
                           "d": f"{docs[name]['title']} · docs", "u": f"docs/{name}/#{sid}", "k": "doc"})
     index += [{"t": f"p.{v['verb']}", "d": v["what"][:90], "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
-    index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": "a rule, with a passing and a failing programme",
+    index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": cards_phrase(R),
                "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
     index += [{"t": f"compile {title}", "d": note[:90], "u": f"compilation/#{gid}", "k": "compiled"} for gid, body, title, note, dev in GATES]
     index += [{"t": text, "d": "Compilation · the algorithm", "u": f"compilation/#{hid}", "k": "page"}
