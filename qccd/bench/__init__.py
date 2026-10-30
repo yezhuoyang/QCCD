@@ -13,7 +13,7 @@ submitted compiler follows, and the harness that runs and grades it.  docs/PLAN-
 
 from .contract import CompilerSpec, ContractError, load_compiler, starter
 from .harness import REPORT_KIND, reference_compiler, run_suite
-from .suite import Suite, SuiteError, find_suite, list_suites
+from .suite import Suite, SuiteError, board_pairs, find_suite, list_suites
 
 __all__ = ["CompilerSpec", "ContractError", "load_compiler", "starter", "run_suite", "reference_compiler",
-           "REPORT_KIND", "Suite", "SuiteError", "find_suite", "list_suites"]
+           "REPORT_KIND", "Suite", "SuiteError", "board_pairs", "find_suite", "list_suites"]

@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 __all__ = ["Suite", "Pair", "SUITES_DIR", "find_suite", "list_suites", "SuiteError", "hidden_pairs",
-           "circuit_kind"]
+           "board_pairs", "circuit_kind"]
 
 SUITES_DIR = Path(__file__).resolve().parent / "suites"
 FIXED_BLOCKS = ("primitives", "heating", "species", "budget")
@@ -175,11 +175,60 @@ class Suite:
 
 
 def with_physics(doc: Mapping, physics: Mapping) -> dict:
+    """The device under the suite's physics: its fixed blocks are the suite's.  A C2LR device
+    keeps what makes it one, as a C2LR board's physics does (docs/c2lr.md): the primitives of
+    its swap-or-stay steps and of a gate in one leg, and its species pair -- without them its
+    steps would not replay at all.  Every other device is exactly the suite's, as before."""
     out = dict(doc)
     for b in FIXED_BLOCKS:
         if b in physics:
             out[b] = physics[b]
+    if str((doc.get("control") or {}).get("model", "")) == "c2lr":
+        from ..arch.c2lr import C2LR_PHYSICS, c2lr_primitives, c2lr_species
+        pair = str((doc.get("species") or {}).get("pair", ""))
+        own = dict(doc.get("primitives") or {})
+        add = (c2lr_primitives(pair) if pair in C2LR_PHYSICS else
+               {k: own[k] for k in ("swap_or_stay", "reorder_or_not", "merge", "split") if k in own})
+        out["primitives"] = {**dict(out.get("primitives") or {}), **add}
+        if pair in C2LR_PHYSICS:
+            out["species"] = {**dict(out.get("species") or {}), **c2lr_species(pair)}
     return out
+
+
+def board_pairs(release, devices: list[Mapping] | None = None) -> tuple["Suite", list[Pair]]:
+    """A board as a one-circuit suite: its circuit (and memory experiment) on each of `devices`
+    -- device documents, the board's suggested start when none is given -- under the board's
+    own physics, noise model and sampling budget, so a compiler can be graded on a board the
+    suite has no pair for (the C2LR boards: `qccd bench run --compiler DIR --board X`).  The
+    reference compiler has no result there, so nothing is compared: it grades, it does not rank."""
+    from ..api import Machine
+    from ..workspace.tasks import board_device
+    m = release.manifest
+    if not devices:
+        st = m.get("starter") or {}
+        if not st.get("generator"):
+            raise SuiteError(f"{release.id} suggests no device: name one with --device")
+        devices = [getattr(Machine, st["generator"])(**st.get("params", {}), name=st.get("name") or "starter")
+                   .arch.to_json()]
+    q = m.get("qec") or {}
+    qasm = release.circuit_text()
+    name = m["task"]
+    det = release.detectors()
+    pairs = []
+    for doc in devices:
+        dev = board_device(dict(doc), release)
+        pairs.append(Pair(f"{name}@{dev['name']}", name, str(dev["name"]), "board", qasm, dev,
+                          circuit_kind(qasm, det), det, n_qubits(qasm)))
+    base = find_suite()
+    man = {**base.manifest, "suite": f"board:{name}", "release": m["release"], "title": release.title,
+           "description": m.get("description", ""), "circuits": [], "devices": [], "pairs": [],
+           "physics": {"model": "corrected", "rank_table": m["physics"].get("rank_table", "qccdsim_jones")},
+           "ler": {**dict(q.get("ler") or {}), "noise": q.get("noise", "qccd-noise@1")} if q else base.manifest["ler"],
+           "baseline": None, "hidden": {"count": 0}}
+    man["limits"] = {**base.manifest["limits"],
+                     "pair_timeout_s": max(int(base.manifest["limits"].get("pair_timeout_s", 120)),
+                                           int((m.get("limits") or {}).get("compile_timeout_s", 0)))}
+    return Suite(root=release.root, manifest=man), pairs
 
 
 def list_suites(extra: Path | None = None) -> list[Suite]:

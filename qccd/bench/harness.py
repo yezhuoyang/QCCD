@@ -33,8 +33,8 @@ from .check import geomean, grade_pair
 from .contract import CompilerSpec, Invocation, build, invoke
 from .suite import Pair, Suite
 
-__all__ = ["run_suite", "reference_compiler", "REPORT_KIND", "STATUSES", "summarize", "LocalRunner",
-           "reference_results"]
+__all__ = ["run_suite", "reference_compiler", "c2lr_compiler", "REPORT_KIND", "STATUSES", "summarize",
+           "LocalRunner", "reference_results"]
 
 REPORT_KIND = "qccd.compiler_report"
 STATUSES = ("valid", "wrong", "refused", "timeout", "crash", "no_output", "not_run", "cancelled")
@@ -46,6 +46,14 @@ def reference_compiler() -> CompilerSpec:
     return CompilerSpec(root=Path(__file__).resolve().parent, name="qccdc (reference)", runtime="python3",
                         entry=("python3", "-m", "qccd.bench.baseline"), build=None,
                         about="the reference compiler: qccdc rotation or routing, then cooling")
+
+
+def c2lr_compiler() -> CompilerSpec:
+    """The baseline C2LR router (qccd.compile.c2lr_router) as a contract compiler: the C2LR
+    boards' reference.  It refuses (exit 4) every device that is not a C2LR lattice."""
+    return CompilerSpec(root=Path(__file__).resolve().parent, name="c2lr-router (baseline)", runtime="python3",
+                        entry=("python3", "-m", "qccd.compile.c2lr_router"), build=None,
+                        about="swap-or-stay steps by the four demonstrated diagonals; enter, gate, exit")
 
 
 def _expand(device_doc: Mapping, dest: Path) -> tuple[Path, Path]:

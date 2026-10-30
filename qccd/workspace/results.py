@@ -272,10 +272,27 @@ class ResultsMixin:
         want = params.get("compiler", "auto")
         if want not in ("auto", "compile", "rotate"):
             raise WorkspaceError("bad_request", "compiler must be auto, compile or rotate", status=422)
+        from ..arch.c2lr import is_c2lr
         from ..compile.programs import closed_loops
         modes = [want] if want != "auto" else (["rotate", "compile"] if closed_loops(r.arch) else ["compile"])
         budget = float((rel.manifest.get("limits") or {}).get("compile_timeout_s", 600))
         log, mode, cp = "", None, None
+        if is_c2lr(r.arch):
+            # A C2LR lattice moves its crystals only by swap-or-stay steps, which qccdc does not
+            # emit: its reference compile is the baseline C2LR router (docs/c2lr.md), in-process,
+            # writing what qccdc writes (the certified programme and its certificate)
+            from ..arch import Architecture
+            from ..compile.c2lr_router import COMPILER_NAME, Refused, compile_c2lr
+            self._progress(jid, "compile", f"compiling {rel.title} with the C2LR router")
+            modes = []
+            try:
+                dev = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
+                prog, cert = compile_c2lr(rel.circuit_text(), dev, name=rel.manifest["task"])
+                prog.save(work / "prog.tsir.json", indent=None)
+                (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
+                mode, log = "c2lr-router", f"--- {COMPILER_NAME}: {len(prog)} instructions\n"
+            except Refused as exc:
+                log = f"--- {COMPILER_NAME}\n{exc}"
         for m in modes:
             self._progress(jid, "compile", f"compiling {rel.title} with qccdc_cli {m}")
             for stale in ("prog.tsir.json", "prog.qcert.json"):

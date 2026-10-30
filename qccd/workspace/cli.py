@@ -25,6 +25,7 @@
                                              reference compiler, the device's noise model)
     qccd leaderboard [--board T] [--official] [--track compiler]   local or published rankings
     qccd bench run --compiler DIR [--only X] [--jobs N]   grade a compiler on the suite, locally
+    qccd bench run --compiler DIR --board B [--device F]  ...or on one board's circuit (the C2LR boards)
     qccd bench suite | reports | show REPORT | init-compiler DIR
     qccd bench publish DIR --server URL      upload a compiler (a person confirms at this terminal)
     qccd trace [--session S] [--prompt P] [--full | --json | --open | --program | --check]
@@ -673,7 +674,7 @@ def cmd_ler(a) -> int:
 def cmd_bench(a) -> int:
     """The Compiler board, at the terminal: run a compiler over the suite, read reports, publish."""
     from ..bench import ContractError, find_suite, load_compiler, run_suite, starter
-    from ..bench.harness import reference_compiler
+    from ..bench.harness import c2lr_compiler, reference_compiler
     if a.action == "init-compiler":
         d = starter(Path(a.target or "my-compiler"))
         print(f"a working compiler (the reference one, to replace) is in {d}\n  grade it: qccd bench run --compiler {d}")
@@ -701,15 +702,26 @@ def cmd_bench(a) -> int:
         return 0
     if a.action == "run":
         try:
-            spec = reference_compiler() if a.compiler == "reference" else load_compiler(a.compiler)
+            spec = ({"reference": reference_compiler, "c2lr": c2lr_compiler}[a.compiler]()
+                    if a.compiler in ("reference", "c2lr") else load_compiler(a.compiler))
         except ContractError as exc:
             print(f"qccd bench: {exc}", file=sys.stderr)
             return 2
         import tempfile
+        progress = lambda i, n, pid, st: print(f"  [{i}/{n}] {pid}: {st}", file=sys.stderr, flush=True)  # noqa: E731
         with tempfile.TemporaryDirectory(prefix="qccd-bench-") as td:
-            rep = run_suite(suite, spec, workdir=Path(td), only=a.only.split(",") if a.only else None,
-                            jobs=a.jobs, progress=lambda i, n, pid, st: print(f"  [{i}/{n}] {pid}: {st}",
-                                                                               file=sys.stderr, flush=True))
+            if a.board:
+                # one board's circuit on its suggested device (or --device ...): the C2LR boards,
+                # which no suite pair covers; graded pair by pair, compared with nothing
+                from ..bench import board_pairs
+                from .tasks import find_board
+                devices = [json.loads(Path(f).read_text(encoding="utf-8")) for f in a.device or []]
+                suite, pairs = board_pairs(find_board(a.board), devices)
+                rep = run_suite(suite, spec, workdir=Path(td), split="none", extra_pairs=pairs, reference={},
+                                jobs=a.jobs, progress=progress)
+            else:
+                rep = run_suite(suite, spec, workdir=Path(td), only=a.only.split(",") if a.only else None,
+                                jobs=a.jobs, progress=progress)
         s = rep["summary"]
         print(f"{spec.name} on {suite.title}: {s['counts']['valid']}/{s['pairs']} valid, {s['wrong']} wrong, "
               f"speedup {s['speedup'] if s['speedup'] is None else round(s['speedup'], 3)} over "
@@ -901,9 +913,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("bench", help="the Compiler board: run a compiler over the benchmark suite, locally")
     p.add_argument("action", choices=["run", "suite", "reports", "show", "init-compiler", "publish"])
     p.add_argument("target", nargs="?", default=None, help="a compiler directory, or a report id for show")
-    p.add_argument("--compiler", default="reference", help="a compiler directory (qccd-compiler.json), or 'reference'")
+    p.add_argument("--compiler", default="reference",
+                   help="a compiler directory (qccd-compiler.json), 'reference', or 'c2lr' (the baseline C2LR router)")
     p.add_argument("--suite", default=None)
     p.add_argument("--only", default=None, help="comma-separated pair ids, circuits or devices")
+    p.add_argument("--board", default=None, help="grade on one board's circuit instead of the suite (a C2LR board)")
+    p.add_argument("--device", action="append", default=None,
+                   help="with --board: a device file to compile onto (repeatable; default the board's suggested start)")
     p.add_argument("--jobs", type=int, default=1)
     p.add_argument("--out", default=None)
     p.add_argument("--server", default=None)
