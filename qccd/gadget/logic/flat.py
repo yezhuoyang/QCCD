@@ -154,6 +154,16 @@ def _flow(lib, gir, eid, name):
     raise KeyError(f"{e[3]} {e[4]} reports no flow {name!r}")
 
 
+def block_order(info: dict, at: float | None = None) -> list[int]:
+    """A block's ions in code order after an op that starts at `at` (None: at the end).  A
+    place that turns the block -- the Hadamard bay -- hands it back relabelled (`turns`)."""
+    order = info["ions"]
+    for t, ions in info.get("turns", ()):
+        if at is None or t <= at:
+            order = ions
+    return order
+
+
 #: the most branches the flat sign-off will take one by one
 MAX_BRANCHES = 64
 
@@ -314,6 +324,8 @@ def _sign_off_branch(alg: Algorithm, gir: dict, lib, leaves, branch: dict, *,
                 cur["az"] = xor_expr(cur["az"], cur["ax"])
             elif delta.get("conjugate") == "SX":   # √X̄ takes Z̄ to Ȳ: ax takes az
                 cur["ax"] = xor_expr(cur["ax"], cur["az"])
+            elif delta.get("conjugate") == "H":    # H̄ trades X̄ and Z̄
+                cur["ax"], cur["az"] = cur["az"], cur["ax"]
             for part, other in (delta.get("copy") or {}).items():
                 src = block_frame.get(other) or {"ax": (0, []), "az": (0, [])}
                 cur[part] = xor_expr(cur[part], src[part])
@@ -504,7 +516,7 @@ def _sign_off_branch(alg: Algorithm, gir: dict, lib, leaves, branch: dict, *,
                              f"bits, the ideal circuit's {r_ideal}")
 
     # flows from inputs to surviving blocks
-    block_ions = {b: [f"g{g}" for g in info["ions"]] for b, info in gir["blocks"].items()}
+    block_ions = {b: [f"g{g}" for g in block_order(info)] for b, info in gir["blocks"].items()}
     magic_ion = {b: f"g{info['magic_ion']}" for b, info in gir["blocks"].items() if "magic_ion" in info}
     lq = inputs + alive
     basis_vecs = []
@@ -616,7 +628,7 @@ def _schedule_distance(flat, gir, outcome_recs, frame_sets, event_ops, itab, rec
     exp.extend(flat, noisy=True)
     decoded = []
     for b in alive:
-        ions = [f"g{g}" for g in gir["blocks"][b]["ions"]]
+        ions = [f"g{g}" for g in block_order(gir["blocks"][b])]
         for row in code.hx:
             exp.mpp({ions[q]: "X" for q in gf2.support(row)})
         for row in code.hz:
@@ -659,7 +671,7 @@ def _schedule_distance(flat, gir, outcome_recs, frame_sets, event_ops, itab, rec
                     last_op[(eid, b)] = max(last_op.get((eid, b), -1), k)
     inserts: dict[int, list] = {}
     for (eid, b), k in last_op.items():
-        ions = [f"g{g}" for g in gir["blocks"][b]["ions"]]
+        ions = [f"g{g}" for g in block_order(gir["blocks"][b], gir["events"][eid][1])]
         for letter in ("X", "Z"):
             qs = tuple(exp.index[ions[i]] for i in sup[letter])
             inserts.setdefault(k, []).append((qs, tuple(letter for _ in qs)))

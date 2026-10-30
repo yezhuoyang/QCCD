@@ -20,6 +20,8 @@ one d = 3 surface-code logical qubit.
     inject t                   a block holding the factory's magic state      -> factory + injection
                                  (T†|+̄⟩: the factory's own verified output)
     s     q0                   logical S̄ by consuming a |Ȳ⟩ block             -> injection + bridge + post
+    ht    q0                   logical H̄ done transversally: H on every ion, the block turned a
+                               quarter turn (the standard gate `h` is S̄·√X̄·S̄) -> a Hadamard bay
     sx    q0                   logical √X̄ the same way, by X̄X̄ surgery        -> injection + bridge + post
     bit   (a & !b) ^ c -> f    a bit the archive computes from outcomes: an XOR of conjunctions
                                  (a guard may read f like a measured outcome)  -> the archive
@@ -112,7 +114,7 @@ __all__ = ["Instr", "Algorithm", "parse_algorithm", "AlgorithmError", "CATEGORY_
 CATEGORY_OF = {"prep": "prep", "se": "se", "cx": "operation", "zz": "surgery", "xx": "surgery",
                "ppm": "ppm",
                "read": "readout", "inject": "injection", "autoccz": "cczfactory", "store": "zone",
-               "s": "injection",
+               "s": "injection", "ht": "hadamard",
                "sx": "injection", "x": "archive", "y": "archive", "z": "archive", "bit": "archive",
                "decode": "decoder"}
 
@@ -137,7 +139,7 @@ CONTRACT_ARITY = {"I": 1, "X": 1, "Y": 1, "Z": 1, "H": 1, "S": 1, "Sdg": 1, "SX"
                   "CSWAP": 3}
 
 PRIMITIVES = ("prep", "inject", "autoccz", "s", "sx", "x", "y", "z", "se", "store", "cx", "zz",
-              "xx", "ppm", "decode", "read", "bit")
+              "xx", "ppm", "decode", "read", "bit", "ht")
 
 
 def parse_bit(text: str) -> tuple:
@@ -477,6 +479,8 @@ class Algorithm:
                 c.add("H", [q[0]])
                 c.add("S", [q[0]])
                 c.add("H", [q[0]])
+            elif ins.kind == "ht":
+                c.add("H", [q[0]])
             elif ins.kind in SOFTWARE:
                 c.add(ins.kind.upper(), [q[0]])
             elif ins.kind == "cx":
@@ -784,7 +788,7 @@ class _Parser:
                     raise AlgorithmError(lineno, raw, f"block {a} already exists")
             ins.blocks = list(args)
             self.born.update(args)
-        elif word in ("s", "sx") or word in SOFTWARE:
+        elif word in ("s", "sx", "ht") or word in SOFTWARE:
             need(1)
             alive(args[0])
             ins.blocks = [args[0]]

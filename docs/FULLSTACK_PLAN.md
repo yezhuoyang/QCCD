@@ -714,6 +714,76 @@ details").**
   - **Next:** a transversal-Hadamard place (H on every ion plus a relabelling, done with the
     bay's dock and ring). It makes every mixed product a one-letter product, and so takes those
     merges off the carry chain.
+- **S8, seventh round (2026-10-29): geometry and the compile unit.** The user: "optimize the
+  gadget geometry / merge smaller gadgets to larger gadgets / design better shuttle highway ...
+  even reconfigure gadget layout".
+  - **The Hadamard bay** (`hbay_d3`, `qccd/gadget/leaves/hadamard.py`; `.alg` primitive `ht`,
+    since the standard gate `h` is S̄·√X̄·S̄). H on every ion, and the block leaves a quarter turn
+    round, which is H̄ on the rotated d=3 code. The GIR records the block's new ion order
+    (`turns`), and the flat check reads it; without it the same schedule is distance 1.
+    `tests/test_gadget_hadamard.py`.
+  - **Two rewrites, each proved by the exact simulator:**
+    - a mixed product ∏Z̄_z ∏X̄_x is one ancilla: |0̄⟩, CNOTs from the Z̄ blocks into it, H̄ on
+      it, CNOTs from it into the X̄ blocks, read X̄ (every letter pattern of 1–4 blocks);
+    - FormalRV's H̄, three |Ȳ⟩ merges S̄, √X̄, S̄, is exactly `ht`. Its six outcomes steer only
+      its own corrections. Gidney 2025 reads no record by address, only source slots, and no
+      source slot reads them.
+  - **What a template's critical path is made of** (walked back op by op): roads 2–8%, gates
+    about a quarter, a memory's release and store about half, and the rest one instruction
+    waiting for another's unrelated block. So better roads would not pay.
+  - **Two scheduler opt-ins** (`City(free_at="block", prefetch=True)`, threaded through
+    `schedule_folded` and `compile_template`; the defaults are unchanged):
+    - a block is free when what an instruction did to IT is over. Before, a CNOT's ancilla
+      waited while its partner was stored. G7 now compares each block's own stretch, which is
+      what the rule says ("each block's instructions run in program order");
+    - a CNOT's operand resting in memory starts out as early as its release takes, so it
+      arrives with the other. `tests/test_gadget_free_at.py`.
+  - **A lowering bug, found and fixed.** Reading the Toffoli template's lines showed a
+    lattice-surgery CNOT from a block into itself. FormalRV's `gidneyForwardProp` reads
+    `for 0 <= i < nSeg: if i ≥ 1: gidneyInterior(i) else: gidneyFirst`. The guard reads only
+    the loop variable, but the lowering made it a data slot, reserved either way, which had two
+    effects:
+    - the adder's first step was charged on every step (`gidneyFirst` and
+      `gidneyMeasFirstRev`: 3.06e8 and 2.70e8 instances; once an adder, they are 1.20e7 and
+      1.04e7);
+    - the interior was lowered at i = 0, against its own `requires 1 ≤ i`. There the previous
+      carry `(i - 1)*3 + 2` and `i*3 + 2` are both 2 (FormalRV's minus saturates), so they
+      became one block.
+
+    A guard that reads only loop variables and parameters is now structural (`Pred.structural`):
+    it is taken only where it holds, in `expand`, `total`, `duration_ns` and `parallel_us`, and
+    its body is lowered where it holds. A guard on data (`if bit b of cst`, a table's bits)
+    stays a slot. Call memos are keyed by the arguments a count reads.
+    `tests/test_scale_gidney2025.py` holds the fix. **Every Gidney 2025 figure in rounds five
+    and six was computed before it** and overcounts the adder; the table below is all after it.
+    The lesson is that `compare` against `qec2alg` is the only check of the lowering's aliasing
+    assumption, and Gidney 2025 at RSA-2048 never had it.
+  - **A door-aware memory** (`mem_d3f`, `qccd/gadget/leaves/doors.py`). It is the same ring,
+    docks, ancillas and programs, with the ions resting where the doors are short as well as
+    the round: entry 86 → 28 slots, exit 81 → 30, the round's contact batches 13 → 9. Store is
+    24.1 → 18.2 ms, refresh 13.2 → 12.0 ms, release 9.4 → 5.5 ms. `tests/test_gadget_doors.py`.
+  - **Lookups as fan-out calls** (scratch for now). The lookups' rows are 89% of the single
+    CNOT calls: for each one-hot flag, a CNOT into every output bit the table sets. One call
+    per row keeps the control out of memory between targets: 50.5 → 12.7 ms a target. The
+    instructions are the same and so are the slots, and the number of CNOTs is checked equal.
+  - **Gidney 2025 at RSA-2048, the fixed program** (paper machine, 25 rounds a merge kept):
+
+    | Design | Sequential, one district | Parallel, unlimited districts |
+    |---|---|---|
+    | As compiled | 796.6 years | 82.4 years |
+    | Round six (rounds in memory, transversal CNOT, one-letter products) | 95.3 years | 25.0 years |
+    | + Hadamard bay (both rewrites) | 58.4 years | |
+    | + a block is free when its own part is done | 52.0 years | |
+    | + prefetch | 50.2 years | 9.46 years |
+    | + lookup rows as fan-out calls | 37.4 years | 9.47 years |
+    | + door-aware memories, every template recompiled on them | 34.1 years | 8.69 years |
+
+    Fusing the lookups halves the work (5.3 → 4.0 districts busy) but leaves the wall clock
+    where it was: the lookups are off the critical path.
+  - **The doors are the bottleneck of every place.** Of a place op's time, the doors take 92%
+    (H bay, 20.3 ms; the H gates 1.7 ms), 79% (transversal CNOT), 78% (readout), 45% of a
+    memory store and all of a release. A ring takes an ion in with a ring turn (100 µs a slot
+    crossed); `place()` set the homes for the round alone, so an entry crossed 86 slots.
 - **A register-wide merge, measured:**
   - its cat states take 35.3 / 36.0 / 37.2 / 37.2 ms over 2–5 blocks, with a depot per bench;
   - its 27 extraction rounds take 534 ms on each block, at that block's district's clinic,

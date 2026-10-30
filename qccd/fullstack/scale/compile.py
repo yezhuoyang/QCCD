@@ -235,7 +235,8 @@ class Compiled(dict):
 
 
 def compile_template(t: Template, floorplan: Path, leaves, *, name: str = "tpl", check: bool = True,
-                     rounds_at: str = "clinic") -> Compiled:
+                     rounds_at: str = "clinic", free_at: str = "instruction",
+                     prefetch: bool = False) -> Compiled:
     from qccd.gadget.floorplan import load_file
     from qccd.gadget.fold import check_folded, parse_folded, schedule_folded
     t0 = time.time()
@@ -245,7 +246,8 @@ def compile_template(t: Template, floorplan: Path, leaves, *, name: str = "tpl",
     keep: dict = {}
     # (a template may make a block the next template of its gadget reads: an ancilla prepared
     # before a register-wide merge splits the run; it rests in its memory when this one ends)
-    g = schedule_folded(alg, lib, leaves, keep=keep, outlive=True, rounds_at=rounds_at)
+    g = schedule_folded(alg, lib, leaves, keep=keep, outlive=True, rounds_at=rounds_at, free_at=free_at,
+                        prefetch=prefetch)
     top = next(m for m in keep["folder"].macros.values() if m.gate == name)
     out = Compiled(tid=t.tid, source=src, span_us=round(top.span, 3), macro=top.id,
                    macros=g["folded"]["macros"], instructions=top.instructions,

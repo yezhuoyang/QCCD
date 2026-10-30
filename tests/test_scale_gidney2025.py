@@ -13,7 +13,10 @@ the instance's rsa2048.inputs, and spec.args).  What is held here:
 * its lookups are calls and loops under a guard on an outcome: `When` bodies, reserved either
   way, every instruction of them carrying the guard;
 * counted with every data slot taken, it asks for about 1.1 x 10^9 |AutoCCZ> states -- a
-  quarter of Gidney-Ekera 2021's (tests/test_scale_ge2021.py).
+  quarter of Gidney-Ekera 2021's (tests/test_scale_ge2021.py);
+* a decision on a loop variable (`if i ≥ 1: interior(i) else: first`) is structure, taken where
+  it holds and lowered there -- not a data slot (fixed 2026-10-29: the adder's first step had
+  been charged on every step, and the interior's previous carry merged with its own).
 """
 from __future__ import annotations
 
@@ -84,3 +87,42 @@ def test_gidney2025_rsa2048_lowers_completely_and_is_counted():
     assert whens and all(len(w.cond.terms) == 1 for w in whens)
     assert 5e8 < c["autoccz"] < 2e9, c["autoccz"]
     assert c["ppm"] > 1e10 and c["se"] > 1e11
+
+
+def test_a_decision_on_a_loop_variable_is_structure_not_data():
+    """`for 0 <= i < nSeg: if i ≥ 1: gidneyInterior(i) else: gidneyFirst` (gidneyForwardProp,
+    and gidneyMeasReverse the same way back).  The guard reads only the loop variable, so it is
+    taken where it holds: the first step once an adder, not once a step.  And the interior is
+    lowered where `i ≥ 1` holds, as its own `requires 1 ≤ i` says -- lowered at i = 0, the
+    previous carry `(i - 1)*3 + 2` and `i*3 + 2` were one block (both 2, FormalRV's minus
+    saturating), and its first CNOT went from a block into itself."""
+    from collections import Counter
+    st, params = _gidney2025()
+
+    def go():
+        prog = P.Builder(st).build({k: v for k, v in params.items() if isinstance(v, (int, list, tuple))})
+        return prog, P.total(prog, lambda tid: Counter({tid: 1}), lambda *a: Counter())
+    prog, inst = _in_thread(go)
+
+    def segs(gadget):
+        out = []
+
+        def walk(body):
+            for n in body:
+                if isinstance(n, P.Seg):
+                    out.append(n)
+                elif isinstance(n, (P.Pred, P.When, P.Let, P.Loop)):
+                    walk(n.body)
+        for key, body in prog.bodies.items():
+            if key[0] == gadget:
+                walk(body)
+        return out
+    for interior, first in (("gidneyInterior", "gidneyFirst"), ("gidneyMeasInteriorRev", "gidneyMeasFirstRev")):
+        big = max(segs(interior), key=lambda s: len(s.params))
+        texts = {e.text for _, e in big.params}
+        assert {"rv_database + (i - 1)*3 + 2", "rv_database + i*3 + 2"} <= texts, (interior, texts)
+        one = max(segs(first), key=lambda s: len(s.params))
+        assert 10 * inst[one.tid] < inst[big.tid], (interior, inst[one.tid], inst[big.tid])
+    structural = [p for b in prog.bodies.values() for n in b if isinstance(n, P.Loop)
+                  for p in n.body if isinstance(p, P.Pred) and p.structural]
+    assert structural and all(not P._reads_table(p.cond.node) for p in structural)

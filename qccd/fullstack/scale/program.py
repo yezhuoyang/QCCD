@@ -119,10 +119,14 @@ class Loop:
 
 @dataclass
 class Pred:
-    """A slot that runs only when `cond` > 0 -- a decision on data, not on an outcome."""
+    """A slot that runs only when `cond` > 0 -- a decision on data, not on an outcome: reserved
+    either way.  `structural`: a decision on the program's own structure (no table read -- a
+    loop variable against a bound, `if i ≥ 1`), so it is taken only where it holds, in every
+    count; its body is lowered where it holds."""
     cond: Expr
     body: Body
     qline: int = 0
+    structural: bool = False
 
 
 @dataclass
@@ -387,6 +391,7 @@ class Builder:
         self.structural = self._structural()
         self.gen: dict = {}
         self.cur: list = []              # the gadgets being lowered, innermost last
+        self.loops: list = [[]]          # per gadget being lowered, its loop variables in scope
         #: survey mode (`build(..., survey=True)`): a statement with no lowering is recorded
         #: here, by kind, and skipped -- never in a program anyone runs
         self.survey: dict | None = None
@@ -448,10 +453,26 @@ class Builder:
         if key not in self.prog.bodies:
             self.prog.bodies[key] = Body()             # (a recursion guard)
             self.cur.append(gadget)
+            self.loops.append([])
             try:
                 self.prog.bodies[key] = self.body(self.gadgets[gadget].body, rep, famap, [], top=False)
             finally:
                 self.cur.pop()
+                self.loops.pop()
+
+    def _holds(self, cond: Expr, rep: dict, known: set, reach: int = 64) -> dict:
+        """`rep` moved, one variable at a time, to the nearest values at which `cond` >= 1 (the
+        loop variables it reads, upward from where they stand); `rep` itself if it holds there or
+        nowhere within `reach`."""
+        if cond(rep) >= 1:
+            return rep
+        free = sorted(v for v in cond.vars - known if isinstance(rep.get(v), int))
+        for v in free:
+            for d in range(1, reach + 1):
+                moved = {**rep, v: rep[v] + d}
+                if cond(moved) >= 1:
+                    return moved
+        return rep
 
     # ---- a body ------------------------------------------------------------------------
     def body(self, stmts: list, rep: dict, famap: dict, scope: list, top: bool) -> Body:
@@ -497,15 +518,29 @@ class Builder:
                             self.stmt(c, S, {**rep, var: 0}, famap, top, guards)
                     return
                 self.close(S, top)
-                S.nodes.append(Pred(hi, self.body(s.children, {**rep, var: 0}, famap, S.scope, top), s.line))
+                if _reads_table(hi.node) or not hi.vars <= known | set(self.loops[-1]):
+                    # (on a table's bits, or a classical argument's -- `if bit b of cst`: data)
+                    S.nodes.append(Pred(hi, self.body(s.children, {**rep, var: 0}, famap, S.scope, top), s.line))
+                    return
+                # a decision on a loop variable (`for i: if i ≥ 1: interior(i) else: first`): taken
+                # only where it holds, and lowered where it holds -- at the representative it may
+                # not, and a body lowered where its own `requires` fails can merge two blocks
+                # (`(i - 1)*3 + 2` and `i*3 + 2` are both 2 at i = 0)
+                where = self._holds(hi, rep, known)
+                S.nodes.append(Pred(hi, self.body(s.children, {**where, var: 0}, famap, S.scope, top), s.line,
+                                    structural=True))
                 return
             self.close(S, top)
             lo_v = lo(rep)
             if hi.text == f"{lo.text} + 1" or (not lo.vars and not hi.vars and hi(rep) - lo_v == 1):
                 S.nodes.append(Let(var, lo, self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top)))
                 return
-            S.nodes.append(Loop(var, lo, hi, self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top), s.line,
-                                par=var.endswith("__par")))
+            self.loops[-1].append(var)
+            try:
+                inner = self.body(s.children, {**rep, var: lo_v}, famap, S.scope, top)
+            finally:
+                self.loops[-1].pop()
+            S.nodes.append(Loop(var, lo, hi, inner, s.line, par=var.endswith("__par")))
             return
         if raw.startswith("when ") and raw.endswith(":"):
             out = self._read(raw, rep, S, s.line)
@@ -1073,7 +1108,7 @@ class _Exp:
                 c = node.cond(env)
                 if c > 1:
                     raise ValueError(f"a guard loop of {c} trips (line {node.qline})")
-                if c or self.reserved:
+                if c or (self.reserved and not node.structural):
                     self.body(node.body, env, guard)
             elif isinstance(node, Call):
                 env2 = {**self.prog.params, **{f: e(env) for f, e in node.skeys + node.args}}
@@ -1318,6 +1353,8 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, 
     def node_ns(node, env) -> int:
         if isinstance(node, Seg):
             return span_ns[node.tid] if prog.templates[node.tid].lines else 0
+        if isinstance(node, Pred) and node.structural:
+            return body_ns(node.body, env) if node.cond(env) >= 1 else 0
         if isinstance(node, (Pred, When)):
             return body_ns(node.body, env)                 # a slot: reserved either way
         if isinstance(node, Let):
@@ -1330,9 +1367,13 @@ def duration_ns(prog: Program, span_ns: dict, rot_ns, *, parallel: bool = True, 
                 raise ValueError(f"a product over a register (line {node.qline}) and no time for one")
             return cat_ns(node.blocks(env), node.rounds)
         if isinstance(node, Call):
-            key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
+            body = prog.body_of(node, env)
+            # (keyed by the arguments the count reads too: a decision on structure may read one)
+            dep = _deps(body)
+            key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam,
+                   tuple((f, e(env)) for f, e in node.args if f in dep))
             if key not in memo:
-                memo[key] = body_ns(prog.body_of(node, env), {**prog.params, **bind(node.skeys + node.args, env)})
+                memo[key] = body_ns(body, {**prog.params, **bind(node.skeys + node.args, env)})
             return memo[key]
         if isinstance(node, Loop):
             lo, hi = node.lo(env), node.hi(env)
@@ -1382,6 +1423,8 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
     def node_count(node, env) -> Counter:
         if isinstance(node, Seg):
             return seg_value(node.tid)
+        if isinstance(node, Pred) and node.structural:
+            return body_count(node.body, env) if node.cond(env) >= 1 else Counter()
         if isinstance(node, (Pred, When)):
             return body_count(node.body, env)
         if isinstance(node, Let):
@@ -1409,9 +1452,13 @@ def total(prog: Program, seg_value, rot_value) -> Counter:
                 total.update(at(v))
             return total
         if isinstance(node, Call):
-            key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam)
+            body = prog.body_of(node, env)
+            # (keyed by the arguments the count reads too: a decision on structure may read one)
+            dep = _deps(body)
+            key = (node.gadget, tuple((f, e(env)) for f, e in node.skeys), node.fam,
+                   tuple((f, e(env)) for f, e in node.args if f in dep))
             if key not in memo:
-                memo[key] = body_count(prog.body_of(node, env), {**prog.params, **bind(node.skeys + node.args, env)})
+                memo[key] = body_count(body, {**prog.params, **bind(node.skeys + node.args, env)})
             return memo[key]
         if isinstance(node, Rot):
             return rot_value(node.k(env), node.sign, [p for p, _, _ in node.factors])
@@ -1439,6 +1486,8 @@ def _deps(body: Body) -> frozenset:
     for n in body:
         if isinstance(n, Loop):
             out |= n.lo.vars | n.hi.vars | (_deps(n.body) - {n.var})
+        elif isinstance(n, Pred) and n.structural:
+            out |= _deps(n.body) | n.cond.vars
         elif isinstance(n, (Pred, When)):
             out |= _deps(n.body)
         elif isinstance(n, Let):

@@ -160,7 +160,9 @@ class _Run:
             elif isinstance(node, Let):
                 self.body(node.body, {**env, node.var: node.value(env)}, scope)
             elif isinstance(node, Pred):
-                self.body(node.body, env, scope)           # a slot: reserved either way
+                # a slot is reserved either way; a decision on structure is taken where it holds
+                if not node.structural or node.cond(env) >= 1:
+                    self.body(node.body, env, scope)
             elif isinstance(node, When):
                 # reserved either way, and not begun before the bit that decides it is recorded
                 saved = self.floor

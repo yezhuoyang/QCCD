@@ -228,6 +228,10 @@ class Folder:
     outlive: bool = False
     #: where a merge's syndrome rounds run (`City.rounds_at`)
     rounds_at: str = "clinic"
+    #: when a block is free for its next instruction (`City.free_at`)
+    free_at: str = "instruction"
+    #: a CNOT's resting operand starts out early (`City.prefetch`)
+    prefetch: bool = False
 
     @property
     def home_places(self) -> set:
@@ -257,7 +261,8 @@ class MacroCity(City):
 
     def __init__(self, alg, lib, leaves, *, folder: Folder, params=(), ext=(), taken=(),
                  depth: int = 0, homes: dict | None = None):
-        super().__init__(alg, lib, leaves, log=folder.log, parallel=True, rounds_at=folder.rounds_at)
+        super().__init__(alg, lib, leaves, log=folder.log, parallel=True, rounds_at=folder.rounds_at,
+                         free_at=folder.free_at, prefetch=folder.prefetch)
         self.folder, self.depth = folder, depth
         self.cal = {p: FastCalendar() for p in self.leaf}
         self.net_cal = {p: FastCalendar() for p in self.nets}
@@ -666,12 +671,13 @@ def _call_blocks(alg: Algorithm) -> list:
 
 
 def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None,
-                    outlive: bool = False, rounds_at: str = "clinic") -> dict:
+                    outlive: bool = False, rounds_at: str = "clinic", free_at: str = "instruction",
+                    prefetch: bool = False) -> dict:
     """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
     macros themselves (their footprints, which GIR 0.3 does not carry) are left in
     `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`."""
     folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None), outlive=outlive,
-                    rounds_at=rounds_at)
+                    rounds_at=rounds_at, free_at=free_at, prefetch=prefetch)
     if keep is not None:
         keep["folder"] = folder
     probe = MacroCity(alg, lib, leaves, folder=folder)

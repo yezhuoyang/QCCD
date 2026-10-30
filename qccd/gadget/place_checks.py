@@ -297,6 +297,13 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
     refused = {i for i, _ in gir["refused"]}
     g7 = [f"instruction {i} not realised: {why}" for i, why in gir["refused"]]
     span: dict[int, list] = {}
+    # program order is each block's: an instruction's stretch on a block is what it does to
+    # that block's ions (a CNOT's ancilla may go on while its partner is still being stored)
+    owner_of: dict[int, list] = defaultdict(list)
+    for b, info in gir.get("blocks", {}).items():
+        for g in info.get("ions", ()):
+            owner_of[g].append(b)
+    bspan: dict[tuple, list] = {}
     for e in events:
         # only what happens to ions orders the program: the classical half deliberately
         # overlaps it (a guard is resolved while the op that measured its bits is still
@@ -305,6 +312,9 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
             continue
         s = span.setdefault(e[6], [e[1], e[2]])
         s[0], s[1] = min(s[0], e[1]), max(s[1], e[2])
+        for b in {b for _, g in e[8] if isinstance(g, int) for b in owner_of.get(g, ())}:
+            s = bspan.setdefault((e[6], b), [e[1], e[2]])
+            s[0], s[1] = min(s[0], e[1]), max(s[1], e[2])
     last: dict[str, tuple[int, float]] = {}
     realised = {e[6] for e in events}          # a software Pauli is realised in the archive
     # a call is realised by its own view; here it is the stretch each block is the call's
@@ -319,7 +329,7 @@ def check_places(gir: dict, lib: Library, leaves: LeafLibrary | None = None, *,
         if ins["id"] not in span and not any((ins["id"], b) in box_of for b in ins["blocks"]):
             continue
         for b in ins["blocks"]:
-            sp = box_of.get((ins["id"], b)) or span.get(ins["id"])
+            sp = box_of.get((ins["id"], b)) or bspan.get((ins["id"], b)) or span.get(ins["id"])
             if sp is None:
                 continue
             prev = last.get(b)

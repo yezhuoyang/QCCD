@@ -62,8 +62,10 @@ def _extra_places() -> dict:
     from .leaves.bench import EXTRA_PLACES as BENCH
     from .leaves.catbench import EXTRA_PLACES as CAT
     from .leaves.ccz import EXTRA_PLACES as CCZ
+    from .leaves.doors import EXTRA_PLACES as DOORS
+    from .leaves.hadamard import EXTRA_PLACES as HADAMARD
     from .leaves.rotation import EXTRA_PLACES as ROTATION
-    return {**BENCH, **ROTATION, **CCZ, **CAT}
+    return {**BENCH, **ROTATION, **CCZ, **CAT, **HADAMARD, **DOORS}
 
 
 def all_places() -> dict:

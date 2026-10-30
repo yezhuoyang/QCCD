@@ -248,6 +248,8 @@ def _primitive(st: State, word: str, args: list[str], outcome: int | None = None
         st.u1(args[0], S)
     elif word == "sx":
         st.u1(args[0], SX)
+    elif word == "ht":
+        st.u1(args[0], H)
     elif word in ("x", "y", "z"):
         st.u1(args[0], {"x": X, "y": Y, "z": Z}[word])
     elif word == "cx":

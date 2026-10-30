@@ -91,6 +91,12 @@ CATEGORIES: dict[str, dict] = {
                "X̄ or Z̄ from each -- Z̄_A X̄_B Z̄_C, say -- without reading any of them alone: "
                "the operation a program written in Pauli-product measurements is made of.",
     },
+    "hadamard": {
+        "title": "Hadamard Bay", "place": "Turnstile", "shape": "dome", "glyph": "H",
+        "stroke": "#7c3aed", "fill": "#ede9fe",
+        "job": "A block comes in, every ion takes an H, and the block leaves a quarter turn round: "
+               "a logical Hadamard, transversal, with no merge.",
+    },
     "catbench": {
         "title": "Cat Bench", "place": "Relay", "shape": "dome", "glyph": "CAT",
         "stroke": "#0f766e", "fill": "#ccfbf1",
@@ -164,7 +170,7 @@ CATEGORIES: dict[str, dict] = {
     },
 }
 
-ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "catbench", "readout", "factory",
+ORDER = ["prep", "se", "zone", "memory", "operation", "surgery", "ppm", "catbench", "hadamard", "readout", "factory",
          "cczfactory",
          "rotation",
          "injection",

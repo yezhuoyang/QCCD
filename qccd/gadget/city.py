@@ -162,9 +162,19 @@ class _Train:
 
 class City:
     def __init__(self, alg: Algorithm, lib: Library, leaves: LeafLibrary, log=None,
-                 parallel: bool = True, rounds_at: str = "clinic"):
+                 parallel: bool = True, rounds_at: str = "clinic", free_at: str = "instruction",
+                 prefetch: bool = False):
         self.alg, self.lib, self.leaves = alg, lib, leaves
         self.parallel = parallel
+        #: when a block an instruction acted on is free for the next: "instruction" (once all
+        #: of the instruction is over -- a CNOT's ancilla waits while its partner is stored)
+        #: or "block" (once what it did to that block is over: the codesign choice of
+        #: 2026-10-29, measured on Gidney 2025's carry chain)
+        self.free_at = free_at
+        #: a CNOT's operand resting in a memory starts out as early as its release takes, so it
+        #: arrives with the other instead of after it (`bring`'s just-in-time rule still holds
+        #: it back while the workshop is busy): the codesign choice of 2026-10-29
+        self.prefetch = prefetch
         #: where `se b k` runs its k syndrome rounds: "clinic" (a block goes to a syndrome
         #: clinic and back) or "memory" (the block rests in a memory and the memory runs the
         #: rounds in place, every block's at once -- the codesign choice of 2026-10-29: a
@@ -760,6 +770,8 @@ class City:
             az = xor(az, ax)
         elif conj == "SX":
             ax = xor(ax, az)
+        elif conj == "H":
+            ax, az = az, ax
         for part, other in (copy or {}).items():           # a CNOT copies the other's frame
             oax, oaz = self.frame(other)
             if part == "ax":
@@ -1151,6 +1163,15 @@ class City:
             trip = (nets[k + 1][1], nets[k + 1][2], outs, taus[k + 1], nb)
         return t, trip
 
+    def _lead(self, q: str, t0: float) -> float:
+        """When block `q` may start out for an op the other operands are ready for at `t0`:
+        a block resting in a memory or a zone that early, less its release (`prefetch`)."""
+        b = self.blocks[q]
+        if not (self.parallel and b.resting):
+            return t0
+        out_op = "release" if self.family(b.leaf) == "memory" else "check_out"
+        return max(self.block_free.get(q, 0.0), t0 - self.leaf[b.leaf].master.ops[out_op].duration_us)
+
     def bring(self, bundle: Bundle, dst, t_min, ins, grp, *, stop_ok: bool = True):
         """A block to door `dst`: out of its zone first if it rests in one.  If no road takes
         it there under the ion-loss limit, it is recooled on the way: stored in a free memory
@@ -1387,7 +1408,7 @@ class City:
         return D, gids, deps
 
     #: the instructions a guard can gate: a place that can be told (`ctl`), or the archive
-    GUARDABLE = ("cx", "zz", "xx", "ppm", "read", "s", "sx", "x", "y", "z")
+    GUARDABLE = ("cx", "zz", "xx", "ppm", "read", "s", "sx", "x", "y", "z", "ht")
 
     def instruction(self, ins: Instr):
         grp = f"i{ins.index}"
@@ -1521,8 +1542,9 @@ class City:
                              also=[((self.blocks[b].leaf, self.blocks[b].port), d)
                                    for b, d in zip(ins.blocks, ("a_in", "b_in"))])
             gd = self.guard_at(ins, grp, W)
-            gc, ac, tc = self.bring(self.blocks[c], (W, "a_in"), t0, ins.index, grp)
-            gt, at_, tt = self.bring(self.blocks[t], (W, "b_in"), t0, ins.index, grp)
+            tc0, tt0 = (self._lead(b, t0) for b in (c, t)) if self.prefetch else (t0, t0)
+            gc, ac, tc = self.bring(self.blocks[c], (W, "a_in"), tc0, ins.index, grp)
+            gt, at_, tt = self.bring(self.blocks[t], (W, "b_in"), tt0, ins.index, grp)
             s, outs, _ = self.op(W, "cx", {"a_in": (gc, ac, tc), "b_in": (gt, at_, tt)},
                                  max(t0, gd), ins.index, grp, guard=self.guard_row(ins, gd))
             produced[c] = Bundle(c, outs["a_out"][0], W, "a_out", outs["a_out"][1])
@@ -1608,6 +1630,24 @@ class City:
             self.block_info[q]["read"] = row[1]
         elif kind in ("s", "sx"):
             self.pi4(ins, grp, t0, before, produced)
+        elif kind == "ht":
+            # a logical Hadamard at a Hadamard bay: H on every ion, the block sent out a quarter
+            # turn round (qccd/gadget/leaves/hadamard.py); the frame's X̄ and Z̄ trade places
+            q = ins.blocks[0]
+            Hb = self._choose("hadamard", ins, near=(self.blocks[q].leaf, self.blocks[q].port), ready=t0)
+            gd = self.guard_at(ins, grp, Hb)
+            gids, arr, trip = self.bring(self.blocks[q], (Hb, "in"), t0, ins.index, grp)
+            s, outs, row = self.op(Hb, "h", {"in": (gids, arr, trip)}, max(t0, gd), ins.index, grp,
+                                   guard=self.guard_row(ins, gd))
+            produced[q] = Bundle(q, outs["out"][0], Hb, "out", outs["out"][1])
+            # the block's ions in code order from this op on: `ions` stays the order it was born
+            # in, `turns` lists [start, order] each time a place hands it back relabelled (times,
+            # like `born` and `read`: event ids are renumbered once the schedule is done)
+            self.block_info[q].setdefault("turns", []).append([row[1], list(outs["out"][0])])
+            if self.frame(q) != (ZERO, ZERO) or ins.cond is not None:
+                self.write_frame(q, row[2], ins=ins.index, grp=grp, guard=self.cond_json(ins), conj="H",
+                                 text=f"frame of {q} through H̄",
+                                 why="H̄ X̄ H̄ = Z̄: the frame's X̄ and Z̄ parts trade places")
         elif kind == "decode":
             # no ion moves: the syndromes cross their wires and the decoder works
             self.decode(ins, grp, t0)
@@ -1674,6 +1714,19 @@ class City:
                     + [m[7] for m in self.messages[before_m:]]
                     + [f["t"] for f in self.frames[before_f:]])
             done = max(mine + [t0])
+            if self.free_at == "block":
+                # each block is free when what this instruction did TO IT is over: the ancilla
+                # a CNOT leaves at the workshop goes on while its partner is still being stored
+                for q in list(ins.blocks) + list(produced):
+                    gs = set(self.blocks[q].gids) if q in self.blocks else set()
+                    if q in produced:
+                        gs |= set(produced[q].gids)
+                    own = ([e[2] for e in self.events[before:]
+                            if any(isinstance(g, int) and g in gs for _, g in e[8])]
+                           + [c[11] for c in self.carries[before_c:] if gs & set(c[7])]
+                           + [f["t"] for f in self.frames[before_f:] if f["block"] == q])
+                    self.block_free[q] = max(self.block_free.get(q, 0.0), max(own + [t0]))
+                return
             for q in list(ins.blocks) + list(produced):
                 self.block_free[q] = max(self.block_free.get(q, 0.0), done)
 
