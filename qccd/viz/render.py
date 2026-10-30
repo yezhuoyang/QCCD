@@ -2624,10 +2624,13 @@ const splitQ = PH.split ? PH.split.quanta : 0;
 const mergeQ = PH.merge ? PH.merge.quanta : 0;
 const junctionQ = d => { const e = PH.junction_by_degree[String(d)]; return e ? e.quanta : 0; };
 
+// `st.q` is the RUNNING n-bar, which a cool zeroes; `st.gone` keeps what each zeroing took,
+// so `q + gone` is the lifetime deposit -- what `D.checksum` is (`per_ion_quanta`)
+function _zeroQ(st, ion){ st.gone[ion]=(st.gone[ion]||0)+(st.q[ion]||0); st.q[ion]=0; }
 function applyFrame(st, f) {
-  if (f.type==='init'){ for(const k in f.place){ st.pos[k]=f.place[k]; st.q[k]=0; } return; }
+  if (f.type==='init'){ for(const k in f.place){ st.pos[k]=f.place[k]; _zeroQ(st,k); } return; }
   if (f.type==='cool'){ const ions=(f.ions&&f.ions.length)?f.ions:Object.keys(st.pos);
-    for(const i of ions) st.q[i]=0; return; }
+    for(const i of ions) _zeroQ(st,i); return; }
   // C2LR (docs/c2lr.md): a two-qubit gate on the two crystals of one leg is merge, MS,
   // split, and the merge and the split heat both of them (`replay.py`)
   if (f.type==='gate' && PH.c2lr){
@@ -2700,7 +2703,7 @@ function applyFrame(st, f) {
 // cannot follow it.  `let`, and one function that reassigns all four together -- deriving
 // three of them and forgetting the fourth is exactly the shape of change that produced the
 // 14.68 px overlap defect, and `tests/census.mjs --program` is what would see it.
-let states=[], before=[], cum=[], SLOTS=[], FINAL={pos:{},q:{}};
+let states=[], before=[], cum=[], SLOTS=[], FINAL={pos:{},q:{},gone:{}};
 // THE RUNNING TOTALS.  `cum` sums the cost Python stamped on each SHIPPED frame; an
 // authored frame carries none, so the head counted 0 of a shipped total under a
 // programme the user had just typed.  For an authored programme the numerators are the
@@ -2731,7 +2734,7 @@ function spurContext(){
 }
 function deriveStage(frames){
   SPUR_CTX = spurContext();
-  const st={pos:{},q:{}}, running={cost:0,steps:0};
+  const st={pos:{},q:{},gone:{}}, running={cost:0,steps:0};
   states=[]; before=[]; cum=[]; SLOTS=[];
   for(const f of frames){
     before.push(Object.assign({},st.pos));   // where everything was when the frame began
@@ -2842,7 +2845,10 @@ const EV = D.evidence || {self_check_ions: Object.keys(D.checksum||{}).length,
                           replayed_cycles: (P.frames||[]).length,
                           rules_evaluated: [], rules_all: []};
 let drift=0, driftIon=null;
-for(const ion in D.checksum){const d=Math.abs((FINAL.q[ion]||0)-D.checksum[ion]);
+// the checksum is the lifetime deposit, so the page's side is its running n-bar plus what
+// its cools took: comparing the running n-bar alone failed every programme that cools
+// after heating (surface3 on grid5x5 by 276 quanta) though both replays agreed
+for(const ion in D.checksum){const d=Math.abs((FINAL.q[ion]||0)+((FINAL.gone||{})[ion]||0)-D.checksum[ion]);
   if(d>drift){drift=d;driftIon=ion;}}
 
 // ---------- is the compiled programme still a programme for THIS device? ----------

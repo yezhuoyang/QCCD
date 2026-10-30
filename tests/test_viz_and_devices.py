@@ -112,12 +112,16 @@ def _page_quanta(view: dict) -> dict:
 
     pos: dict[str, str] = {}
     q: dict[str, float] = {}
+    # what each zeroing took: `q + gone` is the lifetime deposit the checksum is
+    gone: dict[str, float] = {}
     for f in view["program"]["frames"]:
         if f["type"] == "init":
             for k, v in f["place"].items():
+                gone[k] = gone.get(k, 0.0) + q.get(k, 0.0)
                 pos[k], q[k] = v, 0.0
         elif f["type"] == "cool":
             for i in (f.get("ions") or list(pos)):
+                gone[i] = gone.get(i, 0.0) + q.get(i, 0.0)
                 q[i] = 0.0
         elif f["type"] == "simd":
             if "shift" in f:
@@ -149,7 +153,32 @@ def _page_quanta(view: dict) -> dict:
                     if "merge" in priced:
                         dq += merge_q
                     q[ion] = q.get(ion, 0.0) + dq
-    return {k: round(v, 6) for k, v in q.items()}
+    return {k: round(v + gone.get(k, 0.0), 6) for k, v in q.items()}
+
+
+def test_the_page_agrees_after_a_cool():
+    """A cool zeroes the page's running n-bar, but the checksum is the lifetime deposit
+    (`per_ion_quanta`): the page must add back what its cools took.  Comparing the running
+    n-bar alone failed every board page that cools after heating (surface3 on grid5x5 by
+    276 quanta), though both replays agreed."""
+    from qccd.api import Machine
+    m = Machine.load(ARCH_DIR / "ring144_24v.arch.json")
+    arch = m.arch
+    p = m.program("cool", provenance="off").fill()
+    p.rotate(+1)
+    p.cool()
+    p.rotate(+1)
+    prog = p.tsir
+    model = corrected_model()
+    res = replay(prog, arch, model, check_rules=False)
+    view = build_view_model(arch, prog, res, model)
+    assert any(f["type"] == "cool" for f in view["program"]["frames"])
+    assert max(view["checksum"].values()) > 0
+    assert _page_quanta(view) == pytest.approx(view["checksum"], abs=1e-9)
+    # and the page script itself keeps what a cool took and compares the sum
+    from qccd.viz import render
+    assert "_zeroQ(st,i)" in render._TEMPLATE
+    assert "(FINAL.gone||{})[ion]" in render._TEMPLATE
 
 
 def test_the_page_agrees_on_the_shipped_schedule_too():
