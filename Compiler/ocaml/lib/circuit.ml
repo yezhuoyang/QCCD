@@ -323,13 +323,15 @@ let to_json c : Yojson.Safe.t =
    fence over the qubits it names, and it stays one node.  Sending a 32-qubit barrier to
    the gate lowering crashed the compiler before placement (`Unsupported "barrier on 32
    qubits"`), which refused every H2 GHZ and MB circuit (2026-10-07). *)
-let lower (c : t) : t * int =
+let lower_with_sources (c : t) : t * int * int array =
   let out = ref [] in
+  let sources = ref [] in
   let n = ref 0 in
   let expanded = ref 0 in
   List.iter
     (fun (o : op) ->
       if List.length o.qubits <= 2 || o.name = "barrier" then begin
+        sources := o.index :: !sources;
         out := { o with index = !n } :: !out;
         incr n
       end
@@ -337,6 +339,7 @@ let lower (c : t) : t * int =
         incr expanded;
         List.iter
           (fun (l : Gateset_composites.lowered) ->
+            sources := o.index :: !sources;
             out :=
               {
                 index = !n;
@@ -352,4 +355,8 @@ let lower (c : t) : t * int =
           (Gateset_composites.lower o.name o.params o.qubits)
       end)
     c.ops;
-  ({ c with ops = List.rev !out }, !expanded)
+  ({ c with ops = List.rev !out }, !expanded, Array.of_list (List.rev !sources))
+
+let lower c =
+  let c, n, _ = lower_with_sources c in
+  (c, n)

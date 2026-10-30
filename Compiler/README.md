@@ -16,6 +16,70 @@ computed rather than proved, which is the half that sees which gate fires.
 
 ## Status
 
+### Checked compilation stages
+
+Studio's Compile and Run actions now run the following named stages. Each boundary saves
+its input, output, witness, checker method, coverage and verdict. Optimizers choose
+candidates; the checkers accept or reject those candidates independently.
+
+| Stage | Single obligation |
+|---|---|
+| 1. Circuit Normalization | Preserve the source circuit while lowering composite gates and retaining source-operation identities. |
+| 2. Dependency Analysis | Reconstruct quantum/classical wire order, reset dependencies and barrier fences. |
+| 3. Initial Placement | Establish a complete legal qubit-to-ion mapping and occupancy. |
+| 4. Interaction Placement | Assign ordered gate operands to capable sites with enough capacity. |
+| 5. Transport Synthesis | Replay physical paths or collective shifts and check identity, arrival and movement constraints. |
+| 6. Native Gate Lowering | Check each native pulse sequence against its logical operation, including angles and virtual-Z frames. |
+| 7. Broadcast Packing | Preserve each ion's ordered pulse sequence when grouping commands. Full hardware control rules are also checked at final acceptance. |
+| 8. Operating-Point Binding | Recompute durations, intrinsic heating and resources from the fixed device and physical model. |
+| 9. Event Scheduling | Assign and check actual execution intervals. |
+| 10. Thermal Analysis | Integrate elapsed-time and intrinsic heating and check gate-entry budgets and the declared cooling policy. |
+| 11. Cooling Insertion | Insert legal cooling while preserving every original operation; invalidate and repeat stages 8–10. |
+| 12. Artifact Validation | Reload the executable and check source semantics, certificate binding, enforceable hardware rules and physical annotations. |
+
+Stages 4–7 repeat over execution frontiers. Cooling is conditional and its repair
+loop is bounded. The first timing backend is serial between instructions and
+preserves SIMD within each instruction. Cross-instruction overlap is rejected by
+this backend; supporting it requires a checker for concurrent thermal execution.
+Classically conditioned QASM is currently rejected because the native backend
+does not yet implement its conditional execution.
+
+The native compiler writes `<prefix>.stages.json`. Its standalone checker reruns
+the saved stage checks against the source, device and native executable:
+
+```bash
+Compiler/ocaml/_build/default/bin/qccdc_cli.exe check-stages build/prog.stages.json \
+  --qasm circuit.qasm --arch build/device.expanded.json --program build/prog.tsir.json
+```
+
+After the usual architecture export and native compilation, run the remaining
+stages and final acceptance with:
+
+```bash
+python Compiler/bridge/finish_staged.py build/prog --qasm circuit.qasm \
+  --arch device.arch.json --expanded-arch build/device.expanded.json
+```
+
+The second command saves the original native program as `.native.tsir.json`, the
+timed executable as `.cooled.tsir.json`, and a certified correspondence baseline
+as `.tsir.json`. The baseline retains the checked final annotations on the original
+operations, so existing evaluation still compares instruction bodies exactly.
+Use `.native.tsir.json` when rechecking native evidence after finalization.
+`.compilation.json` records acceptance or rejection; `.evidence/manifest.json`
+links immutable content-addressed snapshots and retains invalidated retry history.
+Studio also stores the evidence objects and manifest in its artifact store.
+Submission reuse requires this complete stored chain, with the executable,
+certified baseline and certificate matching the final checked boundary. Older
+cached runs without stage evidence are recompiled.
+
+These are executable checks under the declared model. Stage hashes establish
+integrity, not semantics. Native unitary checks are numerical; the existing Lean
+checker retains its transport/mapping certificate scope. A partial source-semantic
+check cannot be promoted by an exit-zero process result. Experimental calibration,
+R7b duty-cycle budgets and the missing R15 interference model remain outside the
+acceptance claim. The separate BB/ring research pipeline remains a separate entry
+point; the workflow above is the native compiler used by Studio.
+
 | milestone | state |
 |---|---|
 | **C0** interface: OCaml ⇄ Python JSON, validated against the 397 184 / 8 808 oracle | ✅ done |

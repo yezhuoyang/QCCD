@@ -198,8 +198,24 @@ let placement_of_json (j : Yojson.Safe.t) : placement =
 
 let placement_of_file path = placement_of_json (Yojson.Safe.from_file path)
 
-let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circuit.t)
+let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t)
     ~(arch_path : string) ~(qasm_path : string) : Tsir.t * Cert.t * plan * string list =
+  let evidence = ref [] in
+  let boundary = ref 0 in
+  let save_stage record =
+    let record = match record with
+      | `Assoc fields when List.mem (List.assoc "id" fields)
+          (List.map (fun s->`String s) ["interaction_placement";"transport_synthesis";
+            "native_gate_lowering";"broadcast_packing"]) ->
+        incr boundary;
+        `Assoc (("iteration",`Assoc ["engine",`String "rotate";"boundary",`Int !boundary]) ::
+          List.remove_assoc "iteration" fields)
+      | record -> record in
+    evidence := record :: !evidence
+  in
+  let c, _, source_ops, normalization = Stages.normalize c in
+  save_stage normalization;
+  save_stage (Stages.dependency_record c (Compile.layer_of c));
   (* a switchless machine docks every rider, asked or not: anything else breaks R4 *)
   let dock_all = dock_all || spurs_tied a in
   let cv =
@@ -337,7 +353,8 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
   let op_meta (ids : int list) : (string * Yojson.Safe.t) list =
     match List.sort_uniq compare ids with
     | [] -> []
-    | l -> [ ("op", `List (List.map (fun i -> `Int i) l)) ]
+    | l -> [ ("op", `List (List.map (fun i -> `Int i) l));
+             ("source_op", Stages.ints (List.sort_uniq compare (List.map (Array.get source_ops) l))) ]
   in
   let blank = Tsir.{ ityp = ""; id = 0; cls = None; mode = None; template = None;
                      participants = []; holds = []; gate = None; arity = None;
@@ -349,12 +366,81 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
   let placement =
     List.map (fun q -> (ion q, site_of x (ion q))) (dock_side @ loop_side)
   in
+  let pl = Place.{ ion = Array.init c.n_qubits ion; site = Hashtbl.create c.n_qubits; notes = [] } in
+  List.iter (fun (i,s) -> Hashtbl.add pl.site i s) placement;
+  save_stage (Stages.placement_record a c pl);
+  let checked_positions = ref (Hashtbl.copy pl.site) in
+  let transport moves =
+    let before = Stages.position_json !checked_positions in
+    let plan = Route.{cycles=(if moves=[] then [] else [{moves}]);
+                       arrivals=List.map (fun (m:Route.move)->m.ion,m.dst) moves;
+                       slots=(if moves=[] then 0 else 1)} in
+    let after = Stages.check_transport a ~before:!checked_positions plan in
+    save_stage (Stages.record "transport_synthesis" ~input:before
+      ~output:(`Assoc ["cycles",Stages.route_json plan;"final_positions",Stages.position_json after])
+      ~witness:(`Assoc ["arrivals",Stages.position_json after])
+      ~coverage:["independent transition replay: connectivity, ion identity, occupancy and arrival"]);
+    checked_positions := after
+  in
+  (* Movement is checked before emission.  The replay state is separate from the
+     conveyor optimizer's offset and dock assignment, including temporary riders. *)
+  let emit = add in
+  let add (i:Tsir.instr) =
+    if i.ityp="simd" then begin
+      match i.template with
+      | Some (`Assoc fields) when List.assoc_opt "kind" fields=Some (`String "loop_shift") ->
+        let loop = match List.assoc "loop" fields with `String s->s | _->assert false in
+        let delta = match List.assoc "delta" fields with `Int n->n | _->assert false in
+        let before = Stages.position_json !checked_positions in
+        let after = Stages.check_rotation a ~before:!checked_positions ~loop ~delta in
+        save_stage (Stages.record "transport_synthesis" ~input:before
+          ~output:(`Assoc ["rotation",`Assoc ["loop",`String loop;"delta",`Int delta];
+                           "final_positions",Stages.position_json after])
+          ~witness:(`Assoc ["arrivals",Stages.position_json after])
+          ~coverage:["all loop ions replayed on every physical hop, including spectators and capacities"]);
+        checked_positions := after
+      | _ -> transport (List.map (fun (p:Tsir.participant) ->
+          Route.{ion=p.ion;src=p.src;dst=p.dst;via=p.via}) i.participants)
+    end;
+    emit i
+  in
+  let interactions sited =
+    Stages.check_interactions a pl sited;
+    save_stage (Stages.record "interaction_placement"
+      ~input:(`Assoc ["positions",Stages.position_json !checked_positions;
+                     "operations",`List (List.map (fun (o,_)->Stages.op_json o) sited)])
+      ~output:(Stages.sited_json sited) ~witness:`Null
+      ~coverage:["ordered source operands, execution capability and capacity, distinct simultaneous docks"])
+  in
+  let native_lowering sited native =
+    List.iter (function _,None->() | _,Some (s,ions)->List.iter (fun i->
+      Stages.require (Hashtbl.find_opt !checked_positions i=Some s) "rotate: operand has not arrived") ions) sited;
+    Stages.check_native c sited native;
+    save_stage (Stages.record "native_gate_lowering" ~input:(Stages.sited_json sited)
+      ~output:(Stages.native_json native) ~witness:`Null
+      ~coverage:["ordered native pulses preserve each operation up to global phase (numerical tolerance 1e-8)";
+                 "measurement/reset operands preserved"])
+  in
+  let packing native first_id =
+    let output = List.filter (fun (i:Tsir.instr)->i.id>=first_id &&
+      List.mem i.ityp ["gate";"measure";"reset"]) !prog.instructions in
+    Stages.check_packing native output;
+    save_stage (Stages.record "broadcast_packing" ~input:(Stages.native_json native)
+      ~output:(`List (List.map Tsir.instr_to_json output)) ~witness:`Null
+      ~coverage:["per-ion ordered pulse and SPAM effects preserved by packed instructions"])
+  in
   add Tsir.{ blank with ityp = "init"; id = fresh (); placement;
              quanta = List.map (fun (i, _) -> (i, `Float 0.0)) placement;
              meta = [ ("compiler", `String "qccdc/rotate"); ("loop", `String cv.loop);
                       ("docked", `Int (List.length dock_side)) ] };
   add Tsir.{ blank with ityp = "cool"; id = fresh (); broadcast = true;
              meta = [ ("kind", `String "state_prep") ] };
+  if List.for_all (fun (o:Circuit.op)->o.name="barrier") c.ops then begin
+    interactions [];
+    transport [];
+    native_lowering [] [];
+    packing [] !prog.id_seq
+  end;
 
   let n_rot = ref 0 and n_hops = ref 0 and n_contacts = ref 0 and n_batches = ref 0 in
   let n_extra = ref 0 in
@@ -409,6 +495,9 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
   let contact ?(extra : (string * Conveyor.dock) list = [])
       (pairs4 : (string * Conveyor.dock * string * int * bool) list) =
     if pairs4 <> [] then begin
+      let sited = List.map (fun (_, (d:Conveyor.dock), _, dag, _) ->
+        let o=op_at.(dag) in o,Some (d.site,List.map ion o.qubits)) pairs4 in
+      interactions sited;
       let batch_ops = List.map (fun (_, _, _, dag, _) -> dag) pairs4 in
       let riders = List.map (fun (r, d, _, _, _) -> (r, d)) pairs4 @ extra in
       n_extra := !n_extra + List.length extra;
@@ -506,6 +595,10 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
       let rounds =
         List.fold_left (fun acc (_, _, _, _, ps) -> max acc (List.length ps)) 0 seqs
       in
+      let native = List.map (fun ((d:Conveyor.dock),dag,_,_,ps) ->
+        let o=op_at.(dag) in o,d.site,List.map ion o.qubits,ps) seqs in
+      native_lowering sited native;
+      let first_id = !prog.id_seq in
       for k = 0 to rounds - 1 do
         let beams = ref [] and mss = ref [] and vzs = ref [] in
         List.iter
@@ -545,6 +638,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
           incr cyc
         end
       done;
+      packing native first_id;
       List.iter
         (fun ((d : Conveyor.dock), dag, rider, partner, _) ->
           cert_gates :=
@@ -618,6 +712,9 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
      naming the (shared) instruction that performed it. *)
   let emit_singles (items : (Circuit.op * string) list) =
     if items <> [] then begin
+      let sited = List.map (fun (o,i)->o,Some (site_of x i,[i])) items in
+      interactions sited;
+      transport [];
       let seqs =
         List.map
           (fun ((o : Circuit.op), i) ->
@@ -630,6 +727,13 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
             (o, i, dk, d.pulses))
           items
       in
+      let native = List.map (fun (o,i,(dk:Conveyor.dock),ps) ->
+        let ps=List.map (function Gateset.Beam {theta;phi;_}->`Beam (theta,phi,i)
+          | Gateset.Frame {lam;_}->`Frame (lam,i)
+          | Gateset.Ms _->raise (Not_applicable "one-qubit gate lowered to MS")) ps in
+        o,dk.site,[i],ps) seqs in
+      native_lowering sited native;
+      let first_id = !prog.id_seq in
       let rounds = List.fold_left (fun acc (_, _, _, ps) -> max acc (List.length ps)) 0 seqs in
       let last_cycle : (int, int) Hashtbl.t = Hashtbl.create 32 in
       for k = 0 to rounds - 1 do
@@ -658,6 +762,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
         emit "R" "beam" !beams;
         emit "VZ" "virtual_z" !vzs
       done;
+      packing native first_id;
       List.iter
         (fun ((o : Circuit.op), i, (dk : Conveyor.dock), _) ->
           cert_gates :=
@@ -679,10 +784,17 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
      the checker's `needsWitness` excludes measure and reset. *)
   let emit_spam kind (items : (int * string) list) =
     if items <> [] then begin
+      let sited = List.map (fun (dag,i)->op_at.(dag),Some (site_of x i,[i])) items in
+      interactions sited;
+      transport [];
+      let native = List.map (fun (dag,i)->op_at.(dag),site_of x i,[i],[]) items in
+      native_lowering sited native;
+      let first_id = !prog.id_seq in
       add Tsir.{ blank with ityp = kind; id = fresh ();
                  ions = List.map snd items;
                  meta = [ ("kind", `String kind) ] @ op_meta (List.map fst items) };
-      incr cyc
+      incr cyc;
+      packing native first_id
     end
   in
 
@@ -898,6 +1010,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) (a : Arch.t) (c : Circu
             ("contacts", `Int !n_contacts); ("batches", `Int !n_batches) ];
       }
   in
+  stage_records := List.rev !evidence;
   ( !prog, cert,
     { contacts = !n_contacts; rotations = !n_rot; hops = !n_hops; batches = !n_batches },
     !notes )

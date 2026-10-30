@@ -500,7 +500,7 @@ def _op_set_final_program(ctx: _Ctx, op: Mapping, where: str) -> None:
         ctx.state.final_program = None
         return
     out = {}
-    for k in ("artifact", "certified", "certificate", "compiled_for", "circuit_digest"):
+    for k in ("artifact", "certified", "certificate", "compiled_for", "circuit_digest", "compilation"):
         v = op.get(k)
         if v is None and k != "artifact":
             continue
@@ -609,6 +609,7 @@ OPERATIONS: dict = {s.name: s for s in [
            {"calls": "[{method, args, kwargs}]"}, _op_append_program, "program"),
     OpSpec("set_final_program", "Adopt a compiled program (a compile job's adopt_with), or clear it.",
            {"artifact": "sha256:<hex>|null", "certified": "sha256:<hex>?", "certificate": "sha256:<hex>?",
+            "compilation": "sha256:<hex>?",
             "compiled_for": "sha256:<hex>?", "compiler": "'compile'|'rotate'|'external'?", "label": "string?"},
            _op_set_final_program, "program"),
     OpSpec("studio_sync", "The browser's own records (used by Studio, not by agents).",

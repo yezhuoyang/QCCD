@@ -1,0 +1,3 @@
+(test
+ (name stages_test)
+ (libraries qccdc yojson))

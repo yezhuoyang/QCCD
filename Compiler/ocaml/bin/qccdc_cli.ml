@@ -67,6 +67,9 @@ let usage () =
       Every rule of the set is checked on the output afterwards (qccd.ruleset); give the
       resolved file, with every rule written out.
 
+  qccdc check-stages <prefix.stages.json> --qasm <input.qasm> --arch <expanded.json> --program <prefix.tsir.json>
+      independently replay the saved boundary checks without running the optimizers
+
   qccdc pulses-selftest
       differential-test the pulse table against the unitaries it claims to implement
 
@@ -248,6 +251,11 @@ let init_placement_arg rest =
       Printf.eprintf "--init-placement %s: %s\n" path m;
       exit 2)
 
+let save_stages ~engine ~inp ~arch_path ~out ~accepted stages =
+  Qccdc.Stages.save (out ^ ".stages.json")
+    (Qccdc.Stages.manifest ~engine ~circuit_path:inp ~architecture_path:arch_path
+       ~program_path:(out ^ ".tsir.json") ~accepted stages)
+
 let cmd_compile ?init inp arch_path out =
   let a = Qccdc.Arch.load arch_path in
   (match Qccdc.Arch.check_structure a with
@@ -296,8 +304,11 @@ let cmd_compile ?init inp arch_path out =
     prerr_endline "  TSIR SHAPE ERRORS:";
     List.iter (fun e -> prerr_endline ("    " ^ e)) errs;
     exit 2);
+  Qccdc.Stages.require (Qccdc.Cert.check r.cert = []) "final certificate replay failed";
   Qccdc.Tsir.save (out ^ ".tsir.json") r.prog;
   Qccdc.Cert.save (out ^ ".qcert.json") r.cert;
+  save_stages ~engine:"general" ~inp ~arch_path ~out
+    ~accepted:(r.cert.unrealised=[] && Qccdc.Cert.check r.cert=[]) r.stages;
   Printf.printf "  -> %s.tsir.json  %s.qcert.json
 " out out;
   ((if Qccdc.Cert.check r.cert <> [] then 1 else 0), r.cert.unrealised)
@@ -345,9 +356,9 @@ let cmd_rotate ?(sweep = Qccdc.Rotate_pipeline.Greedy) ?placement ?(dock_all = f
   let prog = Qccdc.Qasm.parse_file inp in
   let name = Filename.remove_extension (Filename.basename inp) in
   let c = Qccdc.Circuit.build ~name prog in
-  let c, _ = Qccdc.Circuit.lower c in
+  let stage_records = ref [] in
   let p, cert, st, notes =
-    Qccdc.Rotate_pipeline.run ~sweep ?placement ~dock_all a c
+    Qccdc.Rotate_pipeline.run ~stage_records ~sweep ?placement ~dock_all a c
       ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
   in
   Printf.printf "%s -> %s (rigid rotation)
@@ -387,8 +398,11 @@ let cmd_rotate ?(sweep = Qccdc.Rotate_pipeline.Greedy) ?placement ?(dock_all = f
         if i < 6 then Printf.printf "    %s: %s
 " f.where f.why)
       fs);
+  Qccdc.Stages.require (Qccdc.Cert.check ~loops cert = []) "rotation certificate replay failed";
   Qccdc.Tsir.save (out ^ ".tsir.json") p;
   Qccdc.Cert.save (out ^ ".qcert.json") cert;
+  save_stages ~engine:"rotate" ~inp ~arch_path ~out ~accepted:(cert.unrealised=[])
+    !stage_records;
   Printf.printf "  -> %s.tsir.json  %s.qcert.json
 " out out;
   if Qccdc.Cert.check ~loops cert <> [] then 1 else 0
@@ -400,8 +414,9 @@ let cmd_racetrack ?(strict = false) ?init inp arch_path out =
   let prog = Qccdc.Qasm.parse_file inp in
   let name = Filename.remove_extension (Filename.basename inp) in
   let c = Qccdc.Circuit.build ~name prog in
+  let stage_records = ref [] in
   let p, cert, _, notes =
-    Qccdc.Racetrack.run ?init a c ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
+    Qccdc.Racetrack.run ~stage_records ?init a c ~arch_path:("arch/" ^ a.name ^ ".arch.json") ~qasm_path:inp
   in
   (match Qccdc.Tsir.validate p with
   | [] -> ()
@@ -437,8 +452,11 @@ let cmd_racetrack ?(strict = false) ?init inp arch_path out =
       (fun i (f : Qccdc.Cert.failure) ->
         if i < 6 then Printf.printf "    %s: %s\n" f.where f.why)
       fs);
+  Qccdc.Stages.require (fails = []) "race-track certificate replay failed";
   Qccdc.Tsir.save (out ^ ".tsir.json") p;
   Qccdc.Cert.save (out ^ ".qcert.json") cert;
+  save_stages ~engine:"racetrack" ~inp ~arch_path ~out ~accepted:(cert.unrealised=[])
+    !stage_records;
   Printf.printf "  -> %s.tsir.json  %s.qcert.json\n" out out;
   if fails <> [] then 1 else 0
 
@@ -483,6 +501,7 @@ let cmd_compile_split ?init inp arch_path out : int option =
     Printf.printf "  certificate: %d gate witnesses, self-check OK\n" (List.length r.cert.gates);
     Qccdc.Tsir.save (out ^ ".tsir.json") r.prog;
     Qccdc.Cert.save (out ^ ".qcert.json") r.cert;
+    save_stages ~engine:"general-split" ~inp ~arch_path ~out ~accepted:true r.stages;
     Printf.printf "  -> %s.tsir.json  %s.qcert.json\n" out out;
     Some 0
 
@@ -498,6 +517,7 @@ let try_split ?init inp arch_path out (k : unit -> 'a) : 'a =
     k ()
 
 let () =
+  try
   let argv = Array.to_list Sys.argv |> List.tl in
   (match arg_after "--rules" argv with
    | Some path -> (
@@ -512,6 +532,13 @@ let () =
 " m; exit 2)
    | None -> ());
   match argv with
+  | "check-stages" :: path :: rest -> (
+    match arg_after "--arch" rest, arg_after "--qasm" rest, arg_after "--program" rest with
+    | Some architecture_path, Some circuit_path, Some program_path ->
+      Qccdc.Stages.check_manifest ~circuit_path ~architecture_path ~program_path
+        (Yojson.Safe.from_file path);
+      print_endline (Yojson.Safe.to_string (`Assoc ["accepted",`Bool true;"method",`String "ocaml.stage-replay.v1"])); exit 0
+    | _ -> usage ())
   | "rotate" :: inp :: rest -> (
     match (arg_after "--arch" rest, arg_after "-o" rest) with
     | Some ap, Some out -> (
@@ -633,3 +660,7 @@ let () =
     | Some out -> exit (cmd_roundtrip inp out)
     | None -> usage ())
   | _ -> usage ()
+
+  with Qccdc.Stages.Failed message ->
+    Printf.eprintf "Compiler stage rejected: %s\n" message;
+    exit 6

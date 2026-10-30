@@ -243,7 +243,7 @@ class ResultsMixin:
     def _job_compile(self, jid, params, actor, origin_prompt_id, cancel) -> dict:
         """Compile a board's circuit for the design at one revision, with the REAL
         toolchain: export -> qccdc_cli (rotate first on a design with a closed loop, else the
-        router) -> insert_cooling.  The artifacts are stored by digest; adopting them into the
+        router) -> checked physical stages -> artifact validation.  The artifacts are stored by digest; adopting them into the
         design is a separate change set (`set_final_program`), so compiling never edits the
         design behind anyone's back."""
         from .core import WorkspaceError
@@ -276,7 +276,11 @@ class ResultsMixin:
         from ..compile.programs import closed_loops
         modes = [want] if want != "auto" else (["rotate", "compile"] if closed_loops(r.arch) else ["compile"])
         budget = float((rel.manifest.get("limits") or {}).get("compile_timeout_s", 600))
-        log, mode, cp = "", None, None
+        limits = rel.manifest.get("limits") or {}
+        verification_budget = max(budget, float(limits.get("lean_timeout_s", 1800)),
+                                  float(limits.get("semantics_timeout_s", budget)))
+        verification_memory = int(limits.get("lean_mem_mb", 12288))
+        log, mode, cp, compilation = "", None, None, None
         if is_c2lr(r.arch):
             # A C2LR lattice moves its crystals only by swap-or-stay steps, which qccdc does not
             # emit: its reference compile is the baseline C2LR router (docs/c2lr.md), in-process,
@@ -294,30 +298,49 @@ class ResultsMixin:
             except Refused as exc:
                 log = f"--- {COMPILER_NAME}\n{exc}"
         for m in modes:
+            compilation = None
             self._progress(jid, "compile", f"compiling {rel.title} with qccdc_cli {m}")
-            for stale in ("prog.tsir.json", "prog.qcert.json"):
+            for stale in ("prog.tsir.json", "prog.qcert.json", "prog.stages.json",
+                          "prog.native.tsir.json", "prog.cooled.tsir.json", "prog.compilation.json"):
                 (work / stale).unlink(missing_ok=True)
             cp = run_limited([tc.qccdc, m, work / "circuit.qasm", "--arch", work / "device.expanded.json", "-o",
                               work / "prog"], cwd=work, timeout=budget, mem_mb=8192, cancel=cancel)
             log += f"--- qccdc_cli {m}\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
             if cp.status in ("cancelled", "timeout"):
                 return {"_status": cp.status, "summary": f"compile {cp.status}", "log": log[-6000:]}
-            if cp.ok and (work / "prog.tsir.json").exists() and \
-                    not json.loads((work / "prog.qcert.json").read_text(encoding="utf-8")).get("unrealised"):
-                mode = m
-                break
+            if cp.ok and (work / "prog.tsir.json").exists():
+                self._progress(jid, "stages", "checking stage artifacts, timing, cooling and source semantics")
+                args = [tc.python, tc.bridge / "finish_staged.py", work / "prog", "--qasm", work / "circuit.qasm",
+                        "--arch", work / "device.arch.json", "--expanded-arch", work / "device.expanded.json",
+                        "--qccdc", tc.qccdc, "--table",
+                        (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones"),
+                        "--timeout", str(budget), "--semantic-timeout", str(verification_budget),
+                        "--semantic-mem-mb", str(verification_memory)]
+                if tc.qcheck is not None:
+                    args += ["--qcheck", tc.qcheck]
+                co = run_limited(args, cwd=work, timeout=2 * budget + verification_budget + 600,
+                                 mem_mb=max(8192, verification_memory), cancel=cancel)
+                if co.status in ("cancelled", "timeout"):
+                    return {"_status": co.status, "summary": f"stage verification {co.status}", "log": log[-6000:]}
+                from ..compile.driver import validate_compilation_outputs
+                try:
+                    if (work / "prog.compilation.json").exists():
+                        compilation = strict_loads((work / "prog.compilation.json").read_bytes(), PROGRAM_LIMITS)
+                    if co.ok and isinstance(compilation, dict):
+                        validate_compilation_outputs(work / "prog", compilation)
+                        mode = m
+                        break
+                    if compilation is not None and not isinstance(compilation, dict):
+                        raise ValueError("compiler report must be an object")
+                except (OSError, ValueError, TypeError, KeyError) as exc:
+                    compilation = {"accepted": False, "error": str(exc)}
+                reason = (compilation or {}).get("error") or (co.stderr or co.stdout)[-1600:]
+                log += f"\nstage verification rejected {m}: {reason}\n"
         log = log[-6000:]
         if mode is None:
             return {"_status": "failed", "summary": f"the compiler could not place {rel.title} on this design: "
-                    + _compiler_reason(log), "log": log, "refusal": _compiler_reason(log)}
-        self._progress(jid, "cooling", "inserting cooling (R7)")
-        co = run_limited([tc.python, tc.bridge / "insert_cooling.py", work / "prog.tsir.json", "--arch",
-                          work / "device.arch.json", "-o", work / "prog.cooled.tsir.json", "--table",
-                          (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones")],
-                         cwd=work, timeout=600, cancel=cancel)
-        if not (work / "prog.cooled.tsir.json").exists():
-            return {"_status": "cancelled" if co.status == "cancelled" else "failed",
-                    "summary": "cooling insertion failed", "log": (co.stdout + co.stderr)[-2000:]}
+                    + ((compilation or {}).get("error") or _compiler_reason(log)), "log": log,
+                    "refusal": (compilation or {}).get("error") or _compiler_reason(log), "compilation": compilation}
         self._progress(jid, "rules", "checking the compiled program against the rules")
         fault = _compiler_fault(_replay_for_rules(work, (rel.manifest.get("physics") or {}).get("rank_table", "qccdsim_jones")),
                                 tc, design=self._design_title_of(branch), program=rel.title)
@@ -326,16 +349,41 @@ class ResultsMixin:
         raw = (work / "prog.tsir.json").read_bytes()
         cooled = (work / "prog.cooled.tsir.json").read_bytes()
         certb = (work / "prog.qcert.json").read_bytes()
+        from ..compile.driver import validate_compilation_outputs
+        try:
+            validate_compilation_outputs(work / "prog", compilation)
+            import hashlib
+            if any(hashlib.sha256(data).hexdigest() != compilation[key] for data, key in
+                   ((raw, "certified_sha256"), (cooled, "output_sha256"), (certb, "certificate_sha256"))):
+                raise ValueError("program changed during artifact ingestion")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            return {"_status": "failed", "summary": f"compiler artifact integrity: {exc}"}
         d_raw = self.put_artifact(canonical_bytes(strict_loads(raw, PROGRAM_LIMITS)), "application/json", "certified program")
         d_cool = self.put_artifact(canonical_bytes(strict_loads(cooled, PROGRAM_LIMITS)), "application/json", "final program (cooled)")
         d_cert = self.put_artifact(canonical_bytes(strict_loads(certb, PROGRAM_LIMITS)), "application/json", "certificate")
+        # Keep every evidence object in the immutable workspace artifact store;
+        # the local manifest is also available in this job's run directory.
+        evidence_artifacts = {}
+        for obj in sorted((work / "prog.evidence" / "objects").glob("*.json")):
+            evidence_artifacts[obj.stem] = self.put_artifact(obj.read_bytes(), "application/json", "compiler stage evidence")
+        d_evidence = self.put_artifact((work / "prog.evidence" / "manifest.json").read_bytes(),
+                                       "application/json", "compiler stage manifest")
+        d_report = self.put_artifact((work / "prog.compilation.json").read_bytes(),
+                                    "application/json", "compiler verification report")
+        stage_ref = {"schema": "qccd.compilation.reference.v1", "status": "passed",
+                     "report": d_report, "manifest": d_evidence, "objects": evidence_artifacts,
+                     "manifest_sha256": compilation["manifest_sha256"],
+                     "program": d_cool, "certified": d_raw, "certificate": d_cert,
+                     "physical_iterations": compilation["physical_iterations"]}
+        d_compilation = self.put_artifact(canonical_bytes(stage_ref), "application/json", "accepted compilation reference")
         n_instr = len(strict_loads(cooled, PROGRAM_LIMITS).get("instructions", []))
         final_ref = {"artifact": d_cool, "certified": d_raw, "certificate": d_cert,
                      "compiled_for": r.arch_digest(), "compiler": mode,
-                     "board": rel.id, "circuit_digest": rel.manifest["circuit"]["digest"],
+                     "board": rel.id, "circuit_digest": rel.manifest["circuit"]["digest"], "compilation": d_compilation,
                      "label": f"{rel.title}: qccdc {mode}, r{rev}, {n_instr} instructions"}
-        return {"summary": f"compiled {rel.title} at r{rev}: {n_instr} instructions (cooled); certificate stored",
-                "final_program": final_ref, "log": log[-2000:], "cooling_log": (co.stdout + co.stderr)[-1000:],
+        return {"summary": f"compiled {rel.title} at r{rev}: {n_instr} instructions; stage checks passed",
+                "final_program": final_ref, "log": log[-2000:],
+                "compilation": stage_ref,
                 "adopt_with": {"type": "set_final_program", **final_ref}}
 
     # ------------------------------------------------------------------ snapshots
@@ -517,13 +565,14 @@ class ResultsMixin:
 
     def _job_submit(self, jid, params, actor, origin_prompt_id, cancel) -> dict:
         from .core import WorkspaceError
+        from .compilation import has_stage_evidence
         rel = self.board(params["board"])
         branch = params["branch"]
         head = self.head(branch)
         fp = head.state.final_program or {}
         r = self.replayed(branch, head.revision)
         fresh = (fp.get("artifact") and fp.get("circuit_digest") == rel.manifest["circuit"]["digest"]
-                 and fp.get("compiled_for") == r.arch_digest())
+                 and fp.get("compiled_for") == r.arch_digest() and has_stage_evidence(self, fp))
         rev = head.revision
         compiled = reused = None
         if not fresh:
@@ -565,6 +614,7 @@ class ResultsMixin:
         text (line endings aside: a checkout may carry them either way), and the device the one the
         design has now."""
         want = rel.circuit_text().replace("\r\n", "\n")
+        from .compilation import has_stage_evidence
         for row in self.store.all("SELECT id FROM jobs WHERE kind='run' AND status='succeeded' "
                                   "ORDER BY created_at DESC LIMIT 20"):
             run = (self.job(row["id"]).get("result") or {}).get("run") or {}
@@ -575,6 +625,10 @@ class ResultsMixin:
             if ((run.get("performance") or {}).get("rules") or {}).get("failed"):
                 continue
             if not all(arts.get(k) for k in ("program", "certified", "certificate", "circuit")):
+                continue
+            stage_ref = run.get("compilation") or {}
+            if (stage_ref.get("status") != "passed" or any(stage_ref.get(key) != arts[key]
+                    for key in ("program", "certified", "certificate"))):
                 continue
             try:
                 if self.get_artifact(arts["circuit"]).decode("utf-8").replace("\r\n", "\n") != want:
@@ -587,6 +641,10 @@ class ResultsMixin:
                    "circuit_digest": rel.manifest["circuit"]["digest"],
                    "label": f"{rel.title}: qccdc {run['compiler']}, r{revision}, {n_instr} instructions "
                             f"(compiled by a run)"}
+            ref["compilation"] = self.put_artifact(canonical_bytes({**stage_ref, "schema": "qccd.compilation.reference.v1"}),
+                                                   "application/json", "accepted run compilation reference")
+            if not has_stage_evidence(self, ref):
+                continue
             return {"run_id": row["id"], "adopt_with": {"type": "set_final_program", **ref}}
         return None
 

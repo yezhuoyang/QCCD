@@ -47,6 +47,7 @@ type result = {
   cert : Cert.t;
   stats : stats;
   notes : string list;
+  stages : Yojson.Safe.t list;
 }
 
 (* ------------------------------------------------------------------ layering *)
@@ -215,7 +216,8 @@ let placement_of_init (a : Arch.t) (c : Circuit.t) (init : (string * string) lis
       (match Arch.node a s with
       | Some _ -> ()
       | None -> invalid_arg (Printf.sprintf "--init-placement: %s -> unknown site %s" ion s));
-      Hashtbl.replace site ion s)
+      if Hashtbl.mem site ion then invalid_arg ("duplicate ion in --init-placement: " ^ ion);
+      Hashtbl.add site ion s)
     init;
   let ion = Array.init c.Circuit.n_qubits Place.ion_name in
   Array.iter
@@ -234,14 +236,25 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
      certificate's op list -- is about the LOWERED circuit; R10's stabilizer half still
      compares the emitted pulses against the ORIGINAL, so the lowering is checked rather
      than trusted. *)
-  let c, n_lowered = Circuit.lower c in
+  let c, n_lowered, source_ops, normalization = Stages.normalize c in
+  let stage_records = ref [normalization] in
+  let record_stage stage = stage_records := stage :: !stage_records in
+  let dependency_analysis () =
+    let layers = layer_of c in
+    record_stage (Stages.dependency_record c layers);
+    layers
+  in
+  let lay = dependency_analysis () in
   let t = Traps.build ?rest a in
   let d = Traps.all_dists t in
-  let pl =
-    match init with
-    | Some init -> placement_of_init a c init
-    | None -> Place.run ~variant a t d c
+  let initial_placement () =
+    let pl = match init with
+      | Some init -> placement_of_init a c init
+      | None -> Place.run ~variant a t d c in
+    record_stage (Stages.placement_record ?rest a c pl);
+    pl
   in
+  let pl = initial_placement () in
   let notes = ref (List.rev pl.notes) in
   (match rest with
   | Some rest ->
@@ -306,7 +319,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
   let op_meta (ids : int list) : (string * Yojson.Safe.t) list =
     match List.sort_uniq compare ids with
     | [] -> []
-    | l -> [ ("op", `List (List.map (fun i -> `Int i) l)) ]
+    | l -> [ ("op", `List (List.map (fun i -> `Int i) l));
+             ("source_op", Stages.ints (List.sort_uniq compare (List.map (Array.get source_ops) l))) ]
   in
   (* The instruction a gate witness names ought to be one that actually performs the
      operation.  It used to be `id_seq - 1` -- the last instruction of the whole LAYER --
@@ -407,7 +421,6 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
   let ion_of q = pl.ion.(q) in
 
   (* --- per layer ----------------------------------------------------------- *)
-  let lay = layer_of c in
   let n_layers = Array.fold_left max (-1) lay + 1 in
   let by_layer = Array.make (max n_layers 0) [] in
   List.iter (fun (o : Circuit.op) -> by_layer.(lay.(o.index)) <- o :: by_layer.(lay.(o.index))) c.ops;
@@ -425,8 +438,31 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
   let tied = Route.tied_of a in
   let usable s = not (Hashtbl.mem tied s) in
 
+  (* The optimizer may propose a route whose waveform split violates an
+     intermediate capacity.  Reject that candidate before any emission and let
+     the existing placement/round-splitting search try another plan.  Keep this
+     check in the planner's result expression so optional undocking can decline
+     without abandoning a previously checked round. *)
+  let transport_synthesis ?(tolerate=true) ~targets () =
+    let plan = Route.plan_layer ~tolerate a t d ~pos ~targets ~horizon in
+    (try ignore (Stages.check_transport a ~before:pos plan)
+     with Stages.Failed why ->
+       raise (Route.Unroutable ("transport candidate rejected: " ^ why)));
+    plan
+  in
+
   (* One routed plan, emitted: one instruction and one certificate cycle per cycle. *)
   let emit_plan ~(kind : string) ~(ops_of : string -> int list) (plan : Route.layer_plan) =
+    let before = Stages.position_json pos in
+    let after = Stages.check_transport a ~before:pos plan in
+    record_stage (Stages.record "transport_synthesis"
+      ~iteration:(`Assoc ["kind", `String kind; "cycle", `Int !cyc])
+      ~input:before ~output:(`Assoc ["cycles", Stages.route_json plan;
+                                  "final_positions", Stages.position_json after])
+      ~witness:(`Assoc ["arrivals", `Assoc (List.map (fun (i,s)->i,`String s) plan.arrivals)])
+      ~coverage:["independent segment-path and ion-identity replay";
+                 "site/segment capacities, junction exclusion and opposing traffic";
+                 "arrival claims match replay; full hardware rules checked downstream"]);
     List.iter
       (fun (cy : Route.cycle) ->
         List.iter
@@ -519,7 +555,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
             "they stay, and no plan moves anything across their channel's sites"
           :: !notes
       | Some targets -> (
-        match Route.plan_layer a t d ~pos ~targets ~horizon with
+        match transport_synthesis ~targets () with
         | plan ->
           emit_plan ~kind:"evacuate" ~ops_of:(fun _ -> []) plan;
           List.iter (fun (i, s) -> Hashtbl.replace home i s) targets;
@@ -558,6 +594,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
      ends the layer, and what is left of it is unrealised. *)
   let round ~(eager : bool) ?(cap : int option) (layer_i : int) (round_i : int)
       (ops : Circuit.op list) : Circuit.op list =
+    let interaction_placement () =
     let claimed = Hashtbl.create 16 in
     let occ = occupancy pos in
     (* this round's moves so far, per site.  Read only by the paths the single pass never
@@ -897,6 +934,18 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     (* only these can fail where the single pass would not have *)
     let novel = round_i > 0 || !evictions <> [] || !settled in
 
+    (sited, deferred, novel, List.rev !evictions, home_before)
+    in
+    let interaction_input = Stages.position_json pos in
+    let sited, deferred, novel, evictions, home_before = interaction_placement () in
+    Stages.check_interactions a pl sited;
+    let iteration = `Assoc ["layer", `Int layer_i; "round", `Int round_i] in
+    record_stage (Stages.record "interaction_placement" ~iteration
+      ~input:(`Assoc ["positions",interaction_input;"operations",`List (List.map Stages.op_json ops)])
+      ~output:(Stages.sited_json sited)
+      ~witness:(`Assoc ["deferred",Stages.ints (List.map (fun (o:Circuit.op)->o.index) deferred)])
+      ~coverage:["ordered operands, gate/SPAM capability, operand capacity and exclusive gate sites"]);
+
     (* 2. route everything that has to move *)
     let needed =
       List.concat_map
@@ -907,7 +956,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         sited
     in
     let targets =
-      (needed |> List.filter (fun (i, s) -> Hashtbl.find pos i <> s)) @ List.rev !evictions
+      (needed |> List.filter (fun (i, s) -> Hashtbl.find pos i <> s)) @ evictions
     in
     (* ion -> the ops of THIS layer it is being brought together for, so a transport
        cycle can say which statements it is serving rather than just "route" *)
@@ -924,9 +973,11 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
             ions)
       sited;
     let ops_of i = try Hashtbl.find ion_ops i with Not_found -> [] in
+    if targets = [] then
+      emit_plan ~kind:"no_transport" ~ops_of Route.{cycles=[];arrivals=needed;slots=0};
     if targets <> [] then begin
       let before = Hashtbl.copy pos in
-      match Route.plan_layer ~tolerate:(not split) a t d ~pos ~targets ~horizon with
+      match transport_synthesis ~tolerate:(not split) ~targets () with
       | plan ->
         (* record the sub-problem AND what the heuristic achieved on it, so C4 can measure
            the gap against an optimal solver on the very same instance.
@@ -969,8 +1020,11 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         raise (Round_gave_up m)
     end;
 
+    List.iter (fun (i,s) -> Stages.require (Hashtbl.find_opt pos i=Some s)
+      ("transport did not deliver interaction operand "^i)) needed;
+
     (* 3. the pulses *)
-    let decomposed =
+    let native_gate_lowering () =
       List.filter_map
         (fun ((o : Circuit.op), site) ->
           match site with
@@ -1005,6 +1059,13 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 None)))
         sited
     in
+    let decomposed = native_gate_lowering () in
+    Stages.check_native c sited decomposed;
+    record_stage (Stages.record "native_gate_lowering" ~iteration
+      ~input:(Stages.sited_json sited) ~output:(Stages.native_json decomposed)
+      ~witness:(`Assoc ["tolerance",`Float 1e-8;"global_phase",`String "ignored"])
+      ~coverage:["per-operation numerical unitary equivalence, including declared gate bodies";
+                 "ordered operands, pulse parameters and virtual-Z frames; SPAM preserved"]);
 
     (* barriers cost nothing and only order things *)
     if List.exists (fun ((o : Circuit.op), _, _, _) -> o.name = "barrier") decomposed
@@ -1028,6 +1089,8 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
     in
     List.iter (fun (_, _, _, _, nf) -> n_frames := !n_frames + nf) phys;
 
+    let packing_start = !prog.id_seq in
+    let broadcast_packing () =
     let rounds =
       List.fold_left (fun acc (_, _, _, ps, _) -> max acc (List.length ps)) 0 phys
     in
@@ -1100,8 +1163,9 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         n_ms := !n_ms + List.length !mss
       end;
       if !beams <> [] || !mss <> [] || !vzs <> [] then incr cyc
-    done;
-
+    done
+    in
+    broadcast_packing ();
     (* every gate op gets a witness naming where it happened *)
     List.iter
       (fun ((o : Circuit.op), s, ions, ps, _) ->
@@ -1161,7 +1225,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
       |> List.map (fun i -> (i, Hashtbl.find home i))
     in
     if returning <> [] then begin
-      match Route.plan_layer ~tolerate:(not split) a t d ~pos ~targets:returning ~horizon with
+      match transport_synthesis ~tolerate:(not split) ~targets:returning () with
       | plan ->
         (* the layer's ops again: this transport is not travelling TOWARDS them -- they
            have happened -- it is clearing the gate zone after them, and
@@ -1214,6 +1278,14 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         incr cyc
       end
     end;
+    let packed = List.filter (fun (i:Tsir.instr)->i.id>=packing_start && List.mem i.ityp ["gate";"measure";"reset"]) !prog.instructions in
+    Stages.check_packing decomposed packed;
+    record_stage (Stages.record "broadcast_packing" ~iteration
+      ~input:(Stages.native_json decomposed)
+      ~output:(`List (List.map Tsir.instr_to_json packed)) ~witness:`Null
+      ~coverage:["exact per-ion pulse/SPAM sequence and parameter preservation";
+                 "unique operands within packed commands; control-rule acceptance checked downstream"]);
+
     deferred
   in
 
@@ -1227,6 +1299,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
   Array.iteri
     (fun layer_i (ops : Circuit.op list) ->
       let rec go ?cap round_i pending =
+        let stages_before = !stage_records in
         let home_snap = if split then Some (Hashtbl.copy home) else None in
         let halve () =
           let n = gates_in pending in
@@ -1237,6 +1310,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         | later -> continue ?cap round_i pending later
         | exception ((Round_gave_up _ | Route.Unroutable _) as e)
           when split && halve () <> None ->
+          stage_records := stages_before;
           (match home_snap with
           | Some h ->
             Hashtbl.reset home;
@@ -1249,6 +1323,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
               (Option.get (halve ()));
           go ?cap:(halve ()) round_i pending
         | exception Round_gave_up m ->
+          stage_records := stages_before;
           let later =
             if round_i = 0 && eager then begin
               notes :=
@@ -1281,6 +1356,20 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
       go 0 ops)
     by_layer;
 
+  if n_layers=0 then begin
+    let iteration = `Assoc ["empty_program",`Bool true] in
+    record_stage (Stages.record "interaction_placement" ~iteration
+      ~input:(`Assoc ["positions",Stages.position_json pos;"operations",`List []])
+      ~output:(`List []) ~witness:(`Assoc ["not_applicable",`Bool true])
+      ~coverage:["empty program: no interactions to assign"]);
+    emit_plan ~kind:"no_transport" ~ops_of:(fun _->[]) Route.{cycles=[];arrivals=[];slots=0};
+    record_stage (Stages.record "native_gate_lowering" ~iteration ~input:(`List [])
+      ~output:(`List []) ~witness:(`Assoc ["not_applicable",`Bool true])
+      ~coverage:["empty program: no operations to lower"]);
+    record_stage (Stages.record "broadcast_packing" ~iteration ~input:(`List [])
+      ~output:(`List []) ~witness:(`Assoc ["not_applicable",`Bool true])
+      ~coverage:["empty program: no commands to pack"])
+  end;
   let cert =
     Cert.
       {
@@ -1324,6 +1413,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
         instructions = List.length !prog.instructions;
       };
     notes = List.rev !notes;
+    stages = List.rev !stage_records;
   }
 
 (* Try the placements in order until one routes.

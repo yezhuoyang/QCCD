@@ -228,14 +228,29 @@ type item =
 let item_op = function
   | IBeam (_, _, _, o) | IFrame (_, _, o) | IMs (_, _, _, o) | IMeas (_, o) | IReset (_, o) -> o
 
-let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) :
+let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : string) :
     Tsir.t * Cert.t * stats * string list =
   let d = detect a in
   let n = d.n in
   let k_max = max_pairs d in
   if k_max = 0 then
     na "no gate site on loop %s that an ion beside it can step into to share" d.lid;
-  let c, n_lowered = Circuit.lower c in
+  let evidence = ref [] in
+  let boundary = ref 0 in
+  let save_stage record =
+    let record = match record with
+      | `Assoc fields when List.mem (List.assoc "id" fields)
+          (List.map (fun s->`String s) ["interaction_placement";"transport_synthesis";
+            "native_gate_lowering";"broadcast_packing"]) ->
+        incr boundary;
+        `Assoc (("iteration",`Assoc ["engine",`String "racetrack";"boundary",`Int !boundary]) ::
+          List.remove_assoc "iteration" fields)
+      | record -> record in
+    evidence := record :: !evidence
+  in
+  let c, n_lowered, source_ops, normalization = Stages.normalize c in
+  save_stage normalization;
+  save_stage (Stages.dependency_record c (Compile.layer_of c));
   let nq = c.n_qubits in
   if nq > n then
     na "%d qubits but loop %s has %d sites, and a rigid shift needs every ion alone in its site"
@@ -394,7 +409,8 @@ let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : s
   let op_meta (ids : int list) : (string * Yojson.Safe.t) list =
     match List.sort_uniq compare ids with
     | [] -> []
-    | l -> [ ("op", `List (List.map (fun i -> `Int i) l)) ]
+    | l -> [ ("op", `List (List.map (fun i -> `Int i) l));
+             ("source_op", Stages.ints (List.sort_uniq compare (List.map (Array.get source_ops) l))) ]
   in
   let blank =
     Tsir.{ ityp = ""; id = 0; cls = None; mode = None; template = None; participants = [];
@@ -407,6 +423,42 @@ let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : s
   let n_moves = ref 0 and n_swaps = ref 0 and n_service = ref 0 in
 
   let placement = List.init nq (fun q -> (ion q, d.nodes.(pos.(q)))) in
+  let pl = Place.{ion=Array.init nq ion;site=Hashtbl.create nq;notes=[]} in
+  List.iter (fun (i,s)->Hashtbl.add pl.site i s) placement;
+  save_stage (Stages.placement_record a c pl);
+  let checked_positions = ref (Hashtbl.copy pl.site) in
+  let transport moves =
+    let before = Stages.position_json !checked_positions in
+    let plan = Route.{cycles=(if moves=[] then [] else [{moves}]);
+                       arrivals=List.map (fun (m:Route.move)->m.ion,m.dst) moves;
+                       slots=(if moves=[] then 0 else 1)} in
+    let after=Stages.check_transport a ~before:!checked_positions plan in
+    save_stage (Stages.record "transport_synthesis" ~input:before
+      ~output:(`Assoc ["cycles",Stages.route_json plan;"final_positions",Stages.position_json after])
+      ~witness:(`Assoc ["arrivals",Stages.position_json after])
+      ~coverage:["independent transition replay: physical paths, ion identity, capacity and arrival"]);
+    checked_positions := after
+  in
+  let emit = add in
+  let add (i:Tsir.instr) =
+    if i.ityp="simd" then begin
+      match i.template with
+      | Some (`Assoc fields) when List.assoc_opt "kind" fields=Some (`String "loop_shift") ->
+        let loop=match List.assoc "loop" fields with `String s->s | _->assert false in
+        let delta=match List.assoc "delta" fields with `Int n->n | _->assert false in
+        let before=Stages.position_json !checked_positions in
+        let after=Stages.check_rotation a ~before:!checked_positions ~loop ~delta in
+        save_stage (Stages.record "transport_synthesis" ~input:before
+          ~output:(`Assoc ["rotation",`Assoc ["loop",`String loop;"delta",`Int delta];
+                           "final_positions",Stages.position_json after])
+          ~witness:(`Assoc ["arrivals",Stages.position_json after])
+          ~coverage:["collective loop motion replays every ion and intermediate physical hop"]);
+        checked_positions := after
+      | _ -> transport (List.map (fun (p:Tsir.participant)->
+          Route.{ion=p.ion;src=p.src;dst=p.dst;via=p.via}) i.participants)
+    end;
+    emit i
+  in
   add
     Tsir.{ blank with ityp = "init"; id = fresh (); placement;
                       quanta = List.map (fun (i, _) -> (i, `Float 0.0)) placement;
@@ -487,6 +539,43 @@ let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : s
 
   (* ---- pulses: one item per zone per instruction ---- *)
   let run_zones (zones : (int * item list) list) =
+    (* The zone assignment is immutable across these stages.  A zone contains a
+       sequential chain; it is not a claim that every operation runs simultaneously. *)
+    let assigned = List.concat_map (fun (s,items)->
+      let seen=Hashtbl.create 16 in
+      List.filter_map (fun it ->
+        let op=item_op it in
+        if Hashtbl.mem seen op then None else begin
+          Hashtbl.add seen op ();
+          Some (ops.(op),d.nodes.(s),List.filter (fun x->item_op x=op) items)
+        end) items) zones in
+    let sited=List.map (fun (o,s,_)->o,Some (s,List.map ion o.Circuit.qubits)) assigned in
+    Stages.check_interactions ~sequential:true a pl sited;
+    save_stage (Stages.record "interaction_placement"
+      ~input:(`Assoc ["positions",Stages.position_json !checked_positions;
+                     "operations",`List (List.map (fun (o,_,_)->Stages.op_json o) assigned)])
+      ~output:(Stages.sited_json sited)
+      ~witness:(`Assoc ["sequential",`Bool true;
+        "per_zone_order",`List (List.map (fun (s,items)->`Assoc ["site",`String d.nodes.(s);
+          "operations",Stages.ints (List.map item_op items)]) zones)])
+      ~coverage:["ordered operands and capable, sufficiently large execution sites for each zone chain"]);
+    transport [];
+    List.iter (fun (o,s,_)->List.iter (fun q->
+      Stages.require (Hashtbl.find_opt !checked_positions (ion q)=Some s && d.nodes.(pos.(q))=s)
+        "racetrack: gate operands have not arrived") o.Circuit.qubits) assigned;
+    let native=List.map (fun (o,s,items)->
+      let ps=List.filter_map (function
+        | IBeam (q,t,p,_)->Some (`Beam (t,p,ion q))
+        | IFrame (q,l,_)->Some (`Frame (l,ion q))
+        | IMs (x,y,t,_)->Some (`Ms (t,ion x,ion y))
+        | IMeas _ | IReset _->None) items in
+      o,s,List.map ion o.Circuit.qubits,ps) assigned in
+    Stages.check_native c sited native;
+    save_stage (Stages.record "native_gate_lowering" ~input:(Stages.sited_json sited)
+      ~output:(Stages.native_json native) ~witness:`Null
+      ~coverage:["each native sequence preserves its source operation up to global phase (tolerance 1e-8)";
+                 "measurement/reset operands preserved"]);
+    let first_id = !nid in
     let zs = Array.of_list (List.map (fun (s, l) -> (s, ref l)) zones) in
     let left = Hashtbl.create 32 in
     Array.iter
@@ -572,8 +661,15 @@ let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : s
           (List.sort_uniq compare opl);
         incr cyc
       end
-    done
+    done;
+    let packed=List.rev !instrs |> List.filter (fun (i:Tsir.instr)->i.id>=first_id &&
+      List.mem i.ityp ["gate";"measure";"reset"]) in
+    Stages.check_packing native packed;
+    save_stage (Stages.record "broadcast_packing" ~input:(Stages.native_json native)
+      ~output:(`List (List.map Tsir.instr_to_json packed)) ~witness:`Null
+      ~coverage:["per-ion ordered pulses and SPAM preserved by zone-parallel packing"])
   in
+  if Array.for_all ((=) Barrier) kind then run_zones [];
   (* the items of one op, in time order, on the circuit's qubits *)
   let items_of o =
     match kind.(o) with
@@ -1004,4 +1100,5 @@ let run ?init (a : Arch.t) (c : Circuit.t) ~(arch_path : string) ~(qasm_path : s
     @ [ Printf.sprintf "%d two-qubit gates in %d rounds; %d shifts totalling %d hops (%d to serve one-qubit ops), %d one-ion steps (%d swaps)"
           !n_g2 !n_rounds !n_rot !n_hops !n_service !n_moves !n_swaps ]
   in
+  stage_records := List.rev !evidence;
   (prog, cert, st, notes)
