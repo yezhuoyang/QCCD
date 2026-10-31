@@ -1,0 +1,85 @@
+"""The tiled surface compiler (qccd/compile/tiled_surface.py): a rotated surface patch's rounds on
+a grid, every plaquette playing the same moves at once.
+
+Held here:
+
+* at every distance tried the programme passes every rule (under the default physics and under
+  qccd-physics@2) and R10's checks that do not need the Lean checker -- the certificate's
+  binding, transport, witnesses and per-qubit order, and the stabilizer tableau composed from
+  the emitted pulses against the source; where the Lean checker is built, it accepts too;
+* the programme is the same instructions at every distance (one round: 39), so writing it is
+  linear in the ions, and the round takes as long at d = 9 as at d = 3;
+* it refuses a circuit that is not a rotated surface patch's, saying why.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from qccd.compile.cooling import insert_cooling
+from qccd.compile.tiled_surface import TiledError, compile_tiled, device
+from qccd.cost.models import corrected_model
+from qccd.qec.experiments import rotated_surface
+from qccd.verify import verify
+
+from test_c2lr_router import BRIDGE, _r10
+
+
+@pytest.mark.parametrize("d, rounds", [(3, 1), (5, 3), (9, 2)])
+def test_every_rule_and_r10_hold_at_every_distance(d, rounds, tmp_path):
+    exp = rotated_surface(d, rounds)
+    prog, cert, arch = compile_tiled(exp.qasm, d)
+    for physics, table in ((None, "qccdsim_jones"), ("physics@2", "quantinuum")):
+        a = device(d, physics=physics)
+        model = corrected_model(table)
+        rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+        assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, arch, exp.qasm, tmp_path)
+
+
+def test_the_programme_is_the_same_instructions_at_every_distance():
+    lens, rounds_us = set(), set()
+    model = corrected_model("qccdsim_jones")
+    for d in (3, 5, 9):
+        prog, _, arch = compile_tiled(rotated_surface(d, 1).qasm, d)
+        lens.add(len(prog.instructions))
+        rep = verify(insert_cooling(prog, arch, model).program, arch, model, check_metrics=False)
+        rounds_us.add(round(rep.result.total_us, 3))
+    assert lens == {39} and len(rounds_us) == 1, (lens, rounds_us)
+
+
+def test_the_proved_checker_accepts_the_certificate(tmp_path):
+    exe = os.environ.get("QCCD_QCHECK")
+    if not exe or not Path(exe).is_file():
+        from test_c2lr import _qcheck
+        exe = _qcheck()
+    if exe is None:
+        pytest.skip("the Lean checker (qcheck) is not built here")
+    exp = rotated_surface(5, 2)
+    prog, cert, arch = compile_tiled(exp.qasm, 5)
+    arch_p = tmp_path / "dev.arch.json"
+    arch_p.write_text(json.dumps(arch.to_json()), encoding="utf-8")
+    subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(arch_p), "-o",
+                    str(tmp_path / "dev.expanded.json")], check=True, capture_output=True)
+    prog.save(str(tmp_path / "prog.tsir.json"), indent=None)
+    (tmp_path / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
+    subprocess.run([sys.executable, str(BRIDGE / "mk_qcheck_input.py"), str(tmp_path / "prog"), "--arch",
+                    str(tmp_path / "dev.expanded.json"), "-o", str(tmp_path / "q.json")],
+                   check=True, capture_output=True)
+    out = subprocess.run([str(exe), str(tmp_path / "q.json")], capture_output=True, text=True, timeout=600)
+    assert "ACCEPTED" in out.stdout, out.stdout + out.stderr
+
+
+def test_a_circuit_that_is_not_a_surface_patch_is_refused_saying_why():
+    exp = rotated_surface(3, 1)
+    bad = exp.qasm.replace("cx q[10],q[1];", "cx q[10],q[8];", 1)
+    with pytest.raises(TiledError, match="no check of the d = 3 patch"):
+        compile_tiled(bad, 3)
+    with pytest.raises(TiledError, match="not between a data ion and a measure ion"):
+        compile_tiled(exp.qasm.replace("cx q[10],q[1];", "cx q[0],q[1];", 1), 3)
