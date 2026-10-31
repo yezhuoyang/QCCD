@@ -987,6 +987,52 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
 5. One prime, then the whole program, concrete; the viewer draws tiles zoomed out and ions
    zoomed in.
 
+**Progress (2026-10-31).**
+- Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
+  rule, 138 ms.
+- Step 2, the CNOT done (65c4ad5): `surgery_cnot`, FormalRV's own (A in |+̄>, Z̄_C Z̄_A, X̄_A
+  X̄_T, A read in Z), three patches in an L, two phases, detectors by one rule (`_phased`).
+  Circuit distance d; every rule and R10 at d = 3 .. 15; LER under qccd-noise@2 2.4e-3,
+  2.3e-4, 1.9e-5 (Z̄ flow) and 2.2e-3, 2.8e-4, 2.8e-5 (X̄ flow) at d = 3, 5, 7.  At d = 25:
+  3,849 ions, 94,848 detectors, 1,976 instructions written in 8 s, every rule (132 s), 280 ms.
+  R10 at d = 25 was stopped at 36 GB: it needs a leaner tableau before it can run here.
+
+**What the program asks of the machine (census, 2026-10-31).** Gidney 2025 at RSA-2048 on
+the paper machine, weighted by how often each template runs.  As FormalRV writes it the PPMs
+are Z̄Z̄ 2.07e10, X̄X̄ 1.63e10, X̄Z̄ 1.87e9, Z̄ 1.05e9, X̄X̄X̄ 6.0e8, X̄Z̄Z̄ 1.5e7, with 3.2e9
+|Ȳ> preparations and 8.1e8 CCZ.  Every X̄Z̄ is `prep l Y; ppm X p Z l`, the middle of
+FormalRV's H̄ (S̄ √X̄ S̄ from three |Ȳ> merges).  After codesign's rewrites no PPM is left:
+`cx` 2.76e10, `read` 1.87e10, `prep Z` 5.5e9, `ht` 2.9e9, `prep X` 1.0e9, `autoccz` 8.1e8,
+`prep Y` 4.2e7.  So the d = 25 machine needs the surgery CNOT (built), preparations and
+readouts, the CCZ factory, and H̄.  Of the `ht`: 2.1e9 sit on a fresh ancilla between two
+`cx` (`prep l Z; cx a l; ht l; cx l b; read l X` -- the mixed product Z̄_a X̄_b), and 7.8e8
+open a template on a block (`ht p0; cx p0 l; read l Z` -- "measure X̄", which an X̄X̄ merge
+with a |+̄> patch does with no H̄; a codesign rewrite to make).
+
+**H̄ is the one gadget a CSS-only machine cannot make.** Z̄Z̄ and X̄X̄ merges, with
+preparations and readouts in X and Z, generate only the Cliffords that keep Z-type Paulis
+Z-type (CNOT circuits).  A merge that is a CSS code measures its Z-type and X-type products
+separately, so no straight seam, corridor or L of faces measures Z̄_a X̄_b (checked by hand
+and against the boundary-segment count: every such merged region keeps both logicals).
+H̄ on a stationary tile, the standard way, is:
+1. transversal H (one beam per data ion): the checks swap type, which flips the face
+   checkerboard (Z faces now at odd i + j) and swaps the boundary types;
+2. every data ion one trap to the right (one transport step on this grid): a translation by
+   one site flips the checkerboard back -- no code deformation can, since a deformation
+   extends the checkerboard it has;
+3. the boundary rotation by code deformation on two tiles: extend into the seam and the
+   neighbour tile (d x (2d + 1)), move the four corners in two steps (the long-edge corners
+   to the middle of their edges, then one site further), shrink back into the tile -- four
+   phases of d rounds, each keeping distance d, since at every step a Z̄ and an X̄
+   representative of the step before are representatives of the step after.
+About four merge-times for each H̄: ~1.2e10 merge-times on top of the CNOTs' 5.5e10 (+21 %).
+Off the critical path instead: an H̄ applied in advance to one half of a Bell pair gives the
+pair Z̄_1 X̄_2, X̄_1 Z̄_2, and then Z̄_a X̄_b is two ordinary merges at once (Z̄_a Z̄_1 and
+X̄_b X̄_2, which commute, product Z̄_a X̄_b), and H̄ on a block is teleportation through the
+pair -- the rotations become a resource factory, like magic states.  (A physical 90°
+rotation of the tile's ions would replace steps 2 and 3 with O(d) transport steps, but needs
+a router that moves data ions through the measure ions' traps; not now.)
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.
