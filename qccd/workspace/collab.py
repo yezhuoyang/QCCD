@@ -1326,9 +1326,10 @@ def _hints(ctx: Mapping) -> list:
     lr = ctx.get("latest_result")
     if lr and lr.get("stale"):
         out.append("The latest local result describes an older revision; re-run before citing it.")
-    if ctx.get("mode") == "exploratory":
-        out.append("The design changes the task's fixed physics: it is exploratory and cannot be an "
-                   "eligible submission.")
+    if ctx.get("mode") == "own physics":
+        out.append("The design brings physics numbers the board does not have (a junction degree it never "
+                   "prices, say): it is scored with them, and on the official leaderboard it is listed with the "
+                   "entries under rules of their own, not in the board's own ranking.")
     out.append("Change the design only with qccd_apply_change_set, passing expected_revision="
                f"{ctx['revision']}; mode='apply' when you are confident (validated, undoable), a preview "
                "only when unsure: each extra model call costs seconds.")

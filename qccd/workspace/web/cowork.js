@@ -1242,7 +1242,8 @@ function review(sub) {
 // `/studio?board=<task>` (the website's "Try your own design") opens the Studio focused on one board.
 // The panel is the PERSON's (data-qccd-private): the agent opens it (qccd_present open_board) and
 // asks to submit (qccd_submit_official), and the person presses Submit, in the panel or on the card.
-var B = { open: false, board: null, data: null, timer: null, loading: false, signinWin: null, name: null, vis: 'public' };
+var B = { open: false, board: null, data: null, timer: null, loading: false, signinWin: null, name: null, vis: 'public',
+          rules: '', rulesView: 'board', catalog: null };
 
 function boardParam() {
   var m = /[?&]board=([^&#]+)/.exec(location.search || '');
@@ -1276,7 +1277,9 @@ function closeBoard() {
 function loadBoard() {
   if (!B.open) return Promise.resolve();
   B.loading = true;
-  var q = '/api/board-view?design=' + encodeURIComponent(S.branch) + (B.board ? '&board=' + encodeURIComponent(B.board) : '');
+  var q = '/api/board-view?design=' + encodeURIComponent(S.branch) + (B.board ? '&board=' + encodeURIComponent(B.board) : '') +
+          (B.rulesView === 'all' ? '&rules=all' : '');
+  if (!B.catalog) api('GET', '/api/rules').then(function (r) { if (r.ok) { B.catalog = r.data; renderBoard(); } });
   return api('GET', q).then(function (r) {
     B.loading = false;
     if (r.ok) {
@@ -1323,7 +1326,9 @@ function signOut() {
 }
 function testOnBoard() {
   if (!B.board) return;
-  api('POST', '/api/submissions', { design: S.branch, board: B.board, profile: 'reference', request_id: rid('test') }).then(function (r) {
+  var body = { design: S.branch, board: B.board, profile: 'reference', request_id: rid('test') };
+  if (B.rules) body.rules = B.rules;                     // a rule set of the design's own; none: the board's
+  api('POST', '/api/submissions', body).then(function (r) {
     if (!r.ok) { notice('Not tested: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
     loadBoard();
   });
@@ -1363,6 +1368,32 @@ function newFromStarter() {
       refreshHead(true); loadBoard();
     });
   });
+}
+// an entry under rules of its own (or with physics numbers the board lacks), in a few words
+function ownNote(c) {
+  if (!c || c.board) return '';
+  var r = c.rules || {}, p = c.physics || {}, bits = [];
+  if (r.declared) bits.push('rules: ' + (r.set || 'its own'));
+  if ((r.drops || []).length) bits.push('drops ' + r.drops.join(', '));
+  if ((r.replaces || []).length) bits.push('rewrites ' + r.replaces.join(', '));
+  if ((r.adds || []).length) bits.push('adds ' + r.adds.join(', '));
+  if (!r.declared && (r.breaks || []).length) bits.push('breaks ' + r.breaks.join(', '));
+  if ((p.added || []).length) bits.push('own physics: ' + p.added.map(function (x) {
+    return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
+  return bits.join(' · ');
+}
+// the rule sets a design can be tested and entered under: the board's, the website's, the workspace's
+function rulesPick() {
+  var cat = B.catalog || {}, opts = [h('option', { value: '', text: 'The board\'s rules' })];
+  (cat.shipped || []).forEach(function (x) {
+    if (x.name !== cat.board) opts.push(h('option', { value: x.name, text: x.name + ' · ' + (x.title || '') })); });
+  (cat.workspace || []).forEach(function (x) {
+    opts.push(h('option', { value: x.file, text: x.file + (x.error ? ' (cannot be read)' : x.title ? ' · ' + x.title : ''),
+                            disabled: x.error ? 'disabled' : null, title: x.error || '' })); });
+  opts.forEach(function (o) { if (o.value === B.rules) o.selected = true; });
+  return h('select', { id: 'qcl-brules', cls: 'qcl-sel',
+                       title: 'the rule set the design is tested and entered under: the board\'s own, a set the website ships, or a .rules file in this workspace (rules/). An entry under rules other than the board\'s is listed with every entry, tagged, behind the board\'s own ranking',
+                       on: { change: function (e) { B.rules = e.target.value; } } }, opts);
 }
 // one request to publish, as the panel and the chat card both say it
 function pubLine(p) {
@@ -1435,9 +1466,12 @@ function renderBoard() {
   if (!t) line = 'Not tested on this board yet.';
   else if (t.state === 'running') { line = 'Testing: ' + (t.progress || 'compiling the board\'s circuit onto the design') + '…'; cls = 'busy'; }
   else if (t.eligible) {
-    line = 'Passed every check: ' + fmtVal(t.value, t.unit) + (t.would_rank ? ' · would place #' + t.would_rank + ' of ' + t.of + ' on the official board' : '');
+    line = 'Passed every check' + (t.rules ? ' under ' + t.rules.name : '') + ': ' + fmtVal(t.value, t.unit) +
+      (t.would_rank ? ' · would place #' + t.would_rank + ' of ' + t.of + ' on the official board' : '');
+    if (t.listed_with === 'all') line += ' · listed with every entry, not among the board\'s own (' + ownNote(t.conformance) + ')';
     cls = 'ok';
-  } else { line = 'Did not pass' + ((t.reasons || []).length ? ': ' + t.reasons.join('; ') : '') + '.'; cls = 'bad'; }
+  } else { line = 'Did not pass' + (t.rules ? ' under ' + t.rules.name : '') + ((t.reasons || []).length ? ': ' + t.reasons.join('; ') : '') + '.'; cls = 'bad'; }
+  body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Rules' }), rulesPick()]));
   body.appendChild(h('div', { id: 'qcl-btest', cls: 'qcl-bstatus ' + cls, text: line }));
   body.appendChild(h('div', { cls: 'qcl-row' }, [
     btn(t && t.state !== 'running' ? 'Test again' : 'Test on this board', testOnBoard, t && t.eligible ? '' : 'pri',
@@ -1495,12 +1529,22 @@ function renderBoard() {
   var off = d.official || {}, rows = off.rows || [];
   var mine = {}; (d.publications || []).forEach(function (p) { if ((p.official || {}).submission_id) mine[p.official.submission_id] = true; });
   body.appendChild(h('div', { cls: 'qcl-bsec', text: '3 · The official ranking' }));
+  var cnt = off.counts || {}, others = (cnt.all || 0) - (cnt.board || 0);
+  if (others > 0 || B.rulesView === 'all') {
+    var rv = h('select', { id: 'qcl-brview', cls: 'qcl-sel', title: 'which entries: those that keep the board\'s rules, or every entry, each under the rules it declared',
+                           on: { change: function (e) { B.rulesView = e.target.value; loadBoard(); } } },
+               [['board', 'the board\'s rules (' + (cnt.board || 0) + ')'], ['all', 'any rules, each tagged (' + (cnt.all || 0) + ')']].map(function (o) {
+                 var x = h('option', { value: o[0], text: o[1] }); if (o[0] === B.rulesView) x.selected = true; return x; }));
+    body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Rules' }), rv]));
+  }
   if (off.error) body.appendChild(h('div', { cls: 'qcl-note', text: 'qccd.academy did not answer: ' + off.error }));
   else if (!rows.length) body.appendChild(h('div', { cls: 'qcl-note', text: 'Nobody has submitted to this board yet: the first eligible design is #1.' }));
   else {
     var tb = h('table', { cls: 'qcl-btable' }, [h('tr', {}, ['#', 'design', 'by', bd.rank_by, 'date'].map(function (c) { return h('th', { text: c }); }))]);
     rows.forEach(function (r, i) {
-      tb.appendChild(h('tr', { cls: mine[r.id] ? 'mine' : '' }, [h('td', { text: String(i + 1) }), h('td', { text: r.display_name || '–' }),
+      var own = ownNote(r.conformance);
+      tb.appendChild(h('tr', { cls: mine[r.id] ? 'mine' : '' }, [h('td', { text: String(i + 1) }),
+        h('td', { text: (r.display_name || '–') + (own ? ' (own rules)' : ''), title: own }),
         h('td', { text: r.by || '–' }), h('td', { cls: 'n', text: fmtVal(r.rank_value) }), h('td', { text: fmtDay(r.created_at) })]));
     });
     body.appendChild(tb);

@@ -26,6 +26,7 @@ changed bundle or changed visibility needs a new approval.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -403,10 +404,56 @@ class ResultsMixin:
 
     # ------------------------------------------------------------------ snapshots
 
+    def rules_choice(self, spec) -> dict | None:
+        """The rule set a design is entered under: None (or "board") for the board's own; else a
+        shipped set's name, a .rules file in this workspace, or the text, as the bundle carries it
+        (`qccd.ruleset.declared.rules_doc`)."""
+        from .core import WorkspaceError
+        if spec is None or (isinstance(spec, str) and spec.strip().lower() in ("", "board", "standard")):
+            return None
+        if isinstance(spec, Mapping):
+            spec = spec.get("text") or ""
+        from ..ruleset.declared import DeclaredRulesError, rules_doc
+        try:
+            return rules_doc(str(spec), root=self.root)
+        except DeclaredRulesError as exc:
+            raise WorkspaceError("bad_rules", str(exc), status=422) from None
+
+    def rules_catalog(self) -> dict:
+        """What a design can be entered under: the board's rules, every rule set this website ships,
+        and every .rules file in the workspace (its `rules/` folder or its top level)."""
+        from ..ruleset import load, names
+        shipped = []
+        for n in names("device"):
+            try:
+                rs = load(n)
+                shipped.append({"name": n, "title": rs.title, "about": rs.about})
+            except Exception:
+                continue
+        own = []
+        for p in sorted(list(self.root.glob("*.rules")) + list((self.root / "rules").glob("*.rules"))):
+            try:
+                doc = self.rules_choice(str(p.relative_to(self.root)).replace("\\", "/"))
+                own.append({"file": str(p.relative_to(self.root)).replace("\\", "/"), "name": doc["name"],
+                            "title": doc["title"]})
+            except Exception as exc:
+                own.append({"file": str(p.relative_to(self.root)).replace("\\", "/"), "error": str(exc)[:300]})
+        return {"board": "standard", "shipped": shipped, "workspace": own}
+
+    def _bundle_rules(self, snap: Mapping) -> dict | None:
+        """The rule set a frozen snapshot was entered under, in brief (None: the board's)."""
+        p = self.root / snap["dir"] / "bundle" / "rules.json"
+        if not p.is_file():
+            return None
+        doc = json.loads(p.read_text(encoding="utf-8"))
+        return {"name": doc.get("name"), "title": doc.get("title"),
+                "digest": "sha256:" + hashlib.sha256(str(doc.get("text", "")).encode()).hexdigest()}
+
     def freeze_snapshot(self, branch: str, revision: int, actor: Mapping, *, title: str = "",
-                        board: str | None = None) -> dict:
+                        board: str | None = None, rules: Mapping | None = None) -> dict:
         """Write the immutable bundle for one revision.  Refuses a design with no
-        compiled final program: the official track grades artifacts, not intentions."""
+        compiled final program: the official track grades artifacts, not intentions.  `rules`
+        (`rules_choice`) is the rule set it is entered under; without it, the board's."""
         from .core import WorkspaceError, new_id
         rev = self.revision(branch, revision)
         r = self.replayed(branch, revision)
@@ -434,7 +481,7 @@ class ResultsMixin:
         pres = {"title": title[:200], "studio": rev.state.to_studio(None)}
         b = write_bundle(d / "bundle", task_id=rel.id, task_digest=rel.digest,
                          device=board_device(r.arch_doc, rel), program=prog, certified_program=certified, certificate=cert,
-                         presentation=pres, provenance=prov)
+                         presentation=pres, provenance=prov, rules=rules)
         _freeze_dir(d / "bundle")
         with self.store.tx() as db:
             db.execute("INSERT INTO snapshots(id, branch, revision, input_digest, bundle_digest, dir, created_at, "
@@ -457,9 +504,11 @@ class ResultsMixin:
 
     def submit_local(self, actor: Mapping, *, branch: str = "main", revision: int | None = None,
                      profile: str = "reference", origin_prompt_id: str | None = None,
-                     request_id: str | None = None, title: str = "", board: str | None = None) -> dict:
+                     request_id: str | None = None, title: str = "", board: str | None = None,
+                     rules=None) -> dict:
         """Freeze, then grade with the shared reference evaluator.  Returns at once with
-        the submission and job ids."""
+        the submission and job ids.  `rules`: the rule set it is entered under (`rules_choice`);
+        without it, the board's."""
         from .core import WorkspaceError, new_id
         self._check_actor_may_write(actor, origin_prompt_id)
         if request_id:
@@ -469,8 +518,9 @@ class ResultsMixin:
                 out["duplicate"] = True
                 return out
         rel = self.board(board)
+        rules_doc = self.rules_choice(rules)
         rev = self.branch(branch)["head"] if revision is None else revision
-        snap = self.freeze_snapshot(branch, rev, actor, title=title, board=rel.id)
+        snap = self.freeze_snapshot(branch, rev, actor, title=title, board=rel.id, rules=rules_doc)
         sub_id = new_id("sub")
         with self.store.tx() as db:
             db.execute("INSERT INTO submissions(id, snapshot_id, job_id, profile, task_release, task_digest, status, "
@@ -485,11 +535,11 @@ class ResultsMixin:
             out = {"submission_id": sub_id, "job_id": job["job_id"], "snapshot_id": snap["snapshot_id"],
                    "bundle_digest": snap["bundle_digest"], "revision": rev, "branch": branch,
                    "design": self.design_title(self.branch(branch)), "board": rel.title,
-                   "profile": profile, "status": "grading",
+                   "profile": profile, "status": "grading", "rules": self._bundle_rules(self.snapshot(snap["snapshot_id"])),
                    "label": "Local result - not published"}
             if request_id:
                 db.execute("INSERT INTO idempotency(key, request_digest, response, created_at) VALUES(?,?,?,?)",
-                           (f"submit:{request_id}", digest([branch, rev, profile, rel.id, rel.digest]), dumps(out),
+                           (f"submit:{request_id}", digest([branch, rev, profile, rel.id, rel.digest] + ([rules_doc["text"]] if rules_doc else [])), dumps(out),
                             _now()))
             self._emit(db, "submission.updated", {"submission_id": sub_id, "status": "grading",
                                                   "revision": rev, "bundle_digest": snap["bundle_digest"],
@@ -558,7 +608,7 @@ class ResultsMixin:
 
     def submit_design(self, actor: Mapping, *, design: str = "main", board: str | None = None,
                       profile: str = "reference", origin_prompt_id: str | None = None,
-                      request_id: str | None = None, title: str = "") -> dict:
+                      request_id: str | None = None, title: str = "", rules=None) -> dict:
         """What a person means by "submit this design to that board": compile the board's circuit for
         the design (unless its program already is that), adopt it as the design's final program,
         freeze, grade.  One job; the submission is listed at once and follows it."""
@@ -567,8 +617,10 @@ class ResultsMixin:
         branch = self.resolve_draft(design)
         if profile not in ("draft", "reference"):
             raise WorkspaceError("bad_request", "profile must be draft or reference", status=422)
+        rules_doc = self.rules_choice(rules)          # refused now, not halfway through the job
         job = self.start_job(actor, "submit", {"branch": branch, "board": rel.id, "profile": profile,
-                                               "title": title[:200]},
+                                               "title": title[:200],
+                                               **({"rules": rules_doc["text"]} if rules_doc else {})},
                              request_id=request_id, origin_prompt_id=origin_prompt_id)
         return {"job_id": job["job_id"], "design": self.design_title(self.branch(branch)), "board": rel.title,
                 "status": job["status"], "duplicate": job.get("duplicate", False),
@@ -615,7 +667,7 @@ class ResultsMixin:
         self._progress(jid, "freeze", "freezing the design and its program")
         out = self.submit_local(actor, branch=branch, revision=rev, profile=params.get("profile", "reference"),
                                 origin_prompt_id=origin_prompt_id, title=params.get("title") or "",
-                                board=rel.id)
+                                board=rel.id, rules=params.get("rules"))
         return {"summary": f"{out['design']} submitted to {rel.title} (r{rev}); grading as job {out['job_id']}",
                 "submission_id": out["submission_id"], "grading_job": out["job_id"], "revision": rev,
                 "compiled": bool(compiled), "from_run": (reused or {}).get("run_id"),
@@ -676,6 +728,7 @@ class ResultsMixin:
         d["report"] = self.report_for(sub_id)
         head = self.head(snap["branch"])
         d["stale"] = head.input_digest != snap["input_digest"]
+        d["rules"] = self._bundle_rules(snap)
         d["label"] = "Local result - not published"
         return d
 

@@ -35,8 +35,8 @@ from .design import (DesignRefused, DesignState, Replayed, base_from_arch, diff_
 from .jsonsafe import canonical_text, digest
 from .operations import OperationError, compile_operations, describe_operations
 from .store import Store, dumps, loads
-from .tasks import (DEFAULT_BOARD, LOCK_NAME, TaskRelease, board_device, find_release, physics_mismatch,
-                    read_lock, write_lock)
+from .tasks import (DEFAULT_BOARD, LOCK_NAME, TaskRelease, find_release, physics_mismatch,
+                    read_lock, scored_device, write_lock)
 
 __all__ = ["WorkspaceCore", "WorkspaceError", "new_id", "CONTRACT_VERSION"]
 
@@ -523,9 +523,11 @@ class WorkspaceCore:
                 out["program"] = {"ok": True, "instructions": len(prog)}
             except Exception as exc:
                 out["program"] = {"ok": False, "message": str(exc)}
-        mism = physics_mismatch(board_device(r.arch_doc or {}, self.release), self.release)
-        out["physics"] = {"matches_release": not mism, "changed_blocks": mism,
-                          "mode": "task" if not mism else "exploratory"}
+        # scored with the board's physics; numbers of its own are listed (tasks.scored_device)
+        scored, own = scored_device(r.arch_doc or {}, self.release)
+        mism = physics_mismatch(scored, self.release)
+        out["physics"] = {"matches_release": not mism, "changed_blocks": mism, "added": own["added"],
+                          "ignored": own["ignored"], "mode": "task" if not mism else "own physics"}
         out["warnings"] = out["warnings"][:limit]
         return out
 

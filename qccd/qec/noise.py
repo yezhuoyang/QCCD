@@ -376,6 +376,11 @@ class NoiseModel2(NoiseModel):
     crosstalk_local: float = CROSSTALK_LOCAL
     crosstalk_far: float = CROSSTALK_GLOBAL
     crosstalk_reset: float = CROSSTALK_RESET
+    #: numbers the device itself brought where the board's physics has none (dotted paths, the
+    #: grader's `tasks.scored_device` `added`, e.g. "primitives.junction_cross.curve_by_degree.5"):
+    #: priced from the device's own points whatever their table, the entry being listed as having
+    #: physics of its own (the user's decision of 2026-10-29)
+    own: tuple[str, ...] = ()
 
     per_ion_memory = True
 
@@ -384,15 +389,26 @@ class NoiseModel2(NoiseModel):
         the beams are shared, so there is no frame update, and the clock charges three pulses."""
         return min(CAPS["DEPOLARIZE1"], self.scale * (1.0 - (1.0 - params["p1"]) ** 3))
 
+    def to_json(self) -> dict:
+        d = super().to_json()
+        if not d.get("own"):
+            d.pop("own", None)              # a report without numbers of the device's own reads as before
+        return d
+
     def resolve(self, arch) -> dict[str, Any]:
         # the operating-point policy falls back to another table's points when its own has none,
-        # which would price this model's schedule from numbers it does not cite: refuse instead
+        # which would price this model's schedule from numbers it does not cite: refuse instead --
+        # except for a number the device brought itself, which the grade lists as its own
+        def brought(path: str) -> bool:
+            return any(path == o or path.startswith(o + ".") for o in self.own)
         prim = arch.primitives
         missing = [name for name, curve in prim.curves.items()
-                   if not any(p.table == self.table for p in curve.points)]
+                   if not any(p.table == self.table for p in curve.points)
+                   and not brought(f"primitives.{name}.curve")]
         missing += [f"{name}[degree {d}]" for name, dc in prim.degree_curves.items()
                     for d, curve in dc.by_degree.items()
-                    if d >= 3 and not any(p.table == self.table for p in curve.points)]
+                    if d >= 3 and not any(p.table == self.table for p in curve.points)
+                    and not brought(f"primitives.{name}.curve_by_degree.{d}")]
         if missing:
             raise ValueError(f"{self.id} prices transport from the {self.table!r} operating-point "
                              f"table, which this device's physics does not declare for "

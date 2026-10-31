@@ -51,6 +51,11 @@ CSS = """
 .lbx-bar select{font:inherit;padding:4px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:#1d1d1b;max-width:100%}
 .lbx-tw{overflow-x:auto}.lbx-tw td{white-space:nowrap}
 .lbx-live td.lbx-links a{margin-right:10px;white-space:nowrap}
+.lbx-own{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#fff3df;color:#8a5300;
+ font:600 11px/1.5 var(--sans,system-ui,sans-serif);white-space:nowrap;cursor:help}
+.lbx-rules{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#56545e;margin:6px 0 0}
+.lbx-rules a{margin-left:4px}
+.lbx-ownnote{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#8a5300;margin:2px 0 8px}
 #lbx-pop{position:absolute;z-index:1200;width:min(420px,calc(100vw - 24px));background:#fff;border:1px solid #cfceca;
  border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px;font:14px/1.5 var(--sans,system-ui,sans-serif);
  color:#1d1d1b}
@@ -71,6 +76,9 @@ HINTS = {
                    "gives a link that opens the chart on it"),
     "board:rank": ("Rank by", "rank the submitted designs by another of the board's measures; the board's own "
                    "ranking (the logical error rate per round on a memory board) is the default"),
+    "board:rules": ("Rules", "which entries the ranking lists: those that keep every rule of the board's own rule set "
+                    "with the board's physics (the default), or every entry, each judged by the rule set it "
+                    "declared and tagged with what that drops or adds"),
 }
 
 
@@ -115,6 +123,19 @@ SCRIPT = r"""
   function day(t){ return t ? new Date(t * 1000).toISOString().slice(0, 10) : '-'; }
   function get(path){ return fetch(API + path, { headers: { 'Accept': 'application/json' } }).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); }
+  // an entry under rules of its own (or with physics numbers the board lacks), in a few words
+  function ownNote(c){
+    if (!c || c.board) return '';
+    var r = c.rules || {}, p = c.physics || {}, bits = [];
+    if (r.declared) bits.push('rules: ' + (r.set || 'its own'));
+    if ((r.drops || []).length) bits.push('drops ' + r.drops.join(', '));
+    if ((r.replaces || []).length) bits.push('rewrites ' + r.replaces.join(', '));
+    if ((r.adds || []).length) bits.push('adds ' + r.adds.join(', '));
+    if (!r.declared && (r.breaks || []).length) bits.push('breaks ' + r.breaks.join(', '));
+    if ((p.added || []).length) bits.push('own physics: ' + p.added.map(function(x){
+      return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
+    return bits.join(' · ');
+  }
   // "Try your own design": into the person's own workspace, focused on this board
   function studioURL(task){ return (window.QCCD_MIRROR ? '/studio' : LOCAL) + '?board=' + encodeURIComponent(task); }
   var pop = null;
@@ -149,10 +170,27 @@ SCRIPT = r"""
   // one board's submissions, ranked by the reader's choice of its measures (the board's own by
   // default); each opens on the board's ranking page, where it is a dot with its numbers, its
   // animation, its files and how to grade it again
+  function rulesPick(box, task, lb){
+    // the board's rules by default; every entry, each under the rules it declared, on request
+    var cnt = lb.counts || {}, others = (cnt.all || 0) - (cnt.board || 0);
+    if (!(others > 0 || lb.rules === 'all')) return null;
+    var lab = el('label', null, 'Rules '), sel = el('select');
+    sel.setAttribute('data-hint', 'board:rules');
+    [['board', 'the board’s (' + (cnt.board || 0) + ')'], ['all', 'any, each tagged (' + (cnt.all || 0) + ')']].forEach(function(x){
+      var o = el('option', null, x[1]); o.value = x[0]; sel.appendChild(o); });
+    sel.value = lb.rules === 'all' ? 'all' : 'board';
+    sel.onchange = function(){ load(box, task, sel.value); };
+    lab.appendChild(sel); return lab;
+  }
   function fill(box, task, lb){
     box.textContent = '';
     var rows = lb.rows || [];
-    if (!rows.length) { box.appendChild(el('p', 'lbx-empty', 'No submissions yet.')); return; }
+    if (!rows.length) {
+      box.appendChild(el('p', 'lbx-empty', lb.rules === 'all' || !((lb.counts || {}).all) ? 'No submissions yet.'
+        : 'No submissions under the board’s rules yet.'));
+      var pk = rulesPick(box, task, lb); if (pk) { var b0 = el('div', 'lbx-bar'); b0.appendChild(pk); box.appendChild(b0); }
+      return;
+    }
     var has = function(r, k){ return typeof (r.metrics || {})[k] === 'number'; };
     var ms = (lb.metrics || []).filter(function(m){ return rows.some(function(r){ return has(r, m.name); }); });
     var main = ms.filter(function(m){ return m.name === lb.rank_by; })[0] || {name: lb.rank_by, better: lb.better, unit: ''};
@@ -161,6 +199,7 @@ SCRIPT = r"""
     ms.forEach(function(m){ var o = el('option', null, nice(m) + (m.name === lb.rank_by ? ' (the board’s ranking)' : ''));
       o.value = m.name; sel.appendChild(o); });
     sel.value = main.name; lab.appendChild(sel); bar.appendChild(lab);
+    var pick = rulesPick(box, task, lb); if (pick) bar.appendChild(pick);
     bar.appendChild(el('span', 'lbx-n', rows.length + (rows.length === 1 ? ' design' : ' designs')));
     var wrap = el('div', 'lbx-tw'); box.appendChild(bar); box.appendChild(wrap);
     function open(r){ return CHARTS.indexOf(task) >= 0 ? task + '/?sel=c-' + encodeURIComponent(r.id)
@@ -178,7 +217,10 @@ SCRIPT = r"""
       xs.forEach(function(r, i){
         var tr = el('tr'), td0 = el('td'), a0 = el('a', null, r.display_name || r.id);
         tr.appendChild(el('td', 'n', String(i + 1)));
-        a0.href = open(r); td0.appendChild(a0); tr.appendChild(td0);
+        a0.href = open(r); td0.appendChild(a0);
+        var own = ownNote(r.conformance);
+        if (own) { var tg = el('span', 'lbx-own', 'own rules'); tg.title = own; td0.appendChild(tg); }
+        tr.appendChild(td0);
         tr.appendChild(el('td', 'lbx-by', r.by || '-'));
         tr.appendChild(el('td', 'n', fmt(r.metrics[k])));
         if (k !== main.name) tr.appendChild(el('td', 'n', fmt((r.metrics || {})[main.name])));
@@ -193,6 +235,11 @@ SCRIPT = r"""
     }
     sel.onchange = render; render();
   }
+  function load(box, task, view){
+    var b = BOARDS[task];
+    get('/leaderboard/' + encodeURIComponent(b.id) + (view === 'all' ? '?rules=all' : '')).then(function(lb){ fill(box, task, lb); },
+      function(err){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
+  }
   // each board's community list, live
   var boxes = document.querySelectorAll('.lbx-live[data-board]');
   if (!boxes.length || typeof fetch !== 'function') return;
@@ -201,8 +248,7 @@ SCRIPT = r"""
     [].forEach.call(boxes, function(box){
       var b = BOARDS[box.getAttribute('data-board')];
       if (!b || !have[b.id]) { box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server does not rank this board yet.')); return; }
-      get('/leaderboard/' + encodeURIComponent(b.id)).then(function(lb){ fill(box, box.getAttribute('data-board'), lb); },
-        function(err){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
+      load(box, box.getAttribute('data-board'), 'board');
     });
   }, function(err){
     [].forEach.call(boxes, function(box){ box.textContent = ''; box.appendChild(el('p', 'lbx-empty', 'The official server did not answer (' + err.message + ').')); });
@@ -256,6 +302,32 @@ CHART_SCRIPT = r"""
   var B = __BOARD__, API = '/official/v1', FILES = __FILES__;
   if (!B || typeof fetch !== 'function' || typeof DATA === 'undefined' || typeof draw !== 'function') return;
   var FAM = 'submitted to the official leaderboard', COLOR = '#c2185b';
+  // which entries: those that keep the board's rules (the default), or every one (?rules=all), each tagged
+  var RULES = /[?&]rules=all(&|$)/.test(location.search) ? 'all' : 'board';
+  var OWNFAM = 'submitted under rules of its own', OWNCOLOR = '#8a5300';
+  // an entry under rules of its own (or with physics numbers the board lacks), in a few words
+  function ownNote(c){
+    if (!c || c.board) return '';
+    var r = c.rules || {}, p = c.physics || {}, bits = [];
+    if (r.declared) bits.push('rules: ' + (r.set || 'its own'));
+    if ((r.drops || []).length) bits.push('drops ' + r.drops.join(', '));
+    if ((r.replaces || []).length) bits.push('rewrites ' + r.replaces.join(', '));
+    if ((r.adds || []).length) bits.push('adds ' + r.adds.join(', '));
+    if (!r.declared && (r.breaks || []).length) bits.push('breaks ' + r.breaks.join(', '));
+    if ((p.added || []).length) bits.push('own physics: ' + p.added.map(function(x){
+      return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
+    return bits.join(' · ');
+  }
+  function rulesLine(lb){
+    var cnt = lb.counts || {}, others = (cnt.all || 0) - (cnt.board || 0), blk = document.querySelector('.lbx');
+    if (!blk || !(others > 0 || RULES === 'all')) return;
+    var p = E('p', 'lbx-rules', RULES === 'all' ? 'Showing every entry, each under the rules it declared.'
+                                                : 'Showing the entries that keep the board’s rules.');
+    var q = location.search.replace(/([?&])rules=all(&|$)/, '$1').replace(/[?&]$/, '');
+    var a = link(RULES === 'all' ? 'Only the board’s rules' : 'Show ' + others + ' more under rules of their own',
+                 location.pathname + (RULES === 'all' ? q : (q ? q + '&' : '?') + 'rules=all'));
+    a.setAttribute('data-hint', 'board:rules'); p.appendChild(a); blk.appendChild(p);
+  }
   var PALETTE = ['#c2185b', '#2a78d6', '#1baf7a', '#eb6834', '#4a3aa7', '#b8860b', '#00838f', '#6d4c41',
                  '#8e24aa', '#43a047', '#d84315', '#546e7a'];
   // an official measure -> this chart's (the logical error rate is plotted in units of 1e-4)
@@ -287,10 +359,19 @@ CHART_SCRIPT = r"""
       METRICS.forEach(function(m){ var o = E('option', null, m.name); o.value = m.k; s.appendChild(o); });
     });
   }
-  var path = B.goal ? '/goals/' + encodeURIComponent(B.goal) : '/leaderboard/' + encodeURIComponent(B.id);
+  var path = (B.goal ? '/goals/' + encodeURIComponent(B.goal) : '/leaderboard/' + encodeURIComponent(B.id))
+           + (RULES === 'all' ? '?rules=all' : '');
   fetch(API + path, {headers: {'Accept': 'application/json'}}).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(lb){
     var rows = lb.rows || [];
+    rulesLine(lb);
+    if (RULES === 'all') {
+      // the page's address keeps the view, whatever else the chart writes into it
+      var _keep = pushState;
+      pushState = function(){ _keep();
+        if (!/[?&]rules=all(&|$)/.test(location.search)) try { history.replaceState(null, '', location.pathname +
+          (location.search ? location.search + '&' : '?') + 'rules=all'); } catch (e) {} };
+    }
     if (!rows.length) {
       if (B.goal) say('No entries yet. The first design submitted to one of this goal’s boards that passes every check is #1.');
       return;
@@ -329,9 +410,11 @@ CHART_SCRIPT = r"""
         if (typeof v === 'number') n[key(name)] = SCALE[name] ? v * SCALE[name][1] : v; });
       if (r.ler && typeof r.ler.per_round_lo === 'number') { n.ler_round_lo_1e4 = r.ler.per_round_lo * 1e4; n.ler_round_hi_1e4 = r.ler.per_round_hi * 1e4; }
       var name = r.display_name || r.id, code = r.release_title || r.release || '';
-      var fam = B.goal ? code : FAM;
-      if (codes.indexOf(fam) < 0) { codes.push(fam); relOf[fam] = r.release; FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : COLOR; }
+      var own = !!(r.conformance && !r.conformance.board);
+      var fam = B.goal ? code : (own ? OWNFAM : FAM);
+      if (codes.indexOf(fam) < 0) { codes.push(fam); relOf[fam] = r.release; FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : (own ? OWNCOLOR : COLOR); }
       DATA.push({key: 'c-' + r.id, sid: r.id, community: true, by: r.by || '', when: r.created_at, ler: r.ler || null,
+                 conf: r.conformance || null,
                  place: i + 1, title: name, short: name + ' · ' + (r.by || 'unnamed'), family: fam, compiled: true,
                  code: code, exp: r.experiment || null, numbers: n, marks: [], rules_failed: [], claim: ''});
     });
@@ -392,14 +475,17 @@ CHART_SCRIPT = r"""
       var f = E('div', 'fam'); f.appendChild(document.createTextNode('by ')); f.appendChild(E('span', 'by', d.by || 'unnamed'));
       f.appendChild(document.createTextNode(' · #' + d.place + ' · ' + day(d.when) + (B.goal && d.code ? ' · ' + d.code : '')));
       left.appendChild(f);
-      left.appendChild(E('p', 'ok', '✓ every check passed on the official server'));
+      var on = ownNote(d.conf);
+      left.appendChild(E('p', 'ok', '✓ every check passed on the official server' + (on ? ', under its own rules' : '')));
+      if (on) left.appendChild(E('p', 'lbx-ownnote', on));
       var btns = E('div', 'btns');
       btns.appendChild(link('Open in studio', base + '/page', 'btn primary'));
       var z = link('Download (.zip)', base + '/bundle.zip', 'btn'); z.setAttribute('download', d.sid + '-bundle.zip'); btns.appendChild(z);
       btns.appendChild(link('Report', base + '/report', 'btn'));
       left.appendChild(btns);
       var fl = E('div', 'files'); fl.appendChild(document.createTextNode('Files: '));
-      FILES.forEach(function(x, i){ fl.appendChild(link(x[1], base + '/files/' + x[0])); if (i < FILES.length - 1) fl.appendChild(document.createTextNode(' · ')); });
+      var files = FILES.concat(d.conf && (d.conf.rules || {}).declared ? [['rules.json', 'rule set']] : []);
+      files.forEach(function(x, i){ fl.appendChild(link(x[1], base + '/files/' + x[0])); if (i < files.length - 1) fl.appendChild(document.createTextNode(' · ')); });
       left.appendChild(fl);
       var rp = E('div', 'repro'); rp.appendChild(E('b', null, 'Reproduce'));
       rp.appendChild(E('pre', null, 'qccd grade ' + d.sid + '-bundle.zip'));
@@ -444,7 +530,8 @@ CHART_SCRIPT = r"""
                                            DATA.filter(function(d){ return !d.compiled; }));
       all.forEach(function(d){
         var r = E('tr'); if (SEL === d.key) r.className = 'sel'; var i = rk.indexOf(d);
-        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title : shortName(d), d.community ? d.by : 'the QCCD study'];
+        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title + (ownNote(d.conf) ? ' (own rules)' : '') : shortName(d),
+                    d.community ? d.by : 'the QCCD study'];
         head = head.concat(B.goal ? [d.code || '', d.exp ? String(d.exp.ions) : ''] : [d.community ? 'submitted' : d.family]);
         head.concat(cols.map(function(m){ return fmt(val(d, m.k), m); })).forEach(function(v){ r.appendChild(E('td', null, v)); });
         r.onclick = function(){ select(d.key); }; t.appendChild(r);

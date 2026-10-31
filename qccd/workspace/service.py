@@ -882,10 +882,11 @@ def create_app(state: ServiceState) -> FastAPI:
             # "submit this design to that board": compile for it, adopt, freeze, grade -- one job
             return ws.submit_design(actor, design=b.get("design") or b.get("branch") or "main", board=b.get("board"),
                                     profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
-                                    request_id=b.get("request_id"), title=str(b.get("title", "")))
+                                    request_id=b.get("request_id"), title=str(b.get("title", "")),
+                                    rules=b.get("rules"))
         return ws.submit_local(actor, branch=b.get("branch", "main"), revision=b.get("revision"),
                                profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
-                               request_id=b.get("request_id"), title=str(b.get("title", "")))
+                               request_id=b.get("request_id"), title=str(b.get("title", "")), rules=b.get("rules"))
 
     @route("GET", "/api/submissions", write=False)
     def submissions(request, actor, _):
@@ -911,7 +912,7 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/official/leaderboard", write=False)
     def official_leaderboard(request, actor, _):
-        return ws.official_leaderboard(q(request, "board"))
+        return ws.official_leaderboard(q(request, "board"), q(request, "rules"))
 
     @route("POST", "/api/publish/prepare")
     def prepare(request, actor, b):
@@ -953,14 +954,18 @@ def create_app(state: ServiceState) -> FastAPI:
 
     @route("GET", "/api/board-view", write=False)
     def board_view(request, actor, _):
-        return ws.board_view(q(request, "board"), q(request, "design"))
+        return ws.board_view(q(request, "board"), q(request, "design"), q(request, "rules"))
+
+    @route("GET", "/api/rules", write=False)
+    def rules_catalog(request, actor, _):
+        return ws.rules_catalog()
 
     @route("POST", "/api/publications")
     def publications_new(request, actor, b):
         return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
                                       submission_id=b.get("submission_id"), display_name=b.get("display_name"),
                                       visibility=str(b.get("visibility") or "public"),
-                                      origin_prompt_id=b.get("origin_prompt_id"))
+                                      origin_prompt_id=b.get("origin_prompt_id"), rules=b.get("rules"))
 
     @route("GET", "/api/publications", write=False)
     def publications_list(request, actor, _):

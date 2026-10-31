@@ -115,14 +115,22 @@ def frozen(graded):
 
 
 @needs_toolchain
-def test_changed_physics_is_exploratory_never_eligible(frozen, tmp_path):
+def test_changed_physics_buys_nothing(graded, frozen, tmp_path):
+    """A number the task has is the task's (the user's decision of 2026-10-29): a design that
+    declares a 1000x faster shuttle is scored with the task's shuttle, exactly as if it had not,
+    and the grade lists what it ignored.  (Until then such a design was refused as exploratory.)"""
+    ws, sub = graded
     def faster(docs, man):
         for pt in docs["device"]["primitives"]["shuttle_segment"]["curve"]:
             pt["us"] = 0.001
     b = _reseal(frozen, tmp_path / "b", faster)
     rep = grade(find_release("ghz4@1"), b, "reference", workdir=tmp_path / "w")
-    assert _stages(rep)["physics_lock"] == "failed" and not rep["eligibility"]["eligible"]
-    assert any(d["id"] == "TASK.PHYSICS_MODIFIED" for d in rep["diagnostics"])
+    assert _stages(rep)["physics_lock"] == "passed" and rep["eligibility"]["eligible"], rep["eligibility"]
+    assert any(d["id"] == "TASK.PHYSICS_IGNORED" for d in rep["diagnostics"])
+    assert rep["conformance"]["board"] is True
+    assert rep["conformance"]["physics"]["ignored"] == ["primitives.shuttle_segment.curve"]
+    base = ws.submission(sub["submission_id"])["report"]
+    assert {k: v["value"] for k, v in rep["metrics"].items()} == {k: v["value"] for k, v in base["metrics"].items()}
 
 
 def _direct_wiring(per_trap: int):

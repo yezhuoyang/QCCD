@@ -8,6 +8,8 @@ A bundle is a directory (or a deterministic zip of one) holding
     certified.tsir.json      the program the certificate speaks about (the compiler's output)
     certificate.qcert.json   the compiler's certificate
     presentation.json        optional: title, description, the studio document for display
+    rules.json               optional: the rule set the entry declares it keeps (qccd.ruleset.declared);
+                             without it, the board's own
 
 Every file is canonical JSON (sorted keys, one number spelling), so the same design
 always makes the same bytes and the same digest.  The BUNDLE DIGEST is the digest of the
@@ -45,6 +47,7 @@ BUNDLE_FILES = {
     "certified_program": "certified.tsir.json",
     "certificate": "certificate.qcert.json",
     "presentation": "presentation.json",
+    "rules": "rules.json",
 }
 REQUIRED_FILES = ("device", "program", "certified_program", "certificate")
 MAX_FILE = 48 * 1024 * 1024
@@ -95,14 +98,15 @@ def _publishable(doc: Mapping | None) -> Mapping | None:
 
 def write_bundle(out_dir: Path, *, task_id: str, task_digest: str, device: Mapping,
                  program: Mapping, certified_program: Mapping | None, certificate: Mapping | None,
-                 presentation: Mapping | None = None, provenance: Mapping | None = None) -> Bundle:
+                 presentation: Mapping | None = None, provenance: Mapping | None = None,
+                 rules: Mapping | None = None) -> Bundle:
     """Write canonical files and the manifest.  `out_dir` must not exist yet."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=False)
     files: dict = {}
     docs = {"device": device, "program": _publishable(program),
             "certified_program": _publishable(certified_program),
-            "certificate": certificate, "presentation": presentation}
+            "certificate": certificate, "presentation": presentation, "rules": rules}
     for role, doc in docs.items():
         if doc is None:
             continue

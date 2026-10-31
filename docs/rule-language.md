@@ -90,3 +90,38 @@ compiles, cools, checks R10 (with the proved checker when it is built) and judge
 `cyclone`, `jones`, `tiscc`, `trapsimd`, `ionshuttler`, `ionshuttler-heuristic`.
 `python -m qccd.ruleset list` / `show <set>`.  Our own schedules on Reproduce are judged by
 the paper's set with R25 (each qubit's exact order) in place of R26 (`keeping_order`).
+
+## A leaderboard entry's own rules
+
+Since 2026-10-29 a design is entered on a board under a rule set: the board's own (`standard`)
+unless it names another.  The person picks it in the Studio's Leaderboard panel (Rules, next to
+Test on this board), or `qccd submit --local --board <b> --rules <name or file>`, or an agent's
+`qccd_submit_local(rules=...)`; `qccd_list_rules` lists the choices -- every shipped set and the
+workspace's own `.rules` files (top level or `rules/`).  A set written for a design usually starts
+from the board's:
+
+    ruleset "two-layer"
+    title "Two stacked junction layers"
+    include "standard"
+    drop R19, R20, R21
+    rule L19 "A junction joins at most six rails"
+      for all n in nodes: degree(n) <= 6
+
+The bundle carries it written out whole (`rules.json`, `qccd.ruleset.declared.rules_doc`), and
+the grader reads it with `load_declared`: `include` names only a shipped set, never a path; the
+core rules hold as the catalogue writes them (a set that drops or rewrites R0, R1, R8 or R24 is
+refused); at most 64 KB and 200 rules.  The rules stage judges the program by that set (every rule
+holds or does not apply; R10 is the certificate stages'), and still checks the board's rules, so the
+report's `conformance` says which board rules the entry breaks and what its set drops, rewrites and
+adds.  The certificate, the Lean checker, the semantics and the logical error rate are the same for
+every entry.
+
+The physics is the board's (`qccd.workspace.tasks.scored_device`): a number the board has is the
+board's; a number it lacks -- a degree-5 junction's crossing cost -- may come from the device, and is
+listed (`conformance.physics.added`); the budget is the board's, whole.
+
+A ranking (`/official/v1/leaderboard/<board>`, `/official/v1/goals/goal1`) lists the entries that
+keep every board rule with the board's physics; `?rules=all` lists every eligible entry, each with
+its `conformance`, and `counts` says how many each view has.  On the website and in the Studio the
+Rules choice switches between the two, and an entry under its own rules is tagged with what they
+drop and add (the user's decision: the board's rules first, the others a filter away).

@@ -185,7 +185,7 @@ def _inspect_run(be, a: dict):
 
 
 def _submit_local(be, a: dict):
-    body = {k: a[k] for k in ("design", "board", "profile", "request_id", "origin_prompt_id", "title") if k in a}
+    body = {k: a[k] for k in ("design", "board", "profile", "request_id", "origin_prompt_id", "title", "rules") if k in a}
     if "design" not in body and "board" not in body:          # the older form: an adopted program, as it is
         body = {k: a[k] for k in ("branch", "revision", "profile", "request_id", "origin_prompt_id", "title")
                 if k in a}
@@ -281,7 +281,7 @@ def _estimate_ler(be, a: dict) -> dict:
 def _get_leaderboard(be, a: dict):
     board, official = a.get("board"), bool(a.get("official"))
     if official:
-        out = be.call("GET", "/api/official/leaderboard?" + _q({"board": board}))
+        out = be.call("GET", "/api/official/leaderboard?" + _q({"board": board, "rules": a.get("rules")}))
         if board:
             # this computer's requests to publish on that board, with the server's verdict and place
             out["yours"] = be.call("GET", "/api/publications?" + _q({"board": board, "limit": 10}))["publications"]
@@ -523,9 +523,13 @@ FEATURES: tuple[Feature, ...] = (
         "finishes within a minute: follow it ONCE with qccd_get_job(job_id, wait_s=50), which waits through the "
         "grade and returns the verdict; if it is still running then, say the card in their chat will show the "
         "verdict, and stop. To put it on the OFFICIAL leaderboard at qccd.academy (credited to the signed-in "
-        "person), use qccd_submit_official.",
+        "person), use qccd_submit_official. rules: the rule set the design is entered under -- left out, the "
+        "board's own; else a rule set the website ships by name (qccd_list_rules), a .rules file in the "
+        "workspace, or the text of one (the rule language: `include \"standard\"`, `drop R20, R21`, rules of "
+        "its own). An entry under rules other than the board's is graded by them and listed on the leaderboard "
+        "with what it drops and adds, behind the board's own ranking.",
         _obj({"design": _S, "board": _S, "profile": {"type": "string", "enum": ["draft", "reference"]},
-              "request_id": _S, "origin_prompt_id": _S, "title": _S, "branch": _S, "revision": _I}),
+              "request_id": _S, "origin_prompt_id": _S, "title": _S, "branch": _S, "revision": _I, "rules": _S}),
         _submit_local, ("POST /api/submissions",), cli=("submit",), job_kinds=("submit",), group="boards"),
     Feature(
         "qccd_submit_official",
@@ -537,12 +541,15 @@ FEATURES: tuple[Feature, ...] = (
         "local grade on that board, this starts one (qccd_submit_local's grade) and the card asks the person once "
         "it passes; one that failed is refused with the reasons. The server then grades it again itself, and the "
         "card follows it to its place on the board. display_name: the name shown on the leaderboard (default the "
-        "design's own name; the person may change it). Returns the request; tell the person in one line and stop.",
+        "design's own name; the person may change it). rules: the rule set it is entered under, as for "
+        "qccd_submit_local (left out: whichever its newest test used). Returns the request; tell the person in "
+        "one line and stop.",
         _obj({"design": _S, "board": _S, "display_name": _S, "submission_id": _S,
-              "visibility": {"type": "string", "enum": ["public", "private"]}, "origin_prompt_id": _S}, ["board"]),
+              "visibility": {"type": "string", "enum": ["public", "private"]}, "origin_prompt_id": _S,
+              "rules": _S}, ["board"]),
         lambda be, a: be.call("POST", "/api/publications", {k: a[k] for k in ("design", "board", "display_name",
                                                                              "submission_id", "visibility",
-                                                                             "origin_prompt_id") if k in a}),
+                                                                             "origin_prompt_id", "rules") if k in a}),
         ("POST /api/publications",), job_kinds=(), group="boards"),
     Feature(
         "qccd_prepare_publish",
@@ -595,11 +602,23 @@ FEATURES: tuple[Feature, ...] = (
         "(compilers graded here with `qccd bench run`). official=true: the published ranking on qccd.academy, each "
         "row with `by` (who submitted it) (board: a title; without one, every official board with its section, "
         "Architecture or Compiler); with a board it also lists `yours`, this computer's requests to publish there "
-        "(qccd_submit_official) with the server's verdict and place.",
+        "(qccd_submit_official) with the server's verdict and place. The official ranking lists the entries "
+        "that keep the board's own rules; rules='all' lists every entry, each row's `conformance` saying which "
+        "of the board's rules it breaks and what its own rule set drops and adds.",
         _obj({"board": _S, "track": {"type": "string", "enum": ["architecture", "compiler"]},
-              "official": {"type": "boolean"}}),
+              "official": {"type": "boolean"}, "rules": {"type": "string", "enum": ["board", "all"]}}),
         _get_leaderboard, ("GET /api/leaderboard", "GET /api/bench", "GET /api/official/leaderboard", "GET /api/publications"),
         read_only=True, cli=("leaderboard",), group="boards"),
+    Feature(
+        "qccd_list_rules",
+        "The rule sets a design can be entered under on a leaderboard: the board's own (`standard`), every rule "
+        "set this website ships (name, title, what it assumes -- one per paper), and the workspace's own .rules "
+        "files (top level or rules/), each read as the grader reads it (a file that would be refused says why). "
+        "A rule set is written in the rule language of the website's Rules page; it may `include` a shipped set, "
+        "`drop` rules (never the core ones R0 R1 R8 R24) and add rules of its own. Pass its name or file as "
+        "qccd_submit_local's or qccd_submit_official's `rules`.",
+        _obj({}),
+        lambda be, a: be.call("GET", "/api/rules"), ("GET /api/rules",), read_only=True, group="boards"),
     Feature(
         "qccd_get_bench",
         "The Compiler board's local reports: without report_id the list (compiler, coverage, speedup over the "

@@ -167,8 +167,9 @@ class QecMixin:
 
     # ------------------------------------------------------------------ the official boards (read-only)
 
-    def official_leaderboard(self, board: str | None = None) -> dict:
-        """The official server's boards, or one board's ranked rows: public data, fetched read-only."""
+    def official_leaderboard(self, board: str | None = None, rules: str | None = None) -> dict:
+        """The official server's boards, or one board's ranked rows: public data, fetched read-only.
+        `rules` "all": every entry, not only those that keep the board's rules."""
         from .core import WorkspaceError
 
         def get(path: str) -> Any:
@@ -188,5 +189,5 @@ class QecMixin:
         if len(hit) != 1:
             raise WorkspaceError("bad_request", f"{board!r} matches {len(hit)} official boards: "
                                  + "; ".join(t.get("title") or t["id"] for t in tasks), status=422)
-        lb = get(f"/v1/leaderboard/{urllib.request.quote(hit[0]['id'], safe='@')}")
+        lb = get(f"/v1/leaderboard/{urllib.request.quote(hit[0]['id'], safe='@')}" + ("?rules=all" if rules == "all" else ""))
         return {"server": OFFICIAL_URL, "board": hit[0].get("title"), "track": hit[0].get("track"), **lb}

@@ -73,6 +73,18 @@ def _now() -> float:
     return time.time()
 
 
+def _conformance(report: dict) -> dict:
+    """How a graded entry stands to its board's rules (the evaluator's `conformance`).  A report
+    from before entries could declare rules has none: it was eligible only by keeping every rule
+    of the board's set with the board's physics, so that is what it says."""
+    c = report.get("conformance")
+    if isinstance(c, dict) and isinstance(c.get("rules"), dict) and isinstance(c.get("physics"), dict):
+        return c
+    return {"board": True, "rules": {"set": "standard", "declared": False, "board_set": "standard", "breaks": [],
+                                     "drops": [], "replaces": [], "adds": [], "params": {}},
+            "physics": {"board": True, "added": [], "ignored": []}}
+
+
 class OfficialService:
     def __init__(self, db_url: str, releases_dir: Path, artifacts_dir: Path, *,
                  evaluator_policy: str | None = None, suites_dir: Path | None = None):
@@ -386,6 +398,8 @@ class OfficialService:
                              "stages": {s["id"]: s["status"] for s in r.get("stages", [])}}
             if r.get("kind") == "qccd.compiler_report":
                 out["report"]["counts"] = (r.get("summary") or {}).get("counts")
+            else:
+                out["report"]["conformance"] = _conformance(r)
         job = self.db.one("SELECT status, attempts, error FROM jobs WHERE submission=? ORDER BY created_at DESC LIMIT 1",
                           (sid,))
         out["job"] = job
@@ -414,24 +428,40 @@ class OfficialService:
                         float(val) if isinstance(val, (int, float)) else None, _now()))
             db.execute("UPDATE submissions SET status=? WHERE id=?", ("eligible" if eligible else "ineligible", sid))
 
-    def leaderboard(self, task: str) -> dict:
+    #: which entries a ranking shows: those that keep the board's rules with the board's physics
+    #: (the default), or every eligible entry, each judged by the rule set it declared (the user's
+    #: decision of 2026-10-29: the board's rules first, the others a filter away)
+    RULES_VIEWS = ("board", "all")
+
+    def _rules_view(self, rules: str | None) -> str:
+        view = rules or "board"
+        if view not in self.RULES_VIEWS:
+            raise OfficialError("bad_request", f"rules must be one of {', '.join(self.RULES_VIEWS)}", 422)
+        return view
+
+    def leaderboard(self, task: str, rules: str | None = None) -> dict:
         rel = self.releases.get(task)
         if rel is None:
             raise OfficialError("unknown_task", f"no task {task!r}", 404)
+        view = self._rules_view(rules)
         key = rel.manifest.get("rank_by")
         better = next((m.get("better") for m in rel.manifest.get("metrics", []) if m["name"] == key), "low")
-        rows, units = self._ranked_rows(task)
+        every, units = self._ranked_rows(task)
+        rows = [r for r in every if view == "all" or r["conformance"]["board"]]
         rows.sort(key=lambda r: (r["rank_value"] if better == "low" else -(r["rank_value"] or 0)))
         metrics = [{"name": m["name"], "better": m.get("better", "low"), "unit": units.get(m["name"]) or m.get("unit")}
                    for m in rel.manifest.get("metrics", [])]
         return {"task": task, "task_digest": rel.digest, "evaluator_policy": self.evaluator_policy,
                 "title": rel.title, "track": rel.manifest.get("track"),
-                "rank_by": key, "better": better, "metrics": metrics, "rows": rows}
+                "rank_by": key, "better": better, "metrics": metrics, "rows": rows,
+                "rules": view, "board_rules": rel.manifest.get("rules") or "standard",
+                "counts": {"board": sum(1 for r in every if r["conformance"]["board"]), "all": len(every)}}
 
     def _ranked_rows(self, task: str) -> tuple[list, dict]:
         """A release's public, eligible entries under the current policy, each with its credit,
-        every metric its report scored, and for a memory board the sample behind its logical
-        error rate and the experiment it ran; and the metrics' units."""
+        every metric its report scored, how it stands to the board's rules (`conformance`), and
+        for a memory board the sample behind its logical error rate and the experiment it ran;
+        and the metrics' units."""
         rows = self.db.all("SELECT s.id, s.display_name, s.credit AS by_name, s.bundle_digest, s.created_at, "
                            "r.rank_value, r.report_digest, r.report "
                            "FROM submissions s JOIN reports r ON r.submission=s.id "
@@ -442,6 +472,7 @@ class OfficialService:
             r["by"] = r.pop("by_name") or ""          # who submitted it: the credit the leaderboard shows
             # every metric the report scored, so a reader can rank by any of them, not only rank_by
             rep = json.loads(r.pop("report") or "{}")
+            r["conformance"] = _conformance(rep)
             r["metrics"] = {k: v.get("value") for k, v in (rep.get("metrics") or {}).items()}
             for k, v in (rep.get("metrics") or {}).items():
                 units.setdefault(k, v.get("unit"))
@@ -492,15 +523,17 @@ class OfficialService:
                 if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]
                 and r.manifest.get("goal", "goal1") == goal and r.manifest.get("track") not in self.TRACKS]
 
-    def goal_board(self, goal: str) -> dict:
+    def goal_board(self, goal: str, rules: str | None = None) -> dict:
         """One ranking across releases: every member release's entries, each with its release and
         the experiment it ran (code, distance, ions, logical qubits), ranked by the goal's
-        measure.  An entry whose experiment exceeds the goal's ions is not on it."""
+        measure.  An entry whose experiment exceeds the goal's ions is not on it; one that does
+        not keep its board's rules is on it only when `rules` is "all"."""
         if goal == "goal3":
-            return self._goal3_board()
+            return self._goal3_board(rules)
         g = self.GOALS.get(goal)
         if g is None:
             raise OfficialError("unknown_goal", f"no goal {goal!r}", 404)
+        view = self._rules_view(rules)
         rels, rows, units, names = self.goal_releases(goal), [], {}, []
         for rel in rels:
             rr, u = self._ranked_rows(rel.id)
@@ -522,7 +555,9 @@ class OfficialService:
                          ions_per_logical_qubit=exp["ions"] / exp["k"] if exp["k"] else None)
                 r.update(release=rel.id, release_title=rel.title, rank_value=m.get(g["rank_by"]))
                 rows.append(r)
-        rows = [r for r in rows if isinstance(r["rank_value"], (int, float))]
+        every = [r for r in rows if isinstance(r["rank_value"], (int, float))]
+        keeps = [r for r in every if (r.get("conformance") or {}).get("board", True)]
+        rows = every if view == "all" else keeps
         rows.sort(key=lambda r: r["rank_value"] if g["better"] == "low" else -r["rank_value"])
         units.setdefault(g["rank_by"], g["unit"])
         size_measures = [n for n, _, _ in self.GOAL_SIZE_MEASURES]
@@ -544,7 +579,7 @@ class OfficialService:
                 "releases": [{"id": r.id, "title": r.title, "task": r.manifest.get("task"), "task_digest": r.digest,
                               **size(r)} for r in rels],
                 "metrics": [{"name": n, "better": better.get(n, "low"), "unit": units.get(n)} for n in names],
-                "rows": rows}
+                "rows": rows, "rules": view, "counts": {"board": len(keeps), "all": len(every)}}
 
     # ------------------------------------------------------------------ the tracks: boards ranked apart
 
@@ -562,21 +597,24 @@ class OfficialService:
                        if not self.is_suite(r.id) and r.manifest.get("track") == track),
                       key=lambda r: (int(r.manifest.get("order", 99)), r.title))
 
-    def track_board(self, track: str) -> dict:
+    def track_board(self, track: str, rules: str | None = None) -> dict:
         """A track's boards, each its own ranking (`leaderboard`), in the Leaderboard's order,
-        with the rule set each declares."""
+        with the rule set each declares (a board's `rules`; the view, `rules` at the top, says
+        whether entries under rules of their own are listed too)."""
         t = self.TRACKS.get(track)
         if t is None:
             raise OfficialError("unknown_track", f"no track {track!r} (have: {', '.join(self.TRACKS)})", 404)
+        view = self._rules_view(rules)
         boards = []
         for rel in self.track_releases(track):
-            b = self.leaderboard(rel.id)
+            b = self.leaderboard(rel.id, rules=view)
             q = rel.manifest.get("qec") or {}
             b.update(release=rel.id, rules=rel.manifest.get("rules"), noise=q.get("noise"),
                      starter=rel.manifest.get("starter"))
             boards.append(b)
         return {"track": track, "title": t["title"], "about": t["about"],
-                "evaluator_policy": self.evaluator_policy, "boards": boards}
+                "evaluator_policy": self.evaluator_policy, "boards": boards, "rules": view,
+                "counts": {k: sum(b["counts"][k] for b in boards) for k in ("board", "all")}}
 
     #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py)
     GOAL3_FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor", "Other")
@@ -599,31 +637,37 @@ class OfficialService:
             return "Conveyor" if int(p.get("verticals") or 0) > 0 else "Cyclone"
         return "Other"
 
-    def _goal3_board(self) -> dict:
+    def _goal3_board(self, rules: str | None = None) -> dict:
         """Goal 3, code by code: each release's public eligible entries with the family their
         device declares, the time per round (`T_quantinuum` over every round the program runs:
-        a Z-then-X memory runs its rounds twice) and the logical error rate per round."""
+        a Z-then-X memory runs its rounds twice) and the logical error rate per round.  An entry
+        that does not keep its board's rules is listed only when `rules` is "all"."""
         g = self.GOALS["goal3"]
-        out = []
+        view = self._rules_view(rules)
+        out, counts = [], {"board": 0, "all": 0}
         for rel in sorted(self.goal_releases("goal3"), key=lambda r: r.manifest.get("order", 0)):
             spec = rel.detectors()
             rounds = int(spec.get("rounds") or 1) * (2 if str(spec.get("code", "")).endswith("_seq") else 1)
             rows, _ = self._ranked_rows(rel.id)
+            keeps = [r for r in rows if (r.get("conformance") or {}).get("board", True)]
+            counts["board"] += len(keeps)
+            counts["all"] += len(rows)
             entries = []
-            for r in rows:
+            for r in (rows if view == "all" else keeps):
                 fam, dev = self._entry_family(r["id"])
                 T = r["metrics"].get("T_quantinuum")
                 entries.append({"id": r["id"], "by": r["by"], "display_name": r["display_name"],
                                 "created_at": r["created_at"], "family": fam, "device": dev,
                                 "T_round_ms": T / rounds if isinstance(T, (int, float)) else None,
                                 "ler_per_round": r["metrics"].get("ler_per_round"), "ler": r.get("ler"),
-                                "metrics": r["metrics"]})
+                                "metrics": r["metrics"], "conformance": r.get("conformance")})
             q = rel.manifest.get("qec") or {}
             out.append({"id": rel.id, "title": rel.title, "task": rel.manifest.get("task"), "task_digest": rel.digest,
                         "code": spec.get("code"), "distance": spec.get("distance"), "rounds": rounds,
                         "ions": q.get("n_ions"), "entries": entries})
         return {"goal": "goal3", "title": g["title"], "evaluator_policy": self.evaluator_policy,
-                "noise": g["noise"], "families": list(self.GOAL3_FAMILIES), "releases": out}
+                "noise": g["noise"], "families": list(self.GOAL3_FAMILIES), "releases": out,
+                "rules": view, "counts": counts}
 
     def _entry_family(self, sid: str) -> tuple[str, str | None]:
         """(Goal 3 family, device name) of a stored submission, read once from its bundle's
@@ -646,7 +690,7 @@ class OfficialService:
 
     #: the bundle's files a reader may download: the manifest and every role's file
     READABLE = ("manifest.json", "device.arch.json", "program.tsir.json", "certified.tsir.json",
-                "certificate.qcert.json", "presentation.json")
+                "certificate.qcert.json", "presentation.json", "rules.json")
 
     def _readable(self, sid: str, uploader: dict | None) -> dict:
         """A submission a reader may open: public or unlisted, or private and their own; a design
@@ -824,23 +868,23 @@ def create_app(svc: OfficialService):
             return err(e)
 
     @app.get("/v1/leaderboard/{task}")
-    async def board(task: str):
+    async def board(task: str, request: Request):
         try:
-            return svc.leaderboard(task)
+            return svc.leaderboard(task, rules=request.query_params.get("rules"))
         except OfficialError as e:
             return err(e)
 
     @app.get("/v1/goals/{goal}")
-    async def goal_board(goal: str):
+    async def goal_board(goal: str, request: Request):
         try:
-            return svc.goal_board(goal)
+            return svc.goal_board(goal, rules=request.query_params.get("rules"))
         except OfficialError as e:
             return err(e)
 
     @app.get("/v1/tracks/{track}")
-    async def track_board(track: str):
+    async def track_board(track: str, request: Request):
         try:
-            return svc.track_board(track)
+            return svc.track_board(track, rules=request.query_params.get("rules"))
         except OfficialError as e:
             return err(e)
 

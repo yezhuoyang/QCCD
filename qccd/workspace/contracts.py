@@ -133,7 +133,7 @@ class BundleManifest(_Strict):
     kind: Literal["qccd.submission_bundle"]
     version: Literal[1]
     task: dict[str, str]
-    files: dict[Literal["device", "program", "certified_program", "certificate", "presentation"], FileRef]
+    files: dict[Literal["device", "program", "certified_program", "certificate", "presentation", "rules"], FileRef]
     provenance: dict[str, Any]
 
 
@@ -209,6 +209,9 @@ class EvaluationReport(_Strict):
     profile: Literal["draft", "reference"]
     stages: list[Stage]
     eligibility: dict[str, Any]
+    #: how the entry stands to the board's rules and physics (evaluator._conformance); absent in a
+    #: report from before entries could declare rules of their own (2026-10-29)
+    conformance: Optional[dict[str, Any]] = None
     metrics: dict[str, Metric]
     rank_by: Optional[str]
     cost_breakdown: dict[str, Any]

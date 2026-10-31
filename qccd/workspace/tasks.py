@@ -18,10 +18,12 @@ was graded against, so a result never silently changes meaning).  A workspace ma
 that (lockfile v1) pinned one release; it still opens, and that release is its default.
 
 What a participant MAY change is the design (geometry, zones, capacities, wiring,
-control) and the hardware program.  What they may NOT change for a leaderboard entry is
-the physics: `primitives`, `heating`, `species` and `budget` must equal the release's
-`physics.json`.  A design that changes them is still a legal local experiment -- it is
-labelled exploratory and is never eligible for the task.
+control) and the hardware program.  The physics (`primitives`, `heating`, `species`,
+`budget`) is the release's `physics.json`: an entry is scored with the release's numbers
+wherever the release has one (`scored_device`).  Where it has none -- a junction of a degree
+the release never prices -- the design's own number is used and listed as an addition, so
+the leaderboard can tell such an entry apart (the user's decision of 2026-10-29).  The
+budget is the release's, whole.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ from .jsonsafe import canonical_text, digest, normalize_numbers, strict_loads
 
 __all__ = ["TaskRelease", "ReleaseError", "RELEASES_DIR", "find_release", "list_releases", "find_board",
            "list_boards", "DEFAULT_BOARD", "write_lock", "read_lock", "LOCK_NAME", "physics_mismatch",
-           "FIXED_BLOCKS", "board_device"]
+           "FIXED_BLOCKS", "board_device", "scored_device"]
 
 RELEASES_DIR = Path(__file__).resolve().parent / "releases"
 LOCK_NAME = "qccd.lock.json"
@@ -201,29 +203,115 @@ def find_board(ref: str | None, extra: Path | None = None) -> TaskRelease:
     raise ReleaseError(f"no board {ref!r}; the boards are: " + "; ".join(b.title for b in boards))
 
 
-def board_device(arch_doc: Mapping, release: TaskRelease) -> dict:
-    """The device a design is entered on `release` with.
+#: keys of a physics block that describe a number rather than being one: never an addition,
+#: never an override, whatever they say
+DESCRIPTIVE_KEYS = frozenset({"note", "notes", "source", "sources", "label", "about", "comment"})
+_MISSING = object()
 
-    The fixed blocks are not design variables.  A design that never set its own physics -- its
-    fixed blocks are still those of the template every new design starts from -- takes the
-    board's, so a board with physics of its own (`qccd-physics@2`) can be entered by any design.
-    A design whose physics was edited keeps it, and the physics lock calls it exploratory, as
-    before.  On a board whose physics is the template's (every board before `@2`), and for a
-    design already carrying the board's physics, the design comes back unchanged.
+
+def _bare(x):
+    """A physics value without its descriptive keys, numbers in one spelling: what is compared."""
+    if isinstance(x, Mapping):
+        return {k: _bare(v) for k, v in x.items() if k not in DESCRIPTIVE_KEYS}
+    if isinstance(x, list):
+        return [_bare(v) for v in x]
+    return x
+
+
+def _same(a, b) -> bool:
+    return canonical_text(normalize_numbers(_bare(a))) == canonical_text(normalize_numbers(_bare(b)))
+
+
+def scored_device(arch_doc: Mapping, release: TaskRelease) -> tuple[dict, dict]:
+    """The device a design is scored as on `release`, and what of its own physics that kept.
+
+    Geometry, zones, control and wiring are the design's.  The fixed blocks are the release's,
+    except where the release has no number at all and the design brings one -- a
+    `junction_cross` curve for a degree the release never prices, say: then the design's is
+    used, and listed in `added` (dotted paths).  A number the design changed where the release
+    has one is not used, and is listed in `ignored`; one it merely kept from the template every
+    design starts from is neither.  The `budget` is the release's, whole: what a design declares
+    there is `ignored`.  Lists (a curve's points) are one number each.  A C2LR device keeps its
+    C2LR primitives and species pair wherever they differ from the release's, listed in `added`.
+
+        doc, note = scored_device(design, release)   # note = {"added": [...], "ignored": [...]}
     """
     from ..api import _template_doc
 
-    def same(a, b) -> bool:
-        return canonical_text(normalize_numbers(a)) == canonical_text(normalize_numbers(b))
-
     ref = release.physics()
+    tpl = _template_doc(None)
+    added: list = []
+    ignored: list = []
+
+    def merge(r, d, t, path):
+        if d is _MISSING:
+            return r
+        if isinstance(r, Mapping) and isinstance(d, Mapping):
+            out = dict(r)
+            tt = t if isinstance(t, Mapping) else {}
+            for k, v in d.items():
+                if k in DESCRIPTIVE_KEYS:
+                    continue
+                m = merge(r.get(k, _MISSING), v, tt.get(k, _MISSING), path + (str(k),))
+                if m is not _MISSING:
+                    out[k] = m
+            return out
+        if r is _MISSING:
+            if t is not _MISSING and _same(d, t):
+                return _MISSING          # the template's number, which this release does without
+            added.append(".".join(path))
+            return d
+        if not _same(d, r) and (t is _MISSING or not _same(d, t)):
+            ignored.append(".".join(path))
+        return r
+
     doc = dict(arch_doc)
-    if all(same(doc.get(b), ref.get(b)) for b in FIXED_BLOCKS):
-        return doc
-    default = _template_doc(None)
-    if all(same(doc.get(b), default.get(b)) for b in FIXED_BLOCKS):
-        doc.update({b: ref[b] for b in FIXED_BLOCKS if b in ref})
-    return doc
+    for b in FIXED_BLOCKS:
+        if b not in ref:
+            continue
+        if b == "budget":
+            mark = len(added)
+            merge(ref[b], doc.get(b, _MISSING), tpl.get(b, _MISSING), (b,))
+            ignored.extend(added[mark:])        # a budget figure the design adds is not used either
+            del added[mark:]
+            doc[b] = ref[b]
+        else:
+            doc[b] = merge(ref[b], doc.get(b, _MISSING), tpl.get(b, _MISSING), (b,))
+    # A C2LR device keeps what makes it one, as a C2LR board's physics does (docs/c2lr.md, and
+    # the bench's `with_physics`): its steps' primitives, the merge/split a gate in one leg
+    # entails, and its species pair.  Where the release has other numbers there (a shuttle
+    # board), the device's are used and listed in `added`.
+    if str((arch_doc.get("control") or {}).get("model", "")) == "c2lr":
+        from ..arch.c2lr import C2LR_PHYSICS, c2lr_primitives, c2lr_species
+        pair = str((arch_doc.get("species") or {}).get("pair", ""))
+        own = dict(arch_doc.get("primitives") or {})
+        keep = {"primitives": c2lr_primitives(pair) if pair in C2LR_PHYSICS else
+                {k: own[k] for k in ("swap_or_stay", "reorder_or_not", "merge", "split") if k in own},
+                "species": c2lr_species(pair) if pair in C2LR_PHYSICS else {}}
+        for b, values in keep.items():
+            if b not in ref:
+                continue
+            for k, v in values.items():
+                cur = (doc.get(b) or {}).get(k, _MISSING)
+                if k in DESCRIPTIVE_KEYS or (cur is not _MISSING and _same(cur, v)):
+                    continue
+                doc[b] = {**dict(doc.get(b) or {}), k: v}
+                p = f"{b}.{k}"
+                added[:] = [x for x in added if x != p and not x.startswith(p + ".")] + [p]
+                ignored[:] = [x for x in ignored if x != p and not x.startswith(p + ".")]
+    return doc, {"added": added, "ignored": ignored}
+
+
+def board_device(arch_doc: Mapping, release: TaskRelease) -> dict:
+    """The device a design is entered on `release` with: `scored_device`'s.
+
+    A design that never set its own physics takes the board's, so a board with physics of its
+    own (`qccd-physics@2`) can be entered by any design; one that adds a number the board does
+    not have keeps it, flagged by the grader; one that changed a number the board has is entered
+    with the board's.  For a design already carrying the board's physics, on a board whose
+    physics is the template's, the design comes back unchanged.
+    """
+    return scored_device(arch_doc, release)[0]
 
 
 def physics_mismatch(arch_doc: Mapping, release: TaskRelease) -> list:

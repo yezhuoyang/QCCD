@@ -15,7 +15,8 @@ What makes it safe to let an agent ask:
   * nothing is sent unless this computer is signed in with a qccd.academy account (account.py),
     and the leaderboard names that account as the one who submitted it;
   * the design must have passed the test first: a current, eligible local reference grade of
-    exactly this design on exactly this board.
+    exactly this design on exactly this board -- under the rule set it is entered under (the
+    board's, or one the request names: `rules`), which the upload carries as it was tested.
 
 The server regrades everything itself; the local grade is what lets the person see beforehand
 that it will pass.  The official status is read from the server when asked (cached a few
@@ -80,31 +81,42 @@ class PublicationsMixin:
             self._emit(db, "publication.updated", {"publication_id": pid, "state": row["state"],
                                                    "board": row["board"]}, row["branch"])
 
-    def _passing_submission(self, branch: str, rel) -> dict | None:
+    def _passing_submission(self, branch: str, rel, rules: Mapping | None | bool = False) -> dict | None:
         """The newest local grade of this design on this board that is still current (the design
-        has not changed since), and whether it passed."""
+        has not changed since), and whether it passed.  `rules` (a `rules_choice`, None for the
+        board's) asks for one tested under that rule set; left out, any."""
+        import hashlib
+        want = None if rules is False else (
+            "sha256:" + hashlib.sha256(rules["text"].encode()).hexdigest() if rules else "board")
         rows = self.store.all("SELECT s.id FROM submissions s JOIN snapshots n ON n.id=s.snapshot_id "
                               "WHERE n.branch=? AND s.task_release=? AND s.profile='reference' "
                               "ORDER BY s.created_at DESC LIMIT 10", (branch, rel.id))
         for r in rows:
             s = self.submission(r["id"])
-            if not s["stale"]:
-                return s
+            if s["stale"]:
+                continue
+            if want is not None and want != ((s.get("rules") or {}).get("digest") or "board"):
+                continue
+            return s
         return None
 
     # ------------------------------------------------------------------ requests
 
     def request_publication(self, actor: Mapping, *, board: str | None, design: str | None = None,
                             submission_id: str | None = None, display_name: str | None = None,
-                            visibility: str = "public", origin_prompt_id: str | None = None) -> dict:
+                            visibility: str = "public", origin_prompt_id: str | None = None,
+                            rules=None) -> dict:
         """Ask to put a design on the official leaderboard.  From a PERSON (the Studio's Submit button,
         `qccd publish`) this is the approval and it uploads now; from an AGENT it waits for the person,
-        after testing the design first when it has no current passing grade on that board."""
+        after testing the design first when it has no current passing grade on that board.  `rules`:
+        the rule set it is entered under ("board", a shipped set, a .rules file); left out, whichever
+        its newest current test used."""
         from .core import WorkspaceError, new_id
         if visibility not in ("public", "private"):
             raise WorkspaceError("bad_request", "visibility must be public (on the leaderboard, with your name) "
                                  "or private (only you see it)", status=422)
         human = actor.get("kind") == "human"
+        chosen = False
         if submission_id:
             s = self.submission(submission_id)
             rel = self._bundle_board(self.root / s["snapshot"]["dir"] / "bundle")
@@ -117,7 +129,8 @@ class PublicationsMixin:
                 raise WorkspaceError("bad_request", "name the board: " + "; ".join(b["title"] for b in self.boards()),
                                      status=422)
             branch = self.resolve_draft(design or "main")
-            s = self._passing_submission(branch, rel)
+            chosen = False if rules is None else self.rules_choice(rules)
+            s = self._passing_submission(branch, rel, chosen)
         title = self.design_title(self.branch(branch))
         name = " ".join(str(display_name or title).split())[:80] or title
         acct = self.account()
@@ -139,18 +152,23 @@ class PublicationsMixin:
         status = s["status"] if s is not None else None
         if status == "ineligible":
             reasons = ((s["report"] or {}).get("eligibility") or {}).get("reasons") or []
-            raise WorkspaceError("not_eligible", f"{title} did not pass on {rel.title}: " + "; ".join(reasons[:3])
-                                 + ". Change the design and test it again.", status=409)
+            under = (s.get("rules") or {}).get("name")
+            raise WorkspaceError("not_eligible", f"{title} did not pass on {rel.title}"
+                                 + (f" under its rules ({under})" if under else "") + ": " + "; ".join(reasons[:3])
+                                 + ". Change the design, or the rules it is entered under, and test it again.",
+                                 status=409)
         if status == "grading":
             state, sub_id = "testing", s["id"]
         elif status == "eligible":
             state, sub_id = ("uploading" if human else "awaiting_person"), s["id"]
         elif human:
-            raise WorkspaceError("not_tested", f"test {title} on {rel.title} first (Test on this board): only a "
+            under = f" under {chosen['name']}" if chosen else ""
+            raise WorkspaceError("not_tested", f"test {title} on {rel.title}{under} first (Test on this board): only a "
                                  "design that passes the reference checks can be submitted", status=409)
         else:
             # the agent's "submit it" on an untested design: test it now, and ask the person when it passes
-            job = self.submit_design(actor, design=branch, board=rel.id, origin_prompt_id=origin_prompt_id)
+            job = self.submit_design(actor, design=branch, board=rel.id, origin_prompt_id=origin_prompt_id,
+                                     rules=None if rules is None else chosen and chosen["text"])
             state = "testing"
         pid = new_id("pb")
         now = _now()
@@ -337,8 +355,12 @@ class PublicationsMixin:
             o["metrics"] = rep.get("metrics")
             o["reasons"] = ((rep.get("eligibility") or {}).get("reasons") or [])[:3]
             o["job"] = s.get("job")
+            # an entry that keeps the board's rules is ranked among those; one under rules of its own is
+            # listed with every entry, behind the board's filter (`conformance`)
+            o["conforms"] = (rep.get("conformance") or {}).get("board", True)
             if o["status"] == "eligible" and p["visibility"] == "public":
-                lb = official_call("GET", f"/v1/leaderboard/{p['board']}", server=p["server"], timeout=15)
+                lb = official_call("GET", f"/v1/leaderboard/{p['board']}"
+                                   + ("" if o["conforms"] else "?rules=all"), server=p["server"], timeout=15)
                 ids = [r["id"] for r in lb.get("rows") or []]
                 if p["official_id"] in ids:
                     o["rank"], o["of"] = ids.index(p["official_id"]) + 1, len(ids)
@@ -385,10 +407,14 @@ class PublicationsMixin:
         cache[(server, path)] = (_now(), val)
         return val
 
-    def board_view(self, board: str | None, design: str | None = None) -> dict:
+    def board_view(self, board: str | None, design: str | None = None, rules: str | None = None) -> dict:
         """Everything the Leaderboard panel shows for one board: what it ranks, the official ranking
-        (live from qccd.academy, with who submitted each design), this design's test on it, its
-        requests to publish, and who this computer submits as."""
+        (live from qccd.academy, with who submitted each design; `rules` "all" lists the entries under
+        rule sets of their own too), this design's test on it, its requests to publish, and who this
+        computer submits as."""
+        view = "all" if rules == "all" else "board"
+        rows_of = lambda lb: [{k: r.get(k) for k in ("id", "display_name", "by", "rank_value", "created_at", "conformance")}
+                              for r in lb.get("rows") or []]
         rel = self.board(board or None) if board else None
         tasks = self._official_cached("/v1/tasks", ttl=60.0)
         on_server = {t["id"]: t.get("digest") for t in ((tasks.get("ok") or {}).get("tasks") or [])}
@@ -406,10 +432,10 @@ class PublicationsMixin:
                         "starter": m.get("starter"), "memory": bool(m.get("qec")),
                         "on_server": rel.id in on_server,
                         "same_edition": on_server.get(rel.id) in (None, rel.digest)}
-        lb = self._official_cached(f"/v1/leaderboard/{urllib.parse.quote(rel.id, safe='@')}")
+        lb_path = f"/v1/leaderboard/{urllib.parse.quote(rel.id, safe='@')}" + ("?rules=all" if view == "all" else "")
+        lb = self._official_cached(lb_path)
         if lb.get("ok"):
-            out["official"] = {"rows": [{k: r.get(k) for k in ("id", "display_name", "by", "rank_value", "created_at")}
-                                        for r in lb["ok"].get("rows") or []],
+            out["official"] = {"rows": rows_of(lb["ok"]), "rules": view, "counts": lb["ok"].get("counts"),
                                "rank_by": lb["ok"].get("rank_by"), "better": lb["ok"].get("better")}
         else:
             out["official"] = {"rows": [], "error": (lb.get("error") or {}).get("message")}
@@ -431,7 +457,8 @@ class PublicationsMixin:
             test = {"state": {"grading": "running"}.get(s["status"], s["status"]), "submission_id": s["id"],
                     "eligible": (rep.get("eligibility") or {}).get("eligible"),
                     "reasons": ((rep.get("eligibility") or {}).get("reasons") or [])[:3],
-                    "value": mm.get("value"), "unit": mm.get("unit"), "revision": s["snapshot"]["revision"]}
+                    "value": mm.get("value"), "unit": mm.get("unit"), "revision": s["snapshot"]["revision"],
+                    "rules": s.get("rules"), "conformance": rep.get("conformance")}
             if s["status"] == "grading":
                 jid = s.get("job_id")
                 if jid:
@@ -443,10 +470,9 @@ class PublicationsMixin:
         listed = {r["id"] for r in out["official"]["rows"]}
         if any((p.get("official") or {}).get("rank") and (p.get("official") or {}).get("submission_id") not in listed
                for p in out["publications"]):
-            lb = self._official_cached(f"/v1/leaderboard/{urllib.parse.quote(rel.id, safe='@')}", ttl=0.0)
+            lb = self._official_cached(lb_path, ttl=0.0)
             if lb.get("ok"):
-                out["official"]["rows"] = [{k: r.get(k) for k in ("id", "display_name", "by", "rank_value", "created_at")}
-                                           for r in lb["ok"].get("rows") or []]
+                out["official"]["rows"] = rows_of(lb["ok"])
         # this very graded design, already sent (or waiting for the person): Submit has nothing new to send
         if test and test.get("submission_id"):
             for p in out["publications"]:
@@ -455,7 +481,11 @@ class PublicationsMixin:
                     break
         # where this design's result would rank among the official ones (the server's grade decides);
         # its own entry, if it is already there, is not counted against it
-        if test and test.get("eligible") and isinstance(test.get("value"), (int, float)):
+        # (an entry under rules of its own is ranked with every entry, not among the board's)
+        if test and not ((test.get("conformance") or {}).get("board", True)):
+            test["listed_with"] = "all"
+        if test and test.get("eligible") and isinstance(test.get("value"), (int, float)) and \
+                (test.get("listed_with") != "all" or view == "all"):
             own = {(p.get("official") or {}).get("submission_id") for p in out["publications"]
                    if p["submission_id"] == test.get("submission_id")}
             vals = [r["rank_value"] for r in out["official"]["rows"]
@@ -477,9 +507,14 @@ class PublicationsMixin:
                # who it is (or will be) credited to: the person signed in on this computer
                "credit": p["credit"] or (acct["name"] if acct["signed_in"] else None),
                "signed_in": acct["signed_in"]}
+        if p["submission_id"]:
+            try:                                  # the rule set it was tested, and is entered, under
+                out["rules"] = self.submission(p["submission_id"]).get("rules")
+            except Exception:
+                out["rules"] = None
         if p["state"] == "uploaded":
             out["official"] = {k: o.get(k) for k in ("submission_id", "status", "by", "eligible", "metrics", "reasons",
-                                                     "rank", "of", "rank_by", "rank_value", "unreachable")}
+                                                     "rank", "of", "rank_by", "rank_value", "unreachable", "conforms")}
             out["official"]["report_url"] = f"{p['server']}/v1/submissions/{p['official_id']}/report"
             try:
                 rel = self.board(p["board"])

@@ -12,15 +12,21 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
   bundle               every file hashes to its manifest digest; the manifest names THIS task
                        release (id and digest); no stray or unknown members.
   device               the device loads under the architecture schema and structure checks.
-  physics_lock         primitives/heating/species/budget equal the release's physics.json:
-                       the score is under the task's physics, not the participant's.
+  physics_lock         the device is scored with the release's physics.json: its own number is
+                       used only where the release has none (`tasks.scored_device`), and every
+                       such number is listed (`added`), as is every number of its own that was
+                       not used (`ignored`); the budget is the release's.
   program              the final program is a well-formed TSIR within the release limits.
-  rules                replaying the final program on the device under the task model,
-                       every rule the replay can check passes; rules it cannot check are
+  rules                replaying the final program on the device under the task model, every
+                       rule of the entry's rule set passes: the board's, or the set the bundle
+                       declares (`rules.json`, checked in the rule language,
+                       `qccd.ruleset.declared`).  The board's set is `standard`, checked by
+                       `qccd.verify`, unless the release declares one (`rules`: the C2LR boards'
+                       `c2lr`), which is checked in the rule language as well, the replay taking
+                       its parameters.  The board's rules are checked either way, so the report
+                       says which of them the entry keeps.  Rules the replay cannot check are
                        listed as skipped with the reason, and only the release's
-                       `allowed_skips` may be skipped.  A release that declares a rule set
-                       (`rules`: the C2LR boards' `c2lr`) is judged by that set as well,
-                       in the rule language, and the replay takes the set's parameters.
+                       `allowed_skips` may be skipped.
   correspondence       the final program is the certified program with only the release's
                        allowed transformations applied (inserted `cool` instructions),
                        instruction by instruction, ids included.
@@ -56,6 +62,12 @@ qubit->ion map.
 Eligibility is decided by the release's policy: every required check `passed`, under the
 `reference` profile.  A skipped, unsupported, partial, timed-out or cancelled required
 check is never eligible -- absence of a failure is not a pass.
+
+`conformance` says how an eligible entry stands to the BOARD: whether it keeps every rule of
+the board's set with the board's physics (`board`), and if not, which rules it breaks, what its
+declared set drops, replaces and adds, and which physics numbers are its own.  A leaderboard
+ranks the entries that conform unless a reader asks for every entry (the user's decision of
+2026-10-29: the board's rules first, the others a filter away).
 """
 
 from __future__ import annotations
@@ -76,7 +88,7 @@ from . import EVALUATOR_NAME, EVALUATOR_VERSION, evaluator_identity
 from .bundle import Bundle, BundleError, read_bundle
 from .jsonsafe import canonical_text, digest, normalize_numbers
 from .procs import run_limited
-from .tasks import FIXED_BLOCKS, TaskRelease, physics_mismatch
+from .tasks import FIXED_BLOCKS, TaskRelease, scored_device
 
 __all__ = ["grade", "Toolchain", "PROFILES", "REPORT_KIND", "comparable", "STAGE_STATUSES"]
 
@@ -295,17 +307,29 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         st.done("failed", "architecture schema and structure")
         return finish()
 
-    # ---- physics lock
+    # ---- physics lock: the device is scored with the TASK's physics.  A number the task has is
+    # the task's; one it lacks (a junction degree it never prices) may come from the device, and
+    # is listed, so the leaderboard can tell such an entry from one under the task's physics alone
     st = stages["physics_lock"]
-    mism = physics_mismatch(b.docs["device"], release)
-    if mism:
-        for blk in mism:
-            st.diag("TASK.PHYSICS_MODIFIED", f"the device's {blk!r} differs from the task release's "
-                    f"physics: this is an exploratory design, not an entry for {release.id}",
-                    pointer=f"/device/{blk}")
-        st.done("failed", "fixed blocks " + ", ".join(FIXED_BLOCKS), changed=mism)
-    else:
-        st.done("passed", "fixed blocks " + ", ".join(FIXED_BLOCKS) + " equal the release")
+    scored, own = scored_device(b.docs["device"], release)
+    ctx["physics"] = own
+    for path in own["added"]:
+        st.diag("TASK.PHYSICS_ADDED", f"the task's physics has no {path}; the device's own is used, and the "
+                "entry is listed as bringing physics of its own", severity="warning",
+                pointer="/device/" + path.replace(".", "/"))
+    for path in own["ignored"]:
+        why = ("the budget is the task's" if path.startswith("budget.") else "the task's number is used")
+        st.diag("TASK.PHYSICS_IGNORED", f"the device's own {path} was not used: {why}", severity="warning",
+                pointer="/device/" + path.replace(".", "/"))
+    try:
+        sarch = Architecture.from_json(scored)
+    except (ValueError, KeyError, TypeError) as exc:
+        st.diag("TASK.PHYSICS_INVALID", f"the device with the task's physics does not load: {exc}", pointer="/device")
+        st.done("failed", "fixed blocks " + ", ".join(FIXED_BLOCKS))
+        return finish()
+    st.done("passed", "fixed blocks " + ", ".join(FIXED_BLOCKS) + " are the release's"
+            + (f", with {len(own['added'])} number(s) of the device's own where the release has none"
+               if own["added"] else ""), added=own["added"], ignored=own["ignored"])
 
     # ---- program
     st = stages["program"]
@@ -336,7 +360,8 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
     st = stages["rules"]
     say("rules", "replaying the program and checking the rules")
     try:
-        _rules_stage(st, release, arch, prog)
+        _rules_stage(st, release, sarch, prog, declared=b.docs.get("rules"), cert=b.docs.get("certificate"),
+                     ctx=ctx)
     except Exception as exc:  # the checker failing is an evaluator problem, not a verdict
         st.diag("EVALUATOR.INTERNAL", f"{type(exc).__name__}: {exc}")
         st.done("internal_error", "replay + rules")
@@ -407,7 +432,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         st = stages["ler"]
         say("ler", "measuring the logical error rate of the memory experiment")
         try:
-            _ler_stage(st, release, b, arch, prog, ctx)
+            _ler_stage(st, release, b, sarch, prog, ctx)
         except Exception as exc:  # the estimator failing is an evaluator problem, not a verdict
             st.diag("EVALUATOR.INTERNAL", f"{type(exc).__name__}: {exc}")
             st.done("internal_error", "extract + noiseless check + sampling")
@@ -416,16 +441,10 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
     st = stages["metrics"]
     say("metrics", "computing the leaderboard metrics")
     try:
-        from ..arch.device import Architecture as _A
-        phys_arch = arch
-        if mism:
-            # scored under the TASK's physics even when the device carries its own; the
-            # entry is already ineligible, the numbers are for comparison only
-            doc = dict(b.docs["device"])
-            doc.update(release.physics())
-            phys_arch = _A.from_json(doc)
+        # always under the TASK's physics (the physics lock's scored device), whatever the
+        # device's own blocks say
         from .metrics import METRIC_UNITS, compute_metrics
-        values, breakdown = compute_metrics(phys_arch, prog, release.manifest["physics"])
+        values, breakdown = compute_metrics(sarch, prog, release.manifest["physics"])
         spec = {m["name"]: m for m in release.manifest.get("metrics") or []}
         values.update(ctx.get("ler_metrics") or {})
         ctx["metrics"] = {k: {"value": v, "unit": (spec.get(k) or {}).get("unit", METRIC_UNITS.get(k, "")),
@@ -434,7 +453,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
                           for k, v in values.items()}
         ctx["breakdown"] = breakdown
         st.done("passed", "replay under each task table; hardware report; broadcast use"
-                + (" (under the task physics, substituted)" if mism else ""))
+                + (" (with the device's own numbers where the task has none)" if ctx["physics"]["added"] else ""))
     except Exception as exc:
         st.diag("METRICS.FAILED", f"{type(exc).__name__}: {exc}")
         st.done("failed" if isinstance(exc, (ValueError, KeyError)) else "internal_error", "metrics")
@@ -443,23 +462,36 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
 
 # ---------------------------------------------------------------------- stages
 
-def _rules_stage(st: _Stage, release: TaskRelease, arch, prog) -> None:
+#: the rule set an entry is judged by when its bundle declares none
+BOARD_RULES = "standard"
+
+
+def _rules_stage(st: _Stage, release: TaskRelease, arch, prog, *, declared: Mapping | None = None,
+                 cert: Mapping | None = None, ctx: dict | None = None) -> None:
+    """The board's rules (`qccd.verify`, as always), and the entry's own set when it declares one
+    (`qccd.ruleset`).  The stage's verdict is the entry's set's; `ctx["rules"]` keeps how the entry
+    stands to the board's, for `conformance`."""
     from ..cost.models import corrected_model
     from ..verify import verify
     table = release.manifest["physics"].get("rank_table", "qccdsim_jones")
     # A release that declares its rule set (the C2LR boards: `c2lr`) is judged by it as
     # well: the legacy verifier with the set's parameters (C6's forms), and the set itself,
     # in the rule language.  A release that declares none is judged exactly as it always was.
-    declared = release.manifest.get("rules")
+    board_set = release.manifest.get("rules") or BOARD_RULES
     rs, config = None, None
-    if declared:
+    if release.manifest.get("rules"):
         from ..ruleset import load as load_rules, legacy_config
-        rs = load_rules(str(declared))
+        rs = load_rules(str(board_set))
         config = legacy_config(rs)
     rep = verify(prog, arch, corrected_model(table), check_metrics=False,
                  **({"rule_config": config} if rs is not None else {}))
     s = rep.rules.summary()
     failed = sorted(s.get("failed") or [])
+    own = None
+    if declared is not None:
+        own = _declared_rules(st, release, arch, prog, declared, cert, corrected_model(table), board_set)
+    # a board rule the entry's own set leaves out or writes otherwise: noted, not held against it
+    waived = set((own or {}).get("changes", {}).get("drops", [])) | set((own or {}).get("changes", {}).get("replaces", []))
     language: dict = {}
     if rs is not None:
         from ..ruleset import check as check_rules
@@ -470,7 +502,7 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog) -> None:
         for r in lang.results:
             if r.id in ls["fails"] and r.id not in failed:
                 st.diag(f"RULE.{r.id}", f"the release's rule set {rs.name!r}: {r.id} fails "
-                        f"({r.count} case(s))", rule=r.id,
+                        f"({r.count} case(s))", rule=r.id, **({"severity": "warning"} if r.id in waived else {}),
                         reference={"ruleset": rs.name, "release": release.id})
         failed = sorted(set(failed) | set(ls["fails"]))
         language = {"ruleset": rs.name, "ruleset_holds": ls["holds"], "ruleset_fails": sorted(ls["fails"]),
@@ -480,31 +512,84 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog) -> None:
     skipped = dict(s.get("skipped") or {})
     partial = dict(s.get("partial") or {})
     passed = sorted(set(s.get("passed") or []) - set(partial))
-    for v in rep.rules.violations[:500]:
-        st.diag(f"RULE.{v.rule}", v.message, rule=v.rule,
-                instructions=[v.instr_id] if getattr(v, "instr_id", None) is not None else None,
-                severity=getattr(v, "severity", "error") or "error",
-                reference={"doc": f"docs/rules.md#{v.rule.lower()}", "release": release.id})
     bad_skips = sorted(set(skipped) - ALLOWED_SKIPS)
     bad_partial = sorted(set(partial) - ALLOWED_PARTIAL)
     for r in bad_skips:
         st.diag(f"RULE.{r}.SKIPPED", f"{r} was not checked: {skipped[r]}", severity="warning", rule=r)
+    if language.get("ruleset_could_not_check"):
+        bad_skips = sorted(set(bad_skips) | {f"{rs.name}:{r}" for r in language["ruleset_could_not_check"]})
+    # the board's rules the entry does not keep: broken, or not checked where they must be
+    breaks = sorted(set(failed) | set(bad_skips) | set(bad_partial))
+    for v in rep.rules.violations[:500]:
+        sev = "warning" if v.rule in waived else (getattr(v, "severity", "error") or "error")
+        st.diag(f"RULE.{v.rule}", v.message, rule=v.rule,
+                instructions=[v.instr_id] if getattr(v, "instr_id", None) is not None else None,
+                severity=sev, reference={"doc": f"docs/rules.md#{v.rule.lower()}", "release": release.id})
     cov = f"{len(passed)} rules passed, {len(failed)} failed, {len(skipped)} skipped, {len(partial)} partial"
     detail = {"passed": passed, "failed": failed, "skipped": skipped, "partial": partial,
               "model": f"corrected/{table}", "total_us": rep.result.total_us,
-              "total_cost": rep.result.total_cost, "total_steps": rep.result.total_steps}
+              "total_cost": rep.result.total_cost, "total_steps": rep.result.total_steps,
+              "board_rules": {"set": board_set, "kept": not breaks, "breaks": breaks}}
     if language:
         detail.update(language)
         cov += f"; rule set {rs.name!r}: {len(language['ruleset_holds'])} hold, " \
                f"{len(language['ruleset_fails'])} fail"
-        if language.get("ruleset_could_not_check"):
-            bad_skips = sorted(set(bad_skips) | {f"{rs.name}:{r}" for r in language["ruleset_could_not_check"]})
+    if ctx is not None:
+        ctx["rules"] = {"set": board_set, "breaks": breaks,
+                        "declared": {k: v for k, v in own.items() if k != "rs"} if own is not None else None}
+    if own is not None:
+        detail["declared"] = {k: v for k, v in own.items() if k != "rs"}
+        st.done(own["status"], f"the entry's own rules ({own['name']}): {own['coverage']}; "
+                f"the board's ({board_set}): {cov}", **detail)
+        return
     if failed:
         st.done("failed", cov, **detail)
     elif bad_skips or bad_partial:
         st.done("partial", cov + "; required rules were not all checked", **detail)
     else:
         st.done("passed", cov, **detail)
+
+
+def _declared_rules(st: _Stage, release: TaskRelease, arch, prog, declared: Mapping, cert: Mapping | None,
+                    model, board_set: str) -> dict:
+    """Judge the program by the rule set its bundle declares.  Every rule must hold or not apply;
+    one that could not be checked counts only where the board's own rules may be skipped (R10 is
+    the certificate stages' to decide)."""
+    from ..ruleset import FAILS, NOT_APPLICABLE, UNCHECKED, check, legacy_config, load
+    from ..ruleset.compile import circuit_of_certificate
+    from ..ruleset.declared import RULES_KIND, DeclaredRulesError, changes, load_declared
+    from ..ruleset.programme import programme_execution
+    doc = declared if isinstance(declared, Mapping) else {}
+    text = doc.get("text")
+    out: dict = {"name": str(doc.get("name") or "?")[:80], "title": str(doc.get("title") or "")[:200]}
+    try:
+        if doc.get("kind") != RULES_KIND or doc.get("version") != 1 or not isinstance(text, str):
+            raise DeclaredRulesError("rules.json is not a qccd.rules v1 document with the rule set's text")
+        rs = load_declared(text)
+    except DeclaredRulesError as exc:
+        st.diag("RULESET.INVALID", f"the entry's rule set cannot be read: {exc}", pointer="/rules/text")
+        return {**out, "status": "failed", "coverage": "the rule set cannot be read", "rs": None}
+    out.update(name=rs.name, title=rs.title, digest="sha256:" + hashlib.sha256(rs.text().encode()).hexdigest(),
+               rules=rs.ids, changes=changes(load(board_set), rs))
+    # the set's own parameters (an entry that includes `c2lr` takes C6's forms), as the board's set does
+    exe = programme_execution(prog, arch, model, circuit=circuit_of_certificate(cert) if cert else None,
+                              rule_config=legacy_config(rs) or None, check_metrics=False)
+    rep = check(rs, exe)
+    verdicts = {r.id: r.verdict for r in rep.results}
+    failed = [r for r in rep.results if r.verdict == FAILS]
+    unchecked = {r.id: r.reason for r in rep.results if r.verdict == UNCHECKED}
+    for r in failed:
+        st.diag(f"RULESET.{r.id}", f"{r.id} ({r.title}) fails {r.count} time(s): " + "; ".join(r.examples[:3]),
+                rule=r.id)
+    bad = sorted(set(unchecked) - ALLOWED_SKIPS)
+    for rid in bad:
+        st.diag(f"RULESET.{rid}.UNCHECKED", f"{rid} could not be checked: {unchecked[rid]}", rule=rid)
+    n_hold = sum(1 for v in verdicts.values() if v not in (FAILS, UNCHECKED, NOT_APPLICABLE))
+    n_na = sum(1 for v in verdicts.values() if v == NOT_APPLICABLE)
+    cov = f"{n_hold} rules hold, {len(failed)} fail, {n_na} do not apply, {len(unchecked)} could not be checked"
+    status = "failed" if failed else ("partial" if bad else "passed")
+    return {**out, "status": status, "coverage": cov, "verdicts": verdicts,
+            "failed": [r.id for r in failed], "unchecked": unchecked, "rs": rs}
 
 
 def _correspondence_stage(st: _Stage, release: TaskRelease, final, certified) -> None:
@@ -712,7 +797,15 @@ def _ler_stage(st: _Stage, release: TaskRelease, b, arch, prog, ctx: dict) -> No
         return
     exp = MemoryExperiment.from_spec(release.detectors(), release.circuit_text())
     cert = b.docs.get("certificate")
-    rep = evaluate_memory(prog, arch, exp, noise_id=q["noise"], cert=cert,
+    # the noise model prices transport from the task's table only; a number the device brought
+    # where the task has none (listed by the physics lock) is priced from the device's own points
+    from ..qec import get_noise
+    nm = get_noise(q["noise"])
+    added = tuple((ctx.get("physics") or {}).get("added") or ())
+    if added and "own" in getattr(nm, "__dataclass_fields__", {}):
+        import dataclasses
+        nm = dataclasses.replace(nm, own=added)
+    rep = evaluate_memory(prog, arch, exp, noise_id=q["noise"], noise=nm, cert=cert,
                           ler_budget={k: v for k, v in (q.get("ler") or {}).items() if k != "seed"},
                           seed=(q.get("ler") or {}).get("seed"))
     chk = rep.get("check") or {}
@@ -769,6 +862,7 @@ def _report(release: TaskRelease, profile: str, stages: dict, order: list, ctx: 
         "eligibility": {"eligible": bool(eligible), "policy": "every required check passed under the "
                         "reference profile", "required": release.required_checks if profile == "reference" else [],
                         "reasons": reasons},
+        "conformance": _conformance(ctx),
         "metrics": ctx.get("metrics") or {},
         "rank_by": release.manifest.get("rank_by"),
         "cost_breakdown": ctx.get("breakdown") or {},
@@ -780,6 +874,24 @@ def _report(release: TaskRelease, profile: str, stages: dict, order: list, ctx: 
                    "stage_seconds": {s: stages[s].seconds for s in order}},
     }
     return rep
+
+
+def _conformance(ctx: dict) -> dict | None:
+    """How the entry stands to the board: `board` when it keeps every rule of the board's set and
+    is scored with the board's physics alone; else what differs.  None when the grading stopped
+    before the rules were checked."""
+    r, p = ctx.get("rules"), ctx.get("physics")
+    if r is None or p is None:
+        return None
+    d = r.get("declared") or {}
+    ch = d.get("changes") or {}
+    rules = {"set": d.get("name") or r["set"], "declared": bool(d), "board_set": r["set"],
+             "breaks": r["breaks"], "drops": ch.get("drops", []), "replaces": ch.get("replaces", []),
+             "adds": ch.get("adds", []), "params": ch.get("params", {})}
+    if d:
+        rules.update(title=d.get("title", ""), digest=d.get("digest"))
+    physics = {"board": not p["added"], "added": list(p["added"]), "ignored": list(p["ignored"])}
+    return {"board": not r["breaks"] and physics["board"], "rules": rules, "physics": physics}
 
 
 #: metrics estimated by sampling (the memory boards' logical error rate)

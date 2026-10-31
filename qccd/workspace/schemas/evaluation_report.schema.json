@@ -209,6 +209,19 @@
    "title": "Bundle",
    "type": "object"
   },
+  "conformance": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Conformance"
+  },
   "cost_breakdown": {
    "additionalProperties": true,
    "title": "Cost Breakdown",

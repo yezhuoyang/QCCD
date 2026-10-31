@@ -172,3 +172,61 @@ def test_the_leaderboard_panel_tests_signs_in_submits_and_credits(world):
     assert s[16]["value"] == "403"
     assert svc.db.one("SELECT COUNT(*) AS n FROM submissions WHERE credit='Ada Lovelace'")["n"] == 2
     assert not any(out.get("logs", {}).get("a", [])), out["logs"]
+
+
+def test_the_panel_tests_under_a_rule_set_and_lists_entries_under_other_rules_on_request(world):
+    """The user, 2026-10-29: a design may be entered under a rule set of its own, and the ranking puts
+    the board's rules first.  The panel offers the workspace's .rules files and the website's sets
+    beside Test; the test line says which rules it passed under; the official ranking lists the
+    entries that keep the board's rules until the person asks for every entry, which tags the rest."""
+    info, svc, tmp = world["info"], world["svc"], world["tmp"]
+    (tmp / "ws" / "rules").mkdir(exist_ok=True)
+    (tmp / "ws" / "rules" / "lax.rules").write_text('ruleset "lax"\ntitle "The board\'s, without R21"\n'
+                                                    'include "standard"\ndrop R21\n', encoding="utf-8")
+    own = {"board": False, "rules": {"set": "two-layer", "declared": True, "board_set": "standard",
+                                     "breaks": ["R20", "R21"], "drops": ["R19", "R20", "R21"], "replaces": [],
+                                     "adds": ["L19"], "params": {}},
+           "physics": {"board": True, "added": [], "ignored": []}}
+    rel = svc.releases["ghz4@1"]
+    svc.db.execute("INSERT INTO submissions(id, uploader, task, task_digest, bundle_digest, archive_sha256, visibility, "
+                   "display_name, status, created_at, credit) VALUES('os_y','u_y','ghz4@1',?,'sha256:y','y','public',"
+                   "'Two layers','eligible',?, 'Bingran You')", (rel.digest, time.time()))
+    svc.db.execute("INSERT INTO reports(id, submission, evaluator_version, evaluator_policy, report_digest, report, eligible, "
+                   "rank_value, created_at) VALUES('or_y','os_y','x',?,'d',?,1,1.0,?)",
+                   (svc.evaluator_policy, json.dumps({"conformance": own}), time.time()))
+    base = f"http://127.0.0.1:{info['port']}"
+    code = service_request(info, "POST", "/api/pair-code", {}, token="owner")["code"]
+    ready = "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && QCCD_LIVE.state().rev !== null"
+    bd = "QCCD_LIVE.board().data"
+    opts = lambda sel: f"[].map.call(document.getElementById('{sel}').options, function(o){{ return o.value; }})"
+    steps = [
+        {"wait": ready + " && QCCD_LIVE.board().open && " + bd + " && " + bd + ".official && document.getElementById('qcl-brules')"
+                 " && document.getElementById('qcl-brules').options.length > 1", "timeout": 60000, "stopOnFail": True},  # 0
+        {"eval": "JSON.stringify({rules: " + opts("qcl-brules") + ", view: " + opts("qcl-brview") + ", rows: " + bd +
+                 ".official.rows.map(function(r){ return r.display_name; })})"},                                # 1
+        {"eval": "var s = document.getElementById('qcl-brules'); s.value = 'rules/lax.rules'; "
+                 "s.dispatchEvent(new Event('change')); QCCD_LIVE.testOnBoard(); 'testing'"},                    # 2
+        {"wait": bd + ".test && " + bd + ".test.eligible === true", "timeout": 180000, "stopOnFail": True},     # 3
+        {"eval": "document.getElementById('qcl-btest').textContent"},                                            # 4
+        {"eval": "var v = document.getElementById('qcl-brview'); v.value = 'all'; v.dispatchEvent(new Event('change')); 'all'"},
+        {"wait": bd + ".official.rules === 'all' && " + bd + ".official.rows.length === 2", "timeout": 30000},  # 6
+        {"eval": "JSON.stringify([].map.call(document.querySelectorAll('.qcl-btable tr'), function(t){ return t.textContent; }))"},
+        {"shot": str(tmp / "panel.png")},                                                                        # 8
+    ]
+    spec = {"pages": {"a": f"{base}/studio?board=ghz4#pair={code}"}, "steps": steps}
+    p = tmp / "spec.json"
+    p.write_text(json.dumps(spec), encoding="utf-8")
+    r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(p)], capture_output=True, timeout=900, cwd=REPO)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")[-2000:]
+    out = json.loads(r.stdout.decode("utf-8"))
+    assert not out.get("fatal"), out["fatal"]
+    s = out["steps"]
+    failed = [(i, x.get("error")) for i, x in enumerate(s) if x.get("ok") is False]
+    assert not failed, failed
+    first = json.loads(s[1]["value"])
+    assert first["rules"][0] == "" and "rules/lax.rules" in first["rules"] and "jones" in first["rules"]
+    assert first["view"] == ["board", "all"] and first["rows"] == ["Racetrack 8"]       # the board's rules first
+    assert "under lax" in s[4]["value"], s[4]["value"]
+    rows = json.loads(s[7]["value"])
+    assert any("Two layers (own rules)" in t for t in rows), rows
+    assert not any(out.get("logs", {}).get("a", [])), out["logs"]

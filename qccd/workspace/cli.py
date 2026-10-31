@@ -420,8 +420,12 @@ def cmd_submit(a) -> int:
     info = _svc(a)
     if a.board:
         # one step: compile the board's circuit onto the design, adopt it, freeze, grade
-        t = _call(info, "POST", "/api/submissions", {"profile": a.profile, "board": a.board, "design": a.design or "main"})
-        print(f"submitting {t['design']} to {t['board']} (compile, adopt, freeze, grade)")
+        body = {"profile": a.profile, "board": a.board, "design": a.design or "main"}
+        if a.rules:
+            body["rules"] = a.rules
+        t = _call(info, "POST", "/api/submissions", body)
+        print(f"submitting {t['design']} to {t['board']} (compile, adopt, freeze, grade)"
+              + (f" under the rules {a.rules}" if a.rules else ""))
         j = _wait_job(info, t["job_id"])
         res = j.get("result") or {}
         if j["status"] != "succeeded":
@@ -432,13 +436,22 @@ def cmd_submit(a) -> int:
              "label": "Local result - not published"}
         print(f"submission {s['submission_id']} of r{s['revision']} ({s['label']})")
     else:
-        s = _call(info, "POST", "/api/submissions", {"profile": a.profile})
+        s = _call(info, "POST", "/api/submissions", {"profile": a.profile, **({"rules": a.rules} if a.rules else {})})
         print(f"submission {s['submission_id']} of r{s['revision']} ({s['label']}); bundle {s['bundle_digest']}")
     if a.wait:
         j = _wait_job(info, s["job_id"])
         sub = _call(info, "GET", f"/api/submissions/{s['submission_id']}")
         rep = sub.get("report") or {}
         print(f"{sub['status']}  " + "  ".join(f"{st['id']}={st['status']}" for st in rep.get("stages", [])))
+        c = rep.get("conformance") or {}
+        if c and not c.get("board"):
+            r, ph = c.get("rules") or {}, c.get("physics") or {}
+            print(f"  not under the board's own rules: rules {r.get('set')}"
+                  + (f", drops {', '.join(r['drops'])}" if r.get("drops") else "")
+                  + (f", adds {', '.join(r['adds'])}" if r.get("adds") else "")
+                  + (f", breaks the board's {', '.join(r['breaks'])}" if r.get("breaks") else "")
+                  + (f"; physics of its own: {', '.join(ph['added'])}" if ph.get("added") else "")
+                  + " -- listed with every entry, behind the board's own ranking")
         for k, v in (rep.get("metrics") or {}).items():
             print(f"  {k:24s} {v['value']} {v['unit']}")
         if a.json:
@@ -450,7 +463,8 @@ def cmd_submit(a) -> int:
 def cmd_leaderboard(a) -> int:
     info = _svc(a)
     if a.official:
-        b = _call(info, "GET", "/api/official/leaderboard" + (f"?board={_q(a.board)}" if a.board else ""))
+        b = _call(info, "GET", "/api/official/leaderboard" + (f"?board={_q(a.board)}" if a.board else "")
+                  + (("&" if a.board else "?") + "rules=all" if a.rules == "all" else ""))
         if not a.board:
             for t in b["boards"]:
                 print(f"  {'Compiler' if t.get('track') == 'compiler' else 'Architecture':12s} {t.get('title') or t['id']}"
@@ -459,7 +473,12 @@ def cmd_leaderboard(a) -> int:
         print(f"{b['board']} on {b['server']}, ranked by {b['rank_by']} ({b['better']} is better)")
         b["yours"] = _call(info, "GET", f"/api/publications?board={_q(a.board)}&limit=10")["publications"]
         for i, r in enumerate(b["rows"], 1):
-            print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')!s:>12}  by {r.get('by') or '-'}")
+            own = "" if (r.get("conformance") or {}).get("board", True) else \
+                f"  (own rules: {((r.get('conformance') or {}).get('rules') or {}).get('set')})"
+            print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')!s:>12}  by {r.get('by') or '-'}{own}")
+        more = ((b.get("counts") or {}).get("all") or 0) - ((b.get("counts") or {}).get("board") or 0)
+        if more > 0 and a.rules != "all":
+            print(f"  ({more} more under rules of their own: --rules all)")
         for p in b.get("yours") or []:
             o = p.get("official") or {}
             print(f"  yours: {p['design']} {p['state']}" + (f" -> {o.get('status')}" if o else "")
@@ -858,6 +877,8 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--board", default=None, help="a leaderboard by its title, e.g. 'BB [[144,12,12]]'")
         if name == "leaderboard":
             q.add_argument("--official", action="store_true", help="the published ranking on qccd.academy")
+            q.add_argument("--rules", default="board", choices=["board", "all"],
+                           help="the entries that keep the board's own rules (default), or every entry")
             q.add_argument("--track", default="architecture", choices=["architecture", "compiler"])
         if name == "submit":
             q.add_argument("--design", default=None, help="the design's name (default: the main design)")
@@ -866,6 +887,9 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--compiler", default="auto", choices=["auto", "compile", "rotate"])
         if name == "submit":
             q.add_argument("--local", action="store_true")
+            q.add_argument("--rules", default=None,
+                           help="the rule set the design is entered under: a shipped one by name (e.g. jones), a "
+                                ".rules file in the workspace, or the board's own (default)")
             q.add_argument("--profile", default="reference", choices=["draft", "reference"])
             q.add_argument("--wait", action="store_true")
         if name == "publish":

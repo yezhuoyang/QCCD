@@ -207,8 +207,18 @@ a visible step at a time.
   website opens it).
 - A stage that is `skipped`, `unsupported`, `partial`, `timeout` or `cancelled` is NOT passed.
   Only `eligibility.eligible == true` means the board's policy accepted the entry.
-- Changing `primitives`, `heating`, `species` or `budget` makes the design exploratory: never
-  eligible on a board.
+- **Rules.** A design is graded by the board's own rule set unless it is entered under another:
+  `rules=` on `qccd_submit_local` / `qccd_submit_official` -- a shipped set by name or a `.rules`
+  file in the workspace (`qccd_list_rules` lists both). When a design fails a rule that does not
+  fit it (a two-layer trap and R21, "rails lie in a plane"), offer the person a rule set that
+  `include "standard"` and `drop`s it, written to `rules/<name>.rules` -- never drop a rule just to
+  pass, and say what was dropped. Such an entry is eligible under its own rules, but `conformance`
+  says it does not keep the board's: the official ranking lists it only under "any rules"
+  (`qccd_get_leaderboard(..., rules="all")`), tagged with what it drops and adds.
+- The physics (`primitives`, `heating`, `species`, `budget`) is the board's: a number the design
+  changed is not used (the grade lists it as ignored); a number the board does not have at all
+  (a degree-5 junction's crossing cost) is the design's own, used and listed, and the entry is
+  ranked with the "any rules" entries. The budget is always the board's.
 
 ## The logical error rate, and the Compiler board
 

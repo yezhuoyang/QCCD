@@ -586,9 +586,9 @@ worker all call it.
 |---|---|---|
 | bundle | manifest schema; every member re-hashed; no stray or unknown files; names **this** release (id and digest) | `bundle.read_bundle` |
 | device | loads under the schema and structure checks; size limit | `Architecture.from_json` |
-| physics_lock | `primitives/heating/species/budget` equal the release's `physics.json`; otherwise the design is *exploratory*, never eligible | `tasks.physics_mismatch` |
+| physics_lock | the device is scored with the release's `physics.json`: a number the release has is the release's (the device's own is listed as `ignored`), a number it lacks may be the device's (listed as `added`, and the entry does not conform to the board); the budget is the release's | `tasks.scored_device` |
 | program | well-formed TSIR within limits | `validate_program` |
-| rules | replay under the task model; only R7b, R9 and R10 may be skipped, only R15 may be partial | `qccd.verify.verify` |
+| rules | replay under the task model; only R7b, R9 and R10 may be skipped, only R15 may be partial. The board's set is always checked; a bundle with `rules.json` is judged by the set it declares (docs/rule-language.md, "A leaderboard entry's own rules") | `qccd.verify.verify`, `qccd.ruleset.declared` |
 | correspondence | the final program is the certified program with only allowed insertions (`cool`, fresh ids), identical otherwise except the provenance index `meta.call` | new |
 | certificate_binding | the certificate's `circuit_ops` are the **release's** circuit op by op (a composite such as `ccx` as the run of ops whose product is its defining unitary), with its qubit count and a one-to-one qubit map; gate witnesses match certified instructions | `check_cert.check_binding`, `qccd.ir.source_map` |
 | lean_certificate | `QCCDC.Cert.check` (proved sound) accepts, against facts re-derived from the **submitted** device | `mk_qcheck_input.py`, `qcheck` |
@@ -599,9 +599,13 @@ worker all call it.
 `unsupported`, `partial`, `timeout`, `cancelled` and `internal_error` are never passes. The
 report records task and bundle digests, the evaluator identity (a source digest over the
 code that decides verdicts, plus sha256 of `qccdc_cli` and `qcheck`), per-stage coverage,
-diagnostics with stable ids (`RULE.R1`, `TASK.PHYSICS_MODIFIED`, `CERT.BINDING`,
+diagnostics with stable ids (`RULE.R1`, `RULESET.<id>`, `TASK.PHYSICS_ADDED`, `CERT.BINDING`,
 `CORR.MISMATCH`, …), metrics with units, and non-deterministic timing kept apart.
-`evaluator.comparable` / `publish.compare_reports` define parity.
+`evaluator.comparable` / `publish.compare_reports` define parity. `conformance` says how an eligible entry
+stands to the board: `board` when it keeps every rule of the board's set with the board's
+physics alone, else which board rules it breaks, what its declared rule set drops, rewrites and
+adds, and which physics numbers are its own; the official rankings list the conforming entries
+unless asked for `?rules=all`.
 
 **What it does not establish.** Physical realisability beyond the task's model. (The
 certificate's transport *is* compared with the final program's: `check_cert.py` replays both
