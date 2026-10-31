@@ -891,6 +891,56 @@ details").**
     register memories and work places. Each adder shape is compiled once per district as one
     schedule like the one above, and replayed by start time. Blocks that change districts ride
     compiled transports. No district per instance, and no formula.
+- **Ninth round (2026-10-30): the whole program written concrete; one prime scheduled; and
+  d = 35.** The user asked whether everything scales (memory on this machine, a browser that
+  animates in detail, compile time), and on hearing the blocks were d = 3: "this is
+  ridiculous. We need distance like 35."
+  - **The whole RSA-2048 program, concrete** (`concrete.write_program`, dd215ad): one gate per
+    distinct gadget call; the 21,640 primes are ONE gate (the classical controller supplies
+    their table bits: primes 0, 1 and 21,639 write the same text). A prime reads one source
+    slot nothing ever writes (it holds 0), and the inputs give no contents for `Tanf`/`Tbar`:
+    FormalRV oddities, reported, not fixed here.
+  - **Loops as gadgets** (3231301). The writer unrolled every loop in place, so `gLoop1`'s 214
+    lookups were one body of 2,637,764 lines (439,556 calls): 4 h and 21 GB without finishing.
+    A loop that calls no gadget is now a gate called where it stands (`fold=64`): a lookup's
+    64 × 32 rows are one gadget on the same blocks every iteration. One prime: 2.69M lines →
+    46,641; `gLoop1`'s body 8,346 calls.
+  - **One prime on the 1,900-memory town, d = 3** (stopped, not finished). `gLoop1` scheduled
+    concrete: 8,346 calls, **33,269 s** of machine time, in 29 min. With `gLoop3` (5,313 s)
+    and `gLoop4` (1,254 s) that is **11.1 h for part of one prime** — so RSA-2048 at d = 3 on
+    that town is over 21,640 × 11.1 h ≈ 27 years (concrete, a lower bound; the composed
+    sequential figure was 24.8 years). Stopped in `gUnloop3` at 44 GB private: (1) a gadget
+    is compiled once per placement of its blocks, and `gUnloop3`'s steps land on ~35 home
+    sets, so each step's lookup subtree compiles afresh (one `powerProduct` context ran over
+    an hour); (2) a replayed call copies its whole footprint (≤ 256 intervals a resource)
+    into its caller's calendars. Remedies: stage a repeated step's operands into fixed work
+    memories (one context, compiled once, shorter trips); compact a caller's calendars
+    behind its frontier. Also fixed: a macro no longer keeps the machine's tables (~5 MB each).
+  - **d = 35, tiled** (`qccd/compile/tiled_surface.py`, cfa110b, c5a9847). qccdc's search
+    grows as ions^~3.9 (one round: 12 s at d = 7, 176 s at d = 11, 1,954 s at d = 15; about
+    17 days at d = 35, extrapolated). A patch on `grid(cols + 1, rows + 2, spacing=2)` needs
+    no search: data on the horizontal wires' traps, each check's measure ion at its face's
+    centre, one junction from each of its data; a CNOT layer is two shuttle steps out (north-,
+    then south-bound), the pulses, two back. 39 instructions a round at every distance; gates
+    keep their order; the certificate is built from the instructions and check_cert.py and
+    the proved Lean checker accept it.
+
+    | | ions | written | every rule | R10 (both halves, Lean) | round (physics@2) |
+    |---|---|---|---|---|---|
+    | d = 11 round | 241 | 0.02 s | pass | 1.3 s | 5.6 ms |
+    | d = 35 round | 2,449 | 0.14 s | pass, 6.7 s | 9.2 s | 5.6 ms |
+    | d = 35 merge (71 × 35) | 4,969 | 0.4 s | pass, 22 s | 32 s | 5.8 ms |
+
+    Under qccd-noise@2 the LER falls with d (memories, d rounds): 2.6e-4, 3.6e-5, 2.5e-6 at
+    d = 3, 5, 7 (the last on 5 errors). Extrapolated (memory only), d ≈ 23–25 already suffices
+    for an RSA-2048-length run; d = 35 is the user's margin.
+  - **Next.** The d = 35 machine: a d = 35 block is 1,225 data ions and junctions pass one ion
+    at a time, so blocks should not travel. Stationary patches on a lattice with one seam
+    row/column between neighbours; logic by lattice surgery (any rectangle or corridor of
+    faces is tiled the same way); rounds per merge max(FormalRV's 25, d) = 35; a T factory
+    built from the same patches. The folded scheduler keeps its shape — a block's home is its
+    patch, a macro a surgery gadget — and reserves corridor cells instead of carrying blocks.
+    The viewer draws blocks zoomed out, ions zoomed in.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
