@@ -978,7 +978,7 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
 | Z̄Z̄ / X̄X̄ measurement | seam prepared, the merged patch's rounds, seam read | 25 |
 | multi-patch product (Gidney's lookups and PROD merges) | a corridor of faces joining the patches (any face set) | 25 |
 | CNOT | Z̄Z̄ with an ancilla patch, then X̄X̄ to the target, ancilla read (FormalRV's own lattice-surgery CNOT) | 2 × 25 |
-| H̄ | transversal H (single-ion beams) and the boundary swap by patch deformation | ~25 |
+| H̄ | transversal H, the boundaries turned by deformation over the seam and the neighbouring tile (Gehér et al. 2024), every data state moved one column back through a measure ion | 3 × 25 + 3 |
 | prep / read | reset, or measure every data ion | 0 + 1 |
 | T̄ / CCZ | magic states from a factory built of the same patches, injected | factory-specific |
 
@@ -1005,6 +1005,19 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
   2.3e-4, 1.9e-5 (Z̄ flow) and 2.2e-3, 2.8e-4, 2.8e-5 (X̄ flow) at d = 3, 5, 7.  At d = 25:
   3,849 ions, 94,848 detectors, 1,976 instructions written in 8 s, every rule (132 s), 280 ms.
   R10 at d = 25 was stopped at 36 GB: it needs a leaner tableau before it can run here.
+- Step 2, H̄ done (2026-10-31): `hadamard_bar`, below.  `_phased` gained a transversal H
+  between phases (each check compared with the one of the other type on its support), data
+  states moved through face ions (checks move with them), and the detectors it lacked when a
+  shrink reads more than a seam (a check whose data were all read).  `MemoryExperiment.faces`
+  names each ancilla's face, and `compile_tiled(faces=)` plays faces on either checkerboard.
+  Tiled at d = 3, 5: every rule and R10, 46 / 117 ions, 111 / 160 ms (d rounds a phase).
+  LER under qccd-noise@2 (d rounds a phase): 2.9e-3, 3.0e-4, 2.4e-5 (Z̄ -> X̄) and 2.7e-3,
+  3.3e-4, 3.0e-5 (X̄ -> Z̄) at d = 3, 5, 7.  Per patch area per round (the data of each phase,
+  in patches, times its rounds) that is 1.2-1.3x the Helios memory's rate at d = 3, 5 and
+  0.9-1.1x at d = 7: H̄ fails like an idle patch, as the paper found.  Under the machine's own
+  noise (25 rounds a phase): 5.8e-5 / 3.7e-5 at d = 3, the memory's rate (3.4e-7 / 2.2e-7 vs
+  3.0e-7 per patch area per round).  At d = 5: 2 errors in 1.3e7 shots and 0 in 1.3e7, where
+  the memory's rate predicts 3 each (a short run, stopped there).
 - The machine at d = 11 (qccd-physics-best, 25 rounds a merge), every rule and R10 on each:
 
   | gadget | ions | instructions | every rule | R10 | machine time |
@@ -1012,6 +1025,7 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
   | syndrome round | 241 | 39 | 0.1 s | 1.2 s | 5.8 ms |
   | Z̄Z̄ merge, 25 rounds | 505 | 951 | 4.3 s | 21 s | 138 ms |
   | surgery CNOT, 2 × 25 rounds | 769 | 1,934 | 16 s | 63 s | 278 ms |
+  | H̄, 3 × 25 + 3 rounds | 522 | 4,567 | 16 s | 67 s | 680 ms |
 
   Against d = 25: 5x fewer ions a gadget (3,849 -> 769 for the CNOT), the same machine time (the
   rounds are the same 25; a tiled round takes 5.6-5.8 ms at every d), and R10 fits in memory.
@@ -1027,8 +1041,8 @@ are Z̄Z̄ 2.07e10, X̄X̄ 1.63e10, X̄Z̄ 1.87e9, Z̄ 1.05e9, X̄X̄X̄ 6.0e8, 
 |Ȳ> preparations and 8.1e8 CCZ.  Every X̄Z̄ is `prep l Y; ppm X p Z l`, the middle of
 FormalRV's H̄ (S̄ √X̄ S̄ from three |Ȳ> merges).  After codesign's rewrites no PPM is left:
 `cx` 2.76e10, `read` 1.87e10, `prep Z` 5.5e9, `ht` 2.9e9, `prep X` 1.0e9, `autoccz` 8.1e8,
-`prep Y` 4.2e7.  So the d = 25 machine needs the surgery CNOT (built), preparations and
-readouts, the CCZ factory, and H̄.  Of the `ht`: 2.1e9 sit on a fresh ancilla between two
+`prep Y` 4.2e7.  So the machine needs the surgery CNOT and H̄ (both built), preparations and
+readouts, and the CCZ factory.  Of the `ht`: 2.1e9 sit on a fresh ancilla between two
 `cx` (`prep l Z; cx a l; ht l; cx l b; read l X` -- the mixed product Z̄_a X̄_b), and 7.8e8
 open a template on a block (`ht p0; cx p0 l; read l Z` -- "measure X̄", which an X̄X̄ merge
 with a |+̄> patch does with no H̄; a codesign rewrite to make).
@@ -1038,24 +1052,48 @@ preparations and readouts in X and Z, generate only the Cliffords that keep Z-ty
 Z-type (CNOT circuits).  A merge that is a CSS code measures its Z-type and X-type products
 separately, so no straight seam, corridor or L of faces measures Z̄_a X̄_b (checked by hand
 and against the boundary-segment count: every such merged region keeps both logicals).
-H̄ on a stationary tile, the standard way, is:
-1. transversal H (one beam per data ion): the checks swap type, which flips the face
-   checkerboard (Z faces now at odd i + j) and swaps the boundary types;
-2. every data ion one trap to the right (one transport step on this grid): a translation by
-   one site flips the checkerboard back -- no code deformation can, since a deformation
-   extends the checkerboard it has;
-3. the boundary rotation by code deformation on two tiles: extend into the seam and the
-   neighbour tile (d x (2d + 1)), move the four corners in two steps (the long-edge corners
-   to the middle of their edges, then one site further), shrink back into the tile -- four
-   phases of d rounds, each keeping distance d, since at every step a Z̄ and an X̄
-   representative of the step before are representatives of the step after.
-About four merge-times for each H̄: ~1.2e10 merge-times on top of the CNOTs' 5.5e10 (+21 %).
+H̄ on a stationary tile (built 2026-10-31, `qccd.qec.experiments.hadamard_bar`) is Gehér,
+McLauchlan, Campbell, Moylett and Crawford's (Quantum 8, 1394 (2024), arXiv:2312.11605), turned
+onto our lattice. It uses the tile, its seam column and the neighbouring tile: d x (2d + 1)
+data points.
+1. Transversal H (one beam per data ion). The checks swap type, so the lattice under the patch
+   becomes the other checkerboard (Z faces at odd i + j). No code deformation can flip it back,
+   because a deformation extends the checkerboard it has.
+2. Grow over the seam and the neighbour (prepared |+>). Three corners sit on the top edge and
+   one at the bottom-left; d rounds.
+3. The bottom boundary becomes X. The corners are then at the four ends of the top and the
+   right, so the boundaries have turned a quarter; d rounds.
+4. Read columns 0 .. d in Z. The patch is now the neighbour tile; one round.
+5. Grow back over columns 1 .. d (prepared |0>); d rounds.
+6. Read columns d + 1 .. 2d in Z. The patch sits on columns 1 .. d; one round.
+7. Move every data state one column left, through the measure ion of the face between: two
+   CNOTs in, a reset of both data ions, two CNOTs out. A fault touches one data state, never
+   two. The translation by one site restores the machine's checkerboard, and the patch is home
+   with X̄ and Z̄ exchanged.
+
+Two things differ from the paper. Step 7 moves states through ions instead of SWAPping qubits.
+Every row of the machine is full of ions, so no ion could move one trap without a hole to move
+into. And steps 2 and 3 measure every X check and then every Z check (eight layers), each
+touching one diagonal pair of corners and then the other. Near the top corner, those patches'
+logicals have short representatives both horizontally and vertically. A hook then lands on a
+diagonal pair, two opposite edges of a face, which no shortest logical string can use. The
+four-layer split schedules tried here (one diagonal line per phase, as the paper describes)
+reached only d - 1 at d = 5 and 7. With the diagonal schedule the circuit keeps distance d
+at d = 3, 5, 7, 9, 11 in both bases, and every deterministic parity is a declared detector.
+The cost: an eight-layer round takes about 1.9 four-layer rounds.
+
+H̄ takes 680 ms at the machine's distance with 25 rounds a phase, which is 4.9 merge-times.
+FormalRV's H̄ is three |Ȳ> merges, 3 merge-times, so 2.9e9 H̄ add ~1.4e10 merge-times to the
+CNOTs' 5.5e10 (+26 %). A four-layer schedule that kept distance d would bring H̄ to ~3.1
+merge-times. The neighbouring tile and the seam are busy for the whole gate, and the mirror
+image uses the left neighbour instead.
 Off the critical path instead: an H̄ applied in advance to one half of a Bell pair gives the
 pair Z̄_1 X̄_2, X̄_1 Z̄_2, and then Z̄_a X̄_b is two ordinary merges at once (Z̄_a Z̄_1 and
 X̄_b X̄_2, which commute, product Z̄_a X̄_b), and H̄ on a block is teleportation through the
 pair -- the rotations become a resource factory, like magic states.  (A physical 90°
-rotation of the tile's ions would replace steps 2 and 3 with O(d) transport steps, but needs
-a router that moves data ions through the measure ions' traps; not now.)
+rotation of the tile's ions would replace the deformation with O(d) transport steps, but needs
+holes in the ion lattice and a router that moves data ions through the measure ions' traps;
+not now.)
 
 **What distance trapped-ion fidelities need (2026-10-31; user: "trapped ions have better gate
 fidelity -- estimate the distance we actually need").** Measured, not assumed: the idle gadget

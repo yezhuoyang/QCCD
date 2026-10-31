@@ -28,6 +28,9 @@ a step makes, at its cycle; each op's witness at its last pulse, where its ions 
     compile_tiled(qasm_text, rows, cols)  -- a lattice surgery's merged patch
     compile_tiled(exp.qasm, rows, cols, coords=exp.coords)  -- patches and seams on one
                                              lattice, in phases (`surgery_cnot`)
+    compile_tiled(exp.qasm, d, 2 * d + 1, coords=exp.coords, faces=exp.faces)  -- H̄
+                                             (`hadamard_bar`): both checkerboards, data states
+                                             moved through measure ions
 """
 from __future__ import annotations
 
@@ -160,7 +163,7 @@ def _face(touched: set, basis: str | None) -> tuple[int, int] | None:
 
 
 def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: str = "circuit",
-                  arch=None, coords=None) -> tuple:
+                  arch=None, coords=None, faces=None) -> tuple:
     """`(program, certificate, architecture)` for a circuit of surface-code checks on a lattice of
     rows x cols data points -- uncooled.  The data qubits come first: by default q0 ..
     q[rows*cols - 1] row-major, a rotated surface patch (`qccd.gadget.surface.patch`; cols =
@@ -169,8 +172,11 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
     (a surgery's patches and seams, `MemoryExperiment.coords`).  Every other qubit is a check's
     measure ion and every two-qubit gate is between a measure ion and a data ion of its check.
     The checks are found from the gates: a measure ion's face is the one whose corners hold the
-    data ions it ever touches, of its basis (an X check's ion is the CNOTs' control).  Any set
-    of faces plays: a face's junctions are its own, whichever others are there."""
+    data ions it ever touches, of its basis (an X check's ion is the CNOTs' control) -- or, with
+    `faces`, the face named for each measure ion in qubit order (`MemoryExperiment.faces`:
+    needed when a face's checkerboard is the other one, after a transversal H, or its ion also
+    carries data states, as H̄'s does).  Any set of faces plays: a face's junctions are its own,
+    whichever others are there."""
     cols = cols or rows
     arch = arch or device(rows, cols)
     n, ops, _ = _parse(qasm_text)
@@ -192,9 +198,16 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
         elif op.name not in U3 and op.name not in ("measure", "reset", "barrier"):
             raise TiledError(f"op {op.i}: {op.name} is not played here")
     face: dict = {}
+    if faces is not None and len(faces) != n - nd:
+        raise TiledError(f"{len(faces)} faces named for {n - nd} measure ions")
     for m in range(nd, n):
         basis = role.get(m)
-        f = _face(touch.get(m, set()), next(iter(basis)) if basis and len(basis) == 1 else None)
+        if faces is not None:
+            f = tuple(faces[m - nd])
+            if not all(f[0] <= r <= f[0] + 1 and f[1] <= c <= f[1] + 1 for r, c in touch.get(m, ())):
+                f = None
+        else:
+            f = _face(touch.get(m, set()), next(iter(basis)) if basis and len(basis) == 1 else None)
         if f is None:
             raise TiledError(f"q{m} touches data at {sorted(touch.get(m, ()))}: not the corners of "
                              f"one face of the {rows} x {cols} lattice")

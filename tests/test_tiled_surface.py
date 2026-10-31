@@ -13,6 +13,10 @@ Held here:
   surgeries -- the merged pair, and FormalRV's CNOT (`surgery_cnot`: three patches, two
   phases) -- pass every rule and R10, keep circuit distance d, and their logical error rate
   under qccd-noise@2 falls with d;
+* H̄ (`hadamard_bar`, Gehér et al. 2024 on the machine's lattice): noiselessly the gate's flow
+  (Z̄ -> X̄, X̄ -> Z̄) is deterministic, every deterministic parity is a declared detector, the
+  circuit keeps distance d; tiled -- both checkerboards, data states moved through measure ions
+  -- it passes every rule and R10, and its logical error rate falls with d;
 * the Shor machine (`qccd.fullstack.scale.machine`): a round at its distance on its physics
   (qccd-physics-best) passes every rule and R10;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
@@ -91,17 +95,19 @@ def test_a_lattice_surgery_measures_the_product_and_keeps_both_logicals(kind, tm
     _r10(prog, cert, a, exp.qasm, tmp_path)
 
 
-@pytest.mark.parametrize("gadget", ["ZZ", "cnot"])
+@pytest.mark.parametrize("gadget", ["ZZ", "cnot", "hbar"])
 def test_a_surgerys_logical_error_rate_falls_with_the_distance(gadget):
     from qccd.qec import evaluate_memory
-    from qccd.qec.experiments import lattice_surgery, surgery_cnot
+    from qccd.qec.experiments import hadamard_bar, lattice_surgery, surgery_cnot
     model = corrected_model("quantinuum")
     ler = {}
     for d in (3, 5):
-        exp = lattice_surgery(d, "ZZ") if gadget == "ZZ" else surgery_cnot(d, "Z")
-        rows, cols = (2 * d + 1, d) if gadget == "ZZ" else (2 * d + 1, 2 * d + 1)
+        exp, (rows, cols) = {"ZZ": (lattice_surgery(d, "ZZ"), (2 * d + 1, d)),
+                             "cnot": (surgery_cnot(d, "Z"), (2 * d + 1, 2 * d + 1)),
+                             "hbar": (hadamard_bar(d, "Z"), (d, 2 * d + 1))}[gadget]
         a = device(rows, cols, physics="physics@2")
-        prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords)
+        prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords,
+                                      faces=exp.faces)
         cooled = insert_cooling(prog, a, model).program
         cooled.meta.update(prog.meta)
         rep = evaluate_memory(cooled, a.to_json(), exp, noise_id="qccd-noise@2", cert=cert, seed=7,
@@ -146,6 +152,54 @@ def test_a_surgery_cnots_flow_needs_its_correction():
     broken = replace(exp, observables=(tuple(sorted(flow - m1)),) + exp.observables[1:])
     with pytest.raises(ValueError):
         ideal_stim(broken).detector_error_model()
+
+
+@pytest.mark.parametrize("basis", ["Z", "X"])
+def test_h_bar_exchanges_the_logicals_at_full_distance(basis):
+    """`hadamard_bar`: noiselessly every detector and the flow (Z̄ -> X̄ from |0̄>, X̄ -> Z̄ from
+    |+̄>, with the corrections stim's flow solver finds) are deterministic; at d = 3 every
+    deterministic parity of the measurements is a declared detector or the flow (none left out,
+    which an observable could otherwise pick up as a fault no detector sees); under uniform
+    circuit noise the smallest graphlike logical error has d faults."""
+    from dataclasses import replace
+
+    from qccd.gadget import gf2
+    from qccd.qec.experiments import hadamard_bar, ideal_stim
+    for d in (3, 5):
+        exp = hadamard_bar(d, basis)
+        c = ideal_stim(exp)
+        c.detector_error_model()
+        assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+        assert len(ideal_stim(exp, 1e-3).shortest_graphlike_error(ignore_ungraphlike_errors=True)) == d
+    exp = hadamard_bar(3, basis)
+    bare = ideal_stim(replace(exp, detectors=(), observables=()))
+    m = bare.num_measurements
+    shots = bare.compile_sampler().sample(4 * m + 64)
+    random_part = gf2.rank(int("".join("1" if b else "0" for b in reversed(s ^ shots[0])), 2)
+                           for s in shots)
+    order = _measured_bits(exp.qasm) + [b for _, b in exp.readout_bits]
+    at = {b: k for k, b in enumerate(order)}
+    declared = gf2.rank(sum(1 << at[b] for b in bits) for bits in exp.detectors + exp.observables)
+    assert declared == m - random_part
+
+
+def _measured_bits(qasm: str) -> list[int]:
+    from qccd.qec.qasm import parse_qasm
+    return [op.bit for op in parse_qasm(qasm).ops if op.name == "M"]
+
+
+def test_h_bar_is_played_on_the_tiled_grid(tmp_path):
+    """Tiled on the d x (2d + 1) of a patch, its seam and the neighbouring tile -- the deformed
+    patches on the other checkerboard, every data state moved one column through a measure ion
+    -- H̄ passes every rule under qccd-physics@2 and R10."""
+    from qccd.qec.experiments import hadamard_bar
+    exp = hadamard_bar(3, "Z")
+    a = device(3, 7, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, 3, 7, arch=a, coords=exp.coords, faces=exp.faces)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
 
 
 def test_the_shor_machines_round_holds_at_its_distance_on_its_physics(tmp_path):

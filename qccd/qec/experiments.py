@@ -51,9 +51,16 @@ surface-code faces, in phases -- each a set of checks measured some rounds, afte
 reads and the data it prepares.  Their detectors follow from that by one rule (`_phased`): a
 check's first value in a phase is compared with its face's last value in the phase before when
 the data it gained were just prepared in its basis and the data it lost were just read in it
-(those readouts join the comparison); otherwise it is random.  `coords` says where each data
-qubit sits on the lattice, which a compiler that plays the checks by geometry reads
-(`qccd.compile.tiled_surface`).
+(those readouts join the comparison); otherwise it is random.  A check of the phase before
+whose data were all read in its basis is compared with those readouts.  `coords` says where
+each data qubit sits on the lattice and `faces` which face each ancilla measures, which a
+compiler that plays the checks by geometry reads (`qccd.compile.tiled_surface`).
+
+**H̄** (`hadamard_bar`) is a surgery with two more kinds of step between phases: a transversal H
+(each check changes type; a check of the phase before is then compared with the new one on its
+support), and a move of every data state one lattice site through the measure ion of the face
+between -- the checks move with it.  Its observable is the gate's flow, Z̄ -> X̄ or X̄ -> Z̄,
+with the corrections stim's flow solver finds.
 
 `ideal_stim` turns an experiment into the stim circuit of its source (plus the appended
 readout), with optional uniform circuit-level noise: the reference an extracted hardware
@@ -89,6 +96,7 @@ __all__ = [
     "bb",
     "lattice_surgery",
     "surgery_cnot",
+    "hadamard_bar",
     "EXPERIMENTS",
     "READOUTS",
     "get",
@@ -124,6 +132,9 @@ class MemoryExperiment:
     #: (row, column) of each data qubit on its surface-code lattice, for a surgery; empty
     #: otherwise.  Not part of the spec: the grader never needs it
     coords: tuple[tuple[int, int], ...] = ()
+    #: the lattice face each ancilla (n_data + k) measures, for a surgery; empty otherwise.  Not
+    #: part of the spec either
+    faces: tuple[tuple[int, int], ...] = ()
 
     def readout_plan(self) -> list[tuple[int, int, str]]:
         """(data qubit, classical bit, basis) for each appended readout, in order."""
@@ -410,13 +421,18 @@ def rotated_surface_xz(d: int, rounds: int | None = None, *,
 
 @dataclass(frozen=True)
 class _Phase:
-    """One stretch of a surgery: the data it reads (measured in the basis named), then the data
-    it prepares (reset into the basis named), then its checks -- `(face, basis, support,
-    layers)`, as `_placed` gives them -- measured `rounds` times."""
+    """One stretch of a surgery: the data it reads (measured in the basis named), then a
+    transversal H on the data `hadamard` names, then the data states it moves (`move`: data q ->
+    (the face whose measure ion carries it, the data q' it lands on), every face displaced by
+    `shift`), then the data it prepares (reset into the basis named), then its checks --
+    `(face, basis, support, layers)`, as `_placed` gives them -- measured `rounds` times."""
     checks: tuple
     rounds: int
     read: Mapping[int, str] = field(default_factory=dict)
     prep: Mapping[int, str] = field(default_factory=dict)
+    hadamard: tuple = ()
+    move: Mapping[int, tuple] = field(default_factory=dict)
+    shift: tuple = (0, 0)
 
 
 def _placed(rows: int, cols: int, at: tuple[int, int], index: Mapping) -> list:
@@ -430,15 +446,75 @@ def _placed(rows: int, cols: int, at: tuple[int, int], index: Mapping) -> list:
             for c in patch(rows, cols).checks]
 
 
+#: how a check touches its corners: (corner order, the layer of the first).  Tomita–Svore is
+#: `qccd.gadget.surface`'s.  `_DIAGONAL` measures every X check and then every Z check, each
+#: touching one diagonal pair of corners and then the other: a fault on its measure ion then
+#: spreads to a diagonal pair, two opposite edges of a face, which no shortest logical string
+#: can use -- so a patch whose logicals have short representatives in both directions (a
+#: corner moved into the middle of an edge) keeps its distance with no split schedule.  It
+#: costs twice the layers.
+_TOMITA = {"X": (("NW", "NE", "SW", "SE"), 0), "Z": (("NW", "SW", "NE", "SE"), 0)}
+_DIAGONAL = {"X": (("NW", "SE", "NE", "SW"), 0), "Z": (("NW", "SE", "NE", "SW"), 4)}
+
+
+def _region(at: tuple[int, int], rows: int, cols: int, edges: Mapping, index: Mapping,
+            flip: int = 0, schedule: Mapping = _TOMITA) -> list:
+    """The checks of a rows x cols patch whose top-left data point is `at`, as `_placed` gives
+    them.  Face (i, j) is a Z face when i + j + flip is even (flip 1: the lattice under a patch
+    after a transversal H).  Every weight-4 face is kept; on each side ("top", "right",
+    "bottom", "left") the weight-2 faces of the basis `edges[side](k)` names, k counted along
+    the side from its top or left end -- a side whose basis changes part-way has a corner in
+    its middle."""
+    oi, oj = at
+    out = []
+    for i in range(oi - 1, oi + rows):
+        for j in range(oj - 1, oj + cols):
+            basis = "Z" if (i + j + flip) % 2 == 0 else "X"
+            corners = {k: (r, c) for k, (r, c) in (("NW", (i, j)), ("NE", (i, j + 1)),
+                                                    ("SW", (i + 1, j)), ("SE", (i + 1, j + 1)))
+                       if oi <= r < oi + rows and oj <= c < oj + cols}
+            if len(corners) == 2:
+                side, k = (("top", j - oj) if i < oi else ("bottom", j - oj) if i == oi + rows - 1
+                           else ("left", i - oi) if j < oj else ("right", i - oi))
+                if edges[side](k) != basis:
+                    continue
+            elif len(corners) != 4:
+                continue
+            order, first = schedule[basis]
+            seq = [(index[corners[o]], first + t) for t, o in enumerate(order) if o in corners]
+            out.append(((i, j), basis, tuple(q for q, _ in seq), tuple(t for _, t in seq)))
+    return out
+
+
+def _explained(qasm: str, logical: Mapping[int, str]) -> list[int]:
+    """The classical bits whose parity, by stim's flow solver, is the eigenvalue of the Pauli
+    `logical` (qubit -> "X" | "Z") on the state the circuit leaves: the corrections a readout of
+    that logical at the end needs."""
+    import stim
+    c = ideal_stim(MemoryExperiment(name="flow", code="", distance=0, rounds=1, basis="Z",
+                                    n_data=0, n_ancilla=0, qasm=qasm, detectors=(),
+                                    observables=(), readout="appended"))
+    ps = stim.PauliString(c.num_qubits)
+    for q, p in logical.items():
+        ps[q] = p
+    found = c.solve_flow_measurements([stim.Flow(output=ps)])[0]
+    if found is None:
+        raise ValueError("the circuit does not leave an eigenstate of the logical")
+    order = [op.bit for op in parse_qasm(qasm).ops if op.name == "M"]
+    return sorted(order[m] for m in found)
+
+
 def _phased(title: str, n: int, phases: Sequence[_Phase], final: Mapping[int, str]) -> tuple:
-    """A surgery's QASM and detectors (see the module docstring), its number of ancillas (one
-    per face), and where each classical bit went: `bits["check", phase, round, face]`,
-    `bits["read", phase, q]` (data q read before that phase), `bits["final", q]` (q's
-    appended readout, in the basis `final` names)."""
+    """A surgery's QASM and detectors (see the module docstring), the face each ancilla
+    measures (one per face, in qubit order), and where each classical bit went:
+    `bits["check", phase, round, face]`, `bits["read", phase, q]` (data q read before that
+    phase), `bits["final", q]` (q's appended readout, in the basis `final` names)."""
     anc: dict = {}
     for ph in phases:
         for f, *_ in sorted(ph.checks, key=lambda c: (c[1] != "X", c[0])):
             anc.setdefault(f, n + len(anc))
+        for q in sorted(ph.move):
+            anc.setdefault(ph.move[q][0], n + len(anc))
     bits: dict = {}
 
     def new(key) -> int:
@@ -448,10 +524,30 @@ def _phased(title: str, n: int, phases: Sequence[_Phase], final: Mapping[int, st
     out: list[str] = []
     dets: list[tuple[int, ...]] = []
     used: set = set()
-    last: dict = {}                     # face -> (support, its last bit) in the phase before
+    last: dict = {}                     # face -> (basis, support, its last bit) in the phase before
     for p, ph in enumerate(phases):
         for q, b in sorted(ph.read.items()):
             out += [f"h q[{q}];"] * (b == "X") + [f"measure q[{q}] -> c[{new(('read', p, q))}];"]
+        if ph.hadamard:
+            # every check on the H'd data changes type; the others are not compared again
+            out += [f"h q[{q}];" for q in sorted(ph.hadamard)]
+            last = {f: ({"X": "Z", "Z": "X"}[b], s, bit) for f, (b, s, bit) in last.items()
+                    if s <= set(ph.hadamard)}
+        if ph.move:
+            # each state into its face's measure ion and out onto its new data ion, a reset
+            # between: a fault touches one data state, never two
+            mv = sorted(ph.move.items())
+            out += [f"reset q[{anc[f]}];" for _, (f, _) in mv if f in used]
+            out += [f"cx q[{q}],q[{anc[f]}];" for q, (f, _) in mv]
+            out += [f"cx q[{anc[f]}],q[{q}];" for q, (f, _) in mv]
+            out += [f"reset q[{q}];" for q in sorted({q for q, _ in mv} | {t for _, (_, t) in mv})]
+            out += [f"cx q[{anc[f]}],q[{t}];" for _, (f, t) in mv]
+            out += [f"cx q[{t}],q[{anc[f]}];" for _, (f, t) in mv]
+            used.update(f for _, (f, _) in mv)
+            to = {q: t for q, (_, t) in mv}
+            di, dj = ph.shift
+            last = {(f[0] + di, f[1] + dj): (b, frozenset(to[q] for q in s), bit)
+                    for f, (b, s, bit) in last.items() if s <= to.keys()}
         out += [f"reset q[{q}];" for q in sorted(ph.prep) if p]
         out += [f"h q[{q}];" for q, b in sorted(ph.prep.items()) if b == "X"]
         checks = sorted(ph.checks, key=lambda c: (c[1] != "X", c[0]))
@@ -466,27 +562,32 @@ def _phased(title: str, n: int, phases: Sequence[_Phase], final: Mapping[int, st
             out += [f"measure q[{anc[f]}] -> c[{new(('check', p, r, f))}];" for f, *_ in checks]
             used.update(f for f, *_ in checks)
         touched = set(ph.read) | set(ph.prep)
+        here = {f for f, *_ in checks}
+        for f, (b0, s0, prev) in sorted(last.items()):
+            if f not in here and all(ph.read.get(q) == b0 for q in s0):
+                dets.append((prev,) + tuple(bits["read", p, q] for q in sorted(s0)))
         for f, b, sup, _ in checks:
-            s0, prev = last.get(f, (frozenset(), None))
+            b0, s0, prev = last.get(f, (b, frozenset(), None))
             s = frozenset(sup)
-            if (all(ph.prep.get(q) == b for q in s - s0) and all(ph.read.get(q) == b for q in s0 - s)
-                    and not s & s0 & touched):
+            if (b0 == b and all(ph.prep.get(q) == b for q in s - s0)
+                    and all(ph.read.get(q) == b for q in s0 - s) and not s & s0 & touched):
                 dets.append((bits["check", p, 0, f],) + (() if prev is None else (prev,))
                             + tuple(bits["read", p, q] for q in sorted(s0 - s)))
         dets += [(bits["check", p, r, f], bits["check", p, r - 1, f])
                  for r in range(1, ph.rounds) for f, *_ in checks]
-        last = {f: (frozenset(sup), bits["check", p, ph.rounds - 1, f]) for f, _, sup, _ in checks}
+        last = {f: (b, frozenset(sup), bits["check", p, ph.rounds - 1, f]) for f, b, sup, _ in checks}
     D = len(bits)
     for q in sorted(final):
         new(("final", q))
     for f, b, sup, _ in sorted(phases[-1].checks, key=lambda c: (c[1] != "X", c[0])):
         if all(final.get(q) == b for q in sup):
-            dets.append((last[f][1],) + tuple(bits["final", q] for q in sorted(sup)))
+            dets.append((last[f][2],) + tuple(bits["final", q] for q in sorted(sup)))
     head = ['OPENQASM 2.0;', 'include "qelib1.inc";',
             f"// {title}; data q[0..{n - 1}], ancillas q[{n}..{n + len(anc) - 1}]; "
             f"data readout c[{D}..{len(bits) - 1}] appended by the grader",
             f"qreg q[{n + len(anc)}];", f"creg c[{len(bits)}];"]
-    return "\n".join(head + out) + "\n", tuple(dets), bits, len(anc)
+    faces = tuple(sorted(anc, key=anc.get))
+    return "\n".join(head + out) + "\n", tuple(dets), bits, faces
 
 
 def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> MemoryExperiment:
@@ -511,7 +612,7 @@ def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> Memo
     checks = _placed(p.rows, p.cols, (0, 0), {x: q for q, x in enumerate(coords)})
     dbasis = {q: info["seam_basis"] if q in seam else mem for q in range(p.n)}
     name = f"surgery{d}_{kind.lower()}_r{r}"
-    qasm, dets, bits, m = _phased(
+    qasm, dets, bits, faces = _phased(
         f"{name}: lattice surgery measuring {kind[0]}bar_A {kind[1]}bar_B between two d = {d} "
         f"patches, {r} round(s), {p.rows} x {p.cols} (A, the seam, B)",
         p.n, [_Phase(tuple(checks), r, prep=dbasis)], dbasis)
@@ -522,10 +623,11 @@ def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> Memo
         la, lb = [p.index(rr, 0) for rr in range(d)], [p.index(rr, 2 * d) for rr in range(d)]
     obs = (tuple(measured),) + tuple(tuple(bits["final", q] for q in sorted(lg)) for lg in (la, lb))
     return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_{kind.lower()}",
-                            distance=d, rounds=r, basis=mem, n_data=p.n, n_ancilla=m,
+                            distance=d, rounds=r, basis=mem, n_data=p.n, n_ancilla=len(faces),
                             qasm=qasm, detectors=dets, observables=obs, readout="appended",
                             readout_bits=tuple((q, bits["final", q]) for q in range(p.n)),
-                            readout_basis=tuple(dbasis[q] for q in range(p.n)), coords=tuple(coords))
+                            readout_basis=tuple(dbasis[q] for q in range(p.n)), coords=tuple(coords),
+                            faces=faces)
 
 
 def surgery_cnot(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryExperiment:
@@ -569,7 +671,7 @@ def surgery_cnot(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryE
               _Phase(tuple(xx), r, read=dict.fromkeys(qs(row), "X"), prep=dict.fromkeys(qs(col), "Z"))]
     final = {**dict.fromkeys(qs(C + T), basis), **dict.fromkeys(qs(A + col), "Z")}
     name = f"cnot{d}_{basis.lower()}_r{r}"
-    qasm, dets, bits, m = _phased(
+    qasm, dets, bits, faces = _phased(
         f"{name}: a CNOT by lattice surgery, control C to target T through an ancilla patch A, "
         f"d = {d}, {r} round(s) a merge", len(coords), phases, final)
 
@@ -588,10 +690,94 @@ def surgery_cnot(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryE
                 + read([(d + 1 + i, d + 1) for i in range(d)]))
         kept = read([(d + 1 + i, 2 * d) for i in range(d)])
     return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_cnot", distance=d, rounds=r,
-                            basis=basis, n_data=len(coords), n_ancilla=m, qasm=qasm, detectors=dets,
-                            observables=(tuple(sorted(flow)), tuple(sorted(kept))), readout="appended",
+                            basis=basis, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+                            detectors=dets, observables=(tuple(sorted(flow)), tuple(sorted(kept))),
+                            readout="appended",
                             readout_bits=tuple((q, bits["final", q]) for q in sorted(final)),
-                            readout_basis=tuple(final[q] for q in sorted(final)), coords=tuple(coords))
+                            readout_basis=tuple(final[q] for q in sorted(final)),
+                            coords=tuple(coords), faces=faces)
+
+
+def hadamard_bar(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryExperiment:
+    """H̄ on a stationary distance-d patch, as Gehér, McLauchlan, Campbell, Moylett and Crawford
+    build it (Quantum 8, 1394 (2024); arXiv:2312.11605), turned onto the machine's lattice: the
+    patch's tile, its seam column and the neighbouring tile, d x (2d + 1) data points, the patch
+    on the first d columns, Z̄ along row 0 and X̄ down column 0.
+
+    0. the patch, prepared in `basis`, one round;
+    1. a transversal H: every check changes type and the lattice under the patch is the other
+       checkerboard (Z faces at odd i + j).  The patch grows over the seam and the neighbour
+       (prepared |+>) to d x (2d + 1): Z along the top of the patch and the seam, X along the
+       top of the neighbour, Z down the right and along the bottom, X up the left -- three
+       corners on the top edge, one at the bottom-left; `rounds` (default d) rounds;
+    2. the bottom becomes X: the corners are now at the top-left, top-middle, top-right and
+       bottom-right, the patch's boundaries turned a quarter; `rounds` rounds;
+    3. columns 0 .. d read in Z: the patch is the neighbour tile, X top and bottom; one round;
+    4. it grows back over columns 1 .. d (prepared |0>); `rounds` rounds;
+    5. columns d + 1 .. 2d read in Z: the patch on columns 1 .. d; one round;
+    6. every data state moves one column left through the measure ion of the face between (two
+       CNOTs in, a reset, two CNOTs out): the patch is home, on the machine's checkerboard,
+       with X̄ and Z̄ exchanged; one round, and every data qubit is read in the other basis.
+
+    Phases 1 and 2 use the `_DIAGONAL` schedule (eight layers): their logicals have short
+    representatives in two directions at once (horizontal and vertical near the top corner);
+    the four-layer schedules split by one diagonal line per phase, as the paper describes, that
+    were tried here reach only d - 1 at d = 5 and 7.  Phase 6 is the paper's SWAP step without
+    the round between its halves.
+
+    Observable 0 is the gate's flow: Z̄ -> X̄ ("Z": prepared |0̄>, X̄ read at the end) or X̄ -> Z̄
+    ("X"), the final readout of the output logical with the measurements that, by stim's flow
+    solver, explain it."""
+    if basis not in ("X", "Z"):
+        raise ValueError(f"basis must be 'X' or 'Z', not {basis!r}")
+    r = d if rounds is None else rounds
+    if r < 1:
+        raise ValueError("H-bar needs at least one round a phase")
+    W = 2 * d + 1
+    coords = [(i, j) for i in range(d) for j in range(W)]
+    index = {x: q for q, x in enumerate(coords)}
+
+    def cols(a: int, b: int) -> list[int]:
+        return [index[(i, j)] for i in range(d) for j in range(a, b)]
+
+    def sides(top, right: str, bottom: str, left: str) -> dict:
+        return {"top": top, "right": lambda k: right, "bottom": lambda k: bottom,
+                "left": lambda k: left}
+
+    std = sides(lambda k: "X", "Z", "X", "Z")
+    top = (lambda k: "Z" if k <= d else "X")          # Z over the patch and the seam
+    home = _region((0, 0), d, d, std, index)
+    grown = _region((0, 0), d, W, sides(top, "Z", "Z", "X"), index, 1, _DIAGONAL)
+    turned = _region((0, 0), d, W, sides(top, "Z", "X", "X"), index, 1, _DIAGONAL)
+    away = _region((0, d + 1), d, d, std, index, 1)
+    back = _region((0, 1), d, 2 * d, std, index, 1)
+    near = _region((0, 1), d, d, std, index, 1)
+    other = "X" if basis == "Z" else "Z"
+    phases = [
+        _Phase(tuple(home), 1, prep=dict.fromkeys(cols(0, d), basis)),
+        _Phase(tuple(grown), r, hadamard=tuple(cols(0, d)), prep=dict.fromkeys(cols(d, W), "X")),
+        _Phase(tuple(turned), r),
+        _Phase(tuple(away), 1, read=dict.fromkeys(cols(0, d + 1), "Z")),
+        _Phase(tuple(back), r, prep=dict.fromkeys(cols(1, d + 1), "Z")),
+        _Phase(tuple(near), 1, read=dict.fromkeys(cols(d + 1, W), "Z")),
+        _Phase(tuple(home), 1, shift=(0, -1),
+               move={index[(i, j)]: ((i, j - 1), index[(i, j - 1)])
+                     for i in range(d) for j in range(1, d + 1)}),
+    ]
+    final = dict.fromkeys(cols(0, d), other)
+    name = f"hbar{d}_{basis.lower()}_r{r}"
+    qasm, dets, bits, faces = _phased(
+        f"{name}: H-bar on a d = {d} patch, its seam and the neighbouring tile, {r} round(s) a "
+        f"phase", len(coords), phases, final)
+    out = ({index[(i, 0)]: "X" for i in range(d)} if other == "X"
+           else {index[(0, j)]: "Z" for j in range(d)})
+    flow = _explained(qasm, out) + [bits["final", q] for q in out]
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_hbar", distance=d, rounds=r,
+                            basis=basis, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+                            detectors=dets, observables=(tuple(sorted(flow)),), readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in sorted(final)),
+                            readout_basis=tuple(final[q] for q in sorted(final)),
+                            coords=tuple(coords), faces=faces)
 
 
 def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
