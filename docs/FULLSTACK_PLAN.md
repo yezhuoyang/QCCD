@@ -1033,6 +1033,45 @@ pair -- the rotations become a resource factory, like magic states.  (A physical
 rotation of the tile's ions would replace steps 2 and 3 with O(d) transport steps, but needs
 a router that moves data ions through the measure ions' traps; not now.)
 
+**What distance trapped-ion fidelities need (2026-10-31; user: "trapped ions have better gate
+fidelity -- estimate the distance we actually need").** Measured, not assumed: the idle gadget
+(a stationary d x d patch, d rounds, tiled, physics@2 clock) under qccd-noise@2 with the device's
+fidelities replaced, X and Z memories, sampled with stim + pymatching to 300 errors or 0.6-4e8
+shots; fitted per patch per round as p(d) = A Λ^-((d+1)/2), p = p_X + p_Z, over every point with
+at least 10 errors (also at noise x2, x4 for the cleaner scenarios).  The budget is Gidney 2025's
+own (arXiv:2505.15917): 6.9e13 logical-qubit rounds a shot at d = 25 (1,600 logical qubits, 12 h
+at 1 µs), 93.3 % of shots surviving logical errors; every surgery step lasts d rounds, so a shot
+is 6.9e13 · d / 25 rounds.  Gidney picks d = 25 for p = 1e-3 (1e-15 per patch per round).
+`tools/distance_study.py build | sample | fit` reproduces every number.
+
+| Fidelities (everything not named stays Helios) | Λ | d needed | volume x10 | ions a patch, 2(d+1)² |
+|---|---|---|---|---|
+| Helios 2025 = qccd-noise@2 (2Q 7.9e-4, 1Q 2.5e-5, reset 5e-4) | 13.7 | **23** | 25 | 1,152 |
+| Helios, every error halved | 27 | 19 | 21 | 800 |
+| Helios + the smooth gate, 2Q 8.4e-5 (arXiv:2510.17286) | 77 | **15** | 15 | 512 |
+| best published for each operation: + 1Q 1.5e-7 (arXiv:2412.04421), SPAM 7e-6 (arXiv:2409.05805) | 103 | **13** | 15 | 392 |
+
+- Helios measured: p = 1.8e-4, 1.4e-5, 1.1e-6, 6.5e-8 at d = 3, 5, 7, 9 (Λ step by step 13.0, 12.8,
+  16.3: not falling).  At d = 25 its fit gives 5.7e-17, so d = 25 is the Helios answer with a
+  17x margin; d = 23 meets the budget.
+- Where the error comes from (summed probability per data ion per round, d = 9): on Helios the
+  MS gate 72 % (base 68, heating 4), reset 13 %, one-ion pulses 11 %, memory 2 %, readout
+  crosstalk 1 %.  With the best numbers the MS gate is still 69 %, but memory (18 %) and readout
+  crosstalk (10 %) follow: both are charged per 5.6 ms round, so only faster rounds lower them.
+- The two-qubit gate is the lever: replacing it alone takes Helios from d = 23 to d = 15; the
+  1Q and SPAM records add one step (13).  Reset and one-ion errors are cheaper for the decoder
+  than their share of the budget suggests (Helios + smooth gate: 2.8x less summed error, 5.6x the Λ).
+- The surgery CNOT fails at the memory's rate per patch area per round (Helios, d = 7: 1.07e-6
+  for the CNOT, 14 rounds over 3.14 patch areas, vs 1.06e-6), so the memory fit stands for the gadgets.
+- Caveats: the best row combines records from separate lab experiments (a two-ion gate, a
+  single-ion SPAM, microwave 1Q on ⁴³Ca⁺); Helios is the one whole machine.  Extrapolated from
+  d <= 9.  Leakage is charged as Pauli, as Helios's emulator does; no ion loss, no per-shuttle
+  error (qccd-noise@2's own limits).  The factory's output error at these fidelities is not measured.
+- Wall-clock (composed from Gidney's round count, not from our program): a shot is
+  4.3e10 · d / 25 rounds; at 5.6 ms a round that is 7.1 years at d = 23 and 4.0 years at d = 13.
+  The distance shortens a shot only linearly; the round time (5.6 ms against Gidney's 1 µs) is
+  the trapped-ion machine's real wall-clock problem.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.
