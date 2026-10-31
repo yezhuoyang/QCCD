@@ -945,6 +945,48 @@ details").**
     surgery gadget — and reserves corridor cells instead of carrying blocks. The viewer
     draws blocks zoomed out, ions zoomed in.
 
+### Slice S9 (user, 2026-10-30): the d = 25 machine
+
+The user: d = 3 at RSA-2048 scale "is ridiculous"; then "25 is about enough". So the machine
+FormalRV's Gidney 2025 runs on is a d = 25 machine, and every number from it is concrete.
+
+**The machine.** A lattice of d × d patch tiles on the tiled grid (`tiled_surface.device`:
+data on horizontal-wire traps, measure ions on vertical-wire traps), one seam row and one seam
+column between neighbouring tiles: tile pitch d + 1 = 26 data columns. A block lives in its
+tile and never travels -- a d = 25 block is 625 data ions, and a junction passes one ion at a
+time. Ions move only inside a tile and across a seam, by the tiled compiler's steps.
+
+**Why it scales where the d = 3 town did not.** Every tile is the same piece of grid, so a
+gadget compiled on one neighbourhood is the same program, translated, on any other. A macro is
+keyed by its *shape* (which tiles, relative to each other, and which seams), not by absolute
+homes: the ~35 home contexts that made `gUnloop3` recompile its lookups cannot arise, and the
+footprint of a replayed call is a translated copy of one list, not a fresh one.
+
+**The gadgets, each a tiled program checked once (every rule, R10 with the proved checker):**
+
+| Gadget | Program | Rounds |
+|---|---|---|
+| idle | a patch's syndrome round | 1 (a block refreshes every round) |
+| Z̄Z̄ / X̄X̄ measurement | seam prepared, the merged patch's rounds, seam read | 25 |
+| multi-patch product (Gidney's lookups and PROD merges) | a corridor of faces joining the patches (any face set) | 25 |
+| CNOT | Z̄Z̄ with an ancilla patch, then X̄X̄ to the target, ancilla read (FormalRV's own lattice-surgery CNOT) | 2 × 25 |
+| H̄ | transversal H (single-ion beams) and the boundary swap by patch deformation | ~25 |
+| prep / read | reset, or measure every data ion | 0 + 1 |
+| T̄ / CCZ | magic states from a factory built of the same patches, injected | factory-specific |
+
+**Steps, each with its exit test.**
+1. The tiled compiler takes any face set (a corridor, an L, a merged pair) and the seam's
+   preparation and readout; exit: a Z̄Z̄ measurement at d = 3, 5 passes every rule and R10, and
+   its stabilizer flows give Z̄_A Z̄_B (the `qccd.gadget.logic` spec check).
+2. The surgery gadgets in the table above, as leaves; exit: each passes at d = 25 and its LER
+   falls with d at d = 3, 5, 7 under qccd-noise@2.
+3. The patch-lattice scheduler: the folded scheduler with tiles for homes, shapes for macro
+   keys, seams and corridor tiles for resources; exit: Gidney's 32-bit adder at d = 25 on one
+   concrete lattice, every place check.
+4. The factory at d = 25 (15-to-1 from the same patches first; Gidney's cultivation later).
+5. One prime, then the whole program, concrete; the viewer draws tiles zoomed out and ions
+   zoomed in.
+
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
 **hardware instruction** they are looking at. See §2.6a.
