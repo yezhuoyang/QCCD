@@ -65,6 +65,44 @@ def test_a_lattice_surgerys_merged_patch_is_played_the_same_way(rows, cols, tmp_
     _r10(prog, cert, arch, exp.qasm, tmp_path)
 
 
+@pytest.mark.parametrize("kind", ["ZZ", "XX"])
+def test_a_lattice_surgery_measures_the_product_and_keeps_both_logicals(kind, tmp_path):
+    """`lattice_surgery`: noiseless, every detector and all three observables (the outcome,
+    and each patch's logical) are deterministic -- so the merge measures Z-bar Z-bar (X-bar
+    X-bar) and disturbs neither logical; tiled, the programme passes every rule under
+    qccd-physics@2 and R10."""
+    from qccd.qec.experiments import ideal_stim, lattice_surgery
+    exp = lattice_surgery(3, kind)
+    c = ideal_stim(exp)
+    c.detector_error_model()                 # raises on a random detector or observable
+    assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+    rows, cols = (7, 3) if kind == "ZZ" else (3, 7)
+    a = device(rows, cols, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+
+
+def test_a_surgerys_logical_error_rate_falls_with_the_distance():
+    from qccd.qec import evaluate_memory
+    from qccd.qec.experiments import lattice_surgery
+    model = corrected_model("quantinuum")
+    ler = {}
+    for d in (3, 5):
+        exp = lattice_surgery(d, "ZZ")
+        a = device(2 * d + 1, d, physics="physics@2")
+        prog, cert, _ = compile_tiled(exp.qasm, 2 * d + 1, d, arch=a)
+        cooled = insert_cooling(prog, a, model).program
+        cooled.meta.update(prog.meta)
+        rep = evaluate_memory(cooled, a.to_json(), exp, noise_id="qccd-noise@2", cert=cert, seed=7,
+                              ler_budget={"max_errors": 40, "max_shots": 1_000_000})
+        assert rep["check"]["ok"], rep["check"]
+        ler[d] = rep["ler"]["ler"]
+    assert ler[5] < ler[3] / 3, ler
+
+
 def test_the_programme_is_the_same_instructions_at_every_distance():
     lens, rounds_us = set(), set()
     model = corrected_model("qccdsim_jones")

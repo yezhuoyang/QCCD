@@ -394,6 +394,64 @@ def rotated_surface_xz(d: int, rounds: int | None = None, *,
                    logicals, r, ["Z"] * n + ["X"] * n, layered=True, readout=readout)
 
 
+def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> MemoryExperiment:
+    """A lattice surgery's measurement of Z̄_A Z̄_B ("ZZ") or X̄_A X̄_B ("XX") between two
+    distance-d patches (`qccd.gadget.surface.merged_patch`): A and B start in |0̄> (|+̄>), the
+    seam in |+> (|0>), the merged patch's checks run `rounds` (default d) times, and every data
+    qubit is read at the end -- A and B in their basis, the seam in its own, which is the split.
+
+    Detectors: in the first round, the checks of the patches' basis that do not touch the seam
+    (deterministic); every later round, each check against the one before; at the end, those
+    same checks against the data readout.  Observables: 0, the surgery's outcome -- the
+    first-round product of the checks of its basis that touch the seam, which is Z̄_A Z̄_B
+    (X̄_A X̄_B), +1 here; 1 and 2, Z̄_A and Z̄_B (X̄_A, X̄_B), which the measurement keeps."""
+    from ..gadget.surface import merged_patch
+    r = d if rounds is None else rounds
+    if r < 1:
+        raise ValueError("a lattice surgery needs at least one round")
+    p, info = merged_patch(d, kind)
+    mem = "Z" if kind == "ZZ" else "X"
+    seam = set(info["seam"])
+    dbasis = [info["seam_basis"] if q in seam else mem for q in range(p.n)]
+    checks = sorted(p.checks, key=lambda c: (c.basis != "X", int(c.name[1:])))
+    m = len(checks)
+    anc = [p.n + k for k in range(m)]
+    D = r * m
+    out = ['OPENQASM 2.0;', 'include "qelib1.inc";',
+           f"// surgery{d}_{kind.lower()}_r{r}: lattice surgery measuring {kind[0]}bar_A {kind[1]}bar_B "
+           f"between two d = {d} patches, {r} round(s); data q[0..{p.n - 1}] "
+           f"(A, the seam, B; {p.rows} x {p.cols}), ancillas q[{p.n}..{p.n + m - 1}]; "
+           f"data readout c[{D}..{D + p.n - 1}] appended by the grader",
+           f"qreg q[{p.n + m}];", f"creg c[{D + p.n}];"]
+    out += [f"h q[{q}];" for q in range(p.n) if dbasis[q] == "X"]
+    for rr in range(r):
+        if rr:
+            out += [f"reset q[{a}];" for a in anc]
+        out += [f"h q[{anc[k]}];" for k, c in enumerate(checks) if c.basis == "X"]
+        for t in sorted({t for c in checks for t in c.layers}):
+            for k, c in enumerate(checks):
+                for q, lt in zip(c.support, c.layers):
+                    if lt == t:
+                        out.append(f"cx q[{anc[k]}],q[{q}];" if c.basis == "X" else f"cx q[{q}],q[{anc[k]}];")
+        out += [f"h q[{anc[k]}];" for k, c in enumerate(checks) if c.basis == "X"]
+        out += [f"measure q[{anc[k]}] -> c[{rr * m + k}];" for k in range(m)]
+    own = [k for k, c in enumerate(checks) if c.basis == mem and not set(c.support) & seam]
+    dets = [(k,) for k in own]
+    dets += [(rr * m + k, (rr - 1) * m + k) for rr in range(1, r) for k in range(m)]
+    dets += [((r - 1) * m + k,) + tuple(D + q for q in sorted(checks[k].support)) for k in own]
+    measured = [k for k, c in enumerate(checks) if c.name in set(info["measured"])]
+    if kind == "ZZ":
+        la, lb = [p.index(0, c) for c in range(d)], [p.index(2 * d, c) for c in range(d)]
+    else:
+        la, lb = [p.index(rr, 0) for rr in range(d)], [p.index(rr, 2 * d) for rr in range(d)]
+    obs = (tuple(measured), tuple(D + q for q in sorted(la)), tuple(D + q for q in sorted(lb)))
+    return MemoryExperiment(name=f"surgery{d}_{kind.lower()}_r{r}", code=f"rotated_surface_d{d}_{kind.lower()}",
+                            distance=d, rounds=r, basis=mem, n_data=p.n, n_ancilla=m,
+                            qasm="\n".join(out) + "\n", detectors=tuple(dets), observables=obs,
+                            readout="appended", readout_bits=tuple((q, D + q) for q in range(p.n)),
+                            readout_basis=tuple(dbasis))
+
+
 def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
                   distance: int | None = None, flags: bool = False,
                   readout: str = "appended") -> MemoryExperiment:
