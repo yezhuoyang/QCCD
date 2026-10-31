@@ -932,15 +932,18 @@ details").**
     | d = 35 merge (71 × 35) | 4,969 | 0.4 s | pass, 22 s | 32 s | 5.8 ms |
 
     Under qccd-noise@2 the LER falls with d (memories, d rounds): 2.6e-4, 3.6e-5, 2.5e-6 at
-    d = 3, 5, 7 (the last on 5 errors). Extrapolated (memory only), d ≈ 23–25 already suffices
-    for an RSA-2048-length run; d = 35 is the user's margin.
-  - **Next.** The d = 35 machine: a d = 35 block is 1,225 data ions and junctions pass one ion
+    d = 3, 5, 7 (the last on 5 errors). Extrapolated (memory only), d ≈ 23–25 suffices for an
+    RSA-2048-length run. **The user settled on d = 25** ("25 is about enough"): FormalRV's 25
+    rounds per merge are then also the fault-tolerant count. At d = 25 a round is 1,249 ions
+    (written 0.07 s, every rule 1.7 s, R10 4.7 s) and a merge 51 × 25 = 2,549 ions (0.2 s,
+    6.3 s, 8.7 s); 5.6–5.8 ms a round, so a 25-round merge is ~0.15 s of machine time.
+  - **Next.** The d = 25 machine: a d = 25 block is 625 data ions and junctions pass one ion
     at a time, so blocks should not travel. Stationary patches on a lattice with one seam
     row/column between neighbours; logic by lattice surgery (any rectangle or corridor of
-    faces is tiled the same way); rounds per merge max(FormalRV's 25, d) = 35; a T factory
-    built from the same patches. The folded scheduler keeps its shape — a block's home is its
-    patch, a macro a surgery gadget — and reserves corridor cells instead of carrying blocks.
-    The viewer draws blocks zoomed out, ions zoomed in.
+    faces is tiled the same way), 25 rounds a merge; a T factory built from the same
+    patches. The folded scheduler keeps its shape — a block's home is its patch, a macro a
+    surgery gadget — and reserves corridor cells instead of carrying blocks. The viewer
+    draws blocks zoomed out, ions zoomed in.
 
 **Overriding requirement (user):** *everything is debuggable*. At every instant of the animation, the viewer
 must show exactly which **logical operation**, which **PPM**, which **Clifford circuit** and which
