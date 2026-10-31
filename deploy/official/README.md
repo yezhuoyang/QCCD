@@ -128,6 +128,36 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-10-31 20:16 UTC, `qccd-official:bbffbb2` (an entry may declare the rules it
+keeps; commit `bbffbb2`, pushed to `compiler` and `website/invitations`; the user approved it).
+A bundle may carry `rules.json`, a rule set of its own. The grader judges the entry by that set
+and reports `conformance`: which of the board's rules it keeps, and which physics numbers of its
+own were used (`added`) or ignored. The physics lock no longer refuses a device's own numbers.
+The board's numbers win, and a number the board lacks comes from the device and is listed. Every
+ranking (leaderboard, goals, tracks) lists the entries that keep the board's rules and physics;
+`?rules=all` lists every entry. Built ON THE DROPLET from `qccd-official:a9e8621`, COPY only
+(`/root/qccd-bbffbb2`): `qccd/`, `arch/` and `Compiler/bridge` are the git archive, and all 731
+files equal the image's. 88 layers: a9e8621's 84 plus four. The compose file is unchanged (grader
+2g, 256 MB stack).
+
+Census before the switch (`census_bbffbb2.sh`, read-only, no network, about 22 minutes):
+- the rules stage over all 78 stored archives was identical in both images;
+- the evaluation census found no difference in 78/78;
+- `rules_flex_census.py` re-scored every stored device with the new merge and gave 78/78 with
+  the same device, rules verdict and metrics; every old physics lock had passed;
+- Goal 1, Goal 3 and all 30 boards were identical except for the new keys;
+- the C2LR reference bundle graded exactly as it did under 84f109c;
+- a two-layer trap (two junction layers, degree-5 junctions) graded eligible under rules of its
+  own (`standard` less R20 and R21), with `conformance.board` false and its degree-5 and 6
+  junction curves listed as added.
+
+Production smoke: two private GHZ uploads by `deploy-smoke-bbffbb2` (quota 2, token deleted),
+e.g. `os_038edd444993b27c`, eligible with no stage or metric difference. Rollback is
+`*.bak-a9e8621`; that compose backup keeps the 2g grader. The live board pages (`board/`, its 13
+boards, `goal1/`, `goal3/`) and `agentic/` were re-rendered from bbffbb2 with the live search
+index and replaced in place. Each old-commit render had equalled its live page byte for byte.
+Backup: `/root/qccd-site-backups/before-qccd16-bbffbb2-pages-20261031.tgz`.
+
 **Deployed** 2026-10-30 23:02 UTC, `qccd-official:a9e8621` (Goal 3's BB72 and HGP58 boards;
 commit `a9e8621`, pushed): `qccd-official:84f109c` plus the two releases
 `goal3_bb72_mem@1` and `goal3_hgp58_mem@1` (goals/goal3/boards.py), and no code change. Built
