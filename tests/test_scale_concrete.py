@@ -94,18 +94,23 @@ def _expected(prog, gadget, keyvals):
     return out
 
 
+@pytest.mark.parametrize("fold", [0, 8])
 @pytest.mark.parametrize("gadget,keyvals", [("gidneyAddNoCarry", (("n", 32),)),
                                             ("gLoop4", (("w4", 5), ("W4", 5), ("f", 33)))])
-def test_written_concrete_it_does_exactly_the_work_the_program_counts(prog, gadget, keyvals):
+def test_written_concrete_it_does_exactly_the_work_the_program_counts(prog, gadget, keyvals, fold):
+    """Folded or not (a call-free loop written as a gate of its own), the same work."""
     from qccd.fullstack.scale import concrete as C
     from qccd.gadget.algorithm import parse_algorithm
     from qccd.gadget.fold import parse_folded
-    text, info = _in_thread(lambda: C.write(prog, gadget, keyvals, {"i": 0}, {}, floorplan="town"))
+    text, info = _in_thread(lambda: C.write(prog, gadget, keyvals, {"i": 0}, {}, floorplan="town",
+                                            fold=fold))
     parse_folded(text, name=gadget)
     flat = parse_algorithm(text)
     got = Counter(i.kind for i in flat.instructions if i.kind in PHYSICAL)
     got["prep"] -= info["blocks"]                    # (the program prepares the blocks it passes)
     assert +got == +_expected(prog, gadget, keyvals), (got, info)
+    if fold and gadget == "gLoop4":
+        assert info["stats"].get("folded loops"), info["stats"]
 
 
 def _prime_gate(prog, i):

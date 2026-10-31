@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import math
 import re
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -255,6 +256,9 @@ class Folder:
     #: `City.park_within`)
     park_round: bool = True
     park_within: int = 1
+    #: called as each macro is finished -- (macros made, reused, its gate, its calls, its span
+    #: in us, seconds the gate took) -- so a long run says where it is
+    progress: object = None
 
     @property
     def home_places(self) -> set:
@@ -268,6 +272,7 @@ class Folder:
             return m
         if depth > 64:
             raise FoldError(f"gate {gate} calls itself")
+        t0 = time.time()
         alg = body_algorithm(self.top, gate, len(homes), guard, ext)
         city = MacroCity(alg, self.lib, self.leaves, folder=self, params=list(homes),
                          ext=ext, taken=taken, depth=depth)
@@ -276,6 +281,8 @@ class Folder:
         m.id = f"m{len(self.macros)}"
         self.macros[key] = m
         self.made += 1
+        if self.progress:
+            self.progress(self.made, self.reused, gate, len(m.calls), m.span, time.time() - t0)
         return m
 
 
@@ -759,6 +766,11 @@ class MacroCity(City):
             raise FoldError(f"gate {gate} leaves {', '.join(sorted(alive))} alive: a call may "
                             f"not outlive the blocks it makes")
         gir = self.gir()
+        # the machine's own tables (its places, roads, wires, channels) are the root's to carry:
+        # a macro keeps its body's run, or a program of thousands of gates on a machine of
+        # thousands of memories holds the machine thousands of times over
+        for k in _MACHINE_KEYS:
+            gir.pop(k, None)
         homes_set = set(homes)
         fp = {}
         for p, cal in self.cal.items():
@@ -804,6 +816,10 @@ class MacroCity(City):
 # --------------------------------------------------------------------------- the program
 
 
+_MACHINE_KEYS = ("leaves", "nets", "wires", "ion_order", "channels", "stock", "control",
+                 "block_frames", "branch_frames", "planes")
+
+
 def _call_blocks(alg: Algorithm) -> list:
     out: list = []
     for ins in alg.instructions:
@@ -817,16 +833,16 @@ def _call_blocks(alg: Algorithm) -> list:
 def schedule_folded(alg: Algorithm, lib, leaves, *, log=None, keep: dict | None = None,
                     outlive: bool = False, rounds_at: str = "clinic", free_at: str = "instruction",
                     prefetch: bool = False, park_round: bool = True, park_within: int = 1,
-                    home_order: list | None = None) -> dict:
+                    home_order: list | None = None, progress=None) -> dict:
     """Schedule a folded program (`parse_folded`).  Returns GIR 0.3.  With `keep`, the
     macros themselves (their footprints, which GIR 0.3 does not carry) are left in
     `keep["folder"]`, for `check_composition`.  `outlive`: see `Folder.outlive`.
     `home_order`: blocks that take the first memories (in the floorplan's order -- the ones
     nearest the places, in a town built row by row), the most used first; the rest follow in
-    the order the program passes them."""
+    the order the program passes them.  `progress`: see `Folder.progress`."""
     folder = Folder(alg, lib, leaves, log=log or (lambda *a, **k: None), outlive=outlive,
                     rounds_at=rounds_at, free_at=free_at, prefetch=prefetch, park_round=park_round,
-                    park_within=park_within)
+                    park_within=park_within, progress=progress)
     if keep is not None:
         keep["folder"] = folder
     probe = MacroCity(alg, lib, leaves, folder=folder)

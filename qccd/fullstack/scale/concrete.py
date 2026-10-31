@@ -60,32 +60,109 @@ def _src_slots(ref, env) -> list:
     return []
 
 
+def _made_here(t) -> set:
+    """The blocks a template prepares among those it is passed (`p<i>`)."""
+    made = set()
+    for ln in t.lines:
+        w = (ln.split(": ", 1)[1] if ln.startswith("if ") else ln).split()
+        if w[0] in ("prep", "inject") and w[1].startswith("p"):
+            made.add(w[1])
+        if w[0] == "autoccz":
+            made.update(x for x in w[1:] if x.startswith("p"))
+    return made
+
+
+def _shape(nodes) -> tuple:
+    """(calls inside, bodies inside, bodies its `When`s read outcomes of, its templates) for the
+    subtrees of `nodes`."""
+    calls, sids, reads, tids = False, set(), set(), set()
+
+    def walk(body):
+        nonlocal calls
+        if isinstance(body, P.Body):
+            sids.add(body.sid)
+        for n in body:
+            if isinstance(n, P.Call):
+                calls = True
+            if isinstance(n, P.Seg):
+                tids.add(n.tid)
+            if isinstance(n, P.When):
+                reads.update(ref[0] for term in n.cond.terms for _, rs in term for ref in rs
+                             if isinstance(ref, tuple) and len(ref) == 3)
+            if hasattr(n, "body"):
+                walk(n.body)
+    walk(nodes)
+    return calls, frozenset(sids), frozenset(reads), frozenset(tids)
+
+
 class _Items:
     """A body flattened in program order under env: loops unrolled, structural decisions taken,
     each item with the guards around it -- ("seg", node, env, guards, sid, pos),
-    ("call", node, env, guards), ("when", node, env, guards, sid) opening a guard."""
+    ("call", node, env, guards), ("when", node, env, guards, sid) opening a guard, and
+    ("loop", node, env, guards): a loop written as a gate of its own (`fold`)."""
 
-    def __init__(self, prog, controller: bool = False):
+    def __init__(self, prog, controller: bool = False, fold: int = 0):
         self.prog = prog
         self.unknown = 0          # data decisions on a table the inputs give no contents for
         #: every data decision the classical controller's (one hardware program for every
         #: instance -- Gidney 2025's primes differ only in their tables), not this instance's
         self.controller = controller
+        #: a loop that calls no gadget and runs at least this many trips in all is a gate of its
+        #: own, called where it stands (0: every loop unrolled in place).  A lookup's rows are one
+        #: such loop: the same blocks every time it runs, so the scheduler compiles it once.
+        self.fold = fold
+        self._shape: dict = {}
+        #: tid -> whether it prepares a block it is passed (the writer's templates): such a
+        #: block may outlive the loop, so a loop that makes one stays in place
+        self.makes = lambda tid: False
 
-    def run(self, body, env, guards=()):
+    def run(self, body, env, guards=(), fold: bool = True):
         out = []
-        self._walk(body, env, tuple(guards), out)
+        self._walk(body, env, tuple(guards), out, fold)
         return out
 
-    def _walk(self, body, env, guards, out):
+    def run_loop(self, node, env) -> list:
+        """A folded loop's own items: every trip, unrolled."""
+        out = []
+        for v in range(node.lo(env), node.hi(env)):
+            self._walk(node.body, {**env, node.var: v}, (), out, False)
+        return out
+
+    def _trips(self, node, env) -> int:
+        n = max(0, node.hi(env) - node.lo(env))
+        inner = [m for m in node.body if isinstance(m, P.Loop)]
+        if inner and n:
+            n *= max(1, max(self._trips(m, {**env, node.var: node.lo(env)}) for m in inner))
+        return n
+
+    def foldable(self, body, pos, env) -> bool:
+        node = body[pos]
+        if not self.fold or self._trips(node, env) < self.fold:
+            return False
+        key = id(node)
+        if key not in self._shape:
+            self._shape[key] = _shape(node.body)
+        calls, sids, reads, tids = self._shape[key]
+        if calls or not reads <= sids or any(self.makes(t) for t in tids):
+            return False
+        # nothing after it in this body may read an outcome measured inside it
+        lk = (body.sid, pos)
+        if lk not in self._shape:
+            self._shape[lk] = _shape(body[pos + 1:])[2]
+        return not self._shape[lk] & sids
+
+    def _walk(self, body, env, guards, out, fold=True):
         for pos, node in enumerate(body):
             if isinstance(node, P.Seg):
                 out.append(("seg", node, env, guards, body.sid, pos))
             elif isinstance(node, P.Loop):
+                if fold and self.foldable(body, pos, env):
+                    out.append(("loop", node, env, guards))
+                    continue
                 for v in range(node.lo(env), node.hi(env)):
-                    self._walk(node.body, {**env, node.var: v}, guards, out)
+                    self._walk(node.body, {**env, node.var: v}, guards, out, fold)
             elif isinstance(node, P.Let):
-                self._walk(node.body, {**env, node.var: node.value(env)}, guards, out)
+                self._walk(node.body, {**env, node.var: node.value(env)}, guards, out, fold)
             elif isinstance(node, P.Pred):
                 try:
                     c = 1 if self.controller and not node.structural else node.cond(env)
@@ -100,16 +177,19 @@ class _Items:
                     raise WriteError(f"a guard loop of {c} trips (line {node.qline})")
                 if node.structural:
                     if c:
-                        self._walk(node.body, env, guards, out)
+                        self._walk(node.body, env, guards, out, fold)
                     continue
                 # a decision on data: a constant for this instance, its body reserved either way
                 g = ("data", id(node), len(out), int(c))
                 out.append(("data", node, env, guards, g))
-                self._walk(node.body, env, guards + (g,), out)
+                n0 = len(out)
+                self._walk(node.body, env, guards + (g,), out, fold)
+                if self.fold and len(out) == n0:
+                    out.pop()         # (it guards nothing here: no bit for the controller to give)
             elif isinstance(node, P.When):
                 g = ("when", id(node), len(out))
                 out.append(("when", node, env, guards, g))
-                self._walk(node.body, env, guards + (g,), out)
+                self._walk(node.body, env, guards + (g,), out, fold)
             elif isinstance(node, P.Call):
                 out.append(("call", node, env, guards))
             elif isinstance(node, P.Rot):
@@ -163,10 +243,13 @@ class _Gate:
 
 
 class Writer:
-    def __init__(self, prog, templates: dict, *, controller: bool = False):
+    def __init__(self, prog, templates: dict, *, controller: bool = False, fold: int = 0):
         self.prog = prog
         self.tpl = templates
-        self.items = _Items(prog, controller)
+        self.items = _Items(prog, controller, fold)
+        makes: dict = {}
+        self.items.makes = lambda tid: makes.setdefault(
+            tid, bool(_made_here(self.tpl.get(tid, prog.templates[tid]))))
         self.gates: dict = {}              # text hash -> (name, header words, body lines)
         self.by_text: dict = {}
         self.summ_memo: dict = {}
@@ -213,6 +296,8 @@ class Writer:
             return set(r), set(w)
         if kind == "call":
             return self.summary(it[1], it[2])
+        if kind == "loop":
+            return self._summary_items(self.items.run_loop(it[1], it[2]))
         if kind == "when":
             node, env = it[1], it[2]
             return {a for term in node.cond.terms for _, rs in term for ref in rs
@@ -237,21 +322,34 @@ class Writer:
             return self.reused[node.gadget]
         env2 = {**self.prog.params, **{f: e(env) for f, e in node.skeys + node.args}}
         G, body, cout = self.body(self.items.run(self.prog.body_of(node, env), env2), live_out, node.gadget)
+        out = self._named(G, body, cout, node.gadget)
+        if node.gadget in self.reuse:
+            self.reused[node.gadget] = out
+        return out
+
+    def loop_gate(self, node: P.Loop, env, live_out: frozenset) -> tuple:
+        """A folded loop as a gate: every trip of it, called where the loop stands."""
+        what = f"loop {node.var} (line {node.qline})"
+        G, body, cout = self.body(self.items.run_loop(node, env), live_out, what)
+        if G.made:
+            raise WriteError(f"{what} prepares a block it is passed")
+        self.stats["folded loops"] += 1
+        return self._named(G, body, cout, f"loop{node.var}")
+
+    def _named(self, G: _Gate, body: list, cout: list, label: str) -> tuple:
+        """A gate's name, by its text: gates with the same text are one gate."""
         head = [G.bname[q] for q in G.params] + (["<-"] + [G.slot[a] for a in G.cin] if G.cin else []) + \
             (["->"] + [G.slot[a] for a in cout] if cout else [])
         text = " ".join(head) + "\n" + "\n".join(body)
         h = hashlib.sha1(text.encode()).hexdigest()[:10]
         name = self.by_text.get(h)
         if name is None:
-            name = f"{re.sub(r'[^a-z0-9]', '', node.gadget.lower())[:20]}_{h}"
+            name = f"{re.sub(r'[^a-z0-9]', '', label.lower())[:20]}_{h}"
             self.by_text[h] = name
             self.gates[name] = (head, body)
             self.stats["gates"] += 1
         self.stats["gate calls"] += 1
-        out = name, list(G.params), list(G.cin), cout
-        if node.gadget in self.reuse:
-            self.reused[node.gadget] = out
-        return out
+        return name, list(G.params), list(G.cin), cout
 
     def body(self, items, live_out: frozenset, what: str) -> tuple:
         """(the gate's names, its emitted lines, the slots it hands back) for a body's items."""
@@ -290,13 +388,14 @@ class Writer:
                 fs = [(p, G.block(self._bname(fam, idx, env, gens))) for p, fam, idx in node.factors]
                 self._rotation(G, fs, node.k(env), node.sign, list(gtxt))
                 self.stats["rotations"] += 1
-            elif kind == "call":
+            elif kind in ("call", "loop"):
                 r, w = rw[k]
                 child_live = frozenset(w & after[k])
                 # (under a guard: the bits it hands back as they are before it -- kept where it
                 # does not fire)
                 olds = {a: self._old(a, G) for a in child_live} if gtxt else {}
-                cname, blocks, cin, cout = self.gate(it[1], it[2], child_live)
+                cname, blocks, cin, cout = (self.gate if kind == "call" else self.loop_gate)(
+                    it[1], it[2], child_live)
                 words = [G.block(q) for q in blocks]
                 ins = [self._rs(G, a) for a in cin]
                 outs = [G.fresh("S") for _ in cout]
@@ -316,7 +415,8 @@ class Writer:
                         s = G.fresh("S")
                         G.lines.append(f"bit {P._bit_text(nf, str) if nf else '1 ^ 1'} -> {s}")
                         G.slot[a] = s
-                self.stats["calls"] += 1
+                if kind == "call":
+                    self.stats["calls"] += 1
         cout = sorted(a for a in live_out if a in G.slot and a not in G.cin)
         missing = [a for a in live_out if a not in G.slot]
         if missing:
@@ -413,13 +513,7 @@ class Writer:
         t = self.tpl.get(node.tid, self.prog.templates[node.tid])
         self.stats["templates"] += 1
         ren = {}
-        made_here = set()
-        for ln in t.lines:
-            w = (ln.split(": ", 1)[1] if ln.startswith("if ") else ln).split()
-            if w[0] in ("prep", "inject") and w[1].startswith("p"):
-                made_here.add(w[1])
-            if w[0] == "autoccz":
-                made_here.update(x for x in w[1:] if x.startswith("p"))
+        made_here = _made_here(t)
         for i, (fam, idx) in enumerate(node.params):
             new = f"p{i}" in made_here
             if new and fam == "LogicData":
@@ -601,13 +695,14 @@ def _text(w: Writer, title: str, floorplan: str) -> list:
 
 
 def write_program(prog, templates: dict, *, floorplan: str, title: str = "the program",
-                  reuse=("gOnePrime",), controller: bool = True) -> tuple:
+                  reuse=("gOnePrime",), controller: bool = True, fold: int = 0) -> tuple:
     """The whole program written out concrete: the root's own instructions, a gate per distinct
     call, every block it uses prepared first.  `reuse`: gadgets every call of which is ONE gate --
     for Gidney 2025's primes, whose gates are the same text when the tables are the controller's
-    (`controller`), checked prime by prime where it is claimed (tests/test_scale_concrete.py)."""
+    (`controller`), checked prime by prime where it is claimed (tests/test_scale_concrete.py).
+    `fold`: see `_Items`."""
     _SUBGATES.clear()
-    w = Writer(prog, templates, controller=controller)
+    w = Writer(prog, templates, controller=controller, fold=fold)
     w.reuse = set(reuse)
     G, body, _ = w.body(w.items.run(prog.root, {**prog.params}), frozenset(), "the program")
     if G.cin:
@@ -622,12 +717,13 @@ def write_program(prog, templates: dict, *, floorplan: str, title: str = "the pr
 
 
 def write(prog, gadget: str, keyvals: tuple, env: dict, templates: dict, *, floorplan: str,
-          title: str = "", controller: bool = False) -> tuple:
+          title: str = "", controller: bool = False, fold: int = 0) -> tuple:
     """One gadget call written out concrete: its gates (and their branch gates), every block it
     is passed prepared first, and the call.  Slots it reads from outside are bits the program
-    starts with (constants: this writes a call alone).  `controller`: see `Writer`."""
+    starts with (constants: this writes a call alone).  `controller`: see `Writer`; `fold`: see
+    `_Items`."""
     _SUBGATES.clear()
-    w = Writer(prog, templates, controller=controller)
+    w = Writer(prog, templates, controller=controller, fold=fold)
     key = next(k for k in prog.bodies if k[0] == gadget and k[1] == keyvals)
     call = P.Call(gadget, tuple((f, P.Expr(str(v))) for f, v in keyvals),
                   tuple((f, P.Expr(str(env.get(f, 0)))) for f in prog.formals[gadget]
