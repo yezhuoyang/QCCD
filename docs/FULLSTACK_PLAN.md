@@ -945,15 +945,23 @@ details").**
     surgery gadget — and reserves corridor cells instead of carrying blocks. The viewer
     draws blocks zoomed out, ions zoomed in.
 
-### Slice S9 (user, 2026-10-30): the d = 25 machine
+### Slice S9 (user, 2026-10-30; distance 11 since 2026-10-31): the stationary-tile machine
 
-The user: d = 3 at RSA-2048 scale "is ridiculous"; then "25 is about enough". So the machine
-FormalRV's Gidney 2025 runs on is a d = 25 machine, and every number from it is concrete.
+The user: d = 3 at RSA-2048 scale "is ridiculous"; then "25 is about enough"; then, after the
+distance study below (2026-10-31): "use much smaller code distance, as the gate error rate of
+trapped ion should be better than superconducting qubit -- can be slightly aggressive, be
+optimistic about future trapped ion hardware progress". So the machine FormalRV's Gidney 2025
+runs on is a **d = 11** machine on projected trapped-ion hardware, and every number from it is
+concrete. `qccd.fullstack.scale.machine` holds the choice in one place: distance 11, physics
+`qccd-physics-best` (the best published fidelity for each operation, each cited, the rest
+Helios's), noise qccd-noise@2 at scale 1/2 (every error half of today's best -- the one
+projection), 25 rounds a merge (paper-faithful, unchanged). Everything below is written for any
+d and was built and checked up to d = 25.
 
 **The machine.** A lattice of d × d patch tiles on the tiled grid (`tiled_surface.device`:
 data on horizontal-wire traps, measure ions on vertical-wire traps), one seam row and one seam
-column between neighbouring tiles: tile pitch d + 1 = 26 data columns. A block lives in its
-tile and never travels -- a d = 25 block is 625 data ions, and a junction passes one ion at a
+column between neighbouring tiles: tile pitch d + 1 = 12 data columns. A block lives in its
+tile and never travels -- a d = 11 block is 121 data ions, and a junction passes one ion at a
 time. Ions move only inside a tile and across a seam, by the tiled compiler's steps.
 
 **Why it scales where the d = 3 town did not.** Every tile is the same piece of grid, so a
@@ -978,12 +986,13 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
 1. The tiled compiler takes any face set (a corridor, an L, a merged pair) and the seam's
    preparation and readout; exit: a Z̄Z̄ measurement at d = 3, 5 passes every rule and R10, and
    its stabilizer flows give Z̄_A Z̄_B (the `qccd.gadget.logic` spec check).
-2. The surgery gadgets in the table above, as leaves; exit: each passes at d = 25 and its LER
-   falls with d at d = 3, 5, 7 under qccd-noise@2.
+2. The surgery gadgets in the table above, as leaves; exit: each passes every rule and R10 at the
+   machine's distance and its LER falls with d at d = 3, 5, 7 under qccd-noise@2.
 3. The patch-lattice scheduler: the folded scheduler with tiles for homes, shapes for macro
-   keys, seams and corridor tiles for resources; exit: Gidney's 32-bit adder at d = 25 on one
-   concrete lattice, every place check.
-4. The factory at d = 25 (15-to-1 from the same patches first; Gidney's cultivation later).
+   keys, seams and corridor tiles for resources; exit: Gidney's 32-bit adder at the machine's
+   distance on one concrete lattice, every place check.
+4. The factory at the machine's distance (15-to-1 from the same patches first; Gidney's
+   cultivation later).
 5. One prime, then the whole program, concrete; the viewer draws tiles zoomed out and ions
    zoomed in.
 
@@ -996,6 +1005,21 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
   2.3e-4, 1.9e-5 (Z̄ flow) and 2.2e-3, 2.8e-4, 2.8e-5 (X̄ flow) at d = 3, 5, 7.  At d = 25:
   3,849 ions, 94,848 detectors, 1,976 instructions written in 8 s, every rule (132 s), 280 ms.
   R10 at d = 25 was stopped at 36 GB: it needs a leaner tableau before it can run here.
+- The machine at d = 11 (qccd-physics-best, 25 rounds a merge), every rule and R10 on each:
+
+  | gadget | ions | instructions | every rule | R10 | machine time |
+  |---|---|---|---|---|---|
+  | syndrome round | 241 | 39 | 0.1 s | 1.2 s | 5.8 ms |
+  | Z̄Z̄ merge, 25 rounds | 505 | 951 | 4.3 s | 21 s | 138 ms |
+  | surgery CNOT, 2 × 25 rounds | 769 | 1,934 | 16 s | 63 s | 278 ms |
+
+  Against d = 25: 5x fewer ions a gadget (3,849 -> 769 for the CNOT), the same machine time (the
+  rounds are the same 25; a tiled round takes 5.6-5.8 ms at every d), and R10 fits in memory.
+  Under the machine's own noise (25 rounds a merge) the CNOT's LER is 4.2e-5 / 1.8e-7 (Z̄ flow)
+  and 6.9e-5 / 3.9e-7 (X̄ flow) at d = 3 / 5: Λ 232 and 178 against the memory fit's 206.  Per
+  patch area per round the Z̄ flow fails at the memory's rate (1.1e-9 vs 1.4e-9 at d = 5), the X̄
+  flow 1.7x above it; were the whole run 1.7x worse, 3.7 % of shots would be lost, still
+  under the paper's 6.7 %.
 
 **What the program asks of the machine (census, 2026-10-31).** Gidney 2025 at RSA-2048 on
 the paper machine, weighted by how often each template runs.  As FormalRV writes it the PPMs
@@ -1050,6 +1074,13 @@ is 6.9e13 · d / 25 rounds.  Gidney picks d = 25 for p = 1e-3 (1e-15 per patch p
 | Helios, every error halved | 27 | 19 | 21 | 800 |
 | Helios + the smooth gate, 2Q 8.4e-5 (arXiv:2510.17286) | 77 | **15** | 15 | 512 |
 | best published for each operation: + 1Q 1.5e-7 (arXiv:2412.04421), SPAM 7e-6 (arXiv:2409.05805) | 103 | **13** | 15 | 392 |
+| **the Shor machine**: best published, every error halved (projected; `qccd-physics-best` at noise scale 1/2) | 206 | **11** | 13 | 288 |
+
+The user chose the last row (2026-10-31, "be optimistic about future trapped ion hardware
+progress"): d = 11.  Its p at d = 3 was measured directly, 5.8e-7 a round against the fit's 5.9e-7;
+at d = 11 the fit gives 3.3e-16 a patch a round, so with 25 rounds a merge (the paper's 6.9e13
+logical-qubit rounds a shot, whatever d) 2.2 % of shots are lost to logical errors, against the
+paper's 6.7 %.
 
 - Helios measured: p = 1.8e-4, 1.4e-5, 1.1e-6, 6.5e-8 at d = 3, 5, 7, 9 (Λ step by step 13.0, 12.8,
   16.3: not falling).  At d = 25 its fit gives 5.7e-17, so d = 25 is the Helios answer with a
@@ -1068,7 +1099,8 @@ is 6.9e13 · d / 25 rounds.  Gidney picks d = 25 for p = 1e-3 (1e-15 per patch p
   d <= 9.  Leakage is charged as Pauli, as Helios's emulator does; no ion loss, no per-shuttle
   error (qccd-noise@2's own limits).  The factory's output error at these fidelities is not measured.
 - Wall-clock (composed from Gidney's round count, not from our program): a shot is
-  4.3e10 · d / 25 rounds; at 5.6 ms a round that is 7.1 years at d = 23 and 4.0 years at d = 13.
+  4.3e10 · d / 25 rounds; at 5.6 ms a round that is 7.1 years at d = 23 and 4.0 years at d = 13
+  (with 25 rounds a merge at any d, as the machine keeps them: 7.7 years).
   The distance shortens a shot only linearly; the round time (5.6 ms against Gidney's 1 µs) is
   the trapped-ion machine's real wall-clock problem.
 

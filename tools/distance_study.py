@@ -9,9 +9,11 @@ with the device's fidelities replaced by each scenario's (everything not replace
           2Q 7.9e-4, 1Q 2.5e-5, reset 5e-4, memory 7.9e-3/s, readout crosstalk 2.1e-4 / 4.3e-5
   gate2q  Helios with only its two-qubit gate replaced by the "smooth gate" (arXiv:2510.17286):
           8.4e-5 in the ground state, <= 5e-4 up to n-bar 9.4, so 4.4e-5 per quantum
-  best    the best published number for each operation, each from its own experiment: the smooth
-          gate, 1Q 1.5e-7 (arXiv:2412.04421), SPAM 7e-6 (arXiv:2409.05805, heralded) as the reset
-          error; memory, readout crosstalk and the cooling floor stay Helios's
+  best    the best published number for each operation, each from its own experiment
+          (qccd/workspace/physics/qccd-physics-best.json): the smooth gate, 1Q 1.5e-7
+          (arXiv:2412.04421), SPAM 7e-6 (arXiv:2409.05805, heralded) as the reset error; memory,
+          readout crosstalk and the cooling floor stay Helios's.  At s = 1/2 it is the Shor
+          machine's noise (`qccd.fullstack.scale.machine`)
 
 `s` multiplies every probability of a scenario (`NoiseModel2.scale`): a scenario too clean to
 sample at large d is also measured at s = 2, 4, and every scenario is fitted as
@@ -40,35 +42,31 @@ REPO = Path(__file__).resolve().parents[1]
 OUT = REPO / "out" / "distance_study"
 sys.path.insert(0, str(REPO))
 
-SMOOTH_GATE = {"eps0": 8.4e-5, "slope": (5e-4 - 8.4e-5) / 9.4}
+#: which primitives each scenario takes from qccd-physics-best (the rest stay physics@2's)
 SCENARIOS = {
-    "helios": {},
-    "gate2q": dict(SMOOTH_GATE),
-    "best": {**SMOOTH_GATE, "p1": 1.5e-7, "reset": 7e-6},
+    "helios": (),
+    "gate2q": ("ms_gate",),
+    "best": ("ms_gate", "1q_gate", "reset"),
 }
 RUNS = [  # (scenario, s, distances)
     ("helios", 1.0, (3, 5, 7, 9)),
     ("helios", 0.5, (3, 5, 7)),
     ("gate2q", 1.0, (3, 5, 7)),
     ("gate2q", 2.0, (3, 5, 7)),
+    ("best", 0.5, (3, 5)),          # the Shor machine's noise (qccd.fullstack.scale.machine)
     ("best", 1.0, (3, 5)),
     ("best", 2.0, (3, 5, 7)),
     ("best", 4.0, (3, 5, 7, 9)),
 ]
 SHOTS = {3: 400_000_000, 5: 400_000_000, 7: 150_000_000, 9: 60_000_000}
 V25, SURVIVAL = 6.9e13, 0.933
+BEST = json.loads((REPO / "qccd" / "workspace" / "physics" / "qccd-physics-best.json").read_text(encoding="utf-8"))
 
 
 def scenario_arch(doc: dict, name: str) -> dict:
     doc = json.loads(json.dumps(doc))
-    sc, prim = SCENARIOS[name], doc["primitives"]
-    if "eps0" in sc:
-        prim["ms_gate"]["fidelity_at_n0"] = 1 - sc["eps0"]
-        prim["ms_gate"]["error_vs_quanta"] = f"linear:{sc['slope']:.3g}"
-    if "p1" in sc:
-        prim["1q_gate"]["fidelity"] = 1 - sc["p1"]
-    if "reset" in sc:
-        prim["reset"]["error"] = sc["reset"]
+    for prim in SCENARIOS[name]:
+        doc["primitives"][prim] = json.loads(json.dumps(BEST["primitives"][prim]))
     return doc
 
 
@@ -127,9 +125,12 @@ def sample(workers: int) -> None:
                    save_resume_filepath=str(OUT / "stats.csv"), print_progress=True)
 
 
-def distance_needed(A: float, lam: float, volume_x: float = 1.0) -> int | None:
+def distance_needed(A: float, lam: float, volume_x: float = 1.0, fixed_rounds: bool = False) -> int | None:
+    """The smallest odd d whose shot keeps Gidney's survival; `fixed_rounds`: every merge keeps 25
+    rounds whatever d (the paper-faithful count), so a shot is V25 rounds at every distance."""
     for d in range(3, 101, 2):
-        if volume_x * V25 * d / 25 * A * lam ** (-(d + 1) / 2) <= -math.log(SURVIVAL):
+        v = volume_x * V25 * (1 if fixed_rounds else d / 25)
+        if v * A * lam ** (-(d + 1) / 2) <= -math.log(SURVIVAL):
             return d
     return None
 
@@ -168,6 +169,13 @@ def fit() -> None:
               f"x10: {distance_needed(A, lam, 10)}, x100: {distance_needed(A, lam, 100)})")
         if scen == "helios":
             print(f"helios, every error halved: Lambda {2 * lam:.3g}, d needed {distance_needed(A, 2 * lam)}")
+        if scen == "best":
+            lam2 = 2 * lam
+            d = distance_needed(A, lam2, fixed_rounds=True)
+            p = A * lam2 ** (-(d + 1) / 2)
+            print(f"best at scale 1/2 (the Shor machine): Lambda {lam2:.3g}, d needed {distance_needed(A, lam2)}, "
+                  f"{d} with 25 rounds a merge (p {p:.2g} per patch per round, "
+                  f"{100 * (1 - math.exp(-V25 * p)):.1f} % of shots lost)")
 
 
 if __name__ == "__main__":

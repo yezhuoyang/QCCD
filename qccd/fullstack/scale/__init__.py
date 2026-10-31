@@ -6,4 +6,5 @@
                  sums over its run (instructions, machine time) without expanding it
     compile.py   every template compiled ONCE on a district by the town's own scheduler, and
                  checked there by the place and machine rules
+    machine.py   the machine it runs on at RSA-2048 (slice S9): distance 11, its physics and noise
 """

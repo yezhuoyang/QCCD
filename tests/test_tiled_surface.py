@@ -13,6 +13,8 @@ Held here:
   surgeries -- the merged pair, and FormalRV's CNOT (`surgery_cnot`: three patches, two
   phases) -- pass every rule and R10, keep circuit distance d, and their logical error rate
   under qccd-noise@2 falls with d;
+* the Shor machine (`qccd.fullstack.scale.machine`): a round at its distance on its physics
+  (qccd-physics-best) passes every rule and R10;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
 """
 
@@ -144,6 +146,30 @@ def test_a_surgery_cnots_flow_needs_its_correction():
     broken = replace(exp, observables=(tuple(sorted(flow - m1)),) + exp.observables[1:])
     with pytest.raises(ValueError):
         ideal_stim(broken).detector_error_model()
+
+
+def test_the_shor_machines_round_holds_at_its_distance_on_its_physics(tmp_path):
+    """`qccd.fullstack.scale.machine`: a syndrome round at the machine's distance on
+    qccd-physics-best passes every rule and R10; that physics is qccd-physics@2 but for the
+    fidelities of the two-qubit gate, the one-ion pulse and the reset, each with its source."""
+    from qccd.fullstack.scale import machine as M
+    d = M.DISTANCE
+    exp = rotated_surface(d, 1)
+    a = M.device(d)
+    prog, cert, _ = compile_tiled(exp.qasm, d, arch=a)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+    phys = Path(__file__).resolve().parents[1] / "qccd" / "workspace" / "physics"
+    best, ref = (json.loads((phys / f).read_text(encoding="utf-8"))["primitives"]
+                 for f in ("qccd-physics-best.json", "qccd-physics@2.json"))
+    changed = {k for k in ref if best[k] != ref[k]}
+    assert changed == {"ms_gate", "1q_gate", "reset"}
+    for k in changed:
+        assert best[k]["source"].startswith("arXiv:") and best[k]["source"] != ref[k]["source"]
+        assert {f for f in ref[k] if best[k][f] != ref[k][f]} <= {
+            "fidelity", "fidelity_at_n0", "error_vs_quanta", "error", "note", "source"}
 
 
 def test_the_programme_is_the_same_instructions_at_every_distance():

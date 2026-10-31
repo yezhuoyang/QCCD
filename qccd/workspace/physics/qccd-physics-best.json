@@ -1,0 +1,131 @@
+{
+ "about": "qccd-physics-best: the best published trapped-ion fidelity for each operation, each from its own experiment (no one machine has all of them yet); every other number is qccd-physics@2's (Helios, Quantinuum's transport). The Shor machine of docs/FULLSTACK_PLAN.md S9 runs on it under qccd-noise@2 at scale 1/2: every error half of today's best",
+ "budget": {
+  "junction_electrode_multiplier": 2,
+  "max_area_mm2": 100,
+  "max_dacs": 128,
+  "max_junctions": 200
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.029,
+  "note": "R17: accrues whether or not the ion moves. 29(4) quanta/s, the axial centre-of-mass mode of a Ba-Yb crystal in Quantinuum's junction trap",
+  "source": "arXiv:2206.11888 Fig. 3 caption"
+ },
+ "primitives": {
+  "1q_gate": {
+   "fidelity": 0.99999985,
+   "note": "Clifford error 1.5(4)e-7 by randomized benchmarking, microwave gates on a 43Ca+ clock qubit; the duration stays physics@2's (5 us)",
+   "source": "arXiv:2412.04421; duration arXiv:2003.01293 Table III",
+   "us": 5
+  },
+  "cool": {
+   "broadcastable": true,
+   "note": "the 300 us of cooling Helios applies after a shift, before the next gates. It leaves the floor n-bar 0.05 that qccd-noise@2 adds (arXiv:2206.11888, Fig. 3's Ba-Yb experiment); the replay counts heating from 0",
+   "removes_quanta": "all",
+   "scope": "global",
+   "source": "arXiv:2511.05465 p.5",
+   "us": 300
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent: the logical identity SWAP = CX CX CX, not a measured number"
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "label": "physical swap of a two-ion crystal: 200 us, < 2 quanta per mode (the bound used as the value)",
+     "quanta": 2,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 200
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "3": [
+     {
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs. Measured on an X junction; no Y-junction figure for a Ba-Yb crystal is published",
+      "quanta": 0,
+      "source": "arXiv:2206.11888 Table II",
+      "table": "quantinuum",
+      "us": 0
+     }
+    ],
+    "4": [
+     {
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs",
+      "quanta": 0,
+      "source": "arXiv:2206.11888 Table II",
+      "table": "quantinuum",
+      "us": 0
+     }
+    ]
+   }
+  },
+  "measure": {
+   "fidelity": 0.999999,
+   "note": "Helios's SPAM error, 4.8(6)e-4, is mostly preparation (arXiv:2511.05465 p.7); the vendor's emulator splits it as p_meas 1e-6 and p_init 5e-4, which this block follows (reset.error). 120 us is H0's high-fidelity measurement",
+   "source": "arXiv:2511.05465 Table II; Quantinuum Helios-1E emulator parameters (p_meas); duration arXiv:2003.01293 Table III",
+   "us": 120
+  },
+  "merge": {
+   "curve": [
+    {
+     "label": "combine: 128 us, < 1 quantum per mode (the bound used as the value)",
+     "quanta": 1,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 128
+    }
+   ]
+  },
+  "ms_gate": {
+   "chain_note": "the chain-length term of Murali et al. (arXiv:2004.04706 Eq. 1, ISCA 2020): A ~ N/ln N, referenced to the two-qubit gate the fidelity was measured on",
+   "error_vs_chain": "murali:2",
+   "error_vs_quanta": "linear:4.43e-05",
+   "fidelity_at_n0": 0.999916,
+   "max_quanta": 1,
+   "note": "the 'smooth gate': two-qubit error 8.4(7)e-5 without ground-state cooling, and <= 5e-4 up to n-bar 9.4(3) on the gate mode, i.e. (5e-4 - 8.4e-5) / 9.4 = 4.4e-5 per quantum (derived, an upper bound). Two electronically controlled ions; the gate time and chain factor stay physics@2's. max_quanta is R7's gate budget, a rule of the boards",
+   "source": "arXiv:2510.17286 (abstract); chain factor arXiv:2004.04706 Eq. 1",
+   "us": 70
+  },
+  "reset": {
+   "error": 7e-06,
+   "note": "heralded preparation and measurement: SPAM infidelity 7e-6 (optical qubit; 5e-6 and 8e-6 for the other two 137Ba+ encodings), all of it charged to the reset, the measurement keeping physics@2's 1e-6. Heralding discards failed preparations; their time is not charged here (the reset keeps physics@2's 10 us)",
+   "source": "arXiv:2409.05805",
+   "us": 10
+  },
+  "shuttle_segment": {
+   "curve": [
+    {
+     "label": "one zone pitch, 375 um at 4 m/s (derived: 94 us), the speed at which a Ba-Yb crystal gains <= 0.03 quanta per round trip of four such legs (derived: 0.0075 per leg)",
+     "quanta": 0.0075,
+     "source": "arXiv:2206.11888 Fig. 1 and Table II",
+     "table": "quantinuum",
+     "us": 94
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "label": "split: 128 us, < 1 quantum per mode (the bound used as the value)",
+     "quanta": 1,
+     "source": "arXiv:2003.01293 Table II",
+     "table": "quantinuum",
+     "us": 128
+    }
+   ]
+  }
+ },
+ "species": {
+  "T_coh_s": 126.6,
+  "coolant": "171Yb+",
+  "coolant_fraction": 0.5,
+  "note": "Helios pairs each 137Ba+ qubit with one 171Yb+ coolant. T_coh_s (derived) is 1/r for the Helios linear memory rate r = 7.9e-3/s, so the coarse idle estimate of qccd.cost.physical agrees with qccd-noise@2's memory channel",
+  "qubit": "137Ba+",
+  "source": "arXiv:2511.05465 Sec. II B",
+  "sympathetic": true
+ }
+}

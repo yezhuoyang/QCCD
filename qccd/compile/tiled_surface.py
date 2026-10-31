@@ -46,8 +46,10 @@ class TiledError(ValueError):
 
 
 #: the physics a device may be given: its fixed blocks, and the operating-point table that
-#: prices them (as `qccd.fullstack.pipeline.PHYSICS`)
-PHYSICS = {"physics@2": ("qccd-physics@2.json", "quantinuum")}
+#: prices them (as `qccd.fullstack.pipeline.PHYSICS`).  "best" is physics@2 with the best
+#: published trapped-ion fidelity for each operation (the Shor machine's, `qccd.fullstack.scale.machine`)
+PHYSICS = {"physics@2": ("qccd-physics@2.json", "quantinuum"),
+           "best": ("qccd-physics-best.json", "quantinuum")}
 FIXED_BLOCKS = ("primitives", "heating", "species", "budget")
 
 
