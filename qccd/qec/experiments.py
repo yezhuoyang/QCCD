@@ -46,6 +46,15 @@ and dephasing is what a trapped-ion machine accrues while it idles and shuttles.
 memory, with one observable each; a shot fails when either does (`decode.estimate_ler`).  Its
 `basis` is "XZ" and its readout says each data qubit's basis (`readout_basis`).
 
+**Surgeries** (`lattice_surgery`, `surgery_cnot`) are experiments too: patches on one lattice of
+surface-code faces, in phases -- each a set of checks measured some rounds, after the data it
+reads and the data it prepares.  Their detectors follow from that by one rule (`_phased`): a
+check's first value in a phase is compared with its face's last value in the phase before when
+the data it gained were just prepared in its basis and the data it lost were just read in it
+(those readouts join the comparison); otherwise it is random.  `coords` says where each data
+qubit sits on the lattice, which a compiler that plays the checks by geometry reads
+(`qccd.compile.tiled_surface`).
+
 `ideal_stim` turns an experiment into the stim circuit of its source (plus the appended
 readout), with optional uniform circuit-level noise: the reference an extracted hardware
 circuit is compared with, and the thing whose circuit distance the tests measure.
@@ -53,7 +62,7 @@ circuit is compared with, and the thing whose circuit distance the tests measure
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
 
 from ..gadget import gf2
@@ -78,6 +87,8 @@ __all__ = [
     "steane_code",
     "css_memory",
     "bb",
+    "lattice_surgery",
+    "surgery_cnot",
     "EXPERIMENTS",
     "READOUTS",
     "get",
@@ -110,6 +121,9 @@ class MemoryExperiment:
     #: the basis each `readout_bits` entry is read in, when they differ ("XZ" experiments);
     #: empty means every data qubit is read in `basis`
     readout_basis: tuple[str, ...] = ()
+    #: (row, column) of each data qubit on its surface-code lattice, for a surgery; empty
+    #: otherwise.  Not part of the spec: the grader never needs it
+    coords: tuple[tuple[int, int], ...] = ()
 
     def readout_plan(self) -> list[tuple[int, int, str]]:
         """(data qubit, classical bit, basis) for each appended readout, in order."""
@@ -394,6 +408,87 @@ def rotated_surface_xz(d: int, rounds: int | None = None, *,
                    logicals, r, ["Z"] * n + ["X"] * n, layered=True, readout=readout)
 
 
+@dataclass(frozen=True)
+class _Phase:
+    """One stretch of a surgery: the data it reads (measured in the basis named), then the data
+    it prepares (reset into the basis named), then its checks -- `(face, basis, support,
+    layers)`, as `_placed` gives them -- measured `rounds` times."""
+    checks: tuple
+    rounds: int
+    read: Mapping[int, str] = field(default_factory=dict)
+    prep: Mapping[int, str] = field(default_factory=dict)
+
+
+def _placed(rows: int, cols: int, at: tuple[int, int], index: Mapping) -> list:
+    """`patch(rows, cols)`'s checks with its data qubit (0, 0) at lattice point `at`: each
+    `(face, basis, support, layers)`, the face on the lattice and the support in data qubits
+    (`index`: lattice point -> data qubit).  Patches at even offsets agree on every face's
+    basis, so a seam one row or column wide between distance-d ones (odd d) joins them."""
+    oi, oj = at
+    return [((c.i + oi, c.j + oj), c.basis,
+             tuple(index[(q // cols + oi, q % cols + oj)] for q in c.support), c.layers)
+            for c in patch(rows, cols).checks]
+
+
+def _phased(title: str, n: int, phases: Sequence[_Phase], final: Mapping[int, str]) -> tuple:
+    """A surgery's QASM and detectors (see the module docstring), its number of ancillas (one
+    per face), and where each classical bit went: `bits["check", phase, round, face]`,
+    `bits["read", phase, q]` (data q read before that phase), `bits["final", q]` (q's
+    appended readout, in the basis `final` names)."""
+    anc: dict = {}
+    for ph in phases:
+        for f, *_ in sorted(ph.checks, key=lambda c: (c[1] != "X", c[0])):
+            anc.setdefault(f, n + len(anc))
+    bits: dict = {}
+
+    def new(key) -> int:
+        bits[key] = len(bits)
+        return bits[key]
+
+    out: list[str] = []
+    dets: list[tuple[int, ...]] = []
+    used: set = set()
+    last: dict = {}                     # face -> (support, its last bit) in the phase before
+    for p, ph in enumerate(phases):
+        for q, b in sorted(ph.read.items()):
+            out += [f"h q[{q}];"] * (b == "X") + [f"measure q[{q}] -> c[{new(('read', p, q))}];"]
+        out += [f"reset q[{q}];" for q in sorted(ph.prep) if p]
+        out += [f"h q[{q}];" for q, b in sorted(ph.prep.items()) if b == "X"]
+        checks = sorted(ph.checks, key=lambda c: (c[1] != "X", c[0]))
+        for r in range(ph.rounds):
+            out += [f"reset q[{anc[f]}];" for f, *_ in checks if f in used]
+            out += [f"h q[{anc[f]}];" for f, b, *_ in checks if b == "X"]
+            for t in sorted({t for c in checks for t in c[3]}):
+                for f, b, sup, lay in checks:
+                    out += [f"cx q[{anc[f]}],q[{q}];" if b == "X" else f"cx q[{q}],q[{anc[f]}];"
+                            for q, lt in zip(sup, lay) if lt == t]
+            out += [f"h q[{anc[f]}];" for f, b, *_ in checks if b == "X"]
+            out += [f"measure q[{anc[f]}] -> c[{new(('check', p, r, f))}];" for f, *_ in checks]
+            used.update(f for f, *_ in checks)
+        touched = set(ph.read) | set(ph.prep)
+        for f, b, sup, _ in checks:
+            s0, prev = last.get(f, (frozenset(), None))
+            s = frozenset(sup)
+            if (all(ph.prep.get(q) == b for q in s - s0) and all(ph.read.get(q) == b for q in s0 - s)
+                    and not s & s0 & touched):
+                dets.append((bits["check", p, 0, f],) + (() if prev is None else (prev,))
+                            + tuple(bits["read", p, q] for q in sorted(s0 - s)))
+        dets += [(bits["check", p, r, f], bits["check", p, r - 1, f])
+                 for r in range(1, ph.rounds) for f, *_ in checks]
+        last = {f: (frozenset(sup), bits["check", p, ph.rounds - 1, f]) for f, _, sup, _ in checks}
+    D = len(bits)
+    for q in sorted(final):
+        new(("final", q))
+    for f, b, sup, _ in sorted(phases[-1].checks, key=lambda c: (c[1] != "X", c[0])):
+        if all(final.get(q) == b for q in sup):
+            dets.append((last[f][1],) + tuple(bits["final", q] for q in sorted(sup)))
+    head = ['OPENQASM 2.0;', 'include "qelib1.inc";',
+            f"// {title}; data q[0..{n - 1}], ancillas q[{n}..{n + len(anc) - 1}]; "
+            f"data readout c[{D}..{len(bits) - 1}] appended by the grader",
+            f"qreg q[{n + len(anc)}];", f"creg c[{len(bits)}];"]
+    return "\n".join(head + out) + "\n", tuple(dets), bits, len(anc)
+
+
 def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> MemoryExperiment:
     """A lattice surgery's measurement of Z̄_A Z̄_B ("ZZ") or X̄_A X̄_B ("XX") between two
     distance-d patches (`qccd.gadget.surface.merged_patch`): A and B start in |0̄> (|+̄>), the
@@ -412,44 +507,91 @@ def lattice_surgery(d: int, kind: str = "ZZ", rounds: int | None = None) -> Memo
     p, info = merged_patch(d, kind)
     mem = "Z" if kind == "ZZ" else "X"
     seam = set(info["seam"])
-    dbasis = [info["seam_basis"] if q in seam else mem for q in range(p.n)]
-    checks = sorted(p.checks, key=lambda c: (c.basis != "X", int(c.name[1:])))
-    m = len(checks)
-    anc = [p.n + k for k in range(m)]
-    D = r * m
-    out = ['OPENQASM 2.0;', 'include "qelib1.inc";',
-           f"// surgery{d}_{kind.lower()}_r{r}: lattice surgery measuring {kind[0]}bar_A {kind[1]}bar_B "
-           f"between two d = {d} patches, {r} round(s); data q[0..{p.n - 1}] "
-           f"(A, the seam, B; {p.rows} x {p.cols}), ancillas q[{p.n}..{p.n + m - 1}]; "
-           f"data readout c[{D}..{D + p.n - 1}] appended by the grader",
-           f"qreg q[{p.n + m}];", f"creg c[{D + p.n}];"]
-    out += [f"h q[{q}];" for q in range(p.n) if dbasis[q] == "X"]
-    for rr in range(r):
-        if rr:
-            out += [f"reset q[{a}];" for a in anc]
-        out += [f"h q[{anc[k]}];" for k, c in enumerate(checks) if c.basis == "X"]
-        for t in sorted({t for c in checks for t in c.layers}):
-            for k, c in enumerate(checks):
-                for q, lt in zip(c.support, c.layers):
-                    if lt == t:
-                        out.append(f"cx q[{anc[k]}],q[{q}];" if c.basis == "X" else f"cx q[{q}],q[{anc[k]}];")
-        out += [f"h q[{anc[k]}];" for k, c in enumerate(checks) if c.basis == "X"]
-        out += [f"measure q[{anc[k]}] -> c[{rr * m + k}];" for k in range(m)]
-    own = [k for k, c in enumerate(checks) if c.basis == mem and not set(c.support) & seam]
-    dets = [(k,) for k in own]
-    dets += [(rr * m + k, (rr - 1) * m + k) for rr in range(1, r) for k in range(m)]
-    dets += [((r - 1) * m + k,) + tuple(D + q for q in sorted(checks[k].support)) for k in own]
-    measured = [k for k, c in enumerate(checks) if c.name in set(info["measured"])]
+    coords = [p.coord(q) for q in range(p.n)]
+    checks = _placed(p.rows, p.cols, (0, 0), {x: q for q, x in enumerate(coords)})
+    dbasis = {q: info["seam_basis"] if q in seam else mem for q in range(p.n)}
+    name = f"surgery{d}_{kind.lower()}_r{r}"
+    qasm, dets, bits, m = _phased(
+        f"{name}: lattice surgery measuring {kind[0]}bar_A {kind[1]}bar_B between two d = {d} "
+        f"patches, {r} round(s), {p.rows} x {p.cols} (A, the seam, B)",
+        p.n, [_Phase(tuple(checks), r, prep=dbasis)], dbasis)
+    measured = sorted(bits["check", 0, 0, f] for f, b, sup, _ in checks if b == mem and seam & set(sup))
     if kind == "ZZ":
         la, lb = [p.index(0, c) for c in range(d)], [p.index(2 * d, c) for c in range(d)]
     else:
         la, lb = [p.index(rr, 0) for rr in range(d)], [p.index(rr, 2 * d) for rr in range(d)]
-    obs = (tuple(measured), tuple(D + q for q in sorted(la)), tuple(D + q for q in sorted(lb)))
-    return MemoryExperiment(name=f"surgery{d}_{kind.lower()}_r{r}", code=f"rotated_surface_d{d}_{kind.lower()}",
+    obs = (tuple(measured),) + tuple(tuple(bits["final", q] for q in sorted(lg)) for lg in (la, lb))
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_{kind.lower()}",
                             distance=d, rounds=r, basis=mem, n_data=p.n, n_ancilla=m,
-                            qasm="\n".join(out) + "\n", detectors=tuple(dets), observables=obs,
-                            readout="appended", readout_bits=tuple((q, D + q) for q in range(p.n)),
-                            readout_basis=tuple(dbasis))
+                            qasm=qasm, detectors=dets, observables=obs, readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in range(p.n)),
+                            readout_basis=tuple(dbasis[q] for q in range(p.n)), coords=tuple(coords))
+
+
+def surgery_cnot(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryExperiment:
+    """A CNOT from control C to target T by lattice surgery through an ancilla patch A, as
+    FormalRV writes it (Horsman et al. 2012): A starts in |+̄>; Z̄_C Z̄_A is measured (outcome
+    m1), then X̄_A X̄_T (m2), then A is read in Z (m3); the frame takes Z̄_C when m2 and X̄_T when
+    m1 + m3.
+
+    Three distance-d patches on one lattice at pitch d + 1 -- C above A, T right of A -- the
+    Z̄Z̄ seam the row between C and A, the X̄X̄ seam the column between A and T.  Phase 1:
+    `rounds` (default d) rounds of the C + seam + A merged patch and of T's own checks.  Then
+    the row seam is read in X and the column seam prepared in |0>.  Phase 2: `rounds` rounds
+    of C's own checks and of the A + seam + T merged patch.  Then every data qubit left is
+    read: A and the column seam in Z (m3, and the split), C and T in `basis`.
+
+    `basis` "Z": C and T start in |0̄>; observable 0 is the flow the gate makes, Z̄_T ->
+    Z̄_C Z̄_T with its correction m1 + m3 (A's top row, the seam qubit beside it and T's top row
+    are the merged patch's Z̄, which phase 2 keeps), and observable 1 Z̄_C, which it keeps.
+    "X": C and T start in |+̄>; observable 0 is X̄_C -> X̄_C X̄_T with m2 (and the row seam's
+    readout in C's column, which the first split adds), observable 1 X̄_T.  Were the surgery
+    not a CNOT, observable 0 would be random."""
+    if basis not in ("X", "Z"):
+        raise ValueError(f"basis must be 'X' or 'Z', not {basis!r}")
+    r = d if rounds is None else rounds
+    if r < 1:
+        raise ValueError("a lattice surgery needs at least one round")
+    C = [(i, j) for i in range(d) for j in range(d)]
+    row = [(d, j) for j in range(d)]
+    A = [(d + 1 + i, j) for i in range(d) for j in range(d)]
+    col = [(d + 1 + i, d) for i in range(d)]
+    T = [(d + 1 + i, d + 1 + j) for i in range(d) for j in range(d)]
+    coords = sorted(C + row + A + col + T)
+    index = {x: q for q, x in enumerate(coords)}
+
+    def qs(points) -> list[int]:
+        return [index[x] for x in points]
+
+    zz = _placed(2 * d + 1, d, (0, 0), index) + _placed(d, d, (d + 1, d + 1), index)
+    xx = _placed(d, d, (0, 0), index) + _placed(d, 2 * d + 1, (d + 1, 0), index)
+    phases = [_Phase(tuple(zz), r, prep={**dict.fromkeys(qs(C + T), basis), **dict.fromkeys(qs(row + A), "X")}),
+              _Phase(tuple(xx), r, read=dict.fromkeys(qs(row), "X"), prep=dict.fromkeys(qs(col), "Z"))]
+    final = {**dict.fromkeys(qs(C + T), basis), **dict.fromkeys(qs(A + col), "Z")}
+    name = f"cnot{d}_{basis.lower()}_r{r}"
+    qasm, dets, bits, m = _phased(
+        f"{name}: a CNOT by lattice surgery, control C to target T through an ancilla patch A, "
+        f"d = {d}, {r} round(s) a merge", len(coords), phases, final)
+
+    def read(points) -> list[int]:
+        return [bits["final", q] for q in qs(points)]
+
+    if basis == "Z":
+        seam = set(qs(row))
+        m1 = [bits["check", 0, 0, f] for f, b, sup, _ in zz if b == "Z" and seam & set(sup)]
+        flow = m1 + read([(d - 1, j) for j in range(d)]) + read([(d + 1, j) for j in range(2 * d + 1)])
+        kept = read([(0, j) for j in range(d)])
+    else:
+        seam = set(qs(col))
+        m2 = [bits["check", 1, 0, f] for f, b, sup, _ in xx if b == "X" and seam & set(sup)]
+        flow = (m2 + [bits["read", 1, index[(d, d - 1)]]] + read([(i, d - 1) for i in range(d)])
+                + read([(d + 1 + i, d + 1) for i in range(d)]))
+        kept = read([(d + 1 + i, 2 * d) for i in range(d)])
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_cnot", distance=d, rounds=r,
+                            basis=basis, n_data=len(coords), n_ancilla=m, qasm=qasm, detectors=dets,
+                            observables=(tuple(sorted(flow)), tuple(sorted(kept))), readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in sorted(final)),
+                            readout_basis=tuple(final[q] for q in sorted(final)), coords=tuple(coords))
 
 
 def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,

@@ -26,6 +26,8 @@ a step makes, at its cycle; each op's witness at its last pulse, where its ions 
 
     compile_tiled(qasm_text, d)           ->  (program, certificate, architecture)
     compile_tiled(qasm_text, rows, cols)  -- a lattice surgery's merged patch
+    compile_tiled(exp.qasm, rows, cols, coords=exp.coords)  -- patches and seams on one
+                                             lattice, in phases (`surgery_cnot`)
 """
 from __future__ import annotations
 
@@ -143,42 +145,62 @@ class _Build:
                                "site": self.pos[ions[0]], "ions": ions})
 
 
+def _face(touched: set, basis: str | None) -> tuple[int, int] | None:
+    """The face whose corners hold every lattice point in `touched`: unique for three or more;
+    for two beside each other there are two, one a Z face (i + j even) and one an X face, and
+    the check's basis picks it (`qccd.gadget.surface.patch`'s rule)."""
+    rs, cs = {r for r, _ in touched}, {c for _, c in touched}
+    if not touched or max(rs) - min(rs) > 1 or max(cs) - min(cs) > 1:
+        return None
+    found = [(i, j) for i in range(max(rs) - 1, min(rs) + 1) for j in range(max(cs) - 1, min(cs) + 1)
+             if basis is None or (i + j) % 2 == (basis == "X")]
+    return found[0] if len(found) == 1 else None
+
+
 def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: str = "circuit",
-                  arch=None) -> tuple:
-    """`(program, certificate, architecture)` for a circuit on a rotated surface patch of
-    rows x cols data qubits (`qccd.gadget.surface.patch`; cols = rows: distance d; a lattice
-    surgery's merged patch is (2d + 1) x d or d x (2d + 1)) -- data q0 .. q[rows*cols - 1]
-    row-major, as `qccd.qec.experiments.rotated_surface` writes them; every other qubit a
-    check's measure ion, every two-qubit gate between a measure ion and a data ion of its own
-    check -- uncooled.  The checks are found from the gates: a measure ion's check is the face
-    whose corners are the data ions it touches."""
-    from ..gadget.surface import patch
+                  arch=None, coords=None) -> tuple:
+    """`(program, certificate, architecture)` for a circuit of surface-code checks on a lattice of
+    rows x cols data points -- uncooled.  The data qubits come first: by default q0 ..
+    q[rows*cols - 1] row-major, a rotated surface patch (`qccd.gadget.surface.patch`; cols =
+    rows: distance d; a lattice surgery's merged patch is (2d + 1) x d or d x (2d + 1)) as
+    `qccd.qec.experiments.rotated_surface` writes them; with `coords`, the (row, column) of each
+    (a surgery's patches and seams, `MemoryExperiment.coords`).  Every other qubit is a check's
+    measure ion and every two-qubit gate is between a measure ion and a data ion of its check.
+    The checks are found from the gates: a measure ion's face is the one whose corners hold the
+    data ions it ever touches, of its basis (an X check's ion is the CNOTs' control).  Any set
+    of faces plays: a face's junctions are its own, whichever others are there."""
     cols = cols or rows
     arch = arch or device(rows, cols)
     n, ops, _ = _parse(qasm_text)
-    nd = rows * cols
+    at = [tuple(x) for x in coords] if coords is not None else [divmod(q, cols) for q in range(rows * cols)]
+    nd = len(at)
+    if len(set(at)) != nd or not all(0 <= r < rows and 0 <= c < cols for r, c in at):
+        raise TiledError(f"the data coordinates are not distinct points of the {rows} x {cols} lattice")
     touch: dict = {}
+    role: dict = {}
     for op in ops:
         if op.name in GATES_2Q:
             a, b = op.qubits
             if (a < nd) == (b < nd):
                 raise TiledError(f"op {op.i} ({op.name} q{a}, q{b}) is not between a data ion and a measure ion")
             m, q = (a, b) if a >= nd else (b, a)
-            touch.setdefault(m, set()).add(q)
+            touch.setdefault(m, set()).add(at[q])
+            if op.name == "cx":
+                role.setdefault(m, set()).add("X" if m == a else "Z")
         elif op.name not in U3 and op.name not in ("measure", "reset", "barrier"):
             raise TiledError(f"op {op.i}: {op.name} is not played here")
-    faces = {frozenset(ch.support): (ch.i, ch.j) for ch in patch(rows, cols).checks}
     face: dict = {}
     for m in range(nd, n):
-        f = faces.get(frozenset(touch.get(m, ())))
+        basis = role.get(m)
+        f = _face(touch.get(m, set()), next(iter(basis)) if basis and len(basis) == 1 else None)
         if f is None:
-            raise TiledError(f"q{m} touches {sorted(touch.get(m, ()))}: no check of the "
-                             f"{rows} x {cols} patch")
+            raise TiledError(f"q{m} touches data at {sorted(touch.get(m, ()))}: not the corners of "
+                             f"one face of the {rows} x {cols} lattice")
         face[m] = f
     if len(set(face.values())) != len(face):
         raise TiledError("two measure ions on one face")
     ion = {q: f"q{q}" for q in range(n)}
-    place = {ion[q]: _data_trap(q // cols, q % cols) for q in range(nd)}
+    place = {ion[q]: _data_trap(*at[q]) for q in range(nd)}
     place.update({ion[m]: _face_trap(*face[m]) for m in face})
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "patch": [rows, cols],
@@ -204,7 +226,7 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
         for o in two:
             m, q = (o.qubits[0], o.qubits[1]) if o.qubits[0] >= nd else (o.qubits[1], o.qubits[0])
             i, j = face[m]
-            r, c = divmod(q, cols)
+            r, c = at[q]
             via = _route(i, j, r, c)
             legs["north" if r == i else "south"].append(
                 Participant(ion[m], _face_trap(i, j), _data_trap(r, c), via))

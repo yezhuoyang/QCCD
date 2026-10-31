@@ -9,6 +9,10 @@ Held here:
   the emitted pulses against the source; where the Lean checker is built, it accepts too;
 * the programme is the same instructions at every distance (one round: 39), so writing it is
   linear in the ions, and the round takes as long at d = 9 as at d = 3;
+* any set of faces plays, with the data where the experiment's `coords` put them: lattice
+  surgeries -- the merged pair, and FormalRV's CNOT (`surgery_cnot`: three patches, two
+  phases) -- pass every rule and R10, keep circuit distance d, and their logical error rate
+  under qccd-noise@2 falls with d;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
 """
 
@@ -85,15 +89,17 @@ def test_a_lattice_surgery_measures_the_product_and_keeps_both_logicals(kind, tm
     _r10(prog, cert, a, exp.qasm, tmp_path)
 
 
-def test_a_surgerys_logical_error_rate_falls_with_the_distance():
+@pytest.mark.parametrize("gadget", ["ZZ", "cnot"])
+def test_a_surgerys_logical_error_rate_falls_with_the_distance(gadget):
     from qccd.qec import evaluate_memory
-    from qccd.qec.experiments import lattice_surgery
+    from qccd.qec.experiments import lattice_surgery, surgery_cnot
     model = corrected_model("quantinuum")
     ler = {}
     for d in (3, 5):
-        exp = lattice_surgery(d, "ZZ")
-        a = device(2 * d + 1, d, physics="physics@2")
-        prog, cert, _ = compile_tiled(exp.qasm, 2 * d + 1, d, arch=a)
+        exp = lattice_surgery(d, "ZZ") if gadget == "ZZ" else surgery_cnot(d, "Z")
+        rows, cols = (2 * d + 1, d) if gadget == "ZZ" else (2 * d + 1, 2 * d + 1)
+        a = device(rows, cols, physics="physics@2")
+        prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords)
         cooled = insert_cooling(prog, a, model).program
         cooled.meta.update(prog.meta)
         rep = evaluate_memory(cooled, a.to_json(), exp, noise_id="qccd-noise@2", cert=cert, seed=7,
@@ -101,6 +107,43 @@ def test_a_surgerys_logical_error_rate_falls_with_the_distance():
         assert rep["check"]["ok"], rep["check"]
         ler[d] = rep["ler"]["ler"]
     assert ler[5] < ler[3] / 3, ler
+
+
+@pytest.mark.parametrize("basis", ["Z", "X"])
+def test_a_surgery_cnot_makes_its_flow_at_full_distance(basis, tmp_path):
+    """`surgery_cnot`: noiseless, every detector and both observables are deterministic --
+    observable 0 is the flow the CNOT makes (Z̄_T -> Z̄_C Z̄_T, or X̄_C -> X̄_C X̄_T, with
+    FormalRV's corrections), observable 1 what it keeps; under uniform circuit noise the
+    smallest graphlike logical error has d faults; tiled on one lattice -- C above A, T right
+    of A, two phases -- the programme passes every rule under qccd-physics@2 and R10."""
+    from qccd.qec.experiments import ideal_stim, surgery_cnot
+    for d in (3, 5):
+        exp = surgery_cnot(d, basis)
+        c = ideal_stim(exp)
+        c.detector_error_model()
+        assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+        assert len(ideal_stim(exp, 1e-3).shortest_graphlike_error(ignore_ungraphlike_errors=True)) == d
+    exp = surgery_cnot(3, basis)
+    a = device(7, 7, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, 7, 7, arch=a, coords=exp.coords)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+
+
+def test_a_surgery_cnots_flow_needs_its_correction():
+    """Observable 0 without the Z̄Z̄ outcome m1 is random: the experiment sees the gate."""
+    from dataclasses import replace
+
+    from qccd.qec.experiments import ideal_stim, surgery_cnot
+    exp = surgery_cnot(3, "Z")
+    flow = set(exp.observables[0])
+    m1 = flow & set(range(min(b for _, b in exp.readout_bits)))     # the bits measured in the programme
+    assert m1
+    broken = replace(exp, observables=(tuple(sorted(flow - m1)),) + exp.observables[1:])
+    with pytest.raises(ValueError):
+        ideal_stim(broken).detector_error_model()
 
 
 def test_the_programme_is_the_same_instructions_at_every_distance():
@@ -139,7 +182,7 @@ def test_the_proved_checker_accepts_the_certificate(tmp_path):
 def test_a_circuit_that_is_not_a_surface_patch_is_refused_saying_why():
     exp = rotated_surface(3, 1)
     bad = exp.qasm.replace("cx q[10],q[1];", "cx q[10],q[8];", 1)
-    with pytest.raises(TiledError, match="no check of the 3 x 3 patch"):
+    with pytest.raises(TiledError, match="not the corners of one face of the 3 x 3 lattice"):
         compile_tiled(bad, 3)
     with pytest.raises(TiledError, match="not between a data ion and a measure ion"):
         compile_tiled(exp.qasm.replace("cx q[10],q[1];", "cx q[0],q[1];", 1), 3)
