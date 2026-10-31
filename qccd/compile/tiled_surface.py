@@ -24,7 +24,8 @@ pulses are qccdc's (`c2lr_router.pulses`).  The certificate is the reference com
 (`Compiler/bridge/check_cert.py`), built from the instructions as they are emitted: each move
 a step makes, at its cycle; each op's witness at its last pulse, where its ions stand together.
 
-    compile_tiled(qasm_text, d)  ->  (program, certificate, architecture)
+    compile_tiled(qasm_text, d)           ->  (program, certificate, architecture)
+    compile_tiled(qasm_text, rows, cols)  -- a lattice surgery's merged patch
 """
 from __future__ import annotations
 
@@ -48,15 +49,19 @@ PHYSICS = {"physics@2": ("qccd-physics@2.json", "quantinuum")}
 FIXED_BLOCKS = ("primitives", "heating", "species", "budget")
 
 
-def device(d: int, name: str | None = None, physics: str | None = None):
-    """The grid a distance-d patch is played on: d + 1 junction columns, d + 2 rows; with
-    `physics`, that physics' fixed blocks written in (as a board does)."""
+def device(rows: int, cols: int | None = None, *, name: str | None = None,
+           physics: str | None = None):
+    """The grid a rows x cols patch (cols = rows: a distance-d one) is played on: cols + 1
+    junction columns, rows + 2 junction rows; with `physics`, that physics' fixed blocks
+    written in (as a board does)."""
     import json
     from pathlib import Path
 
     from ..api import Machine
     from ..arch import Architecture
-    arch = Machine.grid(d + 1, d + 2, name=name or f"tiled_d{d}", spacing=2).arch
+    cols = cols or rows
+    tag = f"d{rows}" if cols == rows else f"{rows}x{cols}"
+    arch = Machine.grid(cols + 1, rows + 2, name=name or f"tiled_{tag}", spacing=2).arch
     if physics is None:
         return arch
     ref = json.loads((Path(__file__).resolve().parents[1] / "workspace" / "physics" /
@@ -138,16 +143,20 @@ class _Build:
                                "site": self.pos[ions[0]], "ions": ions})
 
 
-def compile_tiled(qasm_text: str, d: int, *, name: str = "circuit", arch=None) -> tuple:
-    """`(program, certificate, architecture)` for a rotated distance-d surface-code circuit
-    (data q0 .. q[d*d - 1] row-major, as `qccd.qec.experiments.rotated_surface` writes it;
-    every other qubit a check's measure ion, every two-qubit gate between a measure ion and a
-    data ion of its own check), uncooled.  The checks are found from the gates: a measure
-    ion's check is the face whose corners are the data ions it touches."""
+def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: str = "circuit",
+                  arch=None) -> tuple:
+    """`(program, certificate, architecture)` for a circuit on a rotated surface patch of
+    rows x cols data qubits (`qccd.gadget.surface.patch`; cols = rows: distance d; a lattice
+    surgery's merged patch is (2d + 1) x d or d x (2d + 1)) -- data q0 .. q[rows*cols - 1]
+    row-major, as `qccd.qec.experiments.rotated_surface` writes them; every other qubit a
+    check's measure ion, every two-qubit gate between a measure ion and a data ion of its own
+    check -- uncooled.  The checks are found from the gates: a measure ion's check is the face
+    whose corners are the data ions it touches."""
     from ..gadget.surface import patch
-    arch = arch or device(d)
+    cols = cols or rows
+    arch = arch or device(rows, cols)
     n, ops, _ = _parse(qasm_text)
-    nd = d * d
+    nd = rows * cols
     touch: dict = {}
     for op in ops:
         if op.name in GATES_2Q:
@@ -158,20 +167,21 @@ def compile_tiled(qasm_text: str, d: int, *, name: str = "circuit", arch=None) -
             touch.setdefault(m, set()).add(q)
         elif op.name not in U3 and op.name not in ("measure", "reset", "barrier"):
             raise TiledError(f"op {op.i}: {op.name} is not played here")
-    faces = {frozenset(ch.support): (ch.i, ch.j) for ch in patch(d, d).checks}
+    faces = {frozenset(ch.support): (ch.i, ch.j) for ch in patch(rows, cols).checks}
     face: dict = {}
     for m in range(nd, n):
         f = faces.get(frozenset(touch.get(m, ())))
         if f is None:
-            raise TiledError(f"q{m} touches {sorted(touch.get(m, ()))}: no check of the d = {d} patch")
+            raise TiledError(f"q{m} touches {sorted(touch.get(m, ()))}: no check of the "
+                             f"{rows} x {cols} patch")
         face[m] = f
     if len(set(face.values())) != len(face):
         raise TiledError("two measure ions on one face")
     ion = {q: f"q{q}" for q in range(n)}
-    place = {ion[q]: _data_trap(q // d, q % d) for q in range(nd)}
+    place = {ion[q]: _data_trap(q // cols, q % cols) for q in range(nd)}
     place.update({ion[m]: _face_trap(*face[m]) for m in face})
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
-                meta={"compiler": COMPILER_NAME, "distance": d,
+                meta={"compiler": COMPILER_NAME, "patch": [rows, cols],
                       "qubit_map": {str(q): ion[q] for q in range(n)}})
     b = _Build(prog, dict(place))
     b.emit(type="init", placement=dict(place), quanta={i: 0.0 for i in place},
@@ -194,7 +204,7 @@ def compile_tiled(qasm_text: str, d: int, *, name: str = "circuit", arch=None) -
         for o in two:
             m, q = (o.qubits[0], o.qubits[1]) if o.qubits[0] >= nd else (o.qubits[1], o.qubits[0])
             i, j = face[m]
-            r, c = divmod(q, d)
+            r, c = divmod(q, cols)
             via = _route(i, j, r, c)
             legs["north" if r == i else "south"].append(
                 Participant(ion[m], _face_trap(i, j), _data_trap(r, c), via))

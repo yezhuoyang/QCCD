@@ -43,6 +43,28 @@ def test_every_rule_and_r10_hold_at_every_distance(d, rounds, tmp_path):
     _r10(prog, cert, arch, exp.qasm, tmp_path)
 
 
+def _rectangle(rows, cols, rounds):
+    """Syndrome rounds on a rows x cols patch: a lattice surgery's merged patch."""
+    from qccd.gadget.surface import patch
+    from qccd.qec.experiments import _Check, _memory
+    p = patch(rows, cols)
+    checks = [_Check(c.basis, tuple(c.support), tuple(c.layers))
+              for c in sorted(p.checks, key=lambda c: (c.basis != "X", int(c.name[1:])))]
+    return _memory(f"rect{rows}x{cols}", f"surface_{rows}x{cols}", min(rows, cols), p.n, checks,
+                   [p.logical("Z")], rounds, "Z", layered=True)
+
+
+@pytest.mark.parametrize("rows, cols", [(7, 3), (3, 7)])
+def test_a_lattice_surgerys_merged_patch_is_played_the_same_way(rows, cols, tmp_path):
+    """The Z-bar Z-bar merge of two d = 3 patches is 7 x 3, the X-bar X-bar one 3 x 7."""
+    exp = _rectangle(rows, cols, 2)
+    prog, cert, arch = compile_tiled(exp.qasm, rows, cols)
+    model = corrected_model("qccdsim_jones")
+    rep = verify(insert_cooling(prog, arch, model).program, arch, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, arch, exp.qasm, tmp_path)
+
+
 def test_the_programme_is_the_same_instructions_at_every_distance():
     lens, rounds_us = set(), set()
     model = corrected_model("qccdsim_jones")
@@ -79,7 +101,7 @@ def test_the_proved_checker_accepts_the_certificate(tmp_path):
 def test_a_circuit_that_is_not_a_surface_patch_is_refused_saying_why():
     exp = rotated_surface(3, 1)
     bad = exp.qasm.replace("cx q[10],q[1];", "cx q[10],q[8];", 1)
-    with pytest.raises(TiledError, match="no check of the d = 3 patch"):
+    with pytest.raises(TiledError, match="no check of the 3 x 3 patch"):
         compile_tiled(bad, 3)
     with pytest.raises(TiledError, match="not between a data ion and a measure ion"):
         compile_tiled(exp.qasm.replace("cx q[10],q[1];", "cx q[0],q[1];", 1), 3)
