@@ -380,7 +380,7 @@ export function applyStep(ED, PG, step) {
     // the Start card's whole gesture -- device, its name, the automatic test drive --
     // exactly what the card's click listener calls
     else if (step.do === 'startCard') {
-      const r = ED.pressStartCard({ gen: step.gen, open: step.open, tpl: step.tpl });
+      const r = ED.pressStartCard({ gen: step.gen, open: step.open, tpl: step.tpl, corners: step.corners });
       rec.result = { ok: r.ok, name: r.name === undefined ? null : r.name,
                      tpl: r.tpl === undefined ? null : r.tpl,
                      problems: (r.r && r.r.problems || []).map(p => p.code || p.message),

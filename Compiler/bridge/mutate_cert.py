@@ -181,7 +181,10 @@ def _swap_pair(d, *, commuting: bool):
 
 def _positions_at(d, t):
     """Where every ion is at the start of cycle `t`, replayed as qcheck replays it: every
-    move and rotation of an earlier cycle, a cycle's moves before its rotations."""
+    move and rotation of an earlier cycle, a cycle's moves before its rotations.  A rotation
+    turns the loop's `loops` entry of the qcheck input, which `mk_qcheck_input.loop_slots`
+    writes as the loop's SLOTS (its nodes less its bends), so a junction corner is passed
+    here exactly as the checker passes it."""
     pos = dict(d["init"])
     rots = d.get("rotations", [])
     events = sorted([(m["t"], 0, i) for i, m in enumerate(d["moves"])]

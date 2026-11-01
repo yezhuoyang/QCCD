@@ -32,7 +32,7 @@ from ..ir.tsir import C2LR_TEMPLATES, TSIR, Instruction, Participant, iter_opera
 from .c2lr import StepError as _C2LRError, tracker_for, why_not_c2lr as _not_c2lr
 from .rules import CycleView, ResolvedMove, RuleReport, check_cycle, conveyor_nodes, rails_to_loop
 
-__all__ = ["ReplayResult", "CycleRecord", "replay", "ReplayError"]
+__all__ = ["ReplayResult", "CycleRecord", "replay", "ReplayError", "bend_vias"]
 
 
 class ReplayError(RuntimeError):
@@ -130,13 +130,41 @@ class ReplayResult:
         }
 
 
+def bend_vias(dev, loop_id: str, step: int) -> dict[str, tuple[str, ...]]:
+    """`{slot: the rails one slot of rotation carries its ion along}`, for every slot of the
+    loop whose next slot in direction `step` (+1 or -1) lies beyond a bend.
+
+    A bend (`Device.is_bend`) is passed, never landed on, so the ion on the slot before a
+    junction corner travels `Device.slot_walk` -- slot, corner, slot -- in one cycle, and
+    the replay prices and judges that walk rail by rail, exactly as it does any participant
+    whose `via` names several rails.  A slot whose next slot is the next node is absent:
+    the replay resolves that one rail itself, so a loop with no bend on it -- every loop
+    written before junction corners -- gets `{}` and its participants are what they were.
+    """
+    loop = dev.loops[loop_id]
+    seq = loop.nodes
+    k = len(seq)
+    out: dict[str, tuple[str, ...]] = {}
+    for i, node in enumerate(seq):
+        j = i + step
+        if dev.is_bend(node) or not (loop.closed or 0 <= j < k) or not dev.is_bend(seq[j % k]):
+            continue
+        walk = dev.slot_walk(loop_id, node, step)
+        if not loop.closed and (seq.index(walk[-1]) - i) * step <= 0:
+            continue                  # an open path's walk ran off its end: no next slot
+        out[node] = tuple(dev.segment_between(a, b).id for a, b in zip(walk, walk[1:]))
+    return out
+
+
 def _resolve_participants(
     arch: Architecture, instr: Instruction, pos: Mapping[str, str]
 ) -> list[list[Participant]]:
     """Return the sub-cycles of an instruction, each a list of participants.
 
     A `loop_shift` template with `|delta| > 1` decomposes into `|delta|` unit sub-cycles;
-    each is a real machine cycle with its own depth, duration and rule check.
+    each is a real machine cycle with its own depth, duration and rule check.  A unit
+    shift moves every ion one SLOT (`Device.shift_map`); an ion whose next slot lies beyond
+    a bend carries the rails of the walk round it as its `via` (`bend_vias`).
     """
     if instr.template:
         kind = instr.template.get("kind")
@@ -159,15 +187,18 @@ def _resolve_participants(
         step = 1 if delta >= 0 else -1
         sub: list[list[Participant]] = []
         live = dict(pos)
+        vias: dict[str, tuple[str, ...]] | None = None
         for _ in range(abs(delta)):
-            shift = arch.device.shift_map(loop_id, step)
+            shift = arch.device.shift_map(loop_id, step)   # raises first on an open loop
+            if vias is None:
+                vias = bend_vias(arch.device, loop_id, step)
             here: dict[str, str] = {}
             for ion, node in live.items():
                 if node in shift:
                     here[ion] = shift[node]
             sub.append(
                 [
-                    Participant(ion=ion, src=live[ion], dst=dst)
+                    Participant(ion=ion, src=live[ion], dst=dst, via=vias.get(live[ion], ()))
                     for ion, dst in sorted(here.items())
                 ]
             )

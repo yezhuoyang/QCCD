@@ -83,7 +83,7 @@ An open loop (`closed: false`) is a linear register; asking it for a rigid shift
 
 | generator | parameters | produces |
 |---|---|---|
-| `ring` | `width, height, verticals, dock_offset` | `2W + 2H − 4` rail slots in one closed loop, plus `V` dock spurs to mid-line ancilla sites, the first at slot `dock_offset` |
+| `ring` | `width, height, verticals, dock_offset, corners` | `2W + 2H − 4` rail slots in one closed loop, plus `V` dock spurs to mid-line ancilla sites, the first at slot `dock_offset`; with `corners: "junction"`, four corner junctions and `2W + 2H − 8` slots |
 | `grid` | `a, b` | an `a × b` lattice of junctions with one trap in the middle of every wire: `2ab − a − b` traps, interior junctions degree 4, boundary 3, lattice corners 2 |
 | `chain` | `n` | `n` sites in a line; no loop, no junction, two degree-1 ends. `chain(1)` with a large capacity is the stationary-chain baseline |
 
@@ -97,6 +97,20 @@ and on a loop of height 3 or more a corner dock's spur lies along the side rail 
 DRC, while a top and a bottom dock at the same `x` put two ancilla sites on one point.
 The offset costs nothing in the transport model; `Codesign/scripts/q06_campaign.py
 --rings` searches it together with the width for the layout the DRC accepts.
+
+`corners` says what stands at the four corners of the loop.  `"junction"` is the square
+trap as it is built: the corners are junctions `J0`…`J3`, clockwise from the top left, the
+traps stand only on the sides (so `width` is at least 3), and `S0` is the first trap after
+the top-left corner.  A corner is a bend, a junction where only the loop's own two rails
+meet, and a bend is not a stop: one slot of rotation carries an ion from the last trap
+before a corner, round it, to the first trap after it, and no ion ever rests on it.  A junction
+where three or more rails meet stays a slot, as it always was.  `"site"`, the default, puts
+a trap in each corner; a document that does not say `corners` reads that way, so every
+design written before the option keeps its shape.  The Studio and the workspace write
+`"junction"` for a new ring.  `dual_loop` takes the same option for both of its loops
+(`DJ0`…`DJ3`, `AJ0`…`AJ3`).  The junction twin of a corner-trap ring with the same slot and
+dock counts is two columns wider: `ring(74, 2, 24, corners="junction")` has the 144 slots and
+24 docks of `ring(72, 2, 24)`.
 
 ## Compact and expanded forms
 

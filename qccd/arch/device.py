@@ -347,16 +347,50 @@ class Device:
             pairs.append((seq[-1], seq[0]))
         return tuple(self.segment_between(a, b) for a, b in pairs)
 
+    def is_bend(self, node_id: str) -> bool:
+        """A bare junction where only two rails meet: a corner an ion is carried round.
+
+        It is where a rail turns (the junction corners of `ring(corners="junction")`), and
+        no ion stops there, so a loop through it does not count it as a slot.  A bare
+        junction where three or more rails meet is NOT a bend: loops that run through
+        such junctions (`cylinder` with `declare_loops`) have always stopped ions on them,
+        and the designs that do keep that meaning.
+        """
+        return self.nodes[node_id].kind == "junction" and self.degree(node_id) == 2
+
+    def loop_slots(self, loop_id: str) -> tuple[str, ...]:
+        """The places on a loop where an ion stands: its nodes in order, less the bends.
+
+        A loop with no bend on it -- every loop written before junction corners -- has
+        every node as a slot, so this is `loops[loop_id].nodes` exactly.
+        """
+        return tuple(n for n in self.loops[loop_id].nodes if not self.is_bend(n))
+
+    def slot_walk(self, loop_id: str, src: str, step: int) -> tuple[str, ...]:
+        """The nodes one slot of rotation carries an ion through: from slot `src` to the
+        next slot in direction `step` (+1 or -1), both ends included, any bends between.
+        """
+        seq = self.loops[loop_id].nodes
+        k = len(seq)
+        i = seq.index(src)
+        out = [src]
+        while True:
+            i = (i + step) % k
+            out.append(seq[i])
+            if not self.is_bend(seq[i]):
+                return tuple(out)
+
     def shift_map(self, loop_id: str, delta: int) -> Mapping[str, str]:
-        """The rigid-rotation movement template: node -> node after shifting by `delta`.
+        """The rigid-rotation movement template: slot -> slot after shifting by `delta`.
 
         `delta > 0` advances along the loop's declared node order.  This single mapping
-        *is* the one movement primitive that PLAN §1's thesis rests on.
+        *is* the one movement primitive that PLAN §1's thesis rests on.  It moves slots,
+        not nodes: a bend (`is_bend`) is passed, never landed on.
         """
         loop = self.loops[loop_id]
         if not loop.closed and delta != 0:
             raise ValueError(f"loop {loop_id!r} is open; a rigid shift is undefined")
-        seq = loop.nodes
+        seq = self.loop_slots(loop_id)
         k = len(seq)
         return {seq[i]: seq[(i + delta) % k] for i in range(k)}
 

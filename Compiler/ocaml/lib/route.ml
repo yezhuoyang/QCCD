@@ -53,16 +53,23 @@ type layer_plan = {
 (* The action signature R4d judges: moving along a named path is one conveyor
    instruction, `"L0:+1"`, and one channel can only carry one of them per cycle.  A hop
    whose endpoints are not adjacent on a common loop has no signature and no verdict --
-   which is exactly why the router must not treat "no verdict" as "no constraint". *)
+   which is exactly why the router must not treat "no verdict" as "no constraint".
+
+   The step is counted in SLOTS (`Arch.slots`): a hop round a junction corner -- slot, bend,
+   slot -- is one slot along the loop, the same motion as a straight hop, so it is `L0:+1`
+   too and takes the same lock.  The verifier agrees: R4d (`path_actions`) reads that move
+   off its rail out of the slot, one node along the loop.  A loop with no bend has every
+   node as a slot, and this is the node index it always was. *)
 type action = { loop : string; delta : int }
 
 let loop_index (a : Arch.t) =
   let tbl = Hashtbl.create 8 in
   List.iter
     (fun (l : Arch.loop) ->
-      let idx = Hashtbl.create (List.length l.nodes) in
-      List.iteri (fun i n -> Hashtbl.replace idx n i) l.nodes;
-      Hashtbl.replace tbl l.lid (idx, List.length l.nodes, l.closed))
+      let slots = Arch.slots a l in
+      let idx = Hashtbl.create (List.length slots) in
+      List.iteri (fun i n -> Hashtbl.replace idx n i) slots;
+      Hashtbl.replace tbl l.lid (idx, List.length slots, l.closed))
     a.loops;
   tbl
 
@@ -228,19 +235,35 @@ let hop_label (c : sigctx) (seg : Arch.segment) src dst =
     in
     match spur with Some l -> l | None -> direction_label c src dst)
 
+(* Is this hop the rail INTO a bend of the closed loop it runs along (`enters_bend` in
+   `rules.py`)?  A move round a junction corner is slot -> bend -> slot, one step along the
+   loop like a straight hop, and R22 reads it so: the rail into the bend adds no label and
+   the rail out of it carries the loop step, `L0:+1`.  Only on a CLOSED loop, where a hop is
+   labelled by its loop step; a lab-frame label names the direction of every rail. *)
+let enters_bend (c : sigctx) (seg : Arch.segment) src dst =
+  Arch.is_bend c.sarch dst
+  &&
+  match seg.loop with
+  | Some lid when Hashtbl.mem c.closed_loops lid -> (
+    match Hashtbl.find_opt c.loop_seq lid with
+    | Some seq -> index_in seq dst <> None && index_in seq src <> None
+    | None -> false)
+  | _ -> false
+
 (* The waveform one move needs: the instruction's class, then a label per segment the ion
-   crosses, in the order it crosses them.  `via` is ordered from the source, which is how
-   `qccd/verify/replay.py` walks it, so the two label the same hops in the same order. *)
+   crosses, in the order it crosses them -- less the rail into a bend (`enters_bend`).
+   `via` is ordered from the source, which is how `qccd/verify/replay.py` walks it, so the
+   two label the same hops in the same order. *)
 let via_signature (c : sigctx) ~(cls : string) ~(src : string) ~(via : string list) =
   let at = ref src in
   let labels =
-    List.map
+    List.filter_map
       (fun sid ->
         match Hashtbl.find_opt c.seg_by_id sid with
-        | None -> "?"
+        | None -> Some "?"
         | Some (s : Arch.segment) ->
           let nxt = if s.a = !at then s.b else s.a in
-          let l = hop_label c s !at nxt in
+          let l = if enters_bend c s !at nxt then None else Some (hop_label c s !at nxt) in
           at := nxt;
           l)
       via

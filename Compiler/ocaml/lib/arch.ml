@@ -459,6 +459,57 @@ let adjacency a =
 
 let loop_of a lid = List.find_opt (fun l -> l.lid = lid) a.loops
 
+(* {1 Bends: a corner is passed, never a stop}
+
+   A node on a loop that is a bare junction (`kind = "junction"`) where only two rails meet
+   is a BEND: the junction corners of `ring(corners="junction")` and `dual_loop(...)`, where
+   the rail turns.  No ion rests on a bend, so a loop's SLOTS -- the places a rotation moves
+   an ion between, and the slot indices a `--placement` names -- are its nodes in walk order
+   less its bends, and one slot of rotation carries an ion from a slot, through any bends,
+   to the next slot.  A bare junction where three or more rails meet is not a bend: loops
+   declared through such junctions have always stopped ions on them.
+
+   This is `Device.is_bend` / `loop_slots` / `slot_walk` in `qccd/arch/device.py`, read off
+   two facts the expanded document already carries -- the node's `kind` and its exported
+   `degree` -- so nothing is derived here that Python did not.  A loop with no bend (every
+   device written before junction corners) has every node as a slot, and then each function
+   below answers exactly what reading `l.nodes` used to. *)
+let is_bend a id =
+  match node a id with Some n -> n.kind = "junction" && n.degree = 2 | None -> false
+
+let slots a (l : loop) : string list = List.filter (fun n -> not (is_bend a n)) l.nodes
+
+(* The nodes one slot of rotation carries an ion through: from slot `src` to the next slot
+   in direction `step` (+1 or -1), both ends included, any bends between. *)
+let slot_walk a (l : loop) (src : string) (step : int) : string list =
+  let seq = Array.of_list l.nodes in
+  let k = Array.length seq in
+  let rec index i = if i >= k then invalid_arg ("slot_walk: " ^ src ^ " is not on " ^ l.lid)
+    else if seq.(i) = src then i else index (i + 1) in
+  let rec go i acc =
+    let i = ((i + step) mod k + k) mod k in
+    let acc = seq.(i) :: acc in
+    (* the length bound only stops a loop made of nothing but bends, which has no slot *)
+    if is_bend a seq.(i) && List.length acc <= k then go i acc else List.rev acc
+  in
+  go (index 0) [ src ]
+
+(* The first segment, in the device's canonical order, joining two nodes. *)
+let segment_joining a x y =
+  List.find_opt (fun s -> (s.a = x && s.b = y) || (s.b = x && s.a = y)) a.segments
+
+(* The rails a walk of nodes crosses, in walk order, or [None] when two consecutive nodes
+   share no rail. *)
+let via_of_walk a (walk : string list) : string list option =
+  let rec go = function
+    | x :: (y :: _ as rest) -> (
+      match segment_joining a x y with
+      | Some s -> Option.map (fun tl -> s.sid :: tl) (go rest)
+      | None -> None)
+    | _ -> Some []
+  in
+  go walk
+
 (* {1 The structural self-check}
 
    Python computed the degree of every node during expansion, and the document carries

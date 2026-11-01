@@ -638,7 +638,8 @@ def section(by: dict, lowering_text: str = "") -> str:
     mg, mc, mr = machine("grid2x3"), machine("chain4"), machine("ring6d")
     g_sites, g_hops, g_dist, g_cap = trap_graph(mg)
     c_sites, c_hops, c_dist, c_cap = trap_graph(mc)
-    r_loops = {k: list(v.nodes) for k, v in mr.arch.device.loops.items()}
+    # a rotation advances every ion by one SLOT (a junction corner is passed, not a slot)
+    r_loops = {k: list(mr.arch.device.loop_slots(k)) for k in mr.arch.device.loops}
     ops1 = pc["circuit_ops"]
     w1 = interaction(ops1)
     edges1 = dag_edges(ops1)

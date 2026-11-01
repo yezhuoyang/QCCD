@@ -50,6 +50,7 @@ __all__ = [
     "motion_signature",
     "motion_signatures",
     "hop_label",
+    "enters_bend",
     "direction_label",
     "rails_to_loop",
     "conveyor_nodes",
@@ -539,7 +540,8 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     out: list[Violation] = []
     for loop, deltas in sorted(path_actions(v).items()):
         labels = {s: action_label(loop, d) for s, d in deltas.items()}
-        loaded = {s for s in dev.loops[loop].nodes if occ.get(s, 0) > 0}
+        # the loaded SLOTS: a bend is passed, never loaded (`Device.loop_slots`)
+        loaded = {s for s in dev.loop_slots(loop) if occ.get(s, 0) > 0}
         judge(f"on path {loop!r}", labels, loaded)
     # Moves on no named path at all -- a lattice, a rung, a highway on-ramp.  There is no
     # conveyor to take a direction along, so the action is the direction in the LAB frame.
@@ -1071,10 +1073,15 @@ def motion_signature(v: CycleView, ion: str) -> str:
     Two ions with the same signature ride the same waveform; two with different ones
     need two cycles under broadcast control.  The compiler's uniformising pass and R22
     agree because they both call this.
+
+    A slot move round a junction corner is ONE hop along the loop, like a straight one:
+    the rail into the bend (`enters_bend`) adds no label, and the rail out of it carries
+    the loop step, so the ion beside a corner rides the same `L0:+1` waveform as the rest.
     """
     dev = v.arch.device
     on_loop = loop_node_set(dev)
-    hops = [hop_label(dev, on_loop, m.src, m.dst, m.seg) for m in v.moves if m.ion == ion]
+    hops = [hop_label(dev, on_loop, m.src, m.dst, m.seg) for m in v.moves
+            if m.ion == ion and not enters_bend(dev, m.src, m.dst, m.seg)]
     return f"{v.instr.cls or 'shuttle'} {','.join(hops)}"
 
 
@@ -1104,10 +1111,14 @@ def motion_signatures(v: CycleView, ions=None,
         if label is None:
             if on_loop is None:
                 on_loop = loop_node_set(dev)
-            label = hop_label(dev, on_loop, m.src, m.dst, m.seg)
+            # "" for the rail into a bend, which `motion_signature` leaves out
+            label = ("" if enters_bend(dev, m.src, m.dst, m.seg)
+                     else hop_label(dev, on_loop, m.src, m.dst, m.seg))
             if cache is not None:
                 cache[key] = label
-        hops.setdefault(m.ion, []).append(label)
+        mine = hops.setdefault(m.ion, [])
+        if label:
+            mine.append(label)
     cls = v.instr.cls or "shuttle"
     return {ion: f"{cls} {','.join(h)}" for ion, h in hops.items()}
 
@@ -1212,6 +1223,26 @@ def hop_label(dev, on_loop, src: str, dst: str, seg) -> str:
     return direction_label(b[0] - a[0], b[1] - a[1])
 
 
+def enters_bend(dev, src: str, dst: str, seg) -> bool:
+    """Is this hop the rail INTO a bend of the closed loop it runs along?
+
+    A bend (`Device.is_bend`: a bare junction where only the loop's two rails meet) is
+    passed inside one slot move, never stopped on, so the move round a junction corner is
+    slot -> bend -> slot.  Its motion is one step along the loop, the same as a straight
+    hop's, and R22 must read it so: the signature leaves the rail into the bend out and
+    labels the rail out of it (`hop_label`, `L0:+1`).  Only on a CLOSED loop, where a hop
+    is labelled by its loop step; a lab-frame label (an open path, a lattice turning at a
+    degree-2 junction) names the direction of every rail and is left as it was.
+    """
+    if not dev.is_bend(dst):
+        return False
+    loop = seg.loop
+    if loop is None or loop not in dev.loops or not dev.loops[loop].closed:
+        return False
+    seq = dev.loops[loop].nodes
+    return dst in seq and src in seq
+
+
 def r22_uniform_motion(v: CycleView) -> list[Violation]:
     """R22.  Under broadcast control one cycle is one waveform, so every ion that moves in
     a cycle must do the exact same thing; a site may opt out, never do something else."""
@@ -1267,8 +1298,10 @@ def r23_junctions_crossed(v: CycleView) -> list[Violation]:
         junctions = frozenset(dev.junction_nodes)
         room = sum(min(n.capacity, R23_CHAIN_LIMIT) for i, n in dev.nodes.items()
                    if n.kind == "site" and i not in junctions)
+        # the SLOTS of a conveyed loop, where it carries ions (`Device.loop_slots`); a bend
+        # has two rails, so it is never a junction to exempt in the first place
         conveyor = frozenset(n for lid in (v.config.get("rotated_loops") or ())
-                             if lid in dev.loops for n in dev.loops[lid].nodes)
+                             if lid in dev.loops for n in dev.loop_slots(lid))
         facts = (dev, junctions - conveyor, room, set())
         cache["_r23"] = facts
     _, parked_on, room, resting = facts

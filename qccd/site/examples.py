@@ -24,6 +24,7 @@ from ..api import Machine, _template_doc
 from ..cost import corrected_model, deck_model
 from ..ir import TSIR, Instruction, Participant
 from ..verify import verify
+from ..verify.replay import bend_vias
 from ..verify.rules import C2LR_RULE_SOURCES, C2LR_RULE_STATEMENTS, RULE_SOURCES, RULE_STATEMENTS
 
 
@@ -306,7 +307,6 @@ def core_form(m: Machine, calls: list[dict]) -> list[dict]:
     """The programme `calls` written in core statements only: read back from the IR it
     builds, a `loop_shift` template unrolled into one `simd` per slot."""
     prog = m.program("core", provenance="off").apply_calls(calls).build()
-    loops = m.arch.device.loops
     where: dict[str, str] = {}
     out: list[dict] = []
     for ins in prog.instructions:
@@ -315,13 +315,18 @@ def core_form(m: Machine, calls: list[dict]) -> list[dict]:
             q = {k: v for k, v in (ins.quanta or {}).items() if v}
             out.append(rec("init", dict(ins.placement), **({"quanta": q} if q else {})))
         elif ins.type == "simd" and ins.template and ins.template.get("kind") == "loop_shift":
-            nodes = list(loops[ins.template["loop"]].nodes)
+            # one slot per cycle; an ion beside a junction corner is walked round it (`via`)
+            lid = ins.template["loop"]
+            nodes = list(m.arch.device.loop_slots(lid))
             delta = int(ins.template["delta"])
+            step = 1 if delta > 0 else -1
+            vias = bend_vias(m.arch.device, lid, step)
             for _ in range(abs(delta)):
-                parts = [[ion, at, nodes[(nodes.index(at) + (1 if delta > 0 else -1)) % len(nodes)]]
+                parts = [[ion, at, nodes[(nodes.index(at) + step) % len(nodes)]]
+                         + ([list(vias[at])] if at in vias else [])
                          for ion, at in where.items() if at in nodes]
                 out.append(rec("simd", ins.cls, parts))
-                where.update({ion: b for ion, _a, b in parts})
+                where.update({p[0]: p[2] for p in parts})
         elif ins.type == "simd":
             parts = [[p.ion, p.src, p.dst] + ([list(p.via)] if p.via else []) for p in ins.participants]
             out.append(rec("simd", ins.cls, parts, **({} if ins.mode == "inter" else {"mode": ins.mode})))

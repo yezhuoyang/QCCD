@@ -138,13 +138,14 @@ def replay_positions(cert: dict, arch: Architecture) -> tuple[dict, list[str]]:
     compiler must never turn the loop while a dock is occupied, and modelling it here is
     what makes the replay able to catch it if it ever did.
 
-    The loop's node order is read from `arch`, never from the certificate: a compiler that
-    supplied its own could rotate ions to wherever its gates needed them.
+    The loop's slot order is read from `arch`, never from the certificate: a compiler that
+    supplied its own could rotate ions to wherever its gates needed them.  Slots, not nodes
+    (`Device.loop_slots`): a rotation carries an ion round a bend, never onto it.
     """
     problems: list[str] = []
     pos = dict(cert["init"])
     loops = {
-        lid: list(l.nodes)
+        lid: list(arch.device.loop_slots(lid))
         for lid, l in getattr(arch.device, "loops", {}).items()
         if l.closed
     }

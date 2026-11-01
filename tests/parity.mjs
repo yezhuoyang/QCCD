@@ -302,7 +302,8 @@ for (const c of cases.pricing || []) {
     // expanded from the device, so a model without it cannot price one
     const model = Q.makeModel(r.ok.primitives, Q.degrees(dev), Q.cornerEndpoints(dev),
                               dev.segments, { ...c.model,
-                                c2lr: Q.c2lrContext(dev, r.ok.control, r.ok.name, c.classes || {}) });
+                                c2lr: Q.c2lrContext(dev, r.ok.control, r.ok.name, c.classes || {}),
+                                bends: Q.bendsOf(dev) });
     model._pair = Q.pairIndex(dev);      // exactly what editor.js attaches before pricing
     priced = Q.priceFrames(c.frames, c.loops, model, c.classes || {});
   } catch (err) {
@@ -704,7 +705,7 @@ for (const c of cases.rules || []) {
       include_anomalous: c.model.include_anomalous !== false,
       anomalous_per_ms: c.physics.anomalous_per_ms || 0,
       policy: c.physics.policy,
-      c2lr: Q.c2lrContext(dev, st.control, st.name, c.classes || {}) });
+      c2lr: Q.c2lrContext(dev, st.control, st.name, c.classes || {}), bends: Q.bendsOf(dev) });
   } catch (err) { note('rules', c.name, 'makeModel threw', '(a model)', err.message); continue; }
   model._pair = Q.pairIndex(dev);
   let rep;

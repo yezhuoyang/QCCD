@@ -22,8 +22,13 @@ a closed loop tries the conveyor first, then the router.
 
 | board | mechanism | what the device must have | known to work (measured) |
 |---|---|---|---|
-| BB [[144,12,12]] | conveyor (rotate) | ONE closed loop that carries the data qubits, plus docks: gate sites one rail off the loop | `ring` width 72, height 2, 24 docks: 522 ms per round, eligible. Drawn: a triangle loop of 144 sites with 24 docks inside it (below): 505.8 ms, eligible |
-| Repetition code, Steane, Surface code | conveyor | the same, smaller | `ring` width 8, height 2, 8 docks: 9.45, 11.48 and 14.1 ms, all eligible |
+| BB [[144,12,12]] | conveyor (rotate) | ONE closed loop that carries the data qubits, plus docks: gate sites one rail off the loop | `ring` width 72, height 2, 24 docks, a trap in each corner (`"corners": "site"`): 522 ms per round, eligible. Drawn: a triangle loop of 144 sites with 24 docks inside it (below): 505.8 ms, eligible |
+| Repetition code, Steane, Surface code | conveyor | the same, smaller | `ring` width 8, height 2, 8 docks, `"corners": "site"`: 9.45, 11.48 and 14.1 ms, all eligible |
+
+A `construct` of a ring or dual loop gives it junction corners unless its params say
+`"corners": "site"`: the corners are bare junctions an ion is carried round, the traps stand on
+the sides only, and a ring of width W and height H has 2W + 2H - 8 slots (so its docks must
+divide that number). The measured rows above were built with a trap in each corner.
 | Five-qubit code | router (compile) | gate-capable traps that hold 2 ions, sites that can measure, room for all 9 qubits | `grid` 3 × 3: 8.89 ms, eligible |
 | GHZ (starter) | router | 4 qubits' room | `chain` of 4 |
 

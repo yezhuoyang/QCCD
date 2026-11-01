@@ -52,7 +52,7 @@ def main() -> int:
     info = ensure_service(root)
     own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=120)
     ring = lambda v, n: [{"type": "construct", "generator": "ring",
-                          "params": {"width": 72, "height": 2, "verticals": v}, "name": n}]
+                          "params": {"width": 72, "height": 2, "verticals": v, "corners": "site"}, "name": n}]
     own("POST", "/api/change-sets", {"expected_revision": 0, "request_id": "main", "mode": "apply",
                                      "operations": ring(24, "ring24")})
     own("POST", "/api/branches", {"name": "A", "source": "main"})

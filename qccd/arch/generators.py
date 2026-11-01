@@ -69,6 +69,7 @@ def ring(
     segment_capacity: int = 1,
     loop_id: str = "L0",
     dock_offset: int = 0,
+    corners: str = "site",
 ) -> Device:
     """A rectangular transport loop of `2W + 2H - 4` slots with `V` dock spurs.
 
@@ -83,8 +84,31 @@ def ring(
     corner dock's spur lies along the side rail and fails DRC (`Codesign/findings/q06`);
     an offset that keeps every dock on a top or bottom straight costs nothing in the
     transport model and makes the device buildable.
+
+    `corners="junction"` is the square trap as it is built (Ke Sun, reader report
+    2026-10-03): the four corners are junctions, `J0`..`J3` clockwise from the top left,
+    and the traps stand only on the sides, so the loop has `2W + 2H - 8` slots, `S0` the
+    first trap after the top-left corner.  A corner is a bend -- only the loop's own two
+    rails meet there -- so `Device.loop_slots` passes it: one slot of rotation carries
+    the ion around it, and no ion ever stops on it.  `"site"`, the default, is the
+    drawing every document written before this option keeps: a trap in each corner.
     """
-    slots = _ring_slots(width, height)
+    if corners not in ("site", "junction"):
+        raise ExpansionError(f"corners must be 'site' or 'junction', got {corners!r}")
+    perimeter = _ring_slots(width, height)
+    if corners == "junction":
+        if width < 3:
+            raise ExpansionError("a ring with junction corners needs width >= 3, so its "
+                                 "top and bottom sides hold a trap")
+        far_x, far_y = float(width - 1), float(height - 1)
+        corner_id = {(0.0, 0.0): "J0", (far_x, 0.0): "J1", (far_x, far_y): "J2", (0.0, far_y): "J3"}
+        # walk from the first trap after the top-left corner, so slot 0 is S0 and the
+        # corner the walk starts behind comes last
+        walk = perimeter[1:] + perimeter[:1]
+        slots = [p for p in walk if (p[1], p[2]) not in corner_id]
+    else:
+        corner_id = {}
+        walk = slots = perimeter
     capacity = len(slots)
     if verticals < 0:
         raise ExpansionError("verticals must be >= 0")
@@ -116,12 +140,18 @@ def ring(
             labels=tuple(labels),
         )
 
+    for (x, y), jid in corner_id.items():
+        nodes[jid] = Node(id=jid, pos=(x, y), kind="junction", capacity=0, labels=("corner",))
+
+    # the loop walks every perimeter node in order: the slots, and the corner junctions
+    # between them when the corners are junctions
+    site_id = {(x, y): f"S{s}" for s, (_, x, y) in enumerate(slots)}
+    order = [corner_id.get((x, y)) or site_id[(x, y)] for _, x, y in walk]
     segments: dict[str, Segment] = {}
-    for s in range(capacity):
-        t = (s + 1) % capacity
-        segments[f"E{s}"] = Segment(
-            id=f"E{s}",
-            ends=(f"S{s}", f"S{t}"),
+    for i in range(len(order)):
+        segments[f"E{i}"] = Segment(
+            id=f"E{i}",
+            ends=(order[i], order[(i + 1) % len(order)]),
             length=1.0,
             capacity=segment_capacity,
             loop=loop_id,
@@ -163,28 +193,27 @@ def ring(
     loops = {
         loop_id: Loop(
             id=loop_id,
-            nodes=tuple(f"S{s}" for s in range(capacity)),
+            nodes=tuple(order),
             closed=True,
             kind="ring",
             note="the rigid-rotation orbit; one movement template shifts every ion on it",
         )
     }
-    return Device(
-        nodes=nodes,
-        segments=segments,
-        loops=loops,
-        generator="ring",
-        params={
-            "width": width,
-            "height": height,
-            "verticals": verticals,
-            "site_zone": site_zone,
-            "ancilla_zone": ancilla_zone,
-            "segment_capacity": segment_capacity,
-            "loop_id": loop_id,
-            "dock_offset": dock_offset,
-        },
-    )
+    params = {
+        "width": width,
+        "height": height,
+        "verticals": verticals,
+        "site_zone": site_zone,
+        "ancilla_zone": ancilla_zone,
+        "segment_capacity": segment_capacity,
+        "loop_id": loop_id,
+        "dock_offset": dock_offset,
+    }
+    # only a junction-cornered ring says so: a document written before the option
+    # expands to exactly the device, params included, that it always did
+    if corners == "junction":
+        params["corners"] = corners
+    return Device(nodes=nodes, segments=segments, loops=loops, generator="ring", params=params)
 
 
 # --------------------------------------------------------------------------- grid
@@ -511,6 +540,7 @@ def dual_loop(
     # `engine.js::dualLoop`.
     ancilla_zone: str = "trap",
     segment_capacity: int = 1,
+    corners: str = "site",
 ) -> Device:
     """Two concentric loops: an inner storage loop and an outer trap loop (deck p.12).
 
@@ -523,9 +553,17 @@ def dual_loop(
     exactly what the shipped ring's dock spurs cost -- which is why the default is none,
     and why whether a gate needs transport or only adjacency is an open question
     (`Knowledge: q_dual_loop_gate_mechanism`).
+
+    `corners="junction"` makes each loop's four end nodes junctions, `DJ0`..`DJ3` and
+    `AJ0`..`AJ3` clockwise from the top left, as `ring` does: traps only on the long
+    sides, and a coupling may not land on a corner.
     """
-    if width < 2:
-        raise ExpansionError("dual_loop needs width >= 2")
+    if corners not in ("site", "junction"):
+        raise ExpansionError(f"corners must be 'site' or 'junction', got {corners!r}")
+    if width < (3 if corners == "junction" else 2):
+        raise ExpansionError("dual_loop needs width >= 2" if corners == "site" else
+                             "a dual_loop with junction corners needs width >= 3, so its "
+                             "sides hold a trap")
     if couplings is None:
         coupling_x: list[int] = []
     elif isinstance(couplings, int):
@@ -553,18 +591,36 @@ def dual_loop(
             return float(width - 1) - 0.5
         return float(x)
 
+    if corners == "junction" and {0, width - 1} & set(coupling_x):
+        raise ExpansionError("a coupling may not land on a junction corner: keep it off "
+                             f"x = 0 and x = {width - 1}")
+    ends = {0: ("J0", "J3"), width - 1: ("J1", "J2")} if corners == "junction" else {}
+
     for tag, zone, y_top, y_bot, label, side in plan:
         order: list[str] = []
         for x in range(width):
-            nid = f"{tag}T{x}"
-            nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_top), kind="site",
-                              zone_type=zone, labels=(label, side, "top"))
+            if x in ends:
+                nid = f"{tag}{ends[x][0]}"
+                nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_top), kind="junction",
+                                  capacity=0, labels=("corner", side))
+            else:
+                nid = f"{tag}T{x}"
+                nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_top), kind="site",
+                                  zone_type=zone, labels=(label, side, "top"))
             order.append(nid)
         for x in range(width - 1, -1, -1):
-            nid = f"{tag}B{x}"
-            nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_bot), kind="site",
-                              zone_type=zone, labels=(label, side, "bottom"))
+            if x in ends:
+                nid = f"{tag}{ends[x][1]}"
+                nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_bot), kind="junction",
+                                  capacity=0, labels=("corner", side))
+            else:
+                nid = f"{tag}B{x}"
+                nodes[nid] = Node(id=nid, pos=(inner_x(tag, x), y_bot), kind="site",
+                                  zone_type=zone, labels=(label, side, "bottom"))
             order.append(nid)
+        if ends:
+            # start the walk at the first trap after the top-left corner, as `ring` does
+            order = order[1:] + order[:1]
         for i in range(len(order)):
             j = (i + 1) % len(order)
             segments[f"E{tag}{i}"] = Segment(
@@ -577,11 +633,12 @@ def dual_loop(
         segments[f"C{x}"] = Segment(id=f"C{x}", ends=(f"DT{x}", f"AT{x}"),
                                     capacity=segment_capacity, labels=("coupling",))
 
-    return Device(
-        nodes=nodes, segments=segments, loops=loops, generator="dual_loop",
-        params={"width": width, "couplings": coupling_x, "data_zone": data_zone,
-                "ancilla_zone": ancilla_zone, "segment_capacity": segment_capacity},
-    )
+    params = {"width": width, "couplings": coupling_x, "data_zone": data_zone,
+              "ancilla_zone": ancilla_zone, "segment_capacity": segment_capacity}
+    if corners == "junction":
+        params["corners"] = corners
+    return Device(nodes=nodes, segments=segments, loops=loops, generator="dual_loop",
+                  params=params)
 
 
 # --------------------------------------------------------------------------- dispatch

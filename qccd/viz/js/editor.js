@@ -660,7 +660,7 @@ function clockModel(table) {
     kind: 'corrected', corner_hops: 1, junction_min_degree: PH.junction_min_degree || 3,
     length_scaling: false, pitch: 1.0, include_anomalous: true,
     anomalous_per_ms: PH.anomalous_per_ms || 0, policy: { table: table, objective: 'fastest' },
-    c2lr: c2lrOf(dev) });
+    c2lr: c2lrOf(dev), bends: Q.bendsOf(dev) });
   m._pair = Q.pairIndex(dev);
   return m;
 }
@@ -777,7 +777,7 @@ function repriceNow() {
       include_anomalous: !(D.model && D.model.include_anomalous === false),
       anomalous_per_ms: PH.anomalous_per_ms || 0,
       policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' },
-      c2lr: c2lrOf(dev)
+      c2lr: c2lrOf(dev), bends: Q.bendsOf(dev)
     });
   } catch (err) {
     PRICE = { blocked: [{ kind: 'no_curve', message: err.message, count: 1 }] };
@@ -4697,6 +4697,7 @@ var HINTS = {
   'menu:delete': { t: 'Delete', d: 'Removes the selection. A site takes its rails with it, and one Undo brings the whole thing back.', k: 'del' },
   'menu:insert': { t: 'Insert a trapping site here', d: 'Splits this rail where you clicked and drops a trap into the gap. The two halves inherit the rail\u2019s loop, labels and capacity, its declared length is split at that point, and the new site is spliced into the orbit in the right place \u2014 the only add that can safely put a node on a transport loop.' },
   'menu:component': { t: 'The whole component', d: 'This part was placed as one piece \u2014 a dock, a tile, a register. Select or delete every site and rail it owns, in one step.' },
+  'start:corners': { t: 'Corners', d: 'How the ring and dual_loop cards build their corners. Junction corners (the default): the four corners are bare junctions and the traps stand only on the sides, as a square trap is built; a turn of the loop carries an ion round a corner to the next trap and never stops it there. A trap in each corner: the drawing every design made before this choice keeps.' },
   'menu:close-loop': { t: 'Close loop', d: 'Declares the selected nodes as an orbit the machine can rotate by one step in a single instruction: in the order you selected them, or, when that order is not a walk, in the order the rails between them run. It needs at least three.' },
   'testdrive': { t: 'Test drive', d: 'Writes a small valid programme for this device \u2014 a rotation if it has a loop, otherwise a shuttle out and back \u2014 and plays it.' },
   'gripRail': { t: 'Elements', d: 'Hide or show the elements rail.', k: '[' },
@@ -4932,7 +4933,11 @@ function stageHint(h, cx, cy) {
   } else if (h.kind === 'loop') {
     var lp = dev && dev.loops[h.id];
     if (!lp) { hintHide(); return null; }
-    entry = { t: 'Loop ' + h.id, d: lp.nodes.length + ' sites in a ring. One instruction rotates every ion on it by one step.', k: 'drag to move the whole ring' };
+    // its SLOTS: a junction corner on the loop is a node of the walk and no site of it
+    var nSlot = Q.loopSlots(dev, h.id).length, nBend = lp.nodes.length - nSlot;
+    entry = { t: 'Loop ' + h.id, d: nSlot + ' sites in a ring' +
+              (nBend ? ', with ' + nBend + ' junction corner' + (nBend === 1 ? '' : 's') + ' an ion is carried round' : '') +
+              '. One instruction rotates every ion on it by one step.', k: 'drag to move the whole ring' };
   } else { hintHide(); return null; }
   hintShow(entry, cx, cy);
   return entry;
@@ -5296,7 +5301,8 @@ var CHECKS = {
     var lp = (STATE && STATE.device && STATE.device.loops) ? STATE.device.loops[loop] : null;
     var f0 = P.frames[0], pos = lastPos();
     if (!lp || !f0 || f0.type !== 'init' || !pos) return { ok: false, why: 'the loop has not turned', have: 'no ions on it', facts: {} };
-    var seq = lp.nodes, k = seq.length, idx = {}, i, n = 0, bad = null, ion;
+    // counted in SLOTS: a junction corner is passed, never a place an ion is turned to
+    var seq = Q.loopSlots(STATE.device, loop), k = seq.length, idx = {}, i, n = 0, bad = null, ion;
     for (i = 0; i < k; i++) idx[seq[i]] = i;
     var want = ((delta % k) + k) % k;
     for (ion in f0.place) if (has(f0.place, ion) && idx[f0.place[ion]] !== undefined) {
@@ -7402,7 +7408,9 @@ function testDrivePlan(opts) {
   if (!opts.noLoop) for (lid in dev.loops) if (has(dev.loops, lid)) {
     var lp = dev.loops[lid];
     if (lp.closed && lp.nodes.length >= 2) {
-      return { ok: true, kind: 'rotate', loop: lid, from: lp.nodes[0], statements: [
+      // `from`: the loop's first SLOT, where `fill` puts d0 -- a junction corner holds no ion
+      var slots0 = Q.loopSlots(dev, lid);
+      return { ok: true, kind: 'rotate', loop: lid, from: slots0.length ? slots0[0] : lp.nodes[0], statements: [
         { method: 'fill', args: [lid], kwargs: {} },
         { method: 'rotate', args: [1, lid], kwargs: {} },
         { method: 'rotate', args: [1, lid], kwargs: {} },
@@ -7982,18 +7990,63 @@ function esc2(t) {
 // engine's twin has not (`ring(dock_offset=)` did exactly that, and the card refused with
 // "unexpected keyword argument" on every page).  The card label, its tooltip and the
 // click read the same table, and the call the tooltip shows is the call that is made.
-function generatorParams(gen) {
+//
+// ONE KEYWORD IS FORWARDED ON PURPOSE: `corners`, on a generator whose signature has it (ring,
+// dual_loop).  A square trap is built with its corners as junctions and its traps on the
+// sides (reader report T30, Ke Sun), so a NEW ring is made that way unless the Start panel's
+// corner choice says otherwise -- and it is WRITTEN into the document, `corners: "junction"`,
+// because the generator's own default is `"site"`: every document written before the option
+// has no key and must keep reading as the trap-in-each-corner device it always was.
+var CORNER_STYLES = ['junction', 'site'];
+var CORNERS = 'junction';
+function setCorners(style) {
+  if (style !== undefined && style !== null) {
+    if (CORNER_STYLES.indexOf(String(style)) < 0) {
+      return { ok: false, corners: CORNERS, problems: [{ code: 'bad_corners',
+        message: 'corners must be one of ' + CORNER_STYLES.join(', ') + ', got ' + Q.pyRepr(String(style)) }] };
+    }
+    CORNERS = String(style);
+    var boxes = ['palCorners', 'stageCorners'];
+    for (var b = 0; b < boxes.length; b++) if ($(boxes[b])) $(boxes[b]).value = CORNERS;
+    renderStart();
+  }
+  return { ok: true, corners: CORNERS, problems: [] };
+}
+function hasCorners(gen) {
+  var sig = (D.generator_signatures || {})[gen];
+  return !!(sig && sig.defaults && has(sig.defaults, 'corners'));
+}
+function generatorParams(gen, corners) {
   var sig = (D.generator_signatures || {})[gen] || { required: [], defaults: {} };
   var params = {}, j;
   for (j = 0; j < sig.required.length; j++) params[sig.required[j]] = 4;
+  if (hasCorners(gen)) {
+    var style = corners === undefined || corners === null ? CORNERS : String(corners);
+    // a junction-cornered ring of height 2 is two traps a side between two pairs of bare
+    // corners; height 3 gives every side a trap, the square trap the option exists for
+    if (gen === 'ring' && style === 'junction') params.height = 3;
+    params.corners = style;
+  }
   return params;
 }
 function generatorLabel(gen) {
   var sig = (D.generator_signatures || {})[gen] || { required: [], defaults: {} };
   var p = generatorParams(gen), parts = [], i;
-  if (sig.required.length === 2) return String(p[sig.required[0]]) + '×' + String(p[sig.required[1]]);
+  var tail = has(p, 'corners') ? ' · ' + p.corners + ' corners' : '';
+  if (sig.required.length === 2) return String(p[sig.required[0]]) + '×' + String(p[sig.required[1]]) + tail;
   for (i = 0; i < sig.required.length; i++) parts.push(sig.required[i] + ' ' + p[sig.required[i]]);
-  return parts.join(' · ');
+  if (has(p, 'height')) parts.push('height ' + p.height);
+  return parts.join(' · ') + tail;
+}
+// the corner choice as one <select>, for the rail and the empty stage alike
+function cornersSelect(id) {
+  var h = '<select id="' + id + '" data-start="corners" data-hint="start:corners">';
+  for (var i = 0; i < CORNER_STYLES.length; i++) {
+    h += '<option value="' + CORNER_STYLES[i] + '"' + (CORNERS === CORNER_STYLES[i] ? ' selected' : '') + '>' +
+         (CORNER_STYLES[i] === 'junction' ? 'junction corners, traps on the sides' : 'a trap in each corner') +
+         '</option>';
+  }
+  return h + '</select>';
 }
 function paramsLabel(params) {
   var out = [], k;
@@ -8095,6 +8148,7 @@ function wireStartControls(host) {
   var sels = host.querySelectorAll('select');
   for (i = 0; i < (sels.length || 0); i++) {
     if (sels[i].getAttribute('data-start') === 'tpl') wireStartSelect(sels[i]);
+    else if (sels[i].getAttribute('data-start') === 'corners') wireCornersSelect(sels[i]);
   }
 }
 function wireShapeButton(b) {
@@ -8120,6 +8174,7 @@ function renderStart() {
          '<input id="palName" value="' + esc2(typedName() || '') +
          '" placeholder="named after the card you pick, unless you type one"></div>';
     h += '<h5>Build a device</h5>' + startCards('rail');
+    h += '<div class="fieldrow"><label>corners</label>' + cornersSelect('palCorners') + '</div>';
     h += '<div class="fieldrow"><label>open</label>' + openPicker('palOpen', true) + '</div>';
     h += '<div class="mut" style="margin-top:5px;font-size:11px">a blank canvas borrows the ' +
          'selected package’s curves, zone types and control block, because a device with ' +
@@ -8145,6 +8200,7 @@ function renderStart() {
       '\u00b7 a junction is added by itself where the new rail meets or crosses one that is ' +
       'already there.</p>' +
       '<h3>or start from a ready-made device</h3>' + startCards('stage') +
+      '<div class="startrow"><label>ring and dual_loop corners ' + cornersSelect('stageCorners') + '</label></div>' +
       '<div class="startrow"><label>physics package ' + packageSelect('stageTpl') + '</label>' +
       '<label>shipped device ' + openPicker('stageOpen') + '</label></div>' +
       '<div class="startrow"><span class="mut">or build one by hand (Parts): press</span>' + armButtons() +
@@ -8193,7 +8249,7 @@ function pressStartCard(card) {
   var nm = defaultName(gen || open || null);
   var r;
   if (open) r = newFromTemplate(open, { name: nm });
-  else if (gen) r = newFromGenerator(gen, generatorParams(gen), { name: nm, template: PICKED_TEMPLATE });
+  else if (gen) r = newFromGenerator(gen, generatorParams(gen, card.corners), { name: nm, template: PICKED_TEMPLATE });
   else r = newCanvas({ name: nm, template: PICKED_TEMPLATE });
   if (!r.ok) {
     toast('bad', (r.problems[0] || {}).message || 'refused');
@@ -8214,6 +8270,10 @@ function wireStartButton(b) {
 function wireStartSelect(sel) {
   if (!sel || !sel.addEventListener) return;
   sel.addEventListener('change', function () { pressStartCard({ tpl: sel.value }); });
+}
+function wireCornersSelect(sel) {
+  if (!sel || !sel.addEventListener) return;
+  sel.addEventListener('change', function () { setCorners(sel.value); });
 }
 // the "open" button beside a shipped-device <select>, named by `data-open-pick`
 function wireStartOpen(b) {
@@ -11041,6 +11101,12 @@ function renderInspector() {
     var w = (A.loops || {})[sel.id] || [];
     h += '<b>' + esc2(sel.id) + '</b> <span class="sub">transport loop</span>';
     h += '<div class="fieldrow"><label>nodes</label><span>' + w.length + '</span></div>';
+    // a loop through junction corners: the corners are nodes of the walk, not places to stand
+    var wSlots = Q.slotsOf(w, Q.bendsOf(STATE.device));
+    if (wSlots.length !== w.length) {
+      h += '<div class="fieldrow"><label>slots</label><span>' + wSlots.length + ' (' +
+           (w.length - wSlots.length) + ' junction corners passed, never stopped on)</span></div>';
+    }
     h += '<div class="fieldrow"><label>walk</label><span>' + esc2(w.join(' → ')) + '</span></div>';
   }
   if (SELSET.length > 1) {
@@ -11376,7 +11442,7 @@ function evaluationCheck() {
     include_anomalous: !(D.model && D.model.include_anomalous === false),
     anomalous_per_ms: PH.anomalous_per_ms || 0,
     policy: PH.policy || { table: 'qccdsim_jones', objective: 'fastest' },
-    c2lr: c2lrOf(dev) });
+    c2lr: c2lrOf(dev), bends: Q.bendsOf(dev) });
   model._pair = Q.pairIndex(dev);
   var page = Q.evaluation.session(pl, SHIPPED_FRAMES || P.frames, A.loops, model, classes, dev, evalState(),
                                   { closedLoops: closedLoopsOf(dev), mk: clockModel }).page();
@@ -11490,6 +11556,7 @@ var API = {
   setViewOnly: setViewOnly, viewOnly: function () { return VIEW_ONLY; },
   leaveStage: leaveStage,
   sealZones: sealZones, canvasHistory: canvasHistory, pressStartCard: pressStartCard,
+  setCorners: setCorners,
   setName: setName,
   zone: function (z) { if (z !== undefined) { NEW_ZONE = z; AVCACHE = {}; paint(); }
                        return NEW_ZONE; },

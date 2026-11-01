@@ -108,7 +108,9 @@ def pass_place(arch: Architecture, code: BBCode, policy: CompilePolicy, state: d
     produces -- rather than assumed to be better.
     """
     loop_id = state["loop_id"]
-    nodes = list(arch.device.loops[loop_id].nodes)
+    # the loop's SLOTS, the places a data ion stands and a rotation moves it between (a
+    # junction corner is passed, never filled); slot arithmetic below is modulo their count
+    nodes = list(arch.device.loop_slots(loop_id))
     cap = len(nodes)
     if cap < code.n:
         raise ValueError(

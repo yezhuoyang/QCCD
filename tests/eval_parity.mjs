@@ -37,7 +37,8 @@ for (const c of cases.cases) {
     : { kind: 'corrected', corner_hops: 1, junction_min_degree: 3, length_scaling: false, pitch: 1.0,
         include_anomalous: true, anomalous_per_ms: c.model.anomalous_per_ms, policy: { table, objective: 'fastest' } };
   const mk = (table) => {
-    const m = Q.makeModel(st.primitives, Q.degrees(dev), Q.cornerEndpoints(dev), dev.segments, opts(table));
+    const m = Q.makeModel(st.primitives, Q.degrees(dev), Q.cornerEndpoints(dev), dev.segments,
+                          Object.assign({ bends: Q.bendsOf(dev) }, opts(table)));
     m._pair = Q.pairIndex(dev);
     return m;
   };

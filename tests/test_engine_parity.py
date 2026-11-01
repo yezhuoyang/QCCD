@@ -141,10 +141,16 @@ def _fuzz_params(rng) -> list[tuple[str, dict]]:
         if which == "ring":
             w = rng.randint(2, 60)
             h = rng.randint(2, 12)
-            cap = 2 * w + 2 * h - 4
+            # `corners` in BOTH values and sometimes omitted, so the default stays covered:
+            # a junction-cornered ring has four slots fewer, and the dock spacing below is
+            # drawn against the slots it really has (or it would almost always refuse)
+            corners = rng.choice([None, None, "site", "junction", "junction"])
+            cap = 2 * w + 2 * h - (8 if corners == "junction" else 4)
             divisors = [d for d in range(1, cap + 1) if cap % d == 0]
             v = rng.choice(divisors + [0, 0, rng.randint(0, 40)])
             kw: dict = {"width": w, "height": h, "verticals": v}
+            if corners is not None:
+                kw["corners"] = corners
             # `dock_offset` is validated against ONE DOCK SPACING, so the legal range
             # depends on the draw above -- and the illegal draws are the point as much as
             # the legal ones.  Sometimes omit it, to keep its default covered too.
@@ -183,8 +189,17 @@ def _fuzz_params(rng) -> list[tuple[str, dict]]:
         elif which == "racetrack":
             out.append(("racetrack", {"straight": rng.randint(2, 90)}))
         else:
-            out.append(("dual_loop", {"width": rng.randint(2, 60),
-                                      "couplings": rng.choice([None, 0, rng.randint(1, 8)])}))
+            kw = {"width": rng.randint(2, 60),
+                  "couplings": rng.choice([None, 0, rng.randint(1, 8)])}
+            corners = rng.choice([None, "site", "junction", "junction"])
+            if corners is not None:
+                kw["corners"] = corners
+                # a coupling may not land on a junction corner: an interior list, legal
+                # as often as not, alongside the int spellings that always hit x = 0
+                if corners == "junction" and rng.random() < 0.5:
+                    kw["couplings"] = sorted({rng.randint(1, max(1, kw["width"] - 2))
+                                              for _ in range(3)})
+            out.append(("dual_loop", kw))
     # Adversarial: `isinstance(True, int)` is True in Python but `typeof true` is
     # 'boolean' in JS, so these two take DIFFERENT branches unless the port says so.
     out.append(("ladder", {"width": 8, "rungs": True, "highways": 1}))
@@ -215,7 +230,27 @@ def _fuzz_params(rng) -> list[tuple[str, dict]]:
                       "spacing": 1, "periodic": False}),
             ("ring", {"width": 3, "height": 2, "verticals": 2, "site_zone": "data",
                       "ancilla_zone": "trap", "segment_capacity": 1, "loop_id": "L0",
-                      "dock_offset": 0})]
+                      "dock_offset": 0}),
+            # JUNCTION CORNERS (reader report T30), by hand: the three devices the change
+            # is proved on, the adjacent-bend racetrack (height 2: J1 -> J2 with no trap
+            # between), docks on a junction-cornered loop, and every refusal by name
+            ("ring", {"width": 6, "height": 3, "verticals": 2, "corners": "junction"}),
+            ("ring", {"width": 4, "height": 3, "corners": "junction"}),
+            ("ring", {"width": 4, "height": 2, "corners": "junction"}),
+            ("ring", {"width": 5, "height": 4, "verticals": 5, "dock_offset": 1,
+                      "corners": "junction"}),
+            ("ring", {"width": 4, "height": 3, "corners": "site"}),
+            ("ring", {"width": 2, "height": 3, "corners": "junction"}),
+            ("ring", {"width": 1, "corners": "junction"}),
+            ("ring", {"width": 4, "corners": "round"}),
+            ("ring", {"width": 6, "height": 3, "verticals": 4, "corners": "junction"}),
+            ("dual_loop", {"width": 6, "corners": "junction"}),
+            ("dual_loop", {"width": 6, "couplings": [2, 3], "corners": "junction"}),
+            ("dual_loop", {"width": 6, "couplings": [0, 3], "corners": "junction"}),
+            ("dual_loop", {"width": 6, "couplings": 2, "corners": "junction"}),
+            ("dual_loop", {"width": 2, "corners": "junction"}),
+            ("dual_loop", {"width": 6, "corners": "site"}),
+            ("dual_loop", {"width": 6, "corners": "nope"})]
     return out
 
 
@@ -232,8 +267,15 @@ def _assert_generator_corpus_is_not_vacuous(params: list[tuple[str, dict]]) -> N
     for _, kw in params:
         seen |= set(kw)
     for key in ("dock_offset", "spacing", "periodic", "wrap_spokes", "declare_loops",
-                "r0", "pitch", "rungs", "highways", "couplings"):
+                "r0", "pitch", "rungs", "highways", "couplings", "corners"):
         assert key in seen, f"no case in the corpus passes {key!r}; it is untested"
+    # `corners` is a two-valued switch: a corpus that only ever passed one value would
+    # leave the other branch of both generators untested, for each generator separately
+    for gen in ("ring", "dual_loop"):
+        drawn = {kw.get("corners") for n, kw in params if n == gen}
+        assert {"site", "junction", None} <= drawn, (
+            f"{gen}: the corpus draws corners from {sorted(map(str, drawn))}; both values "
+            f"and the omitted default must appear")
 
 
 def _adversarial_layouts(rng) -> list[dict]:
@@ -596,8 +638,12 @@ def _class_cases() -> list[dict]:
     disagreed with Python's `Machine._orbit_warnings`.
     """
     out = []
-    for f in ARCH_FILES:
-        arch = load(f)
+    # the junction-cornered devices too: a class whose orbit is a loop through bends has
+    # that loop's SLOTS as its participants, never its corners (`class_participants`)
+    corner_archs = [seed().arch for name, seed, _ in _junction_corner_programmes()
+                    if name.endswith("-packed") or name.startswith("dual6")]
+    for f in ARCH_FILES + corner_archs:
+        arch = f if not isinstance(f, Path) else load(f)
         calls = _calls_of(arch)
         for cid in sorted(arch.simd_classes):
             out.append({"name": f"cls:{arch.name}:{cid}", "calls": calls, "cls": cid,
@@ -705,7 +751,120 @@ def _pricing_cases() -> list[dict]:
             "per_ion": {k: float(sum(v.values()))
                         for k, v in res.per_ion_quanta.items()},
         })
-    return out + _c2lr_pricing_cases()
+    return out + _junction_corner_pricing_cases() + _c2lr_pricing_cases()
+
+
+def _junction_corner_programmes() -> list[tuple[str, object, object]]:
+    """JUNCTION CORNERS (reader report T30): `(name, machine, build)` on the three devices the
+    change is proved on.  No shipped architecture has a bend on a loop, so without these
+    the pricing and rule buckets could not see the one code path the change adds -- an ion
+    carried round a corner, slot -> bend -> slot, priced and judged rail by rail.  Both
+    directions, several slots at once, ions starting beside a corner, a dock, and the two
+    loops of a dual loop turned separately.
+    """
+    from qccd.api import Machine
+
+    def ring6():
+        return Machine.ring(4, 3, 0, corners="junction", name="jring6",
+                            template=DEFAULT_TEMPLATE)
+
+    def ring10d():
+        return Machine.ring(6, 3, 2, corners="junction", name="jring10d",
+                            template=DEFAULT_TEMPLATE)
+
+    def dual6():
+        return Machine.dual_loop(6, corners="junction", name="jdual6",
+                                 template=DEFAULT_TEMPLATE)
+
+    def packed(p):
+        p.fill()
+        for d in (1, 3, -2, -5, 1):
+            p.rotate(d)
+
+    def beside_corners(p):
+        # S1 is the slot before J1 and S2 the slot after it: one rides the corner each way
+        p.init({"d0": "S1", "d1": "S2", "d2": "S5"})
+        p.rotate(1)
+        p.rotate(-2)
+        p.rotate(4)
+
+    def docked(p):
+        p.init({"d0": "S0", "d1": "S4", "d2": "S5", "a0": "A5"})
+        p.simd("dock", [["d0", "S0", "A0", ["V0"]]])
+        p.rotate(3)
+        p.rotate(-7)
+        p.simd("undock", [["d0", "A0", "S0", ["V0"]]])
+
+    def two_loops(p):
+        p.fill("A", prefix="a")
+        p.fill("D", prefix="d")
+        p.rotate(2, "A")
+        p.rotate(-3, "D")
+        p.rotate(-1, "A")
+
+    return [("ring6-packed", ring6, packed), ("ring6-beside-corners", ring6, beside_corners),
+            ("ring10d-packed", ring10d, packed), ("ring10d-docked", ring10d, docked),
+            ("dual6-two-loops", dual6, two_loops)]
+
+
+def _junction_corner_pricing_cases() -> list[dict]:
+    from qccd.cost import corrected_model, deck_model
+    out = []
+    for name, seed, build in _junction_corner_programmes():
+        for model in (corrected_model(), deck_model()):
+            m = seed()
+            p = m.program(name, provenance="off")
+            build(p)
+            prog, arch = p.build(), m.arch
+            res = replay(prog, arch, model, check_rules=False)
+            vm = build_view_model(arch, prog, res, model, include_listing=False,
+                                  include_control=False, provenance="off")
+            out.append({
+                "name": f"price:corners:{name}:{model.name}",
+                "calls": _calls_of(arch),
+                "frames": vm["program"]["frames"],
+                "loops": vm["arch"]["loops"],
+                "classes": vm.get("classes") or {},
+                "model": {"kind": model.name,
+                          "corner_hops": int(getattr(model, "corner_hops", 1)),
+                          "junction_min_degree": int(getattr(model, "junction_min_degree", 3)),
+                          "length_scaling": bool(getattr(model, "length_scaling", False)),
+                          "pitch": float(getattr(model, "pitch", 1.0)),
+                          "include_anomalous": bool(getattr(model, "include_anomalous", True)),
+                          "anomalous_per_ms": float(vm["physics"].get("anomalous_per_ms", 0.0)),
+                          "policy": {"table": getattr(getattr(model, "policy", None), "table",
+                                                      "qccdsim_jones"),
+                                     "objective": getattr(getattr(model, "policy", None),
+                                                          "objective", "fastest")}},
+                "totals": {"cost": res.total_cost, "steps": res.total_steps,
+                           "us": res.total_us},
+                "transits": sum(res.junction_transits.values()),
+                "peak": res.peak_quanta,
+                "comp": {k: float(v) for k, v in res.quanta_components.items()},
+                "per_ion": {k: float(sum(v.values()))
+                            for k, v in res.per_ion_quanta.items()},
+            })
+    return out
+
+
+def test_the_junction_corner_cases_carry_ions_round_corners():
+    """The junction-corner cases are not vacuous: in every one some ion's resolved route
+    passes a bend (a multi-rail move inside a rotation), and no ion ever stands on one."""
+    from qccd.cost import corrected_model
+    for name, seed, build in _junction_corner_programmes():
+        m = seed()
+        p = m.program(name, provenance="off")
+        build(p)
+        dev = m.arch.device
+        bends = {n for lp in dev.loops.values() for n in lp.nodes if dev.is_bend(n)}
+        assert bends, name
+        views = []
+        replay(p.build(), m.arch, corrected_model(), check_rules=False, on_cycle=views.append)
+        rounded = [mv for v in views for mv in v.moves if mv.dst in bends]
+        assert rounded, f"{name}: no ion was carried round a corner"
+        stood = [(v.instr.id, ion, n) for v in views for ion, n in v.pos_after.items()
+                 if n in bends]
+        assert not stood, f"{name}: ions left standing on a bend: {stood[:5]}"
 
 
 #: The (architecture, program) pairs the pricing bucket already covers, reused so the rule
@@ -1754,6 +1913,33 @@ def _rule_hand_cases() -> list[dict]:
     case("r22-docks-above-and-below-the-rail", [],
          one_cycle(("a", "M", "D", ["dk"]), ("b", "B", "E", ["sp"])), slanted)
 
+    # JUNCTION CORNERS: rotations that carry ions round a bend, slot -> corner -> slot, are
+    # ONE waveform with the straight hops beside them (`enters_bend`), and a corner hop
+    # written by hand beside a straight one is one waveform too -- while one that goes on
+    # past the next slot is not.  Every device before junction corners has no bend, so
+    # these are the only cases where R22's bend clause and the slot walk are judged.
+    for jname, jseed, jbuild in _junction_corner_programmes():
+        case(f"corners-{jname}", [], jbuild, jseed)
+    jring = _junction_corner_programmes()[0][1]
+    case("corners-hand-corner-beside-straight", [],
+         one_cycle(("a", "S1", "S2", ["E1", "E2"]), ("b", "S3", "S4", ["E5"])), jring)
+    case("corners-hand-corner-and-on", [],
+         one_cycle(("a", "S1", "S3", ["E1", "E2", "E3", "E4"]), ("b", "S4", "S5", ["E6", "E7"])),
+         jring)
+
+    # AN ION LEFT ON A CORNER is an ion on a node of capacity 0 (R1, every cycle it stays),
+    # and a rotation does not carry it -- a bend is no slot -- so it is still there after
+    def left_on_corner(p):
+        p.init({"a": "S1", "b": "S4"})
+        p.simd("shuttle", [["a", "S1", "J1", ["E1"]]])
+        p.rotate(2)
+    case("corners-ion-left-on-a-corner", [], left_on_corner, jring)
+
+    def placed_on_corner(p):
+        p.init({"a": "J2", "b": "S0"})
+        p.rotate(-3)
+    case("corners-ion-placed-on-a-corner", [], placed_on_corner, jring)
+
     # R19/R20/R21: THE DRAWING.  A shipped architecture is clean geometry by construction,
     # so these break it the two ways a user can: retune the limits the document declares,
     # or drag a site.  The dragged cases are the ones that matter -- they fire at the
@@ -2052,7 +2238,44 @@ def _prog_cases() -> list[dict]:
                             "records": records, "loops": dev_loops, "classes": classes,
                             "arch_name": arch.name, "frames": None, "tsir": None,
                             "error": None, "accepted": True})
-    return out + _c2lr_prog_cases()
+    return out + _junction_corner_prog_cases() + _c2lr_prog_cases()
+
+
+def _junction_corner_prog_cases() -> list[dict]:
+    """`fill` places one ion on every SLOT and a rotation lowers to the same frame on both
+    sides, on a ring whose corners are bends (junction corners): the lowerer's half of the
+    slot rule, which no shipped architecture can reach."""
+    out = []
+    for name, seed, _ in _junction_corner_programmes():
+        if not name.endswith("-packed") and not name.startswith("dual6"):
+            continue
+        m = seed()
+        arch = m.arch
+        loops = sorted(arch.device.loops)
+        records = [_P("fill", loops[0], "a")]
+        if len(loops) > 1:
+            records.append(_P("fill", loops[1], "b"))
+        records += [_P("rotate", 1, loops[0]), _P("rotate", -3, loops[-1]),
+                    _P("rotate", 2, loops[0], "rotate_cw")]
+        p = m.program("bucket", provenance="off")
+        p.apply_calls(records)
+        prog = p.build()
+        model = corrected_model("qccdsim_jones")
+        res = replay(prog, arch, model, check_rules=False)
+        vm = build_view_model(arch, prog, res, model, include_listing=False,
+                              include_control=False, provenance="off")
+        out.append({
+            "name": f"prog:corners:{name}",
+            "calls": _calls_of(arch), "records": records,
+            "loops": {lid: list(lp.nodes) for lid, lp in arch.device.loops.items()},
+            "classes": {cid: dict(arch.simd_class(cid) or {}) for cid in arch.simd_classes},
+            "arch_name": arch.name,
+            "frames": [{k: fr[k] for k in PROG_FRAME_FIELDS if k in fr}
+                       for fr in vm["program"]["frames"]],
+            "tsir": [i.to_json() for i in prog.instructions],
+            "error": None,
+        })
+    return out
 
 
 def _prog_text_cases() -> list[dict]:

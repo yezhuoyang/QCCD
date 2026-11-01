@@ -41,6 +41,7 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..ir.tsir import TSIR, Instruction, Participant
+from ..verify.replay import bend_vias
 
 __all__ = [
     "SortResult",
@@ -135,12 +136,16 @@ def odd_even_sort_program(
         raise ValueError("odd-even sort needs at least two slots")
 
     loop_id = loop_id or next(iter(arch.device.loops))
-    loop = arch.device.loops[loop_id]
-    if len(loop.nodes) < n:
+    # the loop's SLOTS: a junction corner is passed, never stood on, so two slots on either
+    # side of one are neighbours, and the move between them is the walk round the corner
+    slots = arch.device.loop_slots(loop_id)
+    if len(slots) < n:
         raise ValueError(
-            f"loop {loop_id!r} has {len(loop.nodes)} slots but the placement names {n}"
+            f"loop {loop_id!r} has {len(slots)} slots but the placement names {n}"
         )
-    nodes = list(loop.nodes[:n])
+    nodes = list(slots[:n])
+    ahead = bend_vias(arch.device, loop_id, 1)      # slot i -> slot i+1 round a corner
+    back = bend_vias(arch.device, loop_id, -1)      # slot i+1 -> slot i
 
     # each ion's key is where it has to end up; sorting by key realizes the permutation
     want = {ion: i for i, ion in enumerate(target)}
@@ -180,7 +185,9 @@ def odd_even_sort_program(
                 cls=MERGE_CLASS,
                 mode="inter",
                 participants=tuple(
-                    Participant(order[i + 1], nodes[i + 1], nodes[i]) for i in swaps
+                    Participant(order[i + 1], nodes[i + 1], nodes[i],
+                                via=back.get(nodes[i + 1], ()))
+                    for i in swaps
                 ),
                 holds=tuple(f"{nodes[i]}" for i in swaps),
                 meta={"round": r, "phase": "merge", "pairs": len(swaps)},
@@ -195,7 +202,9 @@ def odd_even_sort_program(
                 cls=SPLIT_CLASS,
                 mode="inter",
                 participants=tuple(
-                    Participant(order[i], nodes[i], nodes[i + 1]) for i in swaps
+                    Participant(order[i], nodes[i], nodes[i + 1],
+                                via=ahead.get(nodes[i], ()))
+                    for i in swaps
                 ),
                 holds=tuple(f"{nodes[i + 1]}" for i in swaps),
                 meta={"round": r, "phase": "split", "pairs": len(swaps)},

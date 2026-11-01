@@ -65,7 +65,8 @@ SECTION_ABOUT = {
 #: an example for the operations a design is usually made of (the rest are listed with their fields)
 OP_EXAMPLES = {
     "add_docks": {"type": "add_docks", "count": 24},
-    "construct": {"type": "construct", "generator": "ring", "params": {"width": 72, "height": 2, "verticals": 24}},
+    "construct": {"type": "construct", "generator": "ring",
+                  "params": {"width": 72, "height": 2, "verticals": 24, "corners": "site"}},
     "add_site": {"type": "add_site", "pos": [6, 1], "zone": "trap", "to": ["k1.s4"]},
     "add_chain": {"type": "add_chain", "prefix": "C", "count": 8, "start": [0, 0], "step": [1, 0], "zone": "trap"},
 }

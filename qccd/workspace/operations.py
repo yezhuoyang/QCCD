@@ -36,6 +36,8 @@ _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:-]*$")
 
 #: generators a `construct` may name -- the ones `Machine` has a constructor for
 GENERATORS = ("ring", "grid", "chain", "ladder", "racetrack", "dual_loop")
+#: the ones whose corners may be junctions; a `construct` that does not say gets them
+CORNERED = ("ring", "dual_loop")
 
 
 def _program_verbs() -> tuple:
@@ -259,11 +261,21 @@ def _op_construct(ctx: _Ctx, op: Mapping, where: str) -> None:
     params = op.get("params") or {}
     if not isinstance(params, Mapping):
         raise OperationError("bad_type", f"{where}: params must be an object")
+    params = dict(params)
+    hint = ""
+    if gen in CORNERED and "corners" not in params:
+        # A NEW ring is drawn as the trap is built: junctions in the corners, traps only on
+        # the sides (reader report, Ke Sun).  Written into the parameters, so the design
+        # says so; a document without the key keeps reading as a trap in each corner, which
+        # stays the generator's own default.
+        params["corners"] = "junction"
+        hint = ('; a new ring has junction corners, so pass "corners": "site" for the '
+                'older drawing with a trap in each corner')
     name = op.get("name") or "design"
     try:
-        m = getattr(Machine, gen)(**dict(params), name=_id(name, where))
+        m = getattr(Machine, gen)(**params, name=_id(name, where))
     except (TypeError, ValueError, KeyError) as exc:
-        raise OperationError("bad_params", f"{where}: {gen}({dict(params)}) refused: {exc}") from None
+        raise OperationError("bad_params", f"{where}: {gen}({params}) refused: {exc}{hint}") from None
     base = base_from_arch(m.arch)
     ctx.state.geom, ctx.state.seed, ctx.state.post = base.geom, base.seed, base.post
     ctx.state.edits = []
@@ -586,7 +598,8 @@ OPERATIONS: dict = {s.name: s for s in [
            {"zone": "zone name", "fields": "object"}, _op_set_zone),
     OpSpec("call", "Any whitelisted retune verbatim (qccd.arch.edit.MUTATE).",
            {"method": "|".join(sorted(MUTATE)), "args": "list", "kwargs": "object"}, _op_call),
-    OpSpec("construct", "Replace the device with a generated one.",
+    OpSpec("construct", "Replace the device with a generated one (a ring or dual loop gets junction "
+           "corners unless params say \"corners\": \"site\").",
            {"generator": "|".join(GENERATORS), "params": "object", "name": "string?"},
            _op_construct),
     OpSpec("add_chain", "Batch: a line of sites joined by segments.",

@@ -178,9 +178,10 @@ var QCCD_TUTORIAL = {
         'The top bar shows the price of the programme on the canvas. [[Cost|m:cost]] is what the model charges for the moves. [[Runtime|m:runtime]] is how long the programme takes.',
         '[[Report|tab:R]] also shows the [[peak n̄|m:peak n̄]], written **peak n-bar**: the heat of the hottest ion, in quanta.',
         'Times and heats come from the [[primitives|el:primitives]]. Each kind of move has a curve: a short table of measured rows. Each row is one way to do the move: its **duration** in microseconds (us) and the **heat** it adds in quanta.',
-        'The model always uses the fastest row in its table (`qccdsim_jones`). A fast move heats more than a slow one: 0.2 quanta in 2 us is 100 quanta per millisecond.'
+        'The model always uses the fastest row in its table (`qccdsim_jones`). A fast move heats more than a slow one: 0.2 quanta in 2 us is 100 quanta per millisecond.',
+        'This ring is built like a real square trap: the six sites stand on its sides, and its four corners are [[junctions|el:junction]]. An ion never stops in a corner. One turn of the loop carries it round the corner to the next site, along two rails, so it pays for two pushes.'
       ],
-      setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
+      setup: [['newFromGenerator', 'ring', { width: 4, height: 3, verticals: 0, corners: 'junction' }, { name: 'ring6' }], ['testDrive'], ['fit']],
       exercise: 'Press **Append a row** in the tools bar, then **Curve point**. A form opens on the left. Pick the `shuttle_segment` curve. At the bottom, type duration **2** (us) and heat added **0.2** (quanta), then press **add**. **RUNTIME** in the top bar falls, and in **Report** the **peak n-bar** rises.',
       check: ['all', ['runtimeBelow', 'setup'], ['peakAbove', 'setup']],
       guide: [['tool', 'row'], ['tile', 'curve_point', 'Press Curve point.'],
@@ -205,7 +206,7 @@ var QCCD_TUTORIAL = {
         'This device uses **broadcast** wiring: many electrodes share one **channel**, and one DAC drives the whole channel. So the device counts DACs by channel, not by electrode.',
         'The price: **every site on a shared channel must move the same way in the same step.** You will meet this again as rule R4d, in Part B, and in Part D.'
       ],
-      setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit']],
+      setup: [['newFromGenerator', 'ring', { width: 4, height: 3, verticals: 0, corners: 'junction' }, { name: 'ring6' }], ['testDrive'], ['fit']],
       stages: [
         { exercise: 'Press **Machine settings** in the tools bar, then **Control plane**. A form opens on the left. Change `wiring.electrodes_per_trap` from 24 to 48. Press **apply** at the bottom of the form. Then open **Report**: **electrodes** goes up, and **DACs** stays the same.',
           check: ['all', ['electrodesAbove', 'setup'], ['dacsSame', 'setup']],
@@ -219,7 +220,7 @@ var QCCD_TUTORIAL = {
       choices: [
         { id: 'stale', text: 'The report has not updated yet.' },
         { id: 'channels', text: 'All electrodes on a channel share one signal, so DACs count channels, not electrodes.' },
-        { id: 'junctions', text: 'DACs are only counted for junctions, and this ring has none.' }
+        { id: 'junctions', text: 'DACs are only counted for junctions, not for the rails between the sites.' }
       ],
       nudges: {
         electrodesAbove: ['Electrodes are still {have}. Change wiring.electrodes_per_trap in the Control plane form, then press apply.'],
@@ -244,7 +245,7 @@ var QCCD_TUTORIAL = {
         '[[Write|tab:W]]: where you write programmes, from Part B on.',
         'A rotation row reads like `L0 × +1  1 hop`: the loop turns one site. Every ion on the loop pays for every hop, so the row with the most hops costs the most.'
       ],
-      setup: [['newFromGenerator', 'ring', { width: 3, height: 2, verticals: 0 }, { name: 'ring6' }], ['testDrive'], ['fit'], ['seekTo', 0]],
+      setup: [['newFromGenerator', 'ring', { width: 4, height: 3, verticals: 0, corners: 'junction' }, { name: 'ring6' }], ['testDrive'], ['fit'], ['seekTo', 0]],
       exercise: 'Open **Program**. Find the most expensive instruction: the rotation with the most hops. Click its row, and the animation jumps there.',
       check: ['frameIs', 'maxcost'],
       nudges: {

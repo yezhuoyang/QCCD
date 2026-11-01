@@ -199,7 +199,8 @@ class Program:
     def fill(self, loop: str | None = None, prefix: str = "d", **meta) -> "Program":
         """Place one ion on every slot of a loop -- the packed ring, in one call."""
         loop = loop or self._m.default_loop
-        nodes = list(self._m.arch.device.loops[loop].nodes)
+        # its SLOTS: a junction corner on the loop is passed, never filled
+        nodes = list(self._m.arch.device.loop_slots(loop))
         return self.init({f"{prefix}{i}": n for i, n in enumerate(nodes)}, **meta)
 
     # -- transport -----------------------------------------------------------

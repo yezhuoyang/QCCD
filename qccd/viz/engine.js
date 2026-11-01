@@ -686,8 +686,33 @@ function ring(width, height, verticals, kw) {
   var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
   var loopId = kw.loop_id === undefined ? 'L0' : kw.loop_id;
   var dockOffset = kw.dock_offset === undefined ? 0 : kw.dock_offset;
+  var corners = kw.corners === undefined ? 'site' : kw.corners;
 
-  var slots = _ringSlots(width, height);
+  // `corners="junction"` is the square trap as it is built (Ke Sun, reader report
+  // 2026-10-03): the four corners are bare junctions J0..J3, clockwise from the top left,
+  // and the traps stand only on the sides.  The walk starts at the first trap after the
+  // top-left corner, so slot 0 is S0, and the loop runs THROUGH the corners -- a bend
+  // (`bendsOf`) that one slot of rotation carries an ion round and no ion stops on.
+  if (corners !== 'site' && corners !== 'junction') {
+    throw new ExpansionError("corners must be 'site' or 'junction', got " + pyRepr(corners));
+  }
+  var perimeter = _ringSlots(width, height), walk, slots, cornerId = {}, pi;
+  if (corners === 'junction') {
+    if (width < 3) {
+      throw new ExpansionError('a ring with junction corners needs width >= 3, so its ' +
+                               'top and bottom sides hold a trap');
+    }
+    var farX = width - 1, farY = height - 1;
+    cornerId['0,0'] = 'J0'; cornerId[farX + ',0'] = 'J1';
+    cornerId[farX + ',' + farY] = 'J2'; cornerId['0,' + farY] = 'J3';
+    walk = perimeter.slice(1).concat(perimeter.slice(0, 1));
+    slots = [];
+    for (pi = 0; pi < walk.length; pi++) {
+      if (!own(cornerId, walk[pi][1] + ',' + walk[pi][2])) slots.push(walk[pi]);
+    }
+  } else {
+    walk = slots = perimeter;
+  }
   var capacity = slots.length;
   if (verticals < 0) throw new ExpansionError('verticals must be >= 0');
   if (verticals && capacity % verticals) {
@@ -716,8 +741,22 @@ function ring(width, height, verticals, kw) {
     if (dockSlots.has(s)) labels.push('dock');
     nodes['S' + s] = _node('S' + s, slots[s][1], slots[s][2], 'site', siteZone, 0, labels);
   }
-  for (s = 0; s < capacity; s++) {
-    segments['E' + s] = _seg('E' + s, 'S' + s, 'S' + ((s + 1) % capacity), 1.0, segCap,
+  // Python's dict literal order: J0, J1, J2, J3
+  var cornerKeys = Object.keys(cornerId);
+  for (pi = 0; pi < cornerKeys.length; pi++) {
+    var jid = cornerId[cornerKeys[pi]], jxy = cornerKeys[pi].split(',');
+    nodes[jid] = _node(jid, Number(jxy[0]), Number(jxy[1]), 'junction', undefined, 0, ['corner']);
+  }
+  // the loop walks every perimeter node in order: the slots, and the corner junctions
+  // between them when the corners are junctions
+  var siteId = {}, order = [];
+  for (s = 0; s < slots.length; s++) siteId[slots[s][1] + ',' + slots[s][2]] = 'S' + s;
+  for (pi = 0; pi < walk.length; pi++) {
+    var wk = walk[pi][1] + ',' + walk[pi][2];
+    order.push(own(cornerId, wk) ? cornerId[wk] : siteId[wk]);
+  }
+  for (s = 0; s < order.length; s++) {
+    segments['E' + s] = _seg('E' + s, order[s], order[(s + 1) % order.length], 1.0, segCap,
                              loopId, ['rail']);
   }
   var docks = Array.from(dockSlots).sort(_cmpNum);
@@ -741,15 +780,17 @@ function ring(width, height, verticals, kw) {
     segments['V' + s] = _seg('V' + s, 'S' + s, 'A' + s,
                              Math.abs(ax - x) + Math.abs(ay - y), segCap, null, ['spur']);
   }
-  var seq = [];
-  for (s = 0; s < capacity; s++) seq.push('S' + s);
   var loops = {};
-  loops[loopId] = _loop(loopId, seq, true, 'ring',
+  loops[loopId] = _loop(loopId, order, true, 'ring',
     'the rigid-rotation orbit; one movement template shifts every ion on it');
-  return _dev(nodes, segments, loops, 'ring', {
+  var params = {
     width: width, height: height, verticals: verticals, site_zone: siteZone,
     ancilla_zone: ancillaZone, segment_capacity: segCap, loop_id: loopId,
-    dock_offset: dockOffset });
+    dock_offset: dockOffset };
+  // only a junction-cornered ring says so: a document written before the option expands
+  // to exactly the device, params included, that it always did
+  if (corners === 'junction') params.corners = corners;
+  return _dev(nodes, segments, loops, 'ring', params);
 }
 
 // `round(x, 6)` -- Python's, not a scale-and-round.  Python rounds the DECIMAL expansion
@@ -1027,7 +1068,14 @@ function dualLoop(width, couplings, kw) {
   var dataZone = kw.data_zone === undefined ? 'data' : kw.data_zone;
   var ancillaZone = kw.ancilla_zone === undefined ? 'trap' : kw.ancilla_zone;
   var segCap = kw.segment_capacity === undefined ? 1 : kw.segment_capacity;
-  if (width < 2) throw new ExpansionError('dual_loop needs width >= 2');
+  var corners = kw.corners === undefined ? 'site' : kw.corners;
+  if (corners !== 'site' && corners !== 'junction') {
+    throw new ExpansionError("corners must be 'site' or 'junction', got " + pyRepr(corners));
+  }
+  if (width < (corners === 'junction' ? 3 : 2)) {
+    throw new ExpansionError(corners === 'site' ? 'dual_loop needs width >= 2'
+      : 'a dual_loop with junction corners needs width >= 3, so its sides hold a trap');
+  }
   var couplingX = [], x;
   if (couplings === null) couplingX = [];
   else if (_isPyInt(couplings)) {
@@ -1052,20 +1100,47 @@ function dualLoop(width, couplings, kw) {
     if (x === width - 1) return (width - 1) - 0.5;
     return x;
   }
+  // `corners="junction"`: each loop's four end nodes are bare junctions, DJ0..DJ3 and
+  // AJ0..AJ3 clockwise from the top left, as `ring` does -- traps only on the long sides,
+  // the walk starting at the first trap after the top-left corner, and no coupling on a
+  // corner (Python refuses it before building anything, in these words)
+  var ends = {};
+  if (corners === 'junction') {
+    for (var ce = 0; ce < couplingX.length; ce++) {
+      if (couplingX[ce] === 0 || couplingX[ce] === width - 1) {
+        throw new ExpansionError('a coupling may not land on a junction corner: keep it off ' +
+                                 'x = 0 and x = ' + (width - 1));
+      }
+    }
+    ends[0] = ['J0', 'J3'];
+    ends[width - 1] = ['J1', 'J2'];
+  }
   for (var pi = 0; pi < plan.length; pi++) {
     var tag = plan[pi][0], zone = plan[pi][1], yTop = plan[pi][2], yBot = plan[pi][3];
     var label = plan[pi][4], side = plan[pi][5];
-    var order = [];
+    var order = [], nid;
     for (x = 0; x < width; x++) {
-      nodes[tag + 'T' + x] = _node(tag + 'T' + x, innerX(tag, x), yTop, 'site', zone, 0,
-                                   [label, side, 'top']);
-      order.push(tag + 'T' + x);
+      if (own(ends, x)) {
+        nid = tag + ends[x][0];
+        nodes[nid] = _node(nid, innerX(tag, x), yTop, 'junction', undefined, 0, ['corner', side]);
+      } else {
+        nid = tag + 'T' + x;
+        nodes[nid] = _node(nid, innerX(tag, x), yTop, 'site', zone, 0, [label, side, 'top']);
+      }
+      order.push(nid);
     }
     for (x = width - 1; x >= 0; x--) {
-      nodes[tag + 'B' + x] = _node(tag + 'B' + x, innerX(tag, x), yBot, 'site', zone, 0,
-                                   [label, side, 'bottom']);
-      order.push(tag + 'B' + x);
+      if (own(ends, x)) {
+        nid = tag + ends[x][1];
+        nodes[nid] = _node(nid, innerX(tag, x), yBot, 'junction', undefined, 0, ['corner', side]);
+      } else {
+        nid = tag + 'B' + x;
+        nodes[nid] = _node(nid, innerX(tag, x), yBot, 'site', zone, 0, [label, side, 'bottom']);
+      }
+      order.push(nid);
     }
+    // start the walk at the first trap after the top-left corner, as `ring` does
+    if (corners === 'junction') order = order.slice(1).concat(order.slice(0, 1));
     for (var i = 0; i < order.length; i++) {
       var j = (i + 1) % order.length;
       segments['E' + tag + i] = _seg('E' + tag + i, order[i], order[j], 1.0, segCap,
@@ -1077,9 +1152,10 @@ function dualLoop(width, couplings, kw) {
     x = couplingX[k];
     segments['C' + x] = _seg('C' + x, 'DT' + x, 'AT' + x, 1.0, segCap, null, ['coupling']);
   }
-  return _dev(nodes, segments, loops, 'dual_loop',
-              { width: width, couplings: couplingX, data_zone: dataZone,
-                ancilla_zone: ancillaZone, segment_capacity: segCap });
+  var params = { width: width, couplings: couplingX, data_zone: dataZone,
+                 ancilla_zone: ancillaZone, segment_capacity: segCap };
+  if (corners === 'junction') params.corners = corners;
+  return _dev(nodes, segments, loops, 'dual_loop', params);
 }
 
 // `_gen_defaults` in Python uses `inspect.signature` -- pure reflection.  Re-declaring it
@@ -1102,12 +1178,12 @@ var _GEN_KNOWN = {
   cylinder: ['a', 'b', 'wrap_spokes', 'declare_loops', 'site_zone', 'segment_capacity',
              'r0', 'pitch'],
   ring: ['width', 'height', 'verticals', 'site_zone', 'ancilla_zone', 'segment_capacity',
-         'loop_id', 'dock_offset'],
+         'loop_id', 'dock_offset', 'corners'],
   grid: ['a', 'b', 'site_zone', 'segment_capacity', 'spacing', 'periodic'],
   chain: ['n', 'site_zone', 'segment_capacity', 'path_id'],
   ladder: ['width', 'rungs', 'highways', 'site_zone', 'highway_zone', 'segment_capacity'],
   racetrack: ['straight', 'site_zone', 'segment_capacity', 'loop_id'],
-  dual_loop: ['width', 'couplings', 'data_zone', 'ancilla_zone', 'segment_capacity']
+  dual_loop: ['width', 'couplings', 'data_zone', 'ancilla_zone', 'segment_capacity', 'corners']
 };
 
 function generatorNames() { return Object.keys(GENERATORS).sort(_cmpStr); }
@@ -1181,6 +1257,71 @@ function junctionNodes(dev) {
   var deg = degrees(dev), out = [];
   deg.forEach(function (d, nid) { if (d >= 3) out.push(nid); });
   return out.sort(_cmpStr);
+}
+
+// THE BENDS -- `Device.is_bend`: a bare junction where only two rails meet, the corner of a
+// junction-cornered ring (`ring(corners="junction")`).  No ion stops on one, so a loop's
+// SLOTS are its nodes less its bends (`Device.loop_slots`) and one slot of rotation carries
+// an ion round any bend between two slots (`Device.slot_walk`).  A bare junction where
+// three or more rails meet is NOT a bend: `cylinder(declare_loops=True)` loops have always
+// stopped ions on theirs.  No design before junction corners has a bend on a loop, so on
+// every one of them the slots are the loop's nodes exactly.
+//
+// `bendsOf(dev)`: {node id: true} for every bend, the set the re-pricer, the lowerer and
+// the stage read (`makeModel(..., {bends})`).
+var NO_BENDS = {};
+function bendsOf(dev, deg) {
+  deg = deg || degrees(dev);
+  var out = {};
+  for (var nid in dev.nodes) if (own(dev.nodes, nid)) {
+    if (dev.nodes[nid].kind === 'junction' && deg.get(nid) === 2) out[nid] = true;
+  }
+  return out;
+}
+// `Device.loop_slots(lid)`, from the loop's node list and a bend set
+function slotsOf(seq, bends) {
+  var out = [];
+  for (var i = 0; i < seq.length; i++) if (!own(bends, seq[i])) out.push(seq[i]);
+  return out;
+}
+function loopSlots(dev, lid, bends) {
+  return slotsOf(dev.loops[lid].nodes, bends || bendsOf(dev));
+}
+// `Device.slot_walk`, from index `i` of the loop's node list `seq` (a slot): the nodes one
+// slot of rotation in direction `step` carries the ion through, both ends included.  It
+// always ends, because it starts on a slot and the walk comes back round to it.
+function _slotWalkAt(seq, bends, i, step) {
+  var k = seq.length, out = [seq[i]], j = i;
+  for (;;) {
+    j = ((j + step) % k + k) % k;
+    out.push(seq[j]);
+    if (!own(bends, seq[j])) return out;
+  }
+}
+function slotWalk(seq, bends, src, step) {
+  var i = seq.indexOf(src);
+  if (i < 0) throw new EngineError(pyRepr(src) + ' is not on the loop');
+  return _slotWalkAt(seq, bends, i, step >= 0 ? 1 : -1);
+}
+// The node path of every ion one rotation of `delta` slots carries, from `place` (ion ->
+// node): {ion: [node, ...]}, the bends on the way included -- what the stage draws an ion
+// along, so a corner hop runs src -> corner -> dst on the rails and never a chord.  An ion
+// off the loop, or on a bend, is not carried.
+function rotationPaths(seq, bends, place, delta) {
+  var out = {}, idx = {}, i, step = delta >= 0 ? 1 : -1, n = Math.abs(delta);
+  for (i = 0; i < seq.length; i++) idx[seq[i]] = i;
+  for (var ion in place) if (own(place, ion)) {
+    var at = idx[place[ion]];
+    if (at === undefined || own(bends, place[ion])) continue;
+    var path = [seq[at]];
+    for (var h = 0; h < n; h++) {
+      var wk = _slotWalkAt(seq, bends, at, step);
+      for (var w = 1; w < wk.length; w++) path.push(wk[w]);
+      at = idx[wk[wk.length - 1]];
+    }
+    out[ion] = path;
+  }
+  return out;
 }
 
 function degreeHistogram(dev) {
@@ -2484,6 +2625,11 @@ function makeModel(prims, deg, ce, segs, opts) {
     kind: kind,
     _deg: deg,
     _segs: segs,          // `_moveEntails` reads each route's rails off it
+    // the device's bends (`bendsOf`): a rotation carries an ion round one and never stops
+    // it there.  A caller that passes none prices every loop node as a slot -- exactly
+    // right on every design with no bend, and WRONG on one that has (ions would stop on
+    // its corners), so every caller passes `bends: Q.bendsOf(dev)`
+    _bends: opts.bends || NO_BENDS,
     _anomalousPerUs: (opts.include_anomalous === false || kind === 'deck')
       ? 0 : (opts.anomalous_per_ms || 0) / 1000.0,
     nonTransport: nonTransport,
@@ -2823,33 +2969,67 @@ function priceFrames(frames, loops, model, classes, opts) {
         } else {
           var kk = seq.length, step = delta >= 0 ? 1 : -1, idx = {};
           for (var si = 0; si < seq.length; si++) idx[seq[si]] = si;
+          // A BEND IS NOT A STOP (`Device.shift_map` moves SLOTS): an ion on a slot rides to
+          // the next slot, round any bend between -- `Device.slot_walk`, src -> bend -> dst,
+          // priced as the multi-segment move it is, one charge per rail -- and an ion an
+          // `init` put ON a bend is not on any slot and stays where it is.  A loop with no
+          // bend (every design before junction corners) takes exactly the one-rail path it
+          // always took.
+          var bends = model._bends || NO_BENDS;
           // |delta| = n is n SEPARATE CYCLES, each with its own max depth and duration.
           for (var h = 0; h < Math.abs(delta); h++) {
             var subC = 0, subD = 0, subUs = 0;
             var subBefore = trk ? _shallow(pos) : null;
             var ionIds = Object.keys(pos).sort(_cmpStr);   // participants sorted by ion id
-            var moved = {}, wParts = [], pb = {}, ob = {}, nmv = 0;
+            var moved = {}, wParts = [], pb = {}, ob = {}, nmv = 0, sTr = EMPTY;
             // the cycle's participants first, so what each one splits and merges can be
             // read off all of them (`move_entails`), then priced in the same order
-            var sParts = [], sRoutes = [];
+            var sParts = [], sRoutes = [], sWalks = [];
             for (var ij = 0; ij < ionIds.length; ij++) {
-              var i1 = idx[pos[ionIds[ij]]];
-              if (i1 === undefined) continue;
-              var d1 = seq[((i1 + step) % kk + kk) % kk];
-              sParts.push([ionIds[ij], pos[ionIds[ij]], d1]);
-              sRoutes.push([_between(model, pos[ionIds[ij]], d1)]);
+              var src1 = pos[ionIds[ij]], i1 = idx[src1];
+              if (i1 === undefined || own(bends, src1)) continue;
+              var wk1 = _slotWalkAt(seq, bends, i1, step), d1 = wk1[wk1.length - 1];
+              sParts.push([ionIds[ij], src1, d1]);
+              if (wk1.length === 2) { sRoutes.push([_between(model, src1, d1)]); sWalks.push(null); }
+              else {
+                var rt1 = [];
+                for (var wi = 1; wi < wk1.length; wi++) rt1.push(_between(model, wk1[wi - 1], wk1[wi]));
+                sRoutes.push(rt1); sWalks.push(wk1);
+              }
             }
             var sEnt = _moveEntails(ent, sParts, occ, sRoutes, model._segs, onLoop, loopRails);
             for (var ii = 0; ii < sParts.length; ii++) {
               var ion = sParts[ii][0], dstNode = sParts[ii][2], segId = sRoutes[ii][0];
-              var entI = sEnt[ii][0], judgedI = sEnt[ii][1];
+              var entI = sEnt[ii][0], judgedI = sEnt[ii][1], wk = sWalks[ii], ch;
               moved[ion] = dstNode;
-              var ch = model.move(segId, pos[ion], dstNode, entI);
+              if (wk === null) {
+                ch = model.move(segId, pos[ion], dstNode, entI);
+                if (deg(model, dstNode) >= 3) transits++;
+              } else {
+                // along the walk the charges compose SEQUENTIALLY, entails once on the first
+                // rail -- the `moves` branch below, and `replay`'s route loop, exactly
+                ch = _charge(0, 0, 0, {});
+                for (var wj = 1; wj < wk.length; wj++) {
+                  ch = _then(ch, model.move(sRoutes[ii][wj - 1], wk[wj - 1], wk[wj],
+                                            wj === 1 ? entI : []));
+                  if (deg(model, wk[wj]) >= 3) transits++;
+                }
+              }
               subC += ch.cost; subD = Math.max(subD, ch.depth); subUs = Math.max(subUs, ch.us);
               _deposit(q, life, comp, ion, ch.q, peak);
-              if (deg(model, dstNode) >= 3) transits++;
               if (onCycle) {
-                _pool(w, nmv++, ion, pos[ion], dstNode, segId, judgedI, entI);
+                if (wk === null) {
+                  _pool(w, nmv++, ion, pos[ion], dstNode, segId, judgedI, entI);
+                } else {
+                  // one resolved move per rail, and every node passed THROUGH (the bend) is
+                  // a transit -- what `CycleView.moves` / `.transits` hold in Python
+                  if (sTr === EMPTY) sTr = {};
+                  for (var wm = 1; wm < wk.length; wm++) {
+                    _pool(w, nmv++, ion, wk[wm - 1], wk[wm], sRoutes[ii][wm - 1], judgedI, entI);
+                    if (wm < wk.length - 1) sTr[wk[wm]] = (sTr[wk[wm]] || 0) + 1;
+                    if (ob[wk[wm]] === undefined) ob[wk[wm]] = occ[wk[wm]] || 0;
+                  }
+                }
                 wParts.push(ion);
                 pb[ion] = pos[ion];
                 if (ob[pos[ion]] === undefined) ob[pos[ion]] = occ[pos[ion]] || 0;
@@ -2872,7 +3052,7 @@ function priceFrames(frames, loops, model, classes, opts) {
             // TRANSPORT reads POST-cycle quanta, unlike a gate.
             _observe(subBefore, { id: fid, type: 'simd', cls: f.cls, template: true });
             _fire(f, fid, 'simd', f.cls === undefined ? null : f.cls,
-                  f.mode === undefined ? null : f.mode, nmv, wParts, pb, ob, q, EMPTY,
+                  f.mode === undefined ? null : f.mode, nmv, wParts, pb, ob, q, sTr,
                   NONE);
           }
         }
@@ -3662,7 +3842,9 @@ function _c2lrRotate(ctx, loop, delta, cls) {
   if (!w || w.dead) return;
   var before = _shallow(w.pos), lp = ctx.dev.loops[loop];
   if (lp && delta) {
-    var seq = lp.nodes, k = seq.length, step = delta > 0 ? 1 : -1, idx = {}, i;
+    // by SLOTS, as `qccd.verify.c2lr` walks `Device.shift_map`
+    var seq = slotsOf(lp.nodes, bendsOf(ctx.dev)), k = seq.length, step = delta > 0 ? 1 : -1;
+    var idx = {}, i;
     for (i = 0; i < k; i++) idx[seq[i]] = i;
     for (var h = 0; h < Math.abs(delta); h++) {
       var next = {};
@@ -3830,7 +4012,7 @@ function mirroredC2LRRules() {
 // anywhere in the stack.  A page that only diffed against Python would agree, confidently,
 // with a wrong number.
 function validateProgram(dev, frames, classes) {
-  var out = [], seen = {}, loopOk = {}, fi, i;
+  var out = [], seen = {}, loopOk = {}, fi, i, vBends = null;
   var pair = pairIndex(dev);
   // WHERE EVERY ION IS, walked alongside the structural checks.  `replay.py` REFUSES a
   // participant that is not where it says it is -- "instruction 2: ion d1 declared at T1
@@ -3860,7 +4042,8 @@ function validateProgram(dev, frames, classes) {
       // the positions have to follow the rotation, or the NEXT frame's declared source
       // is compared against where the ion was three cycles ago
       if (own(dev.loops, lid)) {
-        var sq = dev.loops[lid].nodes, kk = sq.length;
+        // by SLOTS (`Device.shift_map`): a bend is passed, never landed on
+        var sq = slotsOf(dev.loops[lid].nodes, vBends || (vBends = bendsOf(dev))), kk = sq.length;
         var dl = Math.trunc(Number(f.shift[1]));
         if (kk && dl) {
           var ix = {};
@@ -4638,7 +4821,8 @@ function classParticipants(st, clsId) {
   for (i = 0; i < extra.length; i++) if (extra[i].id === clsId) cls = extra[i];
   if (!cls) return [];
   var orbit = own(cls, 'orbit') ? _pyStrOf(cls.orbit) : 'any';
-  if (own(st.device.loops, orbit)) return st.device.loops[orbit].nodes.slice();
+  // a loop's SLOTS (`class_participants`): a junction corner is passed, never a participant
+  if (own(st.device.loops, orbit)) return slotsOf(st.device.loops[orbit].nodes, bendsOf(st.device));
   var nid, sid, out = [];
   if (orbit === 'any') {
     for (nid in st.device.nodes) {
@@ -4852,7 +5036,8 @@ function _pFill(ctx, args, kw) {
   if (!own(ctx.loops, loop)) throw ProgError(String(loop), 'KeyError');
   var prefix = args[1] === undefined ? (kw.prefix === undefined ? 'd' : String(kw.prefix))
                                      : String(args[1]);
-  var nodes = ctx.loops[loop], place = {};
+  // one ion on every SLOT (`Program.fill`): a bend holds no ion
+  var nodes = slotsOf(ctx.loops[loop], bendsOf(ctx.dev)), place = {};
   for (var i = 0; i < nodes.length; i++) place[prefix + i] = nodes[i];
   _pInit(ctx, [place], {});
 }
@@ -5760,6 +5945,20 @@ function _hopLabel(w, m) {
   return _directionLabel(b[0] - a[0], b[1] - a[1]);
 }
 
+// `rules.enters_bend(dev, src, dst, seg)`: is this hop the rail INTO a bend of the CLOSED
+// loop it runs along?  A bend is passed inside one slot move, never stopped on, so the move
+// round a junction corner is slot -> bend -> slot, and its motion is one step along the loop
+// like a straight hop's.  No design before junction corners has a bend, so this is false on
+// every one of them and R22 reads them exactly as before.
+function _entersBend(w, m) {
+  var bends = w._bends || (w._bends = bendsOf(w.dev));
+  if (!own(bends, m.dst)) return false;
+  var seg = w.dev.segments[m.seg], loop = seg.loop === undefined ? null : seg.loop;
+  if (loop === null || !own(w.dev.loops, loop) || !w.dev.loops[loop].closed) return false;
+  var idx = w.loopIdx[loop] || (w.loopIdx[loop] = _indexOfSeq(w.dev.loops[loop].nodes));
+  return own(idx, m.dst) && own(idx, m.src);
+}
+
 // R22: one transport cycle is one waveform.
 //
 // ONE PASS OVER THE MOVES, not one per ion.  `motion_signature(v, ion)` re-scans every
@@ -5781,7 +5980,11 @@ function _r22(w) {
   var cls = w.cls || 'shuttle', seen = {}, sigs = [];
   for (i = 0; i < ions.length; i++) {
     var idxs = hops[ions[i]], labels = [];
-    for (var j = 0; j < idxs.length; j++) labels.push(_hopLabel(w, w.moves[idxs[j]]));
+    for (var j = 0; j < idxs.length; j++) {
+      // the rail INTO a bend adds no label (`motion_signature`): a slot move round a junction
+      // corner is one step along the loop, labelled by the rail out of the bend
+      if (!_entersBend(w, w.moves[idxs[j]])) labels.push(_hopLabel(w, w.moves[idxs[j]]));
+    }
     var sig = cls + ' ' + labels.join(',');
     if (!own(seen, sig)) { seen[sig] = true; sigs.push(sig); }
   }
@@ -5838,6 +6041,8 @@ function _makeChecker(dev, loops, classes, ctx) {
     _onLoop: null,
     // `rails_to_loop` per off-path node, built on first use for the same reason
     _loopRails: null,
+    // the device's bends (`bendsOf`), for R22's `enters_bend`; built on first use
+    _bends: null,
     // on a C2LR device, what this cycle did to the legs (set by `priceFrames`), and the
     // forms the rule set allows (`c2lr_forms`; `c2lr-demonstrated` allows the diagonals)
     c2lr: null, c2lrForms: ctx.c2lr_forms || null
@@ -6420,6 +6625,9 @@ var API = {
   degrees: degrees, junctionNodes: junctionNodes, degreeHistogram: degreeHistogram,
   totalCapacity: totalCapacity, hardwareReport: hardwareReport,
   allCorners: allCorners, cornerEndpoints: cornerEndpoints,
+  // bends and slots -- `Device.is_bend` / `loop_slots` / `slot_walk`
+  bendsOf: bendsOf, slotsOf: slotsOf, loopSlots: loopSlots, slotWalk: slotWalk,
+  rotationPaths: rotationPaths,
   // schema -- SHIPPED as data by qccd/arch/schema.py::export_schema(); no copy here
   setSchema: setSchema, schema: schema, schemaVersion: schemaVersion,
   validateDocument: validateDocument,

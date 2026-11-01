@@ -65,6 +65,21 @@ def trap_hops(arch: dict, max_transit: int = 3) -> list[dict]:
     return out
 
 
+def loop_slots(arch: dict, loop: dict) -> list[str]:
+    """A loop's slots: its nodes in walk order, less its BENDS -- a bare junction
+    (`kind == "junction"`) where only two rails meet, which one slot of rotation carries an
+    ion round and no ion stands on (`Device.is_bend` / `Device.loop_slots`).  Read off the
+    node's `kind` and its exported `degree`, both facts of the expanded document.  A loop
+    with no bend -- every loop written before junction corners -- is its node list exactly.
+
+    The hop set needs no such care: `trap_hops` already crosses every node that is not a
+    site, so the move from the slot before a corner to the slot after it is one hop."""
+    kind = {n["id"]: n.get("kind", "site") for n in arch["geometry"]["nodes"]}
+    caps = arch.get("node_caps", {})
+    return [n for n in loop["nodes"]
+            if not (kind.get(n) == "junction" and caps.get(n, {}).get("degree") == 2)]
+
+
 def build(cert: dict, arch: dict) -> dict:
     """The checker's input: the certificate's fields, and the device facts read from the
     EXPANDED architecture `arch` (`export_arch.expand`).
@@ -74,11 +89,12 @@ def build(cert: dict, arch: dict) -> dict:
     device and not about whatever input it was handed."""
     gate_sites = sorted(n for n, c in arch["node_caps"].items() if c.get("gate"))
     hops = trap_hops(arch)
-    # The cyclic node order of each closed loop, so the checker can replay a rotation
+    # The cyclic SLOT order of each closed loop, so the checker can replay a rotation
     # witness.  Read out of the ARCHITECTURE, exactly as `hops` and `gate_sites` are: a
     # compiler that claimed its own loop order could rotate ions to wherever it liked.
+    # Slots, not nodes: a rotation passes a bend and never lands on one (`loop_slots`).
     loops = {
-        l["id"]: list(l["nodes"])
+        l["id"]: loop_slots(arch, l)
         for l in arch["geometry"].get("loops", [])
         if l.get("closed", l.get("kind") == "ring")
     }

@@ -253,22 +253,32 @@ let check_rotation (a : Arch.t) ~before ~loop ~delta =
   let l=match List.find_opt (fun (l:Arch.loop)->l.lid=loop) a.loops with
     | Some l -> l | None -> raise (Failed "rotation names an unknown loop") in
   require l.closed "rotation requires a closed loop";
-  let nodes=Array.of_list l.nodes in
+  (* a rotation moves ions between the loop's SLOTS: a bend is passed, never stood on, so
+     each ion's physical path is its slot walk, every rail of it replayed *)
+  let nodes=Array.of_list (Arch.slots a l) in
   let n=Array.length nodes in
   require (n>0) "rotation loop is empty";
   let index=Hashtbl.create n in
   Array.iteri (fun k s->Hashtbl.add index s k) nodes;
   let pos=ref (Hashtbl.copy before) in
   let direction=if delta>=0 then 1 else -1 in
+  (* slot k's rails in this direction, found the first time an ion stands on it: the same
+     for every unit step of the rotation *)
+  let rails=Array.make n None in
+  let via_from k src dst=match rails.(k) with
+    | Some v -> v
+    | None ->
+      let walk=Arch.slot_walk a l src direction in
+      require (List.nth walk (List.length walk - 1)=dst) "rotation slot walk disagrees with the slots";
+      let v=match Arch.via_of_walk a walk with
+        | Some v->v | None->raise (Failed "rotation loop skips a physical segment") in
+      rails.(k) <- Some v; v in
   for _=1 to abs delta do
     let moves=Hashtbl.fold (fun ion src acc -> match Hashtbl.find_opt index src with
       | None -> acc
       | Some k ->
         let dst=nodes.((k+direction+n) mod n) in
-        let segment=match List.find_opt (fun (s:Arch.segment)->
-          (s.a=src && s.b=dst)||(s.b=src && s.a=dst)) a.segments with
-          | Some s->s | None->raise (Failed "rotation loop skips a physical segment") in
-        Route.{ion;src;dst;via=[segment.sid]}::acc) !pos [] in
+        Route.{ion;src;dst;via=via_from k src dst}::acc) !pos [] in
     pos := check_transport a ~before:!pos Route.{cycles=[{moves}];arrivals=[];slots=1}
   done;
   !pos

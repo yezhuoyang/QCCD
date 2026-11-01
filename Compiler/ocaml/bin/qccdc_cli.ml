@@ -119,8 +119,15 @@ let cmd_arch path =
     a.classes;
   List.iter
     (fun (l : Qccdc.Arch.loop) ->
-      Printf.printf "  loop  %-6s %d nodes, closed=%b, %d corners\n" l.lid
-        (List.length l.nodes) l.closed (List.length l.corners))
+      Printf.printf "  loop  %-6s %d nodes, closed=%b, %d corners" l.lid
+        (List.length l.nodes) l.closed (List.length l.corners);
+      (* a loop through bends has fewer places to stand than nodes; one without says nothing
+         new, so its line is what it always was *)
+      let slots = List.length (Qccdc.Arch.slots a l) in
+      if slots <> List.length l.nodes then
+        Printf.printf ", %d slots (%d bends passed, never stood on)" slots
+          (List.length l.nodes - slots);
+      print_newline ())
     a.loops;
   0
 
@@ -376,12 +383,13 @@ let cmd_rotate ?(sweep = Qccdc.Rotate_pipeline.Greedy) ?placement ?(dock_all = f
   Printf.printf "  %d contacts in %d batches, %d rotations, %d hops
 " st.contacts
     st.batches st.rotations st.hops;
-  (* the loop's node order for the self-check comes from the ARCHITECTURE, the same place
-     `mk_qcheck_input.py` reads it for the Lean checker *)
+  (* the loop's slot order for the self-check comes from the ARCHITECTURE, the same place
+     `mk_qcheck_input.py` reads it for the Lean checker: its nodes less its bends
+     (`Arch.slots`), since a rotation passes a bend and never lands on one *)
   let loops =
     List.filter_map
       (fun (l : Qccdc.Arch.loop) ->
-        if l.closed then Some (l.lid, Array.of_list l.nodes) else None)
+        if l.closed then Some (l.lid, Array.of_list (Qccdc.Arch.slots a l)) else None)
       a.loops
   in
   (match Qccdc.Cert.check ~loops cert with
@@ -427,7 +435,7 @@ let cmd_racetrack ?(strict = false) ?init inp arch_path out =
   let loops =
     List.filter_map
       (fun (l : Qccdc.Arch.loop) ->
-        if l.closed then Some (l.lid, Array.of_list l.nodes) else None)
+        if l.closed then Some (l.lid, Array.of_list (Qccdc.Arch.slots a l)) else None)
       a.loops
   in
   let fails = Qccdc.Cert.check ~loops cert in

@@ -262,7 +262,7 @@ def class_participants(arch: Architecture, cls_id: str) -> tuple[str, ...]:
         return ()
     orbit = str(spec.get("orbit", "any"))
     if orbit in dev.loops:
-        return tuple(dev.loops[orbit].nodes)
+        return dev.loop_slots(orbit)       # a junction corner is passed, never a participant
     if orbit == "any":
         return tuple(sorted(n.id for n in dev.nodes.values() if n.is_site))
     for label in (orbit, orbit[:-1] if orbit.endswith("s") else orbit):

@@ -2660,13 +2660,14 @@ function applyFrame(st, f) {
     return;
   }
   if (f.shift){
+    // a rotation moves SLOTS: each ion rides to the next one round any bend between
+    // (`QCCD.rotationPaths`, the twin of `Device.slot_walk`), and pays every rail it rides
     const [loop,delta]=f.shift, seq=A.loops[loop]; if(!seq) return;
-    const k=seq.length, step=delta>=0?1:-1, idx={}; seq.forEach((n,i)=>idx[n]=i);
-    for(let h=0;h<Math.abs(delta);h++){
-      const moved={};
-      for(const ion in st.pos){const i=idx[st.pos[ion]]; if(i!==undefined) moved[ion]=seq[((i+step)%k+k)%k];}
-      for(const ion in moved){st.pos[ion]=moved[ion];
-        st.q[ion]=(st.q[ion]||0)+shuttleQ+junctionQ((nodeById[moved[ion]]||{deg:0}).deg);}
+    const walks=globalThis.QCCD.rotationPaths(seq, bendSet(), st.pos, delta);
+    for(const ion in walks){ const w=walks[ion];
+      for(let i=1;i<w.length;i++)
+        st.q[ion]=(st.q[ion]||0)+shuttleQ+junctionQ((nodeById[w[i]]||{deg:0}).deg);
+      st.pos[ion]=w[w.length-1];
     }
   } else if (f.moves){
     // what each move splits and merges is the ENGINE's answer (`QCCD.moveEntails`, the twin
@@ -2725,6 +2726,16 @@ function cumAt(i){
 // the device as `QCCD.moveEntails` reads it, built once per derivation: rails by id, the
 // node pair -> rail index, the nodes on a named path, and each off-path node's rails to one
 let SPUR_CTX = null;
+// THE BENDS (`Device.is_bend`): bare junctions where two rails meet -- the corners of a
+// junction-cornered ring.  A rotation carries an ion round one and never stops it there.
+// Re-read whenever the editor replaces `A.nodes`; none on any design before junction
+// corners, where every loop node is a slot exactly as it always was.
+let BENDS_OF = null, BENDS = {};
+function bendSet(){
+  if(BENDS_OF!==A.nodes){ BENDS_OF=A.nodes; BENDS={};
+    for(const n of A.nodes) if(n.kind==='junction' && n.deg===2) BENDS[n.id]=true; }
+  return BENDS;
+}
 function spurContext(){
   const segs={}, pair={};
   for(const s of A.segments){ segs[s.id]=s; pair[s.a+'>'+s.b]=s.id; pair[s.b+'>'+s.a]=s.id; }
@@ -2795,13 +2806,10 @@ function pathsOf(f, prev){
   const out={};
   if(!f) return out;
   if(f.shift){
+    // slot to slot, THROUGH every bend on the way: a corner hop is drawn src -> corner ->
+    // dst along the rails, never as the chord between the two traps
     const [loop,delta]=f.shift, seq=A.loops[loop]; if(!seq) return out;
-    const k=seq.length, step=delta>=0?1:-1, idx={}; seq.forEach((n,i)=>idx[n]=i);
-    for(const ion in prev){
-      const i0=idx[prev[ion]]; if(i0===undefined) continue;
-      const path=[]; for(let h=0;h<=Math.abs(delta);h++) path.push(seq[((i0+step*h)%k+k)%k]);
-      out[ion]=path;
-    }
+    return globalThis.QCCD.rotationPaths(seq, bendSet(), prev, delta);
   } else if(f.moves){
     for(const [ion,path] of f.moves) out[ion]=path;
   }
@@ -4239,8 +4247,11 @@ for(const nd of A.nodes) DEVROWS.push({kind:'site', id:nd.id,
     +'   cap '+nd.cap+'   deg '+nd.deg+(nd.corner?'   bend':'')});
 for(const sg of A.segments) DEVROWS.push({kind:'segment', id:sg.id,
   t:sg.id+'   '+sg.a+' - '+sg.b+'   '+(sg.loop||'-')+'   cap '+sg.cap});
-for(const lid in (A.loops||{})) DEVROWS.push({kind:'loop', id:lid,
-  t:lid+'   '+A.loops[lid].length+' nodes'});
+// a loop through bends says how many of its nodes an ion can stand on: the corners of a
+// junction-cornered ring are nodes of the walk and no slot of it
+for(const lid in (A.loops||{})){ const nb=A.loops[lid].filter(n=>bendSet()[n]).length;
+  DEVROWS.push({kind:'loop', id:lid,
+    t:lid+'   '+A.loops[lid].length+' nodes'+(nb?'   '+(A.loops[lid].length-nb)+' slots':'')}); }
 let AVIEW = [];
 function archRows(){ return ARCHVIEW==='dev' ? DEVROWS : ARCHROWS; }
 function renderArchRow(r, row){

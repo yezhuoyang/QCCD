@@ -38,13 +38,13 @@
 type dock = {
   site : string;      (* the gate-capable trap off the loop *)
   rail : string;      (* the loop slot it hangs from *)
-  rail_idx : int;     (* that slot's index in the loop's cyclic order *)
+  rail_idx : int;     (* that slot's index in the loop's cyclic order of SLOTS *)
   spur : string;      (* the segment between them *)
 }
 
 type t = {
   loop : string;
-  nodes : string array;
+  nodes : string array;   (* the loop's slots in walk order: its nodes less its bends *)
   index : (string, int) Hashtbl.t;
   docks : dock array;
   n : int;
@@ -69,9 +69,14 @@ let class_named (a : Arch.t) ~(orbit : string) ~(delta : int option)
   in
   match List.find_opt ok a.classes with Some c -> c.cid | None -> fallback
 
-(* Does this loop rotate, and where are its docks? *)
+(* Does this loop rotate, and where are its docks?
+
+   The loop's SLOTS, not its nodes (`Arch.slots`): a bend -- a bare junction corner where
+   only the loop's two rails meet -- is passed by a rotation and never stood on, so slot
+   `i` of this pass, a rotation's `delta` and a `--placement`'s slot index all count slots,
+   exactly as `Device.shift_map` does.  On a loop with no bend the slots are the nodes. *)
 let of_loop (a : Arch.t) (l : Arch.loop) : t option =
-  let nodes = Array.of_list l.nodes in
+  let nodes = Array.of_list (Arch.slots a l) in
   let n = Array.length nodes in
   let index = Hashtbl.create n in
   Array.iteri (fun i s -> Hashtbl.replace index s i) nodes;
@@ -127,7 +132,8 @@ let of_loop (a : Arch.t) (l : Arch.loop) : t option =
    passed over rather than taken as the answer. *)
 let detect (a : Arch.t) : t option =
   List.find_map
-    (fun (l : Arch.loop) -> if l.closed && List.length l.nodes >= 4 then of_loop a l else None)
+    (fun (l : Arch.loop) ->
+      if l.closed && List.length (Arch.slots a l) >= 4 then of_loop a l else None)
     a.loops
 
 (* ------------------------------------------------------------------ geometry *)

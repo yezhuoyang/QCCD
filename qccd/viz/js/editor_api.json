@@ -569,8 +569,14 @@
   "pressStartCard": {
    "use": "agent",
    "kind": "design",
-   "does": "press a card of the Start panel (a generator, a template or a blank canvas)",
-   "args": "card"
+   "does": "press a card of the Start panel (a generator, a template or a blank canvas); a ring or dual_loop card builds junction corners (traps on the sides) unless card.corners or setCorners says 'site'",
+   "args": "card: {gen | open | blank | tpl, corners?: 'junction' | 'site'}"
+  },
+  "setCorners": {
+   "use": "agent",
+   "kind": "design",
+   "does": "choose how the Start panel's ring and dual_loop cards build their corners: 'junction' (the default; bare junction corners, traps only on the sides) or 'site' (a trap in each corner); with no argument, read the choice",
+   "args": "style?: 'junction' | 'site'"
   },
   "setName": {
    "use": "agent",

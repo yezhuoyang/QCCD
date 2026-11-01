@@ -21,7 +21,7 @@ from typing import Callable, Mapping, Sequence
 
 from ..arch import Architecture
 from ..ir import provenance as prov
-from ..verify.rules import hop_label, loop_node_set
+from ..verify.rules import enters_bend, hop_label, loop_node_set
 from ..ir.import_deck import DEFAULT_HTML, import_schedule
 from ..ir.tsir import TSIR, Instruction, Participant, loop_shift
 from .oddeven import cyclic_shift_target, odd_even_sort_program
@@ -35,7 +35,8 @@ def closed_loops(arch: Architecture) -> list[str]:
 
 
 def _loop_ions(arch: Architecture, loop_id: str) -> tuple[list[str], list[str]]:
-    nodes = list(arch.device.loops[loop_id].nodes)
+    # one ion per SLOT: a junction corner on the loop is passed, never filled
+    nodes = list(arch.device.loop_slots(loop_id))
     return [f"d{i}" for i in range(len(nodes))], nodes
 
 
@@ -179,13 +180,15 @@ def walk(arch: Architecture, n_ions: int = 4, *, name: str | None = None) -> TSI
 
 
 def _signature(dev, on_loop, src: str, via: tuple[str, ...]) -> str:
-    """The R22 motion signature of one trap-to-trap move, hop by hop along `via`."""
+    """The R22 motion signature of one trap-to-trap move, hop by hop along `via` --
+    `motion_signature`'s, so the rail into a loop's bend adds no label (`enters_bend`)."""
     labels = []
     at = src
     for sid in via:
         seg = dev.segments[sid]
         nxt = seg.other(at)
-        labels.append(hop_label(dev, on_loop, at, nxt, seg))
+        if not enters_bend(dev, at, nxt, seg):
+            labels.append(hop_label(dev, on_loop, at, nxt, seg))
         at = nxt
     return "shuttle " + ",".join(labels)
 

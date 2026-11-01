@@ -62,7 +62,7 @@
 
    Exactly what the program does: every swap and step is a move witness one site long (an
    ordered pair of neighbouring sites, which `mk_qcheck_input.py` derives from the segment
-   list), every shift a rotation witness whose node order the checker reads from the
+   list), every shift a rotation witness whose slot order the checker reads from the
    architecture, every gate a witness at its zone.  Nothing here asks the checker for
    anything new.
 
@@ -70,7 +70,11 @@
 
    A device that IS one closed loop: every node a site on it, every rail joining two
    neighbours on it.  Anything else -- a spur, a junction, a second loop -- is declined, and
-   the caller's answer stands. *)
+   the caller's answer stands.  The one junction it takes is a BEND (`Arch.is_bend`): a
+   bare corner where only the loop's own two rails meet, as a square trap is built with
+   (`ring(corners="junction")`).  A bend is passed, never stood on, so the loop's sites are
+   its slots (`Arch.slots`) and a step from one site to the next goes round the corner in
+   one move, its `via` the rails on both sides of it. *)
 
 exception Not_applicable of string
 
@@ -97,7 +101,8 @@ type dev = {
   free : bool array;          (* driven independently: not tied to other sites (R4) *)
   gate : bool array;
   spam : bool array;
-  seg : string array;         (* seg.(i) joins nodes.(i) and nodes.(i+1) *)
+  seg : string list array;    (* seg.(i): the rails from nodes.(i) to nodes.(i+1), in that
+                                 order -- one rail, or the rails round a bend *)
   fwd_cls : string;           (* the class of a +1 shift along the loop *)
   bwd_cls : string;
 }
@@ -117,37 +122,47 @@ let detect (a : Arch.t) : dev =
     | [ l ] -> l
     | ls -> na "the device has %d closed loops; this pass drives exactly one" (List.length ls)
   in
-  let nodes = Array.of_list l.nodes in
+  (* the walk is every node of the loop, bends included; the sites are its slots *)
+  let walk = Array.of_list l.nodes in
+  let w = Array.length walk in
+  let nodes = Array.of_list (Arch.slots a l) in
   let n = Array.length nodes in
-  if n < 4 then na "loop %s has %d nodes" l.lid n;
-  let idx = Hashtbl.create n in
+  if n < 4 then na "loop %s has %d %s" l.lid n (if n = w then "nodes" else "slots");
+  let idx = Hashtbl.create w in
   Array.iteri
     (fun i s ->
       if Hashtbl.mem idx s then na "loop %s visits %s twice" l.lid s;
       Hashtbl.replace idx s i)
-    nodes;
+    walk;
   List.iter
     (fun id ->
       match Arch.node a id with
-      | Some nd when nd.kind <> "site" ->
+      | Some nd when nd.kind <> "site" && not (Arch.is_bend a id && Hashtbl.mem idx id) ->
         na "node %s is a %s: the device is not a single loop of sites" id nd.kind
       | _ ->
         if not (Hashtbl.mem idx id) then
           na "site %s is off loop %s (a dock or a spur): the device is not a single loop" id
             l.lid)
     a.node_order;
-  if List.length a.node_order <> n then na "the device is not exactly loop %s" l.lid;
-  let seg = Array.make n "" in
+  if List.length a.node_order <> w then na "the device is not exactly loop %s" l.lid;
+  (* rail k joins walk.(k) and walk.(k+1) *)
+  let rail = Array.make w "" in
   List.iter
     (fun (s : Arch.segment) ->
       match (Hashtbl.find_opt idx s.a, Hashtbl.find_opt idx s.b) with
-      | Some i, Some j when md n (j - i) = 1 && seg.(i) = "" -> seg.(i) <- s.sid
-      | Some i, Some j when md n (i - j) = 1 && seg.(j) = "" -> seg.(j) <- s.sid
+      | Some i, Some j when md w (j - i) = 1 && rail.(i) = "" -> rail.(i) <- s.sid
+      | Some i, Some j when md w (i - j) = 1 && rail.(j) = "" -> rail.(j) <- s.sid
       | _ -> na "rail %s does not join two neighbours of loop %s" s.sid l.lid)
     a.segments;
   Array.iteri
-    (fun i s -> if s = "" then na "no rail joins %s and %s" nodes.(i) nodes.(md n (i + 1)))
-    seg;
+    (fun i s -> if s = "" then na "no rail joins %s and %s" walk.(i) walk.(md w (i + 1)))
+    rail;
+  (* from slot i to slot i+1: the rails between their places in the walk, round any bend *)
+  let seg =
+    Array.init n (fun i ->
+        let p = Hashtbl.find idx nodes.(i) and q = Hashtbl.find idx nodes.(md n (i + 1)) in
+        List.init (md w (q - p)) (fun k -> rail.(md w (p + k))))
+  in
   List.iter
     (fun (s : Arch.segment) ->
       if s.seg_capacity < 1 then na "rail %s carries no ion" s.sid)
@@ -477,14 +492,14 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
         List.map
           (fun (q, s) ->
             let s2 = md n (s + dir) in
-            let sg = if dir > 0 then d.seg.(s) else d.seg.(s2) in
+            let sg = if dir > 0 then d.seg.(s) else List.rev d.seg.(s2) in
             (q, s, s2, sg))
           ms
       in
       List.iter
         (fun (q, s, s2, sg) ->
           cert_moves :=
-            Cert.{ cycle = !cyc; ion = ion q; src = d.nodes.(s); dst = d.nodes.(s2); via = [ sg ] }
+            Cert.{ cycle = !cyc; ion = ion q; src = d.nodes.(s); dst = d.nodes.(s2); via = sg }
             :: !cert_moves)
         parts;
       List.iter (fun (q, s, _, _) -> at.(s) <- List.filter (fun x -> x <> q) at.(s)) parts;
@@ -504,7 +519,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
                           participants =
                             List.map
                               (fun (q, s, s2, sg) ->
-                                Tsir.{ ion = ion q; src = d.nodes.(s); dst = d.nodes.(s2); via = [ sg ] })
+                                Tsir.{ ion = ion q; src = d.nodes.(s); dst = d.nodes.(s2); via = sg })
                               parts;
                           meta = [ ("kind", `String what) ] @ op_meta ops_for };
       n_moves := !n_moves + List.length parts;
@@ -525,7 +540,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
                           template =
                             Some (`Assoc [ ("kind", `String "loop_shift"); ("loop", `String d.lid);
                                            ("delta", `Int delta) ]);
-                          holds = d.lid :: Array.to_list d.seg;
+                          holds = d.lid :: List.concat (Array.to_list d.seg);
                           meta = [ ("kind", `String why) ] @ op_meta ops_for };
       let old = Array.copy at in
       for s = 0 to n - 1 do

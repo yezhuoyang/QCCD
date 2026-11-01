@@ -124,6 +124,12 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
     hw = hardware_of(arch)
     dev = arch.device
     on_loop = loop_node_set(dev)
+    # A bend on a loop (`Device.is_bend`: a junction corner) is passed inside one slot move
+    # and is no place to stand: it is neither a site nor, at two rails, a junction, so no
+    # capacity rule ever looks at it.  An operation that leaves an ion there, or a start
+    # that places one there, names a stop the device does not have (R0's `well_formed`,
+    # `setup_ok`).  Empty on every device without junction corners.
+    bends = frozenset(n for lp in dev.loops.values() for n in lp.nodes if dev.is_bend(n))
     views: list = []
     res = replay(prog, arch, model, check_rules=False, keep_cycles=True,
                  rule_config=rule_config, on_cycle=views.append)
@@ -260,10 +266,14 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                        split="split" in entails, merge="merge" in entails,
                        swap_paid=paid, at_chain_end=src_occ <= 2,
                        exchange=bool(c2 is not None and c2.exchange))
+                if ms[-1].dst in bends:
+                    o.facts["malformed"] = True
                 o.path = tuple(path)
                 o.rails = tuple(Rail(m.seg.id) for m in ms)
                 o.text = f"move {i} {ms[0].src}→{ms[-1].dst}"
                 for m in ms:
+                    # the loop step of one RAIL: a corner's two rails are each one step
+                    # along the loop, as a straight rail is, so R11 sees one direction
                     loop = m.seg.loop
                     shift = None
                     if loop is not None and loop in dev.loops:
@@ -307,8 +317,12 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                     circuit=list(circuit) if circuit is not None else None,
                     name=getattr(prog, "name", ""))
     from ..verify.replay import conveyed_paths
+    # the slots a conveyor carries ions through (`rotated`): a bend is not one
     exe.facts["rotated_nodes"] = frozenset(
-        Site(n) for lid in conveyed_paths(prog, arch) if lid in dev.loops for n in dev.loops[lid].nodes)
+        Site(n) for lid in conveyed_paths(prog, arch) if lid in dev.loops for n in dev.loop_slots(lid))
+    if bends and any(n in bends for ins in prog.instructions if ins.type == "init"
+                     for n in ins.placement.values()):
+        exe.facts["malformed_start"] = True
     exe.facts["exchange_instants"] = frozenset(exchange_instants)
     exe.facts["assumed"] = list(res.assumed)
     if entered.keys():

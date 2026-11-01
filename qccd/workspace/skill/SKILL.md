@@ -56,7 +56,7 @@ so neither of you can silently overwrite the other.
   checked, not Lean-checked, not a submission.
 - **When it cannot run** (the design holds too few ions, or the compiler cannot route), the
   run says why. Tell the user, and offer a design that fits: `construct` a ring with
-  `{"width": 72, "height": 2, "verticals": 24}` holds the BB code.
+  `{"width": 72, "height": 2, "verticals": 24, "corners": "site"}` holds the BB code.
 - **Designs** have the names the user gave them: `qccd_manage_branch(action="list")`,
   `create(title=<a name>, source=<the design to copy>)` for a new one, `rename(design, title)`.
   A new design is a NEW design: never overwrite an existing one unless the user asks. Every tool

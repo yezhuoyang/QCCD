@@ -411,7 +411,8 @@ def _movement(instr: Instruction, arch) -> Movement:
     if instr.template and instr.template.get("kind") == "loop_shift":
         delta = int(instr.template["delta"])
         loop = str(instr.template["loop"])
-        n_loop = len(arch.device.loops[loop].nodes) if arch is not None else 0
+        # every SLOT advances |delta| slots (a junction corner is passed, not a slot)
+        n_loop = len(arch.device.loop_slots(loop)) if arch is not None else 0
         return Movement(kind="template", loop=loop, delta=delta,
                         direction="cw" if delta >= 0 else "ccw",
                         orbit=decl.get("orbit"), hops=abs(delta) * n_loop,
@@ -556,10 +557,11 @@ def _opoints(instr: Instruction, arch, model, mv: Movement, width: int):
             # rotation row reported `shuttle@5us/0.1n` while the replay was charging 312
             # junction crossings on that very instruction. Count the junctions the shift
             # actually crosses: every occupied slot advances |delta| steps around the
-            # loop, so the crossings are the degree>=3 nodes it lands on.
+            # loop, so the crossings are the degree>=3 nodes it lands on.  Steps of SLOTS:
+            # a junction corner passed on the way has two rails, so it is no crossing.
             loop = arch.device.loops.get(str(instr.template.get("loop")))
             if loop is not None:
-                seq = list(loop.nodes)
+                seq = list(arch.device.loop_slots(loop.id))
                 k = len(seq)
                 delta = int(instr.template.get("delta", 0))
                 step = 1 if delta >= 0 else -1

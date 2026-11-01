@@ -46,7 +46,8 @@ class RingProgram(TrackedProgram):
 
     def __init__(self, machine: Machine, name: str, placement: dict[str, str]):
         super().__init__(machine, name, placement)
-        self.loop = list(self.dev.loops["L0"].nodes)
+        # the ring's SLOTS, which a rotation moves ions between (a junction corner is passed)
+        self.loop = list(self.dev.loop_slots("L0"))
         self.index = {n: i for i, n in enumerate(self.loop)}
 
     def ion_at(self, node: str) -> str | None:

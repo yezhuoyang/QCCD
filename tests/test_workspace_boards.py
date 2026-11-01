@@ -99,7 +99,7 @@ def test_one_call_submits_a_design_to_a_board_and_another_board_compiles_again(t
     d = ws.create_candidate(ME, title="Little ring")
     ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
                          "operations": [{"type": "construct", "generator": "ring",
-                                         "params": {"width": 8, "height": 2, "verticals": 8}}]}, ME)
+                                         "params": {"width": 8, "height": 2, "verticals": 8, "corners": "site"}}]}, ME)
     out = ws.submit_design(AGENT, design="little ring", board="repetition code")
     assert out["design"] == "Little ring" and out["board"] == "Repetition code, distance 9"
     j = _wait(ws, out["job_id"])
@@ -136,7 +136,7 @@ def test_the_chat_follows_a_submission_to_its_verdict_on_one_card(tmp_path):
         d = ws.create_candidate(ME, title="Little ring")
         ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
                              "operations": [{"type": "construct", "generator": "ring",
-                                             "params": {"width": 8, "height": 2, "verticals": 8}}]}, ME)
+                                             "params": {"width": 8, "height": 2, "verticals": 8, "corners": "site"}}]}, ME)
         pid = ws.send_prompt(ME, body={"text": "Submit it to the repetition code", "intent": "apply_change",
                                        "mode": "apply", "anchors": [{"kind": "workspace"}]})["prompt_id"]
         out = ws.submit_design(ME, design="Little ring", board="repetition code", origin_prompt_id=pid)
@@ -174,7 +174,7 @@ def test_a_submission_right_after_a_run_adopts_the_runs_compile_instead_of_compi
         d = ws.create_candidate(ME, title="Little ring")
         ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
                              "operations": [{"type": "construct", "generator": "ring",
-                                             "params": {"width": 8, "height": 2, "verticals": 8}}]}, ME)
+                                             "params": {"width": 8, "height": 2, "verticals": 8, "corners": "site"}}]}, ME)
         other = _wait(ws, ws.start_job(ME, "run", {"branch": d["name"], "program": "ghz4"})["job_id"])
         run = _wait(ws, ws.start_job(ME, "run", {"branch": d["name"], "program": "rep9"})["job_id"])
         assert run["status"] == "succeeded" and other["status"] == "succeeded"
@@ -193,7 +193,7 @@ def test_a_submission_right_after_a_run_adopts_the_runs_compile_instead_of_compi
         head = ws.branch(d["name"])["head"]
         ws.apply_change_set({"branch": d["name"], "expected_revision": head, "request_id": "again", "mode": "apply",
                              "operations": [{"type": "construct", "generator": "ring",
-                                             "params": {"width": 12, "height": 2, "verticals": 8}}]}, ME)
+                                             "params": {"width": 12, "height": 2, "verticals": 8, "corners": "site"}}]}, ME)
         j3 = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code")["job_id"])
         assert j3["result"]["compiled"] and j3["result"]["from_run"] is None, j3["result"]
     finally:
@@ -310,7 +310,7 @@ def test_add_docks_computes_where_the_docks_go_from_a_count(tmp_path):
     try:
         ws.apply_change_set({"expected_revision": 0, "request_id": "ring", "mode": "apply",
                              "operations": [{"type": "construct", "generator": "ring",
-                                             "params": {"width": 10, "height": 6}}]}, ME)
+                                             "params": {"width": 10, "height": 6, "corners": "site"}}]}, ME)
         dev0 = ws.replayed("main").arch.device
         loop = next(iter(dev0.loops.values()))
         on = list(loop.nodes)
