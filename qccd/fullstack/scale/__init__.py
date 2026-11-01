@@ -7,4 +7,6 @@
     compile.py   every template compiled ONCE on a district by the town's own scheduler, and
                  checked there by the place and machine rules
     machine.py   the machine it runs on at RSA-2048 (slice S9): distance 11, its physics and noise
+    lattice.py   the patch-lattice scheduler on that machine: products as corridor merges between
+                 stationary tiles, every gadget a copy of a program checked once
 """

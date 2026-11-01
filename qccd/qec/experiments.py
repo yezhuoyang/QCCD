@@ -830,8 +830,9 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
     between tiles; a patch has Z̄ along a row and X̄ down a column.
 
     `patches`: (tile, side) each -- "top" or "bottom" for a Z̄ product, "left" or "right" for X̄:
-    the patch joins, through the seam on that side, the corridor tile there.  `corridor`: a
-    connected set of tiles.  The merged region is the patches, those seams, the corridor and the
+    the patch joins, through the seam on that side, the corridor tile there -- or the patch
+    there, which joins back on its opposite side (two patches side by side need no corridor).
+    `corridor`: a set of tiles, the region connected.  The merged region is the patches, those seams, the corridor and the
     seams (and seam crossings with three corridor tiles around) inside it; every point outside a
     patch starts in |+> ("Z") or |0> ("X").  Each patch's far side keeps its own boundary; the
     rest of the region's boundary is of the merge's type, with its corners of the wrong
@@ -848,12 +849,14 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
     ok = ("top", "bottom") if letter == "Z" else ("left", "right")
     pts: set = set()
     held: list = []
+    sides = {tuple(t): side for t, side in patches}
     for t, side in patches:
         if side not in ok:
             raise ValueError(f"a {letter}-bar product joins a patch on its {' or '.join(ok)}, not {side}")
         nb = (t[0] + _SIDE[side][1], t[1] + _SIDE[side][0])
-        if nb not in corridor:
-            raise ValueError(f"patch {t} joins the corridor on its {side}, at {nb}: not a corridor tile")
+        if nb not in corridor and sides.get(nb) != _FAR[side]:
+            raise ValueError(f"patch {t} joins on its {side}, at {nb}: neither a corridor tile nor a "
+                             f"patch facing it")
         held.append(_tile(d, t))
         pts |= held[-1] | _seam(d, t, nb)
     p = d + 1

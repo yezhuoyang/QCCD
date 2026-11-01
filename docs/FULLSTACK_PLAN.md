@@ -1035,6 +1035,48 @@ Exit, staged honestly:
   uncompute steps;
 - (b) the forward half once step 4's factory delivers CCZ states to ports on the lattice.
 
+**Step 3 (a) done (2026-11-01): `qccd.fullstack.scale.lattice`.** The adder's CCZ-free half,
+expanded from one real call in Gidney 2025 with `surgery_rewrite` applied, is 1,085
+instructions. It runs on a 65 x 7 tile lattice: 95 block homes, bit i's three blocks in column
+2i, 455 tiles, 438 of them used.
+- **Schedule:** 589 gadgets (248 corridor merges, 31 H̄, 155 preparations, 155 readouts), and
+  the check is clean: no tile holds two gadgets at once, every block's instructions run in
+  program order, and every guard is decoded before it is read.
+- **Machine time:** 1.517 s, with 37 gadgets running at once on average. A lattice-surgery
+  CNOT's first merge, control with a fresh ancilla, depends on nothing earlier, so the 31
+  uncompute steps pipeline instead of running as a chain. The conditional CZs' H̄ (0.68 s each)
+  hang off the side.
+- **Programs:** the run is copies of 10 programs, each compiled at the machine's distance,
+  every rule and R10. They are 5 merge shapes (the facing pair used 155 times, four X̄X̄ and
+  fan-out corridors down a bus column 2 to 6 tiles long), the H̄ gadget, and a tile's
+  preparation and readout in each basis (0.31-0.44 ms).
+- **Assumed:** decoding takes one round, and gadgets start off the round clock (no alignment
+  of every tile's rounds to one clock yet).
+- **Not yet built:** a flat hardware program for the whole run. Each gadget is a translated
+  copy of a checked program on tiles no other gadget holds at the time.
+
+**Step 4: what the factory needs (2026-11-01).** The Toffoli consumes |AutoCCZ>: CCZ|+++> on
+three patches plus three routing pairs, each CZ|++> and CNOT-linked from two of the three. That
+is the state the d = 3 town's `msccz` makes, with the check that FormalRV's own consumption of
+it is CCX in all 4,096 branches. On the surgery machine the encoding, the routing pairs and the
+links are merges. The T gates of 15-to-1 and 8T -> CCZ are teleported, and each needs an S̄
+correction half the time. S̄ needs |Ȳ> or another non-CSS operation, and nothing built so far
+can supply one: merges, CSS preparations and readouts, and the transversal-H H̄ keep every
+amplitude real. So the factory needs one new gadget first:
+- Gidney's in-place access to the Y basis (2023): |Ȳ> on a rotated patch, local, about d
+  rounds; or
+- a fold-transversal S̄, if a symmetry of our patch allows it; or
+- a twist for Z̄⊗Ȳ, as in Litinski's auto-corrected π/8.
+
+The Toffoli's mixed X̄Z̄ on its CCZ output becomes X̄X̄ once the factory turns that output with
+H̄ before delivering it.
+
+Budget for the 8.1e8 CCZ a shot. One level of 15-to-1 from injected T gives 35 p³ a T: 3.5e-11
+at p = 1e-4, 4.4e-12 at p = 5e-5. Spending 7 such T on each CCZ loses about 20 % of shots at
+p = 1e-4 (2.5 % at p = 5e-5). Feeding them to 8T -> CCZ (msccz's protocol, 28 p² on its
+inputs) instead makes the CCZ error ~3e-20, nothing beside the memory's 2.2 %. So: 15-to-1,
+then 8T -> CCZ, then the routing pairs.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.
