@@ -1071,6 +1071,28 @@ amplitude real. So the factory needs one new gadget first:
 The Toffoli's mixed X̄Z̄ on its CCZ output becomes X̄X̄ once the factory turns that output with
 H̄ before delivering it.
 
+**|Ȳ> done (2026-11-01): `y_memory` and `y_prep_qasm`, Gidney's own circuits.** The paper's
+data (zenodo 7487893, CC BY 4.0) has his noisy Y-basis memory circuits for d = 3 .. 17. Those
+for d = 3, 5, 7, 9, 11, with (d - 1) / 2 padding rounds and the noise removed, are now in
+`qccd/qec/inplace_y` (README with the citation). They fit our lattice as written:
+- **Orientation:** transposed, his patch is exactly ours. Every check of our patch, and our Ȳ,
+  has a definite value in his state between rounds.
+- **Gates:** every two-qubit gate is a CZ between a data qubit and the measure qubit beside it,
+  so the tiled compiler plays his circuit gate for gate. The two extra measure qubits of the
+  twisted patch sit at boundary faces our tiles already have.
+
+**Checks:**
+- **Distance:** graphlike distance d at d = 3, 5, 7 and 11 under our uniform noise, as on his
+  circuits. With fewer than (d - 3) / 2 padding rounds it is lower, his own finding.
+- **Rules and R10:** every rule and R10 at d = 3 (tests) and at the machine's d = 11.
+- **Cost at d = 11 (qccd-physics-best):** the whole Y memory is 251 ions, 1,515 instructions,
+  154.7 ms. |Ȳ> alone is every operation up to the transition round's measurements:
+  431 instructions, 43.9 ms, a third of a merge. The lattice scheduler's `prep Y` is that
+  gadget.
+
+So S̄ is `prep L Y; ppm Z p Z L; read L X` (FormalRV's own), all concrete, and the factory can
+be built.
+
 Budget for the 8.1e8 CCZ a shot. One level of 15-to-1 from injected T gives 35 p³ a T: 3.5e-11
 at p = 1e-4, 4.4e-12 at p = 5e-5. Spending 7 such T on each CCZ loses about 20 % of shots at
 p = 1e-4 (2.5 % at p = 5e-5). Feeding them to 8T -> CCZ (msccz's protocol, 28 p² on its

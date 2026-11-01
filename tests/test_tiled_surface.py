@@ -19,6 +19,8 @@ Held here:
   -- it passes every rule and R10, and its logical error rate falls with d;
 * a corridor merge (`corridor_merge`: any patches, any corridor of free tiles) measures its
   product, keeps every patch's logical and keeps distance d; tiled, every rule and R10;
+* |Ȳ> (`y_memory`, Gidney's in-place Y basis on our lattice) is prepared and measured at
+  distance d; tiled, every rule and R10;
 * the Shor machine (`qccd.fullstack.scale.machine`): a round at its distance on its physics
   (qccd-physics-best) passes every rule and R10;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
@@ -243,6 +245,32 @@ def test_a_corridor_merge_is_played_on_the_tiled_grid(shape, tmp_path):
     rows, cols = (max(x[k] for x in exp.coords) + 1 for k in (0, 1))
     a = device(rows, cols, physics="physics@2")
     prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords, faces=exp.faces)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+
+
+def test_gidneys_y_basis_memory_is_ours_at_full_distance():
+    """`y_memory` (Gidney's in-place Y basis, Quantum 2024, his circuits transposed onto our
+    lattice): noiselessly every detector and Ȳ (prepared, then measured) are deterministic, and
+    the circuit keeps distance d under uniform noise."""
+    from qccd.qec.experiments import ideal_stim, y_memory
+    for d in (3, 5):
+        exp = y_memory(d)
+        c = ideal_stim(exp)
+        c.detector_error_model()
+        assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+        assert len(ideal_stim(exp, 1e-3).shortest_graphlike_error(ignore_ungraphlike_errors=True)) == d
+
+
+def test_gidneys_y_basis_memory_is_played_on_the_tiled_grid(tmp_path):
+    """Every two-qubit gate is a CZ between a data qubit and a measure qubit beside it, so the
+    tiled compiler plays the circuit as written: every rule under qccd-physics@2, and R10."""
+    from qccd.qec.experiments import y_memory
+    exp = y_memory(3)
+    a = device(3, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, 3, arch=a, coords=exp.coords, faces=exp.faces)
     model = corrected_model("quantinuum")
     rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
     assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]

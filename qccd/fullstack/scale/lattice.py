@@ -13,6 +13,7 @@ every outcome its guard reads is decoded:
 * `prep` of a block with no home: a fresh ancilla, given a bus tile beside the partner of its
   first product, on that product's side, held until its readout.
 * `prep` and `read`: the tile's reset or readout; an outcome is decoded `decode_us` later.
+  `prep Y` is |Ȳ> made in place (`qccd.qec.experiments.y_memory`, Gidney's), on the tile alone.
 * frames (`x`, `z`, `y`) and `bit`: classical, no time.
 A guarded instruction reserves its tiles whether or not its guard holds, so the schedule is the
 same for every run.  Every block not in a gadget refreshes each round on its own tile.
@@ -44,17 +45,24 @@ class LatticeError(ValueError):
     pass
 
 
+#: |Ȳ> made in place at the machine's distance: Gidney's preparation (`y_prep_qasm(11)`), tiled
+#: on qccd-physics-best, every rule and R10
+PREP_Y_US = 43_900.0
+
+
 @dataclass(frozen=True)
 class Costs:
     """Machine times, µs.  The defaults are the Shor machine's (`machine`: d = 11, 25 rounds a
     merge, qccd-physics-best), each measured on its compiled program: a syndrome round 5.8 ms, a
     corridor merge 138.3 ms whatever its shape, H̄ 679.8 ms, a tile's preparation 0.33 ms and
-    readout 0.44 ms (the slower basis of each); decoding is taken as one round -- assumed."""
+    readout 0.44 ms (the slower basis of each), |Ȳ> in place 43.9 ms; decoding is taken as one
+    round -- assumed."""
     round_us: float = 5_800.0
     merge_us: float = 138_300.0
     hbar_us: float = 679_800.0
     prep_us: float = 330.0
     read_us: float = 440.0
+    prep_y_us: float = PREP_Y_US
     decode_us: float = 5_800.0
 
 
@@ -239,8 +247,9 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs()) -> list
                     tile = place(blk, k, t)
                 where[blk] = tile
                 board.take(tile, t, INF, blk)
-            out.append(Gadget("prep", t, t + costs.prep_us, frozenset([where[blk]]), ("prep", a[1]), k, (blk,)))
-            free_at[blk] = t + costs.prep_us
+            dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
+            out.append(Gadget("prep", t, t + dur, frozenset([where[blk]]), ("prep", a[1]), k, (blk,)))
+            free_at[blk] = t + dur
         elif w == "read":
             blk = a[0]
             if blk not in where:

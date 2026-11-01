@@ -70,3 +70,13 @@ def test_a_mixed_product_is_refused():
     homes, bounds = columns(["q0", "q1"], 3)
     with pytest.raises(LatticeError, match="mixed product"):
         schedule([("ppm", ["X", "q0", "Z", "q1"], "m0", [])], homes, bounds)
+
+
+def test_a_y_preparation_is_the_in_place_gadget():
+    homes, bounds = columns(["q0"], 3)
+    stream = [("prep", ["L0", "Y"], None, []), ("ppm", ["Z", "q0", "Z", "L0"], "m0", []),
+              ("read", ["L0", "X"], "m1", [])]
+    gadgets = schedule(stream, homes, bounds)
+    assert check(stream, gadgets) == []
+    prep = next(g for g in gadgets if g.kind == "prep")
+    assert prep.shape == ("prep", "Y") and prep.t1 - prep.t0 == Costs().prep_y_us

@@ -98,6 +98,8 @@ __all__ = [
     "surgery_cnot",
     "hadamard_bar",
     "corridor_merge",
+    "y_memory",
+    "y_prep_qasm",
     "EXPERIMENTS",
     "READOUTS",
     "get",
@@ -908,6 +910,76 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
                             readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
                             readout_basis=tuple(prep[q] for q in range(len(coords))),
                             coords=tuple(coords), faces=faces)
+
+
+_ONE = {"H": "h", "S": "s", "S_DAG": "sdg", "X": "x", "Y": "y", "Z": "z", "SQRT_X": "sx",
+        "SQRT_X_DAG": "sxdg"}
+
+
+def _inplace_y(d: int, prep_only: bool):
+    import stim
+    from pathlib import Path
+    path = Path(__file__).with_name("inplace_y") / f"y_memory_d{d}.stim"
+    if not path.exists():
+        raise ValueError(f"no Y-basis circuit for d = {d} (qccd/qec/inplace_y has 3, 5, 7, 9, 11)")
+    c = stim.Circuit(path.read_text(encoding="utf-8")).without_noise()
+    at = c.get_final_qubit_coordinates()
+    # transposed: Gidney's (a, b) is our (row b, column a); data on integer points, measure
+    # qubits on face centres
+    key = (lambda q: (at[q][1], at[q][0]))
+    data = sorted((q for q in at if all(float(x).is_integer() for x in at[q])), key=key)
+    meas = sorted((q for q in at if q not in data), key=key)
+    new = {q: k for k, q in enumerate(data + meas)}
+    out, dets, obs, k = [], [], [], 0
+    for inst in c.flattened().decomposed():
+        name, ts = inst.name, inst.targets_copy()
+        if name == "OBSERVABLE_INCLUDE":
+            if prep_only:
+                break
+            obs += [k + t.value for t in ts]
+        elif name == "DETECTOR":
+            dets.append(tuple(sorted(k + t.value for t in ts)))
+        elif name in _ONE:
+            out += [f"{_ONE[name]} q[{new[t.value]}];" for t in ts]
+        elif name in ("CX", "CZ"):
+            out += [f"{name.lower()} q[{new[a.value]}],q[{new[b.value]}];" for a, b in zip(ts[0::2], ts[1::2])]
+        elif name == "M":
+            for t in ts:
+                out.append(f"measure q[{new[t.value]}] -> c[{k}];")
+                k += 1
+        elif name == "R":
+            out += [f"reset q[{new[t.value]}];" for t in ts]
+        elif name not in ("QUBIT_COORDS", "SHIFT_COORDS", "TICK", "I"):
+            raise ValueError(f"{path.name}: {name} has no QASM here")
+    head = ['OPENQASM 2.0;', 'include "qelib1.inc";',
+            f"// Gidney's Y-basis memory at d = {d} ({path.name}: Quantum 8, 1310 (2024), CC BY 4.0), "
+            f"transposed onto the tiled lattice" + ("; its preparation only" if prep_only else ""),
+            f"qreg q[{len(new)}];", f"creg c[{k}];"]
+    coords = tuple((int(at[q][1]), int(at[q][0])) for q in data)
+    faces = tuple((int(at[q][1] - 0.5), int(at[q][0] - 0.5)) for q in meas)
+    return "\n".join(head + out) + "\n", tuple(dets), tuple(sorted(set(obs))), coords, faces, len(data), len(meas)
+
+
+def y_memory(d: int) -> MemoryExperiment:
+    """Gidney's Y-basis memory experiment on a distance-d patch (qccd/qec/inplace_y): |Ȳ>
+    prepared in place -- a patch with twisted boundaries, then one transition round into the
+    standard patch -- standard rounds, and Ȳ measured in place.  Transposed, his patch is ours
+    (`qccd.gadget.surface`), and every two-qubit gate is a CZ between a data qubit and a
+    measure qubit beside it, so the tiled compiler plays it as written (`coords`, `faces`).
+    The data are read inside the circuit (readout "program"); observable 0 is Ȳ, prepared and
+    measured.  Its graphlike circuit distance is d (with (d - 1) / 2 padding rounds)."""
+    qasm, dets, obs, coords, faces, nd, nm = _inplace_y(d, False)
+    return MemoryExperiment(name=f"ymemory{d}", code=f"rotated_surface_d{d}_y", distance=d,
+                            rounds=d, basis="Y", n_data=nd, n_ancilla=nm, qasm=qasm,
+                            detectors=dets, observables=(obs,), readout="program",
+                            coords=coords, faces=faces)
+
+
+def y_prep_qasm(d: int) -> str:
+    """The preparation of |Ȳ> alone, from `y_memory`'s circuit: every operation up to the first
+    time the observable is recorded (the transition round's measurements).  Its compiled time is
+    the |Ȳ> gadget's."""
+    return _inplace_y(d, True)[0]
 
 
 def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
