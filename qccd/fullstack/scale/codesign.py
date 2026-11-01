@@ -17,6 +17,9 @@ that need none, and every replacement is a theorem about the template, not a gue
   as one fan-out call the control stays out of memory while the targets come and go.  The same
   instructions in the same order; the table's bit is a slot reserved either way.
 
+For the surgery machine (slice S9, `surgery_rewrite`) products are native and stay; only the H̄
+triple, the "measure X̄" it opens and a CZ's mixed product change.
+
 A rewrite may drop outcomes only when no other line reads them and no call site hands them on
 (`exports`).  `equal_drop` is the proof: every branch of the original lands, outcomes forgotten,
 on the rewrite's branch with the same state and the same total probability.  Templates with an
@@ -31,8 +34,8 @@ from itertools import product
 from .expr import Expr
 from .program import Body, Let, Loop, Pred, Program, Seg, Template, When, _Rec
 
-__all__ = ["rewrite", "equal_drop", "exports", "products_proved", "fan_template", "fuse_rows",
-           "records_read"]
+__all__ = ["rewrite", "surgery_rewrite", "equal_drop", "exports", "products_proved", "fan_template",
+           "fuse_rows", "records_read"]
 
 PPM = re.compile(r"ppm ((?:[XZ] [pl]\d+ ?)+)-> (o\d+)")
 
@@ -267,6 +270,86 @@ def rewrite(t: Template, exported=frozenset(), *, cx_idiom: bool = True):
     if not n:
         return None, n
     return Template(t.tid + "_cd", tuple(out), (0,) * len(out), t.n_params, k, t.n_out, t.n_ext), n
+
+
+def _strip(t: Template) -> Template:
+    keep = tuple(ln for ln in t.lines if not _body(ln).startswith(("se ", "decode")))
+    return Template(t.tid, keep, (0,) * len(keep), t.n_params, t.n_locals, t.n_out, t.n_ext)
+
+
+def _measure_x(lines: list):
+    """`ht P; ppm Z P -> o; ...; if o: x P`, P untouched in between: a measurement of X̄ that
+    leaves |0̄> -- `read P X -> o; prep P Z`.  The lines rewritten, or None."""
+    for i in range(len(lines) - 1):
+        m = re.fullmatch(r"ht ([pl]\d+)", lines[i])
+        m2 = m and re.fullmatch(rf"ppm Z {m[1]} -> (o\d+)", lines[i + 1])
+        if not m2:
+            continue
+        P, o = m[1], m2[1]
+        for j in range(i + 2, len(lines)):
+            if lines[j] == f"if {o}: x {P}":
+                return lines[:i] + [f"read {P} X -> {o}", f"prep {P} Z"] + lines[i + 2:j] + lines[j + 1:]
+            if re.search(rf"\b{P}\b", _body(lines[j])):
+                break
+    return None
+
+
+def _cz_turn(lines: list):
+    """A lattice-surgery CZ -- `prep L X; ppm Z a Z L; ppm X L Z b; read L Z` under one guard --
+    with H̄ on its ancilla between the merges: `ppm X L Z b` -> `ht L; ppm Z L Z b`, `read L Z` ->
+    `read L X`.  The lines rewritten, or None."""
+    for i, ln in enumerate(lines):
+        g = _guard(ln)
+        m = re.fullmatch(r"ppm X ([pl]\d+) Z ([pl]\d+) -> (o\d+)", _body(ln))
+        if not m or not any(_guard(x) == g and _body(x) == f"prep {m[1]} X" for x in lines[:i]):
+            continue
+        L = m[1]
+        new = lines[:i] + [f"{g}ht {L}", f"{g}ppm Z {L} Z {m[2]} -> {m[3]}"] + lines[i + 1:]
+        for j in range(i + 2, len(new)):
+            if _guard(new[j]) == g and re.fullmatch(rf"read {L} Z -> o\d+", _body(new[j])):
+                new[j] = new[j].replace(f"read {L} Z", f"read {L} X")
+                return new
+    return None
+
+
+def surgery_rewrite(t: Template):
+    """(the template for the surgery machine, Counter of what was rewritten) -- docs/
+    FULLSTACK_PLAN.md S9: there a Pauli product is a corridor merge, native, so products stay;
+    what goes is what the machine does better:
+    * FormalRV's H̄ triple -> `ht` (the H̄ gadget, `qccd.qec.experiments.hadamard_bar`);
+    * `ht P; ppm Z P; ...; if o: x P` -> `read P X; prep P Z`: X̄ read out, |0̄> made, no H̄;
+    * a CZ's mixed product -> H̄ on its ancilla between its two merges (`_cz_turn`).
+    Every step is proved by the exact simulator on the whole template (se and decode lines
+    dropped: they leave the state alone); a template with a magic state is not run whole, and
+    keeps all but its proved H̄ triples."""
+    n: Counter = Counter()
+    lines, out, i = list(t.lines), [], 0
+    while i < len(lines):
+        u = [_ymerge(lines, i)]
+        while u[-1] and len(u) < 3:
+            u.append(_ymerge(lines, u[-1][2]))
+        if all(u) and len(u) == 3 and len({x[0] for x in u}) == 1 and "".join(x[1] for x in u) in ("ZXZ", "XZX"):
+            fix = _h_segment(lines[i:u[2][2]], u[0][0])
+            if fix is not None:
+                out += fix
+                n["ht"] += 1
+                i = u[2][2]
+                continue
+        out.append(lines[i])
+        i += 1
+    cur = _strip(Template(t.tid, tuple(out), (0,) * len(out), t.n_params, t.n_locals, t.n_out, t.n_ext))
+    if any(_body(ln).startswith("autoccz") for ln in cur.lines):
+        return cur, n
+    for name, step in (("measure X", _measure_x), ("cz", _cz_turn)):
+        while True:
+            new = step(list(cur.lines))
+            if new is None:
+                break
+            nxt = Template(t.tid, tuple(new), (0,) * len(new), t.n_params, t.n_locals, t.n_out, t.n_ext)
+            if not equal_drop(cur, nxt):
+                raise AssertionError(f"{t.tid}: the {name} rewrite is not the same channel")
+            cur, n[name] = nxt, n[name] + 1
+    return cur, n
 
 
 def products_proved(sizes=(1, 2, 3, 4)) -> bool:

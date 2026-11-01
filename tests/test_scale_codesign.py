@@ -137,3 +137,39 @@ def test_fusing_the_lookups_keeps_every_cnot():
     after = P.total(prog, lambda tid: Counter({tid: 1}), lambda *a: Counter())
     assert info["rows"] >= 2 and 16 in info["fans"]
     assert before[cx] == after[cx] + sum(k * after[t] for k, t in info["fans"].items())
+
+
+#: Gidney's measurement-based uncompute of one adder step (gidneyMeasInteriorRev in FormalRV's
+#: Gidney 2025, its `se` lines left out): two lattice-surgery CNOTs, an H-bar triple, a
+#: measurement of Z-bar, and a lattice-surgery CZ under its outcome
+UNCOMPUTE = (
+    "prep l0 X", "ppm Z p0 Z l0 -> o0", "decode p0 l0", "ppm X l0 X p1 X p2 -> o1", "decode l0 p1 p2",
+    "read l0 Z -> o2", "decode l0", "if o1: z p0", "if o0: x p1", "if o0: x p2", "if o2: x p1",
+    "if o2: x p2", "prep l1 X", "ppm Z p3 Z l1 -> o3", "decode p3 l1", "ppm X l1 X p0 -> o4",
+    "decode l1 p0", "read l1 Z -> o5", "decode l1", "if o4: z p3", "if o3: x p0", "if o5: x p0",
+    "prep l2 Y", "ppm Z p0 Z l2 -> o6", "decode p0 l2", "read l2 X -> o7", "decode l2", "if o6: z p0",
+    "if o7: z p0", "prep l3 Y", "ppm X p0 Z l3 -> o8", "decode p0 l3", "read l3 X -> o9", "decode l3",
+    "if o8: x p0", "if o9: x p0", "prep l4 Y", "ppm Z p0 Z l4 -> o10", "decode p0 l4",
+    "read l4 X -> o11", "decode l4", "if o10: z p0", "if o11: z p0", "ppm Z p0 -> o12", "decode p0",
+    "if o12: x p4", "if o12: prep l5 X", "if o12: ppm Z p5 Z l5 -> o13", "if o12: decode p5 l5",
+    "if o12: ppm X l5 Z p4 -> o14", "if o12: decode l5 p4", "if o12: read l5 Z -> o15",
+    "if o12: decode l5", "if o12 & o14: z p5", "if o12 & o13: z p4", "if o12 & o15: z p4",
+    "if o12: x p4", "if o12: x p0")
+
+
+def test_the_surgery_machine_rewrite_of_an_uncompute_step():
+    """`surgery_rewrite` (slice S9): the H-bar triple goes to `ht`, the `ht; ppm Z; if o: x`
+    that follows to an X-bar readout and a fresh |0-bar> (no H-bar left), and the CZ's mixed
+    product to H-bar on its ancilla between two Z-bar Z-bar merges; products stay merges.  Each
+    step is the same channel (the exact simulator, every branch), and the whole rewrite is too."""
+    t = _t(UNCOMPUTE, 6, 6, 16)
+    new, n = C.surgery_rewrite(t)
+    assert n == {"ht": 1, "measure X": 1, "cz": 1}
+    body = [ln.split(": ", 1)[-1] for ln in new.lines]
+    assert "read p0 X -> o12" in body and "prep p0 Z" in body
+    assert body.count("ht l5") == 1 and "ht p0" not in body
+    assert not any(ln.startswith("prep") and ln.endswith("Y") for ln in body)
+    assert [ln for ln in body if ln.startswith("ppm")] == [
+        "ppm Z p0 Z l0 -> o0", "ppm X l0 X p1 X p2 -> o1", "ppm Z p3 Z l1 -> o3", "ppm X l1 X p0 -> o4",
+        "ppm Z p5 Z l5 -> o13", "ppm Z l5 Z p4 -> o14"]
+    assert C.equal_drop(C._strip(t), new)
