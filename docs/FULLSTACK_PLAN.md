@@ -1093,6 +1093,37 @@ for d = 3, 5, 7, 9, 11, with (d - 1) / 2 padding rounds and the noise removed, a
 So S̄ is `prep L Y; ppm Z p Z L; read L X` (FormalRV's own), all concrete, and the factory can
 be built.
 
+**Injection and the 15-to-1 at the logical level (2026-11-01).**
+- **Injection:** `injection(d, basis)` puts the state on the corner of a patch. Row 0 and the
+  upper-right triangle start in |0>, column 0 and the lower-left in |+> (Li 2015). stim's flow
+  solver shows the map from the corner to the patch is an encoding (Z on the corner to Z̄, X to
+  X̄), so it injects any state, T|+> included. Its circuit distance is 1, as an injection's is.
+  Tiled, every rule and R10; the T itself is one virtual Z on the corner ion.
+- **15-to-1:** prepare five patches in |+>. For each of the 15 nonzero v in F₂⁴, apply a π/8
+  rotation of Z on the patches of supp(v) and the output patch. Then read the first four in X.
+  By state vector, with no faults it accepts with probability 1 and outputs T†|+>. Every single
+  and double fault in a magic state is caught, and exactly 35 triple-fault sets are not: the
+  textbook 35 p³.
+- **On the lattice:** each rotation is a corridor merge (2 to 5 patches and the injected one),
+  the injected patch's X readout, and S̄ on the product half the time (`prep Y`, a merge, a
+  readout).
+- **`qccd.fullstack.scale.factory.distill_15to1`:** the 15-to-1 as lattice instructions. Run
+  on a state vector with outcomes sampled and frames applied, every faultless run accepts and
+  leaves exactly T†|+>, and a Z fault on any one of the 15 magic states is always rejected.
+  Scheduled, it takes 4.24 s on about 34 tiles: 99 gadgets, check clean. The 15 rotations all
+  touch the output patch, so they run in turn, each a merge and a correction merge reserved
+  either way. It uses 30 distinct merge shapes, which are not yet compiled at d = 11.
+- **Injection error under the machine's noise (sampled, tiled at qccd-physics-best):**
+
+  | d | Z basis | X basis | sum |
+  |---|---|---|---|
+  | 3 | 2.0e-4 | 3.6e-4 | ~6e-4 |
+  | 5 | 2.5e-4 | 7.2e-4 | ~1e-3 |
+
+  It grows with d in X, so take p_inj ~ 1e-3. One 15-to-1 level then gives 35 p³ ~ 3.5e-8 a
+  T, far from enough alone. 8T -> CCZ on those gives 28 (3.5e-8)² ~ 3e-14 a CCZ, about 0.003 %
+  of shots over the 8.1e8 CCZ. So the two levels planned suffice, with room.
+
 Budget for the 8.1e8 CCZ a shot. One level of 15-to-1 from injected T gives 35 p³ a T: 3.5e-11
 at p = 1e-4, 4.4e-12 at p = 5e-5. Spending 7 such T on each CCZ loses about 20 % of shots at
 p = 1e-4 (2.5 % at p = 5e-5). Feeding them to 8T -> CCZ (msccz's protocol, 28 p² on its

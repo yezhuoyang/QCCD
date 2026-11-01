@@ -21,6 +21,8 @@ Held here:
   product, keeps every patch's logical and keeps distance d; tiled, every rule and R10;
 * |Ȳ> (`y_memory`, Gidney's in-place Y basis on our lattice) is prepared and measured at
   distance d; tiled, every rule and R10;
+* an injection (`injection`) encodes whatever state its corner holds (stim's flows), at circuit
+  distance 1 as an injection must; tiled, every rule and R10;
 * the Shor machine (`qccd.fullstack.scale.machine`): a round at its distance on its physics
   (qccd-physics-best) passes every rule and R10;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
@@ -341,3 +343,44 @@ def test_a_circuit_that_is_not_a_surface_patch_is_refused_saying_why():
         compile_tiled(bad, 3)
     with pytest.raises(TiledError, match="not between a data ion and a measure ion"):
         compile_tiled(exp.qasm.replace("cx q[10],q[1];", "cx q[0],q[1];", 1), 3)
+
+
+def test_an_injection_encodes_the_corner_whatever_its_state():
+    """`injection`: with the corner left as an input, Z on it flows to Z-bar and X to X-bar, each
+    up to measured parities (stim's flow solver), so the patch encodes any state put there -- T|+>
+    too; injected |0> and |+> read back deterministically; and its circuit distance is 1, as an
+    injection's is (a corner fault before the first round), which distillation is for."""
+    import stim
+
+    from qccd.qec.experiments import ideal_stim, injection
+    for d in (3, 5):
+        for basis in "ZX":
+            exp = injection(d, basis)
+            c = ideal_stim(exp)
+            c.detector_error_model()
+            assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+            assert len(ideal_stim(exp, 1e-3).shortest_graphlike_error(ignore_ungraphlike_errors=True)) == 1
+        exp = injection(d, "Z")
+        bare = str(ideal_stim(type(exp)(**{**exp.__dict__, "detectors": (), "observables": (),
+                                           "readout_bits": ()})))
+        lines = bare.splitlines()
+        lines[0] = "R " + " ".join(t for t in lines[0].split()[1:] if t != "0")   # the corner: an input
+        c = stim.Circuit("\n".join(lines))
+        n = c.num_qubits
+        zin, xin, zbar, xbar = (stim.PauliString(n) for _ in range(4))
+        zin[0], xin[0] = "Z", "X"
+        for k in range(d):
+            zbar[k], xbar[k * d] = "Z", "X"
+        found = c.solve_flow_measurements([stim.Flow(input=zin, output=zbar), stim.Flow(input=xin, output=xbar)])
+        assert all(f is not None for f in found)
+
+
+def test_an_injection_is_played_on_the_tiled_grid(tmp_path):
+    from qccd.qec.experiments import injection
+    exp = injection(3, "X")
+    a = device(3, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, 3, arch=a, coords=exp.coords, faces=exp.faces)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)

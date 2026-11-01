@@ -100,6 +100,7 @@ __all__ = [
     "corridor_merge",
     "y_memory",
     "y_prep_qasm",
+    "injection",
     "EXPERIMENTS",
     "READOUTS",
     "get",
@@ -909,6 +910,45 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
                             detectors=dets, observables=tuple(obs), readout="appended",
                             readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
                             readout_basis=tuple(prep[q] for q in range(len(coords))),
+                            coords=tuple(coords), faces=faces)
+
+
+def injection(d: int, basis: str = "Z", rounds: int | None = None, *, corner=None) -> MemoryExperiment:
+    """A state injected into a distance-d patch at its corner (Li 2015): data (0, 0) holds the
+    state, the rest of row 0 and the upper-right triangle (c >= r) start in |0>, column 0 and the
+    lower-left (r > c) in |+> -- so Z̄ (row 0) is Z on the corner times |0>s and X̄ (column 0) X on
+    the corner times |+>s, and the patch encodes the corner's state.  `rounds` (default d) rounds
+    follow; a check is compared from its first round only if every data it touches was prepared
+    in its basis, so the corner's checks start random.
+
+    `corner`: the one-qubit gates that make the corner's state from |0> (default: none for
+    `basis` "Z", `h` for "X"); the experiment reads every data qubit in `basis`, its observable
+    the logical there.  Injection is not fault tolerant -- a fault on the corner before the first
+    round is a logical error no detector sees (circuit distance 1) -- which is why its states
+    are distilled.  The map it makes from the corner to the patch is checked by stim's flows (Z
+    on the corner to Z̄, X to X̄, each up to measured parities), so it injects any state, T|+>
+    too."""
+    if basis not in ("X", "Z"):
+        raise ValueError(f"basis must be 'X' or 'Z', not {basis!r}")
+    r = d if rounds is None else rounds
+    coords = [(i, j) for i in range(d) for j in range(d)]
+    index = {x: q for q, x in enumerate(coords)}
+    std = {"top": lambda k: "X", "bottom": lambda k: "X", "left": lambda k: "Z", "right": lambda k: "Z"}
+    checks = _region((0, 0), d, d, std, index)
+    prep = {index[(i, j)]: ("Z" if j >= i else "X") for i, j in coords if (i, j) != (0, 0)}
+    corner = (() if basis == "Z" else ("h",)) if corner is None else tuple(corner)
+    final = dict.fromkeys(range(len(coords)), basis)
+    name = f"inject{d}_{basis.lower()}_r{r}"
+    qasm, dets, bits, faces = _phased(f"{name}: a state injected at the corner of a d = {d} patch, "
+                                      f"{r} round(s)", len(coords), [_Phase(tuple(checks), r, prep=prep)], final)
+    lines = qasm.splitlines()
+    qasm = "\n".join(lines[:5] + [f"{g} q[0];" for g in corner] + lines[5:]) + "\n"
+    lg = [index[(0, j)] for j in range(d)] if basis == "Z" else [index[(i, 0)] for i in range(d)]
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_injection", distance=d, rounds=r,
+                            basis=basis, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+                            detectors=dets, observables=(tuple(sorted(bits["final", q] for q in lg)),),
+                            readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
                             coords=tuple(coords), faces=faces)
 
 

@@ -216,7 +216,8 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs()) -> list
                 return False
             for a in prods:
                 L = a[0::2][a[1::2].index(blk)]
-                others = {where.get(b) for b in a[1::2] if b != blk}
+                # facing a partner joins two patches only; a product of more needs a bus side
+                others = {where.get(b) for b in a[1::2] if b != blk} if len(a) == 4 else set()
                 if not any(board.bus(_nb(c, s)) or _nb(c, s) in others for s in LETTER_SIDES[L]):
                     return False
             return True
