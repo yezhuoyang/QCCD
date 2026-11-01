@@ -36,6 +36,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import math
+
 import pytest
 
 from qccd.compile.cooling import insert_cooling
@@ -44,7 +46,7 @@ from qccd.cost.models import corrected_model
 from qccd.qec.experiments import rotated_surface
 from qccd.verify import verify
 
-from test_c2lr_router import BRIDGE, _r10
+from test_c2lr_router import BRIDGE, _r10, _r10_blocks
 
 
 @pytest.mark.parametrize("d, rounds", [(3, 1), (5, 3), (9, 2)])
@@ -256,6 +258,28 @@ def test_a_corridor_merge_is_played_on_the_tiled_grid(shape, tmp_path):
     rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
     assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
     _r10(prog, cert, a, exp.qasm, tmp_path)
+
+
+def test_r10_block_by_block_agrees_and_catches_a_wrong_pulse(tmp_path):
+    """`_r10_blocks`, R10's tableau one block at a time (its memory a block's, not the
+    program's): on a tiled corridor merge it passes wherever the blocks are cut, as the whole
+    check does, and a pulse a quarter turn off deep in the program fails it."""
+    import dataclasses
+    from qccd.qec.experiments import corridor_merge
+    letter, patches, corridor = CORRIDORS["bend"]
+    exp = corridor_merge(3, letter, patches, corridor, 3)
+    rows, cols = (max(x[k] for x in exp.coords) + 1 for k in (0, 1))
+    a = device(rows, cols, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords, faces=exp.faces)
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+    assert [_r10_blocks(prog, cert, a, exp.qasm, tmp_path, n) for n in (50, 300, 10**9)][-1] == 1
+    rs = [k for k, i in enumerate(prog.instructions) if i.type == "gate" and i.gate == "R"]
+    k = rs[len(rs) // 2]
+    ps = [list(x) for x in prog.instructions[k].params]
+    ps[0][0] += math.pi / 2
+    prog.instructions[k] = dataclasses.replace(prog.instructions[k], params=tuple(map(tuple, ps)))
+    with pytest.raises(AssertionError, match="the tableaux differ"):
+        _r10_blocks(prog, cert, a, exp.qasm, tmp_path, 50)
 
 
 def test_gidneys_y_basis_memory_is_ours_at_full_distance():

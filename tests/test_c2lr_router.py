@@ -70,6 +70,69 @@ def _r10(prog, cert, arch, qasm: str, tmp_path: Path) -> None:
         cc.circuit_tableau(p, cert["n_qubits"], src, anc)
 
 
+class _Part:
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+
+def _r10_blocks(prog, cert, arch, qasm: str, tmp_path: Path, block_ops: int = 2000) -> int:
+    """`_r10` with the tableau compared block by block, so its memory follows a block, not the
+    program: one tableau of n + every readout (each deferred onto a fresh qubit) is (n +
+    readouts)^2 bits, ~17 GB for a 25-round merge of 8,000 ions.  The circuit is cut at source
+    indices no instruction straddles (each names the ops it performs, `meta.op`); block k's
+    instructions are compared with block k's ops, every readout of the block deferred onto a
+    block-local fresh qubit.  Sound: `check_program_order` makes every qubit run its ops in
+    source order, so instructions of different blocks that run out of block order touch
+    disjoint qubits and commute -- the program is the blocks in order, and equal blocks multiply
+    to equal wholes; deferring every readout (`_r10` drops a qubit's last on both sides) only
+    adds to what is compared.  Returns the number of blocks."""
+    cc = _cc()
+    p = tmp_path / "c.qasm"
+    p.write_text(qasm, encoding="utf-8")
+    qc = cc.load_source(p)
+    src = cc.source_ops(qc)
+    assert cc.check_binding(cert, qc, src) == []
+    assert cc.check_o1(cert, arch) == []
+    assert cc.check_witnesses(cert, prog) == []
+    assert cc.check_program_transport(cert, prog, arch) == []
+    assert cc.check_program_order(cert, prog) == []
+    n = cert["n_qubits"]
+    qubit_of = {ion: int(q) for q, ion in cert["map"].items()}
+    work = [ins for ins in prog.instructions if ins.type in ("gate", "measure", "reset")]
+    span = []
+    for ins in work:
+        ops = [int(i) for i in ((ins.meta or {}).get("op") or [])]
+        assert ops, f"instruction {ins.id} names no op"
+        span.append((min(ops), max(ops)))
+    straddle = [0] * (len(src) + 2)          # a cut at b: no instruction has ops on both sides
+    for lo, hi in span:
+        if hi > lo:
+            straddle[lo + 1] += 1
+            straddle[hi + 1] -= 1
+    run, cuts = 0, [0]
+    for b in range(1, len(src) + 1):
+        run += straddle[b]
+        if b == len(src) or (run == 0 and b - cuts[-1] >= block_ops):
+            cuts.append(b)
+    owner = [next(k for k in range(len(cuts) - 1) if cuts[k] <= lo < cuts[k + 1]) for lo, _ in span]
+    for k in range(len(cuts) - 1):
+        ops = src[cuts[k]:cuts[k + 1]]
+        part = _Part([ins for ins, o in zip(work, owner) if o == k])
+        mine, theirs = {}, {}
+        for o in ops:
+            if o["name"] in ("measure", "reset"):
+                mine.setdefault(o["qubits"][0], []).append(o["name"])
+        for gate, qs, _ in cc.program_steps(part, qubit_of):
+            if gate in ("measure", "reset"):
+                theirs.setdefault(qs[0], []).append(gate)
+        assert mine == theirs, f"block {k}: the readouts differ"
+        events = [(q, j) for q, seq in mine.items() for j in range(len(seq))]
+        anc = {e: n + i for i, e in enumerate(events)}
+        assert cc.tableau_from_program(part, cert, n, anc) == cc.circuit_tableau(p, n, ops, anc), \
+            f"block {k} (ops {cuts[k]}..{cuts[k + 1]}): the tableaux differ"
+    return len(cuts) - 1
+
+
 @pytest.mark.parametrize("release, size, species", [
     (REP5, (5, 2), "Ba-Sr"), (REP5, (3, 3), "Yb-Ba"), (SURFACE3, (4, 5), "Ba-Sr")])
 def test_the_router_compiles_a_memory_board_and_every_check_holds(release, size, species, tmp_path):
