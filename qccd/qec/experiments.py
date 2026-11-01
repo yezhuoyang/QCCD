@@ -866,8 +866,17 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
     for x, y in corridor:
         pts |= _tile(d, (x, y))
         pts |= set().union(*(_seam(d, (x, y), n) for n in ((x + 1, y), (x, y + 1)) if n in corridor))
+    # a slit: two tiles of the region side by side, their seam left open (a patch's side that
+    # does not join).  A crossing that closed a slit at both ends would enclose a hole -- a
+    # boundary all of one type, a logical qubit too many -- so a crossing on a slit stays open
+    region = corridor | set(sides)
+    joined = {frozenset((t, (t[0] + _SIDE[s][1], t[1] + _SIDE[s][0]))) for t, s in sides.items()}
+    slit = lambda a, b: a in region and b in region and not (a in corridor and b in corridor) \
+        and frozenset((a, b)) not in joined
     for cx, cy in {(x - i, y - j) for x, y in corridor for i in (0, 1) for j in (0, 1)}:
-        if sum(t in corridor for t in ((cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1))) >= 3:
+        a, b, c, e = (cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)
+        if (sum(t in corridor for t in (a, b, c, e)) >= 3
+                and not any(slit(u, v) for u, v in ((a, b), (c, e), (a, c), (b, e)))):
             pts.add((cy * p + d, cx * p + d))
     inside = set().union(*held)
     pts = _cut_corners(pts, inside, letter)

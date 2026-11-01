@@ -219,6 +219,11 @@ CORRIDORS = {
     "facing": ("Z", [((0, 0), "bottom"), ((0, 1), "top")], set()),
     "facing and a corridor": ("X", [((0, 1), "right"), ((1, 1), "left"), ((2, 0), "left"), ((2, 2), "left")],
                               {(1, 0), (1, 2)}),
+    # a corridor wrapping a patch: its far side and its top face the corridor across open seams
+    "slits": ("X", [((0, 1), "right"), ((2, 1), "right"), ((4, 1), "left")],
+              {(1, 0), (1, 1), (2, 0), (3, 0), (3, 1)}),
+    "slits in a column": ("Z", [((1, 0), "bottom"), ((1, 2), "top"), ((1, 4), "top")],
+                          {(0, 1), (0, 2), (0, 3), (1, 1), (1, 3)}),
 }
 
 
@@ -227,8 +232,8 @@ def test_a_corridor_merge_measures_the_product_and_keeps_every_logical(shape):
     """`corridor_merge`: noiselessly the product and every patch's own logical are
     deterministic (so the merged region holds one logical qubit fewer than the patches), and the
     circuit keeps distance d -- for a U, a bend either way, three patches in a row, a fan-out
-    column, a long X̄X̄ path, two patches facing (no corridor) and facing patches joined to a
-    corridor."""
+    column, a long X̄X̄ path, two patches facing (no corridor), facing patches joined to a
+    corridor, and corridors wrapping a patch, whose open seams must not enclose a hole."""
     from qccd.qec.experiments import corridor_merge, ideal_stim
     letter, patches, corridor = CORRIDORS[shape]
     for d in (3, 5):

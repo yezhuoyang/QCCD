@@ -2,14 +2,17 @@
 step 3): one real call, expanded at the PPM level, run by the patch-lattice scheduler.
 
 The program is FormalRV's Gidney 2025 at RSA-2048 on its paper machine (the FormalRV checkout,
-`qccd.fullstack.formalrv.root()`), every template without a magic state rewritten for the
-surgery machine (`codesign.surgery_rewrite`, each step proved).  One call of gidneyAddNoCarry
-(n = 32) is expanded; its forward half (31 CCZ states) waits for step 4's factory, and the rest
--- the final CNOT cascade and the measurement-based uncompute -- is scheduled on a tile-in-a-sea
-lattice, bit i's three blocks in column 2i, and checked (`lattice.check`).  Prints the schedule's
-numbers and every distinct program it is made of.
+`qccd.fullstack.formalrv.root()`), every template rewritten for the surgery machine
+(`codesign.surgery_rewrite`, each step proved; the Toffolis' |AutoCCZ> held as the factory makes
+it).  One call of gidneyAddNoCarry (n = 32) is expanded.  Alone, the rest of it -- the final
+CNOT cascade and the measurement-based uncompute, no CCZ state -- is scheduled on a
+tile-in-a-sea lattice, bit i's three blocks in column 2i; with `--farm` the whole call is, its
+31 |AutoCCZ> states made by 31 factories in a row (`factory.Farm`), bit i's blocks beneath
+factory i -- so every Toffoli reaches its factory alike and the shapes repeat.  Either is
+checked (`lattice.check`).  Prints the schedule's numbers and every distinct program it is
+made of.
 
-    python tools/lattice_adder.py [--shapes FILE]    FILE: the distinct shapes, as JSON
+    python tools/lattice_adder.py [--farm] [--shapes FILE]    FILE: the distinct shapes
 """
 from __future__ import annotations
 
@@ -80,11 +83,11 @@ def adder_streams():
     from qccd.fullstack.scale import codesign as C
     from qccd.fullstack.scale import program as P
     prog = build()
+    keep = C.exports(prog)
     for tid, t in list(prog.templates.items()):
-        if not any(ln.split(": ", 1)[-1].startswith("autoccz") for ln in t.lines):
-            new, n = C.surgery_rewrite(t)
-            if n:
-                prog.templates[tid] = new
+        new, n = C.surgery_rewrite(t, keep.get(tid, set()))
+        if n:
+            prog.templates[tid] = new
     call, env, env2 = first_call(prog, "gidneyAddNoCarry", 32)
     body = prog.body_of(call, env)
     ex = P._Exp(prog)
@@ -103,8 +106,10 @@ def adder_streams():
 
 def main():
     from qccd.fullstack.scale.lattice import check, columns, schedule
+    from qccd.fullstack.scale.factory import Farm
     ap = argparse.ArgumentParser()
     ap.add_argument("--shapes")
+    ap.add_argument("--farm", action="store_true")
     a = ap.parse_args()
     forward, half = adder_streams()
     print(f"forward half {len(forward)} instructions ({dict(Counter(w for w, *_ in forward))}); "
@@ -112,13 +117,27 @@ def main():
     blocks = sorted({b for w, x, _, _ in half for b in (x[1::2] if w == "ppm" else x[:1]) if b.startswith("q")},
                     key=lambda s: int(s[1:]))
     homes, bounds = columns(blocks, 3)
-    gadgets = schedule(half, homes, bounds)
+    stream, walls, farm = half, set(), None
+    if a.farm:
+        n = sum(w == "autoccz_h" for w, *_ in forward)
+        farm = Farm(n, x0=0, y=0, serve=lambda k: k)
+        stream, walls = farm.ports(forward) + half, farm.walls()
+        homes = farm.beneath(blocks, 3)
+        xs, ys = [x for x, _ in homes.values()], [y for _, y in homes.values()]
+        fb = farm.bounds()
+        bounds = (min(fb[0], min(xs) - 1), fb[1], max(fb[2], max(xs) + 1), max(ys) + 1)
+        homes = {**homes, **farm.all_homes()}
+    gadgets = schedule(stream, homes, bounds, walls=walls, macro=farm and farm.macro)
     span = max(g.t1 for g in gadgets)
     busy = sum(g.t1 - g.t0 for g in gadgets)
     tiles = (bounds[2] - bounds[0] + 1) * (bounds[3] - bounds[1] + 1)
-    print(f"{len(gadgets)} gadgets ({dict(Counter(g.kind for g in gadgets))}) on {tiles} tiles "
-          f"({len(homes)} homes); machine time {span / 1e6:.3f} s, {busy / span:.1f} gadgets at once")
-    print("check:", check(half, gadgets) or "clean")
+    print(f"{len(gadgets)} gadgets ({dict(Counter(g.kind for g in gadgets))}) on {tiles} tiles; "
+          f"machine time {span / 1e6:.3f} s, {busy / span:.1f} gadgets at once")
+    if farm:
+        n_fwd = len(farm.ports(forward))
+        print(f"the forward half done at {max(g.t1 for g in gadgets if g.line < n_fwd) / 1e6:.3f} s; "
+              f"states per factory {sorted(Counter(f for _, f, _ in farm.served).values())}")
+    print("check:", check(stream, gadgets) or "clean")
     shapes = Counter(g.shape for g in gadgets)
     print(f"{len(shapes)} distinct programs:")
     for s, n in shapes.most_common():

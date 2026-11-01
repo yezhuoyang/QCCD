@@ -312,16 +312,89 @@ def _cz_turn(lines: list):
     return None
 
 
-def surgery_rewrite(t: Template):
+def _held(lines: list):
+    """`autoccz s0 .. s8` -> `autoccz_h s0 .. s8`: the surgery machine's factory holds the sites
+    at `factory.TURNED` H-turned (its X̄_t Z̄_z becomes X̄X̄), so X and Z swap on them in every
+    later line until a site is made again -- exact: a read of H|ψ> in B is a read of |ψ> in HBH
+    (and `tests/test_scale_factory.py` runs FormalRV's Toffoli on the factory's state).  The
+    lines rewritten, or None."""
+    from .factory import TURNED
+    sw = {"X": "Z", "Z": "X", "x": "z", "z": "x"}
+    for i, ln in enumerate(lines):
+        if not _body(ln).startswith("autoccz "):
+            continue
+        sites = _body(ln).split()[1:]
+        turn = {sites[k] for k in TURNED}
+        new = lines[:i] + [_guard(ln) + "autoccz_h " + " ".join(sites)]
+        for x in lines[i + 1:]:
+            w = _body(x).split()
+            if w[0] == "prep":
+                turn.discard(w[1])
+            elif w[0] == "ppm":
+                w = [sw[w[k]] if 1 <= k < len(w) - 2 and k % 2 == 1 and w[k + 1] in turn else w[k]
+                     for k in range(len(w))]
+            elif w[0] == "read" and w[1] in turn:
+                w[2] = sw[w[2]]
+            elif w[0] in ("x", "z") and w[1] in turn:
+                w[0] = sw[w[0]]
+            new.append(_guard(x) + " ".join(w))
+        return new
+    return None
+
+
+#: FormalRV's CNOT as three |Ȳ> rotations -- S̄ on c, exp(-iπ/4 Z̄_c X̄_t), √X̄ on t -- in
+#: `_canon` form, c = p0 and t = p1 (Gidney 2025's adder, bit 0)
+_ROT_CX = ("prep l0 Y", "ppm Z p0 Z l0 -> o0", "read l0 X -> o1", "if o0: z p0", "if o1: z p0", "z p0",
+           "prep l1 Y", "ppm Z p0 X p1 Z l1 -> o2", "read l1 X -> o3", "if o2: z p0", "if o2: x p1",
+           "if o3: z p0", "if o3: x p1",
+           "prep l2 Y", "ppm X p1 Z l2 -> o4", "read l2 X -> o5", "if o4: x p1", "if o5: x p1", "x p1")
+
+
+def _rotation_cx(lines: list, keep=frozenset()):
+    """`_ROT_CX` -> FormalRV's lattice-surgery CNOT (`prep L X; ppm Z c Z L; ppm X L X t; read L
+    Z`), when no later line and no call site (`keep`) reads its six outcomes: both are `cx c t`
+    once their outcomes are forgotten (`equal_drop`, on the segment alone: equal channels stay
+    equal in any context).  The lines rewritten, or None."""
+    n = len(_ROT_CX)
+    for i in range(len(lines) - n + 1):
+        m = re.fullmatch(r"prep (l\d+) Y", lines[i])
+        m2 = m and re.fullmatch(rf"ppm Z ([pl]\d+) Z {m[1]} -> o\d+", lines[i + 1])
+        if not m2:
+            continue
+        seg = lines[i:i + n]
+        t = next((w for w in re.findall(r"\b[pl]\d+\b", seg[7]) if w not in (m[1], m2[1])), None)
+        if t is None or _canon(seg, {m2[1]: "p0", t: "p1"}) != _ROT_CX:
+            continue
+        outs = re.findall(r"-> (o\d+)", "\n".join(seg))
+        if set(outs) & set(keep) or any(re.search(rf"\b{o}\b", x) for x in lines[i + n:] for o in outs):
+            continue
+        c, L, (oa, ob, oc) = m2[1], m[1], outs[:3]
+        new = [f"prep {L} X", f"ppm Z {c} Z {L} -> {oa}", f"ppm X {L} X {t} -> {ob}", f"read {L} Z -> {oc}",
+               f"if {ob}: z {c}", f"if {oa}: x {t}", f"if {oc}: x {t}"]
+        cx = Template("cx", ("cx p0 p1",), (0,), 2, 0, 0, 0)
+        for s in (seg, new):
+            body = _canon(s, {c: "p0", t: "p1"})
+            local = Template("seg", body, (0,) * len(body), 2, len(set(re.findall(r"\bl\d+\b", " ".join(body)))),
+                             len(set(re.findall(r"\bo\d+\b", " ".join(body)))), 0)
+            if not equal_drop(local, cx):
+                raise AssertionError(f"lines {i}..{i + n}: not a CNOT")
+        return lines[:i] + new + lines[i + n:]
+    return None
+
+
+def surgery_rewrite(t: Template, keep=frozenset()):
     """(the template for the surgery machine, Counter of what was rewritten) -- docs/
     FULLSTACK_PLAN.md S9: there a Pauli product is a corridor merge, native, so products stay;
     what goes is what the machine does better:
     * FormalRV's H̄ triple -> `ht` (the H̄ gadget, `qccd.qec.experiments.hadamard_bar`);
     * `ht P; ppm Z P; ...; if o: x P` -> `read P X; prep P Z`: X̄ read out, |0̄> made, no H̄;
-    * a CZ's mixed product -> H̄ on its ancilla between its two merges (`_cz_turn`).
+    * a CZ's mixed product -> H̄ on its ancilla between its two merges (`_cz_turn`);
+    * `autoccz` -> `autoccz_h`, the factory's state, its consumer's letters swapped (`_held`);
+    * a CNOT as three |Ȳ> rotations -> a lattice-surgery CNOT (`_rotation_cx`).
     Every step is proved by the exact simulator on the whole template (se and decode lines
-    dropped: they leave the state alone); a template with a magic state is not run whole, and
-    keeps all but its proved H̄ triples."""
+    dropped: they leave the state alone); a template with a magic state is not run whole: its
+    H̄ triples, held sites and rotation CNOTs rest on their own proofs.  `keep`: outcomes a call
+    site hands on (`exports`), which no rewrite may drop."""
     n: Counter = Counter()
     lines, out, i = list(t.lines), [], 0
     while i < len(lines):
@@ -339,7 +412,11 @@ def surgery_rewrite(t: Template):
         i += 1
     cur = _strip(Template(t.tid, tuple(out), (0,) * len(out), t.n_params, t.n_locals, t.n_out, t.n_ext))
     if any(_body(ln).startswith("autoccz") for ln in cur.lines):
-        return cur, n
+        new = list(cur.lines)
+        for name, step in (("held", _held), ("rotation cx", lambda ls: _rotation_cx(ls, keep))):
+            while (got := step(new)) is not None:
+                new, n[name] = got, n[name] + 1
+        return Template(t.tid, tuple(new), (0,) * len(new), t.n_params, t.n_locals, t.n_out, t.n_ext), n
     for name, step in (("measure X", _measure_x), ("cz", _cz_turn)):
         while True:
             new = step(list(cur.lines))

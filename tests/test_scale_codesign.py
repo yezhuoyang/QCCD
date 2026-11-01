@@ -12,7 +12,10 @@ need none, and is a theorem, proved by the exact simulator.  What is held here:
   uncompute template -- no magic state, so the simulator runs it whole -- is proved equal to
   its rewrite, every branch;
 * a rewrite never drops an outcome a call site hands on;
-* fusing the lookups' rows keeps the number of CNOTs exactly.
+* fusing the lookups' rows keeps the number of CNOTs exactly;
+* in a template with an |AutoCCZ> state (not run whole): the factory's held sites swap their
+  consumer's letters, and FormalRV's CNOT as three |Y-bar> rotations becomes a lattice-surgery
+  CNOT -- unless a later line or a call site reads its outcomes.
 """
 from __future__ import annotations
 
@@ -173,3 +176,28 @@ def test_the_surgery_machine_rewrite_of_an_uncompute_step():
         "ppm Z p0 Z l0 -> o0", "ppm X l0 X p1 X p2 -> o1", "ppm Z p3 Z l1 -> o3", "ppm X l1 X p0 -> o4",
         "ppm Z p5 Z l5 -> o13", "ppm Z l5 Z p4 -> o14"]
     assert C.equal_drop(C._strip(t), new)
+
+
+#: a Toffoli's first lines and Gidney 2025's bit-0 CNOT as three |Y-bar> rotations (`se` and
+#: `decode` lines left out)
+TOFFOLI_AND_CX = (
+    "autoccz l0 l1 l2 l3 l4 l5 l6 l7 l8", "ppm Z p0 Z l0 -> o0", "ppm Z p1 Z l1 -> o1",
+    "ppm X p2 Z l2 -> o2", "read l2 X -> o3", "if o0: read l4 Z -> o4", "if !o0: read l4 X -> o5",
+    "if o0 & o4: x p2", "prep l9 Y", "ppm Z p2 Z l9 -> o6", "read l9 X -> o7", "if o6: z p2", "if o7: z p2",
+    "z p2", "prep l10 Y", "ppm Z p2 X p3 Z l10 -> o8", "read l10 X -> o9", "if o8: z p2", "if o8: x p3",
+    "if o9: z p2", "if o9: x p3", "prep l11 Y", "ppm X p3 Z l11 -> o10", "read l11 X -> o11",
+    "if o10: x p3", "if o11: x p3", "x p3")
+
+
+def test_a_toffolis_template_holds_the_factorys_sites_and_its_rotation_cnot_goes():
+    new, n = C.surgery_rewrite(_t(TOFFOLI_AND_CX, 4, 12, 12))
+    assert n == {"held": 1, "rotation cx": 1}
+    body = list(new.lines)
+    assert body[0] == "autoccz_h l0 l1 l2 l3 l4 l5 l6 l7 l8"
+    assert body[3:7] == ["ppm X p2 X l2 -> o2", "read l2 Z -> o3", "if o0: read l4 X -> o4",
+                         "if !o0: read l4 Z -> o5"]
+    assert body[8:] == ["prep l9 X", "ppm Z p2 Z l9 -> o6", "ppm X l9 X p3 -> o7", "read l9 Z -> o8",
+                        "if o7: z p2", "if o6: x p3", "if o8: x p3"]
+    # an outcome a call site hands on keeps the rotations
+    _, n = C.surgery_rewrite(_t(TOFFOLI_AND_CX, 4, 12, 12), keep={"o9"})
+    assert n == {"held": 1}

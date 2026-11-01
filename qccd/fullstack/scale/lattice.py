@@ -29,11 +29,12 @@ read) checks the whole run.
 """
 from __future__ import annotations
 
+import bisect
 import math
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
-__all__ = ["Costs", "Gadget", "schedule", "check", "columns", "LatticeError"]
+__all__ = ["Costs", "Gadget", "schedule", "check", "columns", "holds", "shifted", "LatticeError"]
 
 INF = math.inf
 SIDES = {"top": (0, -1), "bottom": (0, 1), "left": (-1, 0), "right": (1, 0)}
@@ -78,16 +79,41 @@ class Gadget:
     detail: dict = field(default_factory=dict)
 
 
+def shifted(g: Gadget, dx: int, dy: int, line: int = 0, rename=lambda b: b, dt: float = 0.0) -> Gadget:
+    """`g` translated by (dx, dy) tiles and `dt` µs, its line moved by `line`, its blocks renamed:
+    a copy of a unit scheduled once (the same shape, so the same checked program)."""
+    mv = lambda t: (t[0] + dx, t[1] + dy)
+    det = dict(g.detail)
+    for key in ("corridor", "tiles"):
+        if key in det:
+            det[key] = [mv(t) for t in det[key]]
+    return Gadget(g.kind, g.t0 + dt, g.t1 + dt, frozenset(mv(t) for t in g.tiles), g.shape, g.line + line,
+                  tuple(rename(b) for b in g.blocks), det)
+
+
+def holds(gadgets) -> list:
+    """(tile, t0, t1, block): a block lives on its tile from its preparation to its readout."""
+    opened, out = {}, []
+    for gd in sorted(gadgets, key=lambda g: g.line):
+        if gd.kind == "prep":
+            opened[gd.blocks[0]] = (next(iter(gd.tiles)), gd.t0)
+        elif gd.kind == "read" and gd.blocks[0] in opened:
+            tile, t0 = opened.pop(gd.blocks[0])
+            out.append((tile, t0, gd.t1, gd.blocks[0]))
+    return out
+
+
 def _nb(t, side):
     dx, dy = SIDES[side]
     return (t[0] + dx, t[1] + dy)
 
 
 class _Board:
-    def __init__(self, homes: dict, bounds: tuple):
-        self.home_tiles = set(homes.values())
+    def __init__(self, homes: dict, bounds: tuple, walls=()):
+        self.home_tiles = set(homes.values()) | set(walls)
         self.x0, self.y0, self.x1, self.y1 = bounds
         self.busy = defaultdict(list)            # tile -> [(t0, t1, tag)]
+        self.ends: list = []                     # every finite t1, sorted (`later`)
 
     def bus(self, t) -> bool:
         return self.x0 <= t[0] <= self.x1 and self.y0 <= t[1] <= self.y1 and t not in self.home_tiles
@@ -97,15 +123,19 @@ class _Board:
 
     def take(self, t, a, b, tag) -> None:
         self.busy[t].append((a, b, tag))
+        if b < INF:
+            bisect.insort(self.ends, b)
 
     def end(self, t, tag, b) -> None:
         self.busy[t] = [(s, b if g == tag and e == INF else e, g) for s, e, g in self.busy[t]]
+        bisect.insort(self.ends, b)
 
     def later(self, a) -> float:
-        ends = [e for lst in self.busy.values() for _, e, _ in lst if a < e < INF]
-        if not ends:
+        """The first time after `a` that any tile frees."""
+        i = bisect.bisect_right(self.ends, a)
+        if i == len(self.ends):
             raise LatticeError("nothing will ever free the tiles this instruction needs")
-        return min(ends)
+        return self.ends[i]
 
 
 def _route(board, tiles, letter, a, b, own):
@@ -171,13 +201,24 @@ def _blocks(w, a) -> list:
     return list(a[1::2]) if w == "ppm" else list(a[:1]) if w in ("prep", "read", "ht") else []
 
 
-def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs()) -> list:
+def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
+             start=None, macro=None) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
     `program._Exp` writes them -- on the lattice: `homes` block -> tile for the blocks that live
-    there, `bounds` (x0, y0, x1, y1) the tiles that exist."""
-    board = _Board(homes, bounds)
+    there, `bounds` (x0, y0, x1, y1) the tiles that exist, `walls` tiles no gadget may use;
+    `reserved` (tile, t0, t1) already taken -- by gadgets scheduled before, copies of a unit
+    scheduled once (`shifted`) -- and `start` block -> when it is first free.
+
+    `macro`: what a `macro` line stands for -- `macro(k, args, free_at, board)` returns (its
+    gadgets, the number of lines after it they carry out, block -> tile, block -> when free,
+    outcome -> when decoded): a unit scheduled once, copied in (a factory).  Its gadgets must fit
+    the board (`board.free`); they are reserved on it, and the lines are not scheduled again."""
+    board = _Board(homes, bounds, walls)
+    homes = dict(homes)
+    for tile, a, b in reserved:
+        board.take(tile, a, b, "reserved")
     where = dict(homes)
-    free_at: dict = defaultdict(float)
+    free_at: dict = defaultdict(float, start or {})
     ready: dict = {}
     out: list = []
     uses = defaultdict(list)
@@ -230,22 +271,41 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs()) -> list
                     seen.add(v)
                     cands.append(v)
                     dq.append(v)
+        # the first candidate free for good soonest: when each is (its last reservation's end),
+        # the earliest of those, the first in breadth-first order free then -- what waiting for
+        # every tile's next end in turn would find, without the wait
         taken = set(where.values())
-        return next((c for c in cands if board.bus(c) and c not in taken and board.free(c, t, INF)
-                     and fits(c)), None)
+        ok = [c for c in cands if board.bus(c) and c not in taken and fits(c)]
+        when = [max([t] + [e for _, e, _ in board.busy[c]]) for c in ok]
+        t1 = min(when, default=INF)
+        if t1 == INF:
+            raise LatticeError(f"line {k}: no tile will ever be free for {blk}")
+        return next(c for c, w in zip(ok, when) if w <= t1), t1
 
+    skip = 0
     for k, (w, a, o, g) in enumerate(stream):
-        if w in ("x", "y", "z", "bit"):
+        if k < skip or w in ("x", "y", "z", "bit"):
+            continue
+        if w == "macro":
+            gs, n, at, free, dec = macro(k, a, free_at, board)
+            for gd in gs:
+                for tile in gd.tiles:
+                    board.take(tile, gd.t0, gd.t1, f"macro{k}")
+            for tile, t0, t1, _ in holds(gs):
+                board.take(tile, t0, t1, f"macro{k}")
+            out += gs
+            where.update(at)
+            homes.update(at)                 # they live on its tiles: read, they stay there
+            free_at.update(free)
+            ready.update(dec)
+            skip = k + 1 + n
             continue
         blks = _blocks(w, a)
         t = max([free_at[b] for b in blks] + [guard_ready(g)])
         if w == "prep":
             blk = a[0]
             if blk not in homes:
-                tile = place(blk, k, t)
-                while tile is None:
-                    t = board.later(t)
-                    tile = place(blk, k, t)
+                tile, t = place(blk, k, t)
                 where[blk] = tile
                 board.take(tile, t, INF, blk)
             dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
@@ -304,10 +364,14 @@ def check(stream, gadgets, costs: Costs = Costs()) -> list:
     by = defaultdict(list)
     for gd in gadgets:
         for t in gd.tiles:
-            by[t].append((gd.t0, gd.t1, gd.line))
+            by[t].append((gd.t0, gd.t1, gd.line, gd.blocks))
     for t, lst in by.items():
         lst.sort()
         bad += [f"tile {t}: lines {x[2]} and {y[2]} overlap" for x, y in zip(lst, lst[1:]) if y[0] < x[1] - 1e-6]
+    # and no gadget of another block on a tile while a block lives there
+    for tile, a, b, blk in holds(gadgets):
+        bad += [f"tile {tile}: line {ln} while {blk} lives there" for s, e, ln, bs in by[tile]
+                if blk not in bs and s < b - 1e-6 and e > a + 1e-6]
     last: dict = {}
     made: dict = {}
     for gd in sorted(gadgets, key=lambda g: g.line):

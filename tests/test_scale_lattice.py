@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from qccd.fullstack.scale.lattice import Costs, LatticeError, check, columns, schedule
+from qccd.fullstack.scale.lattice import Costs, Gadget, LatticeError, check, columns, schedule
 
 STREAM = [
     ("prep", ["L0", "X"], None, []),
@@ -80,3 +80,23 @@ def test_a_y_preparation_is_the_in_place_gadget():
     assert check(stream, gadgets) == []
     prep = next(g for g in gadgets if g.kind == "prep")
     assert prep.shape == ("prep", "Y") and prep.t1 - prep.t0 == Costs().prep_y_us
+
+
+def test_the_check_sees_a_gadget_on_a_tile_where_an_ancilla_lives():
+    stream = [("prep", ["a", "Y"], None, []), ("ppm", ["Z", "q0", "Z", "q1"], "m0", []),
+              ("read", ["a", "X"], "m1", [])]
+    tile = frozenset([(1, 0)])
+    gadgets = [Gadget("prep", 0.0, 10.0, tile, ("prep", "Y"), 0, ("a",)),
+               Gadget("merge", 20.0, 30.0, tile | {(0, 0), (2, 0)}, (), 1, ("q0", "q1")),
+               Gadget("read", 40.0, 41.0, tile, ("read", "X"), 2, ("a",))]
+    assert check(stream, gadgets) == ["tile (1, 0): line 1 while a lives there"]
+
+
+def test_reserved_tiles_and_start_times_hold_a_schedule_back():
+    homes, bounds = columns(["q0", "q1"], 1)
+    stream = [("ppm", ["Z", "q0", "Z", "q1"], "m0", [])]
+    bus = [(x, y) for x in range(bounds[0], bounds[2] + 1) for y in range(bounds[1], bounds[3] + 1)
+           if (x, y) not in homes.values()]
+    assert schedule(stream, homes, bounds)[0].t0 == 0
+    assert schedule(stream, homes, bounds, reserved=[(t, 0.0, 1e6) for t in bus])[0].t0 == 1e6
+    assert schedule(stream, homes, bounds, start={"q1": 5e5})[0].t0 == 5e5

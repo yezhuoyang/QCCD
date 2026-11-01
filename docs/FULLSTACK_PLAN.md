@@ -1130,6 +1130,75 @@ p = 1e-4 (2.5 % at p = 5e-5). Feeding them to 8T -> CCZ (msccz's protocol, 28 p�
 inputs) instead makes the CCZ error ~3e-20, nothing beside the memory's 2.2 %. So: 15-to-1,
 then 8T -> CCZ, then the routing pairs.
 
+**The second stage: |AutoCCZ> from eight distilled T (2026-11-01, `factory.autoccz`).**
+- **8T -> CCZ as rotations.** The [[8,3,2]] cube code's T on even vertices and T† on odd is
+  logical CCZ. With the code's rows chosen as the all-ones word (a check patch) and the three
+  faces (x, y, z), vertex v is a π/8 rotation of Z on the check and on the outputs of supp(v):
+  T for even |v|, T† for odd -- the 15-to-1's teleported gadget with the correction's guard
+  flipped. Both values of the check leave CCZ|+++>, so it reads +1 in X, and any one T fault
+  turns it (28 p² out). All eight products are Z̄ products: no new gadget.
+- **The routing pairs are CZ edges.** Commuting `autoccz.circ`'s CNOTs through its pairs gives
+  CZ_xy CZ_xz CZ_yz on x y z -- Pauli frames, since CCZ CZ_xy CZ_xz CZ_yz|+++> = Z⊗3 X⊗3
+  CCZ|+++> -- and each site attached by CZ to its partner and one of x, y, z. A site attached to
+  qubits all in one frame is one merge on a fresh patch, in the opposite frame: H-turned and a
+  Z̄ product with them (a parity copy), or plain and an X̄ product with turned ones.
+- **Two H̄.** FormalRV's consumption needs x and y plain and z turned (its X̄_t Z̄_z becomes
+  X̄X̄), so z takes an H̄. The pair on x and y closes an odd cycle (y - s7 - s8 - x), so s7
+  takes the second, between its two attachments. The state is held with z, s4, s6, s8 turned
+  (`TURNED`); `codesign.surgery_rewrite` writes `autoccz_h` for it and swaps the consumer's
+  letters on those sites (`_held`), which is exact.
+- **Checked by state vector.** The stage's output, turned sites turned back, is exactly
+  FormalRV's |AutoCCZ> (`ccz.autoccz_vector`), on injected T (40 of 40 runs) and fed by eight
+  15-to-1s; FormalRV's Toffoli -- its own 42 instructions from the adder's first call, letters
+  swapped on the turned sites -- is CCX on random data (30 of 30); each of the 8 single T
+  faults is caught.
+- **On the lattice (`factory_schedule`).** One 15-to-1 is scheduled on a strip of its own (its
+  five patches a column, a bus column each side), and the eight are translated copies of it,
+  side by side: the same gadgets, so the same shapes. The stage's ten patches sit in a row
+  below and are scheduled around the copies (`schedule(reserved=, start=)`). 851 gadgets on
+  360 tiles, 7.59 s (4.24 s of 15-to-1s, then 3.35 s of stage), 5.7 at once, check clean; 58
+  distinct shapes, 52 of them merges. (Scheduled as one stream the 15-to-1s fought over bus
+  columns: 12 to 23 s and 260 shapes.)
+- **Two faults found on the way.** `corridor_merge` closed a *slit* -- a patch's open side
+  beside the corridor -- with filled seam crossings at both ends: a hole, one logical qubit too
+  many, in 18 of the 52 shapes. A crossing on a slit now stays open; the adder's 5 merge shapes
+  and the tests' corridors are unchanged bit for bit. And `lattice.check` did not see a gadget
+  on a tile where a block lives between its preparation and its readout; it does now (the
+  scheduler always honoured it, and the adder's half is still clean).
+- **d = 11:** the 52 merge shapes, every rule and R10: in progress.
+- **Cost:** one |AutoCCZ> per factory per 7.59 s on 360 tiles; 8 x 15 injected T and 128 |Ȳ>
+  a state (made either way, used about half the time).
+
+**Step 3 (b): the whole adder on one lattice (2026-11-01, `tools/lattice_adder.py --farm`).**
+- **The forward half, rewritten.** With `_held` the Toffolis' 31 X̄Z̄ are X̄X̄. Two more mixed
+  products remained, both in bit 0: FormalRV writes that CNOT as three |Ȳ> rotations (S̄ on c,
+  exp(-iπ/4 Z̄_c X̄_t), √X̄ on t). `_rotation_cx` makes it FormalRV's own lattice-surgery CNOT,
+  proved on the segment alone (both are `cx c t` once their outcomes are forgotten). That is
+  sound because nothing reads the six dropped outcomes: no later line, no source-slot write,
+  and Gidney 2025 reads no record by address (`records_read`). The forward half is then 1,827
+  instructions, 31 `autoccz_h` and no mixed product.
+- **Factories as macros.** `factory.Farm`: each `autoccz_h` becomes a `macro` line followed by
+  a renamed copy of the factory's lines, served by a translated, time-shifted copy of the
+  factory's checked schedule (`lattice.schedule(macro=)`). So program order runs from the
+  factory to its consumer, and the check sees each site made before it is read. A factory's
+  inside is walled off; only its row of sites and the bus row below are open.
+- **One factory per bit, bits beneath them.** With bit i's three blocks under factory i
+  (`Farm.beneath`) every Toffoli reaches its factory alike, so the shapes repeat. The whole
+  call -- 31 Toffolis, the CNOT cascade, the 31 uncompute steps -- is 27,776 gadgets on 16,522
+  tiles, **21.83 s**, check clean, 78 distinct shapes (71 merges: the factory's 52 and 19 of
+  the adder's). All 31 states are ready at 7.59 s; the Toffoli chain then takes 0.43 s a bit.
+- **Fewer factories cost time.** Assigned dynamically (the factory free soonest, no repeating
+  geometry): 4 factories 75.6 s on 2,134 tiles, 8 47.2 s, 16 34.2 s, 32 24.4 s, but 360-475
+  distinct shapes. Periodic with 2 to 6 bits a factory: 131-205 s, because a factory's one row
+  of sites holds its last state until the chain reaches it. A second row per factory
+  (double-buffering) is the fix; not built.
+- **Concrete vs composed.** The 21.83 s is a schedule of checked programs, each a compiled
+  program's measured time; there is still no one flat program for the call. Decoding is
+  assumed to take a round.
+- **Open:** the 19 adder shapes at d = 11 (8 of them X̄X̄ corridors 24-29 tiles long, bits now
+  24 tiles apart -- a factory of two rows of four 15-to-1s, 12 tiles wide, would halve them). (Gidney 2025 makes its T states by cultivation, far smaller; the 15-to-1 is
+  our stand-in, a codesign axis.)
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.
