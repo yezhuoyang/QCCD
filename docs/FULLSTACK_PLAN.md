@@ -996,6 +996,45 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
 5. One prime, then the whole program, concrete; the viewer draws tiles zoomed out and ions
    zoomed in.
 
+**Step 3 in detail (2026-11-01).** One real call of the 32-bit adder in Gidney 2025 at
+RSA-2048, expanded at the PPM level (FormalRV's own lines, no transversal-CNOT rewrite), is
+15,593 instructions:
+- products: 310 Z̄Z̄, 93 X̄X̄, 61 X̄X̄X̄ (CNOT fan-outs), 94 X̄Z̄ and 1 Z̄X̄Z̄;
+- preparations: 185 |+̄>, 96 |Ȳ>;
+- 31 CCZ resources and 746 readouts.
+
+On the surgery machine a product is native: a corridor merge, 25 rounds whatever its shape.
+So the program keeps FormalRV's products, with the rewrites that suit merges:
+- **H̄ triples.** The 96 |Ȳ> are exactly 32 FormalRV H̄ triples, each one `ht` (the H̄ gadget),
+  so no |Ȳ> state is needed.
+- **The Toffoli's X̄ on a CCZ output.** 31 of the X̄Z̄ products take Z̄ of a fresh CCZ output.
+  The factory turns that output with H̄ before delivering it, off the critical path, and the
+  product becomes X̄X̄.
+- **The uncompute's "measure X̄".** `ht p; ppm Z p; if o: x p` is `read p X; prep p Z`.
+- **The uncompute's conditional CZ.** The other 31 X̄Z̄ are `prep l X; Z̄Z̄; X̄_l Z̄_p; read l Z`
+  under an outcome. They take H̄ on the ancilla between its two merges (on the path, ~0.7 s
+  each, half the time); a cheaper CZ is an open codesign item.
+
+The lattice is *tile in a sea*: block homes on the even tiles (2i, 2j), every other tile a bus.
+Every block then has bus tiles on all four sides (Z̄ on its top and bottom, X̄ on its left and
+right), the H̄ gadget's neighbour tile, and a home for the ancilla of an idiom. The cost is four
+tiles a block.
+
+The scheduler runs the instruction stream in program order on each block and waits for each
+outcome a guard reads to be decoded. For each instruction:
+- a product routes a corridor through bus tiles that are free for its whole duration
+  (breadth-first from each patch's attachment side, joined into a tree) and reserves them;
+- `ht` reserves the bus tile and seam to the block's right;
+- preparations and readouts take one round on the home tile;
+- every block not in a gadget refreshes each round.
+Each scheduled instance is a translated copy of a shape compiled once, which is the macro key
+(every rule, R10 at the machine's distance). The schedule is checked: no two instances share a
+tile, seam or face trap at the same time, and every outcome is decoded before it is read.
+Exit, staged honestly:
+- (a) the adder's CCZ-free half concrete: the final CNOT cascade and the 31 measurement-based
+  uncompute steps;
+- (b) the forward half once step 4's factory delivers CCZ states to ports on the lattice.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.
@@ -1018,6 +1057,20 @@ footprint of a replayed call is a translated copy of one list, not a fresh one.
   noise (25 rounds a phase): 5.8e-5 / 3.7e-5 at d = 3, the memory's rate (3.4e-7 / 2.2e-7 vs
   3.0e-7 per patch area per round).  At d = 5: 2 errors in 1.3e7 shots and 0 in 1.3e7, where
   the memory's rate predicts 3 each (a short run, stopped there).
+- Step 2, the corridor merge done (2026-11-01): `corridor_merge(d, letter, patches, corridor)`,
+  the product of Z̄ (or X̄) of any patches through any connected set of free tiles. Each patch
+  joins the corridor through the seam on one of its Z̄ sides (X̄ sides). Each patch's far side
+  keeps its own boundary; the rest of the region's boundary takes the merge's type. One rule
+  had to be found: on a tile-aligned region, the top-left and bottom-right corners always carry
+  faces of the X checkerboard colour. On an all-Z boundary such a corner is a point of X
+  boundary, which makes one logical qubit too many, so those corner points are cut (their face
+  becomes a weight-3 check). A U, bends either way, three patches in a row, a fan-out column,
+  a long X̄X̄ path and a snake each measure the product, keep every patch's logical and keep
+  distance d at d = 3, 5, 7. All run on the four-layer Tomita–Svore schedule. Tiled, every rule
+  and R10; any shape is the same instructions (115 for 3 rounds). At d = 11 with 25 rounds the
+  U is 1,295 ions, 951 instructions, every rule (20 s), R10 (51 s), 138 ms. The five-tile X̄X̄
+  path is 1,817 ions, every rule (42 s), R10 (96 s), also 138 ms: a merge costs the same
+  whatever its corridor.
 - The machine at d = 11 (qccd-physics-best, 25 rounds a merge), every rule and R10 on each:
 
   | gadget | ions | instructions | every rule | R10 | machine time |

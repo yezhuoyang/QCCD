@@ -97,6 +97,7 @@ __all__ = [
     "lattice_surgery",
     "surgery_cnot",
     "hadamard_bar",
+    "corridor_merge",
     "EXPERIMENTS",
     "READOUTS",
     "get",
@@ -777,6 +778,132 @@ def hadamard_bar(d: int, basis: str = "Z", rounds: int | None = None) -> MemoryE
                             detectors=dets, observables=(tuple(sorted(flow)),), readout="appended",
                             readout_bits=tuple((q, bits["final", q]) for q in sorted(final)),
                             readout_basis=tuple(final[q] for q in sorted(final)),
+                            coords=tuple(coords), faces=faces)
+
+
+_SIDE = {"top": (-1, 0), "bottom": (1, 0), "left": (0, -1), "right": (0, 1)}
+_FAR = {"top": "bottom", "bottom": "top", "left": "right", "right": "left"}
+
+
+def _tile(d: int, t: tuple[int, int]) -> set:
+    """The data points of tile (x, y) on the machine's lattice (pitch d + 1)."""
+    x, y = t
+    return {(y * (d + 1) + i, x * (d + 1) + j) for i in range(d) for j in range(d)}
+
+
+def _seam(d: int, a: tuple[int, int], b: tuple[int, int]) -> set:
+    """The seam between two neighbouring tiles."""
+    (x1, y1), (x2, y2) = sorted([a, b])
+    p = d + 1
+    if y1 == y2 and x2 == x1 + 1:
+        return {(y1 * p + i, x1 * p + d) for i in range(d)}
+    if x1 == x2 and y2 == y1 + 1:
+        return {(y1 * p + d, x1 * p + j) for j in range(d)}
+    raise ValueError(f"tiles {a} and {b} are not neighbours")
+
+
+def _cut_corners(pts: set, keep: set, letter: str) -> set:
+    """`pts` with every convex corner point outside `keep` removed whose two corner faces are not
+    of the type `letter` -- on a boundary all of that type such a corner would be a point of the
+    other type, a logical qubit too many; cut, its face becomes a weight-3 check of the right one."""
+    want = 0 if letter == "Z" else 1
+    pts = set(pts)
+    while True:
+        cut = set()
+        for r, c in pts - keep:
+            up, down, left, right = ((r - 1, c) in pts, (r + 1, c) in pts, (r, c - 1) in pts,
+                                     (r, c + 1) in pts)
+            par = (r + c - 1 if (not up and not left) or (not down and not right)
+                   else r + c if (not up and not right) or (not down and not left) else None)
+            if par is not None and par % 2 != want:
+                cut.add((r, c))
+        if not cut:
+            return pts
+        pts -= cut
+
+
+def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
+                   rounds: int | None = None) -> MemoryExperiment:
+    """A lattice surgery measuring the product of Z̄ ("Z") or X̄ ("X") of any number of distance-d
+    patches through a corridor of free tiles, on the machine's lattice: tile (x, y) holds data rows
+    y(d + 1) .. y(d + 1) + d - 1 and columns x(d + 1) .. x(d + 1) + d - 1, a seam row and column
+    between tiles; a patch has Z̄ along a row and X̄ down a column.
+
+    `patches`: (tile, side) each -- "top" or "bottom" for a Z̄ product, "left" or "right" for X̄:
+    the patch joins, through the seam on that side, the corridor tile there.  `corridor`: a
+    connected set of tiles.  The merged region is the patches, those seams, the corridor and the
+    seams (and seam crossings with three corridor tiles around) inside it; every point outside a
+    patch starts in |+> ("Z") or |0> ("X").  Each patch's far side keeps its own boundary; the
+    rest of the region's boundary is of the merge's type, with its corners of the wrong
+    checkerboard colour cut (`_cut_corners`).  The checks run `rounds` (default d) times, in the
+    Tomita–Svore schedule; then every data point is read, the patches in the merge's basis.
+
+    Observables: 0, the product -- the first-round product of the merge-type checks that touch
+    the fresh points, +1 here (the patches start in |0̄> or |+̄>); then each patch's own Z̄ (X̄),
+    on its far side, which the merge keeps."""
+    if letter not in ("X", "Z"):
+        raise ValueError(f"letter must be 'X' or 'Z', not {letter!r}")
+    r = d if rounds is None else rounds
+    corridor = set(corridor)
+    ok = ("top", "bottom") if letter == "Z" else ("left", "right")
+    pts: set = set()
+    held: list = []
+    for t, side in patches:
+        if side not in ok:
+            raise ValueError(f"a {letter}-bar product joins a patch on its {' or '.join(ok)}, not {side}")
+        nb = (t[0] + _SIDE[side][1], t[1] + _SIDE[side][0])
+        if nb not in corridor:
+            raise ValueError(f"patch {t} joins the corridor on its {side}, at {nb}: not a corridor tile")
+        held.append(_tile(d, t))
+        pts |= held[-1] | _seam(d, t, nb)
+    p = d + 1
+    for x, y in corridor:
+        pts |= _tile(d, (x, y))
+        pts |= set().union(*(_seam(d, (x, y), n) for n in ((x + 1, y), (x, y + 1)) if n in corridor))
+    for cx, cy in {(x - i, y - j) for x, y in corridor for i in (0, 1) for j in (0, 1)}:
+        if sum(t in corridor for t in ((cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1))) >= 3:
+            pts.add((cy * p + d, cx * p + d))
+    inside = set().union(*held)
+    pts = _cut_corners(pts, inside, letter)
+    other = "X" if letter == "Z" else "Z"
+    far: set = set()                    # the faces on each patch's far side
+    for (x, y), side in patches:
+        f = _FAR[side]
+        far |= ({(y * p - 1 if f == "top" else y * p + d - 1, x * p + j) for j in range(-1, d)}
+                if f in ("top", "bottom") else
+                {(y * p + i, x * p - 1 if f == "left" else x * p + d - 1) for i in range(-1, d)})
+    coords = sorted(pts)
+    index = {q: k for k, q in enumerate(coords)}
+    checks = []
+    for i in range(min(a for a, _ in pts) - 1, max(a for a, _ in pts) + 1):
+        for j in range(min(b for _, b in pts) - 1, max(b for _, b in pts) + 1):
+            basis = "Z" if (i + j) % 2 == 0 else "X"
+            corners = {k: q for k, q in (("NW", (i, j)), ("NE", (i, j + 1)), ("SW", (i + 1, j)),
+                                         ("SE", (i + 1, j + 1))) if q in pts}
+            if (len(corners) < 2 or (len(corners) == 2 and basis != (other if (i, j) in far else letter))
+                    or (len(corners) == 3 and basis != letter)):
+                continue
+            order, first = _TOMITA[basis]
+            seq = [(index[corners[o]], first + t) for t, o in enumerate(order) if o in corners]
+            checks.append(((i, j), basis, tuple(q for q, _ in seq), tuple(t for _, t in seq)))
+    prep = {index[q]: letter if q in inside else other for q in coords}
+    name = f"corridor{d}_{letter.lower()}{len(patches)}_r{r}"
+    qasm, dets, bits, faces = _phased(
+        f"{name}: lattice surgery measuring the product of {letter}bar on {len(patches)} d = {d} "
+        f"patches through {len(corridor)} corridor tile(s), {r} round(s)",
+        len(coords), [_Phase(tuple(checks), r, prep=prep)], prep)
+    fresh = {index[q] for q in coords if q not in inside}
+    obs = [tuple(sorted(bits["check", 0, 0, f] for f, b, sup, _ in checks if b == letter and fresh & set(sup)))]
+    for (x, y), side in patches:
+        f = _FAR[side]
+        lg = ([(y * p if f == "top" else y * p + d - 1, x * p + j) for j in range(d)] if letter == "Z"
+              else [(y * p + i, x * p if f == "left" else x * p + d - 1) for i in range(d)])
+        obs.append(tuple(sorted(bits["final", index[q]] for q in lg)))
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_corridor", distance=d, rounds=r,
+                            basis=letter, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+                            detectors=dets, observables=tuple(obs), readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
+                            readout_basis=tuple(prep[q] for q in range(len(coords))),
                             coords=tuple(coords), faces=faces)
 
 

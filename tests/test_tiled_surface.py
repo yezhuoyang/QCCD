@@ -17,6 +17,8 @@ Held here:
   (Z̄ -> X̄, X̄ -> Z̄) is deterministic, every deterministic parity is a declared detector, the
   circuit keeps distance d; tiled -- both checkerboards, data states moved through measure ions
   -- it passes every rule and R10, and its logical error rate falls with d;
+* a corridor merge (`corridor_merge`: any patches, any corridor of free tiles) measures its
+  product, keeps every patch's logical and keeps distance d; tiled, every rule and R10;
 * the Shor machine (`qccd.fullstack.scale.machine`): a round at its distance on its physics
   (qccd-physics-best) passes every rule and R10;
 * it refuses a circuit that is not a rotated surface patch's, saying why.
@@ -196,6 +198,47 @@ def test_h_bar_is_played_on_the_tiled_grid(tmp_path):
     exp = hadamard_bar(3, "Z")
     a = device(3, 7, physics="physics@2")
     prog, cert, _ = compile_tiled(exp.qasm, 3, 7, arch=a, coords=exp.coords, faces=exp.faces)
+    model = corrected_model("quantinuum")
+    rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
+    assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
+    _r10(prog, cert, a, exp.qasm, tmp_path)
+
+
+CORRIDORS = {
+    "U": ("Z", [((0, 0), "bottom"), ((2, 0), "bottom")], {(0, 1), (1, 1), (2, 1)}),
+    "bend": ("Z", [((1, 0), "bottom"), ((0, 3), "top")], {(1, 1), (0, 2), (1, 2)}),
+    "three": ("Z", [((0, 0), "bottom"), ((2, 0), "bottom"), ((4, 0), "bottom")],
+              {(x, 1) for x in range(5)}),
+    "fan-out": ("X", [((0, 0), "right"), ((0, 2), "right"), ((2, 1), "left")],
+                {(1, 0), (1, 1), (1, 2)}),
+    "far": ("X", [((0, 0), "right"), ((4, 2), "left")], {(1, 0), (1, 1), (2, 1), (3, 1), (3, 2)}),
+}
+
+
+@pytest.mark.parametrize("shape", sorted(CORRIDORS))
+def test_a_corridor_merge_measures_the_product_and_keeps_every_logical(shape):
+    """`corridor_merge`: noiselessly the product and every patch's own logical are
+    deterministic (so the merged region holds one logical qubit fewer than the patches), and the
+    circuit keeps distance d -- for a U, a bend either way, three patches in a row, a fan-out
+    column and a long X̄X̄ path."""
+    from qccd.qec.experiments import corridor_merge, ideal_stim
+    letter, patches, corridor = CORRIDORS[shape]
+    for d in (3, 5):
+        exp = corridor_merge(d, letter, patches, corridor)
+        c = ideal_stim(exp)
+        c.detector_error_model()
+        assert not c.compile_detector_sampler().sample(32, append_observables=True).any()
+        assert len(ideal_stim(exp, 1e-3).shortest_graphlike_error(ignore_ungraphlike_errors=True)) == d
+
+
+@pytest.mark.parametrize("shape", ["bend", "fan-out"])
+def test_a_corridor_merge_is_played_on_the_tiled_grid(shape, tmp_path):
+    from qccd.qec.experiments import corridor_merge
+    letter, patches, corridor = CORRIDORS[shape]
+    exp = corridor_merge(3, letter, patches, corridor)
+    rows, cols = (max(x[k] for x in exp.coords) + 1 for k in (0, 1))
+    a = device(rows, cols, physics="physics@2")
+    prog, cert, _ = compile_tiled(exp.qasm, rows, cols, arch=a, coords=exp.coords, faces=exp.faces)
     model = corrected_model("quantinuum")
     rep = verify(insert_cooling(prog, a, model).program, a, model, check_metrics=False)
     assert rep.rules.summary().get("failed") == [], rep.rules.violations[:3]
