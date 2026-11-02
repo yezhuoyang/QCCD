@@ -240,10 +240,24 @@ def test_inject_hooks_the_comments_and_adds_the_chat():
     assert "window.QCCD_PAGE" in out and "/chatframe?page=" in out
 
 
+def test_inject_adds_rule_categories_only_when_requested():
+    page = PAGES["rules/index.html"]
+    base = {"chat_origin": BASE, "web_origin": WEB, "studio_url": BASE + "/studio"}
+    plain = inject(page, base)
+    grouped = inject(page, {**base, "rules_categories": True})
+    assert "rule-categories" not in plain
+    assert "Static & occupancy" in grouped
+    assert "Transport & control" in grouped
+    assert "Operations & timing" in grouped
+    assert "['R0', 'R1', 'R2', 'R3', 'R13'" in grouped
+
+
 def test_the_mirror_serves_pages_and_nothing_else(svc):
     ws, state, c, w = svc
     r = w.get("/web/rules/")
     assert r.status_code == 200 and "R7 cooling" in r.text and "qccd-mirror-config" in r.text
+    assert "Static & occupancy" in r.text and "Transport & control" in r.text
+    assert "Operations & timing" in r.text
     csp = r.headers["content-security-policy"]
     assert f"frame-src 'self' {BASE}" in csp and "frame-ancestors 'self'" in csp and "form-action 'none'" in csp
     assert r.headers["x-frame-options"] == "SAMEORIGIN" and "set-cookie" not in r.headers
