@@ -1230,6 +1230,23 @@ then 8T -> CCZ, then the routing pairs.
   takes 183.9 s; with three bits a factory two sets are not enough (137.8 s).
 - **d = 11 of the narrow farm's 30 new shapes:** in progress.
 
+**Step 5, the census (2026-11-02).** With every template rewritten for the surgery machine --
+`_pauli_frame` made gidneyCompare's four-merge step (a CNOT-and-S̄ by |Ȳ> rotations, then its
+inverse: Z̄ Z̄, every branch) two frames, so no template has a mixed product left -- one prime
+(`gOnePrime`, P = 1 minus P = 0) is 1,770,257 merges, 877,707 preparations, 1,437,042 readouts,
+46,633 H̄ and 37,289 |AutoCCZ> states, on the program's 1,695 blocks; times 21,640 primes it is
+the program (outside the primes: 1.84M merges, 60,162 states). A data decision reserves its
+places either way, so every prime's schedule is the same: one prime scheduled concretely, times
+21,640, is exact, not an estimate.
+- **Factories set the pace** (composed): 37,289 states at 11.5 s each is 13,800 s a prime with
+  31 factories (9.5 years for the primes), 1,430 s with 300 (about one year, ~58k factory tiles).
+- **Shapes set the checking.** One prime is ~4M gadgets, which the scheduler handles (the
+  whole adder, 27,776, takes 6 s). But its Toffolis act on many registers: on a free floorplan
+  every consumer's corridor is a shape of its own -- thousands to check at d = 11. The adder
+  kept 72 by laying bits beneath their factories; a prime needs a floorplan that does the same
+  for every register a Toffoli touches, or local moves (fixed-shape hops) instead of long
+  corridors.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.
