@@ -2204,7 +2204,7 @@ def build(out: Path) -> int:
     def put(rel: str, page: str, depth: int, active: str | None, app: bool = False, extra: str = "") -> None:
         p = out / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        if app and 'id="svg"' in page:
+        if app and debugpage.STUDIO_MARK in page:
             app_pages.append((rel, debugpage.page_title(page)))
         page = with_nav(page, depth, active, idx, app=app, extra=extra)
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)

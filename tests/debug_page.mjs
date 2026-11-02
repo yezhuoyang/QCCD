@@ -1,6 +1,7 @@
 // The Debug page in a real browser: open a program, step, watch, check rules, see the crosses.
 //
 //   node tests/debug_page.mjs <site dir> <studio page under it> [--csp "<policy>"] [--shots <dir>]
+//   node tests/debug_page.mjs --base https://qccd.academy/ <studio page>      (the live site)
 //
 // Serves the directory (with the MIME types a module worker and WebAssembly need), opens
 // /debug/ in headless Chrome over the DevTools protocol (no npm) and drives the page the way
@@ -16,9 +17,10 @@ import { spawn } from 'node:child_process';
 import { findChrome } from './chrome_path.mjs';
 
 const argv = process.argv.slice(2);
-const site = argv[0], page = argv[1];
 const opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
-const CSP = opt('--csp'), SHOTS = opt('--shots');
+const CSP = opt('--csp'), SHOTS = opt('--shots'), BASE = opt('--base');
+const pos = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--')));
+const site = BASE ? null : pos[0], page = BASE ? pos[0] : pos[1];
 // served as qccd.academy's nginx (1.18) serves them: no type for .mjs or .wasm (application/octet-stream),
 // so the page is held to working from a server that knows neither
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
@@ -33,7 +35,7 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+if (!BASE) await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const CHROME = findChrome();
 if (!CHROME) { console.error('no Chrome found; set CHROME'); process.exit(2); }
 const cport = 9500 + Math.floor(Math.random() * 400);
@@ -70,7 +72,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, de
 const out = {}, fails = [];
 const expect = (ok, what) => { if (!ok) fails.push(what); };
 try {
-  await send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/debug/` });
+  await send('Page.navigate', { url: BASE ? new URL('debug/', BASE).href : `http://127.0.0.1:${server.address().port}/debug/` });
   for (let i = 0; i < 100 && !(await ev('!!window.QCCD_DEBUG').catch(() => false)); i++) await new Promise((r) => setTimeout(r, 100));
   const offered = await ev(`QCCD_DEBUG.sources({}).programs.map(function (p) { return p.src; })`);
   expect(offered.indexOf(page) >= 0, `the Open list offers ${page}`);
@@ -105,5 +107,5 @@ out.errors = errors.slice(0, 5);
 if (errors.length) fails.push('page errors: ' + errors[0]);
 out.fails = fails;
 console.log(JSON.stringify(out));
-ws.close(); chrome.kill(); server.close();
+ws.close(); chrome.kill(); if (!BASE) server.close();
 process.exit(fails.length ? 1 : 0);

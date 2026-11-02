@@ -153,8 +153,10 @@ def python_zip() -> bytes:
 
 #: how a page of the site is grouped in the Open list, by where it lives
 GROUPS = (("board/", "Leaderboard"), ("reproduce/", "Reproduce"), ("compilation/", "Compilation"),
-          ("rules/", "Rules examples"), ("language/", "Language examples"), ("physics/", "Physics"),
-          ("", "Design and tutorial"))
+          ("gadgets/", "Gadgets"), ("rules/", "Rules examples"), ("language/", "Language examples"),
+          ("book/", "Tutorial examples"), ("physics/", "Physics"), ("", "Design and tutorial"))
+#: what makes a page a Studio page (the Studio's own data block): a board index draws an <svg> too
+STUDIO_MARK = '<script id="data" type="application/json">'
 
 
 def catalogue(app_pages: list[tuple[str, str]], index: list[dict] | None = None) -> list[dict]:
@@ -332,7 +334,7 @@ def main(argv=None) -> int:
             if rel.startswith("debug/"):
                 continue
             text = p.read_text(encoding="utf-8", errors="replace")
-            if 'id="svg"' in text and "window.EDITOR" not in rel:
+            if STUDIO_MARK in text:
                 dst = out / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 if dst.resolve() != p.resolve():
