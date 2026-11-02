@@ -173,6 +173,106 @@ def crossings(stream, homes: dict) -> dict:
     return pins
 
 
+def beside(tile: tuple, letter: str, other: bool = False) -> tuple:
+    """The tile facing `tile` on a side of `letter`: below it for Z̄, right of it for X̄ (above, or
+    left, with `other`)."""
+    (x, y), s = tile, -1 if other else 1
+    return (x, y + s) if letter == "Z" else (x + s, y)
+
+
+def path(src: tuple, dst: tuple, blocked, lanes=()) -> list:
+    """Corners for carrying a state from `src` to `dst` in straight legs clear of `blocked`: the
+    shortest of one leg, two (either corner), or three by way of a lane (a row `("y", y)` or a
+    column `("x", x)` kept free); None if there is none."""
+    def clear(pts):
+        for a, b in zip(pts, pts[1:]):
+            if a[0] != b[0] and a[1] != b[1]:
+                return False
+            if any(t in blocked for t in line(a, b) + [b] if t != dst):
+                return False
+        return True
+    opts = [[src, dst], [src, (dst[0], src[1]), dst], [src, (src[0], dst[1]), dst]]
+    for kind, v in lanes:
+        opts.append([src, (src[0], v), (dst[0], v), dst] if kind == "y" else [src, (v, src[1]), (v, dst[1]), dst])
+    best = None
+    for pts in opts:
+        pts = [p for i, p in enumerate(pts) if i == 0 or p != pts[i - 1]]
+        if clear(pts):
+            n = sum(abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b in zip(pts, pts[1:]))
+            if best is None or n < best[0]:
+                best = (n, pts)
+    return best and best[1]
+
+
+def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None, tag: str = "bring"):
+    """(stream, {block: tile}): every fresh block put beside the block at home it is next merged
+    with.  A fresh block is made on the tile facing its first partner at home (on a side of the
+    product's letter: `beside`); before each later product with a block at home it does not face,
+    it is carried there (`carry`, the corners from `path`), and from then on goes by its new name.
+    `sites`: blocks made elsewhere (a factory's |AutoCCZ> sites) -> their tiles.  `skip`: line ->
+    how many lines after it to pass through untouched (a factory's own, under its `macro` line).
+    Products of other kinds, and fresh blocks with no partner at home, are left as they are.  The
+    carries' blocks are named `<tag><n>.`: one tag per call on one lattice."""
+    blocked = set(blocked) | set(homes.values())
+    skip = skip or {}
+    out, pins, cur, at = [], {}, {}, dict(sites)
+    n_carry = 0
+
+    def first_partner(k, blk):
+        for j in _life(stream, k, blk):
+            w, a, _, _ = stream[j]
+            if w == "ppm" and len(a) == 4 and a[0] == a[2]:
+                other = a[3] if a[1] == blk else a[1]
+                if other in homes:
+                    return homes[other], a[0]
+        return None, None
+
+    def facing(t, h, letter):
+        return t in (beside(h, letter), beside(h, letter, True))
+
+    k, n = 0, len(stream)
+    while k < n:
+        w, a, o, g = stream[k]
+        if k in skip:
+            out += stream[k:k + 1 + skip[k]]
+            k += 1 + skip[k]
+            continue
+        a = tuple(cur.get(x, x) if isinstance(x, str) else x for x in a)
+        if w == "prep" and a[0] not in homes and a[0] not in at:
+            h, letter = first_partner(k, a[0])
+            if h is not None:
+                t = beside(h, letter) if beside(h, letter) not in blocked else beside(h, letter, True)
+                if t not in blocked:
+                    at[a[0]] = pins[a[0]] = t
+        elif w == "ppm" and len(a) == 4 and a[0] == a[2]:
+            for f, h in ((a[1], a[3]), (a[3], a[1])):
+                if f in at and h in homes and not facing(at[f], homes[h], a[0]):
+                    dst, pts = None, None
+                    for t in (beside(homes[h], a[0]), beside(homes[h], a[0], True)):
+                        pts = t not in blocked and path(at[f], t, blocked, lanes)
+                        if pts:
+                            dst = t
+                            break
+                    if not pts:
+                        raise ValueError(f"line {k}: no way to carry {f} beside {h}")
+                    n_carry += 1
+                    new = f"{f}~{tag}{n_carry}"
+                    lines, p = carry(f, new, pts, f"{tag}{n_carry}", g)
+                    out += lines
+                    pins.update(p)
+                    at[new] = pins[new] = dst
+                    orig = next((x for x, y in cur.items() if y == f), f)
+                    cur[orig] = new
+                    a = tuple(new if x == f else x for x in a)
+        out.append((w, a, o, g))
+        if w == "read" and a[0] in at and a[0] not in homes:
+            at.pop(a[0])
+            for x in [x for x, y in cur.items() if y == a[0]]:
+                del cur[x]
+        k += 1
+    return out, pins
+
+
 def relay(stream, at: dict):
     """(stream, {relay: tile}, [original line of each line]): every two-patch product of one
     letter whose patches (`at`: block -> tile, homes and pins) sit apart in one column (Z̄) or

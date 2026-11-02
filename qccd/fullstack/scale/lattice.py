@@ -17,6 +17,12 @@ every outcome its guard reads is decoded:
 * `prep` of a block pinned to a tile (`pinned`: a relay, `relay.relay`; an ancilla at a crossing,
   `relay.crossings`): that tile, once every gadget before on it is done, held until its readout.
 * frames (`x`, `z`, `y`) and `bit`: classical, no time (a `bit` is decoded when its inputs are).
+  A frame leaves its block *pending* until its guard is decoded: work on the block goes on --
+  a Pauli frame commutes through every product and readout, flipping the outcomes it
+  anticommutes with -- but such an outcome is known only once the frame is, and a guard reading
+  it waits for that.  An X̄ frame holds outcomes in Z̄, a Z̄ frame those in X̄ (Ȳ both), H̄
+  swaps them.  (A teleport's far end can be used before its near end is read; whatever reads
+  that use's outcomes waits for the teleport's.)
 A guarded instruction reserves its tiles whether or not its guard holds, so the schedule is the
 same for every run.  Every block not in a gadget refreshes each round on its own tile.
 
@@ -209,6 +215,37 @@ def _names(text: str) -> list:
             if x not in ("0", "1")]
 
 
+class _Pending:
+    """When each block's X̄ and Z̄ frames are all known (see the module docstring)."""
+
+    def __init__(self):
+        self.x, self.z = defaultdict(float), defaultdict(float)
+
+    def frame(self, word, blk, at):
+        if word in ("x", "y"):
+            self.x[blk] = max(self.x[blk], at)
+        if word in ("z", "y"):
+            self.z[blk] = max(self.z[blk], at)
+
+    def gadget(self, kind, word, args):
+        if kind == "prep" and word == "prep":
+            self.x[args[0]] = self.z[args[0]] = 0.0
+        elif kind == "ht":
+            self.x[args[0]], self.z[args[0]] = self.z[args[0]], self.x[args[0]]
+
+    def held(self, word, args) -> float:
+        """When the outcome of a product or readout is known, as far as frames go: an outcome
+        in Z̄ waits for the block's X̄ frames, one in X̄ for its Z̄ frames, one in Ȳ for both."""
+        pairs = zip(args[0::2], args[1::2]) if word == "ppm" else [(args[1], args[0])]
+        out = 0.0
+        for letter, b in pairs:
+            if letter in ("Z", "Y"):
+                out = max(out, self.x[b])
+            if letter in ("X", "Y"):
+                out = max(out, self.z[b])
+        return out
+
+
 def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
              start=None, macro=None, pinned=None, max_corridor=None) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
@@ -294,14 +331,21 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
         return next(c for c, w in zip(ok, when) if w <= t1), t1
 
     pinned = pinned or {}
+    pend = _Pending()
+
+    def classical(w, a, o, g):
+        """A `bit` or a frame: no gadget, only what it is decoded after."""
+        if w == "bit":
+            ready[o] = guard_ready(_names(a[0]))
+        else:
+            pend.frame(w, a[0], guard_ready(g))
+
     skip = 0
     for k, (w, a, o, g) in enumerate(stream):
         if k < skip:
             continue
-        if w == "bit":
-            ready[o] = guard_ready(_names(a[0]))
-            continue
-        if w in ("x", "y", "z"):
+        if w in ("bit", "x", "y", "z"):
+            classical(w, a, o, g)
             continue
         if w == "macro":
             gs, n, at, free, dec = macro(k, a, free_at, board)
@@ -315,6 +359,18 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             homes.update(at)                 # they live on its tiles: read, they stay there
             free_at.update(free)
             ready.update(dec)
+            # what its lines measure and frame, as `check` will read them
+            by_line = defaultdict(list)
+            for gd in gs:
+                by_line[gd.line].append(gd)
+            for j in range(k + 1, k + 1 + n):
+                w2, a2, o2, g2 = stream[j]
+                if w2 in ("bit", "x", "y", "z"):
+                    classical(w2, a2, o2, g2)
+                for gd in by_line.get(j, ()):
+                    pend.gadget(gd.kind, w2, a2)
+                    if o2:
+                        ready[o2] = max(gd.t1 + costs.decode_us, pend.held(w2, a2))
             skip = k + 1 + n
             continue
         blks = _blocks(w, a)
@@ -336,13 +392,14 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
             out.append(Gadget("prep", t, t + dur, frozenset([where[blk]]), ("prep", a[1]), k, (blk,)))
             free_at[blk] = t + dur
+            pend.gadget("prep", w, a)
         elif w == "read":
             blk = a[0]
             if blk not in where:
                 raise LatticeError(f"line {k}: {blk} is read but lives nowhere")
             tile, t1 = where[blk], t + costs.read_us
             out.append(Gadget("read", t, t1, frozenset([tile]), ("read", a[1]), k, (blk,)))
-            ready[o] = t1 + costs.decode_us
+            ready[o] = max(t1 + costs.decode_us, pend.held(w, a))
             free_at[blk] = t1
             if blk not in homes:
                 board.end(tile, blk, t1)
@@ -358,6 +415,7 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             board.take(right, t, t + costs.hbar_us, f"ht{k}")
             out.append(Gadget("ht", t, t + costs.hbar_us, frozenset([tile, right]), ("ht",), k, (blk,)))
             free_at[blk] = t + costs.hbar_us
+            pend.gadget("ht", w, a)
         elif w == "ppm":
             letters = a[0::2]
             if len(set(letters)) != 1:
@@ -368,7 +426,10 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
                 return None if r is None or max_corridor is not None and len(r[1]) > max_corridor else r
             r = route(t)
             while r is None:
-                t = board.later(t)
+                try:
+                    t = board.later(t)
+                except LatticeError:
+                    raise LatticeError(f"line {k}: no corridor for {' '.join(a)} on {tiles} will ever free") from None
                 r = route(t)
             att, cor = r
             t1 = t + costs.merge_us
@@ -379,7 +440,7 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
                               {"sides": att, "corridor": sorted(cor), "tiles": tiles}))
             for b in blks:
                 free_at[b] = t1
-            ready[o] = t1 + costs.decode_us
+            ready[o] = max(t1 + costs.decode_us, pend.held(w, a))
         else:
             raise LatticeError(f"line {k}: '{w}' is not an instruction of the surgery machine")
     return out
@@ -387,7 +448,8 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
 
 def check(stream, gadgets, costs: Costs = Costs()) -> list:
     """What is wrong with a schedule: two gadgets on one tile at once, a block's instructions out
-    of program order, a guard read before its outcome is decoded."""
+    of program order, a guard read before its outcome is decoded (an outcome measured on a block
+    with a frame pending decoded no sooner than that frame's guard)."""
     bad = []
     by = defaultdict(list)
     for gd in gadgets:
@@ -402,12 +464,16 @@ def check(stream, gadgets, costs: Costs = Costs()) -> list:
                 if blk not in bs and s < b - 1e-6 and e > a + 1e-6]
     last: dict = {}
     made: dict = {}
-    bits = [(k, a[0], o) for k, (w, a, o, _) in enumerate(stream) if w == "bit"]
+    pend = _Pending()
+    cls = [(k, w, a, o, g) for k, (w, a, o, g) in enumerate(stream) if w in ("bit", "x", "y", "z")]
     nb = 0
     for gd in sorted(gadgets, key=lambda g: g.line):
-        while nb < len(bits) and bits[nb][0] < gd.line:       # a bit: decoded with its inputs
-            _, text, o = bits[nb]
-            made[o] = max((made.get(x, INF) for x in _names(text)), default=0.0)
+        while nb < len(cls) and cls[nb][0] < gd.line:         # a bit, a frame: no gadget
+            _, w, a, o, g = cls[nb]
+            if w == "bit":
+                made[o] = max((made.get(x, INF) for x in _names(a[0])), default=0.0)
+            else:
+                pend.frame(w, a[0], max([made.get(x.lstrip("!"), INF) for x in g], default=0.0))
             nb += 1
         for b in gd.blocks:
             if gd.t0 < last.get(b, 0.0) - 1e-6:
@@ -417,8 +483,10 @@ def check(stream, gadgets, costs: Costs = Costs()) -> list:
         for x in g:
             if gd.t0 < made.get(x.lstrip("!"), INF) - 1e-6:
                 bad.append(f"line {gd.line}: its guard {x} is not decoded yet")
+        w, a = stream[gd.line][:2]
+        pend.gadget(gd.kind, w, a)
         if o:
-            made[o] = gd.t1 + costs.decode_us
+            made[o] = max(gd.t1 + costs.decode_us, pend.held(w, a))
     return bad
 
 

@@ -219,9 +219,11 @@ class Farm:
     `buffers` 2 (with `strips` 4): two sets of sites, the second two rows below the first, a
     factory's states taking them in turn -- its next state is made while the last one waits to
     be consumed.  A factory's inside is walled to everything else (`walls`): only its rows of
-    sites and the bus rows between and below them are open."""
+    sites and the bus rows between and below them are open.  `tag` prefixes every name it gives
+    (two farms on one lattice)."""
 
-    def __init__(self, n: int, x0: int, y: int, costs=None, serve=None, strips: int = 8, buffers: int = 1):
+    def __init__(self, n: int, x0: int, y: int, costs=None, serve=None, strips: int = 8, buffers: int = 1,
+                 tag: str = ""):
         from qccd.fullstack.scale.lattice import holds
         if buffers > 1 and strips != 4:
             raise ValueError("a second set of sites is laid out for the narrow factory (strips 4)")
@@ -252,14 +254,23 @@ class Farm:
         self.last = [[()] * buffers for _ in range(n)]     # per set of sites, the state it holds
         self.turn = [0] * n
         self.served: list = []                # (line, factory, dt)
+        self.tag = tag
 
     def bounds(self) -> tuple:
         x0, y0, x1, y1 = self.local
         return (x0 + self.dx[0], y0 + self.dy, x1 + self.dx[-1], y1 + self.dy)
 
     def all_homes(self) -> dict:
-        return {f"F{f}.v{k}.{b}": (x + self.dx[f], y + self.dy) for f in range(self.n)
+        return {f"{self.tag}F{f}.v{k}.{b}": (x + self.dx[f], y + self.dy) for f in range(self.n)
                 for k, v in enumerate(self.variants) for b, (x, y) in v["homes"].items()}
+
+    def sites_at(self, k: int) -> dict:
+        """The tiles the k-th state's nine sites are made on (`serve` fixed: its factory, and
+        which set of sites, the states before it on that factory say)."""
+        f = self.serve(k)
+        v = self.variants[sum(1 for i in range(k) if self.serve(i) == f) % len(self.variants)]
+        return {f"{self.tag}t{k}s{i}": (v["homes"][f"cl{i}"][0] + self.dx[f], v["homes"][f"cl{i}"][1] + self.dy)
+                for i in range(9)}
 
     def beneath(self, blocks, per: int, columns: int = 1) -> dict:
         """Homes for a program's blocks, `per` a column, `columns` columns under each factory
@@ -281,12 +292,12 @@ class Farm:
         """`stream` with each `autoccz_h s0 .. s8` a `macro` line followed by its factory's lines,
         renamed: the nine sites its own (`t<k>s<i>`, the program's names after it too) and the
         factory's blocks and outcomes `F<k>.`-prefixed."""
-        out, ren, k = [], {}, 0
+        out, ren, k, tag = [], {}, 0, self.tag
         for w, a, o, g in stream:
             if w == "autoccz_h":
-                ren = {s: f"t{k}s{i}" for i, s in enumerate(a)}
-                name = lambda x, k=k: ren[a[int(x[2:])]] if re.fullmatch(r"cl\d", x) else f"F{k}.{x}"
-                out.append(("macro", [k], None, []))
+                ren = {s: f"{tag}t{k}s{i}" for i, s in enumerate(a)}
+                name = lambda x, k=k: ren[a[int(x[2:])]] if re.fullmatch(r"cl\d", x) else f"{tag}F{k}.{x}"
+                out.append(("macro", [k, tag], None, []))
                 out += [(fw, [name(x) if re.fullmatch(r"c\w+", x) else x for x in fa], fo and name(fo),
                          [("!" if x[0] == "!" else "") + name(x.lstrip("!")) for x in fg])
                         for fw, fa, fo, fg in self.stream]
@@ -307,8 +318,8 @@ class Farm:
         f = self.serve(k) if self.serve else min(range(self.n), key=lambda i: self._start(i, free_at))
         dt, turn = self._start(f, free_at), self.turn[f]
         v = self.variants[turn]
-        sites = {f"cl{i}": f"t{k}s{i}" for i in range(9)}
-        name = lambda x: sites.get(x, f"F{k}.{x}")
+        sites = {f"cl{i}": f"{self.tag}t{k}s{i}" for i in range(9)}
+        name = lambda x: sites.get(x, f"{self.tag}F{k}.{x}")
         while True:
             gs = [shifted(g, self.dx[f], self.dy, line + 1, name, dt) for g in v["gadgets"]]
             busy = [(t, g.t0, g.t1) for g in gs for t in g.tiles] + \

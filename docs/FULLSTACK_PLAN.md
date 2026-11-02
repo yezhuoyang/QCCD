@@ -1228,6 +1228,15 @@ then 8T -> CCZ, then the routing pairs.
   16 factories, 5,184 tiles, 36.18 s, check clean -- the least tile-time yet (188k tile-s
   against 217k), at 11 s more latency; 96 merge shapes. Without the second set the same farm
   takes 183.9 s; with three bits a factory two sets are not enough (137.8 s).
+- **Correction (2026-11-02, later): the whole-adder times above were too short.** The scheduler
+  treated a frame as costing nothing, so it never made anything wait for the outcomes a frame
+  steers -- and the check did not look either. A frame on a block flips the later outcomes it
+  anticommutes with, so those outcomes are known only once the frame's own guard is decoded
+  (`lattice` now tracks it, X̄ and Z̄ frames apart, in `schedule` and `check` alike). The
+  uncompute is a chain: bit i's guarded CZ fix-up (an H̄ and two merges) leaves Z̄ frames on bit
+  i-1, whose X̄ readout steers bit i-1's fix-up -- 31 steps in turn, ~34 s. Corrected: narrow
+  farm 58.23 s (not 25.08), wide 54.99 s (not 21.83), two bits a factory 69.33 s (not 36.18);
+  the forward half is unchanged (23.84 s narrow). The earlier schedules fail the corrected check.
 - **d = 11 of the narrow farm's 30 new shapes, every rule and R10 (block by block):** all pass,
   1,297 to 5,517 ions, 138.3 ms each (3.2 h of checking in all; the longest, a 16-tile X̄
   product of three patches, 21 min). With the 42 checked before, every distinct program of
@@ -1291,21 +1300,34 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
   shapes), the preparations and readouts were checked before -- so every program of the write
   is checked at d = 11. The same crossbar with corridor merges: 39.92 s and 343 programs,
   corridors up to 102 tiles, which cannot be checked.
-- **The write, the add and the readouts on one lattice (`tools/lattice_loop1.py`).** The
-  narrow farm with dlog beneath it; the crossbar under it at its left (the 32 a-slots in a
-  column, pp in a row below them). After the write each a-slot is carried into its triple
-  (`relay.carry`: along its row, up beside the triple, one step across -- three moves), the
-  adder runs on the farm, mxDescending reads the a-slots there and makes the next ones back on
-  the crossbar. 345,232 gadgets on 21,603 tiles, **26.63 s**, check clean: the adder's bit j
-  starts as soon as row j is written and carried in, so the add hides under the write (26.35 s
-  alone). A staircase instead (each a-slot under its own triple, the write's rows spread over
-  the farm's width) took 60.3 s: its rows cross most of pp's columns.
+- **gLoop1's first iteration, whole, on one lattice (`tools/lattice_loop1.py`).** The narrow
+  farm with dlog beneath it; under it at its left the crossbar (the 32 a-slots in a column, pp
+  in a row below them, every other column); below pp three lanes, addr, a lane, the exponent's
+  six-block window, a lane; left of the crossbar a second farm for powerProduct (29 narrow
+  factories, tag "P"). After the write each a-slot is carried into its triple (`relay.carry`:
+  along its row, up beside the triple, one step across); the adder runs on the farm;
+  mxDescending reads the a-slots there and makes the next ones back on the crossbar. The
+  exponent loads, powerProduct and its release go through `relay.bring`: each fresh block made
+  facing its first partner, carried beside the next before each later product -- a CNOT's
+  ancilla beside its control then its target, a CZ's past its H̄, a factory's sites from the
+  factory to pp and addr. 705,742 gadgets on 48,709 tiles, **91.37 s**, check clean, 93
+  distinct programs (86 merges). Where the time goes: powerProduct done at 23.3 s (its 57
+  states, two a factory), the write and carries at 34.3 s, the adder at 68.2 s (its uncompute
+  chain, ~34 s), the release at 91.1 s (the same kind of chain, guarded CZ fix-ups each with an
+  H̄). With 8 factories for powerProduct, its states set the pace (92.4 s, before the frame
+  correction).
 - **Corridors capped.** Around the relays' tiles the farm's free router took detours, two of
   them ~250 tiles. `schedule(max_corridor=)` makes a merge wait for a short corridor instead;
-  at the farm's own longest, 19 tiles, nothing is slower and the run has 88 merge programs, 17
-  of them new (detours of 1-18 tiles near the carries), now being checked at d = 11.
-- **Next:** powerProduct and its release beside pp, the exponent's loads, then the iteration
-  whole.
+  at the farm's own longest, 19 tiles. Of the 86 merge programs, 12 are new -- the farm's
+  corridors detouring 4-18 tiles round the carries -- and are among 17 such being checked at
+  d = 11 (7 passed so far); all the others were checked before.
+- **The staircase.** Each a-slot under its own triple, the write's rows spread over the farm's
+  width, made the write 60.3 s on its own (the compact crossbar: 26.35 s): its rows cross most
+  of pp's columns.
+- **Next:** the iterations in turn. The adder of one overlaps the next one's release,
+  powerProduct and write (they touch other blocks), so the adder's ~58 s, its uncompute chain
+  above all, is what a steady iteration costs; the H̄ in every fix-up (0.68 s) is the step to
+  shorten.
 
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every

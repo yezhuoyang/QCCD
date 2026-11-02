@@ -7,7 +7,11 @@ Held here:
   products then become chains on the tiles between;
 * scheduled, a crossbar of such CNOTs passes the schedule's check with two merge programs only
   (a Z̄ pair down a column, an X̄ pair along a row), each a corridor merge at full distance, and
-  a pinned relay waits for its tile.
+  a pinned relay waits for its tile;
+* a move is a SWAP into a fresh patch, a carry is a move per leg, and `bring` puts each fresh
+  block beside its partners in turn, on the same two merge programs;
+* a capped merge waits for a short corridor; a frame holds the outcomes it flips -- a guard on
+  one waits for the frame's own guard -- and the check objects when it does not.
 """
 from __future__ import annotations
 
@@ -17,7 +21,7 @@ import pytest
 
 from qccd.fullstack.scale import relay as R
 from qccd.fullstack.scale.codesign import equal_drop
-from qccd.fullstack.scale.lattice import LatticeError, check, schedule
+from qccd.fullstack.scale.lattice import Costs, Gadget, LatticeError, check, schedule
 from qccd.fullstack.scale.program import Template
 
 
@@ -125,3 +129,45 @@ def test_a_capped_merge_waits_rather_than_going_round():
     assert m_free.t0 == 0.0 and len(m_free.detail["corridor"]) > 1       # round u, at once
     assert m_cap.detail["corridor"] == [(0, 1)] and m_cap.t0 == capped[1].t1   # through u's tile, after it
     assert check(stream, capped) == []
+
+
+def test_bring_puts_each_ancilla_beside_its_partners_in_turn():
+    homes = {"c": (0, 0), "t": (4, 3), "p": (6, 0)}
+    stream = [("prep", ("L", "X"), None, ()), ("ppm", ("Z", "c", "Z", "L"), "a", ()), ("ppm", ("X", "L", "X", "t"), "b", ()),
+              ("read", ("L", "Z"), "c0", ()), ("z", ("c",), None, ("b",)), ("x", ("t",), None, ("a",)),
+              ("prep", ("M", "X"), None, ()), ("ppm", ("Z", "p", "Z", "M"), "d", ()), ("ht", ("M",), None, ()),
+              ("ppm", ("Z", "M", "Z", "c"), "e", ()), ("read", ("M", "X"), "f", ())]
+    out, pins = R.bring(stream, homes, {}, set())
+    assert pins["L"] == (0, 1) and pins["M"] == (6, 1)            # facing their first partners
+    carried = [ln for ln in out if ln[0] == "ppm" and ln[2] in ("b", "e")]
+    assert pins[carried[0][1][1]] == (5, 3) and pins[carried[1][1][1]] == (0, 1)   # beside t, then c
+    gadgets = schedule(out, homes, (-2, -2, 8, 5), pinned=pins)
+    assert check(out, gadgets) == []
+    assert {g.shape for g in gadgets if g.kind == "merge"} == {
+        ("merge", "Z", (((0, 0), "bottom"), ((0, 1), "top")), ()),
+        ("merge", "X", (((0, 0), "right"), ((1, 0), "left")), ())}
+
+
+def test_a_frame_holds_the_outcomes_it_flips():
+    """An X̄ frame on q steered by an outcome decoded late (after an H̄): a Z̄ outcome measured on q
+    meanwhile is known only then, so a guard on it waits; an X̄ readout of q, which the frame does
+    not flip, does not wait; and the check objects to the first guard run early."""
+    homes = {"s": (0, 0), "u": (0, 2), "q": (2, 0), "v": (2, 2), "w": (4, 0), "y": (4, 2)}
+    stream = [("prep", ("s", "Z"), None, ()), ("ht", ("s",), None, ()), ("prep", ("u", "Z"), None, ()),
+              ("ppm", ("Z", "s", "Z", "u"), "late", ()),
+              ("prep", ("q", "Z"), None, ()), ("prep", ("v", "Z"), None, ()),
+              ("x", ("q",), None, ("late",)),
+              ("ppm", ("Z", "q", "Z", "v"), "m1", ()),          # flipped by the frame
+              ("read", ("q", "X"), "m2", ()),                  # not
+              ("prep", ("w", "Z"), None, ()), ("read", ("w", "Z"), "g1", ("m1",)),
+              ("prep", ("y", "Z"), None, ()), ("read", ("y", "Z"), "g2", ("m2",))]
+    gadgets = schedule(stream, homes, (-1, -1, 6, 3))
+    assert check(stream, gadgets) == []
+    at = {g.line: g for g in gadgets}
+    late_known = at[3].t1 + Costs().decode_us
+    assert at[7].t0 < at[3].t0                    # the merge itself does not wait
+    assert at[10].t0 >= late_known - 1e-6        # its outcome's guard does
+    assert at[12].t0 < at[3].t0                   # the X̄ readout's does not
+    early = [Gadget(g.kind, at[7].t1 + Costs().decode_us, at[7].t1 + Costs().decode_us + (g.t1 - g.t0), g.tiles,
+                    g.shape, g.line, g.blocks, g.detail) if g.line == 10 else g for g in gadgets]
+    assert any("guard m1" in p for p in check(stream, early))
