@@ -60,9 +60,10 @@ def choose_docks(all_docks: list[int], n: int) -> list[int]:
 
 
 def conveyor(arch, loop_id: str | None = None) -> tuple[str, list[str], dict[int, str]]:
-    """`(loop id, its node order, {rail index: dock site})`, derived the way the compiler
+    """`(loop id, its slot order, {rail index: dock site})`, derived the way the compiler
     derives it: the first closed loop of four or more nodes, and every gate-capable site
-    that hangs off it by one segment.
+    that hangs off it by one segment.  The order is the loop's SLOTS (`Device.loop_slots`):
+    a junction corner is passed by a rotation and is no slot, so a rail index counts traps.
 
     Structural, not by name, so this serves a ring whose docks are `A{n}` on spurs and a
     dual loop whose "docks" are slots on a second conveyor alike -- the two shapes q06f
@@ -73,7 +74,7 @@ def conveyor(arch, loop_id: str | None = None) -> tuple[str, list[str], dict[int
     if not loops:
         raise SystemExit(f"{arch.name} has no closed loop; the conveyor router needs one")
     loop_id = loop_id or loops[0]
-    nodes = list(arch.device.loops[loop_id].nodes)
+    nodes = list(arch.device.loop_slots(loop_id))
     index = {n: i for i, n in enumerate(nodes)}
     docks: dict[int, str] = {}
     for sg in arch.device.segments.values():

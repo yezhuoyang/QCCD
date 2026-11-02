@@ -60,8 +60,8 @@ PARTS = (("learn", "Tutorial", "learn/", "the course, the reference docs, and wo
 
 #: The running example on the landing: one seed entry, embedded as the page it is, in
 #: embed mode (HASH_JS) so only its stage and transport show.
-EXAMPLE = {"task": "five_qubit", "device": "ring24_8",
-           "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks"}
+EXAMPLE = {"task": "five_qubit", "device": "ring24_8_j",
+           "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks and junction corners"}
 
 #: The ranking pages' family colours (bb_studio.py's FAMHEX); everything else is grey.
 FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7"}
@@ -1858,15 +1858,18 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
 def _zone_legend(m) -> str:
     zones = sorted({n.zone_type for n in m.arch.device.nodes.values() if n.zone_type})
     items = "".join(f'<span><i style="background:{ZONE_HEX.get(z, "#8a8985")}"></i>{html.escape(z)}</span>' for z in zones)
-    if any(n.kind == "junction" for n in m.arch.device.nodes.values()):
-        items += '<span><i style="background:#1c2a4a"></i>lattice junction</span>'
+    dev = m.arch.device
+    bare = [nid for nid, n in dev.nodes.items() if n.kind == "junction"]
+    if bare:
+        what = "corner junction" if all(dev.is_bend(nid) for nid in bare) else "lattice junction"
+        items += f'<span><i style="background:#1c2a4a"></i>{what}</span>'
     return f'<div class="legend zones">{items}<span><i style="background:#fff;border:2px solid #1c2a4a;width:8px;height:8px"></i>a site where three or more axes meet</span></div>'
 
 
 #: Devices the physics page draws besides the examples' small ones: the leaderboard's
-#: 24-site ring with 8 dock spurs, the one the landing page's example runs on.
+#: 24-site ring with 8 dock spurs and junction corners, the one the landing page's example runs on.
 PHYS_DEVICES: dict[str, tuple[str, dict]] = {
-    "ring24_8": ("ring", {"width": 12, "height": 2, "verticals": 8}),
+    "ring24_8_j": ("ring", {"width": 14, "height": 2, "verticals": 8, "corners": "junction"}),
 }
 
 

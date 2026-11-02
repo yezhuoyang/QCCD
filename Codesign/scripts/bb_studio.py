@@ -77,80 +77,114 @@ ONE_WAVEFORM = ("It runs under the one-waveform model (control.model simd_classe
 #: is beside it as `<prefix>.pre_order.*`); its facts are the compile's, and every number
 #: that depends on the programme is computed from it rather than read from the study's data.
 CATALOG: tuple[dict, ...] = (
+    # 01-08 and 17 are JUNCTION-CORNER TWINS since 2026-11-01 (Ke Sun: a square trap's corners
+    # are junctions, the traps stand only on the sides).  Each replaces the corner-trap entry
+    # of the same key: `ring(W, H, V, dock_offset=o)` -> `ring(W + 2, H, V, dock_offset=o,
+    # corners="junction")`, the same slot count, dock count and slot index of every dock, so
+    # the same schedule and the same circuit; compiled with the original's settings by
+    # `q06_campaign.point` and the released qccdc cd3efedbbc10 (which reproduces every
+    # corner-trap original instruction for instruction).  02-08's schedules come from
+    # bb_schedule.py with the September binder (each check's contacts in arrival order, as
+    # the originals'), counting loop slots, not nodes; today's qccd/compile/order.py serves
+    # members in code order since 4cda6db and does not reproduce them.  The twins' files are under
+    # `Compiler/build/q06jc`; the originals stay where they were.  The corner-trap clips
+    # (BBResults/01..08_*.gif) are not linked from the twins: they show the old devices.
     {"key": "01_baseline_stride", "family": "ring + docks",
-     "title": "ring144_24v, stride layout", "gif": "01_baseline_stride.gif",
-     "arch": ROOT / "arch" / "ring144_24v.arch.json",
-     "prefix": BUILD / "q06" / "ring144_24v_a24_stride",
-     "recompiled": {"compiler": "f88754a2fa71", "date": "2026-10-20", "batches": 824,
-                    "hops": 7586, "rotations": 824},
-     "claim": "the study's starting point: the rotation pass laying riders out by stride, "
-              "recompiled on 2026-10-20 with a compiler that keeps every qubit's gates in "
-              "order: 824 batches of 1.05 contacts each, which is why it takes 1.42 s. The "
-              "study's 546 batches and 520 ms came from a compiler that reordered a qubit's "
-              "gates, which the checker now refuses."},
+     "title": "ring(74, 2, 24) with junction corners (ring144_24v's twin), stride layout",
+     "arch": BUILD / "q06jc" / "ring144_24v_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring144_24v_jc_a24_stride",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring144_24v, with the q06 stride settings"},
+     "claim": "the study's starting point, on ring144_24v's junction-corner twin: its four "
+              "corners are junctions that a rotation carries ions round, the traps stand only on "
+              "the sides, and it keeps 144 slots and 24 docks. The rotation pass lays riders out "
+              "by stride, with a compiler that keeps every qubit's gates in order: 824 batches of "
+              "1.05 contacts each, which is why it takes 1.49 s. The study's first compile, on the "
+              "corner-trap original, came from a compiler that reordered a qubit's gates, which "
+              "the checker now refuses."},
     {"key": "02_shipped_ring_code_aware", "family": "ring + docks",
-     "title": "ring144_24v, code-aware schedule", "gif": "02_shipped_ring_code_aware.gif",
-     "arch": ROOT / "arch" / "ring144_24v.arch.json",
-     "prefix": BUILD / "q06" / "ring144_24v_a24_bridge_structured_xz",
-     "claim": "the same device and circuit with the code-aware placer and binder: "
-              "55 batches instead of the stride layout's 824, 70 ms instead of 1.42 s. "
+     "title": "ring(74, 2, 24) with junction corners (ring144_24v's twin), code-aware schedule",
+     "arch": BUILD / "q06jc" / "ring144_24v_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring144_24v_jc_a24_bridge_structured_xz",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring144_24v, with the q06 code-aware settings"},
+     "claim": "the same junction-corner device and circuit with the code-aware placer and binder: "
+              "55 batches instead of the stride layout's 824, 72.5 ms instead of 1.49 s. "
               "The compilation axis alone is 20x."},
-    # 03-08: the q06g rings, each on the SWITCHED twin of the device it was compiled for
-    # (`<name>.arch.json` beside `<name>_noswitch.arch.json`: the same file with
-    # control.channels.switch_per_site true, byte-identical to the generator's own
-    # `rings/<name>.arch.json`).  The programmes are the ones compiled for the switchless
-    # declaration, unchanged; since 2026-10-23 R4d's hold clause refuses them there.
+    # 03-08: the q06g rings' junction twins, each on the SWITCHED device (`<name>_jc.arch.json`
+    # beside `<name>_jc_noswitch.arch.json`: the same file with control.channels.switch_per_site
+    # false, which `q06_campaign.point` writes).  The programmes are compiled for the
+    # switchless declaration, with --dock-all, as their originals were; R4d's hold clause
+    # refuses them there, so the board judges them on the switched device.
     {"key": "03_h3_v24_192", "family": "ring + docks",
-     "title": "ring(95, 3, 24), 192 slots, 24 ancillas, per-site switches", "gif": "03_h3_v24_192.gif",
-     "arch": BUILD / "q06g" / "ring192_h3_v24_o2.arch.json",
-     "prefix": BUILD / "q06g" / "ring192_h3_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "24 docks on a loop of height 3: 66 batches, 87.5 ms. " + SWITCHED + " Not buildable "
-              "by today's DRC: 102 of 216 sites get fewer than the 3 control-electrode pairs the "
-              "technology requires (the 24 docks, the 24 rail sites they hang off, and 54 more); "
-              "it was the study's first buildable answer before that rule."},
+     "title": "ring(97, 3, 24) with junction corners, 192 slots, 24 ancillas, per-site switches",
+     "arch": BUILD / "q06jc" / "ring192_h3_v24_o2_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring192_h3_v24_o2_jc_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(95, 3, 24), with the q06g settings"},
+     "claim": "24 docks on a loop of height 3 whose corners are junctions: 66 batches, 87.5 ms. "
+              + SWITCHED + " Not buildable by today's DRC: 102 of 216 sites get fewer than the 3 "
+              "control-electrode pairs the technology requires (the 24 docks, the 24 rail sites "
+              "they hang off, and 54 more); its corner-trap original was the study's first "
+              "buildable answer before that rule."},
     {"key": "04_h4_v24_216", "family": "ring + docks",
-     "title": "ring(106, 4, 24), 216 slots, 24 ancillas, per-site switches", "gif": "04_h4_v24_216.gif",
-     "arch": BUILD / "q06g" / "ring216_h4_v24_o2.arch.json",
-     "prefix": BUILD / "q06g" / "ring216_h4_v24_o2_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "height 4: 55 batches, 70.8 ms. " + SWITCHED + " The docks and the rail sites they "
-              "hang off get their 3 control-electrode pairs here; 54 plain rail sites do not, so "
-              "today's DRC still fails it -- the fewest short sites of any ring on the board."},
+     "title": "ring(108, 4, 24) with junction corners, 216 slots, 24 ancillas, per-site switches",
+     "arch": BUILD / "q06jc" / "ring216_h4_v24_o2_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring216_h4_v24_o2_jc_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(106, 4, 24), with the q06g settings"},
+     "claim": "height 4, junction corners: 55 batches, 71.5 ms. " + SWITCHED + " The docks and "
+              "the rail sites they hang off get their 3 control-electrode pairs here; 52 plain rail "
+              "sites do not, so today's DRC still fails it -- the fewest short sites of any ring on "
+              "the board."},
     {"key": "05_h3_v36_288_ANSWER", "family": "ring + docks", "answer": True,
-     "title": "ring(143, 3, 36), 288 slots, 36 ancillas, per-site switches -- the recommended design",
-     "gif": "05_h3_v36_288_ANSWER.gif",
-     "arch": BUILD / "q06g" / "ring288_h3_v36_o2.arch.json",
-     "prefix": BUILD / "q06g" / "ring288_h3_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "46 batches, 341 hops, 55.6 ms, R10 passed: the proved Lean checker and the tableau. "
-              "Its rotation schedule is within 10.7% of its lower bound; its batches are 52% full. "
-              + SWITCHED + " That is 324 select bits a cycle, 64.8 Mbit/s at the 5 us rotation "
-              "step; the 32 broadcast DACs are exactly the motion bank and the hold bank (58 with "
-              "the shims). The shims cost time: 17.1 ms a round through the 1:100 demultiplexer "
-              "(WISE, once per reconfiguration), 2.7 ms at 1:16 with 162 shim DACs. Not buildable "
-              "by today's DRC: 150 of 324 sites are short of 3 control-electrode pairs (the 36 "
-              "docks, the 36 rail sites they hang off, and 78 more)."},
+     "title": "ring(145, 3, 36) with junction corners, 288 slots, 36 ancillas, per-site switches "
+              "-- the recommended design",
+     "arch": BUILD / "q06jc" / "ring288_h3_v36_o2_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring288_h3_v36_o2_jc_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(143, 3, 36), with the q06g settings"},
+     "claim": "46 batches, 341 hops, 56.5 ms, R10 passed: the proved Lean checker and the tableau. "
+              "Its four corners are junctions, passed by every rotation and never stopped on, so "
+              "the traps stand only on the sides. Its rotation schedule is within 10.7% of its "
+              "lower bound; its batches are 52% full. "
+              + SWITCHED + " That is 324 select bits a cycle, 32.4 Mbit/s at its shortest transport "
+              "cycle, 10 us; the 32 broadcast DACs are exactly the motion bank and the hold bank "
+              "(58 with the shims). The shims cost time: 17.1 ms a round through the 1:100 "
+              "demultiplexer (WISE, once per reconfiguration), 2.7 ms at 1:16 with 162 shim DACs. "
+              "Not buildable by today's DRC: 150 of 324 sites are short of 3 control-electrode "
+              "pairs (the 36 docks, the 36 rail sites they hang off, and 78 more)."},
     {"key": "06_h5_v36_360", "family": "ring + docks",
-     "title": "ring(177, 5, 36), 360 slots, 36 ancillas, per-site switches", "gif": "06_h5_v36_360.gif",
-     "arch": BUILD / "q06g" / "ring360_h5_v36_o2.arch.json",
-     "prefix": BUILD / "q06g" / "ring360_h5_v36_o2_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "the same 36 ancillas on a taller, longer loop: the same clock (56.0 ms) for twice "
-              "the die (70.7 mm2). " + SWITCHED + " Height 5 gives the docks their electrode "
-              "pairs; 78 rail sites still fall short, so today's DRC fails it."},
+     "title": "ring(179, 5, 36) with junction corners, 360 slots, 36 ancillas, per-site switches",
+     "arch": BUILD / "q06jc" / "ring360_h5_v36_o2_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring360_h5_v36_o2_jc_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(177, 5, 36), with the q06g settings"},
+     "claim": "the same 36 ancillas on a taller, longer loop, junction corners again: the same "
+              "clock (56.9 ms) for twice the die (71.5 mm2). " + SWITCHED + " Height 5 gives the "
+              "docks their electrode pairs; 76 rail sites still fall short, so today's DRC fails it."},
     {"key": "07_h3_v48_384", "family": "ring + docks",
-     "title": "ring(191, 3, 48), 384 slots, 48 ancillas, per-site switches", "gif": "07_h3_v48_384.gif",
-     "arch": BUILD / "q06g" / "ring384_h3_v48_o2.arch.json",
-     "prefix": BUILD / "q06g" / "ring384_h3_v48_o2_noswitch_a48_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "48 docks lose to 36: 48 does not divide the placement's period, and the "
-              "schedule sits 43% above its rotation bound where 36 sits at 11%. " + SWITCHED
-              + " Not buildable by today's DRC: 198 of 432 sites are short of control-electrode pairs."},
+     "title": "ring(193, 3, 48) with junction corners, 384 slots, 48 ancillas, per-site switches",
+     "arch": BUILD / "q06jc" / "ring384_h3_v48_o2_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring384_h3_v48_o2_jc_noswitch_a48_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(191, 3, 48), with the q06g settings"},
+     "claim": "48 docks lose to 36, junction corners on both: 48 does not divide the placement's "
+              "period, and the schedule sits 43% above its rotation bound where 36 sits at 11%. "
+              + SWITCHED + " Not buildable by today's DRC: 198 of 432 sites are short of "
+              "control-electrode pairs."},
     {"key": "08_h4_v72_360_unbuildable", "family": "ring + docks",
-     "title": "ring(178, 4, 72), 360 slots, 72 ancillas, per-site switches -- NOT buildable",
-     "gif": "08_h4_v72_360_unbuildable.gif",
-     "arch": BUILD / "q06g" / "ring360_h4_v72_o0.arch.json",
-     "prefix": BUILD / "q06g" / "ring360_h4_v72_o0_noswitch_a72_bridge_structured_xz_dockall_transport-fastest",
-     "claim": "the model's optimum: 19 batches, 24.9 ms, 2.2x faster than 05. " + SWITCHED
-              + " Not buildable: today's DRC finds 146 of 432 sites short of 3 control-electrode "
-              "pairs (the study's builder found 36 minimum-gap violations instead; today's finds "
-              "none of those)."},
+     "title": "ring(180, 4, 72) with junction corners, 360 slots, 72 ancillas, per-site switches "
+              "-- NOT buildable",
+     "arch": BUILD / "q06jc" / "ring360_h4_v72_o0_jc.arch.json",
+     "prefix": BUILD / "q06jc" / "ring360_h4_v72_o0_jc_noswitch_a72_bridge_structured_xz_dockall_transport-fastest",
+     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
+                  "note": "junction-corner twin of ring(178, 4, 72), with the q06g settings"},
+     "claim": "the model's optimum, with junction corners: 19 batches, 25.8 ms, 2.2x faster than "
+              "05. " + SWITCHED + " Not buildable: today's DRC finds 144 of 432 sites short of 3 "
+              "control-electrode pairs, and 16 RF-to-DC clearance and 16 overlap findings around "
+              "the two docks that sit beside a corner junction (the study's builder found "
+              "minimum-gap violations on the corner-trap original; today's finds none on either)."},
     # 09-11: real direct machines -- the q06h lattices with control.model "direct", compiled
     # by the released qccdc with the q06h recipe (a bare `compile`, insert_cooling, check_tsir
     # --model corrected).  Until 2026-10-23 these rows showed the one-waveform programme
@@ -312,11 +346,18 @@ CATALOG: tuple[dict, ...] = (
      "arch": BUILD / "q06i" / "chain400.arch.json",
      "refusal": "unroutable: q156 cannot reach C202 from C233 within 806 cycles. 42% occupancy.",
      "claim": "a line has no closed loop for rotation and one route for the router."},
+    # 17: the junction twin of q06i's dual240_c0 (dual_loop(120) -> dual_loop(122,
+    # corners="junction"), still 240 slots a loop), put through the q06i recipe -- a bare
+    # `qccdc compile` of the 24-ancilla round -- with the released cd3efedbbc10, which does not
+    # finish in 30 minutes on the twin or on the corner-trap original either.
     {"key": "17_dual240_c0", "family": "two loops",
-     "title": "dual240 with no couplings",
-     "arch": BUILD / "q06i" / "dual240_c0.arch.json",
-     "refusal": "unroutable: q155 cannot reach AT16 from AT45 within 248 cycles.",
-     "claim": "uncoupled, the data loop and the ancilla loop can never interact."},
+     "title": "dual240 with junction corners and no couplings",
+     "arch": BUILD / "q06jc" / "dual240_c0_jc.arch.json",
+     "refusal": "did not finish in 30 minutes (qccdc cd3efedbbc10). 168 ions on 480 traps, "
+                "35% occupancy. The study's compiler refused the corner-trap original as "
+                "unroutable.",
+     "claim": "uncoupled, the data loop and the ancilla loop can never interact, junction "
+              "corners or not: two loops of 240 slots, each turning past four corner junctions."},
     {"key": "18_ladder144_r12", "family": "rails + highways",
      "title": "ladder144: 12 rails and highways, 576 sites",
      "arch": BUILD / "q06h" / "ladder144_r12.arch.json",
@@ -335,14 +376,15 @@ CATALOG: tuple[dict, ...] = (
 #: designs that share a device (grid13x13 direct against broadcast, grid11x11 as drawn
 #: against pitch 2, the shipped ring's two schedules)
 SHORT = {
-    "01_baseline_stride": "ring144_24v stride", "02_shipped_ring_code_aware": "ring144_24v code-aware",
-    "03_h3_v24_192": "ring(95,3,24)", "04_h4_v24_216": "ring(106,4,24)",
-    "05_h3_v36_288_ANSWER": "ring(143,3,36)", "06_h5_v36_360": "ring(177,5,36)",
-    "07_h3_v48_384": "ring(191,3,48)", "08_h4_v72_360_unbuildable": "ring(178,4,72)",
+    "01_baseline_stride": "ring(74,2,24) junction, stride",
+    "02_shipped_ring_code_aware": "ring(74,2,24) junction, code-aware",
+    "03_h3_v24_192": "ring(97,3,24) junction", "04_h4_v24_216": "ring(108,4,24) junction",
+    "05_h3_v36_288_ANSWER": "ring(145,3,36) junction", "06_h5_v36_360": "ring(179,5,36) junction",
+    "07_h3_v48_384": "ring(193,3,48) junction", "08_h4_v72_360_unbuildable": "ring(180,4,72) junction",
     "09_grid13x13": "grid13x13 direct", "10_grid11x11": "grid11x11 direct, as drawn",
     "11_grid11x11_s2_buildable": "grid11x11 direct, pitch 2", "12_grid13x13_broadcast": "grid13x13 broadcast",
     "13_dual144_c24_R2": "dual144 c24", "14_racetrack240": "racetrack240",
-    "15_racetrack480": "racetrack480", "16_chain400": "chain400", "17_dual240_c0": "dual240",
+    "15_racetrack480": "racetrack480", "16_chain400": "chain400", "17_dual240_c0": "dual240 junction",
     "18_ladder144_r12": "ladder144", "19_grid9x9": "grid9x9",
     "20_torus12_own_a72": "torus12x12 a72", "21_torus12_code_a72": "torus12x12 code-placed a72",
     "22_planar12_own_a72": "grid12x12 a72", "23_planar12_own_a24": "grid12x12 a24",

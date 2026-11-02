@@ -79,7 +79,9 @@ def segment_role(labels) -> str:
 # `moves` list -- so the GIF and the page agree about where an ion is.
 
 
-def paths_of(frame, prev, loops):
+def paths_of(frame, prev, loops, bends=frozenset()):
+    """ion -> the nodes a frame carries it through.  A loop shift moves SLOTS: a bend (a junction
+    corner, `Device.is_bend`) is walked through, never landed on -- the page's `rotationPaths`."""
     out = {}
     if frame.get("shift"):
         loop, delta = frame["shift"]
@@ -89,22 +91,29 @@ def paths_of(frame, prev, loops):
         k, step = len(seq), (1 if delta >= 0 else -1)
         idx = {n: i for i, n in enumerate(seq)}
         for ion, at in prev.items():
-            i0 = idx.get(at)
-            if i0 is None:
+            i = idx.get(at)
+            if i is None:
                 continue
-            out[ion] = [seq[(i0 + step * h) % k] for h in range(abs(delta) + 1)]
+            walk = [at]
+            for _ in range(abs(delta)):
+                i = (i + step) % k
+                walk.append(seq[i])
+                while seq[i] in bends:
+                    i = (i + step) % k
+                    walk.append(seq[i])
+            out[ion] = walk
     elif frame.get("moves"):
         for ion, path in frame["moves"]:
             out[ion] = list(path)
     return out
 
 
-def derive_stage(frames, loops):
+def derive_stage(frames, loops, bends=frozenset()):
     """`(before, after, paths)` per frame: ion -> node, and the walk between them."""
     pos, before, after, paths = {}, [], [], []
     for f in frames:
         before.append(dict(pos))
-        p = paths_of(f, pos, loops)
+        p = paths_of(f, pos, loops, bends)
         if f["type"] == "init":
             pos.update(f.get("place", {}))
         else:
@@ -149,7 +158,9 @@ class Clip:
         self.L = layout or vm["layout"]
         self.frames = vm["program"]["frames"]
         self.ion_roles = vm["ion_roles"]
-        self.before, self.after, self.paths = derive_stage(self.frames, self.loops)
+        dev = arch.device
+        bends = frozenset(n for lp in dev.loops.values() for n in lp.nodes if dev.is_bend(n))
+        self.before, self.after, self.paths = derive_stage(self.frames, self.loops, bends)
 
         # A COMPILED programme carries the circuit it came from, and the clip then has
         # two things to say per step rather than one: the hardware instruction, and the

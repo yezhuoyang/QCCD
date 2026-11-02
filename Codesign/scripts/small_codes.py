@@ -199,22 +199,46 @@ def gen_doc(template: Path, name: str, generator: str, params: dict, description
 
 #: (key, family, title, claim, doc-maker or shipped path)
 def devices(code_key: str, qasm: Path, n_data: int) -> list[dict]:
+    # The ring family is entered with JUNCTION CORNERS, the square trap as it is built (Ke Sun,
+    # 2026-10): the four corners of each loop are junctions the rotation passes, the traps
+    # stand only on the sides.  Each is the corner-trap design's twin with the same slots and
+    # docks (`ring(W + 2, ..., corners="junction")`, `dual_loop(w + 2, ...)`); the shipped
+    # arch/*.arch.json files stay as they are, the deck's own drawings.
+    rings = [
+        {"key": "ring144_24v_j", "family": "ring + docks",
+         "title": "ring144_24v_j — the shipped ring with junction corners: ring(74, 2, 24), 144 slots, 24 docks",
+         "claim": "the study's shipped conveyor, rigid rotation with dock spurs, with a junction at each of the loop's four corners",
+         "doc": gen_doc(ARCH / "ring144_24v.arch.json", "ring144_24v_j", "ring",
+                        {"width": 74, "height": 2, "verticals": 24, "corners": "junction"},
+                        "the shipped ring144_24v with junction corners: 144 slots, 24 docks")},
+        {"key": "cyclone_base_j", "family": "loop, no spurs",
+         "title": "cyclone_base_j — Cyclone's base loop with junction corners: ring(38, 2, 0), 72 slots, no docks",
+         "claim": "Cyclone's base, rotation on a loop without spurs; its only junctions are the four corners, which the rotation passes",
+         "doc": gen_doc(ARCH / "cyclone_base.arch.json", "cyclone_base_j", "ring",
+                        {"width": 38, "height": 2, "verticals": 0, "site_zone": "trap", "corners": "junction"},
+                        "Cyclone's base loop with junction corners: 72 slots, no docks")},
+        {"key": "cyclone_dual_loop_j", "family": "two loops",
+         "title": "cyclone_dual_loop_j — data loop and ancilla loop with junction corners: dual_loop(38), two loops of 72 slots",
+         "claim": "two loops, the ancilla loop rotating; each loop's four corners are junctions",
+         "doc": gen_doc(ARCH / "cyclone_dual_loop.arch.json", "cyclone_dual_loop_j", "dual_loop",
+                        {"width": 38, "corners": "junction"},
+                        "Cyclone's data loop and ancilla loop with junction corners: two loops of 72 slots")},
+    ]
     shipped = [
-        ("ring144_24v", "ring + docks", "ring144_24v — the shipped ring, 24 docks", "the study's shipped conveyor: rigid rotation with dock spurs"),
-        ("cyclone_base", "junction-free loop", "cyclone_base — a loop with no junctions", "Cyclone's base: rotation on a loop without spurs"),
         ("h2_racetrack", "junction-free loop", "h2_racetrack — Quantinuum's H2 loop", "one continuous racetrack, no junctions"),
-        ("cyclone_dual_loop", "two loops", "cyclone_dual_loop — data loop and ancilla loop", "two loops, the ancilla loop rotating"),
         ("ladder_2x72", "rails + highways", "ladder_2x72 — rails and highways", "two rails joined by rungs"),
         ("grid9x9", "lattice", "grid9x9 — the baseline lattice", "traps on the wires of a 9x9 junction grid"),
         ("deck_unit_cell", "lattice", "deck_unit_cell — the same lattice, broadcast-wired", "grid9x9 with the 32-channel WISE control block"),
         ("chain", "line", "chain — a line of traps", "one linear trap"),
         ("stationary_chain", "line", "stationary_chain — two traps, one rail", "two traps joined by one rail: the breakeven baseline"),
     ]
-    out = [{"key": k, "family": f, "title": t, "claim": c, "arch": ARCH / f"{k}.arch.json"} for k, f, t, c in shipped]
+    out = rings + [{"key": k, "family": f, "title": t, "claim": c, "arch": ARCH / f"{k}.arch.json"} for k, f, t, c in shipped]
     out += [
-        {"key": "ring24_8", "family": "ring + docks", "title": "ring(12, 2, 8) — a small ring with 8 docks",
-         "claim": "the study's family at the code's scale: 24 slots, 8 dock spurs",
-         "doc": gen_doc(RING_TEMPLATE, "ring24_8", "ring", {"width": 12, "height": 2, "verticals": 8}, "a 24-slot ring with 8 docks")},
+        {"key": "ring24_8_j", "family": "ring + docks",
+         "title": "ring24_8_j — a small ring with junction corners: ring(14, 2, 8), 24 slots, 8 docks",
+         "claim": "the study's family at the code's scale: 24 slots, 8 dock spurs, a junction at each of the loop's four corners",
+         "doc": gen_doc(RING_TEMPLATE, "ring24_8_j", "ring", {"width": 14, "height": 2, "verticals": 8, "corners": "junction"},
+                        "a 24-slot ring with 8 docks and junction corners")},
         {"key": "torus4x4", "family": "torus", "title": "torus 4x4 — a periodic lattice",
          "claim": "every row and column a closed loop, 32 traps",
          "doc": gen_doc(GRID_TEMPLATE, "torus4x4", "grid", {"a": 4, "b": 4, "periodic": True}, "a 4x4 torus")},
