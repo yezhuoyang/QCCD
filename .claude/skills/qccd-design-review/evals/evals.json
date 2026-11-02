@@ -1,0 +1,56 @@
+{
+  "skill_name": "qccd-design-review",
+  "evals": [
+    {
+      "id": 1,
+      "name": "official-entry-surface3xz-grid9x9",
+      "prompt": "Can you review this leaderboard entry before I cite it? It's the grid9x9 design on the 'Surface code memory, distance 3, both bases' board. The bundle is https://qccd.academy/official/v1/submissions/os_4c75a8b07249aea2/bundle.zip and the server's grade is the same URL with /report instead of /bundle.zip. I want to know if it really keeps every rule of the board, which rules it only passes because they are skipped or can't fail, and whether my laptop can reproduce the official verdict.",
+      "expected_output": "A review whose verdict is the official one (eligible), with every rule of the standard set in a linked table. It names the allowed skips (R7b, R9, R10), the allowed partial (R15), the vacuous passes (R16, R17, R18), and the rules the rules stage does not run on this board (R0, R24, R25, judged here in the rule language). It says the local grade cannot be eligible without the Lean checker, and does not claim R10 locally.",
+      "files": [],
+      "expectations": [
+        "States that the official server's grade is eligible (every required stage passed), citing the report",
+        "States that a grade on this machine cannot reproduce eligibility, naming the missing Lean checker (qcheck / lean_certificate unsupported)",
+        "Gives a per-rule table covering all 31 rules of the standard set (R0-R25 including R4b, R4d, R6b, R7b, R7c)",
+        "Links each rule id to its page at https://qccd.academy/rules/#<id>",
+        "Identifies R7b, R9 and R10 as skipped but tolerated by the grader, and R15 as a tolerated partial",
+        "Says that R16, R17 and R18 pass vacuously or by construction, so they are not evidence about the design",
+        "Says that R0, R24 and R25 are not judged by the board's rules stage, and gives their verdict from another check or says they were not checked",
+        "Does not claim the local run established R10 (only the official report's certificate stages do)",
+        "Notes that the entry's wiring differs from the shipped arch/grid9x9 of the same name (broadcast at 44 DACs, against the shipped direct wiring at 5,760 DACs, which is over the budget)",
+        "Names board rules that had nothing to check on this design (for example R14: no splits; the loop half of R11: no loops)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "bell-on-chain4-for-ghz-board",
+      "prompt": "I compiled the Bell example onto the 4-site chain and I'd like to enter it on the GHZ starter board. Files: qccd/site/compiled/chain4.arch.json (device), qccd/site/compiled/bell/prog.cooled.tsir.json (final program) and qccd/site/compiled/bell/prog.qcert.json (certificate). Check it against all the board's rules before I submit and tell me what I need to fix.",
+      "expected_output": "R7 fails under the board's physics (n-bar about 6.1 against a budget of 1.0 at the first two-qubit gate). The fix is to re-cool under the board's physics, which is the one change a board allows after certification. The certificate is for a 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so certificate_binding would fail. Every other rule is reported correctly, and R10 is said to be unestablished.",
+      "files": [],
+      "expectations": [
+        "Identifies R7 as failing, with an n-bar of about 6.1 against a budget of 1.0 at the first two-qubit gate",
+        "Proposes re-inserting cooling under the board's physics (or cooling before that gate) as the fix",
+        "Notices that the programme and certificate are for the 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so the entry would fail the certificate binding",
+        "Reports no false failures: every rule it marks as failing is R7 or a direct consequence of the certificate being for another circuit",
+        "Covers every rule of the standard set, each linked to https://qccd.academy/rules/#<id>",
+        "States that R10 (the programme computes the circuit) is not established by this review",
+        "Points out that an entry needs the certified programme as a fourth file (bell/prog.tsir.json), since the user listed only three"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "sharp-corner-device-for-steane",
+      "prompt": "A collaborator sent me a device for the Steane code board, evals/files/sharp_corner.arch.json in the design-review skill folder. Before we spend time compiling onto it: is the device itself legal under the board's rules, does it fit the budget, and which rules can't be checked until we have a program?",
+      "expected_output": "R20 fails at J0_1 (18.4 degrees) and J1_1 (45 degrees) against the 60-degree minimum, with a concrete geometry fix. The budget is fine (33 of 128 DACs, 2 of 200 junctions). R11, R18, R19 and R21 are checked and pass. Every programme rule is listed as needing a programme, not as passing. A board-fit comment notes that 14 ion slots for Steane's 13 qubits leaves almost no room.",
+      "files": [
+        "evals/files/sharp_corner.arch.json"
+      ],
+      "expectations": [
+        "Identifies R20 failing at J0_1 (about 18.4 degrees) and at J1_1 (45 degrees) against the 60-degree minimum",
+        "Proposes a concrete geometry fix (move the trap back, or open the angle to at least 60 degrees)",
+        "Reports the budget as within limits: 33 DACs of 128 and 2 junctions of 200",
+        "Separates the rules checkable on the device alone (R11, R18-R21) from those that need a programme, and does not claim any programme rule passes",
+        "Comments on board fit: 14 ion slots for the Steane circuit's 13 qubits"
+      ]
+    }
+  ]
+}
