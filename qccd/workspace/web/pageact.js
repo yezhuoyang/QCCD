@@ -18,6 +18,8 @@
 //   open_lesson open a lesson of the course (a studio page)
 //   studio      one verb of the page's Studio API (EDITOR): design on the canvas, write the
 //               program, check a lesson -- the same verbs the course solves its exercises with
+//   debug       one verb of the Debug page's API (QCCD_DEBUG): open a program, step, watch, check
+//               rules and assertions, find a condition, read the located failures
 //   wait        pause, so a demonstration can be followed
 //   comments    the comment threads on this page (the site's own, as the signed-in person sees them)
 //   comment     pin a new thread on an element, as the signed-in person, signed "via <agent>";
@@ -829,6 +831,21 @@ function act(action, args, who) {
           return { ok: !(v && v.ok === false), verb: verb, result: jsonable(v), studio: studioBrief(E) };
         });
       });
+    case 'debug':
+      var DG = window.QCCD_DEBUG, dverb = String(args.verb || ''), DV = iface().debug_verbs || {};
+      if (!DG) throw new Error('this page is not the Debug page: navigate to /web/debug/ (or a link with ?src=<a Studio page>)');
+      if (dverb === 'verbs') return { ok: true, verbs: Object.keys(DV).sort(), declared: DV,
+                                      note: 'steps count from 1, as the Studio status line does' };
+      if (!DV[dverb]) throw new Error('the Debug page has no agent verb ' + JSON.stringify(dverb) + '; debug verb "verbs" lists the declared ones: ' +
+                                      Object.keys(DV).sort().join(', '));
+      if (typeof DG[dverb] !== 'function') throw new Error('this Debug page has no ' + dverb + ' (an older build)');
+      var darg = Array.isArray(args.args) ? (args.args[0] || {}) : (args.args && typeof args.args === 'object' ? args.args : {});
+      var dtarget = document.getElementById(DV[dverb].kind === 'read' ? 'dbgSide' : 'dbgStage') || document.body;
+      return pointAt(dtarget, null, who, dverb + (Object.keys(darg).length ? ' ' + clip(JSON.stringify(darg), 60) : '')).then(function () {
+        return Promise.resolve(DG[dverb](darg)).then(function (v) {
+          return { ok: !(v && v.ok === false), verb: dverb, result: jsonable(v), debug: jsonable(DG.status(), 4000) };
+        });
+      });
     case 'comments':
       var hk = hookOf(), me0 = hk.me();
       if (!me0) return { ok: true, signed_in: false, note: NOT_SIGNED };
@@ -879,7 +896,7 @@ function act(action, args, who) {
       return go.then(function () { return hr.api('POST', '/threads/' + tid + '/resolve', { resolved: args.resolved !== false }); })
         .then(function () { hr.reload(); return { ok: true, thread: tid, resolved: args.resolved !== false }; });
     default:
-      throw new Error('unknown action ' + JSON.stringify(action) + ': read, scroll, highlight, click, fill, press, navigate, step, open_lesson, studio, wait, comments, comment, reply, resolve');
+      throw new Error('unknown action ' + JSON.stringify(action) + ': read, scroll, highlight, click, fill, press, navigate, step, open_lesson, studio, debug, wait, comments, comment, reply, resolve');
   }
 }
 function safe(action, args, who) {

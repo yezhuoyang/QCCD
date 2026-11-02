@@ -61,6 +61,7 @@
     <a href="__ROOT__evaluation/" data-part="evaluation" role="menuitem">Evaluation<small>every metric, and the noisy circuit a run becomes</small></a>
   </span></span>
   <a href="__ROOT__studio.html#design" data-part="design">Design</a>
+  <a href="__ROOT__debug/" data-part="debug" id="sn-debug" data-hint="site:debug">Debug</a>
   <a href="__ROOT__gadgets/" data-part="gadgets">Gadgets</a>
   <a href="__ROOT__board/" data-part="board">Leaderboard</a>
   <a href="__ROOT__reproduce/" data-part="reproduce">Reproduce</a>
@@ -148,7 +149,20 @@
   // what an agent may operate in this bar, in the page's hint table (docs/agent-interface.md)
   window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'site:search': { t: 'Search the site',
     d: 'type words; the matching pages are listed under the box, and Enter opens the first' },
-    'site:learn': { t: 'Learn', d: 'the reference pages: Physics, Language, Rules, Compilation and Evaluation; press to list them' } });
+    'site:learn': { t: 'Learn', d: 'the reference pages: Physics, Language, Rules, Compilation and Evaluation; press to list them' },
+    'site:debug': { t: 'Debug', d: 'step through a program, watch ions and places, and check it against rules; from a Studio page it opens that program' } });
+  // Debug, from a Studio page: the debugger opens THIS program at this step (qccd/site/debugpage.py).  The Design
+  // page's own work travels through the Studio's autosave, written here first so it is the latest.
+  var dbg = document.getElementById('sn-debug');
+  if(dbg && window.self === window.top) dbg.addEventListener('click', function(){
+    var E = window.EDITOR; if(!E || !E.ready || !E.ready()) return;
+    var root; try { root = new URL(ROOT, location.href); } catch(e){ return; }
+    var rel = location.pathname.indexOf(root.pathname) === 0 ? location.pathname.slice(root.pathname.length) : '';
+    if(!rel || rel.indexOf('debug/') === 0) return;
+    var src = rel, step = (typeof frame === 'number') ? frame + 1 : 0;
+    try { if(rel === 'studio.html' && ((E.authored && E.authored()) || (E.edits && E.edits().length))){ if(E.autosave) E.autosave(); src = 'design'; } } catch(e){}
+    dbg.href = ROOT + 'debug/?src=' + encodeURIComponent(src) + (step > 1 ? '&step=' + step : '');
+  });
   window.SITENAV = { search: function(s){ q.value = s; search(); return HITS.slice(); }, index: INDEX };
 })();
 </script>

@@ -2640,7 +2640,7 @@ function pickOnPage() {
 }
 var PAGE_VERBS = { read: 'reading the page', scroll: 'scrolling the page', highlight: 'pointing at something',
                    click: 'pressing a control', fill: 'typing', press: 'pressing a key',
-                   navigate: 'opening another page', step: 'stepping the animation', open_lesson: 'opening a lesson',
+                   navigate: 'opening another page', step: 'stepping the animation', open_lesson: 'opening a lesson', debug: 'debugging the program',
                    studio: 'working in the Studio', wait: 'pausing', comments: 'reading the comments',
                    comment: 'writing a comment', reply: 'replying to a comment', resolve: 'marking a comment addressed' };
 function pageAction(p) {

@@ -115,8 +115,10 @@ def hardware_of(arch) -> Hardware:
 def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] | None = None,
                         computes_circuit: bool | None = None,
                         rule_config: Mapping[str, object] | None = None,
-                        check_metrics: bool = True) -> Execution:
-    """Replay `prog` on `arch` under the clock `model` and build its execution."""
+                        check_metrics: bool = True, views: list | None = None) -> Execution:
+    """Replay `prog` on `arch` under the clock `model` and build its execution.  `views`, when
+    given, receives the replay's per-step views (one per step, in order): the debugger reads
+    each step's state from them without replaying a second time."""
     from ..verify import verify_metrics
     from ..verify.replay import replay
     from ..verify.rules import motion_signature, r4_drivable, r4_simd_classes, hop_label, loop_node_set
@@ -130,9 +132,12 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
     # that places one there, names a stop the device does not have (R0's `well_formed`,
     # `setup_ok`).  Empty on every device without junction corners.
     bends = frozenset(n for lp in dev.loops.values() for n in lp.nodes if dev.is_bend(n))
-    views: list = []
+    keep = views
+    views = []
     res = replay(prog, arch, model, check_rules=False, keep_cycles=True,
                  rule_config=rule_config, on_cycle=views.append)
+    if keep is not None:
+        keep.extend(views)
 
     occ = Timeline(0)
     pos = Timeline(None)

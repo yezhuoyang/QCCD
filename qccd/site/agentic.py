@@ -32,6 +32,7 @@ PAGE_ACTION_ABOUT = {
     "step": "step or play an animation (a compiled programme, a run)",
     "open_lesson": "open a lesson of the course",
     "studio": "run one declared Studio verb: draw, edit, read, check a lesson",
+    "debug": "run one declared verb of the Debug page: open a program, step, watch, check rules and assertions, find a condition",
     "wait": "pause, so the person can watch",
     "comments": "read a page's comments",
     "comment": "comment on the page, as the signed-in person, marked as their agent's",

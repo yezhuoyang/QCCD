@@ -116,6 +116,35 @@ def test_the_contract_the_pages_carry():
         "/web/rules/", "/web/studio.html"]
 
 
+DEBUG_KINDS = {"read", "view", "load", "run"}
+
+
+def test_every_debug_verb_is_declared():
+    # the Debug page (qccd/site/debug): window.QCCD_DEBUG and debug_api.json name the same verbs
+    keys = iface.api_keys(iface.DEBUG_JS.read_text(encoding="utf-8"))
+    reg = iface.debug_api()
+    assert sorted(keys) == sorted(reg), (
+        f"window.QCCD_DEBUG {sorted(set(keys) - set(reg))} has no declaration in qccd/site/debug/debug_api.json; "
+        f"it declares {sorted(set(reg) - set(keys))} that QCCD_DEBUG lacks")
+    bad = [k for k, v in reg.items() if v.get("kind") not in DEBUG_KINDS or not str(v.get("does") or "").strip()
+           or not isinstance(v.get("args"), dict)]
+    assert not bad, f"these Debug verbs are declared incompletely (kind read|view|load|run, does, args): {bad}"
+    c = iface.page_contract()
+    assert c["debug_verbs"] == reg and iface.manifest()["debug_verbs"] == reg
+
+
+def test_every_debug_control_is_described():
+    # every data-hint on the Debug page (the markup and what debug.js writes) has its QCCD_HINTS entry
+    from qccd.site import debugpage
+    js = iface.DEBUG_JS.read_text(encoding="utf-8")
+    used = set(re.findall(r'data-hint="([\w:-]+)"', debugpage.BODY + js))
+    table = js[js.index("window.QCCD_HINTS = Object.assign"):]
+    table = table[:table.index("});") + 3]
+    described = set(re.findall(r"'([\w:-]+)': \{ t: '", table))
+    assert used and not used - described, f"Debug page controls with no QCCD_HINTS entry in debug.js: {sorted(used - described)}"
+    assert not described - used, f"QCCD_HINTS in debug.js describes controls the page no longer has: {sorted(described - used)}"
+
+
 @needs_chrome
 def test_every_control_in_the_studio_is_declared(tmp_path, monkeypatch):
     """The Studio as it renders (every panel's controls are in the page, open or not)."""

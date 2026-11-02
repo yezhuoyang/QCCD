@@ -27,7 +27,9 @@ Four kinds of thing are declared:
   `qccd/viz/js/editor_api.json`; an agent's `studio` action calls only verbs declared for
   agents; on the person's own workspace Studio what a design verb draws is committed as the
   agent's change set (the page syncs it with `by_page_action`), and only the course's verbs,
-  which would replace the design with a lesson's, stay off.
+  which would replace the design with a lesson's, stay off.  The Debug page's API
+  (`window.QCCD_DEBUG`) is declared the same way in `qccd/site/debug/debug_api.json`, and an
+  agent's `debug` action calls only those verbs.
 * ACTIONS and TOOLS -- the page actions (`service.PAGE_ACTIONS`, implemented in web/pageact.js)
   and the MCP tools (`mcp_server._tools`), declared by the code that serves them.
 
@@ -40,11 +42,14 @@ import json
 import re
 from pathlib import Path
 
-__all__ = ["OUT_OF_LINE", "DECLARED_FORMS", "editor_api", "api_keys", "page_contract", "manifest", "places"]
+__all__ = ["OUT_OF_LINE", "DECLARED_FORMS", "editor_api", "debug_api", "api_keys", "page_contract", "manifest",
+           "places"]
 
 _REPO_PKG = Path(__file__).resolve().parents[1]
 EDITOR_JS = _REPO_PKG / "viz" / "js" / "editor.js"
 EDITOR_API = _REPO_PKG / "viz" / "js" / "editor_api.json"
+DEBUG_JS = _REPO_PKG / "site" / "debug" / "debug.js"
+DEBUG_API = _REPO_PKG / "site" / "debug" / "debug_api.json"
 
 #: regions the code GENERATES controls into from a schema or a table; a field or button inside
 #: one is declared by the region (its own label says which field it is).  Selector -> what.
@@ -143,6 +148,11 @@ def editor_api() -> dict:
     return json.loads(EDITOR_API.read_text(encoding="utf-8"))["verbs"]
 
 
+def debug_api() -> dict:
+    """The Debug page's verbs (`window.QCCD_DEBUG`), each with its kind, what it does and its args."""
+    return json.loads(DEBUG_API.read_text(encoding="utf-8"))["verbs"]
+
+
 def places(site_index: list | None) -> list:
     """Every place `navigate` may go on the website: the index's pages (their paths, each once)."""
     seen, out = set(), []
@@ -159,6 +169,7 @@ def page_contract(*, site_index: list | None = None, design_page: bool = False, 
     verbs = {k: {"kind": v["kind"], "does": v["does"], **({"args": v["args"]} if v.get("args") else {})}
              for k, v in editor_api().items() if v["use"] == "agent"}
     return {"verbs": verbs, "not_for_agents": {k: v["use"] for k, v in editor_api().items() if v["use"] != "agent"},
+            "debug_verbs": debug_api(),
             "forms": DECLARED_FORMS, "controls": {k: v for k, v in OUT_OF_LINE.items()},
             "places": places(site_index) if site_index else None, "aliases": aliases or [],
             "design_page": design_page}
@@ -183,6 +194,7 @@ def manifest(ws=None, site_index: list | None = None) -> dict:
                      "by_construction": "links (they go where they point) and native fold-outs (<summary>)"},
         "studio_verbs": {k: v for k, v in api.items() if v["use"] == "agent"},
         "studio_verbs_not_for_agents": sorted(k for k, v in api.items() if v["use"] != "agent"),
+        "debug_verbs": debug_api(),
         "page_actions": list(PAGE_ACTIONS),
         "tools": [{"name": n, "about": d} for n, d, _ in _tools()],
     }

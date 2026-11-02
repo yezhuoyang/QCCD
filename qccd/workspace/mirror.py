@@ -288,7 +288,9 @@ def inject(page: str, cfg: dict, contract: dict | None = None) -> str:
 
 
 def mirror_csp(chat_origin: str) -> str:
-    return ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+    # 'wasm-unsafe-eval' lets a page compile WebAssembly (the Debug page's rule language, the Lean
+    # lessons) and nothing else: script eval stays refused
+    return ("default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; font-src 'self' data:; media-src 'self'; connect-src 'self'; "
             f"frame-src 'self' {chat_origin}; frame-ancestors 'self'; base-uri 'self'; form-action 'none'; "
             "object-src 'none'")

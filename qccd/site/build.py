@@ -2194,11 +2194,18 @@ def build(out: Path) -> int:
     # the logical-gadget tool (qccd/gadget/site.py, docs/GADGETS.md)
     from ..gadget.site import index_entries as gadget_index_entries
     index += gadget_index_entries()
+    # the Debug page: any Studio page above, step by step, checked by rules (qccd/site/debugpage.py)
+    from . import debugpage
+    index += debugpage.index_entries()
     idx = json.dumps(index, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
+
+    app_pages: list[tuple[str, str]] = []      # every Studio page written: what the Debug page can open
 
     def put(rel: str, page: str, depth: int, active: str | None, app: bool = False, extra: str = "") -> None:
         p = out / rel
         p.parent.mkdir(parents=True, exist_ok=True)
+        if app and 'id="svg"' in page:
+            app_pages.append((rel, debugpage.page_title(page)))
         page = with_nav(page, depth, active, idx, app=app, extra=extra)
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
         p.write_text(page, encoding="utf-8", newline="")
@@ -2347,6 +2354,9 @@ def build(out: Path) -> int:
     if g3:
         put("board/goal3/index.html", g3, 2, "board")
         print("  goal3        the reference sweep and the official entries, code by code")
+    # last, so it offers every Studio page the build wrote
+    n_debug = debugpage.write(out, put, PAGE, STYLE, app_pages, index)
+    print(f"  debug        {n_debug} programs to open, the rule language and its Python runtime")
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
     print(f"wrote {out}  ({n_pages} entry pages, {len(index)} search entries, {total / 1e6:.0f} MB)")
     return 0

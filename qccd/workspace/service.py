@@ -960,6 +960,12 @@ def create_app(state: ServiceState) -> FastAPI:
     def rules_catalog(request, actor, _):
         return ws.rules_catalog()
 
+    @route("POST", "/api/debug", write=False)
+    def debug(request, actor, b):
+        """The Debug page's debugger, headless: one action on a run or two workspace files (debugging.py)."""
+        from .debugging import debug_call
+        return debug_call(ws, b)
+
     @route("POST", "/api/publications")
     def publications_new(request, actor, b):
         return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
@@ -1328,7 +1334,7 @@ def _pageact() -> str:
 
 #: what an agent may do on a page (web/pageact.js implements each; nothing else runs)
 PAGE_ACTIONS = ("read", "scroll", "highlight", "click", "fill", "press", "navigate", "step", "open_lesson",
-                "studio", "wait", "comments", "comment", "reply", "resolve")
+                "studio", "debug", "wait", "comments", "comment", "reply", "resolve")
 
 
 def _chat_page(state: ServiceState, web_origin: str | None, page: str) -> str:

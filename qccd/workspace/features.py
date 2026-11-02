@@ -458,7 +458,12 @@ FEATURES: tuple[Feature, ...] = (
         "or 'page'/'-page'), wait (ms up to 10000, optional note), studio (verb + args: one verb the page's Studio "
         "declares for agents, e.g. addSite [x, y], addSegment [a, b], lessonLoad, lessonCheck, lessonHint, "
         "lessonSolution, testDrive; verb 'verbs' lists the declared ones with what each does; frame for an "
-        "embedded example), comments (the site's comment threads on this page, as the signed-in person sees "
+        "embedded example), debug (verb + args: one verb of the Debug page, /web/debug/, with ONE object in args, "
+        "e.g. verb 'open' args [{\"src\": \"board/surface3_mem/02_ring16.html\"}], 'check' [{\"rules\": \"standard\", "
+        "\"assertions\": \"for all s in sites, t in instants: occupancy(s, t) <= 1\"}], 'failures', 'goto' [{\"step\": 12}], "
+        "'state', 'watch' [{\"add\": [\"q0\", \"C3\"]}], 'trace', 'find' [{\"condition\": \"occupancy(\\\"J0\\\", t) > 0\"}], "
+        "'continue', 'report'; verb 'verbs' lists them; steps count from 1 as the Studio shows them; headless, "
+        "without a page, qccd_debug does the same on a run or files), comments (the site's comment threads on this page, as the signed-in person sees "
         "them), comment (target, text: a new thread pinned there, posted AS THE PERSON and signed 'via <you>'), "
         "reply (thread, text), resolve (thread, resolved), click (target), fill (target, value), press "
         "(key: Enter|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Tab|Space|Home|End|PageUp|PageDown; a key "
@@ -471,7 +476,7 @@ FEATURES: tuple[Feature, ...] = (
         "a refusal lists what is declared instead. The chat is out of reach, and links that leave the site "
         "are refused (give the person the link instead).",
         _obj({"action": {"type": "string", "enum": ["highlight", "scroll", "click", "fill", "press", "navigate",
-                                                    "step", "open_lesson", "studio", "wait", "comments", "comment",
+                                                    "step", "open_lesson", "studio", "debug", "wait", "comments", "comment",
                                                     "reply", "resolve"]},
               "text": _S, "thread": _I, "resolved": {"type": "boolean"},
               "verb": _S, "args": {"type": "array"}, "ms": _I, "by": {"anyOf": [_I, _S]}, "frame": _S,
@@ -619,6 +624,31 @@ FEATURES: tuple[Feature, ...] = (
         "qccd_submit_local's or qccd_submit_official's `rules`.",
         _obj({}),
         lambda be, a: be.call("GET", "/api/rules"), ("GET /api/rules",), read_only=True, group="boards"),
+    Feature(
+        "qccd_debug",
+        "Debug a program step by step, without a page (the website's Debug page does the same, visibly: "
+        "qccd_page_act action debug). The program: run_id (a finished run from qccd_run: its compiled program on "
+        "its design, with the certificate, so the circuit rules R24/R25 are judged too), or arch + program (an "
+        ".arch.json and a .tsir.json in the workspace, optional certificate). STEPS COUNT FROM 1, as the Studio's "
+        "status line does: step 7 is what the person sees as 'Step 7 / N'. action: summary (steps, ions, sites, "
+        "junctions); check (rules: a rule set by name, its text, or 'none'; assertions: your own rules in the "
+        "rule language, a formula per paragraph, e.g. 'for all s in sites, t in instants: occupancy(s, t) <= 1' "
+        "or 'for all t in instants: position(\"q0\", t) != \"C3\"'; only: rule ids; limit) -> each rule's "
+        "verdict and its failures LOCATED: step, until, the sites/junctions/rails/ions it names, the grader's "
+        "sentence; state (step, watch: ids) -> the instruction, what it did, every ion's place, occupied places, "
+        "n-bar; step (step) -> one instruction; trace (entity, from, to) -> every step an ion/site/junction/rail "
+        "changed or was acted on; find (condition: a formula over the instant t, from, backward) -> the first "
+        "step it holds, a conditional breakpoint; value (exprs: terms over t, step); diff (from, to) -> ions that "
+        "moved. To find a compiler or hardware bug: check, then state/trace at the first failing step.",
+        _obj({"action": {"type": "string", "enum": ["summary", "check", "state", "step", "trace", "find",
+                                                    "value", "diff"]},
+              "run_id": _S, "arch": _S, "program": _S, "certificate": _S, "model": _S,
+              "rules": _S, "assertions": _S, "only": {"type": "array", "items": _S}, "limit": _I,
+              "step": _I, "watch": {"type": "array", "items": _S}, "entity": _S, "from": _I, "to": _I,
+              "condition": _S, "backward": {"type": "boolean"}, "exprs": {"type": "array", "items": _S}},
+             ["action"]),
+        lambda be, a: be.call("POST", "/api/debug", dict(a), timeout=300),
+        ("POST /api/debug",), read_only=True, group="runs"),
     Feature(
         "qccd_get_bench",
         "The Compiler board's local reports: without report_id the list (compiler, coverage, speedup over the "

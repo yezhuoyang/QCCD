@@ -53,6 +53,14 @@ HOW_TO = [
                                                   "first; newCanvas for a new design, on a new draft) -- each verb is "
                                                   "committed as your change set where they watch -- or "
                                                   "qccd_apply_change_set (preview, then apply), in small steps."},
+    {"task": "debug a program step by step, or look for a bug in a compiler or hardware program",
+     "how": "with the person watching: navigate to /web/debug/?src=<a Studio page of this map, e.g. "
+            "board/surface3_mem/02_ring16.html> (src=design: the person's own design), then qccd_page_act "
+            "action=debug: verb check args=[{rules: 'standard', assertions: '<your rules, the rule language>'}], "
+            "failures, goto [{step: N}] (steps count from 1, as the Studio shows them), state, watch "
+            "[{add: ['q3', 'J1']}], trace, find [{condition: 'occupancy(\"J1\", t) > 1'}], continue, report; "
+            "each failure is crossed out in red on the picture. Headless, on a run or workspace files: "
+            "qccd_debug (the same actions)."},
     {"task": "check a page for scientific mistakes",
      "how": "read it by section; compare every claim, number and example with the rules "
             "(qccd_read_reference section=rules), the physics (docs:phys) and the page's own embedded examples "
