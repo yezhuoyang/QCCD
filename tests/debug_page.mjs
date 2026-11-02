@@ -74,7 +74,7 @@ const expect = (ok, what) => { if (!ok) fails.push(what); };
 try {
   await send('Page.navigate', { url: BASE ? new URL('debug/', BASE).href : `http://127.0.0.1:${server.address().port}/debug/` });
   for (let i = 0; i < 100 && !(await ev('!!window.QCCD_DEBUG').catch(() => false)); i++) await new Promise((r) => setTimeout(r, 100));
-  const offered = await ev(`QCCD_DEBUG.sources({}).programs.map(function (p) { return p.src; })`);
+  const offered = await ev(`QCCD_DEBUG.sources({limit: 100000}).programs.map(function (p) { return p.src; })`);
   expect(offered.indexOf(page) >= 0, `the Open list offers ${page}`);
   const opened = await ev(`QCCD_DEBUG.open({src: ${JSON.stringify(page)}})`);
   out.steps = opened.steps;
