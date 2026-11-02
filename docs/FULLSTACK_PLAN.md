@@ -1228,7 +1228,10 @@ then 8T -> CCZ, then the routing pairs.
   16 factories, 5,184 tiles, 36.18 s, check clean -- the least tile-time yet (188k tile-s
   against 217k), at 11 s more latency; 96 merge shapes. Without the second set the same farm
   takes 183.9 s; with three bits a factory two sets are not enough (137.8 s).
-- **d = 11 of the narrow farm's 30 new shapes:** in progress.
+- **d = 11 of the narrow farm's 30 new shapes, every rule and R10 (block by block):** all pass,
+  1,297 to 5,517 ions, 138.3 ms each (3.2 h of checking in all; the longest, a 16-tile X̄
+  product of three patches, 21 min). With the 42 checked before, every distinct program of
+  the narrow-farm adder is checked at d = 11. The `--bits 2` farm's other shapes are not.
 
 **Step 5, the census (2026-11-02).** With every template rewritten for the surgery machine --
 `_pauli_frame` made gidneyCompare's four-merge step (a CNOT-and-S̄ by |Ȳ> rotations, then its
