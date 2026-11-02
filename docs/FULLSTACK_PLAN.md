@@ -1291,9 +1291,21 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
   shapes), the preparations and readouts were checked before -- so every program of the write
   is checked at d = 11. The same crossbar with corridor merges: 39.92 s and 343 programs,
   corridors up to 102 tiles, which cannot be checked.
-- **Next:** the whole gLoop1 iteration on one floorplan -- the write into a-slots that sit in a
-  column, then moved into the adder's bit triples (a teleport: a chain and a readout), the adder
-  on its farm, the readouts, powerProduct and its release beside pp, and the exponent's loads.
+- **The write, the add and the readouts on one lattice (`tools/lattice_loop1.py`).** The
+  narrow farm with dlog beneath it; the crossbar under it at its left (the 32 a-slots in a
+  column, pp in a row below them). After the write each a-slot is carried into its triple
+  (`relay.carry`: along its row, up beside the triple, one step across -- three moves), the
+  adder runs on the farm, mxDescending reads the a-slots there and makes the next ones back on
+  the crossbar. 345,232 gadgets on 21,603 tiles, **26.63 s**, check clean: the adder's bit j
+  starts as soon as row j is written and carried in, so the add hides under the write (26.35 s
+  alone). A staircase instead (each a-slot under its own triple, the write's rows spread over
+  the farm's width) took 60.3 s: its rows cross most of pp's columns.
+- **Corridors capped.** Around the relays' tiles the farm's free router took detours, two of
+  them ~250 tiles. `schedule(max_corridor=)` makes a merge wait for a short corridor instead;
+  at the farm's own longest, 19 tiles, nothing is slower and the run has 88 merge programs, 17
+  of them new (detours of 1-18 tiles near the carries), now being checked at d = 11.
+- **Next:** powerProduct and its release beside pp, the exponent's loads, then the iteration
+  whole.
 
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every

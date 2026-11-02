@@ -28,19 +28,24 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "tools"))
 
 
-def lookup_stream():
-    """gLoop1's first iteration's lookup write, as `program._Exp` writes it (every slot taken),
-    no `se` or `decode` lines."""
+def rewritten():
+    """Gidney 2025 at RSA-2048 (`lattice_adder.build`), every template rewritten for the surgery
+    machine (`codesign.surgery_rewrite`)."""
     from lattice_adder import build
     from qccd.fullstack.scale import codesign as C
-    from qccd.fullstack.scale import program as P
-    from qccd.fullstack.scale.expr import ExprError
     prog = build()
     keep = C.exports(prog)
     for tid, t in list(prog.templates.items()):
         new, n = C.surgery_rewrite(t, keep.get(tid, set()))
         if n:
             prog.templates[tid] = new
+    return prog
+
+
+def first_gloop1(prog):
+    """(call, env, its own env) of the program's first gLoop1 call."""
+    from qccd.fullstack.scale import program as P
+    from qccd.fullstack.scale.expr import ExprError
     found = []
 
     def holds(node, env):
@@ -66,7 +71,15 @@ def lookup_stream():
             elif isinstance(node, (P.When, P.Pred)) and holds(node, env):
                 walk(node.body, env, depth)
     walk(prog.root, dict(prog.params), 0)
-    call, env, env2 = found[0]
+    return found[0]
+
+
+def lookup_stream():
+    """gLoop1's first iteration's lookup write, as `program._Exp` writes it (every slot taken),
+    no `se` or `decode` lines."""
+    from qccd.fullstack.scale import program as P
+    prog = rewritten()
+    call, env, env2 = first_gloop1(prog)
     loop = prog.body_of(call, env)[0]                  # for 0 <= j < W1
     ex = P._Exp(prog, reserved=True)
     env3 = {**env2, loop.var: 0}

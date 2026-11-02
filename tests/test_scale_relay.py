@@ -103,3 +103,25 @@ def test_a_pinned_relay_waits_for_its_tile_and_a_held_tile_is_refused():
     held = [("prep", ("v", "X"), None, ()), ("prep", ("w", "X"), None, ())]
     with pytest.raises(LatticeError, match="not free"):
         schedule(held, homes, (-1, -1, 2, 4), pinned={"v": (0, 1), "w": (0, 1)})
+
+
+def test_a_carry_takes_one_move_per_leg():
+    lines, pins = R.carry("a", "n", [(0, 0), (3, 0), (3, 2)], "c")
+    assert pins == {"c.h0.0": (1, 0), "c.h0.1": (2, 0), "c.c1": (3, 0), "c.h1.0": (3, 1)}
+    stream = [("prep", ("a", "Z"), None, ())] + lines + [("read", ("n", "Z"), "out", ())]
+    gadgets = schedule(stream, {}, (-1, -1, 4, 3), pinned={"a": (0, 0), "n": (3, 2), **pins})
+    assert check(stream, gadgets) == []
+    assert {g.shape for g in gadgets if g.kind == "merge"} == {
+        ("merge", "Z", (((0, 0), "bottom"), ((0, 1), "top")), ()),
+        ("merge", "X", (((0, 0), "right"), ((1, 0), "left")), ())}
+
+
+def test_a_capped_merge_waits_rather_than_going_round():
+    homes = {"a": (0, 0), "b": (0, 2)}
+    stream = [("prep", ("u", "X"), None, ()), ("read", ("u", "X"), "m", ()), ("ppm", ("Z", "a", "Z", "b"), "o", ())]
+    free = schedule(stream, homes, (-2, -2, 2, 4), pinned={"u": (0, 1)})
+    capped = schedule(stream, homes, (-2, -2, 2, 4), pinned={"u": (0, 1)}, max_corridor=1)
+    m_free, m_cap = free[-1], capped[-1]
+    assert m_free.t0 == 0.0 and len(m_free.detail["corridor"]) > 1       # round u, at once
+    assert m_cap.detail["corridor"] == [(0, 1)] and m_cap.t0 == capped[1].t1   # through u's tile, after it
+    assert check(stream, capped) == []

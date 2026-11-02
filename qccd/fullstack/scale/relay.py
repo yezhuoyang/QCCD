@@ -109,6 +109,21 @@ def move_proved(letter: str) -> bool:
     return equal_drop(Template("move", lines, (0,) * 6, 1, 1, 2, 0), Template("swap", ref, (0,) * 3, 1, 1, 0, 0))
 
 
+def carry(src: str, dst: str, tiles: list, tag: str, guard: tuple = ()):
+    """(lines, {block: tile}): `src`'s state carried onto `dst` along `tiles` -- its own tile,
+    corners, `dst`'s tile -- each leg one `move` down a column (Z̄) or along a row (X̄), relays on
+    the tiles between, the blocks at the corners `<tag>.c<i>`."""
+    names = [src] + [f"{tag}.c{i}" for i in range(1, len(tiles) - 1)] + [dst]
+    lines, pins = [], {}
+    for i, (ta, tb) in enumerate(zip(tiles, tiles[1:])):
+        between = line(ta, tb)
+        relays = [f"{tag}.h{i}.{k}" for k in range(len(between))]
+        pins.update(zip(relays, between))
+        lines += move("Z" if ta[0] == tb[0] else "X", names[i], names[i + 1], relays, f"{tag}.h{i}", guard)
+    pins.update({n: t for n, t in zip(names[1:-1], tiles[1:-1])})
+    return lines, pins
+
+
 def line(ta: tuple, tb: tuple) -> list:
     """The tiles strictly between two tiles of one row or one column, from ta's side."""
     (xa, ya), (xb, yb) = ta, tb

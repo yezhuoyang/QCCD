@@ -210,13 +210,15 @@ def _names(text: str) -> list:
 
 
 def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
-             start=None, macro=None, pinned=None) -> list:
+             start=None, macro=None, pinned=None, max_corridor=None) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
     `program._Exp` writes them -- on the lattice: `homes` block -> tile for the blocks that live
     there, `bounds` (x0, y0, x1, y1) the tiles that exist, `walls` tiles no gadget may use;
     `reserved` (tile, t0, t1) already taken -- by gadgets scheduled before, copies of a unit
     scheduled once (`shifted`) -- and `start` block -> when it is first free; `pinned` fresh
-    block -> the bus tile it is made on.
+    block -> the bus tile it is made on.  `max_corridor`: a merge whose shortest free corridor is
+    longer waits until a shorter one frees, rather than going the long way round (a long way
+    round is a new program, and a long one cannot be checked).
 
     `macro`: what a `macro` line stands for -- `macro(k, args, free_at, board)` returns (its
     gadgets, the number of lines after it they carry out, block -> tile, block -> when free,
@@ -361,10 +363,13 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             if len(set(letters)) != 1:
                 raise LatticeError(f"line {k}: a mixed product, {' '.join(a)}: rewrite it first")
             tiles = [where[b] for b in blks]
-            r = _route(board, tiles, letters[0], t, t + costs.merge_us, set(blks))
+            def route(t):
+                r = _route(board, tiles, letters[0], t, t + costs.merge_us, set(blks))
+                return None if r is None or max_corridor is not None and len(r[1]) > max_corridor else r
+            r = route(t)
             while r is None:
                 t = board.later(t)
-                r = _route(board, tiles, letters[0], t, t + costs.merge_us, set(blks))
+                r = route(t)
             att, cor = r
             t1 = t + costs.merge_us
             for c in cor:
