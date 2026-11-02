@@ -128,6 +128,34 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-02 00:00 UTC, `qccd-official:f79b212` (junction corners; commit `f79b212`,
+pushed to `compiler` and `website/invitations`; the user approved it). Ke Sun's report on lesson
+A4: a square trap's corners are junctions, the traps stand only on its sides. `ring` and
+`dual_loop` take `corners: "junction"`, and a bend (a bare junction where only two rails meet) is
+passed by a loop's rotation, never stopped on (`Device.loop_slots`); a document without the key
+reads as corner traps, so every stored design keeps its shape. The image also carries qccdc
+`cd3efedbbc10`'s pin, but the image's own qccdc and qcheck are unchanged (the grader does not
+compile). Built ON THE DROPLET from `qccd-official:bbffbb2`, COPY only (`/root/qccd-f79b212`):
+`qccd/`, `arch/` and `Compiler/bridge` are the git archive, and all 743 files equal the image's.
+The compose file is unchanged (grader 2g, 256 MB stack).
+
+Census before the switch (`census_f79b212.sh`, bbffbb2's kit with the tags swapped, about 23
+minutes):
+- the rules stage over all 80 stored archives was identical in both images;
+- the evaluation census found no difference in 80/80;
+- the declared-rules census gave 80/80 with the same scored device, rules verdict and metrics;
+- Goal 1, Goal 3 and all 30 boards were identical;
+- the C2LR reference bundle and the two-layer trap graded exactly as under bbffbb2;
+- every starter in the 30 releases (Goal 3's `ring(96, 2, 96)` included) expands byte-identically.
+
+Two junction-cornered `surface3xz_mem@1` designs, made the way a reader makes one (a workspace
+`construct`, a compile job with qccdc `cd3efedbbc10`, adopt, freeze), were graded in both images.
+`ring(24, 2)` with trap sides compiles through the general router, which never turns the loop, and
+grades eligible in both. `ring(18, 2, 16)` compiles in rotate mode, turning the loop through its
+corners: it fails the rules stage in bbffbb2 and grades eligible, 11/11, in f79b212. Production
+smoke: that second bundle, uploaded privately by `deploy-smoke-f79b212` (quota 2, key revoked),
+`os_f71fdd2b42272960`, eligible 11/11 in 20 s. Rollback is `*.bak-bbffbb2`.
+
 **Deployed** 2026-10-31 20:16 UTC, `qccd-official:bbffbb2` (an entry may declare the rules it
 keeps; commit `bbffbb2`, pushed to `compiler` and `website/invitations`; the user approved it).
 A bundle may carry `rules.json`, a rule set of its own. The grader judges the entry by that set
