@@ -18,7 +18,8 @@ that need none, and every replacement is a theorem about the template, not a gue
   instructions in the same order; the table's bit is a slot reserved either way.
 
 For the surgery machine (slice S9, `surgery_rewrite`) products are native and stay; only the H̄
-triple, the "measure X̄" it opens and a CZ's mixed product change.
+triple, the "measure X̄" it opens, a CZ's mixed product, the Toffoli's held sites, a CNOT
+written as |Ȳ> rotations and a template that is only a Pauli change.
 
 A rewrite may drop outcomes only when no other line reads them and no call site hands them on
 (`exports`).  `equal_drop` is the proof: every branch of the original lands, outcomes forgotten,
@@ -382,6 +383,23 @@ def _rotation_cx(lines: list, keep=frozenset()):
     return None
 
 
+def _pauli_frame(t: Template, keep=frozenset()):
+    """A small template whose whole channel, its outcomes forgotten, is a Pauli on its blocks
+    -- Gidney 2025's gidneyCompare runs a CNOT-and-S̄ by |Ȳ> rotations and then its inverse,
+    four merges that leave Z̄ Z̄ -- is that Pauli, as frames: the lines, or None.  Only when no
+    call site hands on an outcome (`keep`), the template makes no magic state, and the search
+    is small (at most 3 blocks passed in, 12 outcomes)."""
+    if keep or t.n_params > 3 or t.n_out > 12 or any(_body(ln).startswith(("autoccz", "inject")) for ln in t.lines):
+        return None
+    if not any(_body(ln).startswith(("ppm", "prep", "read", "ht", "cx")) for ln in t.lines):
+        return None
+    for ps in product("IXYZ", repeat=t.n_params):
+        lines = tuple(f"{p.lower()} p{i}" for i, p in enumerate(ps) if p != "I")
+        if equal_drop(t, Template(t.tid, lines, (0,) * len(lines), t.n_params, 0, t.n_out, t.n_ext)):
+            return list(lines)
+    return None
+
+
 def surgery_rewrite(t: Template, keep=frozenset()):
     """(the template for the surgery machine, Counter of what was rewritten) -- docs/
     FULLSTACK_PLAN.md S9: there a Pauli product is a corridor merge, native, so products stay;
@@ -390,7 +408,8 @@ def surgery_rewrite(t: Template, keep=frozenset()):
     * `ht P; ppm Z P; ...; if o: x P` -> `read P X; prep P Z`: X̄ read out, |0̄> made, no H̄;
     * a CZ's mixed product -> H̄ on its ancilla between its two merges (`_cz_turn`);
     * `autoccz` -> `autoccz_h`, the factory's state, its consumer's letters swapped (`_held`);
-    * a CNOT as three |Ȳ> rotations -> a lattice-surgery CNOT (`_rotation_cx`).
+    * a CNOT as three |Ȳ> rotations -> a lattice-surgery CNOT (`_rotation_cx`);
+    * a template whose whole channel is a Pauli -> that Pauli, as frames (`_pauli_frame`).
     Every step is proved by the exact simulator on the whole template (se and decode lines
     dropped: they leave the state alone); a template with a magic state is not run whole: its
     H̄ triples, held sites and rotation CNOTs rest on their own proofs.  `keep`: outcomes a call
@@ -426,6 +445,10 @@ def surgery_rewrite(t: Template, keep=frozenset()):
             if not equal_drop(cur, nxt):
                 raise AssertionError(f"{t.tid}: the {name} rewrite is not the same channel")
             cur, n[name] = nxt, n[name] + 1
+    frames = _pauli_frame(cur, keep)
+    if frames is not None:
+        cur, n["frame only"] = Template(t.tid, tuple(frames), (0,) * len(frames), t.n_params, 0, t.n_out,
+                                        t.n_ext), 1
     return cur, n
 
 

@@ -15,7 +15,9 @@ need none, and is a theorem, proved by the exact simulator.  What is held here:
 * fusing the lookups' rows keeps the number of CNOTs exactly;
 * in a template with an |AutoCCZ> state (not run whole): the factory's held sites swap their
   consumer's letters, and FormalRV's CNOT as three |Y-bar> rotations becomes a lattice-surgery
-  CNOT -- unless a later line or a call site reads its outcomes.
+  CNOT -- unless a later line or a call site reads its outcomes;
+* a template whose whole channel is a Pauli (Gidney 2025's compare step, four merges) becomes
+  that Pauli as frames.
 """
 from __future__ import annotations
 
@@ -201,3 +203,21 @@ def test_a_toffolis_template_holds_the_factorys_sites_and_its_rotation_cnot_goes
     # an outcome a call site hands on keeps the rotations
     _, n = C.surgery_rewrite(_t(TOFFOLI_AND_CX, 4, 12, 12), keep={"o9"})
     assert n == {"held": 1}
+
+
+#: Gidney 2025's gidneyCompare step (n = 22 and 34), `se` and `decode` lines left out: a
+#: CNOT-and-S-bar by two |Y-bar> rotations, then its inverse -- four merges, a Pauli in all
+COMPARE = (
+    "prep l0 Y", "ppm Z p0 X p1 Z l0 -> o0", "read l0 X -> o1", "if o0: z p0", "if o0: x p1", "if o1: z p0",
+    "if o1: x p1", "z p0", "prep l1 Y", "ppm X p1 Z l1 -> o2", "read l1 X -> o3", "if o2: x p1", "if o3: x p1",
+    "x p1", "z p1", "prep l2 Y", "ppm Z p0 X p1 Z l2 -> o4", "read l2 X -> o5", "if o4: z p0", "if o4: x p1",
+    "if o5: z p0", "if o5: x p1", "prep l3 Y", "ppm X p1 Z l3 -> o6", "read l3 X -> o7", "if o6: x p1",
+    "if o7: x p1", "x p1")
+
+
+def test_a_template_that_is_a_pauli_becomes_frames():
+    new, n = C.surgery_rewrite(_t(COMPARE, 2, 4, 8))
+    assert n == {"frame only": 1} and list(new.lines) == ["z p0", "z p1"]
+    assert C.equal_drop(_t(COMPARE, 2, 4, 8), new)
+    # an outcome a call site hands on keeps it whole
+    assert C.surgery_rewrite(_t(COMPARE, 2, 4, 8), keep={"o3"})[1] == {}
