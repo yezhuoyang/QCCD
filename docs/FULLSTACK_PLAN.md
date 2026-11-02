@@ -1211,6 +1211,25 @@ then 8T -> CCZ, then the routing pairs.
   apart; a factory of two rows of four 15-to-1s, 12 tiles wide, would halve them. A second
   row of sites per factory would let fewer factories serve the chain.
 
+**The narrow factory and two sets of sites (2026-11-02, user: "Yes, agree").**
+- **Narrow factory (`factory_schedule(strips=4)`).** Four 15-to-1 strips, 12 tiles wide, make
+  two T each in turn: the second 15-to-1 on a strip is a copy of the same unit, started once
+  the stage has read the strip's first T and no stage gadget is on the strip. The stage's ten
+  patches sit in two rows below (`NARROW_ROWS`), scheduled in two parts around the two batches.
+  192 tiles instead of 360, 11.52 s a state instead of 7.59, longest corridor 13 tiles instead
+  of 22; check clean, the eight unit copies alike.
+- **The whole adder, one narrow factory a bit (`--farm`):** 27,776 gadgets on 8,671 tiles,
+  25.08 s, check clean (wide: 16,522 tiles, 21.83 s -- 40 % less tile-time now). 72 merge
+  shapes, longest corridor 19; 42 of them were already checked at d = 11, 30 are new.
+- **Two sets of sites (`Farm(buffers=2)`, `--farm --bits 2`).** A factory's states take two
+  sets of sites in turn, the second set two rows below the first, so its next state is made
+  while the last waits for the chain; each set's schedule walls off the other's sites (a
+  corridor through a waiting state was the one bug, caught by the check). Two bits a factory:
+  16 factories, 5,184 tiles, 36.18 s, check clean -- the least tile-time yet (188k tile-s
+  against 217k), at 11 s more latency; 96 merge shapes. Without the second set the same farm
+  takes 183.9 s; with three bits a factory two sets are not enough (137.8 s).
+- **d = 11 of the narrow farm's 30 new shapes:** in progress.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.

@@ -131,18 +131,30 @@ def ccz_factory(tag: str = "c") -> tuple:
     return stream + s, blocks + b
 
 
-def factory_schedule(tag: str = "c", costs=None) -> tuple:
+#: the narrow factory's |AutoCCZ> patches, two rows below its four strips: (x, y)
+NARROW_ROWS = {"cl3": (0, 11), "cl4": (2, 11), "ck": (4, 11), "cl5": (6, 11), "cl7": (8, 11), "cl6": (10, 11),
+               "cl8": (0, 13), "cl0": (2, 13), "cl1": (4, 13), "cl2": (6, 13)}
+
+
+def factory_schedule(tag: str = "c", costs=None, strips: int = 8, rows=None, walls=()) -> tuple:
     """(stream, gadgets, homes, bounds): `ccz_factory` on the lattice.  One 15-to-1 is scheduled
     on a strip of its own (its five patches a column, a bus column each side) and the eight are
     translated copies of it, strips side by side -- the same gadgets, so the same shapes; the
     |AutoCCZ> stage's ten patches sit in a row below, and it is scheduled around the copies, each
     T output free once its 15-to-1 is done, and its patches made only then (so the row is free
-    while the 15-to-1s run: a farm's next state can start before the last is consumed)."""
+    while the 15-to-1s run: a farm's next state can start before the last is consumed).
+
+    `strips` 4: the narrow factory, 12 tiles wide.  Four strips make two T each in turn -- the
+    second 15-to-1 on a strip a copy started once the stage has read the strip's first T and no
+    stage gadget is on the strip -- and the stage's patches sit in two rows (`rows`, by default
+    `NARROW_ROWS`), scheduled in two parts, around the first copies and then around the second."""
     from qccd.fullstack.scale.lattice import Costs, holds, schedule, shifted
     costs = costs or Costs()
     stream, blocks = ccz_factory(tag)
     unit, q = distill_15to1(f"{tag}t0")
     gs = schedule(unit, {b: (0, 2 * i) for i, b in enumerate(q)}, (-1, -1, 1, 9), costs)
+    if strips == 4:
+        return _narrow(tag, costs, stream, blocks, unit, q, gs, rows or NARROW_ROWS, walls)
     homes, copies = {}, []
     for j in range(8):
         name = lambda b, j=j: f"{tag}t{j}" + b[len(f"{tag}t0"):]
@@ -157,32 +169,88 @@ def factory_schedule(tag: str = "c", costs=None) -> tuple:
     return stream, copies + [shifted(g, 0, 0, 8 * len(unit)) for g in stage], homes, bounds
 
 
+def _narrow(tag, costs, stream, blocks, unit, q, gs, rows, walls=()) -> tuple:
+    from qccd.fullstack.scale.lattice import holds, schedule, shifted
+    n, done = len(unit), max(g.t1 for g in gs)
+    name = lambda j: (lambda b: f"{tag}t{j}" + b[len(f"{tag}t0"):])
+    homes = {name(j)(b): (3 * (j % 4), 2 * i) for j in range(8) for i, b in enumerate(q)}
+    homes.update({b.replace("c", tag, 1): xy for b, xy in rows.items()})
+    bounds = (-1, -1, 10, max(y for _, y in rows.values()) + 1)
+
+    def taken(gg):
+        return [(t, g.t0, g.t1) for g in gg for t in g.tiles] + [(t, a, z) for t, a, z, _ in holds(gg)]
+    first = [g2 for j in range(4) for g2 in (shifted(g, 3 * j, 0, j * n, name(j)) for g in gs)]
+    rest = stream[8 * n:]
+    cut = next(i for i, x in enumerate(rest) if x[0] == "x" and x[1] == [f"{tag}t4q4"])
+    part1 = [shifted(g, 0, 0, 8 * n) for g in schedule(
+        rest[:cut], homes, bounds, costs, walls=walls, reserved=taken(first),
+        start={b: done for b in [f"{tag}t{j}q4" for j in range(4)] + blocks[40:]})]
+    busy: dict = {}
+    for t, a, z in taken(first + part1):
+        busy.setdefault(t, []).append((a, z))
+    second = []
+    for j in range(4):
+        dt = max(g.t1 for g in part1 if f"{tag}t{j}q4" in g.blocks)
+        while True:
+            cp = [shifted(g, 3 * j, 0, (4 + j) * n, name(4 + j), dt) for g in gs]
+            clash = [e for t, a, z in taken(cp) for s, e in busy.get(t, []) if s < z - 1e-6 and e > a + 1e-6]
+            if not clash:
+                break
+            dt = max(dt, min(clash))
+        second += cp
+        for t, a, z in taken(cp):
+            busy.setdefault(t, []).append((a, z))
+    start = {b: max((g.t1 for g in part1 if b in g.blocks), default=done) for b in blocks[40:]}
+    start.update({f"{tag}t{j}q4": max(g.t1 for g in second if f"{tag}t{j}q4" in g.blocks) for j in range(4, 8)})
+    part2 = [shifted(g, 0, 0, 8 * n + cut) for g in schedule(
+        rest[cut:], homes, bounds, costs, walls=walls, reserved=taken(first + part1 + second), start=start)]
+    return stream, first + second + part1 + part2, homes, bounds
+
+
 class Farm:
     """`n` CCZ factories (`factory_schedule`, scheduled once) side by side, their |AutoCCZ> rows
     along y = `y`, the first factory's left edge at x = `x0`; a program's `autoccz_h` lines
     become `macro` lines (`ports`) and each is served by a translated, time-shifted copy of the
     factory: the factory free soonest, once its 15-to-1 strips are done with its last state and
-    that state's sites are all read -- or, with `serve`, the factory `serve(k)` for the k-th
-    state (a fixed assignment: with the program's blocks laid out to match, every consumer
-    reaches its factory alike, so the same shapes repeat).  A factory's inside is walled to
-    everything else (`walls`): only its row of sites and the bus row below it are open."""
+    the sites it will make the next state on are all read -- or, with `serve`, the factory
+    `serve(k)` for the k-th state (a fixed assignment: with the program's blocks laid out to
+    match, every consumer reaches its factory alike, so the same shapes repeat).
 
-    def __init__(self, n: int, x0: int, y: int, costs=None, serve=None):
+    `buffers` 2 (with `strips` 4): two sets of sites, the second two rows below the first, a
+    factory's states taking them in turn -- its next state is made while the last one waits to
+    be consumed.  A factory's inside is walled to everything else (`walls`): only its rows of
+    sites and the bus rows between and below them are open."""
+
+    def __init__(self, n: int, x0: int, y: int, costs=None, serve=None, strips: int = 8, buffers: int = 1):
         from qccd.fullstack.scale.lattice import holds
-        self.stream, self.gadgets, homes, b = factory_schedule("c", costs)
-        self.n, self.w = n, b[2] - b[0] + 1
-        self.dx = [x0 - b[0] + f * self.w for f in range(n)]
-        self.dy = y - homes["cl0"][1]
-        self.homes = homes
-        self.span = max(g.t1 for g in self.gadgets)
+        if buffers > 1 and strips != 4:
+            raise ValueError("a second set of sites is laid out for the narrow factory (strips 4)")
         sites = [f"cl{i}" for i in range(9)]
-        self.row_from = min(g.t0 for g in self.gadgets if set(g.blocks) & {"ck", *sites})
-        self.made = {s: max(g.t1 for g in self.gadgets if s in g.blocks) for s in sites}
-        self.inner = holds(self.gadgets)
-        self.local = b
+        self.variants = []
+        sets = [{b: (x, yy + 4 * v) for b, (x, yy) in NARROW_ROWS.items()} for v in range(buffers)]
+        for v in range(buffers):
+            rows = sets[v] if strips == 4 else None
+            # the other sets' sites hold states while this one works: never a corridor through them
+            others = {t for u, r in enumerate(sets) if u != v for t in r.values()} if buffers > 1 else ()
+            stream, gadgets, homes, b = factory_schedule("c", costs, strips, rows, others)
+            units = [g for g in gadgets if g.blocks and all(x.startswith("ct") for x in g.blocks)]
+            self.variants.append({
+                "gadgets": gadgets, "homes": homes, "bounds": b, "inner": holds(gadgets),
+                "row_from": min(g.t0 for g in gadgets if set(g.blocks) & {"ck", *sites}),
+                "made": {s: max(g.t1 for g in gadgets if s in g.blocks) for s in sites},
+                "strips_done": max(g.t1 for g in units)})
+            self.stream = stream
+        b0 = self.variants[0]["bounds"]
+        self.local = (b0[0], b0[1], b0[2], max(v["bounds"][3] for v in self.variants))
+        self.n, self.w = n, self.local[2] - self.local[0] + 1
+        self.dx = [x0 - self.local[0] + f * self.w for f in range(n)]
+        self.homes = self.variants[0]["homes"]
+        self.dy = y - self.homes["cl0"][1]
+        self.span = max(g.t1 for g in self.variants[0]["gadgets"])
         self.serve = serve
-        self.free = [0.0] * n                 # when each factory may start again
-        self.last: list = [()] * n            # the sites of the state it holds
+        self.free = [0.0] * n                 # when each factory's strips may start again
+        self.last = [[()] * buffers for _ in range(n)]     # per set of sites, the state it holds
+        self.turn = [0] * n
         self.served: list = []                # (line, factory, dt)
 
     def bounds(self) -> tuple:
@@ -190,15 +258,17 @@ class Farm:
         return (x0 + self.dx[0], y0 + self.dy, x1 + self.dx[-1], y1 + self.dy)
 
     def all_homes(self) -> dict:
-        return {f"F{f}.{b}": (x + self.dx[f], y + self.dy) for f in range(self.n) for b, (x, y) in self.homes.items()}
+        return {f"F{f}.v{k}.{b}": (x + self.dx[f], y + self.dy) for f in range(self.n)
+                for k, v in enumerate(self.variants) for b, (x, y) in v["homes"].items()}
 
-    def beneath(self, blocks, per: int) -> dict:
-        """Homes for a program's blocks, `per` a column, column k under factory k (below its
-        x site), the rows between them a bus: the k-th state's consumer reaches its factory
-        alike for every k."""
+    def beneath(self, blocks, per: int, columns: int = 1) -> dict:
+        """Homes for a program's blocks, `per` a column, `columns` columns under each factory
+        (the first below its x site, the rest evenly after it), the rows between them a bus:
+        with `serve(k) = k // columns` every consumer reaches its factory alike."""
         x = self.homes["cl0"][0] - self.local[0]
         y = self.dy + self.local[3] + 2
-        return {b: (self.dx[0] + (j // per) * self.w + self.local[0] + x, y + 2 * (j % per))
+        step = self.w // columns
+        return {b: (self.dx[0] + (j // per) * step + self.local[0] + x, y + 2 * (j % per))
                 for j, b in enumerate(blocks)}
 
     def walls(self) -> set:
@@ -225,30 +295,36 @@ class Farm:
             out.append((w, [ren.get(x, x) for x in a], o, g))
         return out
 
+    def _start(self, f, free_at) -> float:
+        v = self.variants[self.turn[f]]
+        held = max((free_at[s] for s in self.last[f][self.turn[f]]), default=0.0)
+        return max(self.free[f], held - v["row_from"], 0.0)
+
     def macro(self, line, args, free_at, board):
         """The factory copy for the k-th state, at `line` of the ported stream (see `schedule`)."""
         from qccd.fullstack.scale.lattice import shifted
         k = args[0]
-        f = self.serve(k) if self.serve else min(
-            range(self.n), key=lambda i: max(self.free[i], max((free_at[s] for s in self.last[i]), default=0.0)
-                                             - self.row_from))
-        dt = max(self.free[f], max((free_at[s] for s in self.last[f]), default=0.0) - self.row_from, 0.0)
+        f = self.serve(k) if self.serve else min(range(self.n), key=lambda i: self._start(i, free_at))
+        dt, turn = self._start(f, free_at), self.turn[f]
+        v = self.variants[turn]
         sites = {f"cl{i}": f"t{k}s{i}" for i in range(9)}
         name = lambda x: sites.get(x, f"F{k}.{x}")
         while True:
-            gs = [shifted(g, self.dx[f], self.dy, line + 1, name, dt) for g in self.gadgets]
+            gs = [shifted(g, self.dx[f], self.dy, line + 1, name, dt) for g in v["gadgets"]]
             busy = [(t, g.t0, g.t1) for g in gs for t in g.tiles] + \
-                   [((x + self.dx[f], y + self.dy), a + dt, z + dt) for (x, y), a, z, _ in self.inner]
+                   [((x + self.dx[f], y + self.dy), a + dt, z + dt) for (x, y), a, z, _ in v["inner"]]
             clash = [e for t, a, z in busy for s, e, _ in board.busy[t] if s < z - 1e-6 and e > a + 1e-6]
             if not clash:
                 break
             if min(clash) == float("inf"):
                 raise ValueError(f"line {line}: a block lives on factory {f}'s tiles for good")
             dt = max(dt, min(clash))
-        self.free[f], self.last[f] = dt + self.span, tuple(sites.values())
+        self.free[f] = dt + v["strips_done"]
+        self.last[f][turn] = tuple(sites.values())
+        self.turn[f] = (turn + 1) % len(self.variants)
         self.served.append((line, f, dt))
-        at = {s: (self.homes[c][0] + self.dx[f], self.homes[c][1] + self.dy) for c, s in sites.items()}
-        return gs, len(self.stream), at, {s: dt + self.made[c] for c, s in sites.items()}, {}
+        at = {s: (v["homes"][c][0] + self.dx[f], v["homes"][c][1] + self.dy) for c, s in sites.items()}
+        return gs, len(self.stream), at, {s: dt + v["made"][c] for c, s in sites.items()}, {}
 
 
 # ---- a state vector over named qubits ----------------------------------------------------------

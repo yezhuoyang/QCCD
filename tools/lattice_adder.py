@@ -7,12 +7,14 @@ The program is FormalRV's Gidney 2025 at RSA-2048 on its paper machine (the Form
 it).  One call of gidneyAddNoCarry (n = 32) is expanded.  Alone, the rest of it -- the final
 CNOT cascade and the measurement-based uncompute, no CCZ state -- is scheduled on a
 tile-in-a-sea lattice, bit i's three blocks in column 2i; with `--farm` the whole call is, its
-31 |AutoCCZ> states made by 31 factories in a row (`factory.Farm`), bit i's blocks beneath
-factory i -- so every Toffoli reaches its factory alike and the shapes repeat.  Either is
-checked (`lattice.check`).  Prints the schedule's numbers and every distinct program it is
+31 |AutoCCZ> states made by narrow factories in a row (`factory.Farm`, four strips, 12 tiles
+wide), bit i's blocks beneath factory i -- so every Toffoli reaches its factory alike and the
+shapes repeat.  `--bits 2`: two bits beneath each factory, which makes their states on two
+sets of sites in turn.  `--wide`: the eight-strip factory, 24 tiles wide, one bit each.  Either
+is checked (`lattice.check`).  Prints the schedule's numbers and every distinct program it is
 made of.
 
-    python tools/lattice_adder.py [--farm] [--shapes FILE]    FILE: the distinct shapes
+    python tools/lattice_adder.py [--farm [--bits 2 | --wide]] [--shapes FILE]
 """
 from __future__ import annotations
 
@@ -110,6 +112,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--shapes")
     ap.add_argument("--farm", action="store_true")
+    ap.add_argument("--bits", type=int, default=1, choices=(1, 2))
+    ap.add_argument("--wide", action="store_true")
     a = ap.parse_args()
     forward, half = adder_streams()
     print(f"forward half {len(forward)} instructions ({dict(Counter(w for w, *_ in forward))}); "
@@ -120,9 +124,10 @@ def main():
     stream, walls, farm = half, set(), None
     if a.farm:
         n = sum(w == "autoccz_h" for w, *_ in forward)
-        farm = Farm(n, x0=0, y=0, serve=lambda k: k)
+        b = 1 if a.wide else a.bits
+        farm = Farm(-(-n // b), x0=0, y=0, serve=lambda k: k // b, strips=8 if a.wide else 4, buffers=b)
         stream, walls = farm.ports(forward) + half, farm.walls()
-        homes = farm.beneath(blocks, 3)
+        homes = farm.beneath(blocks, 3, b)
         xs, ys = [x for x, _ in homes.values()], [y for _, y in homes.values()]
         fb = farm.bounds()
         bounds = (min(fb[0], min(xs) - 1), fb[1], max(fb[2], max(xs) + 1), max(ys) + 1)

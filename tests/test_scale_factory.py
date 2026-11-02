@@ -91,3 +91,42 @@ def test_the_ccz_factory_schedules_as_copies_of_one_15_to_1():
     units = [Counter(g.shape for g in gadgets if j * n <= g.line < (j + 1) * n) for j in range(8)]
     assert all(u == units[0] for u in units)
     assert max(g.t1 for g in gadgets) < 8e6 and sum(g.kind == "ht" for g in gadgets) == 2
+
+
+def test_the_narrow_factory_makes_two_t_a_strip_and_schedules_clean():
+    stream, gadgets, homes, bounds = F.factory_schedule(strips=4)
+    assert check(stream, gadgets) == []
+    assert (bounds[2] - bounds[0] + 1) * (bounds[3] - bounds[1] + 1) == 192
+    n = len(F.distill_15to1()[0])
+    units = [Counter(g.shape for g in gadgets if j * n <= g.line < (j + 1) * n) for j in range(8)]
+    assert all(u == units[0] for u in units)
+    assert max(g.t1 for g in gadgets) < 12e6
+
+
+def _toffolis(k):
+    """k Toffolis, each FormalRV's consumption of a held |AutoCCZ> on data a_j, b_j, t_j."""
+    out, data = [], []
+    for j in range(k):
+        ren = {"a": f"a{j}", "b": f"b{j}", "t": f"t{j}", **{f"cl{i}": f"l{i}" for i in range(9)}}
+        out.append(("autoccz_h", [f"l{i}" for i in range(9)], None, []))
+        held = F.held(TOFFOLI, [f"cl{i}" for i in F.TURNED])
+        out += [(w, [ren.get(x, x) for x in a], o and f"j{j}{o}", [("!" if g[0] == "!" else "") + f"j{j}" + g.lstrip("!")
+                                                              for g in gs]) for w, a, o, gs in held]
+        data += [f"a{j}", f"b{j}", f"t{j}"]
+    return out, data
+
+
+def test_a_farm_with_two_sets_of_sites_serves_two_states_a_factory():
+    stream, data = _toffolis(4)
+    farm = F.Farm(2, x0=0, y=0, serve=lambda k: k // 2, strips=4, buffers=2)
+    homes = farm.beneath(data, 3, 2)
+    ported = farm.ports(stream)
+    xs, ys = [x for x, _ in homes.values()], [y for _, y in homes.values()]
+    fb = farm.bounds()
+    bounds = (min(fb[0], min(xs) - 1), fb[1], max(fb[2], max(xs) + 1), max(ys) + 1)
+    gadgets = schedule(ported, {**homes, **farm.all_homes()}, bounds, walls=farm.walls(), macro=farm.macro)
+    assert check(ported, gadgets) == []
+    assert [f for _, f, _ in farm.served] == [0, 0, 1, 1]
+    # a factory's two states sit on its two sets of sites
+    site = lambda k: next(g for g in gadgets if g.kind == "prep" and g.blocks == (f"t{k}s0",)).tiles
+    assert site(0) != site(1) and site(2) != site(3)
