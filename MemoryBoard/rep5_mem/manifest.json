@@ -74,7 +74,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1799098,
+  "bytes": 1815744,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -189,7 +189,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1866880,
+  "bytes": 1883526,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -296,7 +296,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1961232,
+  "bytes": 1977878,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -411,7 +411,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1916893,
+  "bytes": 1933539,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -528,7 +528,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1922430,
+  "bytes": 1939076,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -635,7 +635,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1809221,
+  "bytes": 1825867,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -742,7 +742,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1860339,
+  "bytes": 1876985,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -851,7 +851,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1872260,
+  "bytes": 1888906,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -984,7 +984,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1941398,
+  "bytes": 1958044,
   "over_budget": [],
   "sites": 24,
   "junctions": 8,
@@ -1115,7 +1115,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1947178,
+  "bytes": 1963824,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -1246,7 +1246,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2017895,
+  "bytes": 2034541,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1353,7 +1353,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1814253,
+  "bytes": 1830899,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
   ],
@@ -1462,7 +1462,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1826145,
+  "bytes": 1842791,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -1580,7 +1580,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1844106,
+  "bytes": 1860752,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1689,7 +1689,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1890501,
+  "bytes": 1907147,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],

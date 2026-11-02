@@ -83,7 +83,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 4633985,
+  "bytes": 4650631,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -202,7 +202,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 4632569,
+  "bytes": 4649215,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -321,7 +321,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 5021138,
+  "bytes": 5037784,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -377,7 +377,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1781513,
+  "bytes": 1798159,
   "r10": null,
   "over_budget": [],
   "sites": 168,
@@ -405,7 +405,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1708543,
+  "bytes": 1725189,
   "r10": null,
   "over_budget": [],
   "sites": 40,
@@ -433,7 +433,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1770357,
+  "bytes": 1787003,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -461,7 +461,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1858935,
+  "bytes": 1875581,
   "r10": null,
   "over_budget": [],
   "sites": 288,
@@ -489,7 +489,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1722817,
+  "bytes": 1739463,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -519,7 +519,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1681026,
+  "bytes": 1697672,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -547,7 +547,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1711685,
+  "bytes": 1728331,
   "r10": null,
   "over_budget": [],
   "sites": 32,
@@ -578,7 +578,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1735633,
+  "bytes": 1752279,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
@@ -608,7 +608,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1748830,
+  "bytes": 1765476,
   "r10": null,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
@@ -641,7 +641,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1762211,
+  "bytes": 1778857,
   "r10": null,
   "over_budget": [
    "dacs 1280 > max_dacs 128"

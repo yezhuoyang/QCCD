@@ -66,7 +66,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1887156,
+  "bytes": 1903802,
   "over_budget": [],
   "sites": 24,
   "junctions": 12,
@@ -165,7 +165,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1856733,
+  "bytes": 1873379,
   "over_budget": [],
   "sites": 31,
   "junctions": 16,
@@ -264,7 +264,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1864809,
+  "bytes": 1881455,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
