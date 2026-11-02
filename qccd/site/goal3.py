@@ -126,6 +126,7 @@ def _code_rules(code: str, rows: dict, judged: dict) -> dict:
     for got in by_fam.values():
         for _, k in got:
             ids |= set(k["checked"]) | set(k["skipped"]) | set(k["partial"])
+    ids = sorted(ids, key=rule_order)         # a set's order changes from run to run; the page must not
     fams = {}
     for fam, got in by_fam.items():
         cells: dict = {}
@@ -147,7 +148,7 @@ def _code_rules(code: str, rows: dict, judged: dict) -> dict:
             elif rid in board:
                 cells[rid] = ["skip", _UNCHECKED]
         fams[fam] = {"n": len(got), "cells": cells}
-    return {"set": mine.get("set", "standard"), "ids": sorted(ids, key=rule_order), "fams": fams}
+    return {"set": mine.get("set", "standard"), "ids": ids, "fams": fams}
 
 
 def _rules_key(judged: dict) -> dict:
