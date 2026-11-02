@@ -1250,6 +1250,28 @@ places either way, so every prime's schedule is the same: one prime scheduled co
   for every register a Toffoli touches, or local moves (fixed-shape hops) instead of long
   corridors.
 
+**Step 5, what a floorplan has to serve (2026-11-02).** One prime walked concretely (every
+call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
+- **Toffolis stay inside one register.** powerProduct's 23,083 act on pp[S], addr[i],
+  pp[S + 2^i] (the 64-block product register and the 6-block address); the adders' 14,206 on
+  three consecutive blocks 3j+2, 3j+3, 3j+4 of dlog, help or acc -- the whole block array is
+  already bit-sliced by three, so the 32-bit adder's farm (a bit's three blocks beneath its
+  factory) serves every adder alike. 66 Toffoli footprints in all, up to translation.
+- **The lookups' writes do not.** 866,541 locals in one prime; 801,429 are a CNOT's ancilla
+  meeting two program blocks, and most of those cross registers: pp[S] (Z̄) into every bit of
+  dlog (438,272; all 64 x 32 pairs), help (246,400), acc, res; addr into all 1,280 blocks of the
+  exponent register (2,560). 8,095 distinct pairs, 1,307 even up to translation on the
+  stride-three layout -- a corridor each, many 12+ columns long.
+- **Long corridors cannot be checked.** The compiler grows about as ions^3.9; the 29-tile X̄X̄
+  corridor (8,430 ions) took 83 min at d = 11, so a 64-tile one is about 30 h at that rate.
+- **A relay chain is exact** (scratch proof, `equal_drop`, k = 0 .. 5 relays, Z̄ and X̄):
+  `ppm P a P b` = prep k relays in the other basis, adjacent pairs merged in two layers, the
+  relays read in the other basis, the outcome the XOR of the pair outcomes, a P frame on a per
+  relay readout (without the frames it fails). Constant depth; every merge two neighbouring
+  patches. With Z̄ chains vertical and X̄ chains horizontal (no patch turned), a CNOT's ancilla
+  sits where its control's column meets its target's row, and every lookup write is two pair
+  shapes, on any floorplan that puts pp in a row and the target bits in a column.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.
