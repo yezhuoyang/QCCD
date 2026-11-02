@@ -1,0 +1,542 @@
+[
+ {
+  "code": "color3",
+  "point": "grid3x3",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "80031e19eaa6cf03",
+  "new": "80031e19eaa6cf03",
+  "seconds": 2.5
+ },
+ {
+  "code": "color3",
+  "point": "grid4x3",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7d32e64915d72fd0",
+  "new": "7d32e64915d72fd0",
+  "seconds": 1.7
+ },
+ {
+  "code": "color3",
+  "point": "grid4x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7d32e64915d72fd0",
+  "new": "7d32e64915d72fd0",
+  "seconds": 2.0
+ },
+ {
+  "code": "color3",
+  "point": "wise3x3",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "80031e19eaa6cf03",
+  "new": "80031e19eaa6cf03",
+  "seconds": 1.5
+ },
+ {
+  "code": "color3",
+  "point": "wise4x3",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7d32e64915d72fd0",
+  "new": "7d32e64915d72fd0",
+  "seconds": 1.6
+ },
+ {
+  "code": "color3",
+  "point": "wise4x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7d32e64915d72fd0",
+  "new": "7d32e64915d72fd0",
+  "seconds": 1.7
+ },
+ {
+  "code": "color5",
+  "point": "grid5x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "095487a0bf5fcd72",
+  "new": "095487a0bf5fcd72",
+  "seconds": 5.4
+ },
+ {
+  "code": "color5",
+  "point": "grid5x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "3d82fcea0031d79a",
+  "new": "3d82fcea0031d79a",
+  "seconds": 3.9
+ },
+ {
+  "code": "color5",
+  "point": "grid6x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "0e492d4e76f87214",
+  "new": "0e492d4e76f87214",
+  "seconds": 3.4
+ },
+ {
+  "code": "color5",
+  "point": "grid6x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "bdd4b6402b9eb9e0",
+  "new": "bdd4b6402b9eb9e0",
+  "seconds": 3.5
+ },
+ {
+  "code": "color5",
+  "point": "grid7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9756f952e09ad3a6",
+  "new": "9756f952e09ad3a6",
+  "seconds": 3.4
+ },
+ {
+  "code": "color5",
+  "point": "grid7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a30b149281df7867",
+  "new": "a30b149281df7867",
+  "seconds": 3.6
+ },
+ {
+  "code": "color5",
+  "point": "wise5x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "095487a0bf5fcd72",
+  "new": "095487a0bf5fcd72",
+  "seconds": 3.5
+ },
+ {
+  "code": "color5",
+  "point": "wise5x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "3d82fcea0031d79a",
+  "new": "3d82fcea0031d79a",
+  "seconds": 3.4
+ },
+ {
+  "code": "color5",
+  "point": "wise6x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "0e492d4e76f87214",
+  "new": "0e492d4e76f87214",
+  "seconds": 3.5
+ },
+ {
+  "code": "color5",
+  "point": "wise6x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "bdd4b6402b9eb9e0",
+  "new": "bdd4b6402b9eb9e0",
+  "seconds": 3.9
+ },
+ {
+  "code": "color5",
+  "point": "wise7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9756f952e09ad3a6",
+  "new": "9756f952e09ad3a6",
+  "seconds": 3.1
+ },
+ {
+  "code": "color5",
+  "point": "wise7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a30b149281df7867",
+  "new": "a30b149281df7867",
+  "seconds": 3.7
+ },
+ {
+  "code": "color7",
+  "point": "grid10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a01f2b306708675d",
+  "new": "a01f2b306708675d",
+  "seconds": 43.2
+ },
+ {
+  "code": "color7",
+  "point": "grid7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "5bd8c162cb2daf78",
+  "new": "5bd8c162cb2daf78",
+  "seconds": 10.9
+ },
+ {
+  "code": "color7",
+  "point": "grid7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a604d07f9fa2a52a",
+  "new": "a604d07f9fa2a52a",
+  "seconds": 47.4
+ },
+ {
+  "code": "color7",
+  "point": "grid8x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "1b556d888093e822",
+  "new": "1b556d888093e822",
+  "seconds": 11.9
+ },
+ {
+  "code": "color7",
+  "point": "grid8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9ec451a447789056",
+  "new": "9ec451a447789056",
+  "seconds": 12.6
+ },
+ {
+  "code": "color7",
+  "point": "grid9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "ea3c2dd39f3cd67f",
+  "new": "ea3c2dd39f3cd67f",
+  "seconds": 9.6
+ },
+ {
+  "code": "color7",
+  "point": "grid9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "5ace163b18a29607",
+  "new": "5ace163b18a29607",
+  "seconds": 11.6
+ },
+ {
+  "code": "color7",
+  "point": "wise10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a01f2b306708675d",
+  "new": "a01f2b306708675d",
+  "seconds": 44.2
+ },
+ {
+  "code": "color7",
+  "point": "wise7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "5bd8c162cb2daf78",
+  "new": "5bd8c162cb2daf78",
+  "seconds": 9.1
+ },
+ {
+  "code": "color7",
+  "point": "wise7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "a604d07f9fa2a52a",
+  "new": "a604d07f9fa2a52a",
+  "seconds": 48.8
+ },
+ {
+  "code": "color7",
+  "point": "wise8x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "1b556d888093e822",
+  "new": "1b556d888093e822",
+  "seconds": 11.9
+ },
+ {
+  "code": "color7",
+  "point": "wise8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9ec451a447789056",
+  "new": "9ec451a447789056",
+  "seconds": 12.5
+ },
+ {
+  "code": "color7",
+  "point": "wise9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "ea3c2dd39f3cd67f",
+  "new": "ea3c2dd39f3cd67f",
+  "seconds": 8.8
+ },
+ {
+  "code": "color7",
+  "point": "wise9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "5ace163b18a29607",
+  "new": "5ace163b18a29607",
+  "seconds": 13.2
+ },
+ {
+  "code": "surface3",
+  "point": "grid4x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "019e8def836953c9",
+  "new": "019e8def836953c9",
+  "seconds": 1.4
+ },
+ {
+  "code": "surface3",
+  "point": "grid5x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "34a09c69a75604d6",
+  "new": "34a09c69a75604d6",
+  "seconds": 1.5
+ },
+ {
+  "code": "surface3",
+  "point": "grid5x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "6b15ff1b0a96302e",
+  "new": "6b15ff1b0a96302e",
+  "seconds": 1.3
+ },
+ {
+  "code": "surface3",
+  "point": "grid6x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "3b62748ca33d28fe",
+  "new": "3b62748ca33d28fe",
+  "seconds": 1.1
+ },
+ {
+  "code": "surface3",
+  "point": "wise4x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "019e8def836953c9",
+  "new": "019e8def836953c9",
+  "seconds": 1.0
+ },
+ {
+  "code": "surface3",
+  "point": "wise5x4",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "34a09c69a75604d6",
+  "new": "34a09c69a75604d6",
+  "seconds": 1.3
+ },
+ {
+  "code": "surface3",
+  "point": "wise5x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "6b15ff1b0a96302e",
+  "new": "6b15ff1b0a96302e",
+  "seconds": 1.1
+ },
+ {
+  "code": "surface3",
+  "point": "wise6x5",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "3b62748ca33d28fe",
+  "new": "3b62748ca33d28fe",
+  "seconds": 1.2
+ },
+ {
+  "code": "surface5",
+  "point": "grid6x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "308cf9e0a4382eaa",
+  "new": "308cf9e0a4382eaa",
+  "seconds": 21.4
+ },
+ {
+  "code": "surface5",
+  "point": "grid7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8f12265677509c10",
+  "new": "8f12265677509c10",
+  "seconds": 4.3
+ },
+ {
+  "code": "surface5",
+  "point": "grid7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "6b54e7604fa1d6dc",
+  "new": "6b54e7604fa1d6dc",
+  "seconds": 3.7
+ },
+ {
+  "code": "surface5",
+  "point": "grid8x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "c2d0c9929fabaaf9",
+  "new": "c2d0c9929fabaaf9",
+  "seconds": 4.7
+ },
+ {
+  "code": "surface5",
+  "point": "grid8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "92488c96a9d731ce",
+  "new": "92488c96a9d731ce",
+  "seconds": 3.7
+ },
+ {
+  "code": "surface5",
+  "point": "grid9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "da7fe09a64ac01c3",
+  "new": "da7fe09a64ac01c3",
+  "seconds": 4.3
+ },
+ {
+  "code": "surface5",
+  "point": "grid9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7e795be2f52a668d",
+  "new": "7e795be2f52a668d",
+  "seconds": 5.1
+ },
+ {
+  "code": "surface5",
+  "point": "wise6x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "308cf9e0a4382eaa",
+  "new": "308cf9e0a4382eaa",
+  "seconds": 22.7
+ },
+ {
+  "code": "surface5",
+  "point": "wise7x6",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8f12265677509c10",
+  "new": "8f12265677509c10",
+  "seconds": 3.8
+ },
+ {
+  "code": "surface5",
+  "point": "wise7x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "6b54e7604fa1d6dc",
+  "new": "6b54e7604fa1d6dc",
+  "seconds": 3.5
+ },
+ {
+  "code": "surface5",
+  "point": "wise8x7",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "c2d0c9929fabaaf9",
+  "new": "c2d0c9929fabaaf9",
+  "seconds": 3.8
+ },
+ {
+  "code": "surface5",
+  "point": "wise8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "92488c96a9d731ce",
+  "new": "92488c96a9d731ce",
+  "seconds": 3.8
+ },
+ {
+  "code": "surface5",
+  "point": "wise9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "da7fe09a64ac01c3",
+  "new": "da7fe09a64ac01c3",
+  "seconds": 4.0
+ },
+ {
+  "code": "surface5",
+  "point": "wise9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "7e795be2f52a668d",
+  "new": "7e795be2f52a668d",
+  "seconds": 5.1
+ }
+]

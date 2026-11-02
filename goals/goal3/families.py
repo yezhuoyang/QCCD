@@ -23,10 +23,17 @@ models, plus the plain grid as the baseline:
               qccdc's plain shuttles break R4 and C1 here, so the platform's baseline C2LR
               router compiles it (qccd.compile.c2lr_router).  Every two-qubit gate merges and
               splits its leg's pair, priced at physics@2's merge/split as every family's is.
-* Cyclone  -- one junction-free loop moved rigidly (Khan et al., HPCA 2026): `ring(W, 2, 0)`
+* Cyclone  -- one loop of trap sites moved rigidly (Khan et al., HPCA 2026): `ring(W, 2, 0)`
               with trap sites, O(1) DACs.
 * Conveyor -- a loop of rail slots with dock spurs, the loop rotated rigidly and ions docked
               to gate (`ring(W, 2, V)`, the study's `ring144_24v` shape; qccdc's conveyor pass).
+
+Both loops have JUNCTION CORNERS, the square trap as it is built (Ke Sun, T30; the site's ring
+boards since 2026-11-01): the four corners are junctions the rotation passes and never stops
+on, the traps stand only on the sides.  A point named `cyclone<w>_j` or `conveyor<w>_<v>d_j` is
+the corner-trap loop of 2w slots' twin, `ring(w + 2, 2, v, corners="junction")`: the same 2w
+slots and v docks.  The corner-trap points, swept until 2026-11-01, are kept in
+`results/corner_traps/`.
 
 What a family does NOT yet capture is listed in `README.md` under "open".
 """
@@ -97,9 +104,11 @@ def points_for(family: str, meta: dict) -> list[dict]:
     elif family == "Cyclone":
         for f in (1.04, 1.15, 1.3, 1.5):
             w = max(3, math.ceil(n * f / 2))
-            pts.append({"family": family, "name": f"cyclone{w}", "generator": "ring",
-                        "params": {"width": w, "height": 2, "verticals": 0, "site_zone": "trap"},
-                        "about": f"Cyclone: one junction-free loop of {2*w} trap sites"})
+            pts.append({"family": family, "name": f"cyclone{w}_j", "generator": "ring",
+                        "params": {"width": w + 2, "height": 2, "verticals": 0, "site_zone": "trap",
+                                   "corners": "junction"},
+                        "about": f"Cyclone: one loop of {2*w} trap sites, its four corners junctions the "
+                                 f"rotation passes"})
     elif family == "Conveyor":
         for f in (0.65, 0.8):
             for v in sorted({anc, math.ceil(anc * 4 / 3)}):
@@ -107,9 +116,10 @@ def points_for(family: str, meta: dict) -> list[dict]:
                 w = math.ceil(n * f)
                 while (2 * w) % v:
                     w += 1
-                pts.append({"family": family, "name": f"conveyor{w}_{v}d", "generator": "ring",
-                            "params": {"width": w, "height": 2, "verticals": v},
-                            "about": f"Conveyor: a {2*w}-slot loop with {v} dock spurs"})
+                pts.append({"family": family, "name": f"conveyor{w}_{v}d_j", "generator": "ring",
+                            "params": {"width": w + 2, "height": 2, "verticals": v, "corners": "junction"},
+                            "about": f"Conveyor: a {2*w}-slot loop with {v} dock spurs and junction "
+                                     f"corners"})
     else:
         raise KeyError(family)
     # one name per point, whatever the arithmetic produced

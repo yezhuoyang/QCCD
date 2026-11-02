@@ -88,8 +88,8 @@ def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000
                 kicker=f"GOAL 3 · {rel.title.removeprefix('Goal 3: ').upper()}",
                 headline=f"{rel.title} on {row['point']}", lede=lede, source=source,
                 template_stems="*", max_frames=max_frames)
-    numbers = {"compiled": f"compiled by {'the baseline C2LR router' if row.get('c2lr') else 'qccdc b4a003dbb4ae'}; "
-                           f"the sweep skips the Lean step, so R10 is not claimed here"}
+    numbers = {"compiled": f"compiled by {row['compiler']}; the sweep skips the Lean step, so R10 is not "
+                           f"claimed here"}
     # the page is served as board/goal3/p/<code>/<point>.html: Goal 3's page is two folders up
     B._inject(page, {"key": row["point"], "claim": claim}, [], numbers, f"../../#{rel.manifest['task']}")
     if row["status"] == "ok":

@@ -102,12 +102,12 @@
     "c2lr14x14": 0,
     "c2lr15x14": 0,
     "c2lr15x15": 0,
-    "cyclone75": 1,
-    "cyclone83": 1,
-    "cyclone94": 1,
-    "conveyor96_96d": 1,
-    "conveyor144_96d": 1,
-    "cyclone108": 1
+    "cyclone75_j": 1,
+    "cyclone83_j": 1,
+    "cyclone94_j": 1,
+    "conveyor96_96d_j": 1,
+    "conveyor144_96d_j": 1,
+    "cyclone108_j": 1
    }
   },
   "color3": {
@@ -119,14 +119,14 @@
     "wise3x3": 1,
     "wise4x3": 1,
     "wise4x4": 1,
-    "cyclone6": 1,
-    "cyclone7": 1,
-    "cyclone8": 1,
-    "conveyor8_4d": 1,
-    "conveyor9_3d": 1,
     "c2lr4x4": 0,
     "c2lr4x3": 0,
-    "c2lr3x3": 0
+    "c2lr3x3": 0,
+    "cyclone7_j": 1,
+    "cyclone6_j": 1,
+    "cyclone8_j": 1,
+    "conveyor8_4d_j": 1,
+    "conveyor9_3d_j": 1
    }
   },
   "color5": {
@@ -144,18 +144,18 @@
     "wise6x6": 1,
     "wise7x7": 1,
     "wise7x6": 1,
-    "cyclone15": 1,
-    "cyclone17": 1,
-    "cyclone19": 1,
-    "cyclone21": 1,
-    "conveyor27_9d": 1,
-    "conveyor24_12d": 1,
     "c2lr6x5": 0,
     "c2lr5x4": 0,
     "c2lr5x5": 0,
     "c2lr6x6": 0,
     "c2lr7x7": 0,
-    "c2lr7x6": 0
+    "c2lr7x6": 0,
+    "cyclone17_j": 1,
+    "cyclone15_j": 1,
+    "cyclone19_j": 1,
+    "cyclone21_j": 1,
+    "conveyor27_9d_j": 1,
+    "conveyor24_12d_j": 1
    }
   },
   "color7": {
@@ -173,23 +173,23 @@
     "wise8x7": 1,
     "wise8x8": 1,
     "wise9x8": 1,
-    "cyclone29": 1,
     "wise9x9": 1,
     "wise10x9": 1,
-    "cyclone32": 1,
-    "cyclone36": 1,
-    "cyclone42": 1,
-    "conveyor36_18d": 1,
-    "conveyor36_24d": 1,
-    "conveyor45_18d": 1,
-    "conveyor48_24d": 1,
     "c2lr7x6": 0,
     "c2lr7x7": 0,
     "c2lr8x7": 0,
     "c2lr8x8": 0,
     "c2lr9x8": 0,
     "c2lr9x9": 0,
-    "c2lr10x9": 0
+    "c2lr10x9": 0,
+    "cyclone29_j": 1,
+    "cyclone32_j": 1,
+    "cyclone36_j": 1,
+    "conveyor36_18d_j": 1,
+    "cyclone42_j": 1,
+    "conveyor36_24d_j": 1,
+    "conveyor45_18d_j": 1,
+    "conveyor48_24d_j": 1
    }
   },
   "hgp58": {
@@ -225,12 +225,12 @@
     "c2lr12x12": 0,
     "c2lr13x12": 0,
     "wise13x12": 1,
-    "cyclone52": 1,
-    "cyclone58": 1,
-    "cyclone65": 1,
-    "cyclone75": 1,
-    "conveyor84_42d": 1,
-    "conveyor84_56d": 1
+    "cyclone52_j": 1,
+    "cyclone58_j": 1,
+    "cyclone65_j": 1,
+    "cyclone75_j": 1,
+    "conveyor84_56d_j": 1,
+    "conveyor84_42d_j": 1
    }
   },
   "surface3": {
@@ -244,17 +244,17 @@
     "wise5x4": 1,
     "wise5x5": 1,
     "wise6x5": 1,
-    "cyclone9": 1,
-    "cyclone10": 1,
-    "cyclone12": 1,
-    "cyclone13": 1,
-    "conveyor22_11d": 1,
-    "conveyor12_8d": 1,
-    "conveyor16_8d": 1,
     "c2lr5x4": 0,
     "c2lr5x5": 0,
     "c2lr4x4": 0,
-    "c2lr6x5": 0
+    "c2lr6x5": 0,
+    "cyclone10_j": 1,
+    "cyclone12_j": 1,
+    "cyclone9_j": 1,
+    "conveyor12_8d_j": 1,
+    "cyclone13_j": 1,
+    "conveyor22_11d_j": 1,
+    "conveyor16_8d_j": 1
    }
   },
   "surface5": {
@@ -274,21 +274,21 @@
     "wise8x8": 1,
     "wise9x8": 1,
     "wise9x9": 1,
-    "cyclone26": 1,
-    "cyclone29": 1,
-    "cyclone32": 1,
-    "conveyor32_32d": 1,
-    "cyclone37": 1,
-    "conveyor36_24d": 1,
-    "conveyor48_32d": 1,
-    "conveyor48_24d": 1,
     "c2lr7x7": 0,
     "c2lr6x6": 0,
     "c2lr7x6": 0,
     "c2lr8x7": 0,
     "c2lr8x8": 0,
     "c2lr9x8": 0,
-    "c2lr9x9": 0
+    "c2lr9x9": 0,
+    "cyclone26_j": 1,
+    "cyclone29_j": 1,
+    "cyclone32_j": 1,
+    "conveyor32_32d_j": 1,
+    "cyclone37_j": 1,
+    "conveyor36_24d_j": 1,
+    "conveyor48_32d_j": 1,
+    "conveyor48_24d_j": 1
    }
   },
   "surface7": {
@@ -314,14 +314,6 @@
     "wise12x12": 1,
     "wise12x11": 1,
     "wise13x12": 1,
-    "cyclone51": 1,
-    "cyclone56": 1,
-    "cyclone64": 1,
-    "cyclone73": 1,
-    "conveyor72_48d": 1,
-    "conveyor64_64d": 1,
-    "conveyor96_48d": 1,
-    "conveyor96_64d": 1,
     "c2lr9x8": 0,
     "c2lr9x9": 0,
     "c2lr8x8": 0,
@@ -331,7 +323,15 @@
     "c2lr11x11": 0,
     "c2lr12x11": 0,
     "c2lr12x12": 0,
-    "c2lr13x12": 0
+    "c2lr13x12": 0,
+    "cyclone51_j": 1,
+    "cyclone56_j": 1,
+    "cyclone64_j": 1,
+    "cyclone73_j": 1,
+    "conveyor72_48d_j": 1,
+    "conveyor64_64d_j": 1,
+    "conveyor96_48d_j": 1,
+    "conveyor96_64d_j": 1
    }
   }
  }

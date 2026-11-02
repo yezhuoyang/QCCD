@@ -41,7 +41,7 @@ def svc(tmp_path):
 def test_goal_3_releases_are_the_codes_z_then_x_memories():
     import boards
     for code in CODES:
-        rel = find_release(f"goal3_{code}_mem@1")
+        rel = find_release(boards.release_id(code))
         exp = boards.experiment(code)
         assert rel.manifest["goal"] == "goal3" and rel.manifest["qec"]["noise"] == "qccd-noise@2"
         assert rel.circuit_text() == exp.qasm, f"{code}: the release is not what boards.py builds"
@@ -63,9 +63,12 @@ def test_the_hgp_builder_still_builds_the_committed_circuits():
 
 
 def test_goal_3_releases_stay_off_goal_1(svc):
+    import boards
     g1 = {r.id for r in svc.goal_releases("goal1")}
     g3 = {r.id for r in svc.goal_releases("goal3")}
-    assert g3 == {f"goal3_{c}_mem@1" for c in CODES} and not g1 & g3
+    # each code's newest release; an older one keeps its board but is not on the goal
+    assert g3 == {boards.release_id(c) for c in CODES} and not g1 & g3
+    assert "goal3_bb72_mem@1" in svc.releases and "goal3_bb72_mem@1" not in g3
     # Goal 1 is every noise@2 memory that names no goal, as before Goal 3 existed
     assert g1 == {r.id for r in svc.releases.values() if not svc.is_suite(r.id)
                   and (r.manifest.get("qec") or {}).get("noise") == "qccd-noise@2" and "goal" not in r.manifest}
@@ -84,6 +87,33 @@ def test_every_family_s_device_is_read_back_as_that_family():
     assert OfficialService.architecture_family({"nodes": []}) == "Other"
 
 
+def test_the_ring_families_have_junction_corners():
+    """Cyclone's and Conveyor's loops are built as the site's rings are since 2026-11-01: four
+    junction corners and the traps on the sides; `<name>_j` keeps the corner-trap loop's slots."""
+    import re
+
+    import families
+    from qccd.arch.generators import ring
+    for code in CODES:
+        meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
+        for fam in ("Cyclone", "Conveyor"):
+            for p in families.points_for(fam, meta):
+                assert p["params"]["corners"] == "junction" and p["name"].endswith("_j"), p["name"]
+                slots = 2 * int(re.match(r"[a-z]+(\d+)", p["name"]).group(1))
+                assert len(ring(**p["params"]).loop_slots("L0")) == slots, p["name"]
+
+
+def test_bb72_release_2_is_release_1_with_the_junction_starter():
+    """A release is never rewritten: BB72's release 2 changes only the starter (its twin with
+    junction corners) and the release number."""
+    one, two = find_release("goal3_bb72_mem@1").manifest, find_release("goal3_bb72_mem@2").manifest
+    same = {k for k in one if k not in ("release", "starter")}
+    assert {k: one[k] for k in same} == {k: two[k] for k in same} and set(one) == set(two)
+    assert one["starter"]["params"].get("corners") is None
+    assert two["starter"]["params"]["corners"] == "junction"
+    assert two["starter"]["params"]["width"] == one["starter"]["params"]["width"] + 2
+
+
 def test_the_goal_3_board_gives_family_time_per_round_and_ler(svc, monkeypatch):
     def rows(task):
         return ([{"id": f"os_{task[:14]}", "display_name": "d", "by": "Ada", "created_at": 0, "rank_value": 2e-4,
@@ -93,7 +123,8 @@ def test_the_goal_3_board_gives_family_time_per_round_and_ler(svc, monkeypatch):
     monkeypatch.setattr(svc, "_entry_family", lambda sid: ("Conveyor", "conveyor24_12d"))
     g = svc.goal_board("goal3")
     assert g["goal"] == "goal3" and g["families"][:5] == ["Grid", "WISE", "C2LR", "Cyclone", "Conveyor"]
-    assert [r["id"] for r in g["releases"]] == [f"goal3_{c}_mem@1" for c in CODES]
+    import boards
+    assert [r["id"] for r in g["releases"]] == [boards.release_id(c) for c in CODES]
     s5 = next(r for r in g["releases"] if r["id"] == "goal3_surface5_mem@1")
     assert s5["rounds"] == 10 and s5["ions"] == 49          # five rounds of Z, then five of X
     e = s5["entries"][0]

@@ -39,7 +39,10 @@ def _families():
 
 def _size(r: dict) -> float:
     p = r.get("params") or {}
-    return p["a"] * p["b"] if r.get("generator") == "grid" else 2 * p.get("width", 0) + p.get("verticals", 0)
+    if r.get("generator") == "grid":
+        return p["a"] * p["b"]
+    # a loop's slots (a junction-corner loop has none in its four corners) and its docks
+    return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
 
 
 def data() -> dict | None:
@@ -478,8 +481,10 @@ def page(PAGE: str, STYLE: str) -> str | None:
             "<tr><td>WISE</td><td>the same lattice with broadcast DACs and a switch per site</td></tr>"
             "<tr><td>C2LR</td><td>the same lattice as a swap-or-stay device (Yb-Ba crystals, the demonstrated "
             "diagonals)</td></tr>"
-            "<tr><td>Cyclone</td><td>one junction-free loop of traps, moved rigidly</td></tr>"
-            "<tr><td>Conveyor</td><td>a loop of rail slots with dock spurs, rotated rigidly, ions docked to gate</td></tr>")
+            "<tr><td>Cyclone</td><td>one loop of traps, moved rigidly; its four corners are junctions the "
+            "rotation passes</td></tr>"
+            "<tr><td>Conveyor</td><td>a loop of rail slots with dock spurs, rotated rigidly, ions docked to gate; "
+            "junction corners</td></tr>")
     body = (
         "<h1>Goal 3: one code at a time, every architecture</h1>"
         '<p class="sub">For each fixed QEC code, every architecture family at every size its rules allow. '

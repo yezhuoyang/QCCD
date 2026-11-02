@@ -35,7 +35,8 @@ def size_key(r: dict) -> float:
     p = r["params"]
     if r["generator"] == "grid":
         return p["a"] * p["b"]
-    return 2 * p.get("width", 0) + p.get("verticals", 0)
+    # a loop's slots (a junction-corner loop has none in its four corners) and its docks
+    return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
 
 
 def points(code: str) -> tuple[dict, dict]:

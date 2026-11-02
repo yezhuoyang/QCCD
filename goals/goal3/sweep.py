@@ -4,8 +4,8 @@
                                 [--list] [--max-points N]
 
 Each design point of each family (`families.py`) is graded on the code's release
-(`boards.py`: goal3_<code>_mem@1, the Z memory then the X memory on the same ions), the way the
-official grader grades a submission to it, minus the certificate chain:
+(`boards.py`: goal3_<code>_mem@<release>, the Z memory then the X memory on the same ions), the
+way the official grader grades a submission to it, minus the certificate chain:
 
 1. the device is the family's generator at that size, entered on the release
    (`board_device`: qccd-physics@2);
@@ -46,10 +46,15 @@ TABLE = "quantinuum"
 
 
 def release(code: str):
-    """The code's Goal 3 release (`boards.py`)."""
-    from boards import task_id
+    """The code's current Goal 3 release (`boards.py`)."""
+    from boards import release_id
     from qccd.workspace.tasks import find_release
-    return find_release(f"{task_id(code)}@1")
+    return find_release(release_id(code))
+
+
+def compiler_name() -> str:
+    """`qccdc <version>`: the toolchain folder QCCD_QCCDC is installed in (`toolchain.install`)."""
+    return f"qccdc {Path(os.environ['QCCD_QCCDC']).parent.name}"
 
 
 def load_exp(rel):
@@ -93,7 +98,8 @@ def grade(code: str, point: dict, work_root: str) -> dict:
     rel = release(code)
     row = {"code": code, "release": rel.id, "family": point["family"], "point": point["name"],
            "generator": point["generator"], "params": point["params"],
-           "control": point.get("control") or {}, **({"c2lr": point["c2lr"]} if point.get("c2lr") else {})}
+           "control": point.get("control") or {}, **({"c2lr": point["c2lr"]} if point.get("c2lr") else {}),
+           "compiler": "the baseline C2LR router" if point.get("c2lr") else compiler_name()}
     t0 = time.time()
     work = Path(work_root) / code / point["name"]
     work.mkdir(parents=True, exist_ok=True)

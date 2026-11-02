@@ -10,7 +10,7 @@ the architecture. It is Fig. 3 of the QCCD Studio paper. (Goal 2, on the same Le
 verified resource estimate for Shor's algorithm.)
 
 On qccd.academy it is the page `board/goal3/`, and each code is a board of the official server
-(`goal3_<code>_mem@1`, [boards.py](boards.py)), so anyone can submit a design for it.
+(`goal3_<code>_mem@1`, BB72's `@2`, [boards.py](boards.py)), so anyone can submit a design for it.
 
 ## The fixed codes
 
@@ -45,8 +45,18 @@ cannot compile it, so C2LR is compiled by the platform's baseline C2LR router:
 | Grid (baseline) | junction lattice, a trap per wire, direct wiring | every a×b, b ∈ {a−1, a}, with 1.1N to 3N traps |
 | WISE | the same lattice, broadcast wiring, one movement class per cycle | as Grid |
 | C2LR | the same lattice as a swap-or-stay device (`Machine.c2lr_grid`'s control and step prices, Yb-Ba, demonstrated diagonals only, [docs/c2lr.md](../../docs/c2lr.md)) | as Grid |
-| Cyclone | one junction-free loop, moved rigidly | 2W ≈ 1.04N to 1.5N trap sites |
-| Conveyor | a loop with dock spurs, rotated rigidly, ions docked to gate | 2W ≈ 1.3N to 1.6N slots, A or 4A/3 docks |
+| Cyclone | one loop of trap sites with junction corners, moved rigidly | 2W ≈ 1.04N to 1.5N trap sites |
+| Conveyor | a loop with dock spurs and junction corners, rotated rigidly, ions docked to gate | 2W ≈ 1.3N to 1.6N slots, A or 4A/3 docks |
+
+**Both loops have junction corners**, as every ring on the site has since 2026-11-01: the
+loop's four corners are junctions the rotation passes and never stops on, and the traps are on
+its sides. A point named `cyclone<w>_j` or `conveyor<w>_<v>d_j` is
+`ring(w + 2, 2, v, corners="junction")`, which keeps the 2w slots and v docks of the corner-trap
+loop it replaced. The corner-trap points, swept until 2026-11-01, are kept in
+`results/corner_traps/`. A junction-corner point runs the same steps as its corner-trap loop,
+plus the corner rails. Its time per round is 1 to 13% longer, most on the smallest loops. Its
+LER per round runs from 9% lower, within sampling error, to a third higher. The extra time is
+idle time, and idle (memory) error is the largest term in the noise budget.
 
 ## A point, and what it is scored by
 
@@ -54,7 +64,11 @@ A point is one (family, size), graded on the code's release the way the official
 a submission to it; only the Lean certificate step is left out ([sweep.py](sweep.py)):
 
 1. qccd-physics@2 (Goal 1's cited Helios-class numbers);
-2. the pinned reference compiler, qccdc b4a003dbb4ae;
+2. the pinned reference compiler: qccdc cd3efedbbc10 for the Cyclone and Conveyor points (the
+   first with junction corners) and b4a003dbb4ae, pinned when they were swept, for the Grid and
+   WISE points; each row names its compiler. Recompiled with cd3efedbbc10, all 54 Grid and WISE
+   points of surface d=3 and 5 and colour d=3, 5 and 7 give the same instructions
+   ([same_compiler.py](same_compiler.py), `results/compiler_identity.json`);
 3. the rules (`verify`);
 4. **time per round**: the replayed program under the `quantinuum` table, divided by the 2d
    rounds of both memories;
@@ -110,8 +124,8 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
 ## Open
 
 - **Cyclone is not compiled as Cyclone.** qccdc's rigid-rotation pass only applies to a loop with
-  docks. On a junction-free loop it falls back to the race-track pass, which moved surface5 with
-  0 loop shifts and 7,418 one-ion steps. Cyclone's points therefore measure the missing
+  docks. On Cyclone's loop, which has none, it falls back to the race-track pass, which moved
+  surface5 on `cyclone26_j` with 0 loop shifts and 14,860 one-ion steps. Cyclone's points therefore measure the missing
   scheduler, not the architecture: they are an upper bound on its time and LER until a Cyclone
   schedule (ancillas rotating past the data, as in Khan et al.) exists. This is the ion-shuttling
   part of the plan (John).
@@ -126,8 +140,9 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   it. Goal 3 prices each merge and split at physics@2's 128 µs and 1 quantum (arXiv:2003.01293
   Table II's bound, used as the value), the price every other family pays when its ions
   combine; the platform's curve for a C2LR leg is 40 µs and 0.1 quantum. Decided 2026-10-30:
-  the main figure keeps physics@2's price. C2LR is the fastest family on surface d=3, 5 and 7
-  and colour d=5, and its LER per round is 2 to 15 times Grid's best; that price is probably
+  the main figure keeps physics@2's price. C2LR is the fastest family on surface d=3, 5 and 7,
+  colour d=5 and HGP58 (and on BB72, where no grid compiles), and its LER per round is 1.4 to
+  15 times Grid's best; that price is probably
   most of the gap, and a run at the platform's price would measure it. Before 2026-10-30 the
   family was a grid with C2LR wiring; those rows gave Grid's numbers exactly and are kept in
   `results/provisional/`. A ranked C2LR entry needs a release whose physics includes the C2LR
@@ -151,11 +166,14 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   within the sweep's first limit of 1800 s, so the sweep now gives every compile the release's
   own limit (3600 s, what the grader gives a submitter). Given that time, they all finish and
   are refused the same way. C2LR's router compiles every size. The Conveyor
-  with a dock for every ion, `conveyor96_96d`, has the lowest LER: 3.6e-4 per round, five times
-  below C2LR's best (1.9e-3). A Conveyor with 72 docks is refused, because half the ions then
-  ride the loop, and on this device only a docked ion can gate. BB72's board therefore starts
-  from `conveyor96_96d`, not from a grid. BB108 and BB144 are checked but not swept: BB72's
-  points already take 7 to 50 minutes each.
+  with a dock for every ion, `conveyor96_96d_j`, has the lowest LER: 4.2e-4 per round at
+  405.6 ms, four times below C2LR's best (1.9e-3). A Conveyor with 72 docks is refused, because
+  half the ions then ride the loop, and on this device only a docked ion can gate. BB72's board
+  therefore starts from `conveyor96_96d_j`, not from a grid: that is release 2
+  (`goal3_bb72_mem@2`, 2026-11-02), which is release 1 with its corner-trap starter,
+  `conveyor96_96d` (3.6e-4 at 383.9 ms), replaced by this twin. Release 1 keeps its board, and
+  Goal 3 shows release 2. BB108 and BB144 are checked but not swept: BB72's points already take
+  7 to 80 minutes each.
 - **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took
   the textbook one on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py),
   [CODES.md](CODES.md)). It passes every check the other codes pass. Its CNOT order is the
@@ -166,7 +184,7 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   within a code.
 - **Code sizes for the target LER < 10⁻⁵:** under qccd-noise@2 only surface d=7 reaches it so
   far (Grid 12x11: 4.1e-6 per round, 95% interval up to 5.4e-6). Colour d=7's best is 1.2e-4,
-  so the colour code needs d > 7, or a colour-code decoder. BB72's best is 3.6e-4 per round for
+  so the colour code needs d > 7, or a colour-code decoder. BB72's best is 4.2e-4 per round for
   its 12 logical qubits, and HGP58's is 2.6e-2 for 16. Both are decoded with generic BP-OSD.
 - **Certificates:** the sweep skips the Lean step. A family's best point should be submitted
   through the full grader before the paper quotes it.

@@ -56,24 +56,34 @@ _SCHEDULE = {
 }
 
 #: the starter of a code no grid compiles: the lowest-LER design the reference compiler does
-#: compile (C2LR aside: on a Goal 3 release its own physics makes it exploratory)
-_BB72_START = {"generator": "ring", "name": "conveyor96_96d", "params": {"width": 96, "height": 2, "verticals": 96}}
+#: compile (C2LR aside: on a Goal 3 release its own physics makes it exploratory).  Release 2
+#: (2026-11-02) is release 1 with its starter's junction-corner twin, as every ring on the site
+#: since 2026-11-01 (families.py): the same 192 slots and 96 docks.  Release 1, with the
+#: corner-trap conveyor96_96d, is kept; a goal shows a task's newest release.
+_BB72_START = {"generator": "ring", "name": "conveyor96_96d_j",
+               "params": {"width": 98, "height": 2, "verticals": 96, "corners": "junction"}}
 
-#: code, order on the Leaderboard, starter (the sweep's lowest-LER grid as (a, b), or a device), limits
+#: code, release, order on the Leaderboard, starter (the sweep's lowest-LER grid as (a, b), or a
+#: device), limits
 RELEASES = [
-    ("surface3", 20, (5, 5), None),
-    ("surface5", 21, (9, 8), None),
-    ("surface7", 22, (10, 9), _LONG),
-    ("color3", 23, (4, 3), None),
-    ("color5", 24, (6, 5), None),
-    ("color7", 25, (9, 8), _LONG),
-    ("bb72", 26, _BB72_START, _LONG),
-    ("hgp58", 27, (12, 12), _LONG),
+    ("surface3", "1", 20, (5, 5), None),
+    ("surface5", "1", 21, (9, 8), None),
+    ("surface7", "1", 22, (10, 9), _LONG),
+    ("color3", "1", 23, (4, 3), None),
+    ("color5", "1", 24, (6, 5), None),
+    ("color7", "1", 25, (9, 8), _LONG),
+    ("bb72", "2", 26, _BB72_START, _LONG),
+    ("hgp58", "1", 27, (12, 12), _LONG),
 ]
 
 
 def task_id(code: str) -> str:
     return f"goal3_{code}_mem"
+
+
+def release_id(code: str) -> str:
+    """The code's current release, `<task>@<release>`."""
+    return next(f"{task_id(c)}@{r}" for c, r, *_ in RELEASES if c == code)
 
 
 def experiment(code: str) -> MemoryExperiment:
@@ -105,15 +115,15 @@ def describe(code: str, exp: MemoryExperiment) -> tuple[str, str]:
 
 def main() -> int:
     physics = json.loads(PHYSICS_2.read_text(encoding="utf-8"))
-    for code, order, start, limits in RELEASES:
+    for code, release, order, start, limits in RELEASES:
         task = task_id(code)
-        if (RELEASES_DIR / f"{task}@1").exists():
-            print(f"{task}@1 exists; left alone")
+        if (RELEASES_DIR / f"{task}@{release}").exists():
+            print(f"{task}@{release} exists; left alone")
             continue
         exp = experiment(code)
         title, text = describe(code, exp)
         budget = _MATCH if exp.matchable else _BPOSD
-        d = build_release(task, "1", exp.qasm, physics, title=title, description=text, out_dir=RELEASES_DIR,
+        d = build_release(task, release, exp.qasm, physics, title=title, description=text, out_dir=RELEASES_DIR,
                           metrics=METRICS_2 + LER_METRICS + [PER_LOGICAL], rank_by="ler_per_round",
                           starter=start if isinstance(start, dict) else
                           {"generator": "grid", "name": f"grid{start[0]}x{start[1]}", "params": {"a": start[0], "b": start[1]}},
@@ -122,7 +132,7 @@ def main() -> int:
                                "ler": budget, "logical_qubits": exp.logical_qubits,
                                "n_ions": exp.n_data + exp.n_ancilla},
                           goal="goal3")
-        rel = find_release(f"{task}@1")
+        rel = find_release(f"{task}@{release}")
         print(f"{rel.id}: {rel.title} -> {d} ({rel.digest[:23]}...)")
     return 0
 

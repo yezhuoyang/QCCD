@@ -408,10 +408,10 @@ def _mutant(entry: dict) -> dict:
 
 def _releases() -> list[dict]:
     from ..qec import MemoryExperiment
-    from ..workspace.tasks import list_releases
+    from ..workspace.tasks import list_boards
 
     out = []
-    for rel in list_releases():
+    for rel in list_boards():           # the newest release of each task, as the boards show
         q = rel.manifest.get("qec") or {}
         if q.get("noise") != "qccd-noise@2" or rel.manifest.get("track") == "suite":
             continue

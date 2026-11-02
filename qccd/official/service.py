@@ -518,10 +518,19 @@ class OfficialService:
     FTL_TARGET = {"logical_qubits": 60, "ions": 2000}
 
     def goal_releases(self, goal: str) -> list:
+        """The goal's releases, the newest of each task: an older release keeps its board and its
+        entries, but a goal ranks one release per task, the one the website's boards show
+        (`list_boards`)."""
         g = self.GOALS[goal]
-        return [r for r in self.releases.values()
+        rels = [r for r in self.releases.values()
                 if not self.is_suite(r.id) and (r.manifest.get("qec") or {}).get("noise") == g["noise"]
                 and r.manifest.get("goal", "goal1") == goal and r.manifest.get("track") not in self.TRACKS]
+        newest: dict = {}
+        for r in rels:
+            t = r.manifest.get("task")
+            if t not in newest or int(r.manifest["release"]) > int(newest[t].manifest["release"]):
+                newest[t] = r
+        return [r for r in rels if newest[r.manifest.get("task")] is r]
 
     def goal_board(self, goal: str, rules: str | None = None) -> dict:
         """One ranking across releases: every member release's entries, each with its release and
