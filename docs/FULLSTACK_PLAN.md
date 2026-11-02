@@ -1165,9 +1165,15 @@ then 8T -> CCZ, then the routing pairs.
   and the tests' corridors are unchanged bit for bit. And `lattice.check` did not see a gadget
   on a tile where a block lives between its preparation and its readout; it does now (the
   scheduler always honoured it, and the adder's half is still clean).
-- **d = 11:** the 52 merge shapes, every rule and R10: in progress.
+- **d = 11, all 52 merge shapes, every rule and R10** (qccd-physics-best, 25 rounds): 505 to
+  7,371 ions, 138.3 ms each. The largest needed ~17 GB for R10's one tableau of the whole
+  program (n plus a fresh qubit per readout); `_r10_blocks` (tests/test_c2lr_router.py)
+  compares it block by block instead -- sound because `check_program_order` keeps each
+  qubit's ops in source order, so instructions of different blocks that run out of block
+  order commute -- 1.2 GB and 130 s where the whole check took ~13 GB and 267 s.
 - **Cost:** one |AutoCCZ> per factory per 7.59 s on 360 tiles; 8 x 15 injected T and 128 |Ȳ>
-  a state (made either way, used about half the time).
+  a state (made either way, used about half the time). (Gidney 2025 makes its T states by
+  cultivation, far smaller; the 15-to-1 is our stand-in, a codesign axis.)
 
 **Step 3 (b): the whole adder on one lattice (2026-11-01, `tools/lattice_adder.py --farm`).**
 - **The forward half, rewritten.** With `_held` the Toffolis' 31 X̄Z̄ are X̄X̄. Two more mixed
@@ -1195,9 +1201,15 @@ then 8T -> CCZ, then the routing pairs.
 - **Concrete vs composed.** The 21.83 s is a schedule of checked programs, each a compiled
   program's measured time; there is still no one flat program for the call. Decoding is
   assumed to take a round.
-- **Open:** the 19 adder shapes at d = 11 (8 of them X̄X̄ corridors 24-29 tiles long, bits now
-  24 tiles apart -- a factory of two rows of four 15-to-1s, 12 tiles wide, would halve them). (Gidney 2025 makes its T states by cultivation, far smaller; the 15-to-1 is
-  our stand-in, a codesign axis.)
+- **d = 11, the adder's 19 merge shapes, every rule and R10:** 1,555 to 8,430 ions, 138.3 ms
+  each, so all 71 merge shapes of the whole call pass (14 h of checking; the longest, a
+  29-tile X̄X̄ corridor, 83 min). The corner injection, until now checked at d = 3 only, passes
+  at d = 11 too (241 ions, 11 rounds, either basis, every rule and R10 on its Clifford twin;
+  the T is one virtual Z on the corner). With the H̄, |Ȳ>, and the preparations and readouts
+  checked before, every distinct program of the call is checked at d = 11.
+- **Open:** 8 of those shapes are X̄X̄ corridors 24-29 tiles long, because bits sit 24 tiles
+  apart; a factory of two rows of four 15-to-1s, 12 tiles wide, would halve them. A second
+  row of sites per factory would let fewer factories serve the chain.
 
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
