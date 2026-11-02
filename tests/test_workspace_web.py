@@ -252,6 +252,20 @@ def test_inject_adds_rule_categories_only_when_requested():
     assert "['R0', 'R1', 'R2', 'R3', 'R13'" in grouped
 
 
+def test_every_rule_on_the_rules_page_has_a_category_and_the_site_groups_them():
+    """A rule left out of rules.js's groups would sit ungrouped below them."""
+    import re
+    rulespage = pytest.importorskip("qccd.site.rulespage", reason="the site package is not in this tree")
+    from qccd.ruleset import catalogue
+    from qccd.site import build
+    js = (rulespage.CATEGORIES / "rules.js").read_text(encoding="utf-8")
+    grouped = [i for lst in re.findall(r"rules: \[([^\]]*)\]", js) for i in re.findall(r"'([^']+)'", lst)]
+    assert len(grouped) == len(set(grouped))
+    assert set(grouped) == {r.id for r in catalogue().rules}
+    page = rulespage.page({}, {}, build.PAGE, build.STYLE, {})
+    assert "Static &amp; occupancy" not in page and "'Static & occupancy'" in page and "#rule-categories" in page
+
+
 def test_the_mirror_serves_pages_and_nothing_else(svc):
     ws, state, c, w = svc
     r = w.get("/web/rules/")

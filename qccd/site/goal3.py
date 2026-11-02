@@ -6,6 +6,8 @@ colour and named; every other size is grey.  The points are the reference sweep'
 (goals/goal3/results: every family at every size, compiled by the pinned reference compiler and
 graded like an entry, minus the Lean step) and the official entries on the code's release,
 fetched live from /official/v1/goals/goal3 and drawn as diamonds that open their entry page.
+Under them, a table of every rule any point was judged by, family by family and entry by entry
+(goals/goal3/rules.json: what each point's rules stage checked), as the Reproduce pages have.
 
 The page is made of the site's own parts: the Leaderboard's "Try your own design" button for
 the selected code (leaderboard.board_block), and the user's rule for Leaderboard pages: one
@@ -54,6 +56,7 @@ def data() -> dict | None:
     # every point's own studio page (goals/goal3/pages.py), served under board/goal3/p/
     pf = GOAL / "pages.json"
     pages = json.loads(pf.read_text(encoding="utf-8")) if pf.exists() else {}
+    judged = _judged()
     codes = []
     for b in rels:
         task = b.manifest["task"]
@@ -84,8 +87,83 @@ def data() -> dict | None:
         name, short = b.title.removeprefix("Goal 3: "), _short(b.title)
         codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": b.manifest.get("description", ""),
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
-                      "counts": counts, "points": pts, "failed": failed})
-    return {"families": fams, "caveats": caveats, "codes": codes}
+                      "counts": counts, "points": pts, "failed": failed,
+                      **({"rules": _code_rules(code, rows, judged)} if judged else {})})
+    out = {"families": fams, "caveats": caveats, "codes": codes}
+    if judged:
+        out["rules"] = _rules_key(judged)
+    return out
+
+
+#: what the page says for a rule a grade did not check, or checked only in part, where the
+#: checker's own reason is written for its developers
+_WHY = {"R7b": "no device declares a per-zone duty-cycle budget yet, so there is nothing to check",
+        "R9": "a program's own figures are not checked; every number shown is the replay's",
+        "R10": "the reference sweep skips the certificate and Lean step; an entry's grade runs it",
+        "R15": "checked as an upper bound: heat is added up, which R15 allows as a bound"}
+_UNCHECKED = "the rules stage has no check of its own for this rule"
+
+
+def _judged() -> dict | None:
+    """goals/goal3/rules.json (goals/goal3/rules.py): the rules each point's grade checked."""
+    f = GOAL / "rules.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+
+
+def _code_rules(code: str, rows: dict, judged: dict) -> dict:
+    """One code's table of rules: every rule any point was judged by, and for each family what
+    its judged sizes made of each rule.  A cell is "ok", ["bad", sizes], ["part", why] or
+    ["skip", why]; a rule missing from a family is not one of its rules."""
+    from ..ruleset import load, rule_order
+    mine = judged["codes"].get(code) or {}
+    kinds, pts = judged["kinds"], mine.get("points", {})
+    board = set(load(mine.get("set", "standard")).ids)
+    by_fam: dict = {}
+    for (fam, name), r in rows.items():
+        if name in pts:
+            by_fam.setdefault(fam, []).append((r, kinds[pts[name]]))
+    ids = set(board)
+    for got in by_fam.values():
+        for _, k in got:
+            ids |= set(k["checked"]) | set(k["skipped"]) | set(k["partial"])
+    fams = {}
+    for fam, got in by_fam.items():
+        cells: dict = {}
+        for rid in ids:
+            bad = [r["point"] for r, _ in got if rid in (r.get("rules_failed") or ())]
+            part = [k["partial"][rid] for _, k in got if rid in k["partial"]]
+            seen = sum(1 for _, k in got if rid in k["checked"])
+            skip = [k["skipped"][rid] for _, k in got if rid in k["skipped"]]
+            if bad:
+                cells[rid] = ["bad", bad]
+            elif part:
+                cells[rid] = ["part", _WHY.get(rid, part[0])]
+            elif seen == len(got):
+                cells[rid] = "ok"
+            elif seen:
+                cells[rid] = ["part", f"checked on {seen} of {len(got)} sizes"]
+            elif skip:
+                cells[rid] = ["skip", _WHY.get(rid, skip[0])]
+            elif rid in board:
+                cells[rid] = ["skip", _UNCHECKED]
+        fams[fam] = {"n": len(got), "cells": cells}
+    return {"set": mine.get("set", "standard"), "ids": sorted(ids, key=rule_order), "fams": fams}
+
+
+def _rules_key(judged: dict) -> dict:
+    """What the page needs to place a submitted entry's rules beside the families': every rule's
+    title and order, each rule set used, and what the rules stage checks on a plain device and on a
+    C2LR lattice (an entry's grade runs the same stage on its own device)."""
+    from ..ruleset import catalogue, load, rule_order
+    cat = sorted(catalogue().rules, key=lambda r: rule_order(r.id))
+    kinds = [{"checked": k["checked"], "skipped": {i: _WHY.get(i, w) for i, w in k["skipped"].items()},
+              "partial": {i: _WHY.get(i, w) for i, w in k["partial"].items()}} for k in judged["kinds"]]
+    c2lr = [any(i.startswith("C") for i in k["checked"]) for k in kinds]
+    sets = sorted({c.get("set", "standard") for c in judged["codes"].values()})
+    return {"titles": {r.id: r.title for r in cat}, "order": [r.id for r in cat], "kinds": kinds,
+            "c2lr": c2lr.index(True) if True in c2lr else None,
+            "plain": c2lr.index(False) if False in c2lr else None,
+            "sets": {n: list(load(n).ids) for n in sets}, "unchecked": _UNCHECKED}
 
 
 def _short(title: str) -> str:
@@ -132,6 +210,15 @@ CSS = """
 .g3 td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .g3 .tw{overflow-x:auto}
 .g3 .lbx{margin-top:14px}
+.g3 table.g3r th.c,.g3 table.g3r td.c{text-align:center;white-space:nowrap}
+.g3 table.g3r th.c{text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink)}
+.g3 table.g3r th small{display:block;text-transform:none;letter-spacing:0;font-weight:400}
+.g3 table.g3r td small{display:block;color:var(--ink2)}
+.g3 table.g3r td a{text-decoration:none}
+.g3 table.g3r span[title]{cursor:help}
+.g3r-ok{color:#1b7f3b;font-weight:600}.g3r-bad{color:#b42318;font-weight:600}.g3r-part{color:#8a5300;font-weight:600}
+.g3r-skip,.g3r-no{color:#8a8985}.g3r-skip{font-size:20px;font-weight:700;line-height:1}
+.g3 p.g3r-why{margin:4px 0;font-size:13px}
 """
 
 SCRIPT = r"""
@@ -267,6 +354,74 @@ SCRIPT = r"""
       tr.appendChild(H('td', null, p.why)); t.appendChild(tr); });
     tw.appendChild(t); host.appendChild(tw);
   }
+  // every rule any point on this code was judged by: one column per family, its judged sizes
+  // together, and one per submitted entry, whose own rules are rows too
+  var GLYPH = {ok: '✓', bad: '✗', part: '◐', skip: '·'};
+  function entryCells(R, p){
+    var K = D.rules, k = K.kinds[p.f === 'C2LR' && K.c2lr != null ? K.c2lr : K.plain] || {checked: [], skipped: {}, partial: {}};
+    var rr = (p.cf || {}).rules || {}, board = K.sets[R.set] || [], cells = {};
+    function has(a, id){ return (a || []).indexOf(id) >= 0; }
+    R.ids.concat(rr.adds || []).forEach(function(id){
+      if (has(rr.breaks, id)) cells[id] = ['bad', 'breaks the board’s rule' + (has(rr.drops, id) ? ', which its own rules drop' : '')];
+      else if (has(rr.adds, id)) cells[id] = ['ok', 'a rule of its own; it holds'];
+      else if (has(rr.replaces, id)) cells[id] = ['ok', 'its own version of this rule; it holds'];
+      else if (id === 'R10') cells[id] = ['ok', 'decided by the certificate and Lean stages'];
+      else if (k.partial[id]) cells[id] = ['part', k.partial[id]];
+      else if (has(k.checked, id)) cells[id] = ['ok', has(rr.drops, id) ? 'not one of its own rules; it holds all the same' : 'holds'];
+      else if (k.skipped[id]) cells[id] = ['skip', k.skipped[id]];
+      else if (has(board, id)) cells[id] = ['skip', K.unchecked];
+    });
+    return cells;
+  }
+  function rules(host, c){
+    var R = c.rules;
+    host.parentNode.hidden = !R;
+    if (!R) return;
+    var cols = D.families.concat(Object.keys(R.fams).filter(function(f){ return D.families.indexOf(f) < 0; }))
+      .filter(function(f){ return R.fams[f]; }).map(function(f){
+        var F = R.fams[f]; return {head: f, sub: F.n + (F.n === 1 ? ' size' : ' sizes'), n: F.n, cells: F.cells}; });
+    (live[c.id] || []).forEach(function(p){
+      cols.push({head: p.n, sub: 'submitted' + (p.by ? ' by ' + p.by : ''), to: href(p), cells: entryCells(R, p)}); });
+    var order = D.rules.order, ids = [], why = {};
+    function at(id){ var i = order.indexOf(id); return i < 0 ? order.length : i; }
+    cols.forEach(function(col){ Object.keys(col.cells).forEach(function(id){ if (ids.indexOf(id) < 0) ids.push(id); }); });
+    ids.sort(function(a, b){ return at(a) - at(b) || (a < b ? -1 : 1); });
+    var tw = H('div', 'tw'), t = H('table', 'g3r'), hd = H('tr');
+    hd.appendChild(H('th', null, 'rule'));
+    cols.forEach(function(col){
+      var th = H('th', 'c');
+      if (col.to) { var a = H('a', null, col.head); a.href = col.to; a.target = '_blank'; a.rel = 'noopener'; th.appendChild(a); }
+      else th.appendChild(document.createTextNode(col.head));
+      th.appendChild(H('small', null, col.sub)); hd.appendChild(th);
+    });
+    t.appendChild(hd);
+    ids.forEach(function(id){
+      var tr = H('tr'), td = H('td'), title = D.rules.titles[id];
+      if (title) { var a = H('a'); a.href = '../../rules/#' + id; a.appendChild(H('b', null, id)); td.appendChild(a); td.appendChild(H('small', null, title)); }
+      else { td.appendChild(H('b', null, id)); td.appendChild(H('small', null, 'a rule of an entry’s own')); }
+      tr.appendChild(td);
+      cols.forEach(function(col){
+        var v = col.cells[id], cell = H('td', 'c'), s;
+        if (!v) { s = H('span', 'g3r-no', '–'); s.title = 'not one of its rules'; }
+        else if (v === 'ok') { s = H('span', 'g3r-ok', '✓'); s.title = 'holds on ' + (col.n === 1 ? 'its one size' : 'all ' + col.n + ' sizes'); }
+        else if (v[0] === 'bad' && typeof v[1] !== 'string') {
+          s = H('span', 'g3r-bad', '✗ ' + v[1].length); s.title = 'fails on ' + v[1].length + ' of ' + col.n + ' sizes: ' + v[1].join(', '); }
+        else {
+          s = H('span', 'g3r-' + v[0], GLYPH[v[0]]); s.title = (v[0] === 'skip' ? 'not checked: ' : '') + v[1];
+          if (v[0] === 'skip' || v[0] === 'part') { var w = (v[0] === 'skip' ? 'not checked: ' : 'checked in part: ') + v[1];
+            if (!why[w]) why[w] = [];
+            if (why[w].indexOf(id) < 0) why[w].push(id); }
+        }
+        cell.appendChild(s); tr.appendChild(cell);
+      });
+      t.appendChild(tr);
+    });
+    tw.appendChild(t); host.appendChild(tw);
+    Object.keys(why).forEach(function(w){
+      var p = H('p', 'g3r-why'); p.appendChild(H('b', null, why[w].join(', '))); p.appendChild(document.createTextNode(' ' + w + '.'));
+      host.appendChild(p);
+    });
+  }
 
   function draw(i){
     cur = i; var c = D.codes[i];
@@ -280,6 +435,7 @@ SCRIPT = r"""
     panel(pan, c, 'l', 'Logical error rate per round (Z and X memories)');
     var tb = document.getElementById('g3-table'); tb.textContent = ''; table(tb, c);
     var fl = document.getElementById('g3-failed'); fl.textContent = ''; failures(fl, c);
+    var rl = document.getElementById('g3-rules'); rl.textContent = ''; rules(rl, c);
     if (location.hash !== '#' + c.task) history.replaceState(null, '', '#' + c.task);
   }
   D.codes.forEach(function(c, i){
@@ -295,7 +451,8 @@ SCRIPT = r"""
       live[rel.id] = (rel.entries || []).filter(function(e){ return e.T_round_ms > 0 && e.ler_per_round > 0; }).map(function(e){
         var l = e.ler || {};
         return {f: e.family, n: e.device || e.display_name || e.id, by: e.by, s: 0, t: e.T_round_ms, l: e.ler_per_round,
-                lo: l.per_round_lo || e.ler_per_round, hi: l.per_round_hi || e.ler_per_round, e: l.errors, sh: l.shots, sid: e.id};
+                lo: l.per_round_lo || e.ler_per_round, hi: l.per_round_hi || e.ler_per_round, e: l.errors, sh: l.shots, sid: e.id,
+                cf: e.conformance};
       });
     });
     draw(cur);
@@ -311,6 +468,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         return None
     from . import leaderboard
     cav = "".join(f"<li><b>{_e(f)}*</b> {_e(t)}.</li>" for f, t in d["caveats"].items())
+    sets = ", ".join(f'<a href="../../rules/#set-{_e(n)}">{_e(n)}</a>' for n in (d.get("rules") or {}).get("sets", {}))
     tries = "".join(f'<div class="g3-try" data-task="{_e(c["task"])}" hidden>'
                     + leaderboard.board_block(c["task"], c["title"], live=False, root="../../").replace(
                         "Coloured dots are submitted designs", "Diamonds are submitted designs") + "</div>"
@@ -350,6 +508,14 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
         '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
+        "<details hidden><summary>The rules every point is judged by</summary>"
+        f"<p>Every rule any point on this code was judged by: the board&rsquo;s rule set ({sets}), and on a "
+        "C2LR lattice the C rules as well. One column per family, its sizes together; a submitted entry is a "
+        "column of its own, with any rules of its own.</p>"
+        '<div id="g3-rules"></div>'
+        "<p><small>✓ the rule holds on every size; ✗ it fails, on that many sizes (a size that breaks a rule "
+        "is not plotted); ◐ checked in part; · one of its rules, not checked; – not one of its rules. Each rule "
+        'is written out on the <a href="../../rules/">Rules</a> page.</small></p></details>'
         f'<details><summary>What the starred families cannot show yet</summary><ul>{cav}</ul>'
         "<p>A size counts as failed when the reference compiler refused it or its program broke a rule.</p></details>"
         f"{tries}</div>"

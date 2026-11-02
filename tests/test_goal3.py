@@ -7,7 +7,9 @@
 * the official board gives each entry its family, its time per round over both memories' rounds
   and its logical error rate per round;
 * the site's Leaderboard keeps the Goal 3 boards off its Goal 1 table and memory-board cards, and
-  board/goal3/ carries every code.
+  board/goal3/ carries every code;
+* board/goal3/'s table of rules has every rule a point was judged by (goals/goal3/rules.json, which
+  still agrees with verify), the C rules only for the C2LR family.
 """
 
 from __future__ import annotations
@@ -115,3 +117,34 @@ def test_the_site_keeps_goal_3_boards_together():
     assert "Goal 3: one code at a time" in page and "/official/v1" in page
     for c in CODES:
         assert f'data-task="goal3_{c}_mem"' in page
+
+
+def test_board_goal3_lists_every_rule_a_point_was_judged_by(tmp_path):
+    pytest.importorskip("qccd.site.boards", reason="the site package is not in this tree")
+    import rules as judged_rules
+    import sweep
+    from qccd.ruleset import load
+    from qccd.site import goal3
+    judged = json.loads((GOAL / "rules.json").read_text(encoding="utf-8"))
+    # rules.json is what verify checks on a point's device today: one point of each kind again
+    rows = {r["point"]: r for r in judged_rules.judged("surface3")}
+    points = judged["codes"]["surface3"]["points"]
+    assert set(points) == set(rows)
+    for k in sorted(set(points.values())):
+        name = next(p for p, i in points.items() if i == k)
+        assert judged_rules.kind_of(rows[name], sweep.release("surface3"), tmp_path) == judged["kinds"][k], name
+    d = goal3.data()
+    standard = set(load("standard").ids)
+    for c in d["codes"]:
+        R = c["rules"]
+        assert standard <= set(R["ids"]), c["task"]
+        for fam, F in R["fams"].items():
+            assert F["n"] >= 1 and standard <= set(F["cells"]), (c["task"], fam)
+            c_rules = {i for i in F["cells"] if i.startswith("C")}
+            assert bool(c_rules) == (fam == "C2LR"), (c["task"], fam, c_rules)
+            # the sweep skips the certificate step, and never checks a program's own figures
+            assert F["cells"]["R10"][0] == "skip" and F["cells"]["R9"][0] == "skip"
+            assert F["cells"]["R15"][0] == "part"
+    s3 = next(c for c in d["codes"] if c["task"] == "goal3_surface3_mem")
+    assert s3["rules"]["fams"]["Grid"]["cells"]["R4"] == "ok"
+    assert d["rules"]["c2lr"] is not None and d["rules"]["plain"] is not None

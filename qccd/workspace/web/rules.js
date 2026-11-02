@@ -21,6 +21,12 @@
       blurb: 'What may run at a site and when: capabilities, cooling and heating, gate serialization, circuit correctness, ordering and duration.',
       rules: ['R6', 'R6b', 'R7', 'R7b', 'R7c', 'R8', 'R9', 'R10', 'R12', 'R15', 'R16', 'R17',
               'R24', 'R25', 'R26', 'R27', 'R29', 'R30', 'R32', 'R33']
+    },
+    {
+      id: 'rules-c2lr',
+      title: 'Swap-or-stay lattices (C2LR)',
+      blurb: 'What a C2LR step may do: one direction bit per leg, one shared waveform, crystals ending at leg centres, and the control it takes. They judge only a C2LR device.',
+      rules: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10']
     }
   ];
 

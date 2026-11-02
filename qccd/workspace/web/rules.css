@@ -1,6 +1,6 @@
 #rule-categories {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin: 24px 0 34px;
 }
@@ -39,6 +39,8 @@
   text-decoration: none;
 }
 .rule-category .rule { scroll-margin-top: 24px; }
+/* the page's own index of every rule, replaced by the categories; its display:flex beats [hidden] */
+ul.toc2[hidden] { display: none; }
 #sitetoc .rule-category-toc { margin-top: 7px; font-weight: 700; color: #315f98; }
 @media (max-width: 780px) {
   #rule-categories { grid-template-columns: 1fr; }

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import html
 import re
+from pathlib import Path
 
 from ..ruleset import RuleSet, catalogue, load, names, rule_order
 from ..ruleset.syntax import KEYWORDS
@@ -318,8 +319,16 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
           'each (R22 is gone), lets a gate chain grow to twenty ions, and keeps everything else as on the '
           'standard machine. X1 is a rule it has never seen: it does not plan for it, and the check '
           'afterwards decides it all the same, naming every instant an ion stands in C3.</p>']
+    # "Every rule" grouped into categories in the reader's browser, the cards and ids unchanged
+    b.append("<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>")
     return PAGE.format(title="Rules - QCCD studio", style=STYLE,
-                       extra_css="main{max-width:1120px}" + CSS, body="\n".join(b))
+                       extra_css="main{max-width:1120px}" + CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8"),
+                       body="\n".join(b))
+
+
+#: the rules' categories (qccd/workspace/web/rules.js), which the workspace's mirror of the site
+#: also lays over this page
+CATEGORIES = Path(__file__).resolve().parents[1] / "workspace" / "web"
 
 
 #: the machine level's rule sets, in the order the page shows them
