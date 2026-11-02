@@ -1272,6 +1272,29 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
   sits where its control's column meets its target's row, and every lookup write is two pair
   shapes, on any floorplan that puts pp in a row and the target bits in a column.
 
+**Relay chains, one lookup (2026-11-02, user: "Yes" to relays and a crossbar).**
+- **`scale/relay.py`.** `chain` writes a product as relays (prep in the other basis, pairs in
+  two layers, readouts, the outcome a `bit` XOR of the pairs, a frame per relay readout);
+  `proved(P, k)` is `equal_drop` against the product (k = 0 .. 6 in the tests, both letters;
+  without the frames it fails), longer chains by induction (in the module). `crossings` pins a
+  CNOT's ancilla where its control's column meets its target's row; `relay` rewrites every
+  product along a column (Z̄) or a row (X̄) into a chain on the tiles between; `move` carries a
+  state along a line (a one-bit teleport, proved a SWAP into a fresh |0̄>). The scheduler
+  takes `pinned` blocks (made on their tile once every gadget before on it is done) and decodes
+  a `bit` when its inputs are.
+- **One lookup write (`tools/lattice_lookup.py`):** gLoop1's first, 64 x 32 CNOTs, every slot
+  taken (`_Exp(reserved=True)` no longer evaluates a data slot it takes either way -- FormalRV
+  gives the table no contents). pp in a row, the 32 a-slots in a column, 2,345 tiles: 96,256
+  relays, 296,960 gadgets, 26.35 s, check clean, scheduled in 5 s, and **6 distinct programs**:
+  the Z̄ pair down a column, the X̄ pair along a row, a preparation and a readout in each basis.
+  Both pairs pass at d = 11 (505 ions each, every rule and R10; the Z̄ pair was among the adder's
+  shapes), the preparations and readouts were checked before -- so every program of the write
+  is checked at d = 11. The same crossbar with corridor merges: 39.92 s and 343 programs,
+  corridors up to 102 tiles, which cannot be checked.
+- **Next:** the whole gLoop1 iteration on one floorplan -- the write into a-slots that sit in a
+  column, then moved into the adder's bit triples (a teleport: a chain and a readout), the adder
+  on its farm, the readouts, powerProduct and its release beside pp, and the exponent's loads.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.

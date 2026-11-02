@@ -9,4 +9,6 @@
     machine.py   the machine it runs on at RSA-2048 (slice S9): distance 11, its physics and noise
     lattice.py   the patch-lattice scheduler on that machine: products as corridor merges between
                  stationary tiles, every gadget a copy of a program checked once
+    relay.py     a long product as a chain of neighbour merges, proved the same; a CNOT's ancilla
+                 at the crossing of its control's column and its target's row
 """

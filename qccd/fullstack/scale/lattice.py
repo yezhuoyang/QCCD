@@ -14,7 +14,9 @@ every outcome its guard reads is decoded:
   first product, on that product's side, held until its readout.
 * `prep` and `read`: the tile's reset or readout; an outcome is decoded `decode_us` later.
   `prep Y` is |Ȳ> made in place (`qccd.qec.experiments.y_memory`, Gidney's), on the tile alone.
-* frames (`x`, `z`, `y`) and `bit`: classical, no time.
+* `prep` of a block pinned to a tile (`pinned`: a relay, `relay.relay`; an ancilla at a crossing,
+  `relay.crossings`): that tile, once every gadget before on it is done, held until its readout.
+* frames (`x`, `z`, `y`) and `bit`: classical, no time (a `bit` is decoded when its inputs are).
 A guarded instruction reserves its tiles whether or not its guard holds, so the schedule is the
 same for every run.  Every block not in a gadget refreshes each round on its own tile.
 
@@ -201,13 +203,20 @@ def _blocks(w, a) -> list:
     return list(a[1::2]) if w == "ppm" else list(a[:1]) if w in ("prep", "read", "ht") else []
 
 
+def _names(text: str) -> list:
+    """The outcomes a `bit` line's text reads: `(a & b) ^ c ^ 1` -> a, b, c."""
+    return [x for x in text.replace("(", " ").replace(")", " ").replace("&", " ").replace("^", " ").split()
+            if x not in ("0", "1")]
+
+
 def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
-             start=None, macro=None) -> list:
+             start=None, macro=None, pinned=None) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
     `program._Exp` writes them -- on the lattice: `homes` block -> tile for the blocks that live
     there, `bounds` (x0, y0, x1, y1) the tiles that exist, `walls` tiles no gadget may use;
     `reserved` (tile, t0, t1) already taken -- by gadgets scheduled before, copies of a unit
-    scheduled once (`shifted`) -- and `start` block -> when it is first free.
+    scheduled once (`shifted`) -- and `start` block -> when it is first free; `pinned` fresh
+    block -> the bus tile it is made on.
 
     `macro`: what a `macro` line stands for -- `macro(k, args, free_at, board)` returns (its
     gadgets, the number of lines after it they carry out, block -> tile, block -> when free,
@@ -282,9 +291,15 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             raise LatticeError(f"line {k}: no tile will ever be free for {blk}")
         return next(c for c, w in zip(ok, when) if w <= t1), t1
 
+    pinned = pinned or {}
     skip = 0
     for k, (w, a, o, g) in enumerate(stream):
-        if k < skip or w in ("x", "y", "z", "bit"):
+        if k < skip:
+            continue
+        if w == "bit":
+            ready[o] = guard_ready(_names(a[0]))
+            continue
+        if w in ("x", "y", "z"):
             continue
         if w == "macro":
             gs, n, at, free, dec = macro(k, a, free_at, board)
@@ -304,7 +319,15 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
         t = max([free_at[b] for b in blks] + [guard_ready(g)])
         if w == "prep":
             blk = a[0]
-            if blk not in homes:
+            if blk in pinned:
+                tile = pinned[blk]
+                ends = [e for _, e, _ in board.busy[tile]]
+                if INF in ends or not board.bus(tile):
+                    raise LatticeError(f"line {k}: {blk}'s tile {tile} is not free for it")
+                t = max([t] + ends)
+                where[blk] = tile
+                board.take(tile, t, INF, blk)
+            elif blk not in homes:
                 tile, t = place(blk, k, t)
                 where[blk] = tile
                 board.take(tile, t, INF, blk)
@@ -374,7 +397,13 @@ def check(stream, gadgets, costs: Costs = Costs()) -> list:
                 if blk not in bs and s < b - 1e-6 and e > a + 1e-6]
     last: dict = {}
     made: dict = {}
+    bits = [(k, a[0], o) for k, (w, a, o, _) in enumerate(stream) if w == "bit"]
+    nb = 0
     for gd in sorted(gadgets, key=lambda g: g.line):
+        while nb < len(bits) and bits[nb][0] < gd.line:       # a bit: decoded with its inputs
+            _, text, o = bits[nb]
+            made[o] = max((made.get(x, INF) for x in _names(text)), default=0.0)
+            nb += 1
         for b in gd.blocks:
             if gd.t0 < last.get(b, 0.0) - 1e-6:
                 bad.append(f"line {gd.line}: {b} starts before its previous instruction ends")

@@ -1112,10 +1112,13 @@ class _Exp:
             elif isinstance(node, Let):
                 self.body(node.body, {**env, node.var: node.value(env)}, guard)
             elif isinstance(node, Pred):
+                if self.reserved and not node.structural:
+                    self.body(node.body, env, guard)      # a slot: taken whatever the data say
+                    continue
                 c = node.cond(env)
                 if c > 1:
                     raise ValueError(f"a guard loop of {c} trips (line {node.qline})")
-                if c or (self.reserved and not node.structural):
+                if c:
                     self.body(node.body, env, guard)
             elif isinstance(node, Call):
                 env2 = {**self.prog.params, **{f: e(env) for f, e in node.skeys + node.args}}
