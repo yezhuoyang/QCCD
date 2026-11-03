@@ -909,10 +909,18 @@ def _circuit_ops(ctx: Ctx):
     return ctx.once("circuit_ops", lambda: [CircuitOp(c.index) for c in _circuit(ctx)])
 
 
+#: the instructions that carry out a circuit operation: those that act on its qubits' state.  The
+#: transport stamped with it only brings its ions together (the race-track pass stamps the split
+#: after a gate layer with the whole layer), so it neither starts nor ends the operation.
+_CARRY = frozenset(("gate1", "gate2", "measure", "reset"))
+
+
 def _performers(ctx: Ctx) -> dict[int, list[Op]]:
     def make():
         by: dict[int, list[Op]] = {}
         for o in ctx.exe.ops:
+            if o.kind not in _CARRY:
+                continue
             for c in o.serves:
                 by.setdefault(c, []).append(o)
         for v in by.values():
@@ -924,7 +932,8 @@ def _performers(ctx: Ctx) -> dict[int, list[Op]]:
 
 @term("performers(c)", "a set of operations", "The operations of the execution that carry out "
       "circuit operation c.", "circuit", domain=True,
-      programme="Every instruction the compiler stamped with c.",
+      programme="Every gate, measurement or reset the compiler stamped with c.  The transport "
+                "stamped with c only brings its ions together, and does not count.",
       schedule="The two-qubit gate matched to c: the k-th gate on a pair of ions is the circuit's "
                "k-th gate on that pair.")
 def _performers_of(ctx: Ctx, c):

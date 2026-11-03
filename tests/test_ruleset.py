@@ -244,6 +244,28 @@ def test_a_papers_rule_set_agrees_with_the_timed_checker(overlap):
     assert new["R29"].verdict == NOT_APPLICABLE      # no clock was given
 
 
+@pytest.mark.parametrize("reordered", [False, True])
+def test_transport_stamped_with_a_gate_does_not_carry_it_out(reordered):
+    """R25 and R26 order a qubit's operations by the instructions that act on its state.  The
+    race-track pass stamps the split after a gate layer with the whole layer, so the split can end
+    after a qubit's next operation begins: that is no reorder (the user's decision, 2026-11-02).
+    The next operation starting before the gate itself is one."""
+    from qccd.ruleset.model import CircuitOpData
+    m = Machine.ring(3, 2, 2, name="ring6d")
+    p = m.program("layer", provenance="off")
+    p.init({"d0": "S0", "d1": "S0"})
+    if reordered:
+        p.measure(["d0"], op=1)
+    p.gate("cx", [["d0", "d1"]], op=0)
+    if not reordered:
+        p.measure(["d0"], op=1)
+    p.move("d1", "S0", "S1", op=0)              # the split, stamped with the cx
+    circ = [CircuitOpData(0, "cx", ("d0", "d1"), ("control", "target")), CircuitOpData(1, "measure", ("d0",))]
+    rs = load('ruleset "order"\nuse R0, R1, R8, R24, R25, R26\n')
+    res = judge(rs, m, p.build(), circuit=circ)
+    assert res["R25"].verdict == res["R26"].verdict == (FAILS if reordered else HOLDS)
+
+
 def test_two_ions_moving_opposite_ways_along_a_loop_in_one_step_break_r11():
     """R11 is decided once per step and loop (a shortcut for `for all a, b ... : shift(a) =
     shift(b)`); it must still see two ions on one loop going opposite ways."""
