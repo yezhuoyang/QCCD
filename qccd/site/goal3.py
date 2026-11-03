@@ -123,9 +123,7 @@ def _why(judged: dict, rid: str) -> str:
 def _code_rules(code: str, board: str, judged: dict) -> dict:
     """One code's table of rules: each family, a submission of the reference sweep, with its own
     rule set, and what its sizes made of each rule of that set.  A cell is "ok", ["bad", sizes],
-    ["part", why] or ["skip", why]; a rule missing from a family is not one of its rules.
-    ["bad", sizes, "stamped"] is an order rule that fails on every one of those sizes only through
-    transport the compiler stamped with a gate (goals/goal3/rules.py `gates_in_order`)."""
+    ["part", why] or ["skip", why]; a rule missing from a family is not one of its rules."""
     from ..ruleset import rule_order
     fams, ids = {}, set()
     for fam, d in judged["codes"][code].items():
@@ -137,9 +135,7 @@ def _code_rules(code: str, board: str, judged: dict) -> dict:
             bad = sorted((p for p, v in pts.items() if rid in v.get("fails", {})),
                          key=lambda p: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", p)])
             skip = sum(1 for v in pts.values() if rid in v.get("skip", ()))
-            if bad and all(rid in pts[p].get("stamped", ()) for p in bad):
-                cells[rid] = ["bad", bad, "stamped"]
-            elif bad:
+            if bad:
                 cells[rid] = ["bad", bad]
             elif skip == len(pts):
                 cells[rid] = ["skip", _why(judged, rid)]
@@ -424,9 +420,7 @@ SCRIPT = r"""
           s = H('span', 'g3r-bad', '✗ ' + v[1].length); s.title = 'fails on ' + v[1].length + ' of ' + col.n + ' sizes: ' + v[1].join(', ');
           bad.push([id, col.head, v[1].length === col.n ? (col.n === 1 ? 'its one size' : 'all ' + col.n + ' sizes')
                                                        : v[1].length + ' of ' + col.n + ' sizes (' + v[1].join(', ') + ')',
-                    v[1].filter(function(n){ return drawn[col.head + '|' + n]; }), v[1].length, v[2] === 'stamped']);
-          if (v[2] === 'stamped') { s.className = 'g3r-part'; s.title += ', only through transport stamped with a gate: '
-                                    + 'counting gate instructions alone, every qubit’s gates keep the circuit’s order'; } }
+                    v[1].filter(function(n){ return drawn[col.head + '|' + n]; }), v[1].length]); }
         else {
           s = H('span', 'g3r-' + v[0], GLYPH[v[0]]); s.title = (v[0] === 'skip' ? 'not checked: ' : '') + v[1];
           if (v[0] === 'skip' || v[0] === 'part') { var w = (v[0] === 'skip' ? 'not checked: ' : 'checked in part: ') + v[1];
@@ -441,12 +435,7 @@ SCRIPT = r"""
     bad.forEach(function(b){
       var p = H('p', 'g3r-why'), d = b[3];
       p.appendChild(H('b', null, b[0]));
-      if (b[5]) p.appendChild(document.createTextNode(' fails for ' + b[1] + ' on ' + b[2] + ', but only as the rule '
-        + 'reads a program today. The rule takes a gate to last until the last instruction the compiler stamped '
-        + 'with it, and the compiler stamps the split after a layer of gates with every gate of the layer, so a '
-        + 'qubit’s next gate seems to start before its last one ends. Counting gate instructions alone, every '
-        + 'qubit’s gates keep the circuit’s order. Whether the rule or the stamping changes is still open.'));
-      else p.appendChild(document.createTextNode(' fails for ' + b[1] + ' on ' + b[2] + ', a rule of its own set.'
+      p.appendChild(document.createTextNode(' fails for ' + b[1] + ' on ' + b[2] + ', a rule of its own set.'
         + (d.length ? ' The figures above still draw ' + (d.length === b[4] ? (d.length === 1 ? 'it' : 'them') : d.join(', '))
           + ': what is drawn was decided by the sweep’s grade, which did not catch this.' : '')));
       host.appendChild(p);
@@ -564,8 +553,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         + ", ".join(set_link(n) for n in boards)
         + ") when it declares none. Every rule of any of these sets is a row.</p>"
         '<div id="g3-rules"></div>'
-        "<p><small>✓ the rule holds on every size; ✗ it fails, on that many sizes (in amber: only as the rule "
-        "reads a program today, explained below the table); ◐ it holds on some sizes "
+        "<p><small>✓ the rule holds on every size; ✗ it fails, on that many sizes; ◐ it holds on some sizes "
         "and does not apply to the others; · one of its rules that does not apply to a program (why is "
         "below the table); – not one of its rules. Each rule and each set is written out on the "
         '<a href="../../rules/">Rules</a> page.</small></p></details>'

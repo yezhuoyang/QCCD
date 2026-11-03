@@ -112,47 +112,23 @@
    "Cyclone": {
     "points": {
      "cyclone108_j": {
-      "fails": {
-       "R26": 936
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone75_j": {
-      "fails": {
-       "R26": 936
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone83_j": {
-      "fails": {
-       "R26": 936
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone94_j": {
-      "fails": {
-       "R26": 936
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -342,47 +318,23 @@
    "Cyclone": {
     "points": {
      "cyclone15_j": {
-      "fails": {
-       "R26": 199
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone17_j": {
-      "fails": {
-       "R26": 199
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone19_j": {
-      "fails": {
-       "R26": 199
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone21_j": {
-      "fails": {
-       "R26": 199
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -562,47 +514,23 @@
    "Cyclone": {
     "points": {
      "cyclone29_j": {
-      "fails": {
-       "R26": 541
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone32_j": {
-      "fails": {
-       "R26": 541
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone36_j": {
-      "fails": {
-       "R26": 541
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone42_j": {
-      "fails": {
-       "R26": 541
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -801,47 +729,23 @@
    "Cyclone": {
     "points": {
      "cyclone52_j": {
-      "fails": {
-       "R26": 310
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone58_j": {
-      "fails": {
-       "R26": 310
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone65_j": {
-      "fails": {
-       "R26": 310
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone75_j": {
-      "fails": {
-       "R26": 310
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -1059,47 +963,23 @@
    "Cyclone": {
     "points": {
      "cyclone10_j": {
-      "fails": {
-       "R26": 57
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone12_j": {
-      "fails": {
-       "R26": 57
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone13_j": {
-      "fails": {
-       "R26": 57
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone9_j": {
-      "fails": {
-       "R26": 57
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -1255,47 +1135,23 @@
    "Cyclone": {
     "points": {
      "cyclone26_j": {
-      "fails": {
-       "R26": 265
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone29_j": {
-      "fails": {
-       "R26": 265
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone32_j": {
-      "fails": {
-       "R26": 265
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone37_j": {
-      "fails": {
-       "R26": 265
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },
@@ -1508,47 +1364,23 @@
    "Cyclone": {
     "points": {
      "cyclone51_j": {
-      "fails": {
-       "R26": 721
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone56_j": {
-      "fails": {
-       "R26": 721
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone64_j": {
-      "fails": {
-       "R26": 721
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      },
      "cyclone73_j": {
-      "fails": {
-       "R26": 721
-      },
       "skip": [
        "R29"
-      ],
-      "stamped": [
-       "R26"
       ]
      }
     },

@@ -9,8 +9,7 @@
 * the site's Leaderboard keeps the Goal 3 boards off its Goal 1 table and memory-board cards, and
   board/goal3/ carries every code;
 * board/goal3/'s table of rules judges each submission by its own rule set: every compiled point by
-  its family's (goals/goal3/rules.json), each column exactly that set's rules, and an order rule
-  that fails only on transport stamped with a gate told from a real reorder.
+  its family's (goals/goal3/rules.json), and each column exactly that set's rules.
 """
 
 from __future__ import annotations
@@ -192,26 +191,13 @@ def test_board_goal3_judges_each_submission_by_its_own_rule_set():
                 bad = sorted(p for p, v in pts.items() if rid in v.get("fails", {}))
                 cell = F["cells"][rid]
                 assert (sorted(cell[1]) if cell[0] == "bad" else []) == bad, (code, fam, rid)
-                # amber only where every failing size fails on stamped transport alone
-                stamped = bool(bad) and all(rid in pts[p].get("stamped", ()) for p in bad)
-                assert (cell[0] == "bad" and cell[2:] == ["stamped"]) == stamped, (code, fam, rid)
             for rid in ("R7b", "R9", "R10", "R29"):
                 if rid in own:
                     assert F["cells"][rid][0] == "skip", (code, fam, rid)
             assert ({i for i in own if i.startswith("C")} != set()) == (fam == "C2LR")
     assert set(d["rules"]["never"]) == {"R7b", "R9", "R29"}
+    # the compilers keep each qubit's gates in the circuit's order, and the transport stamped with a
+    # gate (the race-track split after a layer) does not carry it out: no order rule fails anywhere
+    assert not [(code, fam, p) for code, c in judged["codes"].items() for fam, d in c.items()
+                for p, v in d["points"].items() if {"R25", "R26"} & set(v.get("fails", {}))]
 
-
-def test_an_order_rule_failing_on_stamped_transport_alone_is_told_from_a_reorder():
-    """rules.py's `gates_in_order`: a split stamped with a cx that ends after the qubit's next gate
-    starts is not a reorder; the next gate starting before the cx's own gate ends is."""
-    from types import SimpleNamespace as N
-
-    import rules as judged_rules
-    circuit = [N(index=0, qubits=(0, 1)), N(index=1, qubits=(0,))]       # cx q0,q1; then h q0
-    cx = N(kind="gate2", serves={0}, start=0, end=1)
-    split = N(kind="move", serves={0}, start=1, end=4)                   # stamped with the cx
-    h_after = N(kind="gate1", serves={1}, start=2, end=3)
-    h_before = N(kind="gate1", serves={1}, start=0, end=1)
-    assert judged_rules.gates_in_order(N(circuit=circuit, ops=[cx, split, h_after]))
-    assert not judged_rules.gates_in_order(N(circuit=circuit, ops=[cx, split, h_before]))

@@ -15,9 +15,8 @@ trees).  A folder whose replay does not end at the row's time holds another comp
 (an earlier sweep's) and is passed over; a point with no matching folder stops the script.
 
 Writes `rules.json` beside this file: each set's title and rules; per code, per family its set,
-and per point the rules that fail (how often), the order rules among them that fail on stamped
-transport alone (`gates_in_order`), and those that do not apply or could not be checked; each
-reason once.  The site reads it (qccd/site/goal3.py); rerun after a sweep.
+and per point the rules that fail (how often) and those that do not apply or could not be
+checked; each reason once.  The site reads it (qccd/site/goal3.py); rerun after a sweep.
 """
 
 from __future__ import annotations
@@ -47,36 +46,6 @@ def compiled(code: str) -> list[dict]:
     return [r for r in seen.values() if r.get("T_ms") is not None]
 
 
-#: the rules that order a qubit's operations by the instructions that carry them out
-ORDER_RULES = ("R25", "R26")
-#: the instructions that act on a qubit's state; transport only moves the ion
-_GATES = ("gate1", "gate2", "measure", "reset")
-
-
-def gates_in_order(exe) -> bool:
-    """Whether every qubit's gate instructions keep the circuit's order (R25 read on them alone).
-    The rule language reads a circuit operation's span off every instruction the compiler stamped
-    with it, transport included, and the race-track pass stamps the split after a gate layer with
-    the whole layer: that split can end after a qubit's next gate starts though no gate moved.
-    An order rule that fails while this holds fails on stamping alone, and the page says so."""
-    first: dict = {}
-    last: dict = {}
-    for o in exe.ops:
-        if o.kind in _GATES:
-            for c in o.serves:
-                first[c] = min(first.get(c, o.start), o.start)
-                last[c] = max(last.get(c, o.end), o.end)
-    prev: dict = {}
-    for c in exe.circuit:
-        if c.index not in first:             # nothing acts on a qubit for it (a barrier)
-            continue
-        for q in c.qubits:
-            if q in prev and last[prev[q]] > first[c.index]:
-                return False
-            prev[q] = c.index
-    return True
-
-
 def judge(code: str, row: dict, roots: list[Path]) -> dict:
     """The point's program, from the first folder that replays to the row's time, judged by its
     family's set."""
@@ -101,10 +70,8 @@ def judge(code: str, row: dict, roots: list[Path]) -> dict:
             ends.append(f"{w}: {t_ms} ms")
             continue
         rep = check(rs, exe)
-        fails = {x.id: x.count for x in rep.results if x.verdict == FAILS}
-        return {"fails": fails,
-                "other": {x.id: [x.verdict, x.reason] for x in rep.results if x.verdict not in (HOLDS, FAILS)},
-                "stamped": sorted(r for r in fails if r in ORDER_RULES and gates_in_order(exe))}
+        return {"fails": {x.id: x.count for x in rep.results if x.verdict == FAILS},
+                "other": {x.id: [x.verdict, x.reason] for x in rep.results if x.verdict not in (HOLDS, FAILS)}}
     raise SystemExit(f"{code}/{row['point']}: no work folder replays to the row's {row['T_ms']} ms"
                      + (" (" + "; ".join(ends) + ")" if ends else ""))
 
@@ -137,8 +104,7 @@ def main() -> None:
                                                for k, x in v.items() if x}
                 bad = {k: n for k, n in v["fails"].items()}
                 print(f"{code} {row['family']} {row['point']}: {RULES[row['family']]}"
-                      + (f" fails {bad}" if bad else " holds")
-                      + (f" (stamped transport only: {v['stamped']})" if v["stamped"] else ""), flush=True)
+                      + (f" fails {bad}" if bad else " holds"), flush=True)
             doc["codes"][code] = {f: {"set": d["set"], "points": dict(sorted(d["points"].items()))}
                                   for f, d in sorted(fams.items())}
             OUT.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
