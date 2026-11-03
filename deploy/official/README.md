@@ -128,6 +128,49 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-03 17:47 UTC, `qccd-official:167c1cc`: release `bb144@2`, the BB
+[[144,12,12]] board as Bravyi et al.'s syndrome round. The commit, `167c1cc`, is pushed to
+`compiler` and `website/invitations`. The user chose the circuit ("Bravyi's circuit as
+published") and the scope ("Ship with what compiles"): the compiler keeps gate order, and for the
+BB code that order is the paper's.
+- `bb144@2` is one round of the depth-8 schedule of Fig. 5 of arXiv:2308.07915: one ancilla per
+  check (288 ions), its 864 CNOTs in the schedule's order, with bb144@1's physics, metrics and
+  limits. Digest `sha256:281e4384…`. Its starter is ring(146, 2, 144) with junction corners.
+- `bb144@1` still loads by id and keeps its (empty) board; `find_board("bb144")` now gives
+  `bb144@2`.
+- Also in the range, and not read by the grader: Goal 3 rejudged (`9ff9662`, `45f27c4`),
+  `qccd/site/goal3.py`.
+
+Built ON THE DROPLET from `qccd-official:7136b0c`, COPY only (`/root/qccd-167c1cc`). `qccd/`,
+`arch/` and `Compiler/bridge` are the git archive, and all 784 files equal the image's. Against
+7136b0c's image only the release `bb144@2` and `qccd/site/goal3.py` differ. The compose file is
+unchanged (grader 2g, 256 MB stack).
+
+Census before the switch (`census_167c1cc.sh`, 7136b0c's kit with the tags moved and the
+starter's grade added, about 29 minutes):
+- The rules stage over all 85 stored archives was identical in both images.
+- The declared-rules census gave 85/85 with the same scored device, rules verdict and metrics.
+- The evaluation census gave two lines, both the same archive: `os_5dc1303bbb7eb941` and its
+  re-upload `os_d71928ec40b693f0` (7136b0c's smoke), T_quantinuum 114.844 -> 109.072. This is the
+  census tool's known difference (above).
+- Goal 1, Goal 3 and all 31 boards were identical, and `bb144@2` was added. The C2LR reference
+  bundle graded as before.
+- The `bb144@2` starter graded eligible in 326.6 s under the grader's 2g and 256 MB stack:
+  T_jones 1,000.77 ms, 3,928 instructions, every stage passed.
+
+No production upload: the starter's grade above ran in this image under production's limits, and
+the board has no entries yet.
+
+The site got the rebuilt `board/bb144/`: 12 entry pages, the index and the manifest. The 29 old
+entry pages were removed, not redirected. Also deployed:
+- 17 pages built whole from `167c1cc`: the boards' release lists, the home page's count and Learn.
+- The Debug Open list's BB rows, swapped in place.
+- The search index embedded in 551 other pages, swapped in place.
+
+`rules/index.html` and `debug/qccd-py.zip` stay as 7136b0c deployed them; the first got the index
+swap only. The backup is `/root/qccd-site-backups/bb2-20261103T174801Z/`. Rollback is
+`*.bak-7136b0c`.
+
 **Deployed** 2026-11-03 17:13 UTC, `qccd-official:7136b0c`: the rule language no longer counts
 transport stamped with a circuit operation as carrying it out. The commit, `7136b0c`, is pushed to
 `compiler` and `website/invitations`. The user decided the reading ("Change the rule's reading")
