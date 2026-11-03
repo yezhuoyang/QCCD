@@ -12,6 +12,6 @@
  ],
  "regime": "",
  "n_qubits": 4,
- "compile_seconds": 0.09,
- "check_seconds": 2.3
+ "compile_seconds": 0.04,
+ "check_seconds": 1.4
 }

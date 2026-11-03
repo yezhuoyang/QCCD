@@ -1,11 +1,11 @@
 {
  "program": "circuit+cooling",
- "instructions": 13,
+ "instructions": 14,
  "arch": "race8",
  "model": "corrected",
- "total_cost": 2.0,
- "total_steps": 12,
- "runtime_us": 395.0,
+ "total_cost": 4.0,
+ "total_steps": 15,
+ "runtime_us": 855.0,
  "contacts": 1,
  "templates": {
   "class:shuttle": 2

@@ -12,6 +12,6 @@
  ],
  "regime": "broadcast-free",
  "n_qubits": 2,
- "compile_seconds": 0.03,
+ "compile_seconds": 0.05,
  "check_seconds": 1.4
 }

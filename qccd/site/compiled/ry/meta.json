@@ -13,6 +13,6 @@
  ],
  "regime": "conveyor",
  "n_qubits": 2,
- "compile_seconds": 0.03,
- "check_seconds": 1.3
+ "compile_seconds": 0.04,
+ "check_seconds": 1.6
 }

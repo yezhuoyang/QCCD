@@ -3,6 +3,7 @@
  "arch": "ring6d",
  "circuit_sha256": "bfebe9b4bc8e54c6606fdbdd414ab5c6e01ac48b5754de80eac7bf410a602189",
  "binding": "ok",
+ "transport": "ok",
  "o1_transport": "ok",
  "order": "ok",
  "lean": "accepted",

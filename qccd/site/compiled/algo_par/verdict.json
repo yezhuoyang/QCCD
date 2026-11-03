@@ -3,6 +3,7 @@
  "arch": "grid2x3",
  "circuit_sha256": "bf1b3b09e32c48494e2b37e14e44527f3505e1e831f3943e0909e06f4f1ef4d4",
  "binding": "ok",
+ "transport": "ok",
  "o1_transport": "ok",
  "order": "ok",
  "lean": "accepted",

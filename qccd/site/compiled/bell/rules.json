@@ -1,11 +1,11 @@
 {
  "program": "circuit+cooling",
- "instructions": 11,
+ "instructions": 12,
  "arch": "chain4",
  "model": "corrected",
- "total_cost": 1.0,
- "total_steps": 10,
- "runtime_us": 490.0,
+ "total_cost": 2.0,
+ "total_steps": 12,
+ "runtime_us": 870.0,
  "contacts": 1,
  "templates": {
   "class:shuttle": 1

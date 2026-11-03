@@ -3,6 +3,7 @@
  "arch": "chain4",
  "circuit_sha256": "a6c1803b8301e79ceba044278137397890d40a37eb2eaaa6057b8e96a49bdd00",
  "binding": "ok",
+ "transport": "ok",
  "o1_transport": "ok",
  "order": "ok",
  "lean": "accepted",

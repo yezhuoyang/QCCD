@@ -3,9 +3,9 @@
  "instructions": 26,
  "arch": "ring6d",
  "model": "corrected",
- "total_cost": 14.0,
- "total_steps": 29,
- "runtime_us": 1765.0,
+ "total_cost": 22.0,
+ "total_steps": 37,
+ "runtime_us": 2405.0,
  "contacts": 3,
  "templates": {
   "class:shuttle": 6

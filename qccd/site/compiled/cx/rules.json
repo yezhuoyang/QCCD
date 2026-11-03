@@ -3,9 +3,9 @@
  "instructions": 10,
  "arch": "grid2x3",
  "model": "corrected",
- "total_cost": 6.0,
- "total_steps": 11,
- "runtime_us": 855.0,
+ "total_cost": 8.0,
+ "total_steps": 13,
+ "runtime_us": 1015.0,
  "contacts": 1,
  "templates": {
   "class:shuttle": 2
