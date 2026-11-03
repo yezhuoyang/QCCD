@@ -1,0 +1,112 @@
+{
+ "allowed_transformations": [
+  "insert:cool"
+ ],
+ "circuit": {
+  "digest": "sha256:3e05df282c30579ec42c3d5909b75684bff39964542986ada6600f312b20c529",
+  "file": "circuit.qasm"
+ },
+ "description": "One syndrome round of the bivariate-bicycle [[144,12,12]] code in Bravyi et al.'s depth-8 schedule (Fig. 5 of arXiv:2308.07915): one ancilla per check, so 144 data ions and 144 check ions, and 864 two-qubit gates in the schedule's order, which a programme keeps.",
+ "design_variables": [
+  "geometry",
+  "zone_types",
+  "control",
+  "name",
+  "description"
+ ],
+ "evaluator": {
+  "contract": "1",
+  "name": "qccd-reference-evaluator"
+ },
+ "kind": "qccd.task_release",
+ "limits": {
+  "compile_timeout_s": 1800,
+  "lean_timeout_s": 3600,
+  "max_bundle_bytes": 67108864,
+  "max_instructions": 500000,
+  "max_nodes": 2000
+ },
+ "metrics": [
+  {
+   "about": "replayed round time under corrected_model('qccdsim_jones')",
+   "better": "low",
+   "name": "T_jones",
+   "unit": "ms"
+  },
+  {
+   "about": "replayed round time under corrected_model('transport_excitation')",
+   "better": "low",
+   "name": "T_transport",
+   "unit": "ms"
+  },
+  {
+   "about": "hardware instructions in the final program",
+   "better": "low",
+   "name": "instructions",
+   "unit": "count"
+  },
+  {
+   "about": "qccd.cost.hardware.hardware_report(arch).dacs",
+   "better": "low",
+   "name": "dacs",
+   "unit": "count"
+  },
+  {
+   "about": "mean ions moved per simd instruction",
+   "better": "high",
+   "name": "ions_per_instruction",
+   "unit": "ions"
+  }
+ ],
+ "numerical_policy": {
+  "compare": "rel_or_abs",
+  "float_abs_tol": 1e-12,
+  "float_rel_tol": 1e-09,
+  "time_unit": "ms"
+ },
+ "order": 1,
+ "physics": {
+  "digest": "sha256:648f3c29e2a5d4d475abb86b19529bf17659acbc22c8781a543cb0fcf34c8ec5",
+  "file": "physics.json",
+  "fixed_blocks": [
+   "primitives",
+   "heating",
+   "species",
+   "budget"
+  ],
+  "model": "corrected",
+  "rank_table": "qccdsim_jones",
+  "tables": [
+   "qccdsim_jones",
+   "transport_excitation"
+  ]
+ },
+ "rank_by": "T_jones",
+ "release": "2",
+ "required_checks": [
+  "bundle",
+  "device",
+  "physics_lock",
+  "program",
+  "rules",
+  "certificate_binding",
+  "lean_certificate",
+  "semantics",
+  "correspondence",
+  "metrics"
+ ],
+ "starter": {
+  "generator": "ring",
+  "name": "ring146_144d_j",
+  "params": {
+   "corners": "junction",
+   "height": 2,
+   "verticals": 144,
+   "width": 146
+  }
+ },
+ "task": "bb144",
+ "title": "BB [[144,12,12]], Bravyi's schedule",
+ "track": "codesign-artifact",
+ "version": 1
+}

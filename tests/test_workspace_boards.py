@@ -44,10 +44,11 @@ def _wait(ws, jid, timeout=900):
 
 def test_the_boards_are_the_websites_leaderboards_found_by_their_names():
     titles = [b.title for b in list_boards()]
-    assert titles[:5] == ["BB [[144,12,12]]", "Repetition code, distance 9", "Five-qubit code [[5,1,3]]",
-                          "Steane code [[7,1,3]]", "Surface code, distance 3 (17 qubits)"]
-    assert find_board("bb").title == "BB [[144,12,12]]" and find_board("Surface code").manifest["task"] == "surface17"
-    assert find_board("steane").title == "Steane code [[7,1,3]]" and find_board("BB [[144,12,12]]").id == "bb144@1"
+    assert titles[:5] == ["BB [[144,12,12]], Bravyi's schedule", "Repetition code, distance 9",
+                          "Five-qubit code [[5,1,3]]", "Steane code [[7,1,3]]", "Surface code, distance 3 (17 qubits)"]
+    assert find_board("bb").title == "BB [[144,12,12]], Bravyi's schedule"
+    assert find_board("Surface code").manifest["task"] == "surface17"
+    assert find_board("steane").title == "Steane code [[7,1,3]]" and find_board("BB [[144,12,12]]").id == "bb144@2"
     with pytest.raises(ReleaseError, match="could be"):
         find_board("code")                                              # four boards say "code"
     with pytest.raises(ReleaseError, match="the boards are"):
@@ -62,7 +63,7 @@ def test_a_workspace_needs_no_board_and_designs_have_the_names_people_give_them(
     lock = json.loads((tmp_path / "ws" / "qccd.lock.json").read_text(encoding="utf-8"))
     assert lock["version"] == 2 and "task" not in lock
     ctx = ws.context(AGENT)
-    assert [b["title"] for b in ctx["boards"]][0] == "BB [[144,12,12]]" and "task" not in ctx
+    assert [b["title"] for b in ctx["boards"]][0] == "BB [[144,12,12]], Bravyi's schedule" and "task" not in ctx
     assert ctx["design_title"] == "Main design" and ctx["designs"][0]["name"] == "Main design"
     d = ws.create_candidate(ME, title="Big triangle + small triangle")
     assert d["title"] == "Big triangle + small triangle" and d["name"].startswith("cand/d")

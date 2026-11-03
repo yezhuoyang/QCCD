@@ -1,11 +1,16 @@
-"""Every result of the BB codesign study, as clickable studio pages.
+"""The BB board: every design that runs the board's round, as clickable studio pages.
 
-The findings under `Codesign/findings/q06*` are prose over numbers.  This puts each
-number where a person can click on it: one `qccd studio` page per design, opened on the
-verified programme with its circuit beside it, so every instruction the study counted can
-be stepped, its cost read, its rule verdict seen, and the QASM statement it discharges
-found.  An index page carries the study's claims, and every claim links to the page and
-the STEP where it is visible.
+Since 2026-11-02 the board is release bb144@2: Bravyi et al.'s syndrome round (one ancilla
+per check, 288 ions, the depth-8 schedule of Fig. 5 of arXiv:2308.07915), compiled from the
+release's circuit by the released qccdc, which keeps every qubit's gates in the circuit's
+order.  Until then it held the q06 codesign study's 29 designs, all compiled from 24-ancilla
+variants of the round; those programmes no longer run the board's circuit, so they left it
+(the git history has them).  Shapes the compiler does not serve yet are listed as refusals.
+
+One `qccd studio` page per design, opened on the verified programme with its circuit
+beside it, so every instruction can be stepped, its cost read, its rule verdict seen, and
+the QASM statement it discharges found.  An index page carries each design's claim, and
+every claim links to the page and the STEP where it is visible.
 
     python Codesign/scripts/bb_studio.py -o BBResults/studio
 
@@ -51,357 +56,195 @@ DATA = ROOT / "Codesign" / "data"
 BRIDGE = ROOT / "Compiler" / "bridge"
 #: every compiled entry's R10 verdict, keyed by a digest of the bytes the check read
 R10_CACHE = DATA / "bb_r10.json"
-STRIDE_QASM = BUILD / "q06" / "ring144_24v_a24_stride.qasm"
-
-#: what every q06g ring entry now says about its control plane (2026-10-23)
-SWITCHED = ("It has per-site two-way switches, the deck's: each site follows the motion bank or "
-            "the hold bank of the 32 broadcast channels, so it pays 1 select bit per site per "
-            "transport cycle. The switchless declaration it was compiled for was dropped on "
-            "2026-10-23: R4d's hold clause refuses it, because a switchless channel cannot hold a "
-            "docked ion while it moves the loop.")
-#: what every direct-wired entry compiled under control.model simd_classes says (2026-10-23)
-ONE_WAVEFORM = ("It runs under the one-waveform model (control.model simd_classes: one motion a "
-                "cycle, the R22 split) on direct wiring, so its time is an upper bound for a direct "
-                "machine.")
+#: the board's programmes since 2026-11-02 (bb144@2): `<key>.arch.json` is the device as a
+#: design is entered on the release (`qccd.workspace.tasks.board_device`), `<key>.qasm` the
+#: release's circuit, `<key>.tsir.json`/`.qcert.json`/`.stages.json` what qccdc wrote, and
+#: `<key>.cooled.tsir.json` that programme with cooling inserted (`insert_cooling.py --table
+#: qccdsim_jones`, the release's one allowed transformation); `<key>.compile.json` records the
+#: modes tried, exit codes, seconds and the compiler's sha256, `<key>.<mode>.log` its output
+BB2 = BUILD / "bb2"
+#: the released compiler every entry of the board was compiled with
+QCCDC = "cd3efedbbc10"
+#: what a refused device's compile was given: the release's own limit
+TIME_LIMIT = "30 minutes (the release's compile_timeout_s, 1800 s)"
+#: the words for qccdc's engines, as `<prefix>.stages.json` names them
+ENGINE_WORDS = {"rotate": "rigid rotation (qccdc rotate)",
+                "general": "the general router (qccdc compile)",
+                "general-split": "the general router with split rounds (qccdc compile's fallback: "
+                                 "an unroutable round runs in halves, the rest deferred)",
+                "racetrack": "the race track (qccdc compile's fallback)"}
 
 # --------------------------------------------------------------------------- catalogue
 
-#: One entry per design the study drew a conclusion from.  `prefix` names a compiled
-#: programme (`<prefix>.cooled.tsir.json`, `.qcert.json`, and `.qasm` beside it unless
-#: `qasm` overrides); an entry with no prefix is a device the compiler could not serve,
-#: and gets a page of the device alone with the refusal as its lede.
+#: One entry per design on the board.  `prefix` names a compiled programme
+#: (`<prefix>.cooled.tsir.json`, `.qcert.json`, and `.qasm` beside it unless `qasm` overrides);
+#: an entry with no prefix is a device the compiler could not serve, and gets a page of the
+#: device alone with the refusal as its lede: the compiler's own words and the time it had.
 #: `"draft": True` keeps an entry off the board (pages, manifest, index) unless `--drafts`.
-#: Publishing one is a decision, not a side effect of a rebuild: the eight entries 13 and
-#: 20-29 were drafts until the user published them on 2026-10-20.
-#: `"recompiled"`: the programme on disk is not the study's but a later compile (the study's
-#: is beside it as `<prefix>.pre_order.*`); its facts are the compile's, and every number
-#: that depends on the programme is computed from it rather than read from the study's data.
+#:
+#: SINCE 2026-11-02 THE BOARD IS RELEASE bb144@2 (the user: "for BBCode, we should use the order
+#: designed by Bravyi", then "Ship with what compiles").  Every compiled entry was compiled from
+#: the release's circuit (`<prefix>.qasm`, a copy of qccd/workspace/releases/bb144@2/circuit.qasm)
+#: by the released qccdc cd3efedbbc10 as the workspace's compile job runs it -- `rotate` first on a
+#: device with a closed loop, else `compile`, with no options -- and cooled by insert_cooling.py at
+#: the rank table.  On the release's starter that gives the job's own cooled programme instruction
+#: for instruction (the same cools in the same places, 1,000.77 ms / 1,043.67 ms replayed both
+#: ways).  The devices are `qccd.workspace.tasks.board_device` of a template plus a generator: the
+#: release's physics, the template's zones and control.  Which engine wrote each programme and
+#: whether it keeps the circuit's order are read off its files (`_engine_and_order`), not typed.
+#: The 29 entries before (the q06 study, compiled from 24-ancilla variants of bb144@1's round)
+#: are in the git history with their claims.
 CATALOG: tuple[dict, ...] = (
-    # 01-08 and 17 are JUNCTION-CORNER TWINS since 2026-11-01 (Ke Sun: a square trap's corners
-    # are junctions, the traps stand only on the sides).  Each replaces the corner-trap entry
-    # of the same key: `ring(W, H, V, dock_offset=o)` -> `ring(W + 2, H, V, dock_offset=o,
-    # corners="junction")`, the same slot count, dock count and slot index of every dock, so
-    # the same schedule and the same circuit; compiled with the original's settings by
-    # `q06_campaign.point` and the released qccdc cd3efedbbc10 (which reproduces every
-    # corner-trap original instruction for instruction).  02-08's schedules come from
-    # bb_schedule.py with the September binder (each check's contacts in arrival order, as
-    # the originals'), counting loop slots, not nodes; today's qccd/compile/order.py serves
-    # members in code order since 4cda6db and does not reproduce them.  The twins' files are under
-    # `Compiler/build/q06jc`; the originals stay where they were.  The corner-trap clips
-    # (BBResults/01..08_*.gif) are not linked from the twins: they show the old devices.
-    {"key": "01_baseline_stride", "family": "ring + docks",
-     "title": "ring(74, 2, 24) with junction corners (ring144_24v's twin), stride layout",
-     "arch": BUILD / "q06jc" / "ring144_24v_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring144_24v_jc_a24_stride",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring144_24v, with the q06 stride settings"},
-     "claim": "the study's starting point, on ring144_24v's junction-corner twin: its four "
-              "corners are junctions that a rotation carries ions round, the traps stand only on "
-              "the sides, and it keeps 144 slots and 24 docks. The rotation pass lays riders out "
-              "by stride, with a compiler that keeps every qubit's gates in order: 824 batches of "
-              "1.05 contacts each, which is why it takes 1.49 s. The study's first compile, on the "
-              "corner-trap original, came from a compiler that reordered a qubit's gates, which "
-              "the checker now refuses."},
-    {"key": "02_shipped_ring_code_aware", "family": "ring + docks",
-     "title": "ring(74, 2, 24) with junction corners (ring144_24v's twin), code-aware schedule",
-     "arch": BUILD / "q06jc" / "ring144_24v_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring144_24v_jc_a24_bridge_structured_xz",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring144_24v, with the q06 code-aware settings"},
-     "claim": "the same junction-corner device and circuit with the code-aware placer and binder: "
-              "55 batches instead of the stride layout's 824, 72.5 ms instead of 1.49 s. "
-              "The compilation axis alone is 20x."},
-    # 03-08: the q06g rings' junction twins, each on the SWITCHED device (`<name>_jc.arch.json`
-    # beside `<name>_jc_noswitch.arch.json`: the same file with control.channels.switch_per_site
-    # false, which `q06_campaign.point` writes).  The programmes are compiled for the
-    # switchless declaration, with --dock-all, as their originals were; R4d's hold clause
-    # refuses them there, so the board judges them on the switched device.
-    {"key": "03_h3_v24_192", "family": "ring + docks",
-     "title": "ring(97, 3, 24) with junction corners, 192 slots, 24 ancillas, per-site switches",
-     "arch": BUILD / "q06jc" / "ring192_h3_v24_o2_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring192_h3_v24_o2_jc_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(95, 3, 24), with the q06g settings"},
-     "claim": "24 docks on a loop of height 3 whose corners are junctions: 66 batches, 87.5 ms. "
-              + SWITCHED + " Not buildable by today's DRC: 102 of 216 sites get fewer than the 3 "
-              "control-electrode pairs the technology requires (the 24 docks, the 24 rail sites "
-              "they hang off, and 54 more); its corner-trap original was the study's first "
-              "buildable answer before that rule."},
-    {"key": "04_h4_v24_216", "family": "ring + docks",
-     "title": "ring(108, 4, 24) with junction corners, 216 slots, 24 ancillas, per-site switches",
-     "arch": BUILD / "q06jc" / "ring216_h4_v24_o2_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring216_h4_v24_o2_jc_noswitch_a24_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(106, 4, 24), with the q06g settings"},
-     "claim": "height 4, junction corners: 55 batches, 71.5 ms. " + SWITCHED + " The docks and "
-              "the rail sites they hang off get their 3 control-electrode pairs here; 52 plain rail "
-              "sites do not, so today's DRC still fails it -- the fewest short sites of any ring on "
-              "the board."},
-    {"key": "05_h3_v36_288_ANSWER", "family": "ring + docks", "answer": True,
-     "title": "ring(145, 3, 36) with junction corners, 288 slots, 36 ancillas, per-site switches "
-              "-- the recommended design",
-     "arch": BUILD / "q06jc" / "ring288_h3_v36_o2_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring288_h3_v36_o2_jc_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(143, 3, 36), with the q06g settings"},
-     "claim": "46 batches, 341 hops, 56.5 ms, R10 passed: the proved Lean checker and the tableau. "
-              "Its four corners are junctions, passed by every rotation and never stopped on, so "
-              "the traps stand only on the sides. Its rotation schedule is within 10.7% of its "
-              "lower bound; its batches are 52% full. "
-              + SWITCHED + " That is 324 select bits a cycle, 32.4 Mbit/s at its shortest transport "
-              "cycle, 10 us; the 32 broadcast DACs are exactly the motion bank and the hold bank "
-              "(58 with the shims). The shims cost time: 17.1 ms a round through the 1:100 "
-              "demultiplexer (WISE, once per reconfiguration), 2.7 ms at 1:16 with 162 shim DACs. "
-              "Not buildable by today's DRC: 150 of 324 sites are short of 3 control-electrode "
-              "pairs (the 36 docks, the 36 rail sites they hang off, and 78 more)."},
-    {"key": "06_h5_v36_360", "family": "ring + docks",
-     "title": "ring(179, 5, 36) with junction corners, 360 slots, 36 ancillas, per-site switches",
-     "arch": BUILD / "q06jc" / "ring360_h5_v36_o2_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring360_h5_v36_o2_jc_noswitch_a36_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(177, 5, 36), with the q06g settings"},
-     "claim": "the same 36 ancillas on a taller, longer loop, junction corners again: the same "
-              "clock (56.9 ms) for twice the die (71.5 mm2). " + SWITCHED + " Height 5 gives the "
-              "docks their electrode pairs; 76 rail sites still fall short, so today's DRC fails it."},
-    {"key": "07_h3_v48_384", "family": "ring + docks",
-     "title": "ring(193, 3, 48) with junction corners, 384 slots, 48 ancillas, per-site switches",
-     "arch": BUILD / "q06jc" / "ring384_h3_v48_o2_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring384_h3_v48_o2_jc_noswitch_a48_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(191, 3, 48), with the q06g settings"},
-     "claim": "48 docks lose to 36, junction corners on both: 48 does not divide the placement's "
-              "period, and the schedule sits 43% above its rotation bound where 36 sits at 11%. "
-              + SWITCHED + " Not buildable by today's DRC: 198 of 432 sites are short of "
-              "control-electrode pairs."},
-    {"key": "08_h4_v72_360_unbuildable", "family": "ring + docks",
-     "title": "ring(180, 4, 72) with junction corners, 360 slots, 72 ancillas, per-site switches "
-              "-- NOT buildable",
-     "arch": BUILD / "q06jc" / "ring360_h4_v72_o0_jc.arch.json",
-     "prefix": BUILD / "q06jc" / "ring360_h4_v72_o0_jc_noswitch_a72_bridge_structured_xz_dockall_transport-fastest",
-     "compiled": {"compiler": "cd3efedbbc10", "date": "2026-11-01",
-                  "note": "junction-corner twin of ring(178, 4, 72), with the q06g settings"},
-     "claim": "the model's optimum, with junction corners: 19 batches, 25.8 ms, 2.2x faster than "
-              "05. " + SWITCHED + " Not buildable: today's DRC finds 144 of 432 sites short of 3 "
-              "control-electrode pairs, and 16 RF-to-DC clearance and 16 overlap findings around "
-              "the two docks that sit beside a corner junction (the study's builder found "
-              "minimum-gap violations on the corner-trap original; today's finds none on either)."},
-    # 09-11: real direct machines -- the q06h lattices with control.model "direct", compiled
-    # by the released qccdc with the q06h recipe (a bare `compile`, insert_cooling, check_tsir
-    # --model corrected).  Until 2026-10-23 these rows showed the one-waveform programme
-    # (control.model simd_classes) on a direct-wired device, which is not a direct comparator;
-    # that programme is entry 12's.
-    {"key": "09_grid13x13", "family": "lattice",
-     "title": "grid13x13, 312 traps, direct wiring and direct control",
-     "arch": BUILD / "q06h" / "grid13x13_direct.arch.json",
-     "prefix": BUILD / "q06h" / "grid13x13_direct_bb", "qasm": STRIDE_QASM,
-     "compiled": {"compiler": "b4a003dbb4ae", "date": "2026-10-23", "note": "control.model direct"},
-     "claim": "a real direct machine: grid13x13 with control.model 'direct', so a cycle may play "
-              "several waveforms. It does in most: 930 of 1,319 transport cycles move ions in two "
-              "to eight directions at once (up to 10 distinct motions, 11 waveforms with the "
-              "hold), and the round takes 405.6 ms at 4.8 ions per instruction -- against 866.1 ms "
-              "for the same lattice told to play one waveform a cycle (12). Every site has channels "
-              "of its own: no select bits, and 12,480 DACs, over the task's 128."},
-    {"key": "10_grid11x11", "family": "lattice",
-     "title": "grid11x11, 220 traps, direct control, as drawn -- no control electrodes survive",
-     "arch": BUILD / "q06h" / "grid11x11_direct.arch.json",
-     "prefix": BUILD / "q06h" / "grid11x11_direct_bb", "qasm": STRIDE_QASM,
-     "compiled": {"compiler": "b4a003dbb4ae", "date": "2026-10-23", "note": "control.model direct"},
-     "claim": "the fastest lattice, as a direct machine: 376.7 ms at 4.95 ions per instruction, "
-              "883 of 1,208 cycles moving ions in two to eight directions at once. And a die with "
-              "zero control electrodes: every trap is 112.5 um from two junctions whose keep-outs "
-              "reach 180 um. 8,800 DACs."},
-    {"key": "11_grid11x11_s2_buildable", "family": "lattice",
-     "title": "grid11x11 at junction pitch 2, direct control -- the same programme",
-     "arch": BUILD / "q06h" / "grid11x11_s2_direct.arch.json",
-     "prefix": BUILD / "q06h" / "grid11x11_direct_bb", "qasm": STRIDE_QASM,
-     "compiled": {"compiler": "b4a003dbb4ae", "date": "2026-10-23",
-                  "note": "control.model direct, on grid11x11_direct; compiled on this device it is the same instruction list"},
-     "claim": "node-for-node the same graph as 10, pulled apart so its traps clear the keep-outs: "
-              "the same programme (compiling it here gives the identical instruction list), the "
-              "same 376.7 ms and 25 rules, 35.6 mm2 instead of 9.4. Still not buildable by today's "
-              "DRC: 110 traps get no control-electrode pair and the other 110 get 2 of the 3 required."},
-    {"key": "12_grid13x13_broadcast", "family": "lattice",
-     "title": "grid13x13 with the 32-channel broadcast block", "gif": "09_grid13x13.gif",
-     "arch": BUILD / "q06h" / "grid13x13_bcast.arch.json",
-     "prefix": BUILD / "q06h" / "grid13x13_bcast_bb", "qasm": STRIDE_QASM,
-     "claim": "the one-waveform programme (one motion a cycle, the R22 split: 3,007 transport "
-              "cycles at 2.68 ions each) on the deck's broadcast block with per-site switches: 57 "
-              "DACs and 866.1 ms, against the direct machine's 405.6 ms at 12,480 DACs (09). The 32 "
-              "channels are two banks of 16, a motion and the hold, chosen by 1 select bit per site "
-              "per cycle, so the direct programme does not run here: it fails R4 (up to 10 motions "
-              "against 2 channel sets) and R22. Its shims cost 47.4 ms a round at 1:100, 7.6 ms at 1:16."},
-    {"key": "13_dual144_c24_R2", "family": "two loops",
-     "title": "dual144, two concentric loops joined at 24 couplings -- fails R2",
-     "arch": BUILD / "q06f" / "dual144_c24.arch.json",
-     "prefix": BUILD / "q06f" / "dual144_c24_a24_bridge_structured_xz",
-     "recompiled": {"compiler": "f88754a2fa71", "date": "2026-10-20", "batches": 183,
-                    "hops": 335, "rotations": 182},
-     "claim": "compiles, then fails R2: a coupled ancilla site is degree 3, and a junction "
-              "may hold one ion. It cannot both house an ancilla and receive a rider."},
-    # q06j: the code's own torus, and the planar grid at the same ancilla count
-    {"key": "20_torus12_own_a72", "family": "torus",
-     "title": "torus 12x12, 288 traps, 72 ancillas -- the code's own shape",
-     "arch": BUILD / "q06j" / "torus12x12.arch.json",
-     "prefix": BUILD / "q06j" / "torus12_own_a72_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06j": "torus12_own_a72",
-     "claim": "a periodic lattice, every row and column a closed loop, with one ancilla per "
-              "check pair: 516.4 ms at 3.79 ions per instruction, against the planar grid's 648.1 "
-              "at 72 ancillas (22) and 869.9 at 24 (23). The wrap is worth 1.25x, the ancillas "
-              "1.34x. " + ONE_WAVEFORM + " The study's 97 ms was this programme before the R22 "
-              "split, several motions a cycle."},
-    {"key": "21_torus12_code_a72", "family": "torus",
-     "title": "torus 12x12 with the code-aware placement, 72 ancillas",
-     "arch": BUILD / "q06j" / "torus12x12.arch.json",
-     "prefix": BUILD / "q06j" / "torus12_code_a72_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06j": "torus12_code_a72",
-     "claim": "the code's cell (i, j) laid at columns i, rows 2j and 2j+1 via --init-placement: "
-              "462.8 ms at 4.54 ions per instruction, 1.12x the compiler's own placement (20, "
-              "516.4 ms). " + ONE_WAVEFORM + " Before the R22 split the two placements tied "
-              "(the study's 99 and 97 ms)."},
-    {"key": "22_planar12_own_a72", "family": "lattice",
-     "title": "grid12x12, 264 traps, 72 ancillas",
-     "arch": BUILD / "q06j" / "grid12x12.arch.json",
-     "prefix": BUILD / "q06j" / "planar12_own_a72_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06j": "planar12_own_a72",
-     "claim": "the same planar grid as q06h's lattices with 72 ancillas instead of 24: 648.1 ms "
-              "instead of 869.9 (23), 1.34x. The lattice family's 24-ancilla numbers were "
-              "ancilla-starved. " + ONE_WAVEFORM},
-    {"key": "23_planar12_own_a24", "family": "lattice",
-     "title": "grid12x12, 264 traps, 24 ancillas",
-     "arch": BUILD / "q06j" / "grid12x12.arch.json",
-     "prefix": BUILD / "q06j" / "planar12_own_a24_bb", "qasm": BUILD / "q06j" / "bb144_a24.qasm",
-     "q06j": "planar12_own_a24",
-     "claim": "the control for the ancilla count: the q06h tier, 869.9 ms at 2.62 ions per "
-              "instruction -- level with grid13x13 under the same model (12, 866.1 ms). " + ONE_WAVEFORM},
-    # q06k: the torus drawn as a chip -- concentric rings with spokes
-    {"key": "24_cylinder12_own_a72", "family": "torus",
-     "title": "cylinder 12x12 -- twelve concentric rings joined by spokes, 72 ancillas",
-     "arch": BUILD / "q06j" / "cylinder12x12.arch.json",
-     "prefix": BUILD / "q06j" / "cylinder12_own_a72_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06j": "cylinder12_own_a72",
-     "claim": "the torus drawn as a chip with no crossings: each row a closed ring, the columns "
-              "radial spokes. Under one waveform a cycle it is the slowest of the lattices that "
-              "pass every rule: 1,254.2 ms at 1.08 ions per instruction, against the torus's "
-              "516.4 and the planar grid's 648.1. " + ONE_WAVEFORM + " The study's 106 ms, which "
-              "kept most of the torus's speed, was the programme before the R22 split."},
-    {"key": "25_annulus12_own_a72", "family": "torus",
-     "title": "annulus 12x12 -- the cylinder plus the y-wrap through 120 crossings, 72 ancillas",
-     "arch": BUILD / "q06j" / "annulus12x12.arch.json",
-     "prefix": BUILD / "q06j" / "annulus12_own_a72_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06j": "annulus12_own_a72",
-     "claim": "a true torus on a plane needs 120 crossings, and every one lands on a ring "
-              "wire, so the x-hops pay for the y-wrap: 1,489.5 ms, the slowest compiled lattice "
-              "on the board. The wrap is not worth its crossings. " + ONE_WAVEFORM},
-    # q06l: weird graphs -- random, rewired, and the Tanner graph as a device
-    {"key": "26_rewired_p0.1", "family": "random graph",
-     "title": "torus 12x12 with 10% of its wires rewired at random, 72 ancillas",
-     "arch": BUILD / "q06l" / "rewired_p0.1.arch.json",
-     "prefix": BUILD / "q06l" / "rewired_p0.1_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06l": "rewired_p0.1",
-     "claim": "28 random swaps take the torus from diameter 12 to 8, and under one waveform a "
-              "cycle the shorter distances do not pay: the round goes from 516.4 to 1,125.5 ms, "
-              "one ion per transport instruction. Not drawable: every shortcut would be "
-              "crossings on a chip. " + ONE_WAVEFORM + " Before the R22 split it was 82 ms."},
-    {"key": "27_regular4", "family": "random graph",
-     "title": "a random 4-regular graph on 144 junctions, 72 ancillas",
-     "arch": BUILD / "q06l" / "regular4.arch.json",
-     "prefix": BUILD / "q06l" / "regular4_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06l": "regular4",
-     "claim": "the torus's degrees with none of its geometry: diameter 6, 1,036.1 ms at one ion "
-              "per transport instruction. An expander beats every lattice on distance and has "
-              "hundreds of crossings in practice. " + ONE_WAVEFORM},
-    {"key": "28_tanner_own", "family": "random graph",
-     "title": "the code's Tanner graph as the machine -- every contact one hop, 72 ancillas",
-     "arch": BUILD / "q06l" / "tanner_own.arch.json",
-     "prefix": BUILD / "q06l" / "tanner_own_bb", "qasm": BUILD / "q06j" / "bb144_a72.qasm",
-     "q06l": "tanner_own",
-     "claim": "a hub per check and per data qubit, a contact trap on each of the 864 Tanner "
-              "edges: no device makes the contacts shorter. 856.5 ms at one ion per transport "
-              "instruction -- under the random graphs (1,036 and 1,126 ms), over the torus "
-              "(516.4). " + ONE_WAVEFORM + " Before the R22 split it was 79.5 ms."},
-    {"key": "29_geometric", "family": "random graph",
-     "title": "a random geometric graph: 139 points joined within a radius, mean degree 6",
-     "arch": BUILD / "q06l" / "geometric.arch.json",
-     "refusal": "unroutable: q145 cannot reach T150 from T316 within 40 cycles. Dead ends "
-                "(four degree-1 vertices), diameter 25.",
-     "claim": "random AND local, the way a die is: the worst of both. Locality without "
-              "structure does not route."},
-    # devices the compiler could not serve: the page shows the shape and carries the
-    # refusal, because the shape IS the finding
-    {"key": "14_racetrack240", "family": "junction-free loop",
-     "title": "racetrack240: a closed loop, no junctions, no docks",
-     "arch": BUILD / "q06i" / "racetrack240.arch.json",
-     "refusal": "rotation does not apply: the device has no closed loop with docks; then "
-                "unroutable: q150 cannot reach S76 from S176 within 248 cycles. 70% occupancy.",
-     "claim": "the cheapest transport in the study, unusable: rigid rotation preserves "
-              "cyclic order so two riders never meet, and a loop has one route."},
-    {"key": "15_racetrack480", "family": "junction-free loop",
-     "title": "racetrack480: the same loop at 35% occupancy",
-     "arch": BUILD / "q06i" / "racetrack480.arch.json",
-     "refusal": "did not finish in 30 minutes. 312 of 480 slots empty.",
-     "claim": "free space is not the constraint: a lattice routes at 76% occupancy, this "
-              "loop cannot at 35%."},
-    {"key": "16_chain400", "family": "line",
-     "title": "chain400: a line of 400 traps",
-     "arch": BUILD / "q06i" / "chain400.arch.json",
-     "refusal": "unroutable: q156 cannot reach C202 from C233 within 806 cycles. 42% occupancy.",
-     "claim": "a line has no closed loop for rotation and one route for the router."},
-    # 17: the junction twin of q06i's dual240_c0 (dual_loop(120) -> dual_loop(122,
-    # corners="junction"), still 240 slots a loop), put through the q06i recipe -- a bare
-    # `qccdc compile` of the 24-ancilla round -- with the released cd3efedbbc10, which does not
-    # finish in 30 minutes on the twin or on the corner-trap original either.
-    {"key": "17_dual240_c0", "family": "two loops",
-     "title": "dual240 with junction corners and no couplings",
-     "arch": BUILD / "q06jc" / "dual240_c0_jc.arch.json",
-     "refusal": "did not finish in 30 minutes (qccdc cd3efedbbc10). 168 ions on 480 traps, "
-                "35% occupancy. The study's compiler refused the corner-trap original as "
-                "unroutable.",
-     "claim": "uncoupled, the data loop and the ancilla loop can never interact, junction "
-              "corners or not: two loops of 240 slots, each turning past four corner junctions."},
-    {"key": "18_ladder144_r12", "family": "rails + highways",
-     "title": "ladder144: 12 rails and highways, 576 sites",
-     "arch": BUILD / "q06h" / "ladder144_r12.arch.json",
-     "refusal": "did not finish in 20 minutes. 29% occupancy.",
-     "claim": "open rails are not a closed loop, so rotation does not apply; the router "
-              "did not finish."},
-    {"key": "19_grid9x9", "family": "lattice",
-     "title": "grid9x9: 144 traps for 168 qubits",
-     "arch": BUILD / "q06h" / "grid9x9.arch.json",
-     "refusal": "unroutable: 117% occupancy, no free destination. The device q01b's "
-                "'8 of 9 cannot compile' was true of.",
-     "claim": "genuinely too small -- the one lattice verdict that was right."},
+    # one dock per check: every check ion parks in a dock, the data ions ride the loop and
+    # rigid rotation brings each to its checks in the schedule's order (qccdc rotate)
+    {"key": "ring146_h2_d144", "family": "ring + docks",
+     "title": "ring(146, 2, 144) with junction corners: a dock for every check -- the release's starter",
+     "arch": BB2 / "ring146_h2_d144.arch.json", "prefix": BB2 / "ring146_h2_d144",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
+     "claim": ("The release's starter. Each of the 144 check ions waits in a dock of its own, and the "
+               "144 data ions ride a loop of 288 slots, one in every second slot. Rigid rotation turns "
+               "the whole loop to bring each data ion past its checks' docks in the schedule's order: "
+               "411 rotations, 11,640 hops, and 864 contacts in 411 batches -- about two a batch, "
+               "since each check takes its CNOTs one at a time, in the schedule's order. The heating model "
+               "asks for 411 cools. It is the programme the workspace's compile job writes for the "
+               "starter, instruction for instruction.")},
+    {"key": "ring145_h3_d144", "family": "ring + docks",
+     "title": "ring(145, 3, 144) with junction corners: the same 288-slot loop and 144 docks, height 3",
+     "arch": BB2 / "ring145_h3_d144.arch.json", "prefix": BB2 / "ring145_h3_d144",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
+     "claim": ("The same loop of 288 slots and the same 144 docks, drawn on a rectangle of height 3. The "
+               "compiler writes the same programme as for ring(146, 2, 144), instruction for instruction "
+               "and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the device: "
+               "where its corners turn, and its die.")},
+    {"key": "ring144_h4_d144", "family": "ring + docks",
+     "title": "ring(144, 4, 144) with junction corners: the same 288-slot loop and 144 docks, height 4",
+     "arch": BB2 / "ring144_h4_d144.arch.json", "prefix": BB2 / "ring144_h4_d144",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
+     "claim": ("The same loop and docks again, on a rectangle of height 4: once more the same programme, "
+               "instruction for instruction and cool for cool, on a different device. Drawn at height 4, "
+               "some dock rails cross without a junction (V100 and V142 among them), so "
+               "R21 refuses the device and it is listed under Disqualified, never ranked.")},
+    {"key": "ring218_h2_d144", "family": "ring + docks",
+     "title": "ring(218, 2, 144) with junction corners: a roomier loop of 432 slots, 144 docks",
+     "arch": BB2 / "ring218_h2_d144.arch.json", "prefix": BB2 / "ring218_h2_d144",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
+     "claim": ("A roomier loop: 432 slots for the same 144 docks, so the data ions ride every third slot. "
+               "The schedule keeps its 411 batches, but each rotation has farther to go: 18,885 hops "
+               "instead of 11,640.")},
+    # dock-free loops that gate on the loop itself, on the Cyclone template (4-ion traps):
+    # rotation needs docks and refuses, so `compile` runs
+    {"key": "cyc148_h2", "family": "loop without docks",
+     "title": "ring(148, 2, 0) with junction corners: 292 traps of up to 4 ions, no docks",
+     "arch": BB2 / "cyc148_h2.arch.json", "prefix": BB2 / "cyc148_h2",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc compile, then insert_cooling"},
+     "claim": ("No docks: one loop of 292 traps that hold up to four ions each and can all gate, so a data "
+               "ion and its check meet in a trap on the loop itself. Rotation needs docks and refuses; the "
+               "general router serves it in 2,289 transport cycles, and the heating model asks for only "
+               "7 cools.")},
+    {"key": "cyc148_h3", "family": "loop without docks",
+     "title": "ring(148, 3, 0) with junction corners: 294 traps of up to 4 ions, height 3, no docks",
+     "arch": BB2 / "cyc148_h3.arch.json", "prefix": BB2 / "cyc148_h3",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc compile, then insert_cooling"},
+     "claim": ("The 292-trap loop drawn on a rectangle of height 3, which adds a trap on each short side: "
+               "294 traps. The general router serves it in 2,215 transport cycles, with 7 cools.")},
+    {"key": "cyc120_h2", "family": "loop without docks",
+     "title": "ring(120, 2, 0) with junction corners: 236 traps of up to 4 ions, no docks",
+     "arch": BB2 / "cyc120_h2.arch.json", "prefix": BB2 / "cyc120_h2",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc compile, then insert_cooling"},
+     "claim": ("The same kind of loop with 236 traps, so the ions start up to four to a trap. The general "
+               "router still serves it directly, in 1,850 transport cycles, with 7 cools.")},
+    {"key": "cyc100_h2", "family": "loop without docks",
+     "title": "ring(100, 2, 0) with junction corners: 196 traps of up to 4 ions, no docks",
+     "arch": BB2 / "cyc100_h2.arch.json", "prefix": BB2 / "cyc100_h2",
+     "compiled": {"compiler": QCCDC, "date": "2026-11-02",
+                  "note": "qccdc compile (split rounds), then insert_cooling"},
+     "claim": ("Shorter still: 196 traps. The "
+               "general router alone does not route it; its fallback does, by running each round it "
+               "cannot route in halves and deferring the rest, still in the circuit's order: 1,694 "
+               "transport cycles and 7 cools, after 1,462 s of compiling.")},
+    # the shapes the compiler does not serve yet: listed, never ranked; the router work for
+    # them is a separate follow-up (the user, 2026-11-02).  ring146_h2_d72 is the device the probe
+    # of 2026-11-02 compiled (export_arch gives the same expanded device) with the same compiler
+    # and circuit; its logs are `<key>.compile.log` / `<key>.rotate.log`.  The others were compiled
+    # here, `<key>.compile.json` recording each try.
+    # grid13x13 takes ring144_24v's control.channels and control.wiring (broadcast channels, WISE
+    # shims: 57 DACs) in place of grid9x9's direct control (12,480 DACs against the task's 128).
+    # The probe compiled the direct-wired one (`grid13x13_direct.probe.*`): out of time at 30 min,
+    # with the same account up to split rounds.
+    {"key": "grid13x13", "family": "lattice",
+     "title": "grid13x13 with broadcast control, 312 traps -- not yet compiled by our compiler",
+     "arch": BB2 / "grid13x13.arch.json",
+     "refusal": ("not yet compiled by our compiler: qccdc compile gave up after 1,781 s, inside the "
+                 f"release's {TIME_LIMIT}. Its own account: the general router's transport candidate "
+                 "exceeds site capacity at T8_8v; rigid rotation does not apply (the device has no "
+                 "closed loop with docks); the race track does not apply (no closed loop); split rounds "
+                 "do not complete either."),
+     "claim": ("A lattice of 312 traps joined by 165 junctions, with the default template's broadcast "
+               "control (57 DACs; grid9x9's own direct control would need 12,480, against the task's "
+               "128). It has room for the 288 ions, but the router's next move would overfill a trap, "
+               "the fallbacks that need no free trap, rotation and the race track, need a closed loop, "
+               "and splitting the rounds does not get through either.")},
+    {"key": "ring146_h2_d72", "family": "ring + docks",
+     "title": "ring(146, 2, 72) with junction corners: a dock for every second check -- not yet compiled",
+     "arch": BB2 / "ring146_h2_d72.arch.json",
+     "refusal": ("not yet compiled by our compiler: qccdc compile did not finish in "
+                 f"{TIME_LIMIT}. Its own account: the general router left 881 operations "
+                 "unrealised; rigid rotation does not apply (144 qubits need a dock but the device "
+                 "has 72); the race track does not apply (a dock is off the loop, so the device is "
+                 "not a single loop); it was running split rounds when the time ran out. qccdc "
+                 "rotate refuses it at once: 144 qubits need a dock but the device has 72."),
+     "claim": ("The starter's loop with half its docks: 72 for 144 checks. Rotation needs a dock for "
+               "every check, and the general router leaves 881 of the round's 1,152 operations "
+               "unplaced.")},
+    {"key": "cyc76_h2", "family": "loop without docks",
+     "title": "ring(76, 2, 0) with junction corners: 148 traps of up to 4 ions -- not yet compiled",
+     "arch": BB2 / "cyc76_h2.arch.json",
+     "refusal": ("not yet compiled by our compiler: qccdc compile gave up after 1,709 s, inside the "
+                 f"release's {TIME_LIMIT}. Its own account: q237 cannot reach S80 from S12 within 156 "
+                 "cycles; rigid rotation does not apply (the device has no closed loop with docks); the "
+                 "race track does not apply (288 qubits but the loop has 148 sites, and a rigid shift "
+                 "needs every ion alone in its site); split rounds do not complete either."),
+     "claim": ("The shortest loop of the kind: 148 traps for 288 ions, two to a trap on average. With "
+               "that little room the router cannot bring every ion to where its next gate is.")},
+    # racetrack150 takes ring144_24v's control.wiring (WISE: demultiplexed shims) in place of
+    # H2's per-trap shim drivers, which would need 332 DACs against the task's 128.  The device
+    # compiled for 30 minutes was H2's own (`racetrack150.compiled_as.arch.json`); export_arch of the
+    # two differs in control.wiring alone, whose scheme qccdc's compile never reads.
+    {"key": "racetrack150", "family": "loop without docks",
+     "title": "racetrack(150): an H2-style race track of 300 two-ion traps, no junctions -- not yet compiled",
+     "arch": BB2 / "racetrack150.arch.json",
+     "refusal": ("not yet compiled by our compiler: qccdc compile did not finish in "
+                 f"{TIME_LIMIT}. Its own account: the general router: q143 cannot reach S45 from S144 "
+                 "within 308 cycles; rigid rotation does not apply (the device has no closed loop "
+                 "with docks); it was trying the race track (rigid shifts of the whole loop, swaps in "
+                 "its zones) when the time ran out."),
+     "claim": ("Quantinuum H2's shape, made long enough for the round: one loop of 300 traps of up to "
+               "two ions, with no junctions at all, on H2's template but with demultiplexed shims (H2's "
+               "own shim drivers would need 332 DACs here, against the task's 128). The 288 ions nearly "
+               "fill it, and neither the router nor the race track finishes.")},
 )
 
-#: the name a dot wears on the plot and in the table: short, and distinct between the
-#: designs that share a device (grid13x13 direct against broadcast, grid11x11 as drawn
-#: against pitch 2, the shipped ring's two schedules)
+#: the name a dot wears on the plot and in the table: short, and distinct between designs
 SHORT = {
-    "01_baseline_stride": "ring(74,2,24) junction, stride",
-    "02_shipped_ring_code_aware": "ring(74,2,24) junction, code-aware",
-    "03_h3_v24_192": "ring(97,3,24) junction", "04_h4_v24_216": "ring(108,4,24) junction",
-    "05_h3_v36_288_ANSWER": "ring(145,3,36) junction", "06_h5_v36_360": "ring(179,5,36) junction",
-    "07_h3_v48_384": "ring(193,3,48) junction", "08_h4_v72_360_unbuildable": "ring(180,4,72) junction",
-    "09_grid13x13": "grid13x13 direct", "10_grid11x11": "grid11x11 direct, as drawn",
-    "11_grid11x11_s2_buildable": "grid11x11 direct, pitch 2", "12_grid13x13_broadcast": "grid13x13 broadcast",
-    "13_dual144_c24_R2": "dual144 c24", "14_racetrack240": "racetrack240",
-    "15_racetrack480": "racetrack480", "16_chain400": "chain400", "17_dual240_c0": "dual240 junction",
-    "18_ladder144_r12": "ladder144", "19_grid9x9": "grid9x9",
-    "20_torus12_own_a72": "torus12x12 a72", "21_torus12_code_a72": "torus12x12 code-placed a72",
-    "22_planar12_own_a72": "grid12x12 a72", "23_planar12_own_a24": "grid12x12 a24",
-    "24_cylinder12_own_a72": "cylinder12x12 a72", "25_annulus12_own_a72": "annulus12x12 a72",
-    "26_rewired_p0.1": "torus 10% rewired", "27_regular4": "random 4-regular",
-    "28_tanner_own": "Tanner graph", "29_geometric": "random geometric",
+    "ring146_h2_d144": "ring(146,2,144) junction",
+    "ring145_h3_d144": "ring(145,3,144) junction",
+    "ring144_h4_d144": "ring(144,4,144) junction",
+    "ring218_h2_d144": "ring(218,2,144) junction",
+    "cyc148_h2": "ring(148,2,0) 4-ion traps",
+    "cyc148_h3": "ring(148,3,0) 4-ion traps",
+    "cyc120_h2": "ring(120,2,0) 4-ion traps",
+    "cyc100_h2": "ring(100,2,0) 4-ion traps",
+    "grid13x13": "grid13x13",
+    "ring146_h2_d72": "ring(146,2,72) junction",
+    "cyc76_h2": "ring(76,2,0) 4-ion traps",
+    "racetrack150": "racetrack(150)",
 }
 
+#: each family's transport mechanism, and what the shape must have for it
 FAMILY_NOTE = {
-    "ring + docks": ("rigid rotation", "a closed loop AND gate-capable docks off it"),
-    "lattice": ("individual routing", "route diversity: a blocked path has an alternative"),
-    "junction-free loop": ("neither", "a loop without docks: rotation cannot bring two ions together, and the router has one route"),
-    "line": ("neither", "no closed loop, one route"),
-    "two loops": ("neither", "uncoupled they never meet; coupled, the coupling is a junction and R2 refuses it"),
-    "rails + highways": ("neither", "the rails are open, and the router did not finish"),
-    "torus": ("individual routing", "route diversity plus the wrap: every row and column is a closed loop, so the code's offsets are short in both directions"),
-    "random graph": ("individual routing", "route diversity and a short diameter -- and no drawing on a plane"),
+    "ring + docks": ("rigid rotation", "a closed loop AND a gate-capable dock for every check"),
+    "loop without docks": ("the general router", "a closed loop of gate-capable traps that hold four ions, so two ions meet on the loop itself, and room enough to pass"),
+    "lattice": ("none yet", "route diversity; the router does not finish this round on it yet"),
 }
 
 
@@ -441,6 +284,40 @@ def _numbers(entry: dict) -> dict:
     out["r10"] = v["r10"] if v else None
     if v:
         out["r10_verdict"] = v["verdict"]
+    out.update(_engine_and_order(entry))
+    return out
+
+
+def _engine_and_order(entry: dict) -> dict:
+    """Which of qccdc's engines wrote the programme, and whether each qubit's operations keep
+    the circuit's order -- both READ off the files, never typed.
+
+    The engine is `<prefix>.stages.json`'s own `engine` (rotate, general, ...).  The order is
+    `check_cert.check_program_order` on the certified programme and its certificate, the check
+    the grader's semantics stage reports as `order`: for each qubit, no operation may start
+    before the qubit's previous one in the circuit has finished, even where the two commute.
+    Its count is the whole number of such operations (check_cert's JSON keeps six lines).
+    The certificate's copy of the circuit is the release's circuit op for op (R10's binding).
+    Empty for an entry with no compiled programme."""
+    prefix = entry.get("prefix")
+    if not prefix or not Path(str(prefix) + ".qcert.json").is_file():
+        return {}
+    import importlib.util
+    import re
+    out: dict = {}
+    stages = Path(str(prefix) + ".stages.json")
+    if stages.is_file():
+        out["engine"] = json.loads(stages.read_text(encoding="utf-8")).get("engine")
+    spec = importlib.util.spec_from_file_location("bb_studio_check_cert", BRIDGE / "check_cert.py")
+    cc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cc)
+    probs = cc.check_program_order(json.loads(Path(str(prefix) + ".qcert.json").read_text(encoding="utf-8")),
+                                   TSIR.load(str(prefix) + ".tsir.json"))
+    total = next((int(m.group(1)) for p in probs for m in [re.match(r"\.\.\. (\d+) ops in all", p)] if m),
+                 len(probs))
+    out["order_violations"] = total
+    if probs:
+        out["order_first"] = probs[0][:240]
     return out
 
 
@@ -1454,6 +1331,13 @@ def _inject(page: Path, entry: dict, marks: list[dict], numbers: dict, index_hre
         facts.append(numbers["recompiled"])
     if numbers.get("compiled"):
         facts.append(numbers["compiled"])
+    if numbers.get("engine"):
+        facts.append("engine: " + ENGINE_WORDS.get(numbers["engine"], numbers["engine"]))
+    if numbers.get("order_violations") == 0:
+        facts.append("gate order kept: no operation starts before an earlier one on its qubit")
+    elif numbers.get("order_violations"):
+        facts.append(f"GATE ORDER BROKEN: {numbers['order_violations']} operations start before an "
+                     "earlier one on their qubit")
     if numbers.get("r10"):
         facts.append("R10: Lean checker + tableau")
     elif numbers.get("r10") is False:
@@ -1590,7 +1474,7 @@ def _fmt(v, nd=1):
 
 
 def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
-                subtitle: str | None = None) -> Path:
+                subtitle: str | None = None, intro: str | None = None) -> Path:
     """One white page, one plot: every design is a dot, ranked by whatever the reader picks.
 
     The chart is the page.  A `Rank by` control chooses the measure (running time on
@@ -1636,6 +1520,9 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
         page = page.replace("BB [[144,12,12]] on QCCD — every design, ranked", title)
     if subtitle:
         page = page.replace("One syndrome round of the gross code compiled onto every architecture the study reached.", subtitle)
+    if intro:
+        # the board's own account of itself, under the subtitle and above the controls (HTML)
+        page = page.replace('\n<div class="controls">', f'\n<div class="intro">{intro}</div>\n<div class="controls">', 1)
     p = out_dir / "index.html"
     p.write_text(page, encoding="utf-8")
     return p
@@ -1669,7 +1556,7 @@ def _disqualified_html(rows: list[dict]) -> str:
     n = len(rows)
     return ('<section class="dq" id="disqualified"><h2>Disqualified &mdash; not ranked</h2>'
             f'<p class="sub">{n} design{"s" if n != 1 else ""} ran the same circuit but '
-            f'break{"s" if n == 1 else ""} at least one rule or need more hardware than the task '
+            f'break{"s" if n == 1 else ""} at least one rule or need{"s" if n == 1 else ""} more hardware than the task '
             f'allows, so {"it is" if n == 1 else "they are"} not ranked above. Each is listed with '
             'what it breaks; open one to see every violation on its step in the design '
             'tool.</p><div class="dqw"><table class="tbl dqt"><tr><th>design</th><th>family</th>'
@@ -1689,6 +1576,7 @@ body{margin:0;background:var(--surface);color:var(--ink);
 main{max-width:1280px;margin:0 auto;padding:26px 28px 60px}
 h1{font-size:22px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
 .sub{color:var(--ink2);margin:0 0 18px;max-width:80ch}
+.intro{color:var(--ink2);max-width:80ch;margin:-8px 0 16px;font-size:13.5px}.intro p{margin:0 0 8px}.intro b{color:var(--ink);font-weight:600}
 .controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;padding:10px 0 6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:8px}
 .controls label{display:flex;gap:8px;align-items:center;color:var(--ink2);font-size:13px}
 select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:var(--ink)}
@@ -1898,6 +1786,9 @@ function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
     tb.appendChild(row('buildable', n.buildable ? 'yes' : (n.drc_clean ? 'DRC clean, but no control electrodes survive' : 'no'+(d.drc?' ('+d.drc+' design-rule violations)':'')), n.buildable?'ok':'bad'));
     tb.appendChild(row('rules', d.rules_failed.length ? d.rules_failed.join(' ')+' FAILED' : d.rules_passed+' passed', d.rules_failed.length?'bad':'ok'));
     tb.appendChild(row('R10: Lean checker + tableau', n.r10 === true ? 'passed' : n.r10 === false ? (n.r10_verdict ? n.r10_verdict.replace(/^-> R10 /, '') : 'FAILED') : 'not run', n.r10 === true ? 'ok' : n.r10 === false ? 'bad' : ''));
+    // which engine wrote the programme, and whether each qubit keeps the circuit's order (check_cert)
+    if (n.engine) tb.appendChild(row('compiler engine', n.engine));
+    if (n.order_violations != null) tb.appendChild(row('gate order (each qubit, as the circuit writes it)', n.order_violations === 0 ? 'kept' : n.order_violations + ' operations out of order', n.order_violations === 0 ? 'ok' : 'bad'));
     right.appendChild(tb); }
   el.appendChild(left); el.appendChild(right); }
 function table(){ var w=$('tablewrap'); w.innerHTML=''; var yk=ysel.value;
@@ -1921,6 +1812,79 @@ function pushState(){ try { var q='?y='+ysel.value+'&x='+xsel.value+'&log='+(log
 var ans = DATA.filter(function(d){ return d.key===Q.sel; })[0] || DATA.filter(function(d){ return d.answer; })[0]; if (ans) select(ans.key);
 </script></body></html>
 """
+
+
+BB_TITLE = "BB [[144,12,12]] on QCCD — Bravyi's syndrome round, every design ranked"
+BB_SUBTITLE = ("One syndrome round of the [[144,12,12]] bivariate-bicycle code in Bravyi et al.'s "
+               "schedule (release bb144@2), on every design our compiler serves today.")
+
+
+def board_intro(rows: list[dict]) -> str:
+    """The board's account of itself, above the plot: what is compiled, what is ranked, and
+    which shapes do not compile yet.  Every count and name is read off the rows."""
+    ok = [r for r in rows if r.get("status") == "ok"]
+    compiled = [r for r in ok if r.get("prefix")]
+    ranked = [r for r in compiled if not r.get("rules_failed") and not r.get("over_budget")]
+    order = {e["key"]: i for i, e in enumerate(CATALOG)}
+    refused = sorted((r for r in ok if not r.get("prefix")), key=lambda r: order.get(r["key"], 99))
+    kept = [r for r in compiled if (r.get("numbers") or {}).get("order_violations") == 0]
+    lean = [r for r in compiled if (r.get("numbers") or {}).get("r10") is True]
+    fams = sorted({r.get("family") for r in ranked})
+    words = {"ring + docks": "rings with a dock for every check, which rigid rotation serves",
+             "loop without docks": "loops without docks whose traps hold four ions, which the general "
+                                   "router serves"}
+    n = lambda k, one, many: f"{k} {one if k == 1 else many}"
+    out = [
+        "<p><b>What is compiled.</b> Bravyi et al.'s depth-8 round (Fig. 5 of arXiv:2308.07915) as "
+        "published: one ancilla per check, so 144 data ions and 144 check ions, 288 in all, and its 864 "
+        f"CNOTs in the schedule's order. Every programme here was compiled from that circuit by the "
+        f"released compiler, qccdc {QCCDC}, which keeps each qubit's gates in the circuit's order; the "
+        f"checker confirms it on {len(kept)} of {len(compiled)}: no operation starts before the one "
+        "before it on the same qubit has finished. Cooling is inserted where the heating model needs "
+        "it, the one change the release allows, and R10 is decided by the proved Lean checker and the "
+        f"stabilizer tableau (passed on {len(lean)} of {len(compiled)}).</p>",
+        f"<p><b>What is ranked.</b> {n(len(ranked), 'design', 'designs')} whose programme passes every "
+        "rule on the replay and whose device fits the task's hardware budget"
+        + (": " + "; ".join(html.escape(words.get(f, f)) for f in fams) if fams else "")
+        + ". " + _fastest(ranked) + "Pick a measure to rank by, and click a dot for its numbers and the "
+        "steps where each claim can be checked."
+        + (f" {n(len(compiled) - len(ranked), 'more design runs', 'more designs run')} the round but "
+           f"{'breaks a rule or needs' if len(compiled) - len(ranked) == 1 else 'break a rule or need'} "
+           "more hardware than the task allows: listed under Disqualified, below, never ranked."
+           if len(compiled) > len(ranked) else "") + "</p>",
+    ]
+    if refused:
+        names = ", ".join(html.escape(r.get("short") or SHORT.get(r["key"], r["title"])) for r in refused)
+        out.append(f"<p><b>What does not compile yet.</b> {names}: our compiler does not compile "
+                   f"{'it' if len(refused) == 1 else 'them'} within the release's 30 minutes, and "
+                   f"{'its page gives' if len(refused) == 1 else 'each one&rsquo;s page gives'} the "
+                   f"compiler's own reason. {'It is' if len(refused) == 1 else 'They are'} listed as "
+                   "refused, at the right of the plot, and never ranked; the router work for these "
+                   "shapes is a separate follow-up.</p>")
+    return "".join(out)
+
+
+def _fastest(ranked: list[dict]) -> str:
+    """The fastest ranked round on the jones table, and each family's fastest, read off the rows."""
+    timed = [r for r in ranked if isinstance((r.get("numbers") or {}).get("T_jones"), (int, float))]
+    if not timed:
+        return ""
+    name = lambda r: html.escape(r.get("short") or SHORT.get(r["key"], r["title"]))
+    t = lambda r: f"{r['numbers']['T_jones']:,.1f} ms"
+    def fastest(rs):   # every design at the least time: a tie is said as one
+        lo = min(r["numbers"]["T_jones"] for r in rs)
+        tied = [r for r in rs if abs(r["numbers"]["T_jones"] - lo) < 1e-6]
+        return " and ".join(name(r) for r in tied) + ", " + t(tied[0]), tied[0]
+    words, best = fastest(timed)
+    out = f"The fastest round on the jones table: {words}"
+    for fam in sorted({r.get("family") for r in timed} - {best.get("family")}):
+        out += f"; among the {html.escape(fam)} designs, " + fastest([r for r in timed if r.get("family") == fam])[0]
+    return out + ". "
+
+
+def write_board_index(rows: list[dict], out_dir: Path) -> Path:
+    """The BB board's index: `write_index` with the board's own title, subtitle and intro."""
+    return write_index(rows, out_dir, title=BB_TITLE, subtitle=BB_SUBTITLE, intro=board_intro(rows))
 
 
 # --------------------------------------------------------------------------- main
@@ -1961,13 +1925,15 @@ def main(argv=None) -> int:
                 _inject(page, r, r["marks"], r["numbers"], "index.html")
                 print(f"  overlay -> {page.name}")
             (out_dir / "manifest.json").write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
-        print(f"-> {write_index(rows, out_dir)}")
+        print(f"-> {write_board_index(rows, out_dir)}")
         return 0
     rows = []
     if a.only and (out_dir / "manifest.json").exists():
         # one page rebuilt, the others kept: the manifest is the index's record
+        # (a key the catalogue no longer names is not kept: its design has left the board)
+        keys = {e["key"] for e in CATALOG}
         rows = [r for r in resolve(json.loads((out_dir / "manifest.json").read_text(encoding="utf-8")))
-                if r["key"] != a.only and r["key"] not in drafts]
+                if r["key"] != a.only and r["key"] not in drafts and r["key"] in keys]
     for entry in CATALOG:
         if a.only and entry["key"] != a.only:
             continue
@@ -1986,7 +1952,7 @@ def main(argv=None) -> int:
     manifest = out_dir / "manifest.json"
     manifest.write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
     print(f"-> {manifest}")
-    print(f"-> {write_index(rows, out_dir)}")
+    print(f"-> {write_board_index(rows, out_dir)}")
     return 0
 
 

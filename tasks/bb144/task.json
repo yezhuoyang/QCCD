@@ -3,9 +3,9 @@
  "version": 1,
  "id": "bb144",
  "order": 1,
- "title": "BB [[144,12,12]]",
+ "title": "BB [[144,12,12]], Bravyi's schedule",
  "short": "BB",
- "description": "One syndrome-extraction round of the bivariate-bicycle [[144,12,12]] code: 144 weight-6 checks, 864 two-qubit contacts.",
+ "description": "One syndrome round of the bivariate-bicycle [[144,12,12]] code in Bravyi et al.'s schedule (Fig. 5 of arXiv:2308.07915): one ancilla per check, so 144 data ions and 144 check ions, and 864 two-qubit gates in the schedule's order, which every programme on the board keeps.",
  "circuit": "circuit.qasm",
  "n_data": 144,
  "physics": {
@@ -25,6 +25,7 @@
   "p_eff_vs_threshold"
  ],
  "rank_by": "T_jones",
+ "release": "bb144@2",
  "seed": "BBResults/studio",
- "note": "The seed entries were compiled from ancilla-layout variants of this circuit (Compiler/build/q06/*.qasm, 864 contacts each); phase 3 fixes this file as the task's circuit for new submissions."
+ "note": "circuit.qasm is release bb144@2's circuit, byte for byte: one round of 288 qubits (q0..q143 data, q144..q215 X checks, q216..q287 Z checks) with its 864 CNOTs in the schedule's order. Every seed entry was compiled from it with qccdc cd3efedbbc10, which keeps each qubit's gates in that order. Until 2026-11-02 this task was release bb144@1, a 168-qubit round with 24 ancillas reused by mid-circuit measurement, and its seed entries were compiled from ancilla-layout variants of that round."
 }
