@@ -128,6 +128,34 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-03 01:49 UTC, `qccd-official:6c2c076` (Goal 3's loops get junction corners and
+BB72's Goal 3 board is release 2; commits `a1614dd` and `6c2c076`, pushed to `compiler` and
+`website/invitations`; the user approved it). `goal3_bb72_mem@2` is release 1 with one change:
+its starter is the junction-corner twin, `conveyor96_96d_j` (`ring(98, 2, 96, corners="junction")`,
+the same 192 slots and 96 docks). Release 1 keeps its board and its entries (none). A goal now
+ranks only the newest release of each task (`OfficialService.goal_releases`), so Goal 3 shows
+`@2`. That is the release the site's boards show (`list_boards`). Built ON THE DROPLET from
+`qccd-official:5374634`, COPY only (`/root/img_6c2c076`): the image adds `qccd/official/service.py`
+and the release's four files, and those five files equal `ctx.sha`. 98 layers: 5374634's 96 plus
+two. The compose file is unchanged (grader 2g, 256 MB stack).
+
+The census ran on a copy of the database (no network, volumes read-only):
+- Goal 1 and all 30 existing boards were identical to 5374634's.
+- On Goal 3, BB72's release changed from `@1` to `@2`, with no entries on either; the other
+  seven releases were identical.
+- The new board was empty.
+
+The starter bundle graded eligible, 11/11, under the grader's limits: a 2g container, a 256 MB
+stack and a 4 GB address space. It did so twice:
+- in `qccd-official:14bba4f` (the same five files on f79b212), in 3057 s;
+- in `qccd-official:6c2c076`, in 3049 s.
+
+Both runs gave T_quantinuum 4867.379 ms, which is 405.6 ms a round over 12 rounds, the Goal 3
+sweep's number. The bundle was made by a workspace compile of the starter, with each
+instruction's `operating_point` left out. With them, a workspace bundle of BB72's starter is
+about 100 MB, past the bundle's 64 MB limit, and `freeze_snapshot` refuses it. That holds for
+either release, and readers meet it too. It is open. Rollback is `*.bak-5374634`.
+
 **Deployed** 2026-11-03 00:56 UTC, `qccd-official:5374634` (the rule language reads a quoted name
 given to a word as the thing of that name; commit `5374634`, pushed to `compiler` and
 `website/invitations`; the user asked for it: "Fix the gap", then "Yes do that now"). The grader's
