@@ -8,8 +8,9 @@
   and its logical error rate per round;
 * the site's Leaderboard keeps the Goal 3 boards off its Goal 1 table and memory-board cards, and
   board/goal3/ carries every code;
-* board/goal3/'s table of rules has every rule a point was judged by (goals/goal3/rules.json, which
-  still agrees with verify), the C rules only for the C2LR family.
+* board/goal3/'s table of rules judges each submission by its own rule set: every compiled point by
+  its family's (goals/goal3/rules.json), each column exactly that set's rules, and an order rule
+  that fails only on transport stamped with a gate told from a real reorder.
 """
 
 from __future__ import annotations
@@ -150,32 +151,67 @@ def test_the_site_keeps_goal_3_boards_together():
         assert f'data-task="goal3_{c}_mem"' in page
 
 
-def test_board_goal3_lists_every_rule_a_point_was_judged_by(tmp_path):
+def test_board_goal3_judges_each_submission_by_its_own_rule_set():
     pytest.importorskip("qccd.site.boards", reason="the site package is not in this tree")
+    import os
+
     import rules as judged_rules
-    import sweep
+    from families import RULES
     from qccd.ruleset import load
     from qccd.site import goal3
     judged = json.loads((GOAL / "rules.json").read_text(encoding="utf-8"))
-    # rules.json is what verify checks on a point's device today: one point of each kind again
-    rows = {r["point"]: r for r in judged_rules.judged("surface3")}
-    points = judged["codes"]["surface3"]["points"]
-    assert set(points) == set(rows)
-    for k in sorted(set(points.values())):
-        name = next(p for p, i in points.items() if i == k)
-        assert judged_rules.kind_of(rows[name], sweep.release("surface3"), tmp_path) == judged["kinds"][k], name
+    # every compiled point of every code, judged by its family's own set, and no other
+    for code in sorted(p.stem for p in (GOAL / "results").glob("*.jsonl")):
+        got = judged["codes"][code]
+        want: dict = {}
+        for r in judged_rules.compiled(code):
+            want.setdefault(r["family"], set()).add(r["point"])
+        assert {f: set(d["points"]) for f, d in got.items()} == want, code
+        assert all(d["set"] == RULES[f] for f, d in got.items()), code
+    assert {n: s["ids"] for n, s in judged["sets"].items()} == {n: load(n).ids for n in set(RULES.values())}
+    # a point's work folder lives outside the repository; where one is at hand, judge it again
+    roots = [Path(p) for p in os.environ.get("QCCD_GOAL3_WORK", "").split(os.pathsep) if p]
+    rows = {(r["family"], r["point"]): r for r in judged_rules.compiled("surface3")}
+    for fam in RULES:
+        name = min(p for (f, p) in rows if f == fam)
+        if any((r / "surface3" / name / "prog.cooled.tsir.json").is_file() for r in roots):
+            v = judged_rules.judge("surface3", rows[(fam, name)], roots)
+            mine = judged["codes"]["surface3"][fam]["points"][name]
+            assert v["fails"] == mine.get("fails", {}) and sorted(v["other"]) == mine.get("skip", []), (fam, name)
+    # the page: each family's column holds exactly its own set's rules, a ✗ exactly the sizes
+    # rules.json says fail, and a rule no program can be judged by is marked so, not passed
     d = goal3.data()
-    standard = set(load("standard").ids)
     for c in d["codes"]:
-        R = c["rules"]
-        assert standard <= set(R["ids"]), c["task"]
+        R, code = c["rules"], c["task"].removeprefix("goal3_").removesuffix("_mem")
+        assert R["board"] == "standard"
         for fam, F in R["fams"].items():
-            assert F["n"] >= 1 and standard <= set(F["cells"]), (c["task"], fam)
-            c_rules = {i for i in F["cells"] if i.startswith("C")}
-            assert bool(c_rules) == (fam == "C2LR"), (c["task"], fam, c_rules)
-            # the sweep skips the certificate step, and never checks a program's own figures
-            assert F["cells"]["R10"][0] == "skip" and F["cells"]["R9"][0] == "skip"
-            assert F["cells"]["R15"][0] == "part"
-    s3 = next(c for c in d["codes"] if c["task"] == "goal3_surface3_mem")
-    assert s3["rules"]["fams"]["Grid"]["cells"]["R4"] == "ok"
-    assert d["rules"]["c2lr"] is not None and d["rules"]["plain"] is not None
+            own, pts = load(RULES[fam]).ids, judged["codes"][code][fam]["points"]
+            assert F["set"] == RULES[fam] and sorted(F["cells"]) == sorted(own), (code, fam)
+            assert set(own) <= set(R["ids"])
+            for rid in own:
+                bad = sorted(p for p, v in pts.items() if rid in v.get("fails", {}))
+                cell = F["cells"][rid]
+                assert (sorted(cell[1]) if cell[0] == "bad" else []) == bad, (code, fam, rid)
+                # amber only where every failing size fails on stamped transport alone
+                stamped = bool(bad) and all(rid in pts[p].get("stamped", ()) for p in bad)
+                assert (cell[0] == "bad" and cell[2:] == ["stamped"]) == stamped, (code, fam, rid)
+            for rid in ("R7b", "R9", "R10", "R29"):
+                if rid in own:
+                    assert F["cells"][rid][0] == "skip", (code, fam, rid)
+            assert ({i for i in own if i.startswith("C")} != set()) == (fam == "C2LR")
+    assert set(d["rules"]["never"]) == {"R7b", "R9", "R29"}
+
+
+def test_an_order_rule_failing_on_stamped_transport_alone_is_told_from_a_reorder():
+    """rules.py's `gates_in_order`: a split stamped with a cx that ends after the qubit's next gate
+    starts is not a reorder; the next gate starting before the cx's own gate ends is."""
+    from types import SimpleNamespace as N
+
+    import rules as judged_rules
+    circuit = [N(index=0, qubits=(0, 1)), N(index=1, qubits=(0,))]       # cx q0,q1; then h q0
+    cx = N(kind="gate2", serves={0}, start=0, end=1)
+    split = N(kind="move", serves={0}, start=1, end=4)                   # stamped with the cx
+    h_after = N(kind="gate1", serves={1}, start=2, end=3)
+    h_before = N(kind="gate1", serves={1}, start=0, end=1)
+    assert judged_rules.gates_in_order(N(circuit=circuit, ops=[cx, split, h_after]))
+    assert not judged_rules.gates_in_order(N(circuit=circuit, ops=[cx, split, h_before]))

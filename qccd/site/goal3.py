@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -91,83 +92,85 @@ def data() -> dict | None:
         codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": b.manifest.get("description", ""),
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
                       "counts": counts, "points": pts, "failed": failed,
-                      **({"rules": _code_rules(code, rows, judged)} if judged else {})})
+                      **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
+                         if judged and code in judged["codes"] else {})})
     out = {"families": fams, "caveats": caveats, "codes": codes}
     if judged:
-        out["rules"] = _rules_key(judged)
+        out["rules"] = _rules_key(judged, {c["rules"]["board"] for c in codes if c.get("rules")})
     return out
 
 
-#: what the page says for a rule a grade did not check, or checked only in part, where the
-#: checker's own reason is written for its developers
+#: what the page says for a rule that does not apply to a program, where the rule language's
+#: own reason is written for the rule's author
 _WHY = {"R7b": "no device declares a per-zone duty-cycle budget yet, so there is nothing to check",
         "R9": "a program's own figures are not checked; every number shown is the replay's",
         "R10": "the reference sweep skips the certificate and Lean step; an entry's grade runs it",
-        "R15": "checked as an upper bound: heat is added up, which R15 allows as a bound"}
-_UNCHECKED = "the rules stage has no check of its own for this rule"
+        "R29": "a paper's clock is checked on the paper's own timed schedules; a program's durations are "
+               "the replay's own"}
 
 
 def _judged() -> dict | None:
-    """goals/goal3/rules.json (goals/goal3/rules.py): the rules each point's grade checked."""
+    """goals/goal3/rules.json (goals/goal3/rules.py): each point judged by its family's own set."""
     f = GOAL / "rules.json"
-    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    d = json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    return d if d and "sets" in d else None
 
 
-def _code_rules(code: str, rows: dict, judged: dict) -> dict:
-    """One code's table of rules: every rule any point was judged by, and for each family what
-    its judged sizes made of each rule.  A cell is "ok", ["bad", sizes], ["part", why] or
-    ["skip", why]; a rule missing from a family is not one of its rules."""
-    from ..ruleset import load, rule_order
-    mine = judged["codes"].get(code) or {}
-    kinds, pts = judged["kinds"], mine.get("points", {})
-    board = set(load(mine.get("set", "standard")).ids)
-    by_fam: dict = {}
-    for (fam, name), r in rows.items():
-        if name in pts:
-            by_fam.setdefault(fam, []).append((r, kinds[pts[name]]))
-    ids = set(board)
-    for got in by_fam.values():
-        for _, k in got:
-            ids |= set(k["checked"]) | set(k["skipped"]) | set(k["partial"])
-    ids = sorted(ids, key=rule_order)         # a set's order changes from run to run; the page must not
-    fams = {}
-    for fam, got in by_fam.items():
+def _why(judged: dict, rid: str) -> str:
+    return _WHY.get(rid) or judged["reasons"].get(rid, "not checked").split(": ", 1)[-1]
+
+
+def _code_rules(code: str, board: str, judged: dict) -> dict:
+    """One code's table of rules: each family, a submission of the reference sweep, with its own
+    rule set, and what its sizes made of each rule of that set.  A cell is "ok", ["bad", sizes],
+    ["part", why] or ["skip", why]; a rule missing from a family is not one of its rules.
+    ["bad", sizes, "stamped"] is an order rule that fails on every one of those sizes only through
+    transport the compiler stamped with a gate (goals/goal3/rules.py `gates_in_order`)."""
+    from ..ruleset import rule_order
+    fams, ids = {}, set()
+    for fam, d in judged["codes"][code].items():
+        own = judged["sets"][d["set"]]["ids"]
+        pts = d["points"]
+        ids |= set(own)
         cells: dict = {}
-        for rid in ids:
-            bad = [r["point"] for r, _ in got if rid in (r.get("rules_failed") or ())]
-            part = [k["partial"][rid] for _, k in got if rid in k["partial"]]
-            seen = sum(1 for _, k in got if rid in k["checked"])
-            skip = [k["skipped"][rid] for _, k in got if rid in k["skipped"]]
-            if bad:
+        for rid in own:
+            bad = sorted((p for p, v in pts.items() if rid in v.get("fails", {})),
+                         key=lambda p: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", p)])
+            skip = sum(1 for v in pts.values() if rid in v.get("skip", ()))
+            if bad and all(rid in pts[p].get("stamped", ()) for p in bad):
+                cells[rid] = ["bad", bad, "stamped"]
+            elif bad:
                 cells[rid] = ["bad", bad]
-            elif part:
-                cells[rid] = ["part", _WHY.get(rid, part[0])]
-            elif seen == len(got):
-                cells[rid] = "ok"
-            elif seen:
-                cells[rid] = ["part", f"checked on {seen} of {len(got)} sizes"]
+            elif skip == len(pts):
+                cells[rid] = ["skip", _why(judged, rid)]
             elif skip:
-                cells[rid] = ["skip", _WHY.get(rid, skip[0])]
-            elif rid in board:
-                cells[rid] = ["skip", _UNCHECKED]
-        fams[fam] = {"n": len(got), "cells": cells}
-    return {"set": mine.get("set", "standard"), "ids": ids, "fams": fams}
+                cells[rid] = ["part", f"checked on {len(pts) - skip} of {len(pts)} sizes; on the others "
+                                      + _why(judged, rid)]
+            else:
+                cells[rid] = "ok"
+        fams[fam] = {"set": d["set"], "n": len(pts), "cells": cells}
+    # a set's order changes from run to run; the page must not
+    return {"board": board, "ids": sorted(ids, key=rule_order), "fams": fams}
 
 
-def _rules_key(judged: dict) -> dict:
+def _rules_key(judged: dict, boards: set) -> dict:
     """What the page needs to place a submitted entry's rules beside the families': every rule's
-    title and order, each rule set used, and what the rules stage checks on a plain device and on a
-    C2LR lattice (an entry's grade runs the same stage on its own device)."""
+    title and order, each set's title and rules (the board's too: an entry that declares no set is
+    judged by it), and the rules no program can be judged by, with why."""
     from ..ruleset import catalogue, load, rule_order
     cat = sorted(catalogue().rules, key=lambda r: rule_order(r.id))
-    kinds = [{"checked": k["checked"], "skipped": {i: _WHY.get(i, w) for i, w in k["skipped"].items()},
-              "partial": {i: _WHY.get(i, w) for i, w in k["partial"].items()}} for k in judged["kinds"]]
-    c2lr = [any(i.startswith("C") for i in k["checked"]) for k in kinds]
-    sets = sorted({c.get("set", "standard") for c in judged["codes"].values()})
-    return {"titles": {r.id: r.title for r in cat}, "order": [r.id for r in cat], "kinds": kinds,
-            "c2lr": c2lr.index(True) if True in c2lr else None,
-            "plain": c2lr.index(False) if False in c2lr else None,
-            "sets": {n: list(load(n).ids) for n in sets}, "unchecked": _UNCHECKED}
+    sets = {n: {"title": s["title"], "ids": s["ids"]} for n, s in judged["sets"].items()}
+    for n in sorted(boards - set(sets)):
+        rs = load(n)
+        sets[n] = {"title": rs.title, "ids": rs.ids}
+    # a rule that applies to none of the reference sweep's programs applies to no entry's either,
+    # except R10, which an entry's certificate and Lean stages decide
+    seen = [(sets[d["set"]]["ids"], v) for c in judged["codes"].values() for d in c.values()
+            for v in d["points"].values()]
+    never = sorted({r for _, v in seen for r in v.get("skip", ())
+                    if all(r in w.get("skip", ()) for own, w in seen if r in own)} - {"R10"}, key=rule_order)
+    return {"titles": {r.id: r.title for r in cat}, "order": [r.id for r in cat],
+            "sets": dict(sorted(sets.items())), "never": {r: _why(judged, r) for r in never}}
 
 
 def _short(title: str) -> str:
@@ -217,6 +220,8 @@ CSS = """
 .g3 table.g3r th.c,.g3 table.g3r td.c{text-align:center;white-space:nowrap}
 .g3 table.g3r th.c{text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink)}
 .g3 table.g3r th small{display:block;text-transform:none;letter-spacing:0;font-weight:400}
+.g3 table.g3r th.c small{white-space:normal;min-width:64px;max-width:110px;margin:0 auto}
+.g3 table.g3r td:first-child{min-width:190px}
 .g3 table.g3r td small{display:block;color:var(--ink2)}
 .g3 table.g3r td a{text-decoration:none}
 .g3 table.g3r span[title]{cursor:help}
@@ -358,24 +363,28 @@ SCRIPT = r"""
       tr.appendChild(H('td', null, p.why)); t.appendChild(tr); });
     tw.appendChild(t); host.appendChild(tw);
   }
-  // every rule any point on this code was judged by: one column per family, its judged sizes
-  // together, and one per submitted entry, whose own rules are rows too
+  // each submission with its own rule set, every rule of any of them a row: one column per family
+  // (a submission of the reference sweep, its sizes together, judged by the family's set) and one
+  // per submitted entry, judged by the set it declared, or by the board's when it declared none
   var GLYPH = {ok: '✓', bad: '✗', part: '◐', skip: '·'};
   function entryCells(R, p){
-    var K = D.rules, k = K.kinds[p.f === 'C2LR' && K.c2lr != null ? K.c2lr : K.plain] || {checked: [], skipped: {}, partial: {}};
-    var rr = (p.cf || {}).rules || {}, board = K.sets[R.set] || [], cells = {};
+    var K = D.rules, rr = (p.cf || {}).rules || {}, cells = {};
     function has(a, id){ return (a || []).indexOf(id) >= 0; }
-    R.ids.concat(rr.adds || []).forEach(function(id){
-      if (has(rr.breaks, id)) cells[id] = ['bad', 'breaks the board’s rule' + (has(rr.drops, id) ? ', which its own rules drop' : '')];
-      else if (has(rr.adds, id)) cells[id] = ['ok', 'a rule of its own; it holds'];
-      else if (has(rr.replaces, id)) cells[id] = ['ok', 'its own version of this rule; it holds'];
+    var own = ((K.sets[R.board] || {}).ids || []).filter(function(id){ return !has(rr.drops, id); });
+    (rr.adds || []).forEach(function(id){ if (own.indexOf(id) < 0) own.push(id); });
+    own.forEach(function(id){
+      if (has(rr.replaces, id)) cells[id] = ['ok', 'its own version of this rule; it holds'];
+      else if (has(rr.breaks, id)) cells[id] = ['bad', 'breaks it'];
       else if (id === 'R10') cells[id] = ['ok', 'decided by the certificate and Lean stages'];
-      else if (k.partial[id]) cells[id] = ['part', k.partial[id]];
-      else if (has(k.checked, id)) cells[id] = ['ok', has(rr.drops, id) ? 'not one of its own rules; it holds all the same' : 'holds'];
-      else if (k.skipped[id]) cells[id] = ['skip', k.skipped[id]];
-      else if (has(board, id)) cells[id] = ['skip', K.unchecked];
+      else if (K.never[id]) cells[id] = ['skip', K.never[id]];
+      else cells[id] = ['ok', has(rr.adds, id) ? 'a rule of its own; it holds' : 'holds'];
     });
     return cells;
+  }
+  function setLink(n){
+    var s = D.rules.sets[n], el;
+    if (!s) return H('small', null, n);
+    el = H('small'); var a = H('a', null, s.title); a.href = '../../rules/#set-' + n; el.appendChild(a); return el;
   }
   function rules(host, c){
     var R = c.rules;
@@ -383,10 +392,13 @@ SCRIPT = r"""
     if (!R) return;
     var cols = D.families.concat(Object.keys(R.fams).filter(function(f){ return D.families.indexOf(f) < 0; }))
       .filter(function(f){ return R.fams[f]; }).map(function(f){
-        var F = R.fams[f]; return {head: f, sub: F.n + (F.n === 1 ? ' size' : ' sizes'), n: F.n, cells: F.cells}; });
+        var F = R.fams[f]; return {head: f, set: F.set, sub: F.n + (F.n === 1 ? ' size' : ' sizes'), n: F.n, cells: F.cells}; });
     (live[c.id] || []).forEach(function(p){
-      cols.push({head: p.n, sub: 'submitted' + (p.by ? ' by ' + p.by : ''), to: href(p), cells: entryCells(R, p)}); });
-    var order = D.rules.order, ids = [], why = {};
+      var rr = (p.cf || {}).rules || {};
+      cols.push({head: p.n, set: rr.set || R.board, sub: 'submitted' + (p.by ? ' by ' + p.by : ''), to: href(p),
+                 cells: entryCells(R, p)}); });
+    var order = D.rules.order, ids = [], why = {}, bad = [], drawn = {};
+    c.points.forEach(function(p){ drawn[p.f + '|' + p.n] = 1; });
     function at(id){ var i = order.indexOf(id); return i < 0 ? order.length : i; }
     cols.forEach(function(col){ Object.keys(col.cells).forEach(function(id){ if (ids.indexOf(id) < 0) ids.push(id); }); });
     ids.sort(function(a, b){ return at(a) - at(b) || (a < b ? -1 : 1); });
@@ -396,7 +408,7 @@ SCRIPT = r"""
       var th = H('th', 'c');
       if (col.to) { var a = H('a', null, col.head); a.href = col.to; a.target = '_blank'; a.rel = 'noopener'; th.appendChild(a); }
       else th.appendChild(document.createTextNode(col.head));
-      th.appendChild(H('small', null, col.sub)); hd.appendChild(th);
+      th.appendChild(setLink(col.set)); th.appendChild(H('small', null, col.sub)); hd.appendChild(th);
     });
     t.appendChild(hd);
     ids.forEach(function(id){
@@ -409,7 +421,12 @@ SCRIPT = r"""
         if (!v) { s = H('span', 'g3r-no', '–'); s.title = 'not one of its rules'; }
         else if (v === 'ok') { s = H('span', 'g3r-ok', '✓'); s.title = 'holds on ' + (col.n === 1 ? 'its one size' : 'all ' + col.n + ' sizes'); }
         else if (v[0] === 'bad' && typeof v[1] !== 'string') {
-          s = H('span', 'g3r-bad', '✗ ' + v[1].length); s.title = 'fails on ' + v[1].length + ' of ' + col.n + ' sizes: ' + v[1].join(', '); }
+          s = H('span', 'g3r-bad', '✗ ' + v[1].length); s.title = 'fails on ' + v[1].length + ' of ' + col.n + ' sizes: ' + v[1].join(', ');
+          bad.push([id, col.head, v[1].length === col.n ? (col.n === 1 ? 'its one size' : 'all ' + col.n + ' sizes')
+                                                       : v[1].length + ' of ' + col.n + ' sizes (' + v[1].join(', ') + ')',
+                    v[1].filter(function(n){ return drawn[col.head + '|' + n]; }), v[1].length, v[2] === 'stamped']);
+          if (v[2] === 'stamped') { s.className = 'g3r-part'; s.title += ', only through transport stamped with a gate: '
+                                    + 'counting gate instructions alone, every qubit’s gates keep the circuit’s order'; } }
         else {
           s = H('span', 'g3r-' + v[0], GLYPH[v[0]]); s.title = (v[0] === 'skip' ? 'not checked: ' : '') + v[1];
           if (v[0] === 'skip' || v[0] === 'part') { var w = (v[0] === 'skip' ? 'not checked: ' : 'checked in part: ') + v[1];
@@ -421,6 +438,19 @@ SCRIPT = r"""
       t.appendChild(tr);
     });
     tw.appendChild(t); host.appendChild(tw);
+    bad.forEach(function(b){
+      var p = H('p', 'g3r-why'), d = b[3];
+      p.appendChild(H('b', null, b[0]));
+      if (b[5]) p.appendChild(document.createTextNode(' fails for ' + b[1] + ' on ' + b[2] + ', but only as the rule '
+        + 'reads a program today. The rule takes a gate to last until the last instruction the compiler stamped '
+        + 'with it, and the compiler stamps the split after a layer of gates with every gate of the layer, so a '
+        + 'qubit’s next gate seems to start before its last one ends. Counting gate instructions alone, every '
+        + 'qubit’s gates keep the circuit’s order. Whether the rule or the stamping changes is still open.'));
+      else p.appendChild(document.createTextNode(' fails for ' + b[1] + ' on ' + b[2] + ', a rule of its own set.'
+        + (d.length ? ' The figures above still draw ' + (d.length === b[4] ? (d.length === 1 ? 'it' : 'them') : d.join(', '))
+          + ': what is drawn was decided by the sweep’s grade, which did not catch this.' : '')));
+      host.appendChild(p);
+    });
     Object.keys(why).forEach(function(w){
       var p = H('p', 'g3r-why'); p.appendChild(H('b', null, why[w].join(', '))); p.appendChild(document.createTextNode(' ' + w + '.'));
       host.appendChild(p);
@@ -472,7 +502,17 @@ def page(PAGE: str, STYLE: str) -> str | None:
         return None
     from . import leaderboard
     cav = "".join(f"<li><b>{_e(f)}*</b> {_e(t)}.</li>" for f, t in d["caveats"].items())
-    sets = ", ".join(f'<a href="../../rules/#set-{_e(n)}">{_e(n)}</a>' for n in (d.get("rules") or {}).get("sets", {}))
+    # each family's own set, as the table's heads name them (a family keeps one set on every code)
+    sets_of: dict = {}
+    for c in d["codes"]:
+        for f, F in ((c.get("rules") or {}).get("fams") or {}).items():
+            sets_of.setdefault(f, F["set"])
+    known = (d.get("rules") or {}).get("sets", {})
+
+    def set_link(n: str) -> str:
+        return f'<a href="../../rules/#set-{_e(n)}">{_e(known[n]["title"] if n in known else n)}</a>'
+    own = "; ".join(f"{_e(f)} by {set_link(sets_of[f])}" for f in d["families"] if f in sets_of)
+    boards = sorted({c["rules"]["board"] for c in d["codes"] if c.get("rules")})
     tries = "".join(f'<div class="g3-try" data-task="{_e(c["task"])}" hidden>'
                     + leaderboard.board_block(c["task"], c["title"], live=False, root="../../").replace(
                         "Coloured dots are submitted designs", "Diamonds are submitted designs") + "</div>"
@@ -514,14 +554,21 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
         '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
-        "<details hidden><summary>The rules every point is judged by</summary>"
-        f"<p>Every rule any point on this code was judged by: the board&rsquo;s rule set ({sets}), and on a "
-        "C2LR lattice the C rules as well. One column per family, its sizes together; a submitted entry is a "
-        "column of its own, with any rules of its own.</p>"
+        "<details hidden><summary>The rules each submission is judged by</summary>"
+        "<p>Every submission is judged by its own rule set, as each paper is on the "
+        '<a href="../../reproduce/">Reproduce</a> page. Each family of the reference sweep is one submission, '
+        "its sizes together, and its machine&rsquo;s paper gives its set: "
+        f"{own}. WISE&rsquo;s paper gives closed forms rather than a schedule&rsquo;s rules, and Conveyor is "
+        "this platform&rsquo;s own design, so both are held to this website&rsquo;s machine. A submitted entry is "
+        "judged by the set it declares, or by the board&rsquo;s ("
+        + ", ".join(set_link(n) for n in boards)
+        + ") when it declares none. Every rule of any of these sets is a row.</p>"
         '<div id="g3-rules"></div>'
-        "<p><small>✓ the rule holds on every size; ✗ it fails, on that many sizes (a size that breaks a rule "
-        "is not plotted); ◐ checked in part; · one of its rules, not checked; – not one of its rules. Each rule "
-        'is written out on the <a href="../../rules/">Rules</a> page.</small></p></details>'
+        "<p><small>✓ the rule holds on every size; ✗ it fails, on that many sizes (in amber: only as the rule "
+        "reads a program today, explained below the table); ◐ it holds on some sizes "
+        "and does not apply to the others; · one of its rules that does not apply to a program (why is "
+        "below the table); – not one of its rules. Each rule and each set is written out on the "
+        '<a href="../../rules/">Rules</a> page.</small></p></details>'
         f'<details><summary>What the starred families cannot show yet</summary><ul>{cav}</ul>'
         "<p>A size counts as failed when the reference compiler refused it or its program broke a rule.</p></details>"
         f"{tries}</div>"

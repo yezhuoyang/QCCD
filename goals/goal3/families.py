@@ -63,6 +63,15 @@ _DIRECT = {   # the shipped grid9x9's own block: every electrode its own DAC
 }
 
 FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor")
+#: each family's own rule set (qccd/ruleset/library), which its points are judged by as an entry's
+#: declared set is: the rules of the paper its machine comes from, where they are written, and
+#: this website's machine where they are not.  WISE's paper gives closed forms, not a schedule's
+#: rules (Reproduce drops it for that), and Conveyor is this platform's own design.
+RULES = {"Grid": "qccdsim",                 # arXiv:2004.04706, QCCDSim's scheduler
+         "WISE": "standard",
+         "C2LR": "c2lr-demonstrated",       # arXiv:2403.00756, its diagonals only (_C2LR)
+         "Cyclone": "cyclone",              # Khan et al., HPCA 2026
+         "Conveyor": "standard"}
 #: what a family's points do not yet show; the figures print these under the panels
 CAVEATS = {
     "WISE": "same program and time as Grid until WISE's broadcast rules exist",
