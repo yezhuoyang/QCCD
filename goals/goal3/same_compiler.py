@@ -9,7 +9,8 @@ Grid or WISE point is compiled again here, on its own device file from the sweep
 `work/<code>/<point>/`, with the compiler QCCD_QCCDC names and the release's limit, and the two
 cooled programs are compared instruction by instruction, each without its `meta` (provenance:
 the tree's path, and the source-op fields newer trees add).  The answers are merged into
-`results/compiler_identity.json`, one row per point.
+`results/compiler_identity.json`, one row per point; a point already compared with the same
+compiler is not compiled again.
 """
 
 from __future__ import annotations
@@ -65,17 +66,21 @@ def main() -> int:
     ap.add_argument("--code", nargs="+", required=True)
     ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args()
+    import sweep
+    have = {(r["code"], r["point"]): r for r in json.loads(OUT.read_text(encoding="utf-8"))} if OUT.exists() else {}
     todo = []
     for code in a.code:
         for r in rows(code):
             if r.get("c2lr") or r["generator"] != "grid" or r["status"] not in ("ok", "rules_failed"):
                 continue
+            if (have.get((code, r["point"])) or {}).get("new_compiler") == sweep.compiler_name():
+                continue                    # compared with this compiler already
             w = find_work(code, r["point"], a.work)
             if w is None:
                 print(f"{code} {r['point']}: no work folder", flush=True)
                 continue
             todo.append((code, r, str(w)))
-    have = {(r["code"], r["point"]): r for r in json.loads(OUT.read_text(encoding="utf-8"))} if OUT.exists() else {}
+    print(f"{len(todo)} to compile", flush=True)
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         for f in as_completed([ex.submit(one, *t) for t in todo]):
             r = f.result()
