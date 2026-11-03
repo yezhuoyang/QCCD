@@ -128,6 +128,31 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-03 00:56 UTC, `qccd-official:5374634` (the rule language reads a quoted name
+given to a word as the thing of that name; commit `5374634`, pushed to `compiler` and
+`website/invitations`; the user asked for it: "Fix the gap", then "Yes do that now"). The grader's
+change is `443c829`: `occupancy("C3", t)` is the occupancy of site C3 (it read 0, the string's), a
+place word given a name that names nothing refuses, and the join indexes key a thing and its quoted
+name alike (`for all t in instants: position(i, t) != "S0"` had held vacuously). No shipped rule
+passes a quoted name to a word, so only an entry's own declared rules could ever have read
+differently. The rest of the range is not read by the grader: the Debug page (`qccd/debug`,
+`qccd/site/debug`) and the recompiled Compilation examples. Built ON THE DROPLET from
+`qccd-official:f79b212`, COPY only (`/root/qccd-5374634`): `qccd/`, `arch/` and `Compiler/bridge`
+are the git archive, and all 777 files equal the image's. The compose file is unchanged (grader 2g,
+256 MB stack). qccd-2e's Goal 3 image (`14bba4f`, BB72 release 2) derives from this one next.
+
+Census before the switch (`census_5374634.sh`, f79b212's kit with the tags moved, about 24 minutes):
+- the rules stage over all 81 stored archives was identical in both images;
+- the evaluation census found no difference in 81/81;
+- the declared-rules census gave 81/81 with the same scored device, rules verdict and metrics;
+- Goal 1, Goal 3 and all 30 boards were identical;
+- the C2LR reference bundle, the two-layer trap and the junction-cornered design graded as before.
+
+Production smoke: `deploy-smoke-5374634` (quota 2, key revoked, token deleted) uploaded both kit
+bundles privately to `surface3xz_mem@1`: `os_d9794a9c86304f5a` (junction-cornered design) and
+`os_5dc1303bbb7eb941` (two-layer, under its own rules), eligible 11/11 in 16 s and 12 s. No redraw
+(`qccd/viz` is unchanged). Rollback is `*.bak-f79b212`.
+
 **Deployed** 2026-11-02 00:00 UTC, `qccd-official:f79b212` (junction corners; commit `f79b212`,
 pushed to `compiler` and `website/invitations`; the user approved it). Ke Sun's report on lesson
 A4: a square trap's corners are junctions, the traps stand only on its sides. `ring` and
