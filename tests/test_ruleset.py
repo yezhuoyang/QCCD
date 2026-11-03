@@ -15,7 +15,7 @@ import pytest
 
 from qccd.api import Machine
 from qccd.cost.models import corrected_model
-from qccd.ruleset import (FAILS, HOLDS, NOT_APPLICABLE, RuleSyntaxError, TERMS, check, load,
+from qccd.ruleset import (FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, RuleSyntaxError, TERMS, check, load,
                           names, problems)
 from qccd.ruleset.programme import programme_execution
 from qccd.ruleset.syntax import parse, parse_formula, show
@@ -177,6 +177,30 @@ def test_a_rule_written_by_hand_is_checked_with_no_code():
     res = judge(rs, m, p.build())
     assert res["X1"].verdict == FAILS and "S2" in res["X1"].examples[0]
     assert res["R1"].verdict == HOLDS        # the core rules come with every rule set
+
+
+def test_a_quoted_name_given_to_a_word_is_that_thing():
+    """`occupancy("S0", t)` is the occupancy of site S0 (it read 0, the string's, until
+    2026-11-02); a name that names nothing is refused rather than read as an empty place; a word
+    that is no thing's name (`can(s, "gate")`) stays a word."""
+    m = Machine.ring(3, 2, 2, name="ring6d")
+    p = m.program("crowd", provenance="off")
+    p.init({"d0": "S1", "d1": "S0"})
+    p.move("d0", "S1", "S0")
+    rs = load('ruleset "named"\n'
+              'rule N1 "S0 never holds two"\n'
+              '  for all t in instants: occupancy("S0", t) <= 1\n'
+              'rule N2 "d0 never stands in S0"\n'
+              '  for all t in instants: position("d0", t) != "S0"\n'
+              'rule N3 "S0 is equipped for gates"\n'
+              '  can("S0", "gate") or not can("S0", "gate")\n'
+              'rule N4 "a site that is not there"\n'
+              '  for all t in instants: occupancy("S99", t) <= 1\n')
+    res = judge(rs, m, p.build())
+    assert res["N1"].verdict == FAILS and "2" in res["N1"].examples[0]
+    assert res["N2"].verdict == FAILS
+    assert res["N3"].verdict == HOLDS
+    assert res["N4"].verdict == UNCHECKED and "nothing here is named 'S99'" in res["N4"].reason
 
 
 def test_a_rule_that_needs_what_an_execution_lacks_does_not_apply():

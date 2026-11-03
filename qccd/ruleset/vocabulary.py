@@ -93,6 +93,14 @@ def _show(x: Any) -> str:
     return repr(x)
 
 
+def _place(x: Any, fn: str) -> Any:
+    """A word about a place given a quoted name that names nothing (`occupancy("C9", t)` on a
+    device without C9) refuses, rather than reading the empty place it would otherwise find."""
+    if isinstance(x, str):
+        raise EvalError(f"{fn} needs a site, junction or rail, and nothing here is named {x!r}")
+    return x
+
+
 def _instant(ctx: Ctx, t: Any, fn: str) -> int:
     if isinstance(t, Instant):
         return t.id
@@ -147,13 +155,13 @@ def _capacity(ctx: Ctx, x):
 
 @term("degree(n)", "a number", "How many rails meet at node n.", "hardware")
 def _degree(ctx: Ctx, n):
-    return ctx.hw.degree.get(n, 0)
+    return ctx.hw.degree.get(_place(n, "degree"), 0)
 
 
 @term("zone(s)", "a name", "The zone type of site s (for example \"gate\", \"storage\", \"O\").",
       "hardware")
 def _zone(ctx: Ctx, s):
-    return ctx.hw.zone.get(s)
+    return ctx.hw.zone.get(_place(s, "zone"))
 
 
 @term("can(s, a)", "true or false", "Whether site s is equipped for ability a: \"gate\" (a laser "
@@ -724,7 +732,7 @@ def _instants(ctx: Ctx):
       schedule="An ion counts in a trap from the moment it starts to arrive until the moment it "
                "has left, and on a rail or in a junction while it is there.")
 def _occupancy(ctx: Ctx, x, t):
-    return ctx.exe.occupancy.at(x, _instant(ctx, t, "occupancy"))
+    return ctx.exe.occupancy.at(_place(x, "occupancy"), _instant(ctx, t, "occupancy"))
 
 
 @term("entered(s, t)", "true or false", "Whether leg s holds two crystals at instant t under "
@@ -734,7 +742,7 @@ def _occupancy(ctx: Ctx, x, t):
       programme="During a step, it holds if it held before the step or holds after it.")
 def _entered(ctx: Ctx, s, t):
     line = ctx.exe.timelines.get("entered")
-    return bool(line.at(s, _instant(ctx, t, "entered"))) if line is not None else False
+    return bool(line.at(_place(s, "entered"), _instant(ctx, t, "entered"))) if line is not None else False
 
 
 @term("final()", "an instant", "The last instant of the execution, when everything is over.",

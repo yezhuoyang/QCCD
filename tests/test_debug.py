@@ -27,7 +27,9 @@ from qccd.debug import web
 
 REPO = Path(__file__).resolve().parents[1]
 C = REPO / "qccd" / "site" / "compiled"
-ARCH, PROG, CERT = C / "chain4.arch.json", C / "bell" / "prog.cooled.tsir.json", C / "bell" / "prog.qcert.json"
+# the Bell pair as the compiler emits it, BEFORE the cooling pass: its MS gate starts hot (R7 fails at
+# step 7), which is exactly what the pass is for -- a program with a known failure, kept in the repository
+ARCH, PROG, CERT = C / "chain4.arch.json", C / "bell" / "prog.tsir.json", C / "bell" / "prog.qcert.json"
 PYODIDE = REPO / "out" / "debug-cache"
 
 from chrome_path import CHROME  # noqa: E402

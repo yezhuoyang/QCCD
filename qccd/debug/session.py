@@ -42,8 +42,7 @@ from ..ruleset.evaluate import FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, Evaluato
 from ..ruleset.model import CircuitOp, Entity, Hop, Instant, Ion, Loop, Op, Rail, Site
 from ..ruleset.model import Step as StepEntity
 from ..ruleset.programme import programme_execution
-from ..ruleset.syntax import (Binder, BinOp, Call, Const, Gen, Node, Not, Quant, Rule, SetLit, Str,
-                               free_names, parse, parse_formula, show, walk)
+from ..ruleset.syntax import BinOp, Call, Quant, Rule, Str, free_names, parse, parse_formula, show, walk
 from ..ruleset.vocabulary import TERMS, EvalError, NotApplicable
 
 __all__ = ["Session", "Failure", "model_from", "open_files", "open_documents", "assertion_rules",
@@ -61,28 +60,6 @@ _TRANSPORT = ("move", "split", "merge", "shuttle", "hop", "junction_enter", "jun
 
 class DebugError(ValueError):
     """Something the person asked for cannot be done, said in their words."""
-
-
-class _Named(Str):
-    """A quoted name that stands for a thing: printed as written, evaluated as the thing."""
-    __slots__ = ("entity",)
-
-
-def _named(x: Str, entity) -> _Named:
-    n = _Named(x.value, x.line)
-    n.entity = entity
-    return n
-
-
-class _Evaluator(Evaluator):
-    """The grader's evaluator, reading a `_Named` as its thing.  Used for what the person
-    writes on the page (assertions, breakpoints, expressions); a shipped rule set is judged by
-    the plain `Evaluator`, exactly as the grader judges it."""
-
-    def ev(self, n, env):
-        if type(n) is _Named:
-            return n.entity
-        return Evaluator.ev(self, n, env)
 
 
 # ------------------------------------------------------------------ inputs
@@ -336,7 +313,7 @@ class Session:
     @property
     def ev(self) -> Evaluator:
         if self._ev is None:
-            self._ev = _Evaluator(self.exe, dict(catalogue().params))
+            self._ev = Evaluator(self.exe, dict(catalogue().params))
         return self._ev
 
     def kind_of(self, nid: Any) -> str:
@@ -490,52 +467,14 @@ class Session:
     # ---------------------------------------------------------------- expressions
 
     def entity(self, name: str):
-        """The ion, site, junction or rail a quoted name stands for, or None."""
-        name = str(name)
-        if name in self._ion_ids:
-            return Ion(name)
-        if name in self._rail_ends:
-            return Rail(name)
-        if name in self._sites or name in self._junctions or                 any(str(n.id) == name for n in self.exe.hardware.nodes):
-            return Site(name)
-        return None
-
-    def resolve(self, n):
-        """A formula with every quoted name that is an argument (`occupancy("C3", t)`) or a
-        set member (`{"C0", "C1"}`) replaced by the ion, site or rail it names.  The rule
-        language compares a quoted name with a thing by its name (`site(g) = "C3"`), but a word
-        given a quoted name looks the string up as it is: `occupancy("C3", t)` reads 0 and
-        `position("q0", t)` refuses.  Written by a person at a breakpoint, both mean the obvious
-        thing, so the debugger reads them that way."""
-        if n is None or not isinstance(n, (Node, Binder)):
-            return n
-        def arg(x):
-            if isinstance(x, Str):
-                e = self.entity(x.value)
-                if e is not None:
-                    return _named(x, e)
-            return self.resolve(x)
-        if isinstance(n, Call):
-            return Call(n.fn, tuple(arg(x) for x in n.args), n.line)
-        if isinstance(n, SetLit):
-            return SetLit(tuple(arg(x) for x in n.items), n.line)
-        if isinstance(n, BinOp):
-            return BinOp(n.op, self.resolve(n.left), self.resolve(n.right), n.line)
-        if isinstance(n, Not):
-            return Not(self.resolve(n.arg), n.line)
-        if isinstance(n, Binder):
-            return Binder(n.names, self.resolve(n.domain))
-        if isinstance(n, Quant):
-            return Quant(n.kind, tuple(self.resolve(b) for b in n.binders), self.resolve(n.where),
-                         self.resolve(n.body), n.line)
-        if isinstance(n, Gen):
-            return Gen(n.kind, self.resolve(n.expr), tuple(self.resolve(b) for b in n.binders),
-                       self.resolve(n.where), n.line)
-        return n
+        """The ion, site, junction or rail a quoted name stands for, or None: the grader's own
+        reading of a quoted name (`Evaluator.named`)."""
+        e = self.ev.named(str(name))
+        return None if isinstance(e, str) else e
 
     def _formula(self, text: str, what: str):
         try:
-            node = self.resolve(parse_formula(text))
+            node = parse_formula(text)
         except RuleSyntaxError as exc:
             raise DebugError(f"that {what} does not parse: {exc}") from None
         _known_words(node, what)
@@ -607,7 +546,6 @@ class Session:
         if rs is not None:
             params.update(rs.params)
         ev = Evaluator(self.exe, params)
-        mine = _Evaluator(self.exe, params)
         want = set(only) if only else None
         todo: list[Rule] = [r for r in (rs.rules if rs else []) if want is None or r.id in want]
         own = assertion_rules(assertions or "")
@@ -618,7 +556,6 @@ class Session:
                 raise DebugError(f"your assertions do not parse: {exc}") from None
             for r in src.rules:
                 r.origin = "yours"
-                r.formula, r.when = self.resolve(r.formula), self.resolve(r.when)
                 for f in (r.formula, r.when):
                     if f is not None:
                         _known_words(f, f"assertion {r.id}")
@@ -630,7 +567,7 @@ class Session:
                 if want is None or r.id in want:
                     todo.append(r)
         for r in todo:
-            out["rules"].append(self._judge(mine if r.origin == "yours" else ev, r, limit))
+            out["rules"].append(self._judge(ev, r, limit))
         out["ok"] = not any(x["verdict"] in (FAILS, UNCHECKED) for x in out["rules"])
         out["failing"] = [x["id"] for x in out["rules"] if x["verdict"] == FAILS]
         return out
@@ -721,7 +658,8 @@ class Session:
         where = self._where(full, inst)
         if not where:
             # `occupancy("C0", t) <= 1` binds only t: the place is the one the formula names
-            where = self._where({f"_{k}": x.entity for k, x in enumerate(_names_in(rule.formula))}, inst)
+            named = [e for e in (self.entity(x) for x in _names_in(rule.formula)) if e is not None]
+            where = self._where({f"_{k}": e for k, e in enumerate(named)}, inst)
         last = p
         if tvar is not None and q is not None and inst is not None:
             last = self._span(ev, q, e, tvar, inst, budget)
@@ -816,31 +754,9 @@ def _known_words(n, what: str) -> None:
                          "vocabulary (the Rules page lists every word)")
 
 
-def _names_in(n) -> list:
-    """The quoted names a formula resolved to things (`_Named`), in order."""
-    out: list = []
-
-    def go(x):
-        if isinstance(x, _Named):
-            out.append(x)
-        elif isinstance(x, (Call,)):
-            for y in x.args:
-                go(y)
-        elif isinstance(x, SetLit):
-            for y in x.items:
-                go(y)
-        elif isinstance(x, BinOp):
-            go(x.left)
-            go(x.right)
-        elif isinstance(x, Not):
-            go(x.arg)
-        elif isinstance(x, (Quant, Gen)):
-            for b in x.binders:
-                go(b.domain)
-            go(x.where)
-            go(x.body if isinstance(x, Quant) else x.expr)
-    go(n)
-    return out
+def _names_in(n) -> list[str]:
+    """The quoted names a formula gives to words (`occupancy("C0", t)`), in order."""
+    return [a.value for x in walk(n) if isinstance(x, Call) for a in x.args if type(a) is Str]
 
 
 def _merge(fails: Sequence[Failure]) -> list[Failure]:

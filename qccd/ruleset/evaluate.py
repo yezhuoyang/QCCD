@@ -158,6 +158,18 @@ class Evaluator:
         self._index: dict[tuple, dict] = {}
         self._domain_cache: dict[int, list] = {}
         self._sim_index: dict[int, Any] = {}
+        self._names: dict[str, Any] | None = None
+
+    def named(self, name: str) -> Any:
+        """The ion, node or rail a quoted name stands for, or the name itself when nothing in the
+        execution has it (a word such as an ability, "gate")."""
+        if self._names is None:
+            hw, names = self.exe.hardware, {}
+            for group in (getattr(hw, "rails", ()), getattr(hw, "nodes", ()), self.exe.ions):
+                for e in group or ():
+                    names[str(e.id)] = e                  # ions last: an ion's name wins
+            self._names = names
+        return self._names.get(name, name)
 
     # ------------------------------------------------------------------ params and names
     def param(self, name: str) -> Any:
@@ -194,7 +206,10 @@ class Evaluator:
                 if n.fn == "count" and len(n.args) == 1:
                     return len(self.ev(n.args[0], env))
                 raise EvalError(f"the vocabulary has no word {n.fn!r}")
-            args = [self.ev(a, env) for a in n.args]
+            # a quoted name given to a word is the thing of that name (`occupancy("C3", t)`), as
+            # it is in a comparison (`site(g) = "C3"`); a word that is no thing's name stays a
+            # word (`can(s, "gate")`)
+            args = [self.named(a.value) if type(a) is Str else self.ev(a, env) for a in n.args]
             return t.fn(self.ctx, *args)
         if isinstance(n, BinOp):
             op = n.op
@@ -600,7 +615,7 @@ class Evaluator:
                     k = self.ev(key_side, {name: v})
                 except (EvalError, NotApplicable):
                     continue
-                for kk in ([_hashable(k)] if kind == "eq" else list(k or ())):
+                for kk in ([_join_key(k)] if kind == "eq" else [_join_key(x) for x in (k or ())]):
                     if exe.kind == "programme":
                         groups.setdefault((kk, o.step), []).append(v)
                     else:
@@ -622,7 +637,7 @@ class Evaluator:
                 pk = self.ev(probe_side, env)
             except EvalError:
                 return []
-            probes = [_hashable(pk)] if kind == "eq" else list(pk or ())
+            probes = [_join_key(pk)] if kind == "eq" else [_join_key(x) for x in (pk or ())]
             out: dict = {}
             for kk in probes:
                 if exe.kind == "programme":
@@ -653,13 +668,13 @@ class Evaluator:
                         k = self.ev(key_side, {name: v})
                     except (EvalError, NotApplicable):
                         continue
-                    idx.setdefault(_hashable(k), []).append(v)
+                    idx.setdefault(_join_key(k), []).append(v)
                 self._index[ikey] = idx
             try:
                 probe = self.ev(probe_side, env)
             except EvalError:
                 return []
-            return idx.get(_hashable(probe), [])
+            return idx.get(_join_key(probe), [])
         return gen
 
     def _elem_gen(self, key_side: Node, probe_side: Node, name: str, dom: Node, nameset: set):
@@ -671,11 +686,11 @@ class Evaluator:
                 idx = {}
                 for v in self.domain(dom, env, nameset):
                     for k in self.ev(key_side, {name: v}) or ():
-                        idx.setdefault(k, []).append(v)
+                        idx.setdefault(_join_key(k), []).append(v)
                 self._index[ikey] = idx
             out: dict = {}
             for k in self.ev(probe_side, env) or ():
-                for v in idx.get(k, ()):
+                for v in idx.get(_join_key(k), ()):
                     out[id(v)] = v
             return sorted(out.values(), key=_order)
         return gen
@@ -927,6 +942,17 @@ def _hashable(v: Any) -> Any:
     if isinstance(v, set):
         return frozenset(v)
     return v
+
+
+def _join_key(v: Any) -> Any:
+    """A value as an index key, with a thing and its quoted name one key (`_same`'s equality:
+    `position(i, t) != "S0"` must find the instants where i stands in site S0).  Things of two
+    kinds sharing a name share the key; an index only proposes candidates, and each is tested."""
+    if isinstance(v, Entity) and not isinstance(v, (Instant, Step)):
+        return ("named", str(v.id))
+    if isinstance(v, str):
+        return ("named", v)
+    return _hashable(v)
 
 
 def _order(v: Any) -> Any:
