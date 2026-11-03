@@ -128,6 +128,47 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-03 17:13 UTC, `qccd-official:7136b0c`: the rule language no longer counts
+transport stamped with a circuit operation as carrying it out. The commit, `7136b0c`, is pushed to
+`compiler` and `website/invitations`. The user decided the reading ("Change the rule's reading")
+and approved the switch.
+- `performers(c)` now reads only the gates, measurements and resets stamped with c, and so do
+  `first`, `last` and `performed`.
+- Before, R25 and R26 failed on qccdc's race-track pass, which stamps the split after a gate layer
+  with every gate of the layer, although no gate moved. An entry declaring the `cyclone` set and
+  compiled through the race track would have been refused, though check_cert's order check passes
+  it.
+- The schedule reading is unchanged: it only ever matches two-qubit gates.
+- Also in the range, and not read by the grader: `qccd/site/goal3.py` and `qccd/site/evaluation.py`.
+
+Built ON THE DROPLET from `qccd-official:6c2c076`, COPY only (`/root/qccd-7136b0c`). `qccd/`,
+`arch/` and `Compiler/bridge` are the git archive, and all 781 files equal the image's. The image
+differs from 6c2c076's in exactly those three files. The compose file is unchanged (grader 2g,
+256 MB stack).
+
+Census before the switch (`census_7136b0c.sh`, 5374634's kit with the tags moved and one step
+added, about 23 minutes):
+- The rules stage over all 83 stored archives was identical in both images.
+- The declared-rules census gave 83/83 with the same scored device, rules verdict and metrics.
+- The evaluation census differed on one private submission, `os_5dc1303bbb7eb941` (two-layer):
+  T_quantinuum 114.844 -> 109.072. Production's own code gives the same difference
+  (`eval_one.py`, with nothing mounted). The census tool replaces a device's physics with the
+  release's, which drops the junction_cross gap-fills that design declares and the grader keeps.
+  The tool predates declared physics. Not this change.
+- Goal 1, Goal 3 and all 31 boards were identical. The C2LR reference bundle, the two-layer trap
+  and the junction-cornered design graded as before.
+- A race-track Cyclone program (Goal 3, surface3 `cyclone9_j`) was judged by the `cyclone` set:
+  R26 fails 57 times in 6c2c076 and holds in 7136b0c.
+
+Production smoke: `deploy-smoke-7136b0c` (quota 2, key revoked, token deleted) uploaded both kit
+bundles privately to `surface3xz_mem@1`, as `os_d71928ec40b693f0` and `os_cd5abae37dc29061`. Both
+passed 11/11 stages. No redraw (`qccd/viz` is unchanged).
+
+The site got `rules/index.html` (that word's reading) and `debug/qccd-py.zip` (vocabulary.py); the
+backup is `/root/qccd-site-backups/before-rules-reading-9ff9662-20261103.tgz`. `board/goal3/` went
+live in qccd-2e's 45f27c4 build. Rollback is `*.bak-6c2c076`. qccd-28's bb144@2 image derives from
+this one next.
+
 **Deployed** 2026-11-03 01:49 UTC, `qccd-official:6c2c076` (Goal 3's loops get junction corners and
 BB72's Goal 3 board is release 2; commits `a1614dd` and `6c2c076`, pushed to `compiler` and
 `website/invitations`; the user approved it). `goal3_bb72_mem@2` is release 1 with one change:
