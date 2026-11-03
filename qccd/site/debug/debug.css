@@ -1,40 +1,13 @@
 /* The Debug page: an app, one viewport high -- the Studio in its frame on the left, the
    panels on the right, the toolbar above and the timeline below.  The site's sheet (`main`)
-   is a reading column everywhere else; here it is the whole window. */
+   is a reading column everywhere else; here it is the whole window.  The controls themselves
+   are panel.css, shared with the panel a Studio page opens. */
 html,body{height:100%}
 body{overflow:hidden}
 main{max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
  box-shadow:none!important;background:var(--surface)!important;height:calc(100vh - 40px);display:flex;flex-direction:column;
  font:13.5px/1.45 var(--sans)}
-#dbg{display:flex;flex-direction:column;height:100%;min-height:0}
-#dbg button{font:inherit;font-size:13px;border:1px solid #cfceca;background:#fff;color:var(--ink);border-radius:6px;padding:4px 9px;
- cursor:pointer;line-height:1.2;white-space:nowrap}
-#dbg button:hover:not([disabled]){border-color:#9e9c96;background:#fafaf8}
-#dbg button:focus-visible,#dbg input:focus-visible,#dbg select:focus-visible,#dbg textarea:focus-visible{outline:2px solid #bcd4f2;outline-offset:1px}
-#dbg button[disabled]{opacity:.55;cursor:default}
-#dbg button.p{background:var(--accent);border-color:var(--accent);color:#fff}
-#dbg button.p:hover:not([disabled]){background:#1a4f9e}
-#dbg button.tgl.on{background:var(--soft);border-color:#9cb9e4;color:#173f7e}
-#dbg button.fail{color:#b4231e}
-#dbg button.ev{color:#3d5a80}
-#dbg input,#dbg select,#dbg textarea{font:inherit;font-size:13px;border:1px solid #cfceca;border-radius:6px;padding:4px 7px;background:#fff;color:var(--ink)}
-#dbg code,#dbg pre{font-family:var(--mono);font-size:12px}
-.mut{color:var(--ink3)}
-.ok{color:#127a4a}
-.bad{color:#b4231e}
-.grow{flex:1 1 auto}
-
-/* the toolbar */
-#dbgBar{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--paper);border-bottom:1px solid var(--line);
- flex:0 0 auto;flex-wrap:wrap;row-gap:5px}
-#dbgBar .src{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2);font-weight:600}
-#dbgBar .src a{font-weight:400;margin-left:6px;font-size:12px}
-#dbgBar .sep{width:1px;height:22px;background:var(--line);margin:0 3px}
-#dbgBar .tp{display:inline-flex;align-items:center;gap:4px}
-#dbgBar .stepbox{display:inline-flex;align-items:center;gap:5px;color:var(--ink2);margin:0 2px}
-#dStep{width:74px;text-align:right}
-
-/* the stage and the panels */
+#dbg{height:100%}
 #dbgBody{flex:1 1 auto;display:flex;min-height:0}
 #dbgStage{position:relative;flex:1 1 auto;min-width:0;background:#fff}
 #dFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
@@ -42,52 +15,7 @@ main{max-width:none!important;margin:0!important;padding:0!important;border:0!im
 #dSplit:hover{background:#cfd9ea}
 body.dragging,body.dragging *{user-select:none!important}
 body.dragging #dFrame{pointer-events:none}
-#dbgSide{flex:0 0 auto;width:410px;max-width:70vw;min-width:260px;display:flex;flex-direction:column;background:var(--paper);min-height:0}
-#dTabs{display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line);flex:0 0 auto}
-#dTabs [role=tab]{border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:none!important;
- padding:6px 8px!important;color:var(--ink2)}
-#dTabs [role=tab][aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)!important;font-weight:600}
-#dbgSide .pane{flex:1 1 auto;overflow:auto;padding:10px 14px 18px;min-height:0}
-#dbgSide h3{font:600 15px/1.3 var(--sans);margin:2px 0 6px;color:var(--head)}
-#dbgSide h4{font:600 13px/1.3 var(--sans);margin:14px 0 6px;color:var(--head)}
-#dbgSide p{margin:6px 0;max-width:none}
-#dbgSide .what{font-size:14px;margin:2px 0 8px}
-#dbgSide details summary{cursor:pointer;color:var(--ink2);margin:6px 0}
-#dbgSide .row{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
-#dbgSide .row input:not([type=checkbox]){flex:1 1 140px;min-width:0}
-#dbgSide .lab{display:flex;flex-direction:column;gap:3px;margin:8px 0 4px;color:var(--ink2);font-size:12.5px}
-#dbgSide .chk{display:flex;gap:6px;align-items:center;margin:4px 0}
-#dbgSide textarea{width:100%;box-sizing:border-box;font-family:var(--mono);font-size:12px;resize:vertical}
-#dbgSide pre.code{background:#f7f6f2;border:1px solid var(--line);border-radius:6px;padding:7px 9px;white-space:pre-wrap;word-break:break-word;margin:6px 0;max-height:300px;overflow:auto}
-#dbgSide pre.rep{max-height:none}
-#dbgSide ul{margin:4px 0;padding:0;list-style:none}
-#dbgSide ul.kv li{margin:2px 0}
-#dbgSide .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-#dbg button.ent{border:0;background:#eef2f8;color:#173f7e;padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px}
-#dbg button.ent:hover{background:#dbe6f6}
-#dbg button.mini{padding:1px 6px;font-size:12px;margin-left:3px}
-#dbgSide ul.wl li{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:5px 0;border-bottom:1px solid #f0efea}
-#dbgSide ul.wl li .sub{flex:1 0 100%;color:var(--ink2);font-size:12.5px;padding-left:16px}
-#dbgSide ul.fails li{margin:3px 0}
-#dbg button.fl{display:block;width:100%;text-align:left;white-space:normal;border-color:#f0d4d2;background:#fffafa;font-size:12.5px}
-#dbg button.fl:hover{background:#fff1f0;border-color:#e6a8a4}
-#dbgSide .fl .where{font-family:var(--mono);color:#7a1d19;background:#fde8e7;border-radius:3px;padding:0 4px}
-#dbgSide .fl .new{color:#fff;background:#e0201b;border-radius:3px;padding:0 4px;font-size:11px}
-#dbgSide ul.rl li{border-bottom:1px solid #f0efea;padding:5px 0}
-#dbgSide ul.rl li.f{background:linear-gradient(90deg,#fff5f4,transparent 60%)}
-#dbgSide .rh{display:flex;align-items:center;gap:6px}
-#dbgSide .cbsp{display:inline-block;width:13px}
-#dbg button.rbtn{border:0;background:none;padding:2px 0;text-align:left;white-space:normal;flex:1 1 auto;color:var(--ink)}
-#dbg button.rbtn:hover{background:none;text-decoration:underline}
-#dbgSide .vb{font-size:11.5px;border-radius:10px;padding:1px 8px;white-space:nowrap;flex:0 0 auto}
-#dbgSide .vb.ok{background:#e4f5ec;color:#127a4a}
-#dbgSide .vb.bad{background:#fde3e1;color:#b4231e;font-weight:700}
-#dbgSide .vb.na{background:#f0efea;color:var(--ink3)}
-#dbgSide .tag{font-size:11px;background:#efe9fb;color:#5a32b0;border-radius:3px;padding:0 4px}
-
-/* the timeline */
-#dTime{flex:0 0 46px;background:var(--paper);border-top:1px solid var(--line);padding:1px 0;cursor:pointer}
-#dTimeSvg{width:100%;height:44px;display:block}
+#dbgSide{flex:0 0 auto;width:410px;max-width:70vw;min-width:260px}
 
 /* messages over the stage */
 #dMsg{position:absolute;left:12px;bottom:12px;max-width:min(680px,80%);background:rgba(17,24,39,.86);color:#fff;
@@ -96,25 +24,25 @@ body.dragging #dFrame{pointer-events:none}
 
 /* the start: what to open */
 #dStart{position:absolute;inset:0;overflow:auto;background:var(--surface)}
-#dStart .start{max-width:1080px;margin:0 auto;padding:28px 26px 40px}
+#dStart .q-start{max-width:1080px;margin:0 auto;padding:28px 26px 40px}
 #dStart h2{font:600 26px/1.2 var(--serif);margin:0 0 8px;color:var(--head)}
-#dStart .lead{font:15.5px/1.6 var(--serif);color:var(--ink2);max-width:80ch;margin:0 0 18px}
-#dStart .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-#dStart .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
-#dStart .card.wide{grid-column:1/-1}
-#dStart .card h3{font:600 15px/1.3 var(--sans);margin:0 0 6px;color:var(--head)}
-#dStart .card p{margin:0 0 10px;color:var(--ink2)}
+#dStart .q-lead{font:15.5px/1.6 var(--serif);color:var(--ink2);max-width:80ch;margin:0 0 18px}
+#dStart .q-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+#dStart .q-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+#dStart .q-card.q-wide{grid-column:1/-1}
+#dStart .q-card h3{font:600 15px/1.3 var(--sans);margin:0 0 6px;color:var(--head)}
+#dStart .q-card p{margin:0 0 10px;color:var(--ink2)}
 #dStart #sQ{width:100%;box-sizing:border-box;margin:2px 0 8px;font-size:14px;padding:7px 10px}
-#dStart .list{max-height:52vh;overflow:auto}
-#dStart .list h4{font:600 12px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px}
-#dbg button.src{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f0efea;border-radius:0;padding:6px 4px;
- background:none;white-space:normal}
-#dbg button.src:hover{background:var(--soft)}
-#dbg button.src small{display:block;color:var(--ink3);font-family:var(--mono);font-size:11px;margin-top:1px}
+#dStart .q-list{max-height:52vh;overflow:auto}
+#dStart .q-list h4{font:600 12px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px}
+#dbg button.q-src{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f0efea;border-radius:0;padding:6px 4px;
+ background:none;white-space:normal;max-width:none;font-weight:400}
+#dbg button.q-src:hover{background:var(--soft)}
+#dbg button.q-src small{display:block;color:var(--ink3);font-family:var(--mono);font-size:11px;margin-top:1px}
 
 @media (max-width:900px){
  #dbgBody{flex-direction:column}
  #dSplit{display:none}
  #dbgSide{width:auto!important;max-width:none;height:42vh;border-top:1px solid var(--line)}
- #dbgBar .src{max-width:60vw}
+ #dbg .q-src{max-width:60vw}
 }

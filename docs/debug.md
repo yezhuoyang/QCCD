@@ -9,10 +9,13 @@ long as it lasts.  Agents get the same thing twice: on the page (`qccd_page_act`
 
 ## Opening a program
 
-* **From any Studio page**, press **Debug** in the site bar: a leaderboard entry, a Reproduce
-  run, a compiled example or a lesson's page opens in the debugger at the step you were on.
-  From the Design page, your own design and program come along.
-* **On the Debug page**, press **Open**: a program from the website (every Studio page the site
+* **On the program you are looking at**: every Studio page (a leaderboard entry, a Reproduce
+  run, a compiled example, the Design page with your own unsaved design) has a **Debug** button
+  beside its Play/Step controls, and the site bar's **Debug** link does the same there.  The
+  debugger opens as a panel beside the program, at the step you are on: no other page, no
+  reload.  The element rail folds while it is open; **×** (or Debug again) closes it and puts
+  everything back.  A link with `#debug&step=12&watch=q3&check=1` opens a page that way.
+* **On the Debug page** (`/debug/`), press **Open**: a program from the website (every Studio page the site
   build wrote, searchable), your design (the one the Design page last saved in this browser),
   the Design page itself (design and write a program in the frame, then check it there), or a
   file: a Studio page saved from the site, a saved design (`.studio.json`, `.arch.json`), or a
@@ -101,13 +104,22 @@ step, then `find` for the condition that led there.
 |---|---|
 | the model: steps, states, located failures, conditions, expressions | `qccd/debug/session.py` |
 | JSON in/out for the page's worker | `qccd/debug/web.py` |
-| the page: markup, config, the Python zip, the pinned runtime | `qccd/site/debugpage.py` |
-| the page's script and style | `qccd/site/debug/debug.js`, `debug.css` |
+| the page: markup, config, the Python zip, the pinned runtime; the loader every Studio page carries | `qccd/site/debugpage.py` (`LOADER`, `with_loader`) |
+| the script (both hosts: `CFG.host` frame or inpage) and the styles | `qccd/site/debug/debug.js`; `panel.css` (the controls, all under `#dbg`), `debug.css` (the Debug page), `inpage.css` (the panel in a Studio page) |
+| what a Studio page loads when Debug is pressed | `debug/inpage.js` (= debug.js), `debug/inpage.css`, `debug/config.json` |
 | the worker (Pyodide, a module worker) | `qccd/site/debug/worker.js` |
 | the agent verbs | `qccd/site/debug/debug_api.json` (+ `qccd/workspace/interface.py`, `web/pageact.js`) |
 | the headless tool | `qccd/workspace/debugging.py`, `features.py` (`qccd_debug`) |
 
-* **The Studio is not edited.**  The page hosts a Studio page in a frame and reads its tables
+* **In a Studio page**, the site build appends `LOADER` (after the hash router): a Debug button in
+  `#stagebar .ctrl` and a listener on the bar's Debug link, both of which load `debug/inpage.js`
+  on first use and open the panel; stub `QCCD_DEBUG` verbs make an agent's first verb do the same.
+  The panel is `#dbg.inpage`, fixed at the right; `body[data-qdbg]` gives `main` a right margin and
+  the Studio re-lays itself out (`relayout()`).  Every class the debugger uses is `q-` prefixed: the
+  Studio styles `.pane`, `.bad`, `.ok`, `.mut`, `.row`... and its rules would otherwise reach the panel.
+  Plain arrow keys stay the Studio's (the panel follows its `draw()`); Shift/Alt+arrows and F8 are
+  caught before the Studio, which would read Shift+Right as one more step.
+* **The Studio is not edited.**  The Debug page hosts a Studio page in a frame and reads its tables
   through a small inline bridge script (getters for `P`, `states`, `IONP`, ...; no `eval`), wraps
   its `draw()` to repaint one `<g id="qdbg">` appended to its SVG, and seeks with its own `seek`.
   No stamped file changes, so no page needs regenerating and every page already on the site can

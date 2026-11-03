@@ -2207,6 +2207,8 @@ def build(out: Path) -> int:
         if app and debugpage.STUDIO_MARK in page:
             app_pages.append((rel, debugpage.page_title(page)))
         page = with_nav(page, depth, active, idx, app=app, extra=extra)
+        if app:
+            page = debugpage.with_loader(page)  # its Debug button opens the debugger beside the program
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
         p.write_text(page, encoding="utf-8", newline="")
 

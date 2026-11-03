@@ -19,6 +19,10 @@
 (function () {
 'use strict';
 var CFG = window.QCCD_DEBUG_CONFIG || { root: '../', catalogue: [], rulesets: [], examples: [], python: {} };
+// WHERE THE PROGRAM IS.  'frame': the Debug page, the Studio page in its frame (#dFrame).
+// 'inpage': the Studio page itself, the debugger a panel beside it (opened by its Debug button
+// or the bar's Debug link, through the loader the site build puts on every Studio page).
+var HOST = CFG.host === 'inpage' ? 'inpage' : 'frame';
 var NS = 'http://www.w3.org/2000/svg';
 var PALETTE = ['#2a78d6', '#1baf7a', '#7b4ae0', '#d9822b', '#0f9bb0', '#c43d9b', '#8a7d12', '#4b5563'];
 var RED = '#e0201b';
@@ -44,8 +48,53 @@ var S = {
   F: null,                             // the located failures, indexed by frame
   bps: { steps: [], conds: [], onFail: true, onWatch: false },
   exprs: [], exprVals: {},
-  tab: 'state', pending: null, picking: false, flash: null
+  tab: 'state', pending: null, picking: false, flash: null,
+  active: HOST === 'frame'             // in a Studio page: whether the panel is open
 };
+
+// ------------------------------------------------------------------ the controls (both hosts)
+
+var TOOLS_HTML =
+  '<span class="q-tp">' +
+  '<button id="dFirst" type="button" data-hint="debug:first" title="first step (Home)" aria-label="first step">&#x23EE;</button>' +
+  '<button id="dBack" type="button" data-hint="debug:back" title="back one step (Left arrow)" aria-label="back one step">&#x25C0;</button>' +
+  '<label class="q-stepbox">Step <input id="dStep" type="number" min="1" value="1" data-hint="debug:step" aria-label="step number"> ' +
+  '<span id="dOf">/ 0</span></label>' +
+  '<button id="dFwd" type="button" data-hint="debug:forward" title="forward one step (Right arrow)" aria-label="forward one step">&#x25B6;</button>' +
+  '<button id="dLast" type="button" data-hint="debug:last" title="last step (End)" aria-label="last step">&#x23ED;</button></span>' +
+  '<span class="q-sep"></span>' +
+  '<button id="dPrevFail" type="button" class="q-fail" data-hint="debug:prevfail" title="previous step where a rule fails (Shift+Left)">&#x2717;&#x25C0;</button>' +
+  '<button id="dNextFail" type="button" class="q-fail" data-hint="debug:nextfail" title="next step where a rule fails (Shift+Right)">&#x25B6;&#x2717;</button>' +
+  '<button id="dPrevEv" type="button" class="q-ev" data-hint="debug:prevevent" title="previous step where something you watch changes (Alt+Left)">&#x25C6;&#x25C0;</button>' +
+  '<button id="dNextEv" type="button" class="q-ev" data-hint="debug:nextevent" title="next step where something you watch changes (Alt+Right)">&#x25B6;&#x25C6;</button>' +
+  '<button id="dContBack" type="button" data-hint="debug:continueback" title="run backward to the previous breakpoint (Shift+F8)">&#x25C0;&#x25C0;</button>' +
+  '<button id="dCont" type="button" class="q-p" data-hint="debug:continue" title="run forward to the next breakpoint (F8)">Continue &#x25B6;&#x25B6;</button>' +
+  '<span class="q-grow"></span>' +
+  '<button id="dIsolate" type="button" class="q-tgl" aria-pressed="false" data-hint="debug:isolate">Isolate</button>' +
+  '<button id="dTrails" type="button" class="q-tgl q-on" aria-pressed="true" data-hint="debug:trails">Trails</button>' +
+  '<button id="dCrosses" type="button" class="q-tgl q-on" aria-pressed="true" data-hint="debug:crosses">Crosses</button>';
+var SIDE_HTML =
+  '<div id="dTabs" role="tablist">' +
+  '<button type="button" role="tab" data-tab="state" data-hint="debug:tab:state" aria-selected="true">State</button>' +
+  '<button type="button" role="tab" data-tab="watch" data-hint="debug:tab:watch">Watch</button>' +
+  '<button type="button" role="tab" data-tab="rules" data-hint="debug:tab:rules">Rules</button>' +
+  '<button type="button" role="tab" data-tab="breaks" data-hint="debug:tab:breaks">Breakpoints</button>' +
+  '<button type="button" role="tab" data-tab="report" data-hint="debug:tab:report">Report</button></div>' +
+  '<div class="q-pane" id="pState" data-pane="state"></div>' +
+  '<div class="q-pane" id="pWatch" data-pane="watch" hidden></div>' +
+  '<div class="q-pane" id="pRules" data-pane="rules" hidden></div>' +
+  '<div class="q-pane" id="pBreaks" data-pane="breaks" hidden></div>' +
+  '<div class="q-pane" id="pReport" data-pane="report" hidden></div>';
+var TIME_HTML = '<svg id="dTimeSvg" aria-label="timeline: every step, the steps where rules fail and where what you watch changes"></svg>';
+// the panel a Studio page gets: the same controls, one column
+var INPAGE_HTML =
+  '<div class="q-ihead"><b>Debug</b><span id="dSrc" class="q-src" data-hint="debug:source"></span><span class="q-grow"></span>' +
+  '<a id="dFull" target="_blank" rel="noopener" data-hint="debug:fullpage">open in the Debug page</a>' +
+  '<button id="dClose" type="button" data-hint="debug:close" title="close the debugger" aria-label="close the debugger">&times;</button></div>' +
+  '<div id="dbgBar"><span id="dTools" class="q-tools">' + TOOLS_HTML + '</span></div>' +
+  '<div id="dTime" data-hint="debug:timeline">' + TIME_HTML + '</div>' +
+  '<div id="dMsg" role="status"></div>' +
+  '<div id="dbgSide">' + SIDE_HTML + '</div>';
 
 // ------------------------------------------------------------------ the bridge
 //
@@ -79,7 +128,7 @@ function attach(win) {
   var B = bridge(win);
   if (!B.ok) throw new Error(B.why || 'this page has no Studio animation');
   var doc = win.document;
-  if (!doc.getElementById('qdbg-css')) {
+  if (HOST === 'frame' && !doc.getElementById('qdbg-css')) {
     var st = doc.createElement('style');
     st.id = 'qdbg-css';
     st.textContent = FRAME_CSS;
@@ -99,11 +148,14 @@ function attach(win) {
     wrapped.__qdbg = true;
     win.draw = wrapped;
   }
-  // a zoom or a pan changes the viewBox, and the crosses keep their size on screen
-  try {
-    new win.MutationObserver(function () { paint(); }).observe(B.svg, { attributes: true, attributeFilter: ['viewBox'] });
-  } catch (e) { /* no observer: the next draw repaints */ }
-  B.svg.addEventListener('click', onStageClick, true);
+  if (!win.__qdbgAttached) {
+    win.__qdbgAttached = true;
+    // a zoom or a pan changes the viewBox, and the crosses keep their size on screen
+    try {
+      new win.MutationObserver(function () { paint(); }).observe(B.svg, { attributes: true, attributeFilter: ['viewBox'] });
+    } catch (e) { /* no observer: the next draw repaints */ }
+    B.svg.addEventListener('click', onStageClick, true);
+  }
   S.win = win; S.B = B;
   syncFrames(true);
 }
@@ -298,6 +350,7 @@ function continueRun(back) {
 
 function onDraw() {
   if (!S.B) return;
+  if (!S.active) { paint(); return; }
   syncFrames(false);
   var f = S.B.frame;
   if (typeof f === 'number' && f !== S.cur) { S.cur = f; refreshSoon(); }
@@ -350,6 +403,7 @@ function paint() {
   var B = S.B; if (!B) return;
   var doc = S.win.document, svg = B.svg;
   var g = doc.getElementById('qdbg');
+  if (!S.active) { if (g) g.remove(); return; }       // the panel closed: nothing of it stays
   if (!g) { g = svgEl(doc, 'g', { id: 'qdbg' }); }
   if (g.parentNode !== svg || svg.lastChild !== g) svg.appendChild(g);
   while (g.firstChild) g.removeChild(g.firstChild);
@@ -732,7 +786,7 @@ function showTab(t) {
   Array.prototype.forEach.call(document.querySelectorAll('#dTabs [role=tab]'), function (b) {
     b.setAttribute('aria-selected', b.getAttribute('data-tab') === t ? 'true' : 'false');
   });
-  Array.prototype.forEach.call(document.querySelectorAll('#dbgSide .pane'), function (p) {
+  Array.prototype.forEach.call(document.querySelectorAll('#dbgSide .q-pane'), function (p) {
     p.hidden = p.getAttribute('data-pane') !== t;
   });
   renderPane();
@@ -749,7 +803,7 @@ function renderPane() {
 }
 
 function ent(id, kind) {
-  return '<button type="button" class="ent" data-hint="debug:entity" data-ent="' + esc(id) + '" title="watch ' + esc(id) + '">' + esc(id) + '</button>';
+  return '<button type="button" class="q-ent" data-hint="debug:entity" data-ent="' + esc(id) + '" title="watch ' + esc(id) + '">' + esc(id) + '</button>';
 }
 function stateOf(i) {
   var f = frameAt(i), pos = posAfter(i), over = [], counts = {}, k;
@@ -769,47 +823,47 @@ function stateOf(i) {
 
 function renderState() {
   var el = $('pState');
-  if (!S.B) { el.innerHTML = '<p class="mut">Open a program to step through it.</p>'; return; }
+  if (!S.B) { el.innerHTML = '<p class="q-mut">Open a program to step through it.</p>'; return; }
   var st = stateOf(S.cur), f = frameAt(S.cur);
-  var h = '<h3>Step ' + st.step + ' <span class="mut">/ ' + st.of + '</span> <code>' + esc(st.type) + '</code>' +
+  var h = '<h3>Step ' + st.step + ' <span class="q-mut">/ ' + st.of + '</span> <code>' + esc(st.type) + '</code>' +
           (st.class ? ' <code>' + esc(st.class) + '</code>' : '') + '</h3>';
-  h += '<p class="what">' + esc(st.instruction) + '</p>';
+  h += '<p class="q-what">' + esc(st.instruction) + '</p>';
   if (f.moves && f.moves.length) {
-    h += '<details open><summary>' + plural(f.moves.length, 'ion') + ' move</summary><ul class="kv">' +
-      f.moves.slice(0, 40).map(function (m) { return '<li>' + ent(m[0]) + ' <span class="mut">' + esc((m[1] || []).join(' → ')) + '</span></li>'; }).join('') +
-      (f.moves.length > 40 ? '<li class="mut">… and ' + (f.moves.length - 40) + ' more</li>' : '') + '</ul></details>';
+    h += '<details open><summary>' + plural(f.moves.length, 'ion') + ' move</summary><ul class="q-kv">' +
+      f.moves.slice(0, 40).map(function (m) { return '<li>' + ent(m[0]) + ' <span class="q-mut">' + esc((m[1] || []).join(' → ')) + '</span></li>'; }).join('') +
+      (f.moves.length > 40 ? '<li class="q-mut">… and ' + (f.moves.length - 40) + ' more</li>' : '') + '</ul></details>';
   } else if (st.moved.length) {
     h += '<p><b>Moved:</b> ' + st.moved.slice(0, 40).map(function (x) { return ent(x); }).join(' ') + (st.moved.length > 40 ? ' …' : '') + '</p>';
   }
   if (S.rules.result) {
     var fl = st.failures;
-    h += '<h4>' + (fl.length ? '<span class="bad">✗ ' + plural(fl.length, 'failure') + ' here</span>' : '<span class="ok">✓ no shown rule fails here</span>') +
-         (S.rules.stale ? ' <span class="mut">(the program changed since it was checked)</span>' : '') + '</h4>';
-    if (fl.length) h += '<ul class="fails">' + fl.slice(0, 30).map(function (x, j) {
-      return '<li><button type="button" class="fl" data-hint="debug:failure" data-fi="' + j + '"><b>' + esc(x.rule) + '</b> ' +
-        (x.starts_here ? '<span class="new">starts here</span> ' : '<span class="mut">since step ' + x.from + '</span> ') + esc(x.message) + '</button></li>';
+    h += '<h4>' + (fl.length ? '<span class="q-bad">✗ ' + plural(fl.length, 'failure') + ' here</span>' : '<span class="q-ok">✓ no shown rule fails here</span>') +
+         (S.rules.stale ? ' <span class="q-mut">(the program changed since it was checked)</span>' : '') + '</h4>';
+    if (fl.length) h += '<ul class="q-fails">' + fl.slice(0, 30).map(function (x, j) {
+      return '<li><button type="button" class="q-fl" data-hint="debug:failure" data-fi="' + j + '"><b>' + esc(x.rule) + '</b> ' +
+        (x.starts_here ? '<span class="q-new">starts here</span> ' : '<span class="q-mut">since step ' + x.from + '</span> ') + esc(x.message) + '</button></li>';
     }).join('') + '</ul>';
   } else {
-    h += '<p class="mut">Rules: not checked yet. Open <b>Rules</b> and press Check to see what fails here.</p>';
+    h += '<p class="q-mut">Rules: not checked yet. Open <b>Rules</b> and press Check to see what fails here.</p>';
   }
-  if (st.over_capacity.length) h += '<p class="bad"><b>Over capacity:</b> ' + st.over_capacity.map(function (o) { return ent(o.place) + ' ' + o.ions + '/' + o.capacity; }).join(', ') + '</p>';
+  if (st.over_capacity.length) h += '<p class="q-bad"><b>Over capacity:</b> ' + st.over_capacity.map(function (o) { return ent(o.place) + ' ' + o.ions + '/' + o.capacity; }).join(', ') + '</p>';
   if (S.watch.length) {
-    h += '<h4>Watched</h4><ul class="kv">' + S.watch.map(function (w) {
-      return '<li><i class="dot" style="background:' + w.color + '"></i>' + ent(w.id) + ' <span class="mut">' + esc(lookText(st.watch[w.id])) + '</span></li>';
+    h += '<h4>Watched</h4><ul class="q-kv">' + S.watch.map(function (w) {
+      return '<li><i class="q-dot" style="background:' + w.color + '"></i>' + ent(w.id) + ' <span class="q-mut">' + esc(lookText(st.watch[w.id])) + '</span></li>';
     }).join('') + '</ul>';
   }
   if (st.hottest.length && st.hottest[0].nbar > 0) {
-    h += '<h4>Hottest ions <span class="mut">(n̄, the Studio\'s heating)</span></h4><p>' +
+    h += '<h4>Hottest ions <span class="q-mut">(n̄, the Studio\'s heating)</span></h4><p>' +
       st.hottest.map(function (x) { return ent(x.ion) + ' ' + x.nbar; }).join(' · ') + '</p>';
   }
   el.innerHTML = h;
-  Array.prototype.forEach.call(el.querySelectorAll('.fl'), function (b) {
+  Array.prototype.forEach.call(el.querySelectorAll('.q-fl'), function (b) {
     b.onclick = function () { var x = here()[+b.getAttribute('data-fi')]; if (x) selectFailure(x); };
   });
   wireEnts(el);
 }
 function wireEnts(el) {
-  Array.prototype.forEach.call(el.querySelectorAll('.ent'), function (b) {
+  Array.prototype.forEach.call(el.querySelectorAll('.q-ent'), function (b) {
     b.onclick = function () { addWatch([b.getAttribute('data-ent')]); };
   });
 }
@@ -821,36 +875,36 @@ function allIds() {
 
 function renderWatch() {
   var el = $('pWatch');
-  if (!S.B) { el.innerHTML = '<p class="mut">Open a program to watch its ions, sites, junctions and rails.</p>'; return; }
+  if (!S.B) { el.innerHTML = '<p class="q-mut">Open a program to watch its ions, sites, junctions and rails.</p>'; return; }
   var ids = allIds();
-  var h = '<p class="mut">Highlight and follow parts of the machine: each gets a colour on the picture, ions a trail, and ' +
+  var h = '<p class="q-mut">Highlight and follow parts of the machine: each gets a colour on the picture, ions a trail, and ' +
           '◆◀ ▶◆ jump to the steps where any of them changes.</p>' +
-          '<div class="row"><input id="wIn" list="wIds" placeholder="q0, C3, J1 …" data-hint="debug:watch:input" aria-label="ids to watch">' +
+          '<div class="q-row"><input id="wIn" list="wIds" placeholder="q0, C3, J1 …" data-hint="debug:watch:input" aria-label="ids to watch">' +
           '<datalist id="wIds">' + ids.slice(0, 3000).map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>' +
           '<button type="button" id="wAdd" data-hint="debug:watch:add">Watch</button></div>' +
-          '<div class="row"><button type="button" id="wSel" data-hint="debug:watch:selection">Watch the Studio\'s selection</button>' +
-          '<button type="button" id="wPick" class="tgl' + (S.picking ? ' on' : '') + '" aria-pressed="' + S.picking + '" data-hint="debug:watch:pick">Pick on the picture</button></div>';
+          '<div class="q-row"><button type="button" id="wSel" data-hint="debug:watch:selection">Watch the Studio\'s selection</button>' +
+          '<button type="button" id="wPick" class="q-tgl' + (S.picking ? ' q-on' : '') + '" aria-pressed="' + S.picking + '" data-hint="debug:watch:pick">Pick on the picture</button></div>';
   if (S.watch.length) {
-    h += '<ul class="wl">' + S.watch.map(function (w, j) {
+    h += '<ul class="q-wl">' + S.watch.map(function (w, j) {
       var L = lookAt(w, S.cur);
-      return '<li><i class="dot" style="background:' + w.color + '"></i><b>' + esc(w.id) + '</b> <span class="mut">' + esc(w.kind) + '</span>' +
-        '<span class="grow"></span>' +
-        '<button type="button" class="mini" data-hint="debug:watch:prev" data-w="' + j + '" data-a="prev" title="previous step where ' + esc(w.id) + ' changes">◀</button>' +
-        '<button type="button" class="mini" data-hint="debug:watch:next" data-w="' + j + '" data-a="next" title="next step where ' + esc(w.id) + ' changes">▶</button>' +
-        (w.kind === 'ion' ? '<button type="button" class="mini tgl' + (w.trail !== false ? ' on' : '') + '" data-hint="debug:watch:trail" data-w="' + j + '" data-a="trail" title="trail">trail</button>' : '') +
-        '<button type="button" class="mini" data-hint="debug:watch:remove" data-w="' + j + '" data-a="del" title="stop watching" aria-label="stop watching ' + esc(w.id) + '">×</button>' +
-        '<div class="sub">' + esc(lookText(L)) + '</div></li>';
+      return '<li><i class="q-dot" style="background:' + w.color + '"></i><b>' + esc(w.id) + '</b> <span class="q-mut">' + esc(w.kind) + '</span>' +
+        '<span class="q-grow"></span>' +
+        '<button type="button" class="q-mini" data-hint="debug:watch:prev" data-w="' + j + '" data-a="prev" title="previous step where ' + esc(w.id) + ' changes">◀</button>' +
+        '<button type="button" class="q-mini" data-hint="debug:watch:next" data-w="' + j + '" data-a="next" title="next step where ' + esc(w.id) + ' changes">▶</button>' +
+        (w.kind === 'ion' ? '<button type="button" class="q-mini q-tgl' + (w.trail !== false ? ' q-on' : '') + '" data-hint="debug:watch:trail" data-w="' + j + '" data-a="trail" title="trail">trail</button>' : '') +
+        '<button type="button" class="q-mini" data-hint="debug:watch:remove" data-w="' + j + '" data-a="del" title="stop watching" aria-label="stop watching ' + esc(w.id) + '">×</button>' +
+        '<div class="q-sub">' + esc(lookText(L)) + '</div></li>';
     }).join('') + '</ul>';
     h += '<p><button type="button" id="wClear" data-hint="debug:watch:clear">Stop watching all</button></p>';
   }
-  h += '<h4>Watch expressions <span class="mut">(the rule language, with t the instant after this step)</span></h4>' +
-       '<div class="row"><input id="xIn" placeholder="occupancy(&quot;C0&quot;, t)" data-hint="debug:expr:input" aria-label="an expression">' +
+  h += '<h4>Watch expressions <span class="q-mut">(the rule language, with t the instant after this step)</span></h4>' +
+       '<div class="q-row"><input id="xIn" placeholder="occupancy(&quot;C0&quot;, t)" data-hint="debug:expr:input" aria-label="an expression">' +
        '<button type="button" id="xAdd" data-hint="debug:expr:add">Add</button></div>';
-  if (S.exprs.length) h += '<ul class="wl">' + S.exprs.map(function (x, j) {
+  if (S.exprs.length) h += '<ul class="q-wl">' + S.exprs.map(function (x, j) {
     var v = S.exprVals[x];
-    return '<li><code>' + esc(x) + '</code><span class="grow"></span><b class="' + (v && v.error ? 'bad' : '') + '">' +
+    return '<li><code>' + esc(x) + '</code><span class="q-grow"></span><b class="' + (v && v.error ? 'q-bad' : '') + '">' +
       esc(v === undefined ? '…' : (v.error || v.text)) + '</b>' +
-      '<button type="button" class="mini" data-hint="debug:expr:remove" data-x="' + j + '" aria-label="remove">×</button></li>';
+      '<button type="button" class="q-mini" data-hint="debug:expr:remove" data-x="' + j + '" aria-label="remove">×</button></li>';
   }).join('') + '</ul>';
   el.innerHTML = h;
   var inp = $('wIn');
@@ -905,10 +959,10 @@ function renderPy() {
 }
 
 function verdictBadge(v, n) {
-  if (v === 'holds') return '<span class="vb ok">✓ holds</span>';
-  if (v === 'fails') return '<span class="vb bad">✗ fails' + (n ? ' ×' + n : '') + '</span>';
-  if (v === 'does not apply') return '<span class="vb na">does not apply</span>';
-  return '<span class="vb na">could not be checked</span>';
+  if (v === 'holds') return '<span class="q-vb q-ok">✓ holds</span>';
+  if (v === 'fails') return '<span class="q-vb q-bad">✗ fails' + (n ? ' ×' + n : '') + '</span>';
+  if (v === 'does not apply') return '<span class="q-vb q-na">does not apply</span>';
+  return '<span class="q-vb q-na">could not be checked</span>';
 }
 
 function renderRules() {
@@ -917,44 +971,44 @@ function renderRules() {
     CFG.rulesets.map(function (r) {
       return '<option value="' + esc(r.name) + '"' + (r.name === S.rules.set ? ' selected' : '') + '>' + esc(r.name) + ' — ' + esc(r.title || '') + ' (' + r.rules.length + ')</option>';
     }).join('');
-  var h = '<p class="mut">Judge the program by the website\'s rules or your own assertions, in the rule language of the ' +
+  var h = '<p class="q-mut">Judge the program by the website\'s rules or your own assertions, in the rule language of the ' +
           '<a href="' + esc(CFG.root) + 'rules/" target="_blank" rel="noopener">Rules page</a>, by the grader\'s own checker. ' +
           'Every failure is crossed out in red where and when it happens.</p>' +
-          '<label class="lab">Rule set <select id="rSet" data-hint="debug:rules:set">' + opts + '</select></label>' +
-          '<details id="rText"><summary>show the rule set\'s text</summary><pre class="code">' + esc(rulesetText(S.rules.set)) + '</pre></details>' +
-          '<label class="lab">Your assertions <select id="rEx" data-hint="debug:rules:example"><option value="">insert an example…</option>' +
+          '<label class="q-lab">Rule set <select id="rSet" data-hint="debug:rules:set">' + opts + '</select></label>' +
+          '<details id="rText"><summary>show the rule set\'s text</summary><pre class="q-code">' + esc(rulesetText(S.rules.set)) + '</pre></details>' +
+          '<label class="q-lab">Your assertions <select id="rEx" data-hint="debug:rules:example"><option value="">insert an example…</option>' +
           CFG.examples.map(function (x, j) { return '<option value="' + j + '">' + esc(x.t) + '</option>'; }).join('') + '</select></label>' +
           '<textarea id="rAs" rows="5" spellcheck="false" data-hint="debug:rules:assertions" placeholder="for all s in sites, t in instants: occupancy(s, t) <= 1\n\nassert &quot;q0 stays out of C3&quot;:\nfor all t in instants: position(&quot;q0&quot;, t) != &quot;C3&quot;">' + esc(S.rules.assertions) + '</textarea>' +
-          '<div class="row"><button type="button" id="rCheck" class="p" data-hint="debug:rules:check"' + (S.rules.running ? ' disabled' : '') + '>' +
-          (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="mut"></span></div>';
-  if (S.rules.error) h += '<p class="bad">' + esc(S.rules.error) + '</p>';
+          '<div class="q-row"><button type="button" id="rCheck" class="q-p" data-hint="debug:rules:check"' + (S.rules.running ? ' disabled' : '') + '>' +
+          (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="q-mut"></span></div>';
+  if (S.rules.error) h += '<p class="q-bad">' + esc(S.rules.error) + '</p>';
   var r = S.rules.result;
   if (r) {
     var c = { holds: 0, fails: 0, na: 0 };
     r.rules.forEach(function (x) { if (x.verdict === 'holds') c.holds++; else if (x.verdict === 'fails') c.fails++; else c.na++; });
-    h += '<h4>' + plural(r.rules.length, 'rule') + ': <span class="ok">' + c.holds + ' hold</span> · <span class="bad">' + c.fails + ' fail</span> · ' +
-         '<span class="mut">' + c.na + ' do not apply</span> <span class="mut">(' + (S.rules.ms / 1000).toFixed(1) + ' s)</span></h4>';
-    if (S.rules.stale) h += '<p class="bad">The program changed since this check: press Check again.</p>';
-    if (S.B && S.B.P.truncated) h += '<p class="mut">This page carries the first ' + S.n + ' of ' + S.B.P.n_instructions + ' instructions (a page shows at most 20,000): the rules judged those.</p>';
-    else if (PY.aligned === false) h += '<p class="mut">The Studio exported ' + PY.summary.steps + ' instructions for an animation of ' + S.n + ' frames; failures are drawn by position.</p>';
+    h += '<h4>' + plural(r.rules.length, 'rule') + ': <span class="q-ok">' + c.holds + ' hold</span> · <span class="q-bad">' + c.fails + ' fail</span> · ' +
+         '<span class="q-mut">' + c.na + ' do not apply</span> <span class="q-mut">(' + (S.rules.ms / 1000).toFixed(1) + ' s)</span></h4>';
+    if (S.rules.stale) h += '<p class="q-bad">The program changed since this check: press Check again.</p>';
+    if (S.B && S.B.P.truncated) h += '<p class="q-mut">This page carries the first ' + S.n + ' of ' + S.B.P.n_instructions + ' instructions (a page shows at most 20,000): the rules judged those.</p>';
+    else if (PY.aligned === false) h += '<p class="q-mut">The Studio exported ' + PY.summary.steps + ' instructions for an animation of ' + S.n + ' frames; failures are drawn by position.</p>';
     var order = r.rules.slice().sort(function (a, b) { return (a.verdict === 'fails' ? 0 : 1) - (b.verdict === 'fails' ? 0 : 1); });
-    h += '<ul class="rl">' + order.map(function (x) {
+    h += '<ul class="q-rl">' + order.map(function (x) {
       var open = !!S.rules.open[x.id];
-      var s = '<li class="' + (x.verdict === 'fails' ? 'f' : '') + '"><div class="rh">' +
-        (x.verdict === 'fails' ? '<input type="checkbox" data-hint="debug:rules:show" data-show="' + esc(x.id) + '"' + (S.rules.shown[x.id] ? ' checked' : '') + ' title="cross it out on the picture" aria-label="show ' + esc(x.id) + ' on the picture">' : '<span class="cbsp"></span>') +
-        '<button type="button" class="rbtn" data-hint="debug:rule" data-rule="' + esc(x.id) + '"><b>' + esc(x.id) + '</b> ' + esc(x.title) +
-        (x.origin === 'yours' ? ' <span class="tag">yours</span>' : '') + '</button>' + verdictBadge(x.verdict, x.count) + '</div>';
+      var s = '<li class="' + (x.verdict === 'fails' ? 'q-f' : '') + '"><div class="q-rh">' +
+        (x.verdict === 'fails' ? '<input type="checkbox" data-hint="debug:rules:show" data-show="' + esc(x.id) + '"' + (S.rules.shown[x.id] ? ' checked' : '') + ' title="cross it out on the picture" aria-label="show ' + esc(x.id) + ' on the picture">' : '<span class="q-cbsp"></span>') +
+        '<button type="button" class="q-rbtn" data-hint="debug:rule" data-rule="' + esc(x.id) + '"><b>' + esc(x.id) + '</b> ' + esc(x.title) +
+        (x.origin === 'yours' ? ' <span class="q-tag">yours</span>' : '') + '</button>' + verdictBadge(x.verdict, x.count) + '</div>';
       if (open) {
-        s += '<pre class="code">' + esc((x.when ? 'when ' + x.when + ':\n' : '') + x.text) + '</pre>';
-        if (x.reason) s += '<p class="mut">' + esc(x.reason) + '</p>';
+        s += '<pre class="q-code">' + esc((x.when ? 'when ' + x.when + ':\n' : '') + x.text) + '</pre>';
+        if (x.reason) s += '<p class="q-mut">' + esc(x.reason) + '</p>';
         if (x.failures) {
-          s += '<ul class="fails">' + x.failures.slice(0, 60).map(function (f, j) {
+          s += '<ul class="q-fails">' + x.failures.slice(0, 60).map(function (f, j) {
             var steps = f.step === null || f.step === undefined ? 'every step' : 'step ' + f.step + (f.until && f.until > f.step ? '–' + f.until : '');
             var where = (f.where || []).filter(function (w) { return w.kind !== 'circuit'; }).map(function (w) { return w.id; }).slice(0, 4).join(', ');
-            return '<li><button type="button" class="fl" data-hint="debug:failure" data-rule="' + esc(x.id) + '" data-j="' + j + '"><b>' + steps + '</b>' +
-              (where ? ' <span class="where">' + esc(where) + '</span>' : '') + ' ' + esc(f.message) + '</button></li>';
-          }).join('') + (x.failures.length > 60 ? '<li class="mut">… ' + (x.failures.length - 60) + ' more</li>' : '') +
-          (x.truncated ? '<li class="mut">' + x.count + ' counterexamples in all; the first ' + x.failures.length + ' spans are located</li>' : '') + '</ul>';
+            return '<li><button type="button" class="q-fl" data-hint="debug:failure" data-rule="' + esc(x.id) + '" data-j="' + j + '"><b>' + steps + '</b>' +
+              (where ? ' <span class="q-where">' + esc(where) + '</span>' : '') + ' ' + esc(f.message) + '</button></li>';
+          }).join('') + (x.failures.length > 60 ? '<li class="q-mut">… ' + (x.failures.length - 60) + ' more</li>' : '') +
+          (x.truncated ? '<li class="q-mut">' + x.count + ' counterexamples in all; the first ' + x.failures.length + ' spans are located</li>' : '') + '</ul>';
         }
       }
       return s + '</li>';
@@ -971,13 +1025,13 @@ function renderRules() {
   $('rAs').oninput = function () { S.rules.assertions = this.value; };
   $('rAs').onchange = function () { writeUrl(); };
   $('rCheck').onclick = function () { runCheck({}).catch(function () { /* said */ }); };
-  Array.prototype.forEach.call(el.querySelectorAll('[data-rule].rbtn'), function (b) {
+  Array.prototype.forEach.call(el.querySelectorAll('[data-rule].q-rbtn'), function (b) {
     b.onclick = function () { var id = b.getAttribute('data-rule'); S.rules.open[id] = !S.rules.open[id]; renderRules(); };
   });
   Array.prototype.forEach.call(el.querySelectorAll('[data-show]'), function (b) {
     b.onchange = function () { S.rules.shown[b.getAttribute('data-show')] = b.checked; indexFailures(); refresh(); };
   });
-  Array.prototype.forEach.call(el.querySelectorAll('.fl[data-rule]'), function (b) {
+  Array.prototype.forEach.call(el.querySelectorAll('.q-fl[data-rule]'), function (b) {
     b.onclick = function () {
       var id = b.getAttribute('data-rule'), j = +b.getAttribute('data-j');
       var hit = S.F && S.F.list.filter(function (e) { return e.rule === id; })[j];
@@ -992,25 +1046,25 @@ function rulesetText(name) {
 
 function renderBreaks() {
   var el = $('pBreaks');
-  var h = '<p class="mut"><b>Continue ▶▶</b> runs from this step to the next breakpoint; <b>◀◀</b> runs back to the previous one.</p>' +
-    '<label class="chk"><input type="checkbox" id="bFail" data-hint="debug:breaks:onfail"' + (S.bps.onFail ? ' checked' : '') + '> stop where a shown rule starts failing</label>' +
-    '<label class="chk"><input type="checkbox" id="bWatch" data-hint="debug:breaks:onwatch"' + (S.bps.onWatch ? ' checked' : '') + '> stop where something you watch changes</label>' +
-    '<h4>On steps</h4><div class="row"><input id="bStepIn" type="number" min="1" placeholder="step" data-hint="debug:breaks:stepinput" aria-label="a step number">' +
+  var h = '<p class="q-mut"><b>Continue ▶▶</b> runs from this step to the next breakpoint; <b>◀◀</b> runs back to the previous one.</p>' +
+    '<label class="q-chk"><input type="checkbox" id="bFail" data-hint="debug:breaks:onfail"' + (S.bps.onFail ? ' checked' : '') + '> stop where a shown rule starts failing</label>' +
+    '<label class="q-chk"><input type="checkbox" id="bWatch" data-hint="debug:breaks:onwatch"' + (S.bps.onWatch ? ' checked' : '') + '> stop where something you watch changes</label>' +
+    '<h4>On steps</h4><div class="q-row"><input id="bStepIn" type="number" min="1" placeholder="step" data-hint="debug:breaks:stepinput" aria-label="a step number">' +
     '<button type="button" id="bStepAdd" data-hint="debug:breaks:addstep">Add</button>' +
     '<button type="button" id="bHere" data-hint="debug:breaks:here">Add this step</button></div>';
-  if (S.bps.steps.length) h += '<ul class="wl">' + S.bps.steps.slice().sort(function (a, b) { return a - b; }).map(function (s) {
-    return '<li><button type="button" class="ent" data-hint="debug:breaks:go" data-go="' + s + '">step ' + s + '</button><span class="grow"></span>' +
-      '<button type="button" class="mini" data-hint="debug:breaks:remove" data-del="' + s + '" aria-label="remove">×</button></li>';
+  if (S.bps.steps.length) h += '<ul class="q-wl">' + S.bps.steps.slice().sort(function (a, b) { return a - b; }).map(function (s) {
+    return '<li><button type="button" class="q-ent" data-hint="debug:breaks:go" data-go="' + s + '">step ' + s + '</button><span class="q-grow"></span>' +
+      '<button type="button" class="q-mini" data-hint="debug:breaks:remove" data-del="' + s + '" aria-label="remove">×</button></li>';
   }).join('') + '</ul>';
-  h += '<h4>On conditions <span class="mut">(the rule language over the instant t)</span></h4>' +
-    '<div class="row"><input id="bCond" placeholder="occupancy(&quot;J0&quot;, t) > 0" data-hint="debug:breaks:condition" aria-label="a condition">' +
+  h += '<h4>On conditions <span class="q-mut">(the rule language over the instant t)</span></h4>' +
+    '<div class="q-row"><input id="bCond" placeholder="occupancy(&quot;J0&quot;, t) > 0" data-hint="debug:breaks:condition" aria-label="a condition">' +
     '<button type="button" id="bCondAdd" data-hint="debug:breaks:addcond">Add</button></div>';
-  if (S.bps.conds.length) h += '<ul class="wl">' + S.bps.conds.map(function (c, j) {
+  if (S.bps.conds.length) h += '<ul class="q-wl">' + S.bps.conds.map(function (c, j) {
     return '<li><input type="checkbox" data-hint="debug:breaks:condon" data-on="' + j + '"' + (c.on ? ' checked' : '') + ' aria-label="use it"><code>' + esc(c.text) + '</code>' +
-      '<span class="grow"></span><button type="button" class="mini" data-hint="debug:breaks:findprev" data-find="' + j + '" data-back="1" title="find the previous step where it holds">◀</button>' +
-      '<button type="button" class="mini" data-hint="debug:breaks:findnext" data-find="' + j + '" title="find the next step where it holds">▶</button>' +
-      '<button type="button" class="mini" data-hint="debug:breaks:removecond" data-dc="' + j + '" aria-label="remove">×</button>' +
-      (c.error ? '<div class="sub bad">' + esc(c.error) + '</div>' : '') + '</li>';
+      '<span class="q-grow"></span><button type="button" class="q-mini" data-hint="debug:breaks:findprev" data-find="' + j + '" data-back="1" title="find the previous step where it holds">◀</button>' +
+      '<button type="button" class="q-mini" data-hint="debug:breaks:findnext" data-find="' + j + '" title="find the next step where it holds">▶</button>' +
+      '<button type="button" class="q-mini" data-hint="debug:breaks:removecond" data-dc="' + j + '" aria-label="remove">×</button>' +
+      (c.error ? '<div class="q-sub q-bad">' + esc(c.error) + '</div>' : '') + '</li>';
   }).join('') + '</ul>';
   el.innerHTML = h;
   $('bFail').onchange = function () { S.bps.onFail = this.checked; drawTimeline(); };
@@ -1043,27 +1097,65 @@ function find(condition, back, go) {
 
 // ------------------------------------------------------------------ the report
 
-function link() {
-  var u = new URL(location.href);
-  u.search = '';
-  var q = u.searchParams;
-  if (S.src) q.set('src', S.src);
+// what the page shows, as link parameters: the step, the watch list, the rules, the tab
+function stateParams() {
+  var q = new URLSearchParams();
   if (S.B) q.set('step', String(S.cur + 1));
   if (S.watch.length) q.set('watch', S.watch.map(function (w) { return w.id; }).join(','));
   if (S.rules.set && S.rules.set !== 'standard') q.set('rules', S.rules.set);
   if (S.rules.assertions.trim()) q.set('assert', S.rules.assertions);
   if (S.rules.result) q.set('check', '1');
   if (S.tab !== 'state') q.set('tab', S.tab);
-  u.hash = '';
+  return q;
+}
+// this page, as a path under the site's root (board/five_qubit/08_torus4x4.html)
+function sitePath() {
+  try {
+    var root = new URL(CFG.root, location.href).pathname;
+    return location.pathname.indexOf(root) === 0 ? location.pathname.slice(root.length) : location.pathname.replace(/^\//, '');
+  } catch (e) { return ''; }
+}
+// the link that reopens exactly this: on a Studio page, the page itself with `#debug&...`; on the
+// Debug page, `?src=<page>&...`
+function link() {
+  var q = stateParams(), u = new URL(location.href);
+  if (HOST === 'inpage') { u.hash = 'debug' + (String(q) ? '&' + String(q) : ''); return u.href; }
+  u.search = ''; u.hash = '';
+  if (S.src) u.searchParams.set('src', S.src);
+  q.forEach(function (v, k) { u.searchParams.set(k, v); });
   return u.href;
+}
+// from a Studio page: the same program on the Debug page (its list, files, the frame to itself)
+function fullLink() {
+  var q = stateParams(), u = new URL(CFG.root + 'debug/', location.href);
+  u.searchParams.set('src', sitePath());
+  q.forEach(function (v, k) { u.searchParams.set(k, v); });
+  return u.href;
+}
+// `#debug&step=12&watch=q0,C3` (a Studio page's link) as what to show
+function hashState() {
+  var h = (location.hash || '').replace(/^#/, '');
+  if (!/^debug(&|$)/.test(h)) return null;
+  var q = new URLSearchParams(h.replace(/^debug&?/, ''));
+  return { step: +q.get('step') || null, watch: (q.get('watch') || '').split(',').filter(Boolean),
+           rules: q.get('rules'), assertions: q.get('assert'), check: q.get('check') === '1', tab: q.get('tab') };
 }
 var urlTimer = null;
 function writeUrl() {
   if (!history.replaceState) return;
   clearTimeout(urlTimer);
   urlTimer = setTimeout(function () {
-    // a file from the reader's computer has no address: the link names no source then
-    try { history.replaceState(null, '', S.kind === 'file' ? location.pathname : link()); } catch (e) { /* a sandbox */ }
+    try {
+      if (HOST === 'inpage') {
+        // the page's own address, with the debugger's state in its hash while the panel is open
+        if (S.active) history.replaceState(null, '', link());
+        else if (hashState()) history.replaceState(null, '', location.pathname + location.search);
+        var full = $('dFull'); if (full) full.href = fullLink();
+        return;
+      }
+      // a file from the reader's computer has no address: the link names no source then
+      history.replaceState(null, '', S.kind === 'file' ? location.pathname : link());
+    } catch (e) { /* a sandbox */ }
   }, 250);
 }
 function report() {
@@ -1095,11 +1187,11 @@ function report() {
 }
 function renderReport() {
   var el = $('pReport'), rep = report();
-  el.innerHTML = '<p class="mut">What the page shows, as a bug report: paste it into a comment, an issue or a message. The link reopens this page on this program, at this step, with these rules and this watch list.</p>' +
-    '<div class="row"><button type="button" id="repCopy" class="p" data-hint="debug:report:copy">Copy as Markdown</button>' +
+  el.innerHTML = '<p class="q-mut">What the page shows, as a bug report: paste it into a comment, an issue or a message. The link reopens this page on this program, at this step, with these rules and this watch list.</p>' +
+    '<div class="q-row"><button type="button" id="repCopy" class="q-p" data-hint="debug:report:copy">Copy as Markdown</button>' +
     '<button type="button" id="repLink" data-hint="debug:report:link">Copy the link</button>' +
     '<button type="button" id="repJson" data-hint="debug:report:json">Download as data</button></div>' +
-    '<pre class="code rep">' + esc(rep.markdown) + '</pre>';
+    '<pre class="q-code q-rep">' + esc(rep.markdown) + '</pre>';
   $('repCopy').onclick = function () { copy(rep.markdown, 'report copied'); };
   $('repLink').onclick = function () { copy(rep.link, 'link copied'); };
   $('repJson').onclick = function () {
@@ -1169,32 +1261,32 @@ function renderStart() {
   var el = $('dStart'), mine = autosaved();
   var groups = {};
   CFG.catalogue.forEach(function (r) { (groups[r.g] = groups[r.g] || []).push(r); });
-  el.innerHTML = '<div class="start"><h2>Debug a program, step by step</h2>' +
-    '<p class="lead">Open a program, step through it forward and back, watch ions, sites, junctions and rails, and check it ' +
+  el.innerHTML = '<div class="q-start"><h2>Debug a program, step by step</h2>' +
+    '<p class="q-lead">Open a program, step through it forward and back, watch ions, sites, junctions and rails, and check it ' +
     'against the website\'s rules or your own assertions. Every failure is crossed out in red on the picture, where and when it happens.</p>' +
-    '<div class="cards">' +
-    (mine ? '<div class="card"><h3>Your design</h3><p>The design you last left on the Design page: <b>' + esc(mine.name) + '</b>' +
+    '<div class="q-cards">' +
+    (mine ? '<div class="q-card"><h3>Your design</h3><p>The design you last left on the Design page: <b>' + esc(mine.name) + '</b>' +
       (mine.calls ? ', with a program of ' + plural(mine.calls, 'statement') : ', with no program written yet') + '.</p>' +
-      '<button type="button" class="p" id="sMine" data-hint="debug:start:design">Debug my design</button></div>' : '') +
-    '<div class="card"><h3>Design one here</h3><p>Open the Design page in this frame: build a device and write its program, then check it here. Your work stays in the frame.</p>' +
+      '<button type="button" class="q-p" id="sMine" data-hint="debug:start:design">Debug my design</button></div>' : '') +
+    '<div class="q-card"><h3>Design one here</h3><p>Open the Design page in this frame: build a device and write its program, then check it here. Your work stays in the frame.</p>' +
     '<button type="button" id="sStudio" data-hint="debug:start:studio">Open the Design page</button></div>' +
-    '<div class="card"><h3>A file from your computer</h3><p>A Studio page saved from this site (.html), a saved design (.studio.json, .arch.json), ' +
+    '<div class="q-card"><h3>A file from your computer</h3><p>A Studio page saved from this site (.html), a saved design (.studio.json, .arch.json), ' +
     'or a device and its program together: choose the .arch.json and the .tsir.json at once.</p>' +
     '<input type="file" id="sFile" multiple accept=".html,.htm,.json" data-hint="debug:start:file" aria-label="open a file"></div>' +
-    '<div class="card wide"><h3>A program from the website</h3><input id="sQ" type="search" placeholder="search ' + CFG.catalogue.length +
-    ' programs: a board, a design, a paper…" data-hint="debug:start:search" aria-label="search the programs"><div id="sList" class="list"></div></div>' +
+    '<div class="q-card q-wide"><h3>A program from the website</h3><input id="sQ" type="search" placeholder="search ' + CFG.catalogue.length +
+    ' programs: a board, a design, a paper…" data-hint="debug:start:search" aria-label="search the programs"><div id="sList" class="q-list"></div></div>' +
     '</div></div>';
   var list = function () {
     var q = ($('sQ').value || '').toLowerCase().split(/\s+/).filter(Boolean), h = '', shown = 0;
     Object.keys(groups).forEach(function (g) {
       var rows = groups[g].filter(function (r) { var s = (r.t + ' ' + r.u).toLowerCase(); return q.every(function (w) { return s.indexOf(w) >= 0; }); });
       if (!rows.length) return;
-      h += '<h4>' + esc(g) + ' <span class="mut">' + rows.length + '</span></h4>' + rows.slice(0, q.length ? 200 : 12).map(function (r) {
+      h += '<h4>' + esc(g) + ' <span class="q-mut">' + rows.length + '</span></h4>' + rows.slice(0, q.length ? 200 : 12).map(function (r) {
         shown++;
-        return '<button type="button" class="src" data-hint="debug:start:program" data-src="' + esc(r.u) + '">' + esc(r.t) + '<small>' + esc(r.u) + '</small></button>';
-      }).join('') + (rows.length > (q.length ? 200 : 12) ? '<p class="mut">… type to narrow ' + rows.length + ' programs</p>' : '');
+        return '<button type="button" class="q-src" data-hint="debug:start:program" data-src="' + esc(r.u) + '">' + esc(r.t) + '<small>' + esc(r.u) + '</small></button>';
+      }).join('') + (rows.length > (q.length ? 200 : 12) ? '<p class="q-mut">… type to narrow ' + rows.length + ' programs</p>' : '');
     });
-    $('sList').innerHTML = h || '<p class="mut">No program matches.</p>';
+    $('sList').innerHTML = h || '<p class="q-mut">No program matches.</p>';
     Array.prototype.forEach.call($('sList').querySelectorAll('[data-src]'), function (b) {
       b.onclick = function () { open(b.getAttribute('data-src')); };
     });
@@ -1318,7 +1410,8 @@ var API = {
   open: function (a) { return open(String(arg(a).src || '')); },
   status: function () {
     var r = S.rules.result;
-    return { open: S.B ? { title: S.title, src: S.src, steps: S.n } : null, step: S.B ? S.cur + 1 : null,
+    return { host: HOST === 'inpage' ? 'this Studio page' : 'the Debug page', panel_open: S.active,
+             open: S.B ? { title: S.title, src: S.src, steps: S.n } : null, step: S.B ? S.cur + 1 : null,
              watch: S.watch.map(function (w) { return { id: w.id, kind: w.kind }; }), isolate: S.isolate,
              rules: { set: S.rules.set, assertions: S.rules.assertions, checked: !!r, stale: S.rules.stale, running: S.rules.running,
                       failing: r ? r.failing : null, error: S.rules.error || null },
@@ -1386,6 +1479,21 @@ var API = {
   report: function () { return report(); },
   link: function () { return { link: link() }; }
 };
+if (HOST === 'inpage') {
+  API.open = function (a) {
+    var src = String(arg(a).src || '');
+    if (!src || src === 'design' || src === 'studio') src = 'studio.html';
+    var to = new URL(CFG.root + src.replace(/^\/+/, ''), location.href);
+    to.hash = 'debug';
+    setTimeout(function () { location.assign(to.href); }, 50);
+    return { navigating: to.pathname + to.hash, note: 'the debugger opens beside that page\'s program' };
+  };
+  Object.keys(API).forEach(function (k) {
+    if (k === 'about' || k === 'sources' || k === 'open' || k === 'link') return;
+    var f = API[k];
+    API[k] = function (a) { return S.active ? f(a) : enter().then(function () { return f(a); }); };
+  });
+}
 window.QCCD_DEBUG = API;
 
 // what every control does, in the words an agent and the hover card read (docs/agent-interface.md)
@@ -1393,6 +1501,8 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
   'debug:open': { t: 'Open', d: 'choose the program to debug: one from the website, your design, the Design page, or a file' },
   'debug:source': { t: 'Program', d: 'the program open in the page' },
   'debug:source:page': { t: 'Open the page', d: 'the program\'s own page, in a new tab' },
+  'debug:fullpage': { t: 'Open in the Debug page', d: 'this program on the Debug page, in a new tab: its list of every program, files from your computer' },
+  'debug:close': { t: 'Close the debugger', d: 'close the panel; the program stays where it is' },
   'debug:first': { t: 'First step', d: 'go to step 1' },
   'debug:back': { t: 'Back', d: 'go back one step' },
   'debug:step': { t: 'Step', d: 'the step shown; type a number to go there' },
@@ -1461,11 +1571,11 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
 
 function syncToggles() {
   [['dIsolate', S.isolate], ['dTrails', S.trails], ['dCrosses', S.crosses]].forEach(function (p) {
-    var b = $(p[0]); b.className = 'tgl' + (p[1] ? ' on' : ''); b.setAttribute('aria-pressed', String(!!p[1]));
+    var b = $(p[0]); b.className = 'q-tgl' + (p[1] ? ' q-on' : ''); b.setAttribute('aria-pressed', String(!!p[1]));
   });
 }
-function wire() {
-  $('dOpen').onclick = function () { showStart(true); };
+// the toolbar, the tabs and the timeline: the same on both hosts
+function wireTools() {
   $('dFirst').onclick = function () { goto(0); };
   $('dBack').onclick = function () { stepBy(-1); };
   $('dFwd').onclick = function () { stepBy(1); };
@@ -1483,23 +1593,32 @@ function wire() {
   Array.prototype.forEach.call(document.querySelectorAll('#dTabs [role=tab]'), function (b) {
     b.onclick = function () { showTab(b.getAttribute('data-tab')); };
   });
-  document.addEventListener('keydown', function (e) {
-    var t = e.target, tag = t && t.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
-    if (!S.B) return;
-    var k = e.key, done = true;
-    if (k === 'ArrowRight' && e.shiftKey) nextFailure(false);
-    else if (k === 'ArrowLeft' && e.shiftKey) nextFailure(true);
-    else if (k === 'ArrowRight' && e.altKey) nextEvent(false);
-    else if (k === 'ArrowLeft' && e.altKey) nextEvent(true);
-    else if (k === 'ArrowRight') stepBy(1);
-    else if (k === 'ArrowLeft') stepBy(-1);
-    else if (k === 'Home') goto(0);
-    else if (k === 'End') goto(S.n - 1);
-    else if (k === 'F8') continueRun(e.shiftKey);
-    else done = false;
-    if (done) e.preventDefault();
-  });
+}
+// the debugger's keys.  On the Debug page every key below; in a Studio page the plain arrows,
+// Home and End stay the Studio's own (it steps, and the panel follows), and the debugger takes
+// only the keys the Studio does not have -- caught before the Studio, which would otherwise read
+// Shift+Right as one more step too.
+function onKey(e) {
+  var t = e.target, tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+  if (!S.B || !S.active) return;
+  var k = e.key, mod = e.shiftKey || e.altKey, done = true;
+  if (k === 'ArrowRight' && e.shiftKey) nextFailure(false);
+  else if (k === 'ArrowLeft' && e.shiftKey) nextFailure(true);
+  else if (k === 'ArrowRight' && e.altKey) nextEvent(false);
+  else if (k === 'ArrowLeft' && e.altKey) nextEvent(true);
+  else if (k === 'F8') continueRun(e.shiftKey);
+  else if (HOST === 'inpage') done = false;
+  else if (k === 'ArrowRight') stepBy(1);
+  else if (k === 'ArrowLeft') stepBy(-1);
+  else if (k === 'Home') goto(0);
+  else if (k === 'End') goto(S.n - 1);
+  else done = false;
+  if (done) { e.preventDefault(); if (HOST === 'inpage' && (mod || k === 'F8')) e.stopImmediatePropagation(); }
+}
+function wirePage() {
+  $('dOpen').onclick = function () { showStart(true); };
+  document.addEventListener('keydown', onKey);
   // the divider: the panel's width, remembered
   var split = $('dSplit'), side = $('dbgSide');
   try { var w0 = +localStorage.getItem('qccd.debug.side'); if (w0 > 240) side.style.width = w0 + 'px'; } catch (e) { /* default */ }
@@ -1516,8 +1635,91 @@ function wire() {
   window.addEventListener('resize', function () { drawTimeline(); });
 }
 
+// ------------------------------------------------------------------ in a Studio page
+
+// the Studio has its program once it has booted (or said why it cannot)
+function studioReady() {
+  return new Promise(function (resolve, reject) {
+    var t0 = Date.now();
+    (function poll() {
+      var E = window.EDITOR, ok = false;
+      try { ok = !!(E && ((E.ready && E.ready()) || (E.why && E.why()))); } catch (e) { ok = false; }
+      if (ok) { resolve(); return; }
+      if (Date.now() - t0 > 20000) { reject(new Error('the Studio on this page did not finish loading')); return; }
+      setTimeout(poll, 100);
+    })();
+  });
+}
+// the panel open or shut: the Studio gives up the panel's width and lays itself out again
+function setLayout(on) {
+  // the element rail folds while the panel is open (the picture needs the width more than the
+  // parts do; its grip opens it again) and comes back as it was
+  var rail = $('rail');
+  if (rail && typeof window.foldPanel === 'function') {
+    try {
+      if (on) { S.railWas = rail.getAttribute('data-collapsed') === '1'; if (!S.railWas) window.foldPanel(rail, true); }
+      else if (S.railWas === false) window.foldPanel(rail, false);
+    } catch (e) { /* the rail stays as it is */ }
+  }
+  if (on) document.body.setAttribute('data-qdbg', '1'); else document.body.removeAttribute('data-qdbg');
+  try { if (typeof window.relayout === 'function') window.relayout(); } catch (e) { /* lays out itself */ }
+  var btn = $('qdbgBtn');
+  if (btn) { btn.className = 'tgl' + (on ? ' on' : ''); btn.setAttribute('aria-pressed', String(!!on)); }
+}
+function enter(state) {
+  if (S.active && $('dbg')) return Promise.resolve(API.status());
+  return studioReady().then(function () {
+    if (!$('dbg')) {
+      var a = document.createElement('aside');
+      a.id = 'dbg'; a.className = 'inpage'; a.setAttribute('aria-label', 'Debug');
+      a.innerHTML = INPAGE_HTML;
+      document.body.appendChild(a);
+      wireTools();
+      $('dClose').onclick = function () { exit(); };
+    }
+    S.active = true;
+    setLayout(true);
+    attach(window);
+    S.src = sitePath(); S.kind = 'page'; S.title = document.title;
+    $('dSrc').textContent = S.title;
+    var st = state || hashState() || {};
+    if (st.rules) S.rules.set = st.rules;
+    if (st.assertions) S.rules.assertions = st.assertions;
+    syncToggles();
+    showTab(st.tab || S.tab);
+    if (st.watch && st.watch.length) addWatch(st.watch);
+    // where the reader already is: the Studio's own step, unless a link names another
+    goto(st.step ? st.step - 1 : (typeof S.B.frame === 'number' ? S.B.frame : 0));
+    say(S.n ? 'debugging this program: \u25C0 \u25B6 step it, Rules checks it, \u00d7 closes the panel'
+            : 'this program has no steps yet: write one in the Write pane');
+    if (st.check) runCheck({}).catch(function () { /* said */ });
+    return API.status();
+  });
+}
+function exit() {
+  if (!S.active) return { open: false };
+  S.active = false; S.picking = false;
+  var p = $('dbg'); if (p) p.remove();
+  setLayout(false);
+  paint();
+  writeUrl();
+  return { open: false };
+}
+
 function boot() {
-  wire();
+  if (HOST === 'inpage') {
+    window.QCCD_DEBUG_INPAGE = { enter: enter, exit: exit,
+                                 toggle: function () { return S.active ? Promise.resolve(exit()) : enter(); },
+                                 get active() { return S.active; } };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', function () { if (S.active) drawTimeline(); });
+    return;
+  }
+  $('dTools').innerHTML = TOOLS_HTML;
+  $('dbgSide').innerHTML = SIDE_HTML;
+  $('dTime').innerHTML = TIME_HTML;
+  wireTools();
+  wirePage();
   syncToggles();
   var q = new URLSearchParams(location.search);
   if (q.get('rules')) S.rules.set = q.get('rules');

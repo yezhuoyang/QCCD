@@ -97,7 +97,7 @@ context; `qccd_get_context` lists the open `pages`).
   `fill` (a field or select), `press` (Enter, Escape, arrows...), `navigate` (another page of the
   site, e.g. `../physics/`), `step` (an animation: `step=N`, `delta`, `play`, `pause`; an
   embedded example is `target={"frame": "f3"}`), `open_lesson` (on the Studio page), `debug` (on
-  the Debug page `/web/debug/`: verb `open`, `goto`, `step`, `watch`, `check`, `failures`, `find`,
+  any Studio page, where the debugger opens beside the program, or on `/web/debug/`: verb `goto`, `step`, `watch`, `check`, `failures`, `find`,
   `continue`, `report`..., one object in `args`; `verbs` lists them).
 - Targets are refs from your last read, a CSS `selector`, or visible `text`.
 - The chat itself is out of your reach, and links off the site are refused: give the person

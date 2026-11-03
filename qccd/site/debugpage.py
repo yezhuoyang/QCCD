@@ -229,30 +229,14 @@ def config(cat: list[dict], root: str = "../") -> dict:
             "verbs": sorted(api["verbs"])}
 
 
+#: the Debug page's frame; the toolbar, the panels and the timeline are debug.js's own (TOOLS_HTML,
+#: SIDE_HTML, TIME_HTML), the same controls a Studio page's panel carries
 BODY = """<div id="dbg">
 <header id="dbgBar">
   <button id="dOpen" type="button" data-hint="debug:open">Open&hellip;</button>
-  <span id="dSrc" class="src" data-hint="debug:source">no program open</span>
-  <span class="sep"></span>
-  <span class="tp">
-    <button id="dFirst" type="button" data-hint="debug:first" title="first step (Home)" aria-label="first step">&#x23EE;</button>
-    <button id="dBack" type="button" data-hint="debug:back" title="back one step (Left arrow)" aria-label="back one step">&#x25C0;</button>
-    <label class="stepbox">Step <input id="dStep" type="number" min="1" value="1" data-hint="debug:step"
-      aria-label="step number"> <span id="dOf">/ 0</span></label>
-    <button id="dFwd" type="button" data-hint="debug:forward" title="forward one step (Right arrow)" aria-label="forward one step">&#x25B6;</button>
-    <button id="dLast" type="button" data-hint="debug:last" title="last step (End)" aria-label="last step">&#x23ED;</button>
-  </span>
-  <span class="sep"></span>
-  <button id="dPrevFail" type="button" class="fail" data-hint="debug:prevfail" title="previous step where a rule fails (Shift+Left)">&#x2717;&#x25C0;</button>
-  <button id="dNextFail" type="button" class="fail" data-hint="debug:nextfail" title="next step where a rule fails (Shift+Right)">&#x25B6;&#x2717;</button>
-  <button id="dPrevEv" type="button" class="ev" data-hint="debug:prevevent" title="previous step where something you watch changes (Alt+Left)">&#x25C6;&#x25C0;</button>
-  <button id="dNextEv" type="button" class="ev" data-hint="debug:nextevent" title="next step where something you watch changes (Alt+Right)">&#x25B6;&#x25C6;</button>
-  <button id="dContBack" type="button" data-hint="debug:continueback" title="run backward to the previous breakpoint">&#x25C0;&#x25C0;</button>
-  <button id="dCont" type="button" class="p" data-hint="debug:continue" title="run forward to the next breakpoint (F8)">Continue &#x25B6;&#x25B6;</button>
-  <span class="grow"></span>
-  <button id="dIsolate" type="button" class="tgl" aria-pressed="false" data-hint="debug:isolate">Isolate</button>
-  <button id="dTrails" type="button" class="tgl on" aria-pressed="true" data-hint="debug:trails">Trails</button>
-  <button id="dCrosses" type="button" class="tgl on" aria-pressed="true" data-hint="debug:crosses">Crosses</button>
+  <span id="dSrc" class="q-src" data-hint="debug:source">no program open</span>
+  <span class="q-sep"></span>
+  <span id="dTools" class="q-tools"></span>
 </header>
 <div id="dbgBody">
   <section id="dbgStage">
@@ -261,29 +245,90 @@ BODY = """<div id="dbg">
     <div id="dMsg" role="status"></div>
   </section>
   <div id="dSplit" data-hint="debug:split" title="drag to resize"></div>
-  <aside id="dbgSide">
-    <nav id="dTabs" role="tablist">
-      <button type="button" role="tab" data-tab="state" data-hint="debug:tab:state" aria-selected="true">State</button>
-      <button type="button" role="tab" data-tab="watch" data-hint="debug:tab:watch">Watch</button>
-      <button type="button" role="tab" data-tab="rules" data-hint="debug:tab:rules">Rules</button>
-      <button type="button" role="tab" data-tab="breaks" data-hint="debug:tab:breaks">Breakpoints</button>
-      <button type="button" role="tab" data-tab="report" data-hint="debug:tab:report">Report</button>
-    </nav>
-    <div class="pane" id="pState" data-pane="state"></div>
-    <div class="pane" id="pWatch" data-pane="watch" hidden></div>
-    <div class="pane" id="pRules" data-pane="rules" hidden></div>
-    <div class="pane" id="pBreaks" data-pane="breaks" hidden></div>
-    <div class="pane" id="pReport" data-pane="report" hidden></div>
-  </aside>
+  <aside id="dbgSide"></aside>
 </div>
-<div id="dTime" data-hint="debug:timeline"><svg id="dTimeSvg" aria-label="timeline: every step, the steps where rules fail and where what you watch changes"></svg></div>
+<div id="dTime" data-hint="debug:timeline"></div>
 </div>"""
 
 
+#: What every Studio page of the site carries (the site build appends it, as it does the hash
+#: router): a Debug button beside the Studio's transport, and the bar's Debug link, both of which
+#: open the debugger HERE, beside the program the reader is looking at -- no other page, no reload,
+#: the reader's own unsaved design included.  The debugger itself (debug/inpage.js, inpage.css,
+#: config.json) loads the first time it is opened.  An agent's `debug` verbs work on the page
+#: before then: each opens the panel and runs.  Nothing happens inside a frame (the Debug page's
+#: own, an embedded example) or on an embed.
+LOADER = r"""<script id="qdbg-loader">
+(function(){
+  if(window.self !== window.top || /(^|[#&])embed(&|$)/.test(location.hash)) return;
+  var nav = document.getElementById('sitenav'), brand = nav && nav.querySelector('.sn-brand');
+  if(!brand || !document.getElementById('svg')) return;
+  var ROOT = brand.getAttribute('href') || './', VERBS = __VERBS__, loading = null;
+  function load(){
+    if(window.QCCD_DEBUG_INPAGE) return Promise.resolve(window.QCCD_DEBUG_INPAGE);
+    if(loading) return loading;
+    loading = fetch(ROOT + 'debug/config.json').then(function(r){
+      if(!r.ok) throw new Error('the debugger is not on this site');
+      return r.json();
+    }).then(function(cfg){
+      cfg.host = 'inpage'; cfg.root = ROOT; cfg.python = cfg.python || {};
+      cfg.python.worker = ROOT + 'debug/worker.js';
+      window.QCCD_DEBUG_CONFIG = cfg;
+      return new Promise(function(ok, no){
+        var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = ROOT + 'debug/inpage.css';
+        document.head.appendChild(l);
+        var s = document.createElement('script'); s.src = ROOT + 'debug/inpage.js';
+        s.onload = function(){ ok(window.QCCD_DEBUG_INPAGE); };
+        s.onerror = function(){ no(new Error('the debugger did not load')); };
+        document.head.appendChild(s);
+      });
+    });
+    loading.catch(function(){ loading = null; });
+    return loading;
+  }
+  function toggle(e){
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    load().then(function(D){ return D.toggle(); }).catch(function(err){ if(window.console) console.warn(err); });
+  }
+  function start(){
+    var bar = document.querySelector('#stagebar .ctrl');
+    if(bar && !document.getElementById('qdbgBtn')){
+      var b = document.createElement('button');
+      b.id = 'qdbgBtn'; b.type = 'button'; b.className = 'tgl'; b.setAttribute('aria-pressed', 'false');
+      b.setAttribute('data-hint', 'debug:enter'); b.textContent = 'Debug';
+      b.title = 'debug this program here: step it forward and back, watch ions and places, check rules (failures are crossed out in red)';
+      b.addEventListener('click', toggle);
+      var after = document.getElementById('tLabels');
+      if(after && after.parentNode === bar) bar.insertBefore(b, after.nextSibling); else bar.appendChild(b);
+    }
+    var link = document.getElementById('sn-debug');
+    if(link) link.addEventListener('click', toggle);
+    if(/^#debug(&|$)/.test(location.hash)) load().then(function(D){ return D.enter(); }).catch(function(){});
+  }
+  window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'debug:enter': { t: 'Debug',
+    d: 'debug this program here, beside it: step forward and back, watch ions and places, check rules and your own assertions, see where they fail' } });
+  if(!window.QCCD_DEBUG){
+    var stub = {};
+    VERBS.forEach(function(v){ stub[v] = function(a){ return load().then(function(D){
+      return v === 'about' || v === 'sources' || v === 'open' || v === 'link' ? null : D.enter();
+    }).then(function(){ return window.QCCD_DEBUG[v](a); }); }; });
+    window.QCCD_DEBUG = stub;
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>"""
+
+
+def loader() -> str:
+    """The loader with the declared verbs written in (an agent's verbs work before the panel opens)."""
+    api = json.loads((SRC / "debug_api.json").read_text(encoding="utf-8"))
+    return LOADER.replace("__VERBS__", json.dumps(sorted(api["verbs"])))
+
+
 def page(PAGE: str, STYLE: str, cfg: dict) -> str:
-    css = (SRC / "debug.css").read_text(encoding="utf-8")
+    css = (SRC / "debug.css").read_text(encoding="utf-8") + (SRC / "panel.css").read_text(encoding="utf-8")
     js = (SRC / "debug.js").read_text(encoding="utf-8")
-    blob = json.dumps(cfg, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
+    blob = json.dumps({**cfg, "host": "frame"}, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
     body = (BODY + "\n<script>window.QCCD_DEBUG_CONFIG=" + blob + ";</script>\n<script>\n" + js
             + "\n</script>")
     out = PAGE.format(title="Debug - QCCD studio", style=STYLE, extra_css=css, body=body)
@@ -293,16 +338,31 @@ def page(PAGE: str, STYLE: str, cfg: dict) -> str:
 
 def write(out: Path, put, PAGE: str, STYLE: str, app_pages: list[tuple[str, str]],
           index: list[dict] | None = None) -> int:
-    """The section: the page (through the site's `put`), the worker, the Python and the runtime."""
+    """The section: the page (through the site's `put`), what a Studio page loads when its Debug
+    button is pressed (inpage.js, inpage.css, config.json), the worker, the Python and the runtime."""
     d = out / "debug"
     (d / "pyodide").mkdir(parents=True, exist_ok=True)
     cat = catalogue(app_pages, index)
-    put("debug/index.html", page(PAGE, STYLE, config(cat)), 1, "debug", app=True)
-    (d / "worker.js").write_text((SRC / "worker.js").read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    cfg = config(cat)
+    put("debug/index.html", page(PAGE, STYLE, cfg), 1, "debug", app=True)
+    text = lambda name: (SRC / name).read_text(encoding="utf-8")
+    (d / "inpage.js").write_text(text("debug.js"), encoding="utf-8", newline="\n")
+    (d / "inpage.css").write_text(text("panel.css") + text("inpage.css"), encoding="utf-8", newline="\n")
+    (d / "config.json").write_text(json.dumps({k: v for k, v in cfg.items() if k != "root"}, ensure_ascii=False,
+                                              separators=(",", ":")), encoding="utf-8", newline="\n")
+    (d / "worker.js").write_text(text("worker.js"), encoding="utf-8", newline="\n")
     (d / "qccd-py.zip").write_bytes(python_zip())
     for name, data in pyodide_files().items():
         (d / "pyodide" / name).write_bytes(data)
     return len(cat)
+
+
+def with_loader(page: str) -> str:
+    """A Studio page with the loader, as the site build writes it (once; before </body>)."""
+    if 'id="qdbg-loader"' in page or STUDIO_MARK not in page:
+        return page
+    j = page.rindex("</body>")
+    return page[:j] + loader() + page[j:]
 
 
 def index_entries() -> list[dict]:
@@ -313,7 +373,6 @@ def index_entries() -> list[dict]:
 def main(argv=None) -> int:
     """Build the section alone over an existing site build (`--pages`), for a quick look."""
     import argparse
-    import shutil
     from . import build as B
     ap = argparse.ArgumentParser(description=main.__doc__)
     ap.add_argument("-o", "--out", required=True)
@@ -337,8 +396,7 @@ def main(argv=None) -> int:
             if STUDIO_MARK in text:
                 dst = out / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                if dst.resolve() != p.resolve():
-                    shutil.copy2(p, dst)
+                dst.write_text(with_loader(text), encoding="utf-8", newline="")
                 app_pages.append((rel, page_title(text)))
 
     def put(rel, pg, depth, active, app=False, extra=""):

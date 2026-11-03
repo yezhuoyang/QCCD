@@ -1,24 +1,148 @@
 {
- "about": "The Debug page's API (window.QCCD_DEBUG, qccd/site/debug/debug.js), declared: every verb an agent's `debug` page action may call, and nothing else. Each verb takes ONE object of arguments and returns JSON or a promise of it. Steps count from 1, as the Studio's status line does (\"Step 7 / 11\" is step 7). kind: read (changes nothing), view (changes what is shown: the step, the watch list, the crosses), load (opens another program in the page), run (computes: rules, conditions, expressions -- the grader's own rule language, in the page). A verb added to QCCD_DEBUG without an entry here, or an entry naming none, fails tests/test_agent_interface.py.",
+ "about": "The Debug page's API (window.QCCD_DEBUG, qccd/site/debug/debug.js), declared: every verb an agent's `debug` page action may call, and nothing else. The same verbs work on the Debug page and on every Studio page (where the first verb opens the panel beside the program). Each verb takes ONE object of arguments and returns JSON or a promise of it. Steps count from 1, as the Studio's status line does (\"Step 7 / 11\" is step 7). kind: read (changes nothing), view (changes what is shown: the step, the watch list, the crosses), load (opens another program in the page), run (computes: rules, conditions, expressions -- the grader's own rule language, in the page). A verb added to QCCD_DEBUG without an entry here, or an entry naming none, fails tests/test_agent_interface.py.",
  "verbs": {
-  "about": {"kind": "read", "does": "what the page is, every verb with what it does, and how steps are numbered", "args": {}},
-  "sources": {"kind": "read", "does": "the programs the page can open: every Studio page of the website (title, group, path), the person's saved design if there is one; filtered by words", "args": {"q": "words that must all appear in the title or path (optional)", "limit": "how many to return (default 40)"}},
-  "open": {"kind": "load", "does": "open a program in the page: a site page by the path `sources` gives (e.g. board/surface3_mem/02_ring16.html), 'design' for the design the person last left on the Design page, or 'studio' for a blank Design page; resolves when its animation is ready, with a summary", "args": {"src": "a path from sources, 'design' or 'studio'"}},
-  "status": {"kind": "read", "does": "what is open (title, path, steps), the current step, the watch list, the rule set and whether the program was checked, which rules fail, and whether Python is loaded", "args": {}},
-  "goto": {"kind": "view", "does": "show a step (the Studio's animation seeks to it; the crosses and every panel follow)", "args": {"step": "1 to the number of steps; -1 is the last"}},
-  "step": {"kind": "view", "does": "move forward or back by some steps from the current one", "args": {"delta": "+1 forward (default), -1 back, or any count"}},
-  "state": {"kind": "read", "does": "the state after a step: the instruction and what it did, the ions that moved, places over capacity, the hottest ions' n-bar, what you watch, and the rule failures crossed out there", "args": {"step": "which step (default the current one)"}},
-  "watch": {"kind": "view", "does": "highlight and follow ions, sites, junctions or rails on the picture (each in its own colour, ions with a trail); isolate dims every other ion", "args": {"add": "ids to watch, e.g. [\"q0\", \"C3\", \"J1\"]", "remove": "ids to stop watching", "clear": "true to empty the list", "isolate": "true/false", "trails": "true/false"}},
-  "trace": {"kind": "read", "does": "everything that happened to one ion, site, junction or rail, step by step: only the steps where something did (where it was, what acted on it, who was in it)", "args": {"entity": "an id", "from": "first step (default 1)", "to": "last step (default the last)", "limit": "most events (default 200)"}},
-  "check": {"kind": "run", "does": "judge the program by a rule set the website ships and/or your own assertions (the rule language of the Rules page), locate every failure and cross it out on the picture; resolves with each rule's verdict and its first failures (step, places, the grader's sentence)", "args": {"rules": "a rule set's name (standard, cyclone, jones, ...), the text of one, or 'none'", "assertions": "your own rules: formulas, one per paragraph, optionally led by assert \"title\":, or rule-file text", "only": "rule ids to check (optional)"}},
-  "failures": {"kind": "read", "does": "the located failures of the last check: rule, steps (from, until), places, message", "args": {"rule": "one rule id (optional)", "from": "first step (optional)", "to": "last step (optional)", "limit": "most failures (default 50)"}},
-  "next_failure": {"kind": "view", "does": "go to the next step where a shown rule starts failing", "args": {}},
-  "prev_failure": {"kind": "view", "does": "go to the previous step where a shown rule starts failing", "args": {}},
-  "find": {"kind": "run", "does": "a conditional breakpoint: the first step after the current one (before it, backward) at which a condition holds, written in the rule language over the instant t, e.g. occupancy(\"C3\", t) > 1; goes there unless go is false", "args": {"condition": "a formula over t", "backward": "true to search backward", "go": "false to only report it"}},
-  "value": {"kind": "run", "does": "watch expressions: terms of the rule language evaluated at a step, with t the instant after it, e.g. occupancy(\"C0\", t) or position(\"q3\", t)", "args": {"exprs": "a list of terms", "step": "which step (default the current one)"}},
-  "breakpoints": {"kind": "view", "does": "set what Continue stops at: steps, conditions (rule language over t), a rule starting to fail, something watched changing; returns them", "args": {"add_steps": "step numbers", "remove_steps": "step numbers", "add_conditions": "formulas over t", "remove_conditions": "formulas", "on_failure": "true/false", "on_watch": "true/false", "clear": "true to remove every breakpoint"}},
-  "continue": {"kind": "run", "does": "run forward (or backward) from the current step to the next breakpoint, and say what stopped it", "args": {"backward": "true to run backward"}},
-  "report": {"kind": "read", "does": "a bug report of what the page shows: the program, the rules and their failures, the current step's state, the watch list, and a link that reopens the page exactly here, as Markdown and as data", "args": {}},
-  "link": {"kind": "read", "does": "the link that reopens the page on this program, at this step, with these rules, assertions and watch list", "args": {}}
+  "about": {
+   "kind": "read",
+   "does": "what the page is, every verb with what it does, and how steps are numbered",
+   "args": {}
+  },
+  "sources": {
+   "kind": "read",
+   "does": "the programs the page can open: every Studio page of the website (title, group, path), the person's saved design if there is one; filtered by words",
+   "args": {
+    "q": "words that must all appear in the title or path (optional)",
+    "limit": "how many to return (default 40)"
+   }
+  },
+  "open": {
+   "kind": "load",
+   "does": "open a program: a site page by the path `sources` gives (e.g. board/surface3_mem/02_ring16.html), 'design' for the design the person last left on the Design page, or 'studio' for a blank Design page; on the Debug page it loads into the frame and resolves with a summary, on a Studio page it goes to that page, where the debugger opens beside its program",
+   "args": {
+    "src": "a path from sources, 'design' or 'studio'"
+   }
+  },
+  "status": {
+   "kind": "read",
+   "does": "where the debugger is (the Debug page, or beside this Studio page's program, and whether its panel is open), what is open (title, path, steps), the current step, the watch list, the rule set and whether the program was checked, which rules fail, and whether Python is loaded",
+   "args": {}
+  },
+  "goto": {
+   "kind": "view",
+   "does": "show a step (the Studio's animation seeks to it; the crosses and every panel follow)",
+   "args": {
+    "step": "1 to the number of steps; -1 is the last"
+   }
+  },
+  "step": {
+   "kind": "view",
+   "does": "move forward or back by some steps from the current one",
+   "args": {
+    "delta": "+1 forward (default), -1 back, or any count"
+   }
+  },
+  "state": {
+   "kind": "read",
+   "does": "the state after a step: the instruction and what it did, the ions that moved, places over capacity, the hottest ions' n-bar, what you watch, and the rule failures crossed out there",
+   "args": {
+    "step": "which step (default the current one)"
+   }
+  },
+  "watch": {
+   "kind": "view",
+   "does": "highlight and follow ions, sites, junctions or rails on the picture (each in its own colour, ions with a trail); isolate dims every other ion",
+   "args": {
+    "add": "ids to watch, e.g. [\"q0\", \"C3\", \"J1\"]",
+    "remove": "ids to stop watching",
+    "clear": "true to empty the list",
+    "isolate": "true/false",
+    "trails": "true/false"
+   }
+  },
+  "trace": {
+   "kind": "read",
+   "does": "everything that happened to one ion, site, junction or rail, step by step: only the steps where something did (where it was, what acted on it, who was in it)",
+   "args": {
+    "entity": "an id",
+    "from": "first step (default 1)",
+    "to": "last step (default the last)",
+    "limit": "most events (default 200)"
+   }
+  },
+  "check": {
+   "kind": "run",
+   "does": "judge the program by a rule set the website ships and/or your own assertions (the rule language of the Rules page), locate every failure and cross it out on the picture; resolves with each rule's verdict and its first failures (step, places, the grader's sentence)",
+   "args": {
+    "rules": "a rule set's name (standard, cyclone, jones, ...), the text of one, or 'none'",
+    "assertions": "your own rules: formulas, one per paragraph, optionally led by assert \"title\":, or rule-file text",
+    "only": "rule ids to check (optional)"
+   }
+  },
+  "failures": {
+   "kind": "read",
+   "does": "the located failures of the last check: rule, steps (from, until), places, message",
+   "args": {
+    "rule": "one rule id (optional)",
+    "from": "first step (optional)",
+    "to": "last step (optional)",
+    "limit": "most failures (default 50)"
+   }
+  },
+  "next_failure": {
+   "kind": "view",
+   "does": "go to the next step where a shown rule starts failing",
+   "args": {}
+  },
+  "prev_failure": {
+   "kind": "view",
+   "does": "go to the previous step where a shown rule starts failing",
+   "args": {}
+  },
+  "find": {
+   "kind": "run",
+   "does": "a conditional breakpoint: the first step after the current one (before it, backward) at which a condition holds, written in the rule language over the instant t, e.g. occupancy(\"C3\", t) > 1; goes there unless go is false",
+   "args": {
+    "condition": "a formula over t",
+    "backward": "true to search backward",
+    "go": "false to only report it"
+   }
+  },
+  "value": {
+   "kind": "run",
+   "does": "watch expressions: terms of the rule language evaluated at a step, with t the instant after it, e.g. occupancy(\"C0\", t) or position(\"q3\", t)",
+   "args": {
+    "exprs": "a list of terms",
+    "step": "which step (default the current one)"
+   }
+  },
+  "breakpoints": {
+   "kind": "view",
+   "does": "set what Continue stops at: steps, conditions (rule language over t), a rule starting to fail, something watched changing; returns them",
+   "args": {
+    "add_steps": "step numbers",
+    "remove_steps": "step numbers",
+    "add_conditions": "formulas over t",
+    "remove_conditions": "formulas",
+    "on_failure": "true/false",
+    "on_watch": "true/false",
+    "clear": "true to remove every breakpoint"
+   }
+  },
+  "continue": {
+   "kind": "run",
+   "does": "run forward (or backward) from the current step to the next breakpoint, and say what stopped it",
+   "args": {
+    "backward": "true to run backward"
+   }
+  },
+  "report": {
+   "kind": "read",
+   "does": "a bug report of what the page shows: the program, the rules and their failures, the current step's state, the watch list, and a link that reopens the page exactly here, as Markdown and as data",
+   "args": {}
+  },
+  "link": {
+   "kind": "read",
+   "does": "the link that reopens the page on this program, at this step, with these rules, assertions and watch list",
+   "args": {}
+  }
  }
 }

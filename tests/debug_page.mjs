@@ -71,6 +71,49 @@ await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, de
 
 const out = {}, fails = [];
 const expect = (ok, what) => { if (!ok) fails.push(what); };
+const INPAGE = argv.includes('--inpage');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (expr, ms = 30000) => {
+  for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(150)) if (await ev(expr).catch(() => false)) return true;
+  return false;
+};
+if (INPAGE) {
+  // the debugger in the Studio page itself: its Debug button, the panel beside the program
+  try {
+    const url = BASE ? new URL(page, BASE).href : `http://127.0.0.1:${server.address().port}/${page}`;
+    await send('Page.navigate', { url });
+    expect(await until('!!(window.EDITOR && EDITOR.ready && EDITOR.ready())'), 'the Studio page booted');
+    expect(await ev("!!document.getElementById('qdbgBtn')"), 'the Studio\'s transport has a Debug button');
+    const w0 = await ev("document.querySelector('main').getBoundingClientRect().width");
+    await ev('seek(2, {})');
+    // an agent's verb before the panel exists: it opens the panel and runs
+    const st = await ev('QCCD_DEBUG.status()');
+    out.status = { host: st.host, open: st.panel_open, step: st.step };
+    expect(st.panel_open === true && st.step === 3, 'the first verb opened the panel at the reader\'s step (3)');
+    const w1 = await ev("document.querySelector('main').getBoundingClientRect().width");
+    expect(w1 < w0 - 300, 'the Studio gave the panel its width');
+    const chk = await ev("QCCD_DEBUG.check({rules: 'standard', assertions: 'for all s in sites, t in instants: occupancy(s, t) <= 1'})");
+    out.failing = chk.failing; out.check_seconds = chk.seconds;
+    expect(Array.isArray(chk.failing) && chk.failing.indexOf('A1') >= 0, 'the assertion fails');
+    const nf = await ev('QCCD_DEBUG.next_failure()');
+    await sleep(300);
+    out.crosses = await ev("document.querySelectorAll('#qdbg .qdbg-x').length");
+    expect(nf.step !== null && out.crosses > 0, 'the failure is crossed out on the Studio\'s own picture');
+    expect(/#debug&step=/.test(await ev('QCCD_DEBUG.link().link')), 'the link reopens this page in debug mode');
+    await shot('debug_inpage.png');
+    await ev("document.getElementById('qdbgBtn').click()");
+    expect(await until("!document.getElementById('dbg') && !document.getElementById('qdbg')", 5000), 'the Debug button closes the panel and its marks');
+    expect(await ev("document.querySelector('main').getBoundingClientRect().width") === w0, 'the Studio has its width back');
+    await ev("document.getElementById('qdbgBtn').click()");
+    expect(await until("!!document.getElementById('dbg') && QCCD_DEBUG_INPAGE.active", 10000), 'and opens it again');
+  } catch (e) { fails.push('error: ' + e.message); }
+  out.errors = errors.slice(0, 5);
+  if (errors.length) fails.push('page errors: ' + errors[0]);
+  out.fails = fails;
+  console.log(JSON.stringify(out));
+  ws.close(); chrome.kill(); if (!BASE) server.close();
+  process.exit(fails.length ? 1 : 0);
+}
 try {
   await send('Page.navigate', { url: BASE ? new URL('debug/', BASE).href : `http://127.0.0.1:${server.address().port}/debug/` });
   for (let i = 0; i < 100 && !(await ev('!!window.QCCD_DEBUG').catch(() => false)); i++) await new Promise((r) => setTimeout(r, 100));

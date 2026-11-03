@@ -316,16 +316,25 @@ def test_the_page_in_a_browser(tmp_path):
     site = tmp_path / "site"
     (site / "compilation" / "ex").mkdir(parents=True)
     arch, prog, model = load_arch(ARCH), TSIR.load(PROG), corrected_model()
-    render_html(arch, prog, replay(prog, arch, model, check_rules=True, keep_cycles=True), model,
-                site / "compilation" / "ex" / "bell.html")
+    bell = site / "compilation" / "ex" / "bell.html"
+    render_html(arch, prog, replay(prog, arch, model, check_rules=True, keep_cycles=True), model, bell)
+    # the page as the site serves it: with the site bar (the loader finds the site's root from it)
+    from qccd.site import build as B
+    bell.write_text(B.with_nav(bell.read_text(encoding="utf-8"), 2, "compilation", "[]", app=True),
+                    encoding="utf-8", newline="")
     assert dp.main(["-o", str(site), "--pages", str(site)]) == 0
     from qccd.workspace.mirror import mirror_csp
-    for csp in (None, mirror_csp("http://127.0.0.1:47101")):
-        args = ["node", str(REPO / "tests" / "debug_page.mjs"), str(site), "compilation/ex/bell.html"]
-        if csp:
-            args += ["--csp", csp]
-        r = subprocess.run(args, capture_output=True, text=True, timeout=300)
-        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"fails": [r.stderr[-800:]]}
-        where = "under the mirror's policy" if csp else "with no policy"
-        assert r.returncode == 0 and not out["fails"], f"{where}: {json.dumps(out)}"
-        assert out["steps"] == 11 and "A1" in out["failing"] and out["crosses"] > 0
+    assert 'id="qdbg-loader"' in (site / "compilation" / "ex" / "bell.html").read_text(encoding="utf-8")
+    for inpage in (False, True):                  # the Debug page, then the Studio page's own Debug button
+        for csp in (None, mirror_csp("http://127.0.0.1:47101")):
+            args = ["node", str(REPO / "tests" / "debug_page.mjs"), str(site), "compilation/ex/bell.html"]
+            if csp:
+                args += ["--csp", csp]
+            if inpage:
+                args += ["--inpage"]
+            r = subprocess.run(args, capture_output=True, text=True, timeout=300)
+            out = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"fails": [r.stderr[-800:]]}
+            where = ("in the Studio page" if inpage else "on the Debug page") + (", under the mirror's policy" if csp else "")
+            assert r.returncode == 0 and not out["fails"], f"{where}: {json.dumps(out)}"
+            assert "A1" in out["failing"] and out["crosses"] > 0, where
+            assert inpage or out["steps"] == 11

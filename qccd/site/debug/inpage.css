@@ -1,0 +1,30 @@
+/* The debugger in a Studio page: a panel at the right, under the site bar, and the Studio gives
+   it its width (body[data-qdbg]).  A Studio page does not carry the site's palette, so the panel
+   brings its own; nothing here applies while the panel is shut. */
+:root{--qdbg-w:420px}
+@media (max-width:1300px){:root{--qdbg-w:360px}}
+body[data-qdbg="1"] main{margin-right:var(--qdbg-w)!important}
+#dbg.inpage{--surface:#eceae3;--paper:#fff;--card:#fbfaf7;--ink:#15141a;--ink2:#56545e;--ink3:#8a8892;--head:#1a2540;
+ --line:#e4e2db;--accent:#1f5bb5;--soft:#eaf0fa;
+ --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+ --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+ --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,Cambria,Georgia,serif;
+ position:fixed;top:40px;right:0;bottom:0;width:var(--qdbg-w);z-index:45;background:var(--paper);
+ border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(18,16,28,.07);box-sizing:border-box}
+#dbg.inpage *{box-sizing:border-box}
+#dbg.inpage .q-ihead{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);flex:0 0 auto}
+#dbg.inpage .q-ihead b{font-size:14px;color:var(--head)}
+#dbg.inpage .q-ihead .q-src{max-width:none;flex:0 1 auto;min-width:0;font-weight:400;font-size:12.5px}
+#dbg.inpage .q-ihead a{font-size:12px;white-space:nowrap;color:var(--accent)}
+#dbg.inpage #dClose{font-size:18px;line-height:1;padding:1px 8px}
+#dbg.inpage #dbgBar{padding:5px 8px;gap:4px}
+#dbg.inpage #dbgBar .q-sep{display:none}
+#dbg.inpage #dTime{flex:0 0 40px;border-top:0;border-bottom:1px solid var(--line)}
+#dbg.inpage #dTimeSvg{height:38px}
+#dbg.inpage #dMsg{flex:0 0 auto;font-size:12.5px;color:var(--ink2);padding:4px 10px;background:#f7f6f2;border-bottom:1px solid var(--line)}
+#dbg.inpage #dMsg:empty{display:none}
+#dbg.inpage #dbgSide{flex:1 1 auto}
+@media (max-width:800px){
+ :root{--qdbg-w:100vw}
+ body[data-qdbg="1"] main{margin-right:0!important}
+}

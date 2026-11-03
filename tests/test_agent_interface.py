@@ -137,10 +137,13 @@ def test_every_debug_control_is_described():
     # every data-hint on the Debug page (the markup and what debug.js writes) has its QCCD_HINTS entry
     from qccd.site import debugpage
     js = iface.DEBUG_JS.read_text(encoding="utf-8")
+    # the Debug page's frame, the controls debug.js draws on both hosts, and the Debug button the
+    # loader puts in every Studio page (`setAttribute('data-hint', ...)`)
     used = set(re.findall(r'data-hint="([\w:-]+)"', debugpage.BODY + js))
+    used |= set(re.findall(r"setAttribute\('data-hint', '([\w:-]+)'\)", debugpage.LOADER))
     table = js[js.index("window.QCCD_HINTS = Object.assign"):]
     table = table[:table.index("});") + 3]
-    described = set(re.findall(r"'([\w:-]+)': \{ t: '", table))
+    described = set(re.findall(r"'([\w:-]+)': \{ t: '", table + debugpage.LOADER))
     assert used and not used - described, f"Debug page controls with no QCCD_HINTS entry in debug.js: {sorted(used - described)}"
     assert not described - used, f"QCCD_HINTS in debug.js describes controls the page no longer has: {sorted(described - used)}"
 

@@ -833,7 +833,8 @@ function act(action, args, who) {
       });
     case 'debug':
       var DG = window.QCCD_DEBUG, dverb = String(args.verb || ''), DV = iface().debug_verbs || {};
-      if (!DG) throw new Error('this page is not the Debug page: navigate to /web/debug/ (or a link with ?src=<a Studio page>)');
+      if (!DG) throw new Error('this page has no debugger: it works on every Studio page (a leaderboard entry, a compiled example, ' +
+                               'the Design page), beside the program, and on /web/debug/ for any of them');
       if (dverb === 'verbs') return { ok: true, verbs: Object.keys(DV).sort(), declared: DV,
                                       note: 'steps count from 1, as the Studio status line does' };
       if (!DV[dverb]) throw new Error('the Debug page has no agent verb ' + JSON.stringify(dverb) + '; debug verb "verbs" lists the declared ones: ' +
