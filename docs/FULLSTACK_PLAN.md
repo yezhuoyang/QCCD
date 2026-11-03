@@ -1319,8 +1319,8 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
 - **Corridors capped.** Around the relays' tiles the farm's free router took detours, two of
   them ~250 tiles. `schedule(max_corridor=)` makes a merge wait for a short corridor instead;
   at the farm's own longest, 19 tiles. Of the 86 merge programs, 12 are new -- the farm's
-  corridors detouring 4-18 tiles round the carries -- and are among 17 such being checked at
-  d = 11 (7 passed so far); all the others were checked before.
+  corridors detouring 4-18 tiles round the carries -- and are among 17 such checked at d = 11:
+  all 17 pass (769-5,528 ions, every rule, R10); all the others were checked before.
 - **The staircase.** Each a-slot under its own triple, the write's rows spread over the farm's
   width, made the write 60.3 s on its own (the compact crossbar: 26.35 s): its rows cross most
   of pp's columns.
@@ -1369,7 +1369,8 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
   **129.33 s**, check clean; the second iteration from 65.03 to 129.33 s, **64.30 s**. Composed
   from that pace, gLoop1's 214 iterations would take about 214 x 64.3 s = 3.8 h (composed, not
   scheduled). Its 92 merge programs: 77 checked at d = 11 before, 15 new (corridors 2-18
-  tiles, the second iteration's ancillas placed late), being checked at d = 11.
+  tiles, the second iteration's ancillas placed late), and all 15 pass at d = 11 (every rule,
+  R10): every program of the two iterations is checked at d = 11.
 - **Where an iteration goes now:** powerProduct 23 s (57 states from 29 factories), the write
   and carries 11 s, the adder 9 s past the carries (its forward half; the uncompute is short),
   the release 22 s (addr5's 31 CZs one after another).
