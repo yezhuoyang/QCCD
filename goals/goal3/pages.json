@@ -1039,40 +1039,34 @@
    "status": "ok"
   },
   "grid11x10": {
-   "bytes": 4089664,
+   "bytes": 8296994,
    "code": "hgp58",
    "family": "Grid",
-   "instructions": 4076,
+   "instructions": 4431,
    "page": "hgp58/grid11x10.html",
    "point": "grid11x10",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "grid11x11": {
-   "bytes": 4110943,
+   "bytes": 8227570,
    "code": "hgp58",
    "family": "Grid",
-   "instructions": 4080,
+   "instructions": 4374,
    "page": "hgp58/grid11x11.html",
    "point": "grid11x11",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "grid12x11": {
-   "bytes": 4047262,
+   "bytes": 7956446,
    "code": "hgp58",
    "family": "Grid",
-   "instructions": 3933,
+   "instructions": 3929,
    "page": "hgp58/grid12x11.html",
    "point": "grid12x11",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "grid12x12": {
    "bytes": 7976558,
@@ -1145,40 +1139,34 @@
    "status": "ok"
   },
   "wise11x10": {
-   "bytes": 4094881,
+   "bytes": 8302209,
    "code": "hgp58",
    "family": "WISE",
-   "instructions": 4076,
+   "instructions": 4431,
    "page": "hgp58/wise11x10.html",
    "point": "wise11x10",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "wise11x11": {
-   "bytes": 4116570,
+   "bytes": 8233189,
    "code": "hgp58",
    "family": "WISE",
-   "instructions": 4080,
+   "instructions": 4374,
    "page": "hgp58/wise11x11.html",
    "point": "wise11x11",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "wise12x11": {
-   "bytes": 4053301,
+   "bytes": 7962501,
    "code": "hgp58",
    "family": "WISE",
-   "instructions": 3933,
+   "instructions": 3929,
    "page": "hgp58/wise12x11.html",
    "point": "wise12x11",
-   "rules_failed": [
-    "R1"
-   ],
-   "status": "rules_failed"
+   "rules_failed": [],
+   "status": "ok"
   },
   "wise12x12": {
    "bytes": 7983069,

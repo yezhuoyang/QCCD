@@ -2,9 +2,10 @@
 
     QCCD_QCCDC=<pinned qccdc> python goals/goal3/r1_fault.py [--size 11 11] [--basis z]
 
-The pinned qccdc compiled `codes/surface7_z` (the Z memory alone, as the sweep did before
-2026-10-30) on 11x11, 12x11 and 12x12 into a program that breaks R1: a trap holds 3 ions
-against a capacity of 2.  The one-program Z-then-X memory that the releases grade compiles on
+qccdc b4a003dbb4ae, the pin then, compiled `codes/surface7_z` (the Z memory alone, as the
+sweep did before 2026-10-30) on 11x11, 12x11 and 12x12 into a program that breaks R1: a trap
+holds 3 ions against a capacity of 2.  qccdc cd3efedbbc10 compiles grid11x11 within every rule
+(0 violations).  The one-program Z-then-X memory that the releases grade compiles on
 the same devices without breaking a rule.  The device is the sweep's (`sweep.device_doc` on the
 surface7 release); the compile outputs land in `work/r1_fault/`.  About 7 minutes.
 """

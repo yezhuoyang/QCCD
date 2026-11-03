@@ -64,11 +64,15 @@ A point is one (family, size), graded on the code's release the way the official
 a submission to it; only the Lean certificate step is left out ([sweep.py](sweep.py)):
 
 1. qccd-physics@2 (Goal 1's cited Helios-class numbers);
-2. the pinned reference compiler: qccdc cd3efedbbc10 for the Cyclone and Conveyor points (the
-   first with junction corners) and b4a003dbb4ae, pinned when they were swept, for the Grid and
-   WISE points; each row names its compiler. Recompiled with cd3efedbbc10, all 54 Grid and WISE
-   points of surface d=3 and 5 and colour d=3, 5 and 7 give the same instructions
-   ([same_compiler.py](same_compiler.py), `results/compiler_identity.json`);
+2. the pinned reference compiler, which each row names: qccdc cd3efedbbc10, the first with
+   junction corners, for the Cyclone and Conveyor points; b4a003dbb4ae, the pin when they were
+   swept, for the Grid and WISE points. Recompiled with cd3efedbbc10, 88 of the 94 compiled Grid
+   and WISE points give the same instructions: every one of surface and colour d=3, 5 and 7, and
+   14 of HGP58's 20 ([same_compiler.py](same_compiler.py), `results/compiler_identity.json`).
+   The other six are HGP58's 11x10, 11x11 and 12x11 lattices, Grid and WISE. They broke R1 under
+   b4a003dbb4ae, and under cd3efedbbc10 they keep every rule. So they were graded again with
+   cd3efedbbc10, and their old rows are in `results/superseded/`. BB72's 24 Grid and WISE sizes,
+   each refused after an hour, were not compiled again;
 3. the rules (`verify`);
 4. **time per round**: the replayed program under the `quantinuum` table, divided by the 2d
    rounds of both memories;
@@ -153,13 +157,16 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   computed from the geometry, not from the wiring block. Nothing enforces WISE's single
   broadcast class beyond rule R4. The difference has to come from Ke's broadcast rules, plus a
   scheduler that uses them.
-- **A compiler fault on the largest grids.** surface7's Z memory compiled alone on 11x11, 12x11
-  and 12x12 (Grid and WISE) with the pinned qccdc b4a003dbb4ae gives a program that breaks R1: a
-  trap holds 3 ions against a capacity of 2, six times. The releases' one-program memory (Z then
-  X) compiles on the same three devices without breaking a rule, so the figure has these sizes.
-  The fault is still the compiler's: [r1_fault.py](r1_fault.py) reproduces it in about 7 minutes
-  (grid11x11: 6 violations at sites T3_7h and T7_6v), and `results/separate/surface7.jsonl`
-  records the six failed rows.
+- **A compiler fault on the largest grids, fixed in qccdc cd3efedbbc10.** With qccdc
+  b4a003dbb4ae, surface7's Z memory compiled alone on 11x11, 12x11 and 12x12 (Grid and WISE)
+  gives a program that breaks R1: a trap holds 3 ions against a capacity of 2, six times. The
+  releases' one-program memory (Z then X) compiles on the same three devices without breaking a
+  rule, so the figure has these sizes. [r1_fault.py](r1_fault.py) reproduces the fault in about
+  7 minutes (grid11x11: 6 violations, at sites T3_7h and T7_6v), and
+  `results/separate/surface7.jsonl` records the six failed rows. With cd3efedbbc10 the same
+  compile breaks no rule (0 violations). HGP58's 11x10, 11x11 and 12x11 lattices broke R1 the
+  same way under b4a003dbb4ae and keep every rule under cd3efedbbc10 (see the reference compiler
+  above).
 - **BB72 on a grid: the reference compiler routes no size.** qccdc refuses all 12 grids, 10x9
   to 15x15, as unroutable: an ion cannot reach its gate within the router's cycle limit. WISE,
   which runs the same program, is refused at the same 12 sizes. Six larger grids did not finish

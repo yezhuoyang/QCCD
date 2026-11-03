@@ -320,6 +320,206 @@
   "seconds": 13.2
  },
  {
+  "code": "hgp58",
+  "point": "grid10x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8a1ff29eb655b3be",
+  "new": "8a1ff29eb655b3be",
+  "seconds": 336.9
+ },
+ {
+  "code": "hgp58",
+  "point": "grid10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "007431e0b62bb6f7",
+  "new": "007431e0b62bb6f7",
+  "seconds": 313.6
+ },
+ {
+  "code": "hgp58",
+  "point": "grid11x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "c9253071591d9cff",
+  "new": "0f51ee32d47ffb48",
+  "seconds": 427.6
+ },
+ {
+  "code": "hgp58",
+  "point": "grid11x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "1db09ab2b2e8b67f",
+  "new": "3eed050e6a185d6c",
+  "seconds": 608.7
+ },
+ {
+  "code": "hgp58",
+  "point": "grid12x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "6069a70adb2413de",
+  "new": "4aae81c9f4657c46",
+  "seconds": 976.8
+ },
+ {
+  "code": "hgp58",
+  "point": "grid12x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "28596e0a100321da",
+  "new": "28596e0a100321da",
+  "seconds": 839.1
+ },
+ {
+  "code": "hgp58",
+  "point": "grid13x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "90a1c0d193be93ea",
+  "new": "90a1c0d193be93ea",
+  "seconds": 976.9
+ },
+ {
+  "code": "hgp58",
+  "point": "grid8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "dc174af75f84f3f9",
+  "new": "dc174af75f84f3f9",
+  "seconds": 178.1
+ },
+ {
+  "code": "hgp58",
+  "point": "grid9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8c0cae6f7c3686ed",
+  "new": "8c0cae6f7c3686ed",
+  "seconds": 229.4
+ },
+ {
+  "code": "hgp58",
+  "point": "grid9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "96fabbb0c63ef009",
+  "new": "96fabbb0c63ef009",
+  "seconds": 282.0
+ },
+ {
+  "code": "hgp58",
+  "point": "wise10x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8a1ff29eb655b3be",
+  "new": "8a1ff29eb655b3be",
+  "seconds": 237.3
+ },
+ {
+  "code": "hgp58",
+  "point": "wise10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "007431e0b62bb6f7",
+  "new": "007431e0b62bb6f7",
+  "seconds": 206.9
+ },
+ {
+  "code": "hgp58",
+  "point": "wise11x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "c9253071591d9cff",
+  "new": "0f51ee32d47ffb48",
+  "seconds": 279.0
+ },
+ {
+  "code": "hgp58",
+  "point": "wise11x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "1db09ab2b2e8b67f",
+  "new": "3eed050e6a185d6c",
+  "seconds": 443.1
+ },
+ {
+  "code": "hgp58",
+  "point": "wise12x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": false,
+  "old": "6069a70adb2413de",
+  "new": "4aae81c9f4657c46",
+  "seconds": 805.4
+ },
+ {
+  "code": "hgp58",
+  "point": "wise12x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "28596e0a100321da",
+  "new": "28596e0a100321da",
+  "seconds": 718.0
+ },
+ {
+  "code": "hgp58",
+  "point": "wise13x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "90a1c0d193be93ea",
+  "new": "90a1c0d193be93ea",
+  "seconds": 867.5
+ },
+ {
+  "code": "hgp58",
+  "point": "wise8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "dc174af75f84f3f9",
+  "new": "dc174af75f84f3f9",
+  "seconds": 124.6
+ },
+ {
+  "code": "hgp58",
+  "point": "wise9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "8c0cae6f7c3686ed",
+  "new": "8c0cae6f7c3686ed",
+  "seconds": 155.0
+ },
+ {
+  "code": "hgp58",
+  "point": "wise9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "96fabbb0c63ef009",
+  "new": "96fabbb0c63ef009",
+  "seconds": 191.2
+ },
+ {
   "code": "surface3",
   "point": "grid4x4",
   "old_compiler": "qccdc b4a003dbb4ae",
@@ -538,5 +738,205 @@
   "old": "7e795be2f52a668d",
   "new": "7e795be2f52a668d",
   "seconds": 5.1
+ },
+ {
+  "code": "surface7",
+  "point": "grid10x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "645b04dca7f5eb9b",
+  "new": "645b04dca7f5eb9b",
+  "seconds": 549.8
+ },
+ {
+  "code": "surface7",
+  "point": "grid10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "eb8694b4f4d75019",
+  "new": "eb8694b4f4d75019",
+  "seconds": 99.8
+ },
+ {
+  "code": "surface7",
+  "point": "grid11x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "2e211fb558c7c5cc",
+  "new": "2e211fb558c7c5cc",
+  "seconds": 529.6
+ },
+ {
+  "code": "surface7",
+  "point": "grid11x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "c1dbc72b263a52ba",
+  "new": "c1dbc72b263a52ba",
+  "seconds": 436.4
+ },
+ {
+  "code": "surface7",
+  "point": "grid12x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9ac4b12686a01699",
+  "new": "9ac4b12686a01699",
+  "seconds": 635.3
+ },
+ {
+  "code": "surface7",
+  "point": "grid12x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "66c841b6f8fb2d44",
+  "new": "66c841b6f8fb2d44",
+  "seconds": 212.1
+ },
+ {
+  "code": "surface7",
+  "point": "grid13x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "0befc8c58415c1f5",
+  "new": "0befc8c58415c1f5",
+  "seconds": 754.1
+ },
+ {
+  "code": "surface7",
+  "point": "grid8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "570622b0ec720305",
+  "new": "570622b0ec720305",
+  "seconds": 211.0
+ },
+ {
+  "code": "surface7",
+  "point": "grid9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "d4f18377ba70769a",
+  "new": "d4f18377ba70769a",
+  "seconds": 344.9
+ },
+ {
+  "code": "surface7",
+  "point": "grid9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "d61b0bf216e330ff",
+  "new": "d61b0bf216e330ff",
+  "seconds": 274.3
+ },
+ {
+  "code": "surface7",
+  "point": "wise10x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "645b04dca7f5eb9b",
+  "new": "645b04dca7f5eb9b",
+  "seconds": 512.7
+ },
+ {
+  "code": "surface7",
+  "point": "wise10x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "eb8694b4f4d75019",
+  "new": "eb8694b4f4d75019",
+  "seconds": 88.8
+ },
+ {
+  "code": "surface7",
+  "point": "wise11x10",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "2e211fb558c7c5cc",
+  "new": "2e211fb558c7c5cc",
+  "seconds": 549.1
+ },
+ {
+  "code": "surface7",
+  "point": "wise11x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "c1dbc72b263a52ba",
+  "new": "c1dbc72b263a52ba",
+  "seconds": 422.6
+ },
+ {
+  "code": "surface7",
+  "point": "wise12x11",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "9ac4b12686a01699",
+  "new": "9ac4b12686a01699",
+  "seconds": 552.0
+ },
+ {
+  "code": "surface7",
+  "point": "wise12x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "66c841b6f8fb2d44",
+  "new": "66c841b6f8fb2d44",
+  "seconds": 194.0
+ },
+ {
+  "code": "surface7",
+  "point": "wise13x12",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "0befc8c58415c1f5",
+  "new": "0befc8c58415c1f5",
+  "seconds": 685.9
+ },
+ {
+  "code": "surface7",
+  "point": "wise8x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "570622b0ec720305",
+  "new": "570622b0ec720305",
+  "seconds": 225.2
+ },
+ {
+  "code": "surface7",
+  "point": "wise9x8",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "d4f18377ba70769a",
+  "new": "d4f18377ba70769a",
+  "seconds": 290.0
+ },
+ {
+  "code": "surface7",
+  "point": "wise9x9",
+  "old_compiler": "qccdc b4a003dbb4ae",
+  "new_compiler": "qccdc cd3efedbbc10",
+  "same": true,
+  "old": "d61b0bf216e330ff",
+  "new": "d61b0bf216e330ff",
+  "seconds": 258.2
  }
 ]
