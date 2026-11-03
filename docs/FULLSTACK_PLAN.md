@@ -1324,10 +1324,56 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
 - **The staircase.** Each a-slot under its own triple, the write's rows spread over the farm's
   width, made the write 60.3 s on its own (the compact crossbar: 26.35 s): its rows cross most
   of pp's columns.
-- **Next:** the iterations in turn. The adder of one overlaps the next one's release,
-  powerProduct and write (they touch other blocks), so the adder's ~58 s, its uncompute chain
-  above all, is what a steady iteration costs; the H̄ in every fix-up (0.68 s) is the step to
+- **Next** (as written then; corrected below): the iterations in turn, the adder of one
+  overlapping the next one's release, powerProduct and write; the H̄ in every fix-up the step to
   shorten.
+
+**The H̄ off the chain; iterations in turn (2026-11-02).**
+- **Correction: iterations do not overlap.** pp and addr are never reset inside an iteration:
+  the release reads 57 of pp's 64 blocks and makes them again, the other 7 and all of addr go
+  back to |0̄> by the CNOTs that loaded them. So the next iteration's load waits for this one's
+  unload, and iterations run end to end. Two copies of pp and addr, taken in turn, would
+  overlap them -- but that changes FormalRV's program (it needs a proof that those blocks are
+  |0̄> at the boundary) and is not done.
+- **A CZ by a pair made ahead (`scale/czpair.py`).** The surgery machine's CZ is a fresh L in
+  |+̄>, Z̄_a Z̄_L, H̄ on L, Z̄_L Z̄_b, L read in X̄ -- merge, H̄ (0.68 s), merge, all after the guard.
+  The same CZ: a pair (I ⊗ H̄)|Φ+> made before the guard (prep A, B in Z̄, X̄_A X̄_B, H̄ on B),
+  then after it only Z̄_a Z̄_A and Z̄_b Z̄_B side by side, A and B read in X̄, five frames (the
+  pair's stabilizers ±X̄_A Z̄_B and Z̄_A X̄_B; X̄_a -> X̄_a Z̄_b, X̄_b -> X̄_b Z̄_a). `pairs` finds
+  each such CZ and proves the segment and its replacement against `ht b; cx a b; ht b` under the
+  guard (`equal_drop`); without any one of the five frames it fails (tests). When the guard
+  fails the pair is made and read and touches nothing.
+- **The adder with its 31 CZs by pairs** (`lattice_adder.py --farm --pairs`): **33.54 s** (was
+  58.23), check clean; the forward half unchanged (23.84 s), the uncompute 34.4 -> 9.7 s. Of
+  its 79 programs two are new -- the pair's X̄X̄ product, a three-tile U corridor beside the
+  triple, left and right -- and both pass at d = 11 (1,295 ions, every rule, R10), so every
+  program of the paired adder is checked at d = 11.
+- **The release keeps its CZs.** They are 31 on addr5, then 15 on addr4, 7, 3 and 1, each
+  guarded by its own readout: they wait on addr's two facing tiles, not on their H̄. Pairs made
+  it slower (each pair sat on addr5's tile from its making to its use). `relay.bring` now takes
+  a block's two sides in turn when it carries blocks to it: about 1 s off the release.
+- **The exponent stored.** All m = 1280 blocks of the exponent (FormalRV's last window is two
+  bits: n = min(w1, m - j·w1)) in four rows across both farms' width under addr, every other
+  column, each window together, the first nearest addr: 53,071 tiles (the iteration with only
+  its own window: 48,709).
+- **Fresh ancillas made late (`schedule(late=True)`).** On a lattice already worked on, an
+  ancilla made at once held its tile from t = 0, so only a never-used tile qualified and the
+  second iteration's ancillas landed far from their partners (a corridor past the cap). With
+  `late` a fresh ancilla is made no sooner than its first product's partners are free. Only
+  the iteration driver passes it: the factories, the adder and the lookup keep the schedules
+  that were checked.
+- **One iteration** (`lattice_loop1.py --pairs --pfarm 29`): **65.03 s** (was 91.37), check
+  clean; powerProduct done at 23.3 s, the write and carries at 34.3 s, the adder at 42.9 s, the
+  release at 64.7 s.
+- **Two iterations in turn** (`--iterations 2`), concrete: 1,411,350 gadgets on 53,071 tiles,
+  **129.33 s**, check clean; the second iteration from 65.03 to 129.33 s, **64.30 s**. Composed
+  from that pace, gLoop1's 214 iterations would take about 214 x 64.3 s = 3.8 h (composed, not
+  scheduled). Its 92 merge programs: 77 checked at d = 11 before, 15 new (corridors 2-18
+  tiles, the second iteration's ancillas placed late), being checked at d = 11.
+- **Where an iteration goes now:** powerProduct 23 s (57 states from 29 factories), the write
+  and carries 11 s, the adder 9 s past the carries (its forward half; the uncompute is short),
+  the release 22 s (addr5's 31 CZs one after another).
+- **Next:** the release -- its CZs queue on one addr block's two tiles; then powerProduct.
 
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every

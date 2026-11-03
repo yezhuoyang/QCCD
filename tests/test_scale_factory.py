@@ -116,6 +116,21 @@ def _toffolis(k):
     return out, data
 
 
+def test_a_farm_ported_in_two_calls_numbers_its_states_on():
+    stream, data = _toffolis(4)
+    cut = [k for k, (w, *_) in enumerate(stream) if w == "autoccz_h"][2]
+    farm = F.Farm(2, x0=0, y=0, serve=lambda k: k % 2, strips=4)
+    homes = farm.beneath(data, 3, 2)
+    ported = farm.ports(stream[:cut]) + farm.ports(stream[cut:], start=2)
+    assert [a[0] for w, a, _, _ in ported if w == "macro"] == [0, 1, 2, 3]
+    xs, ys = [x for x, _ in homes.values()], [y for _, y in homes.values()]
+    fb = farm.bounds()
+    bounds = (min(fb[0], min(xs) - 1), fb[1], max(fb[2], max(xs) + 1), max(ys) + 1)
+    gadgets = schedule(ported, {**homes, **farm.all_homes()}, bounds, walls=farm.walls(), macro=farm.macro)
+    assert check(ported, gadgets) == []
+    assert [f for _, f, _ in farm.served] == [0, 1, 0, 1]
+
+
 def test_a_farm_with_two_sets_of_sites_serves_two_states_a_factory():
     stream, data = _toffolis(4)
     farm = F.Farm(2, x0=0, y=0, serve=lambda k: k // 2, strips=4, buffers=2)

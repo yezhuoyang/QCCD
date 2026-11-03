@@ -11,4 +11,5 @@
                  stationary tiles, every gadget a copy of a program checked once
     relay.py     a long product as a chain of neighbour merges, proved the same; a CNOT's ancilla
                  at the crossing of its control's column and its target's row
+    czpair.py    a CZ by a pair made ahead, proved the same: its H̄ before the guard, not after
 """

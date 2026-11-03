@@ -12,9 +12,10 @@ wide), bit i's blocks beneath factory i -- so every Toffoli reaches its factory 
 shapes repeat.  `--bits 2`: two bits beneath each factory, which makes their states on two
 sets of sites in turn.  `--wide`: the eight-strip factory, 24 tiles wide, one bit each.  Either
 is checked (`lattice.check`).  Prints the schedule's numbers and every distinct program it is
-made of.
+made of.  `--pairs`: each CZ of the uncompute by a pair made ahead (`czpair`), its H̄ off the
+chain.
 
-    python tools/lattice_adder.py [--farm [--bits 2 | --wide]] [--shapes FILE]
+    python tools/lattice_adder.py [--farm [--bits 2 | --wide]] [--pairs] [--shapes FILE]
 """
 from __future__ import annotations
 
@@ -114,6 +115,7 @@ def main():
     ap.add_argument("--farm", action="store_true")
     ap.add_argument("--bits", type=int, default=1, choices=(1, 2))
     ap.add_argument("--wide", action="store_true")
+    ap.add_argument("--pairs", action="store_true")
     a = ap.parse_args()
     forward, half = adder_streams()
     print(f"forward half {len(forward)} instructions ({dict(Counter(w for w, *_ in forward))}); "
@@ -132,7 +134,13 @@ def main():
         fb = farm.bounds()
         bounds = (min(fb[0], min(xs) - 1), fb[1], max(fb[2], max(xs) + 1), max(ys) + 1)
         homes = {**homes, **farm.all_homes()}
-    gadgets = schedule(stream, homes, bounds, walls=walls, macro=farm and farm.macro)
+    pins = {}
+    if a.pairs:
+        from qccd.fullstack.scale import czpair
+        stream, found = czpair.pairs(stream)
+        pins = czpair.place(found, homes, walls)
+        print(f"{len(found)} CZs by pairs, {len(pins) // 2} placed")
+    gadgets = schedule(stream, homes, bounds, walls=walls, macro=farm and farm.macro, pinned=pins)
     span = max(g.t1 for g in gadgets)
     busy = sum(g.t1 - g.t0 for g in gadgets)
     tiles = (bounds[2] - bounds[0] + 1) * (bounds[3] - bounds[1] + 1)

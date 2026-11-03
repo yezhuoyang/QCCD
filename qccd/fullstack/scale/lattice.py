@@ -11,7 +11,8 @@ every outcome its guard reads is decoded:
   when two patches face each other.
 * `ht`: the H̄ gadget (`hadamard_bar`), which takes the bus tile right of its block.
 * `prep` of a block with no home: a fresh ancilla, given a bus tile beside the partner of its
-  first product, on that product's side, held until its readout.
+  first product, on that product's side, held until its readout (made no sooner than that
+  partner is free, with `late`).
 * `prep` and `read`: the tile's reset or readout; an outcome is decoded `decode_us` later.
   `prep Y` is |Ȳ> made in place (`qccd.qec.experiments.y_memory`, Gidney's), on the tile alone.
 * `prep` of a block pinned to a tile (`pinned`: a relay, `relay.relay`; an ancilla at a crossing,
@@ -247,7 +248,7 @@ class _Pending:
 
 
 def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
-             start=None, macro=None, pinned=None, max_corridor=None) -> list:
+             start=None, macro=None, pinned=None, max_corridor=None, late=False) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
     `program._Exp` writes them -- on the lattice: `homes` block -> tile for the blocks that live
     there, `bounds` (x0, y0, x1, y1) the tiles that exist, `walls` tiles no gadget may use;
@@ -255,7 +256,10 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
     scheduled once (`shifted`) -- and `start` block -> when it is first free; `pinned` fresh
     block -> the bus tile it is made on.  `max_corridor`: a merge whose shortest free corridor is
     longer waits until a shorter one frees, rather than going the long way round (a long way
-    round is a new program, and a long one cannot be checked).
+    round is a new program, and a long one cannot be checked).  `late`: a fresh ancilla (not
+    pinned) is made no sooner than its first product's partners are free -- made at once, it
+    would hold its tile from the start, and on a lattice already worked on only a tile never
+    used is free that long.
 
     `macro`: what a `macro` line stands for -- `macro(k, args, free_at, board)` returns (its
     gadgets, the number of lines after it they carry out, block -> tile, block -> when free,
@@ -386,6 +390,10 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
                 where[blk] = tile
                 board.take(tile, t, INF, blk)
             elif blk not in homes:
+                if late:
+                    dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
+                    first = next((stream[j][1][1::2] for j in uses[blk] if j > k and stream[j][0] == "ppm"), ())
+                    t = max([t] + [free_at[b] - dur for b in first if b != blk and b in free_at])
                 tile, t = place(blk, k, t)
                 where[blk] = tile
                 board.take(tile, t, INF, blk)

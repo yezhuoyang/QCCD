@@ -29,6 +29,7 @@ there by `move`, a one-bit teleport along a column or a row (`move_proved`: a SW
 """
 from __future__ import annotations
 
+from collections import Counter
 from functools import lru_cache
 
 __all__ = ["chain", "proved", "move", "move_proved", "line", "crossings", "relay"]
@@ -211,12 +212,14 @@ def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None
     it is carried there (`carry`, the corners from `path`), and from then on goes by its new name.
     `sites`: blocks made elsewhere (a factory's |AutoCCZ> sites) -> their tiles.  `skip`: line ->
     how many lines after it to pass through untouched (a factory's own, under its `macro` line).
-    Products of other kinds, and fresh blocks with no partner at home, are left as they are.  The
-    carries' blocks are named `<tag><n>.`: one tag per call on one lattice."""
+    Products of other kinds, and fresh blocks with no partner at home, are left as they are.
+    Blocks carried to one block at home take its two sides of the letter in turn, so two can be
+    there at once.  The carries' blocks are named `<tag><n>.`: one tag per call on one lattice."""
     blocked = set(blocked) | set(homes.values())
     skip = skip or {}
     out, pins, cur, at = [], {}, {}, dict(sites)
     n_carry = 0
+    turns = Counter()                     # carries to each block at home: its two sides in turn
 
     def first_partner(k, blk):
         for j in _life(stream, k, blk):
@@ -248,7 +251,9 @@ def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None
             for f, h in ((a[1], a[3]), (a[3], a[1])):
                 if f in at and h in homes and not facing(at[f], homes[h], a[0]):
                     dst, pts = None, None
-                    for t in (beside(homes[h], a[0]), beside(homes[h], a[0], True)):
+                    sides = (beside(homes[h], a[0]), beside(homes[h], a[0], True))
+                    turns[h] += 1
+                    for t in sides[::1 if turns[h] % 2 else -1]:
                         pts = t not in blocked and path(at[f], t, blocked, lanes)
                         if pts:
                             dst = t

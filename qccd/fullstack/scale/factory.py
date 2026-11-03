@@ -288,11 +288,12 @@ class Farm:
         return {(x + self.dx[f], y + self.dy) for f in range(self.n) for x in range(x0, x1 + 1)
                 for y in range(y0, row)}
 
-    def ports(self, stream) -> list:
+    def ports(self, stream, start: int = 0) -> list:
         """`stream` with each `autoccz_h s0 .. s8` a `macro` line followed by its factory's lines,
         renamed: the nine sites its own (`t<k>s<i>`, the program's names after it too) and the
-        factory's blocks and outcomes `F<k>.`-prefixed."""
-        out, ren, k, tag = [], {}, 0, self.tag
+        factory's blocks and outcomes `F<k>.`-prefixed; k counts from `start` (the states the
+        farm made in earlier calls on the same lattice)."""
+        out, ren, k, tag = [], {}, start, self.tag
         for w, a, o, g in stream:
             if w == "autoccz_h":
                 ren = {s: f"{tag}t{k}s{i}" for i, s in enumerate(a)}

@@ -100,3 +100,17 @@ def test_reserved_tiles_and_start_times_hold_a_schedule_back():
     assert schedule(stream, homes, bounds)[0].t0 == 0
     assert schedule(stream, homes, bounds, reserved=[(t, 0.0, 1e6) for t in bus])[0].t0 == 1e6
     assert schedule(stream, homes, bounds, start={"q1": 5e5})[0].t0 == 5e5
+
+
+def test_a_late_ancilla_is_made_when_its_partner_is_free():
+    homes, bounds = columns(["q0", "q1"], 1)
+    busy = [("ppm", ["Z", "q0", "Z", "q1"], f"m{i}", []) for i in range(4)]
+    use = [("prep", ["a", "Z"], None, []), ("ppm", ["Z", "q0", "Z", "a"], "o", []), ("read", ["a", "Z"], "r", [])]
+    prep = lambda gs: next(g for g in gs if g.kind == "prep")
+    early = schedule(busy + use, homes, bounds)
+    late = schedule(busy + use, homes, bounds, late=True)
+    assert check(busy + use, late) == []
+    q0_free = max(g.t1 for g in late if g.line < len(busy))
+    assert prep(early).t0 == 0 and prep(late).t0 == q0_free - Costs().prep_us
+    # the merge itself starts no later
+    assert late[-2].t0 <= early[-2].t0
