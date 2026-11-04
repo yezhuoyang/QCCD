@@ -1,6 +1,6 @@
 {
  "boards": {
-  "bb144@1": "sha256:f7704189b36cbce2aed3989f42c3f7b16c6fd21d94a84d7b10ba445b503827d7",
+  "bb144@2": "sha256:281e438469f7761aabad9bda539886e3d82c4b2af4e3bba9159861f2cbbac3a5",
   "bb18xz_mem@1": "sha256:c5ec205bc721865284058b3247f74a81b6e8291a6c39613ea00df55f6473cabb",
   "bb72seq_mem@1": "sha256:1a8d9f61d29c1a7b8be58c20aa6de14b20a7c1e372c77b8d6a262096818a96a5",
   "bb90seq_mem@1": "sha256:46984f0b8a4d2973cf5bb320ee8a32c303fe524d6f842b24e93c3d6d790e1929",
@@ -10,7 +10,7 @@
   "c2lr_surface3_mem_ybba@1": "sha256:574ae7e9c2bf31b8e351104ad9df51396c7d635ba28bab6d00c800ca74b244b8",
   "five_qubit@1": "sha256:8a4a09e8e94c34bd7b7cc6b0686eea62609c7b19eb7b542c0a073175dd06e116",
   "ghz4@1": "sha256:be83e5f5199abc23c87f5865b0ac7c08b3df80cab0df9b44b6748647efd462b8",
-  "goal3_bb72_mem@1": "sha256:2cd89b90f674b2264657108bfb6c0ef495c8c8cdfd5ffc5ca2973b1fe7e22d9a",
+  "goal3_bb72_mem@2": "sha256:5b6bd071ab00460208c001f9bffe975dbda9d378a622d1d5b768bde7fb69251b",
   "goal3_color3_mem@1": "sha256:65b22752e983e5041d09edc2b8361e1d6199f803031b1aaf9ade3068d186b587",
   "goal3_color5_mem@1": "sha256:effdfe158a09d11215b6954103ff377efe99d49fc3e862854f2dac823b40f8b9",
   "goal3_color7_mem@1": "sha256:230128861b08556b9cc1cfeef4dba8eac5196d8cb1a6a9c6ee192ca2f015a016",
@@ -39,12 +39,12 @@
   "words": 197
  },
  "files": {
-  "boards.md": "sha256:be95a67c46be42d1d210e73d717fe1add07da55a58dedd86e639b5cbdb97a9a6",
-  "grader.md": "sha256:52e41d0c25be51dbe3961028958694293790a54f87c532f6d6e19df38dd5daa6",
-  "machine-rules.md": "sha256:0d787552cb35787d0174f27d0d79d3990d91fa96a50ef7ac6c3051789d5e7f11",
-  "rule-sets.md": "sha256:4d6ebac4d93e22e3126502b26814ca071ef83f4acd8daa09249936549dc29873",
-  "rules.md": "sha256:ec0a16389f8006efaa3ae35628a8fd7cfbb921db182e822c5dbc8e024a506477",
-  "vocabulary.md": "sha256:468f9a6b969405f6b9e6c8620257694284600c16cf9704a1824cf1676fe5a2e7"
+  "boards.md": "sha256:3fdf9a0e05d207009c7c03ea4c1cae01263f0c55c6fda18dc27c3298e012ea64",
+  "grader.md": "sha256:e7885635d0b8c8da2fcda43e2205dfed9370ff451268c97a0fc84c0098c9e1cf",
+  "machine-rules.md": "sha256:ad2b3538690640f076bfb467690ee2fcd5c267d83854cea53a195a6b6a8f6b33",
+  "rule-sets.md": "sha256:09b7e3e1cf554c55bd146f75a4b728e988e982fcfbdc6f1080498c053da2c929",
+  "rules.md": "sha256:f126bffb6255085d2695a345323e2076ebe01706a7321fbd79948d8471aedb40",
+  "vocabulary.md": "sha256:31764d8ee8407fe17f33f9eac0949c7deb0803576542e5dbbf304935728c10aa"
  },
  "generator": ".claude/skills/qccd-design-review/scripts/sync_references.py",
  "kind": "qccd-design-review.references",
@@ -73,7 +73,10 @@
   "qccd/verify/__init__.py",
   "qccd/verify/rules.py",
   "qccd/ruleset/declared.py",
-  "qccd/workspace/web/rules.js"
+  "qccd/workspace/web/rules.js",
+  "qccd/gadget/judge.py",
+  "qccd/gadget/place_checks.py",
+  "goals/goal3/families.py"
  ],
  "version": 1
 }
