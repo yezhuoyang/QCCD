@@ -22,7 +22,7 @@ The rules are not copied into this skill by hand. They are generated from the co
 | `qccd/ruleset/library/*.rules` (the text the website's Rules page prints) | `references/rules.md`, `rule-sets.md`, `machine-rules.md` |
 | `qccd/ruleset/vocabulary.py` (each word's group and where it can be read) | `references/vocabulary.md`, and each rule's "Reads" and "Judged on" in `rules.md` |
 | `qccd/workspace/releases/*/release.json`, `goals/goal3/families.py` | `references/boards.md` |
-| `qccd/workspace/evaluator.py`, `qccd/verify/` (read by running them) | `references/grader.md` |
+| `qccd/workspace/evaluator.py`, `qccd/verify/` (read by running them), `qccd/evalset/library/*.eval` (the budget's and Goal 1's requirements) | `references/grader.md` |
 | `qccd/gadget/judge.py`, `qccd/gadget/place_checks.py` | `references/machine-rules.md` |
 
 `references/MANIFEST.json` records a digest of every generated file, of every rule set (as

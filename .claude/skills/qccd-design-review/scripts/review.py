@@ -201,6 +201,20 @@ def board_fit(release, info: dict) -> dict:
                          if loops else "the router (no closed loop for the conveyor)")}
 
 
+def goal_ions(release, exe) -> dict | None:
+    """Goal 1 lists a memory board's entries only up to its ion limit (`goal1.eval`, G2:
+    `n_ions <= max_ions`, the ions the programme places). A board of another goal has none."""
+    if release.manifest.get("goal", "goal1") != "goal1" or not release.manifest.get("qec"):
+        return None
+    try:
+        from qccd.evalset import load as load_evaluation
+        limit = int(float(load_evaluation("goal1").param_text["max_ions"]))
+    except Exception:  # an older checkout without the evaluation, or a limit that is not a number
+        return None
+    return {"goal": "goal1", "programme_ions": len(getattr(exe, "ions", None) or []), "max_ions": limit,
+            "experiment_ions": (release.manifest.get("qec") or {}).get("n_ions")}
+
+
 def compare_named(doc: dict, arch, release, repo: Path) -> dict | None:
     """What the design changed against the shipped device of its name, when there is one."""
     from qccd.arch.device import Architecture
@@ -341,6 +355,73 @@ def rule_cases(rs, exe) -> dict:
     return out
 
 
+def rule_margins(rs, exe) -> dict:
+    """The case closest to failing, for every rule whose `for all` compares two numbers: heat
+    against the budget (R7), occupancy against capacity (R1, R3), a rail angle against the minimum
+    (R20), an ion's heat against the loss limit (G6).  A rule that passes by a hair is worth a
+    sentence (review-guide.md, "Heat margin"); this is the evidence, read off every case the rule
+    ranges over, as `rule_cases` reads them."""
+    from qccd.ruleset import TERMS
+    from qccd.ruleset.evaluate import Evaluator
+    from qccd.ruleset.syntax import BinOp, Call, Const, Name, Num, Quant, Str, show
+    from qccd.ruleset.vocabulary import EvalError, NotApplicable
+    try:
+        from qccd.ruleset.evaluate import _brief     # how the checker names a value in a counterexample
+    except ImportError:
+        def _brief(_ev, v):
+            return str(v)
+
+    def conjuncts(f) -> list:
+        return conjuncts(f.left) + conjuncts(f.right) if isinstance(f, BinOp) and f.op == "and" else [f]
+
+    def number(x) -> bool:
+        return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+    def a_limit(c) -> bool:
+        """The bound is a limit (a capacity, a budget, a parameter), not a literal (`<= 1`: an
+        exactness) nor an instant (`before its start`: an order), where a margin says nothing."""
+        if isinstance(c.right, (Num, Str, Const)):
+            return False
+        w = c.right.fn if isinstance(c.right, Call) else c.right.id if isinstance(c.right, Name) else None
+        return not (w in TERMS and "instant" in str(TERMS[w].returns or ""))
+    ev = Evaluator(exe, rs.params)
+    out: dict = {}
+    for r in rs.rules:
+        try:
+            if r.when is not None and not ev.ev(r.when, {}):
+                continue
+            best = None
+            for p in conjuncts(r.formula):
+                if not (isinstance(p, Quant) and p.kind == "all"):
+                    continue
+                comps = [c for c in conjuncts(p.body)
+                         if isinstance(c, BinOp) and c.op in ("<=", "<", ">=", ">") and a_limit(c)]
+                if not comps:
+                    continue
+                for env in ev.counterexamples(Quant("all", p.binders, p.where, Const(False)), {}):
+                    for c in comps:
+                        a, b = ev.ev(c.left, env), ev.ev(c.right, env)
+                        if number(a) and number(b):
+                            slack = (b - a) if c.op in ("<=", "<") else (a - b)
+                            if best is None or slack < best[0]:
+                                names = [nm for bd in p.binders for nm in bd.names]
+                                at = ", ".join(f"{nm} = {_brief(ev, env[nm])}" for nm in names if nm in env)
+                                best = (slack, {"term": show(c.left), "value": a, "op": c.op, "limit": show(c.right),
+                                                "bound": b, "slack": slack, "at": at})
+        except (EvalError, NotApplicable):
+            continue
+        if best is not None:
+            out[r.id] = best[1]
+    return out
+
+
+def _margin_note(m: dict) -> str:
+    def num(x):
+        return f"{x:.4g}" if isinstance(x, float) else str(x)
+    return (f"closest case: {m['term']} is {num(m['value'])} against {m['limit']} = {num(m['bound'])} "
+            f"(slack {num(m['slack'])}), at {m['at']}")
+
+
 def certificate_fit(cert: dict, release) -> dict:
     """Is the certificate about this board's circuit at all?  The binding stage decides that op by
     op (and needs qiskit); this compares only what needs no tool: the qubit count the certificate
@@ -384,7 +465,8 @@ def recool(release, arch, certified_doc: dict, final_prog) -> dict:
 
 def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_info: dict,
           stages: dict | None, device_only: bool, claims: dict | None, cases: dict | None,
-          cert_fit: dict | None = None, assumed: list | None = None) -> list[dict]:
+          cert_fit: dict | None = None, assumed: list | None = None,
+          margins: dict | None = None) -> list[dict]:
     """One row per rule of the board's set and of the entry's own set.
 
     `grader` is what the grader's rules stage makes of the rule, read from the stage's own detail:
@@ -446,12 +528,12 @@ def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_
             row["verify"] = {"status": v, "count": len(ex),
                              "why": (det.get("skipped") or {}).get(rid) or (det.get("partial") or {}).get(rid) or "",
                              "examples": [{"message": d["message"], "instructions": d.get("instructions")}
-                                          for d in ex[:3]]}
+                                          for d in ex[:8]]}
         for key, src in (("language", lv), ("declared", dv)):
             x = src.get(rid)
             # on an empty programme a programme rule holds vacuously: that verdict says nothing
             if x is not None and not programme_rule:
-                row[key] = {"verdict": x.verdict, "count": x.count, "examples": list(x.examples[:3]),
+                row[key] = {"verdict": x.verdict, "count": x.count, "examples": list(x.examples),
                             "reason": x.reason}
         if cases is not None and not programme_rule:
             row["cases"] = cases.get(rid)
@@ -540,6 +622,9 @@ def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_
             row["notes"].append("only the certificate stages decide R10: give the certified programme too "
                                 "(--certified), or review the bundle")
         row["review"] = rv
+        if rv in ("pass", "pass (device part)") and (margins or {}).get(rid):
+            row["closest"] = margins[rid]
+            row["notes"].append(_margin_note(margins[rid]))
         # ---- notes the two checkers' disagreement deserves
         if v == "passed" and lverdict == FAILS:
             row["notes"].append("the rule language finds counterexamples the grader's verifier does not report "
@@ -587,7 +672,7 @@ def device_only_rules(board_rs, release, arch, info) -> list[dict]:
     vview = _verify_view(release, arch, prog, None, None)
     lang, exe = _language(board_rs, release, arch, prog, None, None)
     return _rows(board_rs, None, vview, lang, None, release, info, None, True, None, rule_cases(board_rs, exe),
-                 assumed=list(getattr(lang, "assumed", None) or []))
+                 assumed=list(getattr(lang, "assumed", None) or []), margins=rule_margins(board_rs, exe))
 
 
 # --------------------------------------------------------------------------- a machine of gadgets
@@ -632,11 +717,13 @@ def machine_review(repo: Path, floorplan: str | None, algorithm: str | None, out
         lib, fp = load_file(floorplan, leaves)
         regions, gir, sets = fp.regions, None, ("floorplan",)
         rep = judge_floorplan(lib, leaves, regions=regions)
+    margins: dict = {}
     try:
         exe = machine_execution(lib, leaves, gir, regions=regions)
         cases: dict | None = {}
         for n in sets:
             cases.update(rule_cases(load(n), exe))
+            margins.update(rule_margins(load(n), exe))
     except Exception:  # a count is context, never a verdict
         cases = None
     viol = (checks or {}).get("violations") or {}
@@ -663,10 +750,12 @@ def machine_review(repo: Path, floorplan: str | None, algorithm: str | None, out
             notes.append("the rule language finds counterexamples the place checks do not report")
         if r.get("reason"):
             notes.append(str(r["reason"]))
+        if rv == "pass" and margins.get(rid):
+            notes.append(_margin_note(margins[rid]))
         rows.append({"id": rid, "title": r.get("title") or rid, "url": SITE + rid,
                      "set": "floorplan" if rid in floorplan_ids else "machine",
-                     "language": {"verdict": verdict, "count": r.get("count"), "examples": list(r.get("examples") or [])[:3]},
-                     "place_checks": pc, "place_examples": [str(x) for x in (viol.get(rid) or [])[:3]],
+                     "language": {"verdict": verdict, "count": r.get("count"), "examples": list(r.get("examples") or [])},
+                     "place_checks": pc, "place_examples": [str(x) for x in (viol.get(rid) or [])[:8]],
                      "cases": cs, "review": rv, "notes": notes})
     res["rules"] = rows
     return res
@@ -730,7 +819,7 @@ def machine_render(res: dict) -> str:
         cases = r.get("cases")
         ccell = "-" if not cases else " · ".join(str(c["cases"]) if c["cases"] is not None else "?" for c in cases)
         lines.append(f"| [{r['id']}]({r['url']}) | {_cell(r['title'])} | {lg.get('verdict') or '-'} | "
-                     f"{r.get('place_checks') or '-'} | {ccell} | **{r['review']}** | {_cell(' / '.join(ev))[:600]} |")
+                     f"{r.get('place_checks') or '-'} | {ccell} | **{r['review']}** | {_evidence(ev)} |")
     lines.append("")
     if res.get("reproduce"):
         lines += ["## Reproduce", "", "```", *res["reproduce"], "```"]
@@ -782,6 +871,13 @@ def compare_grades(given: dict, local: dict, policy) -> dict:
 
 def _cell(s) -> str:
     return " ".join(str(s).split()).replace("|", "\\|")
+
+
+def _evidence(ev: list, limit: int = 1000) -> str:
+    """A table cell of evidence: every example the checkers gave (the rule language keeps its
+    first 8), cut at `limit` characters with a pointer to the full list."""
+    text = _cell(" / ".join(ev))
+    return text if len(text) <= limit else text[:limit] + " ... (every example: rule-check.json)"
 
 
 def _stage_why(s: dict) -> str:
@@ -894,7 +990,7 @@ def render(res: dict) -> str:
             ccell = "-" if not cases else " · ".join(str(c["cases"]) if c["cases"] is not None else "?" for c in cases)
             board = f" {_cell(r.get('board') or '')} |" if own else ""
             lines.append(f"| [{r['id']}]({r['url']}) | {_cell(r['title'])} | {_cell(r['grader'])} |{board} "
-                         f"{_cell(lang_cell)} | {ccell} | **{_cell(r['review'])}** | {_cell(' / '.join(ev))[:600]} |")
+                         f"{_cell(lang_cell)} | {ccell} | **{_cell(r['review'])}** | {_evidence(ev)} |")
         lines.append("")
     rc = res.get("recool")
     if rc:
@@ -930,6 +1026,12 @@ def render(res: dict) -> str:
         if f:
             lines.append(f"- board fit: the circuit has {f['circuit_qubits']} qubits; the device has {f['ion_slots']} ion "
                          f"slots ({f['spare_slots']} spare) and {f['gate_sites']} gate sites; {f['compiler']}")
+        io = res.get("ions")
+        if io:
+            lines.append(f"- ions the programme places: {io['programme_ions']} (Goal 1 lists entries up to "
+                         f"{io['max_ions']}: goal1.eval's G2; the board's experiment has {io['experiment_ions']})")
+        for e in res.get("programme_errors") or []:
+            lines.append(f"- ERROR (programme): {e}")
         cn = res.get("named")
         if cn:
             parts = [f"same geometry: {'yes' if cn['same_geometry'] else 'no'}",
@@ -996,6 +1098,8 @@ def verdict_of(res: dict) -> tuple[str, int]:
     parts = []
     if dev_err:
         parts.append("device: " + "; ".join(dev_err))
+    if res.get("programme_errors"):
+        parts.append("programme: " + "; ".join(res["programme_errors"]))
     if res.get("declared_rules_error"):
         parts.append("its rules.json cannot be read, so the rules stage fails (RULESET.INVALID)")
     fit = res.get("certificate")
@@ -1012,6 +1116,10 @@ def verdict_of(res: dict) -> tuple[str, int]:
     # breaking a board rule under the entry's own set costs the ranking, not eligibility
     ranking = (["breaks the board's " + ", ".join(breaks) + ", so it is not on the board's own ranking (only "
                 "with `?rules=all`)"] if breaks else [])
+    ions = res.get("ions") or {}
+    if ions and ions["programme_ions"] > ions["max_ions"]:
+        ranking.append(f"places {ions['programme_ions']} ions, over Goal 1's {ions['max_ions']} (goal1.eval G2): "
+                       "graded, but not listed on Goal 1")
     if g:
         el = g.get("eligibility") or {}
         src = "the given report" if grades.get("given") else "the local grade"
@@ -1116,6 +1224,7 @@ def main(argv=None) -> int:
     t0 = time.time()
     notes: list = []
     res: dict = {"kind": "qccd-design-review.result", "version": 2, "notes": notes, "input_errors": [],
+                 "programme_errors": [],
                  "inputs": {k: getattr(a, k) for k in ("bundle", "report", "device", "program", "certificate",
                                                        "certified", "board", "rules")},
                  "grades": {"given": None, "local": None}}
@@ -1256,13 +1365,19 @@ def main(argv=None) -> int:
         if prog is not None:
             vview = _verify_view(release, arch, prog, declared_doc, cert)
             lang, exe = _language(board_rs, release, arch, prog, cert, computes)
+            limits = release.manifest.get("limits") or {}
+            if limits.get("max_instructions") and len(prog) > int(limits["max_instructions"]):
+                res["programme_errors"].append(f"{len(prog)} instructions, over the board's limit of "
+                                               f"{limits['max_instructions']} (the program stage fails: PROGRAM.TOO_LARGE)")
+            res["ions"] = goal_ions(release, exe)
             dlang, dexe = _language(declared_rs, release, arch, prog, cert, computes) if declared_rs is not None \
                 else (None, None)
             claims = None if a.no_claims else _claims(release, arch, prog)
-            cases = None
+            cases = margins = None
             if len(prog) <= a.cases_limit:
                 # the entry's own rules counted in its own execution (its set's parameters), the board's in the board's
                 cases = {**(rule_cases(declared_rs, dexe) if dexe is not None else {}), **rule_cases(board_rs, exe)}
+                margins = {**(rule_margins(declared_rs, dexe) if dexe is not None else {}), **rule_margins(board_rs, exe)}
             else:
                 notes.append(f"the programme has {len(prog)} instructions, over --cases-limit {a.cases_limit}: cases "
                              "were not counted")
@@ -1272,7 +1387,7 @@ def main(argv=None) -> int:
                 notes.append("the verdicts rest on what the programme's source did not demonstrate: "
                              + "; ".join(assumed))
             res["rules"] = _rows(board_rs, declared_rs, vview, lang, dlang, release, res.get("device") or {},
-                                 stages, False, claims, cases, res.get("certificate"), assumed=assumed)
+                                 stages, False, claims, cases, res.get("certificate"), assumed=assumed, margins=margins)
             res["rules_stage"] = {"status": vview["status"], "coverage": vview["coverage"], "breaks": vview["breaks"]}
             if not cert:
                 notes.append("no certificate was given: R24 and R25 have no circuit to judge against (they do not "

@@ -89,6 +89,11 @@ It also reports what a reviewer would otherwise work out by hand:
 
 - **Cases per rule:** how many bindings each `for all` of a rule ranged over. A rule with 0
   cases passed without judging anything: no splits, no loops, no simultaneous gates.
+- **The closest case of a passing rule** that compares a number with a limit: heat against the
+  budget (R7), occupancy against capacity (R1, R3, G3), a rail angle against the minimum (R20),
+  an ion's heat against the loss limit (G6). This is the margin a reviewer comments on.
+- **Every counterexample the checker kept** (the rule language keeps the first 8), in
+  `rule-check.json`.
 - **Board fit:** the circuit's qubits against the device's ion slots, and which compiler routes
   it.
 - **A certificate made for another circuit:** a qubit-count check that needs no tools.

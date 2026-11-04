@@ -142,9 +142,9 @@ the floorplan is clean and a G rule still fails, suspect the scheduler, and repo
 
 ## 3. Beyond the checkers: look at these in every review
 
-`rule-check.md` already reports the facts behind items 1-3, 7, 8, 9 and 10 (fit, physics lock,
-budget, the shipped device of the same name, cases per rule, R9, buildability). Your job is the
-judgement: what each fact means for this design.
+`rule-check.md` already reports the facts behind items 1-3, 5, 7, 8, 9 and 10 (fit, physics
+lock, budget, the shipped device of the same name, each rule's closest case, cases per rule, R9,
+buildability). Your job is the judgement: what each fact means for this design.
 
 1. **Board fit.** Does the device hold the circuit's qubits (total capacity), and does its shape
    suit the compiler that will route it? The conveyor drives only the first closed loop plus
@@ -167,7 +167,10 @@ judgement: what each fact means for this design.
    only its timed schedule can judge (R29, R30): on a programme they `do not apply`, which
    neither fails nor proves anything.
 5. **Heat margin.** R7 passing by a hair (peak n-bar just under the budget) is worth a sentence.
-   Every heat figure is an upper bound (R15), so the real margin is no smaller.
+   Every heat figure is an upper bound (R15), so the real margin is no smaller. The review
+   script's "closest case" note gives the tightest case of each rule that compares with a limit
+   (R7's heat, R1's occupancy, R20's angle, G6's ion-loss heat), with where it is. A site or road
+   at exactly its capacity (slack 0) is legal; say so only when a small change would break it.
 6. **Control model.** `direct` wiring makes R22 vacuous and costs DACs. `switch_per_site: false`
    is what the R4d hold clause bites on. A C2LR device is judged by C1-C10, and its checkerboard
    steps are assumed.
@@ -243,3 +246,14 @@ These hold as of the code this guide was written against. Each pointer says wher
 | `semantics` | the composed pulses don't implement the circuit (O2), or transport replay disagrees (O1) | a compiler bug: report it with the bundle |
 | `ler` | the detectors aren't deterministic with the circuit's parity (memory boards) | the programme doesn't run the memory experiment the board defines |
 | `metrics` | the replay under the board's tables fails | usually follows an earlier failure |
+
+The evaluations' requirements (`references/grader.md`, generated from `qccd/evalset`) are
+checks beside the rules, with ids of their own. **Goal 1's G1-G3 are not the machine rules
+G1-G3.**
+
+| Requirement | Where it is enforced | Fails when |
+|---|---|---|
+| B1, B2 (`board`) | the `device` stage (the review's budget line) | the wiring needs more DACs, or the device more junctions, than the board's budget |
+| G1 (`goal1`) | the `rules` stage | any rule of the standard set fails |
+| G2 (`goal1`) | Goal 1's listing, not eligibility | the programme places more than 200 ions (the review reports the count). The official listing filters by the board's experiment, which every Goal 1 board keeps under 200 |
+| G3 (`goal1`) | the `ler` stage's noiseless check (`QEC.CHECK_FAILED`) | with noise taken out, a detector or observable is not the fixed 0 the experiment's circuit gives it |

@@ -50,7 +50,8 @@ GENERATED = ("rules.md", "rule-sets.md", "boards.md", "grader.md", "vocabulary.m
 SOURCES = ("qccd/ruleset/library/*.rules", "qccd/ruleset/vocabulary.py", "qccd/ruleset/machine.py",
            "qccd/workspace/releases/*/release.json", "qccd/workspace/evaluator.py", "qccd/verify/__init__.py",
            "qccd/verify/rules.py", "qccd/ruleset/declared.py", "qccd/workspace/web/rules.js",
-           "qccd/gadget/judge.py", "qccd/gadget/place_checks.py", "goals/goal3/families.py")
+           "qccd/gadget/judge.py", "qccd/gadget/place_checks.py", "goals/goal3/families.py",
+           "qccd/evalset/library/*.eval")
 #: how a rule's reach reads in the references (`review.rule_reach`)
 READS = {"model": "the board's cost model alone: the same verdict for every design on a board",
          "device": "the device alone (with the board's physics): a device review decides it",
@@ -235,13 +236,18 @@ def gather(repo: Path) -> dict:
     except Exception:          # so is the gadget package
         PLACE_RULES, judge_doc = {}, ""
     reach = _review_module().rule_reach(cat)
+    try:
+        import qccd.evalset as evalset
+        evaluations = {n: evalset.load(n) for n in evalset.names()}
+    except Exception:          # an older checkout without the evaluation language
+        evaluations = {}
     return {
         "repo": repo, "LIBRARY": LIBRARY, "TERMS": TERMS, "cat": cat, "rule_order": rule_order,
         "sections": sections, "section_of": section_of, "groups": website_groups(repo),
         "device_sets": device_sets, "machine_sets": machine_sets, "boards": boards, "board_set": board_set,
         "ev": ev, "dec": dec, "statements": RULE_STATEMENTS, "coverage": probe_coverage(),
         "param_notes": PARAM_NOTES, "reach": reach, "goal3": goal3_families(repo),
-        "place_rules": dict(PLACE_RULES), "judge_doc": judge_doc,
+        "place_rules": dict(PLACE_RULES), "judge_doc": judge_doc, "evaluations": evaluations,
     }
 
 
@@ -457,6 +463,30 @@ def gen_grader(g: dict) -> str:
                "rule that could not be checked makes the stage `partial`, so the entry is not eligible.")
     out.append("- A rule of the entry's set that only a paper's timed schedule can judge (`rules.md`, \"Judged on\") "
                "does not apply to a programme: it neither fails nor counts.\n")
+    evs = g["evaluations"]
+    if any(e.requirements for e in evs.values()):
+        out.append("## The evaluations' requirements (`qccd/evalset/library/*.eval`)\n")
+        out.append("An evaluation's `require` lines are checks beside the rules: the device stage judges a board's "
+                   "budget by `board`'s, and Goal 1 lists entries by `goal1`'s. Their ids are the evaluation's own: "
+                   "Goal 1's G1-G3 are not the machine rules G1-G3 (`machine-rules.md`).\n")
+        for n, e in evs.items():
+            inherited = {r.id for i in (e.includes or []) if i in evs for r in evs[i].requirements}
+            own = [r for r in e.requirements if r.id not in inherited]
+            if not own:
+                continue
+            out.append(f"### `{n}`: {_md(e.title)}\n")
+            if e.includes:
+                out.append(f"- includes: {', '.join(f'`{i}`' for i in e.includes)}"
+                           + (f" (its {', '.join(sorted(inherited))})" if inherited else ""))
+            for k, v in (e.param_text or {}).items():
+                if any(re.search(rf"\b{re.escape(k)}\b", r.text or "") for r in own):
+                    out.append(f"- param `{k} = {v}`")
+            out.append("")
+            out.append("| Requirement | Title | Assertion | Meaning |")
+            out.append("|---|---|---|---|")
+            for r in own:
+                out.append(f"| {r.id} | {_md(r.title)} | `{_md(r.text)}` | {_md(r.about)} |")
+            out.append("")
     out.append("## What the probe found\n")
     for kind, c in cov.items():
         out.append(f"- {kind} device: qccd.verify reports {len(c['reported'])} rule ids "
@@ -557,7 +587,8 @@ def generate(repo: Path) -> dict[str, str]:
         "generator": SELF, "sources": list(SOURCES),
         "counts": {"device_rules": len(g["cat"].rules), "device_rule_sets": len(g["device_sets"]),
                    "machine_rules": sum(len(rs.rules) for rs in g["machine_sets"].values()),
-                   "boards": len(g["boards"]), "words": len(g["TERMS"])},
+                   "boards": len(g["boards"]), "words": len(g["TERMS"]),
+                   "requirements": len({(r.id, r.text) for e in g["evaluations"].values() for r in e.requirements})},
         # the digest of each set as `RuleSet.text()` writes it: the same text the compiler is given
         "rule_sets": {n: "sha256:" + hashlib.sha256(rs.text().encode()).hexdigest()
                       for n, rs in {**g["device_sets"], **g["machine_sets"]}.items()},
