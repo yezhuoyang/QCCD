@@ -5,18 +5,26 @@
 #
 #   python .claude/skills/qccd-design-review/scripts/sync_references.py --write
 #
-# Pure standard-library Python, like the toolchain: no install beyond pytest.
+# A rule added to the library also fails it until the hand-written guide
+# (references/review-guide.md) has a row for it.
+#
+# Pure standard-library Python, like the toolchain, except numpy for the gadget leaves the
+# machine-rule tests build.
 name: skills
 on:
   push:
     paths:
       - 'qccd/**'
+      - 'goals/goal3/families.py'
+      - 'examples/gadgets/**'
       - '.claude/skills/**'
       - 'tests/test_design_review_skill.py'
       - '.github/workflows/skills.yml'
   pull_request:
     paths:
       - 'qccd/**'
+      - 'goals/goal3/families.py'
+      - 'examples/gadgets/**'
       - '.claude/skills/**'
       - 'tests/test_design_review_skill.py'
       - '.github/workflows/skills.yml'
@@ -35,5 +43,5 @@ jobs:
         run: python .claude/skills/qccd-design-review/scripts/sync_references.py --check
       - name: the review script still judges every rule, and still fails what it should
         run: |
-          python -m pip install --quiet pytest
+          python -m pip install --quiet pytest numpy
           python -m pytest -q tests/test_design_review_skill.py

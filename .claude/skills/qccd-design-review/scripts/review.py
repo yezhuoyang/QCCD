@@ -11,7 +11,11 @@ ones the official grader runs:
     with the circuit the certificate names, so R24/R25 have something to judge;
   * for a bundle (or loose files that make one), the whole reference grade (`grade`): bundle,
     device, physics lock, program, rules, correspondence, certificate binding, the Lean checker,
-    semantics, LER, metrics.
+    semantics, LER, metrics;
+  * an entry's own rule set (its rules.json, or --rules), which decides its rules stage, beside
+    the board's, which decides the board's own ranking;
+  * one level up, a floorplan of gadgets (F1-F9) or a logical algorithm scheduled on one (every
+    machine rule, F, G and H), as `python -m qccd.gadget` judges them.
 
 It also reports what a reviewer would otherwise work out by hand: how many cases each rule had
 to check (a rule with none passes without saying anything), whether the board's circuit fits the
@@ -24,6 +28,8 @@ electrodes' design-rule check (information only).
               [--certified certified.tsir.json] --board "surface code memory, distance 3"
     review.py --device d.arch.json --board steane          # the device alone: drawing, budget, fit
     review.py --report report.json                         # a grade someone already ran
+    review.py --floorplan town.floor                       # a floorplan of gadgets: F1-F9
+    review.py --algorithm bell_cnot.alg [--floorplan f]    # scheduled on it: F, G and H
     review.py --list-boards
 
 Writes rule-check.md and rule-check.json to --out (default: a new temporary folder) and prints the
@@ -55,16 +61,17 @@ def repo_root(arg: str | None = None) -> Path:
     raise SystemExit("review: no QCCD checkout found (pass --repo, or set QCCD_REPO)")
 
 
-#: rules whose `passed` says nothing about the programme: they pass by construction or because
-#: the board's cost model has the property they ask for (qccd/verify/__init__.py, `verify`)
-VACUOUS = {
-    "R16": "a property of the cost model (it prices gate error from n-bar); no programme can fail it",
-    "R17": "a property of the cost model (it accrues heating with time); no programme can fail it",
-    "R18": "by construction: junctions are priced by the degree the expanded graph reports",
+#: rules true by the definition of the words they use, on every device and programme
+BY_DEFINITION = {
+    "R18": "true by definition in both checkers: `junctions` are the nodes where three or more rails "
+           "meet (qccd/ruleset/vocabulary.py), and the verifier prices each junction by that number",
 }
-#: rules the device document decides on its own, with no programme (qccd/verify/rules.py:
-#: architecture_violations, geometry_violations, c2lr_document_violations)
-DEVICE_RULES = ("R11", "R18", "R19", "R20", "R21", "C10")
+#: what a rule that reads only the board's cost model says about a design: nothing
+MODEL_ONLY = ("a property of the board's cost model (it reads no word of the device or the programme): "
+              "the same verdict for every design on this board")
+#: the vocabulary groups a device and the board's physics fix without any programme
+#: (each word's `group`, qccd/ruleset/vocabulary.py)
+DEVICE_GROUPS = frozenset({"hardware", "model"})
 #: the stages that decide R10 between them (the evaluator's docstring)
 R10_STAGES = ("certificate_binding", "lean_certificate", "semantics")
 #: control fields worth naming when a design's control differs from the device it is named after
@@ -237,6 +244,38 @@ def phys_summary(arch, tech: str) -> dict:
 
 # --------------------------------------------------------------------------- the rules
 
+def rule_reach(rs) -> dict[str, str]:
+    """What each rule of `rs` reads, from the vocabulary group of every word it uses:
+
+      "model"      the board's cost model alone: the verdict is the same for every design;
+      "device"     the device (and the model): a device with no programme decides it;
+      "part"       some of its conjuncts read only the device: a device alone decides those;
+      "programme"  it needs an execution.
+
+    Read off the rule text, so a rule that changes what it reads moves with it."""
+    from qccd.ruleset import TERMS
+    from qccd.ruleset.syntax import BinOp, Call, Name, walk
+
+    def groups(f) -> set:
+        out = set()
+        for n in (walk(f) if f is not None else ()):
+            w = n.fn if isinstance(n, Call) else n.id if isinstance(n, Name) else None
+            if w in TERMS:
+                out.add(TERMS[w].group)
+        return out
+
+    def conjuncts(f) -> list:
+        return conjuncts(f.left) + conjuncts(f.right) if isinstance(f, BinOp) and f.op == "and" else [f]
+    out = {}
+    for r in rs.rules:
+        when = groups(r.when)
+        parts = [groups(c) | when for c in conjuncts(r.formula)]
+        every = set(when).union(*parts)
+        out[r.id] = ("model" if every <= {"model"} else "device" if every <= DEVICE_GROUPS
+                     else "part" if any(p <= DEVICE_GROUPS for p in parts) else "programme")
+    return out
+
+
 def _model(release):
     from qccd.cost.models import corrected_model
     return corrected_model(release.manifest["physics"].get("rank_table", "qccdsim_jones"))
@@ -345,7 +384,15 @@ def recool(release, arch, certified_doc: dict, final_prog) -> dict:
 
 def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_info: dict,
           stages: dict | None, device_only: bool, claims: dict | None, cases: dict | None,
-          cert_fit: dict | None = None) -> list[dict]:
+          cert_fit: dict | None = None, assumed: list | None = None) -> list[dict]:
+    """One row per rule of the board's set and of the entry's own set.
+
+    `grader` is what the grader's rules stage makes of the rule, read from the stage's own detail:
+    the verifier's ids; on a board whose release names a set, that set in the rule language (which
+    the stage runs without the circuit); and when the entry declares its own set, that set, whose
+    verdict is the stage's.  `board` is how the rule stands with the board's set, which decides the
+    board's own ranking (`conformance`); it differs from `grader` only for an entry with its own
+    set.  `review` is the reviewer's reading: a counterexample from any checker is a FAIL."""
     from qccd.ruleset import FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, catalogue, rule_order
     from qccd.workspace.evaluator import ALLOWED_PARTIAL, ALLOWED_SKIPS, BOARD_RULES
     cat = {r.id: r for r in catalogue().rules}
@@ -354,23 +401,36 @@ def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_
     det = (vview or {}).get("detail") or {}
     diags = (vview or {}).get("diagnostics") or []
     release_set = bool(release.manifest.get("rules"))
-    ids = list(board_rs.ids)
+    # the stage's own reading of the release's set, when it ran one (without the circuit)
+    stage_lang: dict = {}
+    if det.get("ruleset"):
+        stage_lang.update({i: HOLDS for i in det.get("ruleset_holds") or []})
+        stage_lang.update({i: FAILS for i in det.get("ruleset_fails") or []})
+        stage_lang.update({i: UNCHECKED for i in det.get("ruleset_could_not_check") or {}})
+    # the entry's own set: the stage's verdicts on it (a grade, a report, or the stage run here)
+    own_det = det.get("declared") or {}
+    own = own_det.get("verdicts") or {}
+    declared_ids = list(declared_rs.ids) if declared_rs is not None else list(own_det.get("rules") or [])
+    has_own = bool(declared_ids)
+    reach = rule_reach(board_rs)
     if declared_rs is not None:
-        ids += [i for i in declared_rs.ids if i not in ids]
+        reach.update({k: v for k, v in rule_reach(declared_rs).items() if k not in board_rs.ids})
+    ids = list(board_rs.ids) + [i for i in declared_ids if i not in board_rs.ids]
     ids.sort(key=rule_order)
-    drops = set()
-    if declared_rs is not None:
+    ch = own_det.get("changes") or {}
+    if not ch and declared_rs is not None:
         from qccd.ruleset.declared import changes
         ch = changes(board_rs, declared_rs)
-        drops = set(ch["drops"]) | set(ch["replaces"])
+    dropped, rewritten = set(ch.get("drops") or []), set(ch.get("replaces") or [])
     out = []
     for rid in ids:
-        r = cat.get(rid) or (declared_rs.rule(rid) if declared_rs is not None and rid in declared_rs.ids else None)
+        in_board, in_own = rid in board_rs.ids, rid in declared_ids
+        r = cat.get(rid) or (declared_rs.rule(rid) if declared_rs is not None and in_own else None)
+        programme_rule = device_only and reach.get(rid, "programme") == "programme"
         row = {"id": rid, "title": r.title if r is not None else rid, "url": SITE + rid,
-               "core": bool(getattr(r, "core", False)), "in_board_set": rid in board_rs.ids,
-               "in_declared_set": (rid in declared_rs.ids) if declared_rs is not None else None,
-               "verify": None, "language": None, "declared": None, "cases": None, "grader": "", "review": "",
-               "notes": []}
+               "core": bool(getattr(r, "core", False)), "reads": reach.get(rid), "in_board_set": in_board,
+               "in_declared_set": in_own if has_own else None, "verify": None, "language": None,
+               "declared": None, "cases": None, "grader": "", "board": "", "review": "", "notes": []}
         if vview is not None:
             if rid in det.get("failed", []):
                 v = "failed"
@@ -390,56 +450,83 @@ def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_
         for key, src in (("language", lv), ("declared", dv)):
             x = src.get(rid)
             # on an empty programme a programme rule holds vacuously: that verdict says nothing
-            if x is not None and not (device_only and rid not in DEVICE_RULES):
+            if x is not None and not programme_rule:
                 row[key] = {"verdict": x.verdict, "count": x.count, "examples": list(x.examples[:3]),
                             "reason": x.reason}
-        if cases is not None and not (device_only and rid not in DEVICE_RULES):
+        if cases is not None and not programme_rule:
             row["cases"] = cases.get(rid)
         v = (row["verify"] or {}).get("status")
         lverdict = (row["language"] or {}).get("verdict")
-        # ---- what the grader's rules stage makes of it (the board's set)
-        if not row["in_board_set"]:
-            g = "not a board rule (the entry's own set adds it)"
-        elif device_only and rid not in DEVICE_RULES:
-            g = "needs a programme"
-        elif v == "failed":
-            g = "FAIL" if rid not in drops else "fails (the entry's own set drops or rewrites it)"
+        dverdict = (row["declared"] or {}).get("verdict")
+        # the stage ran the release's set: a rule it did not hold, fail or leave unchecked did not apply
+        sl = stage_lang.get(rid, NOT_APPLICABLE) if in_board and det.get("ruleset") else None
+        ov = (own.get(rid) or dverdict) if in_own else None
+        # ---- the board's set: what the rules stage makes of the rule (with no own set, the stage's
+        # verdict; with one, what decides the board's ranking)
+        if not in_board:
+            gb = "not a board rule"
+        elif programme_rule:
+            gb = "needs a programme"
+        elif v == "failed" or sl == FAILS:
+            gb = "FAIL" if v == "failed" else f"FAIL (the release's set `{det.get('ruleset')}`, in the rule language)"
         elif v == "skipped":
-            g = "allowed skip" if rid in ALLOWED_SKIPS else "BLOCKS: skipped"
+            gb = "allowed skip" if rid in ALLOWED_SKIPS else "BLOCKS: skipped"
         elif v == "partial":
-            g = "allowed partial" if rid in ALLOWED_PARTIAL else "BLOCKS: partial"
+            gb = "allowed partial" if rid in ALLOWED_PARTIAL else "BLOCKS: partial"
+        elif sl == UNCHECKED:
+            gb = f"BLOCKS: could not be checked (the release's set `{det.get('ruleset')}`)"
         elif v == "passed":
-            g = "pass"
-        elif release_set and lverdict is not None:
-            g = {HOLDS: "pass (rule language)", FAILS: "FAIL", UNCHECKED: "BLOCKS: could not be checked",
-                 NOT_APPLICABLE: "not judged (does not apply in the rules stage)"}.get(lverdict, lverdict)
+            gb = "pass"
+        elif sl == HOLDS:
+            gb = "pass (rule language)"
+        elif sl == NOT_APPLICABLE:
+            gb = "not judged (does not apply in the rules stage)"
         else:
-            g = "not judged by the rules stage"
+            gb = "not judged by the rules stage"
+        row["board"] = gb
+        # ---- the stage's verdict: the entry's own set when it declares one
+        if has_own:
+            g = ("not in the entry's own set" if not in_own else
+                 {HOLDS: "holds", FAILS: "FAIL", NOT_APPLICABLE: "does not apply",
+                  UNCHECKED: "allowed skip" if rid in ALLOWED_SKIPS else "BLOCKS: could not be checked"
+                  }.get(ov, "not run"))
+            if programme_rule and in_own:
+                g = "needs a programme"
+        else:
+            g = gb
         if rid == "R10" and stages:
             got = {s: (stages.get(s) or {}).get("status") for s in R10_STAGES}
             g += "; certificate stages: " + ", ".join(f"{s} {got[s] or 'not run'}" for s in R10_STAGES)
         row["grader"] = g
-        # ---- the reviewer's reading: a failure in either checker is a finding
+        # ---- the reviewer's reading: a counterexample from any checker is a finding
+        verdicts = (sl, lverdict, dverdict, ov)
         counted = [c["cases"] for c in (row["cases"] or []) if c["cases"] is not None]
-        if device_only and rid not in DEVICE_RULES:
+        if programme_rule:
             rv = "needs a programme"
-        elif v == "failed" or lverdict == FAILS or (row["declared"] or {}).get("verdict") == FAILS:
+        elif v == "failed" or FAILS in verdicts:
             rv = "FAIL"
         elif g.startswith("BLOCKS"):
             rv = "BLOCKS"
-        elif rid in VACUOUS and v == "passed":
-            rv = "pass (vacuous)"
-            row["notes"].append(VACUOUS[rid])
-        elif v == "passed" or (lverdict == HOLDS and v is None):
-            rv = "pass (nothing to check)" if counted and not any(counted) and len(counted) == len(row["cases"]) else "pass"
-            if rv == "pass" and counted and not all(counted):
-                empty = [c["over"] for c in row["cases"] if c["cases"] == 0]
-                row["notes"].append("part of it has nothing to check here: " + "; ".join(empty))
         elif v in ("skipped", "partial"):
-            rv = g
-        elif lverdict == NOT_APPLICABLE:
+            rv = gb
+        elif v == "passed" or HOLDS in verdicts:
+            if rid in BY_DEFINITION or reach.get(rid) == "model":
+                rv = "pass (vacuous)"
+                row["notes"].append(BY_DEFINITION.get(rid) or MODEL_ONLY)
+            else:
+                rv = ("pass (nothing to check)" if counted and not any(counted) and len(counted) == len(row["cases"])
+                      else "pass")
+                if rv == "pass" and counted and not all(counted) and not device_only:
+                    empty = [c["over"] for c in row["cases"] if c["cases"] == 0]
+                    row["notes"].append("part of it has nothing to check here: " + "; ".join(empty))
+            if device_only and reach.get(rid) == "part":
+                rv = "pass (device part)"
+                row["notes"].append("only the conjuncts that read the device alone were judged; the rest "
+                                    "needs a programme")
+        elif NOT_APPLICABLE in verdicts:
             rv = "does not apply"
-        elif lverdict == UNCHECKED:
+            row["cases"] = None      # the probe never reads what makes the rule not apply
+        elif UNCHECKED in verdicts:
             rv = "could not be checked"
         else:
             rv = "not checked"
@@ -465,17 +552,27 @@ def _rows(board_rs, declared_rs, vview: dict | None, lang, dlang, release, arch_
             row["notes"].append("vacuous on a direct-wired device: every site has its own waveform")
         if rid == "R4d" and v == "passed" and arch_info.get("switch_per_site"):
             row["notes"].append("the device declares a switch at every site, so the hold clause does not apply")
-        if v is None and not release_set and row["in_board_set"] and not device_only and lverdict:
+        why = f" ({(row['language'] or {}).get('reason')})" if (row["language"] or {}).get("reason") else ""
+        if v is None and not release_set and in_board and not device_only and lverdict:
             row["notes"].append(f"the grader's rules stage does not run it on a `{BOARD_RULES}` board; "
-                                f"the rule language says: {lverdict}" +
-                                (f" ({(row['language'] or {}).get('reason')})" if (row["language"] or {}).get("reason") else ""))
+                                f"the rule language says: {lverdict}{why}")
+        if sl == NOT_APPLICABLE and lverdict in (HOLDS, FAILS) and not device_only:
+            row["notes"].append(f"the rules stage runs `{det.get('ruleset')}` without the circuit, so it does not "
+                                f"apply there; with the certificate's circuit the rule language says: {lverdict}")
         if rid == "R9" and claims is not None:
             row["notes"].append(f"advisory R9 (the programme's own figures vs its replay): {claims['status']}"
                                 + (f" -- {claims['why']}" if claims["why"] else "")
                                 + ("; " + "; ".join(claims["examples"]) if claims["examples"] else ""))
-        if rid in drops:
-            row["notes"].append("the entry's declared rule set drops or rewrites this board rule: the entry "
-                                "can be eligible under its own rules, but it does not keep the board's")
+        if rid in dropped or rid in rewritten:
+            row["notes"].append(f"the entry's own set {'drops' if rid in dropped else 'rewrites'} this board rule: the "
+                                "entry can be eligible under its own rules, and is ranked on the board only if it "
+                                "keeps the board's (the board's set says: " + gb + ")")
+        elif has_own and in_own and not in_board and rv != "needs a programme":
+            row["notes"].append("a rule of the entry's own set, not of the board's: it decides eligibility, "
+                                "not the board's ranking")
+        if rid == "C6" and assumed:
+            row["notes"].append("holds by assumption: " + "; ".join(assumed) + " (the checkerboard pairing is "
+                                "proposed, not demonstrated; `c2lr-demonstrated` refuses it)")
         if rid in ("R24", "R25") and cert_fit is not None and not cert_fit["matches"] and lverdict is not None:
             row["notes"].append("judged against the certificate's own circuit, which is not the board's: this "
                                 "verdict says nothing about the board's circuit")
@@ -489,7 +586,155 @@ def device_only_rules(board_rs, release, arch, info) -> list[dict]:
     prog = TSIR(name="device-only", arch_spec=arch.name, instructions=[])
     vview = _verify_view(release, arch, prog, None, None)
     lang, exe = _language(board_rs, release, arch, prog, None, None)
-    return _rows(board_rs, None, vview, lang, None, release, info, None, True, None, rule_cases(board_rs, exe))
+    return _rows(board_rs, None, vview, lang, None, release, info, None, True, None, rule_cases(board_rs, exe),
+                 assumed=list(getattr(lang, "assumed", None) or []))
+
+
+# --------------------------------------------------------------------------- a machine of gadgets
+
+def machine_review(repo: Path, floorplan: str | None, algorithm: str | None, out: Path,
+                   cache: str | None = None) -> dict:
+    """A floorplan of gadgets, or a logical algorithm scheduled on one, judged by the machine-level
+    rule sets exactly as `python -m qccd.gadget floorplan` / `algorithm` judge them:
+
+      * a floorplan alone: `floorplan` (F1-F9) in the rule language (`qccd.gadget.judge`);
+      * an algorithm: it is scheduled (`qccd.gadget.verified.build_algorithm`, the town unless it
+        or --floorplan names a floorplan), then `floorplan` and `machine` (F, G and H) in the rule
+        language, beside the place checks (`qccd.gadget.place_checks`, the Python checker of
+        G1-G11, H1-H2) and the schedule's sign-off.
+    """
+    from qccd.gadget.floorplan import FLOORPLANS_DIR, load_file
+    from qccd.gadget.judge import judge_floorplan
+    from qccd.gadget.library import LeafLibrary
+    from qccd.gadget.place_checks import PLACE_RULES
+    from qccd.ruleset import load
+    from qccd.ruleset.machine import machine_execution
+    leaves = LeafLibrary(cache or (repo / "out" / "gadgets" / "cache"), log=None)
+    res: dict = {"floorplan": floorplan, "algorithm": algorithm}
+    checks = signoff = None
+    if algorithm:
+        from qccd.gadget.verified import build_algorithm
+        b = build_algorithm(algorithm, out_dir=out / "algorithm", leaves=leaves, log=None, floorplan=floorplan)
+        rep, lib, gir = b["rules"], b["library"], b["gir"]
+        fp_path = floorplan or (FLOORPLANS_DIR / f"{b['algorithm'].floorplan}.floor"
+                                if getattr(b["algorithm"], "floorplan", None) else None)
+        regions = load_file(fp_path, leaves)[1].regions if fp_path else None
+        sets = ("floorplan", "machine")
+        checks, st = b["checks"], b["stats"]
+        res["schedule"] = {k: st.get(k) for k in ("ions", "blocks", "instructions", "refused", "events", "carries",
+                                                    "makespan_ms", "places", "junctions", "refreshes", "signed_off")}
+        signoff = {"flat": b["signoff"].get("passed"), "flat_why": b["signoff"].get("why") or b["signoff"].get("skipped"),
+                   "compositional": (b["compositional"] or {}).get("passed"), "page": str(Path(b["out"]) / "index.html")}
+        res["signoff"] = signoff
+        res["place_checks"] = {"passed": list(checks.get("passed") or []), "failed": list(checks.get("failed") or []),
+                               "skipped": dict(checks.get("skipped") or {})}
+    else:
+        lib, fp = load_file(floorplan, leaves)
+        regions, gir, sets = fp.regions, None, ("floorplan",)
+        rep = judge_floorplan(lib, leaves, regions=regions)
+    try:
+        exe = machine_execution(lib, leaves, gir, regions=regions)
+        cases: dict | None = {}
+        for n in sets:
+            cases.update(rule_cases(load(n), exe))
+    except Exception:  # a count is context, never a verdict
+        cases = None
+    viol = (checks or {}).get("violations") or {}
+    floorplan_ids = set(load("floorplan").ids)
+    rows = []
+    for r in rep["rules"]:
+        rid, verdict = r["id"], r["verdict"]
+        pc = None
+        if checks is not None and rid in PLACE_RULES:
+            pc = ("failed" if rid in checks.get("failed", []) else "skipped" if rid in (checks.get("skipped") or {})
+                  else "passed" if rid in checks.get("passed", []) else None)
+        cs = (cases or {}).get(rid) if verdict != "does not apply" else None
+        counted = [c["cases"] for c in (cs or []) if c["cases"] is not None]
+        if verdict == "fails" or pc == "failed":
+            rv = "FAIL"
+        elif verdict == "holds":
+            rv = "pass (nothing to check)" if counted and not any(counted) and len(counted) == len(cs) else "pass"
+        else:
+            rv = "does not apply" if verdict == "does not apply" else "could not be checked"
+        notes = []
+        if pc == "failed" and verdict == "holds":
+            notes.append("the place checks fail it but the rule language holds: read the place checks' messages")
+        if verdict == "fails" and pc == "passed":
+            notes.append("the rule language finds counterexamples the place checks do not report")
+        if r.get("reason"):
+            notes.append(str(r["reason"]))
+        rows.append({"id": rid, "title": r.get("title") or rid, "url": SITE + rid,
+                     "set": "floorplan" if rid in floorplan_ids else "machine",
+                     "language": {"verdict": verdict, "count": r.get("count"), "examples": list(r.get("examples") or [])[:3]},
+                     "place_checks": pc, "place_examples": [str(x) for x in (viol.get(rid) or [])[:3]],
+                     "cases": cs, "review": rv, "notes": notes})
+    res["rules"] = rows
+    return res
+
+
+def machine_verdict(res: dict) -> tuple[str, int]:
+    rows = res.get("rules") or []
+    fails = [r["id"] for r in rows if r["review"] == "FAIL"]
+    unchecked = [r["id"] for r in rows if r["review"] == "could not be checked"]
+    parts = []
+    if fails:
+        parts.append("fails " + ", ".join(fails))
+    if unchecked:
+        parts.append("could not check " + ", ".join(unchecked))
+    so = res.get("signoff")
+    if so is not None and not (so.get("flat") or so.get("compositional")):
+        parts.append("the schedule is not signed off")
+    pcf = (res.get("place_checks") or {}).get("failed")
+    if pcf:
+        parts.append("the place checks fail " + ", ".join(pcf))
+    what = "every machine rule" if res.get("algorithm") else "every floorplan rule"
+    return (what + " holds" if not parts else "NOT clear: " + "; ".join(parts)), (1 if parts else 0)
+
+
+def machine_render(res: dict) -> str:
+    title = Path(res.get("algorithm") or res.get("floorplan") or "machine").name
+    lines = [f"# Rule check: {title} (machine level)", "",
+             "The checkers' evidence, rule by rule; the review is written from it (SKILL.md, step 4).", "",
+             f"**Verdict:** {res['verdict']}", ""]
+    for n in res.get("notes", []):
+        lines.append(f"- {n}")
+    if res.get("notes"):
+        lines.append("")
+    sc = res.get("schedule")
+    if sc:
+        so = res.get("signoff") or {}
+        lines.append("## The schedule")
+        lines.append("")
+        lines.append(f"- {sc.get('ions')} ions, {sc.get('blocks')} blocks, {sc.get('instructions')} instructions "
+                     f"({sc.get('refused')} refused), {sc.get('events')} events, {sc.get('carries')} carries; makespan "
+                     f"{sc.get('makespan_ms')} ms; {sc.get('places')} places, {sc.get('junctions')} junctions; "
+                     f"{sc.get('refreshes')} syndrome rounds added")
+        lines.append(f"- sign-off: flat {so.get('flat')}" + (f" ({so['flat_why']})" if so.get("flat_why") else "")
+                     + f"; compositional {so.get('compositional')}; page `{so.get('page')}`")
+        pc = res.get("place_checks") or {}
+        lines.append(f"- place checks (`qccd/gadget/place_checks.py`): {len(pc.get('passed') or [])} pass"
+                     + (f", FAIL {', '.join(pc['failed'])}" if pc.get("failed") else "")
+                     + (f", skipped {', '.join(pc['skipped'])}" if pc.get("skipped") else ""))
+        lines.append("")
+    lines.append("## Rules: `floorplan`" + (" + `machine`" if res.get("algorithm") else ""))
+    lines.append("")
+    lines.append("| Rule | Title | Rule language | Place checks | Cases | Review | Evidence / notes |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for r in res.get("rules") or []:
+        lg = r.get("language") or {}
+        ev = []
+        if lg.get("verdict") == "fails":
+            ev.append(f"({lg.get('count')} cases) " + "; ".join(lg.get("examples") or []))
+        ev += r.get("place_examples") or []
+        ev += r.get("notes") or []
+        cases = r.get("cases")
+        ccell = "-" if not cases else " · ".join(str(c["cases"]) if c["cases"] is not None else "?" for c in cases)
+        lines.append(f"| [{r['id']}]({r['url']}) | {_cell(r['title'])} | {lg.get('verdict') or '-'} | "
+                     f"{r.get('place_checks') or '-'} | {ccell} | **{r['review']}** | {_cell(' / '.join(ev))[:600]} |")
+    lines.append("")
+    if res.get("reproduce"):
+        lines += ["## Reproduce", "", "```", *res["reproduce"], "```"]
+    return "\n".join(lines).rstrip() + "\n"
 
 
 # --------------------------------------------------------------------------- a whole grade
@@ -514,7 +759,9 @@ def _grade_view(report: dict, source: str) -> dict:
     return {"profile": report.get("profile"), "source": source, "eligibility": report.get("eligibility"),
             "conformance": report.get("conformance"), "metrics": report.get("metrics"),
             "evaluator": {k: (report.get("evaluator") or {}).get(k) for k in ("name", "version", "source_digest")},
-            "stages": [{k: s.get(k) for k in ("id", "required", "status", "coverage", "diagnostics")}
+            # the rules stage's detail holds every rule's verdict (and the entry's own set's): keep it
+            "stages": [{k: s.get(k) for k in ("id", "required", "status", "coverage", "diagnostics")
+                        + (("detail",) if s.get("id") == "rules" else ())}
                        for s in report.get("stages", [])]}
 
 
@@ -607,15 +854,27 @@ def render(res: dict) -> str:
     rows = res.get("rules") or []
     if rows:
         sets = res.get("rule_sets") or {}
-        lines.append(f"## Rules: `{sets.get('board')}`" + (f" + the entry's own `{sets['declared']}`"
-                                                             if sets.get("declared") else ""))
+        own = sets.get("declared")
+        lines.append(f"## Rules: `{sets.get('board')}`" + (f" + the entry's own `{own}`" if own else ""))
         lines.append("")
+        if own:
+            from qccd.workspace.evaluator import ALLOWED_SKIPS
+            lines.append(f"The entry declares its own rule set `{own}`: the grader's rules stage is decided by it "
+                         "(every rule holds or does not apply; only " + ", ".join(sorted(ALLOWED_SKIPS)) +
+                         f" may go unchecked). The board's set `{sets.get('board')}` decides only whether the entry "
+                         "is on the board's own ranking (`conformance`).")
+            lines.append("")
         lines.append("Cases: how many bindings each of the rule's `for all` quantifiers ranged over here, as the rule "
                      "is written (a pair quantifier without `a != b` counts each element with itself too). 0 means "
                      "that part of the rule had nothing to judge.")
         lines.append("")
-        lines.append("| Rule | Title | Grader's rules stage | Rule language | Cases | Review | Evidence / notes |")
-        lines.append("|---|---|---|---|---|---|---|")
+        if own:
+            lines.append(f"| Rule | Title | Rules stage (own set `{own}`) | Board's set (ranking) | Rule language | "
+                         "Cases | Review | Evidence / notes |")
+            lines.append("|---|---|---|---|---|---|---|---|")
+        else:
+            lines.append("| Rule | Title | Grader's rules stage | Rule language | Cases | Review | Evidence / notes |")
+            lines.append("|---|---|---|---|---|---|---|")
         for r in rows:
             v = r.get("verify") or {}
             lg = r.get("language") or {}
@@ -633,8 +892,9 @@ def render(res: dict) -> str:
                 lang_cell += f" / own set: {r['declared']['verdict']}"
             cases = r.get("cases")
             ccell = "-" if not cases else " · ".join(str(c["cases"]) if c["cases"] is not None else "?" for c in cases)
-            lines.append(f"| [{r['id']}]({r['url']}) | {_cell(r['title'])} | {_cell(r['grader'])} | {_cell(lang_cell)} | "
-                         f"{ccell} | **{_cell(r['review'])}** | {_cell(' / '.join(ev))[:600]} |")
+            board = f" {_cell(r.get('board') or '')} |" if own else ""
+            lines.append(f"| [{r['id']}]({r['url']}) | {_cell(r['title'])} | {_cell(r['grader'])} |{board} "
+                         f"{_cell(lang_cell)} | {ccell} | **{_cell(r['review'])}** | {_cell(' / '.join(ev))[:600]} |")
         lines.append("")
     rc = res.get("recool")
     if rc:
@@ -718,8 +978,16 @@ def render(res: dict) -> str:
 
 def verdict_of(res: dict) -> tuple[str, int]:
     rows = res.get("rules") or []
-    fails = [r["id"] for r in rows if r["review"] == "FAIL" and r["in_board_set"]]
-    blocks = [r["id"] for r in rows if r["review"] == "BLOCKS"]
+    own = (res.get("rule_sets") or {}).get("declared")
+    if own:
+        # the entry's own set decides the rules stage; the board's set decides only its ranking
+        fails = [r["id"] for r in rows if r["review"] == "FAIL" and r.get("in_declared_set")]
+        blocks = [r["id"] for r in rows if r["review"] == "BLOCKS" and r.get("in_declared_set")]
+        breaks = [r["id"] for r in rows if r["in_board_set"] and str(r.get("board")).startswith(("FAIL", "BLOCKS"))]
+    else:
+        fails = [r["id"] for r in rows if r["review"] == "FAIL" and r["in_board_set"]]
+        blocks = [r["id"] for r in rows if r["review"] == "BLOCKS"]
+        breaks = []
     dev_err = (res.get("device") or {}).get("errors") or []
     grades = res.get("grades") or {}
     g = grades.get("given") or grades.get("local")
@@ -738,26 +1006,67 @@ def verdict_of(res: dict) -> tuple[str, int]:
     if bf and bf["spare_slots"] < 0:
         parts.append(f"the device holds {bf['ion_slots']} ions but the circuit needs {bf['circuit_qubits']}")
     if fails:
-        parts.append("fails " + ", ".join(fails))
+        parts.append((f"fails its own rule set `{own}`: " if own else "fails ") + ", ".join(fails))
     if blocks:
         parts.append("not checkable here: " + ", ".join(blocks))
+    # breaking a board rule under the entry's own set costs the ranking, not eligibility
+    ranking = (["breaks the board's " + ", ".join(breaks) + ", so it is not on the board's own ranking (only "
+                "with `?rules=all`)"] if breaks else [])
     if g:
         el = g.get("eligibility") or {}
         src = "the given report" if grades.get("given") else "the local grade"
         if el.get("eligible"):
-            return (f"eligible on this board ({src})" + (" -- but " + "; ".join(parts) if parts else "")), (1 if parts else 0)
+            more = parts + ranking
+            return (f"eligible on this board ({src})" + (" -- but " + "; ".join(more) if more else "")), (1 if more else 0)
         why = "; ".join(el.get("reasons") or [])
-        return f"not eligible ({src}): " + "; ".join(parts + ([why] if why else [])), 1
+        return f"not eligible ({src}): " + "; ".join(parts + ([why] if why else []) + ranking), 1
     if res.get("device_only"):
         return ("device-level rules " + ("clear" if not parts else "NOT clear: " + "; ".join(parts))
                 + "; every programme rule still needs a programme"), (1 if parts else 0)
     if parts:
-        return "would not be eligible: " + "; ".join(parts), 1
-    return ("every board rule the rules stage judges is clear; eligibility also needs the certificate "
-            "stages" + (" and the LER stage" if (res.get("board") or {}).get("memory") else "")), 0
+        return "would not be eligible: " + "; ".join(parts + ranking), 1
+    whose = f"of its own set `{own}`" if own else "of the board's set"
+    return (f"every rule {whose} the rules stage judges is clear" + ("; but it " + "; ".join(ranking) if ranking else "")
+            + "; eligibility also needs the certificate stages"
+            + (" and the LER stage" if (res.get("board") or {}).get("memory") else "")), (1 if ranking else 0)
 
 
 # --------------------------------------------------------------------------- main
+
+def machine_main(a, repo: Path) -> int:
+    """`--floorplan` / `--algorithm`: a machine of gadgets, one level above a device."""
+    t0 = time.time()
+    out = Path(a.out) if a.out else Path(tempfile.mkdtemp(prefix="qccd-review-"))
+    out.mkdir(parents=True, exist_ok=True)
+    from qccd.gadget.floorplan import FloorplanError
+    try:
+        res = machine_review(repo, a.floorplan, a.algorithm, out, a.gadget_cache)
+    except ModuleNotFoundError as exc:
+        print(f"review: the gadget leaves need {exc.name}: pip install {exc.name} (or pip install -e \".[agent]\")",
+              file=sys.stderr)
+        return 2
+    except (FloorplanError, OSError, ValueError) as exc:
+        print(f"review: the machine could not be read: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    res.update(kind="qccd-design-review.result", version=2, level="machine", notes=[])
+    if a.device or a.program or a.bundle:
+        res["notes"].append("a floorplan and a device are reviewed apart: run the review again for the device "
+                            "or bundle")
+    res["verdict"], code = machine_verdict(res)
+    here = Path(__file__).resolve()
+    cmd = ["python " + (str(here.relative_to(repo)) if here.is_relative_to(repo) else str(here))]
+    for k in ("floorplan", "algorithm"):
+        if getattr(a, k):
+            cmd.append(f"  --{k} {getattr(a, k)}")
+    res["reproduce"] = [" \\\n".join(cmd)]
+    res["seconds"] = round(time.time() - t0, 1)
+    md = machine_render(res)
+    (out / "rule-check.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+    (out / "rule-check.md").write_text(md, encoding="utf-8")
+    print(md)
+    print(f"(written: {out / 'rule-check.md'} and {out / 'rule-check.json'}; {res['seconds']} s)")
+    return code
+
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -778,6 +1087,11 @@ def main(argv=None) -> int:
     ap.add_argument("--no-recool", action="store_true", help="do not try re-cooling when a heat rule fails")
     ap.add_argument("--cases-limit", type=int, default=20000,
                     help="count each rule's cases only for programmes up to this many instructions")
+    ap.add_argument("--floorplan", help="a floorplan of gadgets (*.floor): the floorplan rules F1-F9")
+    ap.add_argument("--algorithm", help="a logical algorithm (*.alg) to schedule on the floorplan (the town unless it "
+                                        "or --floorplan names one): every machine rule, F, G and H")
+    ap.add_argument("--gadget-cache", help="where characterized gadget leaves are kept (default: out/gadgets/cache "
+                                           "in the checkout, as `python -m qccd.gadget` keeps them)")
     ap.add_argument("--out", help="folder for rule-check.md and rule-check.json (default: a new temporary folder)")
     ap.add_argument("--repo", help="the QCCD checkout (default: the one this skill is in)")
     ap.add_argument("--list-boards", action="store_true")
@@ -793,8 +1107,11 @@ def main(argv=None) -> int:
         for b in list_boards():
             print(f"{b.id:28s} {b.manifest.get('rules') or 'standard':9s} {b.title}")
         return 0
+    if a.floorplan or a.algorithm:
+        return machine_main(a, repo)
     if not (a.bundle or a.report or a.device):
-        ap.error("give --bundle, --report, or --device (with --program for the programme rules)")
+        ap.error("give --bundle, --report, or --device (with --program for the programme rules); or --floorplan "
+                 "/ --algorithm for a machine of gadgets")
 
     t0 = time.time()
     notes: list = []
@@ -939,14 +1256,23 @@ def main(argv=None) -> int:
         if prog is not None:
             vview = _verify_view(release, arch, prog, declared_doc, cert)
             lang, exe = _language(board_rs, release, arch, prog, cert, computes)
-            dlang = _language(declared_rs, release, arch, prog, cert, computes)[0] if declared_rs is not None else None
+            dlang, dexe = _language(declared_rs, release, arch, prog, cert, computes) if declared_rs is not None \
+                else (None, None)
             claims = None if a.no_claims else _claims(release, arch, prog)
-            cases = rule_cases(board_rs, exe) if len(prog) <= a.cases_limit else None
-            if cases is None:
+            cases = None
+            if len(prog) <= a.cases_limit:
+                # the entry's own rules counted in its own execution (its set's parameters), the board's in the board's
+                cases = {**(rule_cases(declared_rs, dexe) if dexe is not None else {}), **rule_cases(board_rs, exe)}
+            else:
                 notes.append(f"the programme has {len(prog)} instructions, over --cases-limit {a.cases_limit}: cases "
                              "were not counted")
+            assumed = sorted({*(getattr(lang, "assumed", None) or []), *(getattr(dlang, "assumed", None) or []),
+                              *((vview.get("detail") or {}).get("assumed") or [])})
+            if assumed:
+                notes.append("the verdicts rest on what the programme's source did not demonstrate: "
+                             + "; ".join(assumed))
             res["rules"] = _rows(board_rs, declared_rs, vview, lang, dlang, release, res.get("device") or {},
-                                 stages, False, claims, cases, res.get("certificate"))
+                                 stages, False, claims, cases, res.get("certificate"), assumed=assumed)
             res["rules_stage"] = {"status": vview["status"], "coverage": vview["coverage"], "breaks": vview["breaks"]}
             if not cert:
                 notes.append("no certificate was given: R24 and R25 have no circuit to judge against (they do not "
@@ -969,17 +1295,24 @@ def main(argv=None) -> int:
         elif arch is not None and decisive is None:
             res["device_only"] = True
             res["rules"] = device_only_rules(board_rs, release, arch, res.get("device") or {})
-            notes.append("no programme was given: only the rules a device decides alone were checked "
-                         f"({', '.join(r for r in DEVICE_RULES if r in board_rs.ids)}) plus the budget; compile the "
-                         "board's circuit onto it (`qccd submit --local --board ...` in a workspace) for the rest")
+            reach = rule_reach(board_rs)
+            alone = [r for r in board_rs.ids if reach[r] in ("device", "model")]
+            part = [r for r in board_rs.ids if reach[r] == "part"]
+            notes.append("no programme was given: only the rules a device and the board's physics decide alone were "
+                         f"checked ({', '.join(alone)}" + (f"; and the device part of {', '.join(part)}" if part else "")
+                         + ") plus the budget; compile the board's circuit onto it (`qccd submit --local --board ...` "
+                         "in a workspace) for the rest")
         elif decisive is not None:
             # a report alone: its rules stage, read as the grader wrote it
             st = stages.get("rules") or {}
             vview = {"detail": st.get("detail") or {}, "diagnostics": st.get("diagnostics") or [],
                      "status": st.get("status"), "coverage": st.get("coverage"), "breaks": []}
+            own_det = (st.get("detail") or {}).get("declared") or {}
+            if declared_rs is None and own_det.get("rules"):
+                res["rule_sets"]["declared"] = own_det.get("name") or "the entry's own set"
             res["rules"] = _rows(board_rs, declared_rs, vview, None, None, release, {}, stages, False, None, None)
             notes.append("read from the report alone: the rule language was not run (pass --bundle as well for "
-                         "R0, R24 and R25)")
+                         "R0, R24 and R25, and for case counts)")
 
         res["verdict"], code = verdict_of(res)
         here = Path(__file__).resolve()

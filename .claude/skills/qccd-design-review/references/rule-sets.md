@@ -25,7 +25,7 @@ A rule set picks the catalogue rules a machine assumes (`use`), sets their param
 | [`qccdsim`](#set-qccdsim) | 11 | - | QCCDSim's rules |
 | [`qccdsim-gateset`](#set-qccdsim-gateset) | 10 | - | QCCDSim's rules, with the circuit's gates as a set |
 | [`qccdsim-physical`](#set-qccdsim-physical) | 11 | - | QCCDSim's rules, with a physical gate swap |
-| [`standard`](#set-standard) | 31 | 26: `bb144@1`, `rep9@1`, `five_qubit@1`, `steane@1`, ... | This website's machine |
+| [`standard`](#set-standard) | 31 | 26: `bb144@2`, `rep9@1`, `five_qubit@1`, `steane@1`, ... | This website's machine |
 | [`tiscc`](#set-tiscc) | 8 | - | TISCC's rules |
 | [`trapsimd`](#set-trapsimd) | 9 | - | TrapSIMD's rules |
 

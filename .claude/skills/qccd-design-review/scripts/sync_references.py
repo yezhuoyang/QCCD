@@ -7,8 +7,11 @@ The rules a design is judged by live in the repository, not in this skill:
                                    page prints exactly this text, `qccd/site/rulespage.py`)
   qccd/ruleset/vocabulary.py       the words a rule may use, and how each is read
   qccd/workspace/releases/         the boards: rule set, required checks, budget, limits
-  qccd/workspace/evaluator.py      what the grader accepts (stages, allowed skips/partials)
+  qccd/workspace/evaluator.py      what the grader accepts (stages, allowed skips/partials, an
+                                   entry's own rule set, conformance)
   qccd/verify/                     the verifier the grader's rules stage runs
+  qccd/gadget/                     how a floorplan and a schedule are judged (the machine rules)
+  goals/goal3/families.py          the rule set each Goal 3 family declares
 
 Every file under `references/` except `review-guide.md` is GENERATED from those sources by
 this script, so the skill never carries a hand-copied rule that could drift.
@@ -46,7 +49,13 @@ GENERATED = ("rules.md", "rule-sets.md", "boards.md", "grader.md", "vocabulary.m
              "MANIFEST.json")
 SOURCES = ("qccd/ruleset/library/*.rules", "qccd/ruleset/vocabulary.py", "qccd/ruleset/machine.py",
            "qccd/workspace/releases/*/release.json", "qccd/workspace/evaluator.py", "qccd/verify/__init__.py",
-           "qccd/verify/rules.py", "qccd/ruleset/declared.py", "qccd/workspace/web/rules.js")
+           "qccd/verify/rules.py", "qccd/ruleset/declared.py", "qccd/workspace/web/rules.js",
+           "qccd/gadget/judge.py", "qccd/gadget/place_checks.py", "goals/goal3/families.py")
+#: how a rule's reach reads in the references (`review.rule_reach`)
+READS = {"model": "the board's cost model alone: the same verdict for every design on a board",
+         "device": "the device alone (with the board's physics): a device review decides it",
+         "part": "the device for some of its conjuncts, an execution for the rest",
+         "programme": "an execution: it needs the programme"}
 
 
 def _header(what: str) -> str:
@@ -116,6 +125,44 @@ def website_groups(repo: Path) -> dict[str, str]:
     return out
 
 
+def _review_module():
+    """The review script beside this one: its `rule_reach` is what a device review uses, so the
+    references say what the review does."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("qccd_design_review_review_for_sync",
+                                                  Path(__file__).with_name("review.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def words_of(rule, terms) -> set[str]:
+    """The vocabulary words a rule uses (its formula and its `when`)."""
+    from qccd.ruleset.syntax import Call, Name, walk
+    out = set()
+    for f in (rule.formula, rule.when):
+        for n in (walk(f) if f is not None else ()):
+            w = n.fn if isinstance(n, Call) else n.id if isinstance(n, Name) else None
+            if w in terms:
+                out.add(w)
+    return out
+
+
+def goal3_families(repo: Path) -> dict[str, str]:
+    """goals/goal3/families.py RULES: the rule set each Goal 3 family declares, when there is one."""
+    p = repo / "goals" / "goal3" / "families.py"
+    if not p.is_file():
+        return {}
+    m = re.search(r"^RULES\s*=\s*(\{.*?\})", p.read_text(encoding="utf-8"), re.S | re.M)
+    if not m:
+        return {}
+    import ast
+    try:
+        return {str(k): str(v) for k, v in ast.literal_eval(re.sub(r"#[^\n]*", "", m.group(1))).items()}
+    except (ValueError, SyntaxError):
+        return {}
+
+
 def source_lines(path: Path) -> dict[str, list[str]]:
     """A rule set file's include / use / drop / param lines, as written."""
     out: dict[str, list[str]] = defaultdict(list)
@@ -181,12 +228,20 @@ def gather(repo: Path) -> dict:
         from qccd.site.rulespage import PARAM_NOTES
     except Exception:          # the site package is optional here
         PARAM_NOTES = {}
+    try:
+        from qccd.gadget import judge
+        from qccd.gadget.place_checks import PLACE_RULES
+        judge_doc = judge.__doc__ or ""
+    except Exception:          # so is the gadget package
+        PLACE_RULES, judge_doc = {}, ""
+    reach = _review_module().rule_reach(cat)
     return {
         "repo": repo, "LIBRARY": LIBRARY, "TERMS": TERMS, "cat": cat, "rule_order": rule_order,
         "sections": sections, "section_of": section_of, "groups": website_groups(repo),
         "device_sets": device_sets, "machine_sets": machine_sets, "boards": boards, "board_set": board_set,
         "ev": ev, "dec": dec, "statements": RULE_STATEMENTS, "coverage": probe_coverage(),
-        "param_notes": PARAM_NOTES,
+        "param_notes": PARAM_NOTES, "reach": reach, "goal3": goal3_families(repo),
+        "place_rules": dict(PLACE_RULES), "judge_doc": judge_doc,
     }
 
 
@@ -247,9 +302,24 @@ def gen_rules(g: dict) -> str:
             out.append(f"- Website: https://qccd.academy/rules/#{r.id}"
                        + (f" (category: {groups[r.id]})" if r.id in groups else "") + core)
             out.append(f"- In rule sets: {', '.join(sorted(in_sets[r.id])) or 'none shipped (catalogue only)'}")
+            out.append(f"- Reads: {READS[g['reach'][r.id]]}")
+            ws = words_of(r, g["TERMS"])
+            only_sched = sorted(w for w in ws if "programme" not in g["TERMS"][w].kinds)
+            only_prog = sorted(w for w in ws if "schedule" not in g["TERMS"][w].kinds)
+            if only_sched:
+                out.append(f"- Judged on: a paper's timed schedule only ({', '.join(f'`{w}`' for w in only_sched)} "
+                           "exist only there), so it never applies to an entry's programme")
+            elif only_prog:
+                out.append(f"- Judged on: a programme only ({', '.join(f'`{w}`' for w in only_prog)} cannot be read "
+                           "off a paper's schedule)")
             for s in board_sets:
                 if r.id in sets[s].ids:
                     out.append(f"- On a `{s}` board: {board_judgement(g, s, r.id)}")
+            own = [n for n in sorted(in_sets[r.id]) if n not in board_sets]
+            if own:
+                out.append(f"- In an entry's own set ({', '.join(own)}): must hold or not apply"
+                           + ("; may go unchecked" if r.id in g["ev"].ALLOWED_SKIPS else "")
+                           + " (`grader.md`, an entry's own rule set)")
             if r.source:
                 out.append(f"- Sources: {r.source}")
             out.append(f"- Defined at: `qccd/ruleset/library/catalogue.rules:{r.line}`")
@@ -307,21 +377,32 @@ def gen_rule_sets(g: dict) -> str:
 
 
 def gen_boards(g: dict) -> str:
-    out = [_header("qccd/workspace/releases/*/release.json"),
+    out = [_header("qccd/workspace/releases/*/release.json and goals/goal3/families.py"),
            "# The boards\n",
            "Each board is one task release: its circuit, its physics (fixed blocks), the checks an entry "
            "must pass, its rule set and its ranking metric. The newest release of each task, in the "
-           "website's order. A board is named by its title, its task, or `<task>@<release>`.\n",
-           "| # | Board | Release | Track | Rule set | Ranked by | Budget (DACs / junctions) | Limits (nodes / instructions) | Memory noise |",
-           "|---:|---|---|---|---|---|---|---|---|"]
+           "website's order. A board is named by its title, its task, or `<task>@<release>`. A release "
+           "that names no goal is Goal 1's.\n",
+           "| # | Board | Release | Goal | Track | Rule set | Ranked by | Budget (DACs / junctions) | Limits (nodes / instructions) | Memory noise |",
+           "|---:|---|---|---|---|---|---|---|---|---|"]
     for b in g["boards"]:
         m = b.manifest
         bud = b.physics().get("budget") or {}
         lim = m.get("limits") or {}
-        out.append(f"| {m.get('order', '-')} | {_md(b.title)} | `{b.id}` | {m.get('track', '')} | "
+        out.append(f"| {m.get('order', '-')} | {_md(b.title)} | `{b.id}` | {m.get('goal', 'goal1')} | {m.get('track', '')} | "
                    f"`{g['board_set'][b.id]}` | `{m.get('rank_by')}` | {bud.get('max_dacs', '-')} / "
                    f"{bud.get('max_junctions', '-')} | {lim.get('max_nodes', '-')} / {lim.get('max_instructions', '-')} | "
                    f"{(m.get('qec') or {}).get('noise', '-')} |")
+    if g["goal3"]:
+        out.append("\n## Goal 3: each architecture family's own rule set\n")
+        out.append("Goal 3 fixes the code and compares architectures. Every submission is judged by its own "
+                   "rule set, the rules of the paper its machine comes from (`goals/goal3/families.py`, "
+                   "`RULES`); the board's set decides only the board's own ranking (`grader.md`). An entry of a "
+                   "family declares that set in its `rules.json`.\n")
+        out.append("| Family | Rule set it declares |")
+        out.append("|---|---|")
+        for fam, rs in g["goal3"].items():
+            out.append(f"| {fam} | [`{rs}`](rule-sets.md#set-{rs}) |")
     checks: dict[tuple, list[str]] = defaultdict(list)
     for b in g["boards"]:
         checks[tuple(b.required_checks)].append(b.id)
@@ -364,6 +445,18 @@ def gen_grader(g: dict) -> str:
             out.append(f"| [{r.id}](https://qccd.academy/rules/#{r.id}) | {_md(r.title)} | "
                        f"{_md(board_judgement(g, rset, r.id))} |")
         out.append("")
+    out.append("## An entry's own rule set\n")
+    out.append("A bundle may declare its own set (`rules.json`; Goal 3's families do, `boards.md`). Then the "
+               "rules stage's verdict is that set's, and the board's set decides only the board's own ranking. "
+               "In the grader's words:\n")
+    for fn in ("_rules_stage", "_declared_rules", "_conformance"):
+        doc = " ".join((getattr(getattr(ev, fn, None), "__doc__", None) or "").split())
+        if doc:
+            out.append(f"- `evaluator.{fn}`: {doc}")
+    out.append(f"- Rules of the entry's set that may go unchecked: {', '.join(sorted(ev.ALLOWED_SKIPS))}. Any other "
+               "rule that could not be checked makes the stage `partial`, so the entry is not eligible.")
+    out.append("- A rule of the entry's set that only a paper's timed schedule can judge (`rules.md`, \"Judged on\") "
+               "does not apply to a programme: it neither fails nor counts.\n")
     out.append("## What the probe found\n")
     for kind, c in cov.items():
         out.append(f"- {kind} device: qccd.verify reports {len(c['reported'])} rule ids "
@@ -410,12 +503,29 @@ def gen_vocabulary(g: dict) -> str:
 
 
 def gen_machine(g: dict) -> str:
-    out = [_header("qccd/ruleset/library/floorplan.rules, machine.rules and qccd/ruleset/machine.py"),
+    out = [_header("qccd/ruleset/library/floorplan.rules, machine.rules, qccd/ruleset/machine.py and qccd/gadget"),
            "# Machine-level rules: floorplans of places, and programs scheduled on them\n",
            "These judge a machine built from gadgets (`qccd/gadget`, docs/GADGETS.md), one level above a "
            "device. Use them when the design under review is a floorplan or a scheduled logical program, "
            "not a single device. Every op of a place is still a device programme judged by the device rules "
-           "(`rules.md`), and H1 asks the roads between places to obey R1-R23 too.\n"]
+           "(`rules.md`), and H1 asks the roads between places to obey R1-R23 too.\n",
+           "## How they are judged\n",
+           "- `review.py --floorplan F.floor`: the floorplan rules (F1-F9) on the floorplan alone, as "
+           "`python -m qccd.gadget floorplan F.floor` judges them.",
+           "- `review.py --algorithm A.alg [--floorplan F.floor]`: the algorithm scheduled on the floorplan (the "
+           "town unless it or `--floorplan` names one), then every machine rule (F, G and H), as `python -m "
+           "qccd.gadget algorithm A.alg` judges them, beside the place checks and the schedule's sign-off.\n"]
+    if g["judge_doc"]:
+        out.append("In `qccd/gadget/judge.py`'s words:\n")
+        out.append("```\n" + g["judge_doc"].strip() + "\n```\n")
+    if g["place_rules"]:
+        out.append("The place checks (`qccd/gadget/place_checks.py`, `PLACE_RULES`) are a second, Python checker of "
+                   "these rules; where one reads differently from the rule text below, the rule text is the rule:\n")
+        out.append("| Rule | Place check |")
+        out.append("|---|---|")
+        for rid, text in g["place_rules"].items():
+            out.append(f"| {rid} | {_md(text)} |")
+        out.append("")
     for n, rs in g["machine_sets"].items():
         out.append(f"## `{n}`: {rs.title}\n")
         if rs.about:
@@ -460,39 +570,83 @@ def generate(repo: Path) -> dict[str, str]:
 
 # --------------------------------------------------------------------------- the deployed page
 
-def live_rules(url: str = SITE_RULES, timeout: float = 30.0) -> dict[str, dict]:
-    """Every rule card on the deployed Rules page: id -> {title, about, text}."""
+def _fetch(url: str, timeout: float = 30.0) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "qccd-design-review/1"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        page = resp.read().decode("utf-8", errors="replace")
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def _plain(s: str | None) -> str:
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", "", s or "")).split())
+
+
+def live_sets(page: str) -> dict[str, dict]:
+    """Every rule set on the deployed Rules page: name -> {rules, params}. A device set is a row of
+    the sets table (its rules as chips, its parameters as `name = value`); a machine set is a
+    heading followed by its rule cards."""
+    out = {}
+    for m in re.finditer(r'<tr id="set-([^"]+)">(.*?)</tr>', page, re.S):
+        chips = re.search(r'<div class="chips">(.*?)</div>', m.group(2), re.S)
+        params = {}
+        for c in re.findall(r"<code>(.*?)</code>", m.group(2), re.S):
+            k, sep, v = _plain(c).partition(" = ")
+            if sep:
+                params[k] = v
+        out[m.group(1)] = {"rules": re.findall(r'<a href="#([^"]+)"', chips.group(1)) if chips else [],
+                           "params": params}
+    heads = list(re.finditer(r'<h3 id="set-([^"]+)">', page))
+    for i, h in enumerate(heads):
+        nxt = page.find("<h2", h.end())
+        end = min([x.start() for x in heads[i + 1:]] + ([nxt] if nxt >= 0 else []) + [len(page)])
+        out.setdefault(h.group(1), {"rules": re.findall(r'<section class="rule" id="([^"]+)">', page[h.end():end]),
+                                    "params": {}})
+    return out
+
+
+def live_rules(url: str = SITE_RULES, timeout: float = 30.0, page: str | None = None) -> dict[str, dict]:
+    """Every rule card on the deployed Rules page: id -> {title, about, text}."""
+    page = _fetch(url, timeout) if page is None else page
     out = {}
     for m in re.finditer(r'<section class="rule" id="([^"]+)">(.*?)</section>', page, re.S):
         body = m.group(2)
         t = re.search(r'<span class="st">(.*?)</span>', body, re.S)
         a = re.search(r'<p class="checks">(.*?)</p>', body, re.S)
         f = re.search(r'<pre class="assert">(.*?)</pre>', body, re.S)
-
-        def plain(s):
-            return " ".join(html.unescape(re.sub(r"<[^>]+>", "", s or "")).split())
-        out[m.group(1)] = {"title": plain(t.group(1) if t else ""), "about": plain(a.group(1) if a else ""),
-                           "text": plain(f.group(1) if f else "")}
+        out[m.group(1)] = {"title": _plain(t.group(1) if t else ""), "about": _plain(a.group(1) if a else ""),
+                           "text": _plain(f.group(1) if f else "")}
     return out
 
 
 def compare_live(repo: Path, url: str = SITE_RULES) -> list[str]:
     _import(repo)
     from qccd.ruleset import load, names
+    sets = {n: load(n) for n in names("device") + names("machine")}
     local = {}
-    for rs in [load(n) for n in names("device")] + [load(n) for n in names("machine")]:
+    for rs in sets.values():
         for r in rs.rules:
             local[r.id] = r
     from qccd.ruleset import catalogue
     for r in catalogue().rules:
         local[r.id] = r
-    site = live_rules(url)
+    page = _fetch(url)
+    site = live_rules(url, page=page)
     if not site:
         return [f"{url}: no rule cards found (the page's layout may have changed)"]
     diffs = []
+    site_sets = live_sets(page)
+    for n in sorted(set(site_sets) - set(sets)):
+        diffs.append(f"rule set {n} is on the website but not in this checkout")
+    for n in sorted(set(sets) - set(site_sets)):
+        diffs.append(f"rule set {n} is in this checkout but not on the website (not deployed yet)")
+    for n in sorted(set(sets) & set(site_sets)):
+        mine, theirs = sets[n], site_sets[n]
+        if sorted(mine.ids) != sorted(theirs["rules"]):
+            more, less = sorted(set(theirs["rules"]) - set(mine.ids)), sorted(set(mine.ids) - set(theirs["rules"]))
+            diffs.append(f"rule set {n}: the website's rules differ (website only: {', '.join(more) or '-'}; "
+                         f"checkout only: {', '.join(less) or '-'})")
+        for k, v in theirs["params"].items():
+            if k in mine.param_text and " ".join(str(mine.param_text[k]).split()) != v:
+                diffs.append(f"rule set {n}: parameter {k} is {v} on the website, {mine.param_text[k]} here")
     for rid in sorted(set(site) - set(local)):
         diffs.append(f"{rid} is on the website but not in this checkout: pull the branch the site is built from")
     for rid in sorted(set(local) - set(site)):

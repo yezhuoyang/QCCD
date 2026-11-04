@@ -100,6 +100,16 @@ Read off the code by running the stage's two checkers on an empty programme: `qc
 | [R24](https://qccd.academy/rules/#R24) | Every two-qubit gate of the circuit is performed, and no other | not judged by the rules stage: qccd.verify does not report it and the board's set is not run in the rule language; only the certificate stages speak to it |
 | [R25](https://qccd.academy/rules/#R25) | Each qubit's operations keep the circuit's order | not judged by the rules stage: qccd.verify does not report it and the board's set is not run in the rule language; only the certificate stages speak to it |
 
+## An entry's own rule set
+
+A bundle may declare its own set (`rules.json`; Goal 3's families do, `boards.md`). Then the rules stage's verdict is that set's, and the board's set decides only the board's own ranking. In the grader's words:
+
+- `evaluator._rules_stage`: The board's rules (`qccd.verify`, as always), and the entry's own set when it declares one (`qccd.ruleset`). The stage's verdict is the entry's set's; `ctx["rules"]` keeps how the entry stands to the board's, for `conformance`.
+- `evaluator._declared_rules`: Judge the program by the rule set its bundle declares. Every rule must hold or not apply; one that could not be checked counts only where the board's own rules may be skipped (R10 is the certificate stages' to decide).
+- `evaluator._conformance`: How the entry stands to the board: `board` when it keeps every rule of the board's set and is scored with the board's physics alone; else what differs. None when the grading stopped before the rules were checked.
+- Rules of the entry's set that may go unchecked: R10, R7b, R9. Any other rule that could not be checked makes the stage `partial`, so the entry is not eligible.
+- A rule of the entry's set that only a paper's timed schedule can judge (`rules.md`, "Judged on") does not apply to a programme: it neither fails nor counts.
+
 ## What the probe found
 
 - surface device: qccd.verify reports 28 rule ids (R1 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R2 R20 R21 R22 R23 R3 R4 R4b R4d R5 R6 R6b R7 R7b R7c R8 R9); skips R10, R7b, R9; partial R15; rule-language rules that need the circuit: R24, R25

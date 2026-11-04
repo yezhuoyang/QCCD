@@ -127,7 +127,7 @@ A rule is an assertion over these words and nothing else. A word an execution do
 | `next_on_qubit(c1, c2)` | true or false | Whether c2 is the operation that comes right after c1 on one of their qubits, in the circuit as written. |  |  |
 | `next_run(c1, c2)` | true or false | Whether c2 belongs to the run of gates that follows c1's run on a qubit they share. A run is a stretch of consecutive CNOTs in which that qubit plays the same role -- always the control, or always the target -- and such gates commute with each other. |  |  |
 | `performed(c)` | true or false | Whether some operation of the execution carries out circuit operation c. |  |  |
-| `performers(c)` | a set of operations | The operations of the execution that carry out circuit operation c. | Every instruction the compiler stamped with c. | The two-qubit gate matched to c: the k-th gate on a pair of ions is the circuit's k-th gate on that pair. |
+| `performers(c)` | a set of operations | The operations of the execution that carry out circuit operation c. | Every gate, measurement or reset the compiler stamped with c. The transport stamped with c only brings its ions together, and does not count. | The two-qubit gate matched to c: the k-th gate on a pair of ions is the circuit's k-th gate on that pair. |
 | `serves_circuit(o)` | true or false | Whether two-qubit gate o carries out some gate of the circuit. |  |  |
 
 ## The clock

@@ -24,13 +24,13 @@
       "id": 2,
       "name": "bell-on-chain4-for-ghz-board",
       "prompt": "I compiled the Bell example onto the 4-site chain and I'd like to enter it on the GHZ starter board. Files: qccd/site/compiled/chain4.arch.json (device), qccd/site/compiled/bell/prog.cooled.tsir.json (final program) and qccd/site/compiled/bell/prog.qcert.json (certificate). Check it against all the board's rules before I submit and tell me what I need to fix.",
-      "expected_output": "R7 fails under the board's physics (n-bar about 6.1 against a budget of 1.0 at the first two-qubit gate). The fix is to re-cool under the board's physics, which is the one change a board allows after certification. The certificate is for a 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so certificate_binding would fail. Every other rule is reported correctly, and R10 is said to be unestablished.",
+      "expected_output": "Every rule of the standard set holds, R7 included (the examples were recompiled under today's physics on 2026-11-02; before that R7 failed at n-bar 6.1). The deciding problem is the circuit: the programme and certificate are for the 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so certificate_binding would fail and the entry cannot be eligible. R10 is said to be unestablished, and the missing certified programme is named.",
       "files": [],
       "expectations": [
-        "Identifies R7 as failing, with an n-bar of about 6.1 against a budget of 1.0 at the first two-qubit gate",
-        "Proposes re-inserting cooling under the board's physics (or cooling before that gate) as the fix",
+        "Reports R7 (the heat budget at a two-qubit gate) as passing under the board's physics, with its evidence, rather than assuming it fails",
+        "Says the fix is to compile the board's own 4-qubit GHZ circuit, not to change the Bell programme's rules",
         "Notices that the programme and certificate are for the 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so the entry would fail the certificate binding",
-        "Reports no false failures: every rule it marks as failing is R7 or a direct consequence of the certificate being for another circuit",
+        "Reports no false failures: every rule it marks as failing is a direct consequence of the certificate being for another circuit",
         "Covers every rule of the standard set, each linked to https://qccd.academy/rules/#<id>",
         "States that R10 (the programme computes the circuit) is not established by this review",
         "Points out that an entry needs the certified programme as a fourth file (bell/prog.tsir.json), since the user listed only three"
@@ -40,7 +40,7 @@
       "id": 3,
       "name": "sharp-corner-device-for-steane",
       "prompt": "A collaborator sent me a device for the Steane code board, evals/files/sharp_corner.arch.json in the design-review skill folder. Before we spend time compiling onto it: is the device itself legal under the board's rules, does it fit the budget, and which rules can't be checked until we have a program?",
-      "expected_output": "R20 fails at J0_1 (18.4 degrees) and J1_1 (45 degrees) against the 60-degree minimum, with a concrete geometry fix. The budget is fine (33 of 128 DACs, 2 of 200 junctions). R11, R18, R19 and R21 are checked and pass. Every programme rule is listed as needing a programme, not as passing. A board-fit comment notes that 14 ion slots for Steane's 13 qubits leaves almost no room.",
+      "expected_output": "R20 fails at J0_1 (18.4 degrees) and J1_1 (45 degrees) against the 60-degree minimum, with a concrete geometry fix. The budget is fine (33 of 128 DACs, 2 of 200 junctions). R18, R19 and R21 are checked and pass, and so does the device half of R11 (every junction priced); R15-R17 read only the board's model. Every programme rule is listed as needing a programme, not as passing. A board-fit comment notes that 14 ion slots for Steane's 13 qubits leaves almost no room.",
       "files": [
         "evals/files/sharp_corner.arch.json"
       ],
@@ -48,8 +48,41 @@
         "Identifies R20 failing at J0_1 (about 18.4 degrees) and at J1_1 (45 degrees) against the 60-degree minimum",
         "Proposes a concrete geometry fix (move the trap back, or open the angle to at least 60 degrees)",
         "Reports the budget as within limits: 33 DACs of 128 and 2 junctions of 200",
-        "Separates the rules checkable on the device alone (R11, R18-R21) from those that need a programme, and does not claim any programme rule passes",
+        "Separates the rules checkable on the device alone (R18-R21, and R11's device half) from those that need a programme, and does not claim any programme rule passes",
         "Comments on board fit: 14 ion slots for the Steane circuit's 13 qubits"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "own-rule-set-jones-on-ghz-board",
+      "prompt": "My entry for the GHZ starter board declares its own rule set, the paper's 'jones' set (Surface-code QCCD), in its rules.json instead of the board's standard rules. Files: qccd/site/compiled/chain4.arch.json, qccd/site/compiled/bell/prog.cooled.tsir.json (final), qccd/site/compiled/bell/prog.tsir.json (certified), qccd/site/compiled/bell/prog.qcert.json. Which rules decide whether it is eligible, does it pass them, and would it still show up on the board's normal ranking?",
+      "expected_output": "Under its own set (jones), R27 fails once: the two measurements run at the same time in trap C0 (step 10), and jones lets a trap do one operation at a time, measurements included. So the rules stage fails and the entry is not eligible; the fix is to serialise the measurements, or to declare no set (the board's standard set has no such rule). R26 holds; R29 and R30 do not apply to a programme (only a paper's timed schedule has their words). jones drops 23 board rules (R7 among them), but the entry breaks none of the board's, so conformance would keep it on the board's ranking if it were eligible. The certificate is for the 2-qubit Bell circuit, not the 4-qubit GHZ one, which fails certificate_binding regardless.",
+      "files": [],
+      "expectations": [
+        "Says the entry's own set (jones) decides the rules stage, and the board's standard set only decides the board's own ranking (conformance)",
+        "Identifies R27 failing under jones because the two measurements run simultaneously in trap C0, counting it as one problem (two ordered cases)",
+        "Gives a fix for R27 (serialise the two measurements, or declare no own set / the standard set)",
+        "Says R29 and R30 do not apply to a programme (they need a paper's timed schedule), without calling them passes or failures",
+        "Lists every rule of both sets, each linked to https://qccd.academy/rules/#<id>, including R26, R27, R29 and R30",
+        "Says what jones drops from the board's set (23 rules, R7 among them) and that the entry still keeps every board rule",
+        "Notices that the certificate is for the 2-qubit Bell circuit, not the board's 4-qubit GHZ circuit, so certificate_binding fails as well"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "floorplan-overlap-then-bell-cnot",
+      "prompt": "I edited the gadget town floorplan to pack it tighter: evals/files/town_overlap.floor in the design-review skill folder. Before I schedule the Bell CNOT algorithm (examples/gadgets/algorithms/bell_cnot.alg) on it, check the floorplan against the machine rules, tell me what to fix, and whether the algorithm would run legally on it.",
+      "expected_output": "F3 fails: zone1 (moved to x = 64) overlaps post. F4 fails too: roads now pass through zone1 and post. Every other floorplan rule (F1, F2, F5-F9) holds. Fix: put zone1 back at 73 10, or anywhere its footprint is clear. Scheduled on this floorplan, Bell CNOT keeps every G and H rule and the place checks, but the floorplan's own F3 and F4 failures remain, so the machine is not legal until the floorplan is fixed; on the original town every machine rule holds.",
+      "files": [
+        "evals/files/town_overlap.floor"
+      ],
+      "expectations": [
+        "Identifies F3 failing because zone1 and post overlap",
+        "Identifies F4 failing (roads passing through zone1 or post), as a consequence of the same move",
+        "Proposes moving zone1 back (to 73 10, its original place) or to any position where its footprint is clear",
+        "Reports the floorplan rules that hold, each linked to https://qccd.academy/rules/#<id>",
+        "Judges the algorithm on the floorplan with the machine rules (G1-G14, H1-H2), not only the floorplan rules, and reports their verdicts",
+        "Does not call the machine legal while F3 and F4 fail"
       ]
     }
   ]

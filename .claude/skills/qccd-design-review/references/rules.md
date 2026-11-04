@@ -26,8 +26,10 @@ Board rule sets: `c2lr` (4 boards); `standard` (26 boards).
 
 - Website: https://qccd.academy/rules/#R0 (category: Static & occupancy) (core: holds in every rule set, cannot be dropped)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard, tiscc, trapsimd
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must hold (the rule language only; qccd.verify does not report it)
 - On a `standard` board: not judged by the rules stage: qccd.verify does not report it and the board's set is not run in the rule language; only the certificate stages speak to it
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:19`
 
 > Each operation names its ions and where they are; replaying the execution from the start must find them there, and every ion must end it standing in a site.
@@ -42,8 +44,10 @@ and (for all i in ions: position(i, final()) != none)
 
 - Website: https://qccd.academy/rules/#R1 (category: Static & occupancy) (core: holds in every rule set, cannot be dropped)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard, tiscc, trapsimd
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2004.04706; arXiv:2511.15910
 - Defined at: `qccd/ruleset/library/catalogue.rules:25`
 
@@ -58,8 +62,10 @@ for all s in sites, t in instants:
 
 - Website: https://qccd.academy/rules/#R8 (category: Operations & timing) (core: holds in every rule set, cannot be dropped)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard, tiscc, trapsimd
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3
 - Defined at: `qccd/ruleset/library/catalogue.rules:31`
 
@@ -74,8 +80,10 @@ for all a, b in operations where a != b and simultaneous(a, b):
 
 - Website: https://qccd.academy/rules/#R24 (category: Operations & timing) (core: holds in every rule set, cannot be dropped)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard, tiscc, trapsimd
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: not judged by the rules stage: the rule language gets no circuit there, so it does not apply; only the certificate stages speak to it
 - On a `standard` board: not judged by the rules stage: qccd.verify does not report it and the board's set is not run in the rule language; only the certificate stages speak to it
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:37`
 
 > Each two-qubit gate of the input circuit is carried out, and the execution performs no two-qubit gate the circuit does not ask for.
@@ -91,8 +99,10 @@ and (for all g in two_qubit_gates: serves_circuit(g))
 
 - Website: https://qccd.academy/rules/#R2 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard, tiscc, trapsimd
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2510.23519; arXiv:2206.11888; arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:44`
 
@@ -107,8 +117,10 @@ for all j in junctions, t in instants where not exchange(t):
 
 - Website: https://qccd.academy/rules/#R3 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, ionshuttler, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, cyclone, ionshuttler, jones, qccdsim, qccdsim-gateset, qccdsim-physical): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2510.23519
 - Defined at: `qccd/ruleset/library/catalogue.rules:50`
 
@@ -123,8 +135,11 @@ for all r in rails, t in instants where not exchange(t):
 
 - Website: https://qccd.academy/rules/#R4 (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`class_declared`, `is_transport`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2504.17886
 - Defined at: `qccd/ruleset/library/catalogue.rules:56`
 
@@ -138,8 +153,11 @@ for all k in steps where is_transport(k): class_declared(k)
 
 - Website: https://qccd.academy/rules/#R4d (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`drivable`, `is_transport`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2403.00756; arXiv:2305.03828
 - Defined at: `qccd/ruleset/library/catalogue.rules:61`
 
@@ -153,8 +171,11 @@ for all k in steps where is_transport(k): drivable(k)
 
 - Website: https://qccd.academy/rules/#R4b (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`carries_gates`, `is_transport`, `mode`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2504.17886
 - Defined at: `qccd/ruleset/library/catalogue.rules:66`
 
@@ -169,8 +190,11 @@ for all k in steps where is_transport(k):
 
 - Website: https://qccd.academy/rules/#R5 (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`hops`, `rail` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3
 - Defined at: `qccd/ruleset/library/catalogue.rules:72`
 
@@ -185,8 +209,11 @@ for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b) and not exch
 
 - Website: https://qccd.academy/rules/#R11 (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device for some of its conjuncts, an execution for the rest
+- Judged on: a programme only (`hops`, `loop`, `priced`, `shift` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2511.15910
 - Defined at: `qccd/ruleset/library/catalogue.rules:78`
 
@@ -202,8 +229,10 @@ and (for all j in junctions: priced(j))
 
 - Website: https://qccd.academy/rules/#R14 (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, jones, qccdsim, qccdsim-gateset, qccdsim-physical): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2510.23519
 - Defined at: `qccd/ruleset/library/catalogue.rules:85`
 
@@ -217,8 +246,11 @@ for all m in splits: at_chain_end(m) or swap_paid(m)
 
 - Website: https://qccd.academy/rules/#R22 (category: Transport & control)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`control` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773
 - Defined at: `qccd/ruleset/library/catalogue.rules:90`
 
@@ -234,8 +266,11 @@ for all a, b in transport where simultaneous(a, b) and not exchange(a):
 
 - Website: https://qccd.academy/rules/#R23 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`rotated` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: reader report 2026-09; deck_v3; arXiv:2510.23519
 - Defined at: `qccd/ruleset/library/catalogue.rules:97`
 
@@ -253,7 +288,10 @@ for all i in ions, t in instants:
 
 - Website: https://qccd.academy/rules/#C1 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `entered`, `exits_as_entered`, `legs`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:111`
 
@@ -269,7 +307,10 @@ and (for all k in steps: exits_as_entered(k))
 
 - Website: https://qccd.academy/rules/#C2 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`bits_only`, `c2lr_device`, `is_transport`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:118`
 
@@ -284,7 +325,10 @@ for all k in steps where is_transport(k): bits_only(k)
 
 - Website: https://qccd.academy/rules/#C3 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `independent_axes`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:124`
 
@@ -299,7 +343,10 @@ for all k in steps where exchange(k): independent_axes(k)
 
 - Website: https://qccd.academy/rules/#C4 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `one_waveform`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:130`
 
@@ -314,7 +361,10 @@ for all k in steps where exchange(k): one_waveform(k)
 
 - Website: https://qccd.academy/rules/#C5 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `legs` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:136`
 
@@ -330,7 +380,10 @@ for all i in ions, t in instants where position(i, t) != none:
 
 - Website: https://qccd.academy/rules/#C6 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `form`, `matched`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:143`
 
@@ -345,7 +398,10 @@ for all k in steps where exchange(k): matched(k) and form(k) in c2lr_forms
 
 - Website: https://qccd.academy/rules/#C7 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:149`
 
@@ -360,7 +416,10 @@ for all i in ions, t in instants: position(i, t) not in junctions
 
 - Website: https://qccd.academy/rules/#C8 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`c2lr_device`, `com_frequency_held` cannot be read off a paper's schedule)
 - On a `c2lr` board: may be partial (qccd.verify: recorded, not decided: the primitive holds the COM mode during a shift)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:155`
 
@@ -375,7 +434,10 @@ com_frequency_held()
 
 - Website: https://qccd.academy/rules/#C9 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`c2lr_device`, `c2lr_step`, `heats_every_crystal`, `models_heating`, `steps` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:161`
 
@@ -390,7 +452,10 @@ for all k in steps where c2lr_step(k): heats_every_crystal(k)
 
 - Website: https://qccd.academy/rules/#C10 (category: Swap-or-stay lattices (C2LR))
 - In rule sets: c2lr, c2lr-demonstrated
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`c2lr_wiring`, `control` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2403.00756
 - Defined at: `qccd/ruleset/library/catalogue.rules:167`
 
@@ -407,8 +472,10 @@ c2lr_wiring()
 
 - Website: https://qccd.academy/rules/#R6 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2504.17886
 - Defined at: `qccd/ruleset/library/catalogue.rules:175`
 
@@ -424,8 +491,10 @@ and (for all c in coolings, i in ions(c): can(position(i, start(c)), "cool"))
 
 - Website: https://qccd.academy/rules/#R6b (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, cyclone, jones, qccdsim, qccdsim-gateset, qccdsim-physical, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated, cyclone, jones, qccdsim, qccdsim-gateset, qccdsim-physical): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2504.17886
 - Defined at: `qccd/ruleset/library/catalogue.rules:182`
 
@@ -441,8 +510,10 @@ and (for all g in two_qubit_gates where size(declared_sites(g)) > 0:
 
 - Website: https://qccd.academy/rules/#R12 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2511.15910; arXiv:2004.04706
 - Defined at: `qccd/ruleset/library/catalogue.rules:189`
 
@@ -457,8 +528,10 @@ for all a, b in gates where a != b and simultaneous(a, b):
 
 - Website: https://qccd.academy/rules/#R13 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2511.15910; arXiv:2004.04706
 - Defined at: `qccd/ruleset/library/catalogue.rules:195`
 
@@ -472,6 +545,8 @@ for all g in gates: occupancy(site(g), start(g)) <= max_chain
 
 - Website: https://qccd.academy/rules/#R27 (category: Operations & timing)
 - In rule sets: cyclone, jones, qccdsim, qccdsim-gateset, qccdsim-physical
+- Reads: an execution: it needs the programme
+- In an entry's own set (cyclone, jones, qccdsim, qccdsim-gateset, qccdsim-physical): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:200`
 
 > The operations of the kinds listed in serial_kinds hold their trap: two of them in one trap never overlap in time.
@@ -486,6 +561,8 @@ for all a, b in operations where a != b and kind(a) in serial_kinds and kind(b) 
 
 - Website: https://qccd.academy/rules/#R32 (category: Operations & timing)
 - In rule sets: tiscc
+- Reads: an execution: it needs the programme
+- In an entry's own set (tiscc): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:206`
 
 > Rotations, preparation and measurement happen only in the zones listed in single_ion_zones.
@@ -499,6 +576,8 @@ for all o in operations where kind(o) in {"gate1", "reset", "measure"}:
 
 - Website: https://qccd.academy/rules/#R33 (category: Operations & timing)
 - In rule sets: tiscc, trapsimd
+- Reads: an execution: it needs the programme
+- In an entry's own set (tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:211`
 
 > On devices whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other.
@@ -515,8 +594,11 @@ for all g in two_qubit_gates, i, j in ions(g):
 
 - Website: https://qccd.academy/rules/#R7 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`heat`, `heat_budget` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: deck_v3; arXiv:2511.15910
 - Defined at: `qccd/ruleset/library/catalogue.rules:219`
 
@@ -531,8 +613,11 @@ for all g in two_qubit_gates, i in ions(g):
 
 - Website: https://qccd.academy/rules/#R7b (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`declares_duty_budget` cannot be read off a paper's schedule)
 - On a `c2lr` board: may be skipped (qccd.verify skips it: no per-zone duty-cycle budget is declared by any architecture yet)
 - On a `standard` board: may be skipped (qccd.verify skips it: no per-zone duty-cycle budget is declared by any architecture yet)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply; may go unchecked (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2504.17886
 - Defined at: `qccd/ruleset/library/catalogue.rules:225`
 
@@ -547,8 +632,11 @@ for all s in sites: duty(s) <= duty_budget(s)
 
 - Website: https://qccd.academy/rules/#R7c (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`models_heating` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2510.23519; arXiv:2606.06455
 - Defined at: `qccd/ruleset/library/catalogue.rules:231`
 
@@ -563,8 +651,11 @@ count(two_qubit_gates) = 0 or count(coolings) > 0
 
 - Website: https://qccd.academy/rules/#R15 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the board's cost model alone: the same verdict for every design on a board
+- Judged on: a programme only (`heat_is_upper_bound`, `models_heating` cannot be read off a paper's schedule)
 - On a `c2lr` board: may be partial (qccd.verify: quanta are composed additively, which R15 says is an upper bound; the interference term needs a secular-phase model the corpus does not supply)
 - On a `standard` board: may be partial (qccd.verify: quanta are composed additively, which R15 says is an upper bound; the interference term needs a secular-phase model the corpus does not supply)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2605.25118
 - Defined at: `qccd/ruleset/library/catalogue.rules:237`
 
@@ -579,8 +670,11 @@ heat_is_upper_bound()
 
 - Website: https://qccd.academy/rules/#R16 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the board's cost model alone: the same verdict for every design on a board
+- Judged on: a programme only (`gate_error_reads_heat`, `models_heating` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2510.23519; arXiv:2605.25118
 - Defined at: `qccd/ruleset/library/catalogue.rules:243`
 
@@ -595,8 +689,11 @@ gate_error_reads_heat()
 
 - Website: https://qccd.academy/rules/#R17 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the board's cost model alone: the same verdict for every design on a board
+- Judged on: a programme only (`heat_accrues_with_time`, `models_heating` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: arXiv:2605.25118
 - Defined at: `qccd/ruleset/library/catalogue.rules:249`
 
@@ -613,8 +710,10 @@ heat_accrues_with_time()
 
 - Website: https://qccd.academy/rules/#R18 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device alone (with the board's physics): a device review decides it
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: quant-ph/0702175; arXiv:2305.03828; arXiv:1210.3655
 - Defined at: `qccd/ruleset/library/catalogue.rules:257`
 
@@ -628,8 +727,11 @@ for all n in nodes: (n in junctions) = (degree(n) >= 3)
 
 - Website: https://qccd.academy/rules/#R19 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`max_junction_degree` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579
 - Defined at: `qccd/ruleset/library/catalogue.rules:262`
 
@@ -643,8 +745,11 @@ for all n in nodes: degree(n) <= max_junction_degree()
 
 - Website: https://qccd.academy/rules/#R20 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`angle`, `min_rail_angle` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: collaborator review 2026-09; arXiv:2201.12579
 - Defined at: `qccd/ruleset/library/catalogue.rules:267`
 
@@ -659,8 +764,11 @@ for all n in nodes, r1, r2 in rails_at(n) where r1 != r2:
 
 - Website: https://qccd.academy/rules/#R21 (category: Static & occupancy)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: the device alone (with the board's physics): a device review decides it
+- Judged on: a programme only (`cross`, `lies_on` cannot be read off a paper's schedule)
 - On a `c2lr` board: must pass (qccd.verify and the rule language)
 - On a `standard` board: must pass (qccd.verify)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply (`grader.md`, an entry's own rule set)
 - Sources: collaborator review 2026-09; quant-ph/0702175
 - Defined at: `qccd/ruleset/library/catalogue.rules:273`
 
@@ -677,8 +785,11 @@ and (for all r1, r2 in rails where r1 < r2: not cross(r1, r2))
 
 - Website: https://qccd.academy/rules/#R9 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`claimed`, `claims`, `replayed` cannot be read off a paper's schedule)
 - On a `c2lr` board: may be skipped (qccd.verify skips it: check_metrics=False: the program's claims were not checked)
 - On a `standard` board: may be skipped (qccd.verify skips it: check_metrics=False: the program's claims were not checked)
+- In an entry's own set (c2lr-demonstrated): must hold or not apply; may go unchecked (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:281`
 
 > Every time, cost, step count or heat figure the programme states about itself equals what replaying it computes.
@@ -693,8 +804,11 @@ for all c in claims: approx(claimed(c), replayed(c))
 
 - Website: https://qccd.academy/rules/#R10 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, standard
+- Reads: an execution: it needs the programme
+- Judged on: a programme only (`computes_circuit` cannot be read off a paper's schedule)
 - On a `c2lr` board: may be skipped (qccd.verify skips it: needs symbolic permutation + Pauli-frame tracking against a QASM DAG); decided by the certificate stages instead
 - On a `standard` board: may be skipped (qccd.verify skips it: needs symbolic permutation + Pauli-frame tracking against a QASM DAG); decided by the certificate stages instead
+- In an entry's own set (c2lr-demonstrated): must hold or not apply; may go unchecked (`grader.md`, an entry's own rule set)
 - Sources: this website; arXiv:2406.19479
 - Defined at: `qccd/ruleset/library/catalogue.rules:287`
 
@@ -708,8 +822,10 @@ computes_circuit()
 
 - Website: https://qccd.academy/rules/#R25 (category: Operations & timing)
 - In rule sets: c2lr, c2lr-demonstrated, ionshuttler, ionshuttler-heuristic, qccdsim, qccdsim-physical, standard
+- Reads: an execution: it needs the programme
 - On a `c2lr` board: not judged by the rules stage: the rule language gets no circuit there, so it does not apply; only the certificate stages speak to it
 - On a `standard` board: not judged by the rules stage: qccd.verify does not report it and the board's set is not run in the rule language; only the certificate stages speak to it
+- In an entry's own set (c2lr-demonstrated, ionshuttler, ionshuttler-heuristic, qccdsim, qccdsim-physical): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:292`
 
 > On every qubit, each operation is over before the next one on that qubit begins, in the order the circuit is written -- even where two of them would commute.
@@ -723,6 +839,8 @@ for all c1, c2 in circuit_ops where next_on_qubit(c1, c2) and performed(c1) and 
 
 - Website: https://qccd.academy/rules/#R26 (category: Operations & timing)
 - In rule sets: cyclone, jones, trapsimd
+- Reads: an execution: it needs the programme
+- In an entry's own set (cyclone, jones, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:297`
 
 > As R25, except that consecutive CNOTs in which a qubit plays the same role (always the control, or always the target) commute, and may run in any order among themselves.
@@ -738,6 +856,9 @@ for all c1, c2 in circuit_ops where next_run(c1, c2) and performed(c1) and perfo
 
 - Website: https://qccd.academy/rules/#R29 (category: Operations & timing)
 - In rule sets: cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd
+- Reads: an execution: it needs the programme
+- Judged on: a paper's timed schedule only (`clock`, `clocked` exist only there), so it never applies to an entry's programme
+- In an entry's own set (cyclone, ionshuttler, ionshuttler-heuristic, jones, qccdsim, qccdsim-gateset, qccdsim-physical, tiscc, trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:304`
 
 > Each operation's duration is the one the model's duration law gives it.
@@ -750,6 +871,9 @@ for all o in operations where clocked(o): approx(duration(o), clock(o))
 
 - Website: https://qccd.academy/rules/#R30 (category: Operations & timing)
 - In rule sets: jones
+- Reads: an execution: it needs the programme
+- Judged on: a paper's timed schedule only (`locks` exist only there), so it never applies to an entry's programme
+- In an entry's own set (jones): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:308`
 
 > The schedule states, for every operation, the components it holds while it runs; two operations naming one component never overlap in time.
@@ -763,6 +887,8 @@ for all a, b in operations where a != b and simultaneous(a, b):
 
 - Website: https://qccd.academy/rules/#R31 (category: Transport & control)
 - In rule sets: trapsimd
+- Reads: an execution: it needs the programme
+- In an entry's own set (trapsimd): must hold or not apply (`grader.md`, an entry's own rule set)
 - Defined at: `qccd/ruleset/library/catalogue.rules:313`
 
 > One waveform drives every broadcast move of a cycle: moves that overlap start and end together and are of one class, and every such move names its class.
