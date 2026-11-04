@@ -44,7 +44,7 @@ review on `upstream/compiler`.
 | the four files of an entry: device, final programme, certificate, certified programme (the compiler's own output, `prog.tsir.json` beside `prog.cooled.tsir.json`) | `--device D --program P --certificate C --certified K --board B`. The script assembles the bundle and grades it whole |
 | a device and its programme, without the rest | `--device D --program P [--certificate C] --board B` (rules only, no grading stages) |
 | only a device | `--device D --board B` (device-level rules, budget and fit) |
-| a grade someone already ran (`qccd grade --json`, the official `/report`) | `--report R`. Add `--bundle` to grade it here as well and compare the two |
+| a grade someone already ran (`qccd grade --json`, the official `/report`) | `--report R`. Add `--bundle` to grade it here as well and compare the two, or `--bundle B --no-grade` to take the report as that bundle's grade (what the official server's agent review runs) |
 | an entry that declares its own rule set (every Goal 3 entry does: `references/boards.md`) | also `--rules NAME_OR_FILE`; a bundle's `rules.json`, and a report's record of it, are read automatically |
 | a floorplan of gadgets (`*.floor`) | `--floorplan F` (the floorplan rules F1-F9). No board |
 | a logical algorithm (`*.alg`) to run on a floorplan | `--algorithm A [--floorplan F]`: it is scheduled (on the town unless it or `--floorplan` names a floorplan), then every machine rule (F, G, H) is judged |

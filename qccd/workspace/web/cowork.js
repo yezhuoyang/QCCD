@@ -1243,7 +1243,9 @@ function review(sub) {
 // The panel is the PERSON's (data-qccd-private): the agent opens it (qccd_present open_board) and
 // asks to submit (qccd_submit_official), and the person presses Submit, in the panel or on the card.
 var B = { open: false, board: null, data: null, timer: null, loading: false, signinWin: null, name: null, vis: 'public',
-          rules: '', rulesView: 'board', catalog: null };
+          rules: '', rulesView: 'board', catalog: null,
+          // the agent the server asks to review a submission once graded ('' for none), remembered
+          reviewer: localGet('qcl-reviewer') || '' };
 
 function boardParam() {
   var m = /[?&]board=([^&#]+)/.exec(location.search || '');
@@ -1336,7 +1338,7 @@ function testOnBoard() {
 function submitToBoard() {
   var d = B.data || {}, name = document.getElementById('qcl-bname');
   api('POST', '/api/publications', { design: S.branch, board: B.board, visibility: B.vis,
-                                     display_name: name ? name.value : null }).then(function (r) {
+                                     display_name: name ? name.value : null, reviewer: B.reviewer || null }).then(function (r) {
     if (!r.ok) { notice('Not submitted: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
     notice('Submitting ' + ((d.design || {}).name || 'the design') + ' to ' + ((d.board || {}).title || 'the board') +
            ' as ' + (r.data.credit || 'you') + '. The server grades it again, then it appears on the leaderboard.');
@@ -1344,7 +1346,7 @@ function submitToBoard() {
   });
 }
 function confirmPublication(pid, fromCard) {
-  api('POST', '/api/publications/' + encodeURIComponent(pid) + '/confirm', {}).then(function (r) {
+  api('POST', '/api/publications/' + encodeURIComponent(pid) + '/confirm', { reviewer: B.reviewer || null }).then(function (r) {
     if (!r.ok) { notice('Not submitted: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
     notice('Submitting as ' + (r.data.credit || 'you') + '.');
     loadBoard(); loadConvSoon();
@@ -1395,8 +1397,25 @@ function rulesPick() {
                        title: 'the rule set the design is tested and entered under: the board\'s own, a set the website ships, or a .rules file in this workspace (rules/). An entry under rules other than the board\'s is listed with every entry, tagged, behind the board\'s own ranking',
                        on: { change: function (e) { B.rules = e.target.value; } } }, opts);
 }
+// the agent review the server runs once it has graded the submission, in a few words
+var REVIEW_SAID = { queued: 'waits for the server\'s grade', checking: 'is checking every rule', reviewing: 'is reviewing it',
+                    failed: 'did not finish' };
+var DECISION_SAID = { accepted: 'Accepted', not_accepted: 'Not accepted', held: 'Held for a maintainer',
+                      undetermined: 'Not decided on that server' };
+function reviewLine(p) {
+  var rv = (p.official || {}).review;
+  if (!rv) return p.reviewer && p.state !== 'uploaded' ? 'The server will ask ' + (p.reviewer === 'codex' ? 'ChatGPT' : 'Claude') + ' to review it.' : '';
+  var who = rv.reviewer === 'codex' ? 'ChatGPT' : 'Claude';
+  var dec = rv.decision ? DECISION_SAID[rv.decision] || rv.decision : '';
+  if (rv.status === 'done') return (dec ? dec + '. ' : '') + who + ' reviewed it: open the review for every rule and the fixes.';
+  return (dec ? dec + '. ' : '') + who + ' ' + (REVIEW_SAID[rv.status] || rv.status) + '…';
+}
 // one request to publish, as the panel and the chat card both say it
 function pubLine(p) {
+  var line = pubLine0(p), rl = reviewLine(p);
+  return rl ? line + ' ' + rl : line;
+}
+function pubLine0(p) {
   var o = p.official || {};
   if (p.state === 'testing') return 'Testing it on the board first…';
   if (p.state === 'test_failed') return 'Did not pass the test: ' + (p.error || 'see the report');
@@ -1414,6 +1433,10 @@ function pubLine(p) {
   return 'Submitted as ' + (o.by || p.credit || 'you') + '. The server is grading it…';
 }
 function pubActions(p) {
+  var rv = (p.official || {}).review;
+  if (rv && rv.page) return [btn(rv.status === 'done' ? 'Open the review' : 'Follow the review', function () {
+    window.open(rv.page, '_blank', 'noopener'); }, rv.status === 'done' ? 'pri' : 'qcl-link',
+    'the server\'s decision, every rule of the board, and the agent\'s review with fixes')];
   if (p.state !== 'awaiting_person') return [];
   if (!p.signed_in) return [btn('Sign in to qccd.academy', signIn, 'pri', 'your name is shown with what you submit'),
                            btn('Not now', function () { declinePublication(p.publication_id); }, 'qcl-link')];
@@ -1507,6 +1530,23 @@ function renderBoard() {
               [['public', 'public, on the leaderboard'], ['private', 'private, only you']].map(function (o) {
                 var x = h('option', { value: o[0], text: o[1] }); if (o[0] === B.vis) x.selected = true; return x; }));
   body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Shown as' }), nameIn, vis]));
+  // who reviews it: an agent the server runs once it has graded the design (qccd/official/review.py)
+  var revs = (d.reviewers || {}).reviewers || [];
+  if ((d.reviewers || {}).enabled && revs.length) {
+    var ready = revs.filter(function (r) { return r.available; });
+    if (B.reviewer && !ready.some(function (r) { return r.id === B.reviewer; })) B.reviewer = '';
+    var rsel = h('select', { id: 'qcl-breviewer', cls: 'qcl-sel',
+                             title: 'an agent with the design-review skill explains the server\'s verdict, rule by rule, with fixes; the grade alone decides',
+                             on: { change: function (e) { B.reviewer = e.target.value; localSet('qcl-reviewer', B.reviewer); } } },
+                 [h('option', { value: '', text: 'No agent review' })].concat(revs.map(function (r) {
+                   var o = h('option', { value: r.id, text: r.title + (r.model ? ' · ' + r.model : '') + (r.available ? '' : ' (not signed in)'),
+                                         title: r.available ? '' : (r.why || ''), disabled: r.available ? null : 'disabled' });
+                   if (r.id === B.reviewer) o.selected = true; return o; })));
+    body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Review by' }), rsel]));
+    var off_ = revs.filter(function (r) { return !r.available; });
+    if (off_.length) body.appendChild(h('div', { cls: 'qcl-note', text: off_.map(function (r) {
+      return r.title + ': ' + (r.why || 'not available'); }).join(' · ') }));
+  }
   var sent = t && t.publication;
   var why = !passed ? 'Test the design on this board first: only a design that passes can be submitted.'
           : sent ? (sent.state === 'awaiting_person' ? 'The agent already asked to submit it: answer below.'

@@ -971,7 +971,8 @@ def create_app(state: ServiceState) -> FastAPI:
         return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
                                       submission_id=b.get("submission_id"), display_name=b.get("display_name"),
                                       visibility=str(b.get("visibility") or "public"),
-                                      origin_prompt_id=b.get("origin_prompt_id"), rules=b.get("rules"))
+                                      origin_prompt_id=b.get("origin_prompt_id"), rules=b.get("rules"),
+                                      reviewer=b.get("reviewer") or None)
 
     @route("GET", "/api/publications", write=False)
     def publications_list(request, actor, _):
@@ -984,7 +985,7 @@ def create_app(state: ServiceState) -> FastAPI:
     @route("POST", "/api/publications/{pid}/confirm", human_only=True)
     def publication_confirm(request, actor, b):
         return ws.confirm_publication(actor, request.path_params["pid"], display_name=b.get("display_name"),
-                                      visibility=b.get("visibility"))
+                                      visibility=b.get("visibility"), reviewer=b.get("reviewer") or None)
 
     @route("POST", "/api/publications/{pid}/decline", human_only=True)
     def publication_decline(request, actor, b):

@@ -1193,6 +1193,9 @@ def main(argv=None) -> int:
     ap.add_argument("--no-phys", action="store_true", help="skip the electrode DRC (information only)")
     ap.add_argument("--no-claims", action="store_true", help="skip the advisory R9 check of the programme's claims")
     ap.add_argument("--no-recool", action="store_true", help="do not try re-cooling when a heat rule fails")
+    ap.add_argument("--no-grade", action="store_true",
+                    help="with --bundle and --report: take the report as the bundle's grade instead of grading it "
+                         "again (the official server reviewing what it graded)")
     ap.add_argument("--cases-limit", type=int, default=20000,
                     help="count each rule's cases only for programmes up to this many instructions")
     ap.add_argument("--floorplan", help="a floorplan of gadgets (*.floor): the floorplan rules F1-F9")
@@ -1308,8 +1311,9 @@ def main(argv=None) -> int:
             notes.append("no certified programme (--certified, the compiler's own output) was given, so the four "
                          "files a bundle needs are not all here: the grading stages were not run")
 
-        # the grade: a bundle is graded here; a report given is kept as given
-        if bundle is not None:
+        # the grade: a bundle is graded here; a report given is kept as given (and with --no-grade
+        # it is the only grade: the official server's own, which reviews the bundle it graded)
+        if bundle is not None and not (a.no_grade and report is not None):
             res["grades"]["local"] = _grade_view(grade_bundle(release, bdir, a.profile, a.grade_timeout),
                                                  "graded here with the reference evaluator")
         if report is not None:
@@ -1436,6 +1440,8 @@ def main(argv=None) -> int:
             v = getattr(a, k)
             if v:
                 cmd.append(f"  --{k} {json.dumps(v) if ' ' in v else v}")
+        if a.no_grade:
+            cmd.append("  --no-grade")
         res["reproduce"] = [" \\\n".join(cmd)]
         res["seconds"] = round(time.time() - t0, 1)
         md = render(res)

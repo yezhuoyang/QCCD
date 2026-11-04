@@ -346,6 +346,16 @@ def main(argv=None) -> int:
     p = sub.add_parser("page")
     p.add_argument("job_dir")
     p.add_argument("--releases", default=rel_default)
+    p = sub.add_parser("reviewer", help="run the agent reviews (review.py): the rule check and decision, then the "
+                                        "agent, for each graded submission someone asked to have reviewed")
+    p.add_argument("--db", default=os.environ.get("QCCD_OFFICIAL_DB", "sqlite:///official/official.db"))
+    p.add_argument("--artifacts", default=os.environ.get("QCCD_OFFICIAL_ARTIFACTS", "official/artifacts"))
+    p.add_argument("--releases", default=rel_default)
+    p.add_argument("--work", default=os.environ.get("QCCD_REVIEW_WORK", "official/reviews"),
+                   help="where each review's job folder is made (outside any repository: the agent's project)")
+    p.add_argument("--python", default=os.environ.get("QCCD_REVIEW_PYTHON", sys.executable),
+                   help="the Python the rule check runs with")
+    p.add_argument("--once", action="store_true")
     p = sub.add_parser("redraw", help="draw every graded entry's page again from its archive (a new template); "
                                       "no grade, no report changes")
     p.add_argument("--db", default=os.environ.get("QCCD_OFFICIAL_DB", "sqlite:///official/official.db"))
@@ -367,6 +377,12 @@ def main(argv=None) -> int:
         return draw_page(Path(a.job_dir), Path(a.releases))
     if a.cmd == "grader":
         run_grader(Path(a.spool), Path(a.releases))
+        return 0
+    if a.cmd == "reviewer":
+        from .review import run_reviewer
+        from .service import OfficialService
+        svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(_suites_default()))
+        run_reviewer(svc, Path(a.work), python=a.python, once=a.once)
         return 0
     from .service import OfficialService
     svc = OfficialService(a.db, Path(a.releases), Path(a.artifacts), suites_dir=Path(_suites_default()))

@@ -53,9 +53,9 @@ SUITES_DEFAULT = str(Path(__file__).resolve().parents[1] / "bench" / "suites")
 
 try:  # the HTTP layer is optional; the service class works without it (worker, tests)
     from fastapi import FastAPI, Request
-    from fastapi.responses import FileResponse, JSONResponse, Response
+    from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 except ImportError:  # pragma: no cover
-    FastAPI = Request = JSONResponse = FileResponse = Response = None
+    FastAPI = Request = JSONResponse = FileResponse = HTMLResponse = Response = None
 
 __all__ = ["OfficialService", "OfficialError", "create_app"]
 
@@ -136,19 +136,27 @@ class OfficialService:
         if dev and dev_token and secrets.compare_digest(token, dev_token):
             if client_host not in ("127.0.0.1", "::1", "localhost"):
                 raise OfficialError("unauthorized", "the development token is accepted only from loopback", 401)
-            row = self.db.one("SELECT * FROM uploaders WHERE name='development'")
-            if row is None:
-                self.db.execute("INSERT INTO uploaders(id, name, token_sha256, quota_per_day, created_at) "
-                                "VALUES(?,?,?,?,?)", ("u_dev", "development",
-                                                      hashlib.sha256(dev_token.encode()).hexdigest(), 1000, _now()))
-                row = self.db.one("SELECT * FROM uploaders WHERE name='development'")
-            return row
+            return self.dev_uploader()
         row = self.db.one("SELECT * FROM uploaders WHERE token_sha256=? AND disabled=0",
                           (hashlib.sha256(token.encode()).hexdigest(),))
         if row is None:
             raise OfficialError("unauthorized", "unknown or disabled upload token (signed out, or revoked on the "
                                 "site): sign in again", 401)
         self.db.execute("UPDATE uploaders SET last_used_at=? WHERE id=?", (_now(), row["id"]))
+        return row
+
+    def dev_uploader(self) -> dict:
+        """The development deployment's one uploader (the loopback-only token's, and the local
+        review console's).  Refused outside QCCD_OFFICIAL_DEV=1."""
+        if os.environ.get("QCCD_OFFICIAL_DEV") != "1":
+            raise OfficialError("unauthorized", "not a development server", 401)
+        row = self.db.one("SELECT * FROM uploaders WHERE name='development'")
+        if row is None:
+            seed = os.environ.get("QCCD_OFFICIAL_DEV_TOKEN") or secrets.token_urlsafe(32)
+            self.db.execute("INSERT INTO uploaders(id, name, token_sha256, quota_per_day, created_at) "
+                            "VALUES(?,?,?,?,?)", ("u_dev", "development",
+                                                  hashlib.sha256(seed.encode()).hexdigest(), 1000, _now()))
+            row = self.db.one("SELECT * FROM uploaders WHERE name='development'")
         return row
 
     # ------------------------------------------------------------------ signing in with a site account
@@ -311,7 +319,20 @@ class OfficialService:
     # ------------------------------------------------------------------ submissions
 
     def submit(self, uploader: dict, archive: bytes, *, task: str, visibility: str = "public",
-               display_name: str = "") -> dict:
+               display_name: str = "", reviewer: str | None = None) -> dict:
+        """Store and queue a submission; with `reviewer`, also ask for an agent review of it once
+        graded (`request_review`)."""
+        out = self._submit(uploader, archive, task=task, visibility=visibility, display_name=display_name)
+        if reviewer:
+            # the upload stands whatever becomes of the review: one this server cannot run is said
+            # beside it, never in its place
+            try:
+                out["review"] = self.request_review(out["submission_id"], uploader, reviewer)
+            except OfficialError as e:
+                out["review_error"] = {"code": e.code, "message": str(e)}
+        return out
+
+    def _submit(self, uploader: dict, archive: bytes, *, task: str, visibility: str, display_name: str) -> dict:
         if visibility not in ("public", "unlisted", "private"):
             raise OfficialError("bad_request", "visibility must be public, unlisted or private", 422)
         if len(archive) > MAX_ARCHIVE:
@@ -356,6 +377,17 @@ class OfficialService:
             db.execute("INSERT INTO jobs(id, submission, status, attempts, created_at) VALUES(?,?, 'queued', 0, ?)",
                        ("oj_" + secrets.token_hex(8), sid, _now()))
         return self._public(self.db.one("SELECT * FROM submissions WHERE id=?", (sid,)))
+
+    def task_of_archive(self, archive: bytes) -> str:
+        """The task release a design bundle archive names (its manifest), checked as an upload is."""
+        if len(archive) > MAX_ARCHIVE:
+            raise OfficialError("too_large", "the archive is larger than 64 MB", 413)
+        with tempfile.TemporaryDirectory() as td:
+            try:
+                b = extract_archive(archive, Path(td) / "bundle")
+            except BundleError as exc:
+                raise OfficialError(f"bundle_{exc.code}", str(exc), 422) from None
+        return str((b.manifest.get("task") or {}).get("id") or "")
 
     def _check_compiler(self, archive: bytes, suite, td: Path) -> str:
         """A compiler archive: safe to extract, a valid contract manifest, bound to THIS suite."""
@@ -403,7 +435,100 @@ class OfficialService:
         job = self.db.one("SELECT status, attempts, error FROM jobs WHERE submission=? ORDER BY created_at DESC LIMIT 1",
                           (sid,))
         out["job"] = job
+        rv = self.db.one("SELECT * FROM reviews WHERE submission=? ORDER BY created_at DESC LIMIT 1", (sid,))
+        if rv:
+            out["review"] = {k: rv[k] for k in ("id", "reviewer", "model", "status", "decision")}
+            out["review"]["page"] = f"/review/{sid}"
         return out
+
+    # ------------------------------------------------------------------ agent reviews (review.py)
+
+    def reviewers(self) -> dict:
+        from .review import local_logins_allowed, reviewer_statuses, reviews_enabled
+        return {"enabled": reviews_enabled(), "local_logins": local_logins_allowed(), "reviewers": reviewer_statuses()}
+
+    def request_review(self, sid: str, uploader: dict, reviewer: str) -> dict:
+        """Ask for an agent review of one's own submission.  It runs once the submission is graded;
+        an active review by the same reviewer is returned instead of a second one."""
+        from .review import NO_AGENT, REVIEWERS, reviewer_status, reviews_enabled
+        if not reviews_enabled():
+            raise OfficialError("reviews_off", "agent reviews are off on this server", 404)
+        if reviewer not in REVIEWERS and reviewer != NO_AGENT:
+            raise OfficialError("bad_request", f"reviewer must be one of {', '.join([*REVIEWERS, NO_AGENT])}", 422)
+        row = self.db.one("SELECT * FROM submissions WHERE id=?", (sid,))
+        if row is None or not self._owns(uploader, row):
+            raise OfficialError("not_found", "no such submission of yours", 404)
+        if self.is_suite(row["task"]):
+            raise OfficialError("bad_request", "a compiler is graded on its suite; reviews are for designs", 422)
+        st = reviewer_status(reviewer) if reviewer != NO_AGENT else {"available": True, "model": None}
+        if not st["available"]:
+            raise OfficialError("reviewer_unavailable", f"{st['title']} cannot review here: {st['why']}", 409)
+        active = self.db.one("SELECT * FROM reviews WHERE submission=? AND reviewer=? AND status IN "
+                             "('queued', 'checking', 'reviewing') ORDER BY created_at DESC LIMIT 1", (sid, reviewer))
+        if active:
+            return self._review_public(active)
+        rid = "rv_" + secrets.token_hex(8)
+        self.db.execute("INSERT INTO reviews(id, submission, reviewer, model, status, attempts, created_at) "
+                        "VALUES(?,?,?,?, 'queued', 0, ?)", (rid, sid, reviewer, st.get("model"), _now()))
+        return self._review_public(self.db.one("SELECT * FROM reviews WHERE id=?", (rid,)))
+
+    @staticmethod
+    def _review_public(rv: dict, *, full: bool = False) -> dict:
+        from .review import DECISION_WORDS, REVIEWERS
+
+        def js(v, default):
+            try:
+                return json.loads(v) if v else default
+            except ValueError:
+                return default
+        why = js(rv.get("reasons"), {})
+        why = why if isinstance(why, dict) else {"reasons": why}
+        out = {"review_id": rv["id"], "submission_id": rv["submission"], "reviewer": rv["reviewer"],
+               "reviewer_title": (REVIEWERS.get(rv["reviewer"]) or {}).get("title", "No agent"),
+               "model": rv.get("model"), "status": rv["status"], "decision": rv.get("decision"),
+               "decision_words": DECISION_WORDS.get(rv.get("decision") or "", None),
+               "reasons": list(why.get("reasons") or []), "not_run": list(why.get("not_run") or []),
+               "error": rv.get("error"),
+               "created_at": rv["created_at"], "started_at": rv.get("started_at"), "finished_at": rv.get("finished_at"),
+               "usage": js(rv.get("usage"), {}), "progress": js(rv.get("progress"), [])}
+        if full:
+            out.update(review_md=rv.get("review_md"), rule_check=js(rv.get("rule_check"), None),
+                       rule_check_md=rv.get("rule_check_md"))
+        return out
+
+    def review(self, sid: str, uploader: dict | None, review_id: str | None = None, *, full: bool = True) -> dict:
+        """A submission's review (the latest, or `review_id`), for whoever may see the submission,
+        with every review of it listed."""
+        sub = self.submission(sid, uploader)
+        rows = self.db.all("SELECT * FROM reviews WHERE submission=? ORDER BY created_at DESC", (sid,))
+        if not rows:
+            raise OfficialError("not_found", "this submission has no review", 404)
+        pick = next((r for r in rows if r["id"] == review_id), None) if review_id else rows[0]
+        if pick is None:
+            raise OfficialError("not_found", "no such review of this submission", 404)
+        out = self._review_public(pick, full=full)
+        from .review import REVIEW_FILES
+        keep = self.artifacts / "reviews" / pick["id"]
+        out["files"] = [{"name": n, "about": about, "url": f"/v1/submissions/{sid}/review/files/{n}?id={pick['id']}"}
+                        for n, about in REVIEW_FILES.items() if (keep / n).is_file()]
+        out["submission"] = {k: sub.get(k) for k in ("submission_id", "task", "status", "display_name", "by",
+                                                       "created_at", "report", "job")}
+        rel = self.releases.get(sub["task"])
+        out["board_title"] = rel.title if rel is not None else sub["task"]
+        out["reviews"] = [{"review_id": r["id"], "reviewer": r["reviewer"], "status": r["status"],
+                           "decision": r.get("decision"), "created_at": r["created_at"]} for r in rows]
+        return out
+
+    def review_file(self, sid: str, uploader: dict | None, review_id: str | None, name: str) -> bytes:
+        """A file a review kept for the person (REVIEW_FILES), for whoever may see the review."""
+        from .review import REVIEW_FILES
+        if name not in REVIEW_FILES:
+            raise OfficialError("not_found", "no such file", 404)
+        rid = self.review(sid, uploader, review_id, full=False)["review_id"]
+        p = self.artifacts / "reviews" / rid / name
+        if not p.is_file():
+            raise OfficialError("not_found", "this review kept no such file", 404)
+        return p.read_bytes()
 
     def report(self, sid: str, uploader: dict | None) -> dict:
         self.submission(sid, uploader)
@@ -857,8 +982,108 @@ def create_app(svc: OfficialService):
             # name from an older client decodes to itself
             name = urllib.parse.unquote(request.headers.get("x-qccd-display-name", ""), errors="replace")
             out = svc.submit(up, data, task=request.headers.get("x-qccd-task", ""),
-                             visibility=request.headers.get("x-qccd-visibility", "public"), display_name=name)
+                             visibility=request.headers.get("x-qccd-visibility", "public"), display_name=name,
+                             reviewer=request.headers.get("x-qccd-reviewer") or None)
             return JSONResponse(out, status_code=200 if out.get("duplicate") else 202)
+        except OfficialError as e:
+            return err(e)
+
+    # ---- agent reviews (review.py): who can review, ask for one, read it
+    @app.get("/v1/reviewers")
+    async def reviewers():
+        return svc.reviewers()
+
+    @app.post("/v1/submissions/{sid}/review")
+    async def review_request(sid: str, request: Request):
+        try:
+            up = who(request, True)
+            return JSONResponse(svc.request_review(sid, up, str((await small_json(request)).get("reviewer") or "")),
+                                status_code=202)
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/submissions/{sid}/review")
+    async def review_read(sid: str, request: Request):
+        try:
+            # the review page polls this from the browser: with no token, the console's person on a
+            # development server (loopback), else whoever may see the submission
+            return svc.review(sid, who(request, False) or console_user(request), request.query_params.get("id") or None,
+                              full=request.query_params.get("brief") != "1")
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/v1/submissions/{sid}/review/files/{name}")
+    async def review_file(sid: str, name: str, request: Request):
+        try:
+            data = svc.review_file(sid, who(request, False) or console_user(request), request.query_params.get("id"), name)
+            return Response(data, media_type="application/json",
+                            headers={"Content-Disposition": f'attachment; filename="{sid}-{name}"', **DOWNLOAD_HEADERS})
+        except OfficialError as e:
+            return err(e)
+
+    @app.get("/review/{sid}")
+    async def review_html(sid: str, request: Request):
+        from .review_pages import page_headers, review_page
+        nonce = secrets.token_urlsafe(16)
+        try:
+            data = svc.review(sid, console_user(request), request.query_params.get("id") or None)
+        except OfficialError as e:
+            return err(e)
+        return HTMLResponse(review_page(data, nonce), headers=page_headers(nonce))
+
+    # ---- the local review console: a development server's page for submitting a design for review,
+    # as the person on this computer (the development uploader).  Loopback only, and only from its
+    # own page: a custom header no other site's page can send without this server's consent (CORS).
+    def console_user(request: Request) -> dict | None:
+        # loopback both ways: the request comes from this computer, and names it (a page that
+        # rebinds its own domain to 127.0.0.1 still sends its own name in Host)
+        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]")
+        if os.environ.get("QCCD_OFFICIAL_DEV") != "1" or not request.client or \
+                request.client.host not in ("127.0.0.1", "::1", "localhost") or \
+                host not in ("127.0.0.1", "::1", "localhost"):
+            return None
+        return svc.dev_uploader()
+
+    def console_post(request: Request) -> dict:
+        up = console_user(request)
+        origin = request.headers.get("origin")
+        if up is None or request.headers.get("x-qccd-console") != "1" or \
+                (origin is not None and origin != f"{request.url.scheme}://{request.headers.get('host', '')}"):
+            raise OfficialError("forbidden", "the review console takes requests from its own page on this computer", 403)
+        return up
+
+    @app.get("/review")
+    async def review_console(request: Request):
+        from .review_pages import EXAMPLES, console_page, page_headers
+        up = console_user(request)
+        if up is None:
+            return err(OfficialError("not_found", "the review console is a development server's page", 404))
+        nonce = secrets.token_urlsafe(16)
+        recent = [s for s in svc.my_submissions(up)["submissions"] if not svc.is_suite(s["task"])][:12]
+        page = console_page(boards=svc.tasks(), reviewers=svc.reviewers(), examples=EXAMPLES, recent=recent,
+                            dev=True, nonce=nonce)
+        return HTMLResponse(page, headers=page_headers(nonce))
+
+    @app.post("/review/submit")
+    async def review_console_submit(request: Request):
+        from .review_pages import EXAMPLES, example_archive
+        try:
+            up = console_post(request)
+            rv = request.headers.get("x-qccd-reviewer") or ""
+            if request.headers.get("content-type", "").startswith("application/json"):
+                name = str((await small_json(request)).get("example") or "")
+                if name not in EXAMPLES:
+                    raise OfficialError("bad_request", f"example must be one of {', '.join(EXAMPLES)}", 422)
+                task, archive = example_archive(name)
+                display = EXAMPLES[name]["title"]
+            else:
+                cl = request.headers.get("content-length")
+                if cl and cl.isdigit() and int(cl) > MAX_ARCHIVE:
+                    raise OfficialError("too_large", "the archive is larger than 64 MB", 413)
+                archive = await request.body()
+                task, display = svc.task_of_archive(archive), ""
+            out = svc.submit(up, archive, task=task, visibility="private", display_name=display, reviewer=rv or None)
+            return JSONResponse({**out, "page": f"/review/{out['submission_id']}"}, status_code=202)
         except OfficialError as e:
             return err(e)
 

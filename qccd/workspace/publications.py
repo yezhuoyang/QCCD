@@ -105,16 +105,19 @@ class PublicationsMixin:
     def request_publication(self, actor: Mapping, *, board: str | None, design: str | None = None,
                             submission_id: str | None = None, display_name: str | None = None,
                             visibility: str = "public", origin_prompt_id: str | None = None,
-                            rules=None) -> dict:
+                            rules=None, reviewer: str | None = None) -> dict:
         """Ask to put a design on the official leaderboard.  From a PERSON (the Studio's Submit button,
         `qccd publish`) this is the approval and it uploads now; from an AGENT it waits for the person,
         after testing the design first when it has no current passing grade on that board.  `rules`:
         the rule set it is entered under ("board", a shipped set, a .rules file); left out, whichever
-        its newest current test used."""
+        its newest current test used.  `reviewer` ("claude", "codex"): the agent the server asks to
+        review it once graded (qccd/official/review.py); the review explains, the grade decides."""
         from .core import WorkspaceError, new_id
         if visibility not in ("public", "private"):
             raise WorkspaceError("bad_request", "visibility must be public (on the leaderboard, with your name) "
                                  "or private (only you see it)", status=422)
+        if reviewer is not None and reviewer not in ("claude", "codex"):
+            raise WorkspaceError("bad_request", "reviewer must be claude or codex (or none)", status=422)
         human = actor.get("kind") == "human"
         chosen = False
         if submission_id:
@@ -146,7 +149,7 @@ class PublicationsMixin:
                 out = self.publication(prior["id"])
                 if human and out["state"] == "awaiting_person":
                     return self.confirm_publication(actor, prior["id"], display_name=display_name,
-                                                    visibility=visibility)
+                                                    visibility=visibility, reviewer=reviewer)
                 return {**out, "duplicate": True}
         state, sub_id, job = None, None, None
         status = s["status"] if s is not None else None
@@ -174,11 +177,11 @@ class PublicationsMixin:
         now = _now()
         with self.store.tx() as db:
             db.execute("INSERT INTO publications(id, branch, board, submission_id, submit_job, display_name, visibility, "
-                       "state, requested_by, approved_by, server, origin_prompt_id, created_at, updated_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       "state, requested_by, approved_by, server, origin_prompt_id, created_at, updated_at, reviewer) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                        (pid, branch, rel.id, sub_id, (job or {}).get("job_id"), name, visibility, state,
                         dumps(dict(actor)), dumps(dict(actor)) if human else None, self._accounts().server,
-                        origin_prompt_id, now, now))
+                        origin_prompt_id, now, now, reviewer))
             self._emit(db, "publication.updated", {"publication_id": pid, "state": state, "board": rel.id}, branch)
             prompt = origin_prompt_id or (self._working_prompt(db, actor) if not human else None)
             if prompt:
@@ -200,8 +203,8 @@ class PublicationsMixin:
         return out
 
     def confirm_publication(self, actor: Mapping, pid: str, *, display_name: str | None = None,
-                            visibility: str | None = None) -> dict:
-        """The person's Submit on a request an agent made."""
+                            visibility: str | None = None, reviewer: str | None = None) -> dict:
+        """The person's Submit on a request an agent made (with the reviewer they pick, if any)."""
         from .core import WorkspaceError
         if actor.get("kind") != "human":
             raise WorkspaceError("forbidden", "only the person submits to the official leaderboard", status=403)
@@ -218,6 +221,8 @@ class PublicationsMixin:
             fields["display_name"] = " ".join(str(display_name).split())[:80]
         if visibility in ("public", "private"):
             fields["visibility"] = visibility
+        if reviewer in ("claude", "codex"):
+            fields["reviewer"] = reviewer
         self._pub_set(pid, **fields)
         self._start_upload(pid)
         return self.publication(pid)
@@ -294,6 +299,8 @@ class PublicationsMixin:
                 if meta.get("display_name"):
                     # a header carries latin-1 only: the name goes percent-encoded, and the server decodes it
                     h["X-QCCD-Display-Name"] = urllib.parse.quote(meta["display_name"], safe=" ")
+                if p.get("reviewer"):
+                    h["X-QCCD-Reviewer"] = p["reviewer"]
                 return official_call("POST", "/v1/submissions", raw=archive, token=cred["token"],
                                      server=p["server"], headers=h, timeout=180)
             res = self.publish(appr["approval_id"], uploader)["server"]
@@ -322,7 +329,10 @@ class PublicationsMixin:
         # while the server grades, every few seconds; once it has a verdict, a minute (others' entries
         # can still move its place)
         age = _now() - o.get("fetched_at", 0)
-        if not force and age < (60 if o.get("status") in ("eligible", "ineligible") else _REFRESH_S):
+        # an agent review still running (qccd/official/review.py) keeps the reads frequent too
+        settled = o.get("status") in ("eligible", "ineligible") and \
+            (o.get("review") or {}).get("status") in (None, "done", "failed")
+        if not force and age < (60 if settled else _REFRESH_S):
             return p
         if force:
             return self._fetch_official(p)
@@ -355,6 +365,11 @@ class PublicationsMixin:
             o["metrics"] = rep.get("metrics")
             o["reasons"] = ((rep.get("eligibility") or {}).get("reasons") or [])[:3]
             o["job"] = s.get("job")
+            # the agent review the server runs once it has graded it, and where to read it
+            rvw = s.get("review") or None
+            if rvw:
+                o["review"] = {**{k: rvw.get(k) for k in ("id", "reviewer", "model", "status", "decision")},
+                               "page": f"{p['server']}{rvw.get('page') or ''}" if rvw.get("page") else None}
             # an entry that keeps the board's rules is ranked among those; one under rules of its own is
             # listed with every entry, behind the board's filter (`conformance`)
             o["conforms"] = (rep.get("conformance") or {}).get("board", True)
@@ -422,6 +437,11 @@ class PublicationsMixin:
                    "on_server": b["id"] in on_server} for b in self.boards()]
         out: dict = {"boards": boards, "account": self.account(verify=True), "server": self._accounts().server,
                      "server_error": (tasks.get("error") or {}).get("message")}
+        # the agents the server can ask to review a submission (an older server has none)
+        rv = self._official_cached("/v1/reviewers", ttl=20.0).get("ok") or {}
+        out["reviewers"] = {"enabled": bool(rv.get("enabled")),
+                            "reviewers": [{k: r.get(k) for k in ("id", "title", "model", "cli", "available", "why", "signin")}
+                                          for r in rv.get("reviewers") or []]}
         if rel is None:
             return out
         m = rel.manifest
@@ -512,9 +532,11 @@ class PublicationsMixin:
                 out["rules"] = self.submission(p["submission_id"]).get("rules")
             except Exception:
                 out["rules"] = None
+        out["reviewer"] = p.get("reviewer")
         if p["state"] == "uploaded":
             out["official"] = {k: o.get(k) for k in ("submission_id", "status", "by", "eligible", "metrics", "reasons",
-                                                     "rank", "of", "rank_by", "rank_value", "unreachable", "conforms")}
+                                                     "rank", "of", "rank_by", "rank_value", "unreachable", "conforms",
+                                                     "review")}
             out["official"]["report_url"] = f"{p['server']}/v1/submissions/{p['official_id']}/report"
             try:
                 rel = self.board(p["board"])
