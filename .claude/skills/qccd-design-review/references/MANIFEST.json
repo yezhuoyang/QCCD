@@ -36,11 +36,12 @@
   "device_rule_sets": 12,
   "device_rules": 48,
   "machine_rules": 25,
+  "requirements": 5,
   "words": 197
  },
  "files": {
   "boards.md": "sha256:3fdf9a0e05d207009c7c03ea4c1cae01263f0c55c6fda18dc27c3298e012ea64",
-  "grader.md": "sha256:e7885635d0b8c8da2fcda43e2205dfed9370ff451268c97a0fc84c0098c9e1cf",
+  "grader.md": "sha256:1fe8ce735d5ba9a114fbd6550b4c8407364f3fe91a7e914c40e571c68d365527",
   "machine-rules.md": "sha256:ad2b3538690640f076bfb467690ee2fcd5c267d83854cea53a195a6b6a8f6b33",
   "rule-sets.md": "sha256:09b7e3e1cf554c55bd146f75a4b728e988e982fcfbdc6f1080498c053da2c929",
   "rules.md": "sha256:f126bffb6255085d2695a345323e2076ebe01706a7321fbd79948d8471aedb40",
@@ -76,7 +77,8 @@
   "qccd/workspace/web/rules.js",
   "qccd/gadget/judge.py",
   "qccd/gadget/place_checks.py",
-  "goals/goal3/families.py"
+  "goals/goal3/families.py",
+  "qccd/evalset/library/*.eval"
  ],
  "version": 1
 }

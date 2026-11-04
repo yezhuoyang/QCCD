@@ -66,6 +66,10 @@ def test_every_rule_set_and_board_is_in_the_references(generated):
             assert f"### {r.id}: " in machine_md, r.id
     for b in list_boards():
         assert f"`{b.id}`" in boards_md, b.id
+    import qccd.evalset as evalset
+    for n in evalset.names():
+        for r in evalset.load(n).requirements:
+            assert f"| {r.id} | " in generated["grader.md"], (n, r.id)
 
 
 def test_the_guide_says_what_every_rule_of_every_set_means():
@@ -156,6 +160,18 @@ def test_a_device_review_finds_a_sharp_corner(tmp_path):
     assert res["fit"]["circuit_qubits"] == 13 and res["fit"]["spare_slots"] == 1
 
 
+def test_goal_1_counts_the_ions_a_programme_places():
+    """goal1.eval's G2 lists a memory board's entries up to 200 ions; a board of no goal-1 memory
+    experiment has no such limit."""
+    from types import SimpleNamespace
+    from qccd.workspace.tasks import find_release
+    goal_ions = _script("review").goal_ions
+    over = goal_ions(find_release("surface3xz_mem@1"), SimpleNamespace(ions=list(range(201))))
+    assert over == {"goal": "goal1", "programme_ions": 201, "max_ions": 200, "experiment_ions": 34}
+    assert goal_ions(find_release("ghz4@1"), SimpleNamespace(ions=[0, 1])) is None
+    assert goal_ions(find_release("goal3_surface3_mem@1"), SimpleNamespace(ions=[0])) is None
+
+
 def test_a_programme_review_judges_every_rule_of_the_board(tmp_path):
     from qccd.ruleset import load
     code, res, md = _run(tmp_path, "--device", str(COMPILED / "chain4.arch.json"),
@@ -171,6 +187,9 @@ def test_a_programme_review_judges_every_rule_of_the_board(tmp_path):
     assert rows["R16"]["review"] == "pass (vacuous)" and rows["R7b"]["review"] == "allowed skip"
     # a rule with nothing to judge says so: the Bell programme splits no chain
     assert rows["R14"]["review"] == "pass (nothing to check)" and rows["R14"]["cases"][0]["cases"] == 0
+    # a passing rule that compares with a limit gives its closest case: chains of 2 against max_chain 15
+    assert rows["R13"]["closest"]["bound"] == 15 and rows["R13"]["closest"]["slack"] == 13
+    assert any(n.startswith("closest case: ") for n in rows["R13"]["notes"])
     # a Bell certificate is not about the GHZ board's circuit
     assert res["certificate"] == {"certificate_qubits": 2, "board_qubits": 4, "matches": False, "certificate_ops": 4}
     assert "[R20](https://qccd.academy/rules/#R20)" in md
@@ -285,6 +304,8 @@ def test_a_floorplan_review_judges_every_floorplan_rule(tmp_path, gadget_cache):
     rows = {r["id"]: r for r in res["rules"]}
     assert code == 1 and rows["F3"]["review"] == "FAIL" and "F3" in res["verdict"]
     assert "[F3](https://qccd.academy/rules/#F3)" in md
+    # every counterexample the rule language kept: the move breaks F4 eight ways
+    assert rows["F4"]["review"] == "FAIL" and len(rows["F4"]["language"]["examples"]) == rows["F4"]["language"]["count"] == 8
 
 
 def test_an_algorithm_review_judges_every_machine_rule(tmp_path, gadget_cache):

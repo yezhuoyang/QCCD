@@ -110,6 +110,32 @@ A bundle may declare its own set (`rules.json`; Goal 3's families do, `boards.md
 - Rules of the entry's set that may go unchecked: R10, R7b, R9. Any other rule that could not be checked makes the stage `partial`, so the entry is not eligible.
 - A rule of the entry's set that only a paper's timed schedule can judge (`rules.md`, "Judged on") does not apply to a programme: it neither fails nor counts.
 
+## The evaluations' requirements (`qccd/evalset/library/*.eval`)
+
+An evaluation's `require` lines are checks beside the rules: the device stage judges a board's budget by `board`'s, and Goal 1 lists entries by `goal1`'s. Their ids are the evaluation's own: Goal 1's G1-G3 are not the machine rules G1-G3 (`machine-rules.md`).
+
+### `board`: A board's measure: the metrics, and the hardware a design may use
+
+- includes: `metrics`
+- param `max_dacs = budget("max_dacs", none)`
+- param `max_junctions = budget("max_junctions", none)`
+
+| Requirement | Title | Assertion | Meaning |
+|---|---|---|---|
+| B1 | The wiring fits the DAC budget | `max_dacs = none or dacs <= max_dacs` | The DACs the wiring needs, counted with the physics' floors, are at most the budget's. |
+| B2 | The device fits the junction budget | `max_junctions = none or n_junctions <= max_junctions` |  |
+
+### `goal1`: Goal 1: the best QEC memory under 200 ions
+
+- includes: `board`, `qccd-noise@2` (its B1, B2)
+- param `max_ions = 200`
+
+| Requirement | Title | Assertion | Meaning |
+|---|---|---|---|
+| G1 | Every rule of the standard rule set holds | `rules_hold()` | The programme is judged by the Rules page's standard set, rule by rule. |
+| G2 | No more than 200 ions | `n_ions <= max_ions` | The board's own filter: an entry over it is graded, and not listed. |
+| G3 | With its noise taken out, the circuit is the experiment | `noiseless_ok()` | Every detector and every logical observable has a fixed value, and it is 0: the value the experiment's own circuit gives it. |
+
 ## What the probe found
 
 - surface device: qccd.verify reports 28 rule ids (R1 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R2 R20 R21 R22 R23 R3 R4 R4b R4d R5 R6 R6b R7 R7b R7c R8 R9); skips R10, R7b, R9; partial R15; rule-language rules that need the circuit: R24, R25
