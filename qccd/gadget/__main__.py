@@ -232,8 +232,8 @@ def _cmd_site(a) -> int:
         # gadgets/ (an earlier deploy's titles and anchors) and carry the rest unchanged
         from .site import SECTION
         live = [row for row in live if not row["u"].startswith(f"{SECTION}/")]
-        idx = json.dumps(live + index_entries(), separators=(",", ":"), ensure_ascii=False)
-    res = standalone(Path(a.out), idx, cache_dir=a.cache, fullstack=a.fullstack)
+        idx = json.dumps(live + index_entries(rsa=bool(a.rsa)), separators=(",", ":"), ensure_ascii=False)
+    res = standalone(Path(a.out), idx, cache_dir=a.cache, fullstack=a.fullstack, rsa=a.rsa)
     # signed off flat, or compositionally where the flat check does not apply (shor15)
     ok_algs = all(r["stats"]["signed_off"] and not r["checks"]["failed"] and not r["rules"]["failed"]
                   for r in res["algorithms"].values())
@@ -331,6 +331,8 @@ def main(argv=None) -> int:
                     "live site's index.html), so search from these pages finds the whole site")
     st.add_argument("--fullstack", choices=("all", "small", "none"), default="all",
                     help="the full-stack runs to build: all, all but the big ones, or none")
+    st.add_argument("--rsa", help="the packed data of gadgets/rsa2048/ (qccd.gadget.rsa.pack); "
+                                  "without it there is no such page")
     common(st)
     a = ap.parse_args(argv)
     return {"build": _cmd_build, "parse": _cmd_parse, "library": _cmd_library,

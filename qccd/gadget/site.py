@@ -10,6 +10,7 @@ machine of places and roads, down to the hardware program and the ions.
     gadgets/algorithms/        Logical Algorithm: the town, and algorithms verified end to end
     gadgets/algorithms/<name>/ the design tool running one algorithm on the town
     gadgets/studio/            the full studio page for every op a build uses
+    gadgets/rsa2048/           RSA-2048 at d = 11: one prime on the patch lattice, played step by step
     gadgets/showcase/          beta at scale: 96 BB [[72,12,6]] blocks, 9,720 ions (hardware only)
     gadgets/demo/              beta: every realised LogicQ instruction, one refusal
     gadgets/plan/              docs/GADGETS.md, rendered like the site's other reference docs
@@ -104,8 +105,8 @@ def _algorithm_titles() -> list[tuple[str, str]]:
     return out
 
 
-def index_entries() -> list[dict]:
-    """What the site's search finds in this section."""
+def index_entries(rsa: bool = False) -> list[dict]:
+    """What the site's search finds in this section (`rsa`: with gadgets/rsa2048/)."""
     rows = [
         {"t": "The full stack: a program down to ions", "d": "FormalRV programs through "
          "Pauli-product measurements, QEC, gadgets and the hardware program to ions, every layer "
@@ -113,6 +114,9 @@ def index_entries() -> list[dict]:
     ]
     rows += [{"t": f"{r['title']} (full stack)", "d": r["about"], "u": f"{SECTION}/fullstack/{r['key']}/",
               "k": "gadgets"} for r in FULLSTACK]
+    if rsa:
+        from .rsa import index_entry
+        rows.append(index_entry())
     rows += [
         {"t": "Logical gadgets: verified places", "d": "syndrome extraction, preparation, "
          "readout, transversal CNOT, lattice surgery, magic-state factory and injection, each "
@@ -148,9 +152,10 @@ def index_entries() -> list[dict]:
 
 
 def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
-                  fullstack: str = "all") -> dict:
+                  fullstack: str = "all", rsa=None) -> dict:
     """Write `gadgets/` under the site directory `out` through the site's `put`.  `fullstack`:
-    "all" runs every program of FULLSTACK, "small" leaves out the big ones, "none" none."""
+    "all" runs every program of FULLSTACK, "small" leaves out the big ones, "none" none.  `rsa`:
+    the packed data of gadgets/rsa2048/ (`rsa.pack`), or None for no such page."""
     from ..site.build import HASH_JS, PAGE, STYLE
     from .floorplan import FLOORPLANS_DIR, load_file
     from .library import LeafLibrary
@@ -163,6 +168,11 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     # -- the full stack: FormalRV programs, every layer, on the machine ----------------------
     stack = _build_fullstack(base, put, leaves=leaves, studio=studio, cache_dir=cache_dir, log=log,
                              which=fullstack)
+    rsa_meta = None
+    if rsa:
+        from . import rsa as R
+        R.build(base, put, rsa)
+        rsa_meta = json.loads((Path(rsa) / "meta.json").read_text(encoding="utf-8"))
     machines = {name: load_file(FLOORPLANS_DIR / f"{name}.floor", leaves)[0]
                 for name in ("fullstack", "fullstack_wide")}
 
@@ -200,7 +210,7 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     town_lib = next(iter(algs.values()))["library"] if algs else None
     put(f"{SECTION}/index.html",
         PAGE.format(title="Gadgets: the full stack - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
-                    body=_landing(stack, machines, town_lib, algs, beta)), 1, SECTION)
+                    body=_landing(stack, machines, town_lib, algs, beta, rsa_meta)), 1, SECTION)
     put(f"{SECTION}/places/index.html",
         PAGE.format(title="Logical gadgets: the places - QCCD studio", style=STYLE, extra_css=EXTRA_CSS,
                     body=_places_page(town_lib, algs, beta, studio, more=machines.values())), 2, SECTION)
@@ -666,8 +676,9 @@ def _counts(lib) -> dict:
             "junctions": fam.get("road", 0), "roads": roads, "fam": fam}
 
 
-def _landing(runs: dict, machines: dict, town_lib, algs: dict, beta: dict) -> str:
-    """The section's front page: the full stack, its runs, its layers and its machine."""
+def _landing(runs: dict, machines: dict, town_lib, algs: dict, beta: dict, rsa=None) -> str:
+    """The section's front page: the full stack, its runs, its layers and its machine (and, with
+    `rsa` the meta of gadgets/rsa2048/, a line to it)."""
     from .svg import design_svg
 
     body = [
@@ -694,6 +705,12 @@ def _landing(runs: dict, machines: dict, town_lib, algs: dict, beta: dict) -> st
     else:
         body.append('<p class="muted">No run was built with this page: the FormalRV toolchain was '
                     "not available.</p>")
+    if rsa:
+        years = (rsa["primes"] * rsa["prime_s"] + (rsa.get("rest") or {}).get("s", 0)) / (365.25 * 86400)
+        body.append(
+            f'<p><b><a href="rsa2048/">At full size: factoring RSA-2048 at d = 11</a></b> &mdash; '
+            f'{years:.2f} years on {rsa["tiles"]:,} tiles; one prime scheduled and checked whole '
+            f'({len(rsa["steps"])} steps, {rsa["prime_s"] / 3600:.2f} h) and played step by step.</p>')
     body.append(
         "<p>Open a run. Its page is the design tool, playing the program on the machine, ion by "
         "ion. Pause anywhere and the <b>Stack</b> above the program names what is happening at "
@@ -893,7 +910,7 @@ def _algorithms_page(lib, algs: dict) -> str:
 
 
 def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadgets/cache",
-               log=print, fullstack: str = "all") -> dict:
+               log=print, fullstack: str = "all", rsa=None) -> dict:
     """Build only this section into `out/gadgets/`, wrapped exactly as the site wraps it.
 
     `index_json` is the search index every page carries; give the live site's (plus
@@ -902,7 +919,7 @@ def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadge
     from ..site.build import FOOTER, with_nav
 
     out = Path(out)
-    idx = index_json if index_json is not None else json.dumps(index_entries())
+    idx = index_json if index_json is not None else json.dumps(index_entries(rsa=bool(rsa)))
     idx = idx.replace("</", "<\\/")
 
     def put(rel: str, page: str, depth: int, active, app: bool = False, extra: str = "") -> None:
@@ -912,7 +929,7 @@ def standalone(out: Path, index_json: str | None = None, *, cache_dir="out/gadge
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
         p.write_text(page, encoding="utf-8", newline="")
 
-    return build_section(out, put, cache_dir=cache_dir, log=log, fullstack=fullstack)
+    return build_section(out, put, cache_dir=cache_dir, log=log, fullstack=fullstack, rsa=rsa)
 
 
 # -- figures ---------------------------------------------------------------------------------

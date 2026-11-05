@@ -147,8 +147,10 @@ class _Board:
         return self.ends[i]
 
 
-def _route(board, tiles, letter, a, b, own):
-    """(attachment side per patch, corridor tiles) for a product at [a, b), or None."""
+def _route(board, tiles, letter, a, b, own, limit=None):
+    """(attachment side per patch, corridor tiles) for a product at [a, b), or None.  `limit`:
+    no corridor branch longer than that many tiles (the search stops there -- it finds the same
+    corridor, sooner, whenever one that short exists)."""
     sides = LETTER_SIDES[letter]
     if len(tiles) == 2:
         for s in sides:
@@ -165,6 +167,7 @@ def _route(board, tiles, letter, a, b, own):
 
     def bfs(srcs, goal):
         prev = {s: None for s in srcs}
+        depth = dict.fromkeys(srcs, 1)
         dq = deque(srcs)
         while dq:
             u = dq.popleft()
@@ -173,10 +176,13 @@ def _route(board, tiles, letter, a, b, own):
                 while prev[path[-1]] is not None:
                     path.append(prev[path[-1]])
                 return path                       # from the goal back to a source
+            if limit is not None and depth[u] >= limit:
+                continue
             for s in SIDES:
                 v = _nb(u, s)
                 if v not in prev and ok(v):
                     prev[v] = u
+                    depth[v] = depth[u] + 1
                     dq.append(v)
         return None
     o0, o1 = opts(tiles[0]), opts(tiles[1])
@@ -248,7 +254,7 @@ class _Pending:
 
 
 def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(), reserved=(),
-             start=None, macro=None, pinned=None, max_corridor=None, late=False) -> list:
+             start=None, macro=None, pinned=None, max_corridor=None, late=False, known=()) -> list:
     """Every gadget of `stream` -- (word, args, outcome, guard) per instruction, as
     `program._Exp` writes them -- on the lattice: `homes` block -> tile for the blocks that live
     there, `bounds` (x0, y0, x1, y1) the tiles that exist, `walls` tiles no gadget may use;
@@ -259,7 +265,8 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
     round is a new program, and a long one cannot be checked).  `late`: a fresh ancilla (not
     pinned) is made no sooner than its first product's partners are free -- made at once, it
     would hold its tile from the start, and on a lattice already worked on only a tile never
-    used is free that long.
+    used is free that long.  `known`: outcomes decoded before the stream starts (measured by
+    an earlier part of the run, scheduled before it).
 
     `macro`: what a `macro` line stands for -- `macro(k, args, free_at, board)` returns (its
     gadgets, the number of lines after it they carry out, block -> tile, block -> when free,
@@ -271,7 +278,7 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
         board.take(tile, a, b, "reserved")
     where = dict(homes)
     free_at: dict = defaultdict(float, start or {})
-    ready: dict = {}
+    ready: dict = dict.fromkeys(known, 0.0)
     out: list = []
     uses = defaultdict(list)
     for k, (w, a, _, _) in enumerate(stream):
@@ -430,7 +437,7 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
                 raise LatticeError(f"line {k}: a mixed product, {' '.join(a)}: rewrite it first")
             tiles = [where[b] for b in blks]
             def route(t):
-                r = _route(board, tiles, letters[0], t, t + costs.merge_us, set(blks))
+                r = _route(board, tiles, letters[0], t, t + costs.merge_us, set(blks), max_corridor)
                 return None if r is None or max_corridor is not None and len(r[1]) > max_corridor else r
             r = route(t)
             while r is None:
@@ -454,10 +461,10 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
     return out
 
 
-def check(stream, gadgets, costs: Costs = Costs()) -> list:
+def check(stream, gadgets, costs: Costs = Costs(), known=()) -> list:
     """What is wrong with a schedule: two gadgets on one tile at once, a block's instructions out
     of program order, a guard read before its outcome is decoded (an outcome measured on a block
-    with a frame pending decoded no sooner than that frame's guard)."""
+    with a frame pending decoded no sooner than that frame's guard).  `known` as `schedule`'s."""
     bad = []
     by = defaultdict(list)
     for gd in gadgets:
@@ -471,7 +478,7 @@ def check(stream, gadgets, costs: Costs = Costs()) -> list:
         bad += [f"tile {tile}: line {ln} while {blk} lives there" for s, e, ln, bs in by[tile]
                 if blk not in bs and s < b - 1e-6 and e > a + 1e-6]
     last: dict = {}
-    made: dict = {}
+    made: dict = dict.fromkeys(known, 0.0)
     pend = _Pending()
     cls = [(k, w, a, o, g) for k, (w, a, o, g) in enumerate(stream) if w in ("bit", "x", "y", "z")]
     nb = 0

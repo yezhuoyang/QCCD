@@ -1376,6 +1376,80 @@ call, loop and slot; P = 1 minus P = 0, as multisets; 20 s):
   the release 22 s (addr5's 31 CZs one after another).
 - **Next:** the release -- its CZs queue on one addr block's two tiles; then powerProduct.
 
+**One prime, whole, and the program (2026-11-04; user: "Finish all of them. And I want a clear
+conclusion: how long does it take to use d = 11 to factor RSA-2048 on a QCCD device").**
+- **The prime as steps.** `gOnePrime` is gLoop1 (214 iterations), gLoop2 (11 steps), gLoop3 (a
+  lookup, then 5 x 7 steps), gLoop4 (5), gUnloop3 (5 rounds of 2 x 7 steps) and gUnloop2 (11):
+  358 steps, 1,770,257 merges, 37,289 CCZ states (the census exactly; 35 X̄ frames fewer, guarded
+  by the one source slot nothing writes, read as 0 as `concrete.Writer` reads it). Every step is
+  the same few operations: loads into addr, powerProduct, a lookup's write from pp into one
+  register's every third block, adders on dlog, help or acc (their bit triples), readouts and
+  phase fix-ups, powerProduct's release, small 8 x 8 lookups, swaps between help and res.
+- **One floorplan for all of it (`tools/lattice_prime.py`).** Three farms of narrow factories
+  side by side, one per register an adder works on -- dlog 31, help 22, acc 34 -- each register's
+  triples beneath its farm as the 32-bit adder's are (so the adders keep the checked shapes),
+  res in a second band under help; the crossbar, pp, addr and the exponent as in
+  `lattice_loop1.py`; powerProduct's farm of 29 at the left. **111,930 tiles** (bus included:
+  every tile is full of ions -- at d = 11, 2(d+1)^2 = 288 ions a tile, **32.2 million ions**),
+  116 factories.
+- **How each operation is laid down.** A write: its target blocks on the seats -- made there when
+  their last reset waits for this use (a reset is made where its block is next used), else
+  carried -- the CNOTs at crossings, relay chains. An adder: factory i for bit i, its CZs by
+  pairs made ahead; an ancilla whose partners sit more than a corridor apart (a conditional add's
+  control bit) brought beside each in turn (`bring(only=)`). Everything else brought. A
+  measure-and-reset on one patch (`ppm Z q -> m; if m: x q`) is a readout and a reset; a lone
+  one-patch measurement is a merge with a fresh patch in its basis -- both proved
+  (`equal_drop`, the outcome kept). The small lookups' 64 guarded CZs by pairs too
+  (`--pair-lookups`: gLoop4's step 155.88 -> 142.87 s).
+- **Steps end to end, concrete.** Each step is scheduled from the board at rest (every block
+  home, every earlier outcome decoded: `schedule(known=)`) and checked (`lattice.check`); the
+  next begins when its last gadget ends and that outcome is decoded. A prime begins with the
+  resets the prime before left waiting (every prime is the same). The corridor search now stops
+  at the corridor cap (same corridors, 23x faster on the big board).
+- **One prime: 31,424.87 s = 8.73 h, concrete** -- all 358 steps scheduled, every check clean:
+
+  | part | steps | time |
+  |---|---|---|
+  | gLoop1 | 214 | 13,916.47 s (65.03 s each but one, 64.75) |
+  | gLoop2 | 11 | 538.52 s |
+  | gLoop3 | 1 + 35 + 5 + 1 | 2,132.17 s (a step 59.43 s) |
+  | gLoop4 | 5 | 714.36 s (142.87 s each) |
+  | gUnloop3 | 70 + 5 + 1 | 13,588.97 s (a step 193.26 s) |
+  | gUnloop2 | 11 | 534.38 s |
+
+- **The 21,640 primes: 21,640 x 31,424.87 s = 680.03 million s = 21.55 years** -- exact, not an
+  estimate: every prime is the same schedule (a data decision reserves its places either way),
+  run back to back.
+- **Everything else, once (`--rest`): 68,679.43 s = 19.08 h, concrete** -- 1,708 steps from every
+  block reset, every check clean: the H̄ on the exponent and scatterBand 0.69 s; the tail after
+  the primes, gLoop1 again (214 x 65.03 s = 13,916.47 s) and its small lookups (214 x 54.0 s =
+  11,554.87 s); the phase gradient's H̄ 0.69 s; the two QFT measurements, 1,278 steps of an add
+  and its guarded CNOTs (33.55 s each, 42,877 s). Left out: gGradientPrep's 32 rotations
+  exp(iπZ/2^k), k = 1 .. 32 -- k = 1 is a frame, k = 2 a |Ȳ>, k = 3 a T, but k >= 4 needs a
+  small-angle resource state no gadget makes yet; run once, a few seconds of a 21-year run.
+- **The program: 680,102,866 s = 21.55 years (7,872 days) on 111,930 tiles at d = 11** -- one
+  prime concrete x 21,640 (exact) plus the rest concrete, less those 29 rotations.
+- **Its distinct programs:** 128 merge shapes and 7 others (H̄, preparations in Z, X, Ȳ and T,
+  readouts in Z and X); **every one passes at d = 11** (every rule, R10) -- 45 merges new in this
+  run (`tools/lattice_check.py`: 1,031 to 5,524 ions, the longest an 18-tile corridor, 74 min),
+  the rest checked before. So every program the run uses is checked at the machine's distance.
+- **Where a prime goes:** gLoop1's iterations (write 34 s, adder to 43 s, release to 65 s) and
+  gUnloop3's steps, of whose 193 s the two small lookups take ~90 s: their 64 CZs queue on the two
+  tiles facing each pp block. Together ~1.75 h a prime -- the next thing to make shorter, then
+  the release and the write.
+- **Tried and dropped:** seats in the middle of pp's row (353 s for an iteration: a short chain
+  made at once waits its turn at the seat on tiles other chains need); relays made just in time
+  (~600 s: every CNOT then waits for its row and column alike).
+- **The page (`qccd/gadget/rsa.py`, `web/rsa.js`; gadgets/rsa2048/).** The answer and what it rests
+  on, and one prime played on the floorplan step by step on one clock. A prime is 282 million
+  gadgets (~4.5 GB even packed), too much for a browser; a step is at most 1.36 million (a frame
+  file of 2-5 MB gzipped: each gadget's start, program and tiles, `lattice_prime.py --frames`). The
+  player fetches a step as the clock nears it and drops it behind (at most four held: ~40-70 MB of
+  heap, measured in Chrome), and the clock waits for a step still on its way, so the run looks
+  continuous. A click on a tile names the program at work and its check at d = 11
+  (`tools/lattice_check.py`, the checker moved out of scratch). Built with `python -m qccd.gadget
+  site --rsa DATA`, DATA from `rsa.pack`, or alone with `rsa.standalone`.
+
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every
   rule, 138 ms.

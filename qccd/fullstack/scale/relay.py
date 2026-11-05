@@ -205,7 +205,8 @@ def path(src: tuple, dst: tuple, blocked, lanes=()) -> list:
     return best and best[1]
 
 
-def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None, tag: str = "bring"):
+def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None, tag: str = "bring",
+          only=None):
     """(stream, {block: tile}): every fresh block put beside the block at home it is next merged
     with.  A fresh block is made on the tile facing its first partner at home (on a side of the
     product's letter: `beside`); before each later product with a block at home it does not face,
@@ -214,7 +215,9 @@ def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None
     how many lines after it to pass through untouched (a factory's own, under its `macro` line).
     Products of other kinds, and fresh blocks with no partner at home, are left as they are.
     Blocks carried to one block at home take its two sides of the letter in turn, so two can be
-    there at once.  The carries' blocks are named `<tag><n>.`: one tag per call on one lattice."""
+    there at once.  The carries' blocks are named `<tag><n>.`: one tag per call on one lattice.
+    `only(k, blk)`: whether to bring the fresh block made at line k (the rest are left to the
+    scheduler, which places them itself)."""
     blocked = set(blocked) | set(homes.values())
     skip = skip or {}
     out, pins, cur, at = [], {}, {}, dict(sites)
@@ -241,7 +244,7 @@ def bring(stream, homes: dict, sites: dict, blocked, lanes=(), skip: dict = None
             k += 1 + skip[k]
             continue
         a = tuple(cur.get(x, x) if isinstance(x, str) else x for x in a)
-        if w == "prep" and a[0] not in homes and a[0] not in at:
+        if w == "prep" and a[0] not in homes and a[0] not in at and (only is None or only(k, a[0])):
             h, letter = first_partner(k, a[0])
             if h is not None:
                 t = beside(h, letter) if beside(h, letter) not in blocked else beside(h, letter, True)
