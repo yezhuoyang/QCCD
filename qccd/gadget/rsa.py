@@ -94,7 +94,9 @@ def pack(run, dst, logs, rest=None) -> dict:
                       "gadgets": r["gadgets"], "programs": local, "check": "clean" if not r["n_bad"] else r["check"]})
         t += r["span_us"] / 1e6
         src = run / "frames" / f"{i:03d}.bin.gz"
-        shutil.copyfile(src, dst / "frames" / src.name)
+        if not src.exists() and r.get("same_as"):     # the same schedule as an earlier step: its frame
+            src = run / "frames" / r["same_as"].replace(".json", ".bin.gz")
+        shutil.copyfile(src, dst / "frames" / f"{i:03d}.bin.gz")
     parts = []
     for name, color in PARTS:
         mine = [s for s in steps if s["part"] == name]

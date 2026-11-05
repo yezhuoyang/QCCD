@@ -1448,7 +1448,11 @@ conclusion: how long does it take to use d = 11 to factor RSA-2048 on a QCCD dev
   heap, measured in Chrome), and the clock waits for a step still on its way, so the run looks
   continuous. A click on a tile names the program at work and its check at d = 11
   (`tools/lattice_check.py`, the checker moved out of scratch). Built with `python -m qccd.gadget
-  site --rsa DATA`, DATA from `rsa.pack`, or alone with `rsa.standalone`.
+  site --rsa DATA`, DATA from `rsa.pack`, or alone with `rsa.standalone`. **Live since 2026-11-05**
+  at qccd.academy/gadgets/rsa2048/ (1.2 GB of frames: the frames run reproduced every step's time
+  and gadget count; a step whose schedule repeats an earlier one has that one's frame), linked from
+  the gadgets landing; driven live in headless Chrome: continuous across steps, heap at most
+  ~115 MB, no errors.
 
 **Progress (2026-10-31).**
 - Step 1 done (9ba329a): `lattice_surgery`, Z̄Z̄ and X̄X̄; d = 25, 25 rounds: 2,549 ions, every

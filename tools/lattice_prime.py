@@ -55,6 +55,7 @@ import json
 import math
 import os
 import pickle
+import shutil
 import sys
 import threading
 import time
@@ -780,6 +781,9 @@ def main():
             r = json.loads(orig.read_text(encoding="utf-8"))
             r.update(label=label, same_as=orig.name)
             res.write_text(json.dumps(r), encoding="utf-8")
+            frame = out / "frames" / orig.name.replace(".json", ".bin.gz")
+            if a.frames and frame.exists():         # the same schedule: the same frame
+                shutil.copyfile(frame, out / "frames" / res.name.replace(".json", ".bin.gz"))
     print(f"{len(same)} steps the same input as an earlier one ({time.time() - t0:.0f} s)", flush=True)
     if a.rest:
         rot = getattr(prime_steps, "rotations", [])
