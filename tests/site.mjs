@@ -167,6 +167,30 @@ const HALO = `(function(){
            sites: rr.n, nring_bad: rr.bad.length, ring_bad: rr.bad.slice(0, 3), ring_planted_caught: rcaught };
 })()`;
 
+// BOTH FILLS WHAT HOLDS IT.  Both is two columns under the Program pane's header, and whatever
+// the page adds to that pane is one grid item: the board overlay's row holding the two listings
+// sat in the first column and left the second empty, half the panel, on every board page
+// (2026-11-06, the user).  Planted: listings held to a quarter of their room must be caught.
+const BOTH_PROBE = `(function(){
+  var pp = document.getElementById('paneP'), seg = document.getElementById('pView');
+  if(!pp || !seg || getComputedStyle(seg).display === 'none') return null;
+  var was = pp.getAttribute('data-view'), tab = document.getElementById('tabP'), both = document.getElementById('pvboth');
+  both.click();
+  var closed = !pp.getBoundingClientRect().width;
+  if(closed && tab) tab.click();
+  function gap(){ var cs = getComputedStyle(pp), p = pp.getBoundingClientRect(),
+    a = document.getElementById('pHw').getBoundingClientRect(), b = document.getElementById('paneQ').getBoundingClientRect();
+    return Math.round(p.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth) - Math.max(a.right, b.right)); }
+  var got = gap(), s = document.createElement('style');
+  s.textContent = '#pHw,#paneQ{max-width:25%!important}';
+  document.head.appendChild(s);
+  var planted = gap();
+  s.remove();
+  if(closed && tab) tab.click();
+  document.getElementById('pv' + was).click();
+  return { gap: got, planted: planted };
+})()`;
+
 const PROBE = `(async function(){
   function embedStatus(){ var f = document.querySelector('.clip iframe.live'); if(!f) return null;
     try { var d = f.contentDocument; if(!(d && d.body && d.body.getAttribute('data-embed') === '1')) return false;
@@ -270,6 +294,9 @@ async function visit(rel, shotName) {
               return d.getElementById('play') ? 'ready' : 'no transport'; } catch(e){ return 'unreadable'; } })()`);
       if (ran !== 'ready') problems.push('the first example did not load: ' + ran);
     }
+    const both = await evaluate(BOTH_PROBE);
+    if (both && both.gap > 2) problems.push(`Both leaves ${both.gap} px empty beside the two listings`);
+    if (both && both.planted <= 2) problems.push('the Both probe did not see a planted gap: it is blind here');
     // WHAT A READER CAN SEE, after every pane is opened -- text behind a tab is text a
     // reader can reach.  `OPEN_PANES` returning 0 on a page that has panes means its
     // selector has gone stale, which is a broken check reading as a clean one, so that is

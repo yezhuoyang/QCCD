@@ -23742,7 +23742,8 @@ if (typeof globalThis !== 'undefined' && globalThis.EDITOR && globalThis.EDITOR.
    blocks sit in a ROW inside the column-flex pane, so every listing keeps the bounded
    height its virtual scroller needs (a wrapped flex line lets the list grow to its
    content -- 28,000 px -- and nothing scrolls) */
-#bbrow{display:flex;flex-direction:row;gap:10px;flex:1 1 0;min-height:0;min-width:0}
+#bbrow{grid-column:1/-1;display:flex;flex-direction:row;gap:10px;flex:1 1 0;min-height:0;min-width:0}
+#paneP[data-view="both"]>#bbreopen{display:none}
 #bbrow .pblock{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column}
 #bbrow .pblock .wrapl{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #bbrow .pblock .lst{flex:1 1 auto;min-height:120px;overflow:auto}
