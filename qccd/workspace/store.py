@@ -27,7 +27,7 @@ from typing import Any, Iterable
 
 __all__ = ["Store", "SCHEMA_VERSION"]
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 #: what each schema version adds to the one before (applied in order to an older database)
 _MIGRATIONS = {
     # 2: general workspaces (2026-09-24) -- a design has a title its person chose; a snapshot and a
@@ -37,6 +37,9 @@ _MIGRATIONS = {
     # 3: conversations (2026-10-23) -- an agent session is one conversation in the chat's list: the name
     # the person gave it, and when they deleted it (kept, hidden, so Undo can bring it back)
     3: [("sessions", "title", "TEXT"), ("sessions", "deleted_at", "REAL")],
+    # 4: agent reviews (2026-11-04) -- the agent a request to publish asks to review the design once
+    # the official server has graded it (qccd/official/review.py)
+    4: [("publications", "reviewer", "TEXT")],
 }
 
 _DDL = """
@@ -156,7 +159,8 @@ CREATE TABLE IF NOT EXISTS publications (   -- a design on the OFFICIAL leaderbo
   state TEXT NOT NULL,                -- testing | test_failed | awaiting_person | uploading | uploaded | declined | failed
   requested_by TEXT NOT NULL, approved_by TEXT, approval_id TEXT,
   server TEXT, credit TEXT, official_id TEXT, official TEXT, error TEXT,
-  origin_prompt_id TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL
+  origin_prompt_id TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+  reviewer TEXT                       -- the agent asked to review it once the server has graded it
 );
 CREATE TABLE IF NOT EXISTS events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, type TEXT NOT NULL,

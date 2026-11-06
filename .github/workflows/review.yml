@@ -1,0 +1,39 @@
+# Agent review of a submission (qccd/official/review.py, docs/agent-review.md): the reviewer, the
+# decision it makes from the grade and the rule check alone, the agent's sandboxed command, the
+# pages and the local console, and the Studio's Submit carrying the reviewer -- run with a stand-in
+# agent, so nothing here reaches a model or needs a sign-in.
+name: review
+on:
+  push:
+    paths:
+      - 'qccd/official/**'
+      - 'qccd/workspace/publications.py'
+      - 'qccd/workspace/service.py'
+      - 'qccd/workspace/store.py'
+      - '.claude/skills/**'
+      - 'tests/test_agent_review.py'
+      - '.github/workflows/review.yml'
+  pull_request:
+    paths:
+      - 'qccd/official/**'
+      - 'qccd/workspace/publications.py'
+      - 'qccd/workspace/service.py'
+      - 'qccd/workspace/store.py'
+      - '.claude/skills/**'
+      - 'tests/test_agent_review.py'
+      - '.github/workflows/review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agent-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: the decision is the grade's and the rule check's; the agent only explains it
+        run: |
+          python -m pip install --quiet pytest numpy fastapi uvicorn httpx markdown-it-py
+          python -m pytest -q tests/test_agent_review.py

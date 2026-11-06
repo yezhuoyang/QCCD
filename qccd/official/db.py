@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -43,6 +44,14 @@ SCHEMA = [
          account_id TEXT, account_name TEXT, key_id TEXT, ip TEXT,
          created_at DOUBLE PRECISION NOT NULL, expires_at DOUBLE PRECISION NOT NULL,
          approved_at DOUBLE PRECISION, delivered_at DOUBLE PRECISION)""",
+    # an agent review of a graded submission (review.py): the rule check and the decision it makes
+    # with the report, then what the agent wrote; one row per request, so reviewers can be compared
+    """CREATE TABLE IF NOT EXISTS reviews (
+         id TEXT PRIMARY KEY, submission TEXT NOT NULL, reviewer TEXT NOT NULL, model TEXT,
+         status TEXT NOT NULL, attempts INTEGER NOT NULL, decision TEXT, reasons TEXT,
+         rule_check TEXT, rule_check_md TEXT, review_md TEXT, progress TEXT, usage TEXT, error TEXT,
+         locked_by TEXT, locked_at DOUBLE PRECISION, heartbeat DOUBLE PRECISION,
+         created_at DOUBLE PRECISION NOT NULL, started_at DOUBLE PRECISION, finished_at DOUBLE PRECISION)""",
 ]
 
 #: columns added after a table was first deployed: (table, column, type).  An existing database
@@ -67,7 +76,16 @@ class Database:
             self.kind = "sqlite"
             self.conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None, timeout=30)
             self.conn.row_factory = sqlite3.Row
-            self.conn.execute("PRAGMA journal_mode=WAL")
+            # switching a new file to WAL takes a moment's exclusive lock: processes that open one
+            # database at once (a development server, its worker, its reviewer) take turns
+            for attempt in range(50):
+                try:
+                    self.conn.execute("PRAGMA journal_mode=WAL")
+                    break
+                except sqlite3.OperationalError as exc:
+                    if "locked" not in str(exc) or attempt == 49:
+                        raise
+                    time.sleep(0.1)
         elif url.startswith("postgresql://") or url.startswith("postgres://"):
             import psycopg  # the deployment image installs it; tests use SQLite
             from psycopg.rows import dict_row
@@ -126,3 +144,10 @@ class Database:
             return ("SELECT id, submission, attempts FROM jobs WHERE status='queued' ORDER BY created_at "
                     "LIMIT 1 FOR UPDATE SKIP LOCKED")
         return "SELECT id, submission, attempts FROM jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
+
+    def claim_review_sql(self) -> str:
+        """Select one queued review whose submission has been graded, skipping rows another
+        reviewer holds."""
+        sql = ("SELECT r.id FROM reviews r JOIN submissions s ON s.id=r.submission WHERE r.status='queued' "
+               "AND s.status IN ('eligible', 'ineligible') ORDER BY r.created_at LIMIT 1")
+        return sql + " FOR UPDATE OF r SKIP LOCKED" if self.kind == "postgres" else sql
