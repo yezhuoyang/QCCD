@@ -2,7 +2,8 @@
 
 This maps every item of the deck "QCCD Transport Architectures" (Ke, 2026-11-06) and of
 "Helios Nominal Noise Model" (the deck's `base-error-model`) to what Goal 3 does with it.
-Where the two documents disagree or leave a gap, the reading taken is under "Readings to confirm".
+Where the two documents disagree or leave a gap, the reading taken is under "Readings", each marked
+open or answered.
 
 The deck's slide 2 sets the order: use the noise model's number where it has one, and the deck's
 where it has none. Section 7 of the noise model calls itself an example clock, so the deck's
@@ -25,9 +26,9 @@ transport numbers beat it, and it only fills what the deck also lacks.
 | 1 | 1Q p = 2.07e-5, leakage 8.4e-6 | channels `gate_1q`, `gate_1q_leakage`; a frame change and an identity are not pulses |
 | 1 | 2Q cooled, excluding cooling dephasing, p ~ 6.74e-4; leakage 9e-5 on each target | channels `ms`, `ms_leakage`: r = 5.5e-4 - 1.1e-5, p = 5r/4 = 6.7375e-4 |
 | 1 | prep / reset 5e-5; readout 4.3e-4 | channels `prepare`, `reset`, `readout_z`, `readout_x` |
-| 1 | crosstalk 7.2e-5 per spectator; MR's combined row used once | channel `crosstalk`, at the measurement; a reset adds none |
+| 1 | crosstalk 7.2e-5 per spectator; MR's combined row used once | channel `crosstalk`, at the measurement; a reset adds none; summed over the ions read out together, a simulation assumption (reading 1) |
 | 2 | pZ(t) = 0.5 [1 - exp(-t/T_lin - (t/T_g)^2)], once over each idle window | channel `idle_dephasing`, over `waited(i, o)`: transport, cooling and other ions' operations do not split it |
-| 2 | idle leakage: the transport-layer rate, folded by 0.75 | channel `idle_leakage`; **the rate is not printed**, see below |
+| 2 | idle leakage: the transport-layer rate, folded by 0.75 | channel `idle_leakage`; the model does not print the rate, Jaewon's report does (reading 3) |
 | 3 | cooling 3 ms, 2Q 70 us, measure 150 us, reset 20 us | `qccd-physics@3` |
 | 4 | n_cal 0.05, 3 quanta/s, junction 0.014 quanta, slope 9.5e-4 | the ledger starts from 0 at n_cal; `p_2Q = p_baseline + slope * excess` inside `ms` |
 | 5 | shuttle 0.1, split 2 or 4.16, merge grouped with split, reorder 0.007 | `qccd-physics@3` takes split 2 and merge 0; see below |
@@ -77,7 +78,7 @@ model turns off.
 | S5 switchable swap | W2: a step's pairs are one kind and one parity, the same pairing the device derives |
 | S6 swap mechanism | a merge half and a split half, R5 as written; 1 t0 between neighbours, 2 t0 across a junction zone, 3 t0 between rows |
 | S7 odd-even sort | an algorithm, so no rule. The router takes real steps from the same step types; the deck's worst case is reported beside it (`reconfiguration_ms`) |
-| S8 junction occupancy | R2, R23. See "Readings to confirm" |
+| S8 junction occupancy | R2, R23. See "Readings" |
 | S9 transport-assisted gates | R6, R6b, R12: a pair merges into one gate zone, gates, splits |
 | S10 gate layers | W10: one gate at one angle per layer; a frame change is not a pulse |
 | S11 shims held | W11: every layer pays its charge, and a reconfiguration opens with one |
@@ -117,23 +118,30 @@ model turns off.
 | T7, T8 | the noise model's channels |
 | T9-T11 | the paper's results, not inputs |
 
-## Readings to confirm
+## Readings
 
 These are the choices a person could reasonably have made another way, the ones that move results first.
+Each is open unless it says it was answered.
 
-1. **Crosstalk under parallel readout (noise model Sec. 1).** Charged per measured ion: every spectator takes
-   7.2e-5 for each ion read out, so reading out in parallel earns no discount. 7.2e-5 is 3/2 of Helios's
-   4.8e-5 per measurement and reset, which is why this reading looks right, but it is the largest term in the
-   budget: **44 to 58% of all error on surface d=7**, where 48 ancillas read out each round. If the model means
-   once per readout layer, this term nearly vanishes for C2LR and WISE, and logical error rates fall.
+1. **Crosstalk under parallel readout (noise model Sec. 1). Answered by Zhuangzhuang, 2026-11-07: a
+   simulation assumption, kept.** Jaewon's report gives 7.2e-5 per affected spectator for a measurement or
+   reset, but not how several ions measured in parallel combine, and each one's contribution depends on where
+   the spectator sits relative to the measurement light. If the scattering is weak and independent, the
+   contributions add to first order. Charging every spectator the same 7.2e-5 for each ion read out, as the
+   channel does (one `DEPOLARIZE1` of k x 7.2e-5 for k ions read out together), is that assumption, and the
+   channel's text says so. Also this sweep's choice: every other ion on the chip is a spectator, at the same
+   strength. It is the largest term in the budget, **44 to 58% of all error on surface d=7**, where 48
+   ancillas read out each round, so the logical error rates lean on it. A contribution that falls with
+   distance from the measurement light would lower it most on the largest chips.
 2. **Cooling time (noise model Sec. 3, Sec. 6).** Used the 3 ms reference. It dominates C2LR's and WISE's time,
    while Cyclone pays nothing under S10, so the time comparison leans on it: at 300 us C2LR's surface d=3 round
    goes from 18.2 to 7.4 ms, ahead of Cyclone's 9.2. The logical error rate barely moves.
-   `results/variants/cool300us/` has this for surface and colour d = 3, 5, 7.
-3. **Idle leakage rate (noise model Sec. 2).** It names the rate without printing it. Used:
-   0.75 x 4.0e-4 per ion per 55 ms layer = 5.45e-3 /s, from Helios (arXiv:2511.05465 Sec. III B4). The
-   T_lin in the model matches that paper's non-leakage part, so this is probably what is meant, but
-   it needs Zhuangzhuang's word. It is about 60% of the idle error, and 7 to 12% of all error on surface d=7.
+   `results/variants/cool300us/` has this for surface d = 3, 5, 7 and colour d = 3, 5 (colour d = 7 was not run).
+3. **Idle leakage rate (noise model Sec. 2). Answered by Zhuangzhuang, 2026-11-07: confirmed.** The model
+   names the rate without printing it. Used 0.75 x 4.0e-4 per ion per 55 ms layer = 5.45e-3 /s. Jaewon's
+   report gives 1.45e-3 per ion at 200 ms before the Stim conversion, which is 4.0e-4 x 200/55 rounded, and
+   applies the 0.75 in `DEPOLARIZE1`, as here. It is also Helios's rate (arXiv:2511.05465 Sec. III B4). It is
+   about 60% of the idle error, and 7 to 12% of all error on surface d=7.
 4. **The GateSwap's error (Cyclone S7).** Time only. Neither document gives it an error. Charging its
    3 CX to the ions would put about 2 x 10⁻³ on an ancilla at every step, which is hard to square
    with the paper's reported logical error rates, so the paper must not be charging it either. Cyclone's

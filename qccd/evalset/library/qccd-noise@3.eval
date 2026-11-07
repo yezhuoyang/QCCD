@@ -24,9 +24,11 @@ param p_crosstalk = 7.2e-5
 # Section 2.  Mixed dephasing over one idle window.
 param t_lin = 183.28657936          # seconds
 param t_g = 3.79487660              # seconds
-# "Idle leakage uses the transport-layer rate from Jaweon's report folded by a factor of 0.75":
-# the model does not print the rate.  4.0e-4 per ion per 55 ms layer is Helios's (arXiv:2511.05465
-# Sec. III B4, the leakage part of its linear memory term), and t_lin is its non-leakage part.
+# "Idle leakage uses the transport-layer rate from Jaweon's report folded by a factor of 0.75" (Sec. 10b).
+# The model does not print the rate.  The report gives 1.45e-3 per ion at 200 ms before the Stim
+# conversion, which is 4.0e-4 per ion per 55 ms layer (4.0e-4 x 200/55, rounded), and folds it by 0.75
+# in DEPOLARIZE1, as below (confirmed by the model's author, 2026-11-07).  It is also Helios's rate
+# (arXiv:2511.05465 Sec. III B4, the leakage part of its linear memory term), and t_lin is the rest.
 param leak_transport_per_s = 4.0e-4 / 55e-3
 
 # Section 4.  The excess above the cooled state, in Stim p.
@@ -47,8 +49,8 @@ channel idle_dephasing "Mixed dephasing over an idle window"
     Z_ERROR(min(1 / 2, scale * 0.5 * (1 - exp(0 - idle_s(i, o) / t_lin - pow(idle_s(i, o) / t_g, 2))))) on i
 
 channel idle_leakage "Leakage over an idle window"
-  about "The transport-layer leakage rate, folded by 0.75 and charged over the same window."
-  source "Helios Nominal Noise Model Sec. 2; the rate from arXiv:2511.05465 Sec. III B4, which the model does not print"
+  about "The transport-layer leakage rate of the report the model is based on, 4.0e-4 per ion per 55 ms, folded by 0.75 and charged over the same window in proportion to its length."
+  source "Helios Nominal Noise Model Sec. 2; the rate from the report it is based on (Sec. 10b): 1.45e-3 per ion at 200 ms, so 4.0e-4 per 55 ms, as in arXiv:2511.05465 Sec. III B4"
   before o in qubit_operations, i in ions(o):
     DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_transport_per_s * idle_s(i, o))) on i
 
@@ -103,7 +105,7 @@ channel reset "A wrong reset"
     X_ERROR(min(1 / 2, scale * p_reset)) on ions(r)
 
 channel crosstalk "Measurement crosstalk"
-  about "Each measured ion disturbs every other ion on the chip, its spectators. A mid-circuit measurement and its reset share one crosstalk input, so a reset adds none. Ions measured together each disturb the spectators, so a schedule does not get cheaper crosstalk by reading out in parallel."
+  about "Each measured ion disturbs every other ion on the chip, its spectators. A mid-circuit measurement and its reset share one crosstalk input, so a reset adds none. The model gives 7.2e-5 per spectator and does not say how ions measured in parallel combine. Here that is a simulation assumption: weak, independent scattering, so each measured ion adds the same 7.2e-5, to first order, wherever the spectator sits relative to the measurement light. Reading out in parallel therefore earns no discount."
   source "Helios Nominal Noise Model Sec. 1 (measurement crosstalk and combined MR crosstalk, 7.2e-5 per spectator)"
   after k in steps where kind(k) = "measure":
     DEPOLARIZE1(min(3 / 4, scale * p_crosstalk * count(j in operated(k)))) on {i for i in ions where i not in operated(k)}

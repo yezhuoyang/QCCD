@@ -35,7 +35,8 @@ see "open".
 
 Three, as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
 their shuttling rules, hardware, parameters and cost models. [DECK.md](DECK.md) maps every item of
-the deck to what happens to it here, and lists the readings that need confirming. The definitions and
+the deck to what happens to it here, and lists the readings taken where the documents leave a gap,
+each open or answered. The definitions and
 the sizes tried are data in [families.py](families.py).
 
 | family | device | swept, per the deck | rule set | compiler |
@@ -116,11 +117,12 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   qccd-noise@2, and their physics lock has no way to give each family its own prices. They hold no entries.
   This sweep uses their circuits, detectors, budgets and seeds. Moving them means new releases, and a lock
   that recomputes a family's prices from its parameters rather than trusting a device's own.
-- **[DECK.md](DECK.md), "Readings to confirm":** the idle leakage rate the noise model does not print, the
-  3 ms cooling, the GateSwap's error, and others. Each is one number here; changing one means sampling again.
+- **[DECK.md](DECK.md), "Readings":** the 3 ms cooling, the GateSwap's error, and others are open. Each is one
+  number here; changing one means sampling again. Two are answered (2026-11-07): the idle leakage rate is the
+  report's, and crosstalk summed over the ions read out together is a simulation assumption, kept and so labelled.
 - **Cooling decides much of the time comparison.** C2LR and WISE pay 3 ms for each batch of gates that needs it.
-  Cyclone pays nothing, as the deck's S10 assumes. `results/variants/cool300us/` is the same sweep at Studio's
-  300 us.
+  Cyclone pays nothing, as the deck's S10 assumes. `results/variants/cool300us/` is the sweep at Studio's
+  300 us for surface d = 3, 5, 7 and colour d = 3, 5.
 - **The compilers are baselines.** WISE's router is greedy over the deck's step types and takes real steps rather
   than the paper's worst case. Cyclone's placement is annealed over one round. Neither is tuned, and C2LR's router
   still gives the same time on several sizes.
