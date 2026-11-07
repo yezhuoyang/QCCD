@@ -1,91 +1,54 @@
 """Goal 3's architecture families and the sizes each is swept over.
 
-A family is a generator, a control block and a rule for which sizes to try for a code of N ions
-with A ancillas.  The sizes start at the smallest the family can plausibly hold (the compiler
-refuses what does not fit, and a refusal is a row of the results) and stop where a larger
-machine stops being a different design.
+The three architectures, their rules, their hardware and what may be swept are Ke's transport deck
+("QCCD Transport Architectures", 2026-11-06): recompile on C2LR, WISE and Cyclone only.  Each
+family is data here, a generator and a rule for which sizes to try for a code; its prices are in
+`qccd.arch.c2lr`, `qccd.arch.wise` and `qccd.arch.cyclone`, and its compiler in `qccd.compile`.
 
-PROVISIONAL (2026-10-29).  The four architectures of the 10/26 plan -- C2LR, WISE, Cyclone,
-Conveyor -- with their shuttling, broadcast, gate and measurement rules are Ke's to define;
-until those rules are written, each family is the closest device this platform already
-models, plus the plain grid as the baseline:
+* C2LR    -- a lattice of X-junctions with one crystal on every leg (arXiv:2403.00756): sweep Cx and
+             Cy, choose the species, keep the rest at the deck's defaults.  `grid(Cx, Cy)` has Cx Cy
+             junctions, the deck's cells.  Its 2 Cx Cy legs ignore the edge, where the drawn lattice
+             has Cx + Cy fewer.  The species is Yb-Ba, the paper's row for the noise model's Ba-Yb
+             crystal, and the one row with a reorder-or-not.
+* WISE    -- cells of one junction zone and h gate zones, sorted by parallel switched swaps
+             (arXiv:2305.12773): sweep h, Cx and Cy, keep the rest at the deck's defaults.
+* Cyclone -- one ring of x traps of up to n ions, data still and ancillas rotating in lockstep
+             (arXiv:2511.15910): choose the code, sweep x and n <= 30, keep the rest at the paper's
+             defaults.  Goal 3's circuits keep one ancilla per check, so a ring holds N + m ions and
+             not the paper's N + m/2.
 
-* Grid     -- the baseline QCCD lattice of arXiv:2004.04706: `grid(a, b)`, a trap on every
-              wire, each trap driven by its own DACs ("direct" wiring), one movement class per
-              cycle.
-* WISE     -- the same lattice wired as arXiv:2305.12773 proposes: broadcast DACs, a switch
-              per site, ONE movement class per cycle (the deck's `deck_unit_cell` block).
-* C2LR     -- the same lattice as a swap-or-stay device (arXiv:2403.00756; docs/c2lr.md):
-              `Machine.c2lr_grid`'s control (crystals move only by swap-or-stay steps, a
-              direction bit per leg, 27 shared signals, the demonstrated diagonals only) and
-              its steps' price (Yb-Ba, the paper's row for physics@2's Ba-Yb crystal: 400 us),
-              on the Goal's physics (sweep.device_doc), DACs counted from the paper's census.
-              qccdc's plain shuttles break R4 and C1 here, so the platform's baseline C2LR
-              router compiles it (qccd.compile.c2lr_router).  Every two-qubit gate merges and
-              splits its leg's pair, priced at physics@2's merge/split as every family's is.
-* Cyclone  -- one loop of trap sites moved rigidly (Khan et al., HPCA 2026): `ring(W, 2, 0)`
-              with trap sites, O(1) DACs.
-* Conveyor -- a loop of rail slots with dock spurs, the loop rotated rigidly and ions docked
-              to gate (`ring(W, 2, V)`, the study's `ring144_24v` shape; qccdc's conveyor pass).
-
-Both loops have JUNCTION CORNERS, the square trap as it is built (Ke Sun, T30; the site's ring
-boards since 2026-11-01): the four corners are junctions the rotation passes and never stops
-on, the traps stand only on the sides.  A point named `cyclone<w>_j` or `conveyor<w>_<v>d_j` is
-the corner-trap loop of 2w slots' twin, `ring(w + 2, 2, v, corners="junction")`: the same 2w
-slots and v docks.  The corner-trap points, swept until 2026-11-01, are kept in
-`results/corner_traps/`.
-
-What a family does NOT yet capture is listed in `README.md` under "open".
+Each family is judged by its own rule set (`RULES`).  What a family does not capture is listed in
+`README.md` under "open".
 """
 
 from __future__ import annotations
 
-import math
-
-_WISE = {
-    "max_simd_classes_per_cycle": 1,
-    "wiring": {"scheme": "wise", "dacs_dynamic": 32, "shim_per_dac": 100, "electrodes_per_trap": 24,
-               "electrodes_per_junction": 48, "compensation_electrodes_per_trap": 8,
-               "note": "WISE (arXiv:2305.12773): 32 broadcast DACs, constant in array size"},
-    "channels": {"grouping": "broadcast", "roles": {"linear_h": 6, "linear_v": 6, "junction": 4},
-                 "differential": 2, "switch_per_site": True},
-}
-#: qccd-physics@2's crystal is Ba-Yb (137Ba+ qubit, 171Yb+ coolant), so the paper's row is
-#: Yb-Ba: 400 us a step, and reorder-or-not, which it measures for that pair alone.  Only the
-#: demonstrated diagonals: the proposal's checkerboard steps are not in the paper.
-_C2LR = {"species": "Yb-Ba", "checkerboard": False}
-_DIRECT = {   # the shipped grid9x9's own block: every electrode its own DAC
-    "max_simd_classes_per_cycle": 1,
-    "wiring": {"scheme": "direct", "dacs_dynamic": 100, "shim_per_dac": 1, "electrodes_per_trap": 24,
-               "electrodes_per_junction": 48, "compensation_electrodes_per_trap": 8},
-    "channels": {"grouping": "direct", "roles": {"linear_h": 6, "linear_v": 6, "junction": 4},
-                 "differential": 2, "switch_per_site": True},
-}
-
-FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor")
+FAMILIES = ("C2LR", "WISE", "Cyclone")
 #: each family's own rule set (qccd/ruleset/library), which its points are judged by as an entry's
-#: declared set is: the rules of the paper its machine comes from, where they are written, and
-#: this website's machine where they are not.  WISE's paper gives closed forms, not a schedule's
-#: rules (Reproduce drops it for that), and Conveyor is this platform's own design.
-RULES = {"Grid": "qccdsim",                 # arXiv:2004.04706, QCCDSim's scheduler
-         "WISE": "standard",
-         "C2LR": "c2lr-demonstrated",       # arXiv:2403.00756, its diagonals only (_C2LR)
-         "Cyclone": "cyclone",              # Khan et al., HPCA 2026
-         "Conveyor": "standard"}
+#: declared set is
+RULES = {"C2LR": "c2lr-demonstrated",   # the deck's S1-S10, its checkerboard form "isn't needed" (S6)
+         "WISE": "wise",
+         "Cyclone": "cyclone-deck"}
+#: which compiler a family's points come from
+COMPILERS = {"C2LR": "the baseline C2LR router", "WISE": "the baseline WISE router",
+             "Cyclone": "the baseline Cyclone router"}
 #: what a family's points do not yet show; the figures print these under the panels
 CAVEATS = {
-    "WISE": "same program and time as Grid until WISE's broadcast rules exist",
-    "C2LR": "compiled by the baseline C2LR router; every two-qubit gate merges and splits its pair, "
-            "priced at physics@2's 128 us and 1 quantum each, as every family's merge is",
-    "Cyclone": "compiled without rigid rotation (qccdc has no Cyclone scheduler yet): an upper bound",
+    "C2LR": "enter and exit are the platform's reading of the deck's open S11; a merge and split around each "
+            "gate are priced from the noise model, which marks that open for C2LR",
+    "WISE": "a baseline router, not the paper's worst-case sort; no qubit rests on a junction zone, so a chip "
+            "holds h, not h + 1, qubits per cell",
+    "Cyclone": "keeps the circuit's gate order, so a round takes more than the paper's 2 rotations; cooling takes "
+               "no time, as the deck's S10 assumes",
 }
 #: the plot's order and each family's colour (its best point; every other point is grey)
-COLOURS = {"Grid": "#4C78A8", "WISE": "#F58518", "C2LR": "#54A24B", "Cyclone": "#B279A2",
-           "Conveyor": "#E45756"}
+COLOURS = {"C2LR": "#54A24B", "WISE": "#F58518", "Cyclone": "#B279A2"}
+#: the species the deck says to choose (its C2LR Hardware model)
+SPECIES = "Yb-Ba"
 
 
 def _grids(n: int) -> list[tuple[int, int]]:
-    """a x b lattices (b in {a-1, a}) whose 2ab-a-b traps hold 1.1N to 3N ions."""
+    """Cx x Cy lattices (Cy in {Cx-1, Cx}) whose 2 Cx Cy - Cx - Cy legs hold 1.1N to 3N crystals."""
     out = []
     for a_ in range(3, 40):
         for b_ in (a_ - 1, a_):
@@ -97,40 +60,22 @@ def _grids(n: int) -> list[tuple[int, int]]:
 
 def points_for(family: str, meta: dict) -> list[dict]:
     """The design points of `family` for a code (`codes/<code>_z/meta.json`)."""
+    from qccd.arch import cyclone, wise
     n, anc = int(meta["ions"]), int(meta["n_ancilla"])
-    pts: list[dict] = []
-    if family in ("Grid", "WISE"):
-        ctl = {"Grid": _DIRECT, "WISE": _WISE}[family]
-        for a_, b_ in _grids(n):
-            pts.append({"family": family, "name": f"{family.lower()}{a_}x{b_}", "generator": "grid",
-                        "params": {"a": a_, "b": b_}, "control": ctl,
-                        "about": f"{family}: a {a_}x{b_} junction lattice, {2*a_*b_-a_-b_} traps"})
-    elif family == "C2LR":
-        for a_, b_ in _grids(n):
-            pts.append({"family": family, "name": f"c2lr{a_}x{b_}", "generator": "grid",
-                        "params": {"a": a_, "b": b_}, "c2lr": _C2LR,
-                        "about": f"C2LR: a {a_}x{b_} swap-or-stay lattice, {2*a_*b_-a_-b_} legs"})
-    elif family == "Cyclone":
-        for f in (1.04, 1.15, 1.3, 1.5):
-            w = max(3, math.ceil(n * f / 2))
-            pts.append({"family": family, "name": f"cyclone{w}_j", "generator": "ring",
-                        "params": {"width": w + 2, "height": 2, "verticals": 0, "site_zone": "trap",
-                                   "corners": "junction"},
-                        "about": f"Cyclone: one loop of {2*w} trap sites, its four corners junctions the "
-                                 f"rotation passes"})
-    elif family == "Conveyor":
-        for f in (0.65, 0.8):
-            for v in sorted({anc, math.ceil(anc * 4 / 3)}):
-                # the docks are spaced evenly round the loop: v must divide its 2w slots
-                w = math.ceil(n * f)
-                while (2 * w) % v:
-                    w += 1
-                pts.append({"family": family, "name": f"conveyor{w}_{v}d_j", "generator": "ring",
-                            "params": {"width": w + 2, "height": 2, "verticals": v, "corners": "junction"},
-                            "about": f"Conveyor: a {2*w}-slot loop with {v} dock spurs and junction "
-                                     f"corners"})
-    else:
-        raise KeyError(family)
-    # one name per point, whatever the arithmetic produced
-    seen: set = set()
-    return [p for p in pts if not (p["name"] in seen or seen.add(p["name"]))]
+    data = n - anc
+    if family == "C2LR":
+        return [{"family": family, "name": f"c2lr{a_}x{b_}", "generator": "grid", "params": {"a": a_, "b": b_},
+                 "species": SPECIES, "deck": {"Cx": a_, "Cy": b_, "species": SPECIES},
+                 "about": f"C2LR: {a_} x {b_} cells, a swap-or-stay lattice of {2 * a_ * b_ - a_ - b_} legs, {SPECIES}"}
+                for a_, b_ in _grids(n)]
+    if family == "WISE":
+        return [{"family": family, "name": f"wise_h{h}_{cx}x{cy}", "generator": "wise",
+                 "params": {"h": h, "cx": cx, "cy": cy}, "deck": {"h": h, "Cx": cx, "Cy": cy},
+                 "about": f"WISE: {cx} x {cy} cells of one junction zone and {h} gate zones"}
+                for h, cx, cy in wise.sizes_for(n)]
+    if family == "Cyclone":
+        return [{"family": family, "name": f"cyclone{x}_n{nt}", "generator": "cyclone", "params": {"x": x, "n": nt},
+                 "deck": {"x": x, "n": nt},
+                 "about": f"Cyclone: a ring of {x} traps of up to {nt} ions, its corners L-shaped junctions"}
+                for x, nt in cyclone.traps_for(data, anc)]
+    raise KeyError(family)

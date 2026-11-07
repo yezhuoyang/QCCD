@@ -170,6 +170,70 @@ rule C10 "Control is shared signals plus one input and one switch per leg"
   when control() = "c2lr":
   c2lr_wiring()
 
+# ---------------------------------------------------------------- WISE
+#
+# A chip of cells, one junction zone and h gate zones each, sorted by parallel switched swaps
+# (arXiv:2305.12773), as the team's transport deck writes it.  Each rule applies only to such a device.
+
+rule W1 "A zone holds one qubit, except for a gate or the middle of a swap"
+  about "The trap is split into zones. A reconfiguration holds one qubit per zone. Two qubits share a zone only because a step merged them, for a gate or as the first half of a swap, and they split again before anything else happens there. (S1)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S1"
+  when wise_device():
+  for all k in steps: pairs_only_to_gate_or_split(k)
+
+rule W2 "A swap step pairs zones by the chip's parity"
+  about "Every zone is odd or even, and zones of one parity class share their DACs. So a step's pairs are all of one parity: the same waveform plays on all of them. WISE needs this because two swap partners must play different waveforms. (S2)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S2"
+  when wise_device():
+  for all k in steps where is_transport(k): one_parity(k)
+
+rule W4 "One kind of operation runs across the chip in a step"
+  about "Only one kind of operation (swap, split, merge or gate) runs across the chip in a step; different kinds run one after another. A design choice that keeps the DAC count fixed, not a hardware limit. Transport's half is W2; a gate's is W10's. (S4)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S4"
+  when wise_device():
+  for all k in steps where is_transport(k): mode(k) = "inter" and not carries_gates(k)
+
+rule W10 "A gate layer is one gate at one angle"
+  about "The circuit is broken into a few basis gates and run as layers, one gate kind across the chip per layer. A frame change is not a pulse, so it is free of this. Many traps may gate at once, but all must run the same gate. (S10)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S10"
+  when wise_device():
+  for all k in steps: one_kind(k)
+
+rule W11 "Every layer pays for its shims first"
+  about "Shim voltages are set before each reconfiguration or gate layer and held fixed throughout it: 128 shims at 3 us each. A gate, readout or reset carries the charge in its price, and a reconfiguration opens with a layer that charges them and plays no pulse. (S11)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S11 and T4"
+  when wise_device():
+  shims_in_every_layer() and (for all k in steps: shim_opens(k))
+
+# ---------------------------------------------------------------- Cyclone
+#
+# One ring of traps, the data still and the ancillas rotating in lockstep (arXiv:2511.15910), as the
+# team's transport deck writes it.  Each rule applies only to such a device.
+
+rule Y1 "The device is one ring"
+  about "Traps sit on one closed ring, with L-shaped junctions only at its corners and no X or T junctions. Split loops were rejected: HGP and BB stabilizers share data across any cut. (S1, S9, HW2)"
+  source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S1, S9 and HW2"
+  when cyclone_device():
+  ring_device()
+
+rule Y2 "Data stays, ancillas move"
+  about "Data qubits are spread evenly and never move; only ancillas travel. (S2)"
+  source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S2"
+  when cyclone_device():
+  for all k in steps where is_transport(k): data_stays(k)
+
+rule Y3 "Every ancilla moves in lockstep"
+  about "All ancillas move together, one way round, one trap per step, so there are no roadblocks or rebalances. (S3)"
+  source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S3"
+  when cyclone_device():
+  for all k in steps where is_transport(k): lockstep(k)
+
+rule Y4 "A trap holds at most 30 ions"
+  about "Traps hold up to n ions each, and n is at most 30 in QCCD Studio. (HW1)"
+  source "QCCD Transport Architectures deck, Cyclone HW1"
+  when cyclone_device():
+  traps_within_thirty()
+
 # ---------------------------------------------------------------- gates and their places
 
 rule R6 "Each operation runs only where the site is equipped for it"

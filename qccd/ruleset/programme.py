@@ -237,7 +237,11 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
             ops.append(o)
             return o
 
-        st: dict[str, Any] = {"index": k, "instr": ins.id, "type": ins.type, "cls": ins.cls,
+        # the instruction itself and one fact about the step, never the replay's view of it: that
+        # holds the ions' positions before and after, which on a long programme is gigabytes
+        st: dict[str, Any] = {"index": k, "instr": ins.id, "instruction": ins,
+                              "holds_two": any(n >= 2 for n in v.occ_after.values()),
+                              "type": ins.type, "cls": ins.cls,
                               "mode": ins.mode, "carries_gates": bool(ins.pairs or ins.gate)
                               if ins.type == "simd" else False}
         if c2 is not None:
@@ -352,4 +356,5 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
     else:
         exe.facts["claims_skipped"] = "the programme's own figures were not checked"
     exe.facts["replay"] = res
+    exe.facts["program_meta"] = dict(getattr(prog, "meta", None) or {})
     return exe

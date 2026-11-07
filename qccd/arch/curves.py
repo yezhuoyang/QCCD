@@ -55,6 +55,8 @@ TABLES = (
     "local",
     # Quantinuum's published transport primitives (qccd/workspace/physics/qccd-physics@2.json)
     "quantinuum",
+    # the Helios Nominal Noise Model's clock, Goal 3's (qccd/workspace/physics/qccd-physics@3.json)
+    "helios",
 )
 
 

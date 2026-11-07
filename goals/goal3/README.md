@@ -10,7 +10,8 @@ the architecture. It is Fig. 3 of the QCCD Studio paper. (Goal 2, on the same Le
 verified resource estimate for Shor's algorithm.)
 
 On qccd.academy it is the page `board/goal3/`, and each code is a board of the official server
-(`goal3_<code>_mem@1`, BB72's `@2`, [boards.py](boards.py)), so anyone can submit a design for it.
+(`goal3_<code>_mem@1`, BB72's `@2`, [boards.py](boards.py)), so anyone can submit a design for it. Those
+boards still grade on the earlier physics; see "Open".
 
 ## The fixed codes
 
@@ -32,58 +33,41 @@ see "open".
 
 ## The architectures
 
-**Provisional until Ke's rules land**, except C2LR, which is the platform's swap-or-stay device
-(2026-10-30). The definitions, and the sizes each family is tried at, are data in
-[families.py](families.py). Every family runs on qccd-physics@2. C2LR adds only its own steps:
-swap-or-stay at 400 µs and reorder-or-not at 93 µs, the paper's Yb-Ba row, because physics@2's
-crystal is Ba-Yb. Its merge and split stay physics@2's, because the C2LR paper does not measure
-them, and its DACs are counted from the paper's census (`c2lr_control(wiring=True)`). qccdc
-cannot compile it, so C2LR is compiled by the platform's baseline C2LR router:
+Three, as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
+their shuttling rules, hardware, parameters and cost models. [DECK.md](DECK.md) maps every item of
+the deck to what happens to it here, and lists the readings that need confirming. The definitions and
+the sizes tried are data in [families.py](families.py).
 
-| family | device | sizes swept, for a code of N ions and A ancillas |
-|---|---|---|
-| Grid (baseline) | junction lattice, a trap per wire, direct wiring | every a×b, b ∈ {a−1, a}, with 1.1N to 3N traps |
-| WISE | the same lattice, broadcast wiring, one movement class per cycle | as Grid |
-| C2LR | the same lattice as a swap-or-stay device (`Machine.c2lr_grid`'s control and step prices, Yb-Ba, demonstrated diagonals only, [docs/c2lr.md](../../docs/c2lr.md)) | as Grid |
-| Cyclone | one loop of trap sites with junction corners, moved rigidly | 2W ≈ 1.04N to 1.5N trap sites |
-| Conveyor | a loop with dock spurs and junction corners, rotated rigidly, ions docked to gate | 2W ≈ 1.3N to 1.6N slots, A or 4A/3 docks |
+| family | device | swept, per the deck | rule set | compiler |
+|---|---|---|---|---|
+| C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-demonstrated` | the baseline C2LR router |
+| WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps, one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
+| Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
 
-**Both loops have junction corners**, as every ring on the site has since 2026-11-01: the
-loop's four corners are junctions the rotation passes and never stops on, and the traps are on
-its sides. A point named `cyclone<w>_j` or `conveyor<w>_<v>d_j` is
-`ring(w + 2, 2, v, corners="junction")`, which keeps the 2w slots and v docks of the corner-trap
-loop it replaced. The corner-trap points, swept until 2026-11-01, are kept in
-`results/corner_traps/`. A junction-corner point runs the same steps as its corner-trap loop,
-plus the corner rails. Its time per round is 1 to 13% longer, most on the smallest loops. Its
-LER per round runs from 9% lower, within sampling error, to a third higher. The extra time is
-idle time, and idle (memory) error is the largest term in the noise budget.
+All three compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
+assigns all X checks to one rotation and all Z checks to the next: Goal 3 runs one circuit per code on
+every architecture (the project owner's decision, 2026-11-06). So Cyclone takes as many rotations a
+round as the circuit's order needs, about 3 on surface d=3, and judges order by R25, not R26.
+
+The earlier families, a plain Grid, a WISE that was the same grid with broadcast wiring, and a
+Conveyor, are retired. Their rows are in `results/pre_deck/`.
 
 ## A point, and what it is scored by
 
-A point is one (family, size), graded on the code's release the way the official grader grades
-a submission to it; only the Lean certificate step is left out ([sweep.py](sweep.py)):
+A point is one (family, size), on the code's experiment from its release, with only the Lean
+certificate step left out ([sweep.py](sweep.py)):
 
-1. qccd-physics@2 (Goal 1's cited Helios-class numbers);
-2. the pinned reference compiler, which each row names: qccdc cd3efedbbc10, the first with
-   junction corners, for the Cyclone and Conveyor points; b4a003dbb4ae, the pin when they were
-   swept, for the Grid and WISE points. Recompiled with cd3efedbbc10, 88 of the 94 compiled Grid
-   and WISE points give the same instructions: every one of surface and colour d=3, 5 and 7, and
-   14 of HGP58's 20 ([same_compiler.py](same_compiler.py), `results/compiler_identity.json`).
-   The other six are HGP58's 11x10, 11x11 and 12x11 lattices, Grid and WISE. They broke R1 under
-   b4a003dbb4ae, and under cd3efedbbc10 they keep every rule. So they were graded again with
-   cd3efedbbc10, and their old rows are in `results/superseded/`. BB72's 24 Grid and WISE sizes,
-   each refused after an hour, were not compiled again;
-3. the rules (`verify`);
-4. **time per round**: the replayed program under the `quantinuum` table, divided by the 2d
-   rounds of both memories;
-5. **LER per round**: qccd-noise@2 sampled by stim with the release's budget and seed (matching
-   for the surface code, BP-OSD otherwise), the grader's `ler_per_round`, which is
-   1 − (1 − p_Z)(1 − p_X), with a 95% interval.
+1. **the physics:** qccd-physics@3, the numbers of the team's Helios Nominal Noise Model (2026-11-05),
+   with the deck's prices where the model has none: `qccd.arch.c2lr`, `qccd.arch.wise`, `qccd.arch.cyclone`;
+2. **the compile**, by the family's own compiler, with the cooling pass on the `helios` table;
+3. **the rules**, the family's own set, judged as the grader judges an entry's declared set. A program
+   that breaks one is recorded and not sampled;
+4. **time per round:** the replayed program divided by the 2d rounds of both memories;
+5. **LER per round:** qccd-noise@3 sampled by stim with the release's budget and seed (matching for the
+   surface code, BP-OSD otherwise), 1 - (1 - p_Z)(1 - p_X), with a 95% interval;
+6. **the hardware census:** electrodes, DACs, switches, lasers and area, by the deck's formulas (`census` in each row).
 
-A size the compiler refuses, or that breaks a rule, is recorded with its reason and counted
-under its family. Until 2026-10-30 the two memories were compiled and sampled apart; those rows
-are in `results/separate/`, and they agree with the one-program points within sampling error
-(surface d=3 on grid 5x5: the same 20.23 ms per round; 2.0e-4 and 2.2e-4 per round).
+A size a compiler refuses, or that breaks a rule, is recorded with its reason and counted under its family.
 
 ## The figure
 
@@ -95,7 +79,8 @@ labelled, and every other size is grey. Run [plot.py](plot.py) to get `figures/<
 ```
 python -I goals/goal3/make_codes.py --builders <Alex's builders, patched>   # stim, qLDPC, igraph
 python goals/goal3/boards.py                                                # the releases, once
-QCCD_QCCDC=<pinned qccdc> python goals/goal3/sweep.py --code surface5 --workers 3
+python goals/goal3/sweep.py --code surface5 --workers 3                     # no qccdc: the routers are Python
+python goals/goal3/rules.py --work goals/goal3/work                         # each point against its family's set
 python goals/goal3/plot.py                                                  # matplotlib
 ```
 
@@ -127,71 +112,28 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
 
 ## Open
 
-- **Cyclone is not compiled as Cyclone.** qccdc's rigid-rotation pass only applies to a loop with
-  docks. On Cyclone's loop, which has none, it falls back to the race-track pass, which moved
-  surface5 on `cyclone26_j` with 0 loop shifts and 14,860 one-ion steps. Cyclone's points therefore measure the missing
-  scheduler, not the architecture: they are an upper bound on its time and LER until a Cyclone
-  schedule (ancillas rotating past the data, as in Khan et al.) exists. This is the ion-shuttling
-  part of the plan (John).
-- **C2LR is compiled by a baseline router, and its merges are priced at physics@2.** A C2LR
-  device moves crystals only by swap-or-stay steps. qccdc emits plain shuttles, which the device
-  does not declare (R4), and it parks two crystals in one leg outside a swap-or-stay enter (C1),
-  so every size failed (`results/c2lr_qccdc/`). Since 2026-10-30 the platform's baseline router
-  (`qccd.compile.c2lr_router`) compiles every size of every code, within every rule and keeping
-  the gate order; it is a first router, not a tuned one (on surface d=3 the 5x4, 5x5 and 6x5
-  lattices give the same time and LER). Every two-qubit gate merges the two crystals of a leg and
-  splits them again (docs/c2lr.md section 6a): that is the device model, and no router avoids
-  it. Goal 3 prices each merge and split at physics@2's 128 µs and 1 quantum (arXiv:2003.01293
-  Table II's bound, used as the value), the price every other family pays when its ions
-  combine; the platform's curve for a C2LR leg is 40 µs and 0.1 quantum. Decided 2026-10-30:
-  the main figure keeps physics@2's price. C2LR is the fastest family on surface d=3, 5 and 7,
-  colour d=5 and HGP58 (and on BB72, where no grid compiles), and its LER per round is 1.4 to
-  15 times Grid's best; that price is probably
-  most of the gap, and a run at the platform's price would measure it. Before 2026-10-30 the
-  family was a grid with C2LR wiring; those rows gave Grid's numbers exactly and are kept in
-  `results/provisional/`. A ranked C2LR entry needs a release whose physics includes the C2LR
-  steps, as the C2LR boards' releases do: on a goal3 release the physics lock marks a C2LR
-  device exploratory.
-- **WISE equals Grid today.** Its control block reaches the device (32 broadcast DACs), but the
-  compiler emits the same program and the replay charges the same time. Even the DAC metric is
-  computed from the geometry, not from the wiring block. Nothing enforces WISE's single
-  broadcast class beyond rule R4. The difference has to come from Ke's broadcast rules, plus a
-  scheduler that uses them.
-- **A compiler fault on the largest grids, fixed in qccdc cd3efedbbc10.** With qccdc
-  b4a003dbb4ae, surface7's Z memory compiled alone on 11x11, 12x11 and 12x12 (Grid and WISE)
-  gives a program that breaks R1: a trap holds 3 ions against a capacity of 2, six times. The
-  releases' one-program memory (Z then X) compiles on the same three devices without breaking a
-  rule, so the figure has these sizes. [r1_fault.py](r1_fault.py) reproduces the fault in about
-  7 minutes (grid11x11: 6 violations, at sites T3_7h and T7_6v), and
-  `results/separate/surface7.jsonl` records the six failed rows. With cd3efedbbc10 the same
-  compile breaks no rule (0 violations). HGP58's 11x10, 11x11 and 12x11 lattices broke R1 the
-  same way under b4a003dbb4ae and keep every rule under cd3efedbbc10 (see the reference compiler
-  above).
-- **BB72 on a grid: the reference compiler routes no size.** qccdc refuses all 12 grids, 10x9
-  to 15x15, as unroutable: an ion cannot reach its gate within the router's cycle limit. WISE,
-  which runs the same program, is refused at the same 12 sizes. Six larger grids did not finish
-  within the sweep's first limit of 1800 s, so the sweep now gives every compile the release's
-  own limit (3600 s, what the grader gives a submitter). Given that time, they all finish and
-  are refused the same way. C2LR's router compiles every size. The Conveyor
-  with a dock for every ion, `conveyor96_96d_j`, has the lowest LER: 4.2e-4 per round at
-  405.6 ms, four times below C2LR's best (1.9e-3). A Conveyor with 72 docks is refused, because
-  half the ions then ride the loop, and on this device only a docked ion can gate. BB72's board
-  therefore starts from `conveyor96_96d_j`, not from a grid: that is release 2
-  (`goal3_bb72_mem@2`, 2026-11-02), which is release 1 with its corner-trap starter,
-  `conveyor96_96d` (3.6e-4 at 383.9 ms), replaced by this twin. Release 1 keeps its board, and
-  Goal 3 shows release 2. BB108 and BB144 are checked but not swept: BB72's points already take
-  7 to 80 minutes each.
-- **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took
-  the textbook one on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py),
-  [CODES.md](CODES.md)). It passes every check the other codes pass. Its CNOT order is the
-  schedule's, not a tuned one (Keyi), and Alex may replace the code.
-- **Colour-code decoder:** the sweep decodes the colour code with generic BP-OSD. A colour-code
-  decoder (e.g. Chromobius) would be fairer before the codes are compared with each other
-  (noise and decoding: Zhuangzhuang, Jaewon, Yuewen). Architectures are still compared fairly
-  within a code.
-- **Code sizes for the target LER < 10⁻⁵:** under qccd-noise@2 only surface d=7 reaches it so
-  far (Grid 12x11: 4.1e-6 per round, 95% interval up to 5.4e-6). Colour d=7's best is 1.2e-4,
-  so the colour code needs d > 7, or a colour-code decoder. BB72's best is 4.2e-4 per round for
-  its 12 logical qubits, and HGP58's is 2.6e-2 for 16. Both are decoded with generic BP-OSD.
-- **Certificates:** the sweep skips the Lean step. A family's best point should be submitted
-  through the full grader before the paper quotes it.
+- **The official boards are not on this model yet.** `goal3_<code>_mem` releases still fix qccd-physics@2 and
+  qccd-noise@2, and their physics lock has no way to give each family its own prices. They hold no entries.
+  This sweep uses their circuits, detectors, budgets and seeds. Moving them means new releases, and a lock
+  that recomputes a family's prices from its parameters rather than trusting a device's own.
+- **[DECK.md](DECK.md), "Readings to confirm":** the idle leakage rate the noise model does not print, the
+  3 ms cooling, the GateSwap's error, and others. Each is one number here; changing one means sampling again.
+- **Cooling decides much of the time comparison.** C2LR and WISE pay 3 ms for each batch of gates that needs it.
+  Cyclone pays nothing, as the deck's S10 assumes. `results/variants/cool300us/` is the same sweep at Studio's
+  300 us.
+- **The compilers are baselines.** WISE's router is greedy over the deck's step types and takes real steps rather
+  than the paper's worst case. Cyclone's placement is annealed over one round. Neither is tuned, and C2LR's router
+  still gives the same time on several sizes.
+- **41 of the 189 pages animate only part of their program.** A page holds 20,000 frames, and most of WISE's
+  programs on the larger codes are longer (BB72's reach 195,000 instructions). Such a page says "truncated", and its
+  self-check covers the frames it animates. Its numbers are always the whole program's.
+- **Certificates:** the sweep skips the Lean step. `Compiler/bridge/check_cert.py` accepts the certificates of all
+  189 points for transport and for each qubit's gate order (run by hand on 2026-11-06; `tests/test_goal3_deck.py`
+  keeps one point of each family). A family's best point should go through the full grader before the paper quotes it.
+- **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took the textbook one
+  on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py), [CODES.md](CODES.md)). Alex may
+  replace it.
+- **Colour-code decoder:** the sweep decodes the colour code with generic BP-OSD. A colour-code decoder (e.g.
+  Chromobius) would be fairer before the codes are compared with each other. Architectures are still compared
+  fairly within a code.
+- **BB108 and BB144** are checked but not swept.

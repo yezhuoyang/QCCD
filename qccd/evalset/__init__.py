@@ -172,9 +172,10 @@ class Evaluation:
 
 
 def noise_for_clock(clock: str) -> str:
-    """The noise model a design priced on this operating-point table is judged under: Goal 1's
-    cited physics (`quantinuum`) by qccd-noise@2, anything else by qccd-noise@1."""
-    return "qccd-noise@2" if clock == "quantinuum" else "qccd-noise@1"
+    """The noise model a design priced on this operating-point table is judged under: Goal 3's
+    Helios nominal clock (`helios`) by qccd-noise@3, Goal 1's cited physics (`quantinuum`) by
+    qccd-noise@2, anything else by qccd-noise@1."""
+    return {"helios": "qccd-noise@3", "quantinuum": "qccd-noise@2"}.get(clock, "qccd-noise@1")
 
 
 def for_page(clock: str) -> "Evaluation":

@@ -23,6 +23,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -30,7 +31,7 @@ for p in (ROOT, ROOT / "Codesign" / "scripts", HERE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-TABLE = "quantinuum"
+TABLE = "helios"
 
 
 def rows(code: str) -> list[dict]:
@@ -66,11 +67,20 @@ def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000
     cert = json.loads((work / "prog.qcert.json").read_text(encoding="utf-8"))
     source = B.build_source(prog, cert, work / "circuit.qasm")
     model = corrected_model(TABLE)
-    report = verify(prog, arch, model, check_metrics=False)
+    from families import RULES
+    from qccd.ruleset import FAILS, check, legacy_config
+    from qccd.ruleset import load as load_rules
+    from qccd.ruleset.compile import circuit_of_certificate
+    from qccd.ruleset.programme import programme_execution
+    rs = load_rules(RULES[row["family"]])
+    plain = TSIR.load(str(work / "prog.cooled.tsir.json"))
+    judged = check(rs, programme_execution(plain, arch, model, circuit=circuit_of_certificate(cert),
+                                           rule_config=legacy_config(rs) or None, check_metrics=False))
+    report = verify(prog, arch, model, check_metrics=False, rule_config=legacy_config(rs) or None)
     t_ms = report.result.total_us / 1000.0
     if abs(t_ms - row["T_ms"]) > 1e-6 * max(1.0, row["T_ms"]):
         raise ValueError(f"{work}: replays to {t_ms} ms, the sweep's row says {row['T_ms']} ms")
-    failed = report.rules.summary()["failed"]
+    failed = sorted(x.id for x in judged.results if x.verdict == FAILS)
     rounds = 2 * exp.rounds
     if row["status"] == "ok":
         ler = row["ler"]
@@ -87,16 +97,22 @@ def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000
     render_html(B._publishable(arch), prog, report.result, model, page,
                 kicker=f"GOAL 3 · {rel.title.removeprefix('Goal 3: ').upper()}",
                 headline=f"{rel.title} on {row['point']}", lede=lede, source=source,
-                template_stems="*", max_frames=max_frames)
+                template_stems="*", max_frames=max_frames,
+                ruleset={"ruleset": rs.name, "title": rs.title, "results": judged.to_json()["rules"],
+                         "note": "A family is judged by its own rule set; the badges below are this "
+                                 "website's machine, for comparison."})
     numbers = {"compiled": f"compiled by {row['compiler']}; the sweep skips the Lean step, so R10 is not "
                            f"claimed here"}
     # the page is served as board/goal3/p/<code>/<point>.html: Goal 3's page is two folders up
     B._inject(page, {"key": row["point"], "claim": claim}, [], numbers, f"../../#{rel.manifest['task']}")
     if row["status"] == "ok":
         lr = json.loads((work / "ler_report.json").read_text(encoding="utf-8"))
+        # the sweep's noise model, on the experiment the release fixes
+        judged_on = SimpleNamespace(manifest={**rel.manifest, "qec": {**rel.manifest["qec"], "noise": row["noise"]}},
+                                    id=rel.id, title=rel.title)
         panel = M.noise_panel({"prefix": str(work / "prog"), "cooled": str(work / "prog.cooled.tsir.json"),
                                "arch": str(work / "device.arch.json"), "ler": row["ler"], "budget": lr["budget"],
-                               "stats": lr["stats"], "key": f"{row['code']}_{row['point']}"}, rel, exp)
+                               "stats": lr["stats"], "key": f"{row['code']}_{row['point']}"}, judged_on, exp)
         # the panel links as a board's seed page does (board/<task>/<page>); this one is two deeper
         for a, b in (('href="../noise/"', 'href="../../../noise/"'),
                      ('href="../../evaluation/"', 'href="../../../../evaluation/"')):
@@ -145,7 +161,9 @@ def main() -> int:
                 continue
             todo.append((code, row, w))
     bad = 0
-    with ProcessPoolExecutor(max_workers=a.workers) as ex:
+    # a process per page: a long programme's page takes gigabytes, and a worker that goes on to the next keeps them
+    one_each = {"max_tasks_per_child": 1} if sys.version_info >= (3, 11) else {}
+    with ProcessPoolExecutor(max_workers=a.workers, **one_each) as ex:
         futs = {ex.submit(_one, code, row, w, a.out, a.gzip): (code, row["point"]) for code, row, w in todo}
         for f in as_completed(futs):
             code, point = futs[f]

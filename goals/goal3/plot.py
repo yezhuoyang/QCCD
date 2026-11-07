@@ -4,9 +4,9 @@ every other size it was tried at is grey.  Sizes run left to right, smallest mac
 
     python goals/goal3/plot.py [--code surface5 ...]      (needs matplotlib)
 
-A point is a design that compiled and passed the rules on the code's release, which runs the Z
+A point is a design that compiled and passed its family's rule set, on the code's experiment, the Z
 memory and then the X memory on the same ions (boards.py):
-* time per round = the replayed program time under the "quantinuum" table / 2d, the rounds of
+* time per round = the replayed program time under the "helios" table / 2d, the rounds of
   both memories;
 * LER per round = the grader's `ler_per_round`, 1 - (1 - p_Z)(1 - p_X): a round fails when
   either memory does; the bar is its 95% Wilson interval.
@@ -35,8 +35,9 @@ def size_key(r: dict) -> float:
     p = r["params"]
     if r["generator"] == "grid":
         return p["a"] * p["b"]
-    # a loop's slots (a junction-corner loop has none in its four corners) and its docks
-    return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
+    if r["generator"] == "wise":
+        return p["h"] * p["cx"] * p["cy"]
+    return p["x"]
 
 
 def points(code: str) -> tuple[dict, dict]:
@@ -137,7 +138,7 @@ def main() -> int:
                          "axes.facecolor": "#fcfcfb", "savefig.facecolor": "#fcfcfb"})
     table = ["# Goal 3 — best design per architecture family", "",
              "Each family's best point by each measure (they can differ). Time per round under the "
-             "`quantinuum` table; LER per round = 1-(1-p_Z)(1-p_X) under qccd-noise@2, 95% interval.", ""]
+             "`helios` table; LER per round = 1-(1-p_Z)(1-p_X) under qccd-noise@3, 95% interval.", ""]
     good = []
     for code in codes:
         pts, counts = points(code)

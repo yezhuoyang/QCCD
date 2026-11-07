@@ -3,8 +3,8 @@
 For each fixed code (goals/goal3/README.md) two charts: time per round and logical error rate
 per round, one column per architecture family.  Each family's best point by that measure is in
 colour and named; every other size is grey.  The points are the reference sweep's
-(goals/goal3/results: every family at every size, compiled by the pinned reference compiler and
-graded like an entry, minus the Lean step) and the official entries on the code's release,
+(goals/goal3/results: every family at every size the transport deck allows, compiled by the
+family's own compiler and judged by its own rule set, minus the Lean step) and the official entries on the code's release,
 fetched live from /official/v1/goals/goal3 and drawn as diamonds that open their entry page.
 Under them, a table of every rule any point was judged by, family by family and entry by entry
 (goals/goal3/rules.json: what each point's rules stage checked), as the Reproduce pages have.
@@ -39,11 +39,16 @@ def _families():
 
 
 def _size(r: dict) -> float:
+    """How large a point's machine is, in its family's own terms: cells, gate zones or traps."""
     p = r.get("params") or {}
-    if r.get("generator") == "grid":
+    gen = r.get("generator")
+    if gen == "grid":
         return p["a"] * p["b"]
-    # a loop's slots (a junction-corner loop has none in its four corners) and its docks
-    return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
+    if gen == "wise":
+        return p["h"] * p["cx"] * p["cy"]
+    if gen == "cyclone":
+        return p["x"]
+    return 0
 
 
 def data() -> dict | None:
@@ -89,7 +94,11 @@ def data() -> dict | None:
                         "l": ler["per_round"], "lo": ler["per_round_lo"], "hi": ler["per_round_hi"],
                         "e": ler["errors"], "sh": ler["shots"], **u})
         name, short = b.title.removeprefix("Goal 3: "), _short(b.title)
-        codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": b.manifest.get("description", ""),
+        # a release is never rewritten, and its text names the board's model; the reference sweep's is the deck's
+        about = b.manifest.get("description", "").replace(
+            "under qccd-noise@2, with Helios-class physics in which every number is cited",
+            "under the team's Helios nominal noise model (qccd-noise@3)")
+        codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": about,
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
                       "counts": counts, "points": pts, "failed": failed,
                       **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
@@ -506,14 +515,14 @@ def page(PAGE: str, STYLE: str) -> str | None:
                     + leaderboard.board_block(c["task"], c["title"], live=False, root="../../").replace(
                         "Coloured dots are submitted designs", "Diamonds are submitted designs") + "</div>"
                     for c in d["codes"])
-    fams = ("<tr><td>Grid</td><td>a junction lattice, a trap on every wire, every electrode its own DAC</td></tr>"
-            "<tr><td>WISE</td><td>the same lattice with broadcast DACs and a switch per site</td></tr>"
-            "<tr><td>C2LR</td><td>the same lattice as a swap-or-stay device (Yb-Ba crystals, the demonstrated "
-            "diagonals)</td></tr>"
-            "<tr><td>Cyclone</td><td>one loop of traps, moved rigidly; its four corners are junctions the "
-            "rotation passes</td></tr>"
-            "<tr><td>Conveyor</td><td>a loop of rail slots with dock spurs, rotated rigidly, ions docked to gate; "
-            "junction corners</td></tr>")
+    fams = ("<tr><td>C2LR</td><td>Cx &times; Cy cells, an X-junction and two legs each, one crystal per leg; "
+            "crystals move only by swap-or-stay steps, one direction bit a leg (Yb-Ba, the demonstrated diagonals)</td>"
+            "<td>Cx, Cy</td></tr>"
+            "<tr><td>WISE</td><td>Cx &times; Cy cells, a junction zone and h gate zones each; parallel switched swaps, "
+            "one parity and one kind of operation across the chip in a step, and every layer pays for its shims</td>"
+            "<td>h, Cx, Cy</td></tr>"
+            "<tr><td>Cyclone</td><td>one ring of x traps of up to n ions, L-shaped junctions at its corners; the data "
+            "stands still and the ancillas rotate in lockstep</td><td>x, n &le; 30</td></tr>")
     body = (
         "<h1>Goal 3: one code at a time, every architecture</h1>"
         '<p class="sub">For each fixed QEC code, every architecture family at every size its rules allow. '
@@ -523,13 +532,15 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "question. Goal 3 fixes the code and sweeps one axis, the architecture: which family runs the code&rsquo;s "
         "memory fastest, and which with the lowest logical error rate. A memory is the code&rsquo;s Z memory and then "
         "its X memory on the same ions, d rounds each, so a round fails when either memory does.</p>"
-        "<p>Every point is graded on qccd-physics@2 and qccd-noise@2, the physics and noise of Goal 1, with the "
-        "<code>quantinuum</code> time table and every rule. The circles are the reference sweep: each family at every "
-        "size, compiled by the reference compiler (qccdc, or the platform&rsquo;s baseline router on C2LR) and graded "
-        "like an entry, without the Lean certificate step; each point&rsquo;s page names the compiler. The diamonds are entries submitted to the official server, which ran every check. "
+        "<p>Every point runs under the team&rsquo;s Helios nominal noise model (qccd-noise@3, on qccd-physics@3), and "
+        "where that model has no number for an architecture, under the architecture&rsquo;s own time and heat from "
+        "the team&rsquo;s transport deck. The circles are the reference sweep: each family at every size the deck "
+        "allows, compiled by its own baseline compiler, which keeps the circuit&rsquo;s gate order, and judged by "
+        "its own rule set, without the Lean certificate step. The diamonds are entries submitted to the official "
+        "server, which ran every check on the board&rsquo;s own physics. "
         "Click any point to open its page: the ions moving on the device, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
-        f"<div class=\"tw\"><table><tr><th>family</th><th>the device</th></tr>{fams}</table></div></details>"
+        f"<div class=\"tw\"><table><tr><th>family</th><th>the device</th><th>swept</th></tr>{fams}</table></div></details>"
         '<div class="g3" id="g3">'
         '<div class="g3-tabs" id="g3-tabs" role="tablist" aria-label="Code"></div>'
         '<p class="g3-code" id="g3-code"></p>'
@@ -547,8 +558,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "<p>Every submission is judged by its own rule set, as each paper is on the "
         '<a href="../../reproduce/">Reproduce</a> page. Each family of the reference sweep is one submission, '
         "its sizes together, and its machine&rsquo;s paper gives its set: "
-        f"{own}. WISE&rsquo;s paper gives closed forms rather than a schedule&rsquo;s rules, and Conveyor is "
-        "this platform&rsquo;s own design, so both are held to this website&rsquo;s machine. A submitted entry is "
+        f"{own}. A submitted entry is "
         "judged by the set it declares, or by the board&rsquo;s ("
         + ", ".join(set_link(n) for n in boards)
         + ") when it declares none. Every rule of any of these sets is a row.</p>"
@@ -558,7 +568,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "below the table); – not one of its rules. Each rule and each set is written out on the "
         '<a href="../../rules/">Rules</a> page.</small></p></details>'
         f'<details><summary>What the starred families cannot show yet</summary><ul>{cav}</ul>'
-        "<p>A size counts as failed when the reference compiler refused it or its program broke a rule.</p></details>"
+        "<p>A size counts as failed when its compiler refused it or its program broke a rule.</p></details>"
         f"{tries}</div>"
     )
     js = SCRIPT.replace("__DATA__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))

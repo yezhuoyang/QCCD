@@ -377,6 +377,39 @@ def c2lr_primitives(species: str) -> dict:
     return out
 
 
+#: The transport deck's prices (its C2LR T1, T5, T6, T7, T9, from Tables I-III of the paper), on
+#: the mode a gate reads.  The Helios nominal noise model counts heat in the gate mode, its
+#: background rate being the stretch mode's, so these are XSTR where `C2LR_PHYSICS` is XCOM: a
+#: step's heat is the doubled operation's final n-bar less the cooled start (0.03 q), halved.
+C2LR_DECK: Mapping[str, Mapping] = {
+    "Yb-Ba": {
+        "swap_or_stay": {"us": 400.0, "quanta_swap": (0.31 - 0.03) / 2, "quanta_stay": (0.10 - 0.03) / 2,
+                         "com_mhz": 1.4,
+                         "source": "QCCD Transport Architectures deck, C2LR T1, T6, T7 (arXiv:2403.00756 Tables I-III)"},
+        "reorder_or_not": {"us": 93.0, "quanta": 0.007,
+                           "source": "QCCD Transport Architectures deck, C2LR T5, T9; Helios Nominal Noise Model Sec. 5"},
+    },
+    "Ba-Sr": {
+        "swap_or_stay": {"us": 312.5, "quanta_swap": (0.30 - 0.03) / 2, "quanta_stay": (0.08 - 0.03) / 2,
+                         "com_mhz": 1.85,
+                         "source": "QCCD Transport Architectures deck, C2LR T1, T6, T7 (arXiv:2403.00756 Tables I-III)"},
+    },
+}
+
+
+def deck_census(cx: int, cy: int) -> dict:
+    """The transport deck's hardware table for one trap of Cx x Cy cells, which counts every cell
+    two legs and so ignores the edge (C2LR, Examples)."""
+    legs = 2 * cx * cy
+    junctions = cx * cy
+    return {"cells": junctions, "legs": legs, "laser_pairs": legs, "broadcast_electrodes": 12 * legs,
+            "c2lr_electrodes": 2 * legs, "shim_electrodes": 2 * legs, "junction_electrodes": 4 * junctions,
+            "total_electrodes": 16 * legs + 4 * junctions, "transport_dacs": 27,
+            "shim_dacs_max": 2 * legs, "total_dacs_max": 27 + 2 * legs,
+            "total_dacs_demultiplexed": 27 + (2 * legs + 126) // 127, "switches": legs,
+            "active_area_mm2": junctions * 0.375 ** 2}
+
+
 def c2lr_species(species: str) -> dict:
     """The species keys a C2LR device adds to its template's `species` block: the pair, its
     qubit and coolant ions.  The paper is cited as `pair_source`, so the block's own `source`

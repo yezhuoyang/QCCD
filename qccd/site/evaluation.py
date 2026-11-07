@@ -941,6 +941,18 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'does not say is said in its <code>about</code>: no error per rail, junction, split or swap (transport '
       'pays in time and heat, which <code>memory</code>, <code>memory_coherent</code> and <code>ms</code> '
       'charge), no ion loss, no crosstalk from a two-ion gate.</p>')
+    # the model Goal 3's architectures are judged by: a studio page on the `helios` clock books under
+    # it and links each budget line here, so the channels @2 does not have keep a card of their own
+    n3 = load("qccd-noise@3")
+    n3names = _names(n3)
+    n3own = [c for c in n3.channels if c.name not in {x.name for x in n2.channels}]
+    w('<details id="noise3"><summary>The model Goal 3 is judged by, qccd-noise@3</summary>'
+      f'<p>{html.escape(n3.about)}</p><pre class="ev">{hl(n3.text(), n3names)}</pre>'
+      '<p>Download <a href="qccd-noise@3.eval">qccd-noise@3.eval</a>.</p>'
+      + "".join(f'<div class="item" id="c-{c.name}"><h4>{html.escape(c.title)}<code>{c.name}</code></h4>'
+                + (f'<p>{html.escape(c.about)}</p>' if c.about else "")
+                + (f'<p class="src">{_arxiv(c.source)}</p>' if c.source else "") + '</div>' for c in n3own)
+      + '</details>')
     # its one channel @2 does not have keeps a card of its own: a studio page priced on another
     # clock than Goal 1's books under qccd-noise@1 and links each budget line here
     n1only = [c for c in n1.channels if c.name not in {x.name for x in n2.channels}]

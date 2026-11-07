@@ -1,0 +1,17 @@
+# WISE (Malinowski, Allcock and Ballance, arXiv:2305.12773), as the team's transport deck writes
+# it for QCCD Studio: a chip of cells, one junction zone and h gate zones each, sorted by parallel
+# switched swaps, with one kind of operation running across the chip in a step.
+#
+# W1-W6, W10 and W11 are the deck's S1-S6, S10 and S11 where no R rule says the same thing.  The
+# deck's S7 is an algorithm and S12 says what switching does not cost, so neither is a rule; S8's
+# R2 and R23 and S9's R6, R6b and R12 are in the list below.
+
+ruleset "wise"
+title "WISE's rules"
+about "A chip of cells, one junction zone and h gate zones each. A zone holds one qubit, or two for a gate or in the middle of a swap. A swap step plays one kind of pair at one parity, one direction to a half; one kind of operation runs across the chip in a step; a layer of gates is one gate at one angle; and every layer pays for its shims before it starts. No ion rests on a junction zone, which holds at most one at a time."
+
+use R0, R1, R2, R3, R4, R4b, R4d, R5, R6, R6b, R7, R7c, R8, R11, R12, R13, R14, R15, R16, R17
+use R18, R19, R20, R21, R22, R23, R24, R25
+
+param max_chain = 2
+use W1, W2, W4, W10, W11

@@ -32,6 +32,9 @@ SETS = (
     # and refused in the second, which keeps to what arXiv:2403.00756 demonstrated
     ("c2lr", "C2LR swap-or-stay"),
     ("c2lr-demonstrated", "C2LR swap-or-stay, as demonstrated"),
+    # Goal 3's WISE and Cyclone, as the transport deck writes them (goals/goal3/DECK.md)
+    ("wise", "WISE"),
+    ("cyclone-deck", "Cyclone, as the transport deck writes it"),
 )
 
 #: The Reproduce papers that are not replays of an artifact's runs, and their rule sets.

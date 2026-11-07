@@ -29,6 +29,7 @@ from .model import Execution
 from .syntax import Node, Rule, RuleSetSource, RuleSyntaxError, parse, show
 from .vocabulary import TERMS
 from . import machine as _machine  # noqa: F401  (registers the machine-level words)
+from . import transport as _transport  # noqa: F401  (registers the WISE and Cyclone words)
 
 __all__ = [
     "RuleSet", "RuleSyntaxError", "load", "names", "catalogue", "check", "check_programme",

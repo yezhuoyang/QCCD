@@ -457,8 +457,40 @@ class NoiseModel2(NoiseModel):
         return self.p_reset(params)     # the first preparation is a reset like any other
 
 
+# ---------------------------------------------------------------------- qccd-noise@3
+#
+# The team's Helios Nominal Noise Model (QCCD simulation specification, 2026-11-05, based on
+# Jaewon's noise model), which Goal 3's architectures are judged by.  Its text is
+# qccd/evalset/library/qccd-noise@3.eval, which is what writes the circuit; there is no
+# hand-written twin of it, so the probability functions above do not apply.  The physics that
+# goes with it is qccd/workspace/physics/qccd-physics@3.json, whose table is "helios".
+
+
+@dataclass(frozen=True)
+class NoiseModel3(NoiseModel2):
+    """The Helios nominal model.  Its numbers are parameters of its text."""
+
+    id: str = "qccd-noise@3"
+    table: str = "helios"
+
+    def channel_names(self) -> tuple[str, ...]:
+        from ..evalset import load
+        names: list[str] = []
+        for c in load(self.id).channels:
+            for k in ([k for k, _ in c.counted] or [c.name]):
+                if k not in names:
+                    names.append(k)
+        return tuple(names)
+
+    def channels(self) -> tuple[dict[str, str], ...]:
+        from ..evalset import load
+        return tuple({"channel": c.name, "where": c.title, "stim": c.text, "formula": c.about,
+                      "source": c.source} for c in load(self.id).channels)
+
+
 #: The published models.  `qccd-noise@1` is `NoiseModel()` with its defaults.
-MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2()}
+MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2(),
+                                 "qccd-noise@3": NoiseModel3()}
 
 #: Which text a model's knobs set, knob by knob: (NoiseModel field, the text's parameter).
 _KNOBS = (("scale", "scale"), ("heating", "heating"), ("chain", "chain"), ("idle", "idle"),
@@ -477,7 +509,7 @@ def evaluation(model: "NoiseModel | str"):
     from ..evalset import load
 
     nm = get(model) if isinstance(model, str) else model
-    base = "qccd-noise@2" if isinstance(nm, NoiseModel2) else "qccd-noise@1"
+    base = nm.id if nm.id in MODELS else ("qccd-noise@2" if isinstance(nm, NoiseModel2) else "qccd-noise@1")
     ev = load(base)
     default = MODELS[base]
     knobs = {}

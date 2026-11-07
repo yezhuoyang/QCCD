@@ -86,6 +86,8 @@ def main() -> None:
     doc = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
     if "sets" not in doc:            # the earlier layout (one shared set) is replaced whole
         doc = {"sets": {}, "reasons": {}, "codes": {}}
+    # only the sets the families use now: a set a family has left does not stay listed
+    doc["sets"] = {}
     for name in sorted(set(RULES.values())):
         rs = load_rules(name)
         doc["sets"][name] = {"title": rs.title, "ids": rs.ids}

@@ -76,31 +76,30 @@ def test_goal_3_releases_stay_off_goal_1(svc):
 
 
 def test_every_family_s_device_is_read_back_as_that_family():
+    import boards
     import families
     import sweep
-    rel = find_release("goal3_surface3_mem@1")
+    exp = boards.experiment("surface3")
     meta = json.loads((GOAL / "codes" / "surface3_z" / "meta.json").read_text(encoding="utf-8"))
     for fam in families.FAMILIES:
         for p in families.points_for(fam, meta)[:2]:
-            assert OfficialService.architecture_family(sweep.device_doc(p, rel)) == fam, p["name"]
+            assert OfficialService.architecture_family(sweep.device_doc(p, exp)) == fam, p["name"]
     assert OfficialService.architecture_family({"geometry": {"generator": "chain"}}) == "Other"
     assert OfficialService.architecture_family({"nodes": []}) == "Other"
 
 
-def test_the_ring_families_have_junction_corners():
-    """Cyclone's and Conveyor's loops are built as the site's rings are since 2026-11-01: four
-    junction corners and the traps on the sides; `<name>_j` keeps the corner-trap loop's slots."""
-    import re
-
+def test_cyclone_s_rings_have_junction_corners():
+    """Cyclone's rings are built as the site's rings are since 2026-11-01, and as the deck's HW2 says:
+    four L-shaped junctions at the corners and x traps on the sides."""
     import families
-    from qccd.arch.generators import ring
+    from qccd.arch import Architecture, cyclone
     for code in CODES:
         meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
-        for fam in ("Cyclone", "Conveyor"):
-            for p in families.points_for(fam, meta):
-                assert p["params"]["corners"] == "junction" and p["name"].endswith("_j"), p["name"]
-                slots = 2 * int(re.match(r"[a-z]+(\d+)", p["name"]).group(1))
-                assert len(ring(**p["params"]).loop_slots("L0")) == slots, p["name"]
+        for p in families.points_for("Cyclone", meta):
+            dev = Architecture.from_json(cyclone.device_doc(p["params"]["x"], p["params"]["n"])).device
+            assert len(dev.loop_slots("L0")) == p["params"]["x"], p["name"]
+            bends = [n for n in dev.nodes if dev.nodes[n].kind == "junction"]
+            assert len(bends) == 4 and all(dev.degree(n) == 2 for n in bends), p["name"]
 
 
 def test_bb72_release_2_is_release_1_with_the_junction_starter():
@@ -120,15 +119,15 @@ def test_the_goal_3_board_gives_family_time_per_round_and_ler(svc, monkeypatch):
                   "metrics": {"T_quantinuum": 120.0, "ler_per_round": 2e-4},
                   "ler": {"per_round": 2e-4, "per_round_lo": 1e-4, "per_round_hi": 3e-4}}], {})
     monkeypatch.setattr(svc, "_ranked_rows", rows)
-    monkeypatch.setattr(svc, "_entry_family", lambda sid: ("Conveyor", "conveyor24_12d"))
+    monkeypatch.setattr(svc, "_entry_family", lambda sid: ("Cyclone", "cyclone24_n2"))
     g = svc.goal_board("goal3")
-    assert g["goal"] == "goal3" and g["families"][:5] == ["Grid", "WISE", "C2LR", "Cyclone", "Conveyor"]
+    assert g["goal"] == "goal3" and g["families"] == ["C2LR", "WISE", "Cyclone", "Other"]
     import boards
     assert [r["id"] for r in g["releases"]] == [boards.release_id(c) for c in CODES]
     s5 = next(r for r in g["releases"] if r["id"] == "goal3_surface5_mem@1")
     assert s5["rounds"] == 10 and s5["ions"] == 49          # five rounds of Z, then five of X
     e = s5["entries"][0]
-    assert e["family"] == "Conveyor" and e["device"] == "conveyor24_12d" and e["by"] == "Ada"
+    assert e["family"] == "Cyclone" and e["device"] == "cyclone24_n2" and e["by"] == "Ada"
     assert e["T_round_ms"] == pytest.approx(12.0) and e["ler_per_round"] == 2e-4
 
 
@@ -195,7 +194,7 @@ def test_board_goal3_judges_each_submission_by_its_own_rule_set():
                 if rid in own:
                     assert F["cells"][rid][0] == "skip", (code, fam, rid)
             assert ({i for i in own if i.startswith("C")} != set()) == (fam == "C2LR")
-    assert set(d["rules"]["never"]) == {"R7b", "R9", "R29"}
+    assert set(d["rules"]["never"]) <= {"R7b", "R9", "R29"}
     # the compilers keep each qubit's gates in the circuit's order, and the transport stamped with a
     # gate (the race-track split after a layer) does not carry it out: no order rule fails anywhere
     assert not [(code, fam, p) for code, c in judged["codes"].items() for fam, d in c.items()

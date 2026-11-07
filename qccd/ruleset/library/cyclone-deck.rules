@@ -1,0 +1,18 @@
+# Cyclone (Khan, Anand, Brown and Baker, arXiv:2511.15910), as the team's transport deck writes it
+# for QCCD Studio: one closed ring of traps, the data standing still and the ancillas rotating in
+# lockstep.  Not the rule set `cyclone`, which is the paper's artifact as Reproduce replays it.
+#
+# Y1-Y4 are the deck's S1-S3 and HW1 where no R rule says the same thing.  The deck's S4 is R4b,
+# its S5 R27 and R12, its HW3 R3 and R5.  Its S6 assigns stabilizers on the fly under R26: Goal 3
+# keeps the circuit's order instead (the project owner's decision, 2026-11-06), so this set uses
+# R25.  Its S8 and S9 are design choices, and its S10 assumes cooling, so nothing here heats and
+# R7 holds at no cost.  R13 is left out: HW1 allows 30 ions a trap, which is Y4.
+
+ruleset "cyclone-deck"
+title "Cyclone's rules, as the deck writes them"
+about "One closed ring of traps with L-shaped junctions at its corners. Data qubits never move. Every ancilla moves in lockstep, one trap per step, one way round. A trap does one operation at a time, and a step's gates come before its rotation. Each qubit's operations keep the circuit's order."
+
+use R0, R1, R2, R3, R4, R4b, R5, R6, R6b, R7, R8, R11, R12, R18, R19, R20, R21, R24, R25, R27
+
+param serial_kinds = {"gate2", "split", "merge"}
+use Y1, Y2, Y3, Y4

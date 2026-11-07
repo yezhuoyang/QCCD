@@ -221,6 +221,41 @@ def layers(ops: Sequence[SourceOp]) -> list[list[SourceOp]]:
     return out
 
 
+def layers_reading_together(ops: Sequence[SourceOp]) -> list[list[SourceOp]]:
+    """`layers`, with one difference: a run of `measure` and `reset` statements reads its qubits
+    out together.  `measure q[9]; reset q[9]; measure q[10]; ...` is one layer of readouts and one
+    of resets, where `layers` plays them one qubit at a time.  Gates keep their time steps exactly
+    as `layers` gives them, and every qubit keeps its sequence.  A barrier fences its qubits."""
+    last: dict[tuple[str, int], int] = {}
+    out: list[list[SourceOp]] = []
+    k = 0
+    run: int | None = None     # the layer the current run of readouts opened at
+    top = 0                    # the latest layer that run has reached
+    for op in ops:
+        wires = [("q", q) for q in op.qubits] + [("c", c) for c in op.clbits]
+        at = max((last.get(w, -1) for w in wires), default=-1)
+        if op.name == "barrier":
+            for w in wires:
+                last[w] = at
+            continue
+        if op.name in ("measure", "reset"):
+            if run is None:
+                run, top = k, k
+            here = max(run, at + 1)
+            top = max(top, here)
+        else:
+            if run is not None:
+                k, run = top, None
+            k = max(k, at + 1)
+            here = k
+        while len(out) <= here:
+            out.append([])
+        out[here].append(op)
+        for w in wires:
+            last[w] = here
+    return out
+
+
 def layer_of(ops: Sequence[SourceOp]) -> list[int]:
     """Each op's layer, as `layers` places it; a barrier's is the fence it sets, the latest
     layer on its qubits (-1 when none has run yet), which no later op on them may share."""
@@ -610,17 +645,20 @@ class _Build:
 
 
 def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
-                 seed: int = 0, stages: list[dict] | None = None) -> tuple[TSIR, dict]:
+                 seed: int = 0, stages: list[dict] | None = None,
+                 reads_together: bool = False) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the C2LR device `arch`, uncooled: the
     certified programme (`compile_with_router` inserts the cooling).  Raises `Refused` for a
     pair it cannot compile, `RouteError` if what it built does not replay cleanly.  A list
-    passed as `stages` receives the native stages' evidence (`write_stages` saves it)."""
+    passed as `stages` receives the native stages' evidence (`write_stages` saves it).
+    `reads_together` lays the ops out by `layers_reading_together`, as Goal 3's compilers do;
+    the C2LR boards keep `layers`."""
     if not is_c2lr(arch):
         raise Refused(f"{arch.name} does not declare C2LR control; this router plays only "
                       f"swap-or-stay steps")
     lat = Lattice(arch)
     n, ops, n_clbits = _parse(qasm_text)
-    plan = layers(ops)
+    plan = layers_reading_together(ops) if reads_together else layers(ops)
     at = place(lat, n, plan, seed=seed)
     ion = {q: f"q{q}" for q in range(n)}
     placement = {ion[q]: at[q] for q in range(n)}
@@ -704,7 +742,7 @@ def compile_with_stages(work, *, name: str = "circuit") -> int:
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qccdsim_jones",
-                        name: str = "circuit") -> tuple[Path, Path]:
+                        name: str = "circuit", reads_together: bool = False) -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs, from this router: `prog.tsir.json` (certified),
     `prog.qcert.json`, `prog.cooled.tsir.json` (the cooling pass at `table`, the final
     programme), `device.expanded.json`, `circuit.qasm` and `compile.json` in `workdir`.
@@ -728,7 +766,7 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qcc
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_c2lr(qasm_text, arch, name=name)
+    prog, cert = compile_c2lr(qasm_text, arch, name=name, reads_together=reads_together)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     model = corrected_model(table)

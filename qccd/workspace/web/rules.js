@@ -27,6 +27,18 @@
       title: 'Swap-or-stay lattices (C2LR)',
       blurb: 'What a C2LR step may do: one direction bit per leg, one shared waveform, crystals ending at leg centres, and the control it takes. They judge only a C2LR device.',
       rules: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10']
+    },
+    {
+      id: 'rules-wise',
+      title: 'Parallel switched swaps (WISE)',
+      blurb: 'What a WISE chip may do: one parity and one kind of operation across the chip in a step, one gate at one angle in a layer, and a shim charge before every layer.',
+      rules: ['W1', 'W2', 'W4', 'W10', 'W11']
+    },
+    {
+      id: 'rules-cyclone',
+      title: 'Ring codesign (Cyclone)',
+      blurb: 'What a Cyclone ring may do: one closed ring, the data still, every ancilla one trap on in lockstep, at most 30 ions a trap.',
+      rules: ['Y1', 'Y2', 'Y3', 'Y4']
     }
   ];
 

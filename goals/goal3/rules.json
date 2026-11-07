@@ -90,49 +90,33 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor144_96d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor96_96d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone108_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone75_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone83_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone94_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone10_n16": {},
+     "cyclone16_n10": {},
+     "cyclone26_n6": {},
+     "cyclone44_n4": {},
+     "cyclone6_n24": {},
+     "cyclone72_n2": {}
     },
-    "set": "cyclone"
+    "set": "cyclone-deck"
+   },
+   "WISE": {
+    "points": {
+     "wise_h3_11x10": {},
+     "wise_h3_12x12": {},
+     "wise_h3_8x7": {},
+     "wise_h3_9x9": {},
+     "wise_h5_6x6": {},
+     "wise_h5_7x7": {},
+     "wise_h5_8x8": {},
+     "wise_h5_9x9": {},
+     "wise_h7_5x5": {},
+     "wise_h7_6x6": {},
+     "wise_h7_7x6": {},
+     "wise_h7_8x7": {}
+    },
+    "set": "wise"
    }
   },
   "color3": {
@@ -162,90 +146,26 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor8_4d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor9_3d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone6_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone7_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone8_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone2_n6": {},
+     "cyclone4_n3": {},
+     "cyclone6_n3": {},
+     "cyclone8_n2": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid3x3": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid4x3": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid4x4": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise3x3": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise4x3": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise4x4": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_2x2": {},
+     "wise_h3_3x2": {},
+     "wise_h3_3x3": {},
+     "wise_h5_2x2": {},
+     "wise_h5_3x2": {},
+     "wise_h7_2x1": {},
+     "wise_h7_2x2": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "color5": {
@@ -296,131 +216,31 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor24_12d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor27_9d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone15_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone17_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone19_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone21_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone12_n3": {},
+     "cyclone20_n2": {},
+     "cyclone2_n15": {},
+     "cyclone4_n8": {},
+     "cyclone6_n6": {},
+     "cyclone8_n5": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid5x4": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid5x5": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid6x5": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid6x6": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x6": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x7": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise5x4": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise5x5": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise6x5": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise6x6": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x6": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x7": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_4x3": {},
+     "wise_h3_4x4": {},
+     "wise_h3_5x4": {},
+     "wise_h3_5x5": {},
+     "wise_h5_3x3": {},
+     "wise_h5_4x3": {},
+     "wise_h5_4x4": {},
+     "wise_h7_3x2": {},
+     "wise_h7_3x3": {},
+     "wise_h7_4x3": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "color7": {
@@ -478,157 +298,33 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor36_18d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor36_24d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor45_18d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor48_24d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone29_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone32_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone36_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone42_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone12_n6": {},
+     "cyclone22_n3": {},
+     "cyclone2_n28": {},
+     "cyclone38_n2": {},
+     "cyclone4_n15": {},
+     "cyclone6_n10": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid10x9": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x6": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x7": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x7": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x9": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise10x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x6": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x7": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x7": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_5x5": {},
+     "wise_h3_6x5": {},
+     "wise_h3_7x6": {},
+     "wise_h3_7x7": {},
+     "wise_h5_4x4": {},
+     "wise_h5_5x4": {},
+     "wise_h5_5x5": {},
+     "wise_h5_6x5": {},
+     "wise_h7_3x3": {},
+     "wise_h7_4x3": {},
+     "wise_h7_4x4": {},
+     "wise_h7_5x4": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "hgp58": {
@@ -707,179 +403,33 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor84_42d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor84_56d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone52_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone58_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone65_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone75_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone12_n9": {},
+     "cyclone20_n6": {},
+     "cyclone34_n4": {},
+     "cyclone4_n26": {},
+     "cyclone58_n2": {},
+     "cyclone6_n17": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid10x10": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid10x9": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid11x10": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid11x11": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid12x11": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid12x12": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid13x12": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x9": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise10x10": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise10x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise11x10": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise11x11": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise12x11": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise12x12": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise13x12": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_10x10": {},
+     "wise_h3_7x6": {},
+     "wise_h3_8x7": {},
+     "wise_h3_9x9": {},
+     "wise_h5_5x5": {},
+     "wise_h5_6x6": {},
+     "wise_h5_7x6": {},
+     "wise_h5_8x7": {},
+     "wise_h7_4x4": {},
+     "wise_h7_5x5": {},
+     "wise_h7_6x5": {},
+     "wise_h7_7x6": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "surface3": {
@@ -916,114 +466,28 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor12_8d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor16_8d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor22_11d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone10_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone12_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone13_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone9_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone10_n2": {},
+     "cyclone2_n9": {},
+     "cyclone4_n5": {},
+     "cyclone6_n4": {},
+     "cyclone8_n3": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid4x4": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid5x4": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid5x5": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid6x5": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise4x4": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise5x4": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise5x5": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise6x5": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_3x3": {},
+     "wise_h3_4x3": {},
+     "wise_h3_4x4": {},
+     "wise_h5_2x2": {},
+     "wise_h5_3x2": {},
+     "wise_h5_3x3": {},
+     "wise_h7_2x2": {},
+     "wise_h7_3x2": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "surface5": {
@@ -1081,157 +545,33 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor32_32d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor36_24d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor48_24d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor48_32d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone26_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone29_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone32_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone37_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone10_n6": {},
+     "cyclone16_n4": {},
+     "cyclone26_n2": {},
+     "cyclone2_n25": {},
+     "cyclone4_n13": {},
+     "cyclone6_n9": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid6x6": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x6": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid7x7": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x7": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x9": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise6x6": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x6": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise7x7": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x7": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_5x4": {},
+     "wise_h3_6x5": {},
+     "wise_h3_6x6": {},
+     "wise_h3_7x7": {},
+     "wise_h5_4x3": {},
+     "wise_h5_4x4": {},
+     "wise_h5_5x4": {},
+     "wise_h5_5x5": {},
+     "wise_h7_3x3": {},
+     "wise_h7_4x3": {},
+     "wise_h7_4x4": {},
+     "wise_h7_5x4": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   },
   "surface7": {
@@ -1310,193 +650,33 @@
     },
     "set": "c2lr-demonstrated"
    },
-   "Conveyor": {
-    "points": {
-     "conveyor64_64d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor72_48d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor96_48d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor96_64d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
-    },
-    "set": "standard"
-   },
    "Cyclone": {
     "points": {
-     "cyclone51_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone56_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone64_j": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "cyclone73_j": {
-      "skip": [
-       "R29"
-      ]
-     }
+     "cyclone10_n10": {},
+     "cyclone18_n6": {},
+     "cyclone30_n4": {},
+     "cyclone4_n25": {},
+     "cyclone50_n2": {},
+     "cyclone6_n17": {}
     },
-    "set": "cyclone"
-   },
-   "Grid": {
-    "points": {
-     "grid10x10": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid10x9": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid11x10": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid11x11": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid12x11": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid12x12": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid13x12": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid8x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x8": {
-      "skip": [
-       "R29"
-      ]
-     },
-     "grid9x9": {
-      "skip": [
-       "R29"
-      ]
-     }
-    },
-    "set": "qccdsim"
+    "set": "cyclone-deck"
    },
    "WISE": {
     "points": {
-     "wise10x10": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise10x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise11x10": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise11x11": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise12x11": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise12x12": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise13x12": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise8x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x8": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "wise9x9": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     }
+     "wise_h3_10x9": {},
+     "wise_h3_6x6": {},
+     "wise_h3_7x7": {},
+     "wise_h3_9x8": {},
+     "wise_h5_5x5": {},
+     "wise_h5_6x6": {},
+     "wise_h5_7x6": {},
+     "wise_h5_8x7": {},
+     "wise_h7_4x4": {},
+     "wise_h7_5x4": {},
+     "wise_h7_6x5": {},
+     "wise_h7_6x6": {}
     },
-    "set": "standard"
+    "set": "wise"
    }
   }
  },
@@ -1553,38 +733,36 @@
    ],
    "title": "C2LR swap-or-stay, as demonstrated"
   },
-  "cyclone": {
+  "cyclone-deck": {
    "ids": [
     "R0",
     "R1",
     "R2",
     "R3",
+    "R4",
+    "R4b",
+    "R5",
+    "R6",
     "R6b",
+    "R7",
     "R8",
-    "R24",
-    "R26",
-    "R27",
-    "R29"
-   ],
-   "title": "Cyclone's rules"
-  },
-  "qccdsim": {
-   "ids": [
-    "R0",
-    "R1",
-    "R2",
-    "R3",
-    "R6b",
-    "R8",
-    "R14",
+    "R11",
+    "R12",
+    "R18",
+    "R19",
+    "R20",
+    "R21",
     "R24",
     "R25",
     "R27",
-    "R29"
+    "Y1",
+    "Y2",
+    "Y3",
+    "Y4"
    ],
-   "title": "QCCDSim's rules"
+   "title": "Cyclone's rules, as the deck writes them"
   },
-  "standard": {
+  "wise": {
    "ids": [
     "R0",
     "R1",
@@ -1597,11 +775,8 @@
     "R6",
     "R6b",
     "R7",
-    "R7b",
     "R7c",
     "R8",
-    "R9",
-    "R10",
     "R11",
     "R12",
     "R13",
@@ -1616,9 +791,14 @@
     "R22",
     "R23",
     "R24",
-    "R25"
+    "R25",
+    "W1",
+    "W2",
+    "W4",
+    "W10",
+    "W11"
    ],
-   "title": "This website's machine"
+   "title": "WISE's rules"
   }
  }
 }

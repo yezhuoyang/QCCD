@@ -401,9 +401,19 @@ def build_view_model(
     # every other device the channel never exists and nothing here changes
     if is_c2lr(arch):
         checked_components += (C2LR_COMPONENT,)
+    # A page past `max_frames` animates, and so replays, only its first frames, so it is checked
+    # against the verifier's replay of those same frames.  Against the whole programme's heat it
+    # would print "self-check FAILED" over a replay that agrees.
+    checked = res
+    if truncated:
+        from ..verify.replay import replay
+        shown = TSIR(name=prog.name, arch_spec=prog.arch_spec)
+        for instr in prog.instructions[:len(frames)]:
+            shown.add(instr)
+        checked = replay(shown, arch, model, check_rules=False, keep_cycles=False)
     checksum = {
         ion: round(sum(v.get(c, 0.0) for c in checked_components), 6)
-        for ion, v in res.per_ion_quanta.items()
+        for ion, v in checked.per_ion_quanta.items()
     }
     exact = getattr(model, "corner_hops", 1) == 1
 

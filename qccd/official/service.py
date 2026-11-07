@@ -625,26 +625,20 @@ class OfficialService:
                 "evaluator_policy": self.evaluator_policy, "boards": boards, "rules": view,
                 "counts": {k: sum(b["counts"][k] for b in boards) for k in ("board", "all")}}
 
-    #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py)
-    GOAL3_FAMILIES = ("Grid", "WISE", "C2LR", "Cyclone", "Conveyor", "Other")
+    #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py); a design
+    #: of any other kind stays on its board as Other
+    GOAL3_FAMILIES = ("C2LR", "WISE", "Cyclone", "Other")
 
     @staticmethod
     def architecture_family(doc: dict) -> str:
-        """The Goal 3 family a device declares, read from its generator and its control block:
-        a lattice is C2LR under the swap-or-stay control, Grid when every electrode has its own
-        DAC ("direct" wiring) and WISE when its DACs are broadcast (the lattice template's own
-        wiring); one loop is Cyclone without docks and Conveyor with them.  A device drawn by
-        hand, or from any other generator, is Other."""
+        """The Goal 3 family a device declares, the transport deck's three: a lattice under the
+        swap-or-stay control is C2LR, and a chip or a ring whose drawing says so (`geometry.params.
+        family`) is WISE or Cyclone.  Anything else is Other."""
         geo = doc.get("geometry") or {}
-        gen, p = geo.get("generator"), geo.get("params") or {}
-        ctl = doc.get("control") or {}
-        if gen == "grid":
-            if ctl.get("model") == "c2lr":
-                return "C2LR"
-            return "Grid" if (ctl.get("wiring") or {}).get("scheme") == "direct" else "WISE"
-        if gen == "ring":
-            return "Conveyor" if int(p.get("verticals") or 0) > 0 else "Cyclone"
-        return "Other"
+        fam = (geo.get("params") or {}).get("family")
+        if geo.get("generator") == "grid" and (doc.get("control") or {}).get("model") == "c2lr":
+            return "C2LR"
+        return {"wise": "WISE", "cyclone": "Cyclone"}.get(fam, "Other")
 
     def _goal3_board(self, rules: str | None = None) -> dict:
         """Goal 3, code by code: each release's public eligible entries with the family their
